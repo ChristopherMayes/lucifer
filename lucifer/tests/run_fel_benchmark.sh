@@ -7,8 +7,9 @@
 # initial dumps both codes start from), Genesis over a single undulator segment importing
 # the same dumps, the same pair again time dependent (32 slices, Aramis-td.in), the Bmad
 # tracker over every configuration (each full line twice, once with the Bmad seam and
-# once with the transcribed Genesis interlude model), and the tiered comparison printing
-# the largest relative difference of each tier.
+# once with the transcribed Genesis interlude model), a thread-count-independence rerun
+# of the time-dependent single segment (8 threads must reproduce 1 thread bit for bit),
+# and the tiered comparison printing the largest relative difference of each tier.
 #
 #   ./run_fel_benchmark.sh
 #
@@ -176,6 +177,11 @@ make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
 
+# The documented tier numbers are single-thread runs; results must not depend on the
+# thread count, and the explicit gate for that follows the loop.
+
+export OMP_NUM_THREADS=1
+
 for tier in tier1 tier2 tier2g tier1s td1 td2 td2g; do
   echo "--- fel_track_test: $tier -------------------------------------------------------"
   if ! "$EXE" $tier.nml > fel-$tier.log 2>&1; then
@@ -186,6 +192,61 @@ for tier in tier1 tier2 tier2g tier1s td1 td2 td2g; do
   tail -4 fel-$tier.log
   echo
 done
+
+# Thread-count independence: the time-dependent single-segment configuration rerun with
+# eight threads must reproduce the one-thread run BIT FOR BIT -- each slice's arithmetic
+# is independent of which thread runs it, so any difference at all is a race. The diag
+# file is compared byte for byte; the dumps dataset by dataset, exactly (HDF5 object
+# headers carry timestamps, so whole-file cmp would false-alarm).
+
+echo "--- thread independence: td1 with OMP_NUM_THREADS=8 --------------------------"
+sed 's/out_root = "td1"/out_root = "td1t8"/' td1.nml > td1t8.nml
+if ! OMP_NUM_THREADS=8 "$EXE" td1t8.nml > fel-td1t8.log 2>&1; then
+  echo "fel_track_test td1t8 FAILED; log tail:" >&2
+  tail -20 fel-td1t8.log >&2
+  exit 1
+fi
+THREADS_OK=1
+if ! cmp -s td1.diag.txt td1t8.diag.txt; then
+  echo "FAIL: diag files differ between 1 and 8 threads" >&2
+  THREADS_OK=0
+fi
+if ! "$PYTHON" - <<'PYEOF'
+import sys
+import h5py
+import numpy as np
+
+def identical(fa, fb):
+    bad = []
+    with h5py.File(fa) as a, h5py.File(fb) as b:
+        names_a, names_b = [], []
+        a.visit(lambda n: names_a.append(n) if isinstance(a[n], h5py.Dataset) else None)
+        b.visit(lambda n: names_b.append(n) if isinstance(b[n], h5py.Dataset) else None)
+        if names_a != names_b:
+            return [f"dataset lists differ: {len(names_a)} vs {len(names_b)}"]
+        for n in names_a:
+            if not np.array_equal(a[n][...], b[n][...]):
+                bad.append(n)
+    return bad
+
+ok = True
+for fa, fb in (("td1-final.fld.h5", "td1t8-final.fld.h5"),
+               ("td1-final.par.h5", "td1t8-final.par.h5")):
+    bad = identical(fa, fb)
+    if bad:
+        ok = False
+        print(f"FAIL: {fa} vs {fb}: {len(bad)} datasets differ (first: {bad[0]})")
+sys.exit(0 if ok else 1)
+PYEOF
+then
+  THREADS_OK=0
+fi
+if [[ $THREADS_OK -ne 1 ]]; then
+  echo "FAIL: thread-count independence violated; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dataset-equal)"
+echo
 
 "$PYTHON" "$SCRIPT_DIR/compare_fel.py" "$WORK_DIR"
 STATUS=$?

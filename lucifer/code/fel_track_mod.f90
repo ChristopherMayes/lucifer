@@ -114,11 +114,14 @@ type fel_slip_struct
   real(rp) :: sample = 1        ! Slice spacing / radiation wavelength (Control::sample).
 end type
 
-! Cached kernel state for fel_field_step, mirroring FieldSolverFFT::init. Module state,
-! single threaded, same caveat as the wavefront plan cache.
+! Cached kernel for fel_field_step, mirroring FieldSolverFFT::init. Module state, built
+! ONCE, SERIALLY, by fel_field_kernel_init before any parallel slice loop, and read-only
+! ever after -- fel_field_step never rebuilds it, it only verifies the match and errors,
+! because a rebuild from inside a parallel loop would race. The per-call source
+! accumulator is a local of fel_field_step, one per invocation, so concurrent slices
+! deposit into their own.
 
 complex(rp), allocatable, private, save :: fel_k2(:,:)        ! -i (kx^2+ky^2)/(2 ks), FFT order.
-complex(rp), allocatable, private, save :: fel_crsource(:,:)  ! Source accumulator.
 integer, private, save :: fel_cache_ngrid = 0
 real(rp), private, save :: fel_cache_dgrid = 0, fel_cache_ks = 0
 
@@ -341,7 +344,8 @@ type (fel_slip_struct) slip
 logical err_flag
 
 real(rp) ks, phi0_new
-integer is, nslice
+integer is, nslice, ngrid_arr(3)
+logical any_err, err
 character(*), parameter :: r_name = 'fel_track_und_step'
 
 !
@@ -358,18 +362,36 @@ endif
 ks = twopi / wf%wavelength
 phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 
+! Everything cross-slice happens serially here, before and between the parallel loops:
+! the phi0 advance above, the kernel build below, and slippage in the caller. Inside the
+! loops each slice touches only its own particle arrays and its own field slice (the
+! beam-to-field mapping is a bijection), and each slice's arithmetic is independent of
+! which thread runs it, so results are bit-identical across thread counts -- the gate the
+! benchmark harness holds.
+
+ngrid_arr = wavefront_shape(wf)
+call fel_field_kernel_init (ngrid_arr(1), wf%dx, ks)
+
+!$OMP parallel do
 do is = 1, size(beam%slice)
   call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
   call fel_advance (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, phi0_new)
   call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
 enddo
+!$OMP end parallel do
 
 beam%phi0 = phi0_new
 
+any_err = .false.
+!$OMP parallel do private(err) reduction(.or.: any_err)
 do is = 1, size(beam%slice)
-  call fel_field_step (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, err_flag)
-  if (err_flag) return
+  call fel_field_step (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, err)
+  any_err = any_err .or. err
 enddo
+!$OMP end parallel do
+if (any_err) return
+
+err_flag = .false.
 
 end subroutine fel_track_und_step
 
@@ -403,9 +425,9 @@ logical err_flag
 
 type (fel_und_struct) und0
 real(rp) xks, xku, qquad, phi0_new, gamma0, p0_mc
-real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, gz_hat, q_hat
-integer is, ip
-logical err
+real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, q_hat
+integer is, ip, nslice, ngrid_arr(3)
+logical err, any_err
 
 !
 
@@ -418,7 +440,13 @@ xku = xks * 0.5_rp / gamma0 / gamma0
 qquad = qf * gamma0                               ! TrackBeam.cpp:26.
 q_hat = qquad / p0_mc
 phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, p0_mc)
+nslice = size(wf%Ex, 3)
 
+! The per-particle temporaries live at routine scope, so the parallel loop must make
+! them private explicitly; a missed one here is a race, which is what the harness's
+! thread-count-independence gate exists to catch.
+
+!$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope)
 do is = 1, size(beam%slice)
   sl => beam%slice(is)
 
@@ -447,19 +475,28 @@ do is = 1, size(beam%slice)
 
   call interlude_transverse_half (sl, q_hat, length/2)
 enddo
+!$OMP end parallel do
 
 beam%phi0 = phi0_new
 
 ! Field diffraction: Genesis's kernel, zero source (aw = 0 makes the coupling exactly
 ! zero, matching Genesis skipping the deposition when not in an undulator). The beam
 ! slice to field slice mapping is a bijection, so looping beam slices covers every field
-! slice exactly once.
+! slice exactly once. Kernel built serially first: a lattice can open with an interlude,
+! so this routine cannot rely on an undulator step having initialized it.
+
+ngrid_arr = wavefront_shape(wf)
+call fel_field_kernel_init (ngrid_arr(1), wf%dx, xks)
 
 und0%aw = 0
+any_err = .false.
+!$OMP parallel do private(err) reduction(.or.: any_err)
 do is = 1, size(beam%slice)
-  call fel_field_step (und0, beam, beam%slice(is), wf, fel_field_index(slip, is, size(wf%Ex, 3)), length, err)
-  if (err) return
+  call fel_field_step (und0, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), length, err)
+  any_err = any_err .or. err
 enddo
+!$OMP end parallel do
+if (any_err) return
 
 err_flag = .false.
 
@@ -831,8 +868,10 @@ logical err_flag
 
 real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p0_mc
 complex(rp) cpart
+complex(rp), allocatable :: crsource(:,:)    ! Per-call source accumulator: thread safe.
 integer ip, ix, iy, ngrid_arr(3), ngrid
 logical on_grid, err
+character(*), parameter :: r_name = 'fel_field_step'
 
 !
 
@@ -844,9 +883,17 @@ xks = twopi / wf%wavelength
 dgrid = wf%dx
 p0_mc = fel_p0_mc(beam)
 
-call fel_field_cache_check (ngrid, dgrid, xks)
+! The kernel is read-only here; a rebuild would race with concurrent slices. The caller
+! initializes it serially (fel_field_kernel_init); a mismatch is a caller bug.
 
-fel_crsource = 0
+if (ngrid /= fel_cache_ngrid .or. dgrid /= fel_cache_dgrid .or. xks /= fel_cache_ks) then
+  call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID. ' // &
+                                 'CALL fel_field_kernel_init FIRST (SERIALLY).')
+  return
+endif
+
+allocate (crsource(ngrid, ngrid))
+crsource = 0
 
 scl_w = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
 scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
@@ -863,10 +910,10 @@ if (scl_w /= 0) then
     part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * scl_w * sl%weight(ip) / gam
     cpart = cmplx(sin(theta), cos(theta), rp) * part
 
-    fel_crsource(ix,   iy)   = fel_crsource(ix,   iy)   + (wx * wy) * cpart
-    fel_crsource(ix+1, iy)   = fel_crsource(ix+1, iy)   + ((1-wx) * wy) * cpart
-    fel_crsource(ix,   iy+1) = fel_crsource(ix,   iy+1) + (wx * (1-wy)) * cpart
-    fel_crsource(ix+1, iy+1) = fel_crsource(ix+1, iy+1) + ((1-wx) * (1-wy)) * cpart
+    crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cpart
+    crsource(ix+1, iy)   = crsource(ix+1, iy)   + ((1-wx) * wy) * cpart
+    crsource(ix,   iy+1) = crsource(ix,   iy+1) + (wx * (1-wy)) * cpart
+    crsource(ix+1, iy+1) = crsource(ix+1, iy+1) + ((1-wx) * (1-wy)) * cpart
   enddo
 endif
 
@@ -876,7 +923,7 @@ endif
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
 wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * exp(fel_k2 * delz)
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
-wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * fel_crsource
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
 
 err_flag = .false.
 
@@ -886,14 +933,18 @@ end subroutine fel_field_step
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_field_cache_check (ngrid, dgrid, ks)
+! Subroutine fel_field_kernel_init (ngrid, dgrid, ks)
 !
-! Routine to (re)build the K2 kernel and source accumulator when the grid changes,
-! exactly as FieldSolverFFT::init builds them: dk = twopi/(ngrid*dgrid), integer offsets
-! from the grid center, fftshift index mapping, K2 = -i*(dx^2+dy^2)*dk^2/(2*ks).
+! Routine to (re)build the K2 kernel when the grid changes, exactly as
+! FieldSolverFFT::init builds it: dk = twopi/(ngrid*dgrid), integer offsets from the grid
+! center, fftshift index mapping, K2 = -i*(dx^2+dy^2)*dk^2/(2*ks).
+!
+! MUST be called serially -- fel_track_und_step and fel_track_interlude_genesis call it
+! before their parallel slice loops. fel_field_step only reads the kernel and errors on a
+! mismatch rather than rebuilding, so that nothing writes module state concurrently.
 !-
 
-subroutine fel_field_cache_check (ngrid, dgrid, ks)
+subroutine fel_field_kernel_init (ngrid, dgrid, ks)
 
 integer ngrid
 real(rp) dgrid, ks
@@ -904,8 +955,8 @@ integer ix, iy, iix, iiy
 
 if (ngrid == fel_cache_ngrid .and. dgrid == fel_cache_dgrid .and. ks == fel_cache_ks) return
 
-if (allocated(fel_k2)) deallocate(fel_k2, fel_crsource)
-allocate (fel_k2(ngrid, ngrid), fel_crsource(ngrid, ngrid))
+if (allocated(fel_k2)) deallocate(fel_k2)
+allocate (fel_k2(ngrid, ngrid))
 
 dk = twopi / (ngrid * dgrid)
 shift = -0.5_rp * (ngrid - 1)
@@ -924,7 +975,7 @@ fel_cache_ngrid = ngrid
 fel_cache_dgrid = dgrid
 fel_cache_ks = ks
 
-end subroutine fel_field_cache_check
+end subroutine fel_field_kernel_init
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

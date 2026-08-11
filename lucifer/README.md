@@ -8,10 +8,12 @@ single-slice steady state (deliverable 3) and multi-slice time dependence with s
 (deliverable 4).
 
 No space charge, no wakes, no harmonics, no shot-noise loading under weights, no slice
-migration, no OpenMP. Those are later deliverables. Per-particle weights, by contrast,
-are carried from day one (brief section 5): the packed arrays store one, every reduction
-uses it, and the split-weight check below tests the nonuniform case that no Genesis
-comparison can reach.
+migration. Those are later deliverables. Per-particle weights, by contrast, are carried
+from day one (brief section 5): the packed arrays store one, every reduction uses it,
+and the split-weight check below tests the nonuniform case that no Genesis comparison
+can reach. The FEL step is OpenMP-parallel over slices (deliverable 5), with
+thread-count independence -- bit-identical results at any thread count -- as a gated
+property, not an aspiration; see the parallelism section.
 
 ## Files
 
@@ -202,7 +204,59 @@ how the unguarded `+1` in Genesis (FINDINGS.md 7.1) was found. The elementwise p
 power comparison is what makes these loud: a one-slice misalignment puts finite power
 against near-vacuum slices, so the failure signature is orders of magnitude, not percent.
 
-## The coarse-step measurement (brief 8.3)
+The thread-independence gate bites too: reintroducing a shared source accumulator across
+slices (the exact state of the code before deliverable 5) puts the 1-thread and 8-thread
+runs apart by 7.0 relative in power -- while the mutated 1-thread run is IDENTICAL to the
+pristine one. That is the defining property of this bug class: invisible to every
+single-threaded check, including all seven Genesis tiers, and caught only by comparing
+across thread counts.
+
+## Parallelism (brief 4.3): OpenMP over slices, bit-identical by construction
+
+Slices are independent within an integration step: the only cross-slice operations are
+slippage (an index rotation, applied serially between steps) and the per-beam `phi0`
+advance (one scalar, computed before the loop). The slice loops of `fel_track_und_step`
+and `fel_track_interlude_genesis` are therefore plain `parallel do` regions, and the work
+of this deliverable was making the per-slice step safe to run concurrently:
+
+- The FFTW plan cache in `wavefront_mod` is **threadprivate**: each thread owns its plans
+  and its aligned work buffer (the change the cache's design note anticipated). Plan
+  *creation* stays inside a named critical section -- FFTW's planner is globally
+  serialized -- while plan *execution* touches only the calling thread's buffer.
+- The field-solve kernel (`fel_k2`) is built **once, serially**, by
+  `fel_field_kernel_init` before any parallel loop, and is read-only ever after;
+  `fel_field_step` errors on a mismatch rather than rebuilding, so nothing writes module
+  state inside a parallel region. The source accumulator is a local of `fel_field_step`,
+  one per invocation.
+- The Bmad-seam interlude loop stays **serial** at the slice level: `track1_bunch`
+  parallelizes over particles internally (`track1_bunch_hom`, on by default via
+  `global_com%mp_threading_is_safe`), so the threads are already busy inside each call
+  and an outer parallel loop would nest.
+
+Because each slice's arithmetic is identical regardless of which thread runs it -- no
+cross-slice reductions exist in the step loop -- the result is **bit-identical across
+thread counts**, and the harness gates that: the time-dependent single-segment
+configuration reruns with `OMP_NUM_THREADS=8` against the 1-thread run, requiring the
+diag file byte-equal and every dump dataset exactly equal. (Whole-file `cmp` of HDF5
+would false-alarm on object-header timestamps; the comparison is per dataset.)
+
+Measured scaling, full 6-FODO line, 32 slices x 2048 particles (Apple Silicon, debug
+build):
+
+| Threads | Wall time | Speedup | Efficiency |
+|---|---|---|---|
+| 1 | 129.6 s | 1.00 | -- |
+| 2 | 74.4 s | 1.74 | 87% |
+| 4 | 46.4 s | 2.79 | 70% |
+| 8 | 32.6 s | 3.97 | 50% |
+
+It saturates near 4x at 8 threads. The serial fraction per step is real: the per-slice
+diagnostics reduction (32 grids of 255^2 every record) and the slippage rotation run
+serially between the parallel regions, two parallel regions are spawned per integration
+step, and on this machine 8 threads includes efficiency cores. With 32 slices there is
+also little schedule slack -- 4 slices per thread at 8 threads. Production-size runs
+(hundreds to thousands of slices) have more parallel work per serial byte, so this is
+the floor of the scaling, not its ceiling.
 
 SIMPLEX's reference case integrates twelve undulator periods per step with the slice
 spacing matched so slippage is one slice per step -- an order of magnitude fewer steps

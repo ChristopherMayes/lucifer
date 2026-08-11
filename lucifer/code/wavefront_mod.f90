@@ -88,23 +88,22 @@ type wavefront_struct
                                              !   carried, not used, by this module.
 end type
 
-! Cached FFTW plan state for wavefront_fft2, private to the module.
+! Cached FFTW plan state for wavefront_fft2, private to the module, ONE CACHE PER THREAD.
 !
 ! Following bmad/space_charge/fft_interface_mod.f90: plans are created once per transverse
 ! grid size and reused. Two differences from that routine. First, the work buffer here is
 ! allocated by fftw_alloc_complex and transforms are executed on it rather than on the
 ! caller's array, so the plan always sees the alignment it was created with; FFTW's
 ! new-array execute rule makes executing a plan on a differently aligned array undefined.
-! Second, the buffer is module state, so wavefront_fft2 is not thread safe. Parallelising
-! over slices, which is a later deliverable, wants one cache per thread; that is a change
-! confined to these five variables and to wavefront_fft2.
+! Second, the cache is threadprivate: every OpenMP thread carries its own plans and work
+! buffer, so wavefront_fft2 is callable from a parallel loop over slices (deliverable 5,
+! the design anticipated when this cache was module-global and single threaded). The cost
+! is one planner run and one nx*ny buffer per thread, paid once per grid size.
 !
-! On the critical section inside wavefront_fft2: it guards FFTW's rule that plan creation is
-! not reentrant, and nothing else. It does not make the routine callable from a parallel
-! region, because wf_buf is written and read outside it. Both statements are repeated at the
-! section itself, since that is where the pragma would otherwise be read as a thread safety
-! claim. Note the per-thread version still needs the section, because the FFTW planner is
-! globally serialised regardless of how many buffers there are.
+! On the critical section inside wavefront_fft2: it guards FFTW's rule that plan creation
+! is not reentrant, and nothing else -- the FFTW planner is globally serialised no matter
+! how many per-thread buffers exist. Plan EXECUTION is thread safe by FFTW's own
+! guarantee, and each execution here touches only the calling thread's buffer.
 
 ! The transform itself is deliberately single threaded. The parallelisation axis for a
 ! wavefront is the slice index, not the transverse transform, so fftw_plan_with_nthreads is
@@ -116,6 +115,7 @@ type(C_PTR), private, save :: wf_plan_bwd = C_NULL_PTR
 type(C_PTR), private, save :: wf_buf_cptr = C_NULL_PTR
 complex(wf_rp), private, pointer, save :: wf_buf(:,:) => null()
 integer, private, save :: wf_cache_nx = 0, wf_cache_ny = 0
+!$OMP threadprivate(wf_plan_fwd, wf_plan_bwd, wf_buf_cptr, wf_buf, wf_cache_nx, wf_cache_ny)
 
 contains
 
@@ -947,13 +947,14 @@ end function wavefront_dft_1d
 ! transform multiplies the data by nx*ny. This matches FFTW and matches numpy.fft.fft2;
 ! numpy's ifft2 differs from wf_fft_backward$ only by that factor.
 !
-! Plans are created once per grid size and cached, following
+! Plans are created once per grid size and cached per thread, following
 ! bmad/space_charge/fft_interface_mod.f90. The transform is executed on an internal
 ! fftw_alloc_complex buffer rather than on dat, because a plan may only be executed on an
 ! array with the alignment it was created with. dat is copied in and out.
 !
-! Not thread safe: the plan cache and its work buffer are module state. See the note at
-! the cache declaration.
+! Thread safe: the plan cache and its work buffer are threadprivate, so concurrent calls
+! from a parallel loop over slices each use their own. First call on each thread (per
+! grid size) pays that thread's planner run. See the note at the cache declaration.
 !
 ! Input:
 !   dat(:,:)    -- complex(wf_rp): Data to transform.
@@ -987,11 +988,10 @@ endif
 nx = size(dat, 1)
 ny = size(dat, 2)
 
-! The critical section below guards one specific thing: FFTW's rule that plan creation is not
-! reentrant. It does NOT make this routine thread safe, and must not be read as doing so. The
-! work buffer wf_buf is module state, written and read outside the section, so two threads in
-! here at once corrupt each other's data whatever the planner does. See the note at the cache
-! declaration for what parallelising over slices actually requires.
+! The critical section below guards one specific thing: FFTW's rule that plan creation is
+! not reentrant -- the planner is globally serialised even though every thread builds into
+! its own threadprivate cache. Everything outside the section touches only threadprivate
+! state, which is what makes the routine as a whole thread safe.
 !
 ! Failures are recorded in wf_cache_nx and reported after the section rather than returned
 ! from inside it, since branching out of a critical construct is not allowed.
@@ -1068,8 +1068,11 @@ end subroutine wavefront_fft2
 !+
 ! Subroutine wavefront_fft_free ()
 !
-! Routine to destroy the cached FFTW plans and free the work buffer. Not needed for
-! correctness; useful for making a leak check clean.
+! Routine to destroy the cached FFTW plans and free the work buffer OF THE CALLING
+! THREAD. The cache is threadprivate, so a serial call after parallel work leaves the
+! worker threads' caches allocated until program end; freeing those would need a call
+! from inside a parallel region. Not needed for correctness; useful for making a
+! single-threaded leak check clean.
 !-
 
 subroutine wavefront_fft_free ()

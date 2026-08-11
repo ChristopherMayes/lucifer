@@ -327,6 +327,12 @@ do ie = 1, branch%n_ele_track
     ! wavefront_drift moves the field (every slice, rotation-invariant), and the common
     ! phase phi0 advances by the reference rate with Genesis's drift surrogate
     ! ks/(2*gamma0^2) as the reference wavenumber.
+    !
+    ! This slice loop is deliberately SERIAL: track1_bunch parallelizes over particles
+    ! internally (track1_bunch_hom, "$OMP parallel do if (thread_safe)", on by default
+    ! via global_com%mp_threading_is_safe), so the threads are already busy inside each
+    ! call, and parallelizing here as well would nest. The FEL step's parallelism over
+    ! slices lives in fel_track_mod.
 
     do is = 1, nslice
       call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch, err)
