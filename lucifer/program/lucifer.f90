@@ -51,7 +51,7 @@
 !     lat_file = "aramis.bmad"                 ! Bmad lattice.
 !     beam_file = "Aramis-initial.par.h5"      ! Genesis particle dump to start from.
 !     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
-!     out_root = "fel_td"                      ! Prefix for the three output files.
+!     out_root = "fel_td"                      ! Prefix for the output files.
 !     gamma0 = 11357.82                        ! Genesis's reference gamma.
 !     delz = 0.045                             ! Target integration step inside undulators [m].
 !     und_aw = 0.84853                         ! Undulator parameter (rms).
@@ -60,7 +60,33 @@
 !     und_helical = T
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
 !     split_weights = F                        ! Weight-invariance test mode; see below.
+!     write_initial = F                        ! Also dump the initial state (Genesis format).
 !   &end
+!
+! Alternatively, leave beam_file and field_file blank and the program generates its own
+! steady-state starting condition -- a quiet-start beam and a Gaussian seed field -- from
+! namelist parameters, making a self-contained single run with no Genesis anywhere (see
+! bsim/fel/examples). Generation parameters, with the &beam / &field names they mirror:
+!
+!     lambda0 = 1e-10          ! Radiation wavelength [m] (with dumps it comes from the file).
+!     gen_npart = 8192         ! Macroparticles; must be divisible by gen_nbins.
+!     gen_nbins = 8            ! Beamlet size of the quiet start.
+!     gen_current = 3000       ! Slice current [A].
+!     gen_delgam = 1.0         ! Gaussian rms energy spread, units of m_e c^2.
+!     gen_ex = 4e-7, gen_ey = 4e-7             ! Normalized emittances [m rad].
+!     gen_beta_x = 8.5, gen_alpha_x = -0.70    ! Twiss at the entrance.
+!     gen_beta_y = 17.4, gen_alpha_y = 1.40
+!     gen_power = 5e3          ! Seed power [W].
+!     gen_waist_size = 30e-6   ! Seed 1/e^2 intensity radius w0 [m], waist at the entrance.
+!     gen_ngrid = 255          ! Transverse grid points per side.
+!     gen_dgrid = 2e-4         ! Grid half width [m] (Genesis's dgrid).
+!     gen_seed = 12345         ! Random seed, so the example is reproducible.
+!
+! The quiet start loads gen_npart/gen_nbins base samples of the transverse and energy
+! distributions and replicates each at gen_nbins equally spaced ponderomotive phases, so
+! every bunching harmonic below gen_nbins is zero to roundoff and the FEL starts from the
+! seed, not from sampling noise. This is the minimal loader an example needs; shot-noise
+! loading with weights (deliverable 6) will supersede it for SASE.
 !
 ! interlude_model selects how the field-free elements are handled. "bmad" is the
 ! deliverable's architecture: track1_bunch for the particles, the exact theta mapping from
@@ -106,8 +132,15 @@ real(rp) :: gamma0 = 0, delz = 0, und_aw = 0, und_lambdau = 0
 real(rp) :: und_kx = 0.5_rp, und_ky = 0.5_rp
 logical :: und_helical = .true.
 logical :: split_weights = .false.
+logical :: write_initial = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
+
+real(rp) :: lambda0 = 0                  ! Generation parameters; see the header.
+real(rp) :: gen_current = 0, gen_delgam = 0, gen_ex = 0, gen_ey = 0
+real(rp) :: gen_beta_x = 0, gen_alpha_x = 0, gen_beta_y = 0, gen_alpha_y = 0
+real(rp) :: gen_power = 0, gen_waist_size = 0, gen_dgrid = 0
+integer :: gen_npart = 8192, gen_nbins = 8, gen_ngrid = 255, gen_seed = 12345
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
@@ -118,7 +151,11 @@ character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
 namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0, delz, &
-                           und_aw, und_lambdau, und_kx, und_ky, und_helical, interlude_model, split_weights
+                           und_aw, und_lambdau, und_kx, und_ky, und_helical, interlude_model, &
+                           split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
+                           gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
+                           gen_beta_y, gen_alpha_y, gen_power, gen_waist_size, gen_ngrid, &
+                           gen_dgrid, gen_seed
 
 ! Read parameters.
 
@@ -143,31 +180,49 @@ if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
   stop 1
 endif
 
-! Read the lattice and the shared starting state.
+! Read the lattice and the starting state: a pair of Genesis dumps (the shared-start
+! benchmark methodology), or a self-generated steady-state condition when both file
+! names are blank.
 
 call bmad_parser (lat_file, lat)
 branch => lat%branch(0)
 
-call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
-if (err) stop 1
+if ((beam_file == '') .neqv. (field_file == '')) then
+  print '(a)', 'fel_track_test: give both beam_file and field_file, or neither (to generate).'
+  stop 1
+endif
+
+if (beam_file == '') then
+  call generate_initial_state ()
+else
+  call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
+  if (err) stop 1
+  call wavefront_read_genesis4 (wf, field_file, err)
+  if (err) stop 1
+endif
+
 if (split_weights) call do_split_weights (fbeam)
 nslice = size(fbeam%slice)
-
-call wavefront_read_genesis4 (wf, field_file, err)
-if (err) stop 1
 ks = twopi / wf%wavelength
 
-! The beam and field dumps must describe the same time window: one field slice per beam
-! slice, at the same wavelength. Checked, never assumed (FINDINGS.md section 5).
+! The beam and field must describe the same time window: one field slice per beam slice,
+! at the same wavelength. Checked, never assumed (FINDINGS.md section 5).
 
 if (size(wf%Ex, 3) /= nslice) then
   print '(2(a, i0))', 'fel_track_test: beam has ', nslice, ' slices but the field has ', size(wf%Ex, 3)
   stop 1
 endif
 if (abs(wf%wavelength - fbeam%wavelength) > 1e-12_rp * fbeam%wavelength) then
-  print '(a, 2es20.12)', 'fel_track_test: beam and field dumps disagree on the wavelength: ', &
+  print '(a, 2es20.12)', 'fel_track_test: beam and field disagree on the wavelength: ', &
                          fbeam%wavelength, wf%wavelength
   stop 1
+endif
+
+if (write_initial) then
+  call wavefront_write_genesis4 (wf, trim(out_root) // '-initial.fld.h5', err, 'x')
+  if (err) stop 1
+  call fel_write_genesis4_beam (fbeam, trim(out_root) // '-initial.par.h5', err)
+  if (err) stop 1
 endif
 
 ! Time dependence follows from the dumps: more than one slice makes a time-dependent run
@@ -338,6 +393,117 @@ call wavefront_fft_free()
 
 !------------------------------------------------------------------------------
 contains
+
+!------------------------------------------------------------------------------
+!+
+! Generate the steady-state starting condition from the gen_* namelist parameters: one
+! quiet-start beam slice and a Gaussian seed field. See the program header for the
+! parameter list and the loading scheme. Minimal by design -- shot-noise loading with
+! weights is deliverable 6; this exists so an example is one command with no Genesis.
+!-
+
+subroutine generate_initial_state ()
+
+type (fel_slice_struct), pointer :: sl
+real(rp) p0_mc, ks_l, eg_x, eg_y, u, v, x, xp, y, yp, gam, p_mc, beta, pz, theta, theta0
+real(rp) dx_grid, w_part, e0, xg, yg
+integer ib, im, ip, mbase, ix, iy
+
+!
+
+if (gamma0 <= 1 .or. lambda0 <= 0) then
+  print '(a)', 'fel_track_test: generation needs gamma0 > 1 and lambda0 > 0.'
+  stop 1
+endif
+if (gen_npart < 1 .or. gen_nbins < 1 .or. mod(gen_npart, gen_nbins) /= 0) then
+  print '(a)', 'fel_track_test: gen_npart must be a positive multiple of gen_nbins.'
+  stop 1
+endif
+if (gen_current <= 0 .or. gen_ex <= 0 .or. gen_ey <= 0 .or. gen_beta_x <= 0 .or. gen_beta_y <= 0) then
+  print '(a)', 'fel_track_test: gen_current, gen_ex, gen_ey, gen_beta_x and gen_beta_y must be positive.'
+  stop 1
+endif
+if (gen_delgam < 0 .or. gen_power < 0 .or. gen_waist_size <= 0 .or. gen_ngrid < 3 .or. gen_dgrid <= 0) then
+  print '(a)', 'fel_track_test: check gen_delgam, gen_power, gen_waist_size, gen_ngrid, gen_dgrid.'
+  stop 1
+endif
+
+! The beam. Quiet start: mbase base samples of the transverse and energy distributions,
+! each replicated at gen_nbins equally spaced ponderomotive phases (theta0 spread on a
+! uniform grid within one beamlet spacing), so bunching harmonics below gen_nbins vanish
+! to roundoff. Weights and coordinates follow the conventions of fel_read_genesis4_beam:
+! z = beta*theta/ks with phi0 = 0, weight = I*slice_spacing/(c*npart).
+
+p0_mc = sqrt(gamma0**2 - 1)
+fbeam%p0c = p0_mc * m_electron
+fbeam%phi0 = 0
+fbeam%wavelength = lambda0
+fbeam%slice_spacing = lambda0
+fbeam%s0 = 0
+fbeam%nbins = gen_nbins
+fbeam%one4one = .false.
+
+if (allocated(fbeam%slice)) deallocate(fbeam%slice)
+allocate (fbeam%slice(1))
+sl => fbeam%slice(1)
+call fel_slice_reallocate (sl, gen_npart)
+sl%n = gen_npart
+
+call ran_seed_put (gen_seed)
+
+ks_l = twopi / lambda0
+mbase = gen_npart / gen_nbins
+eg_x = gen_ex / p0_mc                 ! Normalized emittance to geometric.
+eg_y = gen_ey / p0_mc
+w_part = gen_current * fbeam%slice_spacing / (c_light * gen_npart)
+
+ip = 0
+do ib = 1, mbase
+  call ran_gauss (u);  call ran_gauss (v)
+  x  = sqrt(eg_x * gen_beta_x) * u
+  xp = sqrt(eg_x / gen_beta_x) * (v - gen_alpha_x * u)
+  call ran_gauss (u);  call ran_gauss (v)
+  y  = sqrt(eg_y * gen_beta_y) * u
+  yp = sqrt(eg_y / gen_beta_y) * (v - gen_alpha_y * u)
+
+  call ran_gauss (u)
+  gam = gamma0 + gen_delgam * u
+  p_mc = sqrt(gam**2 - 1)
+  beta = p_mc / gam
+  pz = (p_mc - p0_mc) / p0_mc
+
+  theta0 = (ib - 0.5_rp) * twopi / (gen_nbins * mbase)
+
+  do im = 0, gen_nbins - 1
+    ip = ip + 1
+    theta = theta0 + im * twopi / gen_nbins
+    sl%x(ip) = x;   sl%px(ip) = xp
+    sl%y(ip) = y;   sl%py(ip) = yp
+    sl%pz(ip) = pz
+    sl%z(ip) = beta * theta / ks_l    ! theta = phi0 + ks*z/beta, phi0 = 0.
+    sl%weight(ip) = w_part
+  enddo
+enddo
+
+! The field: a Gaussian seed at its waist, E = E0*exp(-r^2/w0^2), intensity 1/e^2 radius
+! w0, integrating to gen_power: E0 = sqrt(4*Z0*P/(pi*w0^2)). Grid convention matches
+! Genesis's dgrid: ngrid points spanning +-dgrid, dx = 2*dgrid/(ngrid-1), center on axis.
+
+dx_grid = 2 * gen_dgrid / (gen_ngrid - 1)
+call wavefront_init (wf, gen_ngrid, gen_ngrid, 1, dx_grid, dx_grid, lambda0, lambda0, 'x', 0.0_rp)
+
+e0 = sqrt(4 * (mu_0_vac * c_light) * gen_power / (pi * gen_waist_size**2))
+do iy = 1, gen_ngrid
+  yg = (iy - 1) * dx_grid - gen_dgrid
+  do ix = 1, gen_ngrid
+    xg = (ix - 1) * dx_grid - gen_dgrid
+    wf%Ex(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / gen_waist_size**2)
+  enddo
+enddo
+
+end subroutine generate_initial_state
+
+!------------------------------------------------------------------------------
 
 subroutine do_split_weights (beam)
 

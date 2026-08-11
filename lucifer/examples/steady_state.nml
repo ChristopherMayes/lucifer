@@ -1,0 +1,35 @@
+! Steady-state FEL example: one command, no Genesis anywhere.
+!
+!   fel_track_test steady_state.nml
+!
+! The program generates its own starting condition -- a quiet-start beam slice and a
+! Gaussian seed field -- and tracks it through the 6-FODO helical undulator line of
+! aramis.bmad (the Benchmark1-SASE configuration: 5.8 GeV, 1 Angstrom, aw = 0.85 rms).
+! See the README here for what to expect and how to plot the gain curve.
+!
+! The Twiss values are the matched periodic solution of this FODO cell at this energy
+! (computed by Genesis's zmatch for the benchmark; any sensible near-matched values work).
+
+&fel_track_params
+  lat_file = "aramis.bmad"
+  out_root = "steady_state"
+
+  gamma0 = 11357.82            ! 5.8 GeV.
+  lambda0 = 1e-10              ! 1 Angstrom, resonant with aw and und_lambdau below.
+  delz = 0.045                 ! 3 undulator periods per integration step.
+
+  und_aw = 0.84853             ! rms undulator parameter.
+  und_lambdau = 0.015          ! 15 mm period.
+  und_kx = 0.5, und_ky = 0.5   ! Helical natural focusing, split equally.
+  und_helical = T
+
+  gen_current = 3000           ! 3 kA slice current.
+  gen_delgam = 1.0             ! One electron rest mass of rms energy spread.
+  gen_ex = 4e-7, gen_ey = 4e-7 ! 0.4 um normalized emittance.
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+  gen_power = 5e3              ! 5 kW seed...
+  gen_waist_size = 30e-6       ! ...with a 30 um waist at the entrance.
+  gen_ngrid = 255              ! Field grid: 255 x 255 points...
+  gen_dgrid = 2e-4             ! ...spanning +-0.2 mm.
+&end

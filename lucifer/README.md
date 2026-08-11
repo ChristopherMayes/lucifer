@@ -19,7 +19,8 @@ comparison can reach.
 |---|---|
 | `bsim/modules/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
-| `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps in undulator segments, seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage` |
+| `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps in undulator segments, seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
+| `bsim/fel/examples/` | Self-contained single-command example (no Genesis, no dump files): a seeded steady-state run of the benchmark line with its own README |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus three time-dependent tiers against Genesis, plus the split-weight invariance check |
 | `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
