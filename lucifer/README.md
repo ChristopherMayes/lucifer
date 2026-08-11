@@ -258,6 +258,24 @@ also little schedule slack -- 4 slices per thread at 8 threads. Production-size 
 (hundreds to thousands of slices) have more parallel work per serial byte, so this is
 the floor of the scaling, not its ceiling.
 
+### Head to head against Genesis at 12 workers
+
+Measured on a 48-slice run (slice count divisible by the worker count, so Genesis does
+not pad its window), full line, 2048 particles per slice, identical starting dumps,
+production/release builds on both sides, M3 Max with 12 performance cores; the answers
+agree at the documented seam level (4.0e-2) before any timing is quoted:
+
+| | Serial | 12 workers | Parallel speedup |
+|---|---|---|---|
+| Genesis 1.3 v4 (MPI) | 152.7 s | 35.8 s (12 ranks) | 4.3x |
+| `fel_track_test` (OpenMP) | 123.6 s | 19.4 s (12 threads) | 6.4x |
+
+The tracker is 1.2x faster serial and 1.85x faster at 12 workers. The parallel gap is
+the design brief's section 4.3 bet showing up in a measurement: Genesis's 12-rank run
+spent 68 s of system time on the per-step MPI slippage ring exchange and diagnostics
+gather, where this code's slippage is an index rotation in shared memory and costs
+nothing to communicate.
+
 SIMPLEX's reference case integrates twelve undulator periods per step with the slice
 spacing matched so slippage is one slice per step -- an order of magnitude fewer steps
 than one-step-per-period. Whether that economy transfers to this integrator is the
