@@ -24,13 +24,19 @@ run takes about a minute and prints three output files.
 sigma_x, sigma_y` (slice is always 1 here). Measured on this input: the seed enters at
 exactly 5 kW with bunching 4e-17 (the quiet start is exact), power grows exponentially
 with a 7.5 m power gain length and saturates at 1.6 GW around z = 38 m, and the beam
-sizes start on the matched values. To plot:
+sizes start on the matched values. To plot (needs matplotlib; the bmad-fel-validate
+environment has it):
 
-```python
-import numpy as np, matplotlib.pyplot as plt
-d = np.loadtxt("steady_state.diag.txt")
-plt.semilogy(d[:, 0], d[:, 2]); plt.xlabel("z [m]"); plt.ylabel("power [W]"); plt.show()
 ```
+python plot_fel.py steady_state.diag.txt        # writes steady_state.diag.png
+```
+
+Four panels against z: radiation power (log), bunching, energy change and rms spread
+(both in units of m_e c^2 on one axis), and the transverse rms sizes showing the FODO
+betatron oscillation. The same script reads time-dependent diag files -- give it one
+from the benchmark's td tiers and each thin gray line is a slice, with the bold line the
+total power or the slice average; the slippage echelon is directly visible in the
+per-slice power.
 
 `steady_state-final.fld.h5` and `steady_state-final.par.h5` are the end state in Genesis
 dump format (readable by `openPMD-beamphysics`'s `Wavefront.from_genesis4`, h5py, or
