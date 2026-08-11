@@ -71,7 +71,7 @@ one. The particles live in the packed arrays at all times except inside `track1_
 `coord_struct` never enters the FEL step loop.
 
 **Weights.** Every reduction is weighted: the source deposition scales per particle as
-`c*w_j/slicelength` (Genesis's `current/N` for uniform weights), bunching is
+`c*w_j/slice_spacing` (Genesis's `current/N` for uniform weights), bunching is
 `|sum w e^(i theta)|/sum w`, and `N_eff = (sum w)^2/sum w^2` is a per-slice diagnostic.
 The Genesis dump format carries no weights, so imports are uniform and a Genesis
 comparison can only exercise the uniform case; the split-weight check below covers the

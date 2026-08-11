@@ -149,7 +149,7 @@ und%helical = und_helical
 
 open (newunit = iu_diag, file = trim(out_root) // '.diag.txt', action = 'write')
 write (iu_diag, '(a)') '#         z                  power         on_axis_intensity        bunching        ' // &
-      'bunchingphase          energy          energyspread            xsize                 ysize'
+      'bunching_phase        mean_gamma          sigma_gamma           sigma_x               sigma_y'
 
 z_now = 0
 call write_diag_row()      ! Initial record, matching Genesis's diag before the first step.
@@ -196,7 +196,7 @@ do ie = 1, branch%n_ele_track
     if (err) stop 1
 
     fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &
-                    fel_phi0_rate(ks, ks * 0.5_rp / gamma0 / gamma0, fbeam%p0_mc)
+                    fel_phi0_rate(ks, ks * 0.5_rp / fel_gamma0(fbeam)**2, fel_p0_mc(fbeam))
 
     call wavefront_drift (wf, ele%value(l$), err)
     if (err) stop 1
@@ -271,8 +271,8 @@ subroutine write_diag_row ()
 call fel_field_diag (wf, power, on_axis)
 call fel_slice_diag (fbeam, sl, ks, bdiag)
 
-write (iu_diag, '(9es24.16)') z_now, power, on_axis, bdiag%bunching, bdiag%bunchingphase, &
-                              bdiag%energy, bdiag%energyspread, bdiag%xsize, bdiag%ysize
+write (iu_diag, '(9es24.16)') z_now, power, on_axis, bdiag%bunching, bdiag%bunching_phase, &
+                              bdiag%mean_gamma, bdiag%sigma_gamma, bdiag%sigma_x, bdiag%sigma_y
 
 end subroutine write_diag_row
 

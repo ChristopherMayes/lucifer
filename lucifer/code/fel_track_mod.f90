@@ -34,7 +34,7 @@
 ! rounding. The common reference phase phi0 advances once per step per beam
 ! (fel_phi0_rate in fel_beam_mod); the split keeps z small and bunch-scale.
 !
-! Weights: the source deposition scales per particle as c*w_j/slicelength where Genesis
+! Weights: the source deposition scales per particle as c*w_j/slice_spacing where Genesis
 ! has current/N -- identical algebra for uniform weights, and correct for nonuniform ones
 ! (each macroparticle radiates its own charge).
 !
@@ -44,7 +44,7 @@
 ! dfl = u*dgrid*eev/(ks*sqrt(Z0)) with E = dfl*sqrt(2*Z0)/dgrid), under which the
 ! coupling, source and power expressions come out simpler than the originals: the energy
 ! exchange coupling is fc*conj(E)/(sqrt(2)*m_electron), the source scale is
-! fc*Z0*sqrt(2)*c*delz*w_j/(4*dgrid^2*slicelength), and power is sum|E|^2*dgrid^2/(2*Z0).
+! fc*Z0*sqrt(2)*c*delz*w_j/(4*dgrid^2*slice_spacing), and power is sum|E|^2*dgrid^2/(2*Z0).
 ! Constants are Bmad's (m_electron equals Genesis's eev exactly; Z0 = mu_0_vac*c_light
 ! differs from Genesis's truncated 376.73 by 8e-7 relative, the accepted floor of the
 ! Genesis comparison).
@@ -215,7 +215,7 @@ integer is
 
 err_flag = .true.
 ks = twopi / wf%wavelength
-phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, beam%p0_mc)
+phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 
 do is = 1, size(beam%slice)
   call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
@@ -259,7 +259,7 @@ real(rp) qf, length
 logical err_flag
 
 type (fel_und_struct) und0
-real(rp) xks, xku, qquad, phi0_new
+real(rp) xks, xku, qquad, phi0_new, gamma0, p0_mc
 real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, gz_hat, q_hat
 integer is, ip
 logical err
@@ -268,11 +268,13 @@ logical err
 
 err_flag = .true.
 
+gamma0 = fel_gamma0(beam)                         ! Genesis's gammaref.
+p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
-xku = xks * 0.5_rp / beam%gamma0 / beam%gamma0
-qquad = qf * beam%gamma0                          ! TrackBeam.cpp:26.
-q_hat = qquad / beam%p0_mc
-phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, beam%p0_mc)
+xku = xks * 0.5_rp / gamma0 / gamma0
+qquad = qf * gamma0                               ! TrackBeam.cpp:26.
+q_hat = qquad / p0_mc
+phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, p0_mc)
 
 do is = 1, size(beam%slice)
   sl => beam%slice(is)
@@ -284,12 +286,12 @@ do is = 1, size(beam%slice)
   ! btpar = 1 + px_g^2 + py_g^2 (aw = 0), px_g = gamma*beta_x = px * p0_mc.
 
   do ip = 1, sl%n
-    gam = fel_gamma_of(beam%p0_mc, sl%pz(ip))
-    beta = fel_beta_of(beam%p0_mc, sl%pz(ip))
+    gam = fel_gamma_of(p0_mc, sl%pz(ip))
+    beta = fel_beta_of(p0_mc, sl%pz(ip))
     theta = beam%phi0 + xks * sl%z(ip) / beta
 
-    px_g = sl%px(ip) * beam%p0_mc
-    py_g = sl%py(ip) * beam%p0_mc
+    px_g = sl%px(ip) * p0_mc
+    py_g = sl%py(ip) * p0_mc
     btpar = 1 + px_g*px_g + py_g*py_g
     btpar0 = sqrt(1 - btpar / (gam * gam))
     slope = xks * (1 - 1/btpar0) + xku
@@ -365,17 +367,19 @@ type (fel_und_struct) und
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 real(rp) delz
-real(rp) betpar0, qx_hat, qy_hat, aw2, aw_p0_sq, gz_hat
+real(rp) betpar0, qx_hat, qy_hat, aw2, aw_p0_sq, gz_hat, gamma0, p0_mc
 integer ip
 
 !
 
+gamma0 = fel_gamma0(beam)
+p0_mc = fel_p0_mc(beam)
 aw2 = und%aw**2
-betpar0 = sqrt(1 - (1 + aw2)/beam%gamma0**2)
+betpar0 = sqrt(1 - (1 + aw2)/gamma0**2)
 
-qx_hat = und%kx * aw2 / beam%gamma0 / betpar0 / beam%p0_mc
-qy_hat = und%ky * aw2 / beam%gamma0 / betpar0 / beam%p0_mc
-aw_p0_sq = (und%aw / beam%p0_mc)**2
+qx_hat = und%kx * aw2 / gamma0 / betpar0 / p0_mc
+qy_hat = und%ky * aw2 / gamma0 / betpar0 / p0_mc
+aw_p0_sq = (und%aw / p0_mc)**2
 
 do ip = 1, sl%n
   gz_hat = sqrt((1 + sl%pz(ip))**2 - sl%px(ip)**2 - sl%py(ip)**2 - aw_p0_sq)
@@ -451,13 +455,14 @@ type (fel_slice_struct) sl
 type (wavefront_struct) wf
 real(rp) delz, phi0_new
 
-real(rp) xks, xku, aw, rtmp, awloc, btpar, gamma, theta, beta, wx, wy, px_g, py_g, p_mc
+real(rp) xks, xku, aw, rtmp, awloc, btpar, gamma, theta, beta, wx, wy, px_g, py_g, p_mc, p0_mc
 complex(rp) cpart, rpart
 integer ip, ix, iy
 logical on_grid
 
 !
 
+p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
 xku = und%ku
 aw = und%aw
@@ -469,13 +474,13 @@ aw = und%aw
 rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
 
 do ip = 1, sl%n
-  gamma = fel_gamma_of(beam%p0_mc, sl%pz(ip))
-  beta = fel_beta_of(beam%p0_mc, sl%pz(ip))
+  gamma = fel_gamma_of(p0_mc, sl%pz(ip))
+  beta = fel_beta_of(p0_mc, sl%pz(ip))
   theta = beam%phi0 + xks * sl%z(ip) / beta
 
   awloc = faw(und, sl%x(ip), sl%y(ip))
-  px_g = sl%px(ip) * beam%p0_mc
-  py_g = sl%py(ip) * beam%p0_mc
+  px_g = sl%px(ip) * p0_mc
+  py_g = sl%py(ip) * p0_mc
   btpar = 1 + px_g*px_g + py_g*py_g + aw*aw*awloc*awloc
 
   call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
@@ -495,7 +500,7 @@ do ip = 1, sl%n
   ! formed), z from tau = (phi0_new - theta)/ks with the updated beta.
 
   p_mc = sqrt(gamma**2 - 1)
-  sl%pz(ip) = (p_mc - beam%p0_mc) / beam%p0_mc
+  sl%pz(ip) = (p_mc - p0_mc) / p0_mc
   beta = p_mc / gamma
   sl%z(ip) = -beta * (phi0_new - theta) / xks
 enddo
@@ -654,10 +659,10 @@ end subroutine fel_grid_weights
 ! The source scale, weighted, in V/m. Genesis's internal-unit form
 ! (FieldSolverFFT.cpp:21-22) is scl = fc*vacimp*current*ks*delz/(4*eev*npart*dgrid^2)
 ! with current/npart per macroparticle; converting to V/m by the module-header relation
-! and generalizing current/npart to the per-particle c*w_j/slicelength (identical for
+! and generalizing current/npart to the per-particle c*w_j/slice_spacing (identical for
 ! uniform weights) gives
 !
-!   scl_w = fc * Z0 * sqrt(2) * c * delz / (4 * dgrid^2 * slicelength);  per particle scl_w*w_j
+!   scl_w = fc * Z0 * sqrt(2) * c * delz / (4 * dgrid^2 * slice_spacing);  per particle scl_w*w_j
 !
 ! in which the rest energy and the wavenumber have cancelled. Per particle
 ! part = sqrt(faw2(x,y))*scl_w*w_j/gamma, deposited as (sin theta + i cos theta)*part
@@ -674,7 +679,7 @@ type (wavefront_struct), target :: wf
 real(rp) delz
 logical err_flag
 
-real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam
+real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p0_mc
 complex(rp) cpart
 integer ip, ix, iy, ngrid_arr(3), ngrid
 logical on_grid, err
@@ -687,21 +692,22 @@ ngrid_arr = wavefront_shape(wf)
 ngrid = ngrid_arr(1)
 xks = twopi / wf%wavelength
 dgrid = wf%dx
+p0_mc = fel_p0_mc(beam)
 
 call fel_field_cache_check (ngrid, dgrid, xks)
 
 fel_crsource = 0
 
 scl_w = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
-scl_w = scl_w / (4 * dgrid * dgrid * beam%slicelength)
+scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
 
 if (scl_w /= 0) then
   do ip = 1, sl%n
     call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
     if (.not. on_grid) cycle
 
-    gam = fel_gamma_of(beam%p0_mc, sl%pz(ip))
-    beta = fel_beta_of(beam%p0_mc, sl%pz(ip))
+    gam = fel_gamma_of(p0_mc, sl%pz(ip))
+    beta = fel_beta_of(p0_mc, sl%pz(ip))
     theta = beam%phi0 + xks * sl%z(ip) / beta          ! harm = 1: theta not scaled.
 
     part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * scl_w * sl%weight(ip) / gam

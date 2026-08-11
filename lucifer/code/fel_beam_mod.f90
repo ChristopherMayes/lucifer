@@ -15,9 +15,13 @@
 !   weight    macroparticle charge [C], mapping to coord_struct%charge
 !
 ! so conversion at the seam is a plain copy. (z, pz) is the conjugate pair of Bmad's
-! s-based Hamiltonian. The normalization reference p0 is carried on the beam (p0c in eV
-! and p0_mc = p0c/m_e c^2 = gamma0*beta0 dimensionless) and asserted against each
-! element's p0c at conversion time.
+! s-based Hamiltonian. The normalization reference is stored once, as p0c [eV] -- Bmad's
+! own convention, asserted against each element's p0c at conversion time. The equivalent
+! quantities Genesis works in are derived, never stored: p0/(m_e c) from fel_p0_mc and
+! the reference gamma from fel_gamma0. (Genesis carries its reference gamma, gammaref, as
+! an independent run parameter; importing a dump defines p0c from it, so deriving gamma
+! back from p0c reproduces gammaref to ~1 ulp, far below the 8e-7 constants floor of any
+! Genesis comparison.)
 !
 ! The ponderomotive phase is derived, not stored. Genesis's per-particle theta is the sum
 ! of a common reference advance (the undulator's ku term, and the drift slippage term
@@ -34,7 +38,7 @@
 ! wavelengths of bunch; that is a device-struct choice the brief already anticipates.)
 !
 ! Weights are carried from day one (brief section 5): every reduction here and in
-! fel_track_mod is weighted, slice current is derived as I = c * sum(w) / slicelength, and
+! fel_track_mod is weighted, slice current is derived as I = c * sum(w) / slice_spacing, and
 ! N_eff = (sum w)^2 / sum w^2 is a per-slice diagnostic. A uniform-weight beam reproduces
 ! Genesis, which the benchmark gates.
 !
@@ -86,35 +90,38 @@ end type
 
 type fel_beam_struct
   type (fel_slice_struct), allocatable :: slice(:)
-  real(rp) :: p0c = 0              ! Reference momentum times c [eV].
-  real(rp) :: p0_mc = 0            ! p0/(m_e c) = gamma0*beta0, dimensionless.
-  real(rp) :: gamma0 = 0           ! Genesis's reference gamma (of the run, not of p0c).
+  real(rp) :: p0c = 0              ! Reference momentum times c [eV]. The single stored
+                                   !   reference; derive p0/(m_e c) and the reference gamma
+                                   !   with fel_p0_mc and fel_gamma0.
   real(rp) :: phi0 = 0             ! Common ponderomotive reference phase [rad].
-  real(rp) :: reflength = 0        ! Radiation wavelength [m]. 'slicelength' in the dump.
-  real(rp) :: slicelength = 0      ! Slice spacing [m]. 'slicespacing' in the dump.
-  real(rp) :: s0 = 0               ! Start of the time window [m]. 'refposition' in the dump.
-  integer :: nbins = 0             ! Beamlet size at generation. Carried, not used here.
-  logical :: one4one = .false.
+  real(rp) :: wavelength = 0       ! Radiation wavelength [m]. 'slicelength' in a Genesis dump.
+  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. 'slicespacing' in a Genesis dump.
+  real(rp) :: s0 = 0               ! Start of the time window [m]. 'refposition' in a Genesis dump.
+  integer :: nbins = 0             ! Beamlet size at generation. Carried for dump round trips.
+  logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
 end type
 
 !+
 ! Struct fel_slice_diag_struct
 !
-! Per-slice beam diagnostics at one output position. Genesis's DiagBeam::calc definitions,
-! weighted: plain weighted averages, bunching b = |sum w exp(i theta)| / sum w. N_eff per
-! the brief's 6.2.
+! Per-slice beam diagnostics at one output position: the quantities of Genesis's
+! DiagBeam::calc, weighted, under Bmad-style names and normalizations. mean_/sigma_
+! follow the convention of wavefront_transverse_moments; gamma is the Lorentz factor,
+! named as such because Bmad's 'energy' is the total energy in eV, which none of these
+! are. The Genesis output dataset each one compares against is noted.
 !-
 
 type fel_slice_diag_struct
-  real(rp) :: energy = 0           ! <gamma>
-  real(rp) :: energyspread = 0     ! sqrt(|<gamma^2> - <gamma>^2|)
-  real(rp) :: bunching = 0         ! |b(1)|
-  real(rp) :: bunchingphase = 0    ! arg b(1)
-  real(rp) :: xposition = 0, yposition = 0
-  real(rp) :: xsize = 0, ysize = 0
-  real(rp) :: pxposition = 0, pyposition = 0   ! <gamma beta_x>, <gamma beta_y> (Genesis px)
-  real(rp) :: n_eff = 0            ! (sum w)^2 / sum w^2
-  real(rp) :: current = 0          ! c * sum(w) / slicelength [A]
+  real(rp) :: mean_gamma = 0       ! Weighted <gamma>. Genesis 'energy'.
+  real(rp) :: sigma_gamma = 0      ! sqrt(|<gamma^2> - <gamma>^2|). Genesis 'energyspread'.
+  real(rp) :: bunching = 0         ! |sum w e^{i theta}| / sum w. Genesis 'bunching'.
+  real(rp) :: bunching_phase = 0   ! arg(sum w e^{i theta}). Genesis 'bunchingphase'.
+  real(rp) :: mean_x = 0, mean_y = 0    ! Weighted centroid [m]. Genesis 'xposition', 'yposition'.
+  real(rp) :: sigma_x = 0, sigma_y = 0  ! Weighted rms size [m]. Genesis 'xsize', 'ysize'.
+  real(rp) :: mean_px = 0, mean_py = 0  ! Weighted <P_x/p0>, <P_y/p0>, Bmad normalization.
+                                        !   Genesis 'pxposition' is this times p0/(m_e c).
+  real(rp) :: n_eff = 0            ! (sum w)^2 / sum w^2 (brief 6.2; no Genesis counterpart).
+  real(rp) :: current = 0          ! c * sum(w) / slice_spacing [A]. Genesis 'current'.
 end type
 
 contains
@@ -149,6 +156,32 @@ end function
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! The derived reference quantities, from the beam's one stored reference p0c:
+!
+!   fel_p0_mc   p0/(m_e c) = p0c/m_electron, the dimensionless reference momentum
+!               (Bmad px times this is Genesis px)
+!   fel_gamma0  gamma of the reference momentum, Genesis's gammaref
+!
+! Hoist these out of particle loops; they are one division or one sqrt, but there is no
+! reason to pay it per particle.
+!-
+
+elemental function fel_p0_mc (beam) result (p0_mc)
+type (fel_beam_struct), intent(in) :: beam
+real(rp) p0_mc
+p0_mc = beam%p0c / m_electron
+end function
+
+elemental function fel_gamma0 (beam) result (gamma0)
+type (fel_beam_struct), intent(in) :: beam
+real(rp) gamma0
+gamma0 = sqrt((beam%p0c / m_electron)**2 + 1)
+end function
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_theta (beam, sl, ip, ks) result (theta)
 !
 ! The ponderomotive phase of particle ip: theta = phi0 - ks*tau, tau = -z/beta.
@@ -164,7 +197,7 @@ real(rp) ks, theta, beta
 
 !
 
-beta = fel_beta_of(beam%p0_mc, sl%pz(ip))
+beta = fel_beta_of(fel_p0_mc(beam), sl%pz(ip))
 theta = beam%phi0 + ks * sl%z(ip) / beta      ! phi0 - ks*(-z/beta)
 
 end function fel_theta
@@ -183,7 +216,7 @@ end function fel_theta
 !   px_bmad = px_genesis / p0_mc                    (p0_mc = sqrt(gamma0^2 - 1))
 !   pz      = (sqrt(gamma^2 - 1) - p0_mc) / p0_mc
 !   tau     = -theta / ks,   z = -beta * tau        (phi0 starts at zero)
-!   weight  = I * slicelength / (c * n)  [C]        (uniform; the dump carries no weights)
+!   weight  = I * slice_spacing / (c * n)  [C]      (uniform; the dump carries no weights)
 !
 ! ks comes from the dump's own wavelength. p0c is set from gamma0 and Bmad's electron
 ! mass, which is what makes the Bmad-side tracking see exactly this normalization.
@@ -203,7 +236,7 @@ type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 integer(hid_t) f_id, g_id
 integer is, ip, n_slice, np, ivec(1), h5_err
-real(rp) rvec(1), gamma0, ks, current, w_uniform, gam, p_mc, beta, tau
+real(rp) rvec(1), gamma0, ks, current, w_uniform, gam, p_mc, beta, tau, p0_mc
 real(rp), allocatable :: work_gamma(:), work_theta(:)
 logical err_flag, err
 character(*) file_name
@@ -236,19 +269,20 @@ call hdf5_read_dataset_int (f_id, 'one4one', ivec, err, 'one4one');  if (err) re
 beam%one4one = (ivec(1) /= 0)
 
 call hdf5_read_dataset_real (f_id, 'slicelength', rvec, err, 'slicelength');  if (err) return
-beam%reflength = rvec(1)
+beam%wavelength = rvec(1)
 
 call hdf5_read_dataset_real (f_id, 'slicespacing', rvec, err, 'slicespacing');  if (err) return
-beam%slicelength = rvec(1)
+beam%slice_spacing = rvec(1)
 
 call hdf5_read_dataset_real (f_id, 'refposition', rvec, err, 'refposition');  if (err) return
 beam%s0 = rvec(1)
 
-beam%gamma0 = gamma0
-beam%p0_mc = sqrt(gamma0**2 - 1)
-beam%p0c = beam%p0_mc * mass_of(electron$)
+! p0c is the one stored reference: the momentum whose gamma is Genesis's gammaref.
+
+p0_mc = sqrt(gamma0**2 - 1)
+beam%p0c = p0_mc * m_electron
 beam%phi0 = 0
-ks = twopi / beam%reflength
+ks = twopi / beam%wavelength
 
 if (allocated(beam%slice)) deallocate(beam%slice)
 allocate (beam%slice(n_slice))
@@ -281,16 +315,16 @@ do is = 1, n_slice
   ! Convert in place: px, py from gamma*beta to P/p0; (theta, gamma) to (z, pz).
 
   w_uniform = 0
-  if (np > 0) w_uniform = current * beam%slicelength / (c_light * np)
+  if (np > 0) w_uniform = current * beam%slice_spacing / (c_light * np)
 
   do ip = 1, np
     gam = work_gamma(ip)
     p_mc = sqrt(gam**2 - 1)
     beta = p_mc / gam
 
-    sl%px(ip) = sl%px(ip) / beam%p0_mc
-    sl%py(ip) = sl%py(ip) / beam%p0_mc
-    sl%pz(ip) = (p_mc - beam%p0_mc) / beam%p0_mc
+    sl%px(ip) = sl%px(ip) / p0_mc
+    sl%py(ip) = sl%py(ip) / p0_mc
+    sl%pz(ip) = (p_mc - p0_mc) / p0_mc
 
     tau = -work_theta(ip) / ks              ! theta = phi0 - ks*tau with phi0 = 0.
     sl%z(ip) = -beta * tau
@@ -328,7 +362,7 @@ type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 integer(hid_t) f_id, g_id
 integer is, ip, h5_err, one4one_int
-real(rp) ks, gam, beta, p_mc
+real(rp) ks, gam, beta, p_mc, p0_mc
 real(rp), allocatable :: work(:)
 logical err_flag, err
 character(*) file_name
@@ -344,16 +378,17 @@ if (.not. allocated(beam%slice)) then
   return
 endif
 
-ks = twopi / beam%reflength
+ks = twopi / beam%wavelength
+p0_mc = fel_p0_mc(beam)
 
 call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
 
 one4one_int = 0
 if (beam%one4one) one4one_int = 1
 
-call hdf5_write_dataset_real (f_id, 'slicelength',  [beam%reflength],   err);  if (err) return
-call hdf5_write_dataset_real (f_id, 'slicespacing', [beam%slicelength], err);  if (err) return
-call hdf5_write_dataset_real (f_id, 'refposition',  [beam%s0],          err);  if (err) return
+call hdf5_write_dataset_real (f_id, 'slicelength',  [beam%wavelength],    err);  if (err) return
+call hdf5_write_dataset_real (f_id, 'slicespacing', [beam%slice_spacing], err);  if (err) return
+call hdf5_write_dataset_real (f_id, 'refposition',  [beam%s0],            err);  if (err) return
 call hdf5_write_dataset_int  (f_id, 'beamletsize',  [beam%nbins],       err);  if (err) return
 call hdf5_write_dataset_int  (f_id, 'slicecount',   [size(beam%slice)], err);  if (err) return
 call hdf5_write_dataset_int  (f_id, 'one4one',      [one4one_int],      err);  if (err) return
@@ -367,27 +402,27 @@ do is = 1, size(beam%slice)
     return
   endif
 
-  call hdf5_write_dataset_real (g_id, 'current', [c_light * sum(sl%weight(1:sl%n)) / beam%slicelength], err)
+  call hdf5_write_dataset_real (g_id, 'current', [c_light * sum(sl%weight(1:sl%n)) / beam%slice_spacing], err)
   if (err) return
 
   allocate (work(sl%n))
 
   do ip = 1, sl%n                                             ! gamma
-    work(ip) = fel_gamma_of(beam%p0_mc, sl%pz(ip))
+    work(ip) = fel_gamma_of(p0_mc, sl%pz(ip))
   enddo
   call hdf5_write_dataset_real (g_id, 'gamma', work, err);  if (err) return
 
   do ip = 1, sl%n                                             ! theta = phi0 + ks*z/beta
-    work(ip) = beam%phi0 + ks * sl%z(ip) / fel_beta_of(beam%p0_mc, sl%pz(ip))
+    work(ip) = beam%phi0 + ks * sl%z(ip) / fel_beta_of(p0_mc, sl%pz(ip))
   enddo
   call hdf5_write_dataset_real (g_id, 'theta', work, err);  if (err) return
 
   call hdf5_write_dataset_real (g_id, 'x', sl%x(1:sl%n), err);  if (err) return
   call hdf5_write_dataset_real (g_id, 'y', sl%y(1:sl%n), err);  if (err) return
 
-  work = sl%px(1:sl%n) * beam%p0_mc                           ! back to gamma*beta_x
+  work = sl%px(1:sl%n) * p0_mc                                ! back to gamma*beta_x
   call hdf5_write_dataset_real (g_id, 'px', work, err);  if (err) return
-  work = sl%py(1:sl%n) * beam%p0_mc
+  work = sl%py(1:sl%n) * p0_mc
   call hdf5_write_dataset_real (g_id, 'py', work, err);  if (err) return
 
   deallocate (work)
@@ -575,8 +610,8 @@ end function fel_phi0_rate
 ! Routine to compute the per-slice beam diagnostics, weighted. Genesis's DiagBeam::calc
 ! (src/Core/Diagnostic.cpp:515-575) definitions with 1/N generalized to w_j/sum(w);
 ! uniform weights reproduce Genesis exactly up to the regrouped arithmetic. Positions and
-! sizes are of x, y directly; pxposition is reported in Genesis's units (gamma*beta_x) for
-! comparability. Adds N_eff and the derived current.
+! sizes are of x, y directly; mean_px, mean_py are in Bmad's normalization P/p0 (multiply
+! by fel_p0_mc for Genesis's gamma*beta). Adds N_eff and the derived current.
 !-
 
 subroutine fel_slice_diag (beam, sl, ks, diag)
@@ -585,17 +620,18 @@ type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (fel_slice_diag_struct) diag
 real(rp) ks
-real(rp) g1, g2, x1, x2, y1, y2, px1, py1, br, bi, wsum, w2sum, w, gam, theta
+real(rp) g1, g2, x1, x2, y1, y2, px1, py1, br, bi, wsum, w2sum, w, gam, theta, p0_mc
 integer ip
 
 !
 
 g1 = 0; g2 = 0; x1 = 0; x2 = 0; y1 = 0; y2 = 0; px1 = 0; py1 = 0
 br = 0; bi = 0; wsum = 0; w2sum = 0
+p0_mc = fel_p0_mc(beam)
 
 do ip = 1, sl%n
   w = sl%weight(ip)
-  gam = fel_gamma_of(beam%p0_mc, sl%pz(ip))
+  gam = fel_gamma_of(p0_mc, sl%pz(ip))
   theta = fel_theta(beam, sl, ip, ks)
 
   wsum = wsum + w
@@ -621,18 +657,18 @@ g1 = g1/wsum;  g2 = g2/wsum
 x1 = x1/wsum;  x2 = x2/wsum
 y1 = y1/wsum;  y2 = y2/wsum
 
-diag%energy = g1
-diag%energyspread = sqrt(abs(g2 - g1*g1))
-diag%xposition = x1
-diag%xsize = sqrt(abs(x2 - x1*x1))
-diag%yposition = y1
-diag%ysize = sqrt(abs(y2 - y1*y1))
-diag%pxposition = px1/wsum * beam%p0_mc
-diag%pyposition = py1/wsum * beam%p0_mc
+diag%mean_gamma = g1
+diag%sigma_gamma = sqrt(abs(g2 - g1*g1))
+diag%mean_x = x1
+diag%sigma_x = sqrt(abs(x2 - x1*x1))
+diag%mean_y = y1
+diag%sigma_y = sqrt(abs(y2 - y1*y1))
+diag%mean_px = px1/wsum
+diag%mean_py = py1/wsum
 diag%bunching = sqrt((br/wsum)**2 + (bi/wsum)**2)
-diag%bunchingphase = atan2(bi/wsum, br/wsum)
+diag%bunching_phase = atan2(bi/wsum, br/wsum)
 diag%n_eff = wsum*wsum / w2sum
-diag%current = c_light * wsum / beam%slicelength
+diag%current = c_light * wsum / beam%slice_spacing
 
 end subroutine fel_slice_diag
 
