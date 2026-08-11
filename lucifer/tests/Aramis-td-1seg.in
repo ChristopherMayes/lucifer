@@ -1,0 +1,38 @@
+# Time-dependent tier-1 reference: one undulator segment, no interludes, importing the
+# SAME initial beam and field dumps that the full time-dependent run (Aramis-td.in)
+# wrote. Isolates the FEL core plus slippage from every transport and seam question.
+#
+# No &time block: importing a multi-slice beam dump reconstructs the time window from the
+# file (readBeamHDF5.cpp:68-77, sample rate and window from slicespacing and slicecount,
+# time dependence on by default), so the window is guaranteed identical to the dump's.
+#
+# Run Aramis-td.in first; it produces AramisTD-initial.par.h5 and AramisTD-initial.fld.h5.
+
+&setup
+rootname=AramisTD1seg
+lattice=Aramis-1seg.lat
+beamline=SEG1
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&importfield
+file = AramisTD-initial.fld.h5
+&end
+
+&importbeam
+file = AramisTD-initial.par.h5
+&end
+
+&track
+fft_fieldsolver = true
+&end
+
+&write
+field = AramisTD1seg-final
+beam = AramisTD1seg-final
+&end

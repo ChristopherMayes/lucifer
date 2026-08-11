@@ -1,43 +1,47 @@
-# Steady-state FEL tracker, validated against Genesis 1.3 Version 4
+# FEL tracker, validated against Genesis 1.3 Version 4
 
-Deliverable 3 of the FEL port: a single-slice steady-state FEL tracker whose physics is
-transcribed from Genesis 1.3 Version 4 (GPL permits transcription), embedded in Bmad's
-lattice machinery by the seam of the design brief's section 4.1, and validated against
-Genesis over its `benchmark/Benchmark1-SASE` configuration from bitwise-identical starting
-states.
+Deliverables 3 and 4 of the FEL port: an FEL tracker whose physics is transcribed from
+Genesis 1.3 Version 4 (GPL permits transcription), embedded in Bmad's lattice machinery by
+the seam of the design brief's section 4.1, and validated against Genesis over its
+`benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states --
+single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
+(deliverable 4).
 
-No time dependence, no slippage, no space charge, no wakes, no harmonics, no OpenMP.
-Those are later deliverables. Per-particle weights, by contrast, are carried from day one
-(brief section 5): the packed arrays store one, every reduction uses it, and the
-split-weight check below tests the nonuniform case that no Genesis comparison can reach.
+No space charge, no wakes, no harmonics, no shot-noise loading under weights, no slice
+migration, no OpenMP. Those are later deliverables. Per-particle weights, by contrast,
+are carried from day one (brief section 5): the packed arrays store one, every reduction
+uses it, and the split-weight check below tests the nonuniform case that no Genesis
+comparison can reach.
 
 ## Files
 
 | Path | Contents |
 |---|---|
 | `bsim/modules/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
-| `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; plus the transcribed Genesis interlude model |
-| `bsim/fel/fel_ss_test.f90` | The tracker: walks a Bmad lattice, FEL steps in undulator segments, seam everywhere else |
+| `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
+| `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps in undulator segments, seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage` |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
-| `bsim/fel/tests/compare_fel.py` | Comparison: three tiers against Genesis plus the split-weight invariance check |
-| `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE, modified as documented in the deck header |
+| `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus three time-dependent tiers against Genesis, plus the split-weight invariance check |
+| `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
 | `bsim/fel/tests/Aramis-1seg.in`, `Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
+| `bsim/fel/tests/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
 | `bsim/fel/tests/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices |
+| `bsim/fel/tests/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `delz` |
 
 ## Running
 
 ```
 cd <bmad-ecosystem>
-BUILD_PRODUCTION=N ./util/conda_compile                      # builds fel_ss_test
+BUILD_PRODUCTION=N ./util/conda_compile                      # builds fel_track_test
 ./bsim/fel/tests/run_fel_benchmark.sh [--genesis <path to genesis4>]
 ```
 
-The harness runs Genesis twice (full line and single segment), the Bmad tracker four
-times, and prints the largest relative difference of each check. It fails loudly if the
-genesis4 binary is missing; there is no comparison without it, so there is nothing to skip
-to. Genesis must be built with FFTW, since the benchmark runs with `fft_fieldsolver=true`
-(the Bmad tracker transcribes the FFT solver; Genesis's default ADI solver is out of
-scope).
+The harness runs Genesis four times (full line and single segment, steady state and time
+dependent), the Bmad tracker seven times, and prints the largest relative difference of
+each check. It fails loudly if the genesis4 binary is missing; there is no comparison
+without it, so there is nothing to skip to. Genesis must be built with FFTW, since the
+benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver;
+Genesis's default ADI solver is out of scope).
 
 ## Architecture
 
@@ -88,16 +92,36 @@ validation banked, the code moved to Bmad constants by decision; the 8.3e-7 rela
 impedance difference is now the floor of every Genesis comparison, and the gates below
 are sized to it.
 
+**Time dependence and slippage.** A multi-slice starting dump makes a time-dependent run,
+a single-slice dump the steady state -- no separate switch, the same rule as Genesis,
+whose imports carry the time window. Beam slice `is` couples to field slice
+`1 + mod(is-1+first, nslice)`: the field record is a circular buffer over the wavefront's
+slice index, rotated by slippage rather than moved (Genesis's `Field::first`;
+`BeamSolver.cpp:66`, `FieldSolverFFT.cpp:54`). Slippage accumulates at
+`dz*(1+aw^2)/(2*gamma0^2*lambda)` wavelengths per undulator step and rotates the record
+one slice whenever the accumulation exceeds `0.8*sample` (`Control::applySlippage`,
+reduced to one shared-memory node -- the MPI ring exchange is the identity); the slice
+rotating out at the head of the time window is discarded and re-enters zeroed at the
+tail. Drifts autophase `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths onto the last
+interlude element before each undulator (`Lattice::calcSlippage`), and the end-of-lattice
+fixup is **unguarded in Genesis** -- `+1` even with no trailing drift at all -- which
+costs one final rotation if transcribed with a guard Genesis does not have (FINDINGS.md
+7.1; found at 0.84 of the final field). Everything reading the record in time order --
+the per-slice diagnostics, the final field dump -- unrotates through `fel_field_index`,
+as Genesis does at `writeFieldHDF5.cpp:86` and `Diagnostic.cpp:852`. Beam slices never
+rotate.
+
 Undulator segments are marked by name (`UND*`) and their FEL parameters come from the
 namelist, not from the lattice file. A real FEL element type with its own tracking method
 is a later deliverable; this is the smallest scheme that exercises the seam.
 
-## Validation: four checks, from one command
+## Validation: seven checks, from one command
 
 Both codes start from the same Genesis `&write` dumps, so the initial state is bitwise
 identical and no loader is reproduced. Genesis records diagnostics once at the start and
 once per integration step, with each interlude element being a single step; the tracker
-records at the same z positions. Measured, on the numbers this tree was developed against:
+records at the same z positions (per slice, in time-window order, for the time-dependent
+tiers). Measured, on the numbers this tree was developed against:
 
 | Tier | What runs | Largest relative difference |
 |---|---|---|
@@ -105,9 +129,12 @@ records at the same z positions. Measured, on the numbers this tree was develope
 | `tier2_genesis` | Full 6-FODO line, interludes via the transcribed Genesis model | **1.8e-5** (constants floor through full gain; was 5.9e-8) |
 | `tier2_bmad` | Full line, interludes via the Bmad seam | **5.0e-2** (power curve 1.3e-2) -- a measured model difference, see below |
 | `weight_split` | tier1 rerun with every particle split into coincident w/3 + 2w/3 copies, against the unsplit run | **3.6e-13** (Fortran vs Fortran; constants-independent) |
+| `td1` | One undulator segment, 32 slices: FEL core plus slippage (accumulation, threshold, rotation, zero fill, end-of-lattice autophasing) | **8.5e-7** (constants floor) |
+| `td2_genesis` | Full line time dependent, transcribed Genesis interludes: adds the drift autophasing schedule | **2.4e-6** (constants floor) |
+| `td2_bmad` | Full line time dependent through the Bmad seam | **4.1e-2** -- the tier2_bmad transport model difference with slippage interleaved |
 
-Particle ordering is preserved by both codes in steady state, so the final dumps compare
-particle by particle, not just statistically.
+Particle ordering is preserved by both codes (no sorting happens without one4one), so the
+final dumps compare particle by particle, not just statistically, in every tier.
 
 The `weight_split` check is Fortran against itself and exists because Genesis cannot test
 the weighted paths: its dump format has no weights, so every cross-code comparison sees
@@ -164,15 +191,63 @@ now sits below the 2e-6 constants floor and is not detectable by the Genesis com
 Recovering that class of sensitivity is a job for Fortran-vs-Fortran regression baselines
 (the weight_split pattern), not for tighter Genesis gates.
 
+The time-dependent gates were mutation-tested the same way: a slippage rotation that
+never fires fails td1 at 1.0e10 (elementwise per-slice power); zeroing the wrong slice at
+rotation fails td1 at 1.0e9; and dropping the drift autophasing fails td2_genesis at
+1.9e8. The fourth sensitivity was demonstrated live rather than by mutation: guarding the
+end-of-lattice autophasing the way the mid-lattice case is guarded -- one wavelength short
+on the final step -- failed td1 at 0.84 of the final field during development, which is
+how the unguarded `+1` in Genesis (FINDINGS.md 7.1) was found. The elementwise per-slice
+power comparison is what makes these loud: a one-slice misalignment puts finite power
+against near-vacuum slices, so the failure signature is orders of magnitude, not percent.
+
+## The coarse-step measurement (brief 8.3)
+
+SIMPLEX's reference case integrates twelve undulator periods per step with the slice
+spacing matched so slippage is one slice per step -- an order of magnitude fewer steps
+than one-step-per-period. Whether that economy transfers to this integrator is the
+brief's 8.3 question, measured by `run_delz_sweep.sh`: Genesis generates ONE
+time-dependent initial state (32 slices of spacing `12*lambda0`, shot noise on), and the
+tracker runs the full line from that same dump at `delz` of 1, 2, 3, 6 and 12 periods, so
+every run shares one shot-noise realization and the differences are pure integration
+error. Total power at the twelve undulator-segment exits, against the one-period run:
+
+| `delz` | max over exits | at saturation |
+|---|---|---|
+| 2 periods | 1.3e-1 | 1.5e-2 |
+| 3 periods | 2.5e-1 | 2.8e-2 |
+| 6 periods | 5.1e-1 | 2.1e-2 |
+| 12 periods | 7.0e-1 | 2.6e-1 |
+
+The max-over-exits error lives in the exponential-gain region, where a step-size error is
+a quasi-systematic gain-length shift; fitted there, convergence is roughly first order
+(pairwise p of 1.7, 1.1, 0.5). The saturation error is oscillatory (post-saturation power
+oscillates, so a small phase shift moves the sampled value) and fits no clean order.
+
+The answer to 8.3: saturation power holds to ~3% up to six periods per step, and the
+twelve-period matched configuration misses it by 26% -- SIMPLEX's step-size economy is
+tied to its semianalytic field advance and does not transfer to this Genesis-style
+integrator as-is. `delz` of two to three periods is the operating point here; six periods
+is defensible when only saturation power matters.
+
 ## Facts about Genesis this work pinned down
 
 - Outside undulators Genesis does not subdivide into `delz` steps: each interlude element
   is one integration step of the element's full length (`Lattice::unrollLattice` pushes
   one entry per non-undulator layout segment). The step count over the benchmark is
   12*89 undulator steps + 36 interlude steps = 1104.
-- `slippage` and `phaseshift` are no-ops for this benchmark: `Control::applySlippage`
+- In steady state `slippage` and `phaseshift` are no-ops: `Control::applySlippage`
   returns immediately when not time dependent, and the phaseshift array is all zero
   without phase shifter elements.
+- Time dependence follows from `&time` or from importing a multi-slice dump
+  (`readBeamHDF5.cpp:68-77` reconstructs the window from `slicespacing` and `slicecount`,
+  time on by default), with `nslice = round(slen/(sample*lambda0))` (`GenTime.cpp:70`).
+- The end-of-lattice autophasing is unguarded: the last step always gets
+  `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths of slippage, `+1` even with no trailing
+  drift (`Lattice.cpp:191-193`; FINDINGS.md 7.1).
+- The field record's rotation never appears in Genesis's outputs: `writeFieldHDF5` and
+  `DiagField::calc` both unrotate on the fly, so `.out.h5` per-slice arrays and `.fld.h5`
+  dumps are in time-window order, aligned with beam-slice indexing (FINDINGS.md 7.3).
 - A helical undulator defaults to `kx = ky = 0.5` (LatticeParser.cpp:329), scaled by
   `ku^2` in the unroll.
 - The `&importbeam` / `&importfield` namelists take full filenames and make the

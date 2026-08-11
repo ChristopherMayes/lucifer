@@ -1,7 +1,7 @@
-set (EXENAME fel_ss_test)
+set (EXENAME fel_track_test)
 
 set (SRC_FILES
-	fel/fel_ss_test.f90
+	fel/fel_track_test.f90
 )
 
 set (INC_DIRS

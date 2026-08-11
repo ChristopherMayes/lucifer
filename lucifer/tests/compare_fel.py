@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Compare the Bmad FEL tracker (fel_ss_test) against Genesis 1.3 Version 4, over the
-steady-state Benchmark1-SASE configuration. Run through run_fel_benchmark.sh, which
-produces all the inputs; this script only reads and compares.
+Compare the Bmad FEL tracker (fel_track_test) against Genesis 1.3 Version 4, over the
+Benchmark1-SASE configuration: steady state and time dependent with slippage. Run through
+run_fel_benchmark.sh, which produces all the inputs; this script only reads and compares.
 
 Three tiers, each with its own tolerance sized to what it measures. The comparison
 floor is set by fundamental constants: the tracker uses Bmad's (Z0 = mu_0*c =
@@ -41,6 +41,24 @@ observables are linear in the weights, so the curves and the final field must be
 unchanged to round-off. This is the only test of the weighted code paths with nonuniform
 weights -- the Genesis dump format carries no weights, so every Genesis comparison sees
 the uniform case, where a bug like using one particle's weight for all is invisible.
+
+Three time-dependent tiers mirror the steady-state ones over 32 slices with slippage
+active (Aramis-td.in: sample = 3, shot noise on, both codes starting from the same
+multi-slice dumps):
+
+  td1           One undulator segment: the FEL core plus slippage -- accumulation,
+                threshold, rotation, zero fill, the unguarded end-of-lattice
+                autophasing. Constants-floor agreement expected.
+
+  td2_genesis   The full line, transcribed Genesis interludes: adds the drift
+                autophasing schedule through twelve undulator/interlude alternations.
+
+  td2_bmad      The full line through the Bmad seam: the transport model difference of
+                tier2_bmad, now with slippage interleaved.
+
+Per-slice curves compare as full (nrecords, nslice) arrays in time-window order; final
+field and particle dumps compare every slice. The power denominator is floored at 1e-9
+of the global peak so a freshly slipped-in vacuum slice cannot divide by zero.
 """
 
 from __future__ import annotations
@@ -52,50 +70,87 @@ import h5py
 import numpy as np
 
 
-def load_genesis_out(fn):
+def load_genesis_out(fn, nslice=1):
+    """
+    Genesis .out.h5 per-slice arrays are (nrecords, nslice), slices in time-window
+    order. Steady state (nslice=1) returns 1D curves.
+    """
+    sl = slice(None) if nslice > 1 else 0
     with h5py.File(fn) as h5:
         return {
             "z": h5["Lattice/zplot"][:],
-            "power": h5["Field/power"][:, 0],
-            "bunching": h5["Beam/bunching"][:, 0],
-            "bunchingphase": h5["Beam/bunchingphase"][:, 0],
-            "energy": h5["Beam/energy"][:, 0],
-            "xsize": h5["Beam/xsize"][:, 0],
-            "ysize": h5["Beam/ysize"][:, 0],
+            "power": h5["Field/power"][:, sl],
+            "bunching": h5["Beam/bunching"][:, sl],
+            "bunchingphase": h5["Beam/bunchingphase"][:, sl],
+            "energy": h5["Beam/energy"][:, sl],
+            "xsize": h5["Beam/xsize"][:, sl],
+            "ysize": h5["Beam/ysize"][:, sl],
         }
 
 
-def load_fortran_diag(fn):
+def load_nslice(fn):
+    """slicecount of a Genesis dump (.par.h5 or .fld.h5)."""
+    with h5py.File(fn) as h5:
+        return int(h5["slicecount"][0])
+
+
+def load_fortran_diag(fn, nslice=1):
+    """
+    The Fortran diag file: one row per slice per record, columns
+    z, slice, power, on_axis, bunching, bunching_phase, mean_gamma, sigma_gamma,
+    sigma_x, sigma_y. Steady state (nslice=1) returns 1D curves; time dependent
+    returns (nrecords, nslice) arrays, slices in time-window order, matching the
+    Genesis .out.h5 layout.
+    """
     d = np.loadtxt(fn)
+    if nslice > 1:
+        assert d.shape[0] % nslice == 0, f"{fn}: {d.shape[0]} rows not divisible by nslice={nslice}"
+        d = d.reshape(-1, nslice, d.shape[1])
+        return {
+            "z": d[:, 0, 0], "power": d[:, :, 2], "bunching": d[:, :, 4],
+            "bunchingphase": d[:, :, 5], "energy": d[:, :, 6],
+            "xsize": d[:, :, 8], "ysize": d[:, :, 9],
+        }
     return {
-        "z": d[:, 0], "power": d[:, 1], "bunching": d[:, 3],
-        "bunchingphase": d[:, 4], "energy": d[:, 5],
-        "xsize": d[:, 7], "ysize": d[:, 8],
+        "z": d[:, 0], "power": d[:, 2], "bunching": d[:, 4],
+        "bunchingphase": d[:, 5], "energy": d[:, 6],
+        "xsize": d[:, 8], "ysize": d[:, 9],
     }
 
 
-def load_fld(fn):
+def load_fld(fn, nslice=1):
+    """Field dump as (nslice, n, n), slices in time-window order (Genesis unrotates on write)."""
     with h5py.File(fn) as h5:
         n = int(h5["gridpoints"][0])
-        return (h5["slice000001/field-real"][:].reshape(n, n)
-                + 1j * h5["slice000001/field-imag"][:].reshape(n, n))
+        u = np.empty((nslice, n, n), dtype=complex)
+        for i in range(nslice):
+            g = h5[f"slice{i+1:06d}"]
+            u[i] = (g["field-real"][:].reshape(n, n)
+                    + 1j * g["field-imag"][:].reshape(n, n))
+        return u if nslice > 1 else u[0]
 
 
-def load_par(fn):
+def load_par(fn, nslice=1):
+    """Particle dump with all slices concatenated, slice-major (beam slices never rotate)."""
     with h5py.File(fn) as h5:
-        s = h5["slice000001"]
-        return {k: s[k][:] for k in ("gamma", "theta", "x", "y", "px", "py")}
+        out = {k: [] for k in ("gamma", "theta", "x", "y", "px", "py")}
+        for i in range(nslice):
+            s = h5[f"slice{i+1:06d}"]
+            for k in out:
+                out[k].append(s[k][:])
+        return {k: np.concatenate(v) for k, v in out.items()}
 
 
 def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
-                 fortran_par, genesis_par, tolerance):
+                 fortran_par, genesis_par, tolerance, nslice=1):
     """
-    Compare one tier. Returns (worst_relative_difference, ok).
+    Compare one tier. Returns (worst_relative_difference, ok). nslice > 1 compares the
+    full (nrecords, nslice) per-slice curves, all field slices and all particle slices.
     """
     print(f"--- {name} " + "-" * (74 - len(name)))
 
-    f = load_fortran_diag(fortran_diag)
-    g = load_genesis_out(genesis_out)
+    f = load_fortran_diag(fortran_diag, nslice)
+    g = load_genesis_out(genesis_out, nslice)
 
     n = min(len(f["z"]), len(g["z"]))
     if len(f["z"]) != len(g["z"]):
@@ -110,22 +165,27 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
 
     # Curves: elementwise relative for power (it spans decades and every point matters),
     # peak normalized for bunching (near zero at the quiet start, where elementwise
-    # relative measures nothing but the quiet loading noise floor).
-    rel_power = (np.abs(f["power"][:n] - g["power"][:n]) / np.abs(g["power"][:n])).max()
+    # relative measures nothing but the quiet loading noise floor). In time-dependent
+    # runs the power comparison is per slice per record; the denominator is floored at
+    # 1e-9 of the global peak so a freshly slipped-in vacuum slice cannot divide by an
+    # exact zero (inactive in steady state).
+    den = np.maximum(np.abs(g["power"][:n]), 1e-9 * np.abs(g["power"][:n]).max())
+    rel_power = (np.abs(f["power"][:n] - g["power"][:n]) / den).max()
     rel_bunch = np.abs(f["bunching"][:n] - g["bunching"][:n]).max() / np.abs(g["bunching"][:n]).max()
     worst = max(worst, rel_power, rel_bunch)
-    print(f"  power curve     ({n} records)   elementwise max rel = {rel_power:.3e}")
+    slices = f" x {nslice} slices" if nslice > 1 else ""
+    print(f"  power curve     ({n} records{slices})   elementwise max rel = {rel_power:.3e}")
     print(f"  bunching curve                  peak normalized     = {rel_bunch:.3e}")
 
-    # Final field dump, peak normalized.
-    uf, ug = load_fld(fortran_fld), load_fld(genesis_fld)
+    # Final field dump, peak normalized, all slices.
+    uf, ug = load_fld(fortran_fld, nslice), load_fld(genesis_fld, nslice)
     rel_fld = np.abs(uf - ug).max() / np.abs(ug).max()
     worst = max(worst, rel_fld)
     print(f"  final field                     peak normalized     = {rel_fld:.3e}")
 
-    # Final particle dump, particle by particle. gamma relative to itself, transverse
-    # peak normalized. These are gated.
-    pf, pg = load_par(fortran_par), load_par(genesis_par)
+    # Final particle dump, particle by particle, all slices. gamma relative to itself,
+    # transverse peak normalized. These are gated.
+    pf, pg = load_par(fortran_par, nslice), load_par(genesis_par, nslice)
     scales = {"gamma": np.abs(pg["gamma"]).max(),
               "x": np.abs(pg["x"]).max(), "y": np.abs(pg["y"]).max(),
               "px": np.abs(pg["px"]).max(), "py": np.abs(pg["py"]).max()}
@@ -185,33 +245,53 @@ def main():
     p.add_argument("--tol-tier2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-tier2-bmad", type=float, default=1.0e-1)
     p.add_argument("--tol-split", type=float, default=1.0e-10)
+    p.add_argument("--tol-td1", type=float, default=1.0e-4)
+    p.add_argument("--tol-td2-genesis", type=float, default=1.0e-3)
+    p.add_argument("--tol-td2-bmad", type=float, default=1.0e-1)
     args = p.parse_args()
     w = args.workdir
 
     print("=" * 78)
-    print("FEL steady-state benchmark: Bmad tracker against Genesis 1.3 Version 4")
+    print("FEL benchmark: Bmad tracker against Genesis 1.3 Version 4")
     print("=" * 78)
     print()
 
+    nslice_td = load_nslice(f"{w}/AramisTD-initial.par.h5")
+
     results = []
-    for name, diag, out, ffld, gfld, fpar, gpar, tol in (
+    for name, diag, out, ffld, gfld, fpar, gpar, tol, nsl in (
         ("tier1: FEL core, one undulator segment",
          f"{w}/tier1.diag.txt", f"{w}/Aramis1seg.out.h5",
          f"{w}/tier1-final.fld.h5", f"{w}/Aramis1seg-final.fld.h5",
          f"{w}/tier1-final.par.h5", f"{w}/Aramis1seg-final.par.h5",
-         args.tol_tier1),
+         args.tol_tier1, 1),
         ("tier2_genesis: full line, transcribed interludes",
          f"{w}/tier2g.diag.txt", f"{w}/Aramis.out.h5",
          f"{w}/tier2g-final.fld.h5", f"{w}/Aramis-final.fld.h5",
          f"{w}/tier2g-final.par.h5", f"{w}/Aramis-final.par.h5",
-         args.tol_tier2_genesis),
+         args.tol_tier2_genesis, 1),
         ("tier2_bmad: full line, Bmad seam interludes",
          f"{w}/tier2.diag.txt", f"{w}/Aramis.out.h5",
          f"{w}/tier2-final.fld.h5", f"{w}/Aramis-final.fld.h5",
          f"{w}/tier2-final.par.h5", f"{w}/Aramis-final.par.h5",
-         args.tol_tier2_bmad),
+         args.tol_tier2_bmad, 1),
+        ("td1: FEL core + slippage, one undulator segment",
+         f"{w}/td1.diag.txt", f"{w}/AramisTD1seg.out.h5",
+         f"{w}/td1-final.fld.h5", f"{w}/AramisTD1seg-final.fld.h5",
+         f"{w}/td1-final.par.h5", f"{w}/AramisTD1seg-final.par.h5",
+         args.tol_td1, nslice_td),
+        ("td2_genesis: full line time dependent, transcribed interludes",
+         f"{w}/td2g.diag.txt", f"{w}/AramisTD.out.h5",
+         f"{w}/td2g-final.fld.h5", f"{w}/AramisTD-final.fld.h5",
+         f"{w}/td2g-final.par.h5", f"{w}/AramisTD-final.par.h5",
+         args.tol_td2_genesis, nslice_td),
+        ("td2_bmad: full line time dependent, Bmad seam interludes",
+         f"{w}/td2.diag.txt", f"{w}/AramisTD.out.h5",
+         f"{w}/td2-final.fld.h5", f"{w}/AramisTD-final.fld.h5",
+         f"{w}/td2-final.par.h5", f"{w}/AramisTD-final.par.h5",
+         args.tol_td2_bmad, nslice_td),
     ):
-        worst, ok = compare_tier(name, diag, out, ffld, gfld, fpar, gpar, tol)
+        worst, ok = compare_tier(name, diag, out, ffld, gfld, fpar, gpar, tol, nsl)
         results.append((name, worst, ok))
 
     worst, ok = compare_split(

@@ -109,6 +109,11 @@ end type
 ! follow the convention of wavefront_transverse_moments; gamma is the Lorentz factor,
 ! named as such because Bmad's 'energy' is the total energy in eV, which none of these
 ! are. The Genesis output dataset each one compares against is noted.
+!
+! Scope, by decision: this struct is the Genesis-comparison instrument and stays limited
+! to quantities a Genesis output can gate. Production moment diagnostics (mean vector,
+! sigma matrix, emittances) go through Bmad's bunch_params_struct at the seam, where
+! calc_bunch_params already owns the definitions.
 !-
 
 type fel_slice_diag_struct

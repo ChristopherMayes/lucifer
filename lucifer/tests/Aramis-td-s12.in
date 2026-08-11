@@ -1,0 +1,55 @@
+# Initial-dump generator for the coarse-step (delz) sweep of the design brief's section
+# 8.3. Differences from Aramis-td.in, each with its reason:
+#
+#   - sample = 12 with slen = 3.84e-8: 32 slices of spacing 12*lambda0. This is the slice
+#     spacing of SIMPLEX's reference case (twelve periods per step with slippage exactly
+#     one slice per step), so the sweep's coarsest run, delz = 0.18 m = 12 periods, is the
+#     matched configuration; the finer runs measure convergence against it from the SAME
+#     initial state.
+#
+#   - No &track and no final &write: this deck only generates and dumps the initial beam
+#     and field. The sweep tracks with the Bmad tracker at several delz from this one
+#     dump, so every run shares one shot-noise realization and the differences are pure
+#     integration error, not SASE statistics.
+
+&setup
+rootname=AramisS12
+lattice=Aramis.lat
+beamline=ARAMIS
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+shotnoise=1
+npart = 2048
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&lattice
+zmatch=9.5
+&end
+
+&time
+slen = 3.84e-8
+sample = 12
+&end
+
+&field
+power=5e3
+dgrid=2.000000e-04
+ngrid=255
+waist_size=30e-6
+&end
+
+&beam
+current=3000
+delgam=1.000000
+ex=4.000000e-07
+ey=4.000000e-07
+&end
+
+&write
+field = AramisS12-initial
+beam = AramisS12-initial
+&end

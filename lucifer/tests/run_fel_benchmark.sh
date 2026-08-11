@@ -1,18 +1,20 @@
 #!/bin/bash
 #
-# Validate the Bmad steady-state FEL tracker against Genesis 1.3 Version 4.
+# Validate the Bmad FEL tracker against Genesis 1.3 Version 4: steady state and
+# time dependent with slippage.
 #
 # One command runs everything: Genesis over the Benchmark1-SASE lattice (writing the
 # initial dumps both codes start from), Genesis over a single undulator segment importing
-# the same dumps, the Bmad tracker over both lattices (the full line twice, once with the
-# Bmad seam and once with the transcribed Genesis interlude model), and a three-tier
-# comparison printing the largest relative difference of each tier.
+# the same dumps, the same pair again time dependent (32 slices, Aramis-td.in), the Bmad
+# tracker over every configuration (each full line twice, once with the Bmad seam and
+# once with the transcribed Genesis interlude model), and the tiered comparison printing
+# the largest relative difference of each tier.
 #
 #   ./run_fel_benchmark.sh
 #
 # Prerequisites:
 #
-#   1. Bmad built, so debug/bin/fel_ss_test (or production/bin) exists:
+#   1. Bmad built, so debug/bin/fel_track_test (or production/bin) exists:
 #        BUILD_PRODUCTION=N ./util/conda_compile        # from the bmad-ecosystem root
 #
 #   2. A genesis4 binary (CPU is fine). Default location below; override with --genesis.
@@ -24,7 +26,7 @@
 #
 # Options:
 #   --genesis <path>    genesis4 binary. Default: ~/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4
-#   --exe <path>        fel_ss_test binary. Default: debug then production.
+#   --exe <path>        fel_track_test binary. Default: debug then production.
 #   --python <path>     Python interpreter. Default: the bmad-fel-validate conda env.
 #   --work-dir <path>   Where to run. Default: a temporary directory (kept on failure).
 #
@@ -61,12 +63,12 @@ if [[ ! -x "$GENESIS" ]]; then
 fi
 
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/debug/bin/fel_ss_test" "$BMAD_ROOT/production/bin/fel_ss_test"; do
+  for candidate in "$BMAD_ROOT/debug/bin/fel_track_test" "$BMAD_ROOT/production/bin/fel_track_test"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: fel_ss_test not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
+  echo "Error: fel_track_test not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
   exit 1
 fi
 
@@ -92,7 +94,7 @@ mkdir -p "$WORK_DIR"
 echo "=============================================================================="
 echo "FEL steady-state benchmark"
 echo "=============================================================================="
-echo "  fel_ss_test: $EXE"
+echo "  fel_track_test: $EXE"
 echo "  genesis4:    $GENESIS"
 echo "  python:      $PYTHON"
 echo "  workdir:     $WORK_DIR"
@@ -100,6 +102,7 @@ echo
 
 cp "$SCRIPT_DIR/Aramis-ss.in" "$SCRIPT_DIR/Aramis.lat" \
    "$SCRIPT_DIR/Aramis-1seg.in" "$SCRIPT_DIR/Aramis-1seg.lat" \
+   "$SCRIPT_DIR/Aramis-td.in" "$SCRIPT_DIR/Aramis-td-1seg.in" \
    "$SCRIPT_DIR/aramis.bmad" "$SCRIPT_DIR/aramis_1seg.bmad" "$WORK_DIR/"
 
 cd "$WORK_DIR" || exit 1
@@ -126,12 +129,32 @@ fi
 tail -3 genesis-1seg.log
 echo
 
+echo "--- Genesis: full line, time dependent (writes the TD initial dumps) ---------"
+if ! "$GENESIS" Aramis-td.in > genesis-td.log 2>&1; then
+  echo "Genesis time-dependent run FAILED; log tail:" >&2
+  tail -20 genesis-td.log >&2
+  exit 1
+fi
+tail -3 genesis-td.log
+echo
+
+echo "--- Genesis: single segment, time dependent (imports the TD dumps) -----------"
+if ! "$GENESIS" Aramis-td-1seg.in > genesis-td1seg.log 2>&1; then
+  echo "Genesis time-dependent single-segment run FAILED; log tail:" >&2
+  tail -20 genesis-td1seg.log >&2
+  exit 1
+fi
+tail -3 genesis-td1seg.log
+echo
+
+# make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [extra]
+
 make_nml () {
   cat > "$1" <<NML
-&fel_ss_params
+&fel_track_params
   lat_file = "$2"
-  beam_file = "Aramis-initial.par.h5"
-  field_file = "Aramis-initial.fld.h5"
+  beam_file = "$5-initial.par.h5"
+  field_file = "$5-initial.fld.h5"
   out_root = "$3"
   gamma0 = 11357.82
   delz = 0.045
@@ -140,20 +163,23 @@ make_nml () {
   und_kx = 0.5, und_ky = 0.5
   und_helical = T
   interlude_model = "$4"
-${5:+  $5}
+${6:+  $6}
 &end
 NML
 }
 
-make_nml tier1.nml  aramis_1seg.bmad tier1  bmad
-make_nml tier2.nml  aramis.bmad      tier2  bmad
-make_nml tier2g.nml aramis.bmad      tier2g genesis
-make_nml tier1s.nml aramis_1seg.bmad tier1s bmad "split_weights = T"
+make_nml tier1.nml  aramis_1seg.bmad tier1  bmad    Aramis
+make_nml tier2.nml  aramis.bmad      tier2  bmad    Aramis
+make_nml tier2g.nml aramis.bmad      tier2g genesis Aramis
+make_nml tier1s.nml aramis_1seg.bmad tier1s bmad    Aramis "split_weights = T"
+make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
+make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
+make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
 
-for tier in tier1 tier2 tier2g tier1s; do
-  echo "--- fel_ss_test: $tier -------------------------------------------------------"
+for tier in tier1 tier2 tier2g tier1s td1 td2 td2g; do
+  echo "--- fel_track_test: $tier -------------------------------------------------------"
   if ! "$EXE" $tier.nml > fel-$tier.log 2>&1; then
-    echo "fel_ss_test $tier FAILED; log tail:" >&2
+    echo "fel_track_test $tier FAILED; log tail:" >&2
     tail -20 fel-$tier.log >&2
     exit 1
   fi

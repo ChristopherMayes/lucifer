@@ -1,0 +1,73 @@
+# Time-dependent reference run for the Bmad FEL tracker: the Benchmark1-SASE
+# configuration of Aramis-ss.in with a time window, exercising slippage. Differences from
+# Aramis-ss.in, each with its reason:
+#
+#   - &time with slen = 9.6e-9 and sample = 3. Genesis sets nslice =
+#     round(slen/(sample*lambda0)) (GenTime.cpp:70), so this is exactly 32 slices of
+#     spacing 3*lambda0. sample = 3 matches the slice spacing to the slippage of one
+#     delz = 0.045 m = 3-period step (one slice per step at resonance), the matched
+#     configuration of the design brief's section 8.3, and the 32-slice window keeps the
+#     benchmark's runtime in check -- slippage physics does not depend on window length.
+#
+#   - shotnoise = 1. In steady state shot noise was disabled to make the run
+#     deterministic; here the slice-to-slice variation it creates is the signal that
+#     makes slippage observable (with identical quiet slices, every slice would evolve
+#     identically and a rotation bug would be invisible). Both codes start from the
+#     written dumps, so the realization is shared and determinism is preserved.
+#
+#   - npart = 2048 (default 8192). The comparison tracks identical particles in both
+#     codes, so statistical convergence is not at stake, and 32 slices multiply the work.
+#
+# Everything else is unchanged: same lattice, same gamma0, same seed field, FFT field
+# solver, no harmonics.
+
+&setup
+rootname=AramisTD
+lattice=Aramis.lat
+beamline=ARAMIS
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+shotnoise=1
+npart = 2048
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&lattice
+zmatch=9.5
+&end
+
+&time
+slen = 9.6e-9
+sample = 3
+&end
+
+&field
+power=5e3
+dgrid=2.000000e-04
+ngrid=255
+waist_size=30e-6
+&end
+
+&beam
+current=3000
+delgam=1.000000
+ex=4.000000e-07
+ey=4.000000e-07
+&end
+
+&write
+field = AramisTD-initial
+beam = AramisTD-initial
+&end
+
+&track
+fft_fieldsolver = true
+&end
+
+&write
+field = AramisTD-final
+beam = AramisTD-final
+&end
