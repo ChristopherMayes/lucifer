@@ -56,6 +56,14 @@ multi-slice dumps):
   td2_bmad      The full line through the Bmad seam: the transport model difference of
                 tier2_bmad, now with slippage interleaved.
 
+  tdsase        The full line, dark start (power = 0), shot noise on: pure SASE, both
+                codes tracking the identical noisy beam and identical zero field from
+                shared dumps (Aramis-td-sase.in). The one combination the seeded TD
+                tiers and the statistical startup gate leave uncovered -- the whole
+                startup-from-noise path, compared deterministically and elementwise.
+                Transcribed interludes, so the gate sits at the constants floor.
+                plot_fel_compare.py overlays the two codes' curves for any tier.
+
 Per-slice curves compare as full (nrecords, nslice) arrays in time-window order; final
 field and particle dumps compare every slice. The power denominator is floored at 1e-9
 of the global peak so a freshly slipped-in vacuum slice cannot divide by zero.
@@ -248,6 +256,9 @@ def main():
     p.add_argument("--tol-td1", type=float, default=1.0e-4)
     p.add_argument("--tol-td2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-td2-bmad", type=float, default=1.0e-1)
+    # Pure SASE: dark start, so the whole curve is startup-from-noise; same transcribed
+    # interlude model and constants floor as td2_genesis.
+    p.add_argument("--tol-tdsase", type=float, default=1.0e-3)
     # Collective tiers: the sc floor is Genesis's truncated epsilon_0 in longRange
     # (8.85e-12, 4.7e-4 relative; measured 2.4e-4); the wake tier measured 8.7e-7.
     p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
@@ -261,6 +272,7 @@ def main():
     print()
 
     nslice_td = load_nslice(f"{w}/AramisTD-initial.par.h5")
+    nslice_tdsase = load_nslice(f"{w}/AramisTDSASE-initial.par.h5")
 
     results = []
     for name, diag, out, ffld, gfld, fpar, gpar, tol, nsl in (
@@ -294,6 +306,11 @@ def main():
          f"{w}/td2-final.fld.h5", f"{w}/AramisTD-final.fld.h5",
          f"{w}/td2-final.par.h5", f"{w}/AramisTD-final.par.h5",
          args.tol_td2_bmad, nslice_td),
+        ("tdsase: full line, pure SASE (dark start, growth from shot noise alone)",
+         f"{w}/tdsase.diag.txt", f"{w}/AramisTDSASE.out.h5",
+         f"{w}/tdsase-final.fld.h5", f"{w}/AramisTDSASE-final.fld.h5",
+         f"{w}/tdsase-final.par.h5", f"{w}/AramisTDSASE-final.par.h5",
+         args.tol_tdsase, nslice_tdsase),
         ("tdsc: one segment TD, space charge on (short range + long range)",
          f"{w}/tdsc.diag.txt", f"{w}/AramisTDSC.out.h5",
          f"{w}/tdsc-final.fld.h5", f"{w}/AramisTDSC-final.fld.h5",

@@ -105,6 +105,7 @@ cp "$SCRIPT_DIR/Aramis-ss.in" "$SCRIPT_DIR/Aramis.lat" \
    "$SCRIPT_DIR/Aramis-1seg.in" "$SCRIPT_DIR/Aramis-1seg.lat" \
    "$SCRIPT_DIR/Aramis-td.in" "$SCRIPT_DIR/Aramis-td-1seg.in" \
    "$SCRIPT_DIR/Aramis-td-sc.in" "$SCRIPT_DIR/Aramis-td-wake.in" \
+   "$SCRIPT_DIR/Aramis-td-sase.in" \
    "$SCRIPT_DIR/aramis.bmad" "$SCRIPT_DIR/aramis_1seg.bmad" "$WORK_DIR/"
 
 cd "$WORK_DIR" || exit 1
@@ -149,6 +150,15 @@ fi
 tail -3 genesis-td1seg.log
 echo
 
+echo "--- Genesis: full line, pure SASE (dark start; writes its own dumps) ---------"
+if ! "$GENESIS" Aramis-td-sase.in > genesis-tdsase.log 2>&1; then
+  echo "Genesis pure-SASE run FAILED; log tail:" >&2
+  tail -20 genesis-tdsase.log >&2
+  exit 1
+fi
+tail -3 genesis-tdsase.log
+echo
+
 echo "--- Genesis: space-charge and wake tiers (import the TD dumps) ---------------"
 for deck in Aramis-td-sc Aramis-td-wake; do
   if ! "$GENESIS" $deck.in > genesis-$deck.log 2>&1; then
@@ -184,6 +194,7 @@ make_nml tier1s.nml aramis_1seg.bmad tier1s bmad    Aramis "split_weights = T"
 make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
+make_nml tdsase.nml aramis.bmad      tdsase genesis AramisTDSASE
 make_nml tdsc.nml   aramis_1seg.bmad tdsc   genesis AramisTD "sc_rmax = 250e-6
   sc_nz = 2
   sc_nphi = 1
@@ -237,7 +248,7 @@ echo
 
 export OMP_NUM_THREADS=1
 
-for tier in tier1 tier2 tier2g tier1s td1 td2 td2g tdsc tdwk; do
+for tier in tier1 tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk; do
   echo "--- fel_track_test: $tier -------------------------------------------------------"
   if ! "$EXE" $tier.nml > fel-$tier.log 2>&1; then
     echo "fel_track_test $tier FAILED; log tail:" >&2

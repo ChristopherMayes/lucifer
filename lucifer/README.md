@@ -31,7 +31,9 @@ section.
 | `bsim/fel/tests/Aramis-td-sc.in`, `Aramis-td-wake.in` | Genesis decks: the collective tiers, importing the shared TD dumps |
 | `bsim/fel/tests/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
-| `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus three time-dependent tiers against Genesis, plus the split-weight invariance check |
+| `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
+| `bsim/fel/tests/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, gated relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
+| `bsim/fel/tests/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
 | `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
 | `bsim/fel/tests/Aramis-1seg.in`, `Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
 | `bsim/fel/tests/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
@@ -200,11 +202,19 @@ tiers). Measured, on the numbers this tree was developed against:
 | `td1` | One undulator segment, 32 slices: FEL core plus slippage (accumulation, threshold, rotation, zero fill, end-of-lattice autophasing) | **8.5e-7** (constants floor) |
 | `td2_genesis` | Full line time dependent, transcribed Genesis interludes: adds the drift autophasing schedule | **2.4e-6** (constants floor) |
 | `td2_bmad` | Full line time dependent through the Bmad seam | **4.1e-2** -- the tier2_bmad transport model difference with slippage interleaved |
+| `tdsase` | Full line, pure SASE: dark start (`power = 0`), shot noise on, both codes tracking the identical noisy beam and identical zero field from shared dumps -- the deterministic startup-from-noise comparison the seeded tiers and the statistical startup gate leave uncovered | **2.3e-6** (constants floor; exit total power agrees at 1.9e-6) |
 | `tdsc` | One segment TD, space charge on (short-range harmonics nz=2/nphi=1 plus long range) | **2.4e-4** (the epsilon_0-truncation floor of Genesis's longRange, 8.85e-12) |
 | `tdwk` | One segment TD, all three wake kernels on (numerical-impedance resistive wall, gap, roughness) | **8.7e-7** (the impedance floor) |
 
 Particle ordering is preserved by both codes (no sorting happens without one4one), so the
 final dumps compare particle by particle, not just statistically, in every tier.
+
+To *see* any tier rather than gate it, `plot_fel_compare.py <tier>.diag.txt
+<GenesisRoot>.out.h5` (from the benchmark work directory) overlays the two codes' power
+and bunching curves, plots the gated elementwise relative power difference along the
+line, and the per-slice exit power — e.g. `plot_fel_compare.py tdsase.diag.txt
+AramisTDSASE.out.h5`. The slice count comes from the Genesis file, so steady-state and
+time-dependent tiers both work.
 
 The `weight_split` check is Fortran against itself and exists because Genesis cannot test
 the weighted paths: its dump format has no weights, so every cross-code comparison sees
@@ -382,6 +392,11 @@ Mutations bite: amplitudes from macroparticle count fail the statistical gate at
 a slice-uniform electron count (weights ignored) passes uniform and fails the nonuniform
 mode at 1.52 (theory 1.5625); the within-beamlet weight mutation makes the guard refuse
 at 2.3e-1 against a 5.3e-5 target.
+
+These two gates are statistical by necessity (independent RNGs). The `tdsase` tier is
+their deterministic complement: Genesis generates the noisy beam, writes it, and both
+codes track the identical realization dark through the full line, so startup-from-noise
+is also compared elementwise like any other tier.
 
 ## Slice migration under weights (brief 6.4)
 

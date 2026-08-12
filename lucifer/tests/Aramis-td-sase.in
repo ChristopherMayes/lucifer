@@ -1,0 +1,61 @@
+# Pure-SASE reference run: Aramis-td.in with the seed field removed (power = 0), so the
+# FEL grows from electron shot noise alone through the full line. This is the one
+# combination the seeded TD tiers and the statistical startup gate between them do not
+# cover: a DETERMINISTIC dark-start comparison -- both codes track the identical noisy
+# beam and identical (zero) field from the written dumps, so the whole startup-from-noise
+# path is compared elementwise like any other tier, not statistically.
+#
+# The window is the Aramis-td.in one (32 slices of spacing 3*lambda0, matched slippage);
+# see that deck's header for the parameter reasoning. The &field block keeps the grid of
+# the seeded runs and only zeroes the power: the dump then carries an explicit zero field
+# on the right mesh, which the Bmad tracker imports like any other starting field.
+
+&setup
+rootname=AramisTDSASE
+lattice=Aramis.lat
+beamline=ARAMIS
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+shotnoise=1
+npart = 2048
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&lattice
+zmatch=9.5
+&end
+
+&time
+slen = 9.6e-9
+sample = 3
+&end
+
+&field
+power=0
+dgrid=2.000000e-04
+ngrid=255
+&end
+
+&beam
+current=3000
+delgam=1.000000
+ex=4.000000e-07
+ey=4.000000e-07
+&end
+
+&write
+field = AramisTDSASE-initial
+beam = AramisTDSASE-initial
+&end
+
+&track
+fft_fieldsolver = true
+&end
+
+&write
+field = AramisTDSASE-final
+beam = AramisTDSASE-final
+&end
