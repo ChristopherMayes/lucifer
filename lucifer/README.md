@@ -7,7 +7,7 @@ the seam of the design brief's section 4.1, and validated against Genesis over i
 single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
 (deliverable 4).
 
-No space charge, no wakes, no harmonics. Those are later deliverables. Per-particle weights are carried from day one (brief section 5): the
+No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 8 is in. Per-particle weights are carried from day one (brief section 5): the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
 the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
 over slices (deliverable 5), with thread-count independence -- bit-identical results at
@@ -27,6 +27,9 @@ section.
 | `bsim/fel/tests/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `bsim/fel/tests/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
 | `bsim/fel/tests/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
+| `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
+| `bsim/fel/tests/Aramis-td-sc.in`, `Aramis-td-wake.in` | Genesis decks: the collective tiers, importing the shared TD dumps |
+| `bsim/fel/tests/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus three time-dependent tiers against Genesis, plus the split-weight invariance check |
 | `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
@@ -139,6 +142,8 @@ tiers). Measured, on the numbers this tree was developed against:
 | `td1` | One undulator segment, 32 slices: FEL core plus slippage (accumulation, threshold, rotation, zero fill, end-of-lattice autophasing) | **8.5e-7** (constants floor) |
 | `td2_genesis` | Full line time dependent, transcribed Genesis interludes: adds the drift autophasing schedule | **2.4e-6** (constants floor) |
 | `td2_bmad` | Full line time dependent through the Bmad seam | **4.1e-2** -- the tier2_bmad transport model difference with slippage interleaved |
+| `tdsc` | One segment TD, space charge on (short-range harmonics nz=2/nphi=1 plus long range) | **2.4e-4** (the epsilon_0-truncation floor of Genesis's longRange, 8.85e-12) |
+| `tdwk` | One segment TD, all three wake kernels on (numerical-impedance resistive wall, gap, roughness) | **8.7e-7** (the impedance floor) |
 
 Particle ordering is preserved by both codes (no sorting happens without one4one), so the
 final dumps compare particle by particle, not just statistically, in every tier.
@@ -350,6 +355,51 @@ sheet that balances while the beam disappears -- and is caught by window residen
 survivors outside); removing the high-side bounds check dies on the constructed
 off-the-end mover with a bounds trap, never touching memory beyond the arrays
 (FINDINGS.md 7.8).
+
+## Wakes and space charge (brief 10 step 8): Genesis's granularity, gated
+
+Inside undulators and Genesis-model interludes, the collective terms are transcribed at
+Genesis's granularity (`fel_collective_mod`): wakes as a per-slice energy-loss rate --
+the three single-particle kernels (resistive wall via the NUMERICAL impedance of Bane &
+Stupakov SLAC-PUB-10707, with AC conductivity and round/flat geometry; the undulator gap
+wake, convolved with dI/ds; surface roughness via the complex-q contour) superposed and
+causally convolved with the window's current profile, applied between the longitudinal
+advance and the second transverse half step, theta held fixed through the kick -- and
+longitudinal space charge as the per-particle `ez` in the pendulum equation, from the
+per-slice radial-harmonic tridiagonal solves plus the whole-window long-range term, both
+weighted (`c*w_j/slice_spacing` where Genesis has `current/npart`). The convolution is
+hoisted once, as Genesis's is, and recomputed at the migration stride when migration can
+change the currents; every recompute appends a z-stamped eloss block to
+`<out_root>.wake.txt`, making "the wake followed the currents" a parseable fact.
+
+Two decisions recorded here as much as in the code: the numerical impedance is a clean,
+SEPARABLE routine (`fel_resistive_wall_wake`) because that computation is a future port
+target into Bmad proper as a wake source; and the space-charge solver sits behind an
+interface a Bmad-slice implementation can later fill -- Bmad's slice method is suspected
+the better model long-term, Genesis's is transcribed now for consistency, and the
+comparison between the two is an explicit future task.
+
+Genesis's collective code carries more truncated constants than its FEL core, and each
+tier's gate is sized to the floor of the terms it enables:
+
+| Term | Genesis constant | Floor | Measured tier |
+|---|---|---|---|
+| resistive/geometric kernels | `vacimp = 376.73` | 8.3e-7 | tdwk 8.7e-7 |
+| roughness coefficient | `e = 1.6e-19`, `eps0 = 8.854e-12` | 1.4e-3 of that kernel | (inside tdwk) |
+| long-range space charge | `eps0 = 8.85e-12` | 4.7e-4 | tdsc 2.4e-4 |
+
+Self-referenced gates (`check_collective.py`): on a cold dark beam the wake is the only
+energy channel, and every record's `d<gamma>` must equal `eloss*dz/m_electron` exactly
+(measured 8.6e-11 against 4e-4 kicks) with `sigma_gamma` invariant under the uniform
+kicks (4.9e-13, after the diagnostics moved to a two-pass variance -- the one-pass form
+hid sigma-scale cancellation noise for five deliverables because nothing ever moved the
+mean; FINDINGS.md 7.9); and under heavy migration the eloss blocks must multiply and
+change (49 blocks measured).
+
+Mutations bite, each on its named gate: reversing the convolution's causality (wake
+collected from trailing charge) fails tdwk at 7.0e-3 against its 8.7e-7 pristine;
+flipping the sign of `ez` fails tdsc at 9.1e-1; removing the migration-stride recompute
+leaves one eloss block and fails the stale-wake structural gate.
 
 ## The coarse-step measurement (brief 8.3)
 

@@ -1,0 +1,43 @@
+# Space-charge tier: one undulator segment, time dependent, importing the SAME initial
+# dumps as the other TD tiers (Aramis-td.in writes them), with the &efield solver on --
+# short-range harmonics (nz = 2, nphi = 1) and the long-range term. rmax is set large
+# enough that the adaptive grid growth never fires in either code, so the growth paths
+# (persistent in Genesis, per-call in the port) cannot diverge.
+#
+# Run Aramis-td.in first; it produces AramisTD-initial.par.h5 / .fld.h5.
+
+&setup
+rootname=AramisTDSC
+lattice=Aramis-1seg.lat
+beamline=SEG1
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&importfield
+file = AramisTD-initial.fld.h5
+&end
+
+&importbeam
+file = AramisTD-initial.par.h5
+&end
+
+&efield
+rmax = 250e-6
+nz = 2
+nphi = 1
+longrange = true
+&end
+
+&track
+fft_fieldsolver = true
+&end
+
+&write
+field = AramisTDSC-final
+beam = AramisTDSC-final
+&end

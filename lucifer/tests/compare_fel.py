@@ -248,6 +248,10 @@ def main():
     p.add_argument("--tol-td1", type=float, default=1.0e-4)
     p.add_argument("--tol-td2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-td2-bmad", type=float, default=1.0e-1)
+    # Collective tiers: the sc floor is Genesis's truncated epsilon_0 in longRange
+    # (8.85e-12, 4.7e-4 relative; measured 2.4e-4); the wake tier measured 8.7e-7.
+    p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
+    p.add_argument("--tol-tdwk", type=float, default=1.0e-4)
     args = p.parse_args()
     w = args.workdir
 
@@ -290,6 +294,16 @@ def main():
          f"{w}/td2-final.fld.h5", f"{w}/AramisTD-final.fld.h5",
          f"{w}/td2-final.par.h5", f"{w}/AramisTD-final.par.h5",
          args.tol_td2_bmad, nslice_td),
+        ("tdsc: one segment TD, space charge on (short range + long range)",
+         f"{w}/tdsc.diag.txt", f"{w}/AramisTDSC.out.h5",
+         f"{w}/tdsc-final.fld.h5", f"{w}/AramisTDSC-final.fld.h5",
+         f"{w}/tdsc-final.par.h5", f"{w}/AramisTDSC-final.par.h5",
+         args.tol_tdsc, nslice_td),
+        ("tdwk: one segment TD, all wake kernels on",
+         f"{w}/tdwk.diag.txt", f"{w}/AramisTDWK.out.h5",
+         f"{w}/tdwk-final.fld.h5", f"{w}/AramisTDWK-final.fld.h5",
+         f"{w}/tdwk-final.par.h5", f"{w}/AramisTDWK-final.par.h5",
+         args.tol_tdwk, nslice_td),
     ):
         worst, ok = compare_tier(name, diag, out, ffld, gfld, fpar, gpar, tol, nsl)
         results.append((name, worst, ok))

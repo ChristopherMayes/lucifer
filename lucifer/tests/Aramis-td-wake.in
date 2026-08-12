@@ -1,0 +1,50 @@
+# Wake tier: one undulator segment, time dependent, importing the SAME initial dumps as
+# the other TD tiers, with all three single-particle wake kernels on -- resistive wall
+# (copper via explicit conductivity + AC relaxation, round pipe, the numerical impedance
+# of Bane & Stupakov), the geometric gap wake, and the surface-roughness wake. A small
+# chamber radius makes the loss visible above the diagnostics' resolution over one
+# segment. NOTE the comparison floor of this tier is set by Genesis's truncated
+# constants in the roughness coefficient (e as 1.6e-19: 1.4e-3 relative), far above the
+# impedance floor -- the gate is sized accordingly; see the README's floor table.
+#
+# Run Aramis-td.in first; it produces AramisTD-initial.par.h5 / .fld.h5.
+
+&setup
+rootname=AramisTDWK
+lattice=Aramis-1seg.lat
+beamline=SEG1
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&importfield
+file = AramisTD-initial.fld.h5
+&end
+
+&importbeam
+file = AramisTD-initial.par.h5
+&end
+
+&wake
+radius = 2.5e-3
+conductivity = 5.813e7
+relaxation = 8.1e-6
+roundpipe = true
+gap = 0.5e-3
+lgap = 0.015
+hrough = 100e-9
+lrough = 100e-6
+&end
+
+&track
+fft_fieldsolver = true
+&end
+
+&write
+field = AramisTDWK-final
+beam = AramisTDWK-final
+&end

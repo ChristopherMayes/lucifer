@@ -177,6 +177,17 @@ logical :: migrate = .false., migrate_check = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
 
+! Collective effects (deliverable 8), Genesis &wake / &efield names with wake_/sc_
+! prefixes. All off by default; see the header.
+logical :: wake_on = .false.
+real(rp) :: wake_loss = 0, wake_radius = 2.5e-3_rp, wake_conductivity = 0, wake_relaxation = 0
+real(rp) :: wake_gap = 0, wake_lgap = 1, wake_hrough = 0, wake_lrough = 1
+logical :: wake_roundpipe = .true.
+character(8) :: wake_material = ''
+real(rp) :: sc_rmax = 0
+integer :: sc_ngrid = 100, sc_nz = 0, sc_nphi = 0
+logical :: sc_longrange = .false.
+
 real(rp) :: lambda0 = 0                  ! Generation parameters; see the header.
 real(rp) :: gen_current = 0, gen_delgam = 0, gen_ex = 0, gen_ey = 0
 real(rp) :: gen_beta_x = 0, gen_alpha_x = 0, gen_beta_y = 0, gen_alpha_y = 0
@@ -189,8 +200,10 @@ logical :: gen_shotnoise = .false., gen_test_weights = .false., load_only = .fal
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
 real(rp) charge_dropped_tot, b_dev_max
-integer ie, is, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot
+integer ie, is, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot, iu_wake
 logical err, timerun
+
+type (fel_collective_struct) coll
 
 character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
@@ -201,7 +214,10 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0,
                            gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
                            gen_beta_y, gen_alpha_y, gen_power, gen_waist_size, gen_ngrid, &
                            gen_dgrid, gen_seed, gen_slen, gen_sample, gen_shotnoise, &
-                           gen_test_weights, load_only, migrate, migrate_check
+                           gen_test_weights, load_only, migrate, migrate_check, &
+                           wake_on, wake_loss, wake_radius, wake_conductivity, wake_relaxation, &
+                           wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
+                           wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange
 
 ! Read parameters.
 
@@ -262,6 +278,44 @@ if (abs(wf%wavelength - fbeam%wavelength) > 1e-12_rp * fbeam%wavelength) then
   print '(a, 2es20.12)', 'fel_track_test: beam and field disagree on the wavelength: ', &
                          fbeam%wavelength, wf%wavelength
   stop 1
+endif
+
+! Collective effects (deliverable 8): configure, build the wake kernels, hoist the
+! convolution once (Genesis's behavior; recomputed at the migration stride when
+! migration can change the currents). The per-slice eloss is written to
+! <out_root>.wake.txt so the energy-bookkeeping gate can check the applied loss exactly.
+
+coll%efield%on = (sc_nz >= 1 .or. sc_longrange)
+coll%efield%rmax = sc_rmax
+coll%efield%ngrid = sc_ngrid
+coll%efield%nz = sc_nz
+coll%efield%nphi = sc_nphi
+coll%efield%longrange = sc_longrange
+
+if (coll%efield%on .and. interlude_model == 'bmad') then
+  print '(a)', 'fel_track_test: NOTE space charge acts inside undulators and genesis-model'
+  print '(a)', '  interludes only; the Bmad seam''s own space charge is deliverable 9''s domain.'
+endif
+
+coll%wake%on = wake_on
+coll%wake%loss = wake_loss
+coll%wake%radius = wake_radius
+coll%wake%conductivity = wake_conductivity
+coll%wake%relaxation = wake_relaxation
+coll%wake%roundpipe = wake_roundpipe
+coll%wake%material = wake_material
+coll%wake%gap = wake_gap
+coll%wake%lgap = wake_lgap
+coll%wake%hrough = wake_hrough
+coll%wake%lrough = wake_lrough
+
+if (wake_on) then
+  call fel_wake_init (coll%wake, nslice, nint(fbeam%slice_spacing / fbeam%wavelength), &
+                      fbeam%wavelength, err)
+  if (err) stop 1
+  call fel_wake_update (coll%wake, fbeam)
+  open (newunit = iu_wake, file = trim(out_root) // '.wake.txt', action = 'write')
+  call write_wake_block (0.0_rp)
 endif
 
 if (write_initial .or. load_only) then
@@ -366,7 +420,7 @@ do ie = 1, branch%n_ele_track
     und%dz = ele%value(l$) / und%nstep
 
     do istep = 1, und%nstep
-      call fel_track_und_step (und, fbeam, wf, slip, err)
+      call fel_track_und_step (und, fbeam, wf, slip, coll, err)
       if (err) stop 1
       if (istep == und%nstep) then
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step + ele_slip(ie))
@@ -409,6 +463,12 @@ do ie = 1, branch%n_ele_track
     call wavefront_drift (wf, ele%value(l$), err)
     if (err) stop 1
 
+    ! The chamber does not end where the undulator does: the wake's energy loss applies
+    ! through seam interludes too, as one kick of the element's length (Genesis applies
+    ! it every step, and an interlude is one step).
+
+    call fel_wake_apply (coll%wake, fbeam, ele%value(l$))
+
     call fel_apply_slippage (slip, wf, ele_slip(ie))
 
     z_now = z_now + ele%value(l$)
@@ -421,7 +481,7 @@ do ie = 1, branch%n_ele_track
 
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
-    call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, wf, slip, err)
+    call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, wf, slip, coll, err)
     if (err) stop 1
 
     call fel_apply_slippage (slip, wf, ele_slip(ie))
@@ -433,6 +493,7 @@ do ie = 1, branch%n_ele_track
 enddo
 
 close (iu_diag)
+if (wake_on) close (iu_wake)
 
 if (migrate) then
   print '(a, i0, a, es12.4, a)', 'fel_track_test: migration moved ', n_moved_tot, &
@@ -777,6 +838,16 @@ if (err) stop 1
 
 n_moved_tot = n_moved_tot + nm
 charge_dropped_tot = charge_dropped_tot + chd
+
+! Migration changes the current profile, which the wake convolution was hoisted on
+! (brief 4.3's premise predates migration): recompute at this stride. Every recompute
+! appends a z-stamped block to <out_root>.wake.txt, so "the wake followed the currents"
+! is a structural fact a gate can parse without reimplementing the convolution.
+
+if (nm > 0 .and. coll%wake%on) then
+  call fel_wake_update (coll%wake, fbeam)
+  call write_wake_block (z_now)
+endif
 if (chd > 0) then
   print '(a, es22.14, a, es22.14, a)', 'fel_track_test: migration dropped ', chd, &
                                        ' C off the window ends at z = ', z_now, ' m.'
@@ -817,6 +888,23 @@ do is = 1, size(fbeam%slice)
 enddo
 
 end subroutine whole_beam_phasor
+
+!------------------------------------------------------------------------------
+
+subroutine write_wake_block (z)
+
+! One block of per-slice eloss, z-stamped. Written at the hoisted update and at every
+! migration-stride recompute; the energy-bookkeeping and stale-wake gates parse these.
+
+real(rp) z
+integer is_w
+
+write (iu_wake, '(a, es22.14)') '# z = ', z
+do is_w = 1, nslice
+  write (iu_wake, '(i8, es24.16)') is_w, coll%wake%eloss(is_w)
+enddo
+
+end subroutine write_wake_block
 
 !------------------------------------------------------------------------------
 

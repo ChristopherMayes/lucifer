@@ -104,6 +104,7 @@ echo
 cp "$SCRIPT_DIR/Aramis-ss.in" "$SCRIPT_DIR/Aramis.lat" \
    "$SCRIPT_DIR/Aramis-1seg.in" "$SCRIPT_DIR/Aramis-1seg.lat" \
    "$SCRIPT_DIR/Aramis-td.in" "$SCRIPT_DIR/Aramis-td-1seg.in" \
+   "$SCRIPT_DIR/Aramis-td-sc.in" "$SCRIPT_DIR/Aramis-td-wake.in" \
    "$SCRIPT_DIR/aramis.bmad" "$SCRIPT_DIR/aramis_1seg.bmad" "$WORK_DIR/"
 
 cd "$WORK_DIR" || exit 1
@@ -148,6 +149,17 @@ fi
 tail -3 genesis-td1seg.log
 echo
 
+echo "--- Genesis: space-charge and wake tiers (import the TD dumps) ---------------"
+for deck in Aramis-td-sc Aramis-td-wake; do
+  if ! "$GENESIS" $deck.in > genesis-$deck.log 2>&1; then
+    echo "Genesis $deck run FAILED; log tail:" >&2
+    tail -20 genesis-$deck.log >&2
+    exit 1
+  fi
+done
+tail -2 genesis-Aramis-td-wake.log
+echo
+
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [extra]
 
 make_nml () {
@@ -176,13 +188,25 @@ make_nml tier1s.nml aramis_1seg.bmad tier1s bmad    Aramis "split_weights = T"
 make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
+make_nml tdsc.nml   aramis_1seg.bmad tdsc   genesis AramisTD "sc_rmax = 250e-6
+  sc_nz = 2
+  sc_nphi = 1
+  sc_longrange = T"
+make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "wake_on = T
+  wake_radius = 2.5e-3
+  wake_conductivity = 5.813e7
+  wake_relaxation = 8.1e-6
+  wake_gap = 0.5e-3
+  wake_lgap = 0.015
+  wake_hrough = 100e-9
+  wake_lrough = 100e-6"
 
 # The documented tier numbers are single-thread runs; results must not depend on the
 # thread count, and the explicit gate for that follows the loop.
 
 export OMP_NUM_THREADS=1
 
-for tier in tier1 tier2 tier2g tier1s td1 td2 td2g; do
+for tier in tier1 tier2 tier2g tier1s td1 td2 td2g tdsc tdwk; do
   echo "--- fel_track_test: $tier -------------------------------------------------------"
   if ! "$EXE" $tier.nml > fel-$tier.log 2>&1; then
     echo "fel_track_test $tier FAILED; log tail:" >&2
@@ -274,6 +298,17 @@ echo
 echo "--- slice-migration gates ------------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/check_migration.py" --exe "$EXE" --workdir "$WORK_DIR"; then
   echo "FAIL: migration gates; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
+# Collective-effects self-referenced gates (deliverable 8): exact energy bookkeeping of
+# the wake's eloss on a cold dark beam, and the stale-wake structural check (the
+# convolution must follow the currents under migration).
+
+echo "--- collective-effects gates ---------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/check_collective.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: collective gates; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo

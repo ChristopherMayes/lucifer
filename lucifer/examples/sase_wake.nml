@@ -1,0 +1,46 @@
+! SASE with wakefields: the sase.nml run through a deliberately NARROW copper chamber
+! (0.5 mm radius -- a tuned demonstration case; at this energy and wavelength a normal
+! chamber's wake is small, and the point here is to SEE the physics, honestly labeled)
+! plus the undulator gap wake and a rough surface. The per-slice energy loss is written
+! to sase_wake.wake.txt; the mean-energy panel of plot_fel.py shows the wake-driven
+! decline on top of the FEL's own energy extraction.
+!
+!   fel_track_test sase_wake.nml
+!   python plot_fel.py sase_wake.diag.txt
+
+&fel_track_params
+  lat_file = "aramis.bmad"
+  out_root = "sase_wake"
+
+  gamma0 = 11357.82
+  lambda0 = 1e-10
+  delz = 0.045
+
+  und_aw = 0.84853
+  und_lambdau = 0.015
+  und_kx = 0.5, und_ky = 0.5
+  und_helical = T
+
+  gen_current = 3000
+  gen_delgam = 1.0
+  gen_ex = 4e-7, gen_ey = 4e-7
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+
+  gen_power = 0
+  gen_ngrid = 255
+  gen_dgrid = 2e-4
+
+  gen_npart = 2048
+  gen_slen = 2.88e-8           ! 96 slices of spacing 3*lambda0, as sase.nml.
+  gen_sample = 3
+  gen_shotnoise = T
+
+  wake_on = T
+  wake_radius = 0.5e-3         ! Narrow chamber: the tuned, visible case.
+  wake_material = "CU"         ! Copper: conductivity + AC relaxation shortcuts.
+  wake_gap = 0.5e-3            ! Undulator gap wake...
+  wake_lgap = 0.015            ! ...one gap per period.
+  wake_hrough = 100e-9         ! 100 nm surface roughness...
+  wake_lrough = 100e-6         ! ...with 100 um correlation length.
+&end

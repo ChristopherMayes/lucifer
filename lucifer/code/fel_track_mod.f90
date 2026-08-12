@@ -74,6 +74,7 @@
 module fel_track_mod
 
 use fel_beam_mod
+use fel_collective_mod
 use wavefront_mod
 
 implicit none
@@ -335,12 +336,13 @@ end function faw2
 !   err_flag    -- logical: Set True on error.
 !-
 
-subroutine fel_track_und_step (und, beam, wf, slip, err_flag)
+subroutine fel_track_und_step (und, beam, wf, slip, coll, err_flag)
 
 type (fel_und_struct) und
 type (fel_beam_struct), target :: beam
 type (wavefront_struct) wf
 type (fel_slip_struct) slip
+type (fel_collective_struct) coll
 logical err_flag
 
 real(rp) ks, phi0_new
@@ -363,19 +365,29 @@ ks = twopi / wf%wavelength
 phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 
 ! Everything cross-slice happens serially here, before and between the parallel loops:
-! the phi0 advance above, the kernel build below, and slippage in the caller. Inside the
-! loops each slice touches only its own particle arrays and its own field slice (the
-! beam-to-field mapping is a bijection), and each slice's arithmetic is independent of
-! which thread runs it, so results are bit-identical across thread counts -- the gate the
-! benchmark harness holds.
+! the phi0 advance above, the kernel build and the long-range space-charge profile
+! below, and slippage in the caller. Inside the loops each slice touches only its own
+! particle arrays and its own field slice (the beam-to-field mapping is a bijection),
+! and each slice's arithmetic is independent of which thread runs it, so results are
+! bit-identical across thread counts -- the gate the benchmark harness holds.
 
 ngrid_arr = wavefront_shape(wf)
 call fel_field_kernel_init (ngrid_arr(1), wf%dx, ks)
 
+if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(nslice))
+call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_esc)
+
+! Per-slice sequence in Genesis's order (Beam::track): transverse half, longitudinal
+! advance (ez inside the RK), the wake's gamma decrement, transverse half. All four are
+! per-slice pure, so folding them into one loop is arithmetic-identical to Genesis's
+! four sweeps.
+
 !$OMP parallel do
 do is = 1, size(beam%slice)
   call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
-  call fel_advance (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, phi0_new)
+  call fel_advance (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, phi0_new, &
+                    coll, is)
+  call fel_wake_apply_slice (coll%wake, beam, is, und%dz)
   call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
 enddo
 !$OMP end parallel do
@@ -399,14 +411,21 @@ end subroutine fel_track_und_step
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_track_interlude_genesis (qf, length, beam, wf, slip, err_flag)
+! Subroutine fel_track_interlude_genesis (qf, length, beam, wf, slip, coll, err_flag)
 !
 ! Routine to advance one field-free interlude element -- a drift or a quadrupole -- the
-! way Genesis does it, as one integration step: transverse half step, the collapsed
-! theta advance with the path-length term sampled at mid element and Genesis's drift
-! reference xku = ks*0.5/gamma0/gamma0 (BeamSolver.cpp:35-38, division order kept),
-! transverse half step, field diffraction with zero source. Slippage is NOT applied
-! here; the caller schedules it after the step, as with fel_track_und_step.
+! way Genesis does it, as one integration step: transverse half step, the longitudinal
+! advance with the path-length term sampled at mid element and Genesis's drift
+! reference xku = ks*0.5/gamma0/gamma0 (BeamSolver.cpp:35-38, division order kept), the
+! wake's gamma decrement, transverse half step, field diffraction with zero source.
+! Slippage is NOT applied here; the caller schedules it after the step, as with
+! fel_track_und_step.
+!
+! The longitudinal advance has two paths. With space charge off, the RK4 collapses
+! exactly (slope theta-independent, gamma constant) and the collapsed step is kept for
+! bit-identity with the pre-collective code. With space charge on, gamma changes inside
+! the step, so the full RK4 runs with rpart = 0 and the per-particle ez -- which is
+! Genesis's actual code path in drifts (BeamSolver::advance with aw = 0).
 !
 ! This is the Genesis interlude model, transcribed, so that running the full lattice with
 ! it isolates what the Bmad seam changes: the seam integrates the path-length term
@@ -414,12 +433,13 @@ end subroutine fel_track_und_step
 ! production configuration is the seam.
 !-
 
-subroutine fel_track_interlude_genesis (qf, length, beam, wf, slip, err_flag)
+subroutine fel_track_interlude_genesis (qf, length, beam, wf, slip, coll, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (wavefront_struct), target :: wf
 type (fel_slip_struct) slip
+type (fel_collective_struct) coll
 real(rp) qf, length
 logical err_flag
 
@@ -427,7 +447,7 @@ type (fel_und_struct) und0
 real(rp) xks, xku, qquad, phi0_new, gamma0, p0_mc
 real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, q_hat
 integer is, ip, nslice, ngrid_arr(3)
-logical err, any_err
+logical err, any_err, sc_active
 
 !
 
@@ -442,6 +462,10 @@ q_hat = qquad / p0_mc
 phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, p0_mc)
 nslice = size(wf%Ex, 3)
 
+sc_active = coll%efield%on .and. (coll%efield%nz >= 1 .or. coll%efield%longrange)
+if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(size(beam%slice)))
+call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
+
 ! The per-particle temporaries live at routine scope, so the parallel loop must make
 ! them private explicitly; a missed one here is a race, which is what the harness's
 ! thread-count-independence gate exists to catch.
@@ -452,26 +476,35 @@ do is = 1, size(beam%slice)
 
   call interlude_transverse_half (sl, q_hat, length/2)
 
-  ! theta advance, the collapsed RK4: with no field and no space charge the slope is
-  ! theta independent and constant through the stages, so RK4 reduces to one exact step.
-  ! btpar = 1 + px_g^2 + py_g^2 (aw = 0), px_g = gamma*beta_x = px * p0_mc.
+  if (sc_active) then
 
-  do ip = 1, sl%n
-    gam = fel_gamma_of(p0_mc, sl%pz(ip))
-    beta = fel_beta_of(p0_mc, sl%pz(ip))
-    theta = beam%phi0 + xks * sl%z(ip) / beta
+    call interlude_advance_full_rk (sl, is)
 
-    px_g = sl%px(ip) * p0_mc
-    py_g = sl%py(ip) * p0_mc
-    btpar = 1 + px_g*px_g + py_g*py_g
-    btpar0 = sqrt(1 - btpar / (gam * gam))
-    slope = xks * (1 - 1/btpar0) + xku
-    theta = theta + length * slope
+  else
 
-    ! Back to z: tau = (phi0_new - theta)/ks; pz unchanged (no energy change), so beta
-    ! is unchanged too.
-    sl%z(ip) = -beta * (phi0_new - theta) / xks
-  enddo
+    ! theta advance, the collapsed RK4: with no field and no space charge the slope is
+    ! theta independent and constant through the stages, so RK4 reduces to one exact
+    ! step. btpar = 1 + px_g^2 + py_g^2 (aw = 0), px_g = gamma*beta_x = px * p0_mc.
+
+    do ip = 1, sl%n
+      gam = fel_gamma_of(p0_mc, sl%pz(ip))
+      beta = fel_beta_of(p0_mc, sl%pz(ip))
+      theta = beam%phi0 + xks * sl%z(ip) / beta
+
+      px_g = sl%px(ip) * p0_mc
+      py_g = sl%py(ip) * p0_mc
+      btpar = 1 + px_g*px_g + py_g*py_g
+      btpar0 = sqrt(1 - btpar / (gam * gam))
+      slope = xks * (1 - 1/btpar0) + xku
+      theta = theta + length * slope
+
+      ! Back to z: tau = (phi0_new - theta)/ks; pz unchanged (no energy change), so beta
+      ! is unchanged too.
+      sl%z(ip) = -beta * (phi0_new - theta) / xks
+    enddo
+  endif
+
+  call fel_wake_apply_slice (coll%wake, beam, is, length)
 
   call interlude_transverse_half (sl, q_hat, length/2)
 enddo
@@ -516,6 +549,45 @@ do ip = 1, sl%n
 enddo
 
 end subroutine interlude_transverse_half
+
+!------------------------------------------------------------------------------
+
+subroutine interlude_advance_full_rk (sl, is)
+
+! Genesis's actual drift path (BeamSolver::advance with aw = 0): the full RK4 with
+! rpart = 0 and the per-particle space-charge ez held through the stages. gamma changes
+! here, so the chart round trip at exit is fel_advance's. Locals only; safe inside the
+! parallel slice loop.
+
+type (fel_slice_struct) sl
+integer is
+
+real(rp), allocatable :: ez(:)
+real(rp) gam, beta, theta, px_g, py_g, btpar, esc_loss, p_mc
+integer ip
+
+allocate (ez(max(1, sl%n)))
+call fel_shortrange_ez (coll%efield, beam, sl, gamma0**2, xks, ez)   ! gz2 at aw = 0.
+esc_loss = -coll%long_esc(is) / m_electron
+
+do ip = 1, sl%n
+  gam = fel_gamma_of(p0_mc, sl%pz(ip))
+  beta = fel_beta_of(p0_mc, sl%pz(ip))
+  theta = beam%phi0 + xks * sl%z(ip) / beta
+
+  px_g = sl%px(ip) * p0_mc
+  py_g = sl%py(ip) * p0_mc
+  btpar = 1 + px_g*px_g + py_g*py_g
+
+  call fel_runge_kutta (length, xks, xku, btpar, cmplx(0.0_rp, 0.0_rp, rp), &
+                        ez(ip) + esc_loss, gam, theta)
+
+  p_mc = sqrt(gam**2 - 1)
+  sl%pz(ip) = (p_mc - p0_mc) / p0_mc
+  sl%z(ip) = -(p_mc / gam) * (phi0_new - theta) / xks
+enddo
+
+end subroutine interlude_advance_full_rk
 
 end subroutine fel_track_interlude_genesis
 
@@ -618,29 +690,34 @@ end subroutine fel_apply_focus
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new)
+! Subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new, coll, is)
 !
 ! Routine to advance the longitudinal plane of every particle over delz. Transcribed from
 ! BeamSolver::advance: gather the field at (x, y) by bilinear interpolation from field
 ! slice ifld (the rotated-record index, fel_field_index), form
 ! rpart = (fc(1)/ks)*faw*conj(E), and integrate (theta, gamma) by the verbatim RK4 with
-! rpart, px, py and faw held fixed through the stages.
+! rpart, px, py, faw AND the space-charge ez held fixed through the stages. ez per
+! particle is fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
+! ez = getEField(ip) + eloss (BeamSolver.cpp:40,61); is is this slice's beam index.
 !
 ! (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
 ! using phi0_new, the common phase at the end of this step; see the module header for why
 ! this chart change is exact for RK4 and ~1 ulp for the energy.
 !-
 
-subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new)
+subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new, coll, is)
 
 type (fel_und_struct) und
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (wavefront_struct) wf
-integer ifld
+type (fel_collective_struct) coll
+integer ifld, is
 real(rp) delz, phi0_new
 
 real(rp) xks, xku, aw, rtmp, awloc, btpar, gamma, theta, beta, wx, wy, px_g, py_g, p_mc, p0_mc
+real(rp) gz2, ez_ip, esc_loss
+real(rp), allocatable :: ez(:)
 complex(rp) cpart, rpart
 integer ip, ix, iy
 logical on_grid
@@ -651,6 +728,16 @@ p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
 xku = und%ku
 aw = und%aw
+
+! Space charge of this slice, computed once per step and held through the RK stages
+! (BeamSolver::advance's order). The short-range solve is per-call-local, so this is
+! parallel-slice safe; long_esc was refreshed serially by the caller.
+
+allocate (ez(max(1, sl%n)))
+gz2 = fel_gamma0(beam)**2 / (1 + aw**2)
+call fel_shortrange_ez (coll%efield, beam, sl, gz2, xks, ez)
+esc_loss = 0
+if (allocated(coll%long_esc)) esc_loss = -coll%long_esc(is) / m_electron
 
 ! Coupling coefficient for the energy exchange: fc/(sqrt(2)*m_electron), the V/m form of
 ! Genesis's fc/ks (see the module header for the unit relation). rpart then has units of
@@ -679,7 +766,8 @@ do ip = 1, sl%n
     rpart = 0
   endif
 
-  call fel_runge_kutta (delz, xks, xku, btpar, rpart, gamma, theta)
+  ez_ip = ez(ip) + esc_loss     ! BeamSolver.cpp:61: short range plus the long-range loss.
+  call fel_runge_kutta (delz, xks, xku, btpar, rpart, ez_ip, gamma, theta)
 
   ! Back to the stored chart: pz from gamma (the subtraction is exact once p_mc is
   ! formed), z from tau = (phi0_new - theta)/ks with the updated beta.
@@ -696,14 +784,15 @@ end subroutine fel_advance
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, gamma, theta)
+! Subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, ez, gamma, theta)
 !
 ! The RK4 stage bookkeeping of BeamSolver::RungeKutta (BeamSolver.cpp:89-141), verbatim.
+! ez is held fixed through the stages, as Genesis holds it.
 !-
 
-subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, gamma, theta)
+subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, ez, gamma, theta)
 
-real(rp) delz, xks, xku, btpar, gamma, theta
+real(rp) delz, xks, xku, btpar, ez, gamma, theta
 complex(rp) rpart
 real(rp) k2gg, k2pp, k3gg, k3pp, stpz
 
@@ -712,7 +801,7 @@ real(rp) k2gg, k2pp, k3gg, k3pp, stpz
 k2gg = 0
 k2pp = 0
 
-call fel_ode (gamma, theta, xks, xku, btpar, rpart, k2gg, k2pp)
+call fel_ode (gamma, theta, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 
 ! second step
 
@@ -727,7 +816,7 @@ k3pp = k2pp
 k2gg = 0
 k2pp = 0
 
-call fel_ode (gamma, theta, xks, xku, btpar, rpart, k2gg, k2pp)
+call fel_ode (gamma, theta, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 
 ! third step
 
@@ -740,7 +829,7 @@ k3pp = k3pp / 6
 k2gg = k2gg * (-0.5_rp)
 k2pp = k2pp * (-0.5_rp)
 
-call fel_ode (gamma, theta, xks, xku, btpar, rpart, k2gg, k2pp)
+call fel_ode (gamma, theta, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 
 ! fourth step
 
@@ -755,7 +844,7 @@ k3pp = k3pp - k2pp
 k2gg = k2gg * 2
 k2pp = k2pp * 2
 
-call fel_ode (gamma, theta, xks, xku, btpar, rpart, k2gg, k2pp)
+call fel_ode (gamma, theta, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 
 gamma = gamma + stpz * (k3gg + k2gg / 6.0_rp)
 theta = theta + stpz * (k3pp + k2pp / 6.0_rp)
@@ -766,15 +855,18 @@ end subroutine fel_runge_kutta
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, k2gg, k2pp)
+! Subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 !
 ! The longitudinal equations of motion, BeamSolver::ODE (BeamSolver.cpp:144-163),
-! fundamental only, ez = 0.
+! fundamental only. ez is the per-particle space-charge term in m_e c^2 per meter
+! (short-range harmonics plus the long-range loss), zero when space charge is off --
+! in which case the arithmetic is bit-identical to the pre-collective code because
+! subtracting a literal zero is exact.
 !-
 
-subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, k2gg, k2pp)
+subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 
-real(rp) tgam, tthet, xks, xku, btpar, k2gg, k2pp
+real(rp) tgam, tthet, xks, xku, btpar, ez, k2gg, k2pp
 complex(rp) rpart, ctmp
 real(rp) ztemp1, btper0, btpar0
 
@@ -787,7 +879,7 @@ btper0 = btpar + ztemp1 * real(ctmp, rp)
 btpar0 = sqrt(1 - btper0 / (tgam * tgam))
 
 k2pp = k2pp + xks * (1 - 1/btpar0) + xku
-k2gg = k2gg + aimag(ctmp) / btpar0 / tgam       ! - ez, which is zero here.
+k2gg = k2gg + aimag(ctmp) / btpar0 / tgam - ez
 
 end subroutine fel_ode
 

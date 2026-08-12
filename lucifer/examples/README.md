@@ -72,3 +72,20 @@ the head of the finite window at each drift while fresh vacuum enters at the tai
 real effect of any finite time window, identical in Genesis; deep saturation of every
 slice needs a window longer than the total slippage), and the per-slice spaghetti in the
 power panel is the slippage cascade itself.
+
+## SASE with wakefields
+
+```
+../../../debug/bin/fel_track_test sase_wake.nml     # ~100 s
+python plot_fel.py sase_wake.diag.txt
+```
+
+The same SASE run through a deliberately NARROW copper chamber — 0.5 mm radius, a tuned
+demonstration case, honestly labeled: at 5.8 GeV and 1 Angstrom a normal chamber's wake
+is small, and this exists to make the physics visible — plus the undulator gap wake and
+a 100 nm rough surface. The loader writes the per-slice energy-loss rate to
+`sase_wake.wake.txt` (measured: 1.9 to 121 keV/m across the window, the head slices
+losing least — the wake is causal, and the resistive-wall numerical impedance of Bane &
+Stupakov sets the shape). Measured effect: the mean energy drops 8.3 m_e c^2 (about
+4.2 MeV) over the 57 m line — clearly visible in the energy panel against the 1 m_e c^2
+initial spread — while the SASE still reaches 3.9 GW.

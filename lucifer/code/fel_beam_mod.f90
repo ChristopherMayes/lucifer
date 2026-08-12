@@ -775,11 +775,8 @@ do ip = 1, sl%n
   wsum = wsum + w
   w2sum = w2sum + w*w
   x1 = x1 + w * sl%x(ip)
-  x2 = x2 + w * sl%x(ip)**2
   y1 = y1 + w * sl%y(ip)
-  y2 = y2 + w * sl%y(ip)**2
   g1 = g1 + w * gam
-  g2 = g2 + w * gam**2
   px1 = px1 + w * sl%px(ip)
   py1 = py1 + w * sl%py(ip)
   br = br + w * cos(theta)
@@ -791,16 +788,29 @@ if (wsum <= 0) then
   return
 endif
 
-g1 = g1/wsum;  g2 = g2/wsum
-x1 = x1/wsum;  x2 = x2/wsum
-y1 = y1/wsum;  y2 = y2/wsum
+g1 = g1/wsum
+x1 = x1/wsum
+y1 = y1/wsum
+
+! Second pass for the variances (FINDINGS 4.8): the one-pass <v^2> - <v>^2 form loses
+! sigma to cancellation once the mean is large against the spread -- for gamma ~ 1e4
+! with sigma ~ 1e-3 the one-pass noise is of order sigma itself, seen as spurious
+! sigma_gamma jitter under uniform wake kicks before this was rewritten.
+
+do ip = 1, sl%n
+  w = sl%weight(ip)
+  gam = fel_gamma_of(p0_mc, sl%pz(ip))
+  g2 = g2 + w * (gam - g1)**2
+  x2 = x2 + w * (sl%x(ip) - x1)**2
+  y2 = y2 + w * (sl%y(ip) - y1)**2
+enddo
 
 diag%mean_gamma = g1
-diag%sigma_gamma = sqrt(abs(g2 - g1*g1))
+diag%sigma_gamma = sqrt(g2/wsum)
 diag%mean_x = x1
-diag%sigma_x = sqrt(abs(x2 - x1*x1))
+diag%sigma_x = sqrt(x2/wsum)
 diag%mean_y = y1
-diag%sigma_y = sqrt(abs(y2 - y1*y1))
+diag%sigma_y = sqrt(y2/wsum)
 diag%mean_px = px1/wsum
 diag%mean_py = py1/wsum
 diag%bunching = sqrt((br/wsum)**2 + (bi/wsum)**2)
