@@ -6,7 +6,7 @@
 ! and the tracker derives each segment's aw from the element it is standing in --
 ! there is no per-segment namelist input. A post-saturation step-down taper like this
 ! re-matches the resonance to the decelerated beam and pushes power beyond saturation
-! (run taper.nml against steady_state.nml to see the difference; numbers in README.md).
+! (run this example against steady_state to see the difference; numbers in ../README.md).
 
 no_digested
 parameter[geometry] = open

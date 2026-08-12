@@ -1,6 +1,6 @@
 ! Steady-state FEL example: one command, no Genesis anywhere.
 !
-!   fel_track_test steady_state.nml
+!   fel_track_test run.nml           (run from this directory)
 !
 ! The program generates its own starting condition -- a quiet-start beam slice and a
 ! Gaussian seed field -- and tracks it through the 6-FODO helical undulator line of
@@ -11,7 +11,7 @@
 ! (computed by Genesis's zmatch for the benchmark; any sensible near-matched values work).
 
 &fel_track_params
-  lat_file = "aramis.bmad"
+  lat_file = "../aramis.bmad"
   out_root = "steady_state"
 
   gamma0 = 11357.82            ! 5.8 GeV.

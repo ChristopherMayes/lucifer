@@ -178,7 +178,7 @@ on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching phase 1.3e-2 rad m
 differ by design (period-averaged Genesis focusing vs Bmad's end-field treatment);
 this prices the swap without preferring either.
 
-The examples directory exercises the heterogeneity this buys: `taper.bmad` is the same
+The examples directory exercises the heterogeneity this buys: `examples/taper/` is the same
 line with the last two cells' undulators a second element definition with `b_max` 0.4%
 lower — bit-identical to the untapered run until the taper starts, 12.7x its exit
 power after (see `examples/README.md`).

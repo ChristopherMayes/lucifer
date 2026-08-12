@@ -1,83 +1,72 @@
 # FEL examples
 
-Self-contained runs of the FEL tracker: one command, no Genesis, no dump files. For the
-validation benchmark against Genesis — which is where the physics is proven — see
+Self-contained runs of the FEL tracker: one command each, no Genesis, no dump files. For
+the validation benchmark against Genesis — which is where the physics is proven — see
 `bsim/fel/tests/`.
 
-## Steady state
+One directory per example, each holding a `run.nml`. Shared pieces live at this level:
+`aramis.bmad` (the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator
+segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom) and
+`plot_fel.py`. Every example runs the same way, and its outputs land in its own
+directory:
 
 ```
-cd bsim/fel/examples
-../../../debug/bin/fel_track_test steady_state.nml     # or production/bin
+cd bsim/fel/examples/<example>
+../../../../debug/bin/fel_track_test run.nml        # or production/bin
+python ../plot_fel.py <example>.diag.txt            # needs matplotlib; writes <example>.diag.png
 ```
 
-This simulates a seeded, steady-state (single-slice) FEL: the Benchmark1-SASE
-configuration — a 6-cell FODO line of 3.99 m helical undulator segments (aw = 0.85 rms,
-15 mm period) at 5.8 GeV, resonant at 1 Angstrom, 3 kA, with a 5 kW Gaussian seed. With
-no dump files named in the namelist, the program generates its own starting state: a
-quiet-start beam (beamlet loading, so the initial bunching is zero to roundoff and the
-FEL grows from the seed, not from sampling noise) and the seed field at its waist. The
-run takes about a minute and prints three output files.
+| Example | What it is | Time |
+|---|---|---|
+| `steady_state/` | Seeded single-slice gain curve | ~1 min |
+| `taper/` | The same, with a two-stage undulator taper | ~1 min |
+| `sase/` | Pure SASE: 96 slices, dark start, shot noise | ~90 s |
+| `sase_wake/` | The SASE run plus resistive-wall/gap/roughness wakes | ~100 s |
 
-`steady_state.diag.txt` is the gain curve: one row per integration step with columns
-`z, slice, power, on_axis_intensity, bunching, bunching_phase, mean_gamma, sigma_gamma,
-sigma_x, sigma_y` (slice is always 1 here). Measured on this input: the seed enters at
-exactly 5 kW with bunching 4e-17 (the quiet start is exact), power grows exponentially
-with a 7.5 m power gain length and saturates at 1.6 GW around z = 38 m, and the beam
-sizes start on the matched values. To plot (needs matplotlib; the bmad-fel-validate
-environment has it):
+With no dump files named in the namelist, the program generates its own starting state
+(quiet-start beam, and a Gaussian seed where `gen_power > 0`); the header of
+`fel_track_test.f90` documents every parameter. The undulator segments in the lattices
+are real Bmad wiggler elements with `tracking_method = custom`, and their FEL parameters
+live on the lattice: aw derives from `b_max` and `l_period` (helical
+aw = c·b_max/(k_u·m_e c²), rms convention; a planar device divides by √2), helicity from
+`field_calc`. There are no per-undulator namelist parameters. A lattice whose FEL
+element is missing `b_max` or `l_period`, or uses a fieldmap `field_calc`, is refused by
+name at parse time.
 
-```
-python plot_fel.py steady_state.diag.txt        # writes steady_state.diag.png
-```
+`<example>.diag.txt` is the gain curve: one row per slice per integration step with
+columns `z, slice, power, on_axis_intensity, bunching, bunching_phase, mean_gamma,
+sigma_gamma, sigma_x, sigma_y`. The plot is four panels against z: radiation power
+(log), bunching, energy change and rms spread, and the transverse rms sizes showing the
+FODO betatron oscillation. On time-dependent files each thin gray line is a slice, the
+bold line the total power or slice average, and the slippage echelon is directly visible
+in the per-slice power. `<example>-final.fld.h5` / `-final.par.h5` are the end state in
+Genesis dump format (readable by `openPMD-beamphysics`, h5py, or Genesis itself); add
+`write_initial = T` to also dump the generated start — useful for handing the identical
+initial condition to Genesis (`&importbeam` / `&importfield`), which is how the loader
+was validated (Genesis imported the generated dumps and agreed at 1.5e-5, the constants
+floor of every Genesis comparison here).
 
-Four panels against z: radiation power (log), bunching, energy change and rms spread
-(both in units of m_e c^2 on one axis), and the transverse rms sizes showing the FODO
-betatron oscillation. The same script reads time-dependent diag files -- give it one
-from the benchmark's td tiers and each thin gray line is a slice, with the bold line the
-total power or the slice average; the slippage echelon is directly visible in the
-per-slice power.
+## steady_state
 
-`steady_state-final.fld.h5` and `steady_state-final.par.h5` are the end state in Genesis
-dump format (readable by `openPMD-beamphysics`'s `Wavefront.from_genesis4`, h5py, or
-Genesis itself). Add `write_initial = T` to the namelist to also dump the generated
-starting state — useful for handing the identical initial condition to Genesis
-(`&importbeam` / `&importfield`). That is how this loader was validated: Genesis imported
-the generated dumps and tracked the full line, agreeing with this tracker (transcribed
-interlude model) at 1.5e-5 — the constants floor of every Genesis comparison here.
+A seeded, steady-state (single-slice) FEL: the benchmark line with a 3 kA slice and a
+5 kW Gaussian seed at its waist. The quiet start is exact (initial bunching 4e-17, so
+the FEL grows from the seed, not sampling noise). Measured: 7.5 m power gain length,
+saturation at 1.6 GW around z = 38 m, and the beam sizes start on the matched values.
 
-Everything is set in `steady_state.nml`; the header of `fel_track_test.f90` documents
-every parameter. The undulator segments in `aramis.bmad` are real Bmad wiggler elements
-with `tracking_method = custom`, and their FEL parameters live on the lattice: aw derives
-from `b_max` and `l_period` (helical aw = c·b_max/(k_u·m_e c²), rms convention; a planar
-device divides by √2), helicity from `field_calc`. There are no per-undulator namelist
-parameters. A lattice whose FEL element is missing `b_max` or `l_period`, or uses a
-fieldmap `field_calc`, is refused by name at parse time.
+## taper
 
-## Tapered line
+The same run over `taper/taper.bmad`: identical to `aramis.bmad` for the first four FODO
+cells, but the last two cells' undulators are a second element definition, `UND2`, with
+`b_max` (hence aw) 0.4% lower. This is what driving the FEL from lattice attributes
+buys: a heterogeneous line is just different elements, with no per-segment program
+input. Measured against `steady_state` (same seed, same start): the two gain curves are
+bit-identical until the taper begins at z = 31.92 m; the untapered line saturates at
+1.6 GW and falls back to 0.76 GW at z = 57 m as particles rotate in the bucket, while
+the step-down taper re-matches the resonance to the decelerated beam and the power still
+climbs at the exit — 9.6 GW at z = 57 m, 12.7x the untapered exit power (6x its
+saturation peak).
 
-```
-../../../debug/bin/fel_track_test taper.nml
-python plot_fel.py taper.diag.txt
-```
-
-The same seeded steady-state run over `taper.bmad`: identical to `aramis.bmad` for the
-first four FODO cells, but the last two cells' undulators are a second element
-definition, `UND2`, with `b_max` (hence aw) 0.4% lower. This is what driving the FEL
-from lattice attributes buys: a heterogeneous line is just different elements, with no
-per-segment program input. Measured against `steady_state.nml` (same seed, same start):
-the two gain curves are bit-identical until the taper begins at z = 31.92 m; the
-untapered line saturates at 1.6 GW and falls back to 0.76 GW at z = 57 m as particles
-rotate in the bucket, while the step-down taper re-matches the resonance to the
-decelerated beam and the power still climbs at the exit — 9.6 GW at z = 57 m, 12.7x the
-untapered exit power (6x its saturation peak).
-
-## SASE, time dependent
-
-```
-../../../debug/bin/fel_track_test sase.nml     # ~90 s (OpenMP over slices)
-python plot_fel.py sase.diag.txt
-```
+## sase
 
 Pure SASE with nothing external at all: the loader generates a 96-slice time window
 (spacing 3 wavelengths), imposes physical shot noise (weighted Fawley loading — the
@@ -94,17 +83,12 @@ real effect of any finite time window, identical in Genesis; deep saturation of 
 slice needs a window longer than the total slippage), and the per-slice spaghetti in the
 power panel is the slippage cascade itself.
 
-## SASE with wakefields
-
-```
-../../../debug/bin/fel_track_test sase_wake.nml     # ~100 s
-python plot_fel.py sase_wake.diag.txt
-```
+## sase_wake
 
 The same SASE run through a deliberately NARROW copper chamber — 0.5 mm radius, a tuned
 demonstration case, honestly labeled: at 5.8 GeV and 1 Angstrom a normal chamber's wake
 is small, and this exists to make the physics visible — plus the undulator gap wake and
-a 100 nm rough surface. The loader writes the per-slice energy-loss rate to
+a 100 nm rough surface. The run writes the per-slice energy-loss rate to
 `sase_wake.wake.txt` (measured: 1.9 to 121 keV/m across the window, the head slices
 losing least — the wake is causal, and the resistive-wall numerical impedance of Bane &
 Stupakov sets the shape). Measured effect: the mean energy drops 8.3 m_e c^2 (about

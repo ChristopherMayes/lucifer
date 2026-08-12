@@ -5,11 +5,11 @@
 ! to sase_wake.wake.txt; the mean-energy panel of plot_fel.py shows the wake-driven
 ! decline on top of the FEL's own energy extraction.
 !
-!   fel_track_test sase_wake.nml
-!   python plot_fel.py sase_wake.diag.txt
+!   fel_track_test run.nml           (run from this directory)
+!   python ../plot_fel.py sase_wake.diag.txt
 
 &fel_track_params
-  lat_file = "aramis.bmad"
+  lat_file = "../aramis.bmad"
   out_root = "sase_wake"
 
   gamma0 = 11357.82

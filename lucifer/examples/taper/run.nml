@@ -1,11 +1,11 @@
-! Tapered steady-state FEL example: steady_state.nml, but over taper.bmad, whose last
+! Tapered steady-state FEL example: steady_state/run.nml, but over taper.bmad, whose last
 ! two FODO cells use a second undulator definition with b_max 0.4% lower.
 !
-!   fel_track_test taper.nml
+!   fel_track_test run.nml           (run from this directory)
 !
-! Same generated starting condition as steady_state.nml, so the two gain curves are
-! directly comparable: they separate where the taper begins (z = 31.92 m) and this one
-! ends higher. See the README for measured numbers and plotting.
+! Same generated starting condition as the steady_state example, so the two gain curves
+! are directly comparable: they separate where the taper begins (z = 31.92 m) and this
+! one ends higher. See the README for measured numbers and plotting.
 !
 ! The Twiss values are the matched periodic solution of this FODO cell at this energy
 ! (computed by Genesis's zmatch for the benchmark; any sensible near-matched values work).
