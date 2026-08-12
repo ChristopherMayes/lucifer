@@ -575,6 +575,139 @@ end subroutine fel_bunch_to_slice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, err_flag)
+!
+! Routine to move particles between slices when their ponderomotive phase leaves the
+! slice window: the weighted generalization of Genesis's one4one-only Sorting::localSort
+! (src/Util/Sorting.cpp:74-137), which this port can offer for ANY beam because each
+! particle carries its own charge (brief 6.4: weights and migration are the same
+! feature).
+!
+! The criterion is Genesis's, in this code's chart: the derived phase
+! theta = phi0 + ks*z/beta is Genesis's bounded theta, the slice window is
+! [0, slen) with slen = ks*slice_spacing = 2*pi*sample, and
+! atar = floor(theta/slen) is the relative destination (localSort's exact formula;
+! positive theta drift moves toward higher slice index, the head of the window). A
+! mover's z shifts by exactly -atar*beta*slice_spacing, which changes theta by
+! -atar*2*pi*sample: for integer sample the phase seen by every deposition and
+! diagnostic is continuous across the move to rounding -- no wrap protocol, the 4.2
+! coordinate decision paying off. sample is asserted integer for that reason.
+!
+! Removal is Genesis's swap-with-last, and the while-loop re-examines the swapped-in
+! particle exactly as localSort does. A particle appended to a HIGHER slice is
+! re-examined when the scan reaches that slice (its adjusted theta then lies inside the
+! window, so it stays); one appended to a LOWER slice waits for the next call, as in
+! Genesis. Particles whose destination lies beyond the window are DROPPED WITH THEIR
+! CHARGE COUNTED into charge_dropped -- Genesis discards them silently
+! (Sorting.cpp:194-195 clears the push vectors at the world edges); the accounting is
+! this port's deviation, chosen so conservation is checkable.
+!
+! Serial by design: called between the parallel regions at the caller's stride, so
+! thread-count independence is untouched. Single-slice beams return immediately (a
+! steady-state slice is periodic; migration has no meaning).
+!
+! Input:
+!   beam        -- fel_beam_struct: The beam.
+!   ks          -- real(rp): Radiation wavenumber twopi/wavelength [1/m].
+!
+! Output:
+!   beam            -- Particles re-sliced; slice fill counts updated.
+!   n_moved         -- integer: Number of particles moved between slices (this call).
+!   charge_dropped  -- real(rp): Charge of particles dropped off the window ends [C].
+!   drop_re, drop_im -- real(rp): Weighted phasor sum(w*e^{i theta}) of the dropped
+!                        particles, at their phase when dropped. Lets the caller verify
+!                        exact phase continuity including drops:
+!                        S_before = S_after + S_dropped to rounding.
+!   err_flag        -- logical: Set True on error.
+!-
+
+subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, err_flag)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl, sd
+real(rp) ks, charge_dropped, drop_re, drop_im
+integer n_moved
+logical err_flag
+
+real(rp) p0_mc, slen, sample, theta, beta, z_new
+integer ia, ib, il, nslice, atar, idest
+character(*), parameter :: r_name = 'fel_migrate_slices'
+
+!
+
+err_flag = .true.
+n_moved = 0
+charge_dropped = 0
+drop_re = 0
+drop_im = 0
+
+nslice = size(beam%slice)
+if (nslice < 2) then
+  err_flag = .false.
+  return
+endif
+
+sample = beam%slice_spacing / beam%wavelength
+if (abs(sample - nint(sample)) > 1e-9_rp * sample) then
+  call out_io (s_error$, r_name, &
+        'MIGRATION NEEDS AN INTEGER sample (SLICE SPACING OVER WAVELENGTH): PHASE CONTINUITY', &
+        'ACROSS A MOVE HOLDS ONLY THEN. GOT: \es16.8\ ', r_array = [sample])
+  return
+endif
+
+p0_mc = fel_p0_mc(beam)
+slen = ks * beam%slice_spacing            ! Window length in phase: 2*pi*sample.
+
+do ia = 1, nslice
+  sl => beam%slice(ia)
+  ib = 1
+  do while (ib <= sl%n)
+    beta = fel_beta_of(p0_mc, sl%pz(ib))
+    theta = beam%phi0 + ks * sl%z(ib) / beta
+    atar = int(floor(theta / slen))
+
+    if (atar == 0) then
+      ib = ib + 1
+      cycle
+    endif
+
+    idest = ia + atar
+
+    if (idest < 1 .or. idest > nslice) then
+      charge_dropped = charge_dropped + sl%weight(ib)
+      drop_re = drop_re + sl%weight(ib) * cos(theta)
+      drop_im = drop_im + sl%weight(ib) * sin(theta)
+    else
+      sd => beam%slice(idest)
+      if (sd%n + 1 > size(sd%x)) call fel_slice_reallocate (sd, max(sd%n + 1, (3 * sd%n) / 2))
+      sd%n = sd%n + 1
+      z_new = sl%z(ib) - atar * beta * beam%slice_spacing
+      sd%x(sd%n) = sl%x(ib);   sd%px(sd%n) = sl%px(ib)
+      sd%y(sd%n) = sl%y(ib);   sd%py(sd%n) = sl%py(ib)
+      sd%z(sd%n) = z_new;      sd%pz(sd%n) = sl%pz(ib)
+      sd%weight(sd%n) = sl%weight(ib)
+      n_moved = n_moved + 1
+    endif
+
+    ! Swap-with-last removal, re-examining the swapped-in particle (localSort's loop).
+
+    il = sl%n
+    sl%x(ib) = sl%x(il);   sl%px(ib) = sl%px(il)
+    sl%y(ib) = sl%y(il);   sl%py(ib) = sl%py(il)
+    sl%z(ib) = sl%z(il);   sl%pz(ib) = sl%pz(il)
+    sl%weight(ib) = sl%weight(il)
+    sl%n = sl%n - 1
+  enddo
+enddo
+
+err_flag = .false.
+
+end subroutine fel_migrate_slices
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_phi0_rate (ks, ku_like, p0_mc) result (rate)
 !
 ! Routine to return dphi0/ds, the advance rate of the common ponderomotive reference

@@ -267,6 +267,17 @@ if ! "$PYTHON" "$SCRIPT_DIR/check_sase_startup.py" --exe "$EXE" --genesis "$GENE
 fi
 echo
 
+# Slice-migration gates (deliverable 7): conservation under heavy migration, exact
+# phase continuity of the moves, and no-op bit identity (self-referenced, FINDINGS 6.9
+# -- Genesis migrates only under one4one).
+
+echo "--- slice-migration gates ------------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/check_migration.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: migration gates; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
 "$PYTHON" "$SCRIPT_DIR/compare_fel.py" "$WORK_DIR"
 STATUS=$?
 

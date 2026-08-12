@@ -7,8 +7,7 @@ the seam of the design brief's section 4.1, and validated against Genesis over i
 single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
 (deliverable 4).
 
-No space charge, no wakes, no harmonics, no slice migration. Those are later
-deliverables. Per-particle weights are carried from day one (brief section 5): the
+No space charge, no wakes, no harmonics. Those are later deliverables. Per-particle weights are carried from day one (brief section 5): the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
 the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
 over slices (deliverable 5), with thread-count independence -- bit-identical results at
@@ -27,6 +26,7 @@ section.
 | `bsim/fel/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
 | `bsim/fel/tests/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `bsim/fel/tests/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
+| `bsim/fel/tests/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus three time-dependent tiers against Genesis, plus the split-weight invariance check |
 | `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
@@ -312,6 +312,44 @@ Mutations bite: amplitudes from macroparticle count fail the statistical gate at
 a slice-uniform electron count (weights ignored) passes uniform and fails the nonuniform
 mode at 1.52 (theory 1.5625); the within-beamlet weight mutation makes the guard refuse
 at 2.3e-1 against a 5.3e-5 target.
+
+## Slice migration under weights (brief 6.4)
+
+Genesis permits migration only under one4one, because with uniform weighting the charge
+a mover carries cannot be expressed; per-particle weights dissolve the problem, and this
+port's coordinates dissolve the other half: z is continuous, the slice index is derived,
+and a one-slice move adjusts z by exactly `beta*slice_spacing` -- a phase shift of
+exactly `2*pi*sample`, so for integer `sample` the ponderomotive phase is continuous
+across the move to rounding. No wrap protocol exists to get wrong (the 4.2 decision
+paying off a third time). `fel_migrate_slices` is the weighted generalization of
+`Sorting::localSort`: same criterion (`atar = floor(theta/slen)`), same swap-with-last
+removal, same rescan semantics; the MPI `globalSort` has no counterpart here by design
+(brief 4.3). Particles leaving the window ends are dropped WITH THEIR CHARGE COUNTED and
+reported per event -- Genesis discards them silently at the world edges
+(`Sorting.cpp:194-195`). Migration is OFF BY DEFAULT (`migrate = T` enables): the
+Genesis-comparison tiers run against Genesis without one4one, which never migrates, so
+enabling it inside a transcription-level comparison would be a model difference. The
+pass runs serially at a per-element stride between the parallel regions, so the
+thread-independence gate is untouched. Per-slice `current` and `n_eff` are appended to
+the diag columns -- N_eff drifts once particles migrate (brief 6.4) and is monitored,
+not assumed.
+
+Four permanent gates (`check_migration.py`, self-referenced per FINDINGS 6.9): charge
+conservation under heavy migration (a `gen_delgam = 60` beam, 74k moves, in-window
+charge plus reported drops equals initial charge at every record; measured 1.5e-14),
+exact phase continuity (the whole-beam weighted phasor obeys
+`S_before = S_after + S_dropped`; measured 6.9e-15), window residency (every surviving
+particle's phase inside its slice window in the final dump -- the routine's
+postcondition), and no-op bit identity (a frozen-phase run with migration enabled
+reports zero moves and reproduces the disabled run byte for byte).
+
+Mutations bite, each caught by the instrument built for it: charge left behind on the
+move fails conservation at 8.9e-1; z unadjusted on the move SURVIVES conservation and
+continuity -- the mover cascade evaporates through accounted window-end drops, a balance
+sheet that balances while the beam disappears -- and is caught by window residency (17
+survivors outside); removing the high-side bounds check dies on the constructed
+off-the-end mover with a bounds trap, never touching memory beyond the arrays
+(FINDINGS.md 7.8).
 
 ## The coarse-step measurement (brief 8.3)
 

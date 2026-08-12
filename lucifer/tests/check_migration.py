@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""
+Gates for slice migration under weights (deliverable 7, self-referenced per FINDINGS
+6.9: Genesis migrates only under one4one, so weighted migration has no reference).
+
+Three checks:
+
+1. Conservation. A beam with artificially large energy spread (gen_delgam = 60) tracked
+   through the full line migrates heavily and bleeds charge off the window ends. At
+   every diagnostic record, in-window charge (sum of the per-slice current column times
+   spacing/c) plus the charge dropped so far (per-event log lines, full precision) must
+   equal the initial charge to 1e-10 relative. The run must actually bite: >10000 moves
+   and nonzero drops are asserted.
+
+2. Phase continuity. The same run carries migrate_check = T: at every migration the
+   whole-beam weighted phasor must satisfy S_before = S_after + S_dropped -- every
+   mover's phase shifts by an exact multiple of 2*pi*sample, every drop removes exactly
+   its own term. The reported worst deviation must be < 1e-10 (measured: rounding,
+   ~7e-15).
+
+3. No-op. A frozen-phase configuration (delgam ~ 0, negligible emittance, dark, no
+   noise) run with migrate = T must report zero moves and reproduce the migrate = F run
+   bit for bit (diag byte-equal, dumps dataset-equal): migration must not fire
+   spuriously and its inactive presence must change nothing.
+
+Usage: check_migration.py --exe <fel_track_test> --workdir <dir>
+The workdir must hold aramis.bmad and aramis_1seg.bmad. Exit 0 only if all pass.
+"""
+
+from __future__ import annotations
+
+import argparse
+import pathlib
+import re
+import subprocess
+import sys
+
+import h5py
+import numpy as np
+
+C_LIGHT = 2.99792458e8
+
+BASE = """&fel_track_params
+  lat_file = "{lat}"
+  out_root = "{root}"
+  gamma0 = 11357.82
+  lambda0 = 1e-10
+  delz = 0.045
+  und_aw = 0.84853
+  und_lambdau = 0.015
+  und_helical = T
+  gen_current = 3000
+  gen_delgam = {delgam}
+  gen_ex = {emit}, gen_ey = {emit}
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+  gen_power = 0
+  gen_ngrid = 65
+  gen_dgrid = 2e-4
+  gen_npart = {npart}
+  gen_nbins = 8
+  gen_slen = {slen}
+  gen_sample = 3
+  gen_seed = 777
+  migrate = {mig}
+  migrate_check = T
+&end
+"""
+
+
+def run(exe, wd, nml_name, text):
+    (wd / nml_name).write_text(text)
+    r = subprocess.run([str(exe), nml_name], cwd=wd, capture_output=True, text=True,
+                       env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
+    if r.returncode != 0:
+        print(f"FAIL: {nml_name} exited {r.returncode}:\n{r.stdout[-2000:]}")
+        sys.exit(1)
+    return r.stdout
+
+
+def in_window_charge(diag_file):
+    d = np.loadtxt(diag_file)
+    ns = int(d[:, 1].max())
+    d = d.reshape(-1, ns, d.shape[1])
+    return d[:, 0, 0], d[:, :, 10].sum(axis=1) * 3e-10 / C_LIGHT
+
+
+def dumps_equal(fa, fb):
+    with h5py.File(fa) as a, h5py.File(fb) as b:
+        names = []
+        a.visit(lambda n: names.append(n) if isinstance(a[n], h5py.Dataset) else None)
+        return all(np.array_equal(a[n][...], b[n][...]) for n in names)
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+    p.add_argument("--exe", required=True)
+    p.add_argument("--workdir", required=True)
+    a = p.parse_args()
+    wd = pathlib.Path(a.workdir)
+    exe = pathlib.Path(a.exe).resolve()
+    ok = True
+
+    # 1 + 2: conservation and phase continuity under heavy migration.
+    out = run(exe, wd, "migc.nml", BASE.format(lat="aramis.bmad", root="migc",
+              delgam="60.0", emit="4e-7", npart=1024, slen="4.8e-9", mig="T"))
+    moved = int(re.search(r"migration moved (\d+)", out).group(1))
+    bdev = float(re.search(r"bunching deviation across migrations:\s+(\S+)", out).group(1))
+    drops = [(float(m[1]), float(m[0])) for m in
+             re.findall(r"dropped\s+(\S+) C off the window ends at z =\s+(\S+)", out)]
+    z, q_win = in_window_charge(wd / "migc.diag.txt")
+    q0 = q_win[0]
+    worst = max(abs(q_win[i] + sum(q for zd, q in drops if zd <= zr + 1e-9) - q0) / q0
+                for i, zr in enumerate(z))
+    tot_drop = sum(q for _, q in drops)
+    c_ok = moved > 10000 and tot_drop > 0 and worst < 1e-10
+    ok = ok and c_ok
+    print(f"--- migration conservation: {moved} moves, {tot_drop:.3e} C dropped, "
+          f"worst violation {worst:.2e} (tol 1e-10)  {'ok' if c_ok else 'FAIL'}")
+    p_ok = bdev < 1e-10
+    ok = ok and p_ok
+    print(f"--- migration phase continuity: worst phasor deviation {bdev:.2e} "
+          f"(tol 1e-10)  {'ok' if p_ok else 'FAIL'}")
+
+    # Window residency: the routine's postcondition. The final dump is written right
+    # after the last migration, so every surviving particle's theta must lie in its
+    # slice window [0, 2*pi*sample). An unadjusted z on the move survives conservation
+    # (the cascade drops are accounted) but not this.
+    slen = 2 * np.pi * 3
+    n_out = 0
+    with h5py.File(wd / "migc-final.par.h5") as h5:
+        for i in range(int(h5["slicecount"][0])):
+            th = h5[f"slice{i+1:06d}/theta"][:]
+            n_out += int(np.sum((th < -1e-9) | (th >= slen + 1e-9)))
+    w_ok = n_out == 0
+    ok = ok and w_ok
+    print(f"--- migration window residency: {n_out} particles outside their window "
+          f"in the final dump  {'ok' if w_ok else 'FAIL'}")
+
+    # 3: no-op bit identity on a frozen-phase beam.
+    for mig, root in (("F", "mignf"), ("T", "mignt")):
+        out = run(exe, wd, f"{root}.nml", BASE.format(lat="aramis_1seg.bmad", root=root,
+                  delgam="0.001", emit="1e-13", npart=256, slen="1.2e-9", mig=mig))
+    moved = int(re.search(r"migration moved (\d+)", out).group(1))
+    diag_eq = (wd / "mignf.diag.txt").read_bytes() == (wd / "mignt.diag.txt").read_bytes()
+    d_eq = all(dumps_equal(wd / f"mignf-final.{s}.h5", wd / f"mignt-final.{s}.h5")
+               for s in ("fld", "par"))
+    n_ok = moved == 0 and diag_eq and d_eq
+    ok = ok and n_ok
+    print(f"--- migration no-op: {moved} moves, diag byte-equal {diag_eq}, "
+          f"dumps dataset-equal {d_eq}  {'ok' if n_ok else 'FAIL'}")
+
+    print("migration gates:", "PASS" if ok else "FAIL")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

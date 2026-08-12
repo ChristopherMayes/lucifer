@@ -61,7 +61,21 @@
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
 !     split_weights = F                        ! Weight-invariance test mode; see below.
 !     write_initial = F                        ! Also dump the initial state (Genesis format).
+!     migrate = F                              ! Slice migration (see below).
+!     migrate_check = F                        ! Verify phase continuity at each migration.
 !   &end
+!
+! migrate = T moves particles between slices when their ponderomotive phase leaves the
+! slice window (fel_migrate_slices: the weighted generalization of Genesis's
+! one4one-only localSort, brief 6.4), called serially after every element. OFF BY
+! DEFAULT, deliberately: the Genesis-comparison tiers run against Genesis WITHOUT
+! one4one, which never migrates, so migration would be a physics-model difference
+! inside a transcription-level comparison. Particles leaving the window ends are
+! dropped with their charge counted and reported per event and in the end-of-run
+! summary (Genesis discards them silently). migrate_check = T additionally verifies at
+! every migration that the whole-beam bunching is unchanged by the moves -- the z
+! adjustment shifts each mover's phase by an exact multiple of 2*pi*sample, so any
+! deviation beyond rounding is a bookkeeping bug -- and reports the worst deviation.
 !
 ! Alternatively, leave beam_file and field_file blank and the program generates its own
 ! steady-state starting condition -- a quiet-start beam and a Gaussian seed field -- from
@@ -159,6 +173,7 @@ real(rp) :: und_kx = 0.5_rp, und_ky = 0.5_rp
 logical :: und_helical = .true.
 logical :: split_weights = .false.
 logical :: write_initial = .false.
+logical :: migrate = .false., migrate_check = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
 
@@ -173,7 +188,8 @@ logical :: gen_shotnoise = .false., gen_test_weights = .false., load_only = .fal
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
-integer ie, is, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie
+real(rp) charge_dropped_tot, b_dev_max
+integer ie, is, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot
 logical err, timerun
 
 character(400) param_file
@@ -185,7 +201,7 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0,
                            gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
                            gen_beta_y, gen_alpha_y, gen_power, gen_waist_size, gen_ngrid, &
                            gen_dgrid, gen_seed, gen_slen, gen_sample, gen_shotnoise, &
-                           gen_test_weights, load_only
+                           gen_test_weights, load_only, migrate, migrate_check
 
 ! Read parameters.
 
@@ -320,7 +336,12 @@ endif
 open (newunit = iu_diag, file = trim(out_root) // '.diag.txt', action = 'write')
 write (iu_diag, '(a, i0)') '# nslice = ', nslice
 write (iu_diag, '(a)') '#         z            slice        power         on_axis_intensity        bunching        ' // &
-      'bunching_phase        mean_gamma          sigma_gamma           sigma_x               sigma_y'
+      'bunching_phase        mean_gamma          sigma_gamma           sigma_x               sigma_y' // &
+      '               current               n_eff'
+
+n_moved_tot = 0
+charge_dropped_tot = 0
+b_dev_max = 0
 
 z_now = 0
 call write_diag_rows()     ! Initial record, matching Genesis's diag before the first step.
@@ -353,6 +374,7 @@ do ie = 1, branch%n_ele_track
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step)
       endif
       z_now = z_now + und%dz
+      if (istep == und%nstep) call do_migrate ()
       call write_diag_rows()
     enddo
 
@@ -390,6 +412,7 @@ do ie = 1, branch%n_ele_track
     call fel_apply_slippage (slip, wf, ele_slip(ie))
 
     z_now = z_now + ele%value(l$)
+    call do_migrate ()
     call write_diag_rows()
 
   else
@@ -404,11 +427,20 @@ do ie = 1, branch%n_ele_track
     call fel_apply_slippage (slip, wf, ele_slip(ie))
 
     z_now = z_now + ele%value(l$)
+    call do_migrate ()
     call write_diag_rows()
   endif
 enddo
 
 close (iu_diag)
+
+if (migrate) then
+  print '(a, i0, a, es12.4, a)', 'fel_track_test: migration moved ', n_moved_tot, &
+        ' particles; dropped charge ', charge_dropped_tot, ' C off the window ends.'
+  if (migrate_check) then
+    print '(a, es10.2)', '  worst whole-beam bunching deviation across migrations: ', b_dev_max
+  endif
+endif
 
 ! Final dumps in Genesis format. The field record is unrotated to time order first --
 ! time window position is holds record slice 1 + mod(is-1+first, nslice) -- which is what
@@ -722,6 +754,72 @@ end subroutine do_split_weights
 
 !------------------------------------------------------------------------------
 
+subroutine do_migrate ()
+
+! Slice migration at the per-element stride, serial, between the parallel regions (the
+! thread gate stays untouched). Called AFTER z_now is advanced, so per-event drop
+! reports carry the z of the diagnostic record they precede -- the conservation
+! timeline reconstructs exactly from the log. With migrate_check, the whole-beam
+! weighted phasor S = sum(w e^{i theta}) must satisfy S_before = S_after + S_dropped to
+! rounding: every mover's phase shifts by an exact multiple of 2*pi*sample and a drop
+! removes exactly its own term, so any deviation beyond rounding is a bookkeeping bug
+! (wrong z adjustment, weight not moved), not statistics.
+
+real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum
+integer nm
+
+if (.not. migrate) return
+
+if (migrate_check) call whole_beam_phasor (sb_re, sb_im, wsum)
+
+call fel_migrate_slices (fbeam, ks, nm, chd, d_re, d_im, err)
+if (err) stop 1
+
+n_moved_tot = n_moved_tot + nm
+charge_dropped_tot = charge_dropped_tot + chd
+if (chd > 0) then
+  print '(a, es22.14, a, es22.14, a)', 'fel_track_test: migration dropped ', chd, &
+                                       ' C off the window ends at z = ', z_now, ' m.'
+endif
+
+if (migrate_check .and. (nm > 0 .or. chd > 0)) then
+  call whole_beam_phasor (sa_re, sa_im, wsum)
+  if (wsum > 0) then
+    b_dev_max = max(b_dev_max, sqrt((sb_re - sa_re - d_re)**2 + (sb_im - sa_im - d_im)**2) / wsum)
+  endif
+endif
+
+end subroutine do_migrate
+
+!------------------------------------------------------------------------------
+
+subroutine whole_beam_phasor (s_re, s_im, wsum)
+
+! The whole-beam weighted phasor sum(w e^{i theta}) and total weight, all slices.
+! Exactly conserved across migration (moves shift phases by 2*pi*sample multiples;
+! drops are accounted separately), which is what migrate_check verifies.
+
+real(rp) s_re, s_im, wsum, theta, beta, p0_mc, w
+integer is, ip
+
+s_re = 0; s_im = 0; wsum = 0
+p0_mc = fel_p0_mc(fbeam)
+
+do is = 1, size(fbeam%slice)
+  do ip = 1, fbeam%slice(is)%n
+    w = fbeam%slice(is)%weight(ip)
+    beta = fel_beta_of(p0_mc, fbeam%slice(is)%pz(ip))
+    theta = fbeam%phi0 + ks * fbeam%slice(is)%z(ip) / beta
+    s_re = s_re + w * cos(theta)
+    s_im = s_im + w * sin(theta)
+    wsum = wsum + w
+  enddo
+enddo
+
+end subroutine whole_beam_phasor
+
+!------------------------------------------------------------------------------
+
 subroutine write_diag_rows ()
 
 ! One row per slice, slices in time-window order: beam slice is against field slice
@@ -734,8 +832,9 @@ do is = 1, nslice
   call fel_field_diag (wf, fel_field_index(slip, is, nslice), power, on_axis)
   call fel_slice_diag (fbeam, fbeam%slice(is), ks, bdiag)
 
-  write (iu_diag, '(es24.16, i8, 8es24.16)') z_now, is, power, on_axis, bdiag%bunching, &
-        bdiag%bunching_phase, bdiag%mean_gamma, bdiag%sigma_gamma, bdiag%sigma_x, bdiag%sigma_y
+  write (iu_diag, '(es24.16, i8, 10es24.16)') z_now, is, power, on_axis, bdiag%bunching, &
+        bdiag%bunching_phase, bdiag%mean_gamma, bdiag%sigma_gamma, bdiag%sigma_x, bdiag%sigma_y, &
+        bdiag%current, bdiag%n_eff
 enddo
 
 end subroutine write_diag_rows
