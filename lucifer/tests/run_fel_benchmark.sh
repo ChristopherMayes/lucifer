@@ -248,6 +248,25 @@ fi
 echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dataset-equal)"
 echo
 
+# Shot-noise gates (deliverable 6). The statistical gate is self-referenced (FINDINGS
+# 6.9: Genesis cannot represent weighted noise); the SASE startup cross-check pits the
+# two codes' fully independent loaders and RNGs against each other at the level the
+# noise sets, the startup power.
+
+echo "--- shot-noise statistical gate (weighted Fawley loading) ---------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/check_shot_noise.py" --exe "$EXE" --workdir "$WORK_DIR" --seeds 15; then
+  echo "FAIL: shot-noise statistics; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
+echo "--- SASE startup cross-check against Genesis's loader -------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/check_sase_startup.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
+  echo "FAIL: SASE startup level; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
 "$PYTHON" "$SCRIPT_DIR/compare_fel.py" "$WORK_DIR"
 STATUS=$?
 

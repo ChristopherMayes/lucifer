@@ -7,13 +7,15 @@ the seam of the design brief's section 4.1, and validated against Genesis over i
 single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
 (deliverable 4).
 
-No space charge, no wakes, no harmonics, no shot-noise loading under weights, no slice
-migration. Those are later deliverables. Per-particle weights, by contrast, are carried
-from day one (brief section 5): the packed arrays store one, every reduction uses it,
-and the split-weight check below tests the nonuniform case that no Genesis comparison
-can reach. The FEL step is OpenMP-parallel over slices (deliverable 5), with
-thread-count independence -- bit-identical results at any thread count -- as a gated
-property, not an aspiration; see the parallelism section.
+No space charge, no wakes, no harmonics, no slice migration. Those are later
+deliverables. Per-particle weights are carried from day one (brief section 5): the
+packed arrays store one, every reduction uses it, and the split-weight check below tests
+the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
+over slices (deliverable 5), with thread-count independence -- bit-identical results at
+any thread count -- as a gated property; see the parallelism section. The built-in
+loader imposes physical shot noise generalized to weights (deliverable 6), gated
+statistically and cross-checked against Genesis's independent loader; see the shot-noise
+section.
 
 ## Files
 
@@ -22,7 +24,9 @@ property, not an aspiration; see the parallelism section.
 | `bsim/modules/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
 | `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps in undulator segments, seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
-| `bsim/fel/examples/` | Self-contained single-command example (no Genesis, no dump files): a seeded steady-state run of the benchmark line with its own README |
+| `bsim/fel/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
+| `bsim/fel/tests/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
+| `bsim/fel/tests/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus three time-dependent tiers against Genesis, plus the split-weight invariance check |
 | `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
@@ -275,6 +279,41 @@ the design brief's section 4.3 bet showing up in a measurement: Genesis's 12-ran
 spent 68 s of system time on the per-step MPI slippage ring exchange and diagnostics
 gather, where this code's slippage is an index rotation in shared memory and costs
 nothing to communicate.
+
+## Shot noise under weights (brief 6.2): the loader's noise is physical, and gated
+
+A slice of current I represents `N_lambda = I*slice_spacing/(e*c)` real electrons, and
+physical shot noise means `<|b(h)|^2> = 1/N_lambda` per harmonic. The built-in loader
+imposes it Fawley style, transcribed from Genesis's `ShotNoise::applyShotNoise` and
+generalized to per-particle weights in one substitution: the per-beamlet electron count
+in the amplitude is the beamlet's REAL charge over e, not Genesis's slice-uniform
+`ne/mpart` (identical for uniform weights). The algebra then gives `1/N_lambda` for any
+cross-beamlet weight distribution with no correction factors (FINDINGS.md 7.6). Weights
+must stay uniform within a beamlet -- the quiet cancellation is per beamlet. Genesis's
+silent `nbl < 1` clamp is kept but counted and warned.
+
+The N_eff discipline (brief 6.2's trap): the loader reports per-slice `N_lambda` and
+`N_eff = (sum w)^2/sum w^2`, and refuses to impose noise on a slice whose pre-noise
+quiet floor `max_h |b(h)|^2` is not far below the target -- swept over every harmonic
+the beamlet structure can resolve (`1..nbins-1`), not just the imposed ones, because an
+unquiet weight pattern can park its floor on a harmonic the imposition never touches
+(FINDINGS.md 7.7, found by this guard's own mutation test).
+
+Two permanent gates in the harness:
+
+- `check_shot_noise.py` (self-referenced, FINDINGS 6.9): many-seed loading-only runs,
+  `<|b(h)|^2>*N_lambda` against 1 within 5/sqrt(n) for harmonics 1-3, uniform AND
+  0.25x/1.75x alternating beamlet weights. Measured 1.03 in both modes.
+- `check_sase_startup.py` (cross-code): dark start, one segment, each code generating
+  its own noisy beam -- fully independent loaders and RNGs -- and the mean SASE startup
+  power must agree. Measured ln ratio -0.003 (0.3 percent) over 6 seeds x 32 slices.
+
+Mutations bite: amplitudes from macroparticle count fail the statistical gate at 13-20x;
+a slice-uniform electron count (weights ignored) passes uniform and fails the nonuniform
+mode at 1.52 (theory 1.5625); the within-beamlet weight mutation makes the guard refuse
+at 2.3e-1 against a 5.3e-5 target.
+
+## The coarse-step measurement (brief 8.3)
 
 SIMPLEX's reference case integrates twelve undulator periods per step with the slice
 spacing matched so slippage is one slice per step -- an order of magnitude fewer steps

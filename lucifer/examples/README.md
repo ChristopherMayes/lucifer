@@ -50,3 +50,25 @@ Everything is set in `steady_state.nml`; the header of `fel_track_test.f90` docu
 every parameter. The undulator segments are the elements named `UND*` in `aramis.bmad`,
 with the FEL parameters (`und_aw`, `und_lambdau`, ...) coming from the namelist — a real
 FEL element type carrying them on the lattice is a later deliverable.
+
+## SASE, time dependent
+
+```
+../../../debug/bin/fel_track_test sase.nml     # ~90 s (OpenMP over slices)
+python plot_fel.py sase.diag.txt
+```
+
+Pure SASE with nothing external at all: the loader generates a 96-slice time window
+(spacing 3 wavelengths), imposes physical shot noise (weighted Fawley loading — the
+loader prints the per-slice electron count N_lambda, N_eff, and the quiet floor it
+verified before imposing), starts the field dark, and the FEL grows from its own noise
+through the full line with slippage active.
+
+Measured on this input (seed 12345): startup power settles near 4 MW per slice after the
+first segment, total power reaches 4.0 GW at z = 57 m with a per-slice spread of 0.79 —
+the SASE fluctuation — and the induced energy spread grows from 1.0 to 1.15 m_e c^2. The
+plot shows the physics directly: the total-power sawtooth is radiation slipping out of
+the head of the finite window at each drift while fresh vacuum enters at the tail (a
+real effect of any finite time window, identical in Genesis; deep saturation of every
+slice needs a window longer than the total slippage), and the per-slice spaghetti in the
+power panel is the slippage cascade itself.

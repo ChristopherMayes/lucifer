@@ -69,24 +69,50 @@
 ! bsim/fel/examples). Generation parameters, with the &beam / &field names they mirror:
 !
 !     lambda0 = 1e-10          ! Radiation wavelength [m] (with dumps it comes from the file).
-!     gen_npart = 8192         ! Macroparticles; must be divisible by gen_nbins.
+!     gen_npart = 8192         ! Macroparticles per slice; must be divisible by gen_nbins.
 !     gen_nbins = 8            ! Beamlet size of the quiet start.
 !     gen_current = 3000       ! Slice current [A].
 !     gen_delgam = 1.0         ! Gaussian rms energy spread, units of m_e c^2.
 !     gen_ex = 4e-7, gen_ey = 4e-7             ! Normalized emittances [m rad].
 !     gen_beta_x = 8.5, gen_alpha_x = -0.70    ! Twiss at the entrance.
 !     gen_beta_y = 17.4, gen_alpha_y = 1.40
-!     gen_power = 5e3          ! Seed power [W].
+!     gen_power = 5e3          ! Seed power [W]; 0 gives a dark start (pure SASE).
 !     gen_waist_size = 30e-6   ! Seed 1/e^2 intensity radius w0 [m], waist at the entrance.
 !     gen_ngrid = 255          ! Transverse grid points per side.
 !     gen_dgrid = 2e-4         ! Grid half width [m] (Genesis's dgrid).
 !     gen_seed = 12345         ! Random seed, so the example is reproducible.
+!     gen_slen = 0             ! Time window [m]. 0: one slice, steady state (the default).
+!                              !   Positive: nslice = round(slen/(sample*lambda0)) slices.
+!     gen_sample = 1           ! Slice spacing / lambda0 (integer, Genesis's sample).
+!     gen_shotnoise = F        ! Impose physical shot noise (time-dependent windows only,
+!                              !   the same rule as Genesis's dotime condition).
+!     gen_test_weights = F     ! Validation knob: alternate beamlet weights 0.25x/1.75x
+!                              !   (charge preserving, uniform within each beamlet) to
+!                              !   exercise the weighted-noise paths. Not physics input.
+!     load_only = F            ! Generate, write <out_root>-initial dumps, exit without
+!                              !   tracking. For the shot-noise statistical gate.
 !
 ! The quiet start loads gen_npart/gen_nbins base samples of the transverse and energy
-! distributions and replicates each at gen_nbins equally spaced ponderomotive phases, so
-! every bunching harmonic below gen_nbins is zero to roundoff and the FEL starts from the
-! seed, not from sampling noise. This is the minimal loader an example needs; shot-noise
-! loading with weights (deliverable 6) will supersede it for SASE.
+! distributions per slice and replicates each at gen_nbins equally spaced ponderomotive
+! phases, so every bunching harmonic below gen_nbins is zero to roundoff. With
+! gen_shotnoise = T, physical shot noise is imposed on top, Fawley style, transcribed
+! from Genesis's ShotNoise::applyShotNoise and GENERALIZED TO WEIGHTS: per beamlet and
+! harmonic h = 1..(gen_nbins-1)/2, every particle of the beamlet gets the phase kick
+! -a_h*sin(h*theta + phi), phi uniform, a_h = (2/h)*sqrt(-ln(U)/nbl), where nbl is the
+! beamlet's REAL electron count -- its charge over e -- rather than Genesis's ne/mpart
+! (identical for uniform weights). Kick algebra: a quiet beamlet acquires
+! |b(h)| = h*a_h/2, so <|b(h)|^2> per beamlet is 1/nbl, and the charge-weighted slice
+! average is sum(W_j^2/nbl_j)/(sum W_j)^2 = e/sum(W) = 1/N_lambda for ANY cross-beamlet
+! weight distribution -- physical noise by construction (brief 6.2). Genesis silently
+! clamps nbl < 1 (more macroparticles than electrons); this loader warns when it clamps.
+!
+! The N_eff discipline (brief 6.2): the loader reports per-beam N_lambda and
+! N_eff = (sum w)^2/sum w^2 ranges, and REFUSES to impose noise on a slice whose
+! pre-noise quiet floor max_h |b(h)|^2 exceeds 1 percent of the target 1/N_lambda --
+! an unquiet representation (weights varying within a beamlet, degraded structure)
+! cannot carry noise below its own sampling floor, and imposing on top of it would
+! produce a silently wrong startup level. For beams this loader generates the floor is
+! roundoff; the guard exists for what future resampled input may bring.
 !
 ! interlude_model selects how the field-free elements are handled. "bmad" is the
 ! deliverable's architecture: track1_bunch for the particles, the exact theta mapping from
@@ -140,7 +166,10 @@ real(rp) :: lambda0 = 0                  ! Generation parameters; see the header
 real(rp) :: gen_current = 0, gen_delgam = 0, gen_ex = 0, gen_ey = 0
 real(rp) :: gen_beta_x = 0, gen_alpha_x = 0, gen_beta_y = 0, gen_alpha_y = 0
 real(rp) :: gen_power = 0, gen_waist_size = 0, gen_dgrid = 0
+real(rp) :: gen_slen = 0
 integer :: gen_npart = 8192, gen_nbins = 8, gen_ngrid = 255, gen_seed = 12345
+integer :: gen_sample = 1
+logical :: gen_shotnoise = .false., gen_test_weights = .false., load_only = .false.
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
@@ -155,7 +184,8 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0,
                            split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
                            gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
                            gen_beta_y, gen_alpha_y, gen_power, gen_waist_size, gen_ngrid, &
-                           gen_dgrid, gen_seed
+                           gen_dgrid, gen_seed, gen_slen, gen_sample, gen_shotnoise, &
+                           gen_test_weights, load_only
 
 ! Read parameters.
 
@@ -218,11 +248,16 @@ if (abs(wf%wavelength - fbeam%wavelength) > 1e-12_rp * fbeam%wavelength) then
   stop 1
 endif
 
-if (write_initial) then
+if (write_initial .or. load_only) then
   call wavefront_write_genesis4 (wf, trim(out_root) // '-initial.fld.h5', err, 'x')
   if (err) stop 1
   call fel_write_genesis4_beam (fbeam, trim(out_root) // '-initial.par.h5', err)
   if (err) stop 1
+endif
+
+if (load_only) then
+  print '(a)', 'fel_track_test: load_only set; initial state written, no tracking.'
+  stop 0
 endif
 
 ! Time dependence follows from the dumps: more than one slice makes a time-dependent run
@@ -402,18 +437,24 @@ contains
 
 !------------------------------------------------------------------------------
 !+
-! Generate the steady-state starting condition from the gen_* namelist parameters: one
-! quiet-start beam slice and a Gaussian seed field. See the program header for the
-! parameter list and the loading scheme. Minimal by design -- shot-noise loading with
-! weights is deliverable 6; this exists so an example is one command with no Genesis.
+! Generate the starting condition from the gen_* namelist parameters: quiet-start beam
+! slices (one, or a time window of them), optional physical shot noise generalized to
+! weights, and a Gaussian seed field (or a dark start at gen_power = 0). See the program
+! header for the parameter list, the noise algorithm and its provenance, and the N_eff
+! guard. The no-noise single-slice path is arithmetic-identical to the deliverable-4
+! loader -- same draw order, same operations -- which the bit-identity anchors rely on.
 !-
 
 subroutine generate_initial_state ()
 
 type (fel_slice_struct), pointer :: sl
-real(rp) p0_mc, ks_l, eg_x, eg_y, u, v, x, xp, y, yp, gam, p_mc, beta, pz, theta, theta0
-real(rp) dx_grid, w_part, e0, xg, yg
-integer ib, im, ip, mbase, ix, iy
+real(rp) p0_mc, ks_l, eg_x, eg_y, u, v, x, xp, y, yp, gam, p_mc, beta, pz, theta0
+real(rp) dx_grid, w_part, e0, xg, yg, wsum, w2sum, n_lambda, n_eff, floor_b2, target_b2
+real(rp) phi, an, nbl, br, bi
+real(rp), allocatable :: theta_work(:), beta_work(:), kick(:)
+real(rp) nl_min, nl_max, neff_min, neff_max, floor_max
+integer ib, im, ip, mbase, ix, iy, is_g, nslice_gen, ih, nharm, n_clamp
+character(*), parameter :: r_name = 'fel_track_test'
 
 !
 
@@ -429,83 +470,225 @@ if (gen_current <= 0 .or. gen_ex <= 0 .or. gen_ey <= 0 .or. gen_beta_x <= 0 .or.
   print '(a)', 'fel_track_test: gen_current, gen_ex, gen_ey, gen_beta_x and gen_beta_y must be positive.'
   stop 1
 endif
-if (gen_delgam < 0 .or. gen_power < 0 .or. gen_waist_size <= 0 .or. gen_ngrid < 3 .or. gen_dgrid <= 0) then
-  print '(a)', 'fel_track_test: check gen_delgam, gen_power, gen_waist_size, gen_ngrid, gen_dgrid.'
+if (gen_delgam < 0 .or. gen_power < 0 .or. gen_ngrid < 3 .or. gen_dgrid <= 0 .or. gen_sample < 1) then
+  print '(a)', 'fel_track_test: check gen_delgam, gen_power, gen_ngrid, gen_dgrid, gen_sample.'
+  stop 1
+endif
+if (gen_power > 0 .and. gen_waist_size <= 0) then
+  print '(a)', 'fel_track_test: gen_waist_size must be positive when gen_power > 0.'
   stop 1
 endif
 
-! The beam. Quiet start: mbase base samples of the transverse and energy distributions,
-! each replicated at gen_nbins equally spaced ponderomotive phases (theta0 spread on a
-! uniform grid within one beamlet spacing), so bunching harmonics below gen_nbins vanish
-! to roundoff. Weights and coordinates follow the conventions of fel_read_genesis4_beam:
-! z = beta*theta/ks with phi0 = 0, weight = I*slice_spacing/(c*npart).
+! The window: gen_slen <= 0 is the single-slice steady state; otherwise Genesis's count,
+! nslice = round(slen/(sample*lambda0)) (GenTime.cpp:70).
+
+if (gen_slen > 0) then
+  nslice_gen = nint(gen_slen / (gen_sample * lambda0))
+  if (nslice_gen < 1) nslice_gen = 1
+else
+  nslice_gen = 1
+endif
+
+if (gen_shotnoise .and. nslice_gen < 2) then
+  print '(a)', 'fel_track_test: gen_shotnoise needs a time-dependent window (gen_slen), the same rule as Genesis.'
+  stop 1
+endif
+
+mbase = gen_npart / gen_nbins
+if (gen_test_weights .and. mod(mbase, 2) /= 0) then
+  print '(a)', 'fel_track_test: gen_test_weights needs an even number of beamlets.'
+  stop 1
+endif
 
 p0_mc = sqrt(gamma0**2 - 1)
 fbeam%p0c = p0_mc * m_electron
 fbeam%phi0 = 0
 fbeam%wavelength = lambda0
-fbeam%slice_spacing = lambda0
+fbeam%slice_spacing = gen_sample * lambda0
 fbeam%s0 = 0
 fbeam%nbins = gen_nbins
 fbeam%one4one = .false.
 
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
-allocate (fbeam%slice(1))
-sl => fbeam%slice(1)
-call fel_slice_reallocate (sl, gen_npart)
-sl%n = gen_npart
+allocate (fbeam%slice(nslice_gen))
 
 call ran_seed_put (gen_seed)
 
 ks_l = twopi / lambda0
-mbase = gen_npart / gen_nbins
 eg_x = gen_ex / p0_mc                 ! Normalized emittance to geometric.
 eg_y = gen_ey / p0_mc
 w_part = gen_current * fbeam%slice_spacing / (c_light * gen_npart)
+nharm = (gen_nbins - 1) / 2           ! Genesis's harmonic count (ShotNoise.cpp).
 
-ip = 0
-do ib = 1, mbase
-  call ran_gauss (u);  call ran_gauss (v)
-  x  = sqrt(eg_x * gen_beta_x) * u
-  xp = sqrt(eg_x / gen_beta_x) * (v - gen_alpha_x * u)
-  call ran_gauss (u);  call ran_gauss (v)
-  y  = sqrt(eg_y * gen_beta_y) * u
-  yp = sqrt(eg_y / gen_beta_y) * (v - gen_alpha_y * u)
+allocate (theta_work(gen_npart), beta_work(gen_npart), kick(gen_npart))
+n_clamp = 0
+nl_min = huge(1.0_rp); nl_max = 0; neff_min = huge(1.0_rp); neff_max = 0; floor_max = 0
 
-  call ran_gauss (u)
-  gam = gamma0 + gen_delgam * u
-  p_mc = sqrt(gam**2 - 1)
-  beta = p_mc / gam
-  pz = (p_mc - p0_mc) / p0_mc
+do is_g = 1, nslice_gen
+  sl => fbeam%slice(is_g)
+  call fel_slice_reallocate (sl, gen_npart)
+  sl%n = gen_npart
 
-  theta0 = (ib - 0.5_rp) * twopi / (gen_nbins * mbase)
+  ! Quiet start: mbase base samples, each replicated at gen_nbins equally spaced
+  ! ponderomotive phases (theta0 spread on a uniform grid within one beamlet spacing),
+  ! so bunching harmonics below gen_nbins vanish to roundoff. Weights and coordinates
+  ! follow fel_read_genesis4_beam: z = beta*theta/ks with phi0 = 0,
+  ! weight = I*slice_spacing/(c*npart). theta and beta are held in work arrays so noise
+  ! can kick the phases before the z conversion.
 
-  do im = 0, gen_nbins - 1
-    ip = ip + 1
-    theta = theta0 + im * twopi / gen_nbins
-    sl%x(ip) = x;   sl%px(ip) = xp
-    sl%y(ip) = y;   sl%py(ip) = yp
-    sl%pz(ip) = pz
-    sl%z(ip) = beta * theta / ks_l    ! theta = phi0 + ks*z/beta, phi0 = 0.
-    sl%weight(ip) = w_part
+  ip = 0
+  do ib = 1, mbase
+    call ran_gauss (u);  call ran_gauss (v)
+    x  = sqrt(eg_x * gen_beta_x) * u
+    xp = sqrt(eg_x / gen_beta_x) * (v - gen_alpha_x * u)
+    call ran_gauss (u);  call ran_gauss (v)
+    y  = sqrt(eg_y * gen_beta_y) * u
+    yp = sqrt(eg_y / gen_beta_y) * (v - gen_alpha_y * u)
+
+    call ran_gauss (u)
+    gam = gamma0 + gen_delgam * u
+    p_mc = sqrt(gam**2 - 1)
+    beta = p_mc / gam
+    pz = (p_mc - p0_mc) / p0_mc
+
+    theta0 = (ib - 0.5_rp) * twopi / (gen_nbins * mbase)
+
+    do im = 0, gen_nbins - 1
+      ip = ip + 1
+      theta_work(ip) = theta0 + im * twopi / gen_nbins
+      beta_work(ip) = beta
+      sl%x(ip) = x;   sl%px(ip) = xp
+      sl%y(ip) = y;   sl%py(ip) = yp
+      sl%pz(ip) = pz
+      sl%weight(ip) = w_part
+    enddo
+  enddo
+
+  ! Validation knob: alternate beamlet weights 0.25x/1.75x, charge preserving, uniform
+  ! within each beamlet so the quiet cancellation is untouched. Exercises every
+  ! weighted-noise path (the asymmetry is strong enough that using a slice-uniform
+  ! electron count where the beamlet's charge belongs mis-sets <|b|^2> by 56 percent,
+  ! far outside the statistical gate); not a physics input.
+
+  if (gen_test_weights) then
+    do ib = 1, mbase
+      sl%weight((ib-1)*gen_nbins+1 : ib*gen_nbins) = &
+              sl%weight((ib-1)*gen_nbins+1 : ib*gen_nbins) * (1 + 0.75_rp * (-1)**ib)
+    enddo
+  endif
+
+  ! Bookkeeping the brief's 6.2 demands: real electrons N_lambda = charge/e, effective
+  ! macroparticle number N_eff = (sum w)^2/sum w^2, both per slice.
+
+  wsum = sum(sl%weight(1:gen_npart))
+  w2sum = sum(sl%weight(1:gen_npart)**2)
+  n_lambda = wsum / e_charge
+  n_eff = wsum**2 / w2sum
+  nl_min = min(nl_min, n_lambda);  nl_max = max(nl_max, n_lambda)
+  neff_min = min(neff_min, n_eff); neff_max = max(neff_max, n_eff)
+
+  if (gen_shotnoise) then
+
+    ! The N_eff guard: measure the pre-noise quiet floor. A representation whose floor
+    ! is not far below the target 1/N_lambda cannot carry physical noise -- imposing on
+    ! top would give a silently wrong startup level. The sweep covers EVERY harmonic the
+    ! beamlet structure can resolve (1..gen_nbins-1), not just the imposed ones: an
+    ! unquiet weight pattern can park its floor on a harmonic the imposition never
+    ! touches (an alternating within-beamlet pattern lands exactly on gen_nbins/2, found
+    ! by the guard's own mutation test) and still corrupt the dynamics through the
+    ! nonlinear phase evolution.
+
+    target_b2 = 1 / n_lambda
+    floor_b2 = 0
+    do ih = 1, gen_nbins - 1
+      br = 0; bi = 0
+      do ip = 1, gen_npart
+        br = br + sl%weight(ip) * cos(ih * theta_work(ip))
+        bi = bi + sl%weight(ip) * sin(ih * theta_work(ip))
+      enddo
+      floor_b2 = max(floor_b2, (br**2 + bi**2) / wsum**2)
+    enddo
+    floor_max = max(floor_max, floor_b2 * n_lambda)
+
+    if (floor_b2 > 0.01_rp * target_b2) then
+      print '(a, i0, a)',      'fel_track_test: slice ', is_g, ': the quiet-start floor is not far below the'
+      print '(a)',             '  physical shot-noise level -- this representation cannot carry the requested noise.'
+      print '(a, es10.2, a, es10.2)', '  max_h |b(h)|^2 = ', floor_b2, '  vs target 1/N_lambda = ', target_b2
+      print '(a, es10.2, a, es10.2)', '  N_eff = ', n_eff, '  N_lambda = ', n_lambda
+      stop 1
+    endif
+
+    ! Fawley-style shot noise, transcribed from ShotNoise::applyShotNoise and
+    ! generalized to weights: amplitudes from each beamlet's REAL electron count, its
+    ! charge over e (Genesis's ne/mpart for uniform weights). Kicks accumulate from the
+    ! unperturbed phases, exactly as Genesis's work array does; Genesis's silent
+    ! nbl < 1 clamp is kept but counted and reported.
+
+    kick = 0
+    do ih = 0, nharm - 1
+      do ib = 1, mbase
+        nbl = gen_nbins * sl%weight((ib-1)*gen_nbins + 1) / e_charge
+        if (nbl < 1) then
+          nbl = 1
+          n_clamp = n_clamp + 1
+        endif
+        call ran_uniform (u)
+        phi = twopi * u
+        call ran_uniform (u)
+        an = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
+        if (an > twopi) an = mod(an, twopi)
+        do im = 1, gen_nbins
+          ip = (ib-1)*gen_nbins + im
+          kick(ip) = kick(ip) - an * sin(theta_work(ip) * (ih+1) + phi)
+        enddo
+      enddo
+    enddo
+    theta_work(1:gen_npart) = theta_work(1:gen_npart) + kick(1:gen_npart)
+  endif
+
+  ! To the stored chart: z = beta*theta/ks with phi0 = 0, beta of the base sample.
+
+  do ip = 1, gen_npart
+    sl%z(ip) = beta_work(ip) * theta_work(ip) / ks_l
   enddo
 enddo
 
-! The field: a Gaussian seed at its waist, E = E0*exp(-r^2/w0^2), intensity 1/e^2 radius
-! w0, integrating to gen_power: E0 = sqrt(4*Z0*P/(pi*w0^2)). Grid convention matches
-! Genesis's dgrid: ngrid points spanning +-dgrid, dx = 2*dgrid/(ngrid-1), center on axis.
+deallocate (theta_work, beta_work, kick)
+
+if (gen_shotnoise) then
+  print '(a, i0, a)',        'fel_track_test: shot noise imposed on ', nslice_gen, ' slices.'
+  print '(2(a, es10.3))',    '  N_lambda per slice: ', nl_min, ' to ', nl_max
+  print '(2(a, es10.3))',    '  N_eff per slice:    ', neff_min, ' to ', neff_max
+  print '(a, es10.2)',       '  worst quiet floor, |b|^2 * N_lambda: ', floor_max
+  if (n_clamp > 0) then
+    print '(a, i0, a)',      '  WARNING: ', n_clamp, ' beamlet draws had fewer than one real electron'
+    print '(a)',             '  (nbl clamped to 1, as Genesis does silently). The noise level in those'
+    print '(a)',             '  beamlets is not physical; use fewer macroparticles or more charge.'
+  endif
+endif
+
+! The field: a Gaussian seed at its waist in every slice, E = E0*exp(-r^2/w0^2),
+! intensity 1/e^2 radius w0, integrating to gen_power; gen_power = 0 is a dark start.
+! Grid convention matches Genesis's dgrid: ngrid points spanning +-dgrid,
+! dx = 2*dgrid/(ngrid-1), center on axis.
 
 dx_grid = 2 * gen_dgrid / (gen_ngrid - 1)
-call wavefront_init (wf, gen_ngrid, gen_ngrid, 1, dx_grid, dx_grid, lambda0, lambda0, 'x', 0.0_rp)
+call wavefront_init (wf, gen_ngrid, gen_ngrid, nslice_gen, dx_grid, dx_grid, &
+                     fbeam%slice_spacing, lambda0, 'x', 0.0_rp)
 
-e0 = sqrt(4 * (mu_0_vac * c_light) * gen_power / (pi * gen_waist_size**2))
-do iy = 1, gen_ngrid
-  yg = (iy - 1) * dx_grid - gen_dgrid
-  do ix = 1, gen_ngrid
-    xg = (ix - 1) * dx_grid - gen_dgrid
-    wf%Ex(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / gen_waist_size**2)
+if (gen_power > 0) then
+  e0 = sqrt(4 * (mu_0_vac * c_light) * gen_power / (pi * gen_waist_size**2))
+  do iy = 1, gen_ngrid
+    yg = (iy - 1) * dx_grid - gen_dgrid
+    do ix = 1, gen_ngrid
+      xg = (ix - 1) * dx_grid - gen_dgrid
+      wf%Ex(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / gen_waist_size**2)
+    enddo
   enddo
-enddo
+  do is_g = 2, nslice_gen
+    wf%Ex(:, :, is_g) = wf%Ex(:, :, 1)
+  enddo
+endif
 
 end subroutine generate_initial_state
 

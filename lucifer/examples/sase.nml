@@ -1,0 +1,39 @@
+! Time-dependent SASE example: one command, no Genesis, no seed field, no dump files.
+!
+!   fel_track_test sase.nml
+!
+! The program generates a 32-slice time window of quiet-start beam, imposes physical
+! shot noise (weighted Fawley loading -- see the fel_track_test.f90 header), starts the
+! field dark (gen_power = 0), and tracks the full 6-FODO helical line. The FEL grows
+! from its own electron shot noise: pure SASE. Slippage is active; each slice lases
+! independently and the per-slice power spread is the SASE fluctuation. See the README
+! for measured behavior and plotting.
+
+&fel_track_params
+  lat_file = "aramis.bmad"
+  out_root = "sase"
+
+  gamma0 = 11357.82            ! 5.8 GeV.
+  lambda0 = 1e-10              ! 1 Angstrom.
+  delz = 0.045                 ! 3 undulator periods per integration step.
+
+  und_aw = 0.84853
+  und_lambdau = 0.015
+  und_kx = 0.5, und_ky = 0.5
+  und_helical = T
+
+  gen_current = 3000
+  gen_delgam = 1.0
+  gen_ex = 4e-7, gen_ey = 4e-7
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+
+  gen_power = 0                ! Dark start: SASE from shot noise alone.
+  gen_ngrid = 255
+  gen_dgrid = 2e-4
+
+  gen_npart = 2048             ! Per slice.
+  gen_slen = 2.88e-8            ! 96 slices...
+  gen_sample = 3               ! ...of spacing 3*lambda0, slippage one slice per step.
+  gen_shotnoise = T
+&end
