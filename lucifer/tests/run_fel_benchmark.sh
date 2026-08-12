@@ -171,10 +171,6 @@ make_nml () {
   out_root = "$3"
   gamma0 = 11357.82
   delz = 0.045
-  und_aw = 0.84853
-  und_lambdau = 0.015
-  und_kx = 0.5, und_ky = 0.5
-  und_helical = T
   interlude_model = "$4"
 ${6:+  $6}
 &end
@@ -200,6 +196,41 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "wake_on = T
   wake_lgap = 0.015
   wake_hrough = 100e-9
   wake_lrough = 100e-6"
+
+# FEL-element assertion gates (deliverable 9, brief 7.5): a lattice whose FEL element
+# is missing b_max, missing l_period, or uses a fieldmap field_calc must be REFUSED BY
+# NAME -- the failure message names the offending attribute and element -- not passed
+# through to fail downstream with an unrelated message (missing b_max) or a segfault in
+# the parse-time reference tracking (fieldmap). Each gate mutates one attribute of the
+# real single-segment lattice and requires both a nonzero exit and the by-name message.
+
+echo "--- FEL-element assertion gates (refusal by name) -----------------------------"
+grep -v "b_max" aramis_1seg.bmad                                   > gate_bmax.bmad
+sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > gate_lperiod.bmad
+sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > gate_fieldmap.bmad
+
+GATES_OK=1
+run_assert_gate () {   # <name> <by-name message fragment>
+  make_nml gate_$1.nml gate_$1.bmad gate_$1 bmad Aramis
+  if "$EXE" gate_$1.nml > fel-gate_$1.log 2>&1; then
+    echo "FAIL: gate_$1 lattice was accepted (exit 0); it must be refused" >&2
+    GATES_OK=0
+  elif ! grep -q "$2" fel-gate_$1.log; then
+    echo "FAIL: gate_$1 refused, but not by name; log tail:" >&2
+    tail -5 fel-gate_$1.log >&2
+    GATES_OK=0
+  else
+    echo "  gate_$1: refused by name ($(grep "$2" fel-gate_$1.log | head -1 | cut -c1-60)...)"
+  fi
+}
+run_assert_gate bmax     "zero b_max"
+run_assert_gate lperiod  "zero l_period"
+run_assert_gate fieldmap "field_calc must be planar_model"
+if [ "$GATES_OK" -ne 1 ]; then
+  echo "FAIL: FEL-element assertion gates; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
 
 # The documented tier numbers are single-thread runs; results must not depend on the
 # thread count, and the explicit gate for that follows the loop.

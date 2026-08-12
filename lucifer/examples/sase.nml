@@ -17,10 +17,6 @@
   lambda0 = 1e-10              ! 1 Angstrom.
   delz = 0.045                 ! 3 undulator periods per integration step.
 
-  und_aw = 0.84853
-  und_lambdau = 0.015
-  und_kx = 0.5, und_ky = 0.5
-  und_helical = T
 
   gen_current = 3000
   gen_delgam = 1.0

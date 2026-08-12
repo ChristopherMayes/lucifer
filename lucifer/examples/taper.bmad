@@ -1,0 +1,36 @@
+! Two-stage tapered variant of aramis.bmad: the same 6-FODO-cell line, but the last
+! two cells' undulators are a SECOND element definition with b_max stepped down 0.4%.
+!
+! This is the point of driving the FEL from lattice attributes: a heterogeneous line
+! is just different elements. Each wiggler carries its own b_max/l_period/field_calc,
+! and the tracker derives each segment's aw from the element it is standing in --
+! there is no per-segment namelist input. A post-saturation step-down taper like this
+! re-matches the resonance to the decelerated beam and pushes power beyond saturation
+! (run taper.nml against steady_state.nml to see the difference; numbers in README.md).
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 10
+beginning[beta_b] = 10
+
+! Stage 1: aw = 0.84853 (rms, helical), the Benchmark1-SASE undulator.
+UND1: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, num_steps = 1
+
+! Stage 2: identical device, b_max (hence aw) 0.4% lower.
+UND2: UND1, b_max = 0.99600 * 0.84853 * (twopi / 0.015) * m_electron / c_light
+
+D1: drift, l = 0.44
+D2: drift, l = 0.24
+QF: quadrupole, l = 0.08, k1 = 2.0
+QD: quadrupole, l = 0.08, k1 = -2.0
+
+FODO1: line = (UND1, D1, QF, D2, UND1, D1, QD, D2)
+FODO2: line = (UND2, D1, QF, D2, UND2, D1, QD, D2)
+TAPERED: line = (4*FODO1, 2*FODO2)
+
+use, TAPERED

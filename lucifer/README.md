@@ -7,7 +7,7 @@ the seam of the design brief's section 4.1, and validated against Genesis over i
 single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
 (deliverable 4).
 
-No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 8 is in. Per-particle weights are carried from day one (brief section 5): the
+No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 9 is in — including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the brief's 7.5 assertions enforced by name; see the FEL element section. Per-particle weights are carried from day one (brief section 5): the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
 the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
 over slices (deliverable 5), with thread-count independence -- bit-identical results at
@@ -22,7 +22,7 @@ section.
 |---|---|
 | `bsim/modules/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
-| `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps in undulator segments, seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
+| `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes; see the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
 | `bsim/fel/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
 | `bsim/fel/tests/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `bsim/fel/tests/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
@@ -35,7 +35,7 @@ section.
 | `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
 | `bsim/fel/tests/Aramis-1seg.in`, `Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
 | `bsim/fel/tests/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
-| `bsim/fel/tests/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices |
+| `bsim/fel/tests/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
 | `bsim/fel/tests/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `delz` |
 
 ## Running
@@ -46,9 +46,9 @@ BUILD_PRODUCTION=N ./util/conda_compile                      # builds fel_track_
 ./bsim/fel/tests/run_fel_benchmark.sh [--genesis <path to genesis4>]
 ```
 
-The harness runs Genesis four times (full line and single segment, steady state and time
-dependent), the Bmad tracker seven times, and prints the largest relative difference of
-each check. It fails loudly if the genesis4 binary is missing; there is no comparison
+The harness runs Genesis six times (full line and single segment, steady state and time
+dependent, plus the collective tiers), the Bmad tracker for every tier and gate, and
+prints the largest relative difference of each check. It fails loudly if the genesis4 binary is missing; there is no comparison
 without it, so there is nothing to skip to. Genesis must be built with FFTW, since the
 benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver;
 Genesis's default ADI solver is out of scope).
@@ -121,11 +121,69 @@ the per-slice diagnostics, the final field dump -- unrotates through `fel_field_
 as Genesis does at `writeFieldHDF5.cpp:86` and `Diagnostic.cpp:852`. Beam slices never
 rotate.
 
-Undulator segments are marked by name (`UND*`) and their FEL parameters come from the
-namelist, not from the lattice file. A real FEL element type with its own tracking method
-is a later deliverable; this is the smallest scheme that exercises the seam.
+## The FEL element (brief 7.5): parameters live on the lattice
 
-## Validation: seven checks, from one command
+An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying
+`tracking_method = custom` — Bmad's own semantics for "the program supplies the
+tracking", which this driver does. Recognition is by key and tracking method, never by
+name; there are no per-undulator namelist parameters. The FEL parameters derive from
+the element attributes:
+
+- `aw` (rms, Genesis's convention) from the peak field: `K = c*b_max/(k_u*m_e c^2)`,
+  exactly and independent of the reference energy; helical `aw = K`, planar
+  `aw = K/sqrt(2)`. The benchmark lattices write `b_max` as an expression in Bmad's own
+  constants so it encodes `aw = 0.84853` exactly — and the round trip still differs by
+  1 ulp, measured below.
+- Helicity from `field_calc` (`helical_model` / `planar_model`), never from the stored
+  `k1x`/`k1y` wiggler attributes, whose helical sign convention disagrees with Bmad's
+  own tracking locals (brief 7.5; nothing here cross-uses them).
+- Genesis's natural-focusing split from the helicity defaults (`kx = ky = 0.5*k_u^2`
+  helical, `0`/`k_u^2` planar, LatticeParser.cpp:328-333). Bmad's `kx` roll-off
+  attribute is not yet mapped onto that split and must be zero.
+
+Outside the driver's own FEL walk the element is just a periodic wiggler, tracked by
+Bmad's standard kernel through two hooks wired before `bmad_parser`:
+`track1_custom_ptr` and `make_mat6_custom_ptr` both delegate to `track_a_wiggler`, so
+the reference time acquires the resonant undulation delay from Bmad's own code
+(brief 7.5) and the transfer-matrix bookkeeping works. Both hooks are load-bearing:
+`mat6_calc_method` resolves to custom alongside the tracking method, and Bmad calls
+through a null `make_mat6_custom_ptr` (a jump to address zero) if a program sets only
+the tracking hook.
+
+The 7.5 assertions are enforced at the element's first touch — the reference pass
+inside `bmad_parser`, through those hooks — and refuse BY NAME: a missing `b_max`
+(Bmad's own kernel would silently give `osc_amplitude = 0`: no field, no resonance, no
+error), a missing `l_period` (same silence), and a fieldmap `field_calc` (which
+segfaults the parse-time reference tracking if allowed through). Enforcing them any
+later is provably too late — the missing-`b_max` lattice otherwise dies downstream on
+an unrelated generation message. The assertions live in ONE routine
+(`fel_assert_wiggler_sane`); a second inline copy was tried and removed because
+redundant assertions mask the removal of either copy under mutation testing. All three
+refusals are permanent harness gates.
+
+**Anchored against the namelist-driven reference:** the element-driven full TD line
+reproduces the last namelist-driven build's run to a max relative difference of
+3.4e-12, zero at z = 0 and growing with gain — exactly the amplification of the 1-ulp
+`aw` difference from deriving `aw` through the `b_max` attribute round trip rather than
+reading it from input.
+
+**In-undulator transverse transport, swappable and priced** (`und_transport`): the
+default `"genesis"` runs the transcribed Genesis focusing (matrix over each `delz` step
+from `aw`, `kx`, `ky`, chromatic via `gammaz`); `"bmad"` swaps in a flattened Bmad
+periodic-wiggler kernel for the same step — `track_a_wiggler`'s matrix with the
+octupole-like end kicks, chromatic via `p0/p`. Measured over the full time-dependent
+line (32 slices, 90 records): power differs by 5.0e-5 max (exit total power 3.0e-7),
+on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching phase 1.3e-2 rad max
+(5.8e-3 rad where bunching exceeds 1% of peak), for +3.8% runtime. The two models
+differ by design (period-averaged Genesis focusing vs Bmad's end-field treatment);
+this prices the swap without preferring either.
+
+The examples directory exercises the heterogeneity this buys: `taper.bmad` is the same
+line with the last two cells' undulators a second element definition with `b_max` 0.4%
+lower — bit-identical to the untapered run until the taper starts, 12.7x its exit
+power after (see `examples/README.md`).
+
+## Validation, from one command
 
 Both codes start from the same Genesis `&write` dumps, so the initial state is bitwise
 identical and no loader is reproduced. Genesis records diagnostics once at the start and
@@ -212,6 +270,13 @@ on the final step -- failed td1 at 0.84 of the final field during development, w
 how the unguarded `+1` in Genesis (FINDINGS.md 7.1) was found. The elementwise per-slice
 power comparison is what makes these loud: a one-slice misalignment puts finite power
 against near-vacuum slices, so the failure signature is orders of magnitude, not percent.
+
+The element-parameter path was mutation-tested the same way: a spurious `1/sqrt(2)` on
+the helical aw (the rms-convention error, exactly the mistake a translator would make)
+kills the gain outright and fails tier1 at 1.0 relative; deriving helicity from the
+wrong attribute (element key instead of `field_calc`) fails identically; and removing
+the `b_max` assertion is caught by the refusal gate — the lattice still dies, but on an
+unrelated downstream message instead of by name, which the gate's grep rejects.
 
 The thread-independence gate bites too: reintroducing a shared source accumulator across
 slices (the exact state of the code before deliverable 5) puts the 1-thread and 8-thread

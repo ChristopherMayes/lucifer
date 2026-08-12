@@ -1,12 +1,11 @@
-! Bmad translation of Genesis's benchmark/Benchmark1-SASE/Aramis.lat, for the steady-state
-! FEL benchmark. See fel_ss_test.f90 for how it is used.
+! Bmad translation of Genesis's benchmark/Benchmark1-SASE/Aramis.lat, for the FEL
+! examples in this directory.
 !
-! The undulator segments appear as drift placeholders named UND: fel_ss_test intercepts
-! every element whose name starts with UND and applies the FEL step to it; only the length
-! matters here (the FEL parameters aw, lambdau, kx, ky, helical come from the program's
-! namelist input). Everything else -- D1, QF, QD, D2 -- is tracked by Bmad. A real FEL
-! element type with its own tracking method is a later deliverable; this placeholder scheme
-! is the smallest thing that exercises the seam.
+! The undulator segments are real Bmad wiggler elements with tracking_method = custom
+! (Bmad's semantics for program-supplied tracking, which fel_track_test provides): the
+! FEL parameters derive from the element attributes -- aw from b_max and l_period,
+! helicity from field_calc -- and everything else (D1, QF, QD, D2) is tracked by Bmad.
+! Outside the FEL walk the element behaves as the plain periodic wiggler it is.
 !
 ! The reference energy: Genesis's gamma0 = 11357.82 times Bmad's electron rest mass. The
 ! FEL physics uses gamma0 directly from the namelist; the lattice's p0c only sets the scale
@@ -26,7 +25,11 @@ parameter[e_tot] = 11357.82 * m_electron
 beginning[beta_a] = 10   ! Placeholder Twiss; tracking here does not use lattice Twiss.
 beginning[beta_b] = 10
 
-UND: drift, l = 3.99            ! 266 periods of 15 mm. FEL step applied by fel_ss_test.
+! aw = c*b_max/(k_u*m_e c^2) for a helical device (rms convention), so b_max below
+! encodes aw = 0.84853 exactly as an expression in Bmad's own constants.
+UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
+     b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+     tracking_method = custom, num_steps = 1
 D1: drift, l = 0.44
 D2: drift, l = 0.24
 QF: quadrupole, l = 0.08, k1 = 2.0

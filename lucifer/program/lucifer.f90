@@ -7,10 +7,16 @@
 !
 ! The program walks a Bmad lattice and applies the seam of the design (brief section 4.1):
 !
-!   - Elements whose name starts with UND are FEL segments. They are stepped internally in
-!     delz with the transcribed Genesis physics (fel_track_mod): transverse push with
-!     natural focusing, RK4 ponderomotive advance, source deposition and FFT field solve.
-!     Bmad tracking is not used inside them.
+!   - FEL segments are real Bmad wiggler/undulator elements with
+!     tracking_method = custom (Bmad's semantics for program-supplied tracking, which
+!     this driver is; no name matching). Their FEL parameters come from lattice
+!     attributes -- aw from b_max/l_period, helicity from field_calc -- with the brief's
+!     7.5 assertions enforced by name at setup. They are stepped internally in delz with
+!     the transcribed Genesis physics (fel_track_mod): transverse push with natural
+!     focusing, RK4 ponderomotive advance, source deposition and FFT field solve. Bmad's
+!     own tracking is not used inside them; und_transport = "bmad" swaps the transverse
+!     maps for a flattened copy of Bmad's periodic-wiggler kernel, a priced model
+!     alternative.
 !
 !   - Every other element: each slice's bunch is converted from the packed FEL arrays to
 !     coord_structs and tracked by Bmad (track1_bunch). The packed arrays ARE Bmad
@@ -54,11 +60,11 @@
 !     out_root = "fel_td"                      ! Prefix for the output files.
 !     gamma0 = 11357.82                        ! Genesis's reference gamma.
 !     delz = 0.045                             ! Target integration step inside undulators [m].
-!     und_aw = 0.84853                         ! Undulator parameter (rms).
-!     und_lambdau = 0.015                      ! Undulator period [m].
-!     und_kx = 0.5, und_ky = 0.5               ! Natural focusing, deck convention (before ku^2).
-!     und_helical = T
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
+!     und_transport = "genesis"                ! In-undulator transverse maps: transcribed
+!                                              !   TrackBeam ("genesis", the tier default)
+!                                              !   or the flattened Bmad periodic-wiggler
+!                                              !   kernel ("bmad"); priced in the README.
 !     split_weights = F                        ! Weight-invariance test mode; see below.
 !     write_initial = F                        ! Also dump the initial state (Genesis format).
 !     migrate = F                              ! Slice migration (see below).
@@ -168,14 +174,17 @@ type (fel_und_struct) und
 type (fel_slip_struct) slip
 type (fel_slice_diag_struct) bdiag
 
-real(rp) :: gamma0 = 0, delz = 0, und_aw = 0, und_lambdau = 0
-real(rp) :: und_kx = 0.5_rp, und_ky = 0.5_rp
-logical :: und_helical = .true.
+real(rp) :: gamma0 = 0, delz = 0
 logical :: split_weights = .false.
 logical :: write_initial = .false.
 logical :: migrate = .false., migrate_check = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
+character(16) :: und_transport = 'genesis'     ! In-undulator transverse maps: the
+                                               ! transcribed TrackBeam ("genesis", tier
+                                               ! default) or the flattened Bmad periodic
+                                               ! kernel ("bmad"); the difference is
+                                               ! priced, not assumed (brief 10 step 9).
 
 ! Collective effects (deliverable 8), Genesis &wake / &efield names with wake_/sc_
 ! prefixes. All off by default; see the header.
@@ -198,6 +207,8 @@ integer :: gen_sample = 1
 logical :: gen_shotnoise = .false., gen_test_weights = .false., load_only = .false.
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
+type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, from lattice attributes.
+logical, allocatable :: is_fel(:)                 ! Which tracked elements are FEL segments.
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
 real(rp) charge_dropped_tot, b_dev_max
 integer ie, is, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot, iu_wake
@@ -209,7 +220,7 @@ character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
 namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0, delz, &
-                           und_aw, und_lambdau, und_kx, und_ky, und_helical, interlude_model, &
+                           interlude_model, und_transport, &
                            split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
                            gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
                            gen_beta_y, gen_alpha_y, gen_power, gen_waist_size, gen_ngrid, &
@@ -232,8 +243,13 @@ open (newunit = iu_nml, file = param_file, status = 'old', action = 'read')
 read (iu_nml, nml = fel_track_params)
 close (iu_nml)
 
-if (gamma0 <= 0 .or. delz <= 0 .or. und_aw <= 0 .or. und_lambdau <= 0) then
-  print '(a)', 'fel_track_test: gamma0, delz, und_aw and und_lambdau must all be set and positive.'
+if (gamma0 <= 0 .or. delz <= 0) then
+  print '(a)', 'fel_track_test: gamma0 and delz must be set and positive.'
+  stop 1
+endif
+
+if (und_transport /= 'genesis' .and. und_transport /= 'bmad') then
+  print '(a)', 'fel_track_test: und_transport must be "genesis" or "bmad", got: ' // trim(und_transport)
   stop 1
 endif
 
@@ -245,6 +261,19 @@ endif
 ! Read the lattice and the starting state: a pair of Genesis dumps (the shared-start
 ! benchmark methodology), or a self-generated steady-state condition when both file
 ! names are blank.
+!
+! FEL elements carry tracking_method = custom, and Bmad's bookkeeping (the reference
+! time/energy pass inside bmad_parser, any track1 at the seam) resolves custom tracking
+! through track1_custom_ptr: point it at the standard periodic-wiggler kernel, so the
+! element behaves as the plain Bmad wiggler it is everywhere EXCEPT inside this
+! driver's own FEL walk. In particular the reference time acquires the resonant
+! undulation delay of brief 7.5 from Bmad's own code, not from anything written here.
+
+! Both hooks are needed: mat6_calc_method resolves to custom too (auto follows the
+! tracking method), and make_mat6 calls through a null make_mat6_custom_ptr otherwise.
+
+track1_custom_ptr => fel_ele_as_wiggler
+make_mat6_custom_ptr => fel_mat6_as_wiggler
 
 call bmad_parser (lat_file, lat)
 branch => lat%branch(0)
@@ -338,20 +367,19 @@ slip%timerun = timerun
 slip%sample = fbeam%slice_spacing / fbeam%wavelength
 gamma0_ref = fel_gamma0(fbeam)
 
-! Undulator segment parameters, constant for every segment in this benchmark. kx, ky get
-! Genesis's unroll scaling by ku^2 (Lattice.cpp:412-413).
+! FEL segments are real Bmad wiggler/undulator elements carrying
+! tracking_method = custom -- Bmad's own semantics for "the program supplies the
+! tracking", which this driver does. Their FEL parameters come from LATTICE ATTRIBUTES,
+! not the namelist (deliverable 9): aw (rms, Genesis's convention) derives from b_max
+! and l_period through K = c*b_max/(k_u*m_e c^2) -- reference-energy independent -- with
+! aw = K for a helical device and K/sqrt(2) for a planar one; helicity from field_calc;
+! Genesis's natural-focusing split kx/ky from the helicity defaults (0.5/0.5 helical,
+! 0/1 planar; Bmad's kx roll-off attribute is not yet mapped and must be zero). The 7.5
+! assertions are enforced here: a wiggler with zero b_max or l_period would silently get
+! factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
+! gets osc_amplitude without focusing -- both are refused by name.
 
-und%aw = und_aw
-und%ku = twopi / und_lambdau
-und%kx = und_kx * und%ku**2
-und%ky = und_ky * und%ku**2
-und%helical = und_helical
-
-! Undulator slippage per integration step, in wavelengths: dz/(2*gamma0^2*lambda/(1+aw^2))
-! (Lattice.cpp:167-168 with Genesis's reference gamma). Note the step length is set per
-! element below; this is the rate per meter, multiplied by dz at use.
-
-und_slip_step = (1 + und_aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
+call setup_fel_elements ()
 
 ! The rest of the schedule: drift autophasing. Interludes accumulate Lz; the last
 ! interlude before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
@@ -370,7 +398,7 @@ prev_ie = 0
 do ie = 1, branch%n_ele_track
   ele => branch%ele(ie)
   if (ele%value(l$) == 0) cycle
-  if (ele%name(1:3) == 'UND') then
+  if (is_fel(ie)) then
     if (Lz > 0 .and. prev_ie > 0) then
       ele_slip(prev_ie) = ele_slip(prev_ie) + floor(Lz / (2 * gamma0_ref**2 * wf%wavelength)) + 1
       Lz = 0
@@ -410,11 +438,15 @@ do ie = 1, branch%n_ele_track
 
   if (ele%value(l$) == 0) cycle
 
-  if (ele%name(1:3) == 'UND') then
+  if (is_fel(ie)) then
 
     ! FEL segment: Genesis's unroll, nstep = round(l/delz), equal steps. Slippage after
-    ! each step's field solve; any end-of-lattice fixup lands on the last step.
+    ! each step's field solve; any end-of-lattice fixup lands on the last step. The
+    ! element's own parameters drive the step; per-element slippage rate follows its aw.
 
+    und = und_of(ie)
+    und%bmad_transport = (und_transport == 'bmad')
+    und_slip_step = (1 + und%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
     und%nstep = nint(ele%value(l$) / delz)
     if (und%nstep == 0) und%nstep = 1
     und%dz = ele%value(l$) / und%nstep
@@ -812,6 +844,65 @@ do is = 1, size(beam%slice)
 enddo
 
 end subroutine do_split_weights
+
+!------------------------------------------------------------------------------
+
+subroutine setup_fel_elements ()
+
+! Recognize FEL segments -- wiggler/undulator elements with tracking_method = custom,
+! Bmad's own semantics for program-supplied tracking, which this driver is -- and derive
+! their FEL parameters from lattice attributes, enforcing the brief's 7.5 assertions.
+! The stored k1x/k1y wiggler attributes are deliberately NOT read (7.5: their helical
+! sign disagrees with the tracking locals; nothing here cross-uses them).
+
+type (ele_struct), pointer :: w
+integer je
+real(rp) kw, kk
+
+allocate (is_fel(branch%n_ele_track), und_of(branch%n_ele_track))
+is_fel = .false.
+
+do je = 1, branch%n_ele_track
+  w => branch%ele(je)
+  if (.not. (w%key == wiggler$ .or. w%key == undulator$)) cycle
+  if (w%tracking_method /= custom$) cycle
+
+  ! The 7.5 assertions live in fel_assert_wiggler_sane, ONE authority called from the
+  ! track1/mat6 hooks (where they fire first, during the parse) and again here. Keeping
+  ! a second copy inline was tried and rejected: redundant assertions mask the removal
+  ! of either copy, which defeats mutation testing of the refusal gates.
+
+  call fel_assert_wiggler_sane (w)
+
+  is_fel(je) = .true.
+  kw = twopi / w%value(l_period$)
+
+  ! aw (rms, Genesis's convention) from the peak field:
+  ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy;
+  ! helical aw = K, planar aw = K/sqrt(2). Focusing split: Genesis's defaults by
+  ! helicity (LatticeParser.cpp:328-333), scaled by ku^2 as Genesis's unroll does.
+
+  kk = c_light * w%value(b_max$) / (kw * m_electron)
+
+  und_of(je)%ku = kw
+  und_of(je)%helical = (w%field_calc == helical_model$)
+  if (und_of(je)%helical) then
+    und_of(je)%aw = kk
+    und_of(je)%kx = 0.5_rp * kw**2
+    und_of(je)%ky = 0.5_rp * kw**2
+  else
+    und_of(je)%aw = kk / sqrt(2.0_rp)
+    und_of(je)%kx = 0
+    und_of(je)%ky = kw**2
+  endif
+enddo
+
+if (.not. any(is_fel)) then
+  print '(a)', 'fel_track_test: the lattice has no FEL elements (wiggler/undulator with tracking_method = custom).'
+  stop 1
+endif
+
+end subroutine setup_fel_elements
 
 !------------------------------------------------------------------------------
 

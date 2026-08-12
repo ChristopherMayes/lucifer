@@ -95,10 +95,6 @@ for np in 1 2 3 6 12; do
   out_root = "sweep_p$np"
   gamma0 = 11357.82
   delz = $delz
-  und_aw = 0.84853
-  und_lambdau = 0.015
-  und_kx = 0.5, und_ky = 0.5
-  und_helical = T
   interlude_model = "bmad"
 &end
 NML

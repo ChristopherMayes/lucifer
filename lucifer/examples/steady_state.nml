@@ -15,13 +15,9 @@
   out_root = "steady_state"
 
   gamma0 = 11357.82            ! 5.8 GeV.
-  lambda0 = 1e-10              ! 1 Angstrom, resonant with aw and und_lambdau below.
+  lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
   delz = 0.045                 ! 3 undulator periods per integration step.
 
-  und_aw = 0.84853             ! rms undulator parameter.
-  und_lambdau = 0.015          ! 15 mm period.
-  und_kx = 0.5, und_ky = 0.5   ! Helical natural focusing, split equally.
-  und_helical = T
 
   gen_current = 3000           ! 3 kA slice current.
   gen_delgam = 1.0             ! One electron rest mass of rms energy spread.

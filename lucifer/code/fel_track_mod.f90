@@ -95,6 +95,8 @@ type fel_und_struct
   real(rp) :: ky = 0          ! Natural focusing, deck ky * ku^2 [1/m^2].
   real(rp) :: ax = 0, ay = 0  ! Transverse offset of the undulator field [m].
   logical :: helical = .false.
+  logical :: bmad_transport = .false.  ! Transverse maps: transcribed TrackBeam (default)
+                                       !   or the flattened Bmad periodic-wiggler kernel.
   integer :: nstep = 0        ! Number of integration steps over the segment.
   real(rp) :: dz = 0          ! Step length [m].
 end type
@@ -127,6 +129,116 @@ integer, private, save :: fel_cache_ngrid = 0
 real(rp), private, save :: fel_cache_dgrid = 0, fel_cache_ks = 0
 
 contains
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_ele_as_wiggler (orbit, ele, param, err_flag, finished, track)
+!
+! track1_custom hook: outside a driver's own FEL walk, an FEL element (a wiggler with
+! tracking_method = custom) is just a periodic wiggler, so delegate to Bmad's standard
+! kernel. The reference time/energy pass inside bmad_parser and any seam-side track1
+! resolve through this, so the element carries the resonant undulation delay (brief 7.5)
+! from Bmad's own code. Kept at module scope deliberately: gfortran implements pointers
+! to internal procedures with stack trampolines, which Apple Silicon's non-executable
+! stack turns into a segfault at the first call.
+!-
+
+subroutine fel_ele_as_wiggler (orbit, ele, param, err_flag, finished, track)
+
+type (coord_struct) orbit
+type (ele_struct) ele
+type (lat_param_struct) param
+logical err_flag, finished
+type (track_struct), optional :: track
+
+!
+
+call fel_assert_wiggler_sane (ele)
+
+err_flag = .false.
+finished = .true.
+call track_a_wiggler (orbit, ele, param)
+
+end subroutine fel_ele_as_wiggler
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_assert_wiggler_sane (ele)
+!
+! The brief's 7.5 assertions, enforced at the first touch of the element -- which is
+! the reference time/energy pass INSIDE bmad_parser, through the hooks above. Enforcing
+! them any later is too late: a missing b_max parses cleanly and only fails downstream
+! with an unrelated message, and a fieldmap field_calc segfaults track_a_wiggler during
+! the parse itself. Refusal is by name so a lattice author knows which attribute to fix.
+! (The reference pass runs before lat_sanity_check, so these fire first; Bmad's own
+! sanity check would also refuse a missing l_period by name if this were removed.)
+!-
+
+subroutine fel_assert_wiggler_sane (ele)
+
+type (ele_struct) ele
+
+!
+
+if (ele%field_calc /= planar_model$ .and. ele%field_calc /= helical_model$) then
+  print '(2a)', 'fel_track_test: FEL element field_calc must be planar_model or ', &
+                'helical_model (a fieldmap gets no focusing here): ' // trim(ele%name)
+  stop 1
+endif
+if (ele%value(b_max$) <= 0) then
+  print '(2a)', 'fel_track_test: FEL element has zero b_max (no field, no resonance, ', &
+                'and Bmad itself would not warn): ' // trim(ele%name)
+  stop 1
+endif
+if (ele%value(l_period$) <= 0) then
+  print '(2a)', 'fel_track_test: FEL element has zero l_period (osc_amplitude would be ', &
+                'silently zero): ' // trim(ele%name)
+  stop 1
+endif
+if (ele%value(kx$) /= 0) then
+  print '(2a)', 'fel_track_test: the Bmad kx roll-off attribute is not yet mapped to ', &
+                'the FEL focusing split; set kx = 0 on: ' // trim(ele%name)
+  stop 1
+endif
+
+end subroutine fel_assert_wiggler_sane
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_mat6_as_wiggler (ele, param, start_orb, end_orb, err_flag)
+!
+! make_mat6_custom hook, the transfer-matrix companion of fel_ele_as_wiggler: an FEL
+! element's mat6_calc_method resolves to custom (auto follows tracking_method = custom),
+! and Bmad's bookkeeping calls through make_mat6_custom_ptr -- unconditionally, so a
+! program that leaves it null segfaults at a jump to address zero. Delegate to the
+! standard periodic-wiggler kernel with matrix propagation, filling ele%mat6, ele%vec0
+! and end_orb per the make_mat6_bmad convention.
+!-
+
+subroutine fel_mat6_as_wiggler (ele, param, start_orb, end_orb, err_flag)
+
+type (ele_struct), target :: ele
+type (coord_struct) :: start_orb, end_orb
+type (lat_param_struct) param
+logical err_flag
+
+!
+
+call fel_assert_wiggler_sane (ele)
+
+err_flag = .false.
+end_orb = start_orb
+call mat_make_unit (ele%mat6)
+call track_a_wiggler (end_orb, ele, param, ele%mat6, make_matrix = .true.)
+ele%vec0 = end_orb%vec - matmul(ele%mat6, start_orb%vec)
+
+end subroutine fel_mat6_as_wiggler
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -384,11 +496,19 @@ call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_e
 
 !$OMP parallel do
 do is = 1, size(beam%slice)
-  call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
+  if (und%bmad_transport) then
+    call fel_transverse_track_bmad (und, beam, beam%slice(is), und%dz/2, .true.)
+  else
+    call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
+  endif
   call fel_advance (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, phi0_new, &
                     coll, is)
   call fel_wake_apply_slice (coll%wake, beam, is, und%dz)
-  call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
+  if (und%bmad_transport) then
+    call fel_transverse_track_bmad (und, beam, beam%slice(is), und%dz/2, .false.)
+  else
+    call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
+  endif
 enddo
 !$OMP end parallel do
 
@@ -643,6 +763,95 @@ do ip = 1, sl%n
 enddo
 
 end subroutine fel_transverse_track
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
+!
+! The priced transport alternative (brief 10 step 9): the transverse maps of Bmad's own
+! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened -- quadrupole bodies
+! via quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
+! half-octupole edge kicks, using the TRACKING-LOCAL k1 values (7.5: never the stored
+! k1x/k1y attributes, whose helical sign disagrees). The z bookkeeping of the kernel
+! (path-length dz terms, low-energy correction, the end-of-element undulation factor)
+! is deliberately ABSENT: the ponderomotive phase evolution, including the aw^2 and
+! px^2+py^2 path terms, lives in fel_advance's RK, and applying it here too would
+! double-count.
+!
+! Structure: every leading half-step applies half the octupole kick then the quad body;
+! every trailing half-step the body then half the kick. Adjacent half-kicks between
+! steps sum to Bmad's full inter-step kick; the segment faces get the half kick, exactly
+! Bmad's n_step loop. Model differences from the transcribed TrackBeam (measured, not
+! argued): Bmad's 1/rel_p^2 chromaticity against Genesis's 1/gz_hat, and the octupole
+! edge kicks Genesis does not have.
+!
+! g_max reconstructs from aw: c*b_max = K*ku*m_e with K = aw (helical) or aw*sqrt(2)
+! (planar), so g_max = K*ku/p0_mc.
+!-
+
+subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
+
+type (fel_und_struct) und
+type (fel_beam_struct) beam
+type (fel_slice_struct) sl
+real(rp) delz
+logical leading
+
+real(rp) p0_mc, g_max, k1x_loc, k1y_loc, rel_p, k1xx, k1yy, k3l, kz
+real(rp) m2(2,2), dz_c(3), ddz_c(3)
+integer ip
+
+!
+
+p0_mc = fel_p0_mc(beam)
+kz = und%ku
+
+if (und%helical) then
+  g_max = und%aw * und%ku / p0_mc
+  k1x_loc = -0.5_rp * g_max**2
+  k1y_loc = k1x_loc
+else
+  g_max = und%aw * sqrt(2.0_rp) * und%ku / p0_mc
+  k1x_loc = 0                              ! kx attribute is asserted zero at setup.
+  k1y_loc = -0.5_rp * g_max**2
+endif
+
+do ip = 1, sl%n
+  rel_p = 1 + sl%pz(ip)
+  k1yy = k1y_loc / rel_p**2
+  k1xx = k1x_loc / rel_p**2
+  k3l = 2 * delz * k1yy                    ! Half of Bmad's per-step kick; see header.
+
+  if (leading) call octupole_kick ()
+
+  call quad_mat2_calc (k1xx, delz, rel_p, m2, dz_c, ddz_c)
+  call apply_mat2 (sl%x(ip), sl%px(ip))
+  call quad_mat2_calc (k1yy, delz, rel_p, m2, dz_c, ddz_c)
+  call apply_mat2 (sl%y(ip), sl%py(ip))
+
+  if (.not. leading) call octupole_kick ()
+enddo
+
+!------------------------------------------------------------------------------
+contains
+
+subroutine octupole_kick ()
+sl%py(ip) = sl%py(ip) + k3l * rel_p * kz**2 * sl%y(ip)**3 / 3
+if (und%helical) then
+  sl%px(ip) = sl%px(ip) + k3l * rel_p * kz**2 * sl%x(ip)**3 / 3
+endif
+end subroutine octupole_kick
+
+subroutine apply_mat2 (v, vp)
+real(rp) v, vp, v1, v2
+v1 = v; v2 = vp
+v  = m2(1,1) * v1 + m2(1,2) * v2
+vp = m2(2,1) * v1 + m2(2,2) * v2
+end subroutine apply_mat2
+
+end subroutine fel_transverse_track_bmad
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

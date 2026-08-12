@@ -1,0 +1,31 @@
+! Tapered steady-state FEL example: steady_state.nml, but over taper.bmad, whose last
+! two FODO cells use a second undulator definition with b_max 0.4% lower.
+!
+!   fel_track_test taper.nml
+!
+! Same generated starting condition as steady_state.nml, so the two gain curves are
+! directly comparable: they separate where the taper begins (z = 31.92 m) and this one
+! ends higher. See the README for measured numbers and plotting.
+!
+! The Twiss values are the matched periodic solution of this FODO cell at this energy
+! (computed by Genesis's zmatch for the benchmark; any sensible near-matched values work).
+
+&fel_track_params
+  lat_file = "taper.bmad"
+  out_root = "taper"
+
+  gamma0 = 11357.82            ! 5.8 GeV.
+  lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
+  delz = 0.045                 ! 3 undulator periods per integration step.
+
+
+  gen_current = 3000           ! 3 kA slice current.
+  gen_delgam = 1.0             ! One electron rest mass of rms energy spread.
+  gen_ex = 4e-7, gen_ey = 4e-7 ! 0.4 um normalized emittance.
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+  gen_power = 5e3              ! 5 kW seed...
+  gen_waist_size = 30e-6       ! ...with a 30 um waist at the entrance.
+  gen_ngrid = 255              ! Field grid: 255 x 255 points...
+  gen_dgrid = 2e-4             ! ...spanning +-0.2 mm.
+&end

@@ -47,9 +47,30 @@ the generated dumps and tracked the full line, agreeing with this tracker (trans
 interlude model) at 1.5e-5 — the constants floor of every Genesis comparison here.
 
 Everything is set in `steady_state.nml`; the header of `fel_track_test.f90` documents
-every parameter. The undulator segments are the elements named `UND*` in `aramis.bmad`,
-with the FEL parameters (`und_aw`, `und_lambdau`, ...) coming from the namelist — a real
-FEL element type carrying them on the lattice is a later deliverable.
+every parameter. The undulator segments in `aramis.bmad` are real Bmad wiggler elements
+with `tracking_method = custom`, and their FEL parameters live on the lattice: aw derives
+from `b_max` and `l_period` (helical aw = c·b_max/(k_u·m_e c²), rms convention; a planar
+device divides by √2), helicity from `field_calc`. There are no per-undulator namelist
+parameters. A lattice whose FEL element is missing `b_max` or `l_period`, or uses a
+fieldmap `field_calc`, is refused by name at parse time.
+
+## Tapered line
+
+```
+../../../debug/bin/fel_track_test taper.nml
+python plot_fel.py taper.diag.txt
+```
+
+The same seeded steady-state run over `taper.bmad`: identical to `aramis.bmad` for the
+first four FODO cells, but the last two cells' undulators are a second element
+definition, `UND2`, with `b_max` (hence aw) 0.4% lower. This is what driving the FEL
+from lattice attributes buys: a heterogeneous line is just different elements, with no
+per-segment program input. Measured against `steady_state.nml` (same seed, same start):
+the two gain curves are bit-identical until the taper begins at z = 31.92 m; the
+untapered line saturates at 1.6 GW and falls back to 0.76 GW at z = 57 m as particles
+rotate in the bucket, while the step-down taper re-matches the resonance to the
+decelerated beam and the power still climbs at the exit — 9.6 GW at z = 57 m, 12.7x the
+untapered exit power (6x its saturation peak).
 
 ## SASE, time dependent
 

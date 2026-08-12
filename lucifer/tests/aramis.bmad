@@ -26,7 +26,14 @@ parameter[e_tot] = 11357.82 * m_electron
 beginning[beta_a] = 10   ! Placeholder Twiss; tracking here does not use lattice Twiss.
 beginning[beta_b] = 10
 
-UND: drift, l = 3.99            ! 266 periods of 15 mm. FEL step applied by fel_ss_test.
+! The FEL element proper (deliverable 9): a real wiggler with tracking_method = custom
+! (Bmad's semantics for program-supplied tracking, which fel_track_test provides). The
+! FEL parameters derive from the attributes: aw = c*b_max/(k_u*m_e c^2) for a helical
+! device (rms convention), so b_max below encodes aw = 0.84853 exactly as an expression
+! in Bmad's own constants; helicity from field_calc; period from l_period.
+UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
+     b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+     tracking_method = custom, num_steps = 1
 D1: drift, l = 0.44
 D2: drift, l = 0.24
 QF: quadrupole, l = 0.08, k1 = 2.0
