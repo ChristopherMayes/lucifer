@@ -31,6 +31,7 @@ section.
 | `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
 | `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
+| `bsim/fel/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count; see the parallelism section |
 | `bsim/fel/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
 | `bsim/fel/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, gated relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
 | `bsim/fel/tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
@@ -346,6 +347,18 @@ also little schedule slack -- 4 slices per thread at 8 threads. Production-size 
 the floor of the scaling, not its ceiling.
 
 ### Head to head against Genesis at 12 workers
+
+One command reproduces this measurement on any machine:
+
+```
+./bsim/fel/tests/run_perf_benchmark.sh
+```
+
+It detects the performance-core count (`--workers N` to override), sizes the window to
+4 slices per worker so Genesis does not pad, finds the MPI launcher that matches the
+Genesis binary's own linkage (an OpenMPI `mpirun` aborts an MPICH-linked genesis4 on
+sight), times all four runs with one external clock, and refuses to print a table
+unless the two codes' answers agree at the documented seam level first.
 
 Measured on a 48-slice run (slice count divisible by the worker count, so Genesis does
 not pad its window), full line, 2048 particles per slice, identical starting dumps,
