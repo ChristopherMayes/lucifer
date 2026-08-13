@@ -101,12 +101,11 @@ echo "  python:      $PYTHON"
 echo "  workdir:     $WORK_DIR"
 echo
 
-cp "$SCRIPT_DIR/Aramis-ss.in" "$SCRIPT_DIR/Aramis.lat" \
-   "$SCRIPT_DIR/Aramis-1seg.in" "$SCRIPT_DIR/Aramis-1seg.lat" \
-   "$SCRIPT_DIR/Aramis-td.in" "$SCRIPT_DIR/Aramis-td-1seg.in" \
-   "$SCRIPT_DIR/Aramis-td-sc.in" "$SCRIPT_DIR/Aramis-td-wake.in" \
-   "$SCRIPT_DIR/Aramis-td-sase.in" \
-   "$SCRIPT_DIR/aramis.bmad" "$SCRIPT_DIR/aramis_1seg.bmad" "$WORK_DIR/"
+# Inputs are grouped by consumer and configuration (genesis4/<config>/*.in with the
+# shared .lat files one level up; bmad/*.bmad); the run itself is flat in WORK_DIR, so
+# the decks' internal lattice= references need no paths.
+cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/genesis4/*/*.in \
+   "$SCRIPT_DIR"/bmad/*.bmad "$WORK_DIR/"
 
 cd "$WORK_DIR" || exit 1
 
@@ -320,14 +319,14 @@ echo
 # noise sets, the startup power.
 
 echo "--- shot-noise statistical gate (weighted Fawley loading) ---------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/check_shot_noise.py" --exe "$EXE" --workdir "$WORK_DIR" --seeds 15; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_shot_noise.py" --exe "$EXE" --workdir "$WORK_DIR" --seeds 15; then
   echo "FAIL: shot-noise statistics; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
 echo "--- SASE startup cross-check against Genesis's loader -------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/check_sase_startup.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
   echo "FAIL: SASE startup level; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
@@ -338,7 +337,7 @@ echo
 # -- Genesis migrates only under one4one).
 
 echo "--- slice-migration gates ------------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/check_migration.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_migration.py" --exe "$EXE" --workdir "$WORK_DIR"; then
   echo "FAIL: migration gates; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
@@ -349,19 +348,23 @@ echo
 # convolution must follow the currents under migration).
 
 echo "--- collective-effects gates ---------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/check_collective.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir "$WORK_DIR"; then
   echo "FAIL: collective gates; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
-"$PYTHON" "$SCRIPT_DIR/compare_fel.py" "$WORK_DIR"
+"$PYTHON" "$SCRIPT_DIR/scripts/compare_fel.py" "$WORK_DIR"
 STATUS=$?
 
 if [[ $STATUS -eq 0 && $KEEP_WORK_DIR -eq 0 ]]; then
   rm -rf "$WORK_DIR"
-elif [[ $STATUS -ne 0 ]]; then
+  echo "Work directory removed (pass --work-dir <path> to keep every run's outputs,"
+  echo "e.g. to overlay a tier's curves: scripts/plot_fel_compare.py tdsase.diag.txt AramisTDSASE.out.h5)"
+else
   echo "Outputs kept in: $WORK_DIR"
+  echo "Overlay any tier's curves from there, e.g.:"
+  echo "  $SCRIPT_DIR/scripts/plot_fel_compare.py tdsase.diag.txt AramisTDSASE.out.h5"
 fi
 
 exit $STATUS

@@ -24,21 +24,21 @@ section.
 | `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
 | `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes; see the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
 | `bsim/fel/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
-| `bsim/fel/tests/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
-| `bsim/fel/tests/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
-| `bsim/fel/tests/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
+| `bsim/fel/tests/scripts/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
+| `bsim/fel/tests/scripts/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
+| `bsim/fel/tests/scripts/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
 | `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
-| `bsim/fel/tests/Aramis-td-sc.in`, `Aramis-td-wake.in` | Genesis decks: the collective tiers, importing the shared TD dumps |
-| `bsim/fel/tests/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
+| `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
+| `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
-| `bsim/fel/tests/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
-| `bsim/fel/tests/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, gated relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
-| `bsim/fel/tests/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
-| `bsim/fel/tests/Aramis-ss.in`, `Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
-| `bsim/fel/tests/Aramis-1seg.in`, `Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
-| `bsim/fel/tests/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
-| `bsim/fel/tests/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
-| `bsim/fel/tests/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `delz` |
+| `bsim/fel/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
+| `bsim/fel/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, gated relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
+| `bsim/fel/tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
+| `bsim/fel/tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
+| `bsim/fel/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
+| `bsim/fel/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
+| `bsim/fel/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
+| `bsim/fel/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `delz` |
 
 ## Running
 
@@ -57,7 +57,8 @@ Genesis's default ADI solver is out of scope).
 
 ## Architecture
 
-Inside elements named `UND*`, `fel_track_und_step` advances the coupled system in steps of
+Inside FEL elements (wigglers with `tracking_method = custom`; see the FEL element
+section), `fel_track_und_step` advances the coupled system in steps of
 `delz`, in Genesis's exact order: transverse half step, RK4 advance of (theta, gamma) with
 the field gathered once per step, transverse half step, then source deposition and the
 `exp(K2 dz)` field solve. Bmad tracking is never used inside (the brief's rule:
@@ -209,8 +210,10 @@ tiers). Measured, on the numbers this tree was developed against:
 Particle ordering is preserved by both codes (no sorting happens without one4one), so the
 final dumps compare particle by particle, not just statistically, in every tier.
 
-To *see* any tier rather than gate it, `plot_fel_compare.py <tier>.diag.txt
-<GenesisRoot>.out.h5` (from the benchmark work directory) overlays the two codes' power
+All outputs land in the benchmark's work directory (`--work-dir <path>`; without it
+a temporary directory is used, removed on success and kept on failure). To *see* any
+tier rather than gate it, run from a kept work directory:
+`scripts/plot_fel_compare.py <tier>.diag.txt <GenesisRoot>.out.h5` overlays the two codes' power
 and bunching curves, plots the gated elementwise relative power difference along the
 line, and the per-slice exit power — e.g. `plot_fel_compare.py tdsase.diag.txt
 AramisTDSASE.out.h5`. The slice count comes from the Genesis file, so steady-state and

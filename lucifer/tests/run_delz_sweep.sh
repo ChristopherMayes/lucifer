@@ -71,7 +71,7 @@ fi
 mkdir -p "$WORK_DIR"
 
 echo "delz sweep workdir: $WORK_DIR"
-cp "$SCRIPT_DIR/Aramis-td-s12.in" "$SCRIPT_DIR/Aramis.lat" "$SCRIPT_DIR/aramis.bmad" "$WORK_DIR/"
+cp "$SCRIPT_DIR/genesis4/sweep/Aramis-td-s12.in" "$SCRIPT_DIR/genesis4/Aramis.lat" "$SCRIPT_DIR/bmad/aramis.bmad" "$WORK_DIR/"
 cd "$WORK_DIR" || exit 1
 
 export FI_PROVIDER=tcp
