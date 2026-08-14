@@ -1061,6 +1061,24 @@ if (.not. any(is_fel)) then
   stop 1
 endif
 
+! Elements carrying Bmad wakes are refused by name: the seam tracks one FEL slice at a
+! time as its own bunch, so an element wake would act WITHIN single slices only -- the
+! bunch-scale wake between slices never accumulates -- and Bmad's tracker additionally
+! notes every zero-charge filler slice ("Wakes are on but bunch charge is zero!").
+! Near-null physics applied silently is worse than a refusal. The FEL's own wake model
+! (wake_on, deliverable 8) covers in-undulator wakes; bunch-scale element wakes at the
+! seam are future work.
+
+do je = 1, branch%n_ele_track
+  if (associated(branch%ele(je)%wake)) then
+    print '(2a)', 'fel_track_test: element carries Bmad wakes, which the slice-at-a-time ', &
+                  'seam cannot apply meaningfully (they would act within single slices only): ' &
+                  // trim(branch%ele(je)%name)
+    print '(a)',  '  Remove the wakes, or use the FEL wake model (wake_on) for in-undulator wakes.'
+    stop 1
+  endif
+enddo
+
 end subroutine setup_fel_elements
 
 !------------------------------------------------------------------------------

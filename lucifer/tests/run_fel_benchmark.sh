@@ -205,9 +205,10 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "wake_on = T
   wake_hrough = 100e-9
   wake_lrough = 100e-6"
 
-# FEL-element assertion gates (deliverable 9, brief 7.5): a lattice whose FEL element
-# is missing b_max, missing l_period, or uses a fieldmap field_calc must be REFUSED BY
-# NAME -- the failure message names the offending attribute and element -- not passed
+# Assertion gates: a lattice whose FEL element is missing b_max, missing l_period, or
+# uses a fieldmap field_calc (deliverable 9, brief 7.5), or that carries Bmad wakes on
+# any element (the slice-at-a-time seam cannot apply them meaningfully), must be
+# REFUSED BY NAME -- the failure message names the offending attribute and element -- not passed
 # through to fail downstream with an unrelated message (missing b_max) or a segfault in
 # the parse-time reference tracking (fieldmap). Each gate mutates one attribute of the
 # real single-segment lattice and requires both a nonzero exit and the by-name message.
@@ -231,9 +232,18 @@ run_assert_gate () {   # <name> <by-name message fragment>
     echo "  gate_$1: refused by name ($(grep "$2" fel-gate_$1.log | head -1 | cut -c1-60)...)"
   fi
 }
+cat > gate_wake.bmad <<'LAT'
+call, file = aramis_1seg.bmad
+PW: pipe, l = 0.1, sr_wake = {amp_scale = 1.0, z_scale = 1.0, scale_with_length = T, z_max = 1.2,
+  longitudinal = {-8266.6e2, 26.6, 46089.2, 1.578966/twopi, none}}
+SEGW: line = (UND, PW)
+use, SEGW
+LAT
+
 run_assert_gate bmax     "zero b_max"
 run_assert_gate lperiod  "zero l_period"
 run_assert_gate fieldmap "field_calc must be planar_model"
+run_assert_gate wake     "element carries Bmad wakes"
 if [ "$GATES_OK" -ne 1 ]; then
   echo "FAIL: FEL-element assertion gates; outputs kept in: $WORK_DIR" >&2
   exit 1

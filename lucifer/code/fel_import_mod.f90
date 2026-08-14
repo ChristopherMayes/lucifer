@@ -156,6 +156,17 @@ do ip = 1, n
   wt(i) = cp%charge
 enddo
 
+! A bunch with no charge imports as a perfectly dark beam -- every window current
+! zero, every weight zero, a run that tracks and produces nothing, silently. The
+! usual causes are an openPMD file without charge data and an unset
+! beam_init%bunch_charge. Refuse by name.
+
+if (sum(wt) <= 0) then
+  call out_io (s_error$, r_name, 'BUNCH HAS ZERO TOTAL CHARGE; NOTHING WOULD LASE.', &
+    'AN openPMD FILE WITHOUT CHARGE DATA, OR AN UNSET beam_init%bunch_charge, IMPORTS DARK.')
+  return
+endif
+
 smin = minval(s);  s = s - smin                    ! Genesis's min shift (SDDSBeam.cpp:246)
 ttotal = maxval(s)
 if (ttotal <= 0) then

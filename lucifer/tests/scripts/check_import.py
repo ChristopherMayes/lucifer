@@ -270,6 +270,19 @@ def main():
         print("FAIL: openPMD round trip does not reproduce the bunch")
         ok = False
 
+    # zero-charge refusal: a chargeless bunch (openPMD without charge data, unset
+    # beam_init%bunch_charge) must be refused by name, not imported as a dark beam.
+    write_nml(w/"imp_dark.nml", "impdark", 1000, extra='  load_only = T\n',
+              source=BEAM_INIT_SOURCE.replace("bunch_charge = 3.01e-14", "bunch_charge = 0"))
+    with open(w/"imp_dark.log", "w") as fh:
+        rr = subprocess.run([args.exe, "imp_dark.nml"], stdout=fh, stderr=subprocess.STDOUT, env=env1)
+    dark_log = (w/"imp_dark.log").read_text()
+    if rr.returncode == 0 or "ZERO TOTAL CHARGE" not in dark_log:
+        print(f"FAIL: zero-charge bunch not refused by name (exit {rr.returncode})")
+        ok = False
+    else:
+        print("zero-charge refusal: refused by name")
+
     # twiss (statistical): the imported dump's central slices recover the targets.
     # Statistics note: each slice has npart/nbins = 256 independent phase-space seeds,
     # so a single slice's Twiss carries ~1/sqrt(256) = 6% noise and a max over slices
