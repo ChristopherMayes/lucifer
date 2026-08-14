@@ -71,7 +71,6 @@ BMAD_NML = """&fel_track_params
   lat_file = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
   lambda0 = 1e-10
-  delz = 0.045
   gen_current = 3000
   gen_delgam = 1.0
   gen_ex = 4e-7, gen_ey = 4e-7

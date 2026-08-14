@@ -11,7 +11,8 @@
 !     tracking_method = custom (Bmad's semantics for program-supplied tracking, which
 !     this driver is; no name matching). Their FEL parameters come from lattice
 !     attributes -- aw from b_max/l_period, helicity from field_calc -- with the brief's
-!     7.5 assertions enforced by name at setup. They are stepped internally in delz with
+!     7.5 assertions enforced by name at setup. They are stepped in the element's own
+!     ds_step (Genesis's delz, now a lattice attribute like everything else) with
 !     the transcribed Genesis physics (fel_track_mod): transverse push with natural
 !     focusing, RK4 ponderomotive advance, source deposition and FFT field solve. Bmad's
 !     own tracking is not used inside them; und_transport = "bmad" swaps the transverse
@@ -58,7 +59,6 @@
 !     beam_file = "Aramis-initial.par.h5"      ! Genesis particle dump to start from.
 !     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
 !     out_root = "fel_td"                      ! Prefix for the output files.
-!     delz = 0.045                             ! Target integration step inside undulators [m].
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
 !     und_transport = "genesis"                ! In-undulator transverse maps: transcribed
 !                                              !   TrackBeam ("genesis", the tier default)
@@ -196,7 +196,7 @@ type (fel_und_struct) und
 type (fel_slip_struct) slip
 type (fel_slice_diag_struct) bdiag
 
-real(rp) :: gamma0 = 0, delz = 0        ! gamma0 is DERIVED from the lattice e_tot.
+real(rp) :: gamma0 = 0                  ! DERIVED from the lattice e_tot.
 logical :: split_weights = .false.
 logical :: write_initial = .false.
 logical :: migrate = .false., migrate_check = .false.
@@ -258,7 +258,7 @@ type (fel_collective_struct) coll
 character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
-namelist / fel_track_params / lat_file, beam_file, field_file, out_root, delz, &
+namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            interlude_model, und_transport, &
                            split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
                            gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
@@ -283,11 +283,6 @@ call get_command_argument (1, param_file)
 open (newunit = iu_nml, file = param_file, status = 'old', action = 'read')
 read (iu_nml, nml = fel_track_params)
 close (iu_nml)
-
-if (delz <= 0) then
-  print '(a)', 'fel_track_test: delz must be set and positive.'
-  stop 1
-endif
 
 if (und_transport /= 'genesis' .and. und_transport /= 'bmad') then
   print '(a)', 'fel_track_test: und_transport must be "genesis" or "bmad", got: ' // trim(und_transport)
@@ -503,15 +498,16 @@ do ie = 1, branch%n_ele_track
 
   if (is_fel(ie)) then
 
-    ! FEL segment: Genesis's unroll, nstep = round(l/delz), equal steps. Slippage after
-    ! each step's field solve; any end-of-lattice fixup lands on the last step. The
-    ! element's own parameters drive the step; per-element slippage rate follows its aw.
+    ! FEL segment: Genesis's unroll in the element's OWN step -- Bmad's standard
+    ! ds_step/num_steps attributes, whose bookkeeper computes exactly Genesis's
+    ! num_steps = round(l/ds_step) (attribute_bookkeeper.f90; there is no namelist
+    ! step size, the same rule as every other parameter). Equal steps; slippage after
+    ! each step's field solve; any end-of-lattice fixup lands on the last step.
 
     und = und_of(ie)
     und%bmad_transport = (und_transport == 'bmad')
     und_slip_step = (1 + und%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
-    und%nstep = nint(ele%value(l$) / delz)
-    if (und%nstep == 0) und%nstep = 1
+    und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
     do istep = 1, und%nstep

@@ -212,7 +212,6 @@ cat > perf.nml <<NML
   beam_file = "AramisPerf-initial.par.h5"
   field_file = "AramisPerf-initial.fld.h5"
   out_root = "perf"
-  delz = 0.045
   interlude_model = "bmad"
 &end
 NML

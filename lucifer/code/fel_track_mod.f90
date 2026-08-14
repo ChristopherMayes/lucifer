@@ -205,6 +205,19 @@ if (ele%value(kx$) /= 0) then
   stop 1
 endif
 
+! The integration step: with neither ds_step nor num_steps set, Bmad's bookkeeper
+! falls back to bmad_com%default_ds_step (0.2 m -- thirteen periods of this device,
+! garbage FEL physics that would run without complaint). Bmad itself only warns;
+! an FEL element must say its step.
+
+if (ele%value(ds_step$) == bmad_com%default_ds_step) then
+  print '(2a)', 'fel_track_test: FEL element has no integration step; set ds_step ', &
+                '(Genesis''s delz) or num_steps on: ' // trim(ele%name)
+  print '(a)',  '  (Its ds_step equals bmad_com%default_ds_step, the unset fallback. If you'
+  print '(a)',  '  really want that exact value, set it explicitly via num_steps.)'
+  stop 1
+endif
+
 end subroutine fel_assert_wiggler_sane
 
 !------------------------------------------------------------------------------

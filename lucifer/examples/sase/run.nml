@@ -14,7 +14,6 @@
   out_root = "sase"
 
   lambda0 = 1e-10              ! 1 Angstrom.
-  delz = 0.045                 ! 3 undulator periods per integration step.
 
 
   gen_current = 3000

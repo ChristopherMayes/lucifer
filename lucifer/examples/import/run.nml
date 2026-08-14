@@ -26,7 +26,6 @@
   out_root = "import"
 
   lambda0 = 1e-10              ! 1 Angstrom.
-  delz = 0.045                 ! 3 undulator periods per integration step.
 
   gen_sample = 3               ! Slice spacing 3*lambda0, slippage-matched.
   gen_npart = 2048             ! Macroparticles per slice after resampling...

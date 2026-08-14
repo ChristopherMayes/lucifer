@@ -41,7 +41,7 @@ section.
 | `bsim/fel/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
 | `bsim/fel/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
 | `bsim/fel/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
-| `bsim/fel/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `delz` |
+| `bsim/fel/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding the element attribute) |
 
 ## Running
 
@@ -61,8 +61,10 @@ Genesis's default ADI solver is out of scope).
 ## Architecture
 
 Inside FEL elements (wigglers with `tracking_method = custom`; see the FEL element
-section), `fel_track_und_step` advances the coupled system in steps of
-`delz`, in Genesis's exact order: transverse half step, RK4 advance of (theta, gamma) with
+section), `fel_track_und_step` advances the coupled system in steps of the element's
+`ds_step` (Bmad's standard step attribute -- Genesis's `delz`, living on the lattice
+like every other parameter; the bookkeeper's `num_steps = round(l/ds_step)` is exactly
+Genesis's unroll), in Genesis's exact order: transverse half step, RK4 advance of (theta, gamma) with
 the field gathered once per step, transverse half step, then source deposition and the
 `exp(K2 dz)` field solve. Bmad tracking is never used inside (the brief's rule:
 `symp_lie_bmad` resolves the wiggle motion the period-averaged map assumes away).
@@ -174,7 +176,7 @@ reproduces the last namelist-driven build's run to a max relative difference of
 reading it from input.
 
 **In-undulator transverse transport, swappable and priced** (`und_transport`): the
-default `"genesis"` runs the transcribed Genesis focusing (matrix over each `delz` step
+default `"genesis"` runs the transcribed Genesis focusing (matrix over each `ds_step`
 from `aw`, `kx`, `ky`, chromatic via `gammaz`); `"bmad"` swaps in a flattened Bmad
 periodic-wiggler kernel for the same step — `track_a_wiggler`'s matrix with the
 octupole-like end kicks, chromatic via `p0/p`. Measured over the full time-dependent
@@ -577,11 +579,12 @@ spacing matched so slippage is one slice per step -- an order of magnitude fewer
 than one-step-per-period. Whether that economy transfers to this integrator is the
 brief's 8.3 question, measured by `run_delz_sweep.sh`: Genesis generates ONE
 time-dependent initial state (32 slices of spacing `12*lambda0`, shot noise on), and the
-tracker runs the full line from that same dump at `delz` of 1, 2, 3, 6 and 12 periods, so
+tracker runs the full line from that same dump at `ds_step` of 1, 2, 3, 6 and 12 periods
+(two-line wrapper lattices overriding the element attribute), so
 every run shares one shot-noise realization and the differences are pure integration
 error. Total power at the twelve undulator-segment exits, against the one-period run:
 
-| `delz` | max over exits | at saturation |
+| `ds_step` | max over exits | at saturation |
 |---|---|---|
 | 2 periods | 1.3e-1 | 1.5e-2 |
 | 3 periods | 2.5e-1 | 2.8e-2 |
@@ -596,7 +599,7 @@ oscillates, so a small phase shift moves the sampled value) and fits no clean or
 The answer to 8.3: saturation power holds to ~3% up to six periods per step, and the
 twelve-period matched configuration misses it by 26% -- SIMPLEX's step-size economy is
 tied to its semianalytic field advance and does not transfer to this Genesis-style
-integrator as-is. `delz` of two to three periods is the operating point here; six periods
+integrator as-is. `ds_step` of two to three periods is the operating point here; six periods
 is defensible when only saturation power matters.
 
 ## Facts about Genesis this work pinned down

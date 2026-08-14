@@ -61,7 +61,6 @@ LATTICE_TWISS = dict(betax=8.53711, alphax=-0.703306, betay=17.3899, alphay=1.40
 NML = """&fel_track_params
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
-  delz = 0.045
   lambda0 = {lambda0}
   gen_sample = {sample}
   gen_npart = 2048

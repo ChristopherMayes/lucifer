@@ -44,7 +44,6 @@ BASE = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
-  delz = 0.045
   gen_current = 3000
   gen_delgam = {delgam}
   gen_ex = {emit}, gen_ey = {emit}

@@ -83,23 +83,28 @@ if ! "$GENESIS" Aramis-td-s12.in > genesis-s12.log 2>&1; then
   exit 1
 fi
 
-# delz in undulator periods (lambdau = 0.015 m). 1 period is the reference.
+# The step in undulator periods (lambdau = 0.015 m); 1 period is the reference. The
+# step lives on the element (ds_step), so each point of the sweep is a two-line wrapper
+# lattice overriding it -- there is no namelist step size.
 
 for np in 1 2 3 6 12; do
   delz=$(echo "$np * 0.015" | bc -l)
+  cat > "sweep_p$np.bmad" <<LAT
+call, file = aramis.bmad
+UND[ds_step] = $delz
+LAT
   cat > "sweep_p$np.nml" <<NML
 &fel_track_params
-  lat_file = "aramis.bmad"
+  lat_file = "sweep_p$np.bmad"
   beam_file = "AramisS12-initial.par.h5"
   field_file = "AramisS12-initial.fld.h5"
   out_root = "sweep_p$np"
-  delz = $delz
   interlude_model = "bmad"
 &end
 NML
-  echo "--- fel_track_test: delz = $np period(s) --------------------------------------"
+  echo "--- fel_track_test: ds_step = $np period(s) -----------------------------------"
   if ! "$EXE" "sweep_p$np.nml" > "sweep_p$np.log" 2>&1; then
-    echo "fel_track_test delz=$delz FAILED; log tail:" >&2
+    echo "fel_track_test ds_step=$delz FAILED; log tail:" >&2
     tail -20 "sweep_p$np.log" >&2
     exit 1
   fi

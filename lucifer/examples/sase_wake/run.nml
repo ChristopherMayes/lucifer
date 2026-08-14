@@ -13,7 +13,6 @@
   out_root = "sase_wake"
 
   lambda0 = 1e-10
-  delz = 0.045
 
 
   gen_current = 3000

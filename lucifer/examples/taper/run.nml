@@ -15,7 +15,6 @@
   out_root = "taper"
 
   lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
-  delz = 0.045                 ! 3 undulator periods per integration step.
 
 
   gen_current = 3000           ! 3 kA slice current.
