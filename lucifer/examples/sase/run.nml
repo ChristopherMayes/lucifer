@@ -13,7 +13,6 @@
   lat_file = "../aramis.bmad"
   out_root = "sase"
 
-  gamma0 = 11357.82            ! 5.8 GeV.
   lambda0 = 1e-10              ! 1 Angstrom.
   delz = 0.045                 ! 3 undulator periods per integration step.
 

@@ -28,12 +28,15 @@
 ! (GenTime.cpp:96, s0 = 0 here), so both codes bin the identical particle set
 ! identically when the distribution file is written with t = -tau/c.
 !
-! The optional match/center transforms (SDDSBeam.cpp:271-317) operate on SLOPES
-! (xp = Px/P), BEFORE the slope-to-momentum conversion px = xp*gamma at the copy into
-! the internal set (SDDSBeam.cpp:354) -- transcribed in that order. The moments they
-! use come from an UNWEIGHTED analysis over an [eval_start, eval_end] fraction of the
-! bunch (analyse, SDDSBeam.cpp:616), kept unweighted deliberately: coincident
-! split-weight copies then leave every moment bit-identical, which the invariance gate
+! Genesis's match/center transforms (SDDSBeam.cpp:271-317) are NOT ported, by
+! decision: they exist because Genesis lattices carry no optics, so an imported bunch
+! must be rematched by hand. A Bmad lattice carries its Twiss, and
+! init_beam_distribution generates bunches matched to the lattice element already --
+! the transform would be a second way to say what the lattice says. (An openPMD bunch
+! that genuinely needs rematching is a Bmad tracking problem upstream of the FEL, not
+! an import option.) The bunch moments ARE still measured -- an UNWEIGHTED analysis in
+! Genesis's analyse form (SDDSBeam.cpp:616), unweighted deliberately: coincident
+! split-weight copies leave every moment bit-identical, which the invariance gate
 ! relies on.
 !
 ! Genesis quirks found by reading and NOT transcribed as functional: the
@@ -62,16 +65,9 @@ implicit none
 
 type fel_import_param_struct
   real(rp) :: slicewidth = 0.01_rp       ! Sampling window / bunch length (Genesis ds).
-  real(rp) :: eval_start = 0, eval_end = 1  ! Analysis window as fractions of the bunch.
-  real(rp) :: betax = 15, alphax = 0     ! match targets (Genesis defaults 15/matched).
-  real(rp) :: betay = 15, alphay = 0
-  real(rp) :: x0 = 0, y0 = 0             ! center targets: positions [m] and slopes.
-  real(rp) :: px0 = 0, py0 = 0
   integer :: npart = 8192                ! Macroparticles per slice after resampling.
   integer :: nbins = 4                   ! Beamlet size (quiet-load bins).
   integer :: nslice = 0                  ! 0: round(bunch_length/slice_spacing), Genesis's rule.
-  logical :: match = .false.
-  logical :: center = .false.
 end type
 
 private analyse_window
@@ -85,13 +81,13 @@ contains
 ! Subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
 !
 ! Resample a bunch_struct into FEL slices by the transcribed Genesis method (module
-! header). gamma0 is the FEL reference (Genesis's setup energy: the match/center
-! energy target and the filler energy for empty slices); lambda0 the radiation
-! wavelength; slice_spacing = sample*lambda0. The caller seeds Bmad's RNG.
+! header). gamma0 is the FEL reference, resolved from the lattice by the caller (it is
+! also the filler energy for empty slices); lambda0 the radiation wavelength;
+! slice_spacing = sample*lambda0. The caller seeds Bmad's RNG.
 !
 ! moments_out, if present, receives the RNG-free analysis moments in Genesis's
-! analyse order (gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay), measured
-! AFTER any match/center -- the deterministic quantities the exactness gates read.
+! analyse order (gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay) -- the
+! deterministic quantities the exactness gates read.
 !-
 
 subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
@@ -113,7 +109,7 @@ real(rp), allocatable :: s(:), gam(:), x(:), y(:), xp(:), yp(:), wt(:)
 real(rp), allocatable :: cg(:), cx(:), cy(:), cpx(:), cpy(:), theta(:), wk(:)
 
 real(rp) mom(11), gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay
-real(rp) smin, ttotal, dslen, sloc, p_mc, p0_mc, gtarget, ratio, u, ks_l, cur, ne, w_part, beta
+real(rp) smin, ttotal, dslen, sloc, p_mc, p0_mc, u, ks_l, cur, ne, w_part, beta
 integer n, nalive, i, ip, islice, nslice, mpart, ncand, n_clamp
 logical err_flag
 
@@ -129,10 +125,6 @@ if (prm%npart < 1 .or. prm%nbins < 1 .or. mod(prm%npart, prm%nbins) /= 0) then
 endif
 if (prm%slicewidth <= 0) then
   call out_io (s_error$, r_name, 'SLICEWIDTH MUST BE POSITIVE.')
-  return
-endif
-if (prm%match .and. (prm%betax <= 0 .or. prm%betay <= 0)) then
-  call out_io (s_error$, r_name, 'MATCH NEEDS POSITIVE BETAX AND BETAY TARGETS.')
   return
 endif
 
@@ -174,46 +166,11 @@ endif
 nslice = prm%nslice
 if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! GenTime.cpp:71
 
-! Analysis, match, center -- all on slopes, all unweighted, all before the momentum
-! conversion, in Genesis's order (SDDSBeam.cpp:267-323).
+! The bunch moments, in Genesis's analyse form (unweighted, strict window bounds --
+! the two extreme particles are excluded, exactly as Genesis's eval defaults do).
 
-call analyse_window (s, gam, x, y, xp, yp, prm%eval_start*ttotal, prm%eval_end*ttotal, &
+call analyse_window (s, gam, x, y, xp, yp, 0.0_rp, ttotal, &
                      gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
-
-if (prm%match) then
-  gtarget = gamma0
-  if (.not. prm%center) gtarget = gavg             ! SDDSBeam.cpp:275
-  ratio = sqrt(gavg / gtarget)
-  do i = 1, nalive
-    gam(i) = gam(i) + gtarget - gavg
-    x(i) = (x(i) - xavg) * ratio                   ! emittance-preserving rescale
-    y(i) = (y(i) - yavg) * ratio
-    xp(i) = (xp(i) - pxavg) * ratio
-    yp(i) = (yp(i) - pyavg) * ratio
-    xp(i) = xp(i) + (ax/bx) * x(i)                 ! out of the measured Twiss...
-    yp(i) = yp(i) + (ay/by) * y(i)
-    x(i) = x(i) * sqrt(prm%betax/bx)               ! ...into the targets
-    y(i) = y(i) * sqrt(prm%betay/by)
-    xp(i) = xp(i) * sqrt(bx/prm%betax)
-    yp(i) = yp(i) * sqrt(by/prm%betay)
-    xp(i) = xp(i) - (prm%alphax/prm%betax) * x(i)
-    yp(i) = yp(i) - (prm%alphay/prm%betay) * y(i)
-    gam(i) = gam(i) - (gtarget - gavg)
-    x(i) = x(i) + xavg;    y(i) = y(i) + yavg
-    xp(i) = xp(i) + pxavg; yp(i) = yp(i) + pyavg
-  enddo
-endif
-
-if (prm%center) then                               ! SDDSBeam.cpp:305
-  gam = gam + (gamma0 - gavg)
-  x = x + (prm%x0 - xavg);    y = y + (prm%y0 - yavg)
-  xp = xp + (prm%px0 - pxavg); yp = yp + (prm%py0 - pyavg)
-endif
-
-if (prm%match .or. prm%center) then                ! reanalyse (SDDSBeam.cpp:321)
-  call analyse_window (s, gam, x, y, xp, yp, prm%eval_start*ttotal, prm%eval_end*ttotal, &
-                       gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
-endif
 
 mom = [gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay]
 if (present(moments_out)) moments_out = mom

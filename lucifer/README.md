@@ -440,12 +440,19 @@ fresh random draws; child at midpoint plus uniform[-1,1] times the difference); 
 is refilled over one beamlet spacing, mirrored into nbins bins, and the deliverable-6
 Fawley loader imposes shot noise with `ne = round(I*lambda*sample/(e*c))` -- shared
 code (`fel_fawley_noise`), so the generator and the import stay one implementation.
-The optional `match` (an emittance-preserving Twiss transform) and `center` operate on
-SLOPES before the slope-to-momentum conversion, in Genesis's order. Facts pinned by
-reading: the `align*` parameters are parsed but never used in v4, and the `shotnoise`
-flag is read but never consulted (the import applies noise unconditionally, skipping
-only zero-current slices) -- both kept as Genesis has them, neither transcribed as
-functional. one4one is out of scope: weights supersede it.
+Genesis's `match`/`center` transforms are NOT ported, by decision: they exist because
+Genesis lattices carry no optics, so an imported bunch must be rematched by hand. A
+Bmad lattice carries its Twiss and `init_beam_distribution` generates bunches matched
+to it already -- the transform would be a second way to say what the lattice says.
+For the same reason there is no namelist `gamma0` anywhere in the driver anymore: the
+reference energy derives from the lattice's `e_tot`, after the first external user fed
+a hand-rounded gamma0 against a round lattice energy and the run died mid-tracking on
+the seam's backstop p0c check (two specifications of one truth was the defect;
+FINDINGS.md 7.19). Facts pinned by reading: the `align*` parameters are parsed but
+never used in v4, and the `shotnoise` flag is read but never consulted (the import
+applies noise unconditionally, skipping only zero-current slices) -- both kept as
+Genesis has them, neither transcribed as functional. one4one is out of scope: weights
+supersede it.
 
 Validation (`scripts/check_import.py`, in the harness) splits along the RNG boundary
 -- exact gates where no random number enters, statistical only where one does:
@@ -453,23 +460,24 @@ Validation (`scripts/check_import.py`, in the harness) splits along the RNG boun
 | Gate | Kind | Measured |
 |---|---|---|
 | per-slice current profile vs Genesis importing the SAME file | exact | **8.2e-13** of peak (24 slices) |
-| match hits its Twiss targets, preserves emittance | exact | **2.6e-14** worst target miss |
+| the generated bunch carries the specified emittance | exact | ex, ey within 3e-5 of spec |
 | split-weight invariance (coincident w/3 + 2w/3 copies) | exact | moments 1.8e-15, currents 7.4e-14 |
 | openPMD round trip (write_opmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
 | thread determinism (1 vs 8 threads, same seed) | exact | byte-identical diag |
 | slice Twiss/emittance recover the spec (mean, central slices) | statistical | beta 0.8%, alpha 1.0%, emit 1.4% |
 | dark-start startup power vs Genesis, independent resampling RNGs | statistical | ln ratio +0.023 (gate 0.30) |
 
-Mutations bite, each on the gate built for it: the slope/momentum order bug (momenta
-converted before match) fails the emittance-preservation check; normalizing the
-current by the slice spacing instead of `dslen` fails the exact current gate at
-6.5e-1; skipping the shot noise fails the startup gate at ln ratio -57 (a dead-quiet
-start); collapsing the beamlet mirroring fails the startup gate at ln ratio +4.7.
-The fourth planned mutation -- refilling theta over 2pi instead of 2pi/nbins -- turned
-out to be an EQUIVALENT MUTANT: under the beamlet mirroring, a uniform seed over the
-full turn is uniform modulo one beamlet spacing, the quiet cancellation is untouched,
-and the gates correctly pass it (FINDINGS.md 7.16). It is a convention, not a defect
-class; the load-bearing neighbor (the mirroring itself) is what gets mutation-tested.
+Mutations bite, each on the gate built for it: normalizing the current by the slice
+spacing instead of `dslen` fails the exact current gate at 6.5e-1; skipping the shot
+noise fails the startup gate at ln ratio -57 (a dead-quiet start); collapsing the
+beamlet mirroring fails the startup gate at ln ratio +4.7. One planned mutation --
+refilling theta over 2pi instead of 2pi/nbins -- turned out to be an EQUIVALENT
+MUTANT: under the beamlet mirroring, a uniform seed over the full turn is uniform
+modulo one beamlet spacing, the quiet cancellation is untouched, and the gates
+correctly pass it (FINDINGS.md 7.16). It is a convention, not a defect class; the
+load-bearing neighbor (the mirroring itself) is what gets mutation-tested. (A fourth
+mutation, the match transform's slope/momentum order, retired with the match
+transform itself -- see below.)
 
 Recorded improvement path: with per-particle weights the resampling is OPTIONAL -- a
 direct weighted import (every bunch particle a macroparticle in its slice, no deletion,

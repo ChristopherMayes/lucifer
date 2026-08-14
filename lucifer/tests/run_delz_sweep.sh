@@ -93,7 +93,6 @@ for np in 1 2 3 6 12; do
   beam_file = "AramisS12-initial.par.h5"
   field_file = "AramisS12-initial.fld.h5"
   out_root = "sweep_p$np"
-  gamma0 = 11357.82
   delz = $delz
   interlude_model = "bmad"
 &end

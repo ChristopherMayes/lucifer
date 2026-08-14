@@ -7,10 +7,9 @@
 ! helicity from field_calc -- and everything else (D1, QF, QD, D2) is tracked by Bmad.
 ! Outside the FEL walk the element behaves as the plain periodic wiggler it is.
 !
-! The reference energy: Genesis's gamma0 = 11357.82 times Bmad's electron rest mass. The
-! FEL physics uses gamma0 directly from the namelist; the lattice's p0c only sets the scale
-! of Bmad's normalized transverse momenta, and the conversion routines read it back from
-! the element, so the two sides stay individually self-consistent (see fel_beam_mod).
+! The reference energy: e_tot below IS the reference -- the driver derives gamma0 from
+! it (there is no namelist gamma0; one specification of one truth). Genesis's benchmark
+! value 11357.82 is encoded exactly as an expression in Bmad's own rest mass.
 !
 ! Genesis's quadrupole k1 = 2 m^-2 is the geometric strength at the reference energy;
 ! Bmad's k1 has the same meaning. The chromatic behavior then differs at the model level:
@@ -22,8 +21,14 @@ parameter[geometry] = open
 parameter[particle] = electron
 parameter[e_tot] = 11357.82 * m_electron
 
-beginning[beta_a] = 10   ! Placeholder Twiss; tracking here does not use lattice Twiss.
-beginning[beta_b] = 10
+! The matched periodic Twiss of this FODO cell at this energy (Genesis's zmatch values,
+! the same numbers the benchmark namelists carry). The FEL walk itself never reads
+! lattice Twiss; beam_init-driven imports DO -- init_beam_distribution generates
+! bunches matched to these.
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
 
 ! aw = c*b_max/(k_u*m_e c^2) for a helical device (rms convention), so b_max below
 ! encodes aw = 0.84853 exactly as an expression in Bmad's own constants.

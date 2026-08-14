@@ -58,7 +58,6 @@
 !     beam_file = "Aramis-initial.par.h5"      ! Genesis particle dump to start from.
 !     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
 !     out_root = "fel_td"                      ! Prefix for the output files.
-!     gamma0 = 11357.82                        ! Genesis's reference gamma.
 !     delz = 0.045                             ! Target integration step inside undulators [m].
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
 !     und_transport = "genesis"                ! In-undulator transverse maps: transcribed
@@ -123,11 +122,9 @@
 !
 !     imp%slicewidth = 0.01    ! Sampling window / bunch length (Genesis's slicewidth).
 !     imp%nslice = 0           ! 0: round(bunch_length/spacing), Genesis's rule.
-!     imp%eval_start = 0       ! Analysis window, fractions of the bunch length.
-!     imp%eval_end = 1
-!     imp%match = F            ! Rematch to imp%betax/alphax/betay/alphay (Genesis's
-!                              !   match: emittance-preserving, on the slopes).
-!     imp%center = F           ! Recenter to gamma0 and imp%x0/y0/px0/py0.
+!                              ! (Genesis's match/center are NOT ported: a Bmad lattice
+!                              !   carries its Twiss and beam_init generates matched
+!                              !   bunches already -- see fel_import_mod's header.)
 !     use_beam_init = F        ! Generate the bunch from the beam_init%... block.
 !     dist_file = ""           ! Or read an openPMD-beamphysics file.
 !     write_dist_file = ""     ! Write the bunch as a Genesis &importdistribution
@@ -199,7 +196,7 @@ type (fel_und_struct) und
 type (fel_slip_struct) slip
 type (fel_slice_diag_struct) bdiag
 
-real(rp) :: gamma0 = 0, delz = 0
+real(rp) :: gamma0 = 0, delz = 0        ! gamma0 is DERIVED from the lattice e_tot.
 logical :: split_weights = .false.
 logical :: write_initial = .false.
 logical :: migrate = .false., migrate_check = .false.
@@ -261,7 +258,7 @@ type (fel_collective_struct) coll
 character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
-namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0, delz, &
+namelist / fel_track_params / lat_file, beam_file, field_file, out_root, delz, &
                            interlude_model, und_transport, &
                            split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
                            gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
@@ -287,8 +284,8 @@ open (newunit = iu_nml, file = param_file, status = 'old', action = 'read')
 read (iu_nml, nml = fel_track_params)
 close (iu_nml)
 
-if (gamma0 <= 0 .or. delz <= 0) then
-  print '(a)', 'fel_track_test: gamma0 and delz must be set and positive.'
+if (delz <= 0) then
+  print '(a)', 'fel_track_test: delz must be set and positive.'
   stop 1
 endif
 
@@ -321,6 +318,18 @@ make_mat6_custom_ptr => fel_mat6_as_wiggler
 
 call bmad_parser (lat_file, lat)
 branch => lat%branch(0)
+
+gamma0 = branch%ele(0)%value(e_tot$) / m_electron
+print '(a, f0.6, a)', 'fel_track_test: gamma0 = ', gamma0, ' (from the lattice e_tot).'
+
+! ONE reference energy, and the lattice is it: gamma0 = e_tot/m_e c^2 from the lattice
+! header, never a namelist input. There used to be a namelist gamma0 for Genesis-deck
+! symmetry; the first external user fed it a hand-rounded value against a round lattice
+! e_tot, the two disagreed at 1.4e-9, and the run died mid-tracking on the seam's
+! backstop p0c check with raw numbers -- the FEL physics ran on one reference while
+! Bmad's momenta were normalized by the other. Two specifications of one truth is the
+! defect; the redundant one was removed (the deliverable-9 rule: parameters live on
+! the lattice).
 
 if ((beam_file == '') .neqv. (field_file == '')) then
   print '(a)', 'fel_track_test: give both beam_file and field_file, or neither (to generate).'
@@ -637,8 +646,8 @@ character(*), parameter :: r_name = 'fel_track_test'
 
 !
 
-if (gamma0 <= 1 .or. lambda0 <= 0) then
-  print '(a)', 'fel_track_test: generation needs gamma0 > 1 and lambda0 > 0.'
+if (lambda0 <= 0) then
+  print '(a)', 'fel_track_test: generation needs lambda0 > 0.'
   stop 1
 endif
 if (gen_npart < 1 .or. gen_nbins < 1 .or. mod(gen_npart, gen_nbins) /= 0) then
@@ -893,8 +902,8 @@ logical err_i
 
 !
 
-if (gamma0 <= 1 .or. lambda0 <= 0) then
-  print '(a)', 'fel_track_test: import needs gamma0 > 1 and lambda0 > 0.'
+if (lambda0 <= 0) then
+  print '(a)', 'fel_track_test: import needs lambda0 > 0.'
   stop 1
 endif
 if (gen_sample < 1) then

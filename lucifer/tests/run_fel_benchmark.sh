@@ -178,7 +178,6 @@ make_nml () {
   beam_file = "$5-initial.par.h5"
   field_file = "$5-initial.fld.h5"
   out_root = "$3"
-  gamma0 = 11357.82
   delz = 0.045
   interlude_model = "$4"
 ${6:+  $6}

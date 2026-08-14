@@ -35,7 +35,6 @@ M_ELECTRON = 0.51099895069e6
 BASE = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
-  gamma0 = 11357.82
   lambda0 = 1e-10
   delz = 0.045
   gen_current = 3000

@@ -70,7 +70,6 @@ fft_fieldsolver = true
 BMAD_NML = """&fel_track_params
   lat_file = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
-  gamma0 = 11357.82
   lambda0 = 1e-10
   delz = 0.045
   gen_current = 3000

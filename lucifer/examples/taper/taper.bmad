@@ -13,8 +13,14 @@ parameter[geometry] = open
 parameter[particle] = electron
 parameter[e_tot] = 11357.82 * m_electron
 
-beginning[beta_a] = 10
-beginning[beta_b] = 10
+! The matched periodic Twiss of this FODO cell at this energy (Genesis's zmatch values,
+! the same numbers the benchmark namelists carry). The FEL walk itself never reads
+! lattice Twiss; beam_init-driven imports DO -- init_beam_distribution generates
+! bunches matched to these.
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
 
 ! Stage 1: aw = 0.84853 (rms, helical), the Benchmark1-SASE undulator.
 UND1: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &

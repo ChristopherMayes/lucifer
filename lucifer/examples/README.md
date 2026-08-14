@@ -76,11 +76,12 @@ line: SASE from an imported bunch. The bunch is a Gaussian TEST bunch sized to t
 window's economics (sigma_z = 1.2 nm, 30 fC, 3 kA peak -- honestly labeled: physical
 bunches are micrometers and need thousands of slices). The time window derives from
 the bunch itself, so the diag file's per-slice current is the Gaussian profile; the
-bunch is born on the lattice's placeholder Twiss and the import MATCHES it to the FODO
-line's periodic optics (an emittance-preserving transform, Genesis's `match`). Set
-`write_dist_file` to hand the identical bunch to Genesis's `&importdistribution`, or
-`write_opmd_file` for openPMD-beamphysics; `dist_file` reads openPMD back in place of
-`use_beam_init`.
+lattice is the whole optics specification -- the reference energy comes from its
+`e_tot` and `init_beam_distribution` generates the bunch matched to the Twiss in its
+beginning statement (Genesis's `match` transform is not ported; a Bmad lattice already
+says what it would say). Set `write_dist_file` to hand the identical bunch to
+Genesis's `&importdistribution`, or `write_opmd_file` for openPMD-beamphysics;
+`dist_file` reads openPMD back in place of `use_beam_init`.
 
 ## sase
 

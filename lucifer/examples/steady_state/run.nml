@@ -14,7 +14,6 @@
   lat_file = "../aramis.bmad"
   out_root = "steady_state"
 
-  gamma0 = 11357.82            ! 5.8 GeV.
   lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
   delz = 0.045                 ! 3 undulator periods per integration step.
 

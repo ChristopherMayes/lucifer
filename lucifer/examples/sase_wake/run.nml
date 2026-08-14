@@ -12,7 +12,6 @@
   lat_file = "../aramis.bmad"
   out_root = "sase_wake"
 
-  gamma0 = 11357.82
   lambda0 = 1e-10
   delz = 0.045
 
