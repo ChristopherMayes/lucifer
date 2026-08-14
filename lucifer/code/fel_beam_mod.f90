@@ -477,6 +477,65 @@ end subroutine fel_slice_reallocate
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_fawley_noise (theta, weight, n, nbins, n_clamp)
+!
+! Fawley-style shot noise on a quiet-loaded slice, transcribed from Genesis's
+! ShotNoise::applyShotNoise and generalized to per-particle weights: each beamlet's
+! amplitude draws on its REAL electron count, the beamlet's charge over e (Genesis's
+! slice-uniform ne/mpart for uniform weights), which makes <|b(h)|^2> = 1/N_lambda
+! exact for any cross-beamlet weight distribution (FINDINGS.md 7.6). Weights must be
+! uniform WITHIN a beamlet (the quiet cancellation is per beamlet); the first
+! particle's weight speaks for its beamlet. Genesis's silent nbl < 1 clamp is kept but
+! counted into n_clamp for the caller to report. Kicks accumulate from the unperturbed
+! phases, exactly as Genesis's work array does; two ran_uniform draws per (harmonic,
+! beamlet), in Genesis's loop order -- shared by the built-in loader (deliverable 6)
+! and the distribution import (deliverable 10), so the two stay one implementation.
+!-
+
+subroutine fel_fawley_noise (theta, weight, n, nbins, n_clamp)
+
+real(rp) theta(:), weight(:)
+integer n, nbins, n_clamp
+
+real(rp), allocatable :: kick(:)
+real(rp) nbl, u, phi, an
+integer nharm, mbase, ih, ib, im, ip
+
+!
+
+nharm = (nbins - 1) / 2
+mbase = n / nbins
+
+allocate (kick(n))
+kick = 0
+
+do ih = 0, nharm - 1
+  do ib = 1, mbase
+    nbl = nbins * weight((ib-1)*nbins + 1) / e_charge
+    if (nbl < 1) then
+      nbl = 1
+      n_clamp = n_clamp + 1
+    endif
+    call ran_uniform (u)
+    phi = twopi * u
+    call ran_uniform (u)
+    an = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
+    if (an > twopi) an = mod(an, twopi)
+    do im = 1, nbins
+      ip = (ib-1)*nbins + im
+      kick(ip) = kick(ip) - an * sin(theta(ip) * (ih+1) + phi)
+    enddo
+  enddo
+enddo
+
+theta(1:n) = theta(1:n) + kick(1:n)
+
+end subroutine fel_fawley_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag)
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the

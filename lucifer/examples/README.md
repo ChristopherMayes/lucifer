@@ -22,6 +22,7 @@ python ../plot_fel.py <example>.diag.txt            # needs matplotlib; writes <
 | `taper/` | The same, with a two-stage undulator taper | ~1 min |
 | `sase/` | Pure SASE: 96 slices, dark start, shot noise | ~90 s |
 | `sase_wake/` | The SASE run plus resistive-wall/gap/roughness wakes | ~100 s |
+| `import/` | A beam_init bunch resampled into slices (Genesis's importdistribution method), tracked dark | ~1 min |
 
 With no dump files named in the namelist, the program generates its own starting state
 (quiet-start beam, and a Gaussian seed where `gen_power > 0`); the header of
@@ -65,6 +66,21 @@ bit-identical until the taper begins at z = 31.92 m; the untapered line saturate
 the step-down taper re-matches the resonance to the decelerated beam and the power still
 climbs at the exit — 9.6 GW at z = 57 m, 12.7x the untapered exit power (6x its
 saturation peak).
+
+## import
+
+A bunch described by Bmad's `beam_init_struct` -- the native equivalent of Genesis's
+`&beam` -- generated, resampled into FEL slices by the transcribed Genesis
+`importdistribution` method (`fel_import_mod`), and tracked dark through the full
+line: SASE from an imported bunch. The bunch is a Gaussian TEST bunch sized to the FEL
+window's economics (sigma_z = 1.2 nm, 30 fC, 3 kA peak -- honestly labeled: physical
+bunches are micrometers and need thousands of slices). The time window derives from
+the bunch itself, so the diag file's per-slice current is the Gaussian profile; the
+bunch is born on the lattice's placeholder Twiss and the import MATCHES it to the FODO
+line's periodic optics (an emittance-preserving transform, Genesis's `match`). Set
+`write_dist_file` to hand the identical bunch to Genesis's `&importdistribution`, or
+`write_opmd_file` for openPMD-beamphysics; `dist_file` reads openPMD back in place of
+`use_beam_init`.
 
 ## sase
 

@@ -1,0 +1,52 @@
+! Distribution-import example: a bunch described by Bmad's beam_init_struct -- the
+! native equivalent of what Genesis's &beam describes -- is generated, resampled into
+! FEL slices by the transcribed Genesis importdistribution method (fel_import_mod),
+! and tracked dark through the full line: SASE from an imported bunch.
+!
+!   fel_track_test run.nml           (run from this directory)
+!   python ../plot_fel.py import.diag.txt
+!
+! The bunch is a Gaussian TEST bunch sized to the FEL window's economics, honestly
+! labeled: sigma_z = 1.2 nm and 30 fC give a 3 kA peak -- the benchmark current -- in
+! a window a few hundred wavelengths long. A physical accelerator bunch (micrometers,
+! hundreds of pC) needs thousands of slices and belongs to production runs, not to an
+! example. The time window is derived from the bunch itself (imp%nslice = 0, Genesis's
+! settimewindow rule), so the current profile you see in the diag file is the Gaussian.
+!
+! The bunch is born with the lattice entrance Twiss (beta = 10 placeholders) and the
+! import MATCHES it to the FODO line's matched optics -- Genesis's match, an
+! emittance-preserving Twiss transform on the slopes, transcribed. Set
+! write_dist_file to also write the bunch as a Genesis &importdistribution input.
+
+&fel_track_params
+  lat_file = "../aramis.bmad"
+  out_root = "import"
+
+  gamma0 = 11357.82            ! 5.8 GeV.
+  lambda0 = 1e-10              ! 1 Angstrom.
+  delz = 0.045                 ! 3 undulator periods per integration step.
+
+  gen_sample = 3               ! Slice spacing 3*lambda0, slippage-matched.
+  gen_npart = 2048             ! Macroparticles per slice after resampling...
+  gen_nbins = 8                ! ...in beamlets of 8.
+  gen_seed = 12345
+
+  gen_power = 0                ! Dark start: the light grows from the imported bunch.
+  gen_ngrid = 255
+  gen_dgrid = 2e-4
+
+  use_beam_init = T            ! The bunch, in Bmad's native description:
+  beam_init%n_particle = 50000
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beam_init%sig_z = 1.2e-9
+  beam_init%sig_pz = 8.8045e-5 ! One m_e c^2 of spread at 5.8 GeV.
+  beam_init%bunch_charge = 3.01e-14
+
+  imp%slicewidth = 0.01        ! Genesis's slicewidth: the sampling window.
+  imp%match = T                ! Rematch to the FODO line's periodic optics.
+  imp%betax = 8.53711
+  imp%alphax = -0.703306
+  imp%betay = 17.3899
+  imp%alphay = 1.40348
+&end

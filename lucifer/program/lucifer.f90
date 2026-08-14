@@ -112,6 +112,30 @@
 !     load_only = F            ! Generate, write <out_root>-initial dumps, exit without
 !                              !   tracking. For the shot-noise statistical gate.
 !
+! Third way in (deliverable 10): import a particle DISTRIBUTION -- an arbitrary bunch,
+! resampled into slices by the transcribed Genesis importdistribution method
+! (fel_import_mod, where the algorithm and its provenance live). The bunch comes from
+! Bmad's beam_init_struct (use_beam_init = T with a beam_init%... block -- Bmad's
+! native equivalent of Genesis's &beam description) or from an openPMD-beamphysics
+! file (dist_file). npart/nbins/sample/seed and the seed field reuse the gen_
+! parameters above; one seed governs generation, resampling and noise. Knobs, named
+! after &importdistribution's where one exists:
+!
+!     imp%slicewidth = 0.01    ! Sampling window / bunch length (Genesis's slicewidth).
+!     imp%nslice = 0           ! 0: round(bunch_length/spacing), Genesis's rule.
+!     imp%eval_start = 0       ! Analysis window, fractions of the bunch length.
+!     imp%eval_end = 1
+!     imp%match = F            ! Rematch to imp%betax/alphax/betay/alphay (Genesis's
+!                              !   match: emittance-preserving, on the slopes).
+!     imp%center = F           ! Recenter to gamma0 and imp%x0/y0/px0/py0.
+!     use_beam_init = F        ! Generate the bunch from the beam_init%... block.
+!     dist_file = ""           ! Or read an openPMD-beamphysics file.
+!     write_dist_file = ""     ! Write the bunch as a Genesis &importdistribution
+!                              !   input (t/p/x/xp/y/yp + charge, t = -tau/c) -- the
+!                              !   shared file of the cross-code gates.
+!     write_opmd_file = ""     ! Write the bunch as openPMD-beamphysics.
+!     imp_split_weights = F    ! Gate knob: coincident w/3 + 2w/3 copies before import.
+!
 ! The quiet start loads gen_npart/gen_nbins base samples of the transverse and energy
 ! distributions per slice and replicates each at gen_nbins equally spaced ponderomotive
 ! phases, so every bunching harmonic below gen_nbins is zero to roundoff. With
@@ -159,6 +183,7 @@
 program fel_track_test
 
 use fel_track_mod
+use fel_import_mod
 use wavefront_hdf5_mod
 use beam_mod
 
@@ -206,6 +231,23 @@ integer :: gen_npart = 8192, gen_nbins = 8, gen_ngrid = 255, gen_seed = 12345
 integer :: gen_sample = 1
 logical :: gen_shotnoise = .false., gen_test_weights = .false., load_only = .false.
 
+! Distribution import (deliverable 10): a bunch_struct -- generated natively from
+! Bmad's beam_init_struct, or read from an openPMD-beamphysics file -- resampled into
+! FEL slices by the transcribed Genesis method (fel_import_mod). The knobs mirror
+! &importdistribution's names with an imp_ prefix; npart/nbins/sample/seed and the
+! field come from the gen_ parameters (one field generator for both paths).
+type (beam_init_struct) :: beam_init     ! Bmad's native bunch description (&beam_init).
+type (fel_import_param_struct) :: imp
+logical :: use_beam_init = .false.       ! Generate the bunch from beam_init.
+character(400) :: dist_file = ''         ! Or read it from an openPMD-beamphysics file.
+character(400) :: write_dist_file = ''   ! Write the bunch as a Genesis DISTRIBUTION
+                                         ! file (t/p/x/xp/y/yp + charge, t = -tau/c),
+                                         ! the shared input of the cross-code gates.
+character(400) :: write_opmd_file = ''   ! Write the bunch as openPMD-beamphysics
+                                         ! (hdf5_write_beam), the dist_file round trip.
+logical :: imp_split_weights = .false.   ! Gate knob: coincident w/3 + 2w/3 copies
+                                         ! BEFORE import; RNG-free outputs must not move.
+
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, from lattice attributes.
 logical, allocatable :: is_fel(:)                 ! Which tracked elements are FEL segments.
@@ -228,7 +270,9 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, gamma0,
                            gen_test_weights, load_only, migrate, migrate_check, &
                            wake_on, wake_loss, wake_radius, wake_conductivity, wake_relaxation, &
                            wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
-                           wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange
+                           wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
+                           beam_init, imp, use_beam_init, dist_file, write_dist_file, &
+                           write_opmd_file, imp_split_weights
 
 ! Read parameters.
 
@@ -282,14 +326,24 @@ if ((beam_file == '') .neqv. (field_file == '')) then
   print '(a)', 'fel_track_test: give both beam_file and field_file, or neither (to generate).'
   stop 1
 endif
+if (beam_file /= '' .and. (dist_file /= '' .or. use_beam_init)) then
+  print '(a)', 'fel_track_test: dump files and a distribution import are mutually exclusive.'
+  stop 1
+endif
+if (dist_file /= '' .and. use_beam_init) then
+  print '(a)', 'fel_track_test: give dist_file or use_beam_init, not both.'
+  stop 1
+endif
 
-if (beam_file == '') then
-  call generate_initial_state ()
-else
+if (beam_file /= '') then
   call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
   if (err) stop 1
   call wavefront_read_genesis4 (wf, field_file, err)
   if (err) stop 1
+elseif (dist_file /= '' .or. use_beam_init) then
+  call import_initial_state ()
+else
+  call generate_initial_state ()
 endif
 
 if (split_weights) call do_split_weights (fbeam)
@@ -643,9 +697,8 @@ ks_l = twopi / lambda0
 eg_x = gen_ex / p0_mc                 ! Normalized emittance to geometric.
 eg_y = gen_ey / p0_mc
 w_part = gen_current * fbeam%slice_spacing / (c_light * gen_npart)
-nharm = (gen_nbins - 1) / 2           ! Genesis's harmonic count (ShotNoise.cpp).
 
-allocate (theta_work(gen_npart), beta_work(gen_npart), kick(gen_npart))
+allocate (theta_work(gen_npart), beta_work(gen_npart))
 n_clamp = 0
 nl_min = huge(1.0_rp); nl_max = 0; neff_min = huge(1.0_rp); neff_max = 0; floor_max = 0
 
@@ -743,32 +796,12 @@ do is_g = 1, nslice_gen
       stop 1
     endif
 
-    ! Fawley-style shot noise, transcribed from ShotNoise::applyShotNoise and
-    ! generalized to weights: amplitudes from each beamlet's REAL electron count, its
-    ! charge over e (Genesis's ne/mpart for uniform weights). Kicks accumulate from the
-    ! unperturbed phases, exactly as Genesis's work array does; Genesis's silent
-    ! nbl < 1 clamp is kept but counted and reported.
+    ! Fawley-style shot noise: fel_fawley_noise (fel_beam_mod), the ShotNoise
+    ! transcription generalized to weights, shared with the distribution import so the
+    ! two paths stay one implementation. Draw order is unchanged from when this block
+    ! lived inline here (two ran_uniform per harmonic per beamlet, Genesis's loops).
 
-    kick = 0
-    do ih = 0, nharm - 1
-      do ib = 1, mbase
-        nbl = gen_nbins * sl%weight((ib-1)*gen_nbins + 1) / e_charge
-        if (nbl < 1) then
-          nbl = 1
-          n_clamp = n_clamp + 1
-        endif
-        call ran_uniform (u)
-        phi = twopi * u
-        call ran_uniform (u)
-        an = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
-        if (an > twopi) an = mod(an, twopi)
-        do im = 1, gen_nbins
-          ip = (ib-1)*gen_nbins + im
-          kick(ip) = kick(ip) - an * sin(theta_work(ip) * (ih+1) + phi)
-        enddo
-      enddo
-    enddo
-    theta_work(1:gen_npart) = theta_work(1:gen_npart) + kick(1:gen_npart)
+    call fel_fawley_noise (theta_work(1:gen_npart), sl%weight(1:gen_npart), gen_npart, gen_nbins, n_clamp)
   endif
 
   ! To the stored chart: z = beta*theta/ks with phi0 = 0, beta of the base sample.
@@ -778,7 +811,7 @@ do is_g = 1, nslice_gen
   enddo
 enddo
 
-deallocate (theta_work, beta_work, kick)
+deallocate (theta_work, beta_work)
 
 if (gen_shotnoise) then
   print '(a, i0, a)',        'fel_track_test: shot noise imposed on ', nslice_gen, ' slices.'
@@ -792,13 +825,36 @@ if (gen_shotnoise) then
   endif
 endif
 
+call generate_seed_field (nslice_gen)
+
+end subroutine generate_initial_state
+
+!------------------------------------------------------------------------------
+
+subroutine generate_seed_field (nslice_f)
+
 ! The field: a Gaussian seed at its waist in every slice, E = E0*exp(-r^2/w0^2),
 ! intensity 1/e^2 radius w0, integrating to gen_power; gen_power = 0 is a dark start.
 ! Grid convention matches Genesis's dgrid: ngrid points spanning +-dgrid,
-! dx = 2*dgrid/(ngrid-1), center on axis.
+! dx = 2*dgrid/(ngrid-1), center on axis. Shared by the built-in generator and the
+! distribution import (both make their own beam, neither brings a field).
+
+integer nslice_f, ix, iy, is_g
+real(rp) dx_grid, e0, xg, yg
+
+!
+
+if (gen_ngrid < 3 .or. gen_dgrid <= 0) then
+  print '(a)', 'fel_track_test: check gen_ngrid and gen_dgrid.'
+  stop 1
+endif
+if (gen_power > 0 .and. gen_waist_size <= 0) then
+  print '(a)', 'fel_track_test: gen_waist_size must be positive when gen_power > 0.'
+  stop 1
+endif
 
 dx_grid = 2 * gen_dgrid / (gen_ngrid - 1)
-call wavefront_init (wf, gen_ngrid, gen_ngrid, nslice_gen, dx_grid, dx_grid, &
+call wavefront_init (wf, gen_ngrid, gen_ngrid, nslice_f, dx_grid, dx_grid, &
                      fbeam%slice_spacing, lambda0, 'x', 0.0_rp)
 
 if (gen_power > 0) then
@@ -810,12 +866,110 @@ if (gen_power > 0) then
       wf%Ex(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / gen_waist_size**2)
     enddo
   enddo
-  do is_g = 2, nslice_gen
+  do is_g = 2, nslice_f
     wf%Ex(:, :, is_g) = wf%Ex(:, :, 1)
   enddo
 endif
 
-end subroutine generate_initial_state
+end subroutine generate_seed_field
+
+!------------------------------------------------------------------------------
+
+subroutine import_initial_state ()
+
+! Deliverable 10: a bunch_struct -- generated from Bmad's beam_init_struct (the native
+! equivalent of Genesis's &beam description) or read from an openPMD-beamphysics file
+! -- resampled into FEL slices by the transcribed Genesis importdistribution method
+! (fel_import_mod, where the algorithm and its provenance are documented). The seed
+! field comes from the same generator as the built-in loader. The RNG-free outputs the
+! exactness gates read -- the analysis moments and the per-slice current profile --
+! are printed at full precision.
+
+type (beam_struct), target :: beam_b
+type (bunch_struct), pointer :: bp
+real(rp) moments(11)
+integer is_g, ip_g, n0
+logical err_i
+
+!
+
+if (gamma0 <= 1 .or. lambda0 <= 0) then
+  print '(a)', 'fel_track_test: import needs gamma0 > 1 and lambda0 > 0.'
+  stop 1
+endif
+if (gen_sample < 1) then
+  print '(a)', 'fel_track_test: gen_sample must be a positive integer (Genesis''s sample).'
+  stop 1
+endif
+
+! One seed governs the whole import: the bunch generation, the resampler's draws and
+! the shot noise. Seeding AFTER generation was the first mutation this path caught in
+! development -- every run then imports a different bunch, and the split-weight and
+! thread-determinism gates both fail on what looks like resampler noise.
+
+call ran_seed_put (gen_seed)
+
+if (use_beam_init) then
+  if (beam_init%n_particle < 1) then
+    print '(a)', 'fel_track_test: beam_init%n_particle must be positive.'
+    stop 1
+  endif
+  beam_init%n_bunch = 1
+  call init_beam_distribution (branch%ele(0), lat%param, beam_init, beam_b, err_i)
+  if (err_i) stop 1
+  print '(a, i0, a)', 'fel_track_test: generated ', size(beam_b%bunch(1)%particle), &
+                      ' particles from beam_init.'
+else
+  call hdf5_read_beam (dist_file, beam_b, err_i, branch%ele(0))
+  if (err_i) stop 1
+  print '(a, i0, a)', 'fel_track_test: read ', size(beam_b%bunch(1)%particle), &
+                      ' particles from: ' // trim(dist_file)
+endif
+
+bp => beam_b%bunch(1)
+
+! Gate knob: coincident split-weight copies before anything downstream sees the bunch.
+! The current profile (weighted sums) and the analysis moments (unweighted, over
+! coincident copies) must then be bit-identical to the unsplit run.
+
+if (imp_split_weights) then
+  n0 = size(bp%particle)
+  call reallocate_bunch (bp, 2*n0, save = .true.)
+  do ip_g = 1, n0
+    bp%particle(n0+ip_g) = bp%particle(ip_g)
+    bp%particle(n0+ip_g)%charge = 2 * bp%particle(ip_g)%charge / 3
+    bp%particle(ip_g)%charge = bp%particle(ip_g)%charge / 3
+  enddo
+endif
+
+if (write_dist_file /= '') then
+  call fel_write_genesis4_distribution (bp, write_dist_file, err_i)
+  if (err_i) stop 1
+  print '(a)', 'fel_track_test: wrote Genesis distribution file: ' // trim(write_dist_file)
+endif
+
+if (write_opmd_file /= '') then
+  call hdf5_write_beam (write_opmd_file, beam_b%bunch(1:1), .false., err_i, lat)
+  if (err_i) stop 1
+  print '(a)', 'fel_track_test: wrote openPMD-beamphysics file: ' // trim(write_opmd_file)
+endif
+
+imp%npart = gen_npart
+imp%nbins = gen_nbins
+call fel_import_bunch (bp, gamma0, lambda0, gen_sample * lambda0, imp, fbeam, err_i, moments)
+if (err_i) stop 1
+
+print '(a, i0, a, i0, a)', 'fel_track_test: imported into ', size(fbeam%slice), &
+                           ' slices of ', gen_npart, ' particles.'
+print '(a, 11es24.15e3)', 'import moments (gavg xavg pxavg yavg pyavg ex ey bx by ax ay):', moments
+do is_g = 1, size(fbeam%slice)
+  print '(a, i0, a, es24.15e3)', 'import current ', is_g, ': ', &
+        c_light * sum(fbeam%slice(is_g)%weight(1:fbeam%slice(is_g)%n)) / fbeam%slice_spacing
+enddo
+
+call generate_seed_field (size(fbeam%slice))
+
+end subroutine import_initial_state
 
 !------------------------------------------------------------------------------
 

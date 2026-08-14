@@ -7,7 +7,7 @@ the seam of the design brief's section 4.1, and validated against Genesis over i
 single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
 (deliverable 4).
 
-No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 9 is in — including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the brief's 7.5 assertions enforced by name; see the FEL element section. Per-particle weights are carried from day one (brief section 5): the
+No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 10 is in — including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the brief's 7.5 assertions enforced by name; see the FEL element section. Per-particle weights are carried from day one (brief section 5): the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
 the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
 over slices (deliverable 5), with thread-count independence -- bit-identical results at
@@ -27,6 +27,8 @@ section.
 | `bsim/fel/tests/scripts/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `bsim/fel/tests/scripts/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
 | `bsim/fel/tests/scripts/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
+| `bsim/modules/fel_import_mod.f90` | The distribution import (brief 10 step 10): a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer; see the distribution-import section |
+| `bsim/fel/tests/scripts/check_import.py` | Import gates: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
 | `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
@@ -413,6 +415,69 @@ These two gates are statistical by necessity (independent RNGs). The `tdsase` ti
 their deterministic complement: Genesis generates the noisy beam, writes it, and both
 codes track the identical realization dark through the full line, so startup-from-noise
 is also compared elementwise like any other tier.
+
+## Distribution import (brief 10 step 10): a bunch_struct, resampled Genesis's way
+
+The `importdistribution` equivalent: an arbitrary bunch -- arbitrary times, arbitrary
+weights -- resampled into the evenly spaced, equal-population slices the FEL step
+wants, by Genesis's own method, transcribed from `SDDSBeam.cpp` (`fel_import_mod`; the
+class name is historical, it reads plain HDF5). The bunch comes in two ways: generated
+natively from Bmad's `beam_init_struct` via `init_beam_distribution` (a `&beam_init`
+namelist block -- Bmad's equivalent of Genesis's `&beam` description), or read from an
+openPMD-beamphysics file via `hdf5_read_beam`. The driver can write any bunch back out
+as a Genesis distribution file (`t/p/x/xp/y/yp` + charge, with `t = -tau/c` so
+Genesis's `s = -c*t` reproduces this port's window position exactly) and as
+openPMD-beamphysics (`hdf5_write_beam`).
+
+Per slice: every particle inside a sampling window `dslen = slicewidth*bunch_length`
+(default 0.01 of the bunch, deliberately much wider than a slice) is a candidate, and
+the slice current comes from the same window -- Genesis's `count*dQ*c/dslen`,
+generalized to the weight sum `c*sum(w)/dslen`, identical for uniform weights and the
+only weighted generalization made. Candidates are brought to `npart/nbins` beamlet
+seeds by random deletion or by Genesis's phase-space interpolation (normalize 5D to
+unit rms; nearest ORIGINAL neighbor under a metric whose per-coordinate weights are
+fresh random draws; child at midpoint plus uniform[-1,1] times the difference); theta
+is refilled over one beamlet spacing, mirrored into nbins bins, and the deliverable-6
+Fawley loader imposes shot noise with `ne = round(I*lambda*sample/(e*c))` -- shared
+code (`fel_fawley_noise`), so the generator and the import stay one implementation.
+The optional `match` (an emittance-preserving Twiss transform) and `center` operate on
+SLOPES before the slope-to-momentum conversion, in Genesis's order. Facts pinned by
+reading: the `align*` parameters are parsed but never used in v4, and the `shotnoise`
+flag is read but never consulted (the import applies noise unconditionally, skipping
+only zero-current slices) -- both kept as Genesis has them, neither transcribed as
+functional. one4one is out of scope: weights supersede it.
+
+Validation (`scripts/check_import.py`, in the harness) splits along the RNG boundary
+-- exact gates where no random number enters, statistical only where one does:
+
+| Gate | Kind | Measured |
+|---|---|---|
+| per-slice current profile vs Genesis importing the SAME file | exact | **8.2e-13** of peak (24 slices) |
+| match hits its Twiss targets, preserves emittance | exact | **2.6e-14** worst target miss |
+| split-weight invariance (coincident w/3 + 2w/3 copies) | exact | moments 1.8e-15, currents 7.4e-14 |
+| openPMD round trip (write_opmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
+| thread determinism (1 vs 8 threads, same seed) | exact | byte-identical diag |
+| slice Twiss/emittance recover the spec (mean, central slices) | statistical | beta 0.8%, alpha 1.0%, emit 1.4% |
+| dark-start startup power vs Genesis, independent resampling RNGs | statistical | ln ratio +0.023 (gate 0.30) |
+
+Mutations bite, each on the gate built for it: the slope/momentum order bug (momenta
+converted before match) fails the emittance-preservation check; normalizing the
+current by the slice spacing instead of `dslen` fails the exact current gate at
+6.5e-1; skipping the shot noise fails the startup gate at ln ratio -57 (a dead-quiet
+start); collapsing the beamlet mirroring fails the startup gate at ln ratio +4.7.
+The fourth planned mutation -- refilling theta over 2pi instead of 2pi/nbins -- turned
+out to be an EQUIVALENT MUTANT: under the beamlet mirroring, a uniform seed over the
+full turn is uniform modulo one beamlet spacing, the quiet cancellation is untouched,
+and the gates correctly pass it (FINDINGS.md 7.16). It is a convention, not a defect
+class; the load-bearing neighbor (the mirroring itself) is what gets mutation-tested.
+
+Recorded improvement path: with per-particle weights the resampling is OPTIONAL -- a
+direct weighted import (every bunch particle a macroparticle in its slice, no deletion,
+no interpolation) has no Genesis counterpart outside one4one and is likely the better
+default once validated; Genesis's O(n^2) randomly-reweighted nearest-neighbor
+interpolation is the first thing worth replacing. `examples/import/` is the
+self-contained demonstration: a beam_init bunch, matched by the import, tracked dark
+through the full line.
 
 ## Slice migration under weights (brief 6.4)
 

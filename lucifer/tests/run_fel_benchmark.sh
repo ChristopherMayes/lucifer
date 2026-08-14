@@ -332,6 +332,19 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesi
 fi
 echo
 
+# Distribution-import gates (deliverable 10): the bunch_struct resampler transcribed
+# from Genesis's SDDSBeam.cpp -- exact where no RNG enters (the per-slice current
+# profile against Genesis importing the SAME distribution file; the match transform
+# hitting its Twiss targets; split-weight invariance; thread determinism), statistical
+# where the resampling RNG forces it (slice Twiss recovery, startup power cross-code).
+
+echo "--- distribution-import gates --------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_import.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
+  echo "FAIL: distribution-import gates; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
 # Slice-migration gates (deliverable 7): conservation under heavy migration, exact
 # phase continuity of the moves, and no-op bit identity (self-referenced, FINDINGS 6.9
 # -- Genesis migrates only under one4one).
