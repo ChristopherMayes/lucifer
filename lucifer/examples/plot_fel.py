@@ -38,6 +38,13 @@ def load(fn):
     if d.ndim == 1:
         d = d[None, :]
     nslice = int(d[:, 1].max())
+    # An interrupted run leaves a partial trailing record; plot the complete ones.
+    n_full = (d.shape[0] // nslice) * nslice
+    if n_full != d.shape[0]:
+        print(f"note: file ends mid-record (interrupted run?); "
+              f"plotting {d.shape[0]//nslice} complete records, dropping "
+              f"{d.shape[0]-n_full} trailing rows")
+        d = d[:n_full]
     d = d.reshape(-1, nslice, d.shape[1])
     q = {name: d[:, :, i] for i, name in enumerate(
         ("z", "slice", "power", "on_axis", "bunching", "bunching_phase",
