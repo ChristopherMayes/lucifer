@@ -28,6 +28,7 @@ section.
 | `bsim/fel/tests/scripts/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
 | `bsim/fel/tests/scripts/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
 | `bsim/modules/fel_import_mod.f90` | The distribution import (brief 10 step 10): a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer; see the distribution-import section |
+| `bsim/fel/tests/scripts/check_seam_wake.py` | Seam-wake gates: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
 | `bsim/fel/tests/scripts/check_import.py` | Import gates: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
@@ -571,6 +572,66 @@ Mutations bite, each on its named gate: reversing the convolution's causality (w
 collected from trailing charge) fails tdwk at 7.0e-3 against its 8.7e-7 pristine;
 flipping the sign of `ez` fails tdsc at 9.1e-1; removing the migration-stride recompute
 leaves one eloss block and fails the stale-wake structural gate.
+
+## Bmad element wakes across the whole bunch (brief 10 step 11)
+
+Elements carrying Bmad `sr_wake` definitions -- pseudomodes and the tabular `z_long`
+(binning + FFT) -- act across the WHOLE time window. For wake elements only, the seam
+concatenates all slices into one bunch in global window coordinates,
+
+```
+z_global = z_local + beta * (islice-1) * slice_spacing
+```
+
+-- higher slice index is the window head (larger Bmad z). The formula is the slice-
+migration invariant run backward (a mover's z shifts by exactly -atar*beta*spacing),
+and the direction is triple-pinned: by that invariant, by the deliverable-8
+convolution (eloss collects `current(is+i)`, the wake trailing its source), and
+empirically by the causality gate. The deliverable-11 goal guessed the opposite sign;
+the gates corrected it. Interlude elements pass through Bmad's own `track1_bunch`
+(wake applied at `ds_wake`, Bmad's once-per-passage convention); FEL wigglers carrying
+`sr_wake` get one whole-window kick at the step nearest mid-element via
+`track1_sr_wake` directly -- a pure kick, no transport, with z rescaled by
+`beta_new/beta_old` to hold theta (the same convention as `wake_on`'s energy kick).
+Bmad's wake machinery is used AS IS: the seam supplies global z and charges, Bmad
+supplies the physics (`ix_z(1)` is the bunch head at largest `vec(5)`;
+`wake_mod.f90`). Refused by name: lr (multi-bunch) wakes; a pseudomode `z_max` or a
+`z_long` table extent `z0` shorter than the window (Bmad would kill the bunch
+mid-run); a Bmad drift cannot carry a wake at all (use a pipe -- and the driver now
+stops on ANY `bmad_parser` error rather than running a partial lattice, found when an
+example's drift wakes silently never attached).
+
+Gates (`scripts/check_seam_wake.py`, self-referenced per FINDINGS 6.9, every wake
+measurement an A-B difference against a bit-identical no-wake run on a one-step
+wiggler so the FEL evolution cancels exactly):
+
+| Gate | Measured |
+|---|---|
+| constant-pseudomode closed form (W = amp, self = W(0)/2), per-slice means | **6.2e-10** |
+| causality: kick ahead of ALL charge (must be exactly zero) | **0.0** bitwise |
+| d8 direction cross-check: `wake_on` marks the same affected mask | agrees, 0 ahead |
+| z_long vs first-principles particle convolution of the same table | **3.4e-8** |
+| resolved-beam z_long vs `wake_on`, same kernel, per-slice bound derived from Genesis's half-slice head deficit | 0.55 of bound |
+| split-weight invariance of the kick profile | 1.8e-10 |
+| thread determinism with wake elements | byte-identical |
+
+The kernel bridge: `write_wake_kernels` exports the deliverable-8 Bane-Stupakov
+kernels (eV/(m electron), s = 0 rows carrying the Bane self-slice half factor), and a
+`z_long` table built from them (sign-flipped -- the d8 kernels are stored as SIGNED
+energy loss, Bmad's table is positive-decelerating -- unhalved at s = 0, causal side
+z < 0, zero-padded past the window) gives the SAME physical wake through two
+independent implementations. Measured on the full 96-slice SASE line with a 0.5 mm
+copper chamber on every element (`examples/bmad_wake/`): exit mean energy drop
+-2.324 (Bmad z_long, once per element) vs -2.308 m_e c^2 (`wake_on`, per step), the
+interior per-slice profiles agreeing to **0.7%**. On a sub-slice-width bunch the two
+diverge by design: `wake_on` convolves slice-density (Genesis's model, linearly
+interpolated with a zero pad past the head -- half a slice of charge missing at the
+window head), `z_long` bins actual particles; the derived per-slice bound
+0.5/(slices ahead + 0.5) brackets the measured differences at half its size.
+
+Mutations bite: flipping the head/tail direction fails the closed form at 22 and
+causality at 2.8e-4; dropping the slice offset (all slices coincide) fails both;
+unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
 
 ## The coarse-step measurement (brief 8.3)
 

@@ -111,6 +111,15 @@
 !     load_only = F            ! Generate, write <out_root>-initial dumps, exit without
 !                              !   tracking. For the shot-noise statistical gate.
 !
+! Element wakes (deliverable 11): elements carrying Bmad sr_wake definitions --
+! pseudomodes or a tabular z_long -- act across the WHOLE time window: the slices
+! concatenate into one bunch in global window coordinates and Bmad's own wake
+! machinery applies (interludes via track1_bunch at ds_wake; FEL wigglers via one
+! whole-window track1_sr_wake kick at mid-element). lr wakes and wake definitions
+! shorter than the window are refused by name. write_wake_kernels = "<file>" exports
+! the deliverable-8 wake kernels for building matching z_long tables (see the README's
+! seam-wake section and examples/bmad_wake).
+!
 ! Third way in (deliverable 10): import a particle DISTRIBUTION -- an arbitrary bunch,
 ! resampled into slices by the transcribed Genesis importdistribution method
 ! (fel_import_mod, where the algorithm and its provenance live). The bunch comes from
@@ -183,6 +192,7 @@ use fel_track_mod
 use fel_import_mod
 use wavefront_hdf5_mod
 use beam_mod
+use wake_mod
 
 implicit none
 
@@ -192,6 +202,8 @@ type (ele_struct), pointer :: ele
 type (fel_beam_struct), target :: fbeam
 type (wavefront_struct) wf
 type (bunch_struct) bunch
+type (bunch_struct) wake_bunch          ! Whole-window bunch for element sr wakes.
+real(rp), allocatable :: wake_beta0(:)  ! Entry betas for the exact concat/split inverse.
 type (fel_und_struct) und
 type (fel_slip_struct) slip
 type (fel_slice_diag_struct) bdiag
@@ -244,6 +256,9 @@ character(400) :: write_opmd_file = ''   ! Write the bunch as openPMD-beamphysic
                                          ! (hdf5_write_beam), the dist_file round trip.
 logical :: imp_split_weights = .false.   ! Gate knob: coincident w/3 + 2w/3 copies
                                          ! BEFORE import; RNG-free outputs must not move.
+character(400) :: write_wake_kernels = ''  ! Write the deliverable-8 wake kernels
+                                           ! (s, wakeres, wakegeo, wakerou; eV/(m e-))
+                                           ! for the seam-wake cross-validation gate.
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, from lattice attributes.
@@ -269,7 +284,7 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
                            wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
                            beam_init, imp, use_beam_init, dist_file, write_dist_file, &
-                           write_opmd_file, imp_split_weights
+                           write_opmd_file, imp_split_weights, write_wake_kernels
 
 ! Read parameters.
 
@@ -311,7 +326,15 @@ endif
 track1_custom_ptr => fel_ele_as_wiggler
 make_mat6_custom_ptr => fel_mat6_as_wiggler
 
-call bmad_parser (lat_file, lat)
+! err_flag matters: bmad_parser reports attribute errors (e.g. a wake on an element
+! type that cannot carry one) and RETURNS -- without the check the run continues on a
+! partial lattice, found when an example's drift wakes silently never attached.
+
+call bmad_parser (lat_file, lat, err_flag = err)
+if (err) then
+  print '(a)', 'fel_track_test: lattice parse errors (above); refusing to run on a partial lattice.'
+  stop 1
+endif
 branch => lat%branch(0)
 
 gamma0 = branch%ele(0)%value(e_tot$) / m_electron
@@ -403,6 +426,25 @@ if (wake_on) then
   call fel_wake_update (coll%wake, fbeam)
   open (newunit = iu_wake, file = trim(out_root) // '.wake.txt', action = 'write')
   call write_wake_block (0.0_rp)
+
+  ! The single-particle kernels, for the deliverable-11 cross-validation: the same
+  ! physical wake fed to Bmad's z_long machinery must reproduce these kernels'
+  ! convolution. NOTE the s = 0 entries carry the Bane self-slice half factor
+  ! (fel_wake_init halves them); a plain W(z) table wants the unhalved value.
+
+  if (write_wake_kernels /= '') then
+    block
+      integer iu_k, i_k
+      open (newunit = iu_k, file = trim(write_wake_kernels), action = 'write')
+      write (iu_k, '(a)') '# s [m]   wakeres   wakegeo   wakerou   [eV/(m electron)]; s=0 rows are HALVED (Bane self-slice)'
+      do i_k = 1, coll%wake%ns
+        write (iu_k, '(4es24.15e3)') coll%wake%ds * (i_k-1), coll%wake%wakeres(i_k), &
+                                     coll%wake%wakegeo(i_k), coll%wake%wakerou(i_k)
+      enddo
+      close (iu_k)
+      print '(a)', 'fel_track_test: wrote wake kernels: ' // trim(write_wake_kernels)
+    end block
+  endif
 endif
 
 if (write_initial .or. load_only) then
@@ -513,6 +555,14 @@ do ie = 1, branch%n_ele_track
     do istep = 1, und%nstep
       call fel_track_und_step (und, fbeam, wf, slip, coll, err)
       if (err) stop 1
+
+      ! Element sr wake, Bmad's once-per-passage convention mirrored: one kick at the
+      ! step nearest mid-element, scaled to the full element length (scale_with_length
+      ! uses ele's l), applied across the WHOLE window (deliverable 11). Direct kick,
+      ! no transport -- this walk owns transport inside wigglers.
+
+      if (associated(ele%wake) .and. istep == (und%nstep + 1)/2) call apply_bmad_wake_kick (ele)
+
       if (istep == und%nstep) then
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step + ele_slip(ie))
       else
@@ -536,17 +586,36 @@ do ie = 1, branch%n_ele_track
     ! call, and parallelizing here as well would nest. The FEL step's parallelism over
     ! slices lives in fel_track_mod.
 
-    do is = 1, nslice
-      call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch, err)
+    if (associated(ele%wake)) then
+
+      ! Wake-carrying interlude: ALL slices as one bunch in global window coordinates,
+      ! through Bmad's own track1_bunch, which applies the sr wake at ds_wake with the
+      ! whole window visible head to tail (deliverable 11). The per-slice path below is
+      ! untouched for everything else, keeping its numerics bit-identical.
+
+      call fel_concat_slices (fbeam, ele, wake_bunch, wake_beta0, err)
       if (err) stop 1
-      call track1_bunch (bunch, ele, err)
+      call track1_bunch (wake_bunch, ele, err)
       if (err) then
         print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
         stop 1
       endif
-      call fel_bunch_to_slice (bunch, ele, fbeam%slice(is), err)
+      call fel_split_slices (wake_bunch, ele, fbeam, wake_beta0, .false., err)
       if (err) stop 1
-    enddo
+
+    else
+      do is = 1, nslice
+        call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch, err)
+        if (err) stop 1
+        call track1_bunch (bunch, ele, err)
+        if (err) then
+          print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
+          stop 1
+        endif
+        call fel_bunch_to_slice (bunch, ele, fbeam%slice(is), err)
+        if (err) stop 1
+      enddo
+    endif
 
     fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &
                     fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
@@ -573,6 +642,7 @@ do ie = 1, branch%n_ele_track
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
     call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, wf, slip, coll, err)
+    if (associated(ele%wake)) call apply_bmad_wake_kick (ele)
     if (err) stop 1
 
     call fel_apply_slippage (slip, wf, ele_slip(ie))
@@ -1006,6 +1076,33 @@ end subroutine do_split_weights
 
 !------------------------------------------------------------------------------
 
+subroutine apply_bmad_wake_kick (wake_ele)
+
+! One whole-window application of an element's Bmad sr wake, as a pure kick
+! (deliverable 11): concatenate the slices into global window coordinates, let Bmad's
+! own machinery order and kick (track1_sr_wake: pseudomode accumulation head to tail,
+! z_long binned FFT), split back holding theta -- Genesis's convention for wake energy
+! loss, the same z rescale fel_wake_apply_slice does -- so the phase every deposition
+! sees is continuous through the kick. Used inside wigglers (mid-element) and after
+! genesis-model interludes; Bmad-model interludes instead go through track1_bunch,
+! where the wake applies at ds_wake in Bmad's own chart.
+
+type (ele_struct) wake_ele
+logical err_w
+
+!
+
+call fel_concat_slices (fbeam, wake_ele, wake_bunch, wake_beta0, err_w)
+if (err_w) stop 1
+call order_particles_in_z (wake_bunch)
+call track1_sr_wake (wake_bunch, wake_ele)
+call fel_split_slices (wake_bunch, wake_ele, fbeam, wake_beta0, .true., err_w)
+if (err_w) stop 1
+
+end subroutine apply_bmad_wake_kick
+
+!------------------------------------------------------------------------------
+
 subroutine setup_fel_elements ()
 
 ! Recognize FEL segments -- wiggler/undulator elements with tracking_method = custom,
@@ -1061,20 +1158,32 @@ if (.not. any(is_fel)) then
   stop 1
 endif
 
-! Elements carrying Bmad wakes are refused by name: the seam tracks one FEL slice at a
-! time as its own bunch, so an element wake would act WITHIN single slices only -- the
-! bunch-scale wake between slices never accumulates -- and Bmad's tracker additionally
-! notes every zero-charge filler slice ("Wakes are on but bunch charge is zero!").
-! Near-null physics applied silently is worse than a refusal. The FEL's own wake model
-! (wake_on, deliverable 8) covers in-undulator wakes; bunch-scale element wakes at the
-! seam are future work.
+! Element sr wakes act across the WHOLE window (deliverable 11): all slices
+! concatenate into one bunch in global window coordinates and Bmad's wake machinery
+! applies unmodified. What is checked here, by name: lr (multi-bunch) wakes are not
+! supported; a pseudomode wake whose z_max is shorter than the window would have Bmad
+! kill the bunch mid-run; a z_long table narrower than the window would overflow its
+! binning grid the same way.
 
 do je = 1, branch%n_ele_track
-  if (associated(branch%ele(je)%wake)) then
-    print '(2a)', 'fel_track_test: element carries Bmad wakes, which the slice-at-a-time ', &
-                  'seam cannot apply meaningfully (they would act within single slices only): ' &
-                  // trim(branch%ele(je)%name)
-    print '(a)',  '  Remove the wakes, or use the FEL wake model (wake_on) for in-undulator wakes.'
+  w => branch%ele(je)
+  if (.not. associated(w%wake)) cycle
+  if (allocated(w%wake%lr%mode)) then
+    if (size(w%wake%lr%mode) > 0) then
+      print '(2a)', 'fel_track_test: lr (multi-bunch) wakes are not supported; ', &
+                    'remove them from: ' // trim(w%name)
+      stop 1
+    endif
+  endif
+  if (w%wake%sr%z_max > 0 .and. size(fbeam%slice) * fbeam%slice_spacing > w%wake%sr%z_max) then
+    print '(2a)', 'fel_track_test: the time window is longer than this element''s sr wake ', &
+                  'z_max can handle: ' // trim(w%name)
+    stop 1
+  endif
+  if (w%wake%sr%z_long%dz > 0 .and. &
+      size(fbeam%slice) * fbeam%slice_spacing > w%wake%sr%z_long%z0) then
+    print '(2a)', 'fel_track_test: the time window is longer than this element''s z_long ', &
+                  'wake table extent z0: ' // trim(w%name)
     stop 1
   endif
 enddo

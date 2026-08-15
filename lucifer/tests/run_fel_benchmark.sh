@@ -232,9 +232,16 @@ run_assert_gate () {   # <name> <by-name message fragment>
     echo "  gate_$1: refused by name ($(grep "$2" fel-gate_$1.log | head -1 | cut -c1-60)...)"
   fi
 }
-cat > gate_wake.bmad <<'LAT'
+cat > gate_lrwake.bmad <<'LAT'
 call, file = aramis_1seg.bmad
-PW: pipe, l = 0.1, sr_wake = {amp_scale = 1.0, z_scale = 1.0, scale_with_length = T, z_max = 1.2,
+PW: pipe, l = 0.1, lr_wake = {mode = {2e5, 0.1, 1e-5, 0.3, 2, 0.7}}
+SEGW: line = (UND, PW)
+use, SEGW
+LAT
+
+cat > gate_zmax.bmad <<'LAT'
+call, file = aramis_1seg.bmad
+PW: pipe, l = 0.1, sr_wake = {amp_scale = 1.0, scale_with_length = T, z_max = 1e-12,
   longitudinal = {-8266.6e2, 26.6, 46089.2, 1.578966/twopi, none}}
 SEGW: line = (UND, PW)
 use, SEGW
@@ -243,7 +250,8 @@ LAT
 run_assert_gate bmax     "zero b_max"
 run_assert_gate lperiod  "zero l_period"
 run_assert_gate fieldmap "field_calc must be planar_model"
-run_assert_gate wake     "element carries Bmad wakes"
+run_assert_gate lrwake   "lr (multi-bunch) wakes are not supported"
+run_assert_gate zmax     "sr wake z_max can handle"
 if [ "$GATES_OK" -ne 1 ]; then
   echo "FAIL: FEL-element assertion gates; outputs kept in: $WORK_DIR" >&2
   exit 1
@@ -336,6 +344,19 @@ echo
 echo "--- SASE startup cross-check against Genesis's loader -------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
   echo "FAIL: SASE startup level; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
+# Seam-wake gates (deliverable 11): element sr wakes across the whole window --
+# closed-form pseudomode ramp, exact causality with the d8 direction cross-check, the
+# z_long kernel cross-validation against the deliverable-8 wake model (first-principles
+# tight, resolved-beam at the derived boundary bound), split-weight invariance and
+# thread determinism. Self-referenced; needs no Genesis.
+
+echo "--- seam-wake gates -------------------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_seam_wake.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: seam-wake gates; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo

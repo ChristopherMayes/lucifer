@@ -1,0 +1,19 @@
+! The benchmark line with a resistive-wall chamber wake on EVERY element, delivered
+! through Bmad's own machinery: the table ztable.wake is the deliverable-8
+! Bane-Stupakov kernel for a 0.5 mm copper chamber (AC conductivity 5.813e7 S/m,
+! relaxation 8.1 um), exported by write_wake_kernels, sign-flipped to Bmad's
+! positive-decelerating convention, self-slice unhalved, causal side z < 0, padded
+! past the window with zeros. Regenerate with the recipe in the README.
+!
+! Undulators apply it through the FEL walk (one whole-window kick at mid-element);
+! quads and pipes through Bmad's own track1_bunch. The drift slots become PIPES --
+! tracked identically -- because a Bmad drift cannot carry a wake.
+call, file = ../aramis.bmad
+UND[sr_wake] = {scale_with_length = T, z_long = {position_dependence = none, w = { call::ztable.wake }}}
+QF[sr_wake]  = {scale_with_length = T, z_long = {position_dependence = none, w = { call::ztable.wake }}}
+QD[sr_wake]  = {scale_with_length = T, z_long = {position_dependence = none, w = { call::ztable.wake }}}
+P1: pipe, l = 0.44, sr_wake = {scale_with_length = T, z_long = {position_dependence = none, w = { call::ztable.wake }}}
+P2: pipe, l = 0.24, sr_wake = {scale_with_length = T, z_long = {position_dependence = none, w = { call::ztable.wake }}}
+FODOW: line = (UND, P1, QF, P2, UND, P1, QD, P2)
+ARAMISW: line = (6*FODOW)
+use, ARAMISW

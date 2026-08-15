@@ -23,6 +23,7 @@ python ../plot_fel.py <example>.diag.txt            # needs matplotlib; writes <
 | `sase/` | Pure SASE: 96 slices, dark start, shot noise | ~90 s |
 | `sase_wake/` | The SASE run plus resistive-wall/gap/roughness wakes | ~100 s |
 | `import/` | A beam_init bunch resampled into slices (Genesis's importdistribution method), tracked dark | ~1 min |
+| `bmad_wake/` | The SASE run with the chamber wake via BMAD's z_long machinery on every element | ~2 min |
 
 With no dump files named in the namelist, the program generates its own starting state
 (quiet-start beam, and a Gaussian seed where `gen_power > 0`); the header of
@@ -99,6 +100,23 @@ the head of the finite window at each drift while fresh vacuum enters at the tai
 real effect of any finite time window, identical in Genesis; deep saturation of every
 slice needs a window longer than the total slippage), and the per-slice spaghetti in the
 power panel is the slippage cascade itself.
+
+## bmad_wake
+
+The same chamber-wake physics as `sase_wake`, delivered through BMAD's own wake
+machinery instead of the transcribed Genesis model: `ztable.wake` is the
+Bane-Stupakov resistive-wall kernel for a 0.5 mm copper chamber (exported by
+`write_wake_kernels` from the deliverable-8 code, sign-flipped to Bmad's
+positive-decelerating convention, self-slice unhalved, causal side z < 0, padded past
+the window), attached as an `sr_wake` `z_long` table to every element of the line --
+the undulators apply it once per element at mid-element across the whole 96-slice
+window, the quads and pipes through Bmad's own `track1_bunch`. (The drift slots are
+pipes here: a Bmad drift cannot carry a wake.) Measured against the identical kernel
+in the `wake_on` model: exit mean energy drop -2.324 vs -2.308 m_e c^2, interior
+per-slice profiles agreeing to 0.7% -- one physical wake, two independent
+implementations, two application granularities. Regenerate the table by running any
+wake_on configuration with `write_wake_kernels = "kern.txt"` and applying the recipe
+in `wake_lattice.bmad`'s header.
 
 ## sase_wake
 

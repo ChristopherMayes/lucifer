@@ -1,0 +1,27 @@
+! SASE with the chamber wake on the undulators via BMAD's wake machinery (z_long
+! binned-FFT table, once per wiggler element over the whole window) -- the same
+! physical kernel the wake_on model (sase_wake) convolves per step. See the README
+! for the two-implementation comparison and measured numbers.
+!
+!   fel_track_test run.nml           (run from this directory)
+!   python ../plot_fel.py bmad_wake.diag.txt
+
+&fel_track_params
+  lat_file = "wake_lattice.bmad"
+  out_root = "bmad_wake"
+
+  lambda0 = 1e-10
+  gen_current = 3000
+  gen_delgam = 1.0
+  gen_ex = 4e-7, gen_ey = 4e-7
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+  gen_power = 0
+  gen_ngrid = 255
+  gen_dgrid = 2e-4
+  gen_npart = 2048
+  gen_slen = 2.88e-8
+  gen_sample = 3
+  gen_shotnoise = T
+  gen_seed = 12345
+&end

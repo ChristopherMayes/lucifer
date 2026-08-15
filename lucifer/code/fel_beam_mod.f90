@@ -634,6 +634,156 @@ end subroutine fel_bunch_to_slice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_concat_slices (beam, ele, bunch, beta0, err_flag)
+!
+! All slices as ONE bunch_struct in GLOBAL window coordinates, so Bmad's whole-bunch
+! machinery (the sr wake, deliverable 11) sees the beam head to tail:
+!
+!   z_global = z_local + beta * (islice-1) * slice_spacing
+!
+! Higher slice index is the window HEAD (larger Bmad z). The direction and the formula
+! are not new conventions: fel_migrate_slices documents "positive theta drift moves
+! toward higher slice index, the head", shifts a mover's z by exactly
+! -atar*beta*slice_spacing -- which makes z_global the migration INVARIANT -- and
+! fel_wake_update's convolution collects current(is+i) from higher indices, the wake
+! trailing its source. (The deliverable-11 goal guessed the opposite sign; the
+! causality gate and these two authorities pinned it.)
+!
+! beta0 records each particle's entry beta, slice-major in bunch order, for the exact
+! inverse in fel_split_slices. Particles are stored slice-major (slice 1 first), and
+! nothing downstream may permute bunch%particle storage -- Bmad's wake routines order
+! through the bunch%ix_z index array, never by moving particles, so the split can
+! address segments by position.
+!-
+
+subroutine fel_concat_slices (beam, ele, bunch, beta0, err_flag)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
+type (ele_struct) ele
+type (bunch_struct) bunch
+real(rp), allocatable :: beta0(:)
+real(rp) vec(6), beta, p0_mc
+integer is, ip, k, ntot
+logical err_flag
+character(*), parameter :: r_name = 'fel_concat_slices'
+
+!
+
+err_flag = .true.
+
+if (abs(ele%value(p0c$) - beam%p0c) > 1e-10_rp * beam%p0c) then
+  call out_io (s_error$, r_name, 'ELEMENT p0c \es20.12\ DOES NOT MATCH BEAM p0c \es20.12\ ', &
+               'AT ELEMENT: ' // trim(ele%name), r_array = [ele%value(p0c$), beam%p0c])
+  return
+endif
+
+p0_mc = fel_p0_mc(beam)
+ntot = 0
+do is = 1, size(beam%slice)
+  ntot = ntot + beam%slice(is)%n
+enddo
+
+if (allocated(bunch%particle)) then
+  if (size(bunch%particle) /= ntot) deallocate(bunch%particle)
+endif
+if (.not. allocated(bunch%particle)) allocate(bunch%particle(ntot))
+if (allocated(beta0)) then
+  if (size(beta0) /= ntot) deallocate(beta0)
+endif
+if (.not. allocated(beta0)) allocate(beta0(ntot))
+
+k = 0
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  do ip = 1, sl%n
+    k = k + 1
+    beta = fel_beta_of(p0_mc, sl%pz(ip))
+    beta0(k) = beta
+    vec = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), &
+           sl%z(ip) + beta * (is-1) * beam%slice_spacing, sl%pz(ip)]
+    call init_coord (bunch%particle(k), vec, ele, upstream_end$, electron$, shift_vec6 = .false.)
+    bunch%particle(k)%charge = sl%weight(ip)
+  enddo
+enddo
+
+bunch%n_live = ntot
+bunch%charge_live = sum(bunch%particle(1:ntot)%charge)
+
+err_flag = .false.
+
+end subroutine fel_concat_slices
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_split_slices (bunch, ele, beam, beta0, hold_theta, err_flag)
+!
+! The exact inverse of fel_concat_slices: subtract each particle's stored entry offset
+! beta0*(islice-1)*slice_spacing from vec(5) and copy the segment back into its slice.
+! Slice membership is by storage position (slice-major), which Bmad's wake routines
+! never permute.
+!
+! hold_theta: rescale the restored z by beta_new/beta_old, so the derived phase
+! theta = phi0 + ks*z/beta is untouched by an energy kick -- Genesis's convention for
+! wake energy loss (fel_wake_apply_slice does the same), used when the caller applied a
+! pure kick with no transport (the in-wiggler wake). A track1_bunch passage uses
+! hold_theta = false: there the element transported vec(5) in Bmad's own chart and the
+! restored z IS the tracked z.
+!-
+
+subroutine fel_split_slices (bunch, ele, beam, beta0, hold_theta, err_flag)
+
+type (bunch_struct) bunch
+type (ele_struct) ele
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
+real(rp), allocatable :: beta0(:)
+real(rp) z_loc, beta_new, p0_mc
+integer is, ip, k
+logical hold_theta, err_flag
+character(*), parameter :: r_name = 'fel_split_slices'
+
+!
+
+err_flag = .true.
+p0_mc = fel_p0_mc(beam)
+
+k = 0
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  do ip = 1, sl%n
+    k = k + 1
+    if (bunch%particle(k)%state /= alive$) then
+      call out_io (s_error$, r_name, 'PARTICLE \i0\ LOST THROUGH THE WHOLE-BUNCH PASSAGE OF: ' &
+                   // trim(ele%name), i_array = [k])
+      return
+    endif
+
+    z_loc = bunch%particle(k)%vec(5) - beta0(k) * (is-1) * beam%slice_spacing
+    if (hold_theta) then
+      beta_new = fel_beta_of(p0_mc, bunch%particle(k)%vec(6))
+      z_loc = z_loc * beta_new / beta0(k)
+    endif
+
+    sl%x(ip)  = bunch%particle(k)%vec(1)
+    sl%px(ip) = bunch%particle(k)%vec(2)
+    sl%y(ip)  = bunch%particle(k)%vec(3)
+    sl%py(ip) = bunch%particle(k)%vec(4)
+    sl%z(ip)  = z_loc
+    sl%pz(ip) = bunch%particle(k)%vec(6)
+  enddo
+enddo
+
+err_flag = .false.
+
+end subroutine fel_split_slices
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, err_flag)
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
