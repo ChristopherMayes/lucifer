@@ -192,6 +192,39 @@ def main():
         print("FAIL: constant-wake closed form violated (head/tail direction or charge wiring)")
         ok = False
 
+    # ---------------- lord resolution: the same constant wake on a PIPE that a
+    # superimposed marker has SPLIT into super_slaves. The wake then lives on the
+    # LORD (ele%wake is null on every tracked slave; pointer_to_wake_ele resolves it,
+    # applying once at the slave containing the lord's midpoint). Checking ele%wake
+    # directly was the deliverable-11 hole: lord wakes fell through to the per-slice
+    # path. Closed form as in ramp, with the pipe's length in f.
+    L_PIPE = 0.1
+    (w/"wl_lordw.bmad").write_text(
+        LAT_BASE.format(l=L_ELE, wake="").replace("SEGW: line = (UNDW)",
+        "PW: pipe, l = {lp}{wk}\nMK: marker, superimpose, ref = PW\nSEGW: line = (UNDW, PW)".format(
+            lp=L_PIPE, wk=WAKE_MODE.format(amp=AMP).replace(chr(10), " "))))
+    (w/"wl_lordn.bmad").write_text(
+        LAT_BASE.format(l=L_ELE, wake="").replace("SEGW: line = (UNDW)",
+        f"PW: pipe, l = {L_PIPE}\nMK: marker, superimpose, ref = PW\nSEGW: line = (UNDW, PW)"))
+    (w/"wo_a.nml").write_text(NML_GEN.format(lat="wl_lordw.bmad", root="woa", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wo_b.nml").write_text(NML_GEN.format(lat="wl_lordn.bmad", root="wob", sample=SAMPLE, slen=slen, extra=""))
+    run(exe, "wo_a.nml", "woa.log", w)
+    run(exe, "wo_b.nml", "wob.log", w)
+    A, B = load_par(w, "woa"), load_par(w, "wob")
+    q = np.array([b["q"] for b in B])
+    f = L_PIPE * AMP / P0C
+    worst_l = 0.0
+    for i in range(len(A)):
+        pz_a = (np.sqrt(A[i]["gamma"]**2 - 1) - P0_MC) / P0_MC
+        pz_b = (np.sqrt(B[i]["gamma"]**2 - 1) - P0_MC) / P0_MC
+        expect = -f * (q[i+1:].sum() + q[i]/2)
+        got = (pz_a - pz_b).mean()
+        worst_l = max(worst_l, abs(got - expect) / abs(expect))
+    print(f"lord resolution (wake on a superimposition-split pipe): worst rel err = {worst_l:.3e}")
+    if worst_l > 1e-9:
+        print("FAIL: a lord's wake was not applied exactly once across its slaves")
+        ok = False
+
     # ---------------- causality: spike at the tail, probes ahead get EXACTLY zero
     (w/"wc_a.nml").write_text(NML_IMP.format(lat="wl_mode.bmad", root="wca", sample=SAMPLE, extra=""))
     (w/"wc_b.nml").write_text(NML_IMP.format(lat="wl_none.bmad", root="wcb", sample=SAMPLE, extra=""))

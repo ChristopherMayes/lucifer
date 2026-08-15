@@ -199,6 +199,10 @@ implicit none
 type (lat_struct), target :: lat
 type (branch_struct), pointer :: branch
 type (ele_struct), pointer :: ele
+type (ele_struct), pointer :: wake_src   ! The element whose wake applies at ele, resolved
+                                         ! through lords (pointer_to_wake_ele) -- a wake on
+                                         ! a superimposed/split element lives on the LORD
+                                         ! and ele%wake is null on its slaves.
 type (fel_beam_struct), target :: fbeam
 type (wavefront_struct) wf
 type (bunch_struct) bunch
@@ -534,9 +538,18 @@ do ie = 1, branch%n_ele_track
   ele => branch%ele(ie)
 
   ! Zero length elements (Bmad's end marker, for one) get no step and no diagnostic
-  ! record: Genesis's unrolled lattice has no counterpart for them.
+  ! record: Genesis's unrolled lattice has no counterpart for them -- UNLESS a wake
+  ! applies there (a zero-length wake element is a standard Bmad idiom), in which case
+  ! the element takes the interlude wake path below. wake_src resolves the wake through
+  ! lords: a wake on a superimposed or split element lives on the LORD, and ele%wake is
+  ! null on its slaves (pointer_to_wake_ele; the resolution also picks exactly ONE
+  ! slave of a split lord -- the one containing the lord's midpoint -- so a split wake
+  ! applies once, Bmad's own convention). Checking ele%wake directly was the deliverable
+  ! 11 hole: lord wakes fell through to the per-slice path, where Bmad applied them
+  ! within single slices and noted every zero-charge filler.
 
-  if (ele%value(l$) == 0) cycle
+  wake_src => pointer_to_wake_ele(ele)
+  if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
 
   if (is_fel(ie)) then
 
@@ -561,7 +574,7 @@ do ie = 1, branch%n_ele_track
       ! uses ele's l), applied across the WHOLE window (deliverable 11). Direct kick,
       ! no transport -- this walk owns transport inside wigglers.
 
-      if (associated(ele%wake) .and. istep == (und%nstep + 1)/2) call apply_bmad_wake_kick (ele)
+      if (associated(wake_src) .and. istep == (und%nstep + 1)/2) call apply_bmad_wake_kick (wake_src)
 
       if (istep == und%nstep) then
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step + ele_slip(ie))
@@ -586,7 +599,7 @@ do ie = 1, branch%n_ele_track
     ! call, and parallelizing here as well would nest. The FEL step's parallelism over
     ! slices lives in fel_track_mod.
 
-    if (associated(ele%wake)) then
+    if (associated(wake_src)) then
 
       ! Wake-carrying interlude: ALL slices as one bunch in global window coordinates,
       ! through Bmad's own track1_bunch, which applies the sr wake at ds_wake with the
@@ -642,7 +655,7 @@ do ie = 1, branch%n_ele_track
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
     call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, wf, slip, coll, err)
-    if (associated(ele%wake)) call apply_bmad_wake_kick (ele)
+    if (associated(wake_src)) call apply_bmad_wake_kick (wake_src)
     if (err) stop 1
 
     call fel_apply_slippage (slip, wf, ele_slip(ie))
@@ -1166,8 +1179,8 @@ endif
 ! binning grid the same way.
 
 do je = 1, branch%n_ele_track
-  w => branch%ele(je)
-  if (.not. associated(w%wake)) cycle
+  w => pointer_to_wake_ele(branch%ele(je))
+  if (.not. associated(w)) cycle
   if (allocated(w%wake%lr%mode)) then
     if (size(w%wake%lr%mode) > 0) then
       print '(2a)', 'fel_track_test: lr (multi-bunch) wakes are not supported; ', &

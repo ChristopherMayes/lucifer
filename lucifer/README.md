@@ -599,7 +599,13 @@ supplies the physics (`ix_z(1)` is the bunch head at largest `vec(5)`;
 `z_long` table extent `z0` shorter than the window (Bmad would kill the bunch
 mid-run); a Bmad drift cannot carry a wake at all (use a pipe -- and the driver now
 stops on ANY `bmad_parser` error rather than running a partial lattice, found when an
-example's drift wakes silently never attached).
+example's drift wakes silently never attached). Wakes are resolved through LORDS
+(`pointer_to_wake_ele`): a wake on a superimposed or split element lives on the lord
+and `ele%wake` is null on its slaves -- checking `ele%wake` directly was the first
+shipped version's hole, found by a user's lattice whose lord wakes fell through to the
+per-slice path (the zero-charge INFO spam returning was the symptom). Zero-length wake
+elements are kept in the walk for the same reason (a wake on a marker-like element is
+a standard Bmad idiom); zero-length elements without wakes are skipped as before.
 
 Gates (`scripts/check_seam_wake.py`, self-referenced per FINDINGS 6.9, every wake
 measurement an A-B difference against a bit-identical no-wake run on a one-step
@@ -614,6 +620,7 @@ wiggler so the FEL evolution cancels exactly):
 | resolved-beam z_long vs `wake_on`, same kernel, per-slice bound derived from Genesis's half-slice head deficit | 0.55 of bound |
 | split-weight invariance of the kick profile | 1.8e-10 |
 | thread determinism with wake elements | byte-identical |
+| lord resolution: a wake on a superimposition-split element applies exactly once | **1.8e-10** closed form |
 
 The kernel bridge: `write_wake_kernels` exports the deliverable-8 Bane-Stupakov
 kernels (eV/(m electron), s = 0 rows carrying the Bane self-slice half factor), and a
