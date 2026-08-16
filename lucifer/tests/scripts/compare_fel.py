@@ -105,23 +105,25 @@ def load_nslice(fn):
 def load_fortran_diag(fn, nslice=1):
     """
     The Fortran diag file: one row per slice per record, columns
-    z, slice, power, on_axis, bunching, bunching_phase, mean_gamma, sigma_gamma,
-    sigma_x, sigma_y. Steady state (nslice=1) returns 1D curves; time dependent
-    returns (nrecords, nslice) arrays, slices in time-window order, matching the
-    Genesis .out.h5 layout.
+    z, slice, power, on_axis, bunching, bunching_phase, mean_energy [eV],
+    sigma_energy [eV], sigma_x, sigma_y. Steady state (nslice=1) returns 1D curves;
+    time dependent returns (nrecords, nslice) arrays, slices in time-window order,
+    matching the Genesis .out.h5 layout. The energy column converts to gamma here
+    (Genesis's Beam/energy is gamma; the diag carries Bmad-convention eV).
     """
+    M_ELECTRON = 0.51099895069e6
     d = np.loadtxt(fn)
     if nslice > 1:
         assert d.shape[0] % nslice == 0, f"{fn}: {d.shape[0]} rows not divisible by nslice={nslice}"
         d = d.reshape(-1, nslice, d.shape[1])
         return {
             "z": d[:, 0, 0], "power": d[:, :, 2], "bunching": d[:, :, 4],
-            "bunchingphase": d[:, :, 5], "energy": d[:, :, 6],
+            "bunchingphase": d[:, :, 5], "energy": d[:, :, 6] / M_ELECTRON,
             "xsize": d[:, :, 8], "ysize": d[:, :, 9],
         }
     return {
         "z": d[:, 0], "power": d[:, 2], "bunching": d[:, 4],
-        "bunchingphase": d[:, 5], "energy": d[:, 6],
+        "bunchingphase": d[:, 5], "energy": d[:, 6] / M_ELECTRON,
         "xsize": d[:, 8], "ysize": d[:, 9],
     }
 

@@ -32,7 +32,7 @@ section.
 | `bsim/fel/tests/scripts/check_import.py` | Import gates: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
-| `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_gamma invariance, stale-wake structure under migration |
+| `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count; see the parallelism section |
 | `bsim/fel/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
@@ -562,7 +562,8 @@ tier's gate is sized to the floor of the terms it enables:
 
 Self-referenced gates (`check_collective.py`): on a cold dark beam the wake is the only
 energy channel, and every record's `d<gamma>` must equal `eloss*dz/m_electron` exactly
-(measured 8.6e-11 against 4e-4 kicks) with `sigma_gamma` invariant under the uniform
+(measured 8.6e-11 against 4e-4 kicks, in gamma units at the time) with the energy
+spread invariant under the uniform
 kicks (4.9e-13, after the diagnostics moved to a two-pass variance -- the one-pass form
 hid sigma-scale cancellation noise for five deliverables because nothing ever moved the
 mean; FINDINGS.md 7.9); and under heavy migration the eloss blocks must multiply and

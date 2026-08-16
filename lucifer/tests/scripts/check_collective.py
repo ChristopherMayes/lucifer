@@ -103,20 +103,22 @@ def main():
     d = np.loadtxt(wd / "colle.diag.txt")
     ns = int(d[:, 1].max())
     d = d.reshape(-1, ns, d.shape[1])
-    z, mg, sg = d[:, 0, 0], d[:, :, 6], d[:, :, 7]
+    # The diag's energy columns are Bmad-convention eV, so the bookkeeping identity
+    # is d<E> = eloss*dz directly (eloss is eV/m).
+    z, me, se = d[:, 0, 0], d[:, :, 6], d[:, :, 7]
     dz = np.diff(z)
-    dg_meas = np.diff(mg, axis=0)
-    dg_exp = eloss[None, :] * dz[:, None] / M_ELECTRON
-    err = np.abs(dg_meas - dg_exp).max()
-    scale = np.abs(dg_exp).max()
-    e_ok = err < 1e-6 * scale + 1e-7
+    de_meas = np.diff(me, axis=0)
+    de_exp = eloss[None, :] * dz[:, None]
+    err = np.abs(de_meas - de_exp).max()
+    scale = np.abs(de_exp).max()
+    e_ok = err < 1e-6 * scale + 1e-7 * M_ELECTRON
     ok = ok and e_ok
-    print(f"--- collective energy bookkeeping: max |d<gamma> - eloss*dz/mc^2| = {err:.2e}"
-          f" against kicks of {scale:.2e}  {'ok' if e_ok else 'FAIL'}")
-    s_dev = np.abs(np.diff(sg, axis=0)).max()
-    s_ok = s_dev < 1e-8
+    print(f"--- collective energy bookkeeping: max |d<E> - eloss*dz| = {err:.2e} eV"
+          f" against kicks of {scale:.2e} eV  {'ok' if e_ok else 'FAIL'}")
+    s_dev = np.abs(np.diff(se, axis=0)).max()
+    s_ok = s_dev < 1e-8 * M_ELECTRON
     ok = ok and s_ok
-    print(f"--- collective sigma_gamma invariance under uniform kicks: {s_dev:.2e}  "
+    print(f"--- collective sigma_energy invariance under uniform kicks: {s_dev:.2e} eV  "
           f"{'ok' if s_ok else 'FAIL'}")
 
     # 2. Stale-wake structure: heavy migration must force recomputes that change eloss.

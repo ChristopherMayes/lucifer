@@ -84,7 +84,7 @@ def main():
     if len(pos):
         a.set_ylim(bottom=max(pos.min() * 0.3, total_g.max() * 1e-14),
                    top=total_g.max() * 3)
-    a.set_xlabel("z [m]"); a.set_ylabel("total power [W]")
+    a.set_xlabel("z (m)"); a.set_ylabel("total power (W)")
     a.set_title("Power along the line")
     a.legend()
 
@@ -93,7 +93,7 @@ def main():
     if nslice > 1:
         a.semilogy(z, np.median(rel, axis=1), color="tab:red", lw=1.2, ls="--",
                    alpha=0.6, label="median")
-    a.set_xlabel("z [m]"); a.set_ylabel("|P_bmad - P_genesis| / P_genesis")
+    a.set_xlabel("z (m)"); a.set_ylabel("|P_bmad - P_genesis| / P_genesis")
     a.set_title("Relative power difference (the gated quantity)")
     a.legend()
 
@@ -101,14 +101,14 @@ def main():
     s = np.arange(1, nslice + 1)
     a.step(s, gp[-1], where="mid", color="0.25", lw=2.4, label="Genesis4")
     a.step(s, fp[-1], where="mid", color="tab:orange", lw=1.2, label="Bmad")
-    a.set_xlabel("slice (time-window order)"); a.set_ylabel("power [W]")
+    a.set_xlabel("slice (time-window order)"); a.set_ylabel("power (W)")
     a.set_title(f"Per-slice power at exit (z = {z[-1]:.2f} m)")
     a.legend()
 
     a = ax[1, 1]
     a.plot(z, bunch_g, color="0.25", lw=2.4, label="Genesis4")
     a.plot(z, bunch_f, color="tab:orange", lw=1.2, label="Bmad")
-    a.set_xlabel("z [m]"); a.set_ylabel("bunching |b|" + (" (slice mean)" if nslice > 1 else ""))
+    a.set_xlabel("z (m)"); a.set_ylabel("bunching |b|" + (" (slice mean)" if nslice > 1 else ""))
     a.set_title("Bunching along the line")
     a.legend()
 

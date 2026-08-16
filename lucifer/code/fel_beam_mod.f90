@@ -117,8 +117,11 @@ end type
 !-
 
 type fel_slice_diag_struct
-  real(rp) :: mean_gamma = 0       ! Weighted <gamma>. Genesis 'energy'.
-  real(rp) :: sigma_gamma = 0      ! sqrt(|<gamma^2> - <gamma>^2|). Genesis 'energyspread'.
+  real(rp) :: mean_energy = 0      ! Weighted <E> = <gamma>*m_e c^2 [eV] -- Bmad's
+                                   !   convention (energy means eV). Genesis 'energy'
+                                   !   is <gamma>; divide by m_electron to compare.
+  real(rp) :: sigma_energy = 0     ! rms energy spread [eV]. Genesis 'energyspread'
+                                   !   is the same in units of gamma.
   real(rp) :: bunching = 0         ! |sum w e^{i theta}| / sum w. Genesis 'bunching'.
   real(rp) :: bunching_phase = 0   ! arg(sum w e^{i theta}). Genesis 'bunchingphase'.
   real(rp) :: mean_x = 0, mean_y = 0    ! Weighted centroid [m]. Genesis 'xposition', 'yposition'.
@@ -1014,8 +1017,8 @@ do ip = 1, sl%n
   y2 = y2 + w * (sl%y(ip) - y1)**2
 enddo
 
-diag%mean_gamma = g1
-diag%sigma_gamma = sqrt(g2/wsum)
+diag%mean_energy = g1 * m_electron
+diag%sigma_energy = sqrt(g2/wsum) * m_electron
 diag%mean_x = x1
 diag%sigma_x = sqrt(x2/wsum)
 diag%mean_y = y1

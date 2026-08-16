@@ -521,8 +521,9 @@ endif
 
 open (newunit = iu_diag, file = trim(out_root) // '.diag.txt', action = 'write')
 write (iu_diag, '(a, i0)') '# nslice = ', nslice
+write (iu_diag, '(a, es22.14)') '# slice_spacing = ', fbeam%slice_spacing
 write (iu_diag, '(a)') '#         z            slice        power         on_axis_intensity        bunching        ' // &
-      'bunching_phase        mean_gamma          sigma_gamma           sigma_x               sigma_y' // &
+      'bunching_phase        mean_energy         sigma_energy          sigma_x               sigma_y' // &
       '               current               n_eff'
 
 n_moved_tot = 0
@@ -1311,7 +1312,7 @@ do is = 1, nslice
   call fel_slice_diag (fbeam, fbeam%slice(is), ks, bdiag)
 
   write (iu_diag, '(es24.16, i8, 10es24.16)') z_now, is, power, on_axis, bdiag%bunching, &
-        bdiag%bunching_phase, bdiag%mean_gamma, bdiag%sigma_gamma, bdiag%sigma_x, bdiag%sigma_y, &
+        bdiag%bunching_phase, bdiag%mean_energy, bdiag%sigma_energy, bdiag%sigma_x, bdiag%sigma_y, &
         bdiag%current, bdiag%n_eff
 enddo
 
