@@ -5,7 +5,8 @@ Plot the standard diagnostics of a fel_track_test run from its .diag.txt file.
     python plot_fel.py steady_state.diag.txt            # writes steady_state.png
     python plot_fel.py run.diag.txt -o gain.png --show
 
-Five panels against z: radiation power (log), FIELD ENERGY in the window (log,
+Seven panels against z: radiation power (log and linear), FIELD ENERGY in the
+window (log and linear,
 joules -- the honest growth curve for SASE, since per-slice power fluctuates as
 radiation slips through and out of the window while the window energy grows
 smoothly), bunching, beam energy change and rms spread (MeV -- Bmad's convention:
@@ -96,9 +97,11 @@ def main():
         "text.color": INK, "font.size": 10,
     })
 
-    fig, axd = plt.subplot_mosaic([["power", "energy"], ["bunching", "gamma"], ["size", "size"]],
-                                  figsize=(9.5, 9.5), sharex=True)
-    ax_p, ax_u, ax_b, ax_g, ax_s = (axd[k] for k in ("power", "energy", "bunching", "gamma", "size"))
+    fig, axd = plt.subplot_mosaic([["power", "energy"], ["power_lin", "energy_lin"],
+                                   ["bunching", "gamma"], ["size", "size"]],
+                                  figsize=(9.5, 12), sharex=True)
+    ax_p, ax_u, ax_pl, ax_ul, ax_b, ax_g, ax_s = (axd[k] for k in
+        ("power", "energy", "power_lin", "energy_lin", "bunching", "gamma", "size"))
 
     # Radiation power. The one panel where the multi-slice aggregate is a sum:
     # total power is what a detector sees.
@@ -122,6 +125,19 @@ def main():
     ax_u.set_title("Field energy", loc="left")
     if nslice > 1:
         ax_u.legend(frameon=False)
+
+    # The same two quantities on LINEAR axes: the log panels show the exponential
+    # gain regime; the linear ones show where the energy actually is (saturation and
+    # the post-saturation behavior are nearly invisible on a log axis).
+    label = "total" if nslice > 1 else None
+    panel_series(ax_pl, z, q["power"], BLUE, label=label, reduce="sum")
+    ax_pl.set_ylabel("power (W)")
+    ax_pl.set_title("Radiation power (linear)", loc="left")
+
+    label = "window total" if nslice > 1 else None
+    panel_series(ax_ul, z, q["power"] * dt, BLUE, label=label, reduce="sum")
+    ax_ul.set_ylabel("field energy (J)")
+    ax_ul.set_title("Field energy (linear)", loc="left")
 
     # Bunching factor.
     label = "slice average" if nslice > 1 else None

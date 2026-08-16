@@ -38,12 +38,14 @@ name at parse time.
 `<example>.diag.txt` is the gain curve: one row per slice per integration step with
 columns `z, slice, power, on_axis_intensity, bunching, bunching_phase, mean_energy,
 sigma_energy, sigma_x, sigma_y` (energies in eV -- Bmad's convention; Genesis's
-`energy` output is gamma). The plot is five panels against z: radiation power (log),
+`energy` output is gamma). The plot is seven panels against z: radiation power (log
+and linear),
 the FIELD ENERGY in the window (log, joules -- the honest growth curve for SASE,
 since per-slice power churns as radiation slips through and out of the window while
 the window energy integrates it; the scaling reads `slice_spacing` from the diag
-header), bunching, beam energy change and rms spread (MeV), and the transverse rms
-sizes showing the FODO betatron oscillation. On time-dependent files each thin gray line is a slice, the
+header; log and linear -- the log pair shows the gain regime, the linear pair shows
+where the energy actually is), bunching, beam energy change and rms spread (MeV), and
+the transverse rms sizes showing the FODO betatron oscillation. On time-dependent files each thin gray line is a slice, the
 bold line the total power or slice average, and the slippage echelon is directly visible
 in the per-slice power. `<example>-final.fld.h5` / `-final.par.h5` are the end state in
 Genesis dump format (readable by `openPMD-beamphysics`, h5py, or Genesis itself); add
