@@ -108,8 +108,7 @@ def main():
     label = "total" if nslice > 1 else None
     panel_series(ax_p, z, q["power"], BLUE, label=label, reduce="sum")
     ax_p.set_yscale("log")
-    ax_p.set_ylabel("power (W)")
-    ax_p.set_title("Radiation power", loc="left")
+    ax_p.set_ylabel("radiation power (W)")
     if nslice > 1:
         ax_p.legend(frameon=False)
 
@@ -122,7 +121,6 @@ def main():
     panel_series(ax_u, z, q["power"] * dt, BLUE, label=label, reduce="sum")
     ax_u.set_yscale("log")
     ax_u.set_ylabel("field energy (J)")
-    ax_u.set_title("Field energy", loc="left")
     if nslice > 1:
         ax_u.legend(frameon=False)
 
@@ -131,19 +129,16 @@ def main():
     # the post-saturation behavior are nearly invisible on a log axis).
     label = "total" if nslice > 1 else None
     panel_series(ax_pl, z, q["power"], BLUE, label=label, reduce="sum")
-    ax_pl.set_ylabel("power (W)")
-    ax_pl.set_title("Radiation power (linear)", loc="left")
+    ax_pl.set_ylabel("radiation power (W)")
 
     label = "window total" if nslice > 1 else None
     panel_series(ax_ul, z, q["power"] * dt, BLUE, label=label, reduce="sum")
     ax_ul.set_ylabel("field energy (J)")
-    ax_ul.set_title("Field energy (linear)", loc="left")
 
     # Bunching factor.
     label = "slice average" if nslice > 1 else None
     panel_series(ax_b, z, q["bunching"], BLUE, label=label)
-    ax_b.set_ylabel("|b|")
-    ax_b.set_title("Bunching", loc="left")
+    ax_b.set_ylabel("bunching |b|")
     if nslice > 1:
         ax_b.legend(frameon=False)
 
@@ -157,16 +152,14 @@ def main():
     de = (q["mean_energy"] - q["mean_energy"][0, :]) / 1e6
     panel_series(ax_g, z, de, BLUE, label=r"$\Delta\langle E\rangle$")
     panel_series(ax_g, z, q["sigma_energy"] / 1e6, ORANGE, label=r"$\sigma_E$")
-    ax_g.set_ylabel("(MeV)")
-    ax_g.set_title("Beam energy", loc="left")
+    ax_g.set_ylabel("beam energy (MeV)")
     ax_g.legend(**above)
 
     # Transverse rms sizes.
     panel_series(ax_s, z, 1e6 * q["sigma_x"], BLUE, label=r"$\sigma_x$")
     panel_series(ax_s, z, 1e6 * q["sigma_y"], ORANGE, label=r"$\sigma_y$")
-    ax_s.set_ylabel(r"rms size ($\mu$m)")
+    ax_s.set_ylabel(r"rms beam size ($\mu$m)")
     ax_s.set_xlabel("z (m)")
-    ax_s.set_title("Beam size", loc="left")
     ax_s.legend(**above)
 
     title = pathlib.Path(args.diag).name
