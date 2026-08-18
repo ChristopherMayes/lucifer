@@ -1,0 +1,671 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{booktabs}
+\usepackage[colorlinks=true,linkcolor=blue]{hyperref}
+\usepackage{parskip}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newenvironment{provenance}{\par\small\textbf{Provenance.}}{\par}
+\newenvironment{validation}{\par\small\textbf{Validation.}}{\par}
+
+\title{The Bmad FEL Tracker: Physics Manual}
+\author{\code{bsim/fel} --- \code{fel\_beam\_mod}, \code{fel\_track\_mod},
+        \code{fel\_collective\_mod}, \code{fel\_import\_mod}, \code{fel\_track\_test}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}\label{sec:intro}
+
+This manual states the physics and the numerical conventions of the Bmad FEL tracker.
+The code references these sections by label; the validation harness
+(\code{bsim/fel/tests/}) proves each statement against Genesis 1.3 Version 4, against
+closed forms, or against independent implementations, and the measured levels live in
+\code{bsim/fel/README.md}. Each section ends with a \emph{Provenance} note (the Genesis
+routine the physics was transcribed from, moved here from the source comments) and a
+\emph{Validation} note (which gate pins it). The physics was transcribed from Genesis
+(GPL permits transcription), validated at transcription level, and then re-expressed in
+Bmad's units and conventions; the transcription-era agreement is banked in the README.
+
+Throughout: $m_e c^2$ is Bmad's \code{m\_electron} (eV), $c$ is \code{c\_light},
+$Z_0 = \mu_0 c$ (\code{mu\_0\_vac*c\_light}), $e$ is \code{e\_charge}, and
+$\varepsilon_0$ is \code{eps\_0\_vac}. Genesis carries its own truncated constants
+(notably $Z_0 = 376.73$ against $376.7303\ldots$); the resulting $8.3\times10^{-7}$
+relative difference is the accepted floor of every Genesis comparison
+(\S\ref{sec:numerics}).
+
+\section{Coordinates and conventions}\label{sec:coords}
+
+\subsection{The packed chart}\label{sec:chart}
+
+Particles are stored in packed structure-of-arrays slices (\code{fel\_slice\_struct}),
+in Bmad's phase-space coordinates plus a weight:
+\begin{equation}
+  \bigl(x,\; p_x/p_0,\; y,\; p_y/p_0,\; z,\; p_z\bigr), \qquad
+  w = \text{macroparticle charge [C]},
+\end{equation}
+with $z = -\beta c\,(t - t_{\mathrm{ref}})$ and $p_z = (P - p_0)/p_0$. The single stored
+normalization reference is $p_0 c$ in eV (\code{fel\_beam\_struct\%p0c}); everything
+kinematic derives from it exactly (\code{fel\_gamma\_of}, \code{fel\_beta\_of}):
+\begin{equation}\label{eq:kinematics}
+  \hat P = \frac{p_0}{m_e c}(1+p_z), \qquad
+  \gamma = \sqrt{\hat P^2 + 1}, \qquad
+  \beta = \hat P/\gamma, \qquad
+  \tau \equiv -z/\beta = c\,(t - t_{\mathrm{ref}}).
+\end{equation}
+
+The ponderomotive phase is \emph{derived, never stored}. Genesis's per-particle
+$\theta$ splits into a common reference advance --- one scalar per beam, $\varphi_0$,
+advanced once per step --- and the particle lag carried by Bmad's $z$:
+\begin{equation}\label{eq:theta}
+  \theta_j \;=\; \varphi_0 + k_s\, z_j/\beta_j \;=\; \varphi_0 - k_s\,\tau_j ,
+  \qquad k_s = 2\pi/\lambda_s .
+\end{equation}
+This reference-offset split is the FP32-safe formulation (design brief \S8) and removes
+the wrap hazard outright: $z$ does not wrap, so slice migration
+(\S\ref{sec:migration}) needs no $\theta$-wrap protocol. The common advance rate over
+an element with reference wavenumber $k_u^{\mathrm{like}}$ is computed
+cancellation-free (\code{fel\_phi0\_rate}):
+\begin{equation}\label{eq:phi0rate}
+  \frac{d\varphi_0}{ds} = k_u^{\mathrm{like}} + k_s\Bigl(1 - \frac{1}{\beta_0}\Bigr),
+  \qquad
+  1 - \frac{1}{\beta_0} = \frac{-1}{\beta_0\,\gamma_{0b}^2\,(1+\beta_0)},\quad
+  \gamma_{0b}^2 = \hat P_0^2 + 1 .
+\end{equation}
+Inside undulators $k_u^{\mathrm{like}} = k_u$; over field-free interludes Genesis's
+drift surrogate $k_u^{\mathrm{like}} = k_s/(2\gamma_0^2)$ is used
+(\S\ref{sec:interlude}).
+
+\subsection{The time window}\label{sec:window}
+
+A time-dependent beam is a set of slices with longitudinal spacing
+$\Delta s = \code{sample}\cdot\lambda_s$ (integer \code{sample}). \emph{Higher slice
+index is the window head} (earlier arrival, larger Bmad $z$). The global window
+position of a particle in slice $i$ is
+\begin{equation}\label{eq:zglobal}
+  z_{\mathrm{global}} = z_{\mathrm{local}} + \beta\,(i-1)\,\Delta s ,
+\end{equation}
+the invariant that slice migration preserves (\S\ref{sec:migration}) and that the
+whole-window wake concatenation uses directly (\S\ref{sec:seamwake}). A single-slice
+beam is the steady state: slippage is a no-op and the window degenerates to one
+$\lambda_s$-periodic slice.
+
+\subsection{Units}\label{sec:units}
+
+The radiation field is stored in V/m (the \code{wavefront\_struct} convention); there
+is no internal unit system. Beam energies in diagnostics are total energies
+$E = \gamma\, m_e c^2$ in eV (Bmad's convention --- \emph{energy never means}
+$\gamma$; Genesis's \code{energy} output \emph{is} $\gamma$, and the comparison
+scripts convert). Genesis's internal field unit $u$ relates to the physical field by
+$u = E\,k_s/(\sqrt2\, m_e c^2)$, the identity under which every formula in this manual
+was converted from its internal-unit original; the converted forms are simpler
+(\S\ref{sec:eom}, \S\ref{sec:field}).
+
+\begin{provenance}
+The chart and window conventions are this port's own (design brief \S4.2, \S8);
+Genesis stores $(\theta,\gamma)$ per particle with per-slice bounded $\theta$. The
+unit identity composes Genesis's dump scale (\code{writeFieldHDF5.cpp}) with
+$E = \mathit{dfl}\,\sqrt{2 Z_0}/\mathit{dgrid}$.
+\end{provenance}
+\begin{validation}
+The chart is exercised by every tier; the theta identity specifically by the
+bit-identity of the shot-noise-off loader against the deliverable-4 baseline, and
+Eq.~\ref{eq:zglobal} by the migration phase-continuity gate ($6.9\times10^{-15}$) and
+the seam-wake causality gate (exactly zero ahead of all charge).
+\end{validation}
+
+\section{The FEL element}\label{sec:element}
+
+An FEL segment is a Bmad \code{wiggler}/\code{undulator} with
+\code{tracking\_method = custom}, recognized by key and method, never by name. Its FEL
+parameters derive from lattice attributes:
+\begin{equation}\label{eq:awmap}
+  K = \frac{c\,B_{\max}}{k_u\, m_e c^2/e c} = \frac{c\,B_{\max}}{k_u}\frac{e}{m_e c},
+  \qquad
+  a_w = \begin{cases} K & \text{helical (\code{field\_calc = helical\_model})}\\
+                      K/\sqrt2 & \text{planar (\code{planar\_model})}\end{cases}
+\end{equation}
+($a_w$ is rms, Genesis's convention; in code $K = c\,\code{b\_max}/(k_u\,
+\code{m\_electron})$ with \code{b\_max} in Tesla and \code{m\_electron} in eV). The
+natural-focusing split follows the helicity defaults, scaled by $k_u^2$:
+helical $k_x = k_y = \tfrac12 k_u^2$; planar $k_x = 0$, $k_y = k_u^2$. The integration
+step is the element's own \code{ds\_step}/\code{num\_steps}; the bookkeeper's
+$n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\code{ds\_step}))$ is exactly Genesis's
+unroll. Refused by name at parse time: missing \code{b\_max} or \code{l\_period}, a
+fieldmap \code{field\_calc}, nonzero \code{kx} (unmapped roll-off), and an unset
+\code{ds\_step}. Outside the FEL walk the element is a plain periodic wiggler: the
+\code{track1\_custom} and \code{make\_mat6\_custom} hooks delegate to
+\code{track\_a\_wiggler}, so reference time and transfer matrices come from Bmad's own
+kernel.
+
+\begin{provenance}
+Helicity defaults from Genesis's \code{LatticeParser} ($k_x{=}k_y{=}0.5$ helical,
+$0/1$ planar, scaled by $k_u^2$ in the unroll); the step rule from
+\code{Lattice::unrollLattice}.
+\end{provenance}
+\begin{validation}
+The element-driven line reproduces the namelist-driven reference bit-identically at
+$z=0$, growing to $3.4\times10^{-12}$ (the 1-ulp $a_w$ attribute round trip); the
+assertion gates refuse each malformed lattice by name; mutations (rms factor, wrong
+helicity attribute) fail tier1 at $\sim$1.0 relative.
+\end{validation}
+
+\section{The FEL core}\label{sec:core}
+
+\subsection{Step composition}\label{sec:step}
+
+One integration step of length $\delta z$ inside an undulator advances, in order
+(\code{fel\_track\_und\_step}): (i) transverse half step; (ii) longitudinal RK4 with
+the field gathered once and held; (iii) the wake's energy decrement
+(\S\ref{sec:wakes}); (iv) transverse half step; (v) source deposition and field
+propagation (\S\ref{sec:field}); (vi) slippage, applied by the caller
+(\S\ref{sec:slippage}). $\varphi_0$ advances once per step by Eq.~\ref{eq:phi0rate}
+with $k_u^{\mathrm{like}} = k_u$. Beam slice $i$ couples to field record slice
+$1 + \mathrm{mod}(i-1+\code{first},\, n_{\mathrm{slice}})$ (\S\ref{sec:slippage}).
+
+\subsection{Coupling and field roll-off}\label{sec:coupling}
+
+The coupling factor at harmonic $h$ (\code{fel\_und\_coupling}):
+\begin{equation}\label{eq:fc}
+  f_c(h) = \begin{cases}
+    a_w & \text{helical, } h=1; \quad 0 \text{ otherwise},\\[2pt]
+    a_w\,(-1)^{(h-1)/2}\Bigl[J_{\frac{h-1}{2}}(\xi) - J_{\frac{h+1}{2}}(\xi)\Bigr],
+    \;\; \xi = \frac{h}{2}\frac{a_w^2}{1+a_w^2} & \text{planar, odd } h;\quad 0 \text{ even.}
+  \end{cases}
+\end{equation}
+Only $h=1$ is used (harmonics beyond the coupling formula are out of scope). The
+transverse roll-off of the undulator field about its offset $(a_x, a_y)$:
+\begin{equation}\label{eq:faw}
+  f_{aw}(x,y) = 1 + \tfrac12\!\left[k_x (x-a_x)^2 + k_y (y-a_y)^2\right], \qquad
+  f_{aw}^2(x,y) = 1 + k_x (x-a_x)^2 + k_y (y-a_y)^2 ,
+\end{equation}
+the first-order form in the particle gather, the squared form in the deposition.
+
+\subsection{Longitudinal equations of motion}\label{sec:eom}
+
+Per particle, with $\hat p_{x,y} = \gamma\beta_{x,y}$ (in code
+$p_{x}\cdot p_0/m_ec$),
+\begin{equation}\label{eq:btpar}
+  b_\perp = 1 + \hat p_x^2 + \hat p_y^2 + a_w^2 f_{aw}^2(x,y),
+\end{equation}
+and the complex drive from the local field $E$ (bilinear interpolation from the
+particle's cell, zero off-grid),
+\begin{equation}\label{eq:rpart}
+  r = \frac{f_c(1)}{\sqrt2\, m_e c^2}\, f_{aw}(x,y)\, E^{*} \quad [\mathrm{m}^{-1}],
+  \qquad \hat c = r\, e^{-i\theta},
+\end{equation}
+the equations of motion integrated by RK4 (\code{fel\_ode}) are
+\begin{align}
+  \beta_\parallel &= \sqrt{1 - \frac{b_\perp - (2/k_s)\,\mathrm{Re}\,\hat c}{\gamma^2}},
+  \label{eq:betapar}\\
+  \frac{d\theta}{dz} &= k_s\Bigl(1 - \frac{1}{\beta_\parallel}\Bigr) + k_u,
+  \label{eq:dtheta}\\
+  \frac{d\gamma}{dz} &= \frac{\mathrm{Im}\,\hat c}{\beta_\parallel\,\gamma} - e_z,
+  \label{eq:dgamma}
+\end{align}
+with $e_z$ the space-charge term (\S\ref{sec:spacecharge}) in units of $m_e c^2$ per
+meter, held fixed through the stages along with $r$, $\hat p_{x,y}$ and $f_{aw}$. The
+integrator (\code{fel\_runge\_kutta}) is the classical fourth-order Runge--Kutta in
+Genesis's incremental bookkeeping, kept verbatim so the audited transcription
+survives.
+
+\emph{Chart round trip.} $(\theta,\gamma)$ are derived at step entry from
+Eqs.~\ref{eq:kinematics}--\ref{eq:theta} and written back at exit:
+$\hat P = \sqrt{\gamma^2-1}$, $p_z = (\hat P m_e c - p_0)/p_0$ (exact once $\hat P$ is
+formed), $z = -\beta\,(\varphi_0^{\mathrm{new}} - \theta)/k_s$ with the updated
+$\beta$. The $\theta \leftrightarrow z$ map is affine with a state-independent shift,
+under which RK4 is exactly invariant; the $\gamma \leftrightarrow p_z$ round trip
+costs $\sim$1 ulp of $\gamma$ per step (\S\ref{sec:numerics}).
+
+\begin{provenance}
+\code{BeamSolver::advance} (gather, $r$, stage order), \code{BeamSolver::RungeKutta}
+(verbatim), \code{BeamSolver::ODE}; \code{Undulator::fc}, \code{faw}, \code{faw2};
+grid weights from \code{Field::getLLGridpoint}. The V/m forms follow from the unit
+identity of \S\ref{sec:units}, under which the rest energy and $k_s$ cancel out of
+$r$.
+\end{provenance}
+\begin{validation}
+tier1 (one segment, FEL core alone): $1.8\times10^{-6}$, the constants floor
+(transcription-era $2.8\times10^{-11}$ with Genesis's constants). Source-term and
+conjugation mutations fail tier1 at $3.5\times10^{-1}$ and $2.8\times10^{-2}$.
+\end{validation}
+
+\section{Transverse motion}\label{sec:transverse}
+
+\subsection{Natural focusing inside undulators}\label{sec:natfocus}
+
+The default in-undulator transverse transport (\code{fel\_transverse\_track}) is a
+drift-plus-natural-focusing map over each half step. With the per-particle
+longitudinal factor in stored normalization,
+\begin{equation}\label{eq:gzhat}
+  \hat\gamma_z = \gamma_z\frac{m_ec}{p_0} = \sqrt{(1+p_z)^2 - (p_x/p_0)^2 - (p_y/p_0)^2
+   - (a_w m_ec/p_0)^2},
+\end{equation}
+the effective focusing strengths are
+\begin{equation}\label{eq:qnat}
+  \hat q_{x,y} = \frac{k_{x,y}\, a_w^2}{\gamma_0\,\beta_{\parallel 0}}\frac{m_ec}{p_0},
+  \qquad
+  \beta_{\parallel 0} = \sqrt{1 - \frac{1 + a_w^2}{\gamma_0^2}},
+\end{equation}
+and each plane maps by (\code{fel\_apply\_focus}; $\Omega = \sqrt{\hat q/\hat\gamma_z}\,
+\delta z$)
+\begin{equation}\label{eq:focusmap}
+  \begin{pmatrix} x \\ p_x/p_0 \end{pmatrix} \mapsto
+  \begin{pmatrix} \cos\Omega & \dfrac{\sin\Omega}{\sqrt{\hat q \hat\gamma_z}} \\[6pt]
+    -\sqrt{\hat q\hat\gamma_z}\,\sin\Omega & \cos\Omega \end{pmatrix}
+  \begin{pmatrix} x \\ p_x/p_0 \end{pmatrix},
+\end{equation}
+with $\cosh/\sinh$ for $\hat q<0$ and the plain drift $x \mathrel{+}= p_x\,\delta z/
+(p_0\hat\gamma_z)$ for $\hat q = 0$. Chromaticity is through $\hat\gamma_z$
+(Genesis's $\gamma_z$ scaling).
+
+\subsection{The Genesis interlude model}\label{sec:interlude}
+
+Field-free elements (drifts, quadrupoles) tracked ``Genesis's way'' are one
+integration step of the full element length: transverse half (quad strength
+$\hat q = k_1\gamma_0\, m_ec/p_0$, Genesis's chromatic convention $k_1\gamma_0/
+\gamma_z$ against Bmad's $k_1 p_0/P$), then the $\theta$ advance with the path-length
+term sampled once at mid element,
+\begin{equation}\label{eq:interludetheta}
+  \Delta\theta = L\left[k_s\Bigl(1-\frac{1}{\beta_{\parallel}}\Bigr)
+   + \frac{k_s}{2\gamma_0^2}\right],\qquad
+  \beta_\parallel = \sqrt{1 - \frac{1 + \hat p_x^2 + \hat p_y^2}{\gamma^2}},
+\end{equation}
+then the wake decrement and the second transverse half. With space charge off the RK4
+collapses exactly (the slope is $\theta$-independent and $\gamma$ constant) and the
+collapsed step is kept for bit-identity; with space charge on the full RK4 runs with
+$r=0$ and the per-particle $e_z$. This model exists to \emph{price} what the Bmad seam
+changes: the seam integrates the path-length term exactly through the quad map where
+this samples it once --- a measured $\sim\!2\times10^{-3}$ rad of bunching phase per
+quadrupole, compounding to the documented tier2\_bmad difference.
+
+\subsection{The Bmad-kernel alternative}\label{sec:undbmad}
+
+\code{und\_transport = "bmad"} replaces \S\ref{sec:natfocus} by the transverse maps of
+Bmad's periodic-wiggler kernel, flattened: per-particle $k_1 = -\tfrac12 g_{\max}^2/
+(1+p_z)^2$ with $g_{\max} = K k_u\,m_ec/p_0$ ($K$ from Eq.~\ref{eq:awmap}), quadrupole
+bodies via \code{quad\_mat2\_calc}, and half-octupole edge kicks
+$\delta p_y = k_3 L\,(1{+}p_z)\, k_u^2\, y^3/3$ (and $x$ for helical) with
+$k_3 L = 2\,\delta z\, k_1$. The kernel's own $z$ bookkeeping is deliberately absent
+--- the phase evolution lives entirely in \S\ref{sec:eom}, and applying it here too
+would double count. Model differences from \S\ref{sec:natfocus} (chromaticity
+$1/(1+p_z)^2$ vs $1/\hat\gamma_z$; the octupole edges) are priced, not argued: power
+$5\times10^{-5}$, intensity $7.3\times10^{-4}$, $+3.8\%$ runtime over the full TD
+line.
+
+\begin{provenance}
+\S\ref{sec:natfocus}--\ref{sec:interlude}: \code{TrackBeam::track},
+\code{applyDrift}/\code{applyFQuad}/\code{applyDQuad}, and \code{BeamSolver::advance}'s
+drift path with the division order kept. \S\ref{sec:undbmad}:
+\code{track\_a\_wiggler.f90} tracking locals (never the stored \code{k1x}/\code{k1y}
+attributes, whose helical sign disagrees).
+\end{provenance}
+\begin{validation}
+tier2\_genesis $1.8\times10^{-5}$ (transcribed interludes, constants floor);
+tier2\_bmad $5.0\times10^{-2}$, the located and priced transport difference;
+und\_transport pricing above.
+\end{validation}
+
+\section{The field solver}\label{sec:field}
+
+Each field slice advances by split-step Fourier propagation with source addition
+(\code{fel\_field\_step}). The paraxial kernel, built once per grid
+(\code{fel\_field\_kernel\_init}) with $\Delta k = 2\pi/(N\,\mathit{dgrid})$ and
+fftshift index mapping,
+\begin{equation}\label{eq:k2}
+  K_2(k_x,k_y) = -\,i\,\frac{k_x^2 + k_y^2}{2 k_s}, \qquad
+  \tilde E \mapsto \tilde E\, e^{K_2\,\delta z},
+\end{equation}
+followed by the inverse transform and the source added in real space with the factor
+2. The source deposits per particle with bilinear weights at
+$(\sin\theta + i\cos\theta)\cdot p_j$, where
+\begin{equation}\label{eq:source}
+  p_j = \sqrt{f_{aw}^2(x_j,y_j)}\;\frac{s_w\, w_j}{\gamma_j}, \qquad
+  s_w = \frac{f_c(1)\, Z_0\, \sqrt2\, c\;\delta z}{4\,\mathit{dgrid}^2\,\Delta s} ,
+\end{equation}
+the weighted V/m form in which the rest energy and $k_s$ have cancelled; Genesis's
+$\mathit{current}/n_{\mathrm{part}}$ is the uniform-weight special case of
+$c\,w_j/\Delta s$. Field diagnostics: power $= \sum_{\mathrm{cells}}|E|^2\,
+\mathit{dgrid}^2/(2Z_0)$; on-axis intensity $=|E(0,0)|^2/(2Z_0)$; the window field
+energy plotted by the tools is $U = \sum_i P_i\,\Delta s/c$.
+
+\begin{provenance}
+\code{FieldSolverFFT::advance}, \code{FFT}, \code{init} (unfiltered path);
+diagnostics per \code{DiagField::calc}. The internal-unit source scale
+$f_c\,\mathit{vacimp}\,I\,k_s\,\delta z/(4\,\mathit{eev}\,n\,\mathit{dgrid}^2)$
+converts to Eq.~\ref{eq:source} by \S\ref{sec:units}.
+\end{provenance}
+\begin{validation}
+tier1/td1 at the constants floor; the split-weight gate ($3.6\times10^{-13}$) pins the
+weighted deposition; the dropped-factor-2 mutation fails tier1 at $3.5\times10^{-1}$.
+\end{validation}
+
+\section{Time dependence and slippage}\label{sec:slippage}
+
+The field record is a circular buffer over the wavefront's slice index, rotated by
+slippage rather than moved. Beam slice $i$ couples to record slice
+\begin{equation}\label{eq:fieldindex}
+  \mathrm{ifld}(i) = 1 + \mathrm{mod}(i - 1 + \code{first},\, n_{\mathrm{slice}}),
+\end{equation}
+and everything reading the record in time order (diagnostics, dumps) unrotates through
+the same map. Slippage accumulates in units of $\lambda_s$; each undulator step
+contributes
+\begin{equation}\label{eq:slipstep}
+  \delta_{\mathrm{slip}} = \frac{\delta z\,(1 + a_w^2)}{2\gamma_0^2\,\lambda_s},
+\end{equation}
+and whenever $|\mathrm{accuslip}| > 0.8\cdot\code{sample}$ the record rotates one
+slice: the slice coupled to the window \emph{head} is zeroed and re-enters at the tail
+--- radiation leaves at the head, fresh vacuum enters behind the bunch (non-periodic
+fill; backward slippage mirrors the direction). Interludes slip nothing per step;
+instead their lengths $L_z$ accumulate and, when an undulator follows, the last
+interlude element receives $\lfloor L_z/(2\gamma_0^2\lambda_s)\rfloor + 1$ wavelengths
+of autophasing. The end-of-lattice fixup is \emph{unguarded}: the final element always
+receives the same $+1$, even with no trailing interlude at all --- a Genesis quirk
+kept deliberately, since guarding it leaves the record one rotation short.
+
+\begin{provenance}
+\code{Control::applySlippage} reduced to one shared-memory node (the MPI ring exchange
+is the identity); the schedule from \code{Lattice::calcSlippage}, including the
+unguarded fixup (found live: the guarded version failed td1 at 0.84 of the final
+field).
+\end{provenance}
+\begin{validation}
+td1 $8.5\times10^{-7}$; slippage mutations (never-firing rotation, wrong zeroed slice,
+dropped autophasing) fail at $10^{10}$, $10^{9}$, $1.9\times10^{8}$ on the elementwise
+per-slice power comparison.
+\end{validation}
+
+\section{Loading}\label{sec:loading}
+
+\subsection{Quiet start}\label{sec:quiet}
+
+Generated slices load $m = n_{\mathrm{part}}/n_{\mathrm{bins}}$ beamlets: each beamlet
+draws one 4D transverse sample and one energy sample, replicated at $n_{\mathrm{bins}}$
+phases $\theta = \theta_0 + j\,2\pi/n_{\mathrm{bins}}$, so every bunching harmonic
+below $n_{\mathrm{bins}}$ cancels to roundoff. Weights are uniform within a beamlet
+(the cancellation is per beamlet).
+
+\subsection{Weighted shot noise}\label{sec:noise}
+
+Physical noise is imposed Fawley-style (\code{fel\_fawley\_noise}), the one-substitution
+weighted generalization: the per-beamlet amplitude draws on the beamlet's \emph{real}
+electron count, its charge over $e$,
+\begin{equation}\label{eq:fawley}
+  \theta_{bj} \mathrel{-}= \sum_{h=0}^{n_h-1} a_{bh}\,
+     \sin\!\bigl((h{+}1)\theta_{bj} + \phi_{bh}\bigr),
+  \qquad
+  a_{bh} = \frac{2}{h+1}\sqrt{\frac{-\ln u_{bh}}{n_{bl}}},
+  \quad n_{bl} = \frac{n_{\mathrm{bins}}\, w_b}{e},
+\end{equation}
+with $n_h = (n_{\mathrm{bins}}-1)/2$, $\phi_{bh}$ uniform in $[0,2\pi)$, and kicks
+accumulated from the unperturbed phases. This makes $\langle|b(h)|^2\rangle =
+1/N_\lambda$ exact for any cross-beamlet weight distribution, $N_\lambda$ the slice's
+real electron count. Genesis's silent $n_{bl}<1$ clamp is kept but counted and warned.
+The $N_{\mathrm{eff}}$ guard refuses to impose noise when the pre-noise quiet floor
+$\max_h |b(h)|^2$, swept over \emph{every} harmonic the beamlet structure resolves
+($h = 1..n_{\mathrm{bins}}-1$), is not far below the target $1/N_\lambda$.
+
+\begin{provenance}
+\code{ShotNoise::applyShotNoise}, generalized by $n_{bl} = n_e/m \to n_{\mathrm{bins}}
+w_b/e$ (identical for uniform weights). Shared code between the generator and the
+distribution import.
+\end{provenance}
+\begin{validation}
+Statistical gate $\langle|b|^2\rangle N_\lambda = 1.03\pm0.14$, uniform and
+$0.25\times/1.75\times$ beamlet weights; cross-loader SASE startup to 0.3\%;
+mutations at 13--20$\times$ (macroparticle-count amplitudes) and 1.52
+(weights ignored). The guard's own mutation test exposed the $n_{\mathrm{bins}}/2$
+blind spot that fixed its sweep range.
+\end{validation}
+
+\section{Distribution import}\label{sec:import}
+
+An arbitrary \code{bunch\_struct} (from \code{beam\_init} generation or an
+openPMD-beamphysics file) resamples into slices by Genesis's method
+(\code{fel\_import\_mod}). Window positions are $\tau$ of Eq.~\ref{eq:kinematics},
+min-shifted to zero; slice centers sit at $(i-1)\Delta s$;
+$n_{\mathrm{slice}} = \mathrm{nint}(\tau_{\mathrm{total}}/\Delta s)$ when not given.
+Per slice: every particle inside a sampling window $d s_{\mathrm{len}} =
+\code{slicewidth}\cdot\tau_{\mathrm{total}}$ centered on the slice (strict
+inequalities) is a candidate, and the slice current comes from the same window,
+\begin{equation}\label{eq:importcurrent}
+  I_i = \frac{c\sum_{j\in\mathrm{window}} w_j}{d s_{\mathrm{len}}},
+\end{equation}
+the weighted generalization of Genesis's count$\cdot dQ$. The candidate set reduces to
+$n_{\mathrm{part}}/n_{\mathrm{bins}}$ seeds by random deletion, or grows by Genesis's
+phase-space interpolation: normalize the five coordinates $(\gamma,x,y,\hat p_x,
+\hat p_y)$ to zero mean and unit rms, pick a random parent, find its nearest
+\emph{original} neighbor under a metric whose per-coordinate weights are fresh random
+draws, and place the child at the midpoint plus $\mathrm{uniform}[-1,1]$ times the
+difference per coordinate. $\theta$ is refilled uniformly over one beamlet spacing,
+mirrored into $n_{\mathrm{bins}}$, and \S\ref{sec:noise} imposes the noise with
+$n_e = \mathrm{nint}(I\lambda_s\,\code{sample}/(e c))$. The file's $p_x/p_y$ are
+\emph{slopes}; the slope-to-momentum conversion $\hat p = x'\gamma$ happens at the
+copy into the candidate set. Genesis's \code{match}/\code{center} transforms are not
+ported (a Bmad lattice carries its optics; \code{init\_beam\_distribution} generates
+matched bunches), and Genesis's \code{align*} and \code{shotnoise} inputs are parsed
+but dead in v4 --- neither is transcribed as functional. A zero-charge bunch is
+refused by name.
+
+\begin{provenance}
+\code{SDDSBeam::init} (window, current, ordering), \code{removeParticles},
+\code{addParticles}, \code{distance}; slice centers from \code{Time::getPosition}.
+\end{provenance}
+\begin{validation}
+Per-slice current vs Genesis importing the same file: $8.2\times10^{-13}$ of peak
+(RNG-free, exact); openPMD round trip exact; slice optics recover the lattice Twiss at
+the 1\% level; startup power vs Genesis's independent resampling at $\ln$ ratio
+$+0.02$; mutations (dslen/spacing, no noise, collapsed mirroring) caught at
+$6.5\times10^{-1}$, $\ln{-57}$, $\ln{+4.7}$; the ``$\theta$ over $2\pi$'' mutation is
+an equivalent mutant, correctly passed (FINDINGS 7.16).
+\end{validation}
+
+\section{Slice migration}\label{sec:migration}
+
+With per-particle weights, migration needs no one4one: a mover carries its own charge.
+The criterion is Genesis's in this chart: with the derived $\theta$ of
+Eq.~\ref{eq:theta} and the slice window $[0, 2\pi\,\code{sample})$,
+$a_{\mathrm{tar}} = \lfloor\theta/(2\pi\,\code{sample})\rfloor$ is the relative
+destination (positive $\theta$ drift moves toward higher index, the head). A mover's
+$z$ shifts by exactly $-a_{\mathrm{tar}}\,\beta\,\Delta s$, changing $\theta$ by
+$-a_{\mathrm{tar}}\cdot2\pi\,\code{sample}$: for integer \code{sample} the phase every
+deposition sees is continuous across the move to rounding, and
+Eq.~\ref{eq:zglobal} is invariant. Removal is swap-with-last with rescan; particles
+whose destination lies beyond the window are dropped \emph{with their charge counted}
+(Genesis discards silently). Off by default: the Genesis tiers compare against
+non-one4one Genesis, which never migrates.
+
+\begin{provenance}
+\code{Sorting::localSort} (criterion, swap-with-last, rescan semantics); the silent
+world-edge discard replaced by counted drops.
+\end{provenance}
+\begin{validation}
+Conservation with drop accounting $1.5\times10^{-14}$ under 74k moves; exact phasor
+continuity $S_{\mathrm{before}} = S_{\mathrm{after}} + S_{\mathrm{dropped}}$ at
+$6.9\times10^{-15}$; window residency (the postcondition that catches accounted
+evaporation, FINDINGS 7.8); no-op bit identity.
+\end{validation}
+
+\section{Collective effects}\label{sec:collective}
+
+\subsection{Wake kernels}\label{sec:wakes}
+
+Wakes act as a per-slice energy-loss rate built from three single-particle kernels at
+wavelength resolution over the window, $w(s_i)$, $s_i = (i-1)\lambda_s$, in eV per
+meter per electron (negative = loss).
+
+\emph{Resistive wall} (\code{fel\_resistive\_wall\_wake}), the numerical impedance of
+Bane \& Stupakov (SLAC-PUB-10707) with AC (Drude) conductivity and Leontovich surface
+impedance:
+\begin{gather}
+  \sigma(k) = \frac{\sigma_0}{1 - i k c\tau}, \qquad
+  \zeta(k) = (1-i)\sqrt{\frac{k}{2\sigma(k) Z_0}}, \notag\\[2pt]
+  Z_{\mathrm{round}}(k) = \frac{Z_0/(2\pi a)}{1/\zeta - i k a/2}, \qquad
+  Z_{\mathrm{flat}}(k) = \int_0^{X}\!
+     \frac{Z_0/(2\pi a)\; dx}{\cosh x\,[\cosh x/\zeta - i k a\,\mathrm{sinhc}\,x]},
+     \label{eq:bszk}\\[2pt]
+  w(s) = -e\,\frac{2c}{\pi}\int_0^{k_{\max}} \mathrm{Re}\,Z(k)\cos(k s)\, dk,
+  \label{eq:bsws}
+\end{gather}
+with Genesis's exact numerics kept: $k \in [0, 100/s_0]$ on 1000 trapezoid intervals,
+$s_0 = (2a^2/(Z_0\sigma_0))^{1/3}$, flat integral on $[0,15]$ with 20000 points. This
+routine is deliberately separable (a future Bmad-proper wake source; \S\ref{sec:seamwake}
+already feeds it to Bmad's machinery). \emph{Geometric} (undulator gap, convolved with
+$dI/ds$): $w(s) = -\frac{Z_0 c\, e}{\pi^2 a\, L_{\mathrm{gap}}}\,2\sqrt{g/2}\,\sqrt{s}$
+($\times0.956$ flat). \emph{Roughness}: $w(s) = \frac{r_r}{\pi}\frac{4}{a^2}
+\frac{e}{4\pi\varepsilon_0}\,\mathrm{Re}\!\int e^{-iq\tau} K(q)\,dq$ over Genesis's
+four-segment complex-$q$ contour, $r_r = \pi^3 h^2 a/L_r^3$, $\tau = 2\pi s/L_r$. The
+$s{=}0$ bin of every kernel carries half weight (the self-loading theorem).
+
+\emph{Convolution and application} (\code{fel\_wake\_update}, \code{fel\_wake\_apply}):
+slice currents interpolate to $\lambda_s$ resolution with a zero pad past the head
+(the trapezoidal density model whose half-slice head deficit is the derived bound of
+the seam-wake cross-validation), convert to electrons per bin, and each slice sums
+causally \emph{toward the head} --- a trailing slice collects the wake of the charge
+ahead --- averaged over the \code{sample} sub-steps:
+\begin{equation}\label{eq:eloss}
+  \mathcal{E}_i = \frac{1}{\code{sample}}\sum_{j=0}^{\code{sample}-1}
+    \sum_{k\ge0} \Bigl[N_{i,j+k}\,\bigl(w_{\mathrm{res}}+w_{\mathrm{rou}}\bigr)_k
+     + N'_{i,j+k}\, w_{\mathrm{geo},k}\Bigr] + \mathcal{E}_{\mathrm{ext}} .
+\end{equation}
+The kick is uniform within a slice: every particle loses $\Delta\gamma =
+\mathcal{E}_i\,\delta z/(m_e c^2)$ per step, in every element (the chamber does not
+end where the undulator does), with $z$ rescaled by $\beta_{\mathrm{new}}/
+\beta_{\mathrm{old}}$ to hold $\theta$ fixed through the kick. The convolution is
+hoisted while currents cannot change and recomputed at the migration stride.
+
+\subsection{Space charge}\label{sec:spacecharge}
+
+\emph{Short range} (\code{fel\_shortrange\_ez}), per slice: center and radially bin the
+particles, then for azimuthal modes $m = -n_\phi..n_\phi$ and longitudinal harmonics
+$l = 1..n_z$ solve the radial tridiagonal system of the harmonic potential
+(cell volumes $V_1 = \pi\,dr^2$, $V_i = \pi dr^2(2i-1)$; off-diagonals
+$2\pi(i-1)$; $\log$ ring terms $-2\pi m^2\ln\frac{i}{i-1}$; outer boundary
+$-2\pi N$), with the weighted source per particle
+\begin{equation}\label{eq:scsource}
+  \frac{Z_0}{m_ec^2}\,\frac{c\, w_j}{\Delta s}\,\frac{1}{k_s}\;
+  e^{-im\phi_j}\, e^{-il\theta_j},
+\end{equation}
+and the operator scale $-\gamma_z^2/k_s^2$ ($\gamma_z^2 = \gamma_0^2/(1+a_w^2)$ inside
+undulators, $\gamma_0^2$ in drifts). Each particle receives
+$e_z \mathrel{+}= 2\,\mathrm{Re}\bigl[e^{im\phi}e^{il\theta} u_m^l(r)\bigr]$, in
+$m_ec^2$ per meter, entering Eq.~\ref{eq:dgamma}. \emph{Long range}
+(\code{fel\_longrange\_esc}), whole window, one node:
+\begin{equation}\label{eq:longrange}
+  E_i = \frac{\Delta s}{2\pi c\,\varepsilon_0}\sum_{j\ne i}
+    \mathrm{sgn}(i-j)\,
+    \Bigl[1 - \frac{|d_{ij}|}{\sqrt{d_{ij}^2 + \sigma_{x,j}\sigma_{y,j}}}\Bigr]
+    \frac{I_j}{\sigma_{x,j}\sigma_{y,j}}, \qquad d_{ij} = (j-i)\,\Delta s\,\gamma_z,
+\end{equation}
+where the size scale is the \emph{product} $\sigma_x\sigma_y$ (an effective area, not
+a variance sum --- transcribed wrong once, caught at $1.7\times10^{-1}$). The
+per-particle ODE term is $e_z^{\mathrm{short}}(j) - E_i/(m_ec^2)$. Space charge is
+transcribed for consistency; a Bmad-slice implementation behind the same interface is
+an explicit future task.
+
+\subsection{Bmad element wakes across the window}\label{sec:seamwake}
+
+Elements carrying Bmad \code{sr\_wake} definitions (pseudomodes; tabular
+\code{z\_long} with binning + FFT) act across the whole window: for wake elements only,
+the slices concatenate into one bunch in global coordinates (Eq.~\ref{eq:zglobal}) and
+Bmad's machinery applies unmodified --- interludes through \code{track1\_bunch} (wake
+at \code{ds\_wake}, once per passage); FEL wigglers through one whole-window
+\code{track1\_sr\_wake} kick at the step nearest mid-element, $z$ rescaled to hold
+$\theta$ as in \S\ref{sec:wakes}. Bmad's conventions, pinned: \code{ix\_z(1)} is the
+bunch head at largest $z$; the pseudomode wake is $W(\delta z) = A\,e^{\Gamma\delta z}
+\sin(2\pi\phi + k\,\delta z)$ with self-kick $W(0)/2$; the \code{z\_long} table is
+positive-decelerating, causal side $\delta z<0$ (the \S\ref{sec:wakes} kernels are
+stored as signed loss --- flip the sign when bridging); wakes on superimposed/split
+elements live on the \emph{lord} and resolve through \code{pointer\_to\_wake\_ele};
+\code{sr\%z\_max} and the table extent must cover the window (refused by name
+otherwise); lr wakes are refused. \code{write\_wake\_kernels} exports the
+\S\ref{sec:wakes} kernels for building matching tables.
+
+\begin{provenance}
+\S\ref{sec:wakes}: \code{Wake::singleWakeResistive}, \code{singleWakeGeometric},
+\code{singleWakeRoughness} + \code{KernelRoughness} + \code{TrapIntegrateRoughness},
+\code{Collective::update} (convolution, self-half), \code{Collective::apply}.
+\S\ref{sec:spacecharge}: \code{EFieldSolver::shortRange}, \code{analyseBeam},
+\code{constructLaplaceOperator}, \code{tridiag}, \code{longRange}; the ODE entry is
+\code{BeamSolver.cpp}'s \code{ez = getEField + eloss}. \S\ref{sec:seamwake}: Bmad's
+\code{wake\_mod.f90} used as-is; the concatenation is this port's.
+\end{provenance}
+\begin{validation}
+tdwk $8.7\times10^{-7}$ (impedance floor); tdsc $2.4\times10^{-4}$ (Genesis's
+truncated $\varepsilon_0$); exact energy bookkeeping $d\langle E\rangle =
+\mathcal{E}\,\delta z$ at $4.4\times10^{-5}$ eV against 203 eV kicks;
+$\sigma_E$ invariance under uniform kicks $2.5\times10^{-7}$ eV. Seam wakes:
+constant-pseudomode closed form $6.2\times10^{-10}$; causality exactly zero ahead of
+all charge; \code{z\_long} vs first-principles convolution $3.4\times10^{-8}$;
+same-kernel \code{z\_long}-vs-\code{wake\_on} on the full SASE line to 0.7\%;
+lord-resolution closed form $1.8\times10^{-10}$. Mutations: anti-causal convolution
+$7\times10^{-3}$, $e_z$ sign $9.1\times10^{-1}$, stale wake structurally; seam
+direction/offset/charge at 22/11/1.0.
+\end{validation}
+
+\section{The seam}\label{sec:seam}
+
+Outside FEL elements, each slice converts to a Bmad bunch by plain copies (the packed
+chart \emph{is} Bmad's; the element's $p_0c$ is asserted against the beam's),
+\code{track1\_bunch} tracks it, and the field propagates by \code{wavefront\_drift}.
+The only phase bookkeeping is one $\varphi_0$ advance per element
+(Eq.~\ref{eq:phi0rate} with the drift surrogate $k_s/(2\gamma_0^2)$). The reference
+energy is the lattice's ($\gamma_0 = E_{\mathrm{tot}}/m_ec^2$ from the beginning
+element; there is no namelist duplicate), and every FEL parameter lives on the lattice
+(\S\ref{sec:element}) --- one specification of one truth.
+
+\begin{validation}
+tier2\_bmad/td2\_bmad price the seam transport difference ($5.0\times10^{-2}$ /
+$4.1\times10^{-2}$), with tier2\_genesis proving the attribution by collapsing it six
+orders of magnitude under the model swap.
+\end{validation}
+
+\section{Numerical practices}\label{sec:numerics}
+
+\emph{Two-pass variance.} All second moments subtract the mean before squaring: for
+$\gamma \sim 10^4$ with $\sigma \sim 10^{-3}$ the one-pass
+$\langle v^2\rangle - \langle v\rangle^2$ form loses the entire $\sigma$ to
+cancellation (hidden for five deliverables until a uniform wake kick first moved the
+mean).
+
+\emph{Constants floors.} Comparisons against Genesis bottom out at the mismatch of
+its truncated constants, per term: $Z_0 = 376.73$ ($8.3\times10^{-7}$, the FEL core
+and resistive/geometric wakes), $\varepsilon_0 = 8.85\times10^{-12}$ in the
+long-range space charge ($4.7\times10^{-4}$), $e = 1.6\times10^{-19}$ and
+$\varepsilon_0 = 8.854\times10^{-12}$ in the roughness coefficient
+($1.4\times10^{-3}$ of that kernel). Each tier's tolerance is sized to the floor of
+the terms it enables.
+
+\emph{Step size.} Measured convergence (one shared 32-slice dump at
+$\code{sample}=12$, \code{ds\_step} swept): roughly first order in the exponential
+gain region; saturation power holds to $\sim$3\% up to six periods per step and
+misses by 26\% at twelve. Two to three periods per step is the operating point;
+SIMPLEX's twelve-period economy belongs to its semianalytic solver and does not
+transfer.
+
+\emph{Ulp accounting.} The $\gamma \leftrightarrow p_z$ round trip costs $\sim$1 ulp
+of $\gamma$ per step (it moved tier1 from $2.5\times10^{-12}$ to
+$2.8\times10^{-11}$ at transcription level); a lattice-attribute round trip
+($a_w$ through \code{b\_max}) costs 1 ulp amplified to $3.4\times10^{-12}$ over the
+line; moving verbatim code between compilation units shifts arithmetic 1--2 ulp
+(gain-amplified to $1.2\times10^{-4}$ of bunching phase). Bit-identity anchors hold
+within one compilation unit; across moves, anchor at ulp tolerance and record the
+drift.
+
+\emph{Thread safety.} Cross-slice state changes only at serial points: the FFTW plan
+cache is threadprivate, the $K_2$ kernel builds serially before parallel loops and is
+read-only inside them, source accumulators are per call, and slippage/migration/wake
+updates run at barriers. Each slice's arithmetic is independent of which thread runs
+it, so results are bit-identical across thread counts --- a gated property, and the
+only instrument that catches shared-accumulator races (invisible to every
+single-threaded check).
+
+\begin{validation}
+FINDINGS.md 4.8, 7.9, 7.10, 7.14, 7.18; the coarse-step table in the README; the
+thread gate and its shared-accumulator mutation (7.0 relative between thread counts,
+bit-identical single-threaded).
+\end{validation}
+
+\end{document}

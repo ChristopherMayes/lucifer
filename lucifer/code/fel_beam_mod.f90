@@ -791,7 +791,7 @@ end subroutine fel_split_slices
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
 ! slice window: the weighted generalization of Genesis's one4one-only Sorting::localSort
-! (src/Util/Sorting.cpp:74-137), which this port can offer for ANY beam because each
+! (fel-physics.tex sec:migration), which this port can offer for ANY beam because each
 ! particle carries its own charge (brief 6.4: weights and migration are the same
 ! feature).
 !
@@ -810,9 +810,9 @@ end subroutine fel_split_slices
 ! re-examined when the scan reaches that slice (its adjusted theta then lies inside the
 ! window, so it stays); one appended to a LOWER slice waits for the next call, as in
 ! Genesis. Particles whose destination lies beyond the window are DROPPED WITH THEIR
-! CHARGE COUNTED into charge_dropped -- Genesis discards them silently
-! (Sorting.cpp:194-195 clears the push vectors at the world edges); the accounting is
-! this port's deviation, chosen so conservation is checkable.
+! CHARGE COUNTED into charge_dropped -- Genesis discards them silently at the world
+! edges (sec:migration); the accounting is this port's deviation, chosen so
+! conservation is checkable.
 !
 ! Serial by design: called between the parallel regions at the caller's stride, so
 ! thread-count independence is untouched. Single-slice beams return immediately (a
@@ -928,8 +928,8 @@ end subroutine fel_migrate_slices
 !   dphi0/ds = ku_like + ks*(1 - 1/beta0)
 !
 ! where ku_like is the undulator wavenumber inside an undulator, or Genesis's drift
-! surrogate ks/(2*gamma0^2) in field-free regions (BeamSolver.cpp:35-38; the caller
-! supplies it), and beta0 is the reference beta from p0_mc. Combined with the
+! surrogate ks/(2*gamma0^2) in field-free regions (fel-physics.tex sec:chart; the
+! caller supplies it), and beta0 is the reference beta from p0_mc. Combined with the
 ! per-particle theta_j = phi0 - ks*tau_j this reproduces Genesis's
 ! dtheta/ds = ks*(1 - 1/beta_z) + ku_like exactly, because
 ! -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
@@ -958,8 +958,9 @@ end function fel_phi0_rate
 ! Subroutine fel_slice_diag (beam, sl, ks, diag)
 !
 ! Routine to compute the per-slice beam diagnostics, weighted. Genesis's DiagBeam::calc
-! (src/Core/Diagnostic.cpp:515-575) definitions with 1/N generalized to w_j/sum(w);
-! uniform weights reproduce Genesis exactly up to the regrouped arithmetic. Positions and
+! definitions with 1/N generalized to w_j/sum(w) (two-pass variances by REQUIREMENT:
+! fel-physics.tex sec:numerics); uniform weights reproduce Genesis exactly up to the
+! regrouped arithmetic. Positions and
 ! sizes are of x, y directly; mean_px, mean_py are in Bmad's normalization P/p0 (multiply
 ! by fel_p0_mc for Genesis's gamma*beta). Adds N_eff and the derived current.
 !-

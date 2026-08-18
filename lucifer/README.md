@@ -1,11 +1,15 @@
 # FEL tracker, validated against Genesis 1.3 Version 4
 
-Deliverables 3 and 4 of the FEL port: an FEL tracker whose physics is transcribed from
-Genesis 1.3 Version 4 (GPL permits transcription), embedded in Bmad's lattice machinery by
-the seam of the design brief's section 4.1, and validated against Genesis over its
-`benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states --
-single-slice steady state (deliverable 3) and multi-slice time dependence with slippage
-(deliverable 4).
+An FEL tracker whose physics is transcribed from Genesis 1.3 Version 4 (GPL permits
+transcription), embedded in Bmad's lattice machinery by the seam of the design brief's
+section 4.1, and validated against Genesis over its `benchmark/Benchmark1-SASE`
+configuration from bitwise-identical starting states.
+
+**The physics reference is the manual, [`doc/fel-physics.tex`](doc/fel-physics.tex)**
+(`make` in `doc/` builds the PDF): every equation the code integrates, each subsystem's
+Genesis provenance, and which gate pins it at what measured level. This README carries
+the measured numbers, the validation methodology, and how to run everything; where it
+touches physics it cites the manual's sections (`sec:core`, `sec:slippage`, ...).
 
 No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 10 is in — including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the brief's 7.5 assertions enforced by name; see the FEL element section. Per-particle weights are carried from day one (brief section 5): the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
@@ -20,6 +24,7 @@ section.
 
 | Path | Contents |
 |---|---|
+| `bsim/fel/doc/fel-physics.tex` | **The physics manual**: equations, conventions, Genesis provenance and validation pointers, one section per subsystem |
 | `bsim/modules/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
 | `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes; see the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
@@ -60,6 +65,8 @@ benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT
 Genesis's default ADI solver is out of scope).
 
 ## Architecture
+
+(Physics: manual `sec:core`, `sec:chart`, `sec:field`, `sec:slippage`.)
 
 Inside FEL elements (wigglers with `tracking_method = custom`; see the FEL element
 section), `fel_track_und_step` advances the coupled system in steps of the element's
@@ -131,6 +138,8 @@ as Genesis does at `writeFieldHDF5.cpp:86` and `Diagnostic.cpp:852`. Beam slices
 rotate.
 
 ## The FEL element (brief 7.5): parameters live on the lattice
+
+(Physics: manual `sec:element`.)
 
 An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying
 `tracking_method = custom` — Bmad's own semantics for "the program supplies the
@@ -383,6 +392,8 @@ nothing to communicate.
 
 ## Shot noise under weights (brief 6.2): the loader's noise is physical, and gated
 
+(Physics: manual `sec:loading`.)
+
 A slice of current I represents `N_lambda = I*slice_spacing/(e*c)` real electrons, and
 physical shot noise means `<|b(h)|^2> = 1/N_lambda` per harmonic. The built-in loader
 imposes it Fawley style, transcribed from Genesis's `ShotNoise::applyShotNoise` and
@@ -420,6 +431,8 @@ codes track the identical realization dark through the full line, so startup-fro
 is also compared elementwise like any other tier.
 
 ## Distribution import (brief 10 step 10): a bunch_struct, resampled Genesis's way
+
+(Physics: manual `sec:import`.)
 
 The `importdistribution` equivalent: an arbitrary bunch -- arbitrary times, arbitrary
 weights -- resampled into the evenly spaced, equal-population slices the FEL step
@@ -492,6 +505,8 @@ through the full line.
 
 ## Slice migration under weights (brief 6.4)
 
+(Physics: manual `sec:migration`.)
+
 Genesis permits migration only under one4one, because with uniform weighting the charge
 a mover carries cannot be expressed; per-particle weights dissolve the problem, and this
 port's coordinates dissolve the other half: z is continuous, the slice index is derived,
@@ -529,6 +544,8 @@ off-the-end mover with a bounds trap, never touching memory beyond the arrays
 (FINDINGS.md 7.8).
 
 ## Wakes and space charge (brief 10 step 8): Genesis's granularity, gated
+
+(Physics: manual `sec:wakes`, `sec:spacecharge`.)
 
 Inside undulators and Genesis-model interludes, the collective terms are transcribed at
 Genesis's granularity (`fel_collective_mod`): wakes as a per-slice energy-loss rate --
@@ -575,6 +592,8 @@ flipping the sign of `ez` fails tdsc at 9.1e-1; removing the migration-stride re
 leaves one eloss block and fails the stale-wake structural gate.
 
 ## Bmad element wakes across the whole bunch (brief 10 step 11)
+
+(Physics and conventions: manual `sec:seamwake`.)
 
 Elements carrying Bmad `sr_wake` definitions -- pseudomodes and the tabular `z_long`
 (binning + FFT) -- act across the WHOLE time window. For wake elements only, the seam
@@ -642,6 +661,8 @@ causality at 2.8e-4; dropping the slice offset (all slices coincide) fails both;
 unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
 
 ## The coarse-step measurement (brief 8.3)
+
+(Summarized in manual `sec:numerics`.)
 
 SIMPLEX's reference case integrates twelve undulator periods per step with the slice
 spacing matched so slippage is one slice per step -- an order of magnitude fewer steps

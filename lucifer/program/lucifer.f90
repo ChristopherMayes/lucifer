@@ -1,56 +1,36 @@
 !+
 ! Program fel_track_test
 !
-! FEL tracker validated against Genesis 1.3 Version 4: single-slice steady state
-! (deliverable 3) and multi-slice time dependence with slippage (deliverable 4). See
-! bsim/fel/README.md and the design brief.
+! FEL tracker validated against Genesis 1.3 Version 4. The PHYSICS -- coordinates and
+! conventions, the FEL step, the field solver, slippage, loading, import, migration,
+! collective effects, and each piece's Genesis provenance and measured validation
+! level -- lives in the manual, bsim/fel/doc/fel-physics.tex. Measured numbers and how
+! to run the gates: bsim/fel/README.md. This header documents the inputs.
 !
-! The program walks a Bmad lattice and applies the seam of the design (brief section 4.1):
+! The program walks a Bmad lattice and applies the seam of the design (manual
+! sec:element, sec:seam): FEL segments are real Bmad wiggler/undulator elements with
+! tracking_method = custom, their FEL parameters read from lattice attributes (aw from
+! b_max/l_period, helicity from field_calc, step from ds_step -- assertions enforced by
+! name at setup) and stepped with the transcribed Genesis physics of fel_track_mod;
+! every other element tracks each slice's bunch with Bmad's track1_bunch (the packed
+! arrays ARE Bmad coordinates, so conversion is a plain copy) and drifts the field by
+! wavefront_drift, with one advance of the reference phase phi0 per element.
 !
-!   - FEL segments are real Bmad wiggler/undulator elements with
-!     tracking_method = custom (Bmad's semantics for program-supplied tracking, which
-!     this driver is; no name matching). Their FEL parameters come from lattice
-!     attributes -- aw from b_max/l_period, helicity from field_calc -- with the brief's
-!     7.5 assertions enforced by name at setup. They are stepped in the element's own
-!     ds_step (Genesis's delz, now a lattice attribute like everything else) with
-!     the transcribed Genesis physics (fel_track_mod): transverse push with natural
-!     focusing, RK4 ponderomotive advance, source deposition and FFT field solve. Bmad's
-!     own tracking is not used inside them; und_transport = "bmad" swaps the transverse
-!     maps for a flattened copy of Bmad's periodic-wiggler kernel, a priced model
-!     alternative.
+! Time dependence follows from the starting state alone: a multi-slice window makes a
+! time-dependent run (slippage active), a single slice the steady state, no separate
+! switch -- the same rule as Genesis. The slippage schedule is precomputed over the
+! lattice, transcribing Lattice::calcSlippage (manual sec:slippage, including the
+! drift autophasing and its unguarded end-of-lattice fixup), and applied after each
+! step's field solve, before its diagnostics -- Gencore's step order. The field record
+! rotates rather than moves; everything reading it in time order goes through
+! fel_field_index.
 !
-!   - Every other element: each slice's bunch is converted from the packed FEL arrays to
-!     coord_structs and tracked by Bmad (track1_bunch). The packed arrays ARE Bmad
-!     coordinates (see fel_beam_mod), so the conversion is a plain copy; the only phase
-!     bookkeeping is one advance of the common reference phase phi0 per element. The
-!     radiation field is drifted through free space by wavefront_drift.
-!
-! Time dependence follows from the starting dumps alone: a multi-slice dump makes a
-! time-dependent run (slippage active), a single-slice dump the steady state, with no
-! separate switch -- the same rule as Genesis, whose imports carry the time window
-! (ImportBeam.cpp). Slippage is precomputed as a schedule over the lattice, transcribing
-! Lattice::calcSlippage with Genesis's reference gamma:
-!
-!   - each undulator step slips dz*(1+aw^2)/(2*gamma0^2*lambda) wavelengths;
-!   - interlude elements slip zero, but their lengths accumulate, and when an undulator
-!     follows, floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths of autophasing land on the
-!     last interlude element before it (Lattice.cpp:173: "auto phasing would always add
-!     some slippage" -- the field record shifts an integer number of wavelengths, the
-!     particle phase does not move, exactly as in Genesis where the fractional part is
-!     commented out);
-!   - a trailing interlude section adds the same fixup to the lattice's last element
-!     (Lattice.cpp:193).
-!
-! The schedule is applied through fel_apply_slippage after each step's field solve and
-! before its diagnostics -- Gencore's step order (track beam, track field, slippage,
-! diagnostics). The field record rotates rather than moves; everything reading it in time
-! order (the per-slice diagnostics here, the final dump) goes through fel_field_index.
-!
-! The starting state is a pair of Genesis dumps (&write of beam and field), so both codes
-! track from bitwise-identical initial conditions. Diagnostics matching Genesis's
-! definitions are recorded at the same z positions Genesis records them: once at the start
-! and once after every integration step, one step per interlude element -- one row per
-! slice per record, in time-window order.
+! The starting state is a pair of Genesis dumps (&write of beam and field), so both
+! codes track from bitwise-identical initial conditions; or self-generated; or an
+! imported distribution (below). Diagnostics matching Genesis's definitions are
+! recorded at the same z positions Genesis records them: once at the start and once
+! after every integration step, one step per interlude element -- one row per slice
+! per record, in time-window order.
 !
 ! Input is a namelist file:
 !
@@ -71,16 +51,12 @@
 !   &end
 !
 ! migrate = T moves particles between slices when their ponderomotive phase leaves the
-! slice window (fel_migrate_slices: the weighted generalization of Genesis's
-! one4one-only localSort, brief 6.4), called serially after every element. OFF BY
-! DEFAULT, deliberately: the Genesis-comparison tiers run against Genesis WITHOUT
-! one4one, which never migrates, so migration would be a physics-model difference
-! inside a transcription-level comparison. Particles leaving the window ends are
-! dropped with their charge counted and reported per event and in the end-of-run
-! summary (Genesis discards them silently). migrate_check = T additionally verifies at
-! every migration that the whole-beam bunching is unchanged by the moves -- the z
-! adjustment shifts each mover's phase by an exact multiple of 2*pi*sample, so any
-! deviation beyond rounding is a bookkeeping bug -- and reports the worst deviation.
+! slice window (fel_migrate_slices, manual sec:migration), called serially after every
+! element. OFF BY DEFAULT, deliberately: the Genesis-comparison tiers run against
+! Genesis WITHOUT one4one, which never migrates, so migration would be a physics-model
+! difference inside a transcription-level comparison. Dropped charge is counted and
+! reported. migrate_check = T additionally verifies exact phase continuity at every
+! migration and reports the worst deviation.
 !
 ! Alternatively, leave beam_file and field_file blank and the program generates its own
 ! steady-state starting condition -- a quiet-start beam and a Gaussian seed field -- from
@@ -111,18 +87,15 @@
 !     load_only = F            ! Generate, write <out_root>-initial dumps, exit without
 !                              !   tracking. For the shot-noise statistical gate.
 !
-! Element wakes (deliverable 11): elements carrying Bmad sr_wake definitions --
-! pseudomodes or a tabular z_long -- act across the WHOLE time window: the slices
-! concatenate into one bunch in global window coordinates and Bmad's own wake
-! machinery applies (interludes via track1_bunch at ds_wake; FEL wigglers via one
-! whole-window track1_sr_wake kick at mid-element). lr wakes and wake definitions
-! shorter than the window are refused by name. write_wake_kernels = "<file>" exports
-! the deliverable-8 wake kernels for building matching z_long tables (see the README's
-! seam-wake section and examples/bmad_wake).
+! Element wakes: elements carrying Bmad sr_wake definitions -- pseudomodes or a
+! tabular z_long -- act across the WHOLE time window via slice concatenation (manual
+! sec:seamwake: conventions, ds_wake, the mid-element wiggler kick, refusals).
+! write_wake_kernels = "<file>" exports the transcribed wake kernels for building
+! matching z_long tables (see the README's seam-wake section and examples/bmad_wake).
 !
-! Third way in (deliverable 10): import a particle DISTRIBUTION -- an arbitrary bunch,
-! resampled into slices by the transcribed Genesis importdistribution method
-! (fel_import_mod, where the algorithm and its provenance live). The bunch comes from
+! Third way in: import a particle DISTRIBUTION -- an arbitrary bunch, resampled into
+! slices by the transcribed Genesis importdistribution method (fel_import_mod; manual
+! sec:import). The bunch comes from
 ! Bmad's beam_init_struct (use_beam_init = T with a beam_init%... block -- Bmad's
 ! native equivalent of Genesis's &beam description) or from an openPMD-beamphysics
 ! file (dist_file). npart/nbins/sample/seed and the seed field reuse the gen_
@@ -142,43 +115,20 @@
 !     write_opmd_file = ""     ! Write the bunch as openPMD-beamphysics.
 !     imp_split_weights = F    ! Gate knob: coincident w/3 + 2w/3 copies before import.
 !
-! The quiet start loads gen_npart/gen_nbins base samples of the transverse and energy
-! distributions per slice and replicates each at gen_nbins equally spaced ponderomotive
-! phases, so every bunching harmonic below gen_nbins is zero to roundoff. With
-! gen_shotnoise = T, physical shot noise is imposed on top, Fawley style, transcribed
-! from Genesis's ShotNoise::applyShotNoise and GENERALIZED TO WEIGHTS: per beamlet and
-! harmonic h = 1..(gen_nbins-1)/2, every particle of the beamlet gets the phase kick
-! -a_h*sin(h*theta + phi), phi uniform, a_h = (2/h)*sqrt(-ln(U)/nbl), where nbl is the
-! beamlet's REAL electron count -- its charge over e -- rather than Genesis's ne/mpart
-! (identical for uniform weights). Kick algebra: a quiet beamlet acquires
-! |b(h)| = h*a_h/2, so <|b(h)|^2> per beamlet is 1/nbl, and the charge-weighted slice
-! average is sum(W_j^2/nbl_j)/(sum W_j)^2 = e/sum(W) = 1/N_lambda for ANY cross-beamlet
-! weight distribution -- physical noise by construction (brief 6.2). Genesis silently
-! clamps nbl < 1 (more macroparticles than electrons); this loader warns when it clamps.
+! The quiet start and the weighted Fawley shot noise (gen_shotnoise = T), including
+! the noise-level algebra and the N_eff refusal guard, are the manual's sec:loading;
+! the loader warns where Genesis silently clamps beamlets with fewer real electrons
+! than macroparticles.
 !
-! The N_eff discipline (brief 6.2): the loader reports per-beam N_lambda and
-! N_eff = (sum w)^2/sum w^2 ranges, and REFUSES to impose noise on a slice whose
-! pre-noise quiet floor max_h |b(h)|^2 exceeds 1 percent of the target 1/N_lambda --
-! an unquiet representation (weights varying within a beamlet, degraded structure)
-! cannot carry noise below its own sampling floor, and imposing on top of it would
-! produce a silently wrong startup level. For beams this loader generates the floor is
-! roundoff; the guard exists for what future resampled input may bring.
-!
-! interlude_model selects how the field-free elements are handled. "bmad" is the
-! deliverable's architecture: track1_bunch for the particles, the exact theta mapping from
-! Bmad's z, wavefront_drift for the field. "genesis" instead uses the transcribed Genesis
-! interlude step (fel_track_interlude_genesis) everywhere, which prices what the seam
-! changes: with it the whole run should agree with Genesis at transcription level, and the
-! difference between the two modes is the transport model difference, measured rather than
-! argued about. The slippage schedule is identical in both models.
+! interlude_model selects how the field-free elements are handled: "bmad" is the seam
+! (track1_bunch, exact theta mapping, wavefront_drift); "genesis" uses the transcribed
+! Genesis interlude step everywhere, which prices what the seam changes -- the manual's
+! sec:interlude and sec:seam. The slippage schedule is identical in both models.
 !
 ! split_weights = T replaces each imported particle by two copies at identical
-! coordinates carrying 1/3 and 2/3 of its weight. Every collective observable -- power,
-! bunching, the field itself -- must be identical to the unsplit run, because the
-! dynamics is per particle and the sources and reductions are linear in the weight. The
-! benchmark harness runs this against the unsplit run to test the weighted paths, which
-! nothing Genesis produces can test: the Genesis dump format carries no weights, so a
-! Genesis comparison only ever sees the uniform case.
+! coordinates carrying 1/3 and 2/3 of its weight; every collective observable must be
+! identical to the unsplit run. This gates the weighted paths, which no Genesis
+! comparison can (Genesis dumps carry no weights).
 !
 ! Outputs: <out_root>.diag.txt (one row per slice per record: z, slice, field and beam
 ! diagnostics), <out_root>-final.fld.h5 and <out_root>-final.par.h5 (Genesis-format dumps
@@ -492,7 +442,8 @@ call setup_fel_elements ()
 ! floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at all
 ! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is --
 ! omitting that +1 leaves the field record one rotation short at the very end, found the
-! hard way against the single-segment time-dependent run.
+! hard way against the single-segment time-dependent run. (Citations kept AT THE LINES:
+! this quirk's exactness matters here, at the call site; manual sec:slippage.)
 
 allocate (ele_slip(branch%n_ele_track))
 ele_slip = 0
@@ -679,8 +630,8 @@ if (migrate) then
 endif
 
 ! Final dumps in Genesis format. The field record is unrotated to time order first --
-! time window position is holds record slice 1 + mod(is-1+first, nslice) -- which is what
-! writeFieldHDF5.cpp:86 does on the fly.
+! time window position is holds record slice 1 + mod(is-1+first, nslice) -- which is
+! what Genesis's field writer does on the fly (manual sec:slippage).
 
 if (slip%first /= 0) then
   wf%Ex = cshift(wf%Ex, shift = slip%first, dim = 3)
@@ -748,7 +699,7 @@ if (gen_power > 0 .and. gen_waist_size <= 0) then
 endif
 
 ! The window: gen_slen <= 0 is the single-slice steady state; otherwise Genesis's count,
-! nslice = round(slen/(sample*lambda0)) (GenTime.cpp:70).
+! nslice = round(slen/(sample*lambda0)) (manual sec:window).
 
 if (gen_slen > 0) then
   nslice_gen = nint(gen_slen / (gen_sample * lambda0))
@@ -1150,7 +1101,7 @@ do je = 1, branch%n_ele_track
   ! aw (rms, Genesis's convention) from the peak field:
   ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy;
   ! helical aw = K, planar aw = K/sqrt(2). Focusing split: Genesis's defaults by
-  ! helicity (LatticeParser.cpp:328-333), scaled by ku^2 as Genesis's unroll does.
+  ! helicity, scaled by ku^2 as Genesis's unroll does (manual sec:element).
 
   kk = c_light * w%value(b_max$) / (kw * m_electron)
 
@@ -1302,7 +1253,7 @@ end subroutine write_wake_block
 subroutine write_diag_rows ()
 
 ! One row per slice, slices in time-window order: beam slice is against field slice
-! fel_field_index(slip, is, nslice), the rotation Genesis applies at Field.cpp:329.
+! fel_field_index(slip, is, nslice), the unrotation of manual sec:slippage.
 
 real(rp) power, on_axis
 integer is

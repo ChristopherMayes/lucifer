@@ -5,46 +5,31 @@
 ! bunch_struct -- arbitrary times, arbitrary weights -- into the evenly spaced,
 ! equal-population slices the FEL step wants, by Genesis 1.3 v4's own method,
 ! transcribed from SDDSBeam.cpp (the class name is historical: it reads plain HDF5).
-!
-! The method, per slice: every bunch particle inside a sampling window of width
-! dslen = slicewidth * bunch_length centered on the slice (strict inequalities,
-! SDDSBeam.cpp:391) is a candidate; the slice current comes from the SAME window --
-! Genesis's count*dQ*c/dslen (SDDSBeam.cpp:400), generalized here to the weight sum,
-! c*sum(w)/dslen, identical for uniform weights and the only weighted generalization
-! made. The candidate set is brought to npart/nbins beamlet seeds by random deletion
-! (removeParticles, SDDSBeam.cpp:604) or by Genesis's phase-space interpolation
-! (addParticles, SDDSBeam.cpp:469: normalize the five coordinates to zero mean and
-! unit rms, pick a random parent, find its nearest ORIGINAL neighbor under a metric
-! whose per-coordinate weights are fresh random draws (distance, SDDSBeam.cpp:589),
-! place the child at the midpoint plus uniform[-1,1] times the difference per
-! coordinate); theta is refilled uniformly over one beamlet spacing [0, 2pi/nbins)
-! (SDDSBeam.cpp:417), mirrored into nbins bins (SDDSBeam.cpp:422), and Fawley shot
-! noise imposed with ne = round(I*lambda*sample/(e*c)) (SDDSBeam.cpp:436) -- the
-! deliverable-6 loader, shared code.
+! Method, Genesis provenance, and validation: bsim/fel/doc/fel-physics.tex
+! (sec:import). The only weighted generalization: the slice current is c*sum(w)/dslen
+! where Genesis counts particles (identical for uniform weights).
 !
 ! Longitudinal mapping: a bunch particle's window position is the port's own
 ! tau = -z/beta = c*(t - t_ref), min-shifted to zero exactly as Genesis min-shifts its
-! file's s = -c*t (SDDSBeam.cpp:230). Genesis's slice centers are s0 + i*ds
-! (GenTime.cpp:96, s0 = 0 here), so both codes bin the identical particle set
-! identically when the distribution file is written with t = -tau/c.
+! file's s = -c*t, so both codes bin the identical particle set identically when the
+! distribution file is written with t = -tau/c (sec:import).
 !
-! Genesis's match/center transforms (SDDSBeam.cpp:271-317) are NOT ported, by
-! decision: they exist because Genesis lattices carry no optics, so an imported bunch
-! must be rematched by hand. A Bmad lattice carries its Twiss, and
-! init_beam_distribution generates bunches matched to the lattice element already --
-! the transform would be a second way to say what the lattice says. (An openPMD bunch
-! that genuinely needs rematching is a Bmad tracking problem upstream of the FEL, not
-! an import option.) The bunch moments ARE still measured -- an UNWEIGHTED analysis in
-! Genesis's analyse form (SDDSBeam.cpp:616), unweighted deliberately: coincident
-! split-weight copies leave every moment bit-identical, which the invariance gate
-! relies on.
+! Genesis's match/center transforms are NOT ported, by decision: they exist because
+! Genesis lattices carry no optics, so an imported bunch must be rematched by hand. A
+! Bmad lattice carries its Twiss, and init_beam_distribution generates bunches matched
+! to the lattice element already -- the transform would be a second way to say what
+! the lattice says. (An openPMD bunch that genuinely needs rematching is a Bmad
+! tracking problem upstream of the FEL, not an import option.) The bunch moments ARE
+! still measured -- an UNWEIGHTED analysis in Genesis's analyse form, unweighted
+! deliberately: coincident split-weight copies leave every moment bit-identical, which
+! the invariance gate relies on.
 !
-! Genesis quirks found by reading and NOT transcribed as functional: the
+! Genesis quirks found by reading and NOT transcribed as functional (sec:import): the
 ! align/align_start/align_end parameters are parsed but never used in v4; the
-! shotnoise flag is read (SDDSBeam.cpp:71) but never consulted -- the import applies
-! noise unconditionally, skipping only zero-current slices (ShotNoise.cpp:31). Both
-! behaviors are kept as Genesis has them (noise always on for nonzero current).
-! one4one is out of scope: per-particle weights supersede it.
+! shotnoise flag is read but never consulted -- the import applies noise
+! unconditionally, skipping only zero-current slices. Both behaviors are kept as
+! Genesis has them (noise always on for nonzero current). one4one is out of scope:
+! per-particle weights supersede it.
 !
 ! The RNG is Bmad's (ran_uniform), NOT a transcription of Genesis's RandomU, so
 ! everything the RNG touches is validated statistically; the current profile and the
@@ -167,7 +152,7 @@ if (sum(wt) <= 0) then
   return
 endif
 
-smin = minval(s);  s = s - smin                    ! Genesis's min shift (SDDSBeam.cpp:246)
+smin = minval(s);  s = s - smin                    ! Genesis's min shift (sec:import).
 ttotal = maxval(s)
 if (ttotal <= 0) then
   call out_io (s_error$, r_name, 'BUNCH HAS ZERO LENGTH; NOTHING TO SLICE.')
@@ -175,7 +160,7 @@ if (ttotal <= 0) then
 endif
 
 nslice = prm%nslice
-if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! GenTime.cpp:71
+if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! Genesis's rule (sec:import).
 
 ! The bunch moments, in Genesis's analyse form (unweighted, strict window bounds --
 ! the two extreme particles are excluded, exactly as Genesis's eval defaults do).
@@ -199,8 +184,8 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice))
 
-! The slice loop (SDDSBeam.cpp:386-452). Slice centers at (islice-1)*slice_spacing
-! (GenTime.cpp:96 with s0 = 0); candidates from the dslen window, strict inequalities.
+! The slice loop (fel-physics.tex sec:import). Slice centers at
+! (islice-1)*slice_spacing; candidates from the dslen window, strict inequalities.
 
 dslen = prm%slicewidth * ttotal
 mpart = prm%npart / prm%nbins
@@ -222,7 +207,7 @@ do islice = 1, nslice
       if (ncand < mpart) then          ! keep up to mpart directly; excess handled below
         ncand = ncand + 1
         cg(ncand) = gam(i); cx(ncand) = x(i); cy(ncand) = y(i)
-        cpx(ncand) = xp(i) * gam(i)    ! the slope-to-momentum conversion (SDDSBeam.cpp:354)
+        cpx(ncand) = xp(i) * gam(i)    ! Genesis's slope-to-momentum conversion.
         cpy(ncand) = yp(i) * gam(i)
       else
         ! Genesis copies every candidate then deletes at random (removeParticles:
@@ -238,8 +223,7 @@ do islice = 1, nslice
 
   if (ncand > mpart) then
     ! Second pass, transcribing removeParticles faithfully: gather ALL candidates,
-    ! then repeatedly overwrite a random index with the last and shrink
-    ! (SDDSBeam.cpp:604-609).
+    ! then repeatedly overwrite a random index with the last and shrink.
     call gather_and_remove ()
   endif
 
@@ -275,7 +259,7 @@ do k = 1, nalive
   endif
 enddo
 
-do while (m > mpart)                               ! SDDSBeam.cpp:606
+do while (m > mpart)                               ! removeParticles' exact rule.
   call ran_uniform (uu)
   k = int(m * uu) + 1
   if (k > m) k = m
@@ -300,7 +284,7 @@ real(rp) g1, x1, y1, px1, py1, g2, x2, y2, px2, py2, scl, rmin, r, tmp, uu
 real(rp) gam_p, beta_p
 integer nd, nd0, k, j, n1, n2, i1, i2
 
-! addParticles (SDDSBeam.cpp:469): empty -> one filler at the reference energy;
+! addParticles (sec:import): empty -> one filler at the reference energy;
 ! singleton -> mirror it; then interpolate up to mpart.
 
 nd = ncand
@@ -315,7 +299,7 @@ endif
 
 if (nd < mpart) then
   ! Normalize the five coordinates to zero mean, unit rms (cold dimensions keep
-  ! scale 1: SDDSBeam.cpp:535-539).
+  ! scale 1, as Genesis's).
   g1 = sum(cg(1:nd))/nd;   g2 = sqrt(abs(sum(cg(1:nd)**2)/nd - g1**2))
   x1 = sum(cx(1:nd))/nd;   x2 = sqrt(abs(sum(cx(1:nd)**2)/nd - x1**2))
   y1 = sum(cy(1:nd))/nd;   y2 = sqrt(abs(sum(cy(1:nd)**2)/nd - y1**2))
@@ -340,7 +324,7 @@ if (nd < mpart) then
     rmin = 1e9_rp
     n2 = n1
     do k = 1, nd0                                  ! nearest neighbor, random metric
-      if (k == n1) cycle                           ! (distance, SDDSBeam.cpp:589)
+      if (k == n1) cycle                           ! Genesis's distance skips self.
       tmp = cg(n1)-cg(k);  call ran_uniform (uu);  r = tmp*tmp*uu
       tmp = cx(n1)-cx(k);  call ran_uniform (uu);  r = r + tmp*tmp*uu
       tmp = cy(n1)-cy(k);  call ran_uniform (uu);  r = r + tmp*tmp*uu
@@ -364,15 +348,15 @@ if (nd < mpart) then
     cpy(nd) = 0.5_rp*(cpy(n1)+cpy(n2)) + (2*uu-1)*(cpy(n1)-cpy(n2))
   enddo
 
-  cg(1:nd) = cg(1:nd)/g2 + g1                      ! scale back (SDDSBeam.cpp:575)
+  cg(1:nd) = cg(1:nd)/g2 + g1                      ! scale back
   cx(1:nd) = cx(1:nd)/x2 + x1
   cy(1:nd) = cy(1:nd)/y2 + y1
   cpx(1:nd) = cpx(1:nd)/px2 + px1
   cpy(1:nd) = cpy(1:nd)/py2 + py1
 endif
 
-! theta refilled completely new over one beamlet spacing (SDDSBeam.cpp:417), then the
-! beamlet mirroring (SDDSBeam.cpp:422-435): seed i lands at nbins consecutive indices.
+! theta refilled completely new over one beamlet spacing (sec:import), then the
+! beamlet mirroring: seed i lands at nbins consecutive indices.
 
 do k = 1, mpart
   call ran_uniform (uu)
@@ -389,7 +373,7 @@ do k = mpart, 1, -1
 enddo
 
 ! Uniform per-slice weights from the window current (Genesis's dQ semantics), the
-! shared Fawley noise with ne = charge/e (skipped for empty slices, ShotNoise.cpp:31),
+! shared Fawley noise with ne = charge/e (skipped for empty slices, as Genesis's),
 ! then the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
 
 w_part = cur * slice_spacing / (c_light * prm%npart)
@@ -423,8 +407,8 @@ end subroutine fel_import_bunch
 !+
 ! Subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
 !
-! Genesis's analyse (SDDSBeam.cpp:616): UNWEIGHTED means, variances and Twiss over the
-! particles with s0 < s < s1, on the slopes. Emittance ex = sqrt(|var_x*var_px -
+! Genesis's analyse (fel-physics.tex sec:import): UNWEIGHTED means, variances and
+! Twiss over the particles with s0 < s < s1, on the slopes. Emittance ex = sqrt(|var_x*var_px -
 ! cov^2|)*gavg (a normalized emittance through the mean energy), bx = var_x*gavg/ex,
 ! ax = -cov*gavg/ex. Unweighted deliberately -- see the module header.
 !-
@@ -485,8 +469,8 @@ end subroutine analyse_window
 ! Write a bunch_struct as a Genesis 1.3 v4 DISTRIBUTION file (the &importdistribution
 ! input; not a dump): flat datasets t [s], p [gamma*beta], x, y [m], xp, yp [slopes],
 ! plus the total charge. t = -tau/c with tau = -z/beta, so Genesis's s = -c*t
-! (SDDSBeam.cpp:230) reproduces this port's window position exactly and both codes bin
-! the identical particle set identically. Dead particles are skipped.
+! reproduces this port's window position exactly and both codes bin the identical
+! particle set identically (sec:import). Dead particles are skipped.
 !-
 
 subroutine fel_write_genesis4_distribution (bunch, file_name, err_flag)

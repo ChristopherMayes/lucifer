@@ -1,61 +1,32 @@
 !+
 ! Module fel_collective_mod
 !
-! In-undulator collective effects for the FEL tracker, transcribed from Genesis 1.3
-! Version 4 at Genesis's granularity (deliverable 8): wakefields applied as a per-slice
-! energy-loss rate, and longitudinal space charge entering the pendulum equation as a
-! per-particle ez. Sources, by routine:
+! In-undulator collective effects for the FEL tracker: wakefields applied as a
+! per-slice energy-loss rate, and longitudinal space charge entering the pendulum
+! equation as a per-particle ez. Physics, Genesis provenance, and validation:
+! bsim/fel/doc/fel-physics.tex (sec:wakes, sec:spacecharge, sec:seamwake).
 !
-!   fel_resistive_wall_wake  <- Wake::singleWakeResistive (src/Main/Wake.cpp): the
-!                               NUMERICAL impedance of Bane & Stupakov SLAC-PUB-10707 --
-!                               AC (Drude) conductivity, Leontovich surface impedance,
-!                               round pipe closed form or flat-chamber x-integral, then
-!                               the one-sided cosine transform to w(s). Kept a clean,
-!                               separable routine BY DECISION: this computation is a
-!                               future port target into Bmad proper as a wake source.
-!   fel_geometric_wake       <- Wake::singleWakeGeometric (undulator gap wake,
-!                               convolved with dI/ds rather than I)
-!   fel_roughness_wake       <- Wake::singleWakeRoughness + KernelRoughness +
-!                               TrapIntegrateRoughness (complex-q contour, trapezoid)
-!   fel_wake_update          <- Collective::update, one shared-memory node: high-res
-!                               current interpolation, electron-count conversion, the
-!                               causal convolution from each slice toward the bunch
-!                               head, sample averaging, self-loading half weight on
-!                               wakeres(1) (Collective.cpp:99)
-!   fel_wake_apply           <- Collective::apply: dgamma = eloss*delz/m_electron per
-!                               particle, holding theta fixed (z rescales by the beta
-!                               ratio in this port's chart)
-!   fel_shortrange_ez        <- EFieldSolver::shortRange + analyseBeam +
-!                               constructLaplaceOperator + tridiag: per slice, azimuthal
-!                               modes m = -nphi..nphi and longitudinal harmonics
-!                               l = 1..nz, radial tridiagonal solves, per-particle
-!                               ez = sum 2*Re(e^{im phi} e^{il theta} u(r))
-!   fel_longrange_esc        <- EFieldSolver::longRange, one node: whole-window
-!                               current/size profile, per-slice longESC
+! Placement in the step: the wake's gamma decrement lands BETWEEN the longitudinal
+! advance and the second transverse half step; ez is computed per slice before the RK
+! loop and held fixed through the stages, entering dgamma/dz as -ez. Both act in every
+! element, interludes included -- the chamber does not end where the undulator does.
 !
-! Placement in the step (Beam::track): the wake's gamma decrement lands BETWEEN the
-! longitudinal advance and the second transverse half step; ez is computed per slice
-! before the RK loop and held fixed through the stages, entering dgamma/dz as -ez
-! (BeamSolver.cpp:162). Both act in every element, interludes included -- the chamber
-! does not end where the undulator does.
-!
-! Space charge is transcribed FOR CONSISTENCY with Genesis (directly gateable), behind
-! this module's interface BY DECISION: Bmad's slice space-charge method is suspected the
-! better model long-term, and a Bmad-slice implementation of fel_shortrange_ez /
-! fel_longrange_esc is an explicit future task, as is the comparison between the two.
+! fel_resistive_wall_wake is kept a clean, separable routine BY DECISION: it is a
+! future port target into Bmad proper as a wake source, and nothing in it knows about
+! the FEL. Space charge is transcribed FOR CONSISTENCY with Genesis (directly
+! gateable), behind this module's interface BY DECISION: Bmad's slice space-charge
+! method is suspected the better model long-term, and a Bmad-slice implementation of
+! fel_shortrange_ez / fel_longrange_esc is an explicit future task.
 !
 ! Weights: every particle enters the sources with its own charge -- the short-range
 ! source term scales per particle as c*w_j/slice_spacing where Genesis has
 ! current/npart (identical for uniform weights), and the long-range and wake current
-! profiles are the weighted slice currents. Thread safety follows deliverable 5's
-! pattern: fel_shortrange_ez uses per-call locals only (callable from the parallel
-! slice loop); the wake update is serial at the caller's barrier.
+! profiles are the weighted slice currents. Thread safety: fel_shortrange_ez uses
+! per-call locals only (callable from the parallel slice loop); the wake update is
+! serial at the caller's barrier.
 !
-! Constants are Bmad's. Genesis's collective terms carry MORE truncated constants than
-! the FEL core: vacimp = 376.73 (8.3e-7), epsilon_0 as 8.85e-12 in longRange (4.7e-4!)
-! and 8.854e-12 in the roughness coefficient (2.5e-5), e as 1.6e-19 in roughness
-! (1.4e-3!). Each Genesis-comparison gate is sized to the floor of the terms it
-! enables; the README carries the table.
+! Constants are Bmad's; the Genesis-comparison floors this creates are tabulated in
+! the manual (sec:numerics) and the README.
 !
 ! Deliberately absent: Genesis's transient wake option (&wake transient/ztrans), the
 ! incoherent-synchrotron module, harmonics beyond what the solver provides, MPI.
@@ -138,19 +109,12 @@ contains
 !
 ! The single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV per meter per
 ! electron (negative = loss), from the NUMERICAL impedance of Bane & Stupakov
-! SLAC-PUB-10707, transcribed from Wake::singleWakeResistive:
-!
-!   sigma(k) = sigma0/(1 - i k ctau)                        (AC / Drude, Eq. 1)
-!   zeta(k)  = (1-i) sqrt(k/(2 sigma(k) Z0))                (Leontovich)
-!   round:   Z(k) = [Z0/(2 pi a)] / [1/zeta - i k a/2]
-!   flat:    Z(k) = int_0^XMAX [Z0/(2 pi a)] /
-!                   { cosh x [cosh x/zeta - i k a sinhc x] } dx  (Eq. 13 recast)
-!   w(s)     = (2c/pi) int_0^kmax Re Z(k) cos(k s) dk,  then * (-e)
-!
-! with Genesis's exact numerics: k in [0, 100/s0] on 1000 intervals,
-! s0 = (2 a^2/(Z0 sigma0))^(1/3), flat x-integral on [0,15] with 20000 points,
-! trapezoid half weights at every endpoint. Kept separable: this routine is the future
-! port target into Bmad proper as a wake source, and nothing in it knows about the FEL.
+! SLAC-PUB-10707 (fel-physics.tex sec:wakes), transcribed from
+! Wake::singleWakeResistive with Genesis's exact numerics: k in [0, 100/s0] on 1000
+! intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3), flat x-integral on [0,15] with 20000
+! points, trapezoid half weights at every endpoint. Kept separable: this routine is
+! the future port target into Bmad proper as a wake source, and nothing in it knows
+! about the FEL.
 !-
 
 subroutine fel_resistive_wall_wake (radius, conductivity, relaxation, roundpipe, ns, ds, wake)
@@ -246,7 +210,7 @@ end subroutine fel_resistive_wall_wake
 !
 ! Build the single-particle kernels over the window at wavelength resolution
 ! (Wake::init): material shortcuts, the three kernels, the self-loading half weight on
-! the s = 0 bin of the current-convolved kernels (Collective.cpp:99).
+! the s = 0 bin (fel-physics.tex sec:wakes).
 !-
 
 subroutine fel_wake_init (wake, nslice, sample, wavelength, err_flag)
@@ -315,8 +279,8 @@ if (wake%hrough > 0) then
   enddo
 endif
 
-! Self-loading theorem: the s = 0 bin of every kernel carries half weight
-! (Collective.cpp:98-100 halves all three; the geometric one is zero there anyway).
+! Self-loading theorem: the s = 0 bin of every kernel carries half weight (Genesis
+! halves all three; the geometric one is zero there anyway). fel-physics.tex sec:wakes.
 
 wake%wakeres(1) = wake%wakeres(1) * 0.5_rp
 wake%wakegeo(1) = wake%wakegeo(1) * 0.5_rp
@@ -391,7 +355,7 @@ allocate (cur(0:nslice), current(0:wake%ns-1), dcurrent(0:wake%ns-1))
 do ic = 1, nslice
   cur(ic-1) = c_light * sum(beam%slice(ic)%weight(1:beam%slice(ic)%n)) / beam%slice_spacing
 enddo
-cur(nslice) = 0                       ! Interpolation pad (Collective.cpp:150).
+cur(nslice) = 0            ! Zero pad past the head (fel-physics.tex sec:wakes).
 
 do is = 0, wake%ns - 1
   s = wake%ds * is
@@ -499,8 +463,8 @@ end subroutine fel_wake_apply_slice
 !
 ! EFieldSolver::longRange, one node: the per-slice long-range space-charge field from
 ! the whole-window weighted current and rms-size profiles, in Genesis's longESC units
-! (eV/m). The CALLER converts at use exactly as Genesis does (BeamSolver.cpp:40,61):
-! the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
+! (eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.tex
+! sec:spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 !-
 
 subroutine fel_longrange_esc (ef, beam, gamma0, aw, long_esc)
@@ -523,9 +487,9 @@ if (.not. (ef%on .and. ef%longrange)) return
 gamma = gamma0 / sqrt(1 + aw**2)
 allocate (fcur(nslice), fsize(nslice))
 
-! Weighted current and transverse size per slice. Genesis's getSize (Beam.cpp:42) is
-! the PRODUCT of the rms sizes, sigma_x*sigma_y -- an effective area scale, not a
-! variance sum (transcribed wrong once, caught by the SC tier at 1.7e-1). Weighted
+! Weighted current and transverse size per slice. Genesis's getSize is the PRODUCT of
+! the rms sizes, sigma_x*sigma_y -- an effective area scale, not a variance sum
+! (transcribed wrong once, caught by the SC tier at 1.7e-1; sec:spacecharge). Weighted
 ! moments where Genesis counts particles: identical for uniform weights, correct
 ! otherwise. Zero-size guard as the original.
 

@@ -2,7 +2,8 @@
 
 Self-contained runs of the FEL tracker: one command each, no Genesis, no dump files. For
 the validation benchmark against Genesis — which is where the physics is proven — see
-`bsim/fel/tests/`.
+`bsim/fel/tests/`. The physics itself (equations, conventions, provenance) is the
+manual, `bsim/fel/doc/fel-physics.tex`.
 
 One directory per example, each holding a `run.nml`. Shared pieces live at this level:
 `aramis.bmad` (the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator
@@ -29,11 +30,8 @@ With no dump files named in the namelist, the program generates its own starting
 (quiet-start beam, and a Gaussian seed where `gen_power > 0`); the header of
 `fel_track_test.f90` documents every parameter. The undulator segments in the lattices
 are real Bmad wiggler elements with `tracking_method = custom`, and their FEL parameters
-live on the lattice: aw derives from `b_max` and `l_period` (helical
-aw = c·b_max/(k_u·m_e c²), rms convention; a planar device divides by √2), helicity from
-`field_calc`. There are no per-undulator namelist parameters. A lattice whose FEL
-element is missing `b_max` or `l_period`, or uses a fieldmap `field_calc`, is refused by
-name at parse time.
+live on the lattice — the attribute-to-parameter map and the parse-time refusals are the
+manual's `sec:element`. There are no per-undulator namelist parameters.
 
 `<example>.diag.txt` is the gain curve: one row per slice per integration step with
 columns `z, slice, power, on_axis_intensity, bunching, bunching_phase, mean_energy,
@@ -79,7 +77,8 @@ saturation peak).
 A bunch described by Bmad's `beam_init_struct` -- the native equivalent of Genesis's
 `&beam` -- generated, resampled into FEL slices by the transcribed Genesis
 `importdistribution` method (`fel_import_mod`), and tracked dark through the full
-line: SASE from an imported bunch. The bunch is a Gaussian TEST bunch sized to the FEL
+line: SASE from an imported bunch (the resampling method is the manual's `sec:import`).
+The bunch is a Gaussian TEST bunch sized to the FEL
 window's economics (sigma_z = 1.2 nm, 30 fC, 3 kA peak -- honestly labeled: physical
 bunches are micrometers and need thousands of slices). The time window derives from
 the bunch itself, so the diag file's per-slice current is the Gaussian profile; the
@@ -110,9 +109,9 @@ power panel is the slippage cascade itself.
 ## bmad_wake
 
 The same chamber-wake physics as `sase_wake`, delivered through BMAD's own wake
-machinery instead of the transcribed Genesis model: `ztable.wake` is the
-Bane-Stupakov resistive-wall kernel for a 0.5 mm copper chamber (exported by
-`write_wake_kernels` from the deliverable-8 code, sign-flipped to Bmad's
+machinery instead of the transcribed Genesis model (conventions: manual
+`sec:seamwake`): `ztable.wake` is the Bane-Stupakov resistive-wall kernel for a 0.5 mm
+copper chamber (exported by `write_wake_kernels`, sign-flipped to Bmad's
 positive-decelerating convention, self-slice unhalved, causal side z < 0, padded past
 the window), attached as an `sr_wake` `z_long` table to every element of the line --
 the undulators apply it once per element at mid-element across the whole 96-slice
