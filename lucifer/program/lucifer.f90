@@ -40,10 +40,18 @@
 !     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
 !     out_root = "fel_td"                      ! Prefix for the output files.
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
-!     und_transport = "genesis"                ! In-undulator transverse maps: transcribed
-!                                              !   TrackBeam ("genesis", the tier default)
-!                                              !   or the flattened Bmad periodic-wiggler
-!                                              !   kernel ("bmad"); priced in the README.
+!     und_transport = "genesis"                ! In-undulator dynamics: transcribed
+!                                              !   TrackBeam maps ("genesis", the tier
+!                                              !   default), the flattened Bmad periodic-
+!                                              !   wiggler kernel ("bmad"; priced in the
+!                                              !   README), or the UNAVERAGED verification
+!                                              !   mode ("unaveraged": full Newton-Lorentz
+!                                              !   quiver, no fc/faw -- manual
+!                                              !   sec:unaveraged; writes .ledger.txt).
+!     unavg_steps_per_period = 20              ! Unaveraged substeps per undulator period
+!                                              !   (MINERVA's envelope: 10 floor, 20-30).
+!     unavg_ramp_periods = 2                   ! sin^2 entry/exit ramp length [periods];
+!                                              !   0 = hard edge (the mutation config).
 !     split_weights = F                        ! Weight-invariance test mode; see below.
 !     write_initial = F                        ! Also dump the initial state (Genesis format).
 !     migrate = F                              ! Slice migration (see below).
@@ -139,6 +147,7 @@
 program fel_track_test
 
 use fel_track_mod
+use fel_unaveraged_mod
 use fel_import_mod
 use wavefront_hdf5_mod
 use beam_mod
@@ -184,6 +193,17 @@ character(8) :: wake_material = ''
 real(rp) :: sc_rmax = 0
 integer :: sc_ngrid = 100, sc_nz = 0, sc_nphi = 0
 logical :: sc_longrange = .false.
+
+! The unaveraged verification mode (fel-physics.tex sec:unaveraged): selected by
+! und_transport = "unaveraged". Substeps per undulator period (MINERVA's envelope:
+! 10 floor, 20-30 recommended) and the sin^2 entry/exit ramp length in periods
+! (0 = hard edge, the mutation configuration the handoff gate exists to catch).
+type (fel_unavg_struct) ustate
+integer :: unavg_steps_per_period = 20
+real(rp) :: unavg_ramp_periods = 2
+real(rp) dE_step
+integer :: iu_ledger = 0
+logical unavg_mode
 
 real(rp) :: lambda0 = 0                  ! Generation parameters; see the header.
 real(rp) :: gen_current = 0, gen_delgam = 0, gen_ex = 0, gen_ey = 0
@@ -238,7 +258,8 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
                            wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
                            beam_init, imp, use_beam_init, dist_file, write_dist_file, &
-                           write_opmd_file, imp_split_weights, write_wake_kernels
+                           write_opmd_file, imp_split_weights, write_wake_kernels, &
+                           unavg_steps_per_period, unavg_ramp_periods
 
 ! Read parameters.
 
@@ -253,8 +274,19 @@ open (newunit = iu_nml, file = param_file, status = 'old', action = 'read')
 read (iu_nml, nml = fel_track_params)
 close (iu_nml)
 
-if (und_transport /= 'genesis' .and. und_transport /= 'bmad') then
-  print '(a)', 'fel_track_test: und_transport must be "genesis" or "bmad", got: ' // trim(und_transport)
+if (und_transport /= 'genesis' .and. und_transport /= 'bmad' .and. und_transport /= 'unaveraged') then
+  print '(a)', 'fel_track_test: und_transport must be "genesis", "bmad" or "unaveraged", got: ' // trim(und_transport)
+  stop 1
+endif
+unavg_mode = (und_transport == 'unaveraged')
+
+! The unaveraged mode is a verification mode (fel-physics.tex sec:unaveraged): the
+! collective terms are not wired into its step, so running them together would
+! silently drop physics. Refuse by name.
+
+if (unavg_mode .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
+  print '(a)', 'fel_track_test: wakes/space charge are NOT wired into the unaveraged mode'
+  print '(a)', '  (a verification mode; see fel-physics.tex sec:unaveraged). Turn them off.'
   stop 1
 endif
 
@@ -477,6 +509,16 @@ write (iu_diag, '(a)') '#         z            slice        power         on_axi
       'bunching_phase        mean_energy         sigma_energy          sigma_x               sigma_y' // &
       '               current               n_eff'
 
+! The unaveraged energy ledger (fel-physics.tex sec:unaveraged): one row per record
+! step inside FEL segments -- total weighted beam energy, total window field energy,
+! and the kick-side energy change of the step. The ledger gate holds
+! d(E_beam + U_field) to its measured floor.
+
+if (unavg_mode) then
+  open (newunit = iu_ledger, file = trim(out_root) // '.ledger.txt', action = 'write')
+  write (iu_ledger, '(a)') '#         z          E_beam_rel [J]          U_field [J]           dE_kick [J]'
+endif
+
 n_moved_tot = 0
 charge_dropped_tot = 0
 b_dev_max = 0
@@ -517,8 +559,26 @@ do ie = 1, branch%n_ele_track
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
+    if (unavg_mode) then
+      ! The concatenated wake kick would meet the quiver-carrying chart mid-segment;
+      ! nothing in this mode needs element wakes, so refuse rather than approximate.
+      if (associated(wake_src)) then
+        print '(a)', 'fel_track_test: element sr wakes are not supported in the unaveraged mode,'
+        print '(a)', '  at element: ' // trim(ele%name)
+        stop 1
+      endif
+      call fel_unavg_setup (und, ustate, ele%value(l$), und%dz, unavg_steps_per_period, &
+                            unavg_ramp_periods, err)
+      if (err) stop 1
+    endif
+
     do istep = 1, und%nstep
-      call fel_track_und_step (und, fbeam, wf, slip, coll, err)
+      if (unavg_mode) then
+        call fel_unavg_step (und, ustate, fbeam, wf, slip, und%dz, istep == 1, &
+                             istep == und%nstep, dE_step, err)
+      else
+        call fel_track_und_step (und, fbeam, wf, slip, coll, err)
+      endif
       if (err) stop 1
 
       ! Element sr wake, Bmad's once-per-passage convention mirrored: one kick at the
@@ -534,6 +594,7 @@ do ie = 1, branch%n_ele_track
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step)
       endif
       z_now = z_now + und%dz
+      if (unavg_mode) call write_ledger_row ()
       if (istep == und%nstep) call do_migrate ()
       call write_diag_rows()
     enddo
@@ -619,6 +680,7 @@ do ie = 1, branch%n_ele_track
 enddo
 
 close (iu_diag)
+if (unavg_mode) close (iu_ledger)
 if (wake_on) close (iu_wake)
 
 if (migrate) then
@@ -1268,5 +1330,33 @@ do is = 1, nslice
 enddo
 
 end subroutine write_diag_rows
+
+!------------------------------------------------------------------------------
+subroutine write_ledger_row ()
+
+! One energy-ledger row (unaveraged mode): beam energy RELATIVE to the reference,
+! sum(w*(gamma-gamma0))*me [C*eV = J] -- relative so the per-record change is not
+! differenced off a large baseline at its own summation-rounding floor (the
+! FINDINGS 4.8 lesson) -- total window field energy sum(P_is)*slice_spacing/c [J],
+! and the kick-side change dE_step returned by fel_unavg_step.
+
+real(rp) e_beam, u_field, power, on_axis, p_mc_l, g0_l
+integer is, ip
+
+e_beam = 0
+u_field = 0
+g0_l = fel_gamma0(fbeam)
+do is = 1, nslice
+  do ip = 1, fbeam%slice(is)%n
+    p_mc_l = fel_p0_mc(fbeam) * (1 + fbeam%slice(is)%pz(ip))
+    e_beam = e_beam + fbeam%slice(is)%weight(ip) * (sqrt(p_mc_l**2 + 1) - g0_l) * m_electron
+  enddo
+  call fel_field_diag (wf, fel_field_index(slip, is, nslice), power, on_axis)
+  u_field = u_field + power * fbeam%slice_spacing / c_light
+enddo
+
+write (iu_ledger, '(4es24.16)') z_now, e_beam, u_field, dE_step
+
+end subroutine write_ledger_row
 
 end program fel_track_test

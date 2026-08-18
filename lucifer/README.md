@@ -38,6 +38,9 @@ section.
 | `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
 | `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
+| `bsim/modules/fel_unaveraged_mod.f90` | The unaveraged verification mode (brief 6.6, manual `sec:unaveraged`): full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-gated) |
+| `bsim/fel/tests/scripts/check_unaveraged.py` | Unaveraged gates: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
+| `bsim/fel/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count; see the parallelism section |
 | `bsim/fel/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
@@ -659,6 +662,53 @@ window head), `z_long` bins actual particles; the derived per-slice bound
 Mutations bite: flipping the head/tail direction fails the closed form at 22 and
 causality at 2.8e-4; dropping the slice offset (all slices coincide) fails both;
 unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
+
+## The unaveraged verification mode (brief 6.6, step 13): fc measured, not assumed
+
+(Physics, conventions, and provenance: manual `sec:unaveraged`. MINERVA is the
+production existence proof — `minerva-code-analysis.md` — and a statistical
+~1e-3-class reference only, never a bit gate.)
+
+`und_transport = "unaveraged"` integrates the particles through the undulator's REAL
+field — the full Newton-Lorentz quiver, RK4 at `unavg_steps_per_period` (default 20;
+MINERVA's envelope) — with the radiation field as a Strang-split kick and a source
+built from the actual quiver current. Nothing from the averaged coupling path appears
+in it (the harness greps `fel_und_coupling|faw` out of the module), so the averaged
+mode's inputs become measurements. Entry/exit are sin² amplitude ramps
+(`unavg_ramp_periods`, default 2) with continuous slope, so the quiver vanishes at
+the segment ends where the averaged and unaveraged momentum conventions coincide; the
+beam carries a `quiver_in_px` convention flag that every averaged/seam entry asserts.
+Serial over slices by decision (a verification mode); wakes/space charge/element
+wakes are refused by name. Each run writes `<out_root>.ledger.txt`.
+
+Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-form):
+
+| Gate | Measured | Gate level |
+|---|---|---|
+| energy ledger: max d(E_beam+U_field) over field-energy turnover | **6.7e-4** | 2e-3 |
+| ledger internal (kick-side vs realized beam change) | 1.0e-5 | 1e-4 |
+| ballistic dark run: max dgamma (B does no work) | **exactly 0** | 1e-12 |
+| ramp handoff: emittance ratio − 1 / orbit shift / mean-px shift | 9.8e-11 / 1.9e-9 m / 3.6e-14 | 1e-6 / 1e-7 / 1e-6 |
+| fc planar (h=1) vs closed-form JJ: 0.75051 vs 0.75095 | **5.9e-4** | 5e-3 |
+| fc helical (h=1) vs aw: 0.84803 vs 0.84853 | **5.9e-4** | 5e-3 |
+| fc planar h=3 vs closed form: 0.21287 vs 0.21302 | **7.1e-4** | 5e-3 |
+| convergence fc(10/20/30 steps per period) | 0.750582 / 0.750505 / 0.750502 | 5e-4 on 30 vs 20 |
+| full-segment gain curve, unaveraged vs averaged, ln ratio at exit | **2.6e-3** | 0.2 (priced) |
+
+The JJ Bessel factor and its h=3 counterpart EMERGE from the raw dynamics at 6e-4 —
+the first independent check on `fel_und_coupling`'s closed forms, and on the
+harmonic-load rule (the beamlet quiet start cancels every harmonic below `nbins`, so
+`nbins = 8` is quiet at h=3 and no quadrature load is needed for this measurement).
+The h-probe is just the same undulator with the field at `lambda1/h`: the mode is
+harmonic-agnostic.
+
+Mutations bite, each on its named gate: flipping the E·v kick sign fails the ledger
+at 2.0 (energy created) and the gain comparison at 0.69 — while the magnitude-blind
+fc gates PASS it, which is why the ledger is gate zero; a hard-edge entry
+(`unavg_ramp_periods = 0`) fails the orbit-handoff gate at 3.2e-5 m (19 sigma of the
+probe beam; note the exit momentum re-absorbs the quiver at integer-period lengths,
+so the ORBIT, not the exit mean px, is the reliable instrument — FINDINGS.md 7.24);
+skipping the exit handoff flag is refused by name at the first seam element.
 
 ## The coarse-step measurement (brief 8.3)
 

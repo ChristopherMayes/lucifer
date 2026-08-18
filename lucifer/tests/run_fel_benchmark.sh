@@ -396,6 +396,24 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir 
 fi
 echo
 
+# Unaveraged-mode gates (deliverable 13; fel-physics.tex sec:unaveraged): the energy
+# ledger, ballistic conservation and ramp handoff, fc measured against the closed
+# forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
+# comparison against the averaged mode. The fc/faw leak grep is part of the gate: the
+# unaveraged path must not touch the averaged coupling quantities it measures.
+
+echo "--- unaveraged-mode gates ------------------------------------------------------"
+if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../../modules/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
+  echo "FAIL: averaged coupling quantities (fc/faw) leaked into the unaveraged path" >&2
+  exit 1
+fi
+echo "--- fc/faw leak grep: clean"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_unaveraged.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
+  echo "FAIL: unaveraged gates; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+echo
+
 "$PYTHON" "$SCRIPT_DIR/scripts/compare_fel.py" "$WORK_DIR"
 STATUS=$?
 

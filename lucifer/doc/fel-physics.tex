@@ -622,6 +622,111 @@ $4.1\times10^{-2}$), with tier2\_genesis proving the attribution by collapsing i
 orders of magnitude under the model swap.
 \end{validation}
 
+\section{The unaveraged verification mode}\label{sec:unaveraged}
+
+Every input of the averaged map --- the coupling $f_c(h)$, the roll-off $f_{aw}$, the
+entry/exit behavior --- is an output of the underlying unaveraged dynamics. This mode
+(\code{fel\_unaveraged\_mod}, \code{und\_transport = "unaveraged"}) integrates the
+particles through the undulator's \emph{real} field with the radiation as a
+co-evolving kick, so those inputs become measurements. It keeps the grid field and
+the Lorentz force where MINERVA --- the production existence proof of this physics ---
+uses modal fields; it is a verification mode, run on a handful of slices where its
+$\sim$30$\times$ cost is irrelevant. Nothing from the averaged coupling path may
+appear in it (a harness grep enforces this): its agreement with
+Eq.~\ref{eq:fc} is the point, not the input.
+
+\emph{The step.} Per substep $\delta$ ($\lambda_u/20$ by default; MINERVA's envelope
+is 10--30 per period), a Strang split: half magnetic push, radiation kick and source
+deposit at the midpoint, half magnetic push, then the shared pure diffraction
+(Eq.~\ref{eq:k2}) and the $+2\cdot$source convention of \S\ref{sec:field}. The
+magnetic push is classical RK4 on the exact $z$-ODEs in kinetic variables
+$u = \gamma\beta$,
+\begin{equation}\label{eq:unavgode}
+  \frac{du_x}{ds} = b_y - \frac{u_y b_z}{u_s},\quad
+  \frac{du_y}{ds} = -b_x + \frac{u_x b_z}{u_s},\quad
+  \frac{d\tau}{ds} = \frac{\gamma}{u_s} - \frac{1}{\beta_0},\quad
+  u_s = \sqrt{\gamma^2 - 1 - u_\perp^2},
+\end{equation}
+with $\gamma$ exact ($B$ does no work; $\gamma$ changes only in the kick), through
+$b = \nabla\times a$, $a = eA/m_ec$:
+planar $a_x = a_0\, g(s) \cos(k_u s)\cosh(k_u y)$, $a_0 = \sqrt2\,a_w$; helical
+$(a_x, a_y) = a_0\, g(s)(\cos, \sin)(k_u s)\,(1 + k_u^2 r^2/4)$, $a_0 = a_w$ ---
+near-axis models whose ponderomotive-average focusing reproduces
+\S\ref{sec:natfocus}'s split exactly. The envelope $g(s)$ is a $\sin^2$ ramp over
+$n_{\mathrm{ramp}}$ periods at each end, continuous in amplitude \emph{and} slope
+with the $g'$ terms retained in $b$: the quiver builds adiabatically and vanishes at
+the segment ends, which is where the averaged and unaveraged momentum conventions
+coincide. The beam carries a convention flag (\code{quiver\_in\_px}), set inside the
+region and asserted by every averaged-physics and seam entry: a hard-edge handoff
+injects $K/\gamma$ of spurious transverse momentum (brief 6.6).
+
+\emph{Kick and source.} With the optical phase $\Psi = (\varphi_0 - k_u s) - k_s\tau$
+(the reference $\varphi_0$ advances at the averaged rate of \S\ref{sec:chart}, so
+every diagnostic stays comparable; the $k_u s$ term is undone because the particles
+now actually ride $\cos k_u s$), the work phasor $W = -i\hat E\, e^{i\Psi}$ and the
+polarization-basis current $\hat\jmath = u_x$ (planar), $(u_x - iu_y)/\sqrt2$
+(helical):
+\begin{equation}\label{eq:unavgkick}
+  \frac{d\gamma}{ds} = -\frac{\mathrm{Re}[W \bar{\hat\jmath}\,]}{u_s\, m_e},
+  \qquad
+  \mathrm{src} \mathrel{+}= i\,e^{-i\Psi}\,\hat\jmath\;
+     \frac{Z_0\, c\,\delta}{2\,\Delta_{\mathrm{grid}}^2\,\Delta s}\,\frac{w}{\gamma},
+\end{equation}
+the averaged deposit of Eq.~\ref{eq:source} with the coupling removed and the actual
+quiver current in its place. Period-averaging this pair reproduces
+\S\ref{sec:coupling} exactly --- the $JJ$ Bessel factor emerges from the figure-8 ---
+and the pair is energy-consistent by construction to $O(1-\beta_\parallel)$, which is
+what makes the ledger a gate on their mutual normalization. The physical field of the
+scalar envelope: planar $E_x = \mathrm{Re}[-i\hat E e^{i\Psi}]$; helical
+$(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], -\mathrm{Re}[\hat E e^{i\Psi}])/\sqrt2$
+--- both give intensity $|\hat E|^2/2Z_0$, so \S\ref{sec:field}'s power diagnostic is
+mode-independent.
+
+\emph{Measuring $f_c$.} Paired probes (12 and 20 periods, identical 2-period ramps,
+small-signal seed): the difference of the energy-modulation phasors
+$F = (2/N)\sum_j \Delta\gamma_j e^{i\theta_j^0}$ isolates the flat region --- ramps
+and their detuning cancel exactly --- and
+\begin{equation}\label{eq:fcmeas}
+  f_c^{\mathrm{meas}} =
+  \frac{|F_B - F_A|\;\beta_0\gamma_0\sqrt2\, m_e}{|\hat E_0|\,\Delta L\,
+        \mathrm{sinc}(\delta_h \Delta L/2)},\qquad
+  \delta_h = h k_u - k_{s,h}\frac{1+a_w^2}{2\gamma_0^2},
+\end{equation}
+with $|\hat E_0| = \sqrt{4 Z_0 P/\pi w_0^2}$ the Gaussian seed's on-axis envelope.
+The harmonic probe is the same undulator with the field at $\lambda_1/h$ --- the mode
+is harmonic-agnostic --- and the load is quiet there because the beamlet start
+cancels every harmonic below \code{nbins} (\S\ref{sec:quiet}); a quadrature load
+(MINERVA's) is therefore not needed for this measurement.
+
+\begin{provenance}
+Brief 6.6 (the mode's charter, the Strang split, the handoff hazard and its
+convention flag); \code{minerva-code-analysis.md} (MINERVA 2.0, the production
+existence proof: the 10--30 steps/period envelope, the energy-ledger practice, the
+$\sin^2$ ramp treatment, kinematic phase everywhere). MINERVA's standing here is a
+statistical $\sim$$10^{-3}$-class reference ONLY --- truncated constants (emass to
+six digits, awfac), Runge-Kutta-Gill --- never a bit gate; no MINERVA code was
+transcribed. The magnetic push is explicit RK4 (MINERVA's production formulation),
+not the brief's fully symplectic alternative; the ballistic gate prices the
+difference (exact $\gamma$, emittance drift $10^{-10}$ over a probe).
+\end{provenance}
+\begin{validation}
+\code{check\_unaveraged.py}, all self-referenced or closed-form: energy ledger
+$6.7\times10^{-4}$ of the field-energy turnover (gate $2\times10^{-3}$); ledger
+internal kick-vs-realized $1.0\times10^{-5}$; ballistic $\Delta\gamma$ exactly zero,
+emittance handoff $9.8\times10^{-11}$, orbit handoff $1.9\times10^{-9}$ m;
+$f_c$ measured vs closed form: planar $0.75051$ vs $0.75095$, helical $0.84803$ vs
+$0.84853$, $h{=}3$ planar $0.21287$ vs $0.21302$ --- all $\sim$$6\times10^{-4}$
+relative (gates $5\times10^{-3}$); step-size convergence $f_c(10/20/30$ per period$)
+= 0.750582/0.750505/0.750502$; full-segment gain curve vs the averaged mode
+$|\ln$ ratio$| = 2.6\times10^{-3}$ at exit (priced, gate $0.2$). Mutations: the
+$E\cdot v$ sign fails the ledger at $2.0$ and the gain comparison at $0.69$ (the
+magnitude-blind $f_c$ gates pass it --- why the ledger is gate zero); a hard-edge
+entry fails the orbit-handoff gate at $3.2\times10^{-5}$ m ($19\sigma$; NOTE the
+exit momentum re-absorbs the quiver at integer periods, so the orbit, not
+$\langle p_x\rangle$, is the reliable instrument); a skipped exit handoff is refused
+by name at the first seam element.
+\end{validation}
+
 \section{Numerical practices}\label{sec:numerics}
 
 \emph{Two-pass variance.} All second moments subtract the mean before squaring: for

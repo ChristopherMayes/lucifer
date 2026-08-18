@@ -468,6 +468,9 @@ character(*), parameter :: r_name = 'fel_track_und_step'
 
 err_flag = .true.
 
+call fel_assert_averaged_chart (beam, r_name, err)
+if (err) return
+
 nslice = size(wf%Ex, 3)
 if (size(beam%slice) /= nslice) then
   call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES BUT THE FIELD RECORD HAS \i0\ .', &
@@ -1290,6 +1293,57 @@ fel_cache_ks = ks
 fel_cache_dz = dz
 
 end subroutine fel_field_kernel_init
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_field_diffract (wf, ifld, dz, err_flag)
+!
+! Pure free-space diffraction of field slice ifld over the step dz: FFT, multiply
+! the cached exp(K2 dz), inverse FFT, normalize. No source, no coupling factor, no
+! undulator knowledge -- this is the field half the unaveraged mode (fel-physics.tex
+! sec:unaveraged) shares with the averaged solver; the caller deposits its own source.
+! The kernel cache must have been initialized serially (fel_field_kernel_init) for
+! this grid, wavelength and step; a mismatch errors, exactly as fel_field_step.
+!-
+
+subroutine fel_field_diffract (wf, ifld, dz, err_flag)
+
+type (wavefront_struct), target :: wf
+integer ifld
+real(rp) dz
+logical err_flag
+
+real(rp) xks, dgrid
+integer ngrid_arr(3), ngrid
+logical err
+character(*), parameter :: r_name = 'fel_field_diffract'
+
+!
+
+err_flag = .true.
+
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+xks = twopi / wf%wavelength
+dgrid = wf%dx
+
+if (ngrid /= fel_cache_ngrid .or. dgrid /= fel_cache_dgrid .or. xks /= fel_cache_ks .or. &
+    dz /= fel_cache_dz) then
+  call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID. ' // &
+                                 'CALL fel_field_kernel_init FIRST (SERIALLY).')
+  return
+endif
+
+call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_exp_k2
+call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
+
+err_flag = .false.
+
+end subroutine fel_field_diffract
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

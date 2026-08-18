@@ -1,0 +1,26 @@
+! Unaveraged-mode coupling probe, PLANAR, short (fel-physics.tex sec:unaveraged): a
+! 12-period planar undulator at the benchmark energy and rms aw = 0.84853 (planar
+! b_max carries the extra sqrt(2): peak K = sqrt(2)*aw), resonant at 1 Angstrom like
+! the benchmark line. The unaveraged tracker runs 2-period sin^2 ramps at each end;
+! the paired _b lattice is identical except 8 more flat periods, and the DIFFERENCE
+! of the two measured energy-modulation phasors isolates the flat region -- ramps and
+! their detuning cancel exactly -- giving the measured coupling fc to compare against
+! the closed-form Bessel JJ factor.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+
+UNDP: wiggler, l = 0.18, l_period = 0.015, field_calc = planar_model, &
+      b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+
+SEG1: line = (UNDP)
+
+use, SEG1

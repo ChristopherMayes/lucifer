@@ -99,6 +99,13 @@ type fel_beam_struct
   real(rp) :: s0 = 0               ! Start of the time window [m]. 'refposition' in a Genesis dump.
   integer :: nbins = 0             ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
+  logical :: quiver_in_px = .false. ! Momentum convention flag (brief 6.6, fel-physics.tex
+                                   !   sec:unaveraged): False = stored px excludes the
+                                   !   undulator quiver (the averaged chart, and the only
+                                   !   convention any averaged/seam code accepts); True =
+                                   !   the unaveraged tracker is mid-region and px is the
+                                   !   full kinetic momentum. Asserted at region edges: a
+                                   !   hard-edge handoff injects K/gamma of spurious px.
 end type
 
 !+
@@ -185,6 +192,39 @@ type (fel_beam_struct), intent(in) :: beam
 real(rp) gamma0
 gamma0 = sqrt((beam%p0c / m_electron)**2 + 1)
 end function
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_assert_averaged_chart (beam, where_str, err_flag)
+!
+! Refuse by name when the beam's stored px still carries the undulator quiver (the
+! unaveraged tracker left its region without restoring the averaged convention).
+! Every averaged-physics or seam entry point calls this: a hard-edge handoff injects
+! spurious transverse momentum of order K/gamma -- comparable to the beam divergence --
+! and presents downstream as unexplained emittance growth (brief 6.6; fel-physics.tex
+! sec:unaveraged).
+!-
+
+subroutine fel_assert_averaged_chart (beam, where_str, err_flag)
+
+type (fel_beam_struct) beam
+character(*) where_str
+logical err_flag
+character(*), parameter :: r_name = 'fel_assert_averaged_chart'
+
+!
+
+err_flag = .false.
+if (.not. beam%quiver_in_px) return
+
+err_flag = .true.
+call out_io (s_error$, r_name, 'BEAM px STILL CARRIES THE UNDULATOR QUIVER (quiver_in_px IS SET):', &
+        'THE UNAVERAGED TRACKER DID NOT HAND BACK THE AVERAGED CONVENTION AT A RAMP END.', &
+        'AVERAGED PHYSICS AND THE SEAM REFUSE THIS CHART. AT: ' // trim(where_str))
+
+end subroutine fel_assert_averaged_chart
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -560,6 +600,10 @@ character(*), parameter :: r_name = 'fel_slice_to_bunch'
 
 !
 
+err_flag = .true.
+
+call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
+if (err_flag) return
 err_flag = .true.
 
 if (abs(ele%value(p0c$) - beam%p0c) > 1e-10_rp * beam%p0c) then

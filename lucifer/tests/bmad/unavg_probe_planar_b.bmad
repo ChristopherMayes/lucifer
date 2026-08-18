@@ -1,0 +1,21 @@
+! Unaveraged-mode coupling probe, PLANAR, long: identical to unavg_probe_planar_a.bmad
+! except 20 periods instead of 12 -- 8 more FLAT periods between the same 2-period
+! ramps. See the _a header for the differential-measurement design.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+
+UNDP: wiggler, l = 0.30, l_period = 0.015, field_calc = planar_model, &
+      b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+
+SEG1: line = (UNDP)
+
+use, SEG1

@@ -1,0 +1,22 @@
+! Unaveraged-mode coupling probe, HELICAL, short: the helical twin of
+! unavg_probe_planar_a.bmad (same rms aw, same period, same energy, same resonance;
+! helical b_max = aw directly, no sqrt(2)). The helical closed form is fc = aw --
+! no Bessel factor -- so this pair checks the other limit of the vector coupling.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+
+UNDH: wiggler, l = 0.18, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+
+SEG1: line = (UNDH)
+
+use, SEG1
