@@ -567,7 +567,7 @@ logical err_flag
 
 type (fel_und_struct) und0
 real(rp) xks, xku, qquad, phi0_new, gamma0, p0_mc
-real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, q_hat
+real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, q_hat, p_mc
 integer is, ip, nslice, ngrid_arr(3)
 logical err, any_err, sc_active
 
@@ -592,7 +592,7 @@ call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
 ! them private explicitly; a missed one here is a race, which is what the harness's
 ! thread-count-independence gate exists to catch.
 
-!$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope)
+!$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope, p_mc)
 do is = 1, size(beam%slice)
   sl => beam%slice(is)
 
@@ -609,8 +609,9 @@ do is = 1, size(beam%slice)
     ! step. btpar = 1 + px_g^2 + py_g^2 (aw = 0), px_g = gamma*beta_x = px * p0_mc.
 
     do ip = 1, sl%n
-      gam = fel_gamma_of(p0_mc, sl%pz(ip))
-      beta = fel_beta_of(p0_mc, sl%pz(ip))
+      p_mc = p0_mc * (1 + sl%pz(ip))
+      gam = sqrt(p_mc**2 + 1)
+      beta = p_mc / gam
       theta = beam%phi0 + xks * sl%z(ip) / beta
 
       px_g = sl%px(ip) * p0_mc
@@ -693,8 +694,9 @@ call fel_shortrange_ez (coll%efield, beam, sl, gamma0**2, xks, ez)   ! gz2 at aw
 esc_loss = -coll%long_esc(is) / m_electron
 
 do ip = 1, sl%n
-  gam = fel_gamma_of(p0_mc, sl%pz(ip))
-  beta = fel_beta_of(p0_mc, sl%pz(ip))
+  p_mc = p0_mc * (1 + sl%pz(ip))
+  gam = sqrt(p_mc**2 + 1)
+  beta = p_mc / gam
   theta = beam%phi0 + xks * sl%z(ip) / beta
 
   px_g = sl%px(ip) * p0_mc
@@ -958,8 +960,9 @@ if (allocated(coll%long_esc)) esc_loss = -coll%long_esc(is) / m_electron
 rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
 
 do ip = 1, sl%n
-  gamma = fel_gamma_of(p0_mc, sl%pz(ip))
-  beta = fel_beta_of(p0_mc, sl%pz(ip))
+  p_mc = p0_mc * (1 + sl%pz(ip))         ! gamma and beta = P/gamma share one sqrt,
+  gamma = sqrt(p_mc**2 + 1)              ! bit-identical to fel_gamma_of/fel_beta_of.
+  beta = p_mc / gamma
   theta = beam%phi0 + xks * sl%z(ip) / beta
 
   awloc = faw(und, sl%x(ip), sl%y(ip))
@@ -1167,7 +1170,7 @@ integer ifld
 real(rp) delz
 logical err_flag
 
-real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p0_mc
+real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc
 complex(rp) cpart
 complex(rp), allocatable :: crsource(:,:)    ! Per-call source accumulator: thread safe.
 integer ip, ix, iy, ngrid_arr(3), ngrid
@@ -1204,8 +1207,9 @@ if (scl_w /= 0) then
     call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
     if (.not. on_grid) cycle
 
-    gam = fel_gamma_of(p0_mc, sl%pz(ip))
-    beta = fel_beta_of(p0_mc, sl%pz(ip))
+    p_mc = p0_mc * (1 + sl%pz(ip))
+    gam = sqrt(p_mc**2 + 1)
+    beta = p_mc / gam
     theta = beam%phi0 + xks * sl%z(ip) / beta          ! harm = 1: theta not scaled.
 
     part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * scl_w * sl%weight(ip) / gam

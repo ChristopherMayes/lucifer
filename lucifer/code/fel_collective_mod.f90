@@ -444,8 +444,9 @@ if (dg == 0) return
 
 p0_mc = fel_p0_mc(beam)
 do ip = 1, sl%n
-  gam = fel_gamma_of(p0_mc, sl%pz(ip))
-  beta_old = fel_beta_of(p0_mc, sl%pz(ip))
+  p_mc = p0_mc * (1 + sl%pz(ip))
+  gam = sqrt(p_mc**2 + 1)
+  beta_old = p_mc / gam
   gam = gam + dg
   p_mc = sqrt(gam**2 - 1)
   sl%pz(ip) = (p_mc - p0_mc) / p0_mc
@@ -564,8 +565,8 @@ type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 real(rp) gz2, ks, ez(:)
 
-real(rp) p0_mc, xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef, econst_w, theta, beta
-real(rp), allocatable :: vol(:), ldig(:), rlog(:), lmid(:)
+real(rp) xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef, econst_w, theta
+real(rp), allocatable :: vol(:), ldig(:), rlog(:), lmid(:), theta_p(:)
 complex(rp), allocatable :: cwork(:), csrc(:), clow(:), cmid(:), cupp(:), celm(:), gam_w(:)
 integer, allocatable :: idxr(:)
 integer np, ngrid, m, l, i, ip
@@ -577,9 +578,8 @@ ez(1:np) = 0
 if (.not. ef%on .or. ef%nz < 1 .or. np < 1) return
 
 ngrid = ef%ngrid
-p0_mc = fel_p0_mc(beam)
 
-allocate (cwork(np), idxr(np), vol(ngrid), ldig(ngrid+1), rlog(ngrid), lmid(ngrid))
+allocate (cwork(np), idxr(np), theta_p(np), vol(ngrid), ldig(ngrid+1), rlog(ngrid), lmid(ngrid))
 allocate (csrc(ngrid), clow(ngrid), cmid(ngrid), cupp(ngrid), celm(ngrid), gam_w(ngrid))
 
 ! analyseBeam: slice centroid, radial extent, bins and azimuthal phases.
@@ -612,6 +612,14 @@ do ip = 1, np
   if (idxr(ip) > ngrid) idxr(ip) = ngrid
 enddo
 
+! The ponderomotive phase is (m, l)-invariant: computed once per particle here, not
+! 2*(2*nphi+1)*nz times inside the mode loops. (Genesis reads a stored theta
+! coordinate there for free; this port's theta is derived, so it is cached.)
+
+do ip = 1, np
+  theta_p(ip) = fel_theta(beam, sl, ip, ks)
+enddo
+
 ! constructLaplaceOperator.
 
 vol(1) = pi * dr * dr
@@ -636,7 +644,7 @@ do m = -ef%nphi, ef%nphi
 
     csrc = 0
     do ip = 1, np
-      theta = fel_theta(beam, sl, ip, ks)
+      theta = theta_p(ip)
       ! Weighted source: c*w/slice_spacing where Genesis has current/npart.
       econst_w = (mu_0_vac * c_light) / m_electron * (c_light * sl%weight(ip) / beam%slice_spacing) / ks
       csrc(idxr(ip)) = csrc(idxr(ip)) + econst_w * cwork(ip)**(-m) * cmplx(cos(l*theta), -sin(l*theta), rp)
@@ -667,7 +675,7 @@ do m = -ef%nphi, ef%nphi
     enddo
 
     do ip = 1, np
-      theta = fel_theta(beam, sl, ip, ks)
+      theta = theta_p(ip)
       ez(ip) = ez(ip) + 2 * real(cwork(ip)**m * cmplx(cos(l*theta), sin(l*theta), rp) * celm(idxr(ip)), rp)
     enddo
   enddo

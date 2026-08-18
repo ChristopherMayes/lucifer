@@ -971,7 +971,7 @@ type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (fel_slice_diag_struct) diag
 real(rp) ks
-real(rp) g1, g2, x1, x2, y1, y2, px1, py1, br, bi, wsum, w2sum, w, gam, theta, p0_mc
+real(rp) g1, g2, x1, x2, y1, y2, px1, py1, br, bi, wsum, w2sum, w, gam, theta, beta, p_mc, p0_mc
 integer ip
 
 !
@@ -982,8 +982,10 @@ p0_mc = fel_p0_mc(beam)
 
 do ip = 1, sl%n
   w = sl%weight(ip)
-  gam = fel_gamma_of(p0_mc, sl%pz(ip))
-  theta = fel_theta(beam, sl, ip, ks)
+  p_mc = p0_mc * (1 + sl%pz(ip))         ! gamma and theta's beta = P/gamma share one
+  gam = sqrt(p_mc**2 + 1)                ! sqrt; bit-identical to fel_gamma_of/fel_theta.
+  beta = p_mc / gam
+  theta = beam%phi0 + ks * sl%z(ip) / beta
 
   wsum = wsum + w
   w2sum = w2sum + w*w
