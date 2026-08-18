@@ -114,8 +114,9 @@ end type
 ! deposit into their own.
 
 complex(rp), allocatable, private, save :: fel_k2(:,:)        ! -i (kx^2+ky^2)/(2 ks), FFT order.
+complex(rp), allocatable, private, save :: fel_exp_k2(:,:)    ! exp(K2 * dz), the step propagator.
 integer, private, save :: fel_cache_ngrid = 0
-real(rp), private, save :: fel_cache_dgrid = 0, fel_cache_ks = 0
+real(rp), private, save :: fel_cache_dgrid = 0, fel_cache_ks = 0, fel_cache_dz = 0
 
 contains
 
@@ -485,7 +486,7 @@ phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 ! bit-identical across thread counts -- the gate the benchmark harness holds.
 
 ngrid_arr = wavefront_shape(wf)
-call fel_field_kernel_init (ngrid_arr(1), wf%dx, ks)
+call fel_field_kernel_init (ngrid_arr(1), wf%dx, ks, und%dz)
 
 if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(nslice))
 call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_esc)
@@ -642,7 +643,7 @@ beam%phi0 = phi0_new
 ! so this routine cannot rely on an undulator step having initialized it.
 
 ngrid_arr = wavefront_shape(wf)
-call fel_field_kernel_init (ngrid_arr(1), wf%dx, xks)
+call fel_field_kernel_init (ngrid_arr(1), wf%dx, xks, length)
 
 und0%aw = 0
 any_err = .false.
@@ -1190,8 +1191,9 @@ p0_mc = fel_p0_mc(beam)
 ! The kernel is read-only here; a rebuild would race with concurrent slices. The caller
 ! initializes it serially (fel_field_kernel_init); a mismatch is a caller bug.
 
-if (ngrid /= fel_cache_ngrid .or. dgrid /= fel_cache_dgrid .or. xks /= fel_cache_ks) then
-  call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID. ' // &
+if (ngrid /= fel_cache_ngrid .or. dgrid /= fel_cache_dgrid .or. xks /= fel_cache_ks .or. &
+    delz /= fel_cache_dz) then
+  call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID AND STEP. ' // &
                                  'CALL fel_field_kernel_init FIRST (SERIALLY).')
   return
 endif
@@ -1222,11 +1224,11 @@ if (scl_w /= 0) then
   enddo
 endif
 
-! Propagate and add: FFT, multiply exp(K2 delz), inverse FFT, normalize, plus
-! 2*crsource in real space.
+! Propagate and add: FFT, multiply the cached exp(K2 delz), inverse FFT, normalize,
+! plus 2*crsource in real space.
 
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
-wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * exp(fel_k2 * delz)
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_exp_k2
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
 wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
 
@@ -1238,30 +1240,34 @@ end subroutine fel_field_step
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_field_kernel_init (ngrid, dgrid, ks)
+! Subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz)
 !
-! Routine to (re)build the K2 kernel when the grid changes, exactly as
+! Routine to (re)build the K2 kernel when the grid or the step changes, exactly as
 ! FieldSolverFFT::init builds it: dk = twopi/(ngrid*dgrid), integer offsets from the grid
-! center, fftshift index mapping, K2 = -i*(dx^2+dy^2)*dk^2/(2*ks).
+! center, fftshift index mapping, K2 = -i*(dx^2+dy^2)*dk^2/(2*ks) -- plus the step
+! propagator exp(K2*dz), K2 being constant and dz constant across each caller's whole
+! parallel loop, so the ngrid^2 complex exponentials are paid once per (grid, ks, dz)
+! rather than once per slice per step.
 !
 ! MUST be called serially -- fel_track_und_step and fel_track_interlude_genesis call it
 ! before their parallel slice loops. fel_field_step only reads the kernel and errors on a
 ! mismatch rather than rebuilding, so that nothing writes module state concurrently.
 !-
 
-subroutine fel_field_kernel_init (ngrid, dgrid, ks)
+subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz)
 
 integer ngrid
-real(rp) dgrid, ks
+real(rp) dgrid, ks, dz
 real(rp) dk, shift, dx, dy
 integer ix, iy, iix, iiy
 
 !
 
-if (ngrid == fel_cache_ngrid .and. dgrid == fel_cache_dgrid .and. ks == fel_cache_ks) return
+if (ngrid == fel_cache_ngrid .and. dgrid == fel_cache_dgrid .and. ks == fel_cache_ks .and. &
+    dz == fel_cache_dz) return
 
-if (allocated(fel_k2)) deallocate(fel_k2)
-allocate (fel_k2(ngrid, ngrid))
+if (allocated(fel_k2)) deallocate(fel_k2, fel_exp_k2)
+allocate (fel_k2(ngrid, ngrid), fel_exp_k2(ngrid, ngrid))
 
 dk = twopi / (ngrid * dgrid)
 shift = -0.5_rp * (ngrid - 1)
@@ -1276,9 +1282,12 @@ do iy = 0, ngrid-1
   enddo
 enddo
 
+fel_exp_k2 = exp(fel_k2 * dz)
+
 fel_cache_ngrid = ngrid
 fel_cache_dgrid = dgrid
 fel_cache_ks = ks
+fel_cache_dz = dz
 
 end subroutine fel_field_kernel_init
 

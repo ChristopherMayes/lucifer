@@ -655,9 +655,9 @@ within one compilation unit; across moves, anchor at ulp tolerance and record th
 drift.
 
 \emph{Thread safety.} Cross-slice state changes only at serial points: the FFTW plan
-cache is threadprivate, the $K_2$ kernel builds serially before parallel loops and is
-read-only inside them, source accumulators are per call, and slippage/migration/wake
-updates run at barriers. Each slice's arithmetic is independent of which thread runs
+cache is threadprivate, the $K_2$ kernel and its step propagator $e^{K_2\delta z}$
+build serially before parallel loops and are read-only inside them, source
+accumulators are per call, and slippage/migration/wake updates run at barriers. Each slice's arithmetic is independent of which thread runs
 it, so results are bit-identical across thread counts --- a gated property, and the
 only instrument that catches shared-accumulator races (invisible to every
 single-threaded check).

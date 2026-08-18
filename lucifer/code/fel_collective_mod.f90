@@ -565,9 +565,9 @@ type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 real(rp) gz2, ks, ez(:)
 
-real(rp) xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef, econst_w, theta
-real(rp), allocatable :: vol(:), ldig(:), rlog(:), lmid(:), theta_p(:)
-complex(rp), allocatable :: cwork(:), csrc(:), clow(:), cmid(:), cupp(:), celm(:), gam_w(:)
+real(rp) xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef
+real(rp), allocatable :: vol(:), ldig(:), rlog(:), lmid(:), theta_p(:), econst_p(:)
+complex(rp), allocatable :: cwork(:), csrc(:), clow(:), cmid(:), cupp(:), celm(:), gam_w(:), cph(:,:)
 integer, allocatable :: idxr(:)
 integer np, ngrid, m, l, i, ip
 
@@ -579,7 +579,8 @@ if (.not. ef%on .or. ef%nz < 1 .or. np < 1) return
 
 ngrid = ef%ngrid
 
-allocate (cwork(np), idxr(np), theta_p(np), vol(ngrid), ldig(ngrid+1), rlog(ngrid), lmid(ngrid))
+allocate (cwork(np), idxr(np), theta_p(np), econst_p(np), cph(np, ef%nz))
+allocate (vol(ngrid), ldig(ngrid+1), rlog(ngrid), lmid(ngrid))
 allocate (csrc(ngrid), clow(ngrid), cmid(ngrid), cupp(ngrid), celm(ngrid), gam_w(ngrid))
 
 ! analyseBeam: slice centroid, radial extent, bins and azimuthal phases.
@@ -612,12 +613,22 @@ do ip = 1, np
   if (idxr(ip) > ngrid) idxr(ip) = ngrid
 enddo
 
-! The ponderomotive phase is (m, l)-invariant: computed once per particle here, not
-! 2*(2*nphi+1)*nz times inside the mode loops. (Genesis reads a stored theta
-! coordinate there for free; this port's theta is derived, so it is cached.)
+! The ponderomotive phase, the source weight, and the harmonic phasors e^{il theta}
+! are all (m, l)-invariant: computed once per particle here, not 2*(2*nphi+1)*nz
+! times inside the mode loops. (Genesis reads a stored theta coordinate there for
+! free; this port's theta is derived, so it is cached.) The source side uses the
+! phasors' exact conjugates.
 
 do ip = 1, np
   theta_p(ip) = fel_theta(beam, sl, ip, ks)
+  ! Weighted source: c*w/slice_spacing where Genesis has current/npart.
+  econst_p(ip) = (mu_0_vac * c_light) / m_electron * (c_light * sl%weight(ip) / beam%slice_spacing) / ks
+enddo
+
+do l = 1, ef%nz
+  do ip = 1, np
+    cph(ip, l) = cmplx(cos(l * theta_p(ip)), sin(l * theta_p(ip)), rp)
+  enddo
 enddo
 
 ! constructLaplaceOperator.
@@ -644,10 +655,7 @@ do m = -ef%nphi, ef%nphi
 
     csrc = 0
     do ip = 1, np
-      theta = theta_p(ip)
-      ! Weighted source: c*w/slice_spacing where Genesis has current/npart.
-      econst_w = (mu_0_vac * c_light) / m_electron * (c_light * sl%weight(ip) / beam%slice_spacing) / ks
-      csrc(idxr(ip)) = csrc(idxr(ip)) + econst_w * cwork(ip)**(-m) * cmplx(cos(l*theta), -sin(l*theta), rp)
+      csrc(idxr(ip)) = csrc(idxr(ip)) + econst_p(ip) * cwork(ip)**(-m) * conjg(cph(ip, l))
     enddo
 
     do i = 1, ngrid
@@ -675,8 +683,7 @@ do m = -ef%nphi, ef%nphi
     enddo
 
     do ip = 1, np
-      theta = theta_p(ip)
-      ez(ip) = ez(ip) + 2 * real(cwork(ip)**m * cmplx(cos(l*theta), sin(l*theta), rp) * celm(idxr(ip)), rp)
+      ez(ip) = ez(ip) + 2 * real(cwork(ip)**m * cph(ip, l) * celm(idxr(ip)), rp)
     enddo
   enddo
 enddo
