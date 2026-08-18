@@ -84,8 +84,6 @@ NML_GEN = """&fel_track_params
   gen_current = 3000
   gen_delgam = 0.0
   gen_ex = 4e-7, gen_ey = 4e-7
-  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
-  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
   gen_power = 0
   gen_ngrid = 63
   gen_dgrid = 2e-4

@@ -76,8 +76,6 @@ PROBE = """&fel_track_params
   gen_current = 3000
   gen_delgam = 0.01
   gen_ex = 4e-9, gen_ey = 4e-9
-  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
-  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
   gen_power = {power}
   gen_waist_size = {w0}
   gen_ngrid = 129
@@ -99,8 +97,6 @@ GAIN = """&fel_track_params
   gen_current = 3000
   gen_delgam = 1.0
   gen_ex = 4e-7, gen_ey = 4e-7
-  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
-  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
   gen_power = 5e3
   gen_waist_size = 30e-6
   gen_ngrid = 129

@@ -77,8 +77,9 @@
 !     gen_current = 3000       ! Slice current [A].
 !     gen_delgam = 1.0         ! Gaussian rms energy spread, units of m_e c^2.
 !     gen_ex = 4e-7, gen_ey = 4e-7             ! Normalized emittances [m rad].
-!     gen_beta_x = 8.5, gen_alpha_x = -0.70    ! Twiss at the entrance.
-!     gen_beta_y = 17.4, gen_alpha_y = 1.40
+!                                              ! (The Twiss comes from the lattice
+!                                              !   beginning element -- one truth; there
+!                                              !   are no namelist Twiss parameters.)
 !     gen_power = 5e3          ! Seed power [W]; 0 gives a dark start (pure SASE).
 !     gen_waist_size = 30e-6   ! Seed 1/e^2 intensity radius w0 [m], waist at the entrance.
 !     gen_ngrid = 255          ! Transverse grid points per side.
@@ -207,7 +208,10 @@ logical unavg_mode
 
 real(rp) :: lambda0 = 0                  ! Generation parameters; see the header.
 real(rp) :: gen_current = 0, gen_delgam = 0, gen_ex = 0, gen_ey = 0
-real(rp) :: gen_beta_x = 0, gen_alpha_x = 0, gen_beta_y = 0, gen_alpha_y = 0
+real(rp) tw_beta_x, tw_alpha_x, tw_beta_y, tw_alpha_y   ! From the lattice beginning
+                                                        ! element -- NOT namelist input:
+                                                        ! the lattice is the one Twiss
+                                                        ! authority (as for the import).
 real(rp) :: gen_power = 0, gen_waist_size = 0, gen_dgrid = 0
 real(rp) :: gen_slen = 0
 integer :: gen_npart = 8192, gen_nbins = 8, gen_ngrid = 255, gen_seed = 12345
@@ -250,8 +254,8 @@ character(*), parameter :: r_name = 'fel_track_test'
 namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            interlude_model, und_transport, &
                            split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
-                           gen_current, gen_delgam, gen_ex, gen_ey, gen_beta_x, gen_alpha_x, &
-                           gen_beta_y, gen_alpha_y, gen_power, gen_waist_size, gen_ngrid, &
+                           gen_current, gen_delgam, gen_ex, gen_ey, &
+                           gen_power, gen_waist_size, gen_ngrid, &
                            gen_dgrid, gen_seed, gen_slen, gen_sample, gen_shotnoise, &
                            gen_test_weights, load_only, migrate, migrate_check, &
                            wake_on, wake_loss, wake_radius, wake_conductivity, wake_relaxation, &
@@ -747,8 +751,20 @@ if (gen_npart < 1 .or. gen_nbins < 1 .or. mod(gen_npart, gen_nbins) /= 0) then
   print '(a)', 'fel_track_test: gen_npart must be a positive multiple of gen_nbins.'
   stop 1
 endif
-if (gen_current <= 0 .or. gen_ex <= 0 .or. gen_ey <= 0 .or. gen_beta_x <= 0 .or. gen_beta_y <= 0) then
-  print '(a)', 'fel_track_test: gen_current, gen_ex, gen_ey, gen_beta_x and gen_beta_y must be positive.'
+if (gen_current <= 0 .or. gen_ex <= 0 .or. gen_ey <= 0) then
+  print '(a)', 'fel_track_test: gen_current, gen_ex and gen_ey must be positive.'
+  stop 1
+endif
+
+! The Twiss is the LATTICE's (one specification of one truth, as with e_tot and the
+! import path's init_beam_distribution): read the beginning element, refuse by name
+! when a lattice carries none.
+
+tw_beta_x = branch%ele(0)%a%beta;  tw_alpha_x = branch%ele(0)%a%alpha
+tw_beta_y = branch%ele(0)%b%beta;  tw_alpha_y = branch%ele(0)%b%alpha
+if (tw_beta_x <= 0 .or. tw_beta_y <= 0) then
+  print '(a)', 'fel_track_test: the lattice carries no beginning Twiss (beginning[beta_a], etc.);'
+  print '(a)', '  the generated quiet start is matched to the lattice, so the lattice must say.'
   stop 1
 endif
 if (gen_delgam < 0 .or. gen_power < 0 .or. gen_ngrid < 3 .or. gen_dgrid <= 0 .or. gen_sample < 1) then
@@ -819,11 +835,11 @@ do is_g = 1, nslice_gen
   ip = 0
   do ib = 1, mbase
     call ran_gauss (u);  call ran_gauss (v)
-    x  = sqrt(eg_x * gen_beta_x) * u
-    xp = sqrt(eg_x / gen_beta_x) * (v - gen_alpha_x * u)
+    x  = sqrt(eg_x * tw_beta_x) * u
+    xp = sqrt(eg_x / tw_beta_x) * (v - tw_alpha_x * u)
     call ran_gauss (u);  call ran_gauss (v)
-    y  = sqrt(eg_y * gen_beta_y) * u
-    yp = sqrt(eg_y / gen_beta_y) * (v - gen_alpha_y * u)
+    y  = sqrt(eg_y * tw_beta_y) * u
+    yp = sqrt(eg_y / tw_beta_y) * (v - tw_alpha_y * u)
 
     call ran_gauss (u)
     gam = gamma0 + gen_delgam * u
