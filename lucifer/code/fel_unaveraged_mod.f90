@@ -31,11 +31,14 @@
 !        j = u_x (planar),  (u_x - i u_y)/sqrt(2) (helical).
 !      The source is the same SVEA deposit as the averaged solver with the coupling
 !      REMOVED and the actual quiver current in its place:
-!        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/gamma
+!        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
 !      followed by the shared pure diffraction (fel_field_diffract) and the +2*src
-!      convention. Period-averaging this kick/deposit pair reproduces the averaged
-!      mode's fc exactly (the JJ factor emerges from the figure-8); the energy ledger
-!      closes by construction to O(1-beta_par) ~ 5e-9, far below the split error.
+!      convention. The /u_s (where the averaged solver has Genesis's /gamma) makes the
+!      kick/deposit pair EXACT energy duals per substep -- same operands, same bilinear
+!      weights, unitary diffraction between -- so the ledger closes to the physical
+!      spontaneous-emission term and rounding, by construction. Period-averaging the
+!      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
+!      emerges from the figure-8).
 !   3. half magnetic push.
 !
 ! Units: E in V/m (wavefront convention), m_electron in eV, b in 1/m. The physical
@@ -43,12 +46,17 @@
 ! (E_x, E_y) = (Re[-i Ehat e^{i Psi}], -Re[Ehat e^{i Psi}])/sqrt(2) -- both give
 ! intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 !
-! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables
-! (MINERVA's production formulation, 10-30 steps/period). It is not symplectic; the
-! ballistic gate measures the consequence (gamma is conserved EXACTLY by construction
-! -- B does no work and gamma only changes in the kick -- and the emittance drift over
-! a segment is gated), which prices the deviation from the brief's fully symplectic
-! alternative instead of arguing about it.
+! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables --
+! chosen ON MERIT, not because MINERVA uses it: for a verification mode the currency
+! is short-probe ACCURACY, and 4th order is what makes fc measurable at 6e-4 with 20
+! steps/period (a 2nd-order symplectic scheme needs ~100 steps/period to match, and
+! no explicit symplectic method exists for this non-separable Hamiltonian without
+! paying implicit iterations). The structural cost is measured, not argued: gamma is
+! conserved EXACTLY by construction (B does no work; gamma changes only in the kick),
+! and over the longest benchmark segment -- 266 periods, 5320 steps -- the dark-run
+! emittance drifts by <= 3.3e-6, orders below every gate. If production-length
+! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
+! composition; the ballistic gate is the instrument that will say when.
 !
 ! Serial over slices BY DECISION: this is a verification mode run on few slices; the
 ! thread-independence property of the production path is untouched because this path
@@ -354,8 +362,14 @@ do is = 1, nslice
         dE_beam = dE_beam + sl%weight(ip) * dgam * m_electron
         gam(ip) = gam(ip) + dgam
 
+        ! /u_s, not Genesis's averaged /gamma: the source and the E.v force are exact
+        ! duals of one wave equation, and using the SAME u_s the kick used makes the
+        ! per-substep energy exchange cancel identically (the diffraction between
+        ! substeps is unitary), leaving only physical spontaneous emission in the
+        ! ledger. The period-averaged limit shifts by beta_par ~ 5e-9 -- five orders
+        ! below the fc gates. A merit choice, not a transcription (sec:unaveraged).
         cdep = cmplx(0.0_rp, 1.0_rp, rp) * exp(cmplx(0.0_rp, -(psi_mid - ks*tau(ip)), rp)) &
-               * jhat * scl_u * sl%weight(ip) / gam(ip)
+               * jhat * scl_u * sl%weight(ip) / u_s
         crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cdep
         crsource(ix+1, iy)   = crsource(ix+1, iy)   + ((1-wx) * wy) * cdep
         crsource(ix,   iy+1) = crsource(ix,   iy+1) + (wx * (1-wy)) * cdep

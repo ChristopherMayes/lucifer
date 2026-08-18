@@ -195,7 +195,10 @@ def main():
     etot = led[:, 1] + led[:, 2]
     turnover = np.abs(np.diff(led[:, 2])).sum()  # cumulative field-energy turnover |dU|
     ledger_dev = np.abs(etot - etot[0]).max() / max(turnover, 1e-300)
-    check("energy ledger: max|d(E_beam+U_field)| / sum|dU|", ledger_dev, 2e-3)
+    # The /u_s deposit makes kick and source exact energy duals, so this closes at the
+    # gamma<->pz round-trip floor (measured 1.0e-5; it was 6.7e-4 with Genesis's
+    # averaged /gamma convention in the deposit).
+    check("energy ledger: max|d(E_beam+U_field)| / sum|dU|", ledger_dev, 1e-4)
     # Internal consistency: the kick-side column must equal the realized beam change.
     # The floor is the per-record gamma <-> pz round trip (~1 ulp of gamma per particle
     # per record, summed); a missing or double-counted kick would sit at O(1).

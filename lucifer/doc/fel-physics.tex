@@ -670,13 +670,33 @@ polarization-basis current $\hat\jmath = u_x$ (planar), $(u_x - iu_y)/\sqrt2$
   \frac{d\gamma}{ds} = -\frac{\mathrm{Re}[W \bar{\hat\jmath}\,]}{u_s\, m_e},
   \qquad
   \mathrm{src} \mathrel{+}= i\,e^{-i\Psi}\,\hat\jmath\;
-     \frac{Z_0\, c\,\delta}{2\,\Delta_{\mathrm{grid}}^2\,\Delta s}\,\frac{w}{\gamma},
+     \frac{Z_0\, c\,\delta}{2\,\Delta_{\mathrm{grid}}^2\,\Delta s}\,\frac{w}{u_s},
 \end{equation}
 the averaged deposit of Eq.~\ref{eq:source} with the coupling removed and the actual
-quiver current in its place. Period-averaging this pair reproduces
-\S\ref{sec:coupling} exactly --- the $JJ$ Bessel factor emerges from the figure-8 ---
-and the pair is energy-consistent by construction to $O(1-\beta_\parallel)$, which is
-what makes the ledger a gate on their mutual normalization. The physical field of the
+quiver current in its place. The $1/u_s$ --- where the averaged solver carries
+Genesis's $1/\gamma$ --- is a merit choice: kick and source are exact duals of one
+wave equation, and using the same $u_s$ in both (same operands, same bilinear
+weights, unitary diffraction between substeps) makes the coherent energy exchange
+cancel in $E+U$ \emph{identically}, leaving only physical spontaneous emission and
+rounding in the ledger; measured, this tightened the ledger 65$\times$ over the
+$1/\gamma$ convention. The period-averaged limit shifts by
+$O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
+\S\ref{sec:coupling} --- the $JJ$ Bessel factor emerges from the figure-8.
+
+\emph{The energy ledger} (gate zero, written per record step to
+\code{<out\_root>.ledger.txt}): conservation of
+\begin{equation}\label{eq:ledger}
+  E_{\mathrm{beam}} + U, \qquad
+  E_{\mathrm{beam}} = \sum_j w_j\,(\gamma_j - \gamma_0)\, m_e, \qquad
+  U = \sum_{\mathrm{slices}} P\,\Delta s/c,
+\end{equation}
+with $E_{\mathrm{beam}}$ stored \emph{relative} to the reference so per-record
+changes are not differenced off a large baseline at its own summation-rounding floor
+(the two-pass-variance lesson of \S\ref{sec:numerics}), and $P$ the power of
+\S\ref{sec:field}. The kick-side change is written alongside as an internal
+cross-check. The one physical term the ledger does not balance is spontaneous
+emission (the $|\mathrm{src}|^2$ the SVEA deposit adds without debiting a particle,
+as in Genesis and MINERVA); the gate level sits above it. The physical field of the
 scalar envelope: planar $E_x = \mathrm{Re}[-i\hat E e^{i\Psi}]$; helical
 $(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], -\mathrm{Re}[\hat E e^{i\Psi}])/\sqrt2$
 --- both give intensity $|\hat E|^2/2Z_0$, so \S\ref{sec:field}'s power diagnostic is
@@ -705,14 +725,19 @@ existence proof: the 10--30 steps/period envelope, the energy-ledger practice, t
 $\sin^2$ ramp treatment, kinematic phase everywhere). MINERVA's standing here is a
 statistical $\sim$$10^{-3}$-class reference ONLY --- truncated constants (emass to
 six digits, awfac), Runge-Kutta-Gill --- never a bit gate; no MINERVA code was
-transcribed. The magnetic push is explicit RK4 (MINERVA's production formulation),
-not the brief's fully symplectic alternative; the ballistic gate prices the
-difference (exact $\gamma$, emittance drift $10^{-10}$ over a probe).
+transcribed, and MINERVA precedent decided nothing here on its own. The magnetic
+push is explicit RK4 on merit: fourth order is what makes $f_c$ measurable at
+$6\times10^{-4}$ with 20 steps/period (second-order symplectic needs $\sim$100 to
+match), and the non-symplecticity is priced by measurement --- $\gamma$ exact,
+emittance drift $\le 3.3\times10^{-6}$ over the longest benchmark segment
+(266 periods, 5320 steps).
 \end{provenance}
 \begin{validation}
 \code{check\_unaveraged.py}, all self-referenced or closed-form: energy ledger
-$6.7\times10^{-4}$ of the field-energy turnover (gate $2\times10^{-3}$); ledger
-internal kick-vs-realized $1.0\times10^{-5}$; ballistic $\Delta\gamma$ exactly zero,
+$1.0\times10^{-5}$ of the field-energy turnover (gate $10^{-4}$; degenerate with the
+$\gamma\leftrightarrow p_z$ round-trip floor once the deposit uses $1/u_s$ --- it was
+$6.7\times10^{-4}$ under the $1/\gamma$ convention); ledger internal
+kick-vs-realized $1.0\times10^{-5}$; ballistic $\Delta\gamma$ exactly zero,
 emittance handoff $9.8\times10^{-11}$, orbit handoff $1.9\times10^{-9}$ m;
 $f_c$ measured vs closed form: planar $0.75051$ vs $0.75095$, helical $0.84803$ vs
 $0.84853$, $h{=}3$ planar $0.21287$ vs $0.21302$ --- all $\sim$$6\times10^{-4}$

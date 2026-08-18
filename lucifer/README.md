@@ -685,7 +685,7 @@ Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-fo
 
 | Gate | Measured | Gate level |
 |---|---|---|
-| energy ledger: max d(E_beam+U_field) over field-energy turnover | **6.7e-4** | 2e-3 |
+| energy ledger: max d(E_beam+U_field) over field-energy turnover | **1.0e-5** | 1e-4 |
 | ledger internal (kick-side vs realized beam change) | 1.0e-5 | 1e-4 |
 | ballistic dark run: max dgamma (B does no work) | **exactly 0** | 1e-12 |
 | ramp handoff: emittance ratio − 1 / orbit shift / mean-px shift | 9.8e-11 / 1.9e-9 m / 3.6e-14 | 1e-6 / 1e-7 / 1e-6 |
@@ -694,6 +694,15 @@ Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-fo
 | fc planar h=3 vs closed form: 0.21287 vs 0.21302 | **7.1e-4** | 5e-3 |
 | convergence fc(10/20/30 steps per period) | 0.750582 / 0.750505 / 0.750502 | 5e-4 on 30 vs 20 |
 | full-segment gain curve, unaveraged vs averaged, ln ratio at exit | **2.6e-3** | 0.2 (priced) |
+
+Two merit choices over the references' conventions, both measured: the source
+deposits with `1/u_s` (not Genesis's averaged `1/gamma`), making kick and source
+exact energy duals — the ledger tightened 65× to the gamma-pz round-trip floor, while
+the period-averaged limit moves only ~5e-9; and the magnetic push is explicit RK4
+because fourth order is what makes fc measurable at 6e-4 with 20 steps/period — its
+non-symplecticity is priced at gamma exact / emittance ≤ 3.3e-6 over the longest
+benchmark segment (266 periods, 5320 steps), with the ballistic gate standing watch
+should production-length unaveraged runs ever appear.
 
 The JJ Bessel factor and its h=3 counterpart EMERGE from the raw dynamics at 6e-4 —
 the first independent check on `fel_und_coupling`'s closed forms, and on the
