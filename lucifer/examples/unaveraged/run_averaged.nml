@@ -1,0 +1,19 @@
+! The averaged twin of run.nml: identical configuration through the transcribed
+! Genesis map (und_transport default). Compare unaveraged.diag.txt against
+! averaged.diag.txt -- two independent formulations, one gain curve to ~3e-3 ln.
+
+&fel_track_params
+  lat_file = "seg1.bmad"
+  out_root = "averaged"
+
+  lambda0 = 1e-10
+  gen_current = 3000
+  gen_delgam = 1.0
+  gen_ex = 4e-7, gen_ey = 4e-7
+  gen_beta_x = 8.53711,  gen_alpha_x = -0.703306
+  gen_beta_y = 17.3899,  gen_alpha_y = 1.40348
+  gen_power = 5e3
+  gen_waist_size = 30e-6
+  gen_ngrid = 129
+  gen_dgrid = 2e-4
+&end

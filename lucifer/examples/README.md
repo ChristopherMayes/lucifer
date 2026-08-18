@@ -25,6 +25,7 @@ python ../plot_fel.py <example>.diag.txt            # needs matplotlib; writes <
 | `sase_wake/` | The SASE run plus resistive-wall/gap/roughness wakes | ~100 s |
 | `import/` | A beam_init bunch resampled into slices (Genesis's importdistribution method), tracked dark | ~1 min |
 | `bmad_wake/` | The SASE run with the chamber wake via BMAD's z_long machinery on every element | ~2 min |
+| `unaveraged/` | One seeded segment with NO period averaging: the real quiver, the coupling as an outcome — plus its averaged twin for the overlay | ~1 min |
 
 With no dump files named in the namelist, the program generates its own starting state
 (quiet-start beam, and a Gaussian seed where `gen_power > 0`); the header of
@@ -122,6 +123,25 @@ per-slice profiles agreeing to 0.7% -- one physical wake, two independent
 implementations, two application granularities. Regenerate the table by running any
 wake_on configuration with `write_wake_kernels = "kern.txt"` and applying the recipe
 in `wake_lattice.bmad`'s header.
+
+## unaveraged
+
+The FEL with no period averaging (manual `sec:unaveraged`): one seeded steady-state
+segment (`seg1.bmad`, 266 periods of the benchmark undulator) tracked with
+`und_transport = "unaveraged"` — the particles ride the real helical field, quiver
+and all, at 20 integration substeps per period, with sin² entry/exit ramps and the
+radiation as a co-evolving kick. Nothing in this path knows the coupling factor `fc`;
+the energy exchange is just what the Lorentz force does. `run_averaged.nml` is the
+identical configuration through the transcribed Genesis map: the two gain curves —
+two INDEPENDENT formulations of the same physics — agree to 3.8e-3 ln at the segment
+exit (measured here; the harness pins the coupling itself at ~6e-4 with dedicated
+probes, see the main README). Measured cost of not averaging: 12 s vs 0.4 s for the
+averaged twin, ~30× on this config. The run also writes `unaveraged.ledger.txt` —
+beam energy (relative to the reference) and window field energy per record, whose
+sum is conserved (manual `eq:ledger`; gated at 1e-4 of the turnover under the
+harness's strong-exchange probe). One segment sits in the lethargy regime — the seed
+diffracts and the exponential growth is only beginning at the exit — so the point of
+the plot is the overlay, not the gain.
 
 ## sase_wake
 
