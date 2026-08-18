@@ -22,7 +22,7 @@
 ! tracking problem upstream of the FEL, not an import option.) The bunch moments ARE
 ! still measured -- an UNWEIGHTED analysis in Genesis's analyse form, unweighted
 ! deliberately: coincident split-weight copies leave every moment bit-identical, which
-! the invariance gate relies on.
+! the invariance check relies on.
 !
 ! Genesis quirks found by reading and NOT transcribed as functional (sec:import): the
 ! align/align_start/align_end parameters are parsed but never used in v4; the
@@ -33,7 +33,7 @@
 !
 ! The RNG is Bmad's (ran_uniform), NOT a transcription of Genesis's RandomU, so
 ! everything the RNG touches is validated statistically; the current profile and the
-! analyse/match/center moments are RNG-free and gate exactly.
+! analyse/match/center moments are RNG-free and check exactly.
 !-
 
 module fel_import_mod
@@ -72,7 +72,7 @@ contains
 !
 ! moments_out, if present, receives the RNG-free analysis moments in Genesis's
 ! analyse order (gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay) -- the
-! deterministic quantities the exactness gates read.
+! deterministic quantities the exactness checks read.
 !-
 
 subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)

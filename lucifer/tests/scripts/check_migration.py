@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gates for slice migration under weights (deliverable 7, self-referenced per FINDINGS
+Checks for slice migration under weights (deliverable 7, self-referenced per FINDINGS
 6.9: Genesis migrates only under one4one, so weighted migration has no reference).
 
 Three checks:
@@ -44,17 +44,21 @@ BASE = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
-  gen_current = 3000
-  gen_delgam = {delgam}
-  gen_ex = {emit}, gen_ey = {emit}
-  gen_power = 0
-  gen_ngrid = 65
-  gen_dgrid = 2e-4
-  gen_npart = {npart}
-  gen_nbins = 8
-  gen_slen = {slen}
-  gen_sample = 3
-  gen_seed = 777
+  beam_init%n_particle = {npart}
+  beam_init%bunch_charge = {q}
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -{half}
+  beam_init%grid(3)%x_max = {half}
+  beam_init%sig_pz = {sig_pz}
+  beam_init%a_norm_emit = {emit}
+  beam_init%b_norm_emit = {emit}
+  seed_power = 0
+  grid_n_pts = 65
+  grid_half_width = 2e-4
+  nbins = 8
+  window_length = {slen}
+  window_sample = 3
+  ran_seed = 777
   migrate = {mig}
   migrate_check = T
 &end
@@ -96,7 +100,7 @@ def main():
 
     # 1 + 2: conservation and phase continuity under heavy migration.
     out = run(exe, wd, "migc.nml", BASE.format(lat="aramis.bmad", root="migc",
-              delgam="60.0", emit="4e-7", npart=1024, slen="4.8e-9", mig="T"))
+              sig_pz="5.282703940115e-03", emit="4e-7", npart=1024, slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9", mig="T"))
     moved = int(re.search(r"migration moved (\d+)", out).group(1))
     bdev = float(re.search(r"bunching deviation across migrations:\s+(\S+)", out).group(1))
     drops = [(float(m[1]), float(m[0])) for m in
@@ -133,7 +137,7 @@ def main():
     # 3: no-op bit identity on a frozen-phase beam.
     for mig, root in (("F", "mignf"), ("T", "mignt")):
         out = run(exe, wd, f"{root}.nml", BASE.format(lat="aramis_1seg.bmad", root=root,
-                  delgam="0.001", emit="1e-13", npart=256, slen="1.2e-9", mig=mig))
+                  sig_pz="8.804506566858e-08", emit="1e-13", npart=256, slen="1.2e-9", q="1.200830742713e-14", half="6e-10", mig=mig))
     moved = int(re.search(r"migration moved (\d+)", out).group(1))
     diag_eq = (wd / "mignf.diag.txt").read_bytes() == (wd / "mignt.diag.txt").read_bytes()
     d_eq = all(dumps_equal(wd / f"mignf-final.{s}.h5", wd / f"mignt-final.{s}.h5")
@@ -143,7 +147,7 @@ def main():
     print(f"--- migration no-op: {moved} moves, diag byte-equal {diag_eq}, "
           f"dumps dataset-equal {d_eq}  {'ok' if n_ok else 'FAIL'}")
 
-    print("migration gates:", "PASS" if ok else "FAIL")
+    print("migration checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 

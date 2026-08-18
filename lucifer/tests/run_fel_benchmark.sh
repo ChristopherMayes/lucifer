@@ -205,41 +205,41 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "wake_on = T
   wake_hrough = 100e-9
   wake_lrough = 100e-6"
 
-# Assertion gates: a lattice whose FEL element is missing b_max, missing l_period, or
+# Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
 # uses a fieldmap field_calc (deliverable 9, brief 7.5), or that carries Bmad wakes on
 # any element (the slice-at-a-time seam cannot apply them meaningfully), must be
 # REFUSED BY NAME -- the failure message names the offending attribute and element -- not passed
 # through to fail downstream with an unrelated message (missing b_max) or a segfault in
-# the parse-time reference tracking (fieldmap). Each gate mutates one attribute of the
+# the parse-time reference tracking (fieldmap). Each check mutates one attribute of the
 # real single-segment lattice and requires both a nonzero exit and the by-name message.
 
-echo "--- FEL-element assertion gates (refusal by name) -----------------------------"
-grep -v "b_max" aramis_1seg.bmad                                   > gate_bmax.bmad
-sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > gate_lperiod.bmad
-sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > gate_fieldmap.bmad
+echo "--- FEL-element assertion checks (refusal by name) -----------------------------"
+grep -v "b_max" aramis_1seg.bmad                                   > refusal_bmax.bmad
+sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > refusal_lperiod.bmad
+sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > refusal_fieldmap.bmad
 
 GATES_OK=1
-run_assert_gate () {   # <name> <by-name message fragment>
-  make_nml gate_$1.nml gate_$1.bmad gate_$1 bmad Aramis
-  if "$EXE" gate_$1.nml > fel-gate_$1.log 2>&1; then
-    echo "FAIL: gate_$1 lattice was accepted (exit 0); it must be refused" >&2
+run_assert_refusal () {   # <name> <by-name message fragment>
+  make_nml refusal_$1.nml refusal_$1.bmad refusal_$1 bmad Aramis
+  if "$EXE" refusal_$1.nml > fel-refusal_$1.log 2>&1; then
+    echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
     GATES_OK=0
-  elif ! grep -q "$2" fel-gate_$1.log; then
-    echo "FAIL: gate_$1 refused, but not by name; log tail:" >&2
-    tail -5 fel-gate_$1.log >&2
+  elif ! grep -q "$2" fel-refusal_$1.log; then
+    echo "FAIL: refusal_$1 refused, but not by name; log tail:" >&2
+    tail -5 fel-refusal_$1.log >&2
     GATES_OK=0
   else
-    echo "  gate_$1: refused by name ($(grep "$2" fel-gate_$1.log | head -1 | cut -c1-60)...)"
+    echo "  refusal_$1: refused by name ($(grep "$2" fel-refusal_$1.log | head -1 | cut -c1-60)...)"
   fi
 }
-cat > gate_lrwake.bmad <<'LAT'
+cat > refusal_lrwake.bmad <<'LAT'
 call, file = aramis_1seg.bmad
 PW: pipe, l = 0.1, lr_wake = {mode = {2e5, 0.1, 1e-5, 0.3, 2, 0.7}}
 SEGW: line = (UND, PW)
 use, SEGW
 LAT
 
-cat > gate_zmax.bmad <<'LAT'
+cat > refusal_zmax.bmad <<'LAT'
 call, file = aramis_1seg.bmad
 PW: pipe, l = 0.1, sr_wake = {amp_scale = 1.0, scale_with_length = T, z_max = 1e-12,
   longitudinal = {-8266.6e2, 26.6, 46089.2, 1.578966/twopi, none}}
@@ -247,19 +247,19 @@ SEGW: line = (UND, PW)
 use, SEGW
 LAT
 
-run_assert_gate bmax     "zero b_max"
-run_assert_gate lperiod  "zero l_period"
-run_assert_gate fieldmap "field_calc must be planar_model"
-run_assert_gate lrwake   "lr (multi-bunch) wakes are not supported"
-run_assert_gate zmax     "sr wake z_max can handle"
+run_assert_refusal bmax     "zero b_max"
+run_assert_refusal lperiod  "zero l_period"
+run_assert_refusal fieldmap "field_calc must be planar_model"
+run_assert_refusal lrwake   "lr (multi-bunch) wakes are not supported"
+run_assert_refusal zmax     "sr wake z_max can handle"
 if [ "$GATES_OK" -ne 1 ]; then
-  echo "FAIL: FEL-element assertion gates; outputs kept in: $WORK_DIR" >&2
+  echo "FAIL: FEL-element assertion checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
 # The documented tier numbers are single-thread runs; results must not depend on the
-# thread count, and the explicit gate for that follows the loop.
+# thread count, and the explicit check for that follows the loop.
 
 export OMP_NUM_THREADS=1
 
@@ -329,12 +329,12 @@ fi
 echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dataset-equal)"
 echo
 
-# Shot-noise gates (deliverable 6). The statistical gate is self-referenced (FINDINGS
+# Shot-noise checks (deliverable 6). The statistical check is self-referenced (FINDINGS
 # 6.9: Genesis cannot represent weighted noise); the SASE startup cross-check pits the
 # two codes' fully independent loaders and RNGs against each other at the level the
 # noise sets, the startup power.
 
-echo "--- shot-noise statistical gate (weighted Fawley loading) ---------------------"
+echo "--- shot-noise statistical check (weighted Fawley loading) ---------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_shot_noise.py" --exe "$EXE" --workdir "$WORK_DIR" --seeds 15; then
   echo "FAIL: shot-noise statistics; outputs kept in: $WORK_DIR" >&2
   exit 1
@@ -348,68 +348,68 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesi
 fi
 echo
 
-# Seam-wake gates (deliverable 11): element sr wakes across the whole window --
+# Seam-wake checks (deliverable 11): element sr wakes across the whole window --
 # closed-form pseudomode ramp, exact causality with the d8 direction cross-check, the
 # z_long kernel cross-validation against the deliverable-8 wake model (first-principles
 # tight, resolved-beam at the derived boundary bound), split-weight invariance and
 # thread determinism. Self-referenced; needs no Genesis.
 
-echo "--- seam-wake gates -------------------------------------------------------------"
+echo "--- seam-wake checks -------------------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_seam_wake.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: seam-wake gates; outputs kept in: $WORK_DIR" >&2
+  echo "FAIL: seam-wake checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
-# Distribution-import gates (deliverable 10): the bunch_struct resampler transcribed
+# Distribution-import checks (deliverable 10): the bunch_struct resampler transcribed
 # from Genesis's SDDSBeam.cpp -- exact where no RNG enters (the per-slice current
 # profile against Genesis importing the SAME distribution file; the match transform
 # hitting its Twiss targets; split-weight invariance; thread determinism), statistical
 # where the resampling RNG forces it (slice Twiss recovery, startup power cross-code).
 
-echo "--- distribution-import gates --------------------------------------------------"
+echo "--- distribution-import checks --------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_import.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
-  echo "FAIL: distribution-import gates; outputs kept in: $WORK_DIR" >&2
+  echo "FAIL: distribution-import checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
-# Slice-migration gates (deliverable 7): conservation under heavy migration, exact
+# Slice-migration checks (deliverable 7): conservation under heavy migration, exact
 # phase continuity of the moves, and no-op bit identity (self-referenced, FINDINGS 6.9
 # -- Genesis migrates only under one4one).
 
-echo "--- slice-migration gates ------------------------------------------------------"
+echo "--- slice-migration checks ------------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_migration.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: migration gates; outputs kept in: $WORK_DIR" >&2
+  echo "FAIL: migration checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
-# Collective-effects self-referenced gates (deliverable 8): exact energy bookkeeping of
+# Collective-effects self-referenced checks (deliverable 8): exact energy bookkeeping of
 # the wake's eloss on a cold dark beam, and the stale-wake structural check (the
 # convolution must follow the currents under migration).
 
-echo "--- collective-effects gates ---------------------------------------------------"
+echo "--- collective-effects checks ---------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: collective gates; outputs kept in: $WORK_DIR" >&2
+  echo "FAIL: collective checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo
 
-# Unaveraged-mode gates (deliverable 13; fel-physics.tex sec:unaveraged): the energy
+# Unaveraged-mode checks (deliverable 13; fel-physics.tex sec:unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
-# comparison against the averaged mode. The fc/faw leak grep is part of the gate: the
+# comparison against the averaged mode. The fc/faw leak grep is part of the check: the
 # unaveraged path must not touch the averaged coupling quantities it measures.
 
-echo "--- unaveraged-mode gates ------------------------------------------------------"
+echo "--- unaveraged-mode checks ------------------------------------------------------"
 if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../../modules/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
   echo "FAIL: averaged coupling quantities (fc/faw) leaked into the unaveraged path" >&2
   exit 1
 fi
 echo "--- fc/faw leak grep: clean"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_unaveraged.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
-  echo "FAIL: unaveraged gates; outputs kept in: $WORK_DIR" >&2
+  echo "FAIL: unaveraged checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
 echo

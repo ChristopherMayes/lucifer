@@ -7,7 +7,7 @@ time-dependent tiers both work unannounced) and writes a four-panel figure:
 
   1. Total power vs z, both codes overlaid (log). Agreement here is the headline.
   2. The elementwise relative power difference vs z (max and median over slices) --
-     the same quantity compare_fel.py gates, resolved along the line.
+     the same quantity compare_fel.py checks, resolved along the line.
   3. Final-record power per slice, both codes: the SASE spectrum across the time
      window (or two dots for steady state).
   4. Slice-averaged bunching vs z, both codes overlaid.
@@ -66,7 +66,7 @@ def main():
         total_f, total_g = f["power"][:n], g["power"][:n]
         bunch_f, bunch_g = f["bunching"][:n], g["bunching"][:n]
 
-    # The gated quantity: elementwise relative power, denominator floored exactly as in
+    # The checked quantity: elementwise relative power, denominator floored exactly as in
     # compare_fel.py so vacuum slices cannot divide by zero.
     den = np.maximum(np.abs(gp), 1e-9 * np.abs(gp).max())
     rel = np.abs(fp - gp) / den
@@ -92,7 +92,7 @@ def main():
     if nslice > 1:
         a.semilogy(z, np.median(rel, axis=1), color="tab:red", lw=1.2, ls="--",
                    alpha=0.6, label="median")
-    a.set_xlabel("z (m)"); a.set_ylabel("relative power difference (gated)")
+    a.set_xlabel("z (m)"); a.set_ylabel("relative power difference (checked)")
     a.legend()
 
     a = ax[1, 0]

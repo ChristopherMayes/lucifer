@@ -5,7 +5,7 @@
 # chamber radius makes the loss visible above the diagnostics' resolution over one
 # segment. NOTE the comparison floor of this tier is set by Genesis's truncated
 # constants in the roughness coefficient (e as 1.6e-19: 1.4e-3 relative), far above the
-# impedance floor -- the gate is sized accordingly; see the README's floor table.
+# impedance floor -- the check tolerance is sized accordingly; see the README's floor table.
 #
 # Run Aramis-td.in first; it produces AramisTD-initial.par.h5 / .fld.h5.
 

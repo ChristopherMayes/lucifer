@@ -5,7 +5,7 @@
 ! conventions, the FEL step, the field solver, slippage, loading, import, migration,
 ! collective effects, and each piece's Genesis provenance and measured validation
 ! level -- lives in the manual, bsim/fel/doc/fel-physics.tex. Measured numbers and how
-! to run the gates: bsim/fel/README.md. This header documents the inputs.
+! to run the checks: bsim/fel/README.md. This header documents the inputs.
 !
 ! The program walks a Bmad lattice and applies the seam of the design (manual
 ! sec:element, sec:seam): FEL segments are real Bmad wiggler/undulator elements with
@@ -67,34 +67,57 @@
 ! migration and reports the worst deviation.
 !
 ! Alternatively, leave beam_file and field_file blank and the program generates its own
-! steady-state starting condition -- a quiet-start beam and a Gaussian seed field -- from
-! namelist parameters, making a self-contained single run with no Genesis anywhere (see
-! bsim/fel/examples). Generation parameters, with the &beam / &field names they mirror:
+! starting condition -- a quiet-start beam and a Gaussian seed field -- making a
+! self-contained single run with no Genesis anywhere (see bsim/fel/examples). The BEAM
+! is described by Bmad's standard beam_init_struct (the same block the import path
+! uses: one bulk-bunch description, two generation methods -- the import resamples
+! real particles from it, the quiet-start loader evaluates it analytically per slice).
+! The Twiss is always the lattice's. Honored beam_init fields:
 !
-!     lambda0 = 1e-10          ! Radiation wavelength [m] (with dumps it comes from the file).
-!     gen_npart = 8192         ! Macroparticles per slice; must be divisible by gen_nbins.
-!     gen_nbins = 8            ! Beamlet size of the quiet start.
-!     gen_current = 3000       ! Slice current [A].
-!     gen_delgam = 1.0         ! Gaussian rms energy spread, units of m_e c^2.
-!     gen_ex = 4e-7, gen_ey = 4e-7             ! Normalized emittances [m rad].
-!                                              ! (The Twiss comes from the lattice
-!                                              !   beginning element -- one truth; there
-!                                              !   are no namelist Twiss parameters.)
-!     gen_power = 5e3          ! Seed power [W]; 0 gives a dark start (pure SASE).
-!     gen_waist_size = 30e-6   ! Seed 1/e^2 intensity radius w0 [m], waist at the entrance.
-!     gen_ngrid = 255          ! Transverse grid points per side.
-!     gen_dgrid = 2e-4         ! Grid half width [m] (Genesis's dgrid).
-!     gen_seed = 12345         ! Random seed, so the example is reproducible.
-!     gen_slen = 0             ! Time window [m]. 0: one slice, steady state (the default).
-!                              !   Positive: nslice = round(slen/(sample*lambda0)) slices.
-!     gen_sample = 1           ! Slice spacing / lambda0 (integer, Genesis's sample).
-!     gen_shotnoise = F        ! Impose physical shot noise (time-dependent windows only,
-!                              !   the same rule as Genesis's dotime condition).
+!     beam_init%n_particle    ! Macroparticles PER SLICE; a positive multiple of nbins.
+!                             !   (The import path reads it as bunch particles instead.)
+!     beam_init%a_norm_emit   ! Normalized emittances [m rad] (a_emit/b_emit refused:
+!     beam_init%b_norm_emit   !   normalized only, Bmad's preferred form).
+!     beam_init%sig_pz        ! Fractional momentum spread dP/P0. The Gaussian gamma
+!                             !   spread is delta_gamma = beta0*p0_mc*sig_pz. (sig_e is
+!                             !   deprecated Bmad-wide and does not exist here.)
+!     beam_init%bunch_charge  ! Charge [C]. The current is DERIVED, never input.
+!     beam_init%sig_z         ! Bunch length [m], with distribution_type(3):
+!     beam_init%distribution_type(3)  ! "RAN_GAUSS" (default): Gaussian current profile
+!                             !   I(s) = Q*c/(sqrt(2pi)*sig_z) * exp(-s^2/2 sig_z^2) at
+!                             !   the slice centers, bunch centered in the window.
+!                             !   sig_z = 0 is the STEADY STATE: one slice holding the
+!                             !   whole charge, I = Q*c/slice_spacing; refused by name
+!                             !   for time-dependent windows.
+!                             ! "GRID" (Bmad's uniform): flat I = Q*c/(x_max - x_min)
+!                             !   over grid(3)%x_min..x_max (the z extent).
+!
+! EVERY other beam_init field that is set is REFUSED BY NAME (see
+! check_beam_init_contract) -- a standard structure that silently drops fields would
+! be worse than a custom one. Remaining generation knobs, with the Genesis4
+! &field / &time names they map to:
+!
+!     lambda0 = 1e-10          ! Radiation wavelength [m], REQUIRED (with dumps it comes
+!                              !   from the file). Deliberately not defaulted from the
+!                              !   lattice resonance: the first undulator may be off.
+!     nbins = 8                ! Beamlet size of the quiet start (quiet below nbins).
+!     seed_power = 5e3         ! Seed power [W] (Genesis &field power); 0 = dark start.
+!     seed_waist_size = 30e-6  ! Seed 1/e^2 intensity radius w0 [m] (&field waist_size).
+!     grid_n_pts = 255         ! Transverse grid points per side (&field ngrid).
+!     grid_half_width = 2e-4   ! Grid half width [m] (&field dgrid).
+!     ran_seed = 12345         ! Random seed (Bmad's ran_seed_put), for reproducibility.
+!     window_length = 0        ! Time window [m] (&time slen). 0: derived from the bunch
+!                              !   (+-4 sig_z Gaussian; the grid extent flat; one slice
+!                              !   steady state). Override it for slippage headroom; a
+!                              !   window that clips the bunch warns with numbers.
+!     window_sample = 1        ! Slice spacing / lambda0 (integer, &time sample).
+!     shotnoise = F            ! Impose physical shot noise (&time shotnoise;
+!                              !   time-dependent windows only, Genesis's dotime rule).
 !     gen_test_weights = F     ! Validation knob: alternate beamlet weights 0.25x/1.75x
 !                              !   (charge preserving, uniform within each beamlet) to
 !                              !   exercise the weighted-noise paths. Not physics input.
 !     load_only = F            ! Generate, write <out_root>-initial dumps, exit without
-!                              !   tracking. For the shot-noise statistical gate.
+!                              !   tracking. For the shot-noise statistical check.
 !
 ! Element wakes: elements carrying Bmad sr_wake definitions -- pseudomodes or a
 ! tabular z_long -- act across the WHOLE time window via slice concatenation (manual
@@ -104,14 +127,16 @@
 !
 ! Third way in: import a particle DISTRIBUTION -- an arbitrary bunch, resampled into
 ! slices by the transcribed Genesis importdistribution method (fel_import_mod; manual
-! sec:import). The bunch comes from
-! Bmad's beam_init_struct (use_beam_init = T with a beam_init%... block -- Bmad's
-! native equivalent of Genesis's &beam description) or from an openPMD-beamphysics
-! file (dist_file). npart/nbins/sample/seed and the seed field reuse the gen_
-! parameters above; one seed governs generation, resampling and noise. Knobs, named
-! after &importdistribution's where one exists:
+! sec:import). The bunch comes from the SAME beam_init block (use_beam_init = T:
+! init_beam_distribution generates it, honoring everything Bmad honors -- the
+! honored-fields contract above applies to the quiet-start generator only) or from an
+! openPMD-beamphysics file (dist_file). window_sample, ran_seed and the seed field are
+! shared with the generator; one seed governs generation, resampling and noise. Knobs,
+! named after &importdistribution's where one exists:
 !
 !     imp%slicewidth = 0.01    ! Sampling window / bunch length (Genesis's slicewidth).
+!     imp%npart = 8192         ! Macroparticles per slice after resampling.
+!     imp%nbins = 4            ! Beamlet size (quiet-load bins) of the resample.
 !     imp%nslice = 0           ! 0: round(bunch_length/spacing), Genesis's rule.
 !                              ! (Genesis's match/center are NOT ported: a Bmad lattice
 !                              !   carries its Twiss and beam_init generates matched
@@ -120,11 +145,11 @@
 !     dist_file = ""           ! Or read an openPMD-beamphysics file.
 !     write_dist_file = ""     ! Write the bunch as a Genesis &importdistribution
 !                              !   input (t/p/x/xp/y/yp + charge, t = -tau/c) -- the
-!                              !   shared file of the cross-code gates.
+!                              !   shared file of the cross-code checks.
 !     write_opmd_file = ""     ! Write the bunch as openPMD-beamphysics.
-!     imp_split_weights = F    ! Gate knob: coincident w/3 + 2w/3 copies before import.
+!     imp_split_weights = F    ! Check knob: coincident w/3 + 2w/3 copies before import.
 !
-! The quiet start and the weighted Fawley shot noise (gen_shotnoise = T), including
+! The quiet start and the weighted Fawley shot noise (shotnoise = T), including
 ! the noise-level algebra and the N_eff refusal guard, are the manual's sec:loading;
 ! the loader warns where Genesis silently clamps beamlets with fewer real electrons
 ! than macroparticles.
@@ -136,7 +161,7 @@
 !
 ! split_weights = T replaces each imported particle by two copies at identical
 ! coordinates carrying 1/3 and 2/3 of its weight; every collective observable must be
-! identical to the unsplit run. This gates the weighted paths, which no Genesis
+! identical to the unsplit run. This checks the weighted paths, which no Genesis
 ! comparison can (Genesis dumps carry no weights).
 !
 ! Outputs: <out_root>.diag.txt (one row per slice per record: z, slice, field and beam
@@ -198,7 +223,7 @@ logical :: sc_longrange = .false.
 ! The unaveraged verification mode (fel-physics.tex sec:unaveraged): selected by
 ! und_transport = "unaveraged". Substeps per undulator period (MINERVA's envelope:
 ! 10 floor, 20-30 recommended) and the sin^2 entry/exit ramp length in periods
-! (0 = hard edge, the mutation configuration the handoff gate exists to catch).
+! (0 = hard edge, the mutation configuration the handoff check exists to catch).
 type (fel_unavg_struct) ustate
 integer :: unavg_steps_per_period = 20
 real(rp) :: unavg_ramp_periods = 2
@@ -207,36 +232,39 @@ integer :: iu_ledger = 0
 logical unavg_mode
 
 real(rp) :: lambda0 = 0                  ! Generation parameters; see the header.
-real(rp) :: gen_current = 0, gen_delgam = 0, gen_ex = 0, gen_ey = 0
+! The generated beam is described by beam_init (honored fields in the header table);
+! these are the remaining generation knobs, Genesis4 mappings in the header.
 real(rp) tw_beta_x, tw_alpha_x, tw_beta_y, tw_alpha_y   ! From the lattice beginning
                                                         ! element -- NOT namelist input:
                                                         ! the lattice is the one Twiss
                                                         ! authority (as for the import).
-real(rp) :: gen_power = 0, gen_waist_size = 0, gen_dgrid = 0
-real(rp) :: gen_slen = 0
-integer :: gen_npart = 8192, gen_nbins = 8, gen_ngrid = 255, gen_seed = 12345
-integer :: gen_sample = 1
-logical :: gen_shotnoise = .false., gen_test_weights = .false., load_only = .false.
+real(rp) :: seed_power = 0, seed_waist_size = 0, grid_half_width = 0
+real(rp) :: window_length = 0
+integer :: nbins = 8, grid_n_pts = 255, ran_seed = 12345
+integer :: window_sample = 1
+logical :: shotnoise = .false., gen_test_weights = .false., load_only = .false.
+integer npart_gen                        ! From beam_init%n_particle (per slice here).
+real(rp) delgam_gen                      ! beta0*p0_mc*beam_init%sig_pz.
 
 ! Distribution import (deliverable 10): a bunch_struct -- generated natively from
 ! Bmad's beam_init_struct, or read from an openPMD-beamphysics file -- resampled into
 ! FEL slices by the transcribed Genesis method (fel_import_mod). The knobs mirror
-! &importdistribution's names with an imp_ prefix; npart/nbins/sample/seed and the
-! field come from the gen_ parameters (one field generator for both paths).
+! &importdistribution's names in the imp block; window_sample/ran_seed and the seed
+! field are shared with the quiet-start generator (one field generator, one seed).
 type (beam_init_struct) :: beam_init     ! Bmad's native bunch description (&beam_init).
 type (fel_import_param_struct) :: imp
 logical :: use_beam_init = .false.       ! Generate the bunch from beam_init.
 character(400) :: dist_file = ''         ! Or read it from an openPMD-beamphysics file.
 character(400) :: write_dist_file = ''   ! Write the bunch as a Genesis DISTRIBUTION
                                          ! file (t/p/x/xp/y/yp + charge, t = -tau/c),
-                                         ! the shared input of the cross-code gates.
+                                         ! the shared input of the cross-code checks.
 character(400) :: write_opmd_file = ''   ! Write the bunch as openPMD-beamphysics
                                          ! (hdf5_write_beam), the dist_file round trip.
-logical :: imp_split_weights = .false.   ! Gate knob: coincident w/3 + 2w/3 copies
+logical :: imp_split_weights = .false.   ! Check knob: coincident w/3 + 2w/3 copies
                                          ! BEFORE import; RNG-free outputs must not move.
 character(400) :: write_wake_kernels = ''  ! Write the deliverable-8 wake kernels
                                            ! (s, wakeres, wakegeo, wakerou; eV/(m e-))
-                                           ! for the seam-wake cross-validation gate.
+                                           ! for the seam-wake cross-validation check.
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
 type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, from lattice attributes.
@@ -253,10 +281,9 @@ character(*), parameter :: r_name = 'fel_track_test'
 
 namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            interlude_model, und_transport, &
-                           split_weights, write_initial, lambda0, gen_npart, gen_nbins, &
-                           gen_current, gen_delgam, gen_ex, gen_ey, &
-                           gen_power, gen_waist_size, gen_ngrid, &
-                           gen_dgrid, gen_seed, gen_slen, gen_sample, gen_shotnoise, &
+                           split_weights, write_initial, lambda0, nbins, &
+                           seed_power, seed_waist_size, grid_n_pts, &
+                           grid_half_width, ran_seed, window_length, window_sample, shotnoise, &
                            gen_test_weights, load_only, migrate, migrate_check, &
                            wake_on, wake_loss, wake_radius, wake_conductivity, wake_relaxation, &
                            wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
@@ -383,7 +410,7 @@ endif
 ! Collective effects (deliverable 8): configure, build the wake kernels, hoist the
 ! convolution once (Genesis's behavior; recomputed at the migration stride when
 ! migration can change the currents). The per-slice eloss is written to
-! <out_root>.wake.txt so the energy-bookkeeping gate can check the applied loss exactly.
+! <out_root>.wake.txt so the energy-bookkeeping check can check the applied loss exactly.
 
 coll%efield%on = (sc_nz >= 1 .or. sc_longrange)
 coll%efield%rmax = sc_rmax
@@ -515,7 +542,7 @@ write (iu_diag, '(a)') '#         z            slice        power         on_axi
 
 ! The unaveraged energy ledger (fel-physics.tex sec:unaveraged): one row per record
 ! step inside FEL segments -- total weighted beam energy, total window field energy,
-! and the kick-side energy change of the step. The ledger gate holds
+! and the kick-side energy change of the step. The ledger check holds
 ! d(E_beam + U_field) to its measured floor.
 
 if (unavg_mode) then
@@ -722,9 +749,9 @@ contains
 
 !------------------------------------------------------------------------------
 !+
-! Generate the starting condition from the gen_* namelist parameters: quiet-start beam
+! Generate the starting condition from the beam_init description: quiet-start beam
 ! slices (one, or a time window of them), optional physical shot noise generalized to
-! weights, and a Gaussian seed field (or a dark start at gen_power = 0). See the program
+! weights, and a Gaussian seed field (or a dark start at seed_power = 0). See the program
 ! header for the parameter list, the noise algorithm and its provenance, and the N_eff
 ! guard. The no-noise single-slice path is arithmetic-identical to the deliverable-4
 ! loader -- same draw order, same operations -- which the bit-identity anchors rely on.
@@ -736,23 +763,36 @@ type (fel_slice_struct), pointer :: sl
 real(rp) p0_mc, ks_l, eg_x, eg_y, u, v, x, xp, y, yp, gam, p_mc, beta, pz, theta0
 real(rp) dx_grid, w_part, e0, xg, yg, wsum, w2sum, n_lambda, n_eff, floor_b2, target_b2
 real(rp) phi, an, nbl, br, bi
-real(rp), allocatable :: theta_work(:), beta_work(:), kick(:)
+real(rp), allocatable :: theta_work(:), beta_work(:), kick(:), cur_gen(:)
 real(rp) nl_min, nl_max, neff_min, neff_max, floor_max
+real(rp) spacing_gen, zlen_gen, s_i
 integer ib, im, ip, mbase, ix, iy, is_g, nslice_gen, ih, nharm, n_clamp
+logical flat_z
 character(*), parameter :: r_name = 'fel_track_test'
 
 !
 
 if (lambda0 <= 0) then
-  print '(a)', 'fel_track_test: generation needs lambda0 > 0.'
+  print '(a)', 'fel_track_test: generation needs lambda0 > 0 (required by decision; not defaulted'
+  print '(a)', '  from the lattice resonance -- the first undulator may be off).'
   stop 1
 endif
-if (gen_npart < 1 .or. gen_nbins < 1 .or. mod(gen_npart, gen_nbins) /= 0) then
-  print '(a)', 'fel_track_test: gen_npart must be a positive multiple of gen_nbins.'
+
+call check_beam_init_contract ()
+
+npart_gen = beam_init%n_particle
+if (npart_gen < 1 .or. nbins < 1 .or. mod(npart_gen, nbins) /= 0) then
+  print '(a)', 'fel_track_test: beam_init%n_particle (macroparticles PER SLICE here) must be a'
+  print '(a)', '  positive multiple of nbins.'
   stop 1
 endif
-if (gen_current <= 0 .or. gen_ex <= 0 .or. gen_ey <= 0) then
-  print '(a)', 'fel_track_test: gen_current, gen_ex and gen_ey must be positive.'
+if (beam_init%a_norm_emit <= 0 .or. beam_init%b_norm_emit <= 0) then
+  print '(a)', 'fel_track_test: beam_init%a_norm_emit and %b_norm_emit must be positive.'
+  stop 1
+endif
+if (beam_init%bunch_charge <= 0) then
+  print '(a)', 'fel_track_test: the current is DERIVED from the description; beam_init%bunch_charge'
+  print '(a)', '  must be positive (there is no current parameter).'
   stop 1
 endif
 
@@ -767,67 +807,129 @@ if (tw_beta_x <= 0 .or. tw_beta_y <= 0) then
   print '(a)', '  the generated quiet start is matched to the lattice, so the lattice must say.'
   stop 1
 endif
-if (gen_delgam < 0 .or. gen_power < 0 .or. gen_ngrid < 3 .or. gen_dgrid <= 0 .or. gen_sample < 1) then
-  print '(a)', 'fel_track_test: check gen_delgam, gen_power, gen_ngrid, gen_dgrid, gen_sample.'
+if (beam_init%sig_pz < 0 .or. seed_power < 0 .or. grid_n_pts < 3 .or. grid_half_width <= 0 .or. &
+    window_sample < 1) then
+  print '(a)', 'fel_track_test: check beam_init%sig_pz, seed_power, grid_n_pts, grid_half_width,'
+  print '(a)', '  window_sample.'
   stop 1
 endif
-if (gen_power > 0 .and. gen_waist_size <= 0) then
-  print '(a)', 'fel_track_test: gen_waist_size must be positive when gen_power > 0.'
+if (seed_power > 0 .and. seed_waist_size <= 0) then
+  print '(a)', 'fel_track_test: seed_waist_size must be positive when seed_power > 0.'
   stop 1
 endif
 
-! The window: gen_slen <= 0 is the single-slice steady state; otherwise Genesis's count,
-! nslice = round(slen/(sample*lambda0)) (manual sec:window).
+! The window and the per-slice current derive from the beam_init description (manual
+! sec:loading): one bulk bunch, evaluated analytically at the slice centers. The
+! default window covers the described bunch (as the import derives its window from
+! real particles); window_length overrides it for slippage headroom and warns when it
+! clips the bunch. sig_z = 0 is the steady state -- the whole charge in one slice
+! window -- and is refused by name for time-dependent windows.
 
-if (gen_slen > 0) then
-  nslice_gen = nint(gen_slen / (gen_sample * lambda0))
-  if (nslice_gen < 1) nslice_gen = 1
+flat_z = .false.
+select case (trim(beam_init%distribution_type(3)))
+case ('', 'RAN_GAUSS', 'ran_gauss', 'Ran_Gauss')
+case ('GRID', 'grid', 'Grid')
+  flat_z = .true.
+case default
+  print '(a)', 'fel_track_test: beam_init%distribution_type(3) must be RAN_GAUSS (Gaussian bunch)'
+  print '(a)', '  or GRID (flat, Bmad''s uniform) for the quiet-start generator, got: ' // &
+        trim(beam_init%distribution_type(3))
+  stop 1
+end select
+
+spacing_gen = window_sample * lambda0
+
+if (flat_z) then
+  zlen_gen = beam_init%grid(3)%x_max - beam_init%grid(3)%x_min
+  if (zlen_gen <= 0) then
+    print '(a)', 'fel_track_test: a GRID (flat) z-plane needs beam_init%grid(3)%x_min < %x_max.'
+    stop 1
+  endif
+elseif (beam_init%sig_z > 0) then
+  zlen_gen = 8 * beam_init%sig_z          ! +-4 sigma covers the described bunch.
 else
-  nslice_gen = 1
+  zlen_gen = 0                            ! Steady state.
 endif
 
-if (gen_shotnoise .and. nslice_gen < 2) then
-  print '(a)', 'fel_track_test: gen_shotnoise needs a time-dependent window (gen_slen), the same rule as Genesis.'
+if (window_length > 0) then
+  if (zlen_gen == 0 .and. window_length > 1.5_rp * spacing_gen) then
+    print '(a)', 'fel_track_test: sig_z = 0 (the steady-state description) is invalid for a'
+    print '(a)', '  time-dependent window. Give the bunch a length (sig_z, or a GRID extent).'
+    stop 1
+  endif
+  if (window_length < zlen_gen) then
+    print '(a, es10.3, a, es10.3, a)', 'fel_track_test: WARNING: window_length = ', window_length, &
+          ' m CLIPS the described bunch (', zlen_gen, ' m).'
+  endif
+  nslice_gen = max(1, nint(window_length / spacing_gen))
+else
+  nslice_gen = max(1, nint(zlen_gen / spacing_gen))
+endif
+
+if (shotnoise .and. nslice_gen < 2) then
+  print '(a)', 'fel_track_test: shotnoise needs a time-dependent window, the same rule as Genesis.'
   stop 1
 endif
 
-mbase = gen_npart / gen_nbins
+mbase = npart_gen / nbins
 if (gen_test_weights .and. mod(mbase, 2) /= 0) then
   print '(a)', 'fel_track_test: gen_test_weights needs an even number of beamlets.'
   stop 1
 endif
 
 p0_mc = sqrt(gamma0**2 - 1)
+delgam_gen = (p0_mc**2 / gamma0) * beam_init%sig_pz    ! beta0*p0_mc*sig_pz.
+
 fbeam%p0c = p0_mc * m_electron
 fbeam%phi0 = 0
 fbeam%wavelength = lambda0
-fbeam%slice_spacing = gen_sample * lambda0
+fbeam%slice_spacing = spacing_gen
 fbeam%s0 = 0
-fbeam%nbins = gen_nbins
+fbeam%nbins = nbins
 fbeam%one4one = .false.
 
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
-allocate (fbeam%slice(nslice_gen))
+allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 
-call ran_seed_put (gen_seed)
+! The derived per-slice current: flat Q*c/extent inside the GRID extent; Gaussian
+! profile at the slice centers, bunch centered in the window; steady state = the
+! whole charge in the one slice window, I = Q*c/spacing.
+
+if (flat_z) then
+  cur_gen = 0
+  do is_g = 1, nslice_gen
+    s_i = (is_g - 1) * spacing_gen - (nslice_gen - 1) * spacing_gen / 2
+    if (abs(s_i) <= zlen_gen / 2) cur_gen(is_g) = beam_init%bunch_charge * c_light / zlen_gen
+  enddo
+elseif (zlen_gen > 0) then
+  do is_g = 1, nslice_gen
+    s_i = (is_g - 1) * spacing_gen - (nslice_gen - 1) * spacing_gen / 2
+    cur_gen(is_g) = beam_init%bunch_charge * c_light / (sqrt(twopi) * beam_init%sig_z) * &
+                    exp(-s_i**2 / (2 * beam_init%sig_z**2))
+  enddo
+else
+  cur_gen(1) = beam_init%bunch_charge * c_light / spacing_gen
+endif
+
+call ran_seed_put (ran_seed)
 
 ks_l = twopi / lambda0
-eg_x = gen_ex / p0_mc                 ! Normalized emittance to geometric.
-eg_y = gen_ey / p0_mc
-w_part = gen_current * fbeam%slice_spacing / (c_light * gen_npart)
+eg_x = beam_init%a_norm_emit / p0_mc  ! Normalized emittance to geometric.
+eg_y = beam_init%b_norm_emit / p0_mc
 
-allocate (theta_work(gen_npart), beta_work(gen_npart))
+allocate (theta_work(npart_gen), beta_work(npart_gen))
 n_clamp = 0
 nl_min = huge(1.0_rp); nl_max = 0; neff_min = huge(1.0_rp); neff_max = 0; floor_max = 0
 
 do is_g = 1, nslice_gen
   sl => fbeam%slice(is_g)
-  call fel_slice_reallocate (sl, gen_npart)
-  sl%n = gen_npart
+  call fel_slice_reallocate (sl, npart_gen)
+  sl%n = npart_gen
+  w_part = cur_gen(is_g) * fbeam%slice_spacing / (c_light * npart_gen)
 
-  ! Quiet start: mbase base samples, each replicated at gen_nbins equally spaced
+  ! Quiet start: mbase base samples, each replicated at nbins equally spaced
   ! ponderomotive phases (theta0 spread on a uniform grid within one beamlet spacing),
-  ! so bunching harmonics below gen_nbins vanish to roundoff. Weights and coordinates
+  ! so bunching harmonics below nbins vanish to roundoff. Weights and coordinates
   ! follow fel_read_genesis4_beam: z = beta*theta/ks with phi0 = 0,
   ! weight = I*slice_spacing/(c*npart). theta and beta are held in work arrays so noise
   ! can kick the phases before the z conversion.
@@ -842,16 +944,16 @@ do is_g = 1, nslice_gen
     yp = sqrt(eg_y / tw_beta_y) * (v - tw_alpha_y * u)
 
     call ran_gauss (u)
-    gam = gamma0 + gen_delgam * u
+    gam = gamma0 + delgam_gen * u
     p_mc = sqrt(gam**2 - 1)
     beta = p_mc / gam
     pz = (p_mc - p0_mc) / p0_mc
 
-    theta0 = (ib - 0.5_rp) * twopi / (gen_nbins * mbase)
+    theta0 = (ib - 0.5_rp) * twopi / (nbins * mbase)
 
-    do im = 0, gen_nbins - 1
+    do im = 0, nbins - 1
       ip = ip + 1
-      theta_work(ip) = theta0 + im * twopi / gen_nbins
+      theta_work(ip) = theta0 + im * twopi / nbins
       beta_work(ip) = beta
       sl%x(ip) = x;   sl%px(ip) = xp
       sl%y(ip) = y;   sl%py(ip) = yp
@@ -864,41 +966,44 @@ do is_g = 1, nslice_gen
   ! within each beamlet so the quiet cancellation is untouched. Exercises every
   ! weighted-noise path (the asymmetry is strong enough that using a slice-uniform
   ! electron count where the beamlet's charge belongs mis-sets <|b|^2> by 56 percent,
-  ! far outside the statistical gate); not a physics input.
+  ! far outside the statistical check); not a physics input.
 
   if (gen_test_weights) then
     do ib = 1, mbase
-      sl%weight((ib-1)*gen_nbins+1 : ib*gen_nbins) = &
-              sl%weight((ib-1)*gen_nbins+1 : ib*gen_nbins) * (1 + 0.75_rp * (-1)**ib)
+      sl%weight((ib-1)*nbins+1 : ib*nbins) = &
+              sl%weight((ib-1)*nbins+1 : ib*nbins) * (1 + 0.75_rp * (-1)**ib)
     enddo
   endif
 
   ! Bookkeeping the brief's 6.2 demands: real electrons N_lambda = charge/e, effective
   ! macroparticle number N_eff = (sum w)^2/sum w^2, both per slice.
 
-  wsum = sum(sl%weight(1:gen_npart))
-  w2sum = sum(sl%weight(1:gen_npart)**2)
+  wsum = sum(sl%weight(1:npart_gen))
+  w2sum = sum(sl%weight(1:npart_gen)**2)
   n_lambda = wsum / e_charge
   n_eff = wsum**2 / w2sum
   nl_min = min(nl_min, n_lambda);  nl_max = max(nl_max, n_lambda)
   neff_min = min(neff_min, n_eff); neff_max = max(neff_max, n_eff)
 
-  if (gen_shotnoise) then
+  ! Zero-current slices (Gaussian tails, outside a flat extent) carry no noise --
+  ! Genesis's own zero-current skip, shared with the import.
+
+  if (shotnoise .and. wsum > 0) then
 
     ! The N_eff guard: measure the pre-noise quiet floor. A representation whose floor
     ! is not far below the target 1/N_lambda cannot carry physical noise -- imposing on
     ! top would give a silently wrong startup level. The sweep covers EVERY harmonic the
-    ! beamlet structure can resolve (1..gen_nbins-1), not just the imposed ones: an
+    ! beamlet structure can resolve (1..nbins-1), not just the imposed ones: an
     ! unquiet weight pattern can park its floor on a harmonic the imposition never
-    ! touches (an alternating within-beamlet pattern lands exactly on gen_nbins/2, found
+    ! touches (an alternating within-beamlet pattern lands exactly on nbins/2, found
     ! by the guard's own mutation test) and still corrupt the dynamics through the
     ! nonlinear phase evolution.
 
     target_b2 = 1 / n_lambda
     floor_b2 = 0
-    do ih = 1, gen_nbins - 1
+    do ih = 1, nbins - 1
       br = 0; bi = 0
-      do ip = 1, gen_npart
+      do ip = 1, npart_gen
         br = br + sl%weight(ip) * cos(ih * theta_work(ip))
         bi = bi + sl%weight(ip) * sin(ih * theta_work(ip))
       enddo
@@ -919,19 +1024,19 @@ do is_g = 1, nslice_gen
     ! two paths stay one implementation. Draw order is unchanged from when this block
     ! lived inline here (two ran_uniform per harmonic per beamlet, Genesis's loops).
 
-    call fel_fawley_noise (theta_work(1:gen_npart), sl%weight(1:gen_npart), gen_npart, gen_nbins, n_clamp)
+    call fel_fawley_noise (theta_work(1:npart_gen), sl%weight(1:npart_gen), npart_gen, nbins, n_clamp)
   endif
 
   ! To the stored chart: z = beta*theta/ks with phi0 = 0, beta of the base sample.
 
-  do ip = 1, gen_npart
+  do ip = 1, npart_gen
     sl%z(ip) = beta_work(ip) * theta_work(ip) / ks_l
   enddo
 enddo
 
 deallocate (theta_work, beta_work)
 
-if (gen_shotnoise) then
+if (shotnoise) then
   print '(a, i0, a)',        'fel_track_test: shot noise imposed on ', nslice_gen, ' slices.'
   print '(2(a, es10.3))',    '  N_lambda per slice: ', nl_min, ' to ', nl_max
   print '(2(a, es10.3))',    '  N_eff per slice:    ', neff_min, ' to ', neff_max
@@ -949,10 +1054,62 @@ end subroutine generate_initial_state
 
 !------------------------------------------------------------------------------
 
+subroutine check_beam_init_contract ()
+
+! The quiet-start generator honors the beam_init fields in the header table and
+! REFUSES BY NAME every other field that is set -- a standard structure that silently
+! dropped fields would be worse than a custom one. (The import path is exempt:
+! init_beam_distribution honors everything Bmad honors.) renorm_center/renorm_sigma,
+! random_engine defaults and n_bunch = 0/1 are generation details with no analytic
+! counterpart and are accepted at their defaults only.
+
+character(60) bad
+
+!
+
+bad = ''
+if (beam_init%position_file /= '')                          bad = 'position_file'
+if (beam_init%a_emit /= 0 .or. beam_init%b_emit /= 0)       bad = 'a_emit/b_emit (use a_norm_emit/b_norm_emit)'
+if (beam_init%dPz_dz /= 0)                                  bad = 'dPz_dz'
+if (any(beam_init%center /= 0))                             bad = 'center'
+if (any(beam_init%spin /= 0))                               bad = 'spin'
+if (any(beam_init%center_jitter /= 0))                      bad = 'center_jitter'
+if (any(beam_init%emit_jitter /= 0))                        bad = 'emit_jitter'
+if (beam_init%sig_z_jitter /= 0)                            bad = 'sig_z_jitter'
+if (beam_init%sig_pz_jitter /= 0)                           bad = 'sig_pz_jitter'
+if (beam_init%t_offset /= 0)                                bad = 't_offset'
+if (beam_init%dt_bunch /= 0)                                bad = 'dt_bunch'
+if (beam_init%n_bunch > 1)                                  bad = 'n_bunch'
+if (beam_init%ix_turn /= 0)                                 bad = 'ix_turn'
+if (beam_init%full_6D_coupling_calc)                        bad = 'full_6D_coupling_calc'
+if (beam_init%use_particle_start)                           bad = 'use_particle_start'
+if (beam_init%use_t_coords)                                 bad = 'use_t_coords'
+if (beam_init%file_name /= '')                              bad = 'file_name'
+if (beam_init%random_engine /= '' .and. beam_init%random_engine /= 'pseudo') bad = 'random_engine'
+if (beam_init%random_gauss_converter /= '' .and. beam_init%random_gauss_converter /= 'ziggurat') &
+                                                            bad = 'random_gauss_converter'
+if (beam_init%random_sigma_cutoff /= -1)                    bad = 'random_sigma_cutoff'
+if (beam_init%species /= '' .and. beam_init%species /= 'electron') bad = 'species (electron only)'
+if (trim(beam_init%distribution_type(1)) /= '' .and. trim(beam_init%distribution_type(1)) /= 'RAN_GAUSS' &
+    .and. trim(beam_init%distribution_type(1)) /= 'ran_gauss') bad = 'distribution_type(1) (transverse: RAN_GAUSS only)'
+if (trim(beam_init%distribution_type(2)) /= '' .and. trim(beam_init%distribution_type(2)) /= 'RAN_GAUSS' &
+    .and. trim(beam_init%distribution_type(2)) /= 'ran_gauss') bad = 'distribution_type(2) (transverse: RAN_GAUSS only)'
+
+if (bad /= '') then
+  print '(a)', 'fel_track_test: beam_init%' // trim(bad) // ' is set but NOT honored by the'
+  print '(a)', '  quiet-start generator (see the honored-fields table in the program header).'
+  print '(a)', '  Refusing rather than silently ignoring it.'
+  stop 1
+endif
+
+end subroutine check_beam_init_contract
+
+!------------------------------------------------------------------------------
+
 subroutine generate_seed_field (nslice_f)
 
 ! The field: a Gaussian seed at its waist in every slice, E = E0*exp(-r^2/w0^2),
-! intensity 1/e^2 radius w0, integrating to gen_power; gen_power = 0 is a dark start.
+! intensity 1/e^2 radius w0, integrating to seed_power; seed_power = 0 is a dark start.
 ! Grid convention matches Genesis's dgrid: ngrid points spanning +-dgrid,
 ! dx = 2*dgrid/(ngrid-1), center on axis. Shared by the built-in generator and the
 ! distribution import (both make their own beam, neither brings a field).
@@ -962,26 +1119,26 @@ real(rp) dx_grid, e0, xg, yg
 
 !
 
-if (gen_ngrid < 3 .or. gen_dgrid <= 0) then
-  print '(a)', 'fel_track_test: check gen_ngrid and gen_dgrid.'
+if (grid_n_pts < 3 .or. grid_half_width <= 0) then
+  print '(a)', 'fel_track_test: check grid_n_pts and grid_half_width.'
   stop 1
 endif
-if (gen_power > 0 .and. gen_waist_size <= 0) then
-  print '(a)', 'fel_track_test: gen_waist_size must be positive when gen_power > 0.'
+if (seed_power > 0 .and. seed_waist_size <= 0) then
+  print '(a)', 'fel_track_test: seed_waist_size must be positive when seed_power > 0.'
   stop 1
 endif
 
-dx_grid = 2 * gen_dgrid / (gen_ngrid - 1)
-call wavefront_init (wf, gen_ngrid, gen_ngrid, nslice_f, dx_grid, dx_grid, &
+dx_grid = 2 * grid_half_width / (grid_n_pts - 1)
+call wavefront_init (wf, grid_n_pts, grid_n_pts, nslice_f, dx_grid, dx_grid, &
                      fbeam%slice_spacing, lambda0, 'x', 0.0_rp)
 
-if (gen_power > 0) then
-  e0 = sqrt(4 * (mu_0_vac * c_light) * gen_power / (pi * gen_waist_size**2))
-  do iy = 1, gen_ngrid
-    yg = (iy - 1) * dx_grid - gen_dgrid
-    do ix = 1, gen_ngrid
-      xg = (ix - 1) * dx_grid - gen_dgrid
-      wf%Ex(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / gen_waist_size**2)
+if (seed_power > 0) then
+  e0 = sqrt(4 * (mu_0_vac * c_light) * seed_power / (pi * seed_waist_size**2))
+  do iy = 1, grid_n_pts
+    yg = (iy - 1) * dx_grid - grid_half_width
+    do ix = 1, grid_n_pts
+      xg = (ix - 1) * dx_grid - grid_half_width
+      wf%Ex(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / seed_waist_size**2)
     enddo
   enddo
   do is_g = 2, nslice_f
@@ -1000,7 +1157,7 @@ subroutine import_initial_state ()
 ! -- resampled into FEL slices by the transcribed Genesis importdistribution method
 ! (fel_import_mod, where the algorithm and its provenance are documented). The seed
 ! field comes from the same generator as the built-in loader. The RNG-free outputs the
-! exactness gates read -- the analysis moments and the per-slice current profile --
+! exactness checks read -- the analysis moments and the per-slice current profile --
 ! are printed at full precision.
 
 type (beam_struct), target :: beam_b
@@ -1015,17 +1172,17 @@ if (lambda0 <= 0) then
   print '(a)', 'fel_track_test: import needs lambda0 > 0.'
   stop 1
 endif
-if (gen_sample < 1) then
-  print '(a)', 'fel_track_test: gen_sample must be a positive integer (Genesis''s sample).'
+if (window_sample < 1) then
+  print '(a)', 'fel_track_test: window_sample must be a positive integer (Genesis''s sample).'
   stop 1
 endif
 
 ! One seed governs the whole import: the bunch generation, the resampler's draws and
 ! the shot noise. Seeding AFTER generation was the first mutation this path caught in
 ! development -- every run then imports a different bunch, and the split-weight and
-! thread-determinism gates both fail on what looks like resampler noise.
+! thread-determinism checks both fail on what looks like resampler noise.
 
-call ran_seed_put (gen_seed)
+call ran_seed_put (ran_seed)
 
 if (use_beam_init) then
   if (beam_init%n_particle < 1) then
@@ -1046,7 +1203,7 @@ endif
 
 bp => beam_b%bunch(1)
 
-! Gate knob: coincident split-weight copies before anything downstream sees the bunch.
+! Check knob: coincident split-weight copies before anything downstream sees the bunch.
 ! The current profile (weighted sums) and the analysis moments (unweighted, over
 ! coincident copies) must then be bit-identical to the unsplit run.
 
@@ -1072,13 +1229,13 @@ if (write_opmd_file /= '') then
   print '(a)', 'fel_track_test: wrote openPMD-beamphysics file: ' // trim(write_opmd_file)
 endif
 
-imp%npart = gen_npart
-imp%nbins = gen_nbins
-call fel_import_bunch (bp, gamma0, lambda0, gen_sample * lambda0, imp, fbeam, err_i, moments)
+! imp%npart and imp%nbins come from the imp block directly (the resample's own knobs;
+! beam_init%n_particle is the BUNCH particle count on this path).
+call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, imp, fbeam, err_i, moments)
 if (err_i) stop 1
 
 print '(a, i0, a, i0, a)', 'fel_track_test: imported into ', size(fbeam%slice), &
-                           ' slices of ', gen_npart, ' particles.'
+                           ' slices of ', imp%npart, ' particles.'
 print '(a, 11es24.15e3)', 'import moments (gavg xavg pxavg yavg pyavg ex ey bx by ax ay):', moments
 do is_g = 1, size(fbeam%slice)
   print '(a, i0, a, es24.15e3)', 'import current ', is_g, ': ', &
@@ -1169,7 +1326,7 @@ do je = 1, branch%n_ele_track
   ! The 7.5 assertions live in fel_assert_wiggler_sane, ONE authority called from the
   ! track1/mat6 hooks (where they fire first, during the parse) and again here. Keeping
   ! a second copy inline was tried and rejected: redundant assertions mask the removal
-  ! of either copy, which defeats mutation testing of the refusal gates.
+  ! of either copy, which defeats mutation testing of the refusal checks.
 
   call fel_assert_wiggler_sane (w)
 
@@ -1238,7 +1395,7 @@ end subroutine setup_fel_elements
 subroutine do_migrate ()
 
 ! Slice migration at the per-element stride, serial, between the parallel regions (the
-! thread gate stays untouched). Called AFTER z_now is advanced, so per-event drop
+! thread check stays untouched). Called AFTER z_now is advanced, so per-event drop
 ! reports carry the z of the diagnostic record they precede -- the conservation
 ! timeline reconstructs exactly from the log. With migrate_check, the whole-beam
 ! weighted phasor S = sum(w e^{i theta}) must satisfy S_before = S_after + S_dropped to
@@ -1262,7 +1419,7 @@ charge_dropped_tot = charge_dropped_tot + chd
 ! Migration changes the current profile, which the wake convolution was hoisted on
 ! (brief 4.3's premise predates migration): recompute at this stride. Every recompute
 ! appends a z-stamped block to <out_root>.wake.txt, so "the wake followed the currents"
-! is a structural fact a gate can parse without reimplementing the convolution.
+! is a structural fact a check can parse without reimplementing the convolution.
 
 if (nm > 0 .and. coll%wake%on) then
   call fel_wake_update (coll%wake, fbeam)
@@ -1314,7 +1471,7 @@ end subroutine whole_beam_phasor
 subroutine write_wake_block (z)
 
 ! One block of per-slice eloss, z-stamped. Written at the hoisted update and at every
-! migration-stride recompute; the energy-bookkeeping and stale-wake gates parse these.
+! migration-stride recompute; the energy-bookkeeping and stale-wake checks parse these.
 
 real(rp) z
 integer is_w

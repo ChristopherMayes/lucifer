@@ -11,7 +11,7 @@
 # integration error, not SASE statistics. The comparison samples total power (summed over
 # slices) at the twelve undulator-segment exits, positions every run records regardless
 # of delz, against the finest run; a convergence order is fitted from successive step
-# halvings/triplings. This is a measurement, not a gate: results are recorded in
+# halvings/triplings. This is a measurement, not a check: results are recorded in
 # bsim/fel/README.md.
 #
 #   ./run_delz_sweep.sh [--genesis <path>] [--exe <path>] [--python <path>] [--work-dir <path>]

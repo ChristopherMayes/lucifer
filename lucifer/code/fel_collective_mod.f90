@@ -14,7 +14,7 @@
 ! fel_resistive_wall_wake is kept a clean, separable routine BY DECISION: it is a
 ! future port target into Bmad proper as a wake source, and nothing in it knows about
 ! the FEL. Space charge is transcribed FOR CONSISTENCY with Genesis (directly
-! gateable), behind this module's interface BY DECISION: Bmad's slice space-charge
+! testable), behind this module's interface BY DECISION: Bmad's slice space-charge
 ! method is suspected the better model long-term, and a Bmad-slice implementation of
 ! fel_shortrange_ez / fel_longrange_esc is an explicit future task.
 !
@@ -90,7 +90,7 @@ end type
 !
 ! Everything collective the step needs, in one bag: wake state and space-charge
 ! configuration, plus the per-slice longESC scratch the step refreshes. Default
-! constructed = everything off = every existing gate bit-identical.
+! constructed = everything off = every existing check bit-identical.
 !-
 
 type fel_collective_struct

@@ -59,9 +59,9 @@ multi-slice dumps):
   tdsase        The full line, dark start (power = 0), shot noise on: pure SASE, both
                 codes tracking the identical noisy beam and identical zero field from
                 shared dumps (Aramis-td-sase.in). The one combination the seeded TD
-                tiers and the statistical startup gate leave uncovered -- the whole
+                tiers and the statistical startup check leave uncovered -- the whole
                 startup-from-noise path, compared deterministically and elementwise.
-                Transcribed interludes, so the gate sits at the constants floor.
+                Transcribed interludes, so the check sits at the constants floor.
                 plot_fel_compare.py overlays the two codes' curves for any tier.
 
 Per-slice curves compare as full (nrecords, nslice) arrays in time-window order; final
@@ -194,7 +194,7 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
     print(f"  final field                     peak normalized     = {rel_fld:.3e}")
 
     # Final particle dump, particle by particle, all slices. gamma relative to itself,
-    # transverse peak normalized. These are gated.
+    # transverse peak normalized. These are checked.
     pf, pg = load_par(fortran_par, nslice), load_par(genesis_par, nslice)
     scales = {"gamma": np.abs(pg["gamma"]).max(),
               "x": np.abs(pg["x"]).max(), "y": np.abs(pg["y"]).max(),
@@ -206,15 +206,15 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
         parts.append(f"{k} {r:.1e}")
     print(f"  final particles                 per-particle        = " + ", ".join(parts))
 
-    # theta is reported but NOT gated. It is the phase of a particle in its ponderomotive
+    # theta is reported but NOT checked. It is the phase of a particle in its ponderomotive
     # bucket, and at saturation neighboring trajectories separate exponentially, so the
     # worst-particle theta difference measures the Lyapunov amplification of whatever
     # difference exists, not the size of that difference (design brief 9.1: chaotic growth
     # is not a usable comparison metric). The distribution tells the story: the median is
     # the typical particle, the max is the separatrix tail. theta's collective effect IS
-    # gated, through the bunching curve and the final field above.
+    # checked, through the bunching curve and the final field above.
     dth = pf["theta"] - pg["theta"]
-    print(f"  final theta (not gated; see comment)  max {np.abs(dth).max():.1e}, "
+    print(f"  final theta (not checked; see comment)  max {np.abs(dth).max():.1e}, "
           f"rms {dth.std():.1e}, median {np.median(np.abs(dth)):.1e} rad")
 
     ok = worst <= tolerance

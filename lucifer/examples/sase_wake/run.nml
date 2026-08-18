@@ -15,18 +15,22 @@
   lambda0 = 1e-10
 
 
-  gen_current = 3000
-  gen_delgam = 1.0
-  gen_ex = 4e-7, gen_ey = 4e-7
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 2.881993782512e-13  ! 3 kA flat: I = Q*c/extent.
+  beam_init%distribution_type(3) = "GRID"  ! Flat bunch (Bmad's uniform)...
+  beam_init%grid(3)%x_min = -1.44e-8       ! ...spanning the full 96-slice window.
+  beam_init%grid(3)%x_max =  1.44e-8
+  beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
 
-  gen_power = 0
-  gen_ngrid = 255
-  gen_dgrid = 2e-4
+  seed_power = 0
+  grid_n_pts = 255
+  grid_half_width = 2e-4
 
-  gen_npart = 2048
-  gen_slen = 2.88e-8           ! 96 slices of spacing 3*lambda0, as sase.nml.
-  gen_sample = 3
-  gen_shotnoise = T
+  window_length = 2.88e-8      ! 96 slices of spacing 3*lambda0, as sase/run.nml.
+  window_sample = 3
+  shotnoise = T
 
   wake_on = T
   wake_radius = 0.5e-3         ! Narrow chamber: the tuned, visible case.

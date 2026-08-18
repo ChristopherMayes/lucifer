@@ -40,7 +40,7 @@
 ! Weights are carried from day one (brief section 5): every reduction here and in
 ! fel_track_mod is weighted, slice current is derived as I = c * sum(w) / slice_spacing, and
 ! N_eff = (sum w)^2 / sum w^2 is a per-slice diagnostic. A uniform-weight beam reproduces
-! Genesis, which the benchmark gates.
+! Genesis, which the benchmark checks.
 !
 ! Why packed arrays at all (brief section 4.2): the FEL step advances every particle every
 ! internal step, and coord_struct is ~224 bytes against the ~56 needed. coord_struct
@@ -118,7 +118,7 @@ end type
 ! are. The Genesis output dataset each one compares against is noted.
 !
 ! Scope, by decision: this struct is the Genesis-comparison instrument and stays limited
-! to quantities a Genesis output can gate. Production moment diagnostics (mean vector,
+! to quantities a Genesis output can check. Production moment diagnostics (mean vector,
 ! sigma matrix, emittances) go through Bmad's bunch_params_struct at the seam, where
 ! calc_bunch_params already owns the definitions.
 !-
@@ -694,7 +694,7 @@ end subroutine fel_bunch_to_slice
 ! -atar*beta*slice_spacing -- which makes z_global the migration INVARIANT -- and
 ! fel_wake_update's convolution collects current(is+i) from higher indices, the wake
 ! trailing its source. (The deliverable-11 goal guessed the opposite sign; the
-! causality gate and these two authorities pinned it.)
+! causality check and these two authorities pinned it.)
 !
 ! beta0 records each particle's entry beta, slice-major in bunch order, for the exact
 ! inverse in fel_split_slices. Particles are stored slice-major (slice 1 first), and

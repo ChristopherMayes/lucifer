@@ -28,8 +28,13 @@ python ../plot_fel.py <example>.diag.txt            # needs matplotlib; writes <
 | `unaveraged/` | One seeded segment with NO period averaging: the real quiver, the coupling as an outcome — plus its averaged twin for the overlay | ~1 min |
 
 With no dump files named in the namelist, the program generates its own starting state
-(quiet-start beam, and a Gaussian seed where `gen_power > 0`); the header of
-`fel_track_test.f90` documents every parameter. The undulator segments in the lattices
+(quiet-start beam, and a Gaussian seed where `seed_power > 0`). The BEAM is described
+by Bmad's standard `beam_init` block — one bulk-bunch description shared with the
+import path — with the current DERIVED, never input: a Gaussian profile from
+`bunch_charge` + `sig_z`, a flat bunch via Bmad's `distribution_type(3) = "GRID"`, and
+`sig_z = 0` meaning steady state (the whole charge in one slice window). Any set
+`beam_init` field the quiet start does not honor is refused by name. The header of
+`fel_track_test.f90` documents every parameter and the honored-fields table. The undulator segments in the lattices
 are real Bmad wiggler elements with `tracking_method = custom`, and their FEL parameters
 live on the lattice — the attribute-to-parameter map and the parse-time refusals are the
 manual's `sec:element`. There are no per-undulator namelist parameters.
@@ -138,7 +143,7 @@ exit (measured here; the harness pins the coupling itself at ~6e-4 with dedicate
 probes, see the main README). Measured cost of not averaging: 12 s vs 0.4 s for the
 averaged twin, ~30× on this config. The run also writes `unaveraged.ledger.txt` —
 beam energy (relative to the reference) and window field energy per record, whose
-sum is conserved (manual `eq:ledger`; gated at 1e-4 of the turnover under the
+sum is conserved (manual `eq:ledger`; checked at 1e-4 of the turnover under the
 harness's strong-exchange probe). One segment sits in the lethargy regime — the seed
 diffracts and the exponential growth is only beginning at the exit — so the point of
 the plot is the overlay, not the gain.

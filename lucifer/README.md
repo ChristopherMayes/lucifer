@@ -7,7 +7,7 @@ configuration from bitwise-identical starting states.
 
 **The physics reference is the manual, [`doc/fel-physics.tex`](doc/fel-physics.tex)**
 (`make` in `doc/` builds the PDF): every equation the code integrates, each subsystem's
-Genesis provenance, and which gate pins it at what measured level. This README carries
+Genesis provenance, and which check pins it at what measured level. This README carries
 the measured numbers, the validation methodology, and how to run everything; where it
 touches physics it cites the manual's sections (`sec:core`, `sec:slippage`, ...).
 
@@ -15,8 +15,8 @@ No harmonics beyond the coupling formula. Everything else the brief's section 10
 packed arrays store one, every reduction uses it, and the split-weight check below tests
 the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
 over slices (deliverable 5), with thread-count independence -- bit-identical results at
-any thread count -- as a gated property; see the parallelism section. The built-in
-loader imposes physical shot noise generalized to weights (deliverable 6), gated
+any thread count -- as a checked property; see the parallelism section. The built-in
+loader imposes physical shot noise generalized to weights (deliverable 6), checked
 statistically and cross-checked against Genesis's independent loader; see the shot-noise
 section.
 
@@ -29,22 +29,22 @@ section.
 | `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
 | `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes; see the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
 | `bsim/fel/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
-| `bsim/fel/tests/scripts/check_shot_noise.py` | Statistical gate: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
-| `bsim/fel/tests/scripts/check_sase_startup.py` | Cross-code gate: SASE startup power, our loader against Genesis's, independent RNGs |
-| `bsim/fel/tests/scripts/check_migration.py` | Migration gates: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
+| `bsim/fel/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
+| `bsim/fel/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis's, independent RNGs |
+| `bsim/fel/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
 | `bsim/modules/fel_import_mod.f90` | The distribution import (brief 10 step 10): a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer; see the distribution-import section |
-| `bsim/fel/tests/scripts/check_seam_wake.py` | Seam-wake gates: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
-| `bsim/fel/tests/scripts/check_import.py` | Import gates: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
+| `bsim/fel/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
+| `bsim/fel/tests/scripts/check_import.py` | Import checks: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
-| `bsim/fel/tests/scripts/check_collective.py` | Collective gates: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
-| `bsim/modules/fel_unaveraged_mod.f90` | The unaveraged verification mode (brief 6.6, manual `sec:unaveraged`): full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-gated) |
-| `bsim/fel/tests/scripts/check_unaveraged.py` | Unaveraged gates: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
+| `bsim/fel/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
+| `bsim/modules/fel_unaveraged_mod.f90` | The unaveraged verification mode (brief 6.6, manual `sec:unaveraged`): full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
+| `bsim/fel/tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
 | `bsim/fel/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
 | `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
 | `bsim/fel/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count; see the parallelism section |
 | `bsim/fel/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
-| `bsim/fel/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, gated relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
+| `bsim/fel/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, checked relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
 | `bsim/fel/tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
 | `bsim/fel/tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
 | `bsim/fel/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
@@ -61,7 +61,7 @@ BUILD_PRODUCTION=N ./util/conda_compile                      # builds fel_track_
 ```
 
 The harness runs Genesis six times (full line and single segment, steady state and time
-dependent, plus the collective tiers), the Bmad tracker for every tier and gate, and
+dependent, plus the collective tiers), the Bmad tracker for every tier and check, and
 prints the largest relative difference of each check. It fails loudly if the genesis4 binary is missing; there is no comparison
 without it, so there is nothing to skip to. Genesis must be built with FFTW, since the
 benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver;
@@ -118,7 +118,7 @@ development the tracker instead transcribed Genesis's internal units and constan
 including its truncated impedance, 376.73 against the exact 376.7303... — and agreed at
 transcription level: tier1 2.8e-11, tier2_genesis 5.9e-8, on commit 236dc372f. With that
 validation banked, the code moved to Bmad constants by decision; the 8.3e-7 relative
-impedance difference is now the floor of every Genesis comparison, and the gates below
+impedance difference is now the floor of every Genesis comparison, and the checks below
 are sized to it.
 
 **Time dependence and slippage.** A multi-slice starting dump makes a time-dependent run,
@@ -180,7 +180,7 @@ later is provably too late — the missing-`b_max` lattice otherwise dies downst
 an unrelated generation message. The assertions live in ONE routine
 (`fel_assert_wiggler_sane`); a second inline copy was tried and removed because
 redundant assertions mask the removal of either copy under mutation testing. All three
-refusals are permanent harness gates.
+refusals are permanent harness checks.
 
 **Anchored against the namelist-driven reference:** the element-driven full TD line
 reproduces the last namelist-driven build's run to a max relative difference of
@@ -221,7 +221,7 @@ tiers). Measured, on the numbers this tree was developed against:
 | `td1` | One undulator segment, 32 slices: FEL core plus slippage (accumulation, threshold, rotation, zero fill, end-of-lattice autophasing) | **8.5e-7** (constants floor) |
 | `td2_genesis` | Full line time dependent, transcribed Genesis interludes: adds the drift autophasing schedule | **2.4e-6** (constants floor) |
 | `td2_bmad` | Full line time dependent through the Bmad seam | **4.1e-2** -- the tier2_bmad transport model difference with slippage interleaved |
-| `tdsase` | Full line, pure SASE: dark start (`power = 0`), shot noise on, both codes tracking the identical noisy beam and identical zero field from shared dumps -- the deterministic startup-from-noise comparison the seeded tiers and the statistical startup gate leave uncovered | **2.3e-6** (constants floor; exit total power agrees at 1.9e-6) |
+| `tdsase` | Full line, pure SASE: dark start (`power = 0`), shot noise on, both codes tracking the identical noisy beam and identical zero field from shared dumps -- the deterministic startup-from-noise comparison the seeded tiers and the statistical startup check leave uncovered | **2.3e-6** (constants floor; exit total power agrees at 1.9e-6) |
 | `tdsc` | One segment TD, space charge on (short-range harmonics nz=2/nphi=1 plus long range) | **2.4e-4** (the epsilon_0-truncation floor of Genesis's longRange, 8.85e-12) |
 | `tdwk` | One segment TD, all three wake kernels on (numerical-impedance resistive wall, gap, roughness) | **8.7e-7** (the impedance floor) |
 
@@ -230,9 +230,9 @@ final dumps compare particle by particle, not just statistically, in every tier.
 
 All outputs land in the benchmark's work directory (`--work-dir <path>`; without it
 a temporary directory is used, removed on success and kept on failure). To *see* any
-tier rather than gate it, run from a kept work directory:
+tier rather than check it, run from a kept work directory:
 `scripts/plot_fel_compare.py <tier>.diag.txt <GenesisRoot>.out.h5` overlays the two codes' power
-and bunching curves, plots the gated elementwise relative power difference along the
+and bunching curves, plots the checked elementwise relative power difference along the
 line, and the per-slice exit power — e.g. `plot_fel_compare.py tdsase.diag.txt
 AramisTDSASE.out.h5`. The slice count comes from the Genesis file, so steady-state and
 time-dependent tiers both work.
@@ -271,14 +271,14 @@ microradians of per-particle phase noise per interlude, amplified through gain. 
 per-particle theta medians tell the same story: 6.4e-14 rad for the typical particle, with
 a chaotic separatrix tail (see below).
 
-### theta is reported, not gated
+### theta is reported, not checked
 
 The final per-particle theta difference is printed with max, rms and median but does not
-gate the comparison. theta is a bucket phase: at saturation neighboring trajectories
+check the comparison. theta is a bucket phase: at saturation neighboring trajectories
 separate exponentially, so the worst-particle difference measures Lyapunov amplification,
 not implementation quality (the brief's 9.1 warning about chaotic growth, met in
 practice: `tier2_genesis` has median 6.4e-14 rad against max 2.0e-5). Its collective
-effect is gated, through the bunching curve and the final field.
+effect is checked, through the bunching curve and the final field.
 
 ### The harness bites
 
@@ -287,12 +287,12 @@ term fails tier1 at 3.5e-1; dropping the conjugation in the field gather fails a
 and using one particle's weight for every deposition, invisible to every Genesis-based
 tier, fails the split-weight check at 2.4e-1. One sensitivity was knowingly traded away
 with the move to Bmad constants: the near-degenerate replacement of `sqrt(faw2)` by `faw`
-in the deposition, a 1.5e-10-level effect that the transcription-era 1e-10 gate caught,
+in the deposition, a 1.5e-10-level effect that the transcription-era 1e-10 check caught,
 now sits below the 2e-6 constants floor and is not detectable by the Genesis comparison.
 Recovering that class of sensitivity is a job for Fortran-vs-Fortran regression baselines
-(the weight_split pattern), not for tighter Genesis gates.
+(the weight_split pattern), not for tighter Genesis checks.
 
-The time-dependent gates were mutation-tested the same way: a slippage rotation that
+The time-dependent checks were mutation-tested the same way: a slippage rotation that
 never fires fails td1 at 1.0e10 (elementwise per-slice power); zeroing the wrong slice at
 rotation fails td1 at 1.0e9; and dropping the drift autophasing fails td2_genesis at
 1.9e8. The fourth sensitivity was demonstrated live rather than by mutation: guarding the
@@ -306,10 +306,10 @@ The element-parameter path was mutation-tested the same way: a spurious `1/sqrt(
 the helical aw (the rms-convention error, exactly the mistake a translator would make)
 kills the gain outright and fails tier1 at 1.0 relative; deriving helicity from the
 wrong attribute (element key instead of `field_calc`) fails identically; and removing
-the `b_max` assertion is caught by the refusal gate — the lattice still dies, but on an
-unrelated downstream message instead of by name, which the gate's grep rejects.
+the `b_max` assertion is caught by the refusal check — the lattice still dies, but on an
+unrelated downstream message instead of by name, which the check's grep rejects.
 
-The thread-independence gate bites too: reintroducing a shared source accumulator across
+The thread-independence check bites too: reintroducing a shared source accumulator across
 slices (the exact state of the code before deliverable 5) puts the 1-thread and 8-thread
 runs apart by 7.0 relative in power -- while the mutated 1-thread run is IDENTICAL to the
 pristine one. That is the defining property of this bug class: invisible to every
@@ -340,7 +340,7 @@ of this deliverable was making the per-slice step safe to run concurrently:
 
 Because each slice's arithmetic is identical regardless of which thread runs it -- no
 cross-slice reductions exist in the step loop -- the result is **bit-identical across
-thread counts**, and the harness gates that: the time-dependent single-segment
+thread counts**, and the harness checks that: the time-dependent single-segment
 configuration reruns with `OMP_NUM_THREADS=8` against the 1-thread run, requiring the
 diag file byte-equal and every dump dataset exactly equal. (Whole-file `cmp` of HDF5
 would false-alarm on object-header timestamps; the comparison is per dataset.)
@@ -393,7 +393,7 @@ spent 68 s of system time on the per-step MPI slippage ring exchange and diagnos
 gather, where this code's slippage is an index rotation in shared memory and costs
 nothing to communicate.
 
-## Shot noise under weights (brief 6.2): the loader's noise is physical, and gated
+## Shot noise under weights (brief 6.2): the loader's noise is physical, and checked
 
 (Physics: manual `sec:loading`.)
 
@@ -414,7 +414,7 @@ the beamlet structure can resolve (`1..nbins-1`), not just the imposed ones, bec
 unquiet weight pattern can park its floor on a harmonic the imposition never touches
 (FINDINGS.md 7.7, found by this guard's own mutation test).
 
-Two permanent gates in the harness:
+Two permanent checks in the harness:
 
 - `check_shot_noise.py` (self-referenced, FINDINGS 6.9): many-seed loading-only runs,
   `<|b(h)|^2>*N_lambda` against 1 within 5/sqrt(n) for harmonics 1-3, uniform AND
@@ -423,12 +423,12 @@ Two permanent gates in the harness:
   its own noisy beam -- fully independent loaders and RNGs -- and the mean SASE startup
   power must agree. Measured ln ratio -0.003 (0.3 percent) over 6 seeds x 32 slices.
 
-Mutations bite: amplitudes from macroparticle count fail the statistical gate at 13-20x;
+Mutations bite: amplitudes from macroparticle count fail the statistical check at 13-20x;
 a slice-uniform electron count (weights ignored) passes uniform and fails the nonuniform
 mode at 1.52 (theory 1.5625); the within-beamlet weight mutation makes the guard refuse
 at 2.3e-1 against a 5.3e-5 target.
 
-These two gates are statistical by necessity (independent RNGs). The `tdsase` tier is
+These two checks are statistical by necessity (independent RNGs). The `tdsase` tier is
 their deterministic complement: Genesis generates the noisy beam, writes it, and both
 codes track the identical realization dark through the full line, so startup-from-noise
 is also compared elementwise like any other tier.
@@ -474,9 +474,9 @@ Genesis has them, neither transcribed as functional. one4one is out of scope: we
 supersede it.
 
 Validation (`scripts/check_import.py`, in the harness) splits along the RNG boundary
--- exact gates where no random number enters, statistical only where one does:
+-- exact checks where no random number enters, statistical only where one does:
 
-| Gate | Kind | Measured |
+| Check | Kind | Measured |
 |---|---|---|
 | per-slice current profile vs Genesis importing the SAME file | exact | **8.2e-13** of peak (24 slices) |
 | the generated bunch carries the specified emittance | exact | ex, ey within 3e-5 of spec |
@@ -484,15 +484,15 @@ Validation (`scripts/check_import.py`, in the harness) splits along the RNG boun
 | openPMD round trip (write_opmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
 | thread determinism (1 vs 8 threads, same seed) | exact | byte-identical diag |
 | slice Twiss/emittance recover the spec (mean, central slices) | statistical | beta 0.8%, alpha 1.0%, emit 1.4% |
-| dark-start startup power vs Genesis, independent resampling RNGs | statistical | ln ratio +0.023 (gate 0.30) |
+| dark-start startup power vs Genesis, independent resampling RNGs | statistical | ln ratio +0.023 (check 0.30) |
 
-Mutations bite, each on the gate built for it: normalizing the current by the slice
-spacing instead of `dslen` fails the exact current gate at 6.5e-1; skipping the shot
-noise fails the startup gate at ln ratio -57 (a dead-quiet start); collapsing the
-beamlet mirroring fails the startup gate at ln ratio +4.7. One planned mutation --
+Mutations bite, each on the check built for it: normalizing the current by the slice
+spacing instead of `dslen` fails the exact current check at 6.5e-1; skipping the shot
+noise fails the startup check at ln ratio -57 (a dead-quiet start); collapsing the
+beamlet mirroring fails the startup check at ln ratio +4.7. One planned mutation --
 refilling theta over 2pi instead of 2pi/nbins -- turned out to be an EQUIVALENT
 MUTANT: under the beamlet mirroring, a uniform seed over the full turn is uniform
-modulo one beamlet spacing, the quiet cancellation is untouched, and the gates
+modulo one beamlet spacing, the quiet cancellation is untouched, and the checks
 correctly pass it (FINDINGS.md 7.16). It is a convention, not a defect class; the
 load-bearing neighbor (the mirroring itself) is what gets mutation-tested. (A fourth
 mutation, the match transform's slope/momentum order, retired with the match
@@ -525,12 +525,12 @@ reported per event -- Genesis discards them silently at the world edges
 Genesis-comparison tiers run against Genesis without one4one, which never migrates, so
 enabling it inside a transcription-level comparison would be a model difference. The
 pass runs serially at a per-element stride between the parallel regions, so the
-thread-independence gate is untouched. Per-slice `current` and `n_eff` are appended to
+thread-independence check is untouched. Per-slice `current` and `n_eff` are appended to
 the diag columns -- N_eff drifts once particles migrate (brief 6.4) and is monitored,
 not assumed.
 
-Four permanent gates (`check_migration.py`, self-referenced per FINDINGS 6.9): charge
-conservation under heavy migration (a `gen_delgam = 60` beam, 74k moves, in-window
+Four permanent checks (`check_migration.py`, self-referenced per FINDINGS 6.9): charge
+conservation under heavy migration (a 60-m_ec² energy-spread beam, 74k moves, in-window
 charge plus reported drops equals initial charge at every record; measured 1.5e-14),
 exact phase continuity (the whole-beam weighted phasor obeys
 `S_before = S_after + S_dropped`; measured 6.9e-15), window residency (every surviving
@@ -546,7 +546,7 @@ survivors outside); removing the high-side bounds check dies on the constructed
 off-the-end mover with a bounds trap, never touching memory beyond the arrays
 (FINDINGS.md 7.8).
 
-## Wakes and space charge (brief 10 step 8): Genesis's granularity, gated
+## Wakes and space charge (brief 10 step 8): Genesis's granularity, checked
 
 (Physics: manual `sec:wakes`, `sec:spacecharge`.)
 
@@ -572,7 +572,7 @@ the better model long-term, Genesis's is transcribed now for consistency, and th
 comparison between the two is an explicit future task.
 
 Genesis's collective code carries more truncated constants than its FEL core, and each
-tier's gate is sized to the floor of the terms it enables:
+tier's check is sized to the floor of the terms it enables:
 
 | Term | Genesis constant | Floor | Measured tier |
 |---|---|---|---|
@@ -580,7 +580,7 @@ tier's gate is sized to the floor of the terms it enables:
 | roughness coefficient | `e = 1.6e-19`, `eps0 = 8.854e-12` | 1.4e-3 of that kernel | (inside tdwk) |
 | long-range space charge | `eps0 = 8.85e-12` | 4.7e-4 | tdsc 2.4e-4 |
 
-Self-referenced gates (`check_collective.py`): on a cold dark beam the wake is the only
+Self-referenced checks (`check_collective.py`): on a cold dark beam the wake is the only
 energy channel, and every record's `d<gamma>` must equal `eloss*dz/m_electron` exactly
 (measured 8.6e-11 against 4e-4 kicks, in gamma units at the time) with the energy
 spread invariant under the uniform
@@ -589,10 +589,10 @@ hid sigma-scale cancellation noise for five deliverables because nothing ever mo
 mean; FINDINGS.md 7.9); and under heavy migration the eloss blocks must multiply and
 change (49 blocks measured).
 
-Mutations bite, each on its named gate: reversing the convolution's causality (wake
+Mutations bite, each on its named check: reversing the convolution's causality (wake
 collected from trailing charge) fails tdwk at 7.0e-3 against its 8.7e-7 pristine;
 flipping the sign of `ez` fails tdsc at 9.1e-1; removing the migration-stride recompute
-leaves one eloss block and fails the stale-wake structural gate.
+leaves one eloss block and fails the stale-wake structural check.
 
 ## Bmad element wakes across the whole bunch (brief 10 step 11)
 
@@ -610,8 +610,8 @@ z_global = z_local + beta * (islice-1) * slice_spacing
 migration invariant run backward (a mover's z shifts by exactly -atar*beta*spacing),
 and the direction is triple-pinned: by that invariant, by the deliverable-8
 convolution (eloss collects `current(is+i)`, the wake trailing its source), and
-empirically by the causality gate. The deliverable-11 goal guessed the opposite sign;
-the gates corrected it. Interlude elements pass through Bmad's own `track1_bunch`
+empirically by the causality check. The deliverable-11 goal guessed the opposite sign;
+the checks corrected it. Interlude elements pass through Bmad's own `track1_bunch`
 (wake applied at `ds_wake`, Bmad's once-per-passage convention); FEL wigglers carrying
 `sr_wake` get one whole-window kick at the step nearest mid-element via
 `track1_sr_wake` directly -- a pure kick, no transport, with z rescaled by
@@ -630,11 +630,11 @@ per-slice path (the zero-charge INFO spam returning was the symptom). Zero-lengt
 elements are kept in the walk for the same reason (a wake on a marker-like element is
 a standard Bmad idiom); zero-length elements without wakes are skipped as before.
 
-Gates (`scripts/check_seam_wake.py`, self-referenced per FINDINGS 6.9, every wake
+Checks (`scripts/check_seam_wake.py`, self-referenced per FINDINGS 6.9, every wake
 measurement an A-B difference against a bit-identical no-wake run on a one-step
 wiggler so the FEL evolution cancels exactly):
 
-| Gate | Measured |
+| Check | Measured |
 |---|---|
 | constant-pseudomode closed form (W = amp, self = W(0)/2), per-slice means | **6.2e-10** |
 | causality: kick ahead of ALL charge (must be exactly zero) | **0.0** bitwise |
@@ -667,7 +667,7 @@ unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
 
 (Physics, conventions, and provenance: manual `sec:unaveraged`. MINERVA is the
 production existence proof — `minerva-code-analysis.md` — and a statistical
-~1e-3-class reference only, never a bit gate.)
+~1e-3-class reference only, never a bit check.)
 
 `und_transport = "unaveraged"` integrates the particles through the undulator's REAL
 field — the full Newton-Lorentz quiver, RK4 at `unavg_steps_per_period` (default 20;
@@ -683,7 +683,7 @@ wakes are refused by name. Each run writes `<out_root>.ledger.txt`.
 
 Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-form):
 
-| Gate | Measured | Gate level |
+| Check | Measured | Check level |
 |---|---|---|
 | energy ledger: max d(E_beam+U_field) over field-energy turnover | **1.0e-5** | 1e-4 |
 | ledger internal (kick-side vs realized beam change) | 1.0e-5 | 1e-4 |
@@ -701,7 +701,7 @@ exact energy duals — the ledger tightened 65× to the gamma-pz round-trip floo
 the period-averaged limit moves only ~5e-9; and the magnetic push is explicit RK4
 because fourth order is what makes fc measurable at 6e-4 with 20 steps/period — its
 non-symplecticity is priced at gamma exact / emittance ≤ 3.3e-6 over the longest
-benchmark segment (266 periods, 5320 steps), with the ballistic gate standing watch
+benchmark segment (266 periods, 5320 steps), with the ballistic check standing watch
 should production-length unaveraged runs ever appear.
 
 The JJ Bessel factor and its h=3 counterpart EMERGE from the raw dynamics at 6e-4 —
@@ -711,10 +711,10 @@ harmonic-load rule (the beamlet quiet start cancels every harmonic below `nbins`
 The h-probe is just the same undulator with the field at `lambda1/h`: the mode is
 harmonic-agnostic.
 
-Mutations bite, each on its named gate: flipping the E·v kick sign fails the ledger
+Mutations bite, each on its named check: flipping the E·v kick sign fails the ledger
 at 2.0 (energy created) and the gain comparison at 0.69 — while the magnitude-blind
-fc gates PASS it, which is why the ledger is gate zero; a hard-edge entry
-(`unavg_ramp_periods = 0`) fails the orbit-handoff gate at 3.2e-5 m (19 sigma of the
+fc checks PASS it, which is why the ledger is check zero; a hard-edge entry
+(`unavg_ramp_periods = 0`) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
 probe beam; note the exit momentum re-absorbs the quiver at integer-period lengths,
 so the ORBIT, not the exit mean px, is the reliable instrument — FINDINGS.md 7.24);
 skipping the exit handoff flag is refused by name at the first seam element.

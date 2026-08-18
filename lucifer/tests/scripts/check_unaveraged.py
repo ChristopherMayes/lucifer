@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Gates for the unaveraged verification mode (deliverable 13; fel-physics.tex
+Checks for the unaveraged verification mode (deliverable 13; fel-physics.tex
 sec:unaveraged). Self-referenced by design where the point is self-consistency (the
 energy ledger, ballistic conservation) and closed-form where the point is measuring
 the averaged mode's inputs (the coupling factor fc).
 
-1. ENERGY LEDGER (gate zero). A strong-seed helical probe: at every record,
+1. ENERGY LEDGER (check zero). A strong-seed helical probe: at every record,
    E_beam + U_field must be conserved -- the radiation kick and the source deposit are
    independent transcriptions of one wave equation, and only their consistency makes
-   this hold. Gate: max |d(E+U)| over the cumulative field-energy turnover.
+   this hold. Check: max |d(E+U)| over the cumulative field-energy turnover.
 
 2. BALLISTIC: a dark run's magnetic push does no work, EXACTLY (gamma only changes in
    the radiation kick), and the emittance survives the RK4 push through the ramps.
-   This also gates the handoff: with the sin^2 ramps the quiver vanishes at the
+   This also checks the handoff: with the sin^2 ramps the quiver vanishes at the
    segment ends, so the exit emittance equals the entry emittance; a hard-edge entry
    (unavg_ramp_periods = 0, the mutation) leaves the quiver in px and fails loudly.
 
@@ -73,19 +73,26 @@ PROBE = """&fel_track_params
   unavg_steps_per_period = {spp}
   unavg_ramp_periods = {ramp}
   lambda0 = {lam}
-  gen_current = 3000
-  gen_delgam = 0.01
-  gen_ex = 4e-9, gen_ey = 4e-9
-  gen_power = {power}
-  gen_waist_size = {w0}
-  gen_ngrid = 129
-  gen_dgrid = 2e-3
-  gen_npart = 2048
-  gen_nbins = 8
-  gen_seed = 4242
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = {q}
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-07
+  beam_init%a_norm_emit = 4e-9
+  beam_init%b_norm_emit = 4e-9
+  nbins = 8
+  seed_power = {power}
+  seed_waist_size = {w0}
+  grid_n_pts = 129
+  grid_half_width = 2e-3
+  ran_seed = 4242
   write_initial = T
 &end
 """
+
+def probe_nml(**kw):
+    """PROBE with the steady-state charge DERIVED: I = Q*c/spacing, spacing = lam."""
+    kw.setdefault("q", f"{3000 * float(kw['lam']) / 2.99792458e8:.12e}")
+    return PROBE.format(**kw)
 
 GAIN = """&fel_track_params
   lat_file = "{lat}"
@@ -94,16 +101,18 @@ GAIN = """&fel_track_params
   unavg_steps_per_period = 20
   unavg_ramp_periods = 2
   lambda0 = 1e-10
-  gen_current = 3000
-  gen_delgam = 1.0
-  gen_ex = 4e-7, gen_ey = 4e-7
-  gen_power = 5e3
-  gen_waist_size = 30e-6
-  gen_ngrid = 129
-  gen_dgrid = 2e-4
-  gen_npart = 2048
-  gen_nbins = 8
-  gen_seed = 4242
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  nbins = 8
+  seed_power = 5e3
+  seed_waist_size = 30e-6
+  grid_n_pts = 129
+  grid_half_width = 2e-4
+  ran_seed = 4242
 &end
 """
 
@@ -113,7 +122,7 @@ FAILED = False
 def check(name, value, tol, note=""):
     global FAILED
     ok = value <= tol
-    print(f"--- {name}: {value:.3e} (gate {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
+    print(f"--- {name}: {value:.3e} (check {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
     if not ok:
         FAILED = True
 
@@ -185,7 +194,7 @@ def main():
         (wd / lat).write_bytes((latdir / lat).read_bytes())
 
     # 1. Energy ledger: strong-seed helical long probe (real turnover per record).
-    run(exe, wd, "uv_ledger", PROBE.format(lat="unavg_probe_helical_b.bmad", root="uv_ledger",
+    run(exe, wd, "uv_ledger", probe_nml(lat="unavg_probe_helical_b.bmad", root="uv_ledger",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=1e8, w0=SEED_W0))
     led = np.loadtxt(wd / "uv_ledger.ledger.txt")
     etot = led[:, 1] + led[:, 2]
@@ -204,7 +213,7 @@ def main():
           np.abs(kick_col - dE_beam).max() / max(np.abs(dE_beam).max(), 1e-300), 1e-4)
 
     # 2. Ballistic dark run: B does no work; ramps hand the emittance back.
-    run(exe, wd, "uv_dark", PROBE.format(lat="unavg_probe_planar_b.bmad", root="uv_dark",
+    run(exe, wd, "uv_dark", probe_nml(lat="unavg_probe_planar_b.bmad", root="uv_dark",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=0.0, w0=SEED_W0))
     d0 = read_par(wd / "uv_dark-initial.par.h5")
     d1 = read_par(wd / "uv_dark-final.par.h5")
@@ -229,7 +238,7 @@ def main():
             ("helical", "unavg_probe_helical_a.bmad", "unavg_probe_helical_b.bmad", LAMBDA1, 1),
             ("planar_h3", "unavg_probe_planar_a.bmad", "unavg_probe_planar_b.bmad", LAMBDA1 / 3, 3)):
         for tag, lat in (("a", lat_a), ("b", lat_b)):
-            run(exe, wd, f"uv_{pol}_{tag}", PROBE.format(lat=lat, root=f"uv_{pol}_{tag}",
+            run(exe, wd, f"uv_{pol}_{tag}", probe_nml(lat=lat, root=f"uv_{pol}_{tag}",
                 spp=20, ramp=N_RAMP, lam=lam, power=SEED_P, w0=SEED_W0))
         fa = phasor(f"uv_{pol}_a", wd)
         fb = phasor(f"uv_{pol}_b", wd)
@@ -244,7 +253,7 @@ def main():
     fcs = {}
     for spp in (10, 30):
         for tag, lat in (("a", "unavg_probe_planar_a.bmad"), ("b", "unavg_probe_planar_b.bmad")):
-            run(exe, wd, f"uv_cv{spp}_{tag}", PROBE.format(lat=lat, root=f"uv_cv{spp}_{tag}",
+            run(exe, wd, f"uv_cv{spp}_{tag}", probe_nml(lat=lat, root=f"uv_cv{spp}_{tag}",
                 spp=spp, ramp=N_RAMP, lam=LAMBDA1, power=SEED_P, w0=SEED_W0))
         fcs[spp] = fc_measured(phasor(f"uv_cv{spp}_a", wd), phasor(f"uv_cv{spp}_b", wd), LAMBDA1, 1)
     fcs[20] = results["planar"][0]
@@ -263,9 +272,9 @@ def main():
           lnr, 0.2, note="(priced integrator-structure difference)")
 
     if FAILED:
-        print("UNAVERAGED GATES: FAIL")
+        print("UNAVERAGED CHECKS: FAIL")
         sys.exit(1)
-    print("unaveraged gates: PASS")
+    print("unaveraged checks: PASS")
 
 
 if __name__ == "__main__":

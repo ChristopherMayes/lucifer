@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Distribution-import gates (deliverable 10): the bunch_struct -> FEL slices resampler,
+Distribution-import checks (deliverable 10): the bunch_struct -> FEL slices resampler,
 transcribed from Genesis's SDDSBeam.cpp, validated along the RNG boundary.
 
 The driver generates a bunch from Bmad's beam_init_struct (a nm-scale Gaussian test
@@ -26,7 +26,7 @@ STATISTICAL (the resampling and loading RNG):
             the lattice Twiss and the beam_init emittance, central slices, ~percent.
   startup   Dark-start SASE power after one segment, ours vs Genesis's, each code
             resampling with its OWN RNG from the same file: mean over seeds and
-            slices within |ln ratio| < 0.30 (the check_sase_startup gate, reused).
+            slices within |ln ratio| < 0.30 (the check_sase_startup check, reused).
 
 Usage: check_import.py --exe <fel_track_test> --genesis <genesis4> --workdir <dir> [--seeds N]
 The workdir must hold Aramis-1seg.lat and aramis_1seg.bmad. Exit 0 on pass.
@@ -62,13 +62,13 @@ NML = """&fel_track_params
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
   lambda0 = {lambda0}
-  gen_sample = {sample}
-  gen_npart = 2048
-  gen_nbins = 8
-  gen_seed = {seed}
-  gen_power = 0
-  gen_ngrid = 255
-  gen_dgrid = 2e-4
+  window_sample = {sample}
+  imp%npart = 2048
+  imp%nbins = 8
+  ran_seed = {seed}
+  seed_power = 0
+  grid_n_pts = 255
+  grid_half_width = 2e-4
 {source}  imp%nslice = {nslice}
   imp%slicewidth = 0.01
 {extra}&end
@@ -162,7 +162,7 @@ def write_nml(path, root, seed, extra="", source=BEAM_INIT_SOURCE):
 
 
 def parse_stdout(log):
-    """The RNG-free lines the exactness gates read: moments and per-slice currents."""
+    """The RNG-free lines the exactness checks read: moments and per-slice currents."""
     text = pathlib.Path(log).read_text()
     m = re.search(r"import moments \([^)]*\):\s*(.*)", text)
     moments = np.array([float(v) for v in m.group(1).split()])
@@ -286,7 +286,7 @@ def main():
     # twiss (statistical): the imported dump's central slices recover the targets.
     # Statistics note: each slice has npart/nbins = 256 independent phase-space seeds,
     # so a single slice's Twiss carries ~1/sqrt(256) = 6% noise and a max over slices
-    # would gate on order statistics. Gate on the MEAN over central slices instead.
+    # would check on order statistics. Check on the MEAN over central slices instead.
     slices, cur = load_dump_slices(w/"impref-initial.par.h5")
     central = [i for i in range(len(slices)) if cur[i] > 0.5*cur.max()]
     berr, aerr, eerr = [], [], []
@@ -341,12 +341,54 @@ def main():
     m = (po > 0) & (pg > 0)
     lr = math.log(po[m].mean() / pg[m].mean())
     print(f"startup power ({args.seeds} seeds x {NSLICE} slices, {m.sum()} live): "
-          f"ln(P_bmad/P_genesis) = {lr:+.3f} (gate 0.30)")
+          f"ln(P_bmad/P_genesis) = {lr:+.3f} (check 0.30)")
     if abs(lr) > 0.30:
         print("FAIL: startup power after import disagrees between the codes")
         ok = False
 
-    print("import gates: " + ("PASS" if ok else "FAIL"))
+    # ---- Cross-path equivalence (the beam_init interface deliverable): the SAME
+    # Gaussian description, quiet-loaded directly (analytic per-slice evaluation) and
+    # imported (real particles resampled). The quiet-load must match the analytic
+    # Gaussian profile EXACTLY -- this is also the sqrt(2pi) mutation check on the
+    # driver's current derivation -- and the import must match it statistically.
+    (w/"imp_xq.nml").write_text(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
+        sample=SAMPLE, nslice=NSLICE, extra='  load_only = T\n',
+        source="""  beam_init%n_particle = 512
+  beam_init%a_norm_emit = {emit}
+  beam_init%b_norm_emit = {emit}
+  beam_init%sig_z = 1.2e-9
+  beam_init%sig_pz = {sig_pz}
+  beam_init%bunch_charge = 3.01e-14
+""".format(emit=NORM_EMIT, sig_pz=SIG_PZ)))
+    run([args.exe, "imp_xq.nml"], w/"imp_xq.log", env=env1)
+    cur_q = load_dump_currents(w/"impxq-initial.par.h5")
+    sp = SAMPLE * LAMBDA0
+    sig_z, q_charge = 1.2e-9, 3.01e-14
+    n_q = len(cur_q)
+    s_i = (np.arange(n_q) - (n_q - 1) / 2) * sp
+    ana = q_charge * 2.99792458e8 / (math.sqrt(2*math.pi) * sig_z) * np.exp(-s_i**2 / (2*sig_z**2))
+    dev_q = np.abs(cur_q - ana).max() / ana.max()
+    print(f"cross-path: quiet-load current vs analytic Gaussian: {dev_q:.2e} of peak (check 1e-12)")
+    if dev_q > 1e-12:
+        print("FAIL: the quiet-load's derived current is not the described Gaussian")
+        ok = False
+    # The import's profile (cur_ref, measured earlier from the same description):
+    # its own slice centers, bunch center fitted (the import min-shifts positions, and
+    # imp%nslice truncates the +4 sigma tail, so the fit is over a clipped profile --
+    # rms over the live slices is the honest statistic; the mutations this check exists
+    # to catch, a dropped sqrt(2pi) or dslen-for-spacing, sit at 0.65-1.5 of peak).
+    si = np.arange(len(cur_ref)) * sp
+    c0 = (cur_ref * si).sum() / cur_ref.sum()
+    ana_i = q_charge * 2.99792458e8 / (math.sqrt(2*math.pi) * sig_z) * np.exp(-(si - c0)**2 / (2*sig_z**2))
+    live = ana_i > 0.05 * ana_i.max()
+    dev_i = math.sqrt((((cur_ref - ana_i) / ana_i.max())**2)[live].mean())
+    print(f"cross-path: imported current vs the same Gaussian: rms {dev_i:.2e} of peak "
+          f"over {live.sum()} live slices (check 7e-2, statistical; measured 4.9e-2)")
+    if dev_i > 7e-2:
+        print("FAIL: import and quiet-load disagree about the described bunch")
+        ok = False
+
+    print("import checks: " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
 

@@ -1,6 +1,6 @@
 # Pure-SASE reference run: Aramis-td.in with the seed field removed (power = 0), so the
 # FEL grows from electron shot noise alone through the full line. This is the one
-# combination the seeded TD tiers and the statistical startup gate between them do not
+# combination the seeded TD tiers and the statistical startup check between them do not
 # cover: a DETERMINISTIC dark-start comparison -- both codes track the identical noisy
 # beam and identical (zero) field from the written dumps, so the whole startup-from-noise
 # path is compared elementwise like any other tier, not statistically.

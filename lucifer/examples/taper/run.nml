@@ -5,10 +5,8 @@
 !
 ! Same generated starting condition as the steady_state example, so the two gain curves
 ! are directly comparable: they separate where the taper begins (z = 31.92 m) and this
-! one ends higher. See the README for measured numbers and plotting.
-!
-! The Twiss values are the matched periodic solution of this FODO cell at this energy
-! (computed by Genesis's zmatch for the benchmark; any sensible near-matched values work).
+! one ends higher. See the README for measured numbers and plotting. The beam is the
+! steady_state example's beam_init description (3 kA via I = Q*c/spacing at sig_z = 0).
 
 &fel_track_params
   lat_file = "taper.bmad"
@@ -16,12 +14,15 @@
 
   lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
 
+  beam_init%n_particle = 8192
+  beam_init%bunch_charge = 1.000692285594e-15  ! 3 kA: I = Q*c/spacing.
+  beam_init%sig_z = 0                          ! Steady state.
+  beam_init%sig_pz = 8.804506566858e-5         ! delta_gamma = 1.0 m_e c^2.
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
 
-  gen_current = 3000           ! 3 kA slice current.
-  gen_delgam = 1.0             ! One electron rest mass of rms energy spread.
-  gen_ex = 4e-7, gen_ey = 4e-7 ! 0.4 um normalized emittance.
-  gen_power = 5e3              ! 5 kW seed...
-  gen_waist_size = 30e-6       ! ...with a 30 um waist at the entrance.
-  gen_ngrid = 255              ! Field grid: 255 x 255 points...
-  gen_dgrid = 2e-4             ! ...spanning +-0.2 mm.
+  seed_power = 5e3
+  seed_waist_size = 30e-6
+  grid_n_pts = 255
+  grid_half_width = 2e-4
 &end

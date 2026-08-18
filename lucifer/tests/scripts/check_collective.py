@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Self-referenced gates for the collective terms (deliverable 8; the Genesis-comparison
+Self-referenced checks for the collective terms (deliverable 8; the Genesis-comparison
 tiers live in compare_fel.py).
 
 1. Energy bookkeeping. A dark, quiet, cold beam (no seed, no shot noise, negligible
@@ -36,17 +36,21 @@ BASE = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
-  gen_current = 3000
-  gen_delgam = {delgam}
-  gen_ex = 4e-7, gen_ey = 4e-7
-  gen_power = 0
-  gen_ngrid = 65
-  gen_dgrid = 2e-4
-  gen_npart = 512
-  gen_nbins = 8
-  gen_slen = 2.4e-9
-  gen_sample = 3
-  gen_seed = 555
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 2.401661485427e-14
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -1.200000e-09
+  beam_init%grid(3)%x_max = 1.200000e-09
+  beam_init%sig_pz = {sig_pz}
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  seed_power = 0
+  grid_n_pts = 65
+  grid_half_width = 2e-4
+  nbins = 8
+  window_length = 2.4e-9
+  window_sample = 3
+  ran_seed = 555
   wake_on = T
   wake_radius = 2.5e-3
   wake_conductivity = 5.813e7
@@ -96,7 +100,7 @@ def main():
 
     # 1. Energy bookkeeping on a cold dark beam, one segment.
     run(exe, wd, "colle.nml", BASE.format(lat="aramis_1seg.bmad", root="colle",
-                                          delgam="0.001", extra=""))
+                                          sig_pz="8.804506566858e-8", extra=""))
     eloss = wake_blocks(wd / "colle.wake.txt")[0][1]
     d = np.loadtxt(wd / "colle.diag.txt")
     ns = int(d[:, 1].max())
@@ -121,7 +125,7 @@ def main():
 
     # 2. Stale-wake structure: heavy migration must force recomputes that change eloss.
     run(exe, wd, "collm.nml", BASE.format(lat="aramis.bmad", root="collm",
-        delgam="60.0", extra="  migrate = T\n"))
+        sig_pz="5.282703940115e-3", extra="  migrate = T\n"))
     blocks = wake_blocks(wd / "collm.wake.txt")
     changed = len(blocks) > 1 and any(
         not np.array_equal(blocks[0][1], b[1]) for _, b in [(None, blk) for _, blk in blocks[1:]])
@@ -130,7 +134,7 @@ def main():
     print(f"--- stale-wake structure: {len(blocks)} eloss blocks under heavy migration, "
           f"changed = {changed}  {'ok' if m_ok else 'FAIL'}")
 
-    print("collective gates:", "PASS" if ok else "FAIL")
+    print("collective checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 

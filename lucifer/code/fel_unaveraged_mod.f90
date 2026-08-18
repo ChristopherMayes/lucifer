@@ -54,9 +54,9 @@
 ! paying implicit iterations). The structural cost is measured, not argued: gamma is
 ! conserved EXACTLY by construction (B does no work; gamma changes only in the kick),
 ! and over the longest benchmark segment -- 266 periods, 5320 steps -- the dark-run
-! emittance drifts by <= 3.3e-6, orders below every gate. If production-length
+! emittance drifts by <= 3.3e-6, orders below every check. If production-length
 ! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
-! composition; the ballistic gate is the instrument that will say when.
+! composition; the ballistic check is the instrument that will say when.
 !
 ! Serial over slices BY DECISION: this is a verification mode run on few slices; the
 ! thread-independence property of the production path is untouched because this path
@@ -148,7 +148,7 @@ end subroutine fel_unavg_setup
 ! The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
 ! flat 1, sin^2 down over the last l_ramp -- continuous amplitude AND slope (the
 ! slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
-! the hard-edge MUTATION configuration; the handoff gate exists to catch it.
+! the hard-edge MUTATION configuration; the handoff check exists to catch it.
 !-
 
 function fel_unavg_envelope (ustate, s, gp) result (g)
@@ -235,7 +235,7 @@ end subroutine fel_unavg_bfield
 ! it back and restores the flag. beam%phi0 advances at the averaged ponderomotive
 ! rate so every diagnostic row stays comparable; the optical carrier used internally
 ! is Psi = (phi0 - ku*s) - ks*tau. dE_beam returns the weighted particle energy
-! change of this step [J] for the energy-ledger gate.
+! change of this step [J] for the energy-ledger check.
 !-
 
 subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, err_flag)
@@ -367,7 +367,7 @@ do is = 1, nslice
         ! per-substep energy exchange cancel identically (the diffraction between
         ! substeps is unitary), leaving only physical spontaneous emission in the
         ! ledger. The period-averaged limit shifts by beta_par ~ 5e-9 -- five orders
-        ! below the fc gates. A merit choice, not a transcription (sec:unaveraged).
+        ! below the fc checks. A merit choice, not a transcription (sec:unaveraged).
         cdep = cmplx(0.0_rp, 1.0_rp, rp) * exp(cmplx(0.0_rp, -(psi_mid - ks*tau(ip)), rp)) &
                * jhat * scl_u * sl%weight(ip) / u_s
         crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cdep

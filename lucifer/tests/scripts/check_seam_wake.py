@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Seam-wake gates (deliverable 11): Bmad element sr wakes applied across the WHOLE time
+Seam-wake checks (deliverable 11): Bmad element sr wakes applied across the WHOLE time
 window, validated without Genesis (self-referenced and against the deliverable-8 wake
 model; FINDINGS 6.9). Every wake measurement is an A-B difference between a run with
 the wake and a bit-identical run without it, on a single one-step wiggler, so the FEL
 evolution cancels exactly and what remains IS the kick.
 
-Gates:
+Checks:
 
   ramp      Closed form, exact: a constant pseudomode (k = 0, phi = 0.25, damp = 0 --
             Bmad's W(dz) = amp*exp(damp*dz)*sin(2pi*phi + k*dz), self = W(0)/2) on a
@@ -24,7 +24,7 @@ Gates:
             numpy convolution of the same table with the actual particle distribution
             (tight, method-identical), and the wake_on model's eloss (slice-density
             convolution of the same kernel) prices the methodological difference --
-            reported, gated loosely at the derived level.
+            reported, checked loosely at the derived level.
   split     Split-weight invariance: w/3 + 2w/3 coincident copies leave the A-B kick
             profile unchanged to roundoff (the wake is linear in charge).
   threads   1 vs 8 threads with a wake element: byte-identical diag.
@@ -77,31 +77,42 @@ NML_GEN = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
-  gen_sample = {sample}
-  gen_npart = 512
-  gen_nbins = 8
-  gen_seed = 777
-  gen_current = 3000
-  gen_delgam = 0.0
-  gen_ex = 4e-7, gen_ey = 4e-7
-  gen_power = 0
-  gen_ngrid = 63
-  gen_dgrid = 2e-4
-  gen_slen = {slen}
+  window_sample = {sample}
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = {q}
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -{half}
+  beam_init%grid(3)%x_max = {half}
+  beam_init%sig_pz = 0
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  nbins = 8
+  ran_seed = 777
+  seed_power = 0
+  grid_n_pts = 63
+  grid_half_width = 2e-4
+  window_length = {slen}
 {extra}&end
 """
+
+def gen_nml(**kw):
+    """NML_GEN with the flat-bunch charge DERIVED from the window: I = Q*c/extent."""
+    slen = float(kw["slen"])
+    kw.setdefault("q", f"{3000 * slen / 2.99792458e8:.12e}")
+    kw.setdefault("half", f"{slen / 2:.9e}")
+    return NML_GEN.format(**kw)
 
 NML_IMP = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
-  gen_sample = {sample}
-  gen_npart = 512
-  gen_nbins = 8
-  gen_seed = 777
-  gen_power = 0
-  gen_ngrid = 63
-  gen_dgrid = 2e-4
+  window_sample = {sample}
+  imp%npart = 512
+  imp%nbins = 8
+  ran_seed = 777
+  seed_power = 0
+  grid_n_pts = 63
+  grid_half_width = 2e-4
   use_beam_init = T
   beam_init%n_particle = 20000
   beam_init%a_norm_emit = 4e-7
@@ -154,8 +165,8 @@ def main():
 
     # ---------------- ramp: uniform cold quiet beam, 12 slices, constant wake
     slen = 12 * SPACING
-    (w/"wr_a.nml").write_text(NML_GEN.format(lat="wl_mode.bmad", root="wra", sample=SAMPLE, slen=slen, extra=""))
-    (w/"wr_b.nml").write_text(NML_GEN.format(lat="wl_none.bmad", root="wrb", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wr_a.nml").write_text(gen_nml(lat="wl_mode.bmad", root="wra", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wr_b.nml").write_text(gen_nml(lat="wl_none.bmad", root="wrb", sample=SAMPLE, slen=slen, extra=""))
     run(exe, "wr_a.nml", "wra.log", w)
     run(exe, "wr_b.nml", "wrb.log", w)
     A, B = load_par(w, "wra"), load_par(w, "wrb")
@@ -204,8 +215,8 @@ def main():
     (w/"wl_lordn.bmad").write_text(
         LAT_BASE.format(l=L_ELE, wake="").replace("SEGW: line = (UNDW)",
         f"PW: pipe, l = {L_PIPE}\nMK: marker, superimpose, ref = PW\nSEGW: line = (UNDW, PW)"))
-    (w/"wo_a.nml").write_text(NML_GEN.format(lat="wl_lordw.bmad", root="woa", sample=SAMPLE, slen=slen, extra=""))
-    (w/"wo_b.nml").write_text(NML_GEN.format(lat="wl_lordn.bmad", root="wob", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wo_a.nml").write_text(gen_nml(lat="wl_lordw.bmad", root="woa", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wo_b.nml").write_text(gen_nml(lat="wl_lordn.bmad", root="wob", sample=SAMPLE, slen=slen, extra=""))
     run(exe, "wo_a.nml", "woa.log", w)
     run(exe, "wo_b.nml", "wob.log", w)
     A, B = load_par(w, "woa"), load_par(w, "wob")
@@ -319,8 +330,8 @@ def main():
     # Tolerance: Bmad bins at its own dz with linear deposition/interpolation and a
     # half-self-bin treatment that differs from the exact half-self above at the level
     # of (particle spread inside a bin)/(kernel scale). With the table at dz ~ lambda0
-    # and the kernel varying over ~um, that is ~1e-2 of the kick. Gate at 5e-2.
-    print(f"z_long vs first-principles particle convolution: worst charged-slice rel = {worst_m:.3e} (gate 5e-2)")
+    # and the kernel varying over ~um, that is ~1e-2 of the kick. Check at 5e-2.
+    print(f"z_long vs first-principles particle convolution: worst charged-slice rel = {worst_m:.3e} (check 5e-2)")
     if worst_m > 5e-2:
         print("FAIL: Bmad z_long kick does not match the kernel convolution")
         ok = False
@@ -331,17 +342,17 @@ def main():
             continue
         dg_bmad = (a["gamma"] - b["gamma"]).mean()
         print(f"  slice {i+1}: dgamma z_long {dg_bmad:+.4e}, wake_on {dg_d8[i]:+.4e} "
-              f"(methodological difference, reported not gated)")
+              f"(methodological difference, reported not checked)")
 
     # On a RESOLVED beam (uniform current, structure much wider than a slice) the two
-    # methods must converge: gate their per-slice dgamma agreement on interior slices.
+    # methods must converge: check their per-slice dgamma agreement on interior slices.
     # Tolerance derivation: the remaining differences are the self-slice treatment
     # (halved W(0) on slice sums vs particle-level pairs, ~1/(2*nslice) of the kick),
     # slice-center vs particle-position binning (~(spacing/kernel scale)^2), and the
-    # once-per-element vs per-step application (identical here: one step). Gate 5e-2.
-    (w/"wu_a.nml").write_text(NML_GEN.format(lat="wl_zlong.bmad", root="wua", sample=SAMPLE, slen=slen, extra=""))
+    # once-per-element vs per-step application (identical here: one step). Check 5e-2.
+    (w/"wu_a.nml").write_text(gen_nml(lat="wl_zlong.bmad", root="wua", sample=SAMPLE, slen=slen, extra=""))
     run(exe, "wu_a.nml", "wua.log", w)
-    (w/"wu_d8.nml").write_text(NML_GEN.format(lat="wl_none.bmad", root="wud8", sample=SAMPLE, slen=slen,
+    (w/"wu_d8.nml").write_text(gen_nml(lat="wl_none.bmad", root="wud8", sample=SAMPLE, slen=slen,
         extra="  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n"))
     run(exe, "wu_d8.nml", "wud8.log", w)
     AU = load_par(w, "wua")
@@ -359,7 +370,7 @@ def main():
     # this window the kernel is effectively constant (its scale, ~8 um, dwarfs the nm
     # window), so slice i's kick collects (n - i + 1/2) slices of charge ahead+self and
     # the head deficit predicts a fractional difference b_i = 0.5/(n - i + 0.5).
-    # Gate each interior slice at 1.5*b_i + 2e-2 (margin for the interpolation shape).
+    # Check each interior slice at 1.5*b_i + 2e-2 (margin for the interpolation shape).
     worst_excess = 0.0
     nA = len(AU)
     for i in range(1, nA - 1):
@@ -370,7 +381,7 @@ def main():
         worst_excess = max(worst_excess, rel / bound)
         if i in (1, nA//2, nA-2):
             print(f"  uniform slice {i+1}: rel diff {rel:.3e}, derived bound {bound:.3e}")
-    print(f"resolved-beam cross-validation (z_long vs wake_on): worst rel/bound = {worst_excess:.3f} (gate 1)")
+    print(f"resolved-beam cross-validation (z_long vs wake_on): worst rel/bound = {worst_excess:.3f} (check 1)")
     if worst_excess > 1:
         print("FAIL: the two wake implementations disagree beyond the derived boundary term")
         ok = False
@@ -393,8 +404,8 @@ def main():
     # Tolerance: the exact invariant is the CHARGE-weighted kick; the dump carries no
     # weights, and the unweighted slice mean additionally moves because splitting
     # changes the resampler's candidate pools (same currents, different draws) -- an
-    # in-slice self-term-scale effect, ~q_slice/(2*Q_tot*npart) of the kick. Gate 2e-9.
-    print(f"split-weight invariance of the kick profile: {worst_s:.3e} (gate 2e-9)")
+    # in-slice self-term-scale effect, ~q_slice/(2*Q_tot*npart) of the kick. Check 2e-9.
+    print(f"split-weight invariance of the kick profile: {worst_s:.3e} (check 2e-9)")
     if worst_s > 2e-9:
         print("FAIL: wake kick not invariant under coincident weight splitting")
         ok = False
@@ -409,7 +420,7 @@ def main():
         print("FAIL: wake path not thread-count independent")
         ok = False
 
-    print("seam-wake gates: " + ("PASS" if ok else "FAIL"))
+    print("seam-wake checks: " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
 

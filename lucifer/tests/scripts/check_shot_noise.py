@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Statistical gate for the weighted shot-noise loader (deliverable 6, FINDINGS 6.9: a
+Statistical check for the weighted shot-noise loader (deliverable 6, FINDINGS 6.9: a
 feature Genesis cannot represent is tested against its own statistics, not a reference).
 
 Physics under test: after quiet loading plus Fawley-style noise, each slice's bunching
@@ -12,7 +12,7 @@ Method: run fel_track_test with load_only = T over many seeds, in both weight mo
 constant charge). Read each .par.h5, compute the charge-weighted |b(h)|^2 per slice for
 the imposed harmonics, and test the scaled mean m = <|b(h)|^2 * N_lambda> against 1.
 b is a sum of many independent beamlet contributions, so |b|^2*N_lambda is Exp(1) to
-excellent approximation and the mean over n samples has sigma = 1/sqrt(n); the gate is
+excellent approximation and the mean over n samples has sigma = 1/sqrt(n); the check is
 |m - 1| < 5/sqrt(n) per weight mode, plus a looser per-harmonic check (n/3 samples).
 
 Usage: check_shot_noise.py --exe <fel_track_test> --workdir <dir> [--seeds N] [--lat <bmad file>]
@@ -35,19 +35,23 @@ NML = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
-  gen_current = 3000
-  gen_delgam = 1.0
-  gen_ex = 4e-7, gen_ey = 4e-7
-  gen_power = 0
-  gen_ngrid = 33
-  gen_dgrid = 2e-4
-  gen_npart = 1024
-  gen_nbins = 8
-  gen_slen = 4.8e-9
-  gen_sample = 3
-  gen_shotnoise = T
+  beam_init%n_particle = 1024
+  beam_init%bunch_charge = 4.803322970853e-14
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -2.400000e-09
+  beam_init%grid(3)%x_max = 2.400000e-09
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  seed_power = 0
+  grid_n_pts = 33
+  grid_half_width = 2e-4
+  nbins = 8
+  window_length = 4.8e-9
+  window_sample = 3
+  shotnoise = T
   gen_test_weights = {testw}
-  gen_seed = {seed}
+  ran_seed = {seed}
   load_only = T
 &end
 """
@@ -130,7 +134,7 @@ def main():
             ok = ok and goodh
             print(f"      harmonic {h}: {mh:.4f} (+- {bh:.3f})  {'ok' if goodh else 'FAIL'}")
 
-    print("shot-noise statistical gate:", "PASS" if ok else "FAIL")
+    print("shot-noise statistical check:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 

@@ -27,14 +27,14 @@
 
   lambda0 = 1e-10              ! 1 Angstrom.
 
-  gen_sample = 3               ! Slice spacing 3*lambda0, slippage-matched.
-  gen_npart = 2048             ! Macroparticles per slice after resampling...
-  gen_nbins = 8                ! ...in beamlets of 8.
-  gen_seed = 12345
+  window_sample = 3            ! Slice spacing 3*lambda0, slippage-matched.
+  imp%npart = 2048             ! Macroparticles per slice after resampling...
+  imp%nbins = 8                ! ...in beamlets of 8.
+  ran_seed = 12345
 
-  gen_power = 0                ! Dark start: the light grows from the imported bunch.
-  gen_ngrid = 255
-  gen_dgrid = 2e-4
+  seed_power = 0               ! Dark start: the light grows from the imported bunch.
+  grid_n_pts = 255
+  grid_half_width = 2e-4
 
   use_beam_init = T            ! The bunch, in Bmad's native description:
   beam_init%n_particle = 50000

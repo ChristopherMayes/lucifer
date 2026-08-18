@@ -9,7 +9,7 @@ the mean startup power validates the noise level and nothing else.
 
 Statistics: per side, mean over slices and seeds of the final-record slice power. Slice
 powers are near-exponentially distributed, so with n samples the mean carries a relative
-sigma of about 1/sqrt(n); the gate is |ln(P_bmad/P_genesis)| < 0.30, roughly 3 sigma at
+sigma of about 1/sqrt(n); the check is |ln(P_bmad/P_genesis)| < 0.30, roughly 3 sigma at
 the default 6 seeds x 32 slices per side and far below the factor-type errors a wrong
 noise normalization produces.
 
@@ -71,18 +71,22 @@ BMAD_NML = """&fel_track_params
   lat_file = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
   lambda0 = 1e-10
-  gen_current = 3000
-  gen_delgam = 1.0
-  gen_ex = 4e-7, gen_ey = 4e-7
-  gen_power = 0
-  gen_ngrid = 255
-  gen_dgrid = 2e-4
-  gen_npart = 2048
-  gen_nbins = 8
-  gen_slen = 9.6e-9
-  gen_sample = 3
-  gen_shotnoise = T
-  gen_seed = {seed}
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 9.606645941707e-14
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -4.800000e-09
+  beam_init%grid(3)%x_max = 4.800000e-09
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  seed_power = 0
+  grid_n_pts = 255
+  grid_half_width = 2e-4
+  nbins = 8
+  window_length = 9.6e-9
+  window_sample = 3
+  shotnoise = T
+  ran_seed = {seed}
 &end
 """
 

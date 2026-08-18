@@ -486,7 +486,7 @@ phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 ! below, and slippage in the caller. Inside the loops each slice touches only its own
 ! particle arrays and its own field slice (the beam-to-field mapping is a bijection),
 ! and each slice's arithmetic is independent of which thread runs it, so results are
-! bit-identical across thread counts -- the gate the benchmark harness holds.
+! bit-identical across thread counts -- the check the benchmark harness holds.
 
 ngrid_arr = wavefront_shape(wf)
 call fel_field_kernel_init (ngrid_arr(1), wf%dx, ks, und%dz)
@@ -594,7 +594,7 @@ call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
 
 ! The per-particle temporaries live at routine scope, so the parallel loop must make
 ! them private explicitly; a missed one here is a race, which is what the harness's
-! thread-count-independence gate exists to catch.
+! thread-count-independence check exists to catch.
 
 !$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope, p_mc)
 do is = 1, size(beam%slice)

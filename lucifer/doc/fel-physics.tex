@@ -25,7 +25,7 @@ The code references these sections by label; the validation harness
 closed forms, or against independent implementations, and the measured levels live in
 \code{bsim/fel/README.md}. Each section ends with a \emph{Provenance} note (the Genesis
 routine the physics was transcribed from, moved here from the source comments) and a
-\emph{Validation} note (which gate pins it). The physics was transcribed from Genesis
+\emph{Validation} note (which check pins it). The physics was transcribed from Genesis
 (GPL permits transcription), validated at transcription level, and then re-expressed in
 Bmad's units and conventions; the transcription-era agreement is banked in the README.
 
@@ -112,8 +112,8 @@ $E = \mathit{dfl}\,\sqrt{2 Z_0}/\mathit{dgrid}$.
 \begin{validation}
 The chart is exercised by every tier; the theta identity specifically by the
 bit-identity of the shot-noise-off loader against the deliverable-4 baseline, and
-Eq.~\ref{eq:zglobal} by the migration phase-continuity gate ($6.9\times10^{-15}$) and
-the seam-wake causality gate (exactly zero ahead of all charge).
+Eq.~\ref{eq:zglobal} by the migration phase-continuity check ($6.9\times10^{-15}$) and
+the seam-wake causality check (exactly zero ahead of all charge).
 \end{validation}
 
 \section{The FEL element}\label{sec:element}
@@ -148,7 +148,7 @@ $0/1$ planar, scaled by $k_u^2$ in the unroll); the step rule from
 \begin{validation}
 The element-driven line reproduces the namelist-driven reference bit-identically at
 $z=0$, growing to $3.4\times10^{-12}$ (the 1-ulp $a_w$ attribute round trip); the
-assertion gates refuse each malformed lattice by name; mutations (rms factor, wrong
+assertion checks refuse each malformed lattice by name; mutations (rms factor, wrong
 helicity attribute) fail tier1 at $\sim$1.0 relative.
 \end{validation}
 
@@ -338,7 +338,7 @@ $f_c\,\mathit{vacimp}\,I\,k_s\,\delta z/(4\,\mathit{eev}\,n\,\mathit{dgrid}^2)$
 converts to Eq.~\ref{eq:source} by \S\ref{sec:units}.
 \end{provenance}
 \begin{validation}
-tier1/td1 at the constants floor; the split-weight gate ($3.6\times10^{-13}$) pins the
+tier1/td1 at the constants floor; the split-weight check ($3.6\times10^{-13}$) pins the
 weighted deposition; the dropped-factor-2 mutation fails tier1 at $3.5\times10^{-1}$.
 \end{validation}
 
@@ -381,6 +381,29 @@ per-slice power comparison.
 
 \subsection{Quiet start}\label{sec:quiet}
 
+\emph{One description, two generation methods.} The beam is described by Bmad's
+standard \code{beam\_init} structure in both generated paths: the import
+(\S\ref{sec:import}) resamples real particles from it; the quiet-start loader here
+evaluates it \emph{analytically} per slice. The loader honors
+\code{n\_particle} (per slice), \code{a\_norm\_emit}/\code{b\_norm\_emit},
+\code{sig\_pz} ($\delta\gamma = \beta_0 p_0 \,\code{sig\_pz}/mc$),
+\code{bunch\_charge}, \code{sig\_z} and \code{distribution\_type(3)}, and REFUSES BY
+NAME every other field that is set --- a standard structure that silently dropped
+fields would be worse than a custom one. The Twiss is always the lattice's
+(\S\ref{sec:element}'s one-truth rule), and the current is \emph{derived}, never
+input:
+\begin{equation}\label{eq:derivedcurrent}
+  I(s_i) = \frac{Q c}{\sqrt{2\pi}\,\sigma_z}\, e^{-s_i^2/2\sigma_z^2}
+  \;\;\text{(Gaussian)}, \qquad
+  I = \frac{Q c}{x_{\max}-x_{\min}} \;\;\text{(GRID: Bmad's uniform, flat)},
+\end{equation}
+evaluated at the slice centers with the bunch centered in the window; $\sigma_z = 0$
+is the steady state --- the whole charge in one slice window, $I = Qc/\Delta s$ ---
+and is refused by name for time-dependent windows. The default window covers the
+described bunch ($\pm4\sigma_z$ Gaussian; the grid extent flat), exactly as the
+import derives its window from real particles; \code{window\_length} overrides it
+for slippage headroom and warns with numbers when it clips the bunch.
+
 Generated slices load $m = n_{\mathrm{part}}/n_{\mathrm{bins}}$ beamlets: each beamlet
 draws one 4D transverse sample and one energy sample, replicated at $n_{\mathrm{bins}}$
 phases $\theta = \theta_0 + j\,2\pi/n_{\mathrm{bins}}$, so every bunching harmonic
@@ -413,11 +436,16 @@ w_b/e$ (identical for uniform weights). Shared code between the generator and th
 distribution import.
 \end{provenance}
 \begin{validation}
-Statistical gate $\langle|b|^2\rangle N_\lambda = 1.03\pm0.14$, uniform and
+Statistical check $\langle|b|^2\rangle N_\lambda = 1.03\pm0.14$, uniform and
 $0.25\times/1.75\times$ beamlet weights; cross-loader SASE startup to 0.3\%;
 mutations at 13--20$\times$ (macroparticle-count amplitudes) and 1.52
 (weights ignored). The guard's own mutation test exposed the $n_{\mathrm{bins}}/2$
-blind spot that fixed its sweep range.
+blind spot that fixed its sweep range. The description contract: the quiet-load
+current profile matches Eq.~\ref{eq:derivedcurrent} exactly ($9.9\times10^{-15}$ of
+peak; a dropped $\sqrt{2\pi}$ fails at $1.5$), the import of the same Gaussian
+description agrees at rms $4.9\times10^{-2}$ of peak (statistical, 50k particles,
+truncated-tail fit); a set-but-unhonored \code{beam\_init} field refuses by name; a
+clipping \code{window\_length} warns with numbers.
 \end{validation}
 
 \section{Distribution import}\label{sec:import}
@@ -683,7 +711,7 @@ $1/\gamma$ convention. The period-averaged limit shifts by
 $O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
 \S\ref{sec:coupling} --- the $JJ$ Bessel factor emerges from the figure-8.
 
-\emph{The energy ledger} (gate zero, written per record step to
+\emph{The energy ledger} (check zero, written per record step to
 \code{<out\_root>.ledger.txt}): conservation of
 \begin{equation}\label{eq:ledger}
   E_{\mathrm{beam}} + U, \qquad
@@ -696,7 +724,7 @@ changes are not differenced off a large baseline at its own summation-rounding f
 \S\ref{sec:field}. The kick-side change is written alongside as an internal
 cross-check. The one physical term the ledger does not balance is spontaneous
 emission (the $|\mathrm{src}|^2$ the SVEA deposit adds without debiting a particle,
-as in Genesis and MINERVA); the gate level sits above it. The physical field of the
+as in Genesis and MINERVA); the check level sits above it. The physical field of the
 scalar envelope: planar $E_x = \mathrm{Re}[-i\hat E e^{i\Psi}]$; helical
 $(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], -\mathrm{Re}[\hat E e^{i\Psi}])/\sqrt2$
 --- both give intensity $|\hat E|^2/2Z_0$, so \S\ref{sec:field}'s power diagnostic is
@@ -724,7 +752,7 @@ convention flag); \code{minerva-code-analysis.md} (MINERVA 2.0, the production
 existence proof: the 10--30 steps/period envelope, the energy-ledger practice, the
 $\sin^2$ ramp treatment, kinematic phase everywhere). MINERVA's standing here is a
 statistical $\sim$$10^{-3}$-class reference ONLY --- truncated constants (emass to
-six digits, awfac), Runge-Kutta-Gill --- never a bit gate; no MINERVA code was
+six digits, awfac), Runge-Kutta-Gill --- never a bit check; no MINERVA code was
 transcribed, and MINERVA precedent decided nothing here on its own. The magnetic
 push is explicit RK4 on merit: fourth order is what makes $f_c$ measurable at
 $6\times10^{-4}$ with 20 steps/period (second-order symplectic needs $\sim$100 to
@@ -734,19 +762,19 @@ emittance drift $\le 3.3\times10^{-6}$ over the longest benchmark segment
 \end{provenance}
 \begin{validation}
 \code{check\_unaveraged.py}, all self-referenced or closed-form: energy ledger
-$1.0\times10^{-5}$ of the field-energy turnover (gate $10^{-4}$; degenerate with the
+$1.0\times10^{-5}$ of the field-energy turnover (check $10^{-4}$; degenerate with the
 $\gamma\leftrightarrow p_z$ round-trip floor once the deposit uses $1/u_s$ --- it was
 $6.7\times10^{-4}$ under the $1/\gamma$ convention); ledger internal
 kick-vs-realized $1.0\times10^{-5}$; ballistic $\Delta\gamma$ exactly zero,
 emittance handoff $9.8\times10^{-11}$, orbit handoff $1.9\times10^{-9}$ m;
 $f_c$ measured vs closed form: planar $0.75051$ vs $0.75095$, helical $0.84803$ vs
 $0.84853$, $h{=}3$ planar $0.21287$ vs $0.21302$ --- all $\sim$$6\times10^{-4}$
-relative (gates $5\times10^{-3}$); step-size convergence $f_c(10/20/30$ per period$)
+relative (checks $5\times10^{-3}$); step-size convergence $f_c(10/20/30$ per period$)
 = 0.750582/0.750505/0.750502$; full-segment gain curve vs the averaged mode
-$|\ln$ ratio$| = 2.6\times10^{-3}$ at exit (priced, gate $0.2$). Mutations: the
+$|\ln$ ratio$| = 2.6\times10^{-3}$ at exit (priced, check $0.2$). Mutations: the
 $E\cdot v$ sign fails the ledger at $2.0$ and the gain comparison at $0.69$ (the
-magnitude-blind $f_c$ gates pass it --- why the ledger is gate zero); a hard-edge
-entry fails the orbit-handoff gate at $3.2\times10^{-5}$ m ($19\sigma$; NOTE the
+magnitude-blind $f_c$ checks pass it --- why the ledger is check zero); a hard-edge
+entry fails the orbit-handoff check at $3.2\times10^{-5}$ m ($19\sigma$; NOTE the
 exit momentum re-absorbs the quiver at integer periods, so the orbit, not
 $\langle p_x\rangle$, is the reliable instrument); a skipped exit handoff is refused
 by name at the first seam element.
@@ -788,13 +816,13 @@ drift.
 cache is threadprivate, the $K_2$ kernel and its step propagator $e^{K_2\delta z}$
 build serially before parallel loops and are read-only inside them, source
 accumulators are per call, and slippage/migration/wake updates run at barriers. Each slice's arithmetic is independent of which thread runs
-it, so results are bit-identical across thread counts --- a gated property, and the
+it, so results are bit-identical across thread counts --- a checked property, and the
 only instrument that catches shared-accumulator races (invisible to every
 single-threaded check).
 
 \begin{validation}
 FINDINGS.md 4.8, 7.9, 7.10, 7.14, 7.18; the coarse-step table in the README; the
-thread gate and its shared-accumulator mutation (7.0 relative between thread counts,
+thread check and its shared-accumulator mutation (7.0 relative between thread counts,
 bit-identical single-threaded).
 \end{validation}
 
