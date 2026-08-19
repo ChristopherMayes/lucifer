@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 """
-Plot the standard diagnostics of a fel_track_test run from its .diag.txt file.
+Plot the standard diagnostics of a fel_track_test run from its stats file.
 
-    python plot_fel.py steady_state.diag.txt            # writes steady_state.png
-    python plot_fel.py run.diag.txt -o gain.png --show
+    python plot_fel.py run.stats.h5              # writes run.png
+    python plot_fel.py run.stats.h5 -o gain.png --show
 
-Seven panels against z: radiation power (log and linear), FIELD ENERGY in the
-window (log and linear,
-joules -- the honest growth curve for SASE, since per-slice power fluctuates as
-radiation slips through and out of the window while the window energy grows
-smoothly), bunching, beam energy change and rms spread (MeV -- Bmad's convention:
-energy means eV, never gamma), and transverse rms beam sizes. Works on
-steady-state and time-dependent files alike: with more than one slice, thin gray
-lines show every slice and the bold line the total (power, energy) or the plain
-slice average (everything else). The field-energy scaling U = P*slice_spacing/c
-reads slice_spacing from the diag header.
+The stats file (manual sec:stats) carries per-record, per-slice beam MOMENTS (named as
+bunch_params_struct components) and wavefront_params, in fixed Bmad units -- everything
+below derives from it, no text files involved. Ten panels against z:
 
-Needs numpy and matplotlib (the bmad-fel-validate environment has both).
+  radiation power and window field energy (log and linear -- the log pair shows the
+  exponential gain regime, the linear pair shows where the energy actually is);
+  bunching |b|; beam energy change and rms spread (MeV -- Bmad's convention: energy is
+  eV, never gamma); rms BEAM sizes and rms FIELD sizes (the field sizes come from the
+  wavefront_params sigma(4,4) -- watch gain guiding pull the light onto the beam);
+  beam normalized emittances (projected, dispersion removed, the bunch_params
+  convention) and the field "emittance" sqrt(det sigma_plane) = M^2 lambda/4pi at the
+  records where the FFT-costed angle moments were taken (element ends).
+
+Works on steady-state and time-dependent runs alike: with more than one slice, thin
+gray lines show every slice and the bold line the total (power, energy) or the slice
+average (everything else).
+
+Needs numpy, h5py and matplotlib (the bmad-fel-validate environment has all three).
 """
 
 from __future__ import annotations
@@ -24,11 +30,14 @@ from __future__ import annotations
 import argparse
 import pathlib
 
+import h5py
 import numpy as np
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
 # Fixed series colors (validated categorical palette, assigned in order, never
 # cycled); per-slice context lines are neutral gray so identity stays with the
@@ -38,33 +47,41 @@ INK, INK2 = "#0b0b0b", "#52514e"
 
 
 def load(fn):
-    """Return z (nrec,), per-quantity arrays (nrec, nslice) in time order, nslice,
-    and slice_spacing [m] from the header (None for pre-header files)."""
-    spacing = None
-    with open(fn) as fh:
-        for line in fh:
-            if not line.startswith("#"):
-                break
-            if "slice_spacing" in line:
-                spacing = float(line.split("=")[1])
-    if spacing is None:
-        raise SystemExit(f"{fn}: no slice_spacing header; rerun with a current fel_track_test")
-    d = np.loadtxt(fn)
-    if d.ndim == 1:
-        d = d[None, :]
-    nslice = int(d[:, 1].max())
-    # An interrupted run leaves a partial trailing record; plot the complete ones.
-    n_full = (d.shape[0] // nslice) * nslice
-    if n_full != d.shape[0]:
-        print(f"note: file ends mid-record (interrupted run?); "
-              f"plotting {d.shape[0]//nslice} complete records, dropping "
-              f"{d.shape[0]-n_full} trailing rows")
-        d = d[:n_full]
-    d = d.reshape(-1, nslice, d.shape[1])
-    q = {name: d[:, :, i] for i, name in enumerate(
-        ("z", "slice", "power", "on_axis", "bunching", "bunching_phase",
-         "mean_energy", "sigma_energy", "sigma_x", "sigma_y"))}
-    return d[:, 0, 0], q, nslice, spacing
+    """Everything the panels need, all (nrec, nslice) except z and p0c."""
+    with h5py.File(fn) as h5:
+        q = {
+            "z": h5["z"][:], "p0c": float(h5["p0c"][0]),
+            "centroid": h5["beam/centroid"][:],          # (nrec, nslice, 6)
+            "sigma": h5["beam/sigma"][:],                # (nrec, nslice, 36)
+            "bunching": h5["beam/bunching"][:],
+            "power": h5["field/power"][:],
+            "energy": h5["field/energy"][:],
+            "f_sigma": h5["field/sigma"][:],             # (nrec, nslice, 16)
+            "f_emit_x": h5["field/emit_x"][:],
+            "f_emit_y": h5["field/emit_y"][:],
+            "f_valid": h5["field/angle_moments_valid"][:].astype(bool),
+        }
+    return q
+
+
+def beam_energy_ev(q):
+    """Mean total energy per slice [eV] from the stored chart: E = sqrt(P^2 + m^2)."""
+    p_hat = q["p0c"] * (1.0 + q["centroid"][:, :, 5])
+    return np.sqrt(p_hat**2 + M_ELECTRON**2)
+
+
+def norm_emit(q, i, j):
+    """Projected normalized emittance per (record, slice), dispersion removed --
+    the bunch_params convention (Bmad's projected_twiss_calc)."""
+    s = q["sigma"].reshape(q["sigma"].shape[0], -1, 6, 6)
+    s66 = s[:, :, 5, 5]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x2 = s[:, :, i, i] - np.where(s66 > 0, s[:, :, i, 5] ** 2 / s66, 0)
+        xp = s[:, :, i, j] - np.where(s66 > 0, s[:, :, i, 5] * s[:, :, j, 5] / s66, 0)
+        p2 = s[:, :, j, j] - np.where(s66 > 0, s[:, :, j, 5] ** 2 / s66, 0)
+    emit = np.sqrt(np.maximum(0.0, x2 * p2 - xp**2))
+    f_emit = q["p0c"] * (1.0 + q["centroid"][:, :, 5]) / M_ELECTRON
+    return f_emit * emit
 
 
 def panel_series(ax, z, a2d, color, label=None, reduce="mean"):
@@ -80,13 +97,19 @@ def panel_series(ax, z, a2d, color, label=None, reduce="mean"):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    p.add_argument("diag", help="fel_track_test .diag.txt file")
-    p.add_argument("-o", "--output", help="Output image (default: <diag>.png)")
+    p.add_argument("stats", help="fel_track_test .stats.h5 file")
+    p.add_argument("-o", "--output", help="Output image (default: <stats stem>.png)")
     p.add_argument("--show", action="store_true", help="Also open a window")
     args = p.parse_args()
 
-    z, q, nslice, spacing = load(args.diag)
-    out = args.output or str(pathlib.Path(args.diag).with_suffix(".png"))
+    if args.stats.endswith(".diag.txt"):
+        raise SystemExit("plot_fel.py reads the stats file now; pass <out_root>.stats.h5 "
+                         "(the diag file remains the Genesis-comparison instrument).")
+
+    q = load(args.stats)
+    z = q["z"]
+    nslice = q["power"].shape[1]
+    out = args.output or str(pathlib.Path(args.stats).name.removesuffix(".stats.h5") + ".png")
 
     plt.rcParams.update({
         "figure.facecolor": "white", "axes.facecolor": "white",
@@ -97,76 +120,85 @@ def main():
         "text.color": INK, "font.size": 10,
     })
 
-    fig, axd = plt.subplot_mosaic([["power", "energy"], ["power_lin", "energy_lin"],
-                                   ["bunching", "gamma"], ["size", "size"]],
-                                  figsize=(9.5, 12), sharex=True)
-    ax_p, ax_u, ax_pl, ax_ul, ax_b, ax_g, ax_s = (axd[k] for k in
-        ("power", "energy", "power_lin", "energy_lin", "bunching", "gamma", "size"))
+    fig, axd = plt.subplot_mosaic(
+        [["power", "energy"], ["power_lin", "energy_lin"], ["bunching", "gamma"],
+         ["bsize", "fsize"], ["bemit", "femit"]],
+        figsize=(9.5, 14), sharex=True)
 
-    # Radiation power. The one panel where the multi-slice aggregate is a sum:
-    # total power is what a detector sees.
-    label = "total" if nslice > 1 else None
-    panel_series(ax_p, z, q["power"], BLUE, label=label, reduce="sum")
-    ax_p.set_yscale("log")
-    ax_p.set_ylabel("radiation power (W)")
-    if nslice > 1:
-        ax_p.legend(frameon=False)
-
-    # Field energy in the window: U_i = P_i * slice_spacing / c per slice, summed.
-    # This is the curve to read for SASE growth: power per slice churns as radiation
-    # slips forward through the window (and out of its head), while the window energy
-    # integrates it honestly.
-    dt = spacing / 2.99792458e8
-    label = "window total" if nslice > 1 else None
-    panel_series(ax_u, z, q["power"] * dt, BLUE, label=label, reduce="sum")
-    ax_u.set_yscale("log")
-    ax_u.set_ylabel("field energy (J)")
-    if nslice > 1:
-        ax_u.legend(frameon=False)
-
-    # The same two quantities on LINEAR axes: the log panels show the exponential
-    # gain regime; the linear ones show where the energy actually is (saturation and
-    # the post-saturation behavior are nearly invisible on a log axis).
-    label = "total" if nslice > 1 else None
-    panel_series(ax_pl, z, q["power"], BLUE, label=label, reduce="sum")
-    ax_pl.set_ylabel("radiation power (W)")
-
-    label = "window total" if nslice > 1 else None
-    panel_series(ax_ul, z, q["power"] * dt, BLUE, label=label, reduce="sum")
-    ax_ul.set_ylabel("field energy (J)")
+    # Radiation power and window field energy, log then linear. The multi-slice
+    # aggregate is a sum: total power is what a detector sees, and the window energy
+    # is the honest SASE growth curve (per-slice power churns as light slips through
+    # and out of the window; the energy integrates it).
+    for key, quant, ylab in (("power", "power", "radiation power (W)"),
+                             ("energy", "energy", "field energy (J)")):
+        label = "total" if nslice > 1 else None
+        panel_series(axd[key], z, q[quant], BLUE, label=label, reduce="sum")
+        axd[key].set_yscale("log")
+        axd[key].set_ylabel(ylab)
+        if nslice > 1:
+            axd[key].legend(frameon=False)
+        panel_series(axd[key + "_lin"], z, q[quant], BLUE, reduce="sum")
+        axd[key + "_lin"].set_ylabel(ylab)
 
     # Bunching factor.
     label = "slice average" if nslice > 1 else None
-    panel_series(ax_b, z, q["bunching"], BLUE, label=label)
-    ax_b.set_ylabel("bunching |b|")
+    panel_series(axd["bunching"], z, q["bunching"], BLUE, label=label)
+    axd["bunching"].set_ylabel("bunching |b|")
     if nslice > 1:
-        ax_b.legend(frameon=False)
+        axd["bunching"].legend(frameon=False)
 
-    # Two-series legends sit above their panel, clear of the data (betatron
-    # oscillations fill the beam-size panel top to bottom).
     above = dict(frameon=False, ncol=2, loc="lower right",
                  bbox_to_anchor=(1, 0.99), borderaxespad=0)
 
-    # Beam energy: change of the mean and the rms spread share the unit MeV
-    # (Bmad's convention -- energy is eV, never gamma), so one axis carries both.
-    de = (q["mean_energy"] - q["mean_energy"][0, :]) / 1e6
-    panel_series(ax_g, z, de, BLUE, label=r"$\Delta\langle E\rangle$")
-    panel_series(ax_g, z, q["sigma_energy"] / 1e6, ORANGE, label=r"$\sigma_E$")
-    ax_g.set_ylabel("beam energy (MeV)")
-    ax_g.legend(**above)
+    # Beam energy: change of the mean and the rms spread share the unit MeV.
+    e_mean = beam_energy_ev(q)
+    sig = q["sigma"].reshape(len(z), nslice, 6, 6)
+    beta = q["p0c"] * (1 + q["centroid"][:, :, 5]) / e_mean
+    sig_e = beta * q["p0c"] * np.sqrt(np.maximum(0.0, sig[:, :, 5, 5]))
+    panel_series(axd["gamma"], z, (e_mean - e_mean[0]) / 1e6, BLUE, label=r"$\Delta\langle E\rangle$")
+    panel_series(axd["gamma"], z, sig_e / 1e6, ORANGE, label=r"$\sigma_E$")
+    axd["gamma"].set_ylabel("beam energy (MeV)")
+    axd["gamma"].legend(**above)
 
-    # Transverse rms sizes.
-    panel_series(ax_s, z, 1e6 * q["sigma_x"], BLUE, label=r"$\sigma_x$")
-    panel_series(ax_s, z, 1e6 * q["sigma_y"], ORANGE, label=r"$\sigma_y$")
-    ax_s.set_ylabel(r"rms beam size ($\mu$m)")
-    ax_s.set_xlabel("z (m)")
-    ax_s.legend(**above)
+    # Transverse rms sizes: beam from the 6x6, FIELD from the wavefront 4x4 --
+    # gain guiding is the field-size curve bending toward the beam-size curve.
+    panel_series(axd["bsize"], z, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
+    panel_series(axd["bsize"], z, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
+    axd["bsize"].set_ylabel(r"rms beam size ($\mu$m)")
+    axd["bsize"].legend(**above)
 
-    title = pathlib.Path(args.diag).name
+    fsig = q["f_sigma"].reshape(len(z), nslice, 4, 4)
+    panel_series(axd["fsize"], z, 1e6 * np.sqrt(np.maximum(0, fsig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
+    panel_series(axd["fsize"], z, 1e6 * np.sqrt(np.maximum(0, fsig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
+    axd["fsize"].set_ylabel(r"rms field size ($\mu$m)")
+    axd["fsize"].legend(**above)
+
+    # Emittances: beam normalized (projected, dispersion removed); field
+    # sqrt(det sigma_plane) at the records where angle moments exist (element ends),
+    # against the diffraction limit lambda/4pi.
+    panel_series(axd["bemit"], z, 1e6 * norm_emit(q, 0, 1), BLUE, label=r"$\gamma\epsilon_x$")
+    panel_series(axd["bemit"], z, 1e6 * norm_emit(q, 2, 3), ORANGE, label=r"$\gamma\epsilon_y$")
+    axd["bemit"].set_ylabel(r"norm. emittance ($\mu$m)")
+    axd["bemit"].legend(**above)
+
+    valid = q["f_valid"].any(axis=1)
+    if valid.any():
+        zv = z[valid]
+        ex = np.where(q["f_valid"][valid], q["f_emit_x"][valid], np.nan)
+        ey = np.where(q["f_valid"][valid], q["f_emit_y"][valid], np.nan)
+        axd["femit"].plot(zv, 1e12 * np.nanmean(ex, axis=1), "o-", color=BLUE, ms=4, label=r"$\epsilon_x$")
+        axd["femit"].plot(zv, 1e12 * np.nanmean(ey, axis=1), "o-", color=ORANGE, ms=4, label=r"$\epsilon_y$")
+    axd["femit"].set_ylabel(r"field emit (pm$\,$rad)")
+    axd["femit"].legend(**above)
+
+    axd["bemit"].set_xlabel("z (m)")
+    axd["femit"].set_xlabel("z (m)")
+
+    title = pathlib.Path(args.stats).name
     if nslice > 1:
         title += f"   ({nslice} slices; thin lines are individual slices)"
     fig.suptitle(title, x=0.02, ha="left", fontsize=11)
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
 
     fig.savefig(out, dpi=160)
     print(f"wrote {out}")

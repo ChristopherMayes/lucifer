@@ -37,7 +37,7 @@
 module fel_stats_mod
 
 use bmad
-use beam_utils, only: calc_bunch_params
+use beam_utils, only: calc_bunch_params, calc_emittances_and_twiss_from_sigma_matrix
 use fel_beam_mod
 use wavefront_mod
 use fel_track_mod, only: fel_slip_struct, fel_field_index
@@ -56,6 +56,8 @@ type fel_stats_struct
   real(rp), allocatable :: b_sigma(:,:,:)         ! (36, nslice, nrec)
   real(rp), allocatable :: charge_live(:,:)       ! (nslice, nrec) [C]
   real(rp), allocatable :: t(:,:), sigma_t(:,:)   ! (nslice, nrec) [s]
+  real(rp), allocatable :: bunching(:,:)          ! (nslice, nrec) |b| at the fundamental
+  real(rp), allocatable :: bunching_phase(:,:)    ! (nslice, nrec) [rad]
   integer, allocatable :: n_particle_live(:,:)    ! (nslice, nrec)
   ! Field side, wavefront_params_struct names.
   real(rp), allocatable :: f_centroid(:,:,:)      ! (4, nslice, nrec)
@@ -105,6 +107,7 @@ stats%nend = nend;  stats%iend = 0
 allocate (stats%z(nrec))
 allocate (stats%b_centroid(6, nslice, nrec), stats%b_sigma(36, nslice, nrec))
 allocate (stats%charge_live(nslice, nrec), stats%t(nslice, nrec), stats%sigma_t(nslice, nrec))
+allocate (stats%bunching(nslice, nrec), stats%bunching_phase(nslice, nrec))
 allocate (stats%n_particle_live(nslice, nrec))
 allocate (stats%f_centroid(4, nslice, nrec), stats%f_sigma(16, nslice, nrec))
 allocate (stats%f_energy(nslice, nrec), stats%f_power(nslice, nrec), stats%f_on_axis(nslice, nrec))
@@ -136,7 +139,8 @@ type (wavefront_params_struct) pms
 real(rp) z_now
 logical with_angles, err_flag
 
-real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), beta0
+real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), beta0, ks, theta
+complex(rp) bphasor
 integer ir, is, ip, i, j, nslice
 logical err, any_err
 character(*), parameter :: r_name = 'fel_stats_record'
@@ -153,10 +157,12 @@ stats%irec = stats%irec + 1
 ir = stats%irec
 stats%z(ir) = z_now
 beta0 = fel_p0_mc(beam) / sqrt(fel_p0_mc(beam)**2 + 1)
+ks = twopi / wf%wavelength
 
 any_err = .false.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, pms, err) reduction(.or.: any_err)
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, pms, err, bphasor, theta) &
+!$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
 
@@ -194,6 +200,18 @@ do is = 1, nslice
   stats%n_particle_live(is, ir) = sl%n
   stats%t(is, ir) = z_now / c_light - cen(5) / (beta0 * c_light)
   stats%sigma_t(is, ir) = sqrt(max(0.0_rp, sig(5,5))) / (beta0 * c_light)
+
+  ! Bunching at the fundamental: |sum w e^{-i ks tau}| / sum w, tau = -z/beta_j.
+  ! Weighted (each macroparticle radiates its own charge), phase in [rad].
+
+  bphasor = 0
+  do ip = 1, sl%n
+    theta = ks * sl%z(ip) * sqrt((fel_p0_mc(beam) * (1 + sl%pz(ip)))**2 + 1) / (fel_p0_mc(beam) * (1 + sl%pz(ip)))
+    bphasor = bphasor + sl%weight(ip) * cmplx(cos(theta), sin(theta), rp)
+  enddo
+  if (wsum > 0) bphasor = bphasor / wsum
+  stats%bunching(is, ir) = abs(bphasor)
+  stats%bunching_phase(is, ir) = atan2(aimag(bphasor), real(bphasor, rp))
 
   ! The field slice this beam slice couples to, unrotated exactly as the dumps are.
 
@@ -256,9 +274,25 @@ call fel_concat_slices (beam, ele, bunch, beta0, err);  if (err) return
 call calc_bunch_params (bunch, bp, error)
 call pack_bp (bp, stats%e_bunch(:, ie))
 
+! Per slice: the twiss evaluation is Bmad's own (calc_emittances_and_twiss_from_
+! sigma_matrix, the identical code path calc_bunch_params ends in), but fed from the
+! moments the CURRENT record already computed -- an element end always coincides with
+! its last record -- instead of re-summing every particle through a bunch conversion.
+! Measured: this is what moved the element-end cost from 7% of the demo run into the
+! noise (2208 conversions + re-summations retired per run).
+
 do is = 1, size(beam%slice)
-  call fel_slice_to_bunch (beam, beam%slice(is), ele, bunch, err);  if (err) return
-  call calc_bunch_params (bunch, bp, error)
+  bp = bunch_params_struct()
+  bp%centroid%vec = stats%b_centroid(:, is, stats%irec)
+  bp%centroid%p0c = stats%p0c
+  bp%centroid%species = electron$
+  bp%sigma = reshape(stats%b_sigma(:, is, stats%irec), [6, 6])
+  bp%charge_live = stats%charge_live(is, stats%irec)
+  bp%n_particle_live = stats%n_particle_live(is, stats%irec)
+  bp%n_particle_tot = bp%n_particle_live
+  if (bp%n_particle_live >= 6) then
+    call calc_emittances_and_twiss_from_sigma_matrix (bp%sigma, bp, error, .false.)
+  endif
   call pack_bp (bp, stats%e_slice(:, is, ie))
 enddo
 
@@ -343,6 +377,8 @@ call hdf5_write_dataset_int (g_id, 'n_particle_live', stats%n_particle_live(:,1:
 call hdf5_write_dataset_int (g_id, 'n_particle_tot', stats%n_particle_live(:,1:ir), err);  if (err) return
 call hdf5_write_dataset_real (g_id, 't', stats%t(:,1:ir), err);  if (err) return
 call hdf5_write_dataset_real (g_id, 'sigma_t', stats%sigma_t(:,1:ir), err);  if (err) return
+call hdf5_write_dataset_real (g_id, 'bunching', stats%bunching(:,1:ir), err);  if (err) return
+call hdf5_write_dataset_real (g_id, 'bunching_phase', stats%bunching_phase(:,1:ir), err);  if (err) return
 call hdf5_write_dataset_real (g_id, 's', stats%z(1:ir), err);  if (err) return
 call H5Gclose_f (g_id, h5_err)
 

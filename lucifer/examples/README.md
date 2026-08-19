@@ -14,7 +14,7 @@ directory:
 ```
 cd bsim/fel/examples/<example>
 ../../../../debug/bin/fel_track_test run.nml        # or production/bin
-python ../plot_fel.py <example>.diag.txt            # needs matplotlib; writes <example>.diag.png
+python ../plot_fel.py <example>.stats.h5            # needs h5py + matplotlib; writes <example>.png
 ```
 
 | Example | What it is | Time |
@@ -39,24 +39,16 @@ are real Bmad wiggler elements with `tracking_method = custom`, and their FEL pa
 live on the lattice — the attribute-to-parameter map and the parse-time refusals are the
 manual's `sec:element`. There are no per-undulator namelist parameters.
 
-`<example>.diag.txt` is the gain curve: one row per slice per integration step with
-columns `z, slice, power, on_axis_intensity, bunching, bunching_phase, mean_energy,
-sigma_energy, sigma_x, sigma_y` (energies in eV -- Bmad's convention; Genesis's
-`energy` output is gamma). The plot is seven panels against z: radiation power (log
-and linear),
-the FIELD ENERGY in the window (log, joules -- the honest growth curve for SASE,
-since per-slice power churns as radiation slips through and out of the window while
-the window energy integrates it; the scaling reads `slice_spacing` from the diag
-header; log and linear -- the log pair shows the gain regime, the linear pair shows
-where the energy actually is), bunching, beam energy change and rms spread (MeV), and
-the transverse rms sizes showing the FODO betatron oscillation. On time-dependent files each thin gray line is a slice, the
-bold line the total power or slice average, and the slippage echelon is directly visible
-in the per-slice power. `<example>-final.fld.h5` / `-final.par.h5` are the end state in
-Genesis dump format (readable by `openPMD-beamphysics`, h5py, or Genesis itself); add
-`write_initial = T` to also dump the generated start — useful for handing the identical
-initial condition to Genesis (`&importbeam` / `&importfield`), which is how the loader
-was validated (Genesis imported the generated dumps and agreed at 1.5e-5, the constants
-floor of every Genesis comparison here).
+`<example>.stats.h5` is the production statistics file (manual sec:stats): fixed Bmad
+units, per-record per-slice arrays with beam datasets named as `bunch_params_struct`
+components (plus `bunching`), `wavefront_params` for the field, and the evaluated
+`calc_bunch_params` at element ends. The plot is ten panels against z: radiation power
+and window field energy (log and linear), bunching, beam energy change and rms spread
+(MeV -- Bmad's convention; energies are eV, never gamma), rms beam AND field sizes
+(the field sizes from the wavefront sigma(4,4) -- watch gain guiding), and beam
+normalized emittances beside the field emittance sqrt(det) = M^2 lambda/4pi at element
+ends. `<example>.diag.txt` remains the Genesis-comparison instrument (same columns as
+always) and is what the benchmark harness reads
 
 ## steady_state
 

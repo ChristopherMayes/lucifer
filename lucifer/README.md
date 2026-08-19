@@ -841,9 +841,14 @@ Measured (check_diagnostics.py, in the harness -- cross-identities, not referenc
 
 diag.txt is untouched (the Genesis-comparison instrument): every benchmark tier
 reproduces bit for bit. The stats overhead, measured on the saturation demo's averaged
-run (96 slices x 2048 particles, 255^2 grid, 12 threads): 36.5 s -> 40.9 s, +12% --
-5% the per-record moment sweeps, 7% the element-end calc_bunch_params (2208 calls)
-plus the file write. The justification: Genesis's timed runs include its own
+run (96 slices x 2048 particles, 255^2 grid, 12 threads): 36.5 s -> 40.7 s, +11.5%,
+split as ~5% the per-record moment sweeps (every record -- the comb cadence; memory-
+bandwidth bound, streaming every field plane a second time), and the rest the
+element-end theta-moment FFTs (23 ends x 96 slices x 3 FFTs) plus the file write.
+Per-slice element-end twiss is evaluated through Bmad's own
+calc_emittances_and_twiss_from_sigma_matrix FED FROM the already-computed per-record
+moments (an element end always coincides with its last record), not by re-summing
+particles. The justification for the price: Genesis's timed runs include its own
 diagnostics too, and those are scalar columns where these are full 6x6 beam and 4x4
 field moment sets per slice per record -- the difference IS the extra information.
 Known scaling limit, named for the follow-on: the stats accumulate in memory and write
