@@ -110,6 +110,21 @@ type fel_slip_struct
                                 ! closes in a wake-free run).
 end type
 
+!+
+! Struct fel_bank_struct
+!
+! Scratch carrier for the field slices one fel_apply_slippage call transmits out of the
+! window: the caller passes it when it wants the light itself, not just its banked
+! energy (keep_escaped_field). Reset and refilled per call; the caller drains it
+! immediately (streams to file), so peak memory is a handful of grid planes -- one per
+! rotation of the call, ~1 inside undulators, ~10 over an interlude.
+!-
+
+type fel_bank_struct
+  complex(wf_rp), allocatable :: plane(:,:,:)  ! Transmitted planes, in transmission order.
+  integer :: n = 0                             ! How many this call transmitted.
+end type
+
 ! Cached kernel for fel_field_step, mirroring FieldSolverFFT::init. Module state, built
 ! ONCE, SERIALLY, by fel_field_kernel_init before any parallel slice loop, and read-only
 ! ever after -- fel_field_step never rebuilds it, it only verifies the match and errors,
@@ -313,15 +328,18 @@ end function fel_field_index
 !   slip, wf    -- Updated state and rotated record.
 !-
 
-subroutine fel_apply_slippage (slip, wf, slippage)
+subroutine fel_apply_slippage (slip, wf, slippage, bank)
 
 type (fel_slip_struct) slip
 type (wavefront_struct) wf
+type (fel_bank_struct), optional :: bank
 real(rp) slippage
+complex(wf_rp), allocatable :: grow(:,:,:)
 integer nslice, last, direction
 
 !
 
+if (present(bank)) bank%n = 0
 if (.not. slip%timerun) return
 
 slip%accuslip = slip%accuslip + slippage
@@ -346,6 +364,21 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
 
   slip%u_escaped = slip%u_escaped + sum(real(wf%Ex(:,:,last+1), rp)**2 + aimag(wf%Ex(:,:,last+1))**2) &
                      * wf%dx**2 / (2 * (mu_0_vac * c_light)) * (slip%sample * wf%wavelength / c_light)
+
+  ! Bank the light itself when asked: the transmitted slice, copied before the zero.
+
+  if (present(bank)) then
+    if (.not. allocated(bank%plane)) then
+      allocate (bank%plane(size(wf%Ex,1), size(wf%Ex,2), 4))
+    elseif (bank%n == size(bank%plane, 3)) then
+      call move_alloc (bank%plane, grow)
+      allocate (bank%plane(size(grow,1), size(grow,2), 2*size(grow,3)))
+      bank%plane(:,:,1:size(grow,3)) = grow
+      deallocate (grow)
+    endif
+    bank%n = bank%n + 1
+    bank%plane(:,:,bank%n) = wf%Ex(:,:,last+1)
+  endif
 
   wf%Ex(:, :, last+1) = 0
 

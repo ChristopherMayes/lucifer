@@ -35,4 +35,11 @@
   window_length = 2.88e-8      ! 96 slices (&time slen)...
   window_sample = 3            ! ...of spacing 3*lambda0, slippage one slice per step.
   shotnoise = T
+
+  ! Diagnostics (manual sec:stats). The stats file <out_root>.stats.h5 is always
+  ! written. Uncomment to also dump at named elements and bank the escaped field
+  ! (full pulse reconstructed at the exit as <out_root>-pulse.fld.h5):
+  ! dump_beam_at = "UND3"
+  ! dump_field_at = "UND3"
+  ! keep_escaped_field = T
 &end

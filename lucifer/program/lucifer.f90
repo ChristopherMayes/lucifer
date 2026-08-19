@@ -63,6 +63,17 @@
 !                           !   a TRUE hard edge (test configuration) is the explicit
 !                           !   sentinel -1 -- silence never means hard edge.
 !     write_initial = F                        ! Also dump the initial state (Genesis format).
+!     dump_beam_at = "UND3", "quadrupole::*"   ! Dump the beam (Genesis .par.h5 format) at the
+!                                              !   end of the named elements (Bmad locator
+!                                              !   syntax, class::name allowed; an entry
+!                                              !   matching nothing is refused by name).
+!     dump_field_at = "UND3"                   ! Same for the field (Genesis .fld.h5, unrotated).
+!     keep_escaped_field = F                   ! Bank the field slices slippage transmits out of
+!                                              !   the window (<out_root>-escaped.fld.h5, with
+!                                              !   wavefront_params and z_transmit per slice) and
+!                                              !   reconstruct the FULL PULSE at the exit plane
+!                                              !   (<out_root>-pulse.fld.h5) by free-space
+!                                              !   propagation at finalize. Manual sec:stats.
 !     migrate = F                              ! Slice migration (see below).
 !     migrate_check = F                        ! Verify phase continuity at each migration.
 !   &end
@@ -174,7 +185,10 @@
 ! comparison can (Genesis dumps carry no weights).
 !
 ! Outputs: <out_root>.diag.txt (one row per slice per record: z, slice, field and beam
-! diagnostics), <out_root>-final.fld.h5 and <out_root>-final.par.h5 (Genesis-format dumps
+! diagnostics), <out_root>.stats.h5 (the production statistics file, manual sec:stats:
+! per-record per-slice beam moments named as bunch_params_struct components, per-record
+! per-slice wavefront_params, and the evaluated calc_bunch_params at element ends;
+! fixed Bmad units), <out_root>-final.fld.h5 and <out_root>-final.par.h5 (Genesis-format dumps
 ! of the end state, for field-by-field comparison; the field dump is unrotated to time
 ! order first, as writeFieldHDF5 does).
 !-
@@ -185,6 +199,7 @@ use fel_track_mod
 use fel_unaveraged_mod
 use fel_import_mod
 use wavefront_hdf5_mod
+use fel_stats_mod
 use beam_mod
 use wake_mod
 
@@ -279,6 +294,21 @@ logical err, timerun
 
 type (fel_collective_struct) coll
 
+! Diagnostics (manual sec:stats): the stats file, dump-at element lists, and the
+! escaped-field bank (transmitted slices streamed to file; the full pulse is
+! reconstructed at finalize by free-space propagation -- transmitted light never
+! re-interacts, so it is fixed information).
+type (fel_stats_struct) stats
+type (fel_bank_struct) bank
+type (wavefront_struct) wf1     ! One-slice scratch for banked-slice propagation.
+character(60) :: dump_beam_at(40) = '', dump_field_at(40) = ''
+logical :: keep_escaped_field = .false.
+logical, allocatable :: dump_beam_here(:), dump_field_here(:)
+integer nrec_stats, nend_stats
+integer :: n_banked = 0
+real(rp), allocatable :: bank_z(:), bank_pms(:,:)      ! Per banked slice: z, 25 params.
+integer(hid_t) :: esc_id = 0
+
 character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
@@ -292,7 +322,8 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
                            wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
                            beam_init, imp, use_beam_init, dist_file, write_dist_file, &
-                           write_opmd_file, imp_split_weights, write_wake_kernels
+                           write_opmd_file, imp_split_weights, write_wake_kernels, &
+                           dump_beam_at, dump_field_at, keep_escaped_field
 
 ! Read parameters.
 
@@ -570,8 +601,16 @@ n_moved_tot = 0
 charge_dropped_tot = 0
 b_dev_max = 0
 
+! Diagnostics setup (manual sec:stats): resolve the dump-at element lists through
+! Bmad's own locator (class::name syntax comes for free; an entry matching nothing is
+! refused by name), precompute the EXACT record and element-end counts by replaying
+! the walk's skip rule, and size the stats arrays.
+
+call setup_diagnostics ()
+
 z_now = 0
 call write_diag_rows()     ! Initial record, matching Genesis's diag before the first step.
+call take_stats_record (.true.)
 
 ! Walk the lattice.
 
@@ -635,16 +674,18 @@ do ie = 1, branch%n_ele_track
 
       if (associated(wake_src) .and. istep == (und%nstep + 1)/2) call apply_bmad_wake_kick (wake_src)
 
-      if (istep == und%nstep) then
-        call fel_apply_slippage (slip, wf, und%dz * und_slip_step + ele_slip(ie))
-      else
-        call fel_apply_slippage (slip, wf, und%dz * und_slip_step)
-      endif
       z_now = z_now + und%dz
+      if (istep == und%nstep) then
+        call apply_slippage_banked (und%dz * und_slip_step + ele_slip(ie))
+      else
+        call apply_slippage_banked (und%dz * und_slip_step)
+      endif
       if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
       if (istep == und%nstep) call do_migrate ()
       call write_diag_rows()
+      call take_stats_record (istep == und%nstep)
     enddo
+    call end_of_element ()
 
   elseif (interlude_model == 'bmad') then
 
@@ -702,11 +743,13 @@ do ie = 1, branch%n_ele_track
 
     call fel_wake_apply (coll%wake, fbeam, ele%value(l$))
 
-    call fel_apply_slippage (slip, wf, ele_slip(ie))
-
     z_now = z_now + ele%value(l$)
+    call apply_slippage_banked (ele_slip(ie))
+
     call do_migrate ()
     call write_diag_rows()
+    call take_stats_record (.true.)
+    call end_of_element ()
 
   else
 
@@ -718,11 +761,13 @@ do ie = 1, branch%n_ele_track
     if (associated(wake_src)) call apply_bmad_wake_kick (wake_src)
     if (err) stop 1
 
-    call fel_apply_slippage (slip, wf, ele_slip(ie))
-
     z_now = z_now + ele%value(l$)
+    call apply_slippage_banked (ele_slip(ie))
+
     call do_migrate ()
     call write_diag_rows()
+    call take_stats_record (.true.)
+    call end_of_element ()
   endif
 enddo
 
@@ -752,6 +797,8 @@ if (err) stop 1
 
 call fel_write_genesis4_beam (fbeam, trim(out_root) // '-final.par.h5', err)
 if (err) stop 1
+
+call finalize_diagnostics ()
 
 print '(a)', 'fel_track_test done.'
 print '(a)', '  ' // trim(out_root) // '.diag.txt'
@@ -1601,5 +1648,279 @@ enddo
 write (iu_ledger, '(6es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum
 
 end subroutine write_ledger_row
+
+!------------------------------------------------------------------------------
+! Diagnostics (manual sec:stats). setup_diagnostics resolves the dump-at lists through
+! Bmad's own lat_ele_locator (class::name syntax for free; an entry matching nothing is
+! refused by name) and precomputes the EXACT record and element-end counts by replaying
+! the walk's skip rule -- the stats arrays are sized once, never grown.
+
+subroutine setup_diagnostics ()
+
+type (ele_pointer_struct), allocatable :: eles(:)
+integer i, j, n_loc
+logical derr
+
+!
+
+allocate (dump_beam_here(0:branch%n_ele_track), dump_field_here(0:branch%n_ele_track))
+dump_beam_here = .false.;  dump_field_here = .false.
+
+do i = 1, size(dump_beam_at)
+  if (dump_beam_at(i) == '') cycle
+  call lat_ele_locator (dump_beam_at(i), lat, eles, n_loc, derr)
+  if (derr .or. n_loc == 0) then
+    print '(2a)', 'fel_track_test: dump_beam_at entry matches no element: ', trim(dump_beam_at(i))
+    stop 1
+  endif
+  do j = 1, n_loc
+    if (eles(j)%ele%ix_ele >= 1 .and. eles(j)%ele%ix_ele <= branch%n_ele_track) &
+                            dump_beam_here(eles(j)%ele%ix_ele) = .true.
+  enddo
+enddo
+
+do i = 1, size(dump_field_at)
+  if (dump_field_at(i) == '') cycle
+  call lat_ele_locator (dump_field_at(i), lat, eles, n_loc, derr)
+  if (derr .or. n_loc == 0) then
+    print '(2a)', 'fel_track_test: dump_field_at entry matches no element: ', trim(dump_field_at(i))
+    stop 1
+  endif
+  do j = 1, n_loc
+    if (eles(j)%ele%ix_ele >= 1 .and. eles(j)%ele%ix_ele <= branch%n_ele_track) &
+                            dump_field_here(eles(j)%ele%ix_ele) = .true.
+  enddo
+enddo
+
+nrec_stats = 1
+nend_stats = 0
+do i = 1, branch%n_ele_track
+  ele => branch%ele(i)
+  wake_src => pointer_to_wake_ele(ele)
+  if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
+  nend_stats = nend_stats + 1
+  if (is_fel(i)) then
+    nrec_stats = nrec_stats + max(1, nint(ele%value(num_steps$)))
+  else
+    nrec_stats = nrec_stats + 1
+  endif
+enddo
+
+call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c)
+
+end subroutine setup_diagnostics
+
+!------------------------------------------------------------------------------
+subroutine take_stats_record (with_angles)
+
+logical with_angles, serr
+
+call fel_stats_record (stats, fbeam, wf, slip, z_now, with_angles, serr)
+if (serr) stop 1
+
+end subroutine take_stats_record
+
+!------------------------------------------------------------------------------
+! End of element: the evaluated bunch_params (the Tao end-of-element pattern) and any
+! requested dumps. Mid-run field dumps unrotate exactly as the final dump does -- the
+! rotation is a gauge, and re-zeroing slip%first keeps the mapping consistent.
+
+subroutine end_of_element ()
+
+logical eerr
+character(500) fname
+
+!
+
+call fel_stats_element_end (stats, fbeam, ele, z_now, eerr)
+if (eerr) stop 1
+
+if (dump_beam_here(ie)) then
+  write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '.par.h5'
+  call fel_write_genesis4_beam (fbeam, trim(fname), eerr)
+  if (eerr) stop 1
+endif
+
+if (dump_field_here(ie)) then
+  if (slip%first /= 0) then
+    wf%Ex = cshift(wf%Ex, shift = slip%first, dim = 3)
+    slip%first = 0
+  endif
+  write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '.fld.h5'
+  call wavefront_write_genesis4 (wf, trim(fname), eerr, 'x')
+  if (eerr) stop 1
+endif
+
+end subroutine end_of_element
+
+!------------------------------------------------------------------------------
+subroutine apply_slippage_banked (slippage)
+
+real(rp) slippage
+
+if (keep_escaped_field) then
+  call fel_apply_slippage (slip, wf, slippage, bank)
+  call drain_bank ()
+else
+  call fel_apply_slippage (slip, wf, slippage)
+endif
+
+end subroutine apply_slippage_banked
+
+!------------------------------------------------------------------------------
+! Drain the slippage bank: each transmitted slice streams to <out_root>-escaped.fld.h5
+! as it leaves (peak memory a handful of grid planes), with its wavefront_params (full
+! 4x4 at bank time -- exactly what the analytic free-space propagation of pulse
+! statistics needs) and its transmission z. Genesis field-file conventions (dfl units)
+! so existing tooling reads it; root datasets land at finalize.
+
+subroutine drain_bank ()
+
+type (wavefront_params_struct) pms
+integer(hid_t) g_id
+real(rp), allocatable :: work(:), gz(:), gp(:,:)
+real(rp) dfl_scale
+integer k, nx, h5e
+logical berr
+character(20) gname
+
+!
+
+if (bank%n == 0) return
+nx = size(wf%Ex, 1)
+dfl_scale = wf%dx / sqrt(2 * (mu_0_vac * c_light))
+allocate (work(nx*nx))
+
+if (esc_id == 0) then
+  call hdf5_open_file (trim(out_root) // '-escaped.fld.h5', 'WRITE', esc_id, berr)
+  if (berr) stop 1
+endif
+
+do k = 1, bank%n
+  n_banked = n_banked + 1
+  if (.not. allocated(bank_z)) then
+    allocate (bank_z(1024), bank_pms(25, 1024))
+  elseif (n_banked > size(bank_z)) then
+    call move_alloc (bank_z, gz);  call move_alloc (bank_pms, gp)
+    allocate (bank_z(2*size(gz)), bank_pms(25, 2*size(gz)))
+    bank_z(1:size(gz)) = gz;  bank_pms(:, 1:size(gz)) = gp
+    deallocate (gz, gp)
+  endif
+
+  call wavefront_params_of_plane (bank%plane(:,:,k), wf%dx, wf%wavelength, &
+                                  fbeam%slice_spacing, pms, .true., berr)
+  if (berr) stop 1
+  pms%s = z_now
+  bank_z(n_banked) = z_now
+  bank_pms(:, n_banked) = [pms%centroid, reshape(pms%sigma, [16]), &
+                           pms%energy, pms%power, pms%on_axis_intensity, pms%emit_x, pms%emit_y]
+
+  write (gname, '(a, i0.6)') 'slice', n_banked
+  call H5Gcreate_f (esc_id, trim(gname), g_id, h5e)
+  if (h5e < 0) stop 1
+  work = dfl_scale * reshape(real(bank%plane(:,:,k), rp), [nx*nx])
+  call hdf5_write_dataset_real (g_id, 'field-real', work, berr);  if (berr) stop 1
+  work = dfl_scale * reshape(aimag(bank%plane(:,:,k)), [nx*nx])
+  call hdf5_write_dataset_real (g_id, 'field-imag', work, berr);  if (berr) stop 1
+  call hdf5_write_dataset_real (g_id, 'z_transmit', [z_now], berr);  if (berr) stop 1
+  call hdf5_write_dataset_real (g_id, 'wavefront_params', bank_pms(:, n_banked), berr);  if (berr) stop 1
+  call H5Gclose_f (g_id, h5e)
+enddo
+
+end subroutine drain_bank
+
+!------------------------------------------------------------------------------
+! Finalize: the stats file always; with keep_escaped_field also the escaped file's root
+! datasets and the FULL PULSE at the exit plane -- each banked slice read back, free-
+! space propagated over z_end - z_transmit (transmitted light is fixed information;
+! undulator vacuum is free space for light with no beam under it), and concatenated
+! above the live window: earliest-transmitted light is furthest ahead, so banked slice
+! k lands at pulse index nslice + (n_banked - k + 1). The caller has already unrotated
+! the live window (the final-dump cshift).
+
+subroutine finalize_diagnostics ()
+
+integer(hid_t) p_id, e_id, g_id
+real(rp), allocatable :: work(:), re_w(:), im_w(:)
+real(rp) dfl_scale
+integer k, is_f, nx, h5e
+logical ferr
+character(20) gname
+
+!
+
+call fel_stats_write (stats, trim(out_root) // '.stats.h5', ferr)
+if (ferr) stop 1
+print '(a)', '  ' // trim(out_root) // '.stats.h5'
+
+if (.not. keep_escaped_field) return
+nx = size(wf%Ex, 1)
+dfl_scale = wf%dx / sqrt(2 * (mu_0_vac * c_light))
+
+if (esc_id /= 0) then
+  call hdf5_write_dataset_int  (esc_id, 'gridpoints',   [nx],                  ferr)
+  call hdf5_write_dataset_real (esc_id, 'gridsize',     [wf%dx],               ferr)
+  call hdf5_write_dataset_real (esc_id, 'refposition',  [wf%ref_position],     ferr)
+  call hdf5_write_dataset_real (esc_id, 'wavelength',   [wf%wavelength],       ferr)
+  call hdf5_write_dataset_int  (esc_id, 'slicecount',   [n_banked],            ferr)
+  call hdf5_write_dataset_real (esc_id, 'slicespacing', [fbeam%slice_spacing], ferr)
+  call H5Fclose_f (esc_id, h5e)
+  esc_id = 0
+  print '(a)', '  ' // trim(out_root) // '-escaped.fld.h5'
+endif
+
+! The full pulse at the exit plane.
+
+call hdf5_open_file (trim(out_root) // '-pulse.fld.h5', 'WRITE', p_id, ferr);  if (ferr) stop 1
+call hdf5_write_dataset_int  (p_id, 'gridpoints',   [nx],                    ferr)
+call hdf5_write_dataset_real (p_id, 'gridsize',     [wf%dx],                 ferr)
+call hdf5_write_dataset_real (p_id, 'refposition',  [wf%ref_position],       ferr)
+call hdf5_write_dataset_real (p_id, 'wavelength',   [wf%wavelength],         ferr)
+call hdf5_write_dataset_int  (p_id, 'slicecount',   [nslice + n_banked],     ferr)
+call hdf5_write_dataset_real (p_id, 'slicespacing', [fbeam%slice_spacing],   ferr)
+
+allocate (work(nx*nx), re_w(nx*nx), im_w(nx*nx))
+
+do is_f = 1, nslice
+  write (gname, '(a, i0.6)') 'slice', is_f
+  call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
+  work = dfl_scale * reshape(real(wf%Ex(:,:,is_f), rp), [nx*nx])
+  call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1
+  work = dfl_scale * reshape(aimag(wf%Ex(:,:,is_f)), [nx*nx])
+  call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) stop 1
+  call H5Gclose_f (g_id, h5e)
+enddo
+
+if (n_banked > 0) then
+  allocate (wf1%Ex(nx, nx, 1))
+  wf1%dx = wf%dx;  wf1%dy = wf%dy;  wf1%dz = fbeam%slice_spacing
+  wf1%wavelength = wf%wavelength
+
+  call hdf5_open_file (trim(out_root) // '-escaped.fld.h5', 'READ', e_id, ferr);  if (ferr) stop 1
+  do k = 1, n_banked
+    write (gname, '(a, i0.6)') 'slice', k
+    g_id = hdf5_open_group (e_id, trim(gname), ferr, .true.);  if (ferr) stop 1
+    call hdf5_read_dataset_real (g_id, 'field-real', re_w, ferr, trim(gname));  if (ferr) stop 1
+    call hdf5_read_dataset_real (g_id, 'field-imag', im_w, ferr, trim(gname));  if (ferr) stop 1
+    call H5Gclose_f (g_id, h5e)
+    wf1%Ex(:,:,1) = reshape(cmplx(re_w, im_w, wf_rp), [nx, nx]) / dfl_scale
+
+    call wavefront_drift (wf1, z_now - bank_z(k), ferr);  if (ferr) stop 1
+
+    write (gname, '(a, i0.6)') 'slice', nslice + (n_banked - k + 1)
+    call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
+    work = dfl_scale * reshape(real(wf1%Ex(:,:,1), rp), [nx*nx])
+    call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1
+    work = dfl_scale * reshape(aimag(wf1%Ex(:,:,1)), [nx*nx])
+    call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) stop 1
+    call H5Gclose_f (g_id, h5e)
+  enddo
+  call H5Fclose_f (e_id, h5e)
+endif
+
+call H5Fclose_f (p_id, h5e)
+print '(a)', '  ' // trim(out_root) // '-pulse.fld.h5'
+
+end subroutine finalize_diagnostics
 
 end program fel_track_test

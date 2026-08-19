@@ -804,6 +804,52 @@ default 2-period ramps, real field physics, priced and left visible).
 
 The figure is banked at `fel-benchmark-plots/sat-demo.png` in the project root.
 
+## Diagnostic output: the stats file, dumps at elements, the escaped-field bank
+
+The production statistics live in `<out_root>.stats.h5` (manual sec:stats), in FIXED
+Bmad units (m, rad, eV, s, C, J, W -- units attributes are documentation, never
+load-bearing): per-record, per-slice arrays in the Genesis4 visualization layout
+(record index first under h5py), with beam datasets named exactly as
+`bunch_params_struct` components. Those per-record datasets are SUFFICIENT statistics
+-- `scripts/bunch_params_from_stats.py` reconstructs a bunch_params dict from any
+(record, slice), and at element ends (where the tracker stores Bmad's own
+`calc_bunch_params`, whole-window and per slice, the Tao end-of-element pattern) the
+harness holds the reconstruction against the stored values. The field side stores
+`wavefront_params_struct` per slice: `centroid(4)` = (x, theta_x, y, theta_y),
+`sigma(4,4)` Wigner moments, energy, power, on_axis_intensity, emit_x/y = sqrt(det)
+(= M^2 lambda/4pi), with `angle_moments_valid` marking where the FFT-costed theta
+rows were filled (element ends and bank time -- the `twiss_valid` pattern). Pulse
+values are pooled downstream; the file stays raw. `dump_beam_at` / `dump_field_at`
+dump Genesis-format files at named elements (Bmad locator syntax; unknown names
+refused). `keep_escaped_field` banks every slice slippage transmits out of the window
+(`-escaped.fld.h5`, with per-slice wavefront_params and z_transmit) and reconstructs
+the FULL PULSE at the exit plane (`-pulse.fld.h5`) by free-space propagation at
+finalize -- transmitted light is fixed information and never re-interacts, so
+whole-pulse statistics use the ABCD map on the banked moment matrices and never
+propagate numerically.
+
+Measured (check_diagnostics.py, in the harness -- cross-identities, not references):
+
+| Check | Measured | Check level |
+|---|---|---|
+| bunch_params reconstruction vs stored calc_bunch_params | **4.6e-8** | 1e-6 |
+| banked slice energies vs the ledger's U_escaped | 6.7e-16 | 1e-12 |
+| analytic (moment-map) vs FFT-propagated rms at exit, 267 slices | **8.4e-3** | 2e-2 |
+| pooled pulse sigma, analytic vs numerical routes | 3.4e-3 | 2e-2 |
+| stats/escaped/pulse dataset-identical, 1 vs 8 threads | exact | -- |
+| unknown dump element | refused by name | -- |
+
+diag.txt is untouched (the Genesis-comparison instrument): every benchmark tier
+reproduces bit for bit. The stats overhead, measured on the saturation demo's averaged
+run (96 slices x 2048 particles, 255^2 grid, 12 threads): 36.5 s -> 40.9 s, +12% --
+5% the per-record moment sweeps, 7% the element-end calc_bunch_params (2208 calls)
+plus the file write. The justification: Genesis's timed runs include its own
+diagnostics too, and those are scalar columns where these are full 6x6 beam and 4x4
+field moment sets per slice per record -- the difference IS the extra information.
+Known scaling limit, named for the follow-on: the stats accumulate in memory and write
+once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
+incremental writes instead.
+
 ## The coarse-step measurement (brief 8.3)
 
 (Summarized in manual `sec:numerics`.)

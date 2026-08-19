@@ -88,6 +88,35 @@ type wavefront_struct
                                              !   carried, not used, by this module.
 end type
 
+!+
+! Struct wavefront_params_struct
+!
+! Summary statistics of ONE FIELD SLICE, the field analog of Bmad's bunch_params_struct
+! and named to match it: centroid and sigma are the intensity-weighted first and second
+! Wigner moments over the transverse phase space (x, theta_x, y, theta_y), so sizes come
+! out as sqrt(sigma(1,1)) in both structs and free-space propagation is the ABCD map on
+! sigma (sigma_x^2(z) is quadratic in z -- how banked slices are folded into pulse
+! statistics without numerical propagation). emit = sqrt(det of a plane's 2x2 block) is
+! the field-quality analog (= M^2 lambda/4pi). Pulse-level values are POOLED from slice
+! instances downstream (energy-weighted mean of sigmas plus variance of centroids),
+! never stored. Fixed Bmad units.
+!
+! The theta rows of sigma cost FFT-side sums, so they are filled only where needed
+! (element ends, bank time); angle_moments_valid says whether they were -- the
+! twiss_valid pattern.
+!-
+
+type wavefront_params_struct
+  real(rp) :: centroid(4) = 0        ! Intensity-weighted (x, theta_x, y, theta_y) [m, rad].
+  real(rp) :: sigma(4,4) = 0         ! Second moments about the centroid [m^2, m rad, rad^2].
+  real(rp) :: energy = 0             ! Field energy of the slice [J].
+  real(rp) :: power = 0              ! Slice power [W].
+  real(rp) :: on_axis_intensity = 0  ! Intensity at the grid center [W/m^2].
+  real(rp) :: emit_x = 0, emit_y = 0 ! sqrt(det sigma_plane) [m rad].
+  real(rp) :: s = -1                 ! Longitudinal position of evaluation [m].
+  logical :: angle_moments_valid = .false.
+end type
+
 ! Cached FFTW plan state for wavefront_fft2, private to the module, ONE CACHE PER THREAD.
 !
 ! Following bmad/space_charge/fft_interface_mod.f90: plans are created once per transverse
@@ -1179,5 +1208,160 @@ wf_cache_nx = 0; wf_cache_ny = 0
 !$OMP END CRITICAL (wavefront_fft_plan_lock)
 
 end subroutine wavefront_fft_free
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag)
+!
+! Routine to compute the wavefront_params of one transverse field plane (one slice).
+!
+! Spatial moments come from the intensity |E|^2 in one grid pass. The theta moments use
+! the spectral representation: with theta = k_perp/ks, <theta^2> comes from |FFT(E)|^2
+! and the cross moment from <x theta>_sym = Im INT conj(E) x dE/dx / (ks INT |E|^2) with
+! the derivative evaluated spectrally -- one forward and two inverse FFTs, which is why
+! angle moments are computed only where needed (with_angles; the angle_moments_valid
+! pattern). Grid k ordering matches the field solver's kernel (fftshift index mapping).
+!
+! Input:
+!   plane(:,:)   -- complex(wf_rp): One field slice [V/m].
+!   dx           -- real(rp): Transverse grid spacing [m] (square grid).
+!   wavelength   -- real(rp): Radiation wavelength [m].
+!   dz_slice     -- real(rp): Slice spacing [m] (energy = power * dz_slice/c).
+!   with_angles  -- logical: Fill the theta rows of sigma (costs 3 FFTs).
+!
+! Output:
+!   pms          -- wavefront_params_struct: The moments. pms%s is NOT set here.
+!   err_flag     -- logical: Set True on error (FFT failure), False otherwise.
+!-
+
+subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag)
+
+complex(wf_rp) plane(:,:)
+real(rp) dx, wavelength, dz_slice
+type (wavefront_params_struct) pms
+logical with_angles, err_flag
+
+complex(wf_rp), allocatable :: ft(:,:), dxe(:,:), dye(:,:)
+real(rp) wt, wsum, x, y, ks, dk, shift, kx, ky, scl
+real(rp) sx, sy, sxx, syy, stx, sty, stxx, styy, sxtx, syty
+integer nx, ny, ix, iy, ic
+logical err
+
+!
+
+err_flag = .true.
+pms = wavefront_params_struct()
+nx = size(plane, 1);  ny = size(plane, 2)
+ks = twopi / wavelength
+
+! Intensity moments, one pass, SEPARABLE: the inner loop only accumulates row and
+! column intensity sums (the vectorizable part); the 1-D moments follow. Coordinates
+! are grid-centered, matching the solver. This runs per slice per record, so its cost
+! is the stats file's overhead -- keep it lean.
+
+shift = -0.5_rp * (nx - 1)
+block
+  real(rp) colsum(nx), rowsum(ny), rs
+  colsum = 0
+  do iy = 1, ny
+    rs = 0
+    do ix = 1, nx
+      wt = real(plane(ix,iy), rp)**2 + aimag(plane(ix,iy))**2
+      rs = rs + wt
+      colsum(ix) = colsum(ix) + wt
+    enddo
+    rowsum(iy) = rs
+  enddo
+  wsum = sum(rowsum)
+  sx = 0;  sxx = 0
+  do ix = 1, nx
+    x = (ix - 1 + shift) * dx
+    sx = sx + colsum(ix) * x;  sxx = sxx + colsum(ix) * x**2
+  enddo
+  sy = 0;  syy = 0
+  do iy = 1, ny
+    y = (iy - 1 + shift) * dx
+    sy = sy + rowsum(iy) * y;  syy = syy + rowsum(iy) * y**2
+  enddo
+end block
+
+scl = dx**2 / (2 * (mu_0_vac * c_light))       ! |E|^2 sum -> power [W], the diag convention.
+pms%power = wsum * scl
+pms%energy = pms%power * dz_slice / c_light
+ic = nx/2 + 1
+pms%on_axis_intensity = (real(plane(ic,ic), rp)**2 + aimag(plane(ic,ic))**2) / (2 * (mu_0_vac * c_light))
+
+if (wsum > 0) then
+  pms%centroid(1) = sx / wsum
+  pms%centroid(3) = sy / wsum
+  pms%sigma(1,1) = sxx / wsum - pms%centroid(1)**2
+  pms%sigma(3,3) = syy / wsum - pms%centroid(3)**2
+endif
+
+if (.not. with_angles .or. wsum <= 0) then
+  err_flag = .false.
+  return
+endif
+
+! Spectral side: FFT once for |ft|^2 (theta first and second moments), inverse-transform
+! i*k*ft for the spatial derivatives feeding the cross moments.
+
+allocate (ft(nx,ny), dxe(nx,ny), dye(nx,ny))
+ft = plane
+call wavefront_fft2 (ft, wf_fft_forward$, err);  if (err) return
+
+dk = twopi / (nx * dx)
+stx = 0;  sty = 0;  stxx = 0;  styy = 0
+! The kernel's fftshift storage reduces to the standard FFT frequency order:
+! stored index s (0-based) holds frequency s for s <= (n-1)/2, s-n above.
+
+do iy = 1, ny
+  ky = (mod((iy-1) + (ny-1)/2, ny) - (ny-1)/2) * dk
+  do ix = 1, nx
+    kx = (mod((ix-1) + (nx-1)/2, nx) - (nx-1)/2) * dk
+    wt = real(ft(ix,iy), rp)**2 + aimag(ft(ix,iy))**2
+    stx = stx + wt * kx;   sty = sty + wt * ky
+    stxx = stxx + wt * kx**2;   styy = styy + wt * ky**2
+    dxe(ix,iy) = cmplx(0.0_rp, kx, wf_rp) * ft(ix,iy)
+    dye(ix,iy) = cmplx(0.0_rp, ky, wf_rp) * ft(ix,iy)
+  enddo
+enddo
+! Parseval: sum|ft|^2 = nx*ny * sum|E|^2 for this unnormalized transform.
+scl = wsum * real(nx, rp) * real(ny, rp)
+pms%centroid(2) = stx / (scl * ks)
+pms%centroid(4) = sty / (scl * ks)
+pms%sigma(2,2) = stxx / (scl * ks**2) - pms%centroid(2)**2
+pms%sigma(4,4) = styy / (scl * ks**2) - pms%centroid(4)**2
+
+call wavefront_fft2 (dxe, wf_fft_backward$, err);  if (err) return
+call wavefront_fft2 (dye, wf_fft_backward$, err);  if (err) return
+dxe = dxe / real(nx*ny, rp)                        ! dE/dx on the grid.
+dye = dye / real(nx*ny, rp)
+
+! <x theta_x>_sym = Im INT conj(E) x dE/dx / (ks INT|E|^2), then recentered.
+
+sxtx = 0;  syty = 0
+do iy = 1, ny
+  y = (iy - 1 + shift) * dx
+  do ix = 1, nx
+    x = (ix - 1 + shift) * dx
+    sxtx = sxtx + x * aimag(conjg(plane(ix,iy)) * dxe(ix,iy))
+    syty = syty + y * aimag(conjg(plane(ix,iy)) * dye(ix,iy))
+  enddo
+enddo
+pms%sigma(1,2) = sxtx / (wsum * ks) - pms%centroid(1) * pms%centroid(2)
+pms%sigma(2,1) = pms%sigma(1,2)
+pms%sigma(3,4) = syty / (wsum * ks) - pms%centroid(3) * pms%centroid(4)
+pms%sigma(4,3) = pms%sigma(3,4)
+
+pms%emit_x = sqrt(max(0.0_rp, pms%sigma(1,1) * pms%sigma(2,2) - pms%sigma(1,2)**2))
+pms%emit_y = sqrt(max(0.0_rp, pms%sigma(3,3) * pms%sigma(4,4) - pms%sigma(3,4)**2))
+pms%angle_moments_valid = .true.
+
+err_flag = .false.
+
+end subroutine wavefront_params_of_plane
 
 end module wavefront_mod

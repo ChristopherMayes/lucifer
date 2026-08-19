@@ -413,6 +413,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_unaveraged.py" --exe "$EXE" --latdir "
   echo "FAIL: unaveraged checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+
+echo
+echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
+  echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
 echo
 
 "$PYTHON" "$SCRIPT_DIR/scripts/compare_fel.py" "$WORK_DIR"
