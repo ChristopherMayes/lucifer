@@ -696,7 +696,8 @@ beam carries a `quiver_in_px` convention flag that every averaged/seam entry ass
 — in a mixed line those handoffs happen at real internal boundaries, and the sandwich
 check exercises them (ledger conserved on the middle segment at 3.3e-4 of turnover,
 mixed-vs-averaged exit price 2.9e-2 ln, a wake on the unaveraged segment refused by
-name). Serial over slices by decision (a verification mode); wakes/space
+name). Parallel over slices with the averaged path's guarantees (results are
+bit-identical across thread counts; the harness checks it); wakes/space
 charge/element wakes are refused by name. Each run writes `<out_root>.ledger.txt`.
 
 Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-form):

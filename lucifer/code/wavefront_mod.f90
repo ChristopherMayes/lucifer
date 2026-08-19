@@ -953,8 +953,10 @@ end function wavefront_dft_1d
 ! array with the alignment it was created with. dat is copied in and out.
 !
 ! Thread safe: the plan cache and its work buffer are threadprivate, so concurrent calls
-! from a parallel loop over slices each use their own. First call on each thread (per
-! grid size) pays that thread's planner run. See the note at the cache declaration.
+! from a parallel loop over slices each use their own. Callers running transforms in a
+! parallel loop MUST warm every thread's cache first (wavefront_fft2_plan_threads) --
+! a lazy first-call plan would run the planner concurrently with other threads' transform
+! execution, which FFTW does not promise to be safe. See wavefront_fft2_plan's note.
 !
 ! Input:
 !   dat(:,:)    -- complex(wf_rp): Data to transform.
@@ -988,51 +990,7 @@ endif
 nx = size(dat, 1)
 ny = size(dat, 2)
 
-! The critical section below guards one specific thing: FFTW's rule that plan creation is
-! not reentrant -- the planner is globally serialised even though every thread builds into
-! its own threadprivate cache. Everything outside the section touches only threadprivate
-! state, which is what makes the routine as a whole thread safe.
-!
-! Failures are recorded in wf_cache_nx and reported after the section rather than returned
-! from inside it, since branching out of a critical construct is not allowed.
-
-!$OMP CRITICAL (wavefront_fft_plan_lock)
-
-if (nx /= wf_cache_nx .or. ny /= wf_cache_ny) then
-  if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
-  if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
-  if (C_ASSOCIATED(wf_buf_cptr)) call fftw_free(wf_buf_cptr)
-  wf_plan_fwd = C_NULL_PTR
-  wf_plan_bwd = C_NULL_PTR
-  wf_buf_cptr = C_NULL_PTR
-  wf_buf => null()
-
-  ! Mark the cache invalid up front, so that any failure below leaves it invalid rather than
-  ! half built. It is set to the real size only once every piece has been obtained.
-  wf_cache_nx = 0; wf_cache_ny = 0
-
-  ! fftw_alloc_complex and fftw_plan_dft_2d both return null on failure, and a null plan
-  ! reaching fftw_execute_dft is a crash rather than a diagnosable error.
-  wf_buf_cptr = fftw_alloc_complex(int(nx, C_SIZE_T) * int(ny, C_SIZE_T))
-
-  if (C_ASSOCIATED(wf_buf_cptr)) then
-    call C_F_POINTER (wf_buf_cptr, wf_buf, [nx, ny])
-
-    ! Note the reversed dimension order: fftw_plan_dft_2d takes the slowest varying
-    ! dimension first, and in a Fortran (nx, ny) array that is ny. Getting this backwards is
-    ! invisible on a square grid, which is why wavefront_drift_reference exists.
-    wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  FFTW_MEASURE)
-    wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, FFTW_MEASURE)
-
-    if (C_ASSOCIATED(wf_plan_fwd) .and. C_ASSOCIATED(wf_plan_bwd)) then
-      wf_cache_nx = nx; wf_cache_ny = ny
-    endif
-  endif
-endif
-
-cache_ok = (wf_cache_nx == nx .and. wf_cache_ny == ny)
-
-!$OMP END CRITICAL (wavefront_fft_plan_lock)
+call wavefront_fft2_plan (nx, ny, cache_ok)
 
 if (.not. cache_ok) then
   call out_io (s_error$, r_name, &
@@ -1061,6 +1019,134 @@ dat = wf_buf
 if (present(err_flag)) err_flag = .false.
 
 end subroutine wavefront_fft2
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_plan (nx, ny, cache_ok)
+!
+! Routine to fill the calling thread's plan cache for an nx by ny transform (a no-op when
+! it already holds this size). The critical section guards one specific thing: FFTW's rule
+! that only fftw_execute is reentrant -- the planner is globally serialised even though
+! every thread builds into its own threadprivate cache.
+!
+! That same rule is why wavefront_fft2_plan_threads exists: a thread that plans lazily on
+! its first transform does so while other threads are already EXECUTING transforms, and
+! planner activity concurrent with execution sits outside FFTW's thread-safety promise --
+! observed as run-to-run ulp-level differences in the planes of the last-planning threads.
+! Callers about to run transforms in a parallel loop must warm every thread's cache first.
+!
+! Failures are recorded in wf_cache_nx and reported by the caller rather than signalled
+! from inside the section, since branching out of a critical construct is not allowed.
+!
+! Input:
+!   nx, ny      -- integer: Transform size.
+!
+! Output:
+!   cache_ok    -- logical: True if this thread's cache now holds plans for (nx, ny).
+!-
+
+subroutine wavefront_fft2_plan (nx, ny, cache_ok)
+
+include 'fftw3.f03'
+
+integer nx, ny
+logical cache_ok
+
+!
+
+!$OMP CRITICAL (wavefront_fft_plan_lock)
+
+if (nx /= wf_cache_nx .or. ny /= wf_cache_ny) then
+  if (C_ASSOCIATED(wf_plan_fwd)) call fftw_destroy_plan(wf_plan_fwd)
+  if (C_ASSOCIATED(wf_plan_bwd)) call fftw_destroy_plan(wf_plan_bwd)
+  if (C_ASSOCIATED(wf_buf_cptr)) call fftw_free(wf_buf_cptr)
+  wf_plan_fwd = C_NULL_PTR
+  wf_plan_bwd = C_NULL_PTR
+  wf_buf_cptr = C_NULL_PTR
+  wf_buf => null()
+
+  ! Mark the cache invalid up front, so that any failure below leaves it invalid rather than
+  ! half built. It is set to the real size only once every piece has been obtained.
+  wf_cache_nx = 0; wf_cache_ny = 0
+
+  ! fftw_alloc_complex and fftw_plan_dft_2d both return null on failure, and a null plan
+  ! reaching fftw_execute_dft is a crash rather than a diagnosable error.
+  wf_buf_cptr = fftw_alloc_complex(int(nx, C_SIZE_T) * int(ny, C_SIZE_T))
+
+  if (C_ASSOCIATED(wf_buf_cptr)) then
+    call C_F_POINTER (wf_buf_cptr, wf_buf, [nx, ny])
+
+    ! Note the reversed dimension order: fftw_plan_dft_2d takes the slowest varying
+    ! dimension first, and in a Fortran (nx, ny) array that is ny. Getting this backwards is
+    ! invisible on a square grid, which is why wavefront_drift_reference exists.
+    !
+    ! FFTW_ESTIMATE, not FFTW_MEASURE, and deliberately: MEASURE picks the algorithm by
+    ! TIMING candidate transforms, so two runs of the same binary can pick differently and
+    ! every transform thereafter differs at the ulp level -- observed as rare whole-run
+    ! flips of the field diagnostics under the harness's byte-identity checks. ESTIMATE's
+    ! choice is a pure function of the problem, so results are reproducible run to run,
+    ! thread count to thread count, and against the banked reference files. The transform-
+    ! speed difference is the price, and determinism is worth more here than FFT speed.
+    wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  FFTW_ESTIMATE)
+    wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, FFTW_ESTIMATE)
+
+    if (C_ASSOCIATED(wf_plan_fwd) .and. C_ASSOCIATED(wf_plan_bwd)) then
+      wf_cache_nx = nx; wf_cache_ny = ny
+    endif
+  endif
+endif
+
+cache_ok = (wf_cache_nx == nx .and. wf_cache_ny == ny)
+
+!$OMP END CRITICAL (wavefront_fft_plan_lock)
+
+end subroutine wavefront_fft2_plan
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_fft2_plan_threads (nx, ny, err_flag)
+!
+! Routine to fill EVERY OpenMP thread's plan cache for an nx by ny transform, so that no
+! planner runs concurrently with transform execution afterwards (see wavefront_fft2_plan's
+! note: only fftw_execute is reentrant). Call serially, before any parallel loop that
+! executes transforms of this size; a no-op when every thread already holds this size.
+!
+! Input:
+!   nx, ny      -- integer: Transform size.
+!
+! Output:
+!   err_flag    -- logical: Set True if any thread's planning failed, False otherwise.
+!-
+
+subroutine wavefront_fft2_plan_threads (nx, ny, err_flag)
+
+integer nx, ny
+logical err_flag
+logical any_bad, cache_ok
+character(*), parameter :: r_name = 'wavefront_fft2_plan_threads'
+
+!
+
+any_bad = .false.
+
+!$OMP PARALLEL private(cache_ok) reduction(.or.: any_bad)
+call wavefront_fft2_plan (nx, ny, cache_ok)
+any_bad = any_bad .or. .not. cache_ok
+!$OMP END PARALLEL
+
+if (any_bad) then
+  call out_io (s_error$, r_name, &
+        'FFTW COULD NOT ALLOCATE A WORK BUFFER OR CREATE A PLAN FOR A \i0\ BY \i0\ TRANSFORM.', &
+        i_array = [nx, ny])
+endif
+
+err_flag = any_bad
+
+end subroutine wavefront_fft2_plan_threads
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

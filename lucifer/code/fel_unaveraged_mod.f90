@@ -58,9 +58,10 @@
 ! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
 ! composition; the ballistic check is the instrument that will say when.
 !
-! Serial over slices BY DECISION: this is a verification mode run on few slices; the
-! thread-independence property of the production path is untouched because this path
-! never runs inside it.
+! Parallel over slices with the averaged step's own guarantees (deliverable 5's
+! design): disjoint particle arrays and field slices per iteration, serial kernel
+! init, threadprivate FFT plans, per-slice energy summed in fixed order -- results
+! are bit-identical across thread counts, and the harness checks it.
 !-
 
 module fel_unaveraged_mod
@@ -250,13 +251,13 @@ type (fel_slip_struct) slip
 real(rp) dz_record, dE_beam
 logical first, last, err_flag
 
-real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:)
+real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:)
 complex(rp), allocatable :: crsource(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
 complex(rp) ehat, jhat, wphasor, cdep
 integer is, ip, isub, nslice, ifld, ix, iy, ngrid_arr(3), ngrid
-logical on_grid, err
+logical on_grid, err, any_err
 character(*), parameter :: r_name = 'fel_unavg_step'
 
 !
@@ -308,12 +309,25 @@ if (first) then
   ustate%active = .true.
 endif
 
-allocate (crsource(ngrid, ngrid))
+allocate (dE_slice(nslice))
+dE_slice = 0
+any_err = .false.
 
+! Parallel over slices, the averaged step's own design (deliverable 5): each slice
+! touches only its own particle arrays and its own field slice (the beam-to-field
+! mapping is a bijection), the kernel cache is read-only here (initialized serially
+! above), the FFT plan cache is threadprivate, and the per-slice energy lands in
+! dE_slice so the final sum is a fixed-order serial reduction -- results are
+! bit-identical across thread counts, and the harness checks that.
+
+!$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, s_sub, isub, ip, &
+!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, wphasor, dgam, cdep, err) &
+!$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
   ifld = fel_field_index(slip, is, nslice)
 
+  allocate (crsource(ngrid, ngrid))
   allocate (ux(sl%n), uy(sl%n), xx(sl%n), yy(sl%n), tau(sl%n), gam(sl%n))
   do ip = 1, sl%n
     p_mc = p0_mc * (1 + sl%pz(ip))
@@ -333,7 +347,7 @@ do is = 1, nslice
     crsource = 0
 
     do ip = 1, sl%n
-      call unavg_push (ip, s_sub, dsub/2)
+      call unavg_push (s_sub, dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip))
     enddo
 
     ! Radiation kick + deposit at the substep midpoint, phi0 advanced to it.
@@ -359,7 +373,7 @@ do is = 1, nslice
 
         wphasor = cmplx(0.0_rp, -1.0_rp, rp) * ehat * exp(cmplx(0.0_rp, psi_mid - ks*tau(ip), rp))
         dgam = -dsub * real(wphasor * conjg(jhat), rp) / (u_s * m_electron)
-        dE_beam = dE_beam + sl%weight(ip) * dgam * m_electron
+        dE_slice(is) = dE_slice(is) + sl%weight(ip) * dgam * m_electron
         gam(ip) = gam(ip) + dgam
 
         ! /u_s, not Genesis's averaged /gamma: the source and the E.v force are exact
@@ -378,10 +392,11 @@ do is = 1, nslice
     enddo
 
     do ip = 1, sl%n
-      call unavg_push (ip, s_sub + dsub/2, dsub/2)
+      call unavg_push (s_sub + dsub/2, dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip))
     enddo
 
-    call fel_field_diffract (wf, ifld, dsub, err);  if (err) return
+    call fel_field_diffract (wf, ifld, dsub, err)
+    any_err = any_err .or. err
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
 
     s_sub = s_sub + dsub
@@ -401,8 +416,12 @@ do is = 1, nslice
     sl%z(ip) = -beta * tau(ip)
   enddo
 
-  deallocate (ux, uy, xx, yy, tau, gam)
+  deallocate (ux, uy, xx, yy, tau, gam, crsource)
 enddo
+!$OMP end parallel do
+if (any_err) return
+
+dE_beam = sum(dE_slice)   ! Fixed-order serial sum: thread-count independent.
 
 beam%phi0 = beam%phi0 + dz_record * phi0_rate_avg
 ustate%s = ustate%s + dz_record
@@ -419,25 +438,27 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
-! One RK4 magnetic push of particle jp over step h starting at segment position s0.
-! gamma is untouched: B does no work, exactly.
+! One RK4 magnetic push of one particle over step h from segment position s0. All
+! per-particle state passes BY ARGUMENT: host-associated variables privatized by the
+! caller's OMP region are not redirected inside called procedures, so nothing mutable
+! may be host-associated here (und/ustate/inv_beta0 are read-only shared). gamma is
+! untouched: B does no work, exactly.
 
-subroutine unavg_push (jp, s0, h)
+subroutine unavg_push (s0, h, x1, y1, u1, v1, t1, gamma)
 
-integer jp
-real(rp) s0, h
+real(rp) s0, h, x1, y1, u1, v1, t1, gamma
 real(rp) y0(5), k1(5), k2(5), k3(5), k4(5)
 
-y0 = [xx(jp), yy(jp), ux(jp), uy(jp), tau(jp)]
-call unavg_ode (y0,                s0,         gam(jp), k1)
-call unavg_ode (y0 + (h/2) * k1,   s0 + h/2,   gam(jp), k2)
-call unavg_ode (y0 + (h/2) * k2,   s0 + h/2,   gam(jp), k3)
-call unavg_ode (y0 + h * k3,       s0 + h,     gam(jp), k4)
+y0 = [x1, y1, u1, v1, t1]
+call unavg_ode (y0,                s0,         gamma, k1)
+call unavg_ode (y0 + (h/2) * k1,   s0 + h/2,   gamma, k2)
+call unavg_ode (y0 + (h/2) * k2,   s0 + h/2,   gamma, k3)
+call unavg_ode (y0 + h * k3,       s0 + h,     gamma, k4)
 y0 = y0 + (h/6) * (k1 + 2*k2 + 2*k3 + k4)
 
-xx(jp) = y0(1);  yy(jp) = y0(2)
-ux(jp) = y0(3);  uy(jp) = y0(4)
-tau(jp) = y0(5)
+x1 = y0(1);  y1 = y0(2)
+u1 = y0(3);  v1 = y0(4)
+t1 = y0(5)
 
 end subroutine unavg_push
 

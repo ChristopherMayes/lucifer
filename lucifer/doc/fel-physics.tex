@@ -678,8 +678,11 @@ entry/exit behavior --- is an output of the underlying unaveraged dynamics. This
 particles through the undulator's \emph{real} field with the radiation as a
 co-evolving kick, so those inputs become measurements. It keeps the grid field and
 the Lorentz force where MINERVA --- the production existence proof of this physics ---
-uses modal fields; it is a verification mode, run on a handful of slices where its
-$\sim$30$\times$ cost is irrelevant. Nothing from the averaged coupling path may
+uses modal fields; it is a verification mode whose $\sim$30$\times$ cost per step is
+priced, not hidden. Like the averaged path it is parallel over slices with
+bit-identical results at any thread count (per-slice private state, fixed-order
+energy reduction; the harness runs a 1-thread/8-thread byte comparison). Nothing
+from the averaged coupling path may
 appear in it (a harness grep enforces this): its agreement with
 Eq.~\ref{eq:fc} is the point, not the input.
 

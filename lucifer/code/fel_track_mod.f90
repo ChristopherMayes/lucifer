@@ -1273,8 +1273,17 @@ integer ngrid
 real(rp) dgrid, ks, dz
 real(rp) dk, shift, dx, dy
 integer ix, iy, iix, iiy
+logical err
 
 !
+
+! Warm every thread's FFT plan cache from this serial context, so no FFTW planner ever
+! runs concurrently with transform execution in the parallel slice loops that follow
+! (wavefront_fft2_plan_threads' note). Runs even on a kernel-cache hit: the thread team
+! may have grown since the plans were made. A planning failure reports there and then
+! errors again, catchably, at the first transform.
+
+call wavefront_fft2_plan_threads (ngrid, ngrid, err)
 
 if (ngrid == fel_cache_ngrid .and. dgrid == fel_cache_dgrid .and. ks == fel_cache_ks .and. &
     dz == fel_cache_dz) return

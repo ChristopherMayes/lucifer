@@ -112,6 +112,30 @@ GAIN = """&fel_track_params
 &end
 """
 
+TDID = """&fel_track_params
+  lat_file = "{lat}"
+  out_root = "{root}"
+  lambda0 = 1e-10
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 8.0e-15
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -4e-10
+  beam_init%grid(3)%x_max = 4e-10
+  beam_init%sig_pz = 8.8045e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  nbins = 8
+  seed_power = 1e4
+  seed_waist_size = 30e-6
+  grid_n_pts = 63
+  grid_half_width = 2e-4
+  window_length = 8e-10
+  window_sample = 1
+  shotnoise = T
+  ran_seed = 999
+&end
+"""
+
 def unavg_wrapper(wd, base, spp, ramp):
     """A wrapper lattice selecting the unaveraged mode with per-run parameters --
     the delz-sweep pattern: the mode and its knobs are LATTICE attributes."""
@@ -135,10 +159,10 @@ def check(name, value, tol, note=""):
         FAILED = True
 
 
-def run(exe, wd, name, text):
+def run(exe, wd, name, text, threads="4"):
     (wd / (name + ".nml")).write_text(text)
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
-                       env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+                       env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}\n{r.stderr[-1000:]}")
         sys.exit(1)
@@ -323,6 +347,19 @@ def main():
         "element sr wakes are not supported in the unaveraged mode")
     check("sandwich: wake on the unaveraged segment refused by name (1 = yes)",
           0.0 if refused else 1.0, 0.5)
+
+    # 8. Thread invariance: the parallel slice loop must be INVISIBLE. A multi-slice
+    # time-dependent unaveraged run (slippage active, so slices genuinely interleave
+    # through the field) at 1 thread and at 8 threads must produce byte-identical
+    # diagnostics AND ledger -- the same guarantee the averaged path carries
+    # (per-slice private state, fixed-order energy reduction).
+    wl = unavg_wrapper(wd, "aramis_1seg.bmad", 20, 2)
+    run(exe, wd, "uv_tid1", TDID.format(root="uv_tid1", lat=wl), threads="1")
+    run(exe, wd, "uv_tid8", TDID.format(root="uv_tid8", lat=wl), threads="8")
+    same = all((wd / f"uv_tid1{s}").read_bytes() == (wd / f"uv_tid8{s}").read_bytes()
+               for s in (".diag.txt", ".ledger.txt"))
+    check("thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes)",
+          0.0 if same else 1.0, 0.5)
 
     if FAILED:
         print("UNAVERAGED CHECKS: FAIL")
