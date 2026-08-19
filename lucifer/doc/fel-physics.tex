@@ -138,7 +138,10 @@ unroll.
 The FEL tracking mode and unaveraged parameters are likewise per-element lattice
 attributes (registered program-side; class-settable as
 \code{wiggler::*[attr] = ...}), so averaged and unaveraged segments mix freely in one
-line: \code{fel\_tracking} --- unset/0 the averaged default with the
+line. Lattices use NAMED values via one-line variable definitions
+(\code{fel\_unaveraged = 1}, matching the code's \code{fel\_unaveraged\$}-style
+parameters): \code{fel\_tracking} --- unset/0 (\code{fel\_averaged}) the averaged
+default with the
 \code{bmad\_standard} kernel's transverse maps (\S\ref{sec:undbmad}); 1 the
 unaveraged mode (\S\ref{sec:unaveraged}); $-1$ the transcribed-Genesis maps,
 validation-internal --- \code{fel\_steps\_per\_period} (unset $\to$ 20; below 10

@@ -113,6 +113,16 @@ end type
 ! accumulator is a local of fel_field_step, one per invocation, so concurrent slices
 ! deposit into their own.
 
+! Named values of the fel_tracking lattice attribute (manual sec:element), in Bmad's
+! named-integer convention. Lattices use the same names via one-line variable
+! definitions (e.g. "fel_unaveraged = 1" before the element that sets it).
+
+integer, parameter :: fel_transcribed$ = -1   ! Transcribed-Genesis transverse maps
+                                              !   (validation-internal; Genesis tiers).
+integer, parameter :: fel_averaged$ = 0       ! Averaged, bmad_standard kernel maps
+                                              !   (the unset default).
+integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode.
+
 complex(rp), allocatable, private, save :: fel_k2(:,:)        ! -i (kx^2+ky^2)/(2 ks), FFT order.
 complex(rp), allocatable, private, save :: fel_exp_k2(:,:)    ! exp(K2 * dz), the step propagator.
 integer, private, save :: fel_cache_ngrid = 0

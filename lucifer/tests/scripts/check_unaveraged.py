@@ -118,7 +118,8 @@ def unavg_wrapper(wd, base, spp, ramp):
     name = f"w_{base.replace('.bmad','')}_s{spp}_r{str(ramp).replace('-','m').replace('.','p')}.bmad"
     (wd / name).write_text(
         f"call, file = {base}\n"
-        f"wiggler::*[FEL_TRACKING] = 1\n"
+        f"fel_unaveraged = 1\n"
+        f"wiggler::*[FEL_TRACKING] = fel_unaveraged\n"
         f"wiggler::*[FEL_STEPS_PER_PERIOD] = {spp}\n"
         f"wiggler::*[FEL_RAMP_PERIODS] = {ramp}\n")
     return name
@@ -300,7 +301,8 @@ def main():
     # unaveraged segment; a wake on that segment must refuse by name; and the exit
     # power is priced against the all-averaged twin.
     (wd / "sandwich_avg.bmad").write_text(
-        "call, file = unavg_sandwich.bmad\nUNDB[FEL_TRACKING] = 0\n")
+        "call, file = unavg_sandwich.bmad\nfel_averaged = 0\n"
+        "UNDB[FEL_TRACKING] = fel_averaged\n")
     run(exe, wd, "uv_sand", GAIN.format(root="uv_sand", lat="unavg_sandwich.bmad"))
     run(exe, wd, "uv_sand_avg", GAIN.format(root="uv_sand_avg", lat="sandwich_avg.bmad"))
     led = np.loadtxt(wd / "uv_sand.ledger.txt")

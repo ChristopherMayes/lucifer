@@ -1,4 +1,5 @@
 ! Single-segment twin of aramis_val.bmad: transcribed-Genesis transverse maps
 ! (validation-internal) for the Genesis-comparison tiers. See aramis_val.bmad.
 call, file = aramis_1seg.bmad
-wiggler::*[FEL_TRACKING] = -1
+fel_transcribed = -1   ! Named value: transcribed-Genesis maps (validation-internal).
+wiggler::*[FEL_TRACKING] = fel_transcribed

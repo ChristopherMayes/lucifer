@@ -44,7 +44,9 @@
 !
 ! The FEL tracking mode and unaveraged parameters are per-element LATTICE attributes
 ! (registered by this program; usable on any wiggler/undulator, class-settable as
-! wiggler::*[attr] = ...):
+! wiggler::*[attr] = ...). Use NAMED values, defined as one-line lattice variables --
+! fel_transcribed = -1, fel_averaged = 0, fel_unaveraged = 1 -- matching the code's
+! fel_transcribed$/fel_averaged$/fel_unaveraged$ parameters (fel_track_mod):
 !
 !     fel_tracking          ! unset/0 = averaged, the bmad_standard wiggler kernel's
 !                           !   transverse maps -- BMAD'S OWN KERNEL IS THE DEFAULT.
@@ -500,7 +502,7 @@ gamma0_ref = fel_gamma0(fbeam)
 ! gets osc_amplitude without focusing -- both are refused by name.
 
 call setup_fel_elements ()
-any_unavg = any(fel_mode == 1 .and. is_fel)
+any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
 
 ! The unaveraged mode is a verification mode (fel-physics.tex sec:unaveraged): the
 ! collective terms are not wired into its step, and a mixed line would apply them in
@@ -599,12 +601,12 @@ do ie = 1, branch%n_ele_track
     ! each step's field solve; any end-of-lattice fixup lands on the last step.
 
     und = und_of(ie)
-    und%bmad_transport = (fel_mode(ie) == 0)     ! The default: bmad_standard's kernel.
+    und%bmad_transport = (fel_mode(ie) == fel_averaged$)   ! The default: bmad_standard's kernel.
     und_slip_step = (1 + und%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
-    if (fel_mode(ie) == 1) then
+    if (fel_mode(ie) == fel_unaveraged$) then
       ! The concatenated wake kick would meet the quiver-carrying chart mid-segment;
       ! nothing in this mode needs element wakes, so refuse rather than approximate.
       if (associated(wake_src)) then
@@ -617,7 +619,7 @@ do ie = 1, branch%n_ele_track
     endif
 
     do istep = 1, und%nstep
-      if (fel_mode(ie) == 1) then
+      if (fel_mode(ie) == fel_unaveraged$) then
         call fel_unavg_step (und, ustate, fbeam, wf, slip, und%dz, istep == 1, &
                              istep == und%nstep, dE_step, err)
       else
@@ -638,7 +640,7 @@ do ie = 1, branch%n_ele_track
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step)
       endif
       z_now = z_now + und%dz
-      if (fel_mode(ie) == 1) call write_ledger_row ()
+      if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
       if (istep == und%nstep) call do_migrate ()
       call write_diag_rows()
     enddo
@@ -1348,7 +1350,8 @@ do je = 1, branch%n_ele_track
   rv = value_of_attribute(w, 'FEL_TRACKING', err_a)
   if (err_a) stop 1
   fel_mode(je) = nint(rv)
-  if (abs(rv - fel_mode(je)) > 1e-9_rp .or. fel_mode(je) < -1 .or. fel_mode(je) > 1) then
+  if (abs(rv - fel_mode(je)) > 1e-9_rp .or. fel_mode(je) < fel_transcribed$ .or. &
+      fel_mode(je) > fel_unaveraged$) then
     print '(a)', 'fel_track_test: fel_tracking must be -1 (transcribed maps, validation-internal),'
     print '(a)', '  0/unset (averaged, bmad_standard kernel maps) or 1 (unaveraged), at element: ' // trim(w%name)
     stop 1

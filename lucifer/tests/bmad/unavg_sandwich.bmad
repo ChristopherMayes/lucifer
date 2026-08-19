@@ -14,10 +14,12 @@ beginning[alpha_a] = -0.703306
 beginning[beta_b] = 17.3899
 beginning[alpha_b] = 1.40348
 
+fel_unaveraged = 1   ! Named value for the fel_tracking attribute (fel_track_test.f90).
+
 UNDA: wiggler, l = 0.6, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
       tracking_method = custom, ds_step = 0.015
-UNDB: UNDA, fel_tracking = 1
+UNDB: UNDA, fel_tracking = fel_unaveraged
 P1: pipe, l = 0.21
 
 SEG: line = (UNDA, P1, UNDB, P1, UNDA)
