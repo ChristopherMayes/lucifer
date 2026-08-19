@@ -22,7 +22,11 @@
 !      a sin^2 amplitude envelope g(s) over n_ramp periods at each end, with g' terms
 !      retained in b, so the quiver builds adiabatically and vanishes at the segment
 !      ends -- the averaged<->unaveraged handoff (brief 6.6's K/gamma hazard) happens
-!      where the two momentum conventions coincide.
+!      where the two momentum conventions coincide. Each handoff also applies the
+!      ramp's slippage compensation as a discrete phase jump (unavg_ramp_phase_jump:
+!      the ramped ends slip ~3 rad of optical phase less than the contracted
+!      hard-edge element; uncompensated, that scrambles the bunching-to-field phase
+!      of every pre-bunched segment entry).
 !   2. radiation kick + source deposit at the substep midpoint:
 !        dgamma/ds = -Re[W conj(j)]/(u_s m_e),   W = -i*Ehat*e^{i Psi}
 !      with Psi = (phi0 - ku*s_local) - ks*tau the optical phase (phi0 is the beam's
@@ -307,6 +311,7 @@ if (first) then
   if (err) return
   beam%quiver_in_px = .true.
   ustate%active = .true.
+  call unavg_ramp_phase_jump ()
 endif
 
 allocate (dE_slice(nslice))
@@ -431,12 +436,51 @@ ustate%s = ustate%s + dz_record
 if (last) then
   beam%quiver_in_px = .false.
   ustate%active = .false.
+  call unavg_ramp_phase_jump ()
 endif
 
 err_flag = .false.
 
 !------------------------------------------------------------------------------
 contains
+
+! The ramp's slippage compensation, applied as one discrete jump per segment end,
+! at the handoffs where the envelope is exactly zero and nothing couples. The
+! element's contract is L meters of full-strength undulator; the entry/exit ramps
+! are a numerical device (an adiabatic switch-on), and an electron under a ramped
+! quiver <u_perp^2> = g^2 aw^2 lags the wave LESS than the contracted hard-edge
+! element would have it -- by dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds, which
+! is ks*dtau ~ 2.6 rad of optical phase per end at the benchmark parameters
+! (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp per end). Uncompensated, every
+! segment after the first receives a pre-bunched beam with its bunching-to-field
+! phase rotated by that much -- the first segment is immune, nothing is bunched
+! yet, and that is exactly how it was caught: per-segment ln-power deviations vs
+! the averaged mode of {0.0000, +0.08, +0.005, +0.02, +0.01, +0.13}. The jump must
+! be discrete AND at the ends: compensating continuously inside the ramp detunes
+! the live interaction where the coupling is already substantial (measured -0.9%
+! gain on the FIRST segment, doubling with ramp length). In hardware terms this is
+! the phase shifter that makes a tapered-end segment equivalent to its ideal
+! hard-edged length. In the stored chart z = -beta*tau, so tau += dtau is
+! z -= aw^2 INT(1-g^2) / (2 p^2), per particle with its own momentum.
+
+subroutine unavg_ramp_phase_jump ()
+
+real(rp) ramp_int
+integer is_j, ip_j
+
+if (ustate%l_ramp <= 0) return
+ramp_int = 0.625_rp * ustate%l_ramp * und%aw**2 / 2
+
+!$OMP parallel do private(ip_j)
+do is_j = 1, size(beam%slice)
+  do ip_j = 1, beam%slice(is_j)%n
+    beam%slice(is_j)%z(ip_j) = beam%slice(is_j)%z(ip_j) - &
+                     ramp_int / (p0_mc * (1 + beam%slice(is_j)%pz(ip_j)))**2
+  enddo
+enddo
+!$OMP end parallel do
+
+end subroutine unavg_ramp_phase_jump
 
 ! One RK4 magnetic push of one particle over step h from segment position s0. All
 ! per-particle state passes BY ARGUMENT: host-associated variables privatized by the
@@ -478,6 +522,7 @@ dyds(1) = y(3) / us_l
 dyds(2) = y(4) / us_l
 dyds(3) = by - y(4) * bz / us_l
 dyds(4) = -bx + y(3) * bz / us_l
+
 dyds(5) = gamma / us_l - inv_beta0
 
 end subroutine unavg_ode
