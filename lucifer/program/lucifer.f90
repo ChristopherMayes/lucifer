@@ -305,6 +305,8 @@ character(60) :: dump_beam_at(40) = '', dump_field_at(40) = ''
 logical :: keep_escaped_field = .false.
 logical, allocatable :: dump_beam_here(:), dump_field_here(:)
 integer nrec_stats, nend_stats
+integer(8) prog_count0, prog_count_last, prog_rate    ! Wall clock for progress lines.
+real(rp) lat_length
 integer :: n_banked = 0
 real(rp), allocatable :: bank_z(:), bank_pms(:,:)      ! Per banked slice: z, 25 params.
 integer(hid_t) :: esc_id = 0
@@ -608,6 +610,14 @@ b_dev_max = 0
 
 call setup_diagnostics ()
 
+! Progress goes to stdout, throttled by wall clock (slow modes print a steady trickle,
+! fast runs just the element boundaries); scripts that redirect stdout get it as their
+! log. The numbers come from the stats row just taken -- no extra computation.
+
+call system_clock (prog_count0, prog_rate)
+prog_count_last = prog_count0
+lat_length = branch%ele(branch%n_ele_track)%s
+
 z_now = 0
 call write_diag_rows()     ! Initial record, matching Genesis's diag before the first step.
 call take_stats_record (.true.)
@@ -684,6 +694,7 @@ do ie = 1, branch%n_ele_track
       if (istep == und%nstep) call do_migrate ()
       call write_diag_rows()
       call take_stats_record (istep == und%nstep)
+      call progress_line (istep == und%nstep, istep, und%nstep)
     enddo
     call end_of_element ()
 
@@ -749,6 +760,7 @@ do ie = 1, branch%n_ele_track
     call do_migrate ()
     call write_diag_rows()
     call take_stats_record (.true.)
+    call progress_line (.true., 1, 1)
     call end_of_element ()
 
   else
@@ -767,6 +779,7 @@ do ie = 1, branch%n_ele_track
     call do_migrate ()
     call write_diag_rows()
     call take_stats_record (.true.)
+    call progress_line (.true., 1, 1)
     call end_of_element ()
   endif
 enddo
@@ -1648,6 +1661,32 @@ enddo
 write (iu_ledger, '(6es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum
 
 end subroutine write_ledger_row
+
+!------------------------------------------------------------------------------
+! One progress line to stdout: where the walk is and what the light and beam are
+! doing, so the slow modes (the unaveraged mode runs ~30x the averaged) show signs of
+! life. Element boundaries always print; inside elements a wall-clock throttle (2 s)
+! keeps fast runs quiet. All numbers are read from the stats row just taken.
+
+subroutine progress_line (at_element_end, i_step, n_step)
+
+logical at_element_end
+integer i_step, n_step
+integer(8) now
+real(rp) elapsed
+
+call system_clock (now)
+if (.not. at_element_end .and. real(now - prog_count_last, rp) / prog_rate < 2.0_rp) return
+prog_count_last = now
+elapsed = real(now - prog_count0, rp) / prog_rate
+
+print '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, es9.2, a, es9.2, a, f8.5, a, i0, a)', &
+      'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
+      branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
+      '  P = ', sum(stats%f_power(:, stats%irec)), ' W  U = ', sum(stats%f_energy(:, stats%irec)), &
+      ' J  <|b|> = ', sum(stats%bunching(:, stats%irec)) / nslice, '  t = ', nint(elapsed), ' s'
+
+end subroutine progress_line
 
 !------------------------------------------------------------------------------
 ! Diagnostics (manual sec:stats). setup_diagnostics resolves the dump-at lists through
