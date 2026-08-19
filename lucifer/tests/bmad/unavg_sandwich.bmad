@@ -1,0 +1,25 @@
+! Mixed-mode sandwich (Stage A check): averaged / UNAVERAGED / averaged segments with
+! pipe interludes. UNDB carries fel_tracking = 1 on the element itself -- the mode is
+! a lattice attribute -- so the averaged<->unaveraged handoffs happen at REAL internal
+! boundaries mid-line, which the single-segment configurations never exercise. The
+! all-averaged twin is a two-line wrapper overriding UNDB[fel_tracking] = 0.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+
+UNDA: wiggler, l = 0.6, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+UNDB: UNDA, fel_tracking = 1
+P1: pipe, l = 0.21
+
+SEG: line = (UNDA, P1, UNDB, P1, UNDA)
+
+use, SEG

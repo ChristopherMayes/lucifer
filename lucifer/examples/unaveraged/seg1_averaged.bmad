@@ -1,0 +1,4 @@
+! The all-averaged twin of seg1.bmad: the element's fel_tracking overridden back to
+! the default (0: averaged, the bmad_standard kernel's transverse maps).
+call, file = seg1.bmad
+UND[FEL_TRACKING] = 0

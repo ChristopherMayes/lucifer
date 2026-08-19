@@ -40,19 +40,26 @@
 !     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
 !     out_root = "fel_td"                      ! Prefix for the output files.
 !     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
-!     und_transport = "genesis"                ! In-undulator dynamics: transcribed
-!                                              !   TrackBeam maps ("genesis", the tier
-!                                              !   default), the flattened Bmad periodic-
-!                                              !   wiggler kernel ("bmad"; priced in the
-!                                              !   README), or the UNAVERAGED verification
-!                                              !   mode ("unaveraged": full Newton-Lorentz
-!                                              !   quiver, no fc/faw -- manual
-!                                              !   sec:unaveraged; writes .ledger.txt).
-!     unavg_steps_per_period = 20              ! Unaveraged substeps per undulator period
-!                                              !   (MINERVA's envelope: 10 floor, 20-30).
-!     unavg_ramp_periods = 2                   ! sin^2 entry/exit ramp length [periods];
-!                                              !   0 = hard edge (the mutation config).
 !     split_weights = F                        ! Weight-invariance test mode; see below.
+!
+! The FEL tracking mode and unaveraged parameters are per-element LATTICE attributes
+! (registered by this program; usable on any wiggler/undulator, class-settable as
+! wiggler::*[attr] = ...):
+!
+!     fel_tracking          ! unset/0 = averaged, the bmad_standard wiggler kernel's
+!                           !   transverse maps -- BMAD'S OWN KERNEL IS THE DEFAULT.
+!                           ! 1 = the unaveraged verification mode (full Newton-Lorentz
+!                           !   quiver, no fc/faw; manual sec:unaveraged; the run
+!                           !   writes <out_root>.ledger.txt).
+!                           ! -1 = averaged with the transcribed-Genesis transverse
+!                           !   maps: VALIDATION-INTERNAL (the Genesis tiers require
+!                           !   transcription-level transport; no production lattice
+!                           !   writes it). Differences priced in the README.
+!     fel_steps_per_period  ! Unaveraged substeps per period. unset/0 -> 20;
+!                           !   below 10 refused (MINERVA's floor).
+!     fel_ramp_periods      ! sin^2 entry/exit ramp length [periods]. unset/0 -> 2;
+!                           !   a TRUE hard edge (test configuration) is the explicit
+!                           !   sentinel -1 -- silence never means hard edge.
 !     write_initial = F                        ! Also dump the initial state (Genesis format).
 !     migrate = F                              ! Slice migration (see below).
 !     migrate_check = F                        ! Verify phase continuity at each migration.
@@ -203,11 +210,6 @@ logical :: write_initial = .false.
 logical :: migrate = .false., migrate_check = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
-character(16) :: und_transport = 'genesis'     ! In-undulator transverse maps: the
-                                               ! transcribed TrackBeam ("genesis", tier
-                                               ! default) or the flattened Bmad periodic
-                                               ! kernel ("bmad"); the difference is
-                                               ! priced, not assumed (brief 10 step 9).
 
 ! Collective effects (deliverable 8), Genesis &wake / &efield names with wake_/sc_
 ! prefixes. All off by default; see the header.
@@ -220,16 +222,15 @@ real(rp) :: sc_rmax = 0
 integer :: sc_ngrid = 100, sc_nz = 0, sc_nphi = 0
 logical :: sc_longrange = .false.
 
-! The unaveraged verification mode (fel-physics.tex sec:unaveraged): selected by
-! und_transport = "unaveraged". Substeps per undulator period (MINERVA's envelope:
-! 10 floor, 20-30 recommended) and the sin^2 entry/exit ramp length in periods
-! (0 = hard edge, the mutation configuration the handoff check exists to catch).
+! The FEL tracking mode and unaveraged parameters are per-element LATTICE attributes
+! (fel_tracking / fel_steps_per_period / fel_ramp_periods; see the header), read at
+! setup into these arrays. any_unavg is derived: does ANY element run unaveraged?
 type (fel_unavg_struct) ustate
-integer :: unavg_steps_per_period = 20
-real(rp) :: unavg_ramp_periods = 2
+integer, allocatable :: fel_mode(:), fel_spp(:)
+real(rp), allocatable :: fel_ramp(:)
 real(rp) dE_step
 integer :: iu_ledger = 0
-logical unavg_mode
+logical any_unavg
 
 real(rp) :: lambda0 = 0                  ! Generation parameters; see the header.
 ! The generated beam is described by beam_init (honored fields in the header table);
@@ -280,7 +281,7 @@ character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
 namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
-                           interlude_model, und_transport, &
+                           interlude_model, &
                            split_weights, write_initial, lambda0, nbins, &
                            seed_power, seed_waist_size, grid_n_pts, &
                            grid_half_width, ran_seed, window_length, window_sample, shotnoise, &
@@ -289,8 +290,7 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
                            wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
                            beam_init, imp, use_beam_init, dist_file, write_dist_file, &
-                           write_opmd_file, imp_split_weights, write_wake_kernels, &
-                           unavg_steps_per_period, unavg_ramp_periods
+                           write_opmd_file, imp_split_weights, write_wake_kernels
 
 ! Read parameters.
 
@@ -305,21 +305,9 @@ open (newunit = iu_nml, file = param_file, status = 'old', action = 'read')
 read (iu_nml, nml = fel_track_params)
 close (iu_nml)
 
-if (und_transport /= 'genesis' .and. und_transport /= 'bmad' .and. und_transport /= 'unaveraged') then
-  print '(a)', 'fel_track_test: und_transport must be "genesis", "bmad" or "unaveraged", got: ' // trim(und_transport)
-  stop 1
-endif
-unavg_mode = (und_transport == 'unaveraged')
-
-! The unaveraged mode is a verification mode (fel-physics.tex sec:unaveraged): the
-! collective terms are not wired into its step, so running them together would
-! silently drop physics. Refuse by name.
-
-if (unavg_mode .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
-  print '(a)', 'fel_track_test: wakes/space charge are NOT wired into the unaveraged mode'
-  print '(a)', '  (a verification mode; see fel-physics.tex sec:unaveraged). Turn them off.'
-  stop 1
-endif
+! (The FEL tracking mode is a lattice attribute; its refusals live in
+! setup_fel_elements, and the unaveraged-vs-collective refusal follows setup, once
+! any_unavg is known.)
 
 if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
   print '(a)', 'fel_track_test: interlude_model must be "bmad" or "genesis", got: ' // trim(interlude_model)
@@ -342,6 +330,21 @@ endif
 
 track1_custom_ptr => fel_ele_as_wiggler
 make_mat6_custom_ptr => fel_mat6_as_wiggler
+
+! The FEL mode and unaveraged parameters live on the LATTICE (Stage A of the CUSTOM
+! retirement; manual sec:element), registered program-side so no lattice declares
+! them. The same slot index serves wigglers and undulators.
+
+call set_custom_attribute_name ('WIGGLER::FEL_TRACKING', err, 1)
+if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_TRACKING', err, 1)
+if (.not. err) call set_custom_attribute_name ('WIGGLER::FEL_STEPS_PER_PERIOD', err, 2)
+if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_STEPS_PER_PERIOD', err, 2)
+if (.not. err) call set_custom_attribute_name ('WIGGLER::FEL_RAMP_PERIODS', err, 3)
+if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_RAMP_PERIODS', err, 3)
+if (err) then
+  print '(a)', 'fel_track_test: could not register the FEL lattice attributes.'
+  stop 1
+endif
 
 ! err_flag matters: bmad_parser reports attribute errors (e.g. a wake on an element
 ! type that cannot carry one) and RETURNS -- without the check the run continues on a
@@ -497,6 +500,17 @@ gamma0_ref = fel_gamma0(fbeam)
 ! gets osc_amplitude without focusing -- both are refused by name.
 
 call setup_fel_elements ()
+any_unavg = any(fel_mode == 1 .and. is_fel)
+
+! The unaveraged mode is a verification mode (fel-physics.tex sec:unaveraged): the
+! collective terms are not wired into its step, and a mixed line would apply them in
+! some segments and silently drop them in others. Refuse by name.
+
+if (any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
+  print '(a)', 'fel_track_test: wakes/space charge are NOT wired into the unaveraged mode'
+  print '(a)', '  (a verification mode; see fel-physics.tex sec:unaveraged). Turn them off.'
+  stop 1
+endif
 
 ! The rest of the schedule: drift autophasing. Interludes accumulate Lz; the last
 ! interlude before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
@@ -545,7 +559,7 @@ write (iu_diag, '(a)') '#         z            slice        power         on_axi
 ! and the kick-side energy change of the step. The ledger check holds
 ! d(E_beam + U_field) to its measured floor.
 
-if (unavg_mode) then
+if (any_unavg) then
   open (newunit = iu_ledger, file = trim(out_root) // '.ledger.txt', action = 'write')
   write (iu_ledger, '(a)') '#         z          E_beam_rel [J]          U_field [J]           dE_kick [J]'
 endif
@@ -585,12 +599,12 @@ do ie = 1, branch%n_ele_track
     ! each step's field solve; any end-of-lattice fixup lands on the last step.
 
     und = und_of(ie)
-    und%bmad_transport = (und_transport == 'bmad')
+    und%bmad_transport = (fel_mode(ie) == 0)     ! The default: bmad_standard's kernel.
     und_slip_step = (1 + und%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
-    if (unavg_mode) then
+    if (fel_mode(ie) == 1) then
       ! The concatenated wake kick would meet the quiver-carrying chart mid-segment;
       ! nothing in this mode needs element wakes, so refuse rather than approximate.
       if (associated(wake_src)) then
@@ -598,13 +612,12 @@ do ie = 1, branch%n_ele_track
         print '(a)', '  at element: ' // trim(ele%name)
         stop 1
       endif
-      call fel_unavg_setup (und, ustate, ele%value(l$), und%dz, unavg_steps_per_period, &
-                            unavg_ramp_periods, err)
+      call fel_unavg_setup (und, ustate, ele%value(l$), und%dz, fel_spp(ie), fel_ramp(ie), err)
       if (err) stop 1
     endif
 
     do istep = 1, und%nstep
-      if (unavg_mode) then
+      if (fel_mode(ie) == 1) then
         call fel_unavg_step (und, ustate, fbeam, wf, slip, und%dz, istep == 1, &
                              istep == und%nstep, dE_step, err)
       else
@@ -625,7 +638,7 @@ do ie = 1, branch%n_ele_track
         call fel_apply_slippage (slip, wf, und%dz * und_slip_step)
       endif
       z_now = z_now + und%dz
-      if (unavg_mode) call write_ledger_row ()
+      if (fel_mode(ie) == 1) call write_ledger_row ()
       if (istep == und%nstep) call do_migrate ()
       call write_diag_rows()
     enddo
@@ -711,7 +724,7 @@ do ie = 1, branch%n_ele_track
 enddo
 
 close (iu_diag)
-if (unavg_mode) close (iu_ledger)
+if (any_unavg) close (iu_ledger)
 if (wake_on) close (iu_wake)
 
 if (migrate) then
@@ -1313,15 +1326,62 @@ subroutine setup_fel_elements ()
 
 type (ele_struct), pointer :: w
 integer je
-real(rp) kw, kk
+real(rp) kw, kk, rv
+logical err_a
 
 allocate (is_fel(branch%n_ele_track), und_of(branch%n_ele_track))
+allocate (fel_mode(branch%n_ele_track), fel_spp(branch%n_ele_track), fel_ramp(branch%n_ele_track))
 is_fel = .false.
+fel_mode = 0;  fel_spp = 0;  fel_ramp = 0
 
 do je = 1, branch%n_ele_track
   w => branch%ele(je)
   if (.not. (w%key == wiggler$ .or. w%key == undulator$)) cycle
   if (w%tracking_method /= custom$) cycle
+
+  ! The FEL mode and unaveraged parameters, from the element's own attributes.
+  ! fel_tracking: unset/0 = averaged with the bmad_standard kernel's transverse maps
+  ! (Bmad's own kernel is the default); 1 = unaveraged; -1 = averaged with the
+  ! transcribed-Genesis maps (validation-internal: the Genesis tiers require
+  ! transcription-level transport; no production lattice writes it).
+
+  rv = value_of_attribute(w, 'FEL_TRACKING', err_a)
+  if (err_a) stop 1
+  fel_mode(je) = nint(rv)
+  if (abs(rv - fel_mode(je)) > 1e-9_rp .or. fel_mode(je) < -1 .or. fel_mode(je) > 1) then
+    print '(a)', 'fel_track_test: fel_tracking must be -1 (transcribed maps, validation-internal),'
+    print '(a)', '  0/unset (averaged, bmad_standard kernel maps) or 1 (unaveraged), at element: ' // trim(w%name)
+    stop 1
+  endif
+
+  rv = value_of_attribute(w, 'FEL_STEPS_PER_PERIOD', err_a)
+  if (err_a) stop 1
+  fel_spp(je) = nint(rv)
+  if (fel_spp(je) == 0) fel_spp(je) = 20
+  if (fel_spp(je) < 10) then
+    print '(a)', 'fel_track_test: fel_steps_per_period is below the floor of 10 (MINERVA''s envelope),'
+    print '(a)', '  at element: ' // trim(w%name)
+    stop 1
+  endif
+
+  ! fel_ramp_periods: an attribute's unset value is 0, and a silent hard edge would
+  ! reintroduce the K/gamma handoff hazard by omission -- so unset/0 means the default
+  ! of 2 periods, and a TRUE hard edge (the mutation/test configuration) must be asked
+  ! for by name with the explicit sentinel -1.
+
+  rv = value_of_attribute(w, 'FEL_RAMP_PERIODS', err_a)
+  if (err_a) stop 1
+  if (rv == 0) then
+    fel_ramp(je) = 2
+  elseif (rv == -1) then
+    fel_ramp(je) = 0
+  elseif (rv < 0) then
+    print '(a)', 'fel_track_test: fel_ramp_periods must be positive, 0/unset (default 2), or the'
+    print '(a)', '  hard-edge test sentinel -1, at element: ' // trim(w%name)
+    stop 1
+  else
+    fel_ramp(je) = rv
+  endif
 
   ! The 7.5 assertions live in fel_assert_wiggler_sane, ONE authority called from the
   ! track1/mat6 hooks (where they fire first, during the parse) and again here. Keeping

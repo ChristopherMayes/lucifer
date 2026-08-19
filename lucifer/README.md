@@ -188,16 +188,24 @@ reproduces the last namelist-driven build's run to a max relative difference of
 `aw` difference from deriving `aw` through the `b_max` attribute round trip rather than
 reading it from input.
 
-**In-undulator transverse transport, swappable and priced** (`und_transport`): the
-default `"genesis"` runs the transcribed Genesis focusing (matrix over each `ds_step`
-from `aw`, `kx`, `ky`, chromatic via `gammaz`); `"bmad"` swaps in a flattened Bmad
-periodic-wiggler kernel for the same step — `track_a_wiggler`'s matrix with the
-octupole-like end kicks, chromatic via `p0/p`. Measured over the full time-dependent
-line (32 slices, 90 records): power differs by 5.0e-5 max (exit total power 3.0e-7),
-on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching phase 1.3e-2 rad max
-(5.8e-3 rad where bunching exceeds 1% of peak), for +3.8% runtime. The two models
-differ by design (period-averaged Genesis focusing vs Bmad's end-field treatment);
-this prices the swap without preferring either.
+**The FEL tracking mode is a per-element lattice attribute** (`fel_tracking`,
+registered by the driver; class-settable as `wiggler::*[fel_tracking] = ...`), so
+averaged and unaveraged segments mix freely in one line. Unset/0 — THE DEFAULT — is
+averaged with the transverse maps of Bmad's own `bmad_standard` periodic-wiggler
+kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like
+end kicks, chromatic via `p0/p`). `1` is the unaveraged verification mode. `-1` is
+averaged with the transcribed-Genesis focusing (matrix from `aw`, `kx`, `ky`,
+chromatic via `gammaz`) — VALIDATION-INTERNAL: the Genesis tiers require
+transcription-level transport and select it via the `*_val.bmad` wrapper lattices; no
+production lattice writes it. The two averaged models are priced, measured over the
+full time-dependent line (32 slices, 90 records): power differs by 5.0e-5 max (exit
+total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching
+phase 1.3e-2 rad max, for +3.8% runtime — period-averaged Genesis focusing vs Bmad's
+end-field treatment. The unaveraged parameters are attributes too:
+`fel_steps_per_period` (unset → 20; below 10 refused) and `fel_ramp_periods`
+(unset → 2; a true hard edge — the test configuration — is the explicit sentinel -1,
+because an attribute's unset value is 0 and a silent hard edge would reintroduce the
+K/gamma handoff hazard).
 
 The examples directory exercises the heterogeneity this buys: `examples/taper/` is the same
 line with the last two cells' undulators a second element definition with `b_max` 0.4%
@@ -669,17 +677,21 @@ unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
 production existence proof — `minerva-code-analysis.md` — and a statistical
 ~1e-3-class reference only, never a bit check.)
 
-`und_transport = "unaveraged"` integrates the particles through the undulator's REAL
-field — the full Newton-Lorentz quiver, RK4 at `unavg_steps_per_period` (default 20;
-MINERVA's envelope) — with the radiation field as a Strang-split kick and a source
+`fel_tracking = 1` — a per-element lattice attribute, so unaveraged segments mix with
+averaged ones in a single line — integrates the particles through the undulator's
+REAL field: the full Newton-Lorentz quiver, RK4 at `fel_steps_per_period` (default
+20; MINERVA's envelope), with the radiation field as a Strang-split kick and a source
 built from the actual quiver current. Nothing from the averaged coupling path appears
 in it (the harness greps `fel_und_coupling|faw` out of the module), so the averaged
 mode's inputs become measurements. Entry/exit are sin² amplitude ramps
-(`unavg_ramp_periods`, default 2) with continuous slope, so the quiver vanishes at
-the segment ends where the averaged and unaveraged momentum conventions coincide; the
-beam carries a `quiver_in_px` convention flag that every averaged/seam entry asserts.
-Serial over slices by decision (a verification mode); wakes/space charge/element
-wakes are refused by name. Each run writes `<out_root>.ledger.txt`.
+(`fel_ramp_periods`, default 2) with continuous slope, so the quiver vanishes at the
+segment ends where the averaged and unaveraged momentum conventions coincide; the
+beam carries a `quiver_in_px` convention flag that every averaged/seam entry asserts
+— in a mixed line those handoffs happen at real internal boundaries, and the sandwich
+check exercises them (ledger conserved on the middle segment at 3.3e-4 of turnover,
+mixed-vs-averaged exit price 2.9e-2 ln, a wake on the unaveraged segment refused by
+name). Serial over slices by decision (a verification mode); wakes/space
+charge/element wakes are refused by name. Each run writes `<out_root>.ledger.txt`.
 
 Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-form):
 
@@ -693,7 +705,7 @@ Measured (`check_unaveraged.py`, in the harness — self-referenced or closed-fo
 | fc helical (h=1) vs aw: 0.84803 vs 0.84853 | **5.9e-4** | 5e-3 |
 | fc planar h=3 vs closed form: 0.21287 vs 0.21302 | **7.1e-4** | 5e-3 |
 | convergence fc(10/20/30 steps per period) | 0.750582 / 0.750505 / 0.750502 | 5e-4 on 30 vs 20 |
-| full-segment gain curve, unaveraged vs averaged, ln ratio at exit | **2.6e-3** | 0.2 (priced) |
+| full-segment gain curve, unaveraged vs the averaged default (bmad_standard maps), ln ratio at exit | **2.7e-3** | 0.2 (priced) |
 
 Two merit choices over the references' conventions, both measured: the source
 deposits with `1/u_s` (not Genesis's averaged `1/gamma`), making kick and source
@@ -714,7 +726,7 @@ harmonic-agnostic.
 Mutations bite, each on its named check: flipping the E·v kick sign fails the ledger
 at 2.0 (energy created) and the gain comparison at 0.69 — while the magnitude-blind
 fc checks PASS it, which is why the ledger is check zero; a hard-edge entry
-(`unavg_ramp_periods = 0`) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
+(`fel_ramp_periods = -1`, the explicit sentinel) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
 probe beam; note the exit momentum re-absorbs the quiver at integer-period lengths,
 so the ORBIT, not the exit mean px, is the reliable instrument — FINDINGS.md 7.24);
 skipping the exit handoff flag is refused by name at the first seam element.

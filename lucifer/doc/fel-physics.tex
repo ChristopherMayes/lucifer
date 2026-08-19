@@ -133,7 +133,19 @@ natural-focusing split follows the helicity defaults, scaled by $k_u^2$:
 helical $k_x = k_y = \tfrac12 k_u^2$; planar $k_x = 0$, $k_y = k_u^2$. The integration
 step is the element's own \code{ds\_step}/\code{num\_steps}; the bookkeeper's
 $n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\code{ds\_step}))$ is exactly Genesis's
-unroll. Refused by name at parse time: missing \code{b\_max} or \code{l\_period}, a
+unroll.
+
+The FEL tracking mode and unaveraged parameters are likewise per-element lattice
+attributes (registered program-side; class-settable as
+\code{wiggler::*[attr] = ...}), so averaged and unaveraged segments mix freely in one
+line: \code{fel\_tracking} --- unset/0 the averaged default with the
+\code{bmad\_standard} kernel's transverse maps (\S\ref{sec:undbmad}); 1 the
+unaveraged mode (\S\ref{sec:unaveraged}); $-1$ the transcribed-Genesis maps,
+validation-internal --- \code{fel\_steps\_per\_period} (unset $\to$ 20; below 10
+refused), and \code{fel\_ramp\_periods} (unset $\to$ 2). An attribute's unset value
+is 0 and a silent hard edge would reintroduce the $K/\gamma$ handoff hazard, so a
+true hard edge --- the test configuration --- must be asked for by name with the
+sentinel $-1$; silence never means hard edge. Refused by name at parse time: missing \code{b\_max} or \code{l\_period}, a
 fieldmap \code{field\_calc}, nonzero \code{kx} (unmapped roll-off), and an unset
 \code{ds\_step}. Outside the FEL walk the element is a plain periodic wiggler: the
 \code{track1\_custom} and \code{make\_mat6\_custom} hooks delegate to
@@ -281,10 +293,14 @@ changes: the seam integrates the path-length term exactly through the quad map w
 this samples it once --- a measured $\sim\!2\times10^{-3}$ rad of bunching phase per
 quadrupole, compounding to the documented tier2\_bmad difference.
 
-\subsection{The Bmad-kernel alternative}\label{sec:undbmad}
+\subsection{The Bmad-kernel default}\label{sec:undbmad}
 
-\code{und\_transport = "bmad"} replaces \S\ref{sec:natfocus} by the transverse maps of
-Bmad's periodic-wiggler kernel, flattened: per-particle $k_1 = -\tfrac12 g_{\max}^2/
+The DEFAULT transverse maps (\code{fel\_tracking} unset; \S\ref{sec:element}) are
+Bmad's own: the \code{bmad\_standard} periodic-wiggler kernel, flattened to per-step
+granularity. The transcribed maps of \S\ref{sec:natfocus} remain selectable as
+\code{fel\_tracking = -1}, validation-internal --- the Genesis comparisons require
+transcription-level transport; no production lattice writes it. The kernel, per
+particle: $k_1 = -\tfrac12 g_{\max}^2/
 (1+p_z)^2$ with $g_{\max} = K k_u\,m_ec/p_0$ ($K$ from Eq.~\ref{eq:awmap}), quadrupole
 bodies via \code{quad\_mat2\_calc}, and half-octupole edge kicks
 $\delta p_y = k_3 L\,(1{+}p_z)\, k_u^2\, y^3/3$ (and $x$ for helical) with
@@ -304,8 +320,8 @@ attributes, whose helical sign disagrees).
 \end{provenance}
 \begin{validation}
 tier2\_genesis $1.8\times10^{-5}$ (transcribed interludes, constants floor);
-tier2\_bmad $5.0\times10^{-2}$, the located and priced transport difference;
-und\_transport pricing above.
+tier2\_bmad $5.0\times10^{-2}$, the located and priced transport difference; the
+transverse-map pricing above.
 \end{validation}
 
 \section{The field solver}\label{sec:field}
@@ -654,7 +670,8 @@ orders of magnitude under the model swap.
 
 Every input of the averaged map --- the coupling $f_c(h)$, the roll-off $f_{aw}$, the
 entry/exit behavior --- is an output of the underlying unaveraged dynamics. This mode
-(\code{fel\_unaveraged\_mod}, \code{und\_transport = "unaveraged"}) integrates the
+(\code{fel\_unaveraged\_mod}, selected per element by the lattice attribute
+\code{fel\_tracking = 1}; \S\ref{sec:element}) integrates the
 particles through the undulator's \emph{real} field with the radiation as a
 co-evolving kick, so those inputs become measurements. It keeps the grid field and
 the Lorentz force where MINERVA --- the production existence proof of this physics ---

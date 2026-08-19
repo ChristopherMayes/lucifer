@@ -184,19 +184,19 @@ ${6:+  $6}
 NML
 }
 
-make_nml tier1.nml  aramis_1seg.bmad tier1  bmad    Aramis
-make_nml tier2.nml  aramis.bmad      tier2  bmad    Aramis
-make_nml tier2g.nml aramis.bmad      tier2g genesis Aramis
-make_nml tier1s.nml aramis_1seg.bmad tier1s bmad    Aramis "split_weights = T"
-make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
-make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
-make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
-make_nml tdsase.nml aramis.bmad      tdsase genesis AramisTDSASE
-make_nml tdsc.nml   aramis_1seg.bmad tdsc   genesis AramisTD "sc_rmax = 250e-6
+make_nml tier1.nml  aramis_1seg_val.bmad tier1  bmad    Aramis
+make_nml tier2.nml  aramis_val.bmad      tier2  bmad    Aramis
+make_nml tier2g.nml aramis_val.bmad      tier2g genesis Aramis
+make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "split_weights = T"
+make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
+make_nml td2.nml    aramis_val.bmad      td2    bmad    AramisTD
+make_nml td2g.nml   aramis_val.bmad      td2g   genesis AramisTD
+make_nml tdsase.nml aramis_val.bmad      tdsase genesis AramisTDSASE
+make_nml tdsc.nml   aramis_1seg_val.bmad tdsc   genesis AramisTD "sc_rmax = 250e-6
   sc_nz = 2
   sc_nphi = 1
   sc_longrange = T"
-make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "wake_on = T
+make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "wake_on = T
   wake_radius = 2.5e-3
   wake_conductivity = 5.813e7
   wake_relaxation = 8.1e-6

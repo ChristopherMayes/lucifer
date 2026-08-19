@@ -14,7 +14,7 @@ the averaged mode's inputs (the coupling factor fc).
    the radiation kick), and the emittance survives the RK4 push through the ramps.
    This also checks the handoff: with the sin^2 ramps the quiver vanishes at the
    segment ends, so the exit emittance equals the entry emittance; a hard-edge entry
-   (unavg_ramp_periods = 0, the mutation) leaves the quiver in px and fails loudly.
+   (fel_ramp_periods = -1, the explicit test sentinel) fails the orbit instrument loudly.
 
 3. fc MEASURED, both limits. Paired probes (12 and 20 periods, identical 2-period
    ramps): the difference of the two energy-modulation phasors
@@ -69,9 +69,6 @@ SEED_W0 = 4e-4                 # 1/e^2 intensity radius [m]
 PROBE = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
-  und_transport = "unaveraged"
-  unavg_steps_per_period = {spp}
-  unavg_ramp_periods = {ramp}
   lambda0 = {lam}
   beam_init%n_particle = 2048
   beam_init%bunch_charge = {q}
@@ -89,17 +86,16 @@ PROBE = """&fel_track_params
 &end
 """
 
-def probe_nml(**kw):
-    """PROBE with the steady-state charge DERIVED: I = Q*c/spacing, spacing = lam."""
+def probe_nml(wd, **kw):
+    """PROBE with the steady-state charge DERIVED (I = Q*c/spacing, spacing = lam) and
+    the unaveraged mode selected by a wrapper lattice (attributes, not namelist)."""
     kw.setdefault("q", f"{3000 * float(kw['lam']) / 2.99792458e8:.12e}")
+    kw["lat"] = unavg_wrapper(wd, kw["lat"], kw.pop("spp"), kw.pop("ramp"))
     return PROBE.format(**kw)
 
 GAIN = """&fel_track_params
   lat_file = "{lat}"
   out_root = "{root}"
-  und_transport = "{transport}"
-  unavg_steps_per_period = 20
-  unavg_ramp_periods = 2
   lambda0 = 1e-10
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 1.000692285594e-15
@@ -115,6 +111,17 @@ GAIN = """&fel_track_params
   ran_seed = 4242
 &end
 """
+
+def unavg_wrapper(wd, base, spp, ramp):
+    """A wrapper lattice selecting the unaveraged mode with per-run parameters --
+    the delz-sweep pattern: the mode and its knobs are LATTICE attributes."""
+    name = f"w_{base.replace('.bmad','')}_s{spp}_r{str(ramp).replace('-','m').replace('.','p')}.bmad"
+    (wd / name).write_text(
+        f"call, file = {base}\n"
+        f"wiggler::*[FEL_TRACKING] = 1\n"
+        f"wiggler::*[FEL_STEPS_PER_PERIOD] = {spp}\n"
+        f"wiggler::*[FEL_RAMP_PERIODS] = {ramp}\n")
+    return name
 
 FAILED = False
 
@@ -134,6 +141,22 @@ def run(exe, wd, name, text):
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}\n{r.stderr[-1000:]}")
         sys.exit(1)
+
+
+def run_expect_refusal(exe, wd, name, text, fragment):
+    """The run must FAIL, and by name."""
+    (wd / (name + ".nml")).write_text(text)
+    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+                       env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    return r.returncode != 0 and fragment in r.stdout
+
+
+SAND_WAKE_LAT = """call, file = unavg_sandwich.bmad
+UNDW: UNDB, sr_wake = {amp_scale = 1, scale_with_length = T,
+  longitudinal = {1e14, 0, 0, 0.25, none}}
+SEGW: line = (UNDA, P1, UNDW, P1, UNDA)
+use, SEGW
+"""
 
 
 def read_par(path):
@@ -190,11 +213,11 @@ def main():
     wd.mkdir(parents=True, exist_ok=True)
     for lat in ("unavg_probe_planar_a.bmad", "unavg_probe_planar_b.bmad",
                 "unavg_probe_helical_a.bmad", "unavg_probe_helical_b.bmad",
-                "aramis_1seg.bmad"):
+                "aramis_1seg.bmad", "unavg_sandwich.bmad"):
         (wd / lat).write_bytes((latdir / lat).read_bytes())
 
     # 1. Energy ledger: strong-seed helical long probe (real turnover per record).
-    run(exe, wd, "uv_ledger", probe_nml(lat="unavg_probe_helical_b.bmad", root="uv_ledger",
+    run(exe, wd, "uv_ledger", probe_nml(wd, lat="unavg_probe_helical_b.bmad", root="uv_ledger",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=1e8, w0=SEED_W0))
     led = np.loadtxt(wd / "uv_ledger.ledger.txt")
     etot = led[:, 1] + led[:, 2]
@@ -213,7 +236,7 @@ def main():
           np.abs(kick_col - dE_beam).max() / max(np.abs(dE_beam).max(), 1e-300), 1e-4)
 
     # 2. Ballistic dark run: B does no work; ramps hand the emittance back.
-    run(exe, wd, "uv_dark", probe_nml(lat="unavg_probe_planar_b.bmad", root="uv_dark",
+    run(exe, wd, "uv_dark", probe_nml(wd, lat="unavg_probe_planar_b.bmad", root="uv_dark",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=0.0, w0=SEED_W0))
     d0 = read_par(wd / "uv_dark-initial.par.h5")
     d1 = read_par(wd / "uv_dark-final.par.h5")
@@ -221,8 +244,8 @@ def main():
           float(np.abs(d1["gamma"] - d0["gamma"]).max() / GAMMA0), 1e-12)
     check("ballistic: |emit_x out/in - 1| (ramp handoff)",
           abs(emit(d1) / emit(d0) - 1), 1e-6)
-    # The coherent-quiver instruments. A hard-edge entry (unavg_ramp_periods = 0, the
-    # mutation) starts the quiver about the wrong DC (pi = -a0 instead of 0), which
+    # The coherent-quiver instruments. A hard-edge entry (fel_ramp_periods = -1, the
+    # explicit test sentinel) starts the quiver about the wrong DC (pi = -a0 instead of 0), which
     # integrates to a centroid displacement ~a0*L/gamma -- measured 3.2e-5 m against
     # 1.9e-9 pristine, 19 sigma of this beam -- and a non-integer-period hard exit
     # would additionally leave the coherent quiver ~a0 in <px>. Both watched.
@@ -238,7 +261,7 @@ def main():
             ("helical", "unavg_probe_helical_a.bmad", "unavg_probe_helical_b.bmad", LAMBDA1, 1),
             ("planar_h3", "unavg_probe_planar_a.bmad", "unavg_probe_planar_b.bmad", LAMBDA1 / 3, 3)):
         for tag, lat in (("a", lat_a), ("b", lat_b)):
-            run(exe, wd, f"uv_{pol}_{tag}", probe_nml(lat=lat, root=f"uv_{pol}_{tag}",
+            run(exe, wd, f"uv_{pol}_{tag}", probe_nml(wd, lat=lat, root=f"uv_{pol}_{tag}",
                 spp=20, ramp=N_RAMP, lam=lam, power=SEED_P, w0=SEED_W0))
         fa = phasor(f"uv_{pol}_a", wd)
         fb = phasor(f"uv_{pol}_b", wd)
@@ -253,7 +276,7 @@ def main():
     fcs = {}
     for spp in (10, 30):
         for tag, lat in (("a", "unavg_probe_planar_a.bmad"), ("b", "unavg_probe_planar_b.bmad")):
-            run(exe, wd, f"uv_cv{spp}_{tag}", probe_nml(lat=lat, root=f"uv_cv{spp}_{tag}",
+            run(exe, wd, f"uv_cv{spp}_{tag}", probe_nml(wd, lat=lat, root=f"uv_cv{spp}_{tag}",
                 spp=spp, ramp=N_RAMP, lam=LAMBDA1, power=SEED_P, w0=SEED_W0))
         fcs[spp] = fc_measured(phasor(f"uv_cv{spp}_a", wd), phasor(f"uv_cv{spp}_b", wd), LAMBDA1, 1)
     fcs[20] = results["planar"][0]
@@ -262,14 +285,42 @@ def main():
     check("convergence: |fc(30)/fc(20) - 1|", abs(fcs[30] / fcs[20] - 1), 5e-4)
 
     # 6. Gain curve: benchmark segment, unaveraged vs averaged, same start.
-    for transport in ("unaveraged", "genesis"):
-        run(exe, wd, f"uv_gain_{transport}", GAIN.format(lat="aramis_1seg.bmad",
-            root=f"uv_gain_{transport}", transport=transport))
-    pu = np.loadtxt(wd / "uv_gain_unaveraged.diag.txt")[:, 2]
-    pa = np.loadtxt(wd / "uv_gain_genesis.diag.txt")[:, 2]
+    run(exe, wd, "uv_gain_unavg", GAIN.format(root="uv_gain_unavg",
+        lat=unavg_wrapper(wd, "aramis_1seg.bmad", 20, 2)))
+    run(exe, wd, "uv_gain_avg", GAIN.format(root="uv_gain_avg", lat="aramis_1seg.bmad"))
+    pu = np.loadtxt(wd / "uv_gain_unavg.diag.txt")[:, 2]
+    pa = np.loadtxt(wd / "uv_gain_avg.diag.txt")[:, 2]
     lnr = abs(math.log(pu[-1] / pa[-1]))
     check(f"gain curve: |ln(P_unavg/P_avg)| at segment exit  [{pu[-1]:.4e} vs {pa[-1]:.4e}]",
           lnr, 0.2, note="(priced integrator-structure difference)")
+
+    # 7. Mixed line (Stage A): averaged / unaveraged / averaged sandwich with pipe
+    # interludes. Completing at all exercises the convention-flag asserts at REAL
+    # internal boundaries; the ledger must be confined to and conserved over the
+    # unaveraged segment; a wake on that segment must refuse by name; and the exit
+    # power is priced against the all-averaged twin.
+    (wd / "sandwich_avg.bmad").write_text(
+        "call, file = unavg_sandwich.bmad\nUNDB[FEL_TRACKING] = 0\n")
+    run(exe, wd, "uv_sand", GAIN.format(root="uv_sand", lat="unavg_sandwich.bmad"))
+    run(exe, wd, "uv_sand_avg", GAIN.format(root="uv_sand_avg", lat="sandwich_avg.bmad"))
+    led = np.loadtxt(wd / "uv_sand.ledger.txt")
+    confined = float(((led[:, 0] > 0.81 - 1e-9) & (led[:, 0] < 1.41 + 1e-9)).all())
+    check("sandwich: ledger rows confined to the unaveraged segment (1 = yes)",
+          1.0 - confined, 0.5)
+    etot = led[:, 1] + led[:, 2]
+    turn = np.abs(np.diff(led[:, 2])).sum()
+    check("sandwich: ledger max|d(E+U)| / sum|dU| on the middle segment",
+          np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
+    ps = np.loadtxt(wd / "uv_sand.diag.txt")[:, 2]
+    pa2 = np.loadtxt(wd / "uv_sand_avg.diag.txt")[:, 2]
+    check(f"sandwich: |ln(P_mixed/P_averaged)| at exit  [{ps[-1]:.4e} vs {pa2[-1]:.4e}]",
+          abs(math.log(ps[-1] / pa2[-1])), 5e-2, note="(one segment's ramp+mode price)")
+    (wd / "sandwich_wake.bmad").write_text(SAND_WAKE_LAT)
+    refused = run_expect_refusal(exe, wd, "uv_sandw",
+        GAIN.format(root="uv_sandw", lat="sandwich_wake.bmad"),
+        "element sr wakes are not supported in the unaveraged mode")
+    check("sandwich: wake on the unaveraged segment refused by name (1 = yes)",
+          0.0 if refused else 1.0, 0.5)
 
     if FAILED:
         print("UNAVERAGED CHECKS: FAIL")

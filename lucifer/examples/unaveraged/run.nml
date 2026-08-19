@@ -4,24 +4,22 @@
 !
 !   fel_track_test run.nml           (run from this directory; ~1 min)
 !
-! One seeded steady-state segment of the benchmark line. The run writes the usual
+! One seeded steady-state segment of the benchmark line. The unaveraged mode is
+! seg1.bmad's OWN attribute (fel_tracking = 1; steps/period and ramps default to
+! 20 and 2 -- override per element with fel_steps_per_period / fel_ramp_periods). The run writes the usual
 ! diag file PLUS unaveraged.ledger.txt -- the energy ledger: beam energy (relative to
 ! the reference) and window field energy per record, whose sum is conserved to ~1e-5
 ! of the turnover (the kick and the source are exact duals; manual eq:ledger).
 !
-! The verification story: run run_averaged.nml (identical except
-! und_transport = "genesis") and compare the two gain curves -- they agree to ~3e-3
-! ln at the exit, the measured price of ramps + splitting between two INDEPENDENT
-! formulations of the same physics. That agreement is what pins the averaged mode's
+! The verification story: run run_averaged.nml (identical, with the element's
+! fel_tracking overridden back to the averaged default) and compare the two gain
+! curves -- they agree to ~8e-4 ln at the exit, the measured price of ramps +
+! splitting between two INDEPENDENT formulations of the same physics. That agreement is what pins the averaged mode's
 ! coupling factor; the harness measures it precisely (fc to ~6e-4, README).
 
 &fel_track_params
   lat_file = "seg1.bmad"
   out_root = "unaveraged"
-
-  und_transport = "unaveraged"
-  unavg_steps_per_period = 20  ! Substeps per undulator period (10 floor, 20-30 typical).
-  unavg_ramp_periods = 2       ! sin^2 entry/exit ramps; the handoff happens at their ends.
 
   lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
 

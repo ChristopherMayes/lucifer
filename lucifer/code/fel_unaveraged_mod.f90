@@ -127,7 +127,7 @@ if (2 * ustate%l_ramp > l) then
 endif
 
 if (steps_per_period < 10) then
-  call out_io (s_error$, r_name, 'unavg_steps_per_period BELOW MINERVA''S FLOOR OF 10: \i0\ ', &
+  call out_io (s_error$, r_name, 'fel_steps_per_period BELOW MINERVA''S FLOOR OF 10: \i0\ ', &
                                  i_array = [steps_per_period])
   return
 endif

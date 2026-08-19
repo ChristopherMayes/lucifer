@@ -1,0 +1,6 @@
+! Validation-internal transport selection: the transcribed-Genesis transverse maps
+! (fel_tracking = -1) on every FEL element, for the Genesis-comparison tiers, which
+! require transcription-level transport. No production lattice writes this value; the
+! production default (fel_tracking unset) is the bmad_standard kernel's maps.
+call, file = aramis.bmad
+wiggler::*[FEL_TRACKING] = -1

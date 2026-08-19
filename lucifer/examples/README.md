@@ -75,7 +75,7 @@ input. Measured against `steady_state` (same seed, same start): the two gain cur
 bit-identical until the taper begins at z = 31.92 m; the untapered line saturates at
 1.6 GW and falls back to 0.76 GW at z = 57 m as particles rotate in the bucket, while
 the step-down taper re-matches the resonance to the decelerated beam and the power still
-climbs at the exit — 9.6 GW at z = 57 m, 12.7x the untapered exit power (6x its
+climbs at the exit — 9.6 GW at z = 57 m, 12.7x the untapered exit power (5.9x its
 saturation peak).
 
 ## import
@@ -104,8 +104,10 @@ verified before imposing), starts the field dark, and the FEL grows from its own
 through the full line with slippage active.
 
 Measured on this input (seed 12345): startup power settles near 4 MW per slice after the
-first segment, total power reaches 4.0 GW at z = 57 m with a per-slice spread of 0.79 —
-the SASE fluctuation — and the induced energy spread grows from 1.0 to 1.15 m_e c^2. The
+first segment, total power reaches 3.0 GW at z = 57 m with a per-slice spread of 0.91 —
+the SASE fluctuation — and the induced energy spread grows from 0.99 to 1.14 m_e c^2.
+(These numbers moved when the transverse-map default became Bmad's own kernel: in a
+dark start, a tiny transport change re-rolls the effective noise realization.) The
 plot shows the physics directly: the total-power sawtooth is radiation slipping out of
 the head of the finite window at each drift while fresh vacuum enters at the tail (a
 real effect of any finite time window, identical in Genesis; deep saturation of every
@@ -132,14 +134,15 @@ in `wake_lattice.bmad`'s header.
 ## unaveraged
 
 The FEL with no period averaging (manual `sec:unaveraged`): one seeded steady-state
-segment (`seg1.bmad`, 266 periods of the benchmark undulator) tracked with
-`und_transport = "unaveraged"` — the particles ride the real helical field, quiver
+segment (`seg1.bmad`, 266 periods of the benchmark undulator, carrying
+`fel_tracking = 1` as its own lattice attribute) — the particles ride the real helical field, quiver
 and all, at 20 integration substeps per period, with sin² entry/exit ramps and the
 radiation as a co-evolving kick. Nothing in this path knows the coupling factor `fc`;
 the energy exchange is just what the Lorentz force does. `run_averaged.nml` is the
-identical configuration through the transcribed Genesis map: the two gain curves —
-two INDEPENDENT formulations of the same physics — agree to 3.8e-3 ln at the segment
-exit (measured here; the harness pins the coupling itself at ~6e-4 with dedicated
+identical configuration through the averaged default (a wrapper overrides the
+element's attribute): the two gain curves — two INDEPENDENT formulations of the same
+physics — agree to 7.7e-4 ln at the segment exit (measured here; notably CLOSER to
+Bmad's own kernel than the 3.8e-3 the transcribed maps gave; the harness pins the coupling itself at ~6e-4 with dedicated
 probes, see the main README). Measured cost of not averaging: 12 s vs 0.4 s for the
 averaged twin, ~30× on this config. The run also writes `unaveraged.ledger.txt` —
 beam energy (relative to the reference) and window field energy per record, whose

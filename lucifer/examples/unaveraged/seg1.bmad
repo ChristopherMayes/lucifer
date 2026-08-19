@@ -1,5 +1,6 @@
 ! One undulator segment of the benchmark line (aramis.bmad's UND, nothing else), for
-! the unaveraged-mode example: 3.99 m / 266 periods of helical undulator, aw = 0.85
+! the unaveraged-mode example (fel_tracking = 1 -- the mode is the element's own
+! lattice attribute; the averaged twin overrides it to the default): 3.99 m / 266 periods of helical undulator, aw = 0.85
 ! rms, resonant at 1 Angstrom at 5.8 GeV. The unaveraged tracker integrates the real
 ! quiver through this field; see fel-physics.tex sec:unaveraged and ../README.md.
 
@@ -15,7 +16,7 @@ beginning[alpha_b] = 1.40348
 
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = custom, ds_step = 0.045
+     tracking_method = custom, ds_step = 0.045, fel_tracking = 1
 
 SEG1: line = (UND)
 

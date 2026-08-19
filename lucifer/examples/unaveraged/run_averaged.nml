@@ -1,9 +1,10 @@
-! The averaged twin of run.nml: identical configuration through the transcribed
-! Genesis map (und_transport default). Compare unaveraged.diag.txt against
+! The averaged twin of run.nml: identical configuration through the averaged map
+! (seg1_averaged.bmad overrides the element's fel_tracking back to the default --
+! the bmad_standard kernel's transverse maps). Compare unaveraged.diag.txt against
 ! averaged.diag.txt -- two independent formulations, one gain curve to ~3e-3 ln.
 
 &fel_track_params
-  lat_file = "seg1.bmad"
+  lat_file = "seg1_averaged.bmad"
   out_root = "averaged"
 
   lambda0 = 1e-10
