@@ -684,7 +684,16 @@ particles through the undulator's \emph{real} field with the radiation as a
 co-evolving kick, so those inputs become measurements. It keeps the grid field and
 the Lorentz force where MINERVA --- the production existence proof of this physics ---
 uses modal fields; it is a verification mode whose $\sim$30$\times$ cost per step is
-priced, not hidden. Like the averaged path it is parallel over slices with
+priced, not hidden. Because the kick/deposit pair resolves each particle's full quiver
+current, a beam carrying \emph{physical shot noise} radiates it continuously into the
+SVEA band and pays for it (self-interaction back-reaction) --- spontaneous-emission
+physics the period-averaged model does not track (it injects shot noise once, at load
+time). On the saturation demo this lifts the unaveraged SASE curve $\sim$2\%/m above
+the averaged codes and deepens the beam's energy loss; the effect is independent of
+particle count and steps per period (physics, not statistics or resolution), and
+quiet-start probes are blind to it by design (the beamlet loading cancels shot noise).
+Its absolute calibration against the analytic undulator spectrum is the named future
+check (FINDINGS 7.27). Like the averaged path it is parallel over slices with
 bit-identical results at any thread count (per-slice private state, fixed-order
 energy reduction; the harness runs a 1-thread/8-thread byte comparison). Nothing
 from the averaged coupling path may

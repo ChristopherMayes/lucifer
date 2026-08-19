@@ -738,6 +738,58 @@ probe beam; note the exit momentum re-absorbs the quiver at integer-period lengt
 so the ORBIT, not the exit mean px, is the reliable instrument — FINDINGS.md 7.24);
 skipping the exit handoff flag is refused by name at the first seam element.
 
+## The saturation demo: one practical SASE case, three trackers, one clock
+
+```
+./bsim/fel/tests/run_saturation_demo.sh
+```
+
+The expert's question — does this work for a practical case? — answered on Genesis's
+own Benchmark1-SASE configuration run to saturation: the full 57 m 6-FODO Aramis line,
+dark start, growth from shot noise alone, 96 slices × 2048 particles, all three
+trackers fed IDENTICAL initial dumps and each given the machine's full performance-core
+count. Wall times come from one external clock; the exit answers must agree at the
+documented levels before any timing or figure is produced. The script ends with a
+six-panel figure (`scripts/plot_fel_saturation.py`): gain curves, relative differences,
+per-slice exit power, bunching, mean energy, energy spread, timings annotated.
+
+Measured (M3 Max, 12 performance cores, production builds both sides):
+
+| | wall | exit total power | vs Genesis |
+|---|---|---|---|
+| Genesis 1.3 v4, 12 MPI ranks | 38.4 s | 3.381 GW (4.52 GW peak at 56.8 m) | — |
+| Bmad averaged (`bmad_standard` default), 12 threads | 36.5 s | 3.380 GW | **rel 4.9e-4** |
+| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1170.7 s | 6.25 GW | ln ratio +0.62 |
+
+The averaged mode tracks Genesis through eight decades of z and three of power to
+**4.9e-4** at saturation — the ~4e-2 seam-transport difference the benchmark tiers
+price is invisible here because saturation self-limits the power. It is also 1.05x
+faster than Genesis at equal cores on this machine.
+
+The unaveraged mode — an independent integrator with fc/JJ nowhere in its inputs,
+paying its documented ~32x cost — reproduces the startup (coherent shot-noise
+radiation matches both codes to ~8%), the gain curve shape, and the saturation
+location (56.2 vs 56.8 m), and rides ~2%/m above the KMR codes through the
+exponential regime. That excess is the shot-noise radiation channel it physically
+resolves and the averaged model does not track (FINDINGS.md 7.27): each particle's
+full quiver current radiates its real shot-noise structure continuously and pays for
+it — visible exactly where an expert would look, in the energy panels (mean energy
+−0.45 vs −0.03 of gamma at exit; faster energy-spread growth). Measured independent of
+particle count (1024/2048/4096) and steps-per-period (20/40): physics, not statistics
+or resolution. A dark segment with real shot noise isolates it: same in-window noise
+power in both models, 20x the beam-side energy cost in the unaveraged one. The absolute
+calibration of that channel (the in-band, in-grid-acceptance fraction of undulator
+radiation) is the named future check; until then the demo prices the difference at
+|ln| <= 1.0 at exit, measured 0.615.
+
+Two more unaveraged end effects were found and dispatched on the way to this figure:
+the ramps' slippage deficit (3.3 rad of optical phase per end — compensated exactly by
+the built-in handoff phase jump, FINDINGS.md 7.26; tier1_unavg's theta median fell
+from 6.6 rad to 6.4e-2) and their reduced coupling length (~2% ln per segment at the
+default 2-period ramps, real field physics, priced and left visible).
+
+The figure is banked at `fel-benchmark-plots/sat-demo.png` in the project root.
+
 ## The coarse-step measurement (brief 8.3)
 
 (Summarized in manual `sec:numerics`.)
