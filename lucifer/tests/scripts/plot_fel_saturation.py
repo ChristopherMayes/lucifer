@@ -13,7 +13,11 @@ Six panels:
   2. Relative total-power difference vs z, each Bmad mode against Genesis (log).
   3. Power per slice at the exit: the SASE spike structure across the time window.
   4. Slice-averaged bunching |b| vs z.
-  5. Mean energy change <gamma> - gamma(0) vs z: the energy the light took.
+  5. The energy budget [J]: beam energy given up, -dE_beam (solid), against the
+     field energy held in the time window, U = P_total*(slice spacing)/c (dashed),
+     per code. In a slipping window these need not match -- light escapes forward --
+     and the gap is the point: the unaveraged beam pays for shot-noise radiation
+     the window does not keep (README "The saturation demo", FINDINGS 7.27).
   6. Slice-averaged rms energy spread vs z.
 
 Usage:
@@ -64,21 +68,44 @@ def main():
     with h5py.File(args.genesis_out) as h5:
         nslice = h5["Field/power"].shape[1]
         espread_g = h5["Beam/energyspread"][:]     # gamma units, (nrec, nslice)
+        current_g = h5["Beam/current"][:]          # A, (nrec, nslice)
+
+    # Slice spacing from the diag header (written as '# slice_spacing = ...').
+    spacing = None
+    with open(args.avg_diag) as fh:
+        for line in fh:
+            if line.startswith("# slice_spacing"):
+                spacing = float(line.split("=")[1])
+            if not line.startswith("#"):
+                break
+    assert spacing is not None, "diag header lacks slice_spacing"
+    C = 299792458.0
 
     g = load_genesis_out(args.genesis_out, nslice)
     a = load_fortran_diag(args.avg_diag, nslice)
     u = load_fortran_diag(args.unavg_diag, nslice)
-    # sigma_energy is diag column 7 (eV); load it directly for the spread panel.
-    sig_a = np.loadtxt(args.avg_diag).reshape(-1, nslice, 12)[:, :, 7] / M_ELECTRON
-    sig_u = np.loadtxt(args.unavg_diag).reshape(-1, nslice, 12)[:, :, 7] / M_ELECTRON
+    # sigma_energy is diag column 7 (eV) and current column 10 (A); load directly.
+    raw_a = np.loadtxt(args.avg_diag).reshape(-1, nslice, 12)
+    raw_u = np.loadtxt(args.unavg_diag).reshape(-1, nslice, 12)
+    sig_a, sig_u = raw_a[:, :, 7] / M_ELECTRON, raw_u[:, :, 7] / M_ELECTRON
+
+    # Per-slice charge [C] from the current columns (I * spacing / c); constant in z.
+    q_g = current_g[0] * spacing / C
+    q_a, q_u = raw_a[0, :, 10] * spacing / C, raw_u[0, :, 10] * spacing / C
 
     n = min(len(g["z"]), len(a["z"]), len(u["z"]))
     z = g["z"][:n]
     total = {k: d["power"][:n].sum(axis=1) for k, d in (("genesis", g), ("avg", a), ("unavg", u))}
     bunch = {k: d["bunching"][:n].mean(axis=1) for k, d in (("genesis", g), ("avg", a), ("unavg", u))}
     # Flat-current window: the plain slice mean IS the bunch mean.
-    dgam = {k: d["energy"][:n].mean(axis=1) - d["energy"][0].mean()
-            for k, d in (("genesis", g), ("avg", a), ("unavg", u))}
+    # The energy budget, both sides in joules. Beam energy is charge-weighted mean
+    # energy summed over slices, RELATIVE to the first record (differencing an
+    # absolute total would sit at its own summation-rounding floor -- FINDINGS 4.8).
+    # E [J] = sum_slices <E_slice> [eV] * Q_slice [C]; Genesis's energy is gamma.
+    ebeam = {"genesis": ((g["energy"][:n] - g["energy"][0]) * M_ELECTRON * q_g).sum(axis=1),
+             "avg": ((a["energy"][:n] - a["energy"][0]) * M_ELECTRON * q_a).sum(axis=1),
+             "unavg": ((u["energy"][:n] - u["energy"][0]) * M_ELECTRON * q_u).sum(axis=1)}
+    ufield = {k: total[k] * spacing / C for k in total}
     spread = {"genesis": espread_g[:n].mean(axis=1),
               "avg": sig_a[:n].mean(axis=1), "unavg": sig_u[:n].mean(axis=1)}
 
@@ -129,10 +156,15 @@ def main():
     A.legend()
 
     A = ax[1, 1]
+    floor = 1e-14
     for k in STYLE:
-        A.plot(z, dgam[k], **STYLE[k])
-    A.set_xlabel("z (m)"); A.set_ylabel("⟨γ⟩ − γ(0)")
-    A.legend()
+        A.semilogy(z, np.maximum(-ebeam[k], floor), color=STYLE[k]["color"],
+                   lw=STYLE[k]["lw"], label=STYLE[k]["label"] + ": −ΔE_beam")
+        A.semilogy(z, np.maximum(ufield[k], floor), color=STYLE[k]["color"],
+                   lw=STYLE[k]["lw"], ls="--", alpha=0.7,
+                   label=STYLE[k]["label"] + ": U_field")
+    A.set_xlabel("z (m)"); A.set_ylabel("energy budget (J)")
+    A.legend(fontsize=7, ncol=2)
 
     A = ax[1, 2]
     for k in STYLE:
@@ -151,6 +183,10 @@ def main():
         print(f"  {STYLE[k]['label']:16s} exit P = {total[k][-1]:.3e} W "
               f"(Genesis {total['genesis'][-1]:.3e}); |ln ratio| = "
               f"{abs(math.log(total[k][-1] / total['genesis'][-1])):.3f}")
+    for k in ("genesis", "avg", "unavg"):
+        print(f"  {STYLE[k]['label']:16s} energy budget at exit: beam gave "
+              f"{-ebeam[k][-1]:.3e} J, window holds {ufield[k][-1]:.3e} J "
+              f"({100*ufield[k][-1]/max(-ebeam[k][-1],1e-300):.0f}% kept; the rest slipped out forward)")
     return 0
 
 

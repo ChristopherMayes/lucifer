@@ -751,7 +751,9 @@ trackers fed IDENTICAL initial dumps and each given the machine's full performan
 count. Wall times come from one external clock; the exit answers must agree at the
 documented levels before any timing or figure is produced. The script ends with a
 six-panel figure (`scripts/plot_fel_saturation.py`): gain curves, relative differences,
-per-slice exit power, bunching, mean energy, energy spread, timings annotated.
+per-slice exit power, bunching, the energy budget (beam energy given up vs field energy
+held in the slipping window, both in joules -- the panel where the unaveraged mode's
+radiation cost is visible), energy spread, timings annotated.
 
 Measured (M3 Max, 12 performance cores, production builds both sides):
 
@@ -773,8 +775,11 @@ location (56.2 vs 56.8 m), and rides ~2%/m above the KMR codes through the
 exponential regime. That excess is the shot-noise radiation channel it physically
 resolves and the averaged model does not track (FINDINGS.md 7.27): each particle's
 full quiver current radiates its real shot-noise structure continuously and pays for
-it — visible exactly where an expert would look, in the energy panels (mean energy
-−0.45 vs −0.03 of gamma at exit; faster energy-spread growth). Measured independent of
+it — visible exactly where an expert would look, in the energy panels (the budget panel:
+Genesis and the averaged mode both keep ~72% of the beam's energy in the window at
+exit, the unaveraged mode keeps 10% -- its beam gave 6.6e-8 J against their 4.7e-9,
+the difference radiated and slipped out forward; also the faster energy-spread
+growth). Measured independent of
 particle count (1024/2048/4096) and steps-per-period (20/40): physics, not statistics
 or resolution. A dark segment with real shot noise isolates it: same in-window noise
 power in both models, 20x the beam-side energy cost in the unaveraged one. The absolute
