@@ -243,7 +243,7 @@ end subroutine fel_unavg_bfield
 ! change of this step [J] for the energy-ledger check.
 !-
 
-subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, err_flag)
+subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, dU_spont, err_flag)
 
 type (fel_und_struct) und
 type (fel_unavg_struct) ustate
@@ -252,10 +252,10 @@ type (fel_slice_struct), pointer :: sl
 type (wavefront_struct), target :: wf
 type (fel_slip_struct) slip
 
-real(rp) dz_record, dE_beam
+real(rp) dz_record, dE_beam, dU_spont
 logical first, last, err_flag
 
-real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:)
+real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:), dU_sp_slice(:)
 complex(rp), allocatable :: crsource(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
@@ -268,6 +268,7 @@ character(*), parameter :: r_name = 'fel_unavg_step'
 
 err_flag = .true.
 dE_beam = 0
+dU_spont = 0
 
 nslice = size(wf%Ex, 3)
 if (size(beam%slice) /= nslice) then
@@ -314,8 +315,9 @@ if (first) then
   call unavg_ramp_phase_jump ()
 endif
 
-allocate (dE_slice(nslice))
+allocate (dE_slice(nslice), dU_sp_slice(nslice))
 dE_slice = 0
+dU_sp_slice = 0
 any_err = .false.
 
 ! Parallel over slices, the averaged step's own design (deliverable 5): each slice
@@ -404,6 +406,15 @@ do is = 1, nslice
     any_err = any_err .or. err
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
 
+    ! The deposit's own energy |dE|^2 = 4|src|^2: the ONE term of the field-energy
+    ! increment the kick/deposit duality does not charge to the beam (the beam pays the
+    ! cross term 2 Re<E, dE> exactly; manual eq:ledger). Physically this is the
+    ! spontaneous emission of the substep; numerically it is banked here so the
+    ! time-dependent ledger closes EXACTLY: E_beam + U_window + U_escaped - U_spont.
+
+    dU_sp_slice(is) = dU_sp_slice(is) + 4 * sum(real(crsource, rp)**2 + aimag(crsource)**2) &
+                        * dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
+
     s_sub = s_sub + dsub
   enddo
 
@@ -426,7 +437,8 @@ enddo
 !$OMP end parallel do
 if (any_err) return
 
-dE_beam = sum(dE_slice)   ! Fixed-order serial sum: thread-count independent.
+dE_beam = sum(dE_slice)     ! Fixed-order serial sums: thread-count independent.
+dU_spont = sum(dU_sp_slice)
 
 beam%phi0 = beam%phi0 + dz_record * phi0_rate_avg
 ustate%s = ustate%s + dz_record

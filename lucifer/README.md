@@ -779,7 +779,16 @@ it — visible exactly where an expert would look, in the energy panels (the bud
 Genesis and the averaged mode both keep ~72% of the beam's energy in the window at
 exit, the unaveraged mode keeps 10% -- its beam gave 6.6e-8 J against their 4.7e-9,
 the difference radiated and slipped out forward; also the faster energy-spread
-growth). Measured independent of
+growth). And "slipped out forward" is bookkept, not asserted: the unaveraged ledger
+banks the energy of every slice the slippage zero-fill discards (U_escaped) and the
+deposit's own |src|^2 (U_spont, the one term the kick/deposit duality does not charge
+to the beam -- physically the substep's spontaneous emission), so the time-dependent
+books close EXACTLY: E_beam + U_window + U_escaped - U_spont conserved to 2.9e-3 of
+turnover over the whole demo (8.0e-6 on the harness configuration, where it is a
+standing check at 1e-3; the demo's 6.6e-8 J = 7.9e-9 held + 5.9e-8 escaped - 1.1e-9
+spontaneous credit). The figure's dotted curve is that closure drawn on the budget
+panel. Wakes would be a second, unbanked exit channel from the beam -- the ledger
+exists only in the unaveraged mode, where wakes and space charge are refused by name. Measured independent of
 particle count (1024/2048/4096) and steps-per-period (20/40): physics, not statistics
 or resolution. A dark segment with real shot noise isolates it: same in-window noise
 power in both models, 20x the beam-side energy cost in the unaveraged one. The absolute

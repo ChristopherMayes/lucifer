@@ -230,7 +230,7 @@ logical :: sc_longrange = .false.
 type (fel_unavg_struct) ustate
 integer, allocatable :: fel_mode(:), fel_spp(:)
 real(rp), allocatable :: fel_ramp(:)
-real(rp) dE_step
+real(rp) :: dE_step, dU_step, u_spont_cum = 0
 integer :: iu_ledger = 0
 logical any_unavg
 
@@ -563,7 +563,7 @@ write (iu_diag, '(a)') '#         z            slice        power         on_axi
 
 if (any_unavg) then
   open (newunit = iu_ledger, file = trim(out_root) // '.ledger.txt', action = 'write')
-  write (iu_ledger, '(a)') '#         z          E_beam_rel [J]          U_field [J]           dE_kick [J]'
+  write (iu_ledger, '(a)') '#         z          E_beam_rel [J]          U_field [J]           dE_kick [J]          U_escaped [J]          U_spont [J]'
 endif
 
 n_moved_tot = 0
@@ -621,7 +621,8 @@ do ie = 1, branch%n_ele_track
     do istep = 1, und%nstep
       if (fel_mode(ie) == fel_unaveraged$) then
         call fel_unavg_step (und, ustate, fbeam, wf, slip, und%dz, istep == 1, &
-                             istep == und%nstep, dE_step, err)
+                             istep == und%nstep, dE_step, dU_step, err)
+        u_spont_cum = u_spont_cum + dU_step
       else
         call fel_track_und_step (und, fbeam, wf, slip, coll, err)
       endif
@@ -1574,7 +1575,13 @@ subroutine write_ledger_row ()
 ! sum(w*(gamma-gamma0))*me [C*eV = J] -- relative so the per-record change is not
 ! differenced off a large baseline at its own summation-rounding floor (the
 ! FINDINGS 4.8 lesson) -- total window field energy sum(P_is)*slice_spacing/c [J],
-! and the kick-side change dE_step returned by fel_unavg_step.
+! and the kick-side change dE_step returned by fel_unavg_step. The last column is the
+! cumulative energy transmitted out of the window by slippage (banked at the zero fill
+! in fel_apply_slippage) and the cumulative spontaneous deposit energy sum|dE_src|^2 --
+! the one field-energy term the kick/deposit duality does not charge to the beam. In a
+! time-dependent run the window is an open system, and the EXACTLY closing quantity is
+! E_beam + U_field + U_escaped - U_spont. Wakes would be a second, unbanked exit
+! channel; this ledger only exists where they are refused.
 
 real(rp) e_beam, u_field, power, on_axis, p_mc_l, g0_l
 integer is, ip
@@ -1591,7 +1598,7 @@ do is = 1, nslice
   u_field = u_field + power * fbeam%slice_spacing / c_light
 enddo
 
-write (iu_ledger, '(4es24.16)') z_now, e_beam, u_field, dE_step
+write (iu_ledger, '(6es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum
 
 end subroutine write_ledger_row
 

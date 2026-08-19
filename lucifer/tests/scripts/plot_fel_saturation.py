@@ -17,7 +17,11 @@ Six panels:
      field energy held in the time window, U = P_total*(slice spacing)/c (dashed),
      per code. In a slipping window these need not match -- light escapes forward --
      and the gap is the point: the unaveraged beam pays for shot-noise radiation
-     the window does not keep (README "The saturation demo", FINDINGS 7.27).
+     the window does not keep (README "The saturation demo", FINDINGS 7.27). For the
+     unaveraged run the books CLOSE on the figure: its ledger banks the escaped
+     energy at each slippage zero-fill, and U_window + U_escaped (dotted) lands on
+     -dE_beam. (Found automatically as <unavg diag stem>.ledger.txt; wake-free by
+     that mode's own refusals -- wakes would be a second, unbanked exit channel.)
   6. Slice-averaged rms energy spread vs z.
 
 Usage:
@@ -163,6 +167,13 @@ def main():
         A.semilogy(z, np.maximum(ufield[k], floor), color=STYLE[k]["color"],
                    lw=STYLE[k]["lw"], ls="--", alpha=0.7,
                    label=STYLE[k]["label"] + ": U_field")
+    ledger = pathlib.Path(str(args.unavg_diag).replace(".diag.txt", ".ledger.txt"))
+    if ledger.exists():
+        led = np.loadtxt(ledger)
+        if led.shape[1] >= 5:
+            A.semilogy(led[:, 0], np.maximum(led[:, 2] + led[:, 4], floor),
+                       color=STYLE["unavg"]["color"], lw=1.0, ls=":",
+                       label="Bmad unaveraged: U_field + U_escaped")
     A.set_xlabel("z (m)"); A.set_ylabel("energy budget (J)")
     A.legend(fontsize=7, ncol=2)
 

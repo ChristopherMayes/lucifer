@@ -104,6 +104,10 @@ type fel_slip_struct
   integer :: first = 0          ! Rotation offset of the field record, 0-based (Field::first).
   real(rp) :: accuslip = 0      ! Accumulated slippage [radiation wavelengths] (Field::accuslip).
   real(rp) :: sample = 1        ! Slice spacing / radiation wavelength (Control::sample).
+  real(rp) :: u_escaped = 0     ! Energy [J] transmitted out of the window by slippage
+                                ! (summed over every zero-filled slice; the TD energy
+                                ! ledger's escape column, so E_beam + U_window + U_escaped
+                                ! closes in a wake-free run).
 end type
 
 ! Cached kernel for fel_field_step, mirroring FieldSolverFFT::init. Module state, built
@@ -335,7 +339,13 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   if (direction < 0) last = mod(last + 1, nslice)
 
   ! One node: send/receive to self, then the non-periodic zero fill of the transmitted
-  ! slice.
+  ! slice. Its energy leaves the simulation here -- bank it first, so the time-dependent
+  ! energy ledger can close: the slice's power (same convention as fel_field_diag) times
+  ! its light-time slice_spacing/c. Wakes would be a second, unbanked exit channel from
+  ! the beam; the unaveraged mode, whose ledger this feeds, refuses them by name.
+
+  slip%u_escaped = slip%u_escaped + sum(real(wf%Ex(:,:,last+1), rp)**2 + aimag(wf%Ex(:,:,last+1))**2) &
+                     * wf%dx**2 / (2 * (mu_0_vac * c_light)) * (slip%sample * wf%wavelength / c_light)
 
   wf%Ex(:, :, last+1) = 0
 

@@ -751,7 +751,7 @@ $O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
 \emph{The energy ledger} (check zero, written per record step to
 \code{<out\_root>.ledger.txt}): conservation of
 \begin{equation}\label{eq:ledger}
-  E_{\mathrm{beam}} + U, \qquad
+  E_{\mathrm{beam}} + U + U_{\mathrm{esc}} - U_{\mathrm{sp}}, \qquad
   E_{\mathrm{beam}} = \sum_j w_j\,(\gamma_j - \gamma_0)\, m_e, \qquad
   U = \sum_{\mathrm{slices}} P\,\Delta s/c,
 \end{equation}
@@ -759,9 +759,18 @@ with $E_{\mathrm{beam}}$ stored \emph{relative} to the reference so per-record
 changes are not differenced off a large baseline at its own summation-rounding floor
 (the two-pass-variance lesson of \S\ref{sec:numerics}), and $P$ the power of
 \S\ref{sec:field}. The kick-side change is written alongside as an internal
-cross-check. The one physical term the ledger does not balance is spontaneous
-emission (the $|\mathrm{src}|^2$ the SVEA deposit adds without debiting a particle,
-as in Genesis and MINERVA); the check level sits above it. The physical field of the
+cross-check. The last two columns make the time-dependent ledger close
+\emph{exactly}: $U_{\mathrm{esc}}$ is the energy transmitted out of the window by
+slippage, banked at each zero fill (the window is an open system --- light escapes
+forward), and $U_{\mathrm{sp}}$ is the cumulative deposit energy
+$\sum|\Delta E_{\mathrm{src}}|^2$ --- the one field-energy term the kick/deposit
+duality does not charge to the beam (physically, the substep's spontaneous emission;
+as in Genesis and MINERVA). Both vanish in steady state. Measured closure:
+$8\times10^{-6}$ of turnover on the time-dependent harness configuration (checked at
+$10^{-3}$), $1.0\times10^{-5}$ steady state. The closure premise --- radiation is the
+beam's only exit channel --- is enforced by this mode's wake and space-charge
+refusals; a wake would drain beam energy to the environment with no ledger column,
+which is one more reason those refusals exist. The physical field of the
 scalar envelope: planar $E_x = \mathrm{Re}[-i\hat E e^{i\Psi}]$; helical
 $(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], -\mathrm{Re}[\hat E e^{i\Psi}])/\sqrt2$
 --- both give intensity $|\hat E|^2/2Z_0$, so \S\ref{sec:field}'s power diagnostic is

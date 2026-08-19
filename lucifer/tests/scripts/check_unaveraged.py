@@ -361,6 +361,20 @@ def main():
     check("thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes)",
           0.0 if same else 1.0, 0.5)
 
+    # 9. The TIME-DEPENDENT ledger closure. The window is an open system -- slippage
+    # transmits the head slice's light out of the simulation -- and the deposit's own
+    # |dE_src|^2 is the one field-energy term the kick/deposit duality does not charge
+    # to the beam (physically: the substep's spontaneous emission). BOTH are banked as
+    # ledger columns, so the closing quantity is exact:
+    #     E_beam + U_window + U_escaped - U_spont = const.
+    # Wakes would be a second, unbanked exit channel from the beam; they are refused in
+    # this mode, which is what entitles this check to exist.
+    led = np.loadtxt(wd / "uv_tid1.ledger.txt")
+    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5]
+    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5])
+    check("TD ledger: max|d(E_beam+U_window+U_escaped-U_spont)| / turnover",
+          np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
+
     if FAILED:
         print("UNAVERAGED CHECKS: FAIL")
         sys.exit(1)
