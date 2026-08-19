@@ -243,7 +243,12 @@ tier rather than check it, run from a kept work directory:
 `scripts/plot_fel_compare.py <tier>.diag.txt <GenesisRoot>.out.h5` overlays the two codes' power
 and bunching curves, plots the checked elementwise relative power difference along the
 line, and the per-slice exit power — e.g. `plot_fel_compare.py tdsase.diag.txt
-AramisTDSASE.out.h5`. The slice count comes from the Genesis file, so steady-state and
+AramisTDSASE.out.h5`. Add `--fld <tier>-final.fld.h5 <GenesisRoot>-final.fld.h5` for a
+second figure overlaying the FINAL FIELD (on-axis amplitude and unwrapped-phase
+lineouts, plus the transverse map of the complex difference) — the panel that shows
+what a phase-dominated tier number is made of: for `tier1_unavg`, an amplitude overlay
+indistinguishable by eye, a −0.03 rad on-axis phase offset, and the 6.9e-2 difference
+localized at the beam center, i.e. the freshly radiated model-dependent part. The slice count comes from the Genesis file, so steady-state and
 time-dependent tiers both work.
 
 The `weight_split` check is Fortran against itself and exists because Genesis cannot test

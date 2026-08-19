@@ -12,11 +12,18 @@ time-dependent tiers both work unannounced) and writes a four-panel figure:
      window (or two dots for steady state).
   4. Slice-averaged bunching vs z, both codes overlaid.
 
+With --fld <bmad .fld.h5> <genesis .fld.h5>, a second figure overlays the FINAL FIELD:
+on-axis lineouts of amplitude and unwrapped phase, plus the transverse profile of the
+complex difference -- the panel that shows what a phase-dominated tier difference
+(tier1_unavg's 6.9e-2) actually looks like.
+
 Usage:
   plot_fel_compare.py <bmad diag.txt> <genesis .out.h5> [-o out.png]
+                      [--fld <bmad fld.h5> <genesis fld.h5>]
 
 e.g., from a benchmark work directory:
   plot_fel_compare.py tdsase.diag.txt AramisTDSASE.out.h5
+  plot_fel_compare.py tier1u.diag.txt Aramis1seg.out.h5 --fld tier1u-final.fld.h5 Aramis1seg-final.fld.h5
 """
 
 from __future__ import annotations
@@ -29,7 +36,47 @@ import h5py
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from compare_fel import load_fortran_diag, load_genesis_out  # noqa: E402
+from compare_fel import load_fortran_diag, load_genesis_out, load_fld  # noqa: E402
+
+
+def plot_field_overlay(fld_f, fld_g, name, plt):
+    """The final-field figure: on-axis amplitude and unwrapped-phase lineouts of both
+    codes, and the transverse map of |E_bmad - E_genesis| (peak normalized) -- the
+    quantity a phase-dominated tier number is made of."""
+    uf, ug = load_fld(fld_f), load_fld(fld_g)
+    if uf.ndim == 3:                     # time dependent: take the peak-power slice
+        i = int(np.argmax([(abs(u)**2).sum() for u in ug]))
+        uf, ug = uf[i], ug[i]
+    n = ug.shape[0]
+    c = n // 2
+    x = np.arange(n) - c
+
+    fig, ax = plt.subplots(1, 3, figsize=(13.5, 4.2), constrained_layout=True)
+    a = ax[0]
+    a.plot(x, np.abs(ug[c, :]), color="0.25", lw=2.4, label="Genesis4")
+    a.plot(x, np.abs(uf[c, :]), color="tab:orange", lw=1.2, label="Bmad")
+    a.set_xlabel("grid point (from axis)"); a.set_ylabel("|E| on axis row (V/m)")
+    a.legend()
+
+    a = ax[1]
+    m = np.abs(ug[c, :]) > 1e-3 * np.abs(ug).max()     # phase where there is field
+    a.plot(x[m], np.unwrap(np.angle(ug[c, m])), color="0.25", lw=2.4, label="Genesis4")
+    a.plot(x[m], np.unwrap(np.angle(uf[c, m])), color="tab:orange", lw=1.2, label="Bmad")
+    a.set_xlabel("grid point (from axis)"); a.set_ylabel("field phase, unwrapped (rad)")
+    a.legend()
+
+    a = ax[2]
+    d = np.abs(uf - ug) / np.abs(ug).max()
+    im = a.imshow(d, origin="lower", extent=[-c, c, -c, c])
+    a.set_xlabel("grid x"); a.set_ylabel("grid y")
+    a.set_title(f"|E_bmad - E_genesis| / peak   (max {d.max():.2e})", fontsize=10)
+    fig.colorbar(im, ax=a, shrink=0.85)
+
+    out = f"{name}.field.png"
+    fig.savefig(out, dpi=140)
+    print(f"wrote {out}")
+    dphi = np.angle(uf[c, c] / ug[c, c])
+    print(f"  on-axis phase difference: {dphi:+.3f} rad; peak-normalized |dE| max {d.max():.3e}")
 
 
 def main():
@@ -39,6 +86,8 @@ def main():
     p.add_argument("genesis_out", help="Genesis .out.h5 of the same configuration")
     p.add_argument("-o", "--out", default=None,
                    help="Output figure (default: <bmad_diag stem>.compare.png)")
+    p.add_argument("--fld", nargs=2, metavar=("BMAD_FLD", "GENESIS_FLD"), default=None,
+                   help="Final-field dumps: adds a field overlay figure (<stem>.field.png)")
     args = p.parse_args()
 
     import matplotlib
@@ -114,6 +163,9 @@ def main():
     print(f"  exit total power: bmad {total_f[-1]:.4e} W, genesis {total_g[-1]:.4e} W, "
           f"rel {abs(total_f[-1]-total_g[-1])/total_g[-1]:.2e}")
     print(f"  elementwise relative power, whole run: max {rel.max():.3e}")
+
+    if args.fld:
+        plot_field_overlay(args.fld[0], args.fld[1], name, plt)
     return 0
 
 
