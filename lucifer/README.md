@@ -223,6 +223,7 @@ tiers). Measured, on the numbers this tree was developed against:
 | Tier | What runs | Largest relative difference |
 |---|---|---|
 | `tier1` | One undulator segment: the FEL core alone | **1.8e-6** (the impedance-constant floor; was 2.8e-11 with Genesis's constants transcribed) |
+| `tier1_unavg` | The same segment and dumps, tracked by the UNAVERAGED mode against Genesis's averaged run | **6.9e-2** — a priced model difference (sin² ramps vs hard edges, no averaging, integrator structure), dominated by the final-field phase; the power curve agrees at 6.1e-3 and per-particle gamma at 3.7e-6, and theta shows a CONSTANT ~6.6 rad ramp-phase offset with only 2.8e-3 rms about it |
 | `tier2_genesis` | Full 6-FODO line, interludes via the transcribed Genesis model | **1.8e-5** (constants floor through full gain; was 5.9e-8) |
 | `tier2_bmad` | Full line, interludes via the Bmad seam | **5.0e-2** (power curve 1.3e-2) -- a measured model difference, see below |
 | `weight_split` | tier1 rerun with every particle split into coincident w/3 + 2w/3 copies, against the unsplit run | **3.6e-13** (Fortran vs Fortran; constants-independent) |

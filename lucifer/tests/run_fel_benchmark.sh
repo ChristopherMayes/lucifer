@@ -188,6 +188,7 @@ make_nml tier1.nml  aramis_1seg_val.bmad tier1  bmad    Aramis
 make_nml tier2.nml  aramis_val.bmad      tier2  bmad    Aramis
 make_nml tier2g.nml aramis_val.bmad      tier2g genesis Aramis
 make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "split_weights = T"
+make_nml tier1u.nml aramis_1seg_unavg.bmad tier1u bmad Aramis
 make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis_val.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis_val.bmad      td2g   genesis AramisTD
@@ -263,7 +264,7 @@ echo
 
 export OMP_NUM_THREADS=1
 
-for tier in tier1 tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk; do
+for tier in tier1 tier1u tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk; do
   echo "--- fel_track_test: $tier -------------------------------------------------------"
   if ! "$EXE" $tier.nml > fel-$tier.log 2>&1; then
     echo "fel_track_test $tier FAILED; log tail:" >&2

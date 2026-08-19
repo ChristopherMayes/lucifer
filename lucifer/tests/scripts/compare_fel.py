@@ -252,6 +252,11 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("workdir", help="Directory holding all run outputs")
     p.add_argument("--tol-tier1", type=float, default=1.0e-4)
+    # The unaveraged tier is a PRICED MODEL DIFFERENCE, not a transcription check: sin^2
+    # end ramps vs Genesis's hard edges, no period averaging, RK4-vs-RK4 of different
+    # equations. The self-referenced physics checks (check_unaveraged.py) pin the mode's
+    # correctness; this tier pins its distance to Genesis so drift is visible.
+    p.add_argument("--tol-tier1-unavg", type=float, default=1.5e-1)  # measured 6.9e-2
     p.add_argument("--tol-tier2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-tier2-bmad", type=float, default=1.0e-1)
     p.add_argument("--tol-split", type=float, default=1.0e-10)
@@ -283,6 +288,11 @@ def main():
          f"{w}/tier1-final.fld.h5", f"{w}/Aramis1seg-final.fld.h5",
          f"{w}/tier1-final.par.h5", f"{w}/Aramis1seg-final.par.h5",
          args.tol_tier1, 1),
+        ("tier1_unavg: one segment, UNAVERAGED dynamics vs Genesis (priced model difference)",
+         f"{w}/tier1u.diag.txt", f"{w}/Aramis1seg.out.h5",
+         f"{w}/tier1u-final.fld.h5", f"{w}/Aramis1seg-final.fld.h5",
+         f"{w}/tier1u-final.par.h5", f"{w}/Aramis1seg-final.par.h5",
+         args.tol_tier1_unavg, 1),
         ("tier2_genesis: full line, transcribed interludes",
          f"{w}/tier2g.diag.txt", f"{w}/Aramis.out.h5",
          f"{w}/tier2g-final.fld.h5", f"{w}/Aramis-final.fld.h5",

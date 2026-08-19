@@ -790,8 +790,13 @@ emittance handoff $9.8\times10^{-11}$, orbit handoff $1.9\times10^{-9}$ m;
 $f_c$ measured vs closed form: planar $0.75051$ vs $0.75095$, helical $0.84803$ vs
 $0.84853$, $h{=}3$ planar $0.21287$ vs $0.21302$ --- all $\sim$$6\times10^{-4}$
 relative (checks $5\times10^{-3}$); step-size convergence $f_c(10/20/30$ per period$)
-= 0.750582/0.750505/0.750502$; full-segment gain curve vs the averaged mode
-$|\ln$ ratio$| = 2.6\times10^{-3}$ at exit (priced, check $0.2$). Mutations: the
+= 0.750582/0.750505/0.750502$; full-segment gain curve vs the averaged default
+$|\ln$ ratio$| = 2.7\times10^{-3}$ at exit (priced). The benchmark's
+\code{tier1\_unavg} compares this mode DIRECTLY against Genesis from the same
+starting dumps: $6.9\times10^{-2}$ overall (a priced model difference dominated by
+the final-field phase; power $6.1\times10^{-3}$, per-particle $\gamma$
+$3.7\times10^{-6}$, and a constant $\sim$6.6 rad ramp-phase offset in $\theta$ with
+$2.8\times10^{-3}$ rms about it). Mutations: the
 $E\cdot v$ sign fails the ledger at $2.0$ and the gain comparison at $0.69$ (the
 magnitude-blind $f_c$ checks pass it --- why the ledger is check zero); a hard-edge
 entry fails the orbit-handoff check at $3.2\times10^{-5}$ m ($19\sigma$; NOTE the
