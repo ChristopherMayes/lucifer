@@ -773,7 +773,10 @@ price is invisible here because saturation self-limits the power. It is also 1.2
 faster than Genesis at equal cores, each code computing its own in-run diagnostics —
 and ours are the full 6x6/4x4 moment sets of the stats file where Genesis's are
 scalar columns (the diag/stats fusion in the diagnostics section is where that speed
-came from).
+came from). Spontaneous radiation is OFF in the demo on both sides, matching Genesis's
+`&sponrad` default; turning `radiation_damping`/`radiation_fluctuations` on costs the
+beam ~1.3e-4 of its energy over the line (~0.5 rho of accumulated detuning -- the size
+that moves hard-X-ray saturation, and the reason the switches exist).
 
 The unaveraged mode — an independent integrator with fc/JJ nowhere in its inputs,
 paying its documented ~32x cost — reproduces the startup (coherent shot-noise
@@ -904,12 +907,30 @@ The absolute normalization sits ~3x below a dipole-limit estimate of the angular
 distribution, which is that estimate's own accuracy at a_w ~ 1 -- so the test checks
 the shape tightly and the magnitude loosely, which is the honest split.
 
-Consequence, named: **neither mode carries the ~97% radiated outside the grid
-acceptance**, which costs a real beam energy. The fix is an optional analytic loss +
-diffusion term (Genesis's `&sponrad` equivalent): the full rate for the averaged mode,
-the complement for the unaveraged one. FINDINGS.md 7.27 has the full trail, including
-the measurement that first exposed it (a dark segment where the averaged model's field
-gained 134x what its beam paid).
+RESOLVED: both FEL modes now honor Bmad's GLOBAL switches
+`bmad_com%radiation_damping_on` / `%radiation_fluctuations_on` (set from the driver's
+`radiation_damping` / `radiation_fluctuations` namelist conveniences; interludes always
+honored them through track1). Measured, same instrument:
+
+| with the switches on | measured | check level |
+|---|---|---|
+| damping: averaged vs analytic | **8.9e-4** | 5e-3 |
+| damping: unaveraged vs the ramp+capture composite (0.9703 of analytic: the explicit term integrates the ramp envelope, the grid-captured self-field adds on top) | **2.1e-6** | 2e-2 |
+| fluctuations: averaged / unaveraged sigma growth vs the Saldin form | 1.3e-2 / 1.8e-2 | 5e-2 |
+| fluctuations: FEL form vs Bmad runge_kutta+fluctuations, ln | 0.13 | 0.25 (the references' own F-convention spread) |
+| 1 vs 8 threads with fluctuations on | byte-identical | (serial per-beamlet draws in fixed slice order) |
+| unaveraged TD ledger with radiation on: E_beam + U + U_esc − U_spont + E_rad | 4.6e-5 of turnover | 1e-3 |
+
+Fluctuation kicks are ONE DRAW PER BEAMLET, exactly as Genesis: independent
+per-particle kicks would break the quiet start's per-beamlet harmonic cancellation
+(and fluctuations + slice migration is refused by name for the same reason). Genesis
+reaches the same variance with uniform x sqrt(3) draws; ours are Gaussian -- the
+physical limit. With the switches off (the default) every tier and check is unchanged
+bit for bit. FINDINGS.md 7.27 has the full trail, including the measurement that first
+exposed the gap (a dark segment where the averaged model's field gained 134x what its
+beam paid) and the measurement-design lesson (cold beam for fluctuation growth: with a
+real energy spread the sigma^2 differencing drowns in cross-covariance sampling
+noise).
 
 ## The coarse-step measurement (brief 8.3)
 

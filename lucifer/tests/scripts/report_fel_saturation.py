@@ -312,6 +312,8 @@ def energy_page(pdf, d, checks):
     zl = led[:, 1 - 1]
     given_z = -(led[:, 1] - led[0, 1])
     account_z = (led[:, 2] - led[0, 2]) + led[:, 4] - led[:, 5]
+    if led.shape[1] > 6:
+        account_z = account_z + led[:, 6]      # E_radiated (bmad_com radiation on).
     a2.plot(zl, given_z, color=BLUE, lw=2.6, label="beam energy given, −ΔE_beam")
     a2.plot(zl, account_z, color=INK, lw=1.0, ls="--",
             label="accounted: U_window + U_escaped − U_spontaneous")

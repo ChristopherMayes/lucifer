@@ -81,6 +81,14 @@ NML = """&fel_track_params
 {extra}&end
 """
 
+# sig_pz override for the fluctuation rows: with a real energy spread the
+# sigma^2-differencing measurement is dominated by the cross-covariance sampling term
+# (beamlet-common kicks against 2048-particle sample variances, ~50% noise); starting
+# from (near-)zero spread measures the kicks directly. Measured and learned, not
+# guessed -- see FINDINGS 7.27's instrument notes.
+def cold(nml):
+    return nml.replace("sig_pz = 8.804506566858e-05", "sig_pz = 1e-12")
+
 WRAP = """call, file = spont_probe.bmad
 fel_unaveraged = 1
 wiggler::*[FEL_TRACKING] = fel_unaveraged
@@ -97,10 +105,10 @@ def check(name, value, lo, hi, note=""):
         FAILED = True
 
 
-def run(exe, wd, name, text):
+def run(exe, wd, name, text, threads="8"):
     (wd / (name + ".nml")).write_text(text)
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
-                       env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
+                       env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
         sys.exit(1)
@@ -112,6 +120,14 @@ def loss(wd, root):
     ns = int(re.search(r"nslice = (\d+)", fn.open().read(400)).group(1))
     d = np.loadtxt(fn).reshape(-1, ns, 12)
     return -(d[-1, :, 6] - d[0, :, 6]).mean() / M_ELECTRON
+
+
+def sigma_gamma(wd, root):
+    """Slice-mean sigma_gamma at the exit (cold beam: the growth itself)."""
+    fn = wd / f"{root}.diag.txt"
+    ns = int(re.search(r"nslice = (\d+)", fn.open().read(400)).group(1))
+    d = np.loadtxt(fn).reshape(-1, ns, 12)
+    return d[-1, :, 7].mean() / M_ELECTRON
 
 
 def dipole_fraction(u):
@@ -191,6 +207,67 @@ def main():
     check("unaveraged: acceptance SCALING, measured/predicted ratio over 16x solid angle",
           r_meas / r_pred, 0.5, 2.0,
           note=f"(measured {r_meas:.2f}x vs predicted {r_pred:.2f}x)")
+
+    # 5. DAMPING ON: both FEL modes honor bmad_com%radiation_damping_on.
+    #    Averaged: the full analytic rate (its native debit is ~0). Unaveraged: the
+    #    COMPOSITE prediction -- the explicit term integrates the ramp envelope
+    #    (INT g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps), and the grid-captured
+    #    self-field work measured in step (4) adds on top. Measured 0.9703 vs
+    #    predicted 0.9705 at the defaults.
+    print("--- bmad_com%radiation_damping_on, both FEL modes:")
+    run(exe, wd, "sp_avg_d", NML.format(lat="spont_probe.bmad", root="sp_avg_d",
+                                        ngrid=NGRID_REF, extra="  radiation_damping = T\n"))
+    run(exe, wd, "sp_uv_d", NML.format(lat="sp_uv.bmad", root="sp_uv_d",
+                                       ngrid=NGRID_REF, extra="  radiation_damping = T\n"))
+    check("damping: averaged mode vs analytic, |ratio - 1|",
+          abs(loss(wd, "sp_avg_d") / analytic - 1), 0.0, 5e-3)
+    l_ramp = 2 * LAMBDA_U                       # fel_ramp_periods default 2
+    composite = (1 - 2 * (5 / 8) * l_ramp / L_UND) + meas[NGRID_REF] / analytic
+    check("damping: unaveraged mode vs the ramp+capture composite, |ratio - 1|",
+          abs(loss(wd, "sp_uv_d") / (composite * analytic) - 1), 0.0, 2e-2,
+          note=f"(composite = {composite:.4f} of analytic)")
+
+    # 6. FLUCTUATIONS ON: the Genesis/Saldin variance 1.015e-27 ku^3 aw^2 F(aw) g0^4
+    #    per meter (Genesis reaches it with uniform*sqrt(3) draws; ours are Gaussian).
+    #    Cold beam (see cold()); the FEL modes must sit on the analytic form, and Bmad's
+    #    own runge_kutta + fluctuations is the independent cross-reference -- measured
+    #    11% below the fit form, the two references' own convention spread, recorded
+    #    as a |ln| level rather than absorbed.
+    print("--- bmad_com%radiation_fluctuations_on (cold beam):")
+    f_aw = 1.42 * AW + 1 / (1 + 1.5 * AW + 0.95 * AW**2)      # helical fit
+    sig_an = np.sqrt(1.015e-27 * ku**3 * AW**2 * f_aw * GAMMA0**4 * L_UND)
+    for root, lat, extra in (("sp_avg_f", "spont_probe.bmad", "  radiation_fluctuations = T\n"),
+                             ("sp_uv_f", "sp_uv.bmad", "  radiation_fluctuations = T\n"),
+                             ("sp_rk_f", "spont_probe_rk.bmad",
+                              "  radiation_fluctuations = T\n  reference_run = T\n")):
+        run(exe, wd, root, cold(NML.format(lat=lat, root=root, ngrid=NGRID_REF, extra=extra)))
+    sig = {r: sigma_gamma(wd, r) for r in ("sp_avg_f", "sp_uv_f", "sp_rk_f")}
+    check("fluctuations: averaged sigma growth vs analytic, |ratio - 1|",
+          abs(sig["sp_avg_f"] / sig_an - 1), 0.0, 5e-2)
+    check("fluctuations: unaveraged sigma growth vs analytic, |ratio - 1|",
+          abs(sig["sp_uv_f"] / sig_an - 1), 0.0, 5e-2)
+    check("fluctuations: FEL form vs Bmad runge_kutta+fluctuations, |ln ratio|",
+          abs(np.log(sig["sp_avg_f"] / sig["sp_rk_f"])), 0.0, 0.25,
+          note="(measured 0.13: the two references' F-convention spread)")
+
+    # 7. Determinism with fluctuations on: draws are serial in fixed slice order from
+    #    the one seeded stream, so 1 vs 8 threads must be byte-identical.
+    run(exe, wd, "sp_uv_f1", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f1",
+        ngrid=NGRID_REF, extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="1")
+    run(exe, wd, "sp_uv_f8", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f8",
+        ngrid=NGRID_REF, extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8")
+    same = all((wd / f"sp_uv_f1{s}").read_bytes() == (wd / f"sp_uv_f8{s}").read_bytes()
+               for s in (".diag.txt", ".ledger.txt"))
+    check("fluctuations: 1-thread vs 8-thread byte-identical (1 = yes)",
+          0.0 if same else 1.0, 0.0, 0.5)
+
+    # 8. The ledger closes with the E_radiated column (radiation on, TD, unaveraged):
+    #    E_beam + U_window + U_escaped - U_spont + E_radiated = const, ACTUAL drawn sums.
+    led = np.loadtxt(wd / "sp_uv_f1.ledger.txt")
+    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
+    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
+    check("ledger: max|d(E+U+U_esc-U_spont+E_rad)| / turnover, radiation on",
+          np.abs(etot - etot[0]).max() / max(turn, 1e-300), 0.0, 1e-3)
 
     if FAILED:
         print("SPONTANEOUS CHECKS: FAIL")

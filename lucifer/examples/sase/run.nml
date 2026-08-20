@@ -42,4 +42,8 @@
   ! dump_beam_at = "UND3"
   ! dump_field_at = "UND3"
   ! keep_escaped_field = T
+  ! Spontaneous radiation (Bmad's global switches; off by default, like Genesis's
+  ! &sponrad). At 1 Angstrom the loss is ~0.5 rho of detuning over the full line:
+  ! radiation_damping = T
+  ! radiation_fluctuations = T
 &end

@@ -751,7 +751,7 @@ $O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
 \emph{The energy ledger} (check zero, written per record step to
 \code{<out\_root>.ledger.txt}): conservation of
 \begin{equation}\label{eq:ledger}
-  E_{\mathrm{beam}} + U + U_{\mathrm{esc}} - U_{\mathrm{sp}}, \qquad
+  E_{\mathrm{beam}} + U + U_{\mathrm{esc}} - U_{\mathrm{sp}} + E_{\mathrm{rad}}, \qquad
   E_{\mathrm{beam}} = \sum_j w_j\,(\gamma_j - \gamma_0)\, m_e, \qquad
   U = \sum_{\mathrm{slices}} P\,\Delta s/c,
 \end{equation}
@@ -765,7 +765,9 @@ slippage, banked at each zero fill (the window is an open system --- light escap
 forward), and $U_{\mathrm{sp}}$ is the cumulative deposit energy
 $\sum|\Delta E_{\mathrm{src}}|^2$ --- the one field-energy term the kick/deposit
 duality does not charge to the beam (physically, the substep's spontaneous emission;
-as in Genesis and MINERVA). Both vanish in steady state. Measured closure:
+as in Genesis and MINERVA). Both vanish in steady state. $E_{\mathrm{rad}}$ is the energy the beam radiated away
+under \code{bmad\_com}'s radiation switches (actual drawn sums, not expectations;
+zero with the switches off, their default). Measured closure:
 $8\times10^{-6}$ of turnover on the time-dependent harness configuration (checked at
 $10^{-3}$), $1.0\times10^{-5}$ steady state. The closure premise --- radiation is the
 beam's only exit channel --- is enforced by this mode's wake and space-charge
@@ -791,8 +793,28 @@ Nyquist $\theta_{\max} = \lambda/2\,dx$. Measured at the benchmark parameters th
 3.3\% of the analytic rate, and the evidence that this is acceptance-limited undulator
 radiation is its scaling: over a $16\times$ range in captured solid angle the loss
 moves $0.84\% \to 11.4\%$, a measured $13.7\times$ against a predicted $10.5\times$.
-Neither mode carries the $\sim$97\% radiated outside the acceptance; an optional
-analytic loss/diffusion term is the named follow-on (FINDINGS 7.27).
+Both modes now honor Bmad's GLOBAL switches
+\code{bmad\_com\%radiation\_damping\_on} and
+\code{\%radiation\_fluctuations\_on} --- the same switches every Bmad tracking path
+honors (interludes get theirs through \code{track1}; this covers the custom-tracked
+FEL step). Damping applies $d\gamma_j = -\tfrac23 r_e \gamma_j^2 k_u^2 a_w^2
+\int g^2\,ds$ per record (each particle's own $\gamma$; the envelope integral, so
+the unaveraged ramps radiate by their actual strength) --- measured: the averaged mode
+lands on the analytic rate at $9\times10^{-4}$, and the unaveraged mode on the
+ramp+capture composite $(1 - \tfrac{5}{4}l_{\mathrm{ramp}}/L) + f_{\mathrm{cap}}$
+at $2\times10^{-6}$ (its grid-captured self-field work adds to the explicit term).
+Fluctuations apply the standard quantum-diffusion variance
+$1.015\times10^{-27} k_u^3 a_w^2 F(a_w)\gamma_0^4$ per meter (Genesis's
+\code{Incoherent.cpp} fits of the Saldin form; Genesis reaches the same variance with
+uniform$\times\sqrt3$ draws, ours are Gaussian --- the physical limit), ONE DRAW PER
+BEAMLET exactly as Genesis (independent per-particle kicks would break the quiet
+start's per-beamlet cancellation), drawn serially in fixed slice order so thread
+count stays invisible. Measured: both FEL modes sit on the analytic form at
+$\le 2\%$; Bmad's own \code{runge\_kutta}+fluctuations through the same wiggler
+sits 11\% below it --- the two references' $F$-convention spread, recorded as a
+cross-check level, not absorbed. The radiated energy is the ledger's
+$E_{\mathrm{rad}}$ term (actual drawn sums, so closure stays exact). With the
+switches off (the default) every model is unchanged bit for bit.
 
 \emph{Measuring $f_c$.} Paired probes (12 and 20 periods, identical 2-period ramps,
 small-signal seed): the difference of the energy-modulation phasors

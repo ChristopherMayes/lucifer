@@ -256,6 +256,11 @@ type (fel_unavg_struct) ustate
 integer, allocatable :: fel_mode(:), fel_spp(:)
 real(rp), allocatable :: fel_ramp(:)
 real(rp) :: dE_step, dU_step, u_spont_cum = 0
+! Spontaneous radiation inside FEL elements (bmad_com's GLOBAL switches; manual
+! sec:core spontaneous paragraph): the actual drawn energy the beam radiated away,
+! the ledger's E_radiated column, plus the per-record scratch.
+real(rp) :: e_rad_cum = 0
+real(rp), allocatable :: e_rad_slice(:), rad_kick(:,:)
 integer :: iu_ledger = 0
 logical any_unavg
 
@@ -364,6 +369,12 @@ endif
 
 bmad_com%radiation_damping_on = radiation_damping
 bmad_com%radiation_fluctuations_on = radiation_fluctuations
+
+if (radiation_fluctuations .and. migrate) then
+  print '(a)', 'fel_track_test: radiation_fluctuations draws one kick per BEAMLET (the quiet start'
+  print '(a)', '  cancels per beamlet), and slice migration scrambles beamlet grouping. Pick one.'
+  stop 1
+endif
 
 ! Read the lattice and the starting state: a pair of Genesis dumps (the shared-start
 ! benchmark methodology), or a self-generated steady-state condition when both file
@@ -612,7 +623,7 @@ write (iu_diag, '(a)') '#         z            slice        power         on_axi
 
 if (any_unavg) then
   open (newunit = iu_ledger, file = trim(out_root) // '.ledger.txt', action = 'write')
-  write (iu_ledger, '(a)') '#         z          E_beam_rel [J]          U_field [J]           dE_kick [J]          U_escaped [J]          U_spont [J]'
+  write (iu_ledger, '(a)') '#         z          E_beam_rel [J]          U_field [J]           dE_kick [J]          U_escaped [J]          U_spont [J]         E_radiated [J]'
 endif
 
 n_moved_tot = 0
@@ -692,6 +703,7 @@ do ie = 1, branch%n_ele_track
         call fel_track_und_step (und, fbeam, wf, slip, coll, err)
       endif
       if (err) stop 1
+      call apply_radiation ()
 
       ! Element sr wake, Bmad's once-per-passage convention mirrored: one kick at the
       ! step nearest mid-element, scaled to the full element length (scale_with_length
@@ -1655,11 +1667,13 @@ subroutine write_ledger_row ()
 ! FINDINGS 4.8 lesson) -- total window field energy sum(P_is)*slice_spacing/c [J],
 ! and the kick-side change dE_step returned by fel_unavg_step. The last column is the
 ! cumulative energy transmitted out of the window by slippage (banked at the zero fill
-! in fel_apply_slippage) and the cumulative spontaneous deposit energy sum|dE_src|^2 --
-! the one field-energy term the kick/deposit duality does not charge to the beam. In a
-! time-dependent run the window is an open system, and the EXACTLY closing quantity is
-! E_beam + U_field + U_escaped - U_spont. Wakes would be a second, unbanked exit
-! channel; this ledger only exists where they are refused.
+! in fel_apply_slippage), the cumulative spontaneous deposit energy sum|dE_src|^2 (the
+! one field-energy term the kick/deposit duality does not charge to the beam), and the
+! cumulative energy the beam radiated away under bmad_com's radiation switches (the
+! ACTUAL drawn sums, not expectations, so closure stays exact; zero with the switches
+! off). In a time-dependent run the window is an open system, and the EXACTLY closing
+! quantity is E_beam + U_field + U_escaped - U_spont + E_radiated. Wakes would be a
+! second, unbanked exit channel; this ledger only exists where they are refused.
 
 real(rp) e_beam, u_field, p_mc_l, g0_l
 integer is, ip
@@ -1679,9 +1693,106 @@ do is = 1, nslice
   u_field = u_field + fpow_arr(is) * fbeam%slice_spacing / c_light
 enddo
 
-write (iu_ledger, '(6es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum
+write (iu_ledger, '(7es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum, e_rad_cum
 
 end subroutine write_ledger_row
+
+!------------------------------------------------------------------------------
+! Spontaneous radiation inside FEL elements, honoring Bmad's GLOBAL switches
+! bmad_com%radiation_damping_on / %radiation_fluctuations_on -- the same switches every
+! Bmad tracking path honors (interludes get theirs through track1; this covers the
+! custom-tracked FEL step, whose radiation reaction cannot emerge from Newton-Lorentz:
+! FINDINGS 7.27). Per record:
+!
+!   damping:      dgamma_j = -(2/3) r_e gamma_j^2 ku^2 aw^2 * INT g^2 ds
+!                 (each particle's own gamma; the envelope integral over the record, so
+!                 the unaveraged ramps radiate by their actual strength; averaged g = 1)
+!   fluctuations: the standard undulator quantum-diffusion form -- variance
+!                 1.015e-27 * ku^3 aw^2 F(aw) gamma0^4 per meter with Genesis's
+!                 Incoherent.cpp F(aw) fits (the Saldin closed form) -- drawn GAUSSIAN.
+!                 Genesis draws uniform scaled by sqrt(3) to reach this SAME variance;
+!                 the sqrt(3) normalizes the uniform draw and must not appear with a
+!                 Gaussian (the physical limit, a merit choice). ONE DRAW PER BEAMLET,
+!                 exactly as
+!                 Genesis: independent per-particle kicks would break the quiet start's
+!                 per-beamlet harmonic cancellation. Draws happen SERIALLY in fixed
+!                 slice order from the one seeded stream, so results are independent of
+!                 thread count; only the application parallelizes.
+!
+! The actual drawn energy accumulates into e_rad_cum (the ledger's E_radiated column):
+! drawn sums, not expectations, so the TD closure stays exact. In the unaveraged mode
+! this double-counts the grid-captured band (~3% at the reference grid, bounded live by
+! check_spontaneous.py) -- accepted, smaller than the angular-distribution estimate's
+! own uncertainty.
+
+subroutine apply_radiation ()
+
+real(rp) c_loss, fform, sig, gam, p_mc_r, dgam, intg2, s0, g_env, gp_env
+integer isl, ipr, ibl, nb, nbl_max
+!
+
+if (.not. (bmad_com%radiation_damping_on .or. bmad_com%radiation_fluctuations_on)) return
+
+! The envelope integral over this record: the substep-grid midpoint sum for the
+! unaveraged mode (matching its own integration grid), dz exactly for the averaged.
+
+if (fel_mode(ie) == fel_unaveraged$) then
+  intg2 = 0
+  do ipr = 1, ustate%nsub
+    s0 = (ustate%s - und%dz) + (ipr - 0.5_rp) * ustate%dsub
+    g_env = fel_unavg_envelope(ustate, s0, gp_env)
+    intg2 = intg2 + g_env**2 * ustate%dsub
+  enddo
+else
+  intg2 = und%dz
+endif
+
+c_loss = (2.0_rp / 3.0_rp) * r_e * und%ku**2 * und%aw**2
+if (und%helical) then
+  fform = 1.42_rp * und%aw + 1 / (1 + 1.5_rp * und%aw + 0.95_rp * und%aw**2)
+else
+  fform = 1.697_rp * und%aw + 1 / (1 + 1.88_rp * und%aw + 0.8_rp * und%aw**2)
+endif
+sig = 0
+if (bmad_com%radiation_fluctuations_on) then
+  sig = sqrt(1.015e-27_rp * und%ku**3 * und%aw**2 * fform * gamma0_ref**4 * intg2)
+endif
+
+nb = max(1, fbeam%nbins)
+if (.not. allocated(e_rad_slice)) allocate (e_rad_slice(nslice))
+e_rad_slice = 0
+
+if (bmad_com%radiation_fluctuations_on) then
+  nbl_max = 0
+  do isl = 1, nslice
+    nbl_max = max(nbl_max, (fbeam%slice(isl)%n + nb - 1) / nb)
+  enddo
+  if (.not. allocated(rad_kick)) allocate (rad_kick(nbl_max, nslice))
+  do isl = 1, nslice
+    do ibl = 1, (fbeam%slice(isl)%n + nb - 1) / nb
+      call ran_gauss (rad_kick(ibl, isl))
+    enddo
+  enddo
+endif
+
+!$OMP parallel do private(ipr, p_mc_r, gam, dgam)
+do isl = 1, nslice
+  do ipr = 1, fbeam%slice(isl)%n
+    p_mc_r = fel_p0_mc(fbeam) * (1 + fbeam%slice(isl)%pz(ipr))
+    gam = sqrt(p_mc_r**2 + 1)
+    dgam = 0
+    if (bmad_com%radiation_damping_on) dgam = dgam - c_loss * gam**2 * intg2
+    if (bmad_com%radiation_fluctuations_on) dgam = dgam + sig * rad_kick((ipr-1)/nb + 1, isl)
+    e_rad_slice(isl) = e_rad_slice(isl) - fbeam%slice(isl)%weight(ipr) * dgam * m_electron
+    gam = gam + dgam
+    fbeam%slice(isl)%pz(ipr) = (sqrt(gam**2 - 1) - fel_p0_mc(fbeam)) / fel_p0_mc(fbeam)
+  enddo
+enddo
+!$OMP end parallel do
+
+e_rad_cum = e_rad_cum + sum(e_rad_slice)
+
+end subroutine apply_radiation
 
 !------------------------------------------------------------------------------
 ! One progress line to stdout: where the walk is and what the light and beam are

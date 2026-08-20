@@ -370,9 +370,9 @@ def main():
     # Wakes would be a second, unbanked exit channel from the beam; they are refused in
     # this mode, which is what entitles this check to exist.
     led = np.loadtxt(wd / "uv_tid1.ledger.txt")
-    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5]
-    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5])
-    check("TD ledger: max|d(E_beam+U_window+U_escaped-U_spont)| / turnover",
+    etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
+    turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
+    check("TD ledger: max|d(E_beam+U_window+U_escaped-U_spont+E_rad)| / turnover",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
 
     if FAILED:
