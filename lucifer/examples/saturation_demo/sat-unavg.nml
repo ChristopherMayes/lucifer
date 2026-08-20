@@ -1,0 +1,7 @@
+&fel_track_params
+  lat_file = "sat_unavg.bmad"
+  beam_file = "AramisSat-initial.par.h5"
+  field_file = "AramisSat-initial.fld.h5"
+  out_root = "sat-unavg"
+  interlude_model = "bmad"
+&end

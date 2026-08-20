@@ -741,16 +741,18 @@ skipping the exit handoff flag is refused by name at the first seam element.
 ## The saturation demo: one practical SASE case, three trackers, one clock
 
 ```
-./bsim/fel/tests/run_saturation_demo.sh
+bsim/fel/examples/saturation_demo/run.sh
 ```
 
-The expert's question — does this work for a practical case? — answered on Genesis's
+Every input of the demo is a real file in `examples/saturation_demo/` (Genesis decks,
+Bmad namelists, the two-line unaveraged wrapper lattice) -- read them, edit them,
+rerun; the script is a thin clock-and-check runner. The expert's question — does this work for a practical case? — answered on Genesis's
 own Benchmark1-SASE configuration run to saturation: the full 57 m 6-FODO Aramis line,
 dark start, growth from shot noise alone, 96 slices × 2048 particles, all three
 trackers fed IDENTICAL initial dumps and each given the machine's full performance-core
 count. Wall times come from one external clock; the exit answers must agree at the
-documented levels before any timing or figure is produced. The script ends with a
-six-panel figure (`scripts/plot_fel_saturation.py`): gain curves, relative differences,
+documented levels before any timing or figure is produced. The run ends with a
+six-panel figure (`tests/scripts/plot_fel_saturation.py`): gain curves, relative differences,
 per-slice exit power, bunching, the energy budget (beam energy given up vs field energy
 held in the slipping window, both in joules -- the panel where the unaveraged mode's
 radiation cost is visible), energy spread, timings annotated.
@@ -759,14 +761,17 @@ Measured (M3 Max, 12 performance cores, production builds both sides):
 
 | | wall | exit total power | vs Genesis |
 |---|---|---|---|
-| Genesis 1.3 v4, 12 MPI ranks | 38.4 s | 3.381 GW (4.52 GW peak at 56.8 m) | — |
-| Bmad averaged (`bmad_standard` default), 12 threads | 36.5 s | 3.380 GW | **rel 4.9e-4** |
-| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1170.7 s | 6.25 GW | ln ratio +0.62 |
+| Genesis 1.3 v4, 12 MPI ranks | 38.0 s | 3.381 GW (4.52 GW peak at 56.8 m) | — |
+| Bmad averaged (`bmad_standard` default), 12 threads | 40.1 s | 3.380 GW | **rel 4.9e-4** |
+| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1164.0 s | 6.25 GW | ln ratio +0.62 |
 
 The averaged mode tracks Genesis through eight decades of z and three of power to
 **4.9e-4** at saturation — the ~4e-2 seam-transport difference the benchmark tiers
-price is invisible here because saturation self-limits the power. It is also 1.05x
-faster than Genesis at equal cores on this machine.
+price is invisible here because saturation self-limits the power. Wall clocks are
+comparable at equal cores (each code's number includes its own in-run diagnostics:
+Genesis's are scalar columns, ours the full 6x6/4x4 moment sets of the stats file —
+the ~10% gap IS that difference; see the overhead measurement in the diagnostics
+section).
 
 The unaveraged mode — an independent integrator with fc/JJ nowhere in its inputs,
 paying its documented ~32x cost — reproduces the startup (coherent shot-noise

@@ -1,0 +1,9 @@
+! The unaveraged selection lives in the lattice, where element parameters belong.
+! The default 2-period ramps carry two priced end effects (manual sec:unaveraged):
+! their slippage deficit is compensated exactly by the mode's built-in phase jump,
+! and their reduced coupling length costs ~2% in ln power per segment -- real field
+! physics of adiabatic ends, deliberately not hidden.
+
+call, file = aramis.bmad
+fel_unaveraged = 1
+wiggler::*[FEL_TRACKING] = fel_unaveraged
