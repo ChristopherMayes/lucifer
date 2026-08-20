@@ -5,7 +5,8 @@
 !
 ! Same generated starting condition as the steady_state example, so the two gain curves
 ! are directly comparable: they separate where the taper begins (z = 31.92 m) and this
-! one ends higher. See the README for measured numbers and plotting. The beam is the
+! one ends higher. Measured numbers are ../README.md's taper section; plot with
+! ../plot_fel.py taper.stats.h5. The beam is the
 ! steady_state example's beam_init description (3 kA via I = Q*c/spacing at sig_z = 0).
 
 &fel_track_params

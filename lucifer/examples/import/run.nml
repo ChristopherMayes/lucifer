@@ -4,7 +4,7 @@
 ! and tracked dark through the full line: SASE from an imported bunch.
 !
 !   fel_track_test run.nml           (run from this directory)
-!   python ../plot_fel.py import.diag.txt
+!   python ../plot_fel.py import.stats.h5
 !
 ! The lattice is the whole optics specification: the reference energy comes from its
 ! e_tot, and init_beam_distribution generates the bunch matched to the Twiss in its

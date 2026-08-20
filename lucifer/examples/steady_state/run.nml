@@ -5,7 +5,8 @@
 ! The program generates its own starting condition -- a quiet-start beam slice and a
 ! Gaussian seed field -- and tracks it through the 6-FODO helical undulator line of
 ! aramis.bmad (the Benchmark1-SASE configuration: 5.8 GeV, 1 Angstrom, aw = 0.85 rms).
-! See the README here for what to expect and how to plot the gain curve.
+! ../README.md's steady_state section has what to expect; plot with
+!   python ../plot_fel.py steady_state.stats.h5
 !
 ! The beam is described by Bmad's standard beam_init block (the Twiss comes from the
 ! lattice beginning element). The current is DERIVED, never input: sig_z = 0 is the

@@ -6,7 +6,7 @@
 ! decline on top of the FEL's own energy extraction.
 !
 !   fel_track_test run.nml           (run from this directory)
-!   python ../plot_fel.py sase_wake.diag.txt
+!   python ../plot_fel.py sase_wake.stats.h5
 
 &fel_track_params
   lat_file = "../aramis.bmad"

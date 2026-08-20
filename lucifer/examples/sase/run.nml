@@ -6,8 +6,8 @@
 ! shot noise (weighted Fawley loading -- see the fel_track_test.f90 header), starts the
 ! field dark (seed_power = 0), and tracks the full 6-FODO helical line. The FEL grows
 ! from its own electron shot noise: pure SASE. Slippage is active; each slice lases
-! independently and the per-slice power spread is the SASE fluctuation. See the README
-! for measured behavior and plotting.
+! independently and the per-slice power spread is the SASE fluctuation. Measured
+! behavior is ../README.md's sase section; plot with ../plot_fel.py sase.stats.h5.
 !
 ! The beam is a FLAT (coasting) bunch, described in Bmad's own vocabulary:
 ! distribution_type(3) = "GRID" (Bmad's uniform) over the window extent, with the
