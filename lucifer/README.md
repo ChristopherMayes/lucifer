@@ -779,14 +779,21 @@ The unaveraged mode — an independent integrator with fc/JJ nowhere in its inpu
 paying its documented ~32x cost — reproduces the startup (coherent shot-noise
 radiation matches both codes to ~8%), the gain curve shape, and the saturation
 location (56.2 vs 56.8 m), and rides ~2%/m above the KMR codes through the
-exponential regime. That excess is the shot-noise radiation channel it physically
-resolves and the averaged model does not track (FINDINGS.md 7.27): each particle's
-full quiver current radiates its real shot-noise structure continuously and pays for
-it — visible exactly where an expert would look, in the energy panels (the budget panel:
+exponential regime, while its beam gives up ~14x more energy. The energy difference is
+understood and measured (FINDINGS.md 7.27): both models emit spontaneous shot-noise
+radiation of the same magnitude, but the averaged/KMR model does not DEBIT the beam
+for it (its step adds 2S to the field and kicks with E, so the 4|S|^2 part of the
+field energy is created — measured factor 134 on a dark segment), while the unaveraged
+mode conserves energy by construction and therefore pays. The unaveraged mode's
+captured spontaneous loss agrees with the analytic rate (2/3)r_e gamma^2 ku^2 aw^2
+restricted to the grid's angular acceptance to 8% — the same formula Genesis's own
+optional &sponrad module uses. Neither model yet carries the ~90% of spontaneous
+power radiated outside the grid acceptance (the named follow-on). The energy panels
+are where all of this is visible (the budget panel:
 Genesis and the averaged mode both keep ~72% of the beam's energy in the window at
 exit, the unaveraged mode keeps 10% -- its beam gave 6.6e-8 J against their 4.7e-9,
 the difference radiated and slipped out forward; also the faster energy-spread
-growth). And "slipped out forward" is bookkept, not asserted: the unaveraged ledger
+growth), and "slipped out forward" is bookkept, not asserted: the unaveraged ledger
 banks the energy of every slice the slippage zero-fill discards (U_escaped) and the
 deposit's own |src|^2 (U_spont, the one term the kick/deposit duality does not charge
 to the beam -- physically the substep's spontaneous emission), so the time-dependent

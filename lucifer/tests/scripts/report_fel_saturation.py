@@ -136,14 +136,17 @@ def cover(pdf, d, checks):
         ("       and three of power (4.9e-4 at the exit). The unaveraged mode -- an", 10, 0),
         ("       independent integrator through the real undulator field, with the", 10, 0),
         ("       coupling factor nowhere in its inputs -- reproduces startup, gain shape", 10, 0),
-        ("       and saturation location, riding ~2%/m above (the shot-noise radiation", 10, 0),
-        ("       channel it physically resolves; FINDINGS 7.27).", 10, 0),
+        ("       and saturation location, riding ~2%/m above the averaged codes while its", 10, 0),
+        ("       beam gives up ~14x more energy -- see page 4 (FINDINGS 7.27).", 10, 0),
         ("    2. Pulse structure: per-slice exit power and bunching evolution.", 10, 0),
         ("    3. Beam evolution: energy loss and spread -- where the unaveraged mode's", 10, 0),
         ("       extra physics is visible on the beam itself.", 10, 0),
         ("    4. Energy accounting: the window is an OPEN system (slippage transmits", 10, 0),
         ("       light out of its head), so window energy never equals beam energy given.", 10, 0),
-        ("       The decomposition per code, and the unaveraged ledger closing exactly.", 10, 0),
+        ("       The decomposition per code, the unaveraged ledger closing exactly, and", 10, 0),
+        ("       WHY the two Bmad modes differ: the averaged/KMR model emits spontaneous", 10, 0),
+        ("       radiation without debiting the beam; the unaveraged mode conserves and", 10, 0),
+        ("       pays, at the analytically correct magnitude.", 10, 0),
         ("", 10, 0),
         ("The measured levels, attributions and methodology live in bsim/fel/README.md", 10, 0),
         ("(sections: The saturation demo, Diagnostic output) and the physics manual", 10, 0),
@@ -245,14 +248,20 @@ def beam_page(pdf, d):
     style(fig)
     caption(fig,
         "HOW TO READ THIS.  Top: the energy the beam gives up. Genesis and the Bmad\n"
-        "averaged mode lose what the amplified radiation gains (the FEL exchange). The\n"
-        "unaveraged beam loses ~14x more: every particle's full quiver current radiates\n"
-        "its real shot-noise structure continuously and pays for it -- spontaneous\n"
-        "emission the period-averaged model does not track. Most of that light promptly\n"
-        "slips out of the window (energy page), which is why the extra loss here is much\n"
-        "larger than the extra radiation power on the gain page. Bottom: the same physics\n"
-        "as heating -- the unaveraged energy spread grows faster (spontaneous-emission\n"
-        "diffusion) on top of the FEL-induced spread both models share.")
+        "averaged mode show essentially only the coherent FEL exchange. The unaveraged\n"
+        "beam loses ~14x more, and the reason is a MODEL difference, not a bug: both\n"
+        "models emit spontaneous shot-noise radiation of the same magnitude, but the\n"
+        "period-averaged (KMR) model does not charge the beam for it -- its field step\n"
+        "adds 2S while the particles are kicked by E, so the 4|S|^2 part of the field\n"
+        "energy is created rather than taken from the beam (measured factor 134 on a dark\n"
+        "segment; Genesis's optional &sponrad module exists precisely to add the missing\n"
+        "loss by hand, and is off by default). The unaveraged mode conserves energy by\n"
+        "construction, so its beam pays -- at a rate that agrees to 8% with the analytic\n"
+        "spontaneous power (2/3)r_e g^2 ku^2 aw^2 restricted to the grid's angular\n"
+        "acceptance. Neither model yet carries the ~90% of spontaneous power radiated\n"
+        "outside that acceptance (FINDINGS 7.27). Bottom: the same physics as heating --\n"
+        "the unaveraged spread grows faster (spontaneous diffusion) on top of the\n"
+        "FEL-induced spread both models share.")
     page(pdf, fig)
 
 
@@ -327,10 +336,12 @@ def energy_page(pdf, d, checks):
         "by the exit; the lower bar shows where it is now -- still in the window (solid)\n"
         "or slipped out ahead (hatched). Genesis and the averaged mode keep ~72%: their\n"
         "radiation is made late, near saturation, and has not had time to escape. The\n"
-        "unaveraged beam gave ~14x more and keeps only ~10%: its extra emission is the\n"
-        "beam's continuous shot-noise radiation, produced uniformly along all 57 m, and\n"
-        "anything radiated more than ~4 m of undulator ago has fully crossed the 96-slice\n"
-        "window and left. For Genesis and the averaged mode the escaped part is INFERRED\n"
+        "unaveraged beam gave ~14x more and keeps only ~10%: it is charged for the\n"
+        "spontaneous radiation both models emit (the averaged model creates that field\n"
+        "energy without debiting the beam -- page 4's caption and FINDINGS 7.27), and\n"
+        "that emission is spread uniformly along all 57 m, so anything radiated more than\n"
+        "~4 m of undulator ago has fully crossed the 96-slice window and left. For\n"
+        "Genesis and the averaged mode the escaped part is INFERRED\n"
         "(given minus window); for the unaveraged mode it is bookkept exactly, slice by\n"
         "slice, as the light leaves (the ledger's U_escaped column).\n"
         "\n"
