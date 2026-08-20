@@ -13,3 +13,6 @@
 *-final-y.fld.h5
 *-escaped.fld.h5
 *-pulse*.fld.h5
+*.wf.h5
+*-final-h*.fld.h5
+*-escaped-h*.fld.h5

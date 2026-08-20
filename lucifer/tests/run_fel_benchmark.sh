@@ -429,6 +429,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_two_polarization.py" --exe "$EXE" --la
 fi
 
 echo
+echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$WORK_DIR/harmonics" --exe "$EXE" --genesis "$GENESIS"; then
+  echo "FAIL: harmonic/openPMD checks; outputs kept in: $WORK_DIR/harmonics" >&2
+  exit 1
+fi
+
+echo
 echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
   echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2

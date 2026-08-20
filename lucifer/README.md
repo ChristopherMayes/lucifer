@@ -906,6 +906,47 @@ draws its planes sequentially, so the generated beam itself is never swap-symmet
 The elliptical follow-on (cartesian_map-derived coupling, APPLE-II, the Ming-Xie
 ladder, B0's em_field_calc unification) builds on this foundation.
 
+## Harmonic fields and the openPMD wavefront (brief deliverable 2 + the field set)
+
+The walk carries an ordered SET of radiation fields -- Genesis's `vector<Field*>`
+shape -- with the fundamental always entry 1. A harmonic field h (namelist
+`harmonics = 1, 3, ...`) lives at wavelength lambda_1/h and enters the physics in
+exactly three places: its coupling fc(h) (the Bessel factor; zero for every
+harmonic of a helical device), the harmonic ponderomotive phase h*theta in kick and
+deposit, and its own diffraction kernel and escape accounting. In V/m no other
+factor appears -- Genesis's per-field ks factors are its internal unit conversion,
+absorbed once. Harmonic fields start dark and grow from the beam's bunching
+(nonlinear harmonic generation: `examples/harmonics/`, P3 climbing nine decades to
+5.1 kW under a 200 MW fundamental in 4 m), or import. A single-entry set is the
+pre-harmonic walk BIT FOR BIT (the two-polarization overlay discipline again).
+Harmonics with two live polarizations, and with an unaveraged element, are refused
+by name -- unvalidated combinations refuse rather than guess.
+
+Radiation dumps speak two formats (`wavefront_format = 'genesis' | 'openpmd' |
+'both'`): the Genesis field dump (default; the tiers' shared-state format,
+harmonic files carrying `-h<h>`) and openPMD EXT_Wavefront (`.wf.h5`; both
+polarizations as complex components of ONE mesh record -- h5py reads them as
+complex128 natively -- one file per harmonic, photonEnergy identifying it). The
+STANDARD DOCUMENT is authoritative: the harness verifies every required attribute
+against its text independently of the writer. Import auto-detects the format by
+signature. The Python-side reader/writer is carried as a patch in
+`bsim/fel/openpmd/` (with the upstream clarification notes the implementation
+surfaced), exercised against the Fortran writer every harness run.
+
+Measured (check_harmonics.py, ninth harness section):
+
+| check | level |
+|---|---|
+| planar SS tier vs Genesis4, fundamental power | 5.3e-8 |
+| planar SS tier vs Genesis4, dark harmonic-3 growth | 1.3e-4 |
+| one-step dark deposit P3/P1 vs the exact Bessel sum | 3.3e-16 |
+| Genesis-format vs openPMD dumps, complex values | 1.4e-16 |
+| Fortran openPMD read-back, Genesis re-dump | dataset-identical |
+| Python Wavefront class energy (its Genesis path) | 1.2e-12 |
+| carried Python patch read + round trip | 1.4e-16 / exact |
+| 1 vs 8 threads (TD harmonic run) | byte-identical |
+| six refusals (anchor, unavg, two-pol, frequency domain, no-match, format) | by name |
+
 ## Spontaneous emission: the two FEL modes against Bmad's own radiation
 
 Bmad-only, no Genesis (the averaged mode's Genesis agreement is settled by the tiers).

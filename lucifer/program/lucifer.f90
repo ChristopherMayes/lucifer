@@ -200,6 +200,7 @@ use fel_unaveraged_mod
 use fel_import_mod
 use wavefront_hdf5_mod
 use fel_stats_mod
+use wavefront_openpmd_mod
 use beam_mod
 use wake_mod
 
@@ -213,12 +214,18 @@ type (ele_struct), pointer :: wake_src   ! The element whose wake applies at ele
                                          ! a superimposed/split element lives on the LORD
                                          ! and ele%wake is null on its slaves.
 type (fel_beam_struct), target :: fbeam
-type (wavefront_struct) wf
+! The radiation field SET (manual sec:field-set): ffield(1) is the fundamental,
+! further entries are harmonic fields (namelist harmonics). The wf/slip/bank pointers
+! alias entry 1, so every fundamental-only statement below reads exactly as it did
+! when the walk carried one field -- the bit-for-bit keystone.
+type (fel_field_struct), allocatable, target :: ffield(:)
+type (wavefront_struct), pointer :: wf => null()
+type (fel_slip_struct), pointer :: slip => null()
+type (fel_bank_struct), pointer :: bank => null()
 type (bunch_struct) bunch
 type (bunch_struct) wake_bunch          ! Whole-window bunch for element sr wakes.
 real(rp), allocatable :: wake_beta0(:)  ! Entry betas for the exact concat/split inverse.
 type (fel_und_struct) und
-type (fel_slip_struct) slip
 type (fel_slice_diag_struct) bdiag
 
 real(rp) :: gamma0 = 0                  ! DERIVED from the lattice e_tot.
@@ -245,7 +252,11 @@ logical :: two_pol = .false.
 ! swapped beam must reproduce the x-planar line fed the original, exactly -- the RNG
 ! draws its planes sequentially, so the generated beam itself is never swap-symmetric.
 logical :: swap_beam_xy = .false.
-character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
+! field_file: entry 1 starts the FUNDAMENTAL (Genesis dump or openPMD wavefront,
+! auto-detected by signature); entries 2+ are per-harmonic imports, each matched to
+! the field-set entry whose photon energy the file carries -- no match is refused.
+character(400) :: lat_file = '', beam_file = '', out_root = 'fel_track'
+character(400) :: field_file(9) = ''
 character(16) :: interlude_model = 'bmad'
 
 ! Collective effects (deliverable 8), Genesis &wake / &efield names with wake_/sc_
@@ -314,7 +325,7 @@ type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, 
 logical, allocatable :: is_fel(:)                 ! Which tracked elements are FEL segments.
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
 real(rp) charge_dropped_tot, b_dev_max
-integer ie, is, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot, iu_wake
+integer ie, is, ih, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot, iu_wake
 logical err, timerun
 
 type (fel_collective_struct) coll
@@ -324,7 +335,6 @@ type (fel_collective_struct) coll
 ! reconstructed at finalize by free-space propagation -- transmitted light never
 ! re-interacts, so it is fixed information).
 type (fel_stats_struct) stats
-type (fel_bank_struct) bank
 type (fel_slice_diag_struct), allocatable :: bdiag_arr(:)  ! Diag rows, filled by the stats loop.
 real(rp), allocatable :: fpow_arr(:), fonax_arr(:)         ! fel_field_diag per slice, same loop.
 type (wavefront_struct) wf1     ! One-slice scratch for banked-slice propagation.
@@ -334,9 +344,22 @@ logical, allocatable :: dump_beam_here(:), dump_field_here(:)
 integer nrec_stats, nend_stats
 integer(8) prog_count0, prog_count_last, prog_rate    ! Wall clock for progress lines.
 real(rp) lat_length
-integer :: n_banked = 0
-real(rp), allocatable :: bank_z(:), bank_pms(:,:)      ! Per banked slice: z, 25 params.
-integer(hid_t) :: esc_id = 0
+! Escaped-field stream state, one per field object (the fundamental's file keeps its
+! pre-harmonic name; a harmonic's carries -h<h>).
+integer, allocatable :: n_banked(:)
+real(rp), allocatable :: bank_z(:,:), bank_pms(:,:,:)  ! (slot, field) / (25, slot, field).
+integer(hid_t), allocatable :: esc_id(:)
+
+! The field set requested by the namelist: harmonics(1) must be 1 (the fundamental);
+! further entries are harmonic numbers in increasing order, 0 = unused. Harmonic
+! fields share the fundamental's grid and start dark, growing from the bunching the
+! fundamental drives (or filled by an openPMD import whose photonEnergy matches).
+integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
+integer :: n_harm = 1
+! Radiation dump format: 'genesis' (the default; one polarization per file, the
+! validation tiers' format), 'openpmd' (EXT_Wavefront; both polarizations as
+! components of one mesh record, one file per harmonic), or 'both'.
+character(8) :: wavefront_format = 'genesis'
 
 character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
@@ -354,7 +377,7 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            write_opmd_file, imp_split_weights, write_wake_kernels, &
                            dump_beam_at, dump_field_at, keep_escaped_field, &
                            radiation_damping, radiation_fluctuations, reference_run, &
-                           seed_polarization, swap_beam_xy
+                           seed_polarization, swap_beam_xy, harmonics, wavefront_format
 
 ! Read parameters.
 
@@ -436,6 +459,59 @@ print '(a, f0.6, a)', 'fel_track_test: gamma0 = ', gamma0, ' (from the lattice e
 call setup_fel_elements ()   ! Needs only the parsed lattice; sets two_pol for the
                              ! beam/field construction below.
 
+! The field set (manual sec:field-set). Validate the harmonics request, then allocate
+! the set and point the fundamental aliases at entry 1 BEFORE any field construction:
+! every construction path below builds the fundamental through wf.
+
+n_harm = count(harmonics /= 0)
+if (harmonics(1) /= 1) then
+  print '(a)', 'fel_track_test: harmonics(1) must be 1 -- the FUNDAMENTAL anchors the phase,'
+  print '(a)', '  the phi0 advance and the slippage schedule; harmonic fields ride on it.'
+  stop 1
+endif
+do ih = 2, 9
+  if (harmonics(ih) == 0) then
+    if (any(harmonics(ih:) /= 0)) then
+      print '(a)', 'fel_track_test: harmonics must be a gap-free increasing list (0 padding at the end).'
+      stop 1
+    endif
+    exit
+  endif
+  if (harmonics(ih) <= harmonics(ih-1)) then
+    print '(a)', 'fel_track_test: harmonics must be strictly increasing (no duplicates).'
+    stop 1
+  endif
+enddo
+if (n_harm > 1 .and. any(fel_mode == fel_unaveraged$ .and. is_fel)) then
+  print '(a)', 'fel_track_test: harmonic FIELDS with an UNAVERAGED element are not implemented'
+  print '(a)', '  (the unaveraged mode carries the fundamental envelope only; its harmonic'
+  print '(a)', '  couplings are validated through the particle spectra, not a carried field).'
+  stop 1
+endif
+if (n_harm > 1 .and. two_pol) then
+  print '(a)', 'fel_track_test: harmonic fields with TWO LIVE POLARIZATIONS are not validated'
+  print '(a)', '  together yet; run one or the other.'
+  stop 1
+endif
+select case (wavefront_format)
+case ('genesis', 'openpmd', 'both')
+case default
+  print '(a)', 'fel_track_test: wavefront_format must be genesis, openpmd or both, not "' // &
+                trim(wavefront_format) // '".'
+  stop 1
+end select
+
+allocate (ffield(n_harm))
+do ih = 1, n_harm
+  ffield(ih)%harm = harmonics(ih)
+enddo
+allocate (n_banked(n_harm), esc_id(n_harm))
+n_banked = 0
+esc_id = 0
+wf => ffield(1)%wf
+slip => ffield(1)%slip
+bank => ffield(1)%bank
+
 ! ONE reference energy, and the lattice is it: gamma0 = e_tot/m_e c^2 from the lattice
 ! header, never a namelist input. There used to be a namelist gamma0 for Genesis-deck
 ! symmetry; the first external user fed it a hand-rounded value against a round lattice
@@ -445,8 +521,12 @@ call setup_fel_elements ()   ! Needs only the parsed lattice; sets two_pol for t
 ! defect; the redundant one was removed (the deliverable-9 rule: parameters live on
 ! the lattice).
 
-if ((beam_file == '') .neqv. (field_file == '')) then
+if ((beam_file == '') .neqv. (field_file(1) == '')) then
   print '(a)', 'fel_track_test: give both beam_file and field_file, or neither (to generate).'
+  stop 1
+endif
+if (field_file(1) == '' .and. any(field_file(2:) /= '')) then
+  print '(a)', 'fel_track_test: harmonic field files need the fundamental in field_file(1).'
   stop 1
 endif
 if (beam_file /= '' .and. (dist_file /= '' .or. use_beam_init)) then
@@ -461,17 +541,41 @@ endif
 if (beam_file /= '') then
   call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
   if (err) stop 1
-  call wavefront_read_genesis4 (wf, field_file, err)
-  if (.not. err .and. two_pol .and. .not. allocated(wf%Ey)) then
+  if (wavefront_file_is_openpmd(field_file(1))) then
+    call read_openpmd_into_field (field_file(1), 1)
+  else
+    call wavefront_read_genesis4 (wf, field_file(1), err)
+    if (err) stop 1
+  endif
+  if (two_pol .and. .not. allocated(wf%Ey)) then
     allocate (wf%Ey(size(wf%Ex,1), size(wf%Ex,2), size(wf%Ex,3)))
     wf%Ey = 0
   endif
-  if (err) stop 1
 elseif (dist_file /= '' .or. use_beam_init) then
   call import_initial_state ()
 else
   call generate_initial_state ()
 endif
+
+! Harmonic fields: the fundamental's grid and window, its wavelength / h, dark. An
+! openPMD import (field_file entries 2+) fills the entry whose photon energy it
+! carries; the fundamental's grid must match, per the same one-window rule the
+! fundamental import obeys.
+
+do ih = 2, n_harm
+  call wavefront_init (ffield(ih)%wf, size(wf%Ex,1), size(wf%Ex,2), size(wf%Ex,3), &
+                       wf%dx, wf%dy, wf%dz, wf%wavelength / ffield(ih)%harm, 'x', wf%ref_position)
+enddo
+
+do is = 2, 9
+  if (field_file(is) == '') cycle
+  if (.not. wavefront_file_is_openpmd(field_file(is))) then
+    print '(a)', 'fel_track_test: harmonic field files must be openPMD EXT_Wavefront'
+    print '(a)', '  (the Genesis format carries no photon energy to match on): ' // trim(field_file(is))
+    stop 1
+  endif
+  call import_harmonic_field (field_file(is))
+enddo
 
 if (split_weights) call do_split_weights (fbeam)
 nslice = size(fbeam%slice)
@@ -563,8 +667,11 @@ endif
 ! with slippage active; one slice is the steady state and fel_apply_slippage is a no-op.
 
 timerun = (nslice > 1)
-slip%timerun = timerun
-slip%sample = fbeam%slice_spacing / fbeam%wavelength
+do ih = 1, n_harm       ! Same values for every field: one window, lockstep rotation
+                        ! in fundamental-wavelength units (Genesis's one Control::sample).
+  ffield(ih)%slip%timerun = timerun
+  ffield(ih)%slip%sample = fbeam%slice_spacing / fbeam%wavelength
+enddo
 gamma0_ref = fel_gamma0(fbeam)
 
 ! FEL segments are real Bmad wiggler/undulator elements carrying
@@ -727,7 +834,7 @@ do ie = 1, branch%n_ele_track
                              istep == und%nstep, dE_step, dU_step, err)
         u_spont_cum = u_spont_cum + dU_step
       else
-        call fel_track_und_step (und, fbeam, wf, slip, coll, err)
+        call fel_track_und_step (und, fbeam, ffield, coll, err)
       endif
       if (err) stop 1
       call apply_radiation ()
@@ -800,7 +907,10 @@ do ie = 1, branch%n_ele_track
     fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &
                     fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
 
-    call wavefront_drift (wf, ele%value(l$), err)
+    do ih = 1, n_harm      ! Each field diffracts at its own wavelength.
+    call wavefront_drift (ffield(ih)%wf, ele%value(l$), err)
+    if (err) exit
+  enddo
     if (err) stop 1
 
     ! The chamber does not end where the undulator does: the wake's energy loss applies
@@ -824,7 +934,7 @@ do ie = 1, branch%n_ele_track
 
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
-    call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, wf, slip, coll, err)
+    call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err)
     if (associated(wake_src)) call apply_bmad_wake_kick (wake_src)
     if (err) stop 1
 
@@ -851,39 +961,19 @@ if (migrate) then
   endif
 endif
 
-! Final dumps in Genesis format. The field record is unrotated to time order first --
-! time window position is holds record slice 1 + mod(is-1+first, nslice) -- which is
-! what Genesis's field writer does on the fly (manual sec:slippage).
-
-if (slip%first /= 0) then
-  wf%Ex = cshift(wf%Ex, shift = slip%first, dim = 3)
-  if (allocated(wf%Ey)) wf%Ey = cshift(wf%Ey, shift = slip%first, dim = 3)
-  slip%first = 0
-endif
-
-if (allocated(wf%Ey)) then      ! Genesis's format holds one component per file.
-  call wavefront_write_genesis4 (wf, trim(out_root) // '-final-x.fld.h5', err, 'x')
-  if (err) stop 1
-  call wavefront_write_genesis4 (wf, trim(out_root) // '-final-y.fld.h5', err, 'y')
-  if (err) stop 1
-else
-  call wavefront_write_genesis4 (wf, trim(out_root) // '-final.fld.h5', err, 'x')
-  if (err) stop 1
-endif
+! Final dumps. The field records are unrotated to time order first -- time window
+! position is holds record slice 1 + mod(is-1+first, nslice) -- which is what
+! Genesis's field writer does on the fly (manual sec:slippage).
 
 call fel_write_genesis4_beam (fbeam, trim(out_root) // '-final.par.h5', err)
 if (err) stop 1
 
-call finalize_diagnostics ()
-
 print '(a)', 'fel_track_test done.'
 print '(a)', '  ' // trim(out_root) // '.diag.txt'
-if (two_pol) then
-  print '(a)', '  ' // trim(out_root) // '-final-{x,y}.fld.h5'
-else
-  print '(a)', '  ' // trim(out_root) // '-final.fld.h5'
-endif
+call dump_field_set (trim(out_root) // '-final')
 print '(a)', '  ' // trim(out_root) // '-final.par.h5'
+
+call finalize_diagnostics ()
 
 call wavefront_fft_free()
 
@@ -1987,7 +2077,7 @@ do i = 1, branch%n_ele_track
   endif
 enddo
 
-call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c, two_pol)
+call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c, two_pol, harmonics(2:n_harm))
 allocate (bdiag_arr(nslice), fpow_arr(nslice), fonax_arr(nslice))
 
 end subroutine setup_diagnostics
@@ -1997,7 +2087,7 @@ subroutine take_stats_record (with_angles)
 
 logical with_angles, serr
 
-call fel_stats_record (stats, fbeam, wf, slip, z_now, with_angles, bdiag_arr, fpow_arr, fonax_arr, serr)
+call fel_stats_record (stats, fbeam, ffield, z_now, with_angles, bdiag_arr, fpow_arr, fonax_arr, serr)
 if (serr) stop 1
 
 end subroutine take_stats_record
@@ -2024,37 +2114,154 @@ if (dump_beam_here(ie)) then
 endif
 
 if (dump_field_here(ie)) then
-  if (slip%first /= 0) then
-    wf%Ex = cshift(wf%Ex, shift = slip%first, dim = 3)
-    if (allocated(wf%Ey)) wf%Ey = cshift(wf%Ey, shift = slip%first, dim = 3)
-    slip%first = 0
-  endif
-  if (allocated(wf%Ey)) then
-    write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '-x.fld.h5'
-    call wavefront_write_genesis4 (wf, trim(fname), eerr, 'x')
-    if (eerr) stop 1
-    write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '-y.fld.h5'
-    call wavefront_write_genesis4 (wf, trim(fname), eerr, 'y')
-    if (eerr) stop 1
-  else
-    write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '.fld.h5'
-    call wavefront_write_genesis4 (wf, trim(fname), eerr, 'x')
-    if (eerr) stop 1
-  endif
+  write (fname, '(2a, i0, 2a)') trim(out_root), '-at', ie, '-', trim(ele%name)
+  call dump_field_set (trim(fname))
 endif
 
 end subroutine end_of_element
 
 !------------------------------------------------------------------------------
+! Write the whole field set at the given filename prefix, honoring wavefront_format:
+! Genesis dumps (one polarization per file: -x/-y when Ey is live) and/or openPMD
+! EXT_Wavefront (both polarizations as components of ONE mesh record). The
+! fundamental keeps the pre-harmonic names; a harmonic's files carry -h<h>. Every
+! record is unrotated to time order first (each field owns its rotation state; they
+! move in lockstep, but the cshift must run per record).
+
+subroutine dump_field_set (prefix)
+
+character(*) prefix
+integer ihh
+logical eerr
+character(8) hsuf
+
+!
+
+do ihh = 1, n_harm
+  if (ffield(ihh)%slip%first /= 0) then
+    ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = ffield(ihh)%slip%first, dim = 3)
+    if (allocated(ffield(ihh)%wf%Ey)) &
+        ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = ffield(ihh)%slip%first, dim = 3)
+    ffield(ihh)%slip%first = 0
+  endif
+
+  hsuf = ''
+  if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
+
+  if (wavefront_format /= 'openpmd') then         ! genesis or both
+    if (allocated(ffield(ihh)%wf%Ey)) then        ! One component per Genesis file.
+      call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-x.fld.h5', eerr, 'x')
+      if (eerr) stop 1
+      call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-y.fld.h5', eerr, 'y')
+      if (eerr) stop 1
+      print '(a)', '  ' // prefix // trim(hsuf) // '-{x,y}.fld.h5'
+    else
+      call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '.fld.h5', eerr, 'x')
+      if (eerr) stop 1
+      print '(a)', '  ' // prefix // trim(hsuf) // '.fld.h5'
+    endif
+  endif
+
+  if (wavefront_format /= 'genesis') then         ! openpmd or both
+    call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
+    if (eerr) stop 1
+    print '(a)', '  ' // prefix // trim(hsuf) // '.wf.h5'
+  endif
+enddo
+
+end subroutine dump_field_set
+
+!------------------------------------------------------------------------------
+! Read an openPMD wavefront into field-set entry ihh (the fundamental import path).
+! The photon energy must be the fundamental's -- a file carrying a harmonic in
+! field_file(1) is refused by name.
+
+subroutine read_openpmd_into_field (fname, ihh)
+
+character(*) fname
+integer ihh
+real(rp) e_photon
+logical rerr
+
+!
+
+call wavefront_read_openpmd (ffield(ihh)%wf, fname, rerr, e_photon)
+if (rerr) stop 1
+if (abs(ffield(ihh)%wf%wavelength - fbeam%wavelength) > 1e-6_rp * fbeam%wavelength) then
+  print '(a)', 'fel_track_test: the openPMD file in field_file(1) does not carry the FUNDAMENTAL:'
+  print '(a, 2es20.12)', '  its photonEnergy wavelength vs the beam: ', &
+                         ffield(ihh)%wf%wavelength, fbeam%wavelength
+  stop 1
+endif
+ffield(ihh)%wf%dz = fbeam%slice_spacing
+ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength authority (the 1e-12
+                                               ! beam/field consistency check's spirit).
+
+end subroutine read_openpmd_into_field
+
+!------------------------------------------------------------------------------
+! Import a harmonic field: match the file's photon energy to the field-set entry
+! carrying that harmonic (no match is refused by name), require the fundamental's
+! grid and window, and keep the walk's wavelength convention (fundamental / h).
+
+subroutine import_harmonic_field (fname)
+
+character(*) fname
+type (wavefront_struct) wtmp
+real(rp) e_photon, e1
+integer ihh
+logical rerr
+
+!
+
+call wavefront_read_openpmd (wtmp, fname, rerr, e_photon)
+if (rerr) stop 1
+e1 = h_planck * c_light / fbeam%wavelength * e_charge
+
+do ihh = 2, n_harm
+  if (abs(e_photon - ffield(ihh)%harm * e1) <= 1e-6_rp * ffield(ihh)%harm * e1) exit
+enddo
+if (ihh > n_harm) then
+  print '(a)', 'fel_track_test: the photonEnergy of ' // trim(fname)
+  print '(a, es13.5, a)', '  (', e_photon, ' J) matches NO field of this run''s harmonics list.'
+  stop 1
+endif
+
+if (size(wtmp%Ex,1) /= size(wf%Ex,1) .or. size(wtmp%Ex,3) /= size(wf%Ex,3) .or. &
+    abs(wtmp%dx - wf%dx) > 1e-12_rp * wf%dx) then
+  print '(a)', 'fel_track_test: harmonic import ' // trim(fname)
+  print '(a)', '  does not match the fundamental''s grid and window (one time window, one grid).'
+  stop 1
+endif
+
+call move_alloc (wtmp%Ex, ffield(ihh)%wf%Ex)
+if (allocated(wtmp%Ey)) call move_alloc (wtmp%Ey, ffield(ihh)%wf%Ey)
+ffield(ihh)%wf%dx = wtmp%dx;  ffield(ihh)%wf%dy = wtmp%dy
+ffield(ihh)%wf%dz = fbeam%slice_spacing
+ffield(ihh)%wf%wavelength = wf%wavelength / ffield(ihh)%harm
+
+end subroutine import_harmonic_field
+
+!------------------------------------------------------------------------------
 subroutine apply_slippage_banked (slippage)
 
 real(rp) slippage
+integer ihh
+
+! Every field of the set slips by the same amount in fundamental-wavelength units
+! (one window, lockstep rotation; the harm argument only fixes the escape bank's
+! slice light-time for a harmonic field).
 
 if (keep_escaped_field) then
-  call fel_apply_slippage (slip, wf, slippage, bank)
-  call drain_bank ()
+  do ihh = 1, n_harm
+    call fel_apply_slippage (ffield(ihh)%slip, ffield(ihh)%wf, slippage, ffield(ihh)%bank, &
+                             ffield(ihh)%harm)
+    call drain_bank (ihh)
+  enddo
 else
-  call fel_apply_slippage (slip, wf, slippage)
+  do ihh = 1, n_harm
+    call fel_apply_slippage (ffield(ihh)%slip, ffield(ihh)%wf, slippage, harm = ffield(ihh)%harm)
+  enddo
 endif
 
 end subroutine apply_slippage_banked
@@ -2066,74 +2273,94 @@ end subroutine apply_slippage_banked
 ! statistics needs) and its transmission z. Genesis field-file conventions (dfl units)
 ! so existing tooling reads it; root datasets land at finalize.
 
-subroutine drain_bank ()
+subroutine drain_bank (ihh)
 
 type (wavefront_params_struct) pms
+type (fel_bank_struct), pointer :: bnk
+type (wavefront_struct), pointer :: wfl
 integer(hid_t) g_id
-real(rp), allocatable :: work(:), gz(:), gp(:,:)
+real(rp), allocatable :: work(:), gz(:,:), gp(:,:,:)
 real(rp) dfl_scale
-integer k, nx, h5e
+integer ihh, k, nx, h5e
 logical berr
 character(20) gname
 
 !
 
-if (bank%n == 0) return
-nx = size(wf%Ex, 1)
-dfl_scale = wf%dx / sqrt(2 * (mu_0_vac * c_light))
+bnk => ffield(ihh)%bank
+wfl => ffield(ihh)%wf
+if (bnk%n == 0) return
+nx = size(wfl%Ex, 1)
+dfl_scale = wfl%dx / sqrt(2 * (mu_0_vac * c_light))
 allocate (work(nx*nx))
 
-if (esc_id == 0) then
-  call hdf5_open_file (trim(out_root) // '-escaped.fld.h5', 'WRITE', esc_id, berr)
+if (esc_id(ihh) == 0) then
+  call hdf5_open_file (trim(escaped_file_name(ihh)), 'WRITE', esc_id(ihh), berr)
   if (berr) stop 1
 endif
 
-do k = 1, bank%n
-  n_banked = n_banked + 1
+do k = 1, bnk%n
+  n_banked(ihh) = n_banked(ihh) + 1
   if (.not. allocated(bank_z)) then
-    allocate (bank_z(1024), bank_pms(25, 1024))
-  elseif (n_banked > size(bank_z)) then
+    allocate (bank_z(1024, n_harm), bank_pms(25, 1024, n_harm))
+  elseif (n_banked(ihh) > size(bank_z, 1)) then
     call move_alloc (bank_z, gz);  call move_alloc (bank_pms, gp)
-    allocate (bank_z(2*size(gz)), bank_pms(25, 2*size(gz)))
-    bank_z(1:size(gz)) = gz;  bank_pms(:, 1:size(gz)) = gp
+    allocate (bank_z(2*size(gz,1), n_harm), bank_pms(25, 2*size(gz,1), n_harm))
+    bank_z(1:size(gz,1), :) = gz;  bank_pms(:, 1:size(gz,1), :) = gp
     deallocate (gz, gp)
   endif
 
-  call wavefront_params_of_plane (bank%plane(:,:,k), wf%dx, wf%wavelength, &
+  call wavefront_params_of_plane (bnk%plane(:,:,k), wfl%dx, wfl%wavelength, &
                                   fbeam%slice_spacing, pms, .true., berr)
   if (berr) stop 1
   pms%s = z_now
-  bank_z(n_banked) = z_now
-  bank_pms(:, n_banked) = [pms%centroid, reshape(pms%sigma, [16]), &
+  bank_z(n_banked(ihh), ihh) = z_now
+  bank_pms(:, n_banked(ihh), ihh) = [pms%centroid, reshape(pms%sigma, [16]), &
                            pms%energy, pms%power, pms%on_axis_intensity, pms%emit_x, pms%emit_y]
   if (two_pol) then             ! The y component's params add to the banked energy.
-    call wavefront_params_of_plane (bank%plane_y(:,:,k), wf%dx, wf%wavelength, &
+    call wavefront_params_of_plane (bnk%plane_y(:,:,k), wfl%dx, wfl%wavelength, &
                                     fbeam%slice_spacing, pms, .true., berr)
     if (berr) stop 1
   endif
 
-  write (gname, '(a, i0.6)') 'slice', n_banked
-  call H5Gcreate_f (esc_id, trim(gname), g_id, h5e)
+  write (gname, '(a, i0.6)') 'slice', n_banked(ihh)
+  call H5Gcreate_f (esc_id(ihh), trim(gname), g_id, h5e)
   if (h5e < 0) stop 1
-  work = dfl_scale * reshape(real(bank%plane(:,:,k), rp), [nx*nx])
+  work = dfl_scale * reshape(real(bnk%plane(:,:,k), rp), [nx*nx])
   call hdf5_write_dataset_real (g_id, 'field-real', work, berr);  if (berr) stop 1
-  work = dfl_scale * reshape(aimag(bank%plane(:,:,k)), [nx*nx])
+  work = dfl_scale * reshape(aimag(bnk%plane(:,:,k)), [nx*nx])
   call hdf5_write_dataset_real (g_id, 'field-imag', work, berr);  if (berr) stop 1
   if (two_pol) then
-    work = dfl_scale * reshape(real(bank%plane_y(:,:,k), rp), [nx*nx])
+    work = dfl_scale * reshape(real(bnk%plane_y(:,:,k), rp), [nx*nx])
     call hdf5_write_dataset_real (g_id, 'field-real-y', work, berr);  if (berr) stop 1
-    work = dfl_scale * reshape(aimag(bank%plane_y(:,:,k)), [nx*nx])
+    work = dfl_scale * reshape(aimag(bnk%plane_y(:,:,k)), [nx*nx])
     call hdf5_write_dataset_real (g_id, 'field-imag-y', work, berr);  if (berr) stop 1
     call hdf5_write_dataset_real (g_id, 'wavefront_params_y', &
             [pms%centroid, reshape(pms%sigma, [16]), pms%energy, pms%power, &
              pms%on_axis_intensity, pms%emit_x, pms%emit_y], berr);  if (berr) stop 1
   endif
   call hdf5_write_dataset_real (g_id, 'z_transmit', [z_now], berr);  if (berr) stop 1
-  call hdf5_write_dataset_real (g_id, 'wavefront_params', bank_pms(:, n_banked), berr);  if (berr) stop 1
+  call hdf5_write_dataset_real (g_id, 'wavefront_params', bank_pms(:, n_banked(ihh), ihh), berr);  if (berr) stop 1
   call H5Gclose_f (g_id, h5e)
 enddo
 
 end subroutine drain_bank
+
+!------------------------------------------------------------------------------
+! Escaped-file name of field ihh: the fundamental keeps its pre-harmonic name.
+
+function escaped_file_name (ihh) result (fname)
+
+integer ihh
+character(420) fname
+
+if (ffield(ihh)%harm == 1) then
+  fname = trim(out_root) // '-escaped.fld.h5'
+else
+  write (fname, '(2a, i0, a)') trim(out_root), '-escaped-h', ffield(ihh)%harm, '.fld.h5'
+endif
+
+end function escaped_file_name
 
 !------------------------------------------------------------------------------
 ! Finalize: the stats file always; with keep_escaped_field also the escaped file's root
@@ -2146,9 +2373,9 @@ end subroutine drain_bank
 
 subroutine finalize_diagnostics ()
 
-integer nx, h5e
-real(rp) dfl_scale
+integer nx, h5e, ihh
 logical ferr
+character(420) fname_h
 
 !
 
@@ -2157,32 +2384,38 @@ if (ferr) stop 1
 print '(a)', '  ' // trim(out_root) // '.stats.h5'
 
 if (.not. keep_escaped_field) return
-nx = size(wf%Ex, 1)
-dfl_scale = wf%dx / sqrt(2 * (mu_0_vac * c_light))
 
-if (esc_id /= 0) then
-  call hdf5_write_dataset_int  (esc_id, 'gridpoints',   [nx],                  ferr)
-  call hdf5_write_dataset_real (esc_id, 'gridsize',     [wf%dx],               ferr)
-  call hdf5_write_dataset_real (esc_id, 'refposition',  [wf%ref_position],     ferr)
-  call hdf5_write_dataset_real (esc_id, 'wavelength',   [wf%wavelength],       ferr)
-  call hdf5_write_dataset_int  (esc_id, 'slicecount',   [n_banked],            ferr)
-  call hdf5_write_dataset_real (esc_id, 'slicespacing', [fbeam%slice_spacing], ferr)
-  call H5Fclose_f (esc_id, h5e)
-  esc_id = 0
-  print '(a)', '  ' // trim(out_root) // '-escaped.fld.h5'
-endif
+do ihh = 1, n_harm
+  nx = size(ffield(ihh)%wf%Ex, 1)
 
-! The full pulse at the exit plane; with two live polarizations, one file per
-! component (Genesis's format holds one).
+  if (esc_id(ihh) /= 0) then
+    call hdf5_write_dataset_int  (esc_id(ihh), 'gridpoints',   [nx],                        ferr)
+    call hdf5_write_dataset_real (esc_id(ihh), 'gridsize',     [ffield(ihh)%wf%dx],         ferr)
+    call hdf5_write_dataset_real (esc_id(ihh), 'refposition',  [ffield(ihh)%wf%ref_position], ferr)
+    call hdf5_write_dataset_real (esc_id(ihh), 'wavelength',   [ffield(ihh)%wf%wavelength], ferr)
+    call hdf5_write_dataset_int  (esc_id(ihh), 'slicecount',   [n_banked(ihh)],             ferr)
+    call hdf5_write_dataset_real (esc_id(ihh), 'slicespacing', [fbeam%slice_spacing],       ferr)
+    call H5Fclose_f (esc_id(ihh), h5e)
+    esc_id(ihh) = 0
+    print '(a)', '  ' // trim(escaped_file_name(ihh))
+  endif
 
-if (two_pol) then
-  call write_pulse_file (trim(out_root) // '-pulse-x.fld.h5', .false.)
-  call write_pulse_file (trim(out_root) // '-pulse-y.fld.h5', .true.)
-  print '(a)', '  ' // trim(out_root) // '-pulse-{x,y}.fld.h5'
-else
-  call write_pulse_file (trim(out_root) // '-pulse.fld.h5', .false.)
-  print '(a)', '  ' // trim(out_root) // '-pulse.fld.h5'
-endif
+  ! The full pulse at the exit plane; with two live polarizations, one file per
+  ! component (Genesis's format holds one). Harmonic pulses carry -h<h>.
+
+  if (two_pol) then
+    call write_pulse_file (trim(out_root) // '-pulse-x.fld.h5', .false., ihh)
+    call write_pulse_file (trim(out_root) // '-pulse-y.fld.h5', .true., ihh)
+    print '(a)', '  ' // trim(out_root) // '-pulse-{x,y}.fld.h5'
+  elseif (ffield(ihh)%harm == 1) then
+    call write_pulse_file (trim(out_root) // '-pulse.fld.h5', .false., ihh)
+    print '(a)', '  ' // trim(out_root) // '-pulse.fld.h5'
+  else
+    write (fname_h, '(2a, i0, a)') trim(out_root), '-pulse-h', ffield(ihh)%harm, '.fld.h5'
+    call write_pulse_file (trim(fname_h), .false., ihh)
+    print '(a)', '  ' // trim(fname_h)
+  endif
+enddo
 
 end subroutine finalize_diagnostics
 
@@ -2191,10 +2424,12 @@ end subroutine finalize_diagnostics
 ! the live window's slices, then each banked slice read back from the escaped file
 ! and free-space propagated over z_end - z_transmit. Shared by the -x and -y files.
 
-subroutine write_pulse_file (fname, use_y)
+subroutine write_pulse_file (fname, use_y, ihh)
 
 character(*) fname
 logical use_y
+integer ihh
+type (wavefront_struct), pointer :: wfl
 integer(hid_t) p_id, e_id, g_id
 real(rp), allocatable :: work(:), re_w(:), im_w(:)
 real(rp) dfl_scale
@@ -2204,20 +2439,21 @@ character(24) gname, dset_r, dset_i
 
 !
 
-nx = size(wf%Ex, 1)
-dfl_scale = wf%dx / sqrt(2 * (mu_0_vac * c_light))
+wfl => ffield(ihh)%wf
+nx = size(wfl%Ex, 1)
+dfl_scale = wfl%dx / sqrt(2 * (mu_0_vac * c_light))
 dset_r = 'field-real';  dset_i = 'field-imag'
 if (use_y) then
   dset_r = 'field-real-y';  dset_i = 'field-imag-y'
 endif
 
 call hdf5_open_file (trim(fname), 'WRITE', p_id, ferr);  if (ferr) stop 1
-call hdf5_write_dataset_int  (p_id, 'gridpoints',   [nx],                    ferr)
-call hdf5_write_dataset_real (p_id, 'gridsize',     [wf%dx],                 ferr)
-call hdf5_write_dataset_real (p_id, 'refposition',  [wf%ref_position],       ferr)
-call hdf5_write_dataset_real (p_id, 'wavelength',   [wf%wavelength],         ferr)
-call hdf5_write_dataset_int  (p_id, 'slicecount',   [nslice + n_banked],     ferr)
-call hdf5_write_dataset_real (p_id, 'slicespacing', [fbeam%slice_spacing],   ferr)
+call hdf5_write_dataset_int  (p_id, 'gridpoints',   [nx],                       ferr)
+call hdf5_write_dataset_real (p_id, 'gridsize',     [wfl%dx],                   ferr)
+call hdf5_write_dataset_real (p_id, 'refposition',  [wfl%ref_position],         ferr)
+call hdf5_write_dataset_real (p_id, 'wavelength',   [wfl%wavelength],           ferr)
+call hdf5_write_dataset_int  (p_id, 'slicecount',   [nslice + n_banked(ihh)],   ferr)
+call hdf5_write_dataset_real (p_id, 'slicespacing', [fbeam%slice_spacing],      ferr)
 
 allocate (work(nx*nx), re_w(nx*nx), im_w(nx*nx))
 
@@ -2225,29 +2461,29 @@ do is_f = 1, nslice
   write (gname, '(a, i0.6)') 'slice', is_f
   call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
   if (use_y) then
-    work = dfl_scale * reshape(real(wf%Ey(:,:,is_f), rp), [nx*nx])
+    work = dfl_scale * reshape(real(wfl%Ey(:,:,is_f), rp), [nx*nx])
   else
-    work = dfl_scale * reshape(real(wf%Ex(:,:,is_f), rp), [nx*nx])
+    work = dfl_scale * reshape(real(wfl%Ex(:,:,is_f), rp), [nx*nx])
   endif
   call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1
   if (use_y) then
-    work = dfl_scale * reshape(aimag(wf%Ey(:,:,is_f)), [nx*nx])
+    work = dfl_scale * reshape(aimag(wfl%Ey(:,:,is_f)), [nx*nx])
   else
-    work = dfl_scale * reshape(aimag(wf%Ex(:,:,is_f)), [nx*nx])
+    work = dfl_scale * reshape(aimag(wfl%Ex(:,:,is_f)), [nx*nx])
   endif
   call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) stop 1
   call H5Gclose_f (g_id, h5e)
 enddo
 
-if (n_banked > 0) then
+if (n_banked(ihh) > 0) then
   if (.not. allocated(wf1%Ex)) then
     allocate (wf1%Ex(nx, nx, 1))
-    wf1%dx = wf%dx;  wf1%dy = wf%dy;  wf1%dz = fbeam%slice_spacing
-    wf1%wavelength = wf%wavelength
+    wf1%dx = wfl%dx;  wf1%dy = wfl%dy;  wf1%dz = fbeam%slice_spacing
   endif
+  wf1%wavelength = wfl%wavelength      ! Per field: banked light drifts at ITS wavelength.
 
-  call hdf5_open_file (trim(out_root) // '-escaped.fld.h5', 'READ', e_id, ferr);  if (ferr) stop 1
-  do k = 1, n_banked
+  call hdf5_open_file (trim(escaped_file_name(ihh)), 'READ', e_id, ferr);  if (ferr) stop 1
+  do k = 1, n_banked(ihh)
     write (gname, '(a, i0.6)') 'slice', k
     g_id = hdf5_open_group (e_id, trim(gname), ferr, .true.);  if (ferr) stop 1
     call hdf5_read_dataset_real (g_id, trim(dset_r), re_w, ferr, trim(gname));  if (ferr) stop 1
@@ -2255,9 +2491,9 @@ if (n_banked > 0) then
     call H5Gclose_f (g_id, h5e)
     wf1%Ex(:,:,1) = reshape(cmplx(re_w, im_w, wf_rp), [nx, nx]) / dfl_scale
 
-    call wavefront_drift (wf1, z_now - bank_z(k), ferr);  if (ferr) stop 1
+    call wavefront_drift (wf1, z_now - bank_z(k, ihh), ferr);  if (ferr) stop 1
 
-    write (gname, '(a, i0.6)') 'slice', nslice + (n_banked - k + 1)
+    write (gname, '(a, i0.6)') 'slice', nslice + (n_banked(ihh) - k + 1)
     call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
     work = dfl_scale * reshape(real(wf1%Ex(:,:,1), rp), [nx*nx])
     call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1

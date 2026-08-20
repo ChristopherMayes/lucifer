@@ -22,7 +22,9 @@ Works on steady-state and time-dependent runs alike: with more than one slice, t
 gray lines show every slice and the bold line the total (power, energy) or the slice
 average (everything else). When the run carries TWO POLARIZATIONS (any tilted FEL
 element; the stats file then has a field/y group) an eleventh panel splits the power
-by polarization -- on a crossed line that panel IS the afterburner story.
+by polarization -- on a crossed line that panel IS the afterburner story. When it
+carries HARMONIC FIELDS (namelist harmonics; field/harm<h> groups) a panel plots each
+harmonic's power against the fundamental's.
 
 Needs numpy, h5py and matplotlib (the bmad-fel-validate environment has all three).
 """
@@ -68,6 +70,13 @@ def load(fn):
         if "field/y" in h5:
             q["power_y"] = h5["field/y/power"][:]
             q["power_x"] = q["power"] - q["power_y"]
+        # Harmonic fields: field/harm<h>/ groups, one per harmonic beyond the
+        # fundamental. field/power stays the FUNDAMENTAL's -- harmonics are separate
+        # wavelengths, never summed with it.
+        q["harmonics"] = {}
+        for k in h5["field"]:
+            if k.startswith("harm"):
+                q["harmonics"][int(k[4:])] = h5[f"field/{k}/power"][:]
     return q
 
 
@@ -132,7 +141,10 @@ def main():
     two_pol = "power_y" in q
     if two_pol:
         rows.append(["pol", "pol"])
-    fig, axd = plt.subplot_mosaic(rows, figsize=(9.5, 14 + 2.6 * two_pol), sharex=True)
+    if q["harmonics"]:
+        rows.append(["harm", "harm"])
+    fig, axd = plt.subplot_mosaic(rows, figsize=(9.5, 14 + 2.6 * (two_pol + bool(q["harmonics"]))),
+                                  sharex=True)
 
     # Radiation power and window field energy, log then linear. The multi-slice
     # aggregate is a sum: total power is what a detector sees, and the window energy
@@ -213,6 +225,21 @@ def main():
         A.semilogy(z, np.maximum(q["power_y"][:len(z)].sum(axis=1), 1e-30),
                    color=ORANGE, lw=1.8, label="y polarization")
         A.set_xlabel("z (m)"); A.set_ylabel("radiation power by polarization (W)")
+        A.legend(frameon=False)
+        axd["bemit"].set_xlabel("")
+        axd["femit"].set_xlabel("")
+
+    # Harmonic power (harmonic field-set runs): each harmonic against the
+    # fundamental, on the fundamental's log scale -- harmonic lasing reads directly
+    # off the vertical gaps.
+    if q["harmonics"]:
+        A = axd["harm"]
+        A.semilogy(z, np.maximum(q["power"][:len(z)].sum(axis=1), 1e-30),
+                   color=BLUE, lw=1.8, label="fundamental")
+        for hh, ph in sorted(q["harmonics"].items()):
+            A.semilogy(z, np.maximum(ph[:len(z)].sum(axis=1), 1e-30),
+                       color=ORANGE, lw=1.8, label=f"harmonic {hh}")
+        A.set_xlabel("z (m)"); A.set_ylabel("radiation power by harmonic (W)")
         A.legend(frameon=False)
         axd["bemit"].set_xlabel("")
         axd["femit"].set_xlabel("")

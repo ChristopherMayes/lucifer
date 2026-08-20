@@ -40,7 +40,7 @@ use bmad
 use beam_utils, only: calc_bunch_params, calc_emittances_and_twiss_from_sigma_matrix
 use fel_beam_mod
 use wavefront_mod
-use fel_track_mod, only: fel_slip_struct, fel_field_index, fel_field_diag
+use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel_field_diag
 use hdf5_interface
 
 implicit none
@@ -71,6 +71,16 @@ type fel_stats_struct
   real(rp), allocatable :: f2_centroid(:,:,:), f2_sigma(:,:,:)
   real(rp), allocatable :: f2_energy(:,:), f2_power(:,:), f2_on_axis(:,:)
   real(rp), allocatable :: f2_emit_x(:,:), f2_emit_y(:,:)
+  ! Harmonic fields (field-set entries 2+): full wavefront_params per harmonic,
+  ! written as field/harm<h>/ groups. The fundamental's datasets above are NEVER
+  ! summed with these -- harmonics are distinct wavelengths (a detector separates
+  ! colors), unlike the two polarization components of one wave.
+  integer, allocatable :: fh_harm(:)                ! (n_extra) harmonic numbers.
+  real(rp), allocatable :: fh_centroid(:,:,:,:)     ! (4, nslice, nrec, n_extra)
+  real(rp), allocatable :: fh_sigma(:,:,:,:)        ! (16, nslice, nrec, n_extra)
+  real(rp), allocatable :: fh_energy(:,:,:), fh_power(:,:,:), fh_on_axis(:,:,:)
+  real(rp), allocatable :: fh_emit_x(:,:,:), fh_emit_y(:,:,:)
+  integer, allocatable :: fh_angles_valid(:,:,:)
   ! Element ends: the evaluated bunch_params_struct, whole bunch and per slice.
   integer, allocatable :: e_ix_ele(:)             ! (nend)
   real(rp), allocatable :: e_s(:)                 ! (nend) [m]
@@ -97,11 +107,12 @@ contains
 ! from the lattice walk (records = 1 + sum of undulator steps + one per interlude).
 !-
 
-subroutine fel_stats_init (stats, nrec, nend, nslice, p0c, two_pol)
+subroutine fel_stats_init (stats, nrec, nend, nslice, p0c, two_pol, harm_extra)
 
 type (fel_stats_struct) stats
 real(rp) p0c
 integer nrec, nend, nslice
+integer harm_extra(:)          ! Harmonic numbers of field-set entries 2+ (may be empty).
 logical two_pol
 
 !
@@ -125,6 +136,18 @@ if (two_pol) then
   allocate (stats%f2_energy(nslice, nrec), stats%f2_power(nslice, nrec), stats%f2_on_axis(nslice, nrec))
   allocate (stats%f2_emit_x(nslice, nrec), stats%f2_emit_y(nslice, nrec))
 endif
+if (size(harm_extra) > 0) then
+  allocate (stats%fh_harm(size(harm_extra)))
+  stats%fh_harm = harm_extra
+  allocate (stats%fh_centroid(4, nslice, nrec, size(harm_extra)), &
+            stats%fh_sigma(16, nslice, nrec, size(harm_extra)))
+  allocate (stats%fh_energy(nslice, nrec, size(harm_extra)), &
+            stats%fh_power(nslice, nrec, size(harm_extra)), &
+            stats%fh_on_axis(nslice, nrec, size(harm_extra)))
+  allocate (stats%fh_emit_x(nslice, nrec, size(harm_extra)), &
+            stats%fh_emit_y(nslice, nrec, size(harm_extra)))
+  allocate (stats%fh_angles_valid(nslice, nrec, size(harm_extra)))
+endif
 allocate (stats%e_ix_ele(nend), stats%e_s(nend))
 allocate (stats%e_bunch(fel_stats_n_bp$, nend), stats%e_slice(fel_stats_n_bp$, nslice, nend))
 
@@ -140,14 +163,15 @@ end subroutine fel_stats_init
 ! for every slice. with_angles fills the field theta moments (element ends).
 !-
 
-subroutine fel_stats_record (stats, beam, wf, slip, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
+subroutine fel_stats_record (stats, beam, ff, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_beam_struct), target :: beam
-type (wavefront_struct), target :: wf
-type (fel_slip_struct) slip
+type (fel_field_struct), target :: ff(:)
+type (wavefront_struct), pointer :: wf
 type (fel_slice_struct), pointer :: sl
 type (wavefront_params_struct) pms
+integer io
 type (fel_slice_diag_struct) bdiag_arr(:)   ! OUT: the diag instrument, one per slice.
 real(rp) fpow(:), fonax(:)                  ! OUT: fel_field_diag's power/on-axis per slice.
 real(rp) z_now
@@ -161,6 +185,7 @@ character(*), parameter :: r_name = 'fel_stats_record'
 !
 
 err_flag = .true.
+wf => ff(1)%wf
 nslice = size(beam%slice)
 if (stats%irec >= stats%nrec) then
   call out_io (s_error$, r_name, 'MORE RECORDS THAN THE PRECOMPUTED COUNT. INTERNAL BUG.')
@@ -179,11 +204,11 @@ any_err = .false.
 ! identical serial code, so diag.txt is bit-for-bit what it always was; what changed
 ! is that the formerly SERIAL per-record diag sweeps now ride this parallel loop.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, pms, err) &
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, io, pms, err) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
-  call fel_field_diag (wf, fel_field_index(slip, is, nslice), fpow(is), fonax(is))
+  call fel_field_diag (wf, fel_field_index(ff(1)%slip, is, nslice), fpow(is), fonax(is))
   call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
   ! Two-pass weighted moments (the FINDINGS 4.8 variance lesson).
@@ -229,7 +254,7 @@ do is = 1, nslice
 
   ! The field slice this beam slice couples to, unrotated exactly as the dumps are.
 
-  call wavefront_params_of_plane (wf%Ex(:,:,fel_field_index(slip, is, nslice)), wf%dx, &
+  call wavefront_params_of_plane (wf%Ex(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
                                   wf%wavelength, beam%slice_spacing, pms, with_angles, err)
   any_err = any_err .or. err
   pms%s = z_now
@@ -243,7 +268,7 @@ do is = 1, nslice
   stats%f_angles_valid(is, ir) = merge(1, 0, pms%angle_moments_valid)
 
   if (allocated(wf%Ey)) then
-    call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(slip, is, nslice)), wf%dx, &
+    call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
                                     wf%wavelength, beam%slice_spacing, pms, with_angles, err)
     any_err = any_err .or. err
     stats%f2_centroid(:, is, ir) = pms%centroid
@@ -254,6 +279,24 @@ do is = 1, nslice
     stats%f2_emit_x(is, ir) = pms%emit_x
     stats%f2_emit_y(is, ir) = pms%emit_y
   endif
+
+  ! Harmonic fields: full wavefront_params per extra field, at ITS wavelength and
+  ! record rotation.
+
+  do io = 2, size(ff)
+    call wavefront_params_of_plane ( &
+            ff(io)%wf%Ex(:,:,fel_field_index(ff(io)%slip, is, size(ff(io)%wf%Ex,3))), &
+            ff(io)%wf%dx, ff(io)%wf%wavelength, beam%slice_spacing, pms, with_angles, err)
+    any_err = any_err .or. err
+    stats%fh_centroid(:, is, ir, io-1) = pms%centroid
+    stats%fh_sigma(:, is, ir, io-1) = reshape(pms%sigma, [16])
+    stats%fh_energy(is, ir, io-1) = pms%energy
+    stats%fh_power(is, ir, io-1) = pms%power
+    stats%fh_on_axis(is, ir, io-1) = pms%on_axis_intensity
+    stats%fh_emit_x(is, ir, io-1) = pms%emit_x
+    stats%fh_emit_y(is, ir, io-1) = pms%emit_y
+    stats%fh_angles_valid(is, ir, io-1) = merge(1, 0, pms%angle_moments_valid)
+  enddo
 enddo
 !$OMP end parallel do
 
@@ -375,9 +418,10 @@ subroutine fel_stats_write (stats, file_name, err_flag)
 
 type (fel_stats_struct) stats
 integer(hid_t) f_id, g_id, b_id, s_id
-integer h5_err, ir
+integer h5_err, ir, ihh
 logical err_flag, err
 character(*) file_name
+character(12) hname
 character(*), parameter :: r_name = 'fel_stats_write'
 
 !
@@ -437,6 +481,25 @@ if (allocated(stats%f2_energy)) then
   call hdf5_write_dataset_real (b_id, 'emit_x', stats%f2_emit_x(:,1:ir), err);  if (err) return
   call hdf5_write_dataset_real (b_id, 'emit_y', stats%f2_emit_y(:,1:ir), err);  if (err) return
   call H5Gclose_f (b_id, h5_err)
+endif
+
+! Harmonic fields: field/harm<h>/ groups, one full wavefront_params set each. The
+! fundamental's datasets above are untouched -- harmonics are separate wavelengths.
+
+if (allocated(stats%fh_energy)) then
+  do ihh = 1, size(stats%fh_harm)
+    write (hname, '(a, i0)') 'harm', stats%fh_harm(ihh)
+    call H5Gcreate_f (g_id, trim(hname), b_id, h5_err)
+    call hdf5_write_dataset_real (b_id, 'centroid', stats%fh_centroid(:,:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_real (b_id, 'sigma', stats%fh_sigma(:,:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_real (b_id, 'energy', stats%fh_energy(:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_real (b_id, 'power', stats%fh_power(:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_real (b_id, 'on_axis_intensity', stats%fh_on_axis(:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_real (b_id, 'emit_x', stats%fh_emit_x(:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_real (b_id, 'emit_y', stats%fh_emit_y(:,1:ir,ihh), err);  if (err) return
+    call hdf5_write_dataset_int (b_id, 'angle_moments_valid', stats%fh_angles_valid(:,1:ir,ihh), err);  if (err) return
+    call H5Gclose_f (b_id, h5_err)
+  enddo
 endif
 call H5Gclose_f (g_id, h5_err)
 

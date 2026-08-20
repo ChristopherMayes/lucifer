@@ -135,12 +135,41 @@ type fel_bank_struct
   integer :: n = 0                             ! How many this call transmitted.
 end type
 
-! Cached kernel for fel_field_step, mirroring FieldSolverFFT::init. Module state, built
-! ONCE, SERIALLY, by fel_field_kernel_init before any parallel slice loop, and read-only
-! ever after -- fel_field_step never rebuilds it, it only verifies the match and errors,
-! because a rebuild from inside a parallel loop would race. The per-call source
-! accumulator is a local of fel_field_step, one per invocation, so concurrent slices
-! deposit into their own.
+!+
+! Struct fel_field_struct
+!
+! One radiation field of the walk's field set: the harmonic number, the wavefront
+! record, and that field's own slippage state and escape bank. The walk carries an
+! ordered set of these -- Genesis's vector<Field*> -- with the FUNDAMENTAL always
+! entry 1 (the ponderomotive phase, the phi0 advance and the slippage schedule are
+! all defined against it; a harmonic field couples through fc(h) and the phase h*theta
+! and diffracts at its own wavelength). A single-entry set is the pre-harmonic walk,
+! bit for bit. wf%wavelength = fundamental wavelength / harm; every field shares the
+! time window, so the slippage state advances in fundamental-wavelength units for all
+! of them (Genesis's one Control::sample) and the records rotate in lockstep.
+!-
+
+type fel_field_struct
+  integer :: harm = 1               ! Harmonic number h (Field::harm).
+  type (wavefront_struct) :: wf
+  type (fel_slip_struct) :: slip
+  type (fel_bank_struct) :: bank
+end type
+
+! Cached kernels for fel_field_step, mirroring FieldSolverFFT::init: ONE ENTRY PER
+! WAVELENGTH (per harmonic), each rebuilt when its grid or step changes, all module
+! state, built SERIALLY by fel_field_kernel_init before any parallel slice loop and
+! read-only ever after -- fel_field_step never rebuilds, it only looks its entry up
+! (fel_kernel_index) and errors on a miss, because a rebuild from inside a parallel
+! loop would race. The per-call source accumulator is a local of fel_field_step, one
+! per invocation, so concurrent slices deposit into their own.
+
+type fel_kernel_struct
+  complex(rp), allocatable :: k2(:,:)      ! -i (kx^2+ky^2)/(2 ks), FFT order.
+  complex(rp), allocatable :: exp_k2(:,:)  ! exp(K2 * dz), the step propagator.
+  integer :: ngrid = 0
+  real(rp) :: dgrid = 0, ks = 0, dz = 0
+end type
 
 ! Named values of the fel_tracking lattice attribute (manual sec:element), in Bmad's
 ! named-integer convention. Lattices use the same names via one-line variable
@@ -152,10 +181,7 @@ integer, parameter :: fel_averaged$ = 0       ! Averaged, bmad_standard kernel m
                                               !   (the unset default).
 integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode.
 
-complex(rp), allocatable, private, save :: fel_k2(:,:)        ! -i (kx^2+ky^2)/(2 ks), FFT order.
-complex(rp), allocatable, private, save :: fel_exp_k2(:,:)    ! exp(K2 * dz), the step propagator.
-integer, private, save :: fel_cache_ngrid = 0
-real(rp), private, save :: fel_cache_dgrid = 0, fel_cache_ks = 0, fel_cache_dz = 0
+type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
 contains
 
@@ -316,7 +342,7 @@ end function fel_field_index
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_apply_slippage (slip, wf, slippage)
+! Subroutine fel_apply_slippage (slip, wf, slippage, bank, harm)
 !
 ! Routine to account the slippage of one step and rotate the field record when it
 ! crosses a slice boundary. Transcribed from Control::applySlippage (fel-physics.tex
@@ -343,16 +369,28 @@ end function fel_field_index
 !   slip, wf    -- Updated state and rotated record.
 !-
 
-subroutine fel_apply_slippage (slip, wf, slippage, bank)
+subroutine fel_apply_slippage (slip, wf, slippage, bank, harm)
 
 type (fel_slip_struct) slip
 type (wavefront_struct) wf
 type (fel_bank_struct), optional :: bank
-real(rp) slippage
+integer, optional :: harm
+real(rp) slippage, t_slice
 complex(wf_rp), allocatable :: grow(:,:,:)
 integer nslice, last, direction
 
 !
+
+! The transmitted slice's light time, for the escape bank: slice_spacing / c. For a
+! harmonic field wf%wavelength is the fundamental's / harm while sample stays in
+! fundamental units (every field shares the window and rotates in lockstep), so the
+! product must be scaled back up by harm. harm absent or 1 leaves the fundamental's
+! expression untouched.
+
+t_slice = (slip%sample * wf%wavelength / c_light)
+if (present(harm)) then
+  if (harm /= 1) t_slice = t_slice * harm
+endif
 
 if (present(bank)) bank%n = 0
 if (.not. slip%timerun) return
@@ -378,10 +416,10 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   ! the beam; the unaveraged mode, whose ledger this feeds, refuses them by name.
 
   slip%u_escaped = slip%u_escaped + sum(real(wf%Ex(:,:,last+1), rp)**2 + aimag(wf%Ex(:,:,last+1))**2) &
-                     * wf%dx**2 / (2 * (mu_0_vac * c_light)) * (slip%sample * wf%wavelength / c_light)
+                     * wf%dx**2 / (2 * (mu_0_vac * c_light)) * t_slice
   if (allocated(wf%Ey)) then
     slip%u_escaped = slip%u_escaped + sum(real(wf%Ey(:,:,last+1), rp)**2 + aimag(wf%Ey(:,:,last+1))**2) &
-                       * wf%dx**2 / (2 * (mu_0_vac * c_light)) * (slip%sample * wf%wavelength / c_light)
+                       * wf%dx**2 / (2 * (mu_0_vac * c_light)) * t_slice
   endif
 
   ! Bank the light itself when asked: the transmitted slice, copied before the zero.
@@ -521,38 +559,39 @@ end function faw2
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_track_und_step (und, beam, wf, slip, err_flag)
+! Subroutine fel_track_und_step (und, beam, ff, coll, err_flag)
 !
-! Routine to advance the whole beam and field one integration step of length und%dz
-! inside an undulator segment, in Genesis's order: transverse half step, longitudinal RK4
-! (gathering the field of this moment and holding it through the stages), transverse half
-! step, then source deposition and field solve. The common phase phi0 advances once per
-! step, with the undulator's ku as the reference wavenumber. Each beam slice couples to
-! its field slice through fel_field_index. Slippage is NOT applied here -- the caller
+! Routine to advance the whole beam and the field set one integration step of length
+! und%dz inside an undulator segment, in Genesis's order: transverse half step,
+! longitudinal RK4 (gathering every field of this moment and holding the couplings
+! through the stages), transverse half step, then source deposition and field solve per
+! field, harmonic loop outermost. The common phase phi0 advances once per step, with
+! the undulator's ku as the reference wavenumber. Each beam slice couples to its field
+! slice through fel_field_index per field. Slippage is NOT applied here -- the caller
 ! owns the schedule and calls fel_apply_slippage after this step (Gencore's step 5).
 !
 ! Input:
 !   und         -- fel_und_struct: Segment parameters.
 !   beam        -- fel_beam_struct: The beam. Steady state: one slice.
-!   wf          -- wavefront_struct: The field [V/m], one slice per beam slice.
-!   slip        -- fel_slip_struct: Rotation state of the field record.
+!   ff          -- fel_field_struct(:): The field set [V/m]; entry 1 the fundamental,
+!                    one field slice per beam slice each.
+!   coll        -- fel_collective_struct: Collective-effects state.
 !
 ! Output:
-!   beam, wf    -- Advanced one step.
+!   beam, ff    -- Advanced one step.
 !   err_flag    -- logical: Set True on error.
 !-
 
-subroutine fel_track_und_step (und, beam, wf, slip, coll, err_flag)
+subroutine fel_track_und_step (und, beam, ff, coll, err_flag)
 
 type (fel_und_struct) und
 type (fel_beam_struct), target :: beam
-type (wavefront_struct) wf
-type (fel_slip_struct) slip
+type (fel_field_struct), target :: ff(:)
 type (fel_collective_struct) coll
 logical err_flag
 
 real(rp) ks, phi0_new
-integer is, nslice, ngrid_arr(3)
+integer is, io, nslice, nslice_f, ngrid_arr(3)
 logical any_err, err
 character(*), parameter :: r_name = 'fel_track_und_step'
 
@@ -563,25 +602,31 @@ err_flag = .true.
 call fel_assert_averaged_chart (beam, r_name, err)
 if (err) return
 
-nslice = size(wf%Ex, 3)
+nslice = size(ff(1)%wf%Ex, 3)
 if (size(beam%slice) /= nslice) then
   call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES BUT THE FIELD RECORD HAS \i0\ .', &
                                  i_array = [size(beam%slice), nslice])
   return
 endif
 
-ks = twopi / wf%wavelength
+! ks, phi0 and the slippage schedule are all FUNDAMENTAL quantities (field 1); a
+! harmonic field enters only through its coupling fc(h), its phase h*theta and its own
+! diffraction kernel.
+
+ks = twopi / ff(1)%wf%wavelength
 phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 
 ! Everything cross-slice happens serially here, before and between the parallel loops:
-! the phi0 advance above, the kernel build and the long-range space-charge profile
+! the phi0 advance above, the kernel builds and the long-range space-charge profile
 ! below, and slippage in the caller. Inside the loops each slice touches only its own
 ! particle arrays and its own field slice (the beam-to-field mapping is a bijection),
 ! and each slice's arithmetic is independent of which thread runs it, so results are
 ! bit-identical across thread counts -- the check the benchmark harness holds.
 
-ngrid_arr = wavefront_shape(wf)
-call fel_field_kernel_init (ngrid_arr(1), wf%dx, ks, und%dz)
+do io = 1, size(ff)
+  ngrid_arr = wavefront_shape(ff(io)%wf)
+  call fel_field_kernel_init (ngrid_arr(1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz)
+enddo
 
 if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(nslice))
 call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_esc)
@@ -598,8 +643,7 @@ do is = 1, size(beam%slice)
   else
     call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
   endif
-  call fel_advance (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, phi0_new, &
-                    coll, is)
+  call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is)
   call fel_wake_apply_slice (coll%wake, beam, is, und%dz)
   if (und%bmad_transport) then
     call fel_transverse_track_bmad (und, beam, beam%slice(is), und%dz/2, .false.)
@@ -611,14 +655,21 @@ enddo
 
 beam%phi0 = phi0_new
 
-any_err = .false.
-!$OMP parallel do private(err) reduction(.or.: any_err)
-do is = 1, size(beam%slice)
-  call fel_field_step (und, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), und%dz, err)
-  any_err = any_err .or. err
+! Field solve, harmonic loop outermost (each pass is self-contained; brief 6.1). The
+! deposit reads the just-advanced particles, so every field sees the same beam state.
+
+do io = 1, size(ff)
+  nslice_f = size(ff(io)%wf%Ex, 3)
+  any_err = .false.
+  !$OMP parallel do private(err) reduction(.or.: any_err)
+  do is = 1, size(beam%slice)
+    call fel_field_step (und, beam, beam%slice(is), ff(io)%wf, &
+                         fel_field_index(ff(io)%slip, is, nslice_f), und%dz, ff(io)%harm, ks, err)
+    any_err = any_err .or. err
+  enddo
+  !$OMP end parallel do
+  if (any_err) return
 enddo
-!$OMP end parallel do
-if (any_err) return
 
 err_flag = .false.
 
@@ -628,7 +679,7 @@ end subroutine fel_track_und_step
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_track_interlude_genesis (qf, length, beam, wf, slip, coll, err_flag)
+! Subroutine fel_track_interlude_genesis (qf, length, beam, ff, coll, err_flag)
 !
 ! Routine to advance one field-free interlude element -- a drift or a quadrupole -- the
 ! way Genesis does it, as one integration step: transverse half step, the longitudinal
@@ -651,12 +702,12 @@ end subroutine fel_track_und_step
 ! production configuration is the seam.
 !-
 
-subroutine fel_track_interlude_genesis (qf, length, beam, wf, slip, coll, err_flag)
+subroutine fel_track_interlude_genesis (qf, length, beam, ff, coll, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
-type (wavefront_struct), target :: wf
-type (fel_slip_struct) slip
+type (fel_field_struct), target :: ff(:)
+type (wavefront_struct), pointer :: wf
 type (fel_collective_struct) coll
 real(rp) qf, length
 logical err_flag
@@ -664,13 +715,14 @@ logical err_flag
 type (fel_und_struct) und0
 real(rp) xks, xku, qquad, phi0_new, gamma0, p0_mc
 real(rp) px_g, py_g, gam, beta, theta, btpar, btpar0, slope, q_hat, p_mc
-integer is, ip, nslice, ngrid_arr(3)
+integer is, io, ip, nslice, nslice_f, ngrid_arr(3)
 logical err, any_err, sc_active
 
 !
 
 err_flag = .true.
 
+wf => ff(1)%wf                                    ! The fundamental sets the beam side.
 gamma0 = fel_gamma0(beam)                         ! Genesis's gammaref.
 p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
@@ -734,21 +786,28 @@ beam%phi0 = phi0_new
 ! Field diffraction: Genesis's kernel, zero source (aw = 0 makes the coupling exactly
 ! zero, matching Genesis skipping the deposition when not in an undulator). The beam
 ! slice to field slice mapping is a bijection, so looping beam slices covers every field
-! slice exactly once. Kernel built serially first: a lattice can open with an interlude,
-! so this routine cannot rely on an undulator step having initialized it.
+! slice exactly once. Kernels built serially first: a lattice can open with an interlude,
+! so this routine cannot rely on an undulator step having initialized them. Harmonic
+! loop outermost, each field diffracting at its own wavelength.
 
-ngrid_arr = wavefront_shape(wf)
-call fel_field_kernel_init (ngrid_arr(1), wf%dx, xks, length)
+do io = 1, size(ff)
+  ngrid_arr = wavefront_shape(ff(io)%wf)
+  call fel_field_kernel_init (ngrid_arr(1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, length)
+enddo
 
 und0%aw = 0
-any_err = .false.
-!$OMP parallel do private(err) reduction(.or.: any_err)
-do is = 1, size(beam%slice)
-  call fel_field_step (und0, beam, beam%slice(is), wf, fel_field_index(slip, is, nslice), length, err)
-  any_err = any_err .or. err
+do io = 1, size(ff)
+  nslice_f = size(ff(io)%wf%Ex, 3)
+  any_err = .false.
+  !$OMP parallel do private(err) reduction(.or.: any_err)
+  do is = 1, size(beam%slice)
+    call fel_field_step (und0, beam, beam%slice(is), ff(io)%wf, &
+                         fel_field_index(ff(io)%slip, is, nslice_f), length, ff(io)%harm, xks, err)
+    any_err = any_err .or. err
+  enddo
+  !$OMP end parallel do
+  if (any_err) return
 enddo
-!$OMP end parallel do
-if (any_err) return
 
 err_flag = .false.
 
@@ -1023,9 +1082,12 @@ end subroutine fel_apply_focus
 ! Routine to advance the longitudinal plane of every particle over delz. Transcribed from
 ! BeamSolver::advance: gather the field at (x, y) by bilinear interpolation from field
 ! slice ifld (the rotated-record index, fel_field_index), form
-! rpart = (fc(1)/ks)*faw*conj(E), and integrate (theta, gamma) by the verbatim RK4 with
-! rpart, px, py, faw AND the space-charge ez held fixed through the stages. ez per
-! particle is fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
+! rpart = (fc(h)/ks)*faw*conj(E_h) per field of the set ff (the fundamental is entry 1;
+! a single-entry set takes the pre-harmonic scalar path verbatim), and integrate
+! (theta, gamma) by the verbatim RK4 with the rpart set, px, py, faw AND the
+! space-charge ez held fixed through the stages; the harmonic phases h*theta are live
+! per stage (fel_ode_multi). ez per particle is
+! fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
 ! ez = getEField(ip) + eloss (fel-physics.tex sec:eom, sec:spacecharge); is is this
 ! slice's beam index.
 !
@@ -1034,24 +1096,32 @@ end subroutine fel_apply_focus
 ! this chart change is exact for RK4 and ~1 ulp for the energy.
 !-
 
-subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new, coll, is)
+subroutine fel_advance (und, beam, sl, ff, delz, phi0_new, coll, is)
 
 type (fel_und_struct) und
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
-type (wavefront_struct) wf
+type (fel_field_struct), target :: ff(:)
+type (wavefront_struct), pointer :: wf
 type (fel_collective_struct) coll
-integer ifld, is
+integer is
 real(rp) delz, phi0_new
 
 real(rp) xks, xku, aw, rtmp, awloc, btpar, gamma, theta, beta, wx, wy, px_g, py_g, p_mc, p0_mc
 real(rp) gz2, ez_ip, esc_loss
 real(rp), allocatable :: ez(:)
+real(rp) rtmp_h(size(ff)), rharm(size(ff))
 complex(rp) cpart, rpart
-integer ip, ix, iy
+complex(rp) rpart_h(size(ff))
+integer ip, ix, iy, ifld, io, nf
+integer ifld_h(size(ff))
 logical on_grid
 
 !
+
+nf = size(ff)
+wf => ff(1)%wf
+ifld = fel_field_index(ff(1)%slip, is, size(wf%Ex, 3))
 
 p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
@@ -1074,51 +1144,104 @@ if (allocated(coll%long_esc)) esc_loss = -coll%long_esc(is) / m_electron
 
 rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
 
-do ip = 1, sl%n
-  p_mc = p0_mc * (1 + sl%pz(ip))         ! gamma and beta = P/gamma share one sqrt,
-  gamma = sqrt(p_mc**2 + 1)              ! bit-identical to fel_gamma_of/fel_beta_of.
-  beta = p_mc / gamma
-  theta = beam%phi0 + xks * sl%z(ip) / beta
+if (nf == 1) then
 
-  awloc = faw(und, sl%x(ip), sl%y(ip))
-  px_g = sl%px(ip) * p0_mc
-  py_g = sl%py(ip) * p0_mc
-  btpar = 1 + px_g*px_g + py_g*py_g + aw*aw*awloc*awloc
+  ! Single field (all pre-harmonic decks): the pre-field-set body, verbatim.
 
-  call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
-  if (on_grid) then
-    cpart =         wf%Ex(ix,   iy,   ifld) * wx * wy
-    cpart = cpart + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
-    cpart = cpart + wf%Ex(ix,   iy+1, ifld) * wx * (1-wy)
-    cpart = cpart + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
+  do ip = 1, sl%n
+    p_mc = p0_mc * (1 + sl%pz(ip))         ! gamma and beta = P/gamma share one sqrt,
+    gamma = sqrt(p_mc**2 + 1)              ! bit-identical to fel_gamma_of/fel_beta_of.
+    beta = p_mc / gamma
+    theta = beam%phi0 + xks * sl%z(ip) / beta
 
-    ! Two live polarizations: the element couples to E_eff = conj(pol).E (manual
-    ! sec:field). With one polarization pol = (1,0) and this branch never runs, so
-    ! single-polarization arithmetic is untouched.
+    awloc = faw(und, sl%x(ip), sl%y(ip))
+    px_g = sl%px(ip) * p0_mc
+    py_g = sl%py(ip) * p0_mc
+    btpar = 1 + px_g*px_g + py_g*py_g + aw*aw*awloc*awloc
 
-    if (allocated(wf%Ey)) then
-      cpart = conjg(und%pol(1)) * cpart
-      cpart = cpart + conjg(und%pol(2)) * (wf%Ey(ix,   iy,   ifld) * wx * wy &
-                                         + wf%Ey(ix+1, iy,   ifld) * (1-wx) * wy &
-                                         + wf%Ey(ix,   iy+1, ifld) * wx * (1-wy) &
-                                         + wf%Ey(ix+1, iy+1, ifld) * (1-wx) * (1-wy))
+    call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
+    if (on_grid) then
+      cpart =         wf%Ex(ix,   iy,   ifld) * wx * wy
+      cpart = cpart + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
+      cpart = cpart + wf%Ex(ix,   iy+1, ifld) * wx * (1-wy)
+      cpart = cpart + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
+
+      ! Two live polarizations: the element couples to E_eff = conj(pol).E (manual
+      ! sec:field). With one polarization pol = (1,0) and this branch never runs, so
+      ! single-polarization arithmetic is untouched.
+
+      if (allocated(wf%Ey)) then
+        cpart = conjg(und%pol(1)) * cpart
+        cpart = cpart + conjg(und%pol(2)) * (wf%Ey(ix,   iy,   ifld) * wx * wy &
+                                           + wf%Ey(ix+1, iy,   ifld) * (1-wx) * wy &
+                                           + wf%Ey(ix,   iy+1, ifld) * wx * (1-wy) &
+                                           + wf%Ey(ix+1, iy+1, ifld) * (1-wx) * (1-wy))
+      endif
+      rpart = rtmp * awloc * conjg(cpart)
+    else
+      rpart = 0
     endif
-    rpart = rtmp * awloc * conjg(cpart)
-  else
-    rpart = 0
-  endif
 
-  ez_ip = ez(ip) + esc_loss     ! Short range plus the long-range loss (sec:spacecharge).
-  call fel_runge_kutta (delz, xks, xku, btpar, rpart, ez_ip, gamma, theta)
+    ez_ip = ez(ip) + esc_loss     ! Short range plus the long-range loss (sec:spacecharge).
+    call fel_runge_kutta (delz, xks, xku, btpar, rpart, ez_ip, gamma, theta)
 
-  ! Back to the stored chart: pz from gamma (the subtraction is exact once p_mc is
-  ! formed), z from tau = (phi0_new - theta)/ks with the updated beta.
+    ! Back to the stored chart: pz from gamma (the subtraction is exact once p_mc is
+    ! formed), z from tau = (phi0_new - theta)/ks with the updated beta.
 
-  p_mc = sqrt(gamma**2 - 1)
-  sl%pz(ip) = (p_mc - p0_mc) / p0_mc
-  beta = p_mc / gamma
-  sl%z(ip) = -beta * (phi0_new - theta) / xks
-enddo
+    p_mc = sqrt(gamma**2 - 1)
+    sl%pz(ip) = (p_mc - p0_mc) / p0_mc
+    beta = p_mc / gamma
+    sl%z(ip) = -beta * (phi0_new - theta) / xks
+  enddo
+
+else
+
+  ! The field set: every field works the beam at once, BeamSolver::advance's structure
+  ! -- per-field coupling fc(h) and record index held outside the particle loop, the
+  ! per-field rpart (coupling times that field's interpolated amplitude, no phase) held
+  ! through the RK stages, and the harmonic phase h*theta applied per stage inside
+  ! fel_ode_multi (BeamSolver.cpp:24-30,150).
+
+  do io = 1, nf
+    rtmp_h(io) = fel_und_coupling(und, ff(io)%harm) / (sqrt(2.0_rp) * m_electron)
+    rharm(io) = ff(io)%harm
+    ifld_h(io) = fel_field_index(ff(io)%slip, is, size(ff(io)%wf%Ex, 3))
+  enddo
+
+  do ip = 1, sl%n
+    p_mc = p0_mc * (1 + sl%pz(ip))
+    gamma = sqrt(p_mc**2 + 1)
+    beta = p_mc / gamma
+    theta = beam%phi0 + xks * sl%z(ip) / beta
+
+    awloc = faw(und, sl%x(ip), sl%y(ip))
+    px_g = sl%px(ip) * p0_mc
+    py_g = sl%py(ip) * p0_mc
+    btpar = 1 + px_g*px_g + py_g*py_g + aw*aw*awloc*awloc
+
+    do io = 1, nf
+      call fel_grid_weights (ff(io)%wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
+      if (on_grid) then
+        cpart =         ff(io)%wf%Ex(ix,   iy,   ifld_h(io)) * wx * wy
+        cpart = cpart + ff(io)%wf%Ex(ix+1, iy,   ifld_h(io)) * (1-wx) * wy
+        cpart = cpart + ff(io)%wf%Ex(ix,   iy+1, ifld_h(io)) * wx * (1-wy)
+        cpart = cpart + ff(io)%wf%Ex(ix+1, iy+1, ifld_h(io)) * (1-wx) * (1-wy)
+        rpart_h(io) = rtmp_h(io) * awloc * conjg(cpart)
+      else
+        rpart_h(io) = 0
+      endif
+    enddo
+
+    ez_ip = ez(ip) + esc_loss
+    call fel_runge_kutta_multi (delz, xks, xku, btpar, rpart_h, rharm, ez_ip, gamma, theta)
+
+    p_mc = sqrt(gamma**2 - 1)
+    sl%pz(ip) = (p_mc - p0_mc) / p0_mc
+    beta = p_mc / gamma
+    sl%z(ip) = -beta * (phi0_new - theta) / xks
+  enddo
+
+endif
 
 end subroutine fel_advance
 
@@ -1230,6 +1353,118 @@ end subroutine fel_ode
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_runge_kutta_multi (delz, xks, xku, btpar, rpart, rharm, ez, gamma, theta)
+!
+! The field-set form of fel_runge_kutta: identical RK4 stage bookkeeping
+! (BeamSolver::RungeKutta), with the slope summing every field's contribution at that
+! field's harmonic phase (fel_ode_multi). The single-field walk never calls this --
+! fel_advance keeps the scalar path verbatim -- so the pre-harmonic arithmetic is
+! untouched by construction.
+!-
+
+subroutine fel_runge_kutta_multi (delz, xks, xku, btpar, rpart, rharm, ez, gamma, theta)
+
+real(rp) delz, xks, xku, btpar, ez, gamma, theta
+real(rp) rharm(:)
+complex(rp) rpart(:)
+real(rp) k2gg, k2pp, k3gg, k3pp, stpz
+
+! first step
+
+k2gg = 0
+k2pp = 0
+
+call fel_ode_multi (gamma, theta, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
+
+! second step
+
+stpz = 0.5_rp * delz
+
+gamma = gamma + stpz * k2gg
+theta = theta + stpz * k2pp
+
+k3gg = k2gg
+k3pp = k2pp
+
+k2gg = 0
+k2pp = 0
+
+call fel_ode_multi (gamma, theta, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
+
+! third step
+
+gamma = gamma + stpz * (k2gg - k3gg)
+theta = theta + stpz * (k2pp - k3pp)
+
+k3gg = k3gg / 6
+k3pp = k3pp / 6
+
+k2gg = k2gg * (-0.5_rp)
+k2pp = k2pp * (-0.5_rp)
+
+call fel_ode_multi (gamma, theta, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
+
+! fourth step
+
+stpz = delz
+
+gamma = gamma + stpz * k2gg
+theta = theta + stpz * k2pp
+
+k3gg = k3gg - k2gg
+k3pp = k3pp - k2pp
+
+k2gg = k2gg * 2
+k2pp = k2pp * 2
+
+call fel_ode_multi (gamma, theta, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
+
+gamma = gamma + stpz * (k3gg + k2gg / 6.0_rp)
+theta = theta + stpz * (k3pp + k2pp / 6.0_rp)
+
+end subroutine fel_runge_kutta_multi
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_ode_multi (tgam, tthet, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
+!
+! The longitudinal equations of motion over a field set, BeamSolver::ODE verbatim:
+! ctmp sums rpart(i) * exp(-i * rharm(i) * theta) over the fields at the CURRENT stage
+! theta -- the couplings held fixed through the stages, the harmonic phases live
+! (BeamSolver.cpp:150). xks is the FUNDAMENTAL wavenumber (the theta equation is the
+! fundamental's; harmonics enter the slope only through ctmp).
+!-
+
+subroutine fel_ode_multi (tgam, tthet, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
+
+real(rp) tgam, tthet, xks, xku, btpar, ez, k2gg, k2pp
+real(rp) rharm(:)
+complex(rp) rpart(:), ctmp
+real(rp) ztemp1, btper0, btpar0
+integer i
+
+!
+
+ztemp1 = -2.0_rp / xks
+ctmp = 0
+do i = 1, size(rpart)
+  ctmp = ctmp + rpart(i) * cmplx(cos(rharm(i) * tthet), -sin(rharm(i) * tthet), rp)
+enddo
+
+btper0 = btpar + ztemp1 * real(ctmp, rp)
+btpar0 = sqrt(1 - btper0 / (tgam * tgam))
+
+k2pp = k2pp + xks * (1 - 1/btpar0) + xku
+k2gg = k2gg + aimag(ctmp) / btpar0 / tgam - ez
+
+end subroutine fel_ode_multi
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_grid_weights (wf, x, y, ix, iy, wx, wy, on_grid)
 !
 ! Routine to map a particle position to its lower-left grid cell corner and bilinear
@@ -1287,20 +1522,20 @@ end subroutine fel_grid_weights
 ! with the bilinear weights, added times 2 in real space after the transform pair.
 !-
 
-subroutine fel_field_step (und, beam, sl, wf, ifld, delz, err_flag)
+subroutine fel_field_step (und, beam, sl, wf, ifld, delz, harm, xks1, err_flag)
 
 type (fel_und_struct) und
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (wavefront_struct), target :: wf
-integer ifld
-real(rp) delz
+integer ifld, harm
+real(rp) delz, xks1
 logical err_flag
 
 real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc
 complex(rp) cpart
 complex(rp), allocatable :: crsource(:,:)    ! Per-call source accumulator: thread safe.
-integer ip, ix, iy, ngrid_arr(3), ngrid
+integer ip, ix, iy, ngrid_arr(3), ngrid, ik
 logical on_grid, err
 character(*), parameter :: r_name = 'fel_field_step'
 
@@ -1317,8 +1552,8 @@ p0_mc = fel_p0_mc(beam)
 ! The kernel is read-only here; a rebuild would race with concurrent slices. The caller
 ! initializes it serially (fel_field_kernel_init); a mismatch is a caller bug.
 
-if (ngrid /= fel_cache_ngrid .or. dgrid /= fel_cache_dgrid .or. xks /= fel_cache_ks .or. &
-    delz /= fel_cache_dz) then
+ik = fel_kernel_index(ngrid, dgrid, xks, delz)
+if (ik == 0) then
   call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID AND STEP. ' // &
                                  'CALL fel_field_kernel_init FIRST (SERIALLY).')
   return
@@ -1327,7 +1562,7 @@ endif
 allocate (crsource(ngrid, ngrid))
 crsource = 0
 
-scl_w = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
+scl_w = fel_und_coupling(und, harm) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
 scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
 
 if (scl_w /= 0) then
@@ -1338,7 +1573,14 @@ if (scl_w /= 0) then
     p_mc = p0_mc * (1 + sl%pz(ip))
     gam = sqrt(p_mc**2 + 1)
     beta = p_mc / gam
-    theta = beam%phi0 + xks * sl%z(ip) / beta          ! harm = 1: theta not scaled.
+
+    ! The fundamental ponderomotive phase (xks1 = the FUNDAMENTAL wavenumber, passed by
+    ! the caller so a harmonic field never reconstructs it from its own wavelength's
+    ! rounding), scaled to harm*theta for a harmonic source -- FieldSolver.cpp's
+    ! theta = harm * particle.theta. harm = 1 leaves the phase untouched.
+
+    theta = beam%phi0 + xks1 * sl%z(ip) / beta
+    if (harm /= 1) theta = harm * theta
 
     part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * scl_w * sl%weight(ip) / gam
     cpart = cmplx(sin(theta), cos(theta), rp) * part
@@ -1354,7 +1596,7 @@ endif
 ! plus 2*crsource in real space.
 
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
-wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_exp_k2
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
 
 if (allocated(wf%Ey)) then
@@ -1364,7 +1606,7 @@ if (allocated(wf%Ey)) then
 
   wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(1) * crsource
   call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
-  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_exp_k2
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2
   call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
   wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(2) * crsource
 else
@@ -1398,7 +1640,9 @@ subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz)
 integer ngrid
 real(rp) dgrid, ks, dz
 real(rp) dk, shift, dx, dy
-integer ix, iy, iix, iiy
+type (fel_kernel_struct), allocatable :: grow(:)
+type (fel_kernel_struct), pointer :: kn
+integer ix, iy, iix, iiy, ik
 logical err
 
 !
@@ -1411,11 +1655,29 @@ logical err
 
 call wavefront_fft2_plan_threads (ngrid, ngrid, err)
 
-if (ngrid == fel_cache_ngrid .and. dgrid == fel_cache_dgrid .and. ks == fel_cache_ks .and. &
-    dz == fel_cache_dz) return
+! One cache entry per wavelength: find this ks's entry (rebuilding it when the grid or
+! the step changed, exactly the single-entry behavior each wavelength saw before), or
+! append a new one. A single-field run lives entirely in entry 1.
 
-if (allocated(fel_k2)) deallocate(fel_k2, fel_exp_k2)
-allocate (fel_k2(ngrid, ngrid), fel_exp_k2(ngrid, ngrid))
+if (.not. allocated(fel_kernels)) allocate (fel_kernels(0))
+
+do ik = 1, size(fel_kernels)
+  if (fel_kernels(ik)%ks /= ks) cycle
+  if (fel_kernels(ik)%ngrid == ngrid .and. fel_kernels(ik)%dgrid == dgrid .and. &
+      fel_kernels(ik)%dz == dz) return
+  exit
+enddo
+
+if (ik > size(fel_kernels)) then
+  call move_alloc (fel_kernels, grow)
+  allocate (fel_kernels(size(grow) + 1))
+  fel_kernels(1:size(grow)) = grow
+  deallocate (grow)
+endif
+
+kn => fel_kernels(ik)
+if (allocated(kn%k2)) deallocate(kn%k2, kn%exp_k2)
+allocate (kn%k2(ngrid, ngrid), kn%exp_k2(ngrid, ngrid))
 
 dk = twopi / (ngrid * dgrid)
 shift = -0.5_rp * (ngrid - 1)
@@ -1426,18 +1688,45 @@ do iy = 0, ngrid-1
     dx = ix + shift
     iiy = mod(iy + (ngrid+1)/2, ngrid)
     iix = mod(ix + (ngrid+1)/2, ngrid)
-    fel_k2(iix+1, iiy+1) = cmplx(0.0_rp, -(dx*dx + dy*dy) * dk * dk / 2 / ks, rp)
+    kn%k2(iix+1, iiy+1) = cmplx(0.0_rp, -(dx*dx + dy*dy) * dk * dk / 2 / ks, rp)
   enddo
 enddo
 
-fel_exp_k2 = exp(fel_k2 * dz)
+kn%exp_k2 = exp(kn%k2 * dz)
 
-fel_cache_ngrid = ngrid
-fel_cache_dgrid = dgrid
-fel_cache_ks = ks
-fel_cache_dz = dz
+kn%ngrid = ngrid
+kn%dgrid = dgrid
+kn%ks = ks
+kn%dz = dz
 
 end subroutine fel_field_kernel_init
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_kernel_index (ngrid, dgrid, ks, dz) result (ik)
+!
+! Look up the cached kernel entry matching all four keys exactly; 0 on a miss.
+! Read-only, so callable from inside the parallel slice loops.
+!-
+
+function fel_kernel_index (ngrid, dgrid, ks, dz) result (ik)
+
+integer ngrid, ik
+real(rp) dgrid, ks, dz
+
+!
+
+if (allocated(fel_kernels)) then
+  do ik = 1, size(fel_kernels)
+    if (fel_kernels(ik)%ngrid == ngrid .and. fel_kernels(ik)%dgrid == dgrid .and. &
+        fel_kernels(ik)%ks == ks .and. fel_kernels(ik)%dz == dz) return
+  enddo
+endif
+ik = 0
+
+end function fel_kernel_index
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1461,7 +1750,7 @@ real(rp) dz
 logical err_flag
 
 real(rp) xks, dgrid
-integer ngrid_arr(3), ngrid
+integer ngrid_arr(3), ngrid, ik
 logical err
 character(*), parameter :: r_name = 'fel_field_diffract'
 
@@ -1474,21 +1763,21 @@ ngrid = ngrid_arr(1)
 xks = twopi / wf%wavelength
 dgrid = wf%dx
 
-if (ngrid /= fel_cache_ngrid .or. dgrid /= fel_cache_dgrid .or. xks /= fel_cache_ks .or. &
-    dz /= fel_cache_dz) then
+ik = fel_kernel_index(ngrid, dgrid, xks, dz)
+if (ik == 0) then
   call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID. ' // &
                                  'CALL fel_field_kernel_init FIRST (SERIALLY).')
   return
 endif
 
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
-wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_exp_k2
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
 wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
 
 if (allocated(wf%Ey)) then      ! Diffraction is polarization-diagonal.
   call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
-  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_exp_k2
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2
   call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
   wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp)
 endif

@@ -906,6 +906,81 @@ components at $10^{-4}$; thread byte-identity; helical re-anchor $7\times10^{-15
 tilt on helical and tilt with the transcribed maps refused by name.
 \end{validation}
 
+\subsection{The field set: harmonic radiation}\label{sec:field-set}
+
+The walk carries an ordered SET of radiation fields (\code{fel\_field\_struct}:
+harmonic number, wavefront, slippage state, escape bank -- Genesis's
+\code{vector<Field*>}), with the fundamental always entry~1: the ponderomotive
+phase, the \code{phi0} advance and the slippage schedule are all defined against it.
+A harmonic field $h$ carries wavelength $\lambda_1/h$ and enters the physics in
+exactly three places: its coupling $f_c(h)$ (the Bessel factor of
+\S\ref{sec:coupling}; zero for every harmonic of a helical device), the harmonic
+ponderomotive phase $h\theta$ -- live per Runge--Kutta stage in the kick
+(\code{BeamSolver::ODE}'s $\sum_i r_i e^{-ih_i\theta}$) and scaling the deposit
+phase (\code{FieldSolver.cpp}'s $\theta_h = h\,\theta$) -- and its own diffraction
+kernel and escape accounting at $\lambda_1/h$. In the V/m field
+convention no other factor appears: Genesis's per-field $k_{s,h}$ factors in kick
+and deposit are exactly its per-field internal unit conversion, which this
+formulation absorbed once (\S\ref{sec:units}). Every field shares the time window,
+so all slippage states advance in fundamental-wavelength units and the records
+rotate in lockstep (one \code{Control::sample}); harmonic fields start dark and
+grow from the bunching the beam carries, or import. A single-entry set is the
+pre-harmonic walk, bit for bit -- the same overlay discipline as
+\S\ref{sec:vector}, and the two are not yet validated together: harmonic fields
+with two live polarizations, and with an unaveraged element (the unaveraged mode
+carries the fundamental envelope only), are refused by name.
+
+Validation (\code{check\_harmonics.py}, ninth harness section): a planar
+steady-state segment at the benchmark's $\gamma$, $\lambda$ and rms $a_w$, both
+codes tracking the same Genesis-written start with a dark third-harmonic field --
+fundamental power to $5.3\times10^{-8}$, harmonic growth to $1.3\times10^{-4}$ of
+its curve maximum; a one-step dark restart from a hard-bunched beam, whose exit
+$P_3/P_1$ the exact deposit sum (Bessel $f_c$, $h\theta$, bilinear weights, from
+the dumped particles) reproduces at $3.3\times10^{-16}$; thread byte-identity on a
+time-dependent harmonic run; refusals by name. \code{examples/harmonics/} is the
+runnable instance.
+
+\subsection{The openPMD wavefront}\label{sec:openpmd}
+
+Radiation dumps speak two formats, selected by \code{wavefront\_format}: the
+Genesis 1.3 v4 field dump (the default -- the validation tiers' shared-state
+format; one polarization per file, harmonic files carrying \code{-h<h>}) and the
+openPMD \code{Wavefront} extension (\code{EXT\_Wavefront.md}, standard branch
+\code{upcoming-2.0.0} -- THE STANDARD DOCUMENT IS AUTHORITATIVE; the harness
+verifies the written attributes against its text independently of the writer).
+Import auto-detects the format by the \code{openPMD} root-attribute signature;
+per-harmonic openPMD imports are matched to the field whose photon energy they
+carry, and a file matching none is refused by name.
+
+The mapping, one decision per row where the extension's text under-determines the
+file (each also recorded for upstream in \code{bsim/fel/openpmd/UPSTREAM-NOTES.md}):
+
+\begin{center}
+\begin{tabular}{ll}
+one mesh record \code{electricField} & complex compound $\{r,i\}$ components
+\code{x}, \code{y} (V/m); \\
+& both polarizations in ONE file; \code{z} never written (paraxial) \\
+required attributes & ON THE MESH RECORD (the extension's heading; its body says \\
+& ``series'' -- resolved for the record: \code{photonEnergy} is per field) \\
+\code{photonEnergy} & $h_{\rm Planck} c/\lambda$ in JOULES; identifies the harmonic \\
+\code{temporalDomain}, \code{spatialDomain} & \code{time} (field in
+V/m) and \code{r} only; the rest refused by name \\
+slice axis & a MESH axis (slices are simultaneous; the iteration is not time): \\
+& stored order $(z,y,x)$, declared by \code{axisLabels}, zero-copy for \\
+& Fortran and numpy alike; one iteration per file \\
+harmonics & one file per harmonic (the record name is fixed by the extension) \\
+\end{tabular}
+\end{center}
+
+Validation: every required attribute and \code{unitDimension} checked against the
+spec text in h5py; Genesis-format and openPMD dumps of the same field agree
+complex-value-wise at $1.4\times10^{-16}$; the Fortran reader's re-dump is
+dataset-identical to the original; the openPMD-beamphysics \code{Wavefront} class
+agrees on the field energy through its own Genesis path at $1.2\times10^{-12}$;
+and the carried Python patch (\code{bsim/fel/openpmd/}, the class's future
+\code{from\_openpmd}/\code{write\_openpmd}) reads and round-trips the files
+exactly, exercised every harness run.
+
 \section{Diagnostic output}\label{sec:stats}
 
 \emph{The stats file} \code{<out\_root>.stats.h5} carries the production statistics in
