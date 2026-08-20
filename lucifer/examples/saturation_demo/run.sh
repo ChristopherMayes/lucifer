@@ -10,14 +10,14 @@
 #
 # Methodology: an untimed Genesis prep run (same ranks, same seed, no &track) writes
 # the shared initial dumps; wall times come from one external clock (/usr/bin/time -p);
-# check_agreement.py must pass before any timing or figure is produced. The window is
+# check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
 # decks stay static. Measured results: the "The saturation demo" section of
 # bsim/fel/README.md.
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]
 #                  [--python <path>] [--work-dir <path>]
-# Outputs land in ./output (or --work-dir), figure included: output/sat-demo.png.
+# Outputs land in ./output (or --work-dir); the summary report: output/sat-demo-report.pdf.
 
 set -o pipefail
 
@@ -106,8 +106,7 @@ echo
 
 "$PYTHON" "$DEMO_DIR/check_agreement.py" AramisSat.out.h5 sat-avg.diag.txt sat-unavg.diag.txt || exit 1
 
-"$PYTHON" "$SCRIPTS/plot_fel_saturation.py" AramisSat.out.h5 sat-avg.diag.txt sat-unavg.diag.txt \
-  --times "${TIMES[0]},${TIMES[1]},${TIMES[2]}" --workers "$WORKERS" -o sat-demo.png || exit 1
+"$PYTHON" "$SCRIPTS/report_fel_saturation.py" "$WORK_DIR" || exit 1
 
 echo
-echo "Outputs in: $WORK_DIR (figure: sat-demo.png; per-run stats: sat-*.stats.h5)"
+echo "Outputs in: $WORK_DIR (report: sat-demo-report.pdf; per-run stats: sat-*.stats.h5)"

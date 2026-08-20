@@ -751,11 +751,13 @@ own Benchmark1-SASE configuration run to saturation: the full 57 m 6-FODO Aramis
 dark start, growth from shot noise alone, 96 slices × 2048 particles, all three
 trackers fed IDENTICAL initial dumps and each given the machine's full performance-core
 count. Wall times come from one external clock; the exit answers must agree at the
-documented levels before any timing or figure is produced. The run ends with a
-six-panel figure (`tests/scripts/plot_fel_saturation.py`): gain curves, relative differences,
-per-slice exit power, bunching, the energy budget (beam energy given up vs field energy
-held in the slipping window, both in joules -- the panel where the unaveraged mode's
-radiation cost is visible), energy spread, timings annotated.
+documented levels before any timing or report is produced. The run ends with a
+multi-page PDF summary (`tests/scripts/report_fel_saturation.py`), regenerated from the
+run's own files: a cover carrying the timing and agreement tables, then gain curves,
+pulse structure, beam evolution, and the energy accounting -- every figure with the
+paragraph that explains how to read it. The energy page shows per tracker the energy
+the beam gave against where it is now (still in the window vs slipped out forward),
+and the unaveraged ledger closing exactly along z.
 
 Measured (M3 Max, 12 performance cores, production builds both sides):
 
@@ -807,7 +809,7 @@ the built-in handoff phase jump, FINDINGS.md 7.26; tier1_unavg's theta median fe
 from 6.6 rad to 6.4e-2) and their reduced coupling length (~2% ln per segment at the
 default 2-period ramps, real field physics, priced and left visible).
 
-The figure is banked at `fel-benchmark-plots/sat-demo.png` in the project root.
+The report is banked at `fel-benchmark-plots/sat-demo-report.pdf` in the project root.
 
 ## Diagnostic output: the stats file, dumps at elements, the escaped-field bank
 

@@ -15,14 +15,21 @@ performance-core count. Every input is a real file in this directory:
 | `sat-avg.nml` | Bmad averaged mode (the `bmad_standard` default) |
 | `sat-unavg.nml` | Bmad unaveraged mode (~32x cost; the point is the same answer from raw dynamics) |
 | `check_agreement.py` | exit powers must agree at the documented levels before timings mean anything |
-| `run.sh` | thin runner: prep, three timed runs (one external clock), check, figure |
+| `run.sh` | thin runner: prep, three timed runs (one external clock), check, PDF report |
 
 ```
-./run.sh                     # outputs land in ./output, figure output/sat-demo.png
+./run.sh                     # outputs land in ./output; summary: output/sat-demo-report.pdf
 ```
+
+The report (`tests/scripts/report_fel_saturation.py`) is a multi-page PDF regenerated
+from the run's own files: a cover with the timing and agreement tables, then gain
+curves, pulse structure, beam evolution and the energy accounting -- each figure with
+the paragraph that explains how to read it. The energy page shows, per tracker, the
+energy the beam gave against where it is now (window vs slipped-out-forward), and the
+unaveraged ledger closing exactly along z.
 
 Measured results, attribution of every difference (the averaged mode matches Genesis
 at 4.9e-4 through saturation; the unaveraged mode rides +0.6 ln on the shot-noise
-radiation channel it physically resolves, FINDINGS 7.27), and the banked figure live
+radiation channel it physically resolves, FINDINGS 7.27), and the banked report live
 in the "The saturation demo" section of `bsim/fel/README.md` and
-`fel-benchmark-plots/sat-demo.png` at the project root.
+`fel-benchmark-plots/sat-demo-report.pdf` at the project root.
