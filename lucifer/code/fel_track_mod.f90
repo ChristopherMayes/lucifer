@@ -223,6 +223,14 @@ if (ele%value(kx$) /= 0) then
                 'the FEL focusing split; set kx = 0 on: ' // trim(ele%name)
   stop 1
 endif
+if (ele%value(tilt$) /= 0) then
+  print '(2a)', 'fel_track_test: a tilted FEL element would be SILENTLY treated as ', &
+                'untilted -- the radiation is a single scalar envelope today (planar'
+  print '(2a)', '  couples as x-wiggle by convention), so a y-plane undulator would ', &
+                'wrongly amplify the x field. Two-component radiation is the 6.1'
+  print '(a)',  '  deliverable (design brief). Refused at: ' // trim(ele%name)
+  stop 1
+endif
 
 ! The integration step: with neither ds_step nor num_steps set, Bmad's bookkeeper
 ! falls back to bmad_com%default_ds_step (0.2 m -- thirteen periods of this device,
