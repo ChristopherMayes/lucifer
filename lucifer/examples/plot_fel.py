@@ -20,7 +20,9 @@ below derives from it, no text files involved. Ten panels against z:
 
 Works on steady-state and time-dependent runs alike: with more than one slice, thin
 gray lines show every slice and the bold line the total (power, energy) or the slice
-average (everything else).
+average (everything else). When the run carries TWO POLARIZATIONS (any tilted FEL
+element; the stats file then has a field/y group) an eleventh panel splits the power
+by polarization -- on a crossed line that panel IS the afterburner story.
 
 Needs numpy, h5py and matplotlib (the bmad-fel-validate environment has all three).
 """
@@ -61,6 +63,11 @@ def load(fn):
             "f_emit_y": h5["field/emit_y"][:],
             "f_valid": h5["field/angle_moments_valid"][:].astype(bool),
         }
+        # Two live polarizations: field/power is the TOTAL and field/* the x
+        # component; field/y/ carries the second. Absent on single-polarization runs.
+        if "field/y" in h5:
+            q["power_y"] = h5["field/y/power"][:]
+            q["power_x"] = q["power"] - q["power_y"]
     return q
 
 
@@ -120,10 +127,12 @@ def main():
         "text.color": INK, "font.size": 10,
     })
 
-    fig, axd = plt.subplot_mosaic(
-        [["power", "energy"], ["power_lin", "energy_lin"], ["bunching", "gamma"],
-         ["bsize", "fsize"], ["bemit", "femit"]],
-        figsize=(9.5, 14), sharex=True)
+    rows = [["power", "energy"], ["power_lin", "energy_lin"], ["bunching", "gamma"],
+            ["bsize", "fsize"], ["bemit", "femit"]]
+    two_pol = "power_y" in q
+    if two_pol:
+        rows.append(["pol", "pol"])
+    fig, axd = plt.subplot_mosaic(rows, figsize=(9.5, 14 + 2.6 * two_pol), sharex=True)
 
     # Radiation power and window field energy, log then linear. The multi-slice
     # aggregate is a sum: total power is what a detector sees, and the window energy
@@ -193,6 +202,20 @@ def main():
 
     axd["bemit"].set_xlabel("z (m)")
     axd["femit"].set_xlabel("z (m)")
+
+    # The polarization split (two live components only): x and y power against z. On a
+    # crossed line this is the afterburner -- the x set amplifies Ex and bunches the
+    # beam, then the tilted set radiates Ey from that bunching while Ex only diffracts.
+    if two_pol:
+        A = axd["pol"]
+        A.semilogy(z, np.maximum(q["power_x"][:len(z)].sum(axis=1), 1e-30),
+                   color=BLUE, lw=1.8, label="x polarization")
+        A.semilogy(z, np.maximum(q["power_y"][:len(z)].sum(axis=1), 1e-30),
+                   color=ORANGE, lw=1.8, label="y polarization")
+        A.set_xlabel("z (m)"); A.set_ylabel("radiation power by polarization (W)")
+        A.legend(frameon=False)
+        axd["bemit"].set_xlabel("")
+        axd["femit"].set_xlabel("")
 
     title = pathlib.Path(args.stats).name
     if nslice > 1:

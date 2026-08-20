@@ -153,9 +153,14 @@ effects (\S\ref{sec:unaveraged}): their slippage deficit is compensated exactly 
 the mode's built-in end-of-segment phase jump, and their reduced coupling length
 costs $\sim$2\% in $\ln P$ per 266-period benchmark segment at the default 2
 periods --- real field physics of adiabatic ends, scaling with the ramp length,
-deliberately left visible. Refused by name at parse time: missing \code{b\_max} or \code{l\_period}, a
-fieldmap \code{field\_calc}, nonzero \code{kx} (unmapped roll-off), and an unset
-\code{ds\_step}. Outside the FEL walk the element is a plain periodic wiggler: the
+deliberately left visible. \code{tilt} is honored on planar elements as the polarization specification
+(\S\ref{sec:vector}): the wiggle plane, the focusing, the coupling roll-off and the
+unaveraged field all rotate with it, and the radiation grows a second component.
+Refused by name at parse time: missing \code{b\_max} or \code{l\_period}, a
+fieldmap \code{field\_calc}, nonzero \code{kx} (unmapped roll-off), an unset
+\code{ds\_step}, \code{tilt} on a helical element (a rotation of a circularly
+symmetric field --- a no-op that reads as a mistake) and \code{tilt} with the
+transcribed-Genesis maps (Genesis has no tilt). Outside the FEL walk the element is a plain periodic wiggler: the
 \code{track1\_custom} and \code{make\_mat6\_custom} hooks delegate to
 \code{track\_a\_wiggler}, so reference time and transfer matrices come from Bmad's own
 kernel.

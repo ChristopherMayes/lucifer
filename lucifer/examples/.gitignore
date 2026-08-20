@@ -7,3 +7,9 @@
 *-initial.par.h5
 *.log
 *.wake.txt
+*.stats.h5
+*.ledger.txt
+*-final-x.fld.h5
+*-final-y.fld.h5
+*-escaped.fld.h5
+*-pulse*.fld.h5
