@@ -762,16 +762,16 @@ Measured (M3 Max, 12 performance cores, production builds both sides):
 | | wall | exit total power | vs Genesis |
 |---|---|---|---|
 | Genesis 1.3 v4, 12 MPI ranks | 38.0 s | 3.381 GW (4.52 GW peak at 56.8 m) | — |
-| Bmad averaged (`bmad_standard` default), 12 threads | 40.1 s | 3.380 GW | **rel 4.9e-4** |
-| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1164.0 s | 6.25 GW | ln ratio +0.62 |
+| Bmad averaged (`bmad_standard` default), 12 threads | 30.2 s | 3.380 GW | **rel 4.9e-4** |
+| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1143.2 s | 6.25 GW | ln ratio +0.62 |
 
 The averaged mode tracks Genesis through eight decades of z and three of power to
 **4.9e-4** at saturation — the ~4e-2 seam-transport difference the benchmark tiers
-price is invisible here because saturation self-limits the power. Wall clocks are
-comparable at equal cores (each code's number includes its own in-run diagnostics:
-Genesis's are scalar columns, ours the full 6x6/4x4 moment sets of the stats file —
-the ~10% gap IS that difference; see the overhead measurement in the diagnostics
-section).
+price is invisible here because saturation self-limits the power. It is also 1.26x
+faster than Genesis at equal cores, each code computing its own in-run diagnostics —
+and ours are the full 6x6/4x4 moment sets of the stats file where Genesis's are
+scalar columns (the diag/stats fusion in the diagnostics section is where that speed
+came from).
 
 The unaveraged mode — an independent integrator with fc/JJ nowhere in its inputs,
 paying its documented ~32x cost — reproduces the startup (coherent shot-noise
