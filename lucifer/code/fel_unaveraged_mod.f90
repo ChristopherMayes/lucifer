@@ -202,7 +202,7 @@ subroutine fel_unavg_bfield (und, ustate, x, y, s, bx, by, bz)
 type (fel_und_struct) und
 type (fel_unavg_struct) ustate
 real(rp) x, y, s, bx, by, bz
-real(rp) a0, g, gp, c_u, s_u, fperp
+real(rp) a0, g, gp, c_u, s_u, fperp, xl, yl, bt
 
 !
 
@@ -210,18 +210,33 @@ g = fel_unavg_envelope(ustate, s, gp)
 c_u = cos(und%ku * s)
 s_u = sin(und%ku * s)
 
+! A tilted planar element: evaluate the untilted potential in the wiggle frame
+! (coordinates rotated in), rotate b back out. sin_t = 0 skips both rotations.
+
+xl = x;  yl = y
+if (und%sin_t /= 0) then
+  xl =  und%cos_t * x + und%sin_t * y
+  yl = -und%sin_t * x + und%cos_t * y
+endif
+
 if (und%helical) then
   a0 = und%aw
-  fperp = 1 + (und%ku**2 / 4) * (x*x + y*y)
+  fperp = 1 + (und%ku**2 / 4) * (xl*xl + yl*yl)
   ! b = curl(a) with a_x = a0 g c_u fperp, a_y = a0 g s_u fperp:
   bx = -a0 * (gp * s_u + g * und%ku * c_u) * fperp                        ! -d(a_y)/ds
   by =  a0 * (gp * c_u - g * und%ku * s_u) * fperp                        !  d(a_x)/ds
-  bz =  a0 * g * (und%ku**2 / 2) * (s_u * x - c_u * y)                    !  d(a_y)/dx - d(a_x)/dy
+  bz =  a0 * g * (und%ku**2 / 2) * (s_u * xl - c_u * yl)                  !  d(a_y)/dx - d(a_x)/dy
 else
   a0 = sqrt(2.0_rp) * und%aw
   bx = 0
-  by = a0 * (gp * c_u - g * und%ku * s_u) * cosh(und%ku * y)            ! d(a_x)/ds
-  bz = -a0 * g * c_u * und%ku * sinh(und%ku * y)                        ! -d(a_x)/dy
+  by = a0 * (gp * c_u - g * und%ku * s_u) * cosh(und%ku * yl)           ! d(a_x)/ds
+  bz = -a0 * g * c_u * und%ku * sinh(und%ku * yl)                       ! -d(a_x)/dy
+endif
+
+if (und%sin_t /= 0) then        ! Rotate the transverse field components back out.
+  bt = und%cos_t * bx - und%sin_t * by
+  by = und%sin_t * bx + und%cos_t * by
+  bx = bt
 endif
 
 end subroutine fel_unavg_bfield
@@ -256,10 +271,11 @@ real(rp) dz_record, dE_beam, dU_spont
 logical first, last, err_flag
 
 real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:), dU_sp_slice(:)
-complex(rp), allocatable :: crsource(:,:)
+complex(rp), allocatable :: crsource(:,:), crsource_y(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
-complex(rp) ehat, jhat, wphasor, cdep
+complex(rp) ehat, jhat, wphasor, cdep, ehat_y, cph
+logical two_pol
 integer is, ip, isub, nslice, ifld, ix, iy, ngrid_arr(3), ngrid
 logical on_grid, err, any_err
 character(*), parameter :: r_name = 'fel_unavg_step'
@@ -271,6 +287,7 @@ dE_beam = 0
 dU_spont = 0
 
 nslice = size(wf%Ex, 3)
+two_pol = allocated(wf%Ey)
 if (size(beam%slice) /= nslice) then
   call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES BUT THE FIELD RECORD HAS \i0\ .', &
                                  i_array = [size(beam%slice), nslice])
@@ -327,14 +344,15 @@ any_err = .false.
 ! dE_slice so the final sum is a fixed-order serial reduction -- results are
 ! bit-identical across thread counts, and the harness checks that.
 
-!$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, s_sub, isub, ip, &
-!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, wphasor, dgam, cdep, err) &
+!$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, crsource_y, s_sub, isub, ip, &
+!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, ehat_y, wphasor, dgam, cdep, cph, err) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
   ifld = fel_field_index(slip, is, nslice)
 
   allocate (crsource(ngrid, ngrid))
+  if (two_pol) allocate (crsource_y(ngrid, ngrid))
   allocate (ux(sl%n), uy(sl%n), xx(sl%n), yy(sl%n), tau(sl%n), gam(sl%n))
   do ip = 1, sl%n
     p_mc = p0_mc * (1 + sl%pz(ip))
@@ -352,6 +370,7 @@ do is = 1, nslice
   do isub = 1, ustate%nsub
 
     crsource = 0
+    if (two_pol) crsource_y = 0
 
     do ip = 1, sl%n
       call unavg_push (s_sub, dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip))
@@ -372,7 +391,40 @@ do is = 1, nslice
       endif
 
       call fel_grid_weights (wf, xx(ip), yy(ip), ix, iy, wx, wy, on_grid)
-      if (on_grid) then
+      if (on_grid .and. two_pol) then
+
+        ! Two live polarizations: COMPONENT-WISE duals -- the instantaneous kinetic
+        ! momenta u_x, u_y are real numbers, each working against and depositing into
+        ! its own field component; no polarization convention enters at all (manual
+        ! sec:field vector convention). The scalar branch below keeps the folded
+        ! ĵ-convention verbatim for single-polarization lines.
+
+        ehat =        wf%Ex(ix,   iy,   ifld) * wx * wy
+        ehat = ehat + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
+        ehat = ehat + wf%Ex(ix,   iy+1, ifld) * wx * (1-wy)
+        ehat = ehat + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
+        ehat_y =          wf%Ey(ix,   iy,   ifld) * wx * wy
+        ehat_y = ehat_y + wf%Ey(ix+1, iy,   ifld) * (1-wx) * wy
+        ehat_y = ehat_y + wf%Ey(ix,   iy+1, ifld) * wx * (1-wy)
+        ehat_y = ehat_y + wf%Ey(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
+
+        cph = exp(cmplx(0.0_rp, psi_mid - ks*tau(ip), rp))
+        dgam = -dsub * real(cmplx(0.0_rp, -1.0_rp, rp) * (ehat * ux(ip) + ehat_y * uy(ip)) * cph, rp) &
+                     / (u_s * m_electron)
+        dE_slice(is) = dE_slice(is) + sl%weight(ip) * dgam * m_electron
+        gam(ip) = gam(ip) + dgam
+
+        cdep = cmplx(0.0_rp, 1.0_rp, rp) * conjg(cph) * scl_u * sl%weight(ip) / u_s
+        crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cdep * ux(ip)
+        crsource(ix+1, iy)   = crsource(ix+1, iy)   + ((1-wx) * wy) * cdep * ux(ip)
+        crsource(ix,   iy+1) = crsource(ix,   iy+1) + (wx * (1-wy)) * cdep * ux(ip)
+        crsource(ix+1, iy+1) = crsource(ix+1, iy+1) + ((1-wx) * (1-wy)) * cdep * ux(ip)
+        crsource_y(ix,   iy)   = crsource_y(ix,   iy)   + (wx * wy) * cdep * uy(ip)
+        crsource_y(ix+1, iy)   = crsource_y(ix+1, iy)   + ((1-wx) * wy) * cdep * uy(ip)
+        crsource_y(ix,   iy+1) = crsource_y(ix,   iy+1) + (wx * (1-wy)) * cdep * uy(ip)
+        crsource_y(ix+1, iy+1) = crsource_y(ix+1, iy+1) + ((1-wx) * (1-wy)) * cdep * uy(ip)
+
+      elseif (on_grid) then
         ehat =        wf%Ex(ix,   iy,   ifld) * wx * wy
         ehat = ehat + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
         ehat = ehat + wf%Ex(ix,   iy+1, ifld) * wx * (1-wy)
@@ -405,6 +457,7 @@ do is = 1, nslice
     call fel_field_diffract (wf, ifld, dsub, err)
     any_err = any_err .or. err
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
+    if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
 
     ! The deposit's own energy |dE|^2 = 4|src|^2: the ONE term of the field-energy
     ! increment the kick/deposit duality does not charge to the beam (the beam pays the
@@ -414,6 +467,10 @@ do is = 1, nslice
 
     dU_sp_slice(is) = dU_sp_slice(is) + 4 * sum(real(crsource, rp)**2 + aimag(crsource)**2) &
                         * dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
+    if (two_pol) then
+      dU_sp_slice(is) = dU_sp_slice(is) + 4 * sum(real(crsource_y, rp)**2 + aimag(crsource_y)**2) &
+                          * dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
+    endif
 
     s_sub = s_sub + dsub
   enddo
@@ -433,6 +490,7 @@ do is = 1, nslice
   enddo
 
   deallocate (ux, uy, xx, yy, tau, gam, crsource)
+  if (two_pol) deallocate (crsource_y)
 enddo
 !$OMP end parallel do
 if (any_err) return

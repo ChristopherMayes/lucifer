@@ -27,6 +27,7 @@ python ../plot_fel.py <example>.stats.h5            # needs h5py + matplotlib; w
 | `import/` | A beam_init bunch resampled into slices (Genesis's importdistribution method), tracked dark | ~1 min |
 | `bmad_wake/` | The SASE run with the chamber wake via BMAD's z_long machinery on every element | ~2 min |
 | `unaveraged/` | One seeded segment with NO period averaging: the real quiver, the coupling as an outcome — plus its averaged twin for the overlay | ~1 min |
+| `crossed_undulator/` | The two-polarization afterburner: an x-planar set bunches, its quarter-turn twin radiates orthogonally from that bunching | ~30 s |
 | `saturation_demo/` | The one exception to "no Genesis": the full 57 m SASE case to saturation, three trackers (Genesis4 MPI, Bmad averaged, Bmad unaveraged) from identical dumps, one clock — its own `run.sh`, every input a real file in the directory | ~25 min |
 
 With no dump files named in the namelist, the program generates its own starting state

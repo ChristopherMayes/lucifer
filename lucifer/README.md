@@ -873,6 +873,39 @@ Known scaling limit, named for the follow-on: the stats accumulate in memory and
 once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.
 
+## Two polarizations: vector radiation, tilt honored, the crossed undulator
+
+The radiation carries (Ex, Ey) when any FEL element is TILTED -- `UNDY: UNDX,
+tilt = pi/2` is a y-planar undulator, standard Bmad, no new attribute -- or the seed
+is y-polarized (`seed_polarization = 'y'`); otherwise Ey is never allocated and the
+single-component path runs untouched (every tier bit-for-bit, the compatibility
+keystone). Kick and deposit act through each element's polarization 2-vector (planar:
+(cos t, sin t); helical: (1,-i)/sqrt2); the unaveraged mode needs no polarization
+code at all -- its real per-particle currents work against and deposit into their own
+components. Dumps hold one polarization per Genesis-format file (-final-{x,y});
+stats.h5's field group carries totals plus the x component, with a field/y/ group.
+
+Measured (check_two_polarization.py, in the harness -- symmetries and physics, not
+reference files):
+
+| Check | Measured | Check level |
+|---|---|---|
+| rotation identity, averaged (all-y line + swapped beam == all-x line) | **4.5e-15** | 1e-8 |
+| rotation identity, unaveraged | 4.1e-6 | 1e-5 (the vector path carries the betatron-current radiation the scalar convention omits -- a refinement, priced) |
+| beam-size swap identity, both modes | ~1e-16 | 1e-8 |
+| crossed undulator: x-field gain isolation through the y set | **1.6e-14** (avg), 1.7e-6 (unavg) | 5e-2 |
+| crossed undulator: the y field lights up from carried-over bunching | Py/Px ~ 1e-2 | floor 5e-3 |
+| averaged vs unaveraged crossed y-power, ln | 0.25 | 0.5 (priced) |
+| unaveraged TD ledger over both components | 9.6e-5 | 1e-3 |
+| 1 vs 8 threads, crossed TD | byte-identical | -- |
+| helical re-anchor (vector vs scalar path, shot-noise power) | **7.2e-15** | 1e-12 |
+| tilt on helical / tilt with transcribed maps | refused by name | -- |
+
+The rotation identity uses the driver's `swap_beam_xy` check instrument (the RNG
+draws its planes sequentially, so the generated beam itself is never swap-symmetric).
+The elliptical follow-on (cartesian_map-derived coupling, APPLE-II, the Ming-Xie
+ladder, B0's em_field_calc unification) builds on this foundation.
+
 ## Spontaneous emission: the two FEL modes against Bmad's own radiation
 
 Bmad-only, no Genesis (the averaged mode's Genesis agreement is settled by the tiers).

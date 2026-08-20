@@ -235,6 +235,16 @@ logical :: radiation_damping = .false., radiation_fluctuations = .false.
 ! drifts. The reference leg of check_spontaneous.py, which measures Bmad's own
 ! radiation physics through the same wiggler the FEL modes use.
 logical :: reference_run = .false.
+! Two-polarization radiation (manual sec:field vector convention): Ey goes LIVE when
+! any FEL element is tilted or the seed is y-polarized; single-polarization lines
+! never allocate it and stay bit-identical.
+character(1) :: seed_polarization = 'x'
+logical :: two_pol = .false.
+! Check instrument (check_two_polarization.py's rotation identity): swap the beam's
+! transverse planes after generation, (x,px) <-> (y,py). A y-planar line fed the
+! swapped beam must reproduce the x-planar line fed the original, exactly -- the RNG
+! draws its planes sequentially, so the generated beam itself is never swap-symmetric.
+logical :: swap_beam_xy = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
 
@@ -343,7 +353,8 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            beam_init, imp, use_beam_init, dist_file, write_dist_file, &
                            write_opmd_file, imp_split_weights, write_wake_kernels, &
                            dump_beam_at, dump_field_at, keep_escaped_field, &
-                           radiation_damping, radiation_fluctuations, reference_run
+                           radiation_damping, radiation_fluctuations, reference_run, &
+                           seed_polarization, swap_beam_xy
 
 ! Read parameters.
 
@@ -422,6 +433,9 @@ branch => lat%branch(0)
 gamma0 = branch%ele(0)%value(e_tot$) / m_electron
 print '(a, f0.6, a)', 'fel_track_test: gamma0 = ', gamma0, ' (from the lattice e_tot).'
 
+call setup_fel_elements ()   ! Needs only the parsed lattice; sets two_pol for the
+                             ! beam/field construction below.
+
 ! ONE reference energy, and the lattice is it: gamma0 = e_tot/m_e c^2 from the lattice
 ! header, never a namelist input. There used to be a namelist gamma0 for Genesis-deck
 ! symmetry; the first external user fed it a hand-rounded value against a round lattice
@@ -448,6 +462,10 @@ if (beam_file /= '') then
   call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
   if (err) stop 1
   call wavefront_read_genesis4 (wf, field_file, err)
+  if (.not. err .and. two_pol .and. .not. allocated(wf%Ey)) then
+    allocate (wf%Ey(size(wf%Ex,1), size(wf%Ex,2), size(wf%Ex,3)))
+    wf%Ey = 0
+  endif
   if (err) stop 1
 elseif (dist_file /= '' .or. use_beam_init) then
   call import_initial_state ()
@@ -560,8 +578,10 @@ gamma0_ref = fel_gamma0(fbeam)
 ! assertions are enforced here: a wiggler with zero b_max or l_period would silently get
 ! factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
 ! gets osc_amplitude without focusing -- both are refused by name.
+! (setup_fel_elements itself runs right after the parse, before the beam and field are
+! built: two_pol -- does any element tilt? -- must be known when the field is made.)
 
-call setup_fel_elements ()
+call check_wake_window ()
 any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
 
 ! The unaveraged mode is a verification mode (fel-physics.tex sec:unaveraged): the
@@ -634,6 +654,13 @@ b_dev_max = 0
 ! Bmad's own locator (class::name syntax comes for free; an entry matching nothing is
 ! refused by name), precompute the EXACT record and element-end counts by replaying
 ! the walk's skip rule, and size the stats arrays.
+
+if (swap_beam_xy) then
+  do is = 1, nslice
+    call swap_arrays (fbeam%slice(is)%x, fbeam%slice(is)%y)
+    call swap_arrays (fbeam%slice(is)%px, fbeam%slice(is)%py)
+  enddo
+endif
 
 call setup_diagnostics ()
 
@@ -830,11 +857,19 @@ endif
 
 if (slip%first /= 0) then
   wf%Ex = cshift(wf%Ex, shift = slip%first, dim = 3)
+  if (allocated(wf%Ey)) wf%Ey = cshift(wf%Ey, shift = slip%first, dim = 3)
   slip%first = 0
 endif
 
-call wavefront_write_genesis4 (wf, trim(out_root) // '-final.fld.h5', err, 'x')
-if (err) stop 1
+if (allocated(wf%Ey)) then      ! Genesis's format holds one component per file.
+  call wavefront_write_genesis4 (wf, trim(out_root) // '-final-x.fld.h5', err, 'x')
+  if (err) stop 1
+  call wavefront_write_genesis4 (wf, trim(out_root) // '-final-y.fld.h5', err, 'y')
+  if (err) stop 1
+else
+  call wavefront_write_genesis4 (wf, trim(out_root) // '-final.fld.h5', err, 'x')
+  if (err) stop 1
+endif
 
 call fel_write_genesis4_beam (fbeam, trim(out_root) // '-final.par.h5', err)
 if (err) stop 1
@@ -843,7 +878,11 @@ call finalize_diagnostics ()
 
 print '(a)', 'fel_track_test done.'
 print '(a)', '  ' // trim(out_root) // '.diag.txt'
-print '(a)', '  ' // trim(out_root) // '-final.fld.h5'
+if (two_pol) then
+  print '(a)', '  ' // trim(out_root) // '-final-{x,y}.fld.h5'
+else
+  print '(a)', '  ' // trim(out_root) // '-final.fld.h5'
+endif
 print '(a)', '  ' // trim(out_root) // '-final.par.h5'
 
 call wavefront_fft_free()
@@ -1236,7 +1275,24 @@ dx_grid = 2 * grid_half_width / (grid_n_pts - 1)
 call wavefront_init (wf, grid_n_pts, grid_n_pts, nslice_f, dx_grid, dx_grid, &
                      fbeam%slice_spacing, lambda0, 'x', 0.0_rp)
 
-if (seed_power > 0) then
+if (two_pol .and. .not. allocated(wf%Ey)) then
+  allocate (wf%Ey(grid_n_pts, grid_n_pts, nslice_f))
+  wf%Ey = 0
+endif
+
+if (seed_power > 0 .and. seed_polarization == 'y') then
+  e0 = sqrt(4 * (mu_0_vac * c_light) * seed_power / (pi * seed_waist_size**2))
+  do iy = 1, grid_n_pts
+    yg = (iy - 1) * dx_grid - grid_half_width
+    do ix = 1, grid_n_pts
+      xg = (ix - 1) * dx_grid - grid_half_width
+      wf%Ey(ix, iy, 1) = e0 * exp(-(xg**2 + yg**2) / seed_waist_size**2)
+    enddo
+  enddo
+  do is_g = 2, nslice_f
+    wf%Ey(:, :, is_g) = wf%Ey(:, :, 1)
+  enddo
+elseif (seed_power > 0) then
   e0 = sqrt(4 * (mu_0_vac * c_light) * seed_power / (pi * seed_waist_size**2))
   do iy = 1, grid_n_pts
     yg = (iy - 1) * dx_grid - grid_half_width
@@ -1503,7 +1559,41 @@ do je = 1, branch%n_ele_track
     und_of(je)%kx = 0
     und_of(je)%ky = kw**2
   endif
+
+  ! Tilt: the wiggle-plane rotation (planar only -- a tilted helical is a no-op that
+  ! reads as confusion, refused; the transcribed-Genesis maps know no tilt, refused).
+  ! The polarization 2-vector on (Ex, Ey): planar (cos t, sin t); helical (1,-i)/sqrt2.
+
+  und_of(je)%tilt = w%value(tilt_tot$)
+  if (und_of(je)%tilt /= 0) then
+    if (und_of(je)%helical) then
+      print '(2a)', 'fel_track_test: tilt on a HELICAL FEL element is a rotation of a ', &
+                    'circularly symmetric field -- a no-op that reads as a mistake: ' // trim(w%name)
+      stop 1
+    endif
+    if (fel_mode(je) == fel_transcribed$) then
+      print '(2a)', 'fel_track_test: the transcribed-Genesis maps (fel_tracking = -1) know ', &
+                    'no tilt (Genesis has none); use the default maps on: ' // trim(w%name)
+      stop 1
+    endif
+  endif
+  und_of(je)%cos_t = cos(und_of(je)%tilt)
+  und_of(je)%sin_t = sin(und_of(je)%tilt)
+  if (und_of(je)%helical) then
+    und_of(je)%pol = [cmplx(1.0_rp, 0.0_rp, rp), cmplx(0.0_rp, -1.0_rp, rp)] / sqrt(2.0_rp)
+  else
+    und_of(je)%pol = [cmplx(und_of(je)%cos_t, 0.0_rp, rp), cmplx(und_of(je)%sin_t, 0.0_rp, rp)]
+  endif
 enddo
+
+two_pol = seed_polarization == 'y'
+do je = 1, branch%n_ele_track
+  if (is_fel(je) .and. und_of(je)%sin_t /= 0) two_pol = .true.
+enddo
+if (seed_polarization /= 'x' .and. seed_polarization /= 'y') then
+  print '(a)', 'fel_track_test: seed_polarization must be "x" or "y".'
+  stop 1
+endif
 
 if (.not. any(is_fel) .and. .not. reference_run) then
   print '(a)', 'fel_track_test: the lattice has no FEL elements (wiggler/undulator with tracking_method = custom).'
@@ -1511,12 +1601,23 @@ if (.not. any(is_fel) .and. .not. reference_run) then
   stop 1
 endif
 
+
+
+end subroutine setup_fel_elements
+
+!------------------------------------------------------------------------------
 ! Element sr wakes act across the WHOLE window (deliverable 11): all slices
 ! concatenate into one bunch in global window coordinates and Bmad's wake machinery
 ! applies unmodified. What is checked here, by name: lr (multi-bunch) wakes are not
 ! supported; a pseudomode wake whose z_max is shorter than the window would have Bmad
 ! kill the bunch mid-run; a z_long table narrower than the window would overflow its
-! binning grid the same way.
+! binning grid the same way. Runs AFTER the beam is built (the window length is the
+! subject); setup_fel_elements runs before it (two_pol must precede the field).
+
+subroutine check_wake_window ()
+
+type (ele_struct), pointer :: w
+integer je
 
 do je = 1, branch%n_ele_track
   w => pointer_to_wake_ele(branch%ele(je))
@@ -1541,7 +1642,7 @@ do je = 1, branch%n_ele_track
   endif
 enddo
 
-end subroutine setup_fel_elements
+end subroutine check_wake_window
 
 !------------------------------------------------------------------------------
 
@@ -1795,6 +1896,15 @@ e_rad_cum = e_rad_cum + sum(e_rad_slice)
 end subroutine apply_radiation
 
 !------------------------------------------------------------------------------
+subroutine swap_arrays (a, b)
+
+real(rp) a(:), b(:), tmp(size(a))
+
+tmp = a;  a = b;  b = tmp
+
+end subroutine swap_arrays
+
+!------------------------------------------------------------------------------
 ! One progress line to stdout: where the walk is and what the light and beam are
 ! doing, so the slow modes (the unaveraged mode runs ~30x the averaged) show signs of
 ! life. Element boundaries always print; inside elements a wall-clock throttle (2 s)
@@ -1877,7 +1987,7 @@ do i = 1, branch%n_ele_track
   endif
 enddo
 
-call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c)
+call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c, two_pol)
 allocate (bdiag_arr(nslice), fpow_arr(nslice), fonax_arr(nslice))
 
 end subroutine setup_diagnostics
@@ -1916,11 +2026,21 @@ endif
 if (dump_field_here(ie)) then
   if (slip%first /= 0) then
     wf%Ex = cshift(wf%Ex, shift = slip%first, dim = 3)
+    if (allocated(wf%Ey)) wf%Ey = cshift(wf%Ey, shift = slip%first, dim = 3)
     slip%first = 0
   endif
-  write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '.fld.h5'
-  call wavefront_write_genesis4 (wf, trim(fname), eerr, 'x')
-  if (eerr) stop 1
+  if (allocated(wf%Ey)) then
+    write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '-x.fld.h5'
+    call wavefront_write_genesis4 (wf, trim(fname), eerr, 'x')
+    if (eerr) stop 1
+    write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '-y.fld.h5'
+    call wavefront_write_genesis4 (wf, trim(fname), eerr, 'y')
+    if (eerr) stop 1
+  else
+    write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '.fld.h5'
+    call wavefront_write_genesis4 (wf, trim(fname), eerr, 'x')
+    if (eerr) stop 1
+  endif
 endif
 
 end subroutine end_of_element
@@ -1986,6 +2106,11 @@ do k = 1, bank%n
   bank_z(n_banked) = z_now
   bank_pms(:, n_banked) = [pms%centroid, reshape(pms%sigma, [16]), &
                            pms%energy, pms%power, pms%on_axis_intensity, pms%emit_x, pms%emit_y]
+  if (two_pol) then             ! The y component's params add to the banked energy.
+    call wavefront_params_of_plane (bank%plane_y(:,:,k), wf%dx, wf%wavelength, &
+                                    fbeam%slice_spacing, pms, .true., berr)
+    if (berr) stop 1
+  endif
 
   write (gname, '(a, i0.6)') 'slice', n_banked
   call H5Gcreate_f (esc_id, trim(gname), g_id, h5e)
@@ -1994,6 +2119,15 @@ do k = 1, bank%n
   call hdf5_write_dataset_real (g_id, 'field-real', work, berr);  if (berr) stop 1
   work = dfl_scale * reshape(aimag(bank%plane(:,:,k)), [nx*nx])
   call hdf5_write_dataset_real (g_id, 'field-imag', work, berr);  if (berr) stop 1
+  if (two_pol) then
+    work = dfl_scale * reshape(real(bank%plane_y(:,:,k), rp), [nx*nx])
+    call hdf5_write_dataset_real (g_id, 'field-real-y', work, berr);  if (berr) stop 1
+    work = dfl_scale * reshape(aimag(bank%plane_y(:,:,k)), [nx*nx])
+    call hdf5_write_dataset_real (g_id, 'field-imag-y', work, berr);  if (berr) stop 1
+    call hdf5_write_dataset_real (g_id, 'wavefront_params_y', &
+            [pms%centroid, reshape(pms%sigma, [16]), pms%energy, pms%power, &
+             pms%on_axis_intensity, pms%emit_x, pms%emit_y], berr);  if (berr) stop 1
+  endif
   call hdf5_write_dataset_real (g_id, 'z_transmit', [z_now], berr);  if (berr) stop 1
   call hdf5_write_dataset_real (g_id, 'wavefront_params', bank_pms(:, n_banked), berr);  if (berr) stop 1
   call H5Gclose_f (g_id, h5e)
@@ -2012,12 +2146,9 @@ end subroutine drain_bank
 
 subroutine finalize_diagnostics ()
 
-integer(hid_t) p_id, e_id, g_id
-real(rp), allocatable :: work(:), re_w(:), im_w(:)
+integer nx, h5e
 real(rp) dfl_scale
-integer k, is_f, nx, h5e
 logical ferr
-character(20) gname
 
 !
 
@@ -2041,9 +2172,46 @@ if (esc_id /= 0) then
   print '(a)', '  ' // trim(out_root) // '-escaped.fld.h5'
 endif
 
-! The full pulse at the exit plane.
+! The full pulse at the exit plane; with two live polarizations, one file per
+! component (Genesis's format holds one).
 
-call hdf5_open_file (trim(out_root) // '-pulse.fld.h5', 'WRITE', p_id, ferr);  if (ferr) stop 1
+if (two_pol) then
+  call write_pulse_file (trim(out_root) // '-pulse-x.fld.h5', .false.)
+  call write_pulse_file (trim(out_root) // '-pulse-y.fld.h5', .true.)
+  print '(a)', '  ' // trim(out_root) // '-pulse-{x,y}.fld.h5'
+else
+  call write_pulse_file (trim(out_root) // '-pulse.fld.h5', .false.)
+  print '(a)', '  ' // trim(out_root) // '-pulse.fld.h5'
+endif
+
+end subroutine finalize_diagnostics
+
+!------------------------------------------------------------------------------
+! One component of the full exit-plane pulse (Genesis's format holds one per file):
+! the live window's slices, then each banked slice read back from the escaped file
+! and free-space propagated over z_end - z_transmit. Shared by the -x and -y files.
+
+subroutine write_pulse_file (fname, use_y)
+
+character(*) fname
+logical use_y
+integer(hid_t) p_id, e_id, g_id
+real(rp), allocatable :: work(:), re_w(:), im_w(:)
+real(rp) dfl_scale
+integer k, is_f, nx, h5e
+logical ferr
+character(24) gname, dset_r, dset_i
+
+!
+
+nx = size(wf%Ex, 1)
+dfl_scale = wf%dx / sqrt(2 * (mu_0_vac * c_light))
+dset_r = 'field-real';  dset_i = 'field-imag'
+if (use_y) then
+  dset_r = 'field-real-y';  dset_i = 'field-imag-y'
+endif
+
+call hdf5_open_file (trim(fname), 'WRITE', p_id, ferr);  if (ferr) stop 1
 call hdf5_write_dataset_int  (p_id, 'gridpoints',   [nx],                    ferr)
 call hdf5_write_dataset_real (p_id, 'gridsize',     [wf%dx],                 ferr)
 call hdf5_write_dataset_real (p_id, 'refposition',  [wf%ref_position],       ferr)
@@ -2056,24 +2224,34 @@ allocate (work(nx*nx), re_w(nx*nx), im_w(nx*nx))
 do is_f = 1, nslice
   write (gname, '(a, i0.6)') 'slice', is_f
   call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
-  work = dfl_scale * reshape(real(wf%Ex(:,:,is_f), rp), [nx*nx])
+  if (use_y) then
+    work = dfl_scale * reshape(real(wf%Ey(:,:,is_f), rp), [nx*nx])
+  else
+    work = dfl_scale * reshape(real(wf%Ex(:,:,is_f), rp), [nx*nx])
+  endif
   call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1
-  work = dfl_scale * reshape(aimag(wf%Ex(:,:,is_f)), [nx*nx])
+  if (use_y) then
+    work = dfl_scale * reshape(aimag(wf%Ey(:,:,is_f)), [nx*nx])
+  else
+    work = dfl_scale * reshape(aimag(wf%Ex(:,:,is_f)), [nx*nx])
+  endif
   call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) stop 1
   call H5Gclose_f (g_id, h5e)
 enddo
 
 if (n_banked > 0) then
-  allocate (wf1%Ex(nx, nx, 1))
-  wf1%dx = wf%dx;  wf1%dy = wf%dy;  wf1%dz = fbeam%slice_spacing
-  wf1%wavelength = wf%wavelength
+  if (.not. allocated(wf1%Ex)) then
+    allocate (wf1%Ex(nx, nx, 1))
+    wf1%dx = wf%dx;  wf1%dy = wf%dy;  wf1%dz = fbeam%slice_spacing
+    wf1%wavelength = wf%wavelength
+  endif
 
   call hdf5_open_file (trim(out_root) // '-escaped.fld.h5', 'READ', e_id, ferr);  if (ferr) stop 1
   do k = 1, n_banked
     write (gname, '(a, i0.6)') 'slice', k
     g_id = hdf5_open_group (e_id, trim(gname), ferr, .true.);  if (ferr) stop 1
-    call hdf5_read_dataset_real (g_id, 'field-real', re_w, ferr, trim(gname));  if (ferr) stop 1
-    call hdf5_read_dataset_real (g_id, 'field-imag', im_w, ferr, trim(gname));  if (ferr) stop 1
+    call hdf5_read_dataset_real (g_id, trim(dset_r), re_w, ferr, trim(gname));  if (ferr) stop 1
+    call hdf5_read_dataset_real (g_id, trim(dset_i), im_w, ferr, trim(gname));  if (ferr) stop 1
     call H5Gclose_f (g_id, h5e)
     wf1%Ex(:,:,1) = reshape(cmplx(re_w, im_w, wf_rp), [nx, nx]) / dfl_scale
 
@@ -2091,8 +2269,7 @@ if (n_banked > 0) then
 endif
 
 call H5Fclose_f (p_id, h5e)
-print '(a)', '  ' // trim(out_root) // '-pulse.fld.h5'
 
-end subroutine finalize_diagnostics
+end subroutine write_pulse_file
 
 end program fel_track_test

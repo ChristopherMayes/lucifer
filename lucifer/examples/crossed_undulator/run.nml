@@ -1,0 +1,24 @@
+&fel_track_params
+  lat_file = "run_lattice.bmad"
+  out_root = "crossed"
+  lambda0 = 1e-10
+
+  ! The crossed-polarized afterburner: an x-planar undulator seeds and bunches the
+  ! beam; the same undulator rotated a quarter turn (tilt = pi/2) follows. Bunching
+  ! is longitudinal and polarization-blind, so the y-undulator's ORTHOGONAL radiation
+  ! grows from it while the x field only diffracts through -- watch the -final-x and
+  ! -final-y dumps and the stats file's field/ (totals + x) and field/y groups.
+
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0                  ! Steady state.
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  nbins = 8
+  seed_power = 1e6                     ! x-polarized seed (seed_polarization default).
+  seed_waist_size = 30e-6
+  grid_n_pts = 129
+  grid_half_width = 2e-4
+  ran_seed = 4242
+&end

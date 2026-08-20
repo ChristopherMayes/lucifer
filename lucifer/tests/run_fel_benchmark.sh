@@ -422,6 +422,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_spontaneous.py" --exe "$EXE" --latdir 
 fi
 
 echo
+echo "--- two-polarization checks (vector radiation, tilt, crossed undulator) -------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_two_polarization.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
+  echo "FAIL: two-polarization checks; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+
+echo
 echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
   echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2

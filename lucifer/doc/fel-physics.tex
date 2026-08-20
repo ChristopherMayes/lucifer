@@ -871,6 +871,36 @@ $\langle p_x\rangle$, is the reliable instrument); a skipped exit handoff is ref
 by name at the first seam element.
 \end{validation}
 
+\subsection{Two polarizations}\label{sec:vector}
+
+The radiation carries the envelope pair $(\hat E_x, \hat E_y)$ when any FEL element
+is tilted (or the seed is y-polarized); otherwise $\hat E_y$ is never allocated and
+the single-component path runs with its arithmetic untouched (every tier reproduces
+bit for bit). Diffraction is polarization-diagonal; power and intensity are totals
+$|\hat E_x|^2 + |\hat E_y|^2$. Each averaged element carries a polarization 2-vector
+$\hat p$ --- planar with tilt $t$: $(\cos t, \sin t)$; helical: $(1, -i)/\sqrt2$ ---
+its kick reads $E_{\mathrm{eff}} = \hat p^\dagger\!\cdot\!(\hat E_x,\hat E_y)$
+and its deposit writes $\hat p\,S$, which reproduces the scalar convention exactly
+when one polarization is live. The unaveraged mode needs no polarization vector at
+all: the instantaneous kinetic momenta are real, and each component works against and
+deposits into its own field component (the tilted element's field is the untilted
+analytic potential evaluated in the rotated frame). The scalar helical envelope is
+the co-rotating combination $(\hat E_x - i\hat E_y)/\sqrt2$; measured on dark
+shot-noise runs the two representations agree at $7\times10^{-15}$.
+
+\begin{validation}
+check\_two\_polarization.py: rotation identity (an all-y line fed the x/y-swapped
+beam reproduces the all-x line) at $4.5\times10^{-15}$ averaged, $4.1\times10^{-6}$
+unaveraged (the vector path also carries the betatron-current radiation the scalar
+convention omits --- a real refinement, tolerated at $10^{-5}$ not hidden); crossed
+undulator: x-field gain isolation through the y set at $1.6\times10^{-14}$ (averaged)
+and $1.7\times10^{-6}$ (unaveraged) against a pure-diffraction reference, the
+y field lighting up from the carried-over bunching at $P_y/P_x \sim 10^{-2}$, the
+two modes agreeing at $0.25$ in $\ln$; the unaveraged TD ledger closes over both
+components at $10^{-4}$; thread byte-identity; helical re-anchor $7\times10^{-15}$;
+tilt on helical and tilt with the transcribed maps refused by name.
+\end{validation}
+
 \section{Diagnostic output}\label{sec:stats}
 
 \emph{The stats file} \code{<out\_root>.stats.h5} carries the production statistics in

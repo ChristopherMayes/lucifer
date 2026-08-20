@@ -83,6 +83,15 @@ type fel_und_struct
   real(rp) :: kx = 0          ! Natural focusing, deck kx * ku^2 [1/m^2].
   real(rp) :: ky = 0          ! Natural focusing, deck ky * ku^2 [1/m^2].
   real(rp) :: ax = 0, ay = 0  ! Transverse offset of the undulator field [m].
+  real(rp) :: tilt = 0        ! Wiggle-plane tilt [rad]: planar wiggles along
+  real(rp) :: cos_t = 1, sin_t = 0   !   e = (cos_t, sin_t). Cached for the maps.
+  complex(rp) :: pol(2) = [(1.0_rp, 0.0_rp), (0.0_rp, 0.0_rp)]
+                              ! Polarization 2-vector on the (Ex, Ey) pair (manual
+                              ! sec:field vector convention): planar (cos t, sin t);
+                              ! helical (1, -i)/sqrt(2). The averaged kick reads
+                              ! E_eff = conj(pol).E and the deposit writes pol*src,
+                              ! which reproduces the scalar path exactly when only
+                              ! one polarization is live.
   logical :: helical = .false.
   logical :: bmad_transport = .false.  ! Transverse maps: transcribed TrackBeam (default)
                                        !   or the flattened Bmad periodic-wiggler kernel.
@@ -122,6 +131,7 @@ end type
 
 type fel_bank_struct
   complex(wf_rp), allocatable :: plane(:,:,:)  ! Transmitted planes, in transmission order.
+  complex(wf_rp), allocatable :: plane_y(:,:,:)  ! Ey planes, allocated when Ey is live.
   integer :: n = 0                             ! How many this call transmitted.
 end type
 
@@ -223,12 +233,9 @@ if (ele%value(kx$) /= 0) then
                 'the FEL focusing split; set kx = 0 on: ' // trim(ele%name)
   stop 1
 endif
-if (ele%value(tilt$) /= 0) then
-  print '(2a)', 'fel_track_test: a tilted FEL element would be SILENTLY treated as ', &
-                'untilted -- the radiation is a single scalar envelope today (planar'
-  print '(2a)', '  couples as x-wiggle by convention), so a y-plane undulator would ', &
-                'wrongly amplify the x field. Two-component radiation is the 6.1'
-  print '(a)',  '  deliverable (design brief). Refused at: ' // trim(ele%name)
+if (ele%value(tilt$) /= 0 .and. ele%field_calc == helical_model$) then
+  print '(2a)', 'fel_track_test: tilt on a HELICAL FEL element is a rotation of a ', &
+                'circularly symmetric field -- a no-op that reads as a mistake: ' // trim(ele%name)
   stop 1
 endif
 
@@ -372,6 +379,10 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
 
   slip%u_escaped = slip%u_escaped + sum(real(wf%Ex(:,:,last+1), rp)**2 + aimag(wf%Ex(:,:,last+1))**2) &
                      * wf%dx**2 / (2 * (mu_0_vac * c_light)) * (slip%sample * wf%wavelength / c_light)
+  if (allocated(wf%Ey)) then
+    slip%u_escaped = slip%u_escaped + sum(real(wf%Ey(:,:,last+1), rp)**2 + aimag(wf%Ey(:,:,last+1))**2) &
+                       * wf%dx**2 / (2 * (mu_0_vac * c_light)) * (slip%sample * wf%wavelength / c_light)
+  endif
 
   ! Bank the light itself when asked: the transmitted slice, copied before the zero.
 
@@ -384,11 +395,21 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
       bank%plane(:,:,1:size(grow,3)) = grow
       deallocate (grow)
     endif
+    if (allocated(wf%Ey) .and. .not. allocated(bank%plane_y)) then
+      allocate (bank%plane_y(size(wf%Ex,1), size(wf%Ex,2), size(bank%plane,3)))
+    elseif (allocated(bank%plane_y) .and. size(bank%plane_y,3) < size(bank%plane,3)) then
+      call move_alloc (bank%plane_y, grow)
+      allocate (bank%plane_y(size(grow,1), size(grow,2), size(bank%plane,3)))
+      bank%plane_y(:,:,1:size(grow,3)) = grow
+      deallocate (grow)
+    endif
     bank%n = bank%n + 1
     bank%plane(:,:,bank%n) = wf%Ex(:,:,last+1)
+    if (allocated(wf%Ey)) bank%plane_y(:,:,bank%n) = wf%Ey(:,:,last+1)
   endif
 
   wf%Ex(:, :, last+1) = 0
+  if (allocated(wf%Ey)) wf%Ey(:, :, last+1) = 0
 
   ! The transmitted slice becomes the start of the record.
 
@@ -454,12 +475,17 @@ end function fel_und_coupling
 function faw (und, x, y) result (value)
 
 type (fel_und_struct) und
-real(rp) x, y, value, dx, dy
+real(rp) x, y, value, dx, dy, dt
 
 !
 
 dx = x - und%ax
 dy = y - und%ay
+if (und%sin_t /= 0) then     ! The roll-off lives in the wiggle frame (tilted planar).
+  dt = und%cos_t * dx + und%sin_t * dy
+  dy = -und%sin_t * dx + und%cos_t * dy
+  dx = dt
+endif
 value = 1 + 0.5_rp * (und%kx * dx*dx + und%ky * dy*dy)
 
 end function faw
@@ -476,12 +502,17 @@ end function faw
 function faw2 (und, x, y) result (value)
 
 type (fel_und_struct) und
-real(rp) x, y, value, dx, dy
+real(rp) x, y, value, dx, dy, dt
 
 !
 
 dx = x - und%ax
 dy = y - und%ay
+if (und%sin_t /= 0) then     ! Wiggle-frame roll-off, as in faw.
+  dt = und%cos_t * dx + und%sin_t * dy
+  dy = -und%sin_t * dx + und%cos_t * dy
+  dx = dt
+endif
 value = 1 + und%kx * dx*dx + und%ky * dy*dy
 
 end function faw2
@@ -893,6 +924,12 @@ do ip = 1, sl%n
   k1xx = k1x_loc / rel_p**2
   k3l = 2 * delz * k1yy                    ! Half of Bmad's per-step kick; see header.
 
+  ! A tilted planar element focuses in its own wiggle frame: rotate in, apply the
+  ! untilted map, rotate out -- exactly Bmad's tilt_coords composition. sin_t = 0
+  ! (every untilted element) skips both rotations, arithmetic untouched.
+
+  if (und%sin_t /= 0) call rot_xy (sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), und%cos_t, und%sin_t)
+
   if (leading) call octupole_kick ()
 
   call quad_mat2_calc (k1xx, delz, rel_p, m2, dz_c, ddz_c)
@@ -901,6 +938,8 @@ do ip = 1, sl%n
   call apply_mat2 (sl%y(ip), sl%py(ip))
 
   if (.not. leading) call octupole_kick ()
+
+  if (und%sin_t /= 0) call rot_xy (sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), und%cos_t, -und%sin_t)
 enddo
 
 !------------------------------------------------------------------------------
@@ -912,6 +951,17 @@ if (und%helical) then
   sl%px(ip) = sl%px(ip) + k3l * rel_p * kz**2 * sl%x(ip)**3 / 3
 endif
 end subroutine octupole_kick
+
+subroutine rot_xy (x, px, y, py, c, s)
+
+! Rotate the transverse pair into (s > 0 passed) or out of (s < 0) the wiggle frame.
+
+real(rp) x, px, y, py, c, s, t1
+
+t1 = c * x + s * y;   y = -s * x + c * y;   x = t1
+t1 = c * px + s * py; py = -s * px + c * py; px = t1
+
+end subroutine rot_xy
 
 subroutine apply_mat2 (v, vp)
 real(rp) v, vp, v1, v2
@@ -1041,6 +1091,18 @@ do ip = 1, sl%n
     cpart = cpart + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
     cpart = cpart + wf%Ex(ix,   iy+1, ifld) * wx * (1-wy)
     cpart = cpart + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
+
+    ! Two live polarizations: the element couples to E_eff = conj(pol).E (manual
+    ! sec:field). With one polarization pol = (1,0) and this branch never runs, so
+    ! single-polarization arithmetic is untouched.
+
+    if (allocated(wf%Ey)) then
+      cpart = conjg(und%pol(1)) * cpart
+      cpart = cpart + conjg(und%pol(2)) * (wf%Ey(ix,   iy,   ifld) * wx * wy &
+                                         + wf%Ey(ix+1, iy,   ifld) * (1-wx) * wy &
+                                         + wf%Ey(ix,   iy+1, ifld) * wx * (1-wy) &
+                                         + wf%Ey(ix+1, iy+1, ifld) * (1-wx) * (1-wy))
+    endif
     rpart = rtmp * awloc * conjg(cpart)
   else
     rpart = 0
@@ -1294,7 +1356,20 @@ endif
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
 wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_exp_k2
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
-wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
+
+if (allocated(wf%Ey)) then
+
+  ! Two live polarizations: the element's source lands as pol * src on the pair
+  ! (the exact dual of the kick's conj(pol).E read), and Ey diffracts identically.
+
+  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(1) * crsource
+  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_exp_k2
+  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(2) * crsource
+else
+  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
+endif
 
 err_flag = .false.
 
@@ -1411,6 +1486,13 @@ wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_exp_k2
 call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
 wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
 
+if (allocated(wf%Ey)) then      ! Diffraction is polarization-diagonal.
+  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_exp_k2
+  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp)
+endif
+
 err_flag = .false.
 
 end subroutine fel_field_diffract
@@ -1451,11 +1533,28 @@ do iy = 1, ngrid
     power = power + wei
   enddo
 enddo
+
+! With a live second polarization, power and intensity are TOTALS (|Ex|^2 + |Ey|^2);
+! single-polarization lines never take this branch, keeping them bit-identical.
+
+if (allocated(wf%Ey)) then
+  do iy = 1, ngrid
+    do ix = 1, ngrid
+      wei = real(wf%Ey(ix,iy,ifld), rp)**2 + aimag(wf%Ey(ix,iy,ifld))**2
+      power = power + wei
+    enddo
+  enddo
+endif
 power = power * scl
 
 ic = ngrid/2 + 1
 on_axis_intensity = (real(wf%Ex(ic,ic,ifld), rp)**2 + aimag(wf%Ex(ic,ic,ifld))**2) &
                     / (2 * (mu_0_vac * c_light))
+if (allocated(wf%Ey)) then
+  on_axis_intensity = on_axis_intensity + &
+                    (real(wf%Ey(ic,ic,ifld), rp)**2 + aimag(wf%Ey(ic,ic,ifld))**2) &
+                    / (2 * (mu_0_vac * c_light))
+endif
 
 end subroutine fel_field_diag
 
