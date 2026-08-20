@@ -870,6 +870,47 @@ Known scaling limit, named for the follow-on: the stats accumulate in memory and
 once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.
 
+## Spontaneous emission: the two FEL modes against Bmad's own radiation
+
+Bmad-only, no Genesis (the averaged mode's Genesis agreement is settled by the tiers).
+One short helical wiggler (`tests/bmad/spont_probe.bmad`, 40 periods, benchmark
+parameters), the same beam, tracked four ways -- `check_spontaneous.py` in the harness:
+
+| | Δγ over 0.6 m | vs analytic |
+|---|---|---|
+| analytic `(2/3) r_e γ² k_u² a_w²` (= the coefficient in Genesis's `Incoherent.cpp`) | 0.018369 | — |
+| **Bmad `runge_kutta` + `radiation_damping`** (the same wiggler, Bmad's own tracking) | 0.018371 | **1.0e-4** |
+| Bmad `runge_kutta`, radiation off | exactly 0 | the integrator conserves |
+| averaged FEL mode | 1.6e-5 | 8.9e-4 — nothing |
+| unaveraged FEL mode | 6.0e-4 | 3.3% |
+
+Bmad's radiation damping reproduces the analytic rate to **1e-4**, so the reference is
+independent and not in doubt. The two FEL modes then say something specific:
+
+The **averaged (KMR) mode does not charge the beam at all**. Its step adds `2S` to the
+field while the particles are kicked by `E`, so the `4|S|²` part of the field-energy
+increment is created rather than taken from the beam. That is the model, not a defect
+-- Genesis carries an optional `&sponrad` module (`doLoss`/`doSpread`, off by default)
+precisely to add the missing loss and diffusion by hand. The check pins it as a known
+zero, so a future change that starts debiting the beam cannot pass unnoticed.
+
+The **unaveraged mode conserves energy by construction**, so its beam pays -- but only
+for the radiation the grid can hold. An SVEA grid represents angles to the FFT Nyquist
+θ_max = λ/2dx, and the evidence that the captured 3.3% really is acceptance-limited
+undulator radiation is its SCALING: varying only the acceptance (ngrid 127/255/511 at
+fixed box, θ_max = 1.6/3.2/6.4e-5 rad) moves the captured loss 0.84% -> 3.28% -> 11.4%,
+a measured 13.7x against a predicted 10.5x across a 16x range in captured solid angle.
+The absolute normalization sits ~3x below a dipole-limit estimate of the angular
+distribution, which is that estimate's own accuracy at a_w ~ 1 -- so the test checks
+the shape tightly and the magnitude loosely, which is the honest split.
+
+Consequence, named: **neither mode carries the ~97% radiated outside the grid
+acceptance**, which costs a real beam energy. The fix is an optional analytic loss +
+diffusion term (Genesis's `&sponrad` equivalent): the full rate for the averaged mode,
+the complement for the unaveraged one. FINDINGS.md 7.27 has the full trail, including
+the measurement that first exposed it (a dark segment where the averaged model's field
+gained 134x what its beam paid).
+
 ## The coarse-step measurement (brief 8.3)
 
 (Summarized in manual `sec:numerics`.)

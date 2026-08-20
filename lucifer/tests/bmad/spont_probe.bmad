@@ -1,0 +1,26 @@
+! Spontaneous-emission cross-check probe (check_spontaneous.py): ONE short helical
+! wiggler at the benchmark parameters, tracked three ways from the same beam -- the
+! averaged FEL mode, the unaveraged FEL mode, and Bmad's own runge_kutta with
+! radiation damping (spont_probe_rk.bmad, the same wiggler with a different tracking
+! method) -- against the analytic rate dgamma/ds = (2/3) r_e gamma^2 ku^2 aw^2.
+!
+! 40 periods: long enough that the loss is well above the tracking floor, short
+! enough that all three runs finish in seconds.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+
+UNDS: wiggler, l = 0.60, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+
+SEG: line = (UNDS)
+
+use, SEG

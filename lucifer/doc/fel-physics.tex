@@ -776,6 +776,24 @@ $(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], -\mathrm{Re}[\hat E e^{i\Psi}])/
 --- both give intensity $|\hat E|^2/2Z_0$, so \S\ref{sec:field}'s power diagnostic is
 mode-independent.
 
+\emph{Spontaneous emission.} The classical rate is
+$d\gamma/ds = \tfrac23 r_e \gamma^2 k_u^2 a_w^2$ ($a_w$ rms, both polarizations); Bmad's
+own \code{radiation\_damping} through the same wiggler reproduces it to $10^{-4}$, and
+it is the coefficient in Genesis's \code{Incoherent.cpp}. The two FEL modes stand in
+very different relations to it. The averaged (KMR) mode \emph{emits} the radiation but
+never debits the beam: its step adds $2S$ to the field while particles are kicked by
+$E$, so the $4|S|^2$ part of the field energy is created (measured on a dark segment:
+the field gains $134\times$ what the beam pays). Genesis's optional \code{\&sponrad}
+module exists to add that loss by hand and is off by default. The unaveraged mode
+conserves energy by construction (\S\ref{sec:unaveraged}'s $1/u_s$ deposit), so its
+beam pays --- for the fraction of the emission the grid can hold, angles up to the FFT
+Nyquist $\theta_{\max} = \lambda/2\,dx$. Measured at the benchmark parameters that is
+3.3\% of the analytic rate, and the evidence that this is acceptance-limited undulator
+radiation is its scaling: over a $16\times$ range in captured solid angle the loss
+moves $0.84\% \to 11.4\%$, a measured $13.7\times$ against a predicted $10.5\times$.
+Neither mode carries the $\sim$97\% radiated outside the acceptance; an optional
+analytic loss/diffusion term is the named follow-on (FINDINGS 7.27).
+
 \emph{Measuring $f_c$.} Paired probes (12 and 20 periods, identical 2-period ramps,
 small-signal seed): the difference of the energy-modulation phasors
 $F = (2/N)\sum_j \Delta\gamma_j e^{i\theta_j^0}$ isolates the flat region --- ramps

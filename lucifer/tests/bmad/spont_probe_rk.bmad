@@ -1,0 +1,11 @@
+! The spont_probe wiggler tracked by BMAD ITSELF: tracking_method = runge_kutta, so
+! the FEL walk does not recognize it as an FEL element (recognition is key + custom)
+! and hands it to track1_bunch -- Bmad's integrator through the same helical field,
+! with Bmad's radiation damping applied from the element's own radiation integrals
+! when the driver's radiation_damping knob is set. The independent reference for the
+! spontaneous energy loss: no FEL model, no grid, no SVEA band.
+
+call, file = spont_probe.bmad
+
+UNDS[tracking_method] = runge_kutta
+UNDS[num_steps] = 400

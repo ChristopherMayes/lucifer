@@ -225,6 +225,16 @@ real(rp) :: gamma0 = 0                  ! DERIVED from the lattice e_tot.
 logical :: split_weights = .false.
 logical :: write_initial = .false.
 logical :: migrate = .false., migrate_check = .false.
+! Bmad's own synchrotron radiation, for elements Bmad tracks (interludes and any
+! wiggler whose tracking_method is not custom). The FEL path has its own radiation
+! physics -- these knobs do not touch it. Used by check_spontaneous.py to measure
+! Bmad's independent spontaneous-loss implementation against the FEL modes and the
+! analytic rate; off by default, as in Bmad.
+logical :: radiation_damping = .false., radiation_fluctuations = .false.
+! A deliberate run with NO FEL interaction: Bmad tracks every element, the field just
+! drifts. The reference leg of check_spontaneous.py, which measures Bmad's own
+! radiation physics through the same wiggler the FEL modes use.
+logical :: reference_run = .false.
 character(400) :: lat_file = '', beam_file = '', field_file = '', out_root = 'fel_track'
 character(16) :: interlude_model = 'bmad'
 
@@ -327,7 +337,8 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
                            beam_init, imp, use_beam_init, dist_file, write_dist_file, &
                            write_opmd_file, imp_split_weights, write_wake_kernels, &
-                           dump_beam_at, dump_field_at, keep_escaped_field
+                           dump_beam_at, dump_field_at, keep_escaped_field, &
+                           radiation_damping, radiation_fluctuations, reference_run
 
 ! Read parameters.
 
@@ -350,6 +361,9 @@ if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
   print '(a)', 'fel_track_test: interlude_model must be "bmad" or "genesis", got: ' // trim(interlude_model)
   stop 1
 endif
+
+bmad_com%radiation_damping_on = radiation_damping
+bmad_com%radiation_fluctuations_on = radiation_fluctuations
 
 ! Read the lattice and the starting state: a pair of Genesis dumps (the shared-start
 ! benchmark methodology), or a self-generated steady-state condition when both file
@@ -1479,8 +1493,9 @@ do je = 1, branch%n_ele_track
   endif
 enddo
 
-if (.not. any(is_fel)) then
+if (.not. any(is_fel) .and. .not. reference_run) then
   print '(a)', 'fel_track_test: the lattice has no FEL elements (wiggler/undulator with tracking_method = custom).'
+  print '(a)', '  Set reference_run = T for a deliberate no-FEL run (Bmad tracks everything).'
   stop 1
 endif
 
