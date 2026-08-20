@@ -40,7 +40,7 @@ use bmad
 use beam_utils, only: calc_bunch_params, calc_emittances_and_twiss_from_sigma_matrix
 use fel_beam_mod
 use wavefront_mod
-use fel_track_mod, only: fel_slip_struct, fel_field_index
+use fel_track_mod, only: fel_slip_struct, fel_field_index, fel_field_diag
 use hdf5_interface
 
 implicit none
@@ -128,7 +128,7 @@ end subroutine fel_stats_init
 ! for every slice. with_angles fills the field theta moments (element ends).
 !-
 
-subroutine fel_stats_record (stats, beam, wf, slip, z_now, with_angles, err_flag)
+subroutine fel_stats_record (stats, beam, wf, slip, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_beam_struct), target :: beam
@@ -136,11 +136,12 @@ type (wavefront_struct), target :: wf
 type (fel_slip_struct) slip
 type (fel_slice_struct), pointer :: sl
 type (wavefront_params_struct) pms
+type (fel_slice_diag_struct) bdiag_arr(:)   ! OUT: the diag instrument, one per slice.
+real(rp) fpow(:), fonax(:)                  ! OUT: fel_field_diag's power/on-axis per slice.
 real(rp) z_now
 logical with_angles, err_flag
 
-real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), beta0, ks, theta
-complex(rp) bphasor
+real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), beta0, ks
 integer ir, is, ip, i, j, nslice
 logical err, any_err
 character(*), parameter :: r_name = 'fel_stats_record'
@@ -161,10 +162,17 @@ ks = twopi / wf%wavelength
 
 any_err = .false.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, pms, err, bphasor, theta) &
+! This loop ALSO evaluates the diag instrument (fel_slice_diag, fel_field_diag) for
+! every slice -- the diag writer then only prints. Each slice's arithmetic is the
+! identical serial code, so diag.txt is bit-for-bit what it always was; what changed
+! is that the formerly SERIAL per-record diag sweeps now ride this parallel loop.
+
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, pms, err) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
+  call fel_field_diag (wf, fel_field_index(slip, is, nslice), fpow(is), fonax(is))
+  call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
   ! Two-pass weighted moments (the FINDINGS 4.8 variance lesson).
 
@@ -201,17 +209,11 @@ do is = 1, nslice
   stats%t(is, ir) = z_now / c_light - cen(5) / (beta0 * c_light)
   stats%sigma_t(is, ir) = sqrt(max(0.0_rp, sig(5,5))) / (beta0 * c_light)
 
-  ! Bunching at the fundamental: |sum w e^{-i ks tau}| / sum w, tau = -z/beta_j.
-  ! Weighted (each macroparticle radiates its own charge), phase in [rad].
+  ! Bunching from the diag instrument just evaluated (|b| at the fundamental; the
+  ! phase carries the common phi0, Genesis's own convention).
 
-  bphasor = 0
-  do ip = 1, sl%n
-    theta = ks * sl%z(ip) * sqrt((fel_p0_mc(beam) * (1 + sl%pz(ip)))**2 + 1) / (fel_p0_mc(beam) * (1 + sl%pz(ip)))
-    bphasor = bphasor + sl%weight(ip) * cmplx(cos(theta), sin(theta), rp)
-  enddo
-  if (wsum > 0) bphasor = bphasor / wsum
-  stats%bunching(is, ir) = abs(bphasor)
-  stats%bunching_phase(is, ir) = atan2(aimag(bphasor), real(bphasor, rp))
+  stats%bunching(is, ir) = bdiag_arr(is)%bunching
+  stats%bunching_phase(is, ir) = bdiag_arr(is)%bunching_phase
 
   ! The field slice this beam slice couples to, unrotated exactly as the dumps are.
 

@@ -845,17 +845,18 @@ Measured (check_diagnostics.py, in the harness -- cross-identities, not referenc
 | unknown dump element | refused by name | -- |
 
 diag.txt is untouched (the Genesis-comparison instrument): every benchmark tier
-reproduces bit for bit. The stats overhead, measured on the saturation demo's averaged
-run (96 slices x 2048 particles, 255^2 grid, 12 threads): 36.5 s -> 40.7 s, +11.5%,
-split as ~5% the per-record moment sweeps (every record -- the comb cadence; memory-
-bandwidth bound, streaming every field plane a second time), and the rest the
-element-end theta-moment FFTs (23 ends x 96 slices x 3 FFTs) plus the file write.
-Per-slice element-end twiss is evaluated through Bmad's own
-calc_emittances_and_twiss_from_sigma_matrix FED FROM the already-computed per-record
-moments (an element end always coincides with its last record), not by re-summing
-particles. The justification for the price: Genesis's timed runs include its own
-diagnostics too, and those are scalar columns where these are full 6x6 beam and 4x4
-field moment sets per slice per record -- the difference IS the extra information.
+reproduces bit for bit -- including through the diag/stats FUSION: the per-record
+stats loop also evaluates the diag instrument (the identical fel_field_diag and
+fel_slice_diag calls per slice, so each slice's arithmetic is unchanged), and the
+diag writer only prints. That retired the formerly SERIAL per-record diag sweeps
+(all 96 field planes and 96 particle slices, every record), which were worth more
+than the whole stats machinery costs: measured on the saturation demo's averaged run
+(96 slices x 2048 particles, 255^2 grid, 12 threads), the pre-stats baseline was
+36.5 s and the run WITH full statistics is ~32 s -- the diagnostics deliverable made
+the tracker 12% faster, net. Per-slice element-end twiss is evaluated through Bmad's
+own calc_emittances_and_twiss_from_sigma_matrix FED FROM the already-computed
+per-record moments (an element end always coincides with its last record), not by
+re-summing particles.
 Known scaling limit, named for the follow-on: the stats accumulate in memory and write
 once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.

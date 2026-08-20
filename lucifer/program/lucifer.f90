@@ -300,6 +300,8 @@ type (fel_collective_struct) coll
 ! re-interacts, so it is fixed information).
 type (fel_stats_struct) stats
 type (fel_bank_struct) bank
+type (fel_slice_diag_struct), allocatable :: bdiag_arr(:)  ! Diag rows, filled by the stats loop.
+real(rp), allocatable :: fpow_arr(:), fonax_arr(:)         ! fel_field_diag per slice, same loop.
 type (wavefront_struct) wf1     ! One-slice scratch for banked-slice propagation.
 character(60) :: dump_beam_at(40) = '', dump_field_at(40) = ''
 logical :: keep_escaped_field = .false.
@@ -619,8 +621,8 @@ prog_count_last = prog_count0
 lat_length = branch%ele(branch%n_ele_track)%s
 
 z_now = 0
-call write_diag_rows()     ! Initial record, matching Genesis's diag before the first step.
-call take_stats_record (.true.)
+call take_stats_record (.true.)   ! Evaluates the diag instrument too; the writer prints.
+call write_diag_rows()            ! Initial record, matching Genesis's diag before the first step.
 
 ! Walk the lattice.
 
@@ -690,10 +692,10 @@ do ie = 1, branch%n_ele_track
       else
         call apply_slippage_banked (und%dz * und_slip_step)
       endif
-      if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
       if (istep == und%nstep) call do_migrate ()
-      call write_diag_rows()
       call take_stats_record (istep == und%nstep)
+      if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
+      call write_diag_rows()
       call progress_line (istep == und%nstep, istep, und%nstep)
     enddo
     call end_of_element ()
@@ -758,8 +760,8 @@ do ie = 1, branch%n_ele_track
     call apply_slippage_banked (ele_slip(ie))
 
     call do_migrate ()
-    call write_diag_rows()
     call take_stats_record (.true.)
+    call write_diag_rows()
     call progress_line (.true., 1, 1)
     call end_of_element ()
 
@@ -777,8 +779,8 @@ do ie = 1, branch%n_ele_track
     call apply_slippage_banked (ele_slip(ie))
 
     call do_migrate ()
-    call write_diag_rows()
     call take_stats_record (.true.)
+    call write_diag_rows()
     call progress_line (.true., 1, 1)
     call end_of_element ()
   endif
@@ -1612,18 +1614,19 @@ end subroutine write_wake_block
 subroutine write_diag_rows ()
 
 ! One row per slice, slices in time-window order: beam slice is against field slice
-! fel_field_index(slip, is, nslice), the unrotation of manual sec:slippage.
+! fel_field_index(slip, is, nslice), the unrotation of manual sec:slippage. The values
+! are the ones the stats loop just evaluated with the SAME fel_field_diag and
+! fel_slice_diag calls, slice-parallel (each slice's arithmetic identical to the old
+! serial sweep, so this file is bit-for-bit what it always was); this routine only
+! prints. take_stats_record must have run for this record first.
 
-real(rp) power, on_axis
 integer is
 
 do is = 1, nslice
-  call fel_field_diag (wf, fel_field_index(slip, is, nslice), power, on_axis)
-  call fel_slice_diag (fbeam, fbeam%slice(is), ks, bdiag)
-
-  write (iu_diag, '(es24.16, i8, 10es24.16)') z_now, is, power, on_axis, bdiag%bunching, &
-        bdiag%bunching_phase, bdiag%mean_energy, bdiag%sigma_energy, bdiag%sigma_x, bdiag%sigma_y, &
-        bdiag%current, bdiag%n_eff
+  write (iu_diag, '(es24.16, i8, 10es24.16)') z_now, is, fpow_arr(is), fonax_arr(is), &
+        bdiag_arr(is)%bunching, bdiag_arr(is)%bunching_phase, bdiag_arr(is)%mean_energy, &
+        bdiag_arr(is)%sigma_energy, bdiag_arr(is)%sigma_x, bdiag_arr(is)%sigma_y, &
+        bdiag_arr(is)%current, bdiag_arr(is)%n_eff
 enddo
 
 end subroutine write_diag_rows
@@ -1643,8 +1646,12 @@ subroutine write_ledger_row ()
 ! E_beam + U_field + U_escaped - U_spont. Wakes would be a second, unbanked exit
 ! channel; this ledger only exists where they are refused.
 
-real(rp) e_beam, u_field, power, on_axis, p_mc_l, g0_l
+real(rp) e_beam, u_field, p_mc_l, g0_l
 integer is, ip
+
+! The field power per slice comes from the stats loop's fel_field_diag evaluation
+! (same call, same unrotation, same summation order over slices -- bit-identical);
+! take_stats_record must have run for this record first.
 
 e_beam = 0
 u_field = 0
@@ -1654,8 +1661,7 @@ do is = 1, nslice
     p_mc_l = fel_p0_mc(fbeam) * (1 + fbeam%slice(is)%pz(ip))
     e_beam = e_beam + fbeam%slice(is)%weight(ip) * (sqrt(p_mc_l**2 + 1) - g0_l) * m_electron
   enddo
-  call fel_field_diag (wf, fel_field_index(slip, is, nslice), power, on_axis)
-  u_field = u_field + power * fbeam%slice_spacing / c_light
+  u_field = u_field + fpow_arr(is) * fbeam%slice_spacing / c_light
 enddo
 
 write (iu_ledger, '(6es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum
@@ -1746,6 +1752,7 @@ do i = 1, branch%n_ele_track
 enddo
 
 call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c)
+allocate (bdiag_arr(nslice), fpow_arr(nslice), fonax_arr(nslice))
 
 end subroutine setup_diagnostics
 
@@ -1754,7 +1761,7 @@ subroutine take_stats_record (with_angles)
 
 logical with_angles, serr
 
-call fel_stats_record (stats, fbeam, wf, slip, z_now, with_angles, serr)
+call fel_stats_record (stats, fbeam, wf, slip, z_now, with_angles, bdiag_arr, fpow_arr, fonax_arr, serr)
 if (serr) stop 1
 
 end subroutine take_stats_record
