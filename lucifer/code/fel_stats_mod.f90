@@ -59,12 +59,18 @@ type fel_stats_struct
   real(rp), allocatable :: bunching(:,:)          ! (nslice, nrec) |b| at the fundamental
   real(rp), allocatable :: bunching_phase(:,:)    ! (nslice, nrec) [rad]
   integer, allocatable :: n_particle_live(:,:)    ! (nslice, nrec)
-  ! Field side, wavefront_params_struct names.
+  ! Field side, wavefront_params_struct names. With ONE live polarization these are
+  ! the whole story; with two, they carry the X component, the f2_* arrays carry Y
+  ! (written as a field/y/ group), and the power/energy/on_axis datasets are written
+  ! as TOTALS -- single-polarization files are unchanged.
   real(rp), allocatable :: f_centroid(:,:,:)      ! (4, nslice, nrec)
   real(rp), allocatable :: f_sigma(:,:,:)         ! (16, nslice, nrec)
   real(rp), allocatable :: f_energy(:,:), f_power(:,:), f_on_axis(:,:)
   real(rp), allocatable :: f_emit_x(:,:), f_emit_y(:,:)
   integer, allocatable :: f_angles_valid(:,:)     ! 0/1
+  real(rp), allocatable :: f2_centroid(:,:,:), f2_sigma(:,:,:)
+  real(rp), allocatable :: f2_energy(:,:), f2_power(:,:), f2_on_axis(:,:)
+  real(rp), allocatable :: f2_emit_x(:,:), f2_emit_y(:,:)
   ! Element ends: the evaluated bunch_params_struct, whole bunch and per slice.
   integer, allocatable :: e_ix_ele(:)             ! (nend)
   real(rp), allocatable :: e_s(:)                 ! (nend) [m]
@@ -91,11 +97,12 @@ contains
 ! from the lattice walk (records = 1 + sum of undulator steps + one per interlude).
 !-
 
-subroutine fel_stats_init (stats, nrec, nend, nslice, p0c)
+subroutine fel_stats_init (stats, nrec, nend, nslice, p0c, two_pol)
 
 type (fel_stats_struct) stats
 real(rp) p0c
 integer nrec, nend, nslice
+logical two_pol
 
 !
 
@@ -113,6 +120,11 @@ allocate (stats%f_centroid(4, nslice, nrec), stats%f_sigma(16, nslice, nrec))
 allocate (stats%f_energy(nslice, nrec), stats%f_power(nslice, nrec), stats%f_on_axis(nslice, nrec))
 allocate (stats%f_emit_x(nslice, nrec), stats%f_emit_y(nslice, nrec))
 allocate (stats%f_angles_valid(nslice, nrec))
+if (two_pol) then
+  allocate (stats%f2_centroid(4, nslice, nrec), stats%f2_sigma(16, nslice, nrec))
+  allocate (stats%f2_energy(nslice, nrec), stats%f2_power(nslice, nrec), stats%f2_on_axis(nslice, nrec))
+  allocate (stats%f2_emit_x(nslice, nrec), stats%f2_emit_y(nslice, nrec))
+endif
 allocate (stats%e_ix_ele(nend), stats%e_s(nend))
 allocate (stats%e_bunch(fel_stats_n_bp$, nend), stats%e_slice(fel_stats_n_bp$, nslice, nend))
 
@@ -229,6 +241,19 @@ do is = 1, nslice
   stats%f_emit_x(is, ir) = pms%emit_x
   stats%f_emit_y(is, ir) = pms%emit_y
   stats%f_angles_valid(is, ir) = merge(1, 0, pms%angle_moments_valid)
+
+  if (allocated(wf%Ey)) then
+    call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(slip, is, nslice)), wf%dx, &
+                                    wf%wavelength, beam%slice_spacing, pms, with_angles, err)
+    any_err = any_err .or. err
+    stats%f2_centroid(:, is, ir) = pms%centroid
+    stats%f2_sigma(:, is, ir) = reshape(pms%sigma, [16])
+    stats%f2_energy(is, ir) = pms%energy
+    stats%f2_power(is, ir) = pms%power
+    stats%f2_on_axis(is, ir) = pms%on_axis_intensity
+    stats%f2_emit_x(is, ir) = pms%emit_x
+    stats%f2_emit_y(is, ir) = pms%emit_y
+  endif
 enddo
 !$OMP end parallel do
 
@@ -387,12 +412,32 @@ call H5Gclose_f (g_id, h5_err)
 call H5Gcreate_f (f_id, 'field', g_id, h5_err)
 call hdf5_write_dataset_real (g_id, 'centroid', stats%f_centroid(:,:,1:ir), err);  if (err) return
 call hdf5_write_dataset_real (g_id, 'sigma', stats%f_sigma(:,:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'energy', stats%f_energy(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'power', stats%f_power(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'on_axis_intensity', stats%f_on_axis(:,1:ir), err);  if (err) return
+if (allocated(stats%f2_energy)) then
+  ! Two live polarizations: power/energy/intensity are TOTALS; the x-component params
+  ! stay in this group's centroid/sigma/emit, the y component's under field/y/.
+  call hdf5_write_dataset_real (g_id, 'energy', stats%f_energy(:,1:ir) + stats%f2_energy(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (g_id, 'power', stats%f_power(:,1:ir) + stats%f2_power(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (g_id, 'on_axis_intensity', &
+                                stats%f_on_axis(:,1:ir) + stats%f2_on_axis(:,1:ir), err);  if (err) return
+else
+  call hdf5_write_dataset_real (g_id, 'energy', stats%f_energy(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (g_id, 'power', stats%f_power(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (g_id, 'on_axis_intensity', stats%f_on_axis(:,1:ir), err);  if (err) return
+endif
 call hdf5_write_dataset_real (g_id, 'emit_x', stats%f_emit_x(:,1:ir), err);  if (err) return
 call hdf5_write_dataset_real (g_id, 'emit_y', stats%f_emit_y(:,1:ir), err);  if (err) return
 call hdf5_write_dataset_int (g_id, 'angle_moments_valid', stats%f_angles_valid(:,1:ir), err);  if (err) return
+if (allocated(stats%f2_energy)) then
+  call H5Gcreate_f (g_id, 'y', b_id, h5_err)
+  call hdf5_write_dataset_real (b_id, 'centroid', stats%f2_centroid(:,:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (b_id, 'sigma', stats%f2_sigma(:,:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (b_id, 'energy', stats%f2_energy(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (b_id, 'power', stats%f2_power(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (b_id, 'on_axis_intensity', stats%f2_on_axis(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (b_id, 'emit_x', stats%f2_emit_x(:,1:ir), err);  if (err) return
+  call hdf5_write_dataset_real (b_id, 'emit_y', stats%f2_emit_y(:,1:ir), err);  if (err) return
+  call H5Gclose_f (b_id, h5_err)
+endif
 call H5Gclose_f (g_id, h5_err)
 
 ! Element ends: the evaluated bunch_params_struct, unpacked into named datasets.
