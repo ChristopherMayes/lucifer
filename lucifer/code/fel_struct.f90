@@ -125,6 +125,8 @@ type fel_wake_init_struct
   real(rp) :: lgap = 1             ! Period of the gaps [m].
   real(rp) :: hrough = 0           ! Roughness amplitude [m]. 0: no roughness wake.
   real(rp) :: lrough = 1           ! Roughness period [m].
+  ! Check instrument: export the transcribed kernels for building z_long tables.
+  character(400) :: write_kernels = ''
 end type
 
 ! (Space charge needs no init mirror: fel_efield_struct is already pure scalars and

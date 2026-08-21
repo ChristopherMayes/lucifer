@@ -27,15 +27,11 @@ use fel_struct
 
 implicit none
 
-! The check instruments of &fel_beam_init and &fel_params that are not part of any
-! physics struct live in fel_beam_init_param_struct (bparam); write_wake_kernels is
-! returned alongside since it is a driver output knob, not wake physics.
-
 contains
 
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_read_input (param_file, run, write_wake_kernels, err_flag)
+! Subroutine fel_read_input (param_file, run, err_flag)
 !
 ! Read the three namelist groups of param_file into run's input structs. bmad_com and
 ! space_charge_com are set directly by the namelist (they are Bmad's own globals).
@@ -47,11 +43,10 @@ contains
 !   run                -- fel_run_struct: input structs filled (global, winit,
 !                           wake_init, sc_init, beam_init, imp, bparam, lat_file,
 !                           field_file). Nothing else is touched.
-!   write_wake_kernels -- character(*): the wake-kernel dump file ('' = none).
 !   err_flag           -- logical: set on any parse error or on the retired group.
 !-
 
-subroutine fel_read_input (param_file, run, write_wake_kernels, err_flag)
+subroutine fel_read_input (param_file, run, err_flag)
 
 type (fel_run_struct), target :: run
 
@@ -63,8 +58,8 @@ type (fel_efield_struct) :: sc
 type (beam_init_struct) :: beam_init
 type (fel_import_param_struct) :: imp
 character(400) :: lat_file, beam_file, dist_file, write_dist_file, write_opmd_file
+character(400) :: write_wake_kernels
 character(400) :: field_file(9)
-character(*) write_wake_kernels
 logical :: use_beam_init, shotnoise
 logical :: split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
 integer :: nbins
@@ -108,7 +103,7 @@ split_weights = run%bparam%split_weights
 swap_beam_xy = run%bparam%swap_beam_xy
 gen_test_weights = run%bparam%gen_test_weights
 imp_split_weights = run%bparam%imp_split_weights
-write_wake_kernels = ''
+write_wake_kernels = run%wake_init%write_kernels
 
 ! The retired group is refused by name before anything is read.
 
@@ -162,6 +157,7 @@ run%field_file = field_file
 run%global = global
 run%winit = wavefront_init
 run%wake_init = wake
+run%wake_init%write_kernels = write_wake_kernels
 run%sc_init = sc
 run%beam_init = beam_init
 run%imp = imp
