@@ -87,6 +87,7 @@ BMAD_NML = """&fel_track_params
   window_sample = 3
   shotnoise = T
   ran_seed = {seed}
+  write_diag = T
 &end
 """
 

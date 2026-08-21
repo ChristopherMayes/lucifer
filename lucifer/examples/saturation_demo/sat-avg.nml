@@ -4,4 +4,5 @@
   field_file = "AramisSat-initial.fld.h5"
   out_root = "sat-avg"
   interlude_model = "bmad"
+  write_diag = T          ! the PDF report's Genesis comparison parses this file.
 &end

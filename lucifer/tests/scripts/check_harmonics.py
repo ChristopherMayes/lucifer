@@ -138,6 +138,7 @@ NML_IMPORT = """&fel_track_params
   beam_file = "{beam}"
   field_file = "{field}"
   harmonics = 1, 3
+  write_diag = T
 {extra}&end
 """
 
@@ -163,6 +164,7 @@ NML_TD = """&fel_track_params
   shotnoise = T
   ran_seed = 777
   harmonics = 1, 3
+  write_diag = T
 {extra}&end
 """
 

@@ -63,6 +63,7 @@ NML = """&fel_track_params
   window_sample = 1
   shotnoise = T
   ran_seed = 777
+  write_diag = T
 {extra}&end
 """
 

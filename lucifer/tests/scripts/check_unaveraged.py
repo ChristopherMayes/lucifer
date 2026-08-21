@@ -83,6 +83,7 @@ PROBE = """&fel_track_params
   grid_half_width = 2e-3
   ran_seed = 4242
   write_initial = T
+  write_diag = T
 &end
 """
 
@@ -109,6 +110,7 @@ GAIN = """&fel_track_params
   grid_n_pts = 129
   grid_half_width = 2e-4
   ran_seed = 4242
+  write_diag = T
 &end
 """
 
@@ -133,6 +135,7 @@ TDID = """&fel_track_params
   window_sample = 1
   shotnoise = T
   ran_seed = 999
+  write_diag = T
 &end
 """
 

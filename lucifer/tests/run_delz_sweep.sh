@@ -100,6 +100,7 @@ LAT
   field_file = "AramisS12-initial.fld.h5"
   out_root = "sweep_p$np"
   interlude_model = "bmad"
+  write_diag = T
 &end
 NML
   echo "--- fel_track_test: ds_step = $np period(s) -----------------------------------"

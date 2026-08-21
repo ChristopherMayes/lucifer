@@ -71,6 +71,7 @@ NML = """&fel_track_params
   grid_half_width = 2e-4
 {source}  imp%nslice = {nslice}
   imp%slicewidth = 0.01
+  write_diag = T
 {extra}&end
 """
 

@@ -59,6 +59,7 @@ BASE = """&fel_track_params
   wake_lgap = 0.015
   wake_hrough = 100e-9
   wake_lrough = 100e-6
+  write_diag = T
 {extra}&end
 """
 

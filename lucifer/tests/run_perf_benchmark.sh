@@ -213,6 +213,7 @@ cat > perf.nml <<NML
   field_file = "AramisPerf-initial.fld.h5"
   out_root = "perf"
   interlude_model = "bmad"
+  write_diag = T
 &end
 NML
 

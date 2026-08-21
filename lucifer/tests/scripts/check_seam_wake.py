@@ -92,6 +92,7 @@ NML_GEN = """&fel_track_params
   grid_n_pts = 63
   grid_half_width = 2e-4
   window_length = {slen}
+  write_diag = T
 {extra}&end
 """
 
@@ -122,6 +123,7 @@ NML_IMP = """&fel_track_params
   beam_init%bunch_charge = 3.0e-14
   imp%nslice = 12
   imp%slicewidth = 0.01
+  write_diag = T
 {extra}&end
 """
 

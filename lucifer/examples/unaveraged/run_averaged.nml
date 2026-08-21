@@ -19,4 +19,5 @@
   seed_waist_size = 30e-6
   grid_n_pts = 129
   grid_half_width = 2e-4
+  write_diag = T          ! the two-formulation overlay compares diag files.
 &end

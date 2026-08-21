@@ -34,4 +34,5 @@
   seed_waist_size = 30e-6      ! ...with a 30 um waist at the entrance.
   grid_n_pts = 129             ! Field grid (129 keeps the run around a minute;
   grid_half_width = 2e-4       !   the physics checks use the same size).
+  write_diag = T          ! the two-formulation overlay compares diag files.
 &end

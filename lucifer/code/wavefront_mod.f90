@@ -678,6 +678,7 @@ logical err
 integer n_grid(3), nx, ny, nz, iz, i_pol
 complex(wf_rp), allocatable :: kernel(:,:)
 complex(wf_rp), pointer :: field(:,:,:)
+logical any_err
 character(*), parameter :: r_name = 'wavefront_drift'
 
 !
@@ -711,6 +712,18 @@ kernel = wavefront_drift_kernel(wf, z_drift)
 
 ! Apply slice by slice. Both polarisation components see the same kernel: the paraxial
 ! operator does not couple Ex and Ey in free space.
+!
+! PARALLEL OVER SLICES, the same shape as the FEL field solve (fel_field_step): every
+! slice touches only its own plane, the kernel is read-only, and the FFTW plan cache is
+! threadprivate, so the arithmetic per slice is independent of which thread runs it and
+! of how many there are. It matters: a time-dependent line spends one of these calls
+! per field-free element, and at production slice counts the serial version was the
+! largest single serial block in the walk (a 590-slice, 256-point case measured ~0.5 s
+! per element on one core). wavefront_fft2_plan_threads warms every thread's plans from
+! the serial context first -- FFTW's planner is not reentrant, and creating a plan
+! inside this loop would race with the transforms.
+
+call wavefront_fft2_plan_threads (nx, ny, err);  if (err) return
 
 do i_pol = 1, 2
   if (i_pol == 1) then
@@ -721,12 +734,19 @@ do i_pol = 1, 2
     field => wf%Ey
   endif
 
+  any_err = .false.
+  !$OMP parallel do private(err) reduction(.or.: any_err)
   do iz = 1, nz
-    call wavefront_fft2 (field(:,:,iz), wf_fft_forward$, err);  if (err) return
-    field(:,:,iz) = kernel * field(:,:,iz)
-    call wavefront_fft2 (field(:,:,iz), wf_fft_backward$, err);  if (err) return
-    field(:,:,iz) = field(:,:,iz) / real(nx * ny, wf_rp)
+    call wavefront_fft2 (field(:,:,iz), wf_fft_forward$, err)
+    if (.not. err) then
+      field(:,:,iz) = kernel * field(:,:,iz)
+      call wavefront_fft2 (field(:,:,iz), wf_fft_backward$, err)
+      if (.not. err) field(:,:,iz) = field(:,:,iz) / real(nx * ny, wf_rp)
+    endif
+    any_err = any_err .or. err
   enddo
+  !$OMP end parallel do
+  if (any_err) return
 enddo
 
 if (present(err_flag)) err_flag = .false.

@@ -124,6 +124,7 @@ NML = """&fel_track_params
   grid_n_pts = 151
   grid_half_width = 2e-4
   ran_seed = 777
+  write_diag = T
 /
 """
 
@@ -168,6 +169,7 @@ NML_TD = """&fel_track_params
   window_sample = 1
   ran_seed = 777
   keep_escaped_field = T
+  write_diag = T
 /
 """
 
@@ -268,6 +270,7 @@ NML_IMP = """&fel_track_params
   beam_file = "PSP-initial.par.h5"
   field_file = "PSP-initial.fld.h5"
   interlude_model = '{imodel}'
+  write_diag = T
 /
 """
 

@@ -184,7 +184,7 @@
 ! identical to the unsplit run. This checks the weighted paths, which no Genesis
 ! comparison can (Genesis dumps carry no weights).
 !
-! Outputs: <out_root>.diag.txt (one row per slice per record: z, slice, field and beam
+! Outputs: <out_root>.diag.txt, ONLY with write_diag = T (one row per slice per record: z, slice, field and beam
 ! diagnostics), <out_root>.stats.h5 (the production statistics file, manual sec:stats:
 ! per-record per-slice beam moments named as bunch_params_struct components, per-record
 ! per-slice wavefront_params, and the evaluated calc_bunch_params at element ends;
@@ -316,6 +316,13 @@ character(400) :: write_opmd_file = ''   ! Write the bunch as openPMD-beamphysic
                                          ! (hdf5_write_beam), the dist_file round trip.
 logical :: imp_split_weights = .false.   ! Check knob: coincident w/3 + 2w/3 copies
                                          ! BEFORE import; RNG-free outputs must not move.
+! The Genesis-comparison diagnostic file (<out_root>.diag.txt), OFF BY DEFAULT: it is
+! one formatted row per slice per record, which at production slice counts is hundreds
+! of megabytes of text written serially (a 590-slice line writes ~175 MB), and
+! <out_root>.stats.h5 carries everything analysis needs in fixed Bmad units. The
+! cross-code validation machinery -- compare_fel.py and the check scripts, which parse
+! the fixed columns -- asks for it explicitly.
+logical :: write_diag = .false.
 character(400) :: write_wake_kernels = ''  ! Write the deliverable-8 wake kernels
                                            ! (s, wakeres, wakegeo, wakerou; eV/(m e-))
                                            ! for the seam-wake cross-validation check.
@@ -387,7 +394,8 @@ namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
                            write_opmd_file, imp_split_weights, write_wake_kernels, &
                            dump_beam_at, dump_field_at, keep_escaped_field, &
                            radiation_damping, radiation_fluctuations, reference_run, &
-                           seed_polarization, swap_beam_xy, harmonics, wavefront_format
+                           seed_polarization, swap_beam_xy, harmonics, wavefront_format, &
+                           write_diag
 
 ! Read parameters.
 
@@ -773,12 +781,14 @@ call setup_break_geometry ()   ! Chicane breaks: chord vs arc from ele%floor, th
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
 
-open (newunit = iu_diag, file = trim(out_root) // '.diag.txt', action = 'write')
-write (iu_diag, '(a, i0)') '# nslice = ', nslice
-write (iu_diag, '(a, es22.14)') '# slice_spacing = ', fbeam%slice_spacing
-write (iu_diag, '(a)') '#         z            slice        power         on_axis_intensity        bunching        ' // &
-      'bunching_phase        mean_energy         sigma_energy          sigma_x               sigma_y' // &
-      '               current               n_eff'
+if (write_diag) then
+  open (newunit = iu_diag, file = trim(out_root) // '.diag.txt', action = 'write')
+  write (iu_diag, '(a, i0)') '# nslice = ', nslice
+  write (iu_diag, '(a, es22.14)') '# slice_spacing = ', fbeam%slice_spacing
+  write (iu_diag, '(a)') '#         z            slice        power         on_axis_intensity        bunching        ' // &
+        'bunching_phase        mean_energy         sigma_energy          sigma_x               sigma_y' // &
+        '               current               n_eff'
+endif
 
 ! The unaveraged energy ledger (fel-physics.tex sec:unaveraged): one row per record
 ! step inside FEL segments -- total weighted beam energy, total window field energy,
@@ -1009,7 +1019,7 @@ do ie = 1, branch%n_ele_track
   endif
 enddo
 
-close (iu_diag)
+if (write_diag) close (iu_diag)
 if (any_unavg) close (iu_ledger)
 if (wake_on) close (iu_wake)
 
@@ -1029,7 +1039,7 @@ call fel_write_genesis4_beam (fbeam, trim(out_root) // '-final.par.h5', err)
 if (err) stop 1
 
 print '(a)', 'fel_track_test done.'
-print '(a)', '  ' // trim(out_root) // '.diag.txt'
+if (write_diag) print '(a)', '  ' // trim(out_root) // '.diag.txt'
 call dump_field_set (trim(out_root) // '-final')
 print '(a)', '  ' // trim(out_root) // '-final.par.h5'
 
@@ -1980,6 +1990,8 @@ subroutine write_diag_rows ()
 ! prints. take_stats_record must have run for this record first.
 
 integer is
+
+if (.not. write_diag) return
 
 do is = 1, nslice
   write (iu_diag, '(es24.16, i8, 10es24.16)') z_now, is, fpow_arr(is), fonax_arr(is), &

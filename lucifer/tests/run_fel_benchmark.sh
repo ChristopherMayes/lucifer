@@ -180,6 +180,7 @@ make_nml () {
   out_root = "$3"
   interlude_model = "$4"
 ${6:+  $6}
+  write_diag = T
 &end
 NML
 }

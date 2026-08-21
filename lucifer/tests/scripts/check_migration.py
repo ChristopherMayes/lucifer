@@ -61,6 +61,7 @@ BASE = """&fel_track_params
   ran_seed = 777
   migrate = {mig}
   migrate_check = T
+  write_diag = T
 &end
 """
 
