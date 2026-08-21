@@ -947,6 +947,44 @@ Measured (check_harmonics.py, ninth harness section):
 | 1 vs 8 threads (TD harmonic run) | byte-identical |
 | six refusals (anchor, unavg, two-pol, frequency domain, no-match, format) | by name |
 
+## Phasing between segments (brief proposal 2026-08-20): measured, then built
+
+Between undulator segments the default is Genesis's behavior, verified by
+measurement before anything was written: scanning an inter-segment gap by fractions
+of 2 gamma^2 lambda (25.8 mm per turn at the benchmark) leaves the bunching phase
+entering the next segment FLAT on Genesis and on this code alike -- segments are
+autophased, and the fractional drift slip never reaches the coupling. The
+deliberate off-phase knob is the wiggler's own `z_offset` (standard Bmad
+misalignment, anchored at the nominal position): a displacement delta shifts the
+entry phase by exactly -2 pi delta/(2 gamma^2 lambda), and the same scan run as
+Genesis's own PHASESHIFTER element (which needs FINITE length to register -- a
+zero-length one silently does nothing) reproduces our curve at 6.0e-6. No new
+element, no new attribute.
+
+With `bmad_com[absolute_time_tracking] = T` in the lattice (honored per element
+through Bmad's own resolver), phasing follows the REAL spacings instead -- the
+recirculating-linac discipline: a wrong-length break visibly detunes the next
+segment, and the absolute-mode gap scan reproduces the relative-mode z_offset scan
+point by point. Chicanes work in both modes: the beam detours the closed bump via
+the seam while the radiation drifts the CHORD between undulator faces (from
+ele%floor, derived never entered); the arc-minus-chord delay becomes whole-slice
+window rotations plus, in absolute mode, its carrier phase. examples/chicane/
+flips a second segment between 1.32x gain and 0.94x absorption on 0.43 urad of
+bend angle -- half a wavelength of geometric delay.
+
+Measured (check_phasing.py, tenth harness section):
+
+| check | level |
+|---|---|
+| re-anchor baseline: gap scan flat (rad span) | 1.5e-3 |
+| z_offset knob vs -2pi delta/(2 gamma^2 lambda) | 1.5e-3 |
+| cross-mode identity (absolute gap == relative knob) | 1.2e-3 |
+| our knob curve vs Genesis's PHASESHIFTER curve | 6.0e-6 |
+| chicane, relative mode: geometric fraction dropped | 6.8e-6 |
+| chicane, absolute mode vs independent 2D geometry | 6.8e-4 |
+| unaveraged ledger closure across the chicane | 4.0e-6 |
+| four refusals (open bump, genesis-model bend, oversize z_offset, first-element z_offset) | by name |
+
 ## Spontaneous emission: the two FEL modes against Bmad's own radiation
 
 Bmad-only, no Genesis (the averaged mode's Genesis agreement is settled by the tiers).

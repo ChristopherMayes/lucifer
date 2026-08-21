@@ -321,6 +321,16 @@ character(400) :: write_wake_kernels = ''  ! Write the deliverable-8 wake kernel
                                            ! for the seam-wake cross-validation check.
 
 real(rp), allocatable :: ele_slip(:)     ! Slippage applied after each element's last step [wavelengths].
+! Phasing (manual sec:phasing): the FEL element's z_offset (the deliberate off-phase
+! knob; physical displacement, anchored at the nominal position), and the light-path
+! correction on the last element of a geometry break (a chicane's radiation drifts the
+! CHORD between undulator faces; the arc-minus-chord delay is charged as whole-slice
+! rotations plus, in absolute mode, its carrier phase).
+real(rp), allocatable :: fel_zoff(:), light_corr(:)
+real(rp) phase_rate                      ! 2pi/(2 gamma0^2 lambda) [rad/m]: the drift's
+                                         ! beam-vs-light carrier slip rate, the one
+                                         ! expression the knob, absolute mode and the
+                                         ! schedule all share.
 type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, from lattice attributes.
 logical, allocatable :: is_fel(:)                 ! Which tracked elements are FEL segments.
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
@@ -712,7 +722,11 @@ endif
 ! this quirk's exactness matters here, at the call site; manual sec:slippage.)
 
 allocate (ele_slip(branch%n_ele_track))
+allocate (fel_zoff(branch%n_ele_track), light_corr(branch%n_ele_track))
 ele_slip = 0
+fel_zoff = 0
+light_corr = 0
+phase_rate = twopi / (2 * gamma0_ref**2 * wf%wavelength)
 Lz = 0
 prev_ie = 0
 
@@ -722,8 +736,27 @@ do ie = 1, branch%n_ele_track
   if (is_fel(ie)) then
     if (Lz > 0 .and. prev_ie > 0) then
       ele_slip(prev_ie) = ele_slip(prev_ie) + floor(Lz / (2 * gamma0_ref**2 * wf%wavelength)) + 1
-      Lz = 0
     endif
+
+    ! The off-phase knob (manual sec:phasing): the wiggler's own z_offset, standard
+    ! Bmad misalignment (girder-composed _tot form). Anchored at the NOMINAL position:
+    ! the entry phase shifts by the displaced upstream break, the exit unshifts for the
+    ! displaced downstream one, so everything downstream stays anchored. The knob must
+    ! fit inside its breaks -- a z_offset that walks the element out of its gap is
+    ! geometry, not phasing.
+
+    fel_zoff(ie) = ele%value(z_offset_tot$)
+    if (fel_zoff(ie) /= 0 .and. prev_ie > 0 .and. abs(fel_zoff(ie)) >= Lz .and. Lz > 0) then
+      print '(2a)', 'fel_track_test: the z_offset of FEL element ', trim(ele%name)
+      print '(a, es10.2, a, es10.2, a)', '   (', fel_zoff(ie), ' m) exceeds its upstream break (', Lz, ' m).'
+      stop 1
+    endif
+    if (fel_zoff(ie) /= 0 .and. prev_ie == 0) then
+      print '(2a)', 'fel_track_test: the z_offset knob on the FIRST element ', trim(ele%name)
+      print '(a)', '   has no upstream break to displace into; give the lattice a leading break.'
+      stop 1
+    endif
+    Lz = 0
   else
     Lz = Lz + ele%value(l$)
   endif
@@ -732,6 +765,10 @@ enddo
 if (prev_ie > 0) then
   ele_slip(prev_ie) = ele_slip(prev_ie) + floor(Lz / (2 * gamma0_ref**2 * wf%wavelength)) + 1
 endif
+
+call setup_break_geometry ()   ! Chicane breaks: chord vs arc from ele%floor, the
+                               ! delay's rotations, the light-path correction, and
+                               ! the closed-bump and genesis-model refusals.
 
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
@@ -828,6 +865,14 @@ do ie = 1, branch%n_ele_track
       if (err) stop 1
     endif
 
+    ! The off-phase knob (manual sec:phasing): a displaced element sees the extra
+    ! upstream-break phase at entry and gives it back at exit (the downstream break
+    ! is shorter by the same delta), so the anchor stays nominal downstream. Sign:
+    ! positive z_offset = a longer upstream break = MORE beam delay = theta backwards,
+    ! Genesis's phase-shifter convention -- anchored by the cross-code phi scan.
+
+    if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 - phase_rate * fel_zoff(ie)
+
     do istep = 1, und%nstep
       if (fel_mode(ie) == fel_unaveraged$) then
         call fel_unavg_step (und, ustate, fbeam, wf, slip, und%dz, istep == 1, &
@@ -858,6 +903,7 @@ do ie = 1, branch%n_ele_track
       call write_diag_rows()
       call progress_line (istep == und%nstep, istep, und%nstep)
     enddo
+    if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
     call end_of_element ()
 
   elseif (interlude_model == 'bmad') then
@@ -907,10 +953,21 @@ do ie = 1, branch%n_ele_track
     fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &
                     fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
 
-    do ih = 1, n_harm      ! Each field diffracts at its own wavelength.
-    call wavefront_drift (ffield(ih)%wf, ele%value(l$), err)
+    do ih = 1, n_harm      ! Each field diffracts at its own wavelength; through a
+                         ! geometry break the light goes the CHORD, not the arc, and
+                         ! the correction lands on the break's last element.
+    call wavefront_drift (ffield(ih)%wf, ele%value(l$) - light_corr(ie), err)
     if (err) exit
   enddo
+
+  ! Absolute-time phasing (manual sec:phasing; bmad_com's global switch through
+  ! Bmad's own resolver): keep the real beam-vs-light carrier phase of this break --
+  ! the drift slip plus any geometric (chicane) delay -- where the relative mode
+  ! re-anchors. Whole turns wrap; no floors needed on a phase.
+
+  if (absolute_time_tracking(ele)) then
+    fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$) - twopi * light_corr(ie) / wf%wavelength
+  endif
     if (err) stop 1
 
     ! The chamber does not end where the undulator does: the wake's energy loss applies
@@ -935,6 +992,9 @@ do ie = 1, branch%n_ele_track
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
     call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err)
+    if (absolute_time_tracking(ele)) then      ! Absolute-time phasing (sec:phasing).
+      fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$)
+    endif
     if (associated(wake_src)) call apply_bmad_wake_kick (wake_src)
     if (err) stop 1
 
@@ -1697,6 +1757,87 @@ end subroutine setup_fel_elements
 
 !------------------------------------------------------------------------------
 ! Element sr wakes act across the WHOLE window (deliverable 11): all slices
+! Chicane breaks (manual sec:phasing): a break whose elements bend the reference
+! (sbends, patches) detours the BEAM while the RADIATION goes straight -- so the
+! light's path is the CHORD between the flanking undulator faces, from ele%floor,
+! never the reference arc that vec(5) is measured against. The arc-minus-chord
+! delay is charged as whole-wavelength window rotations (Genesis's chicane
+! semantics: "always autophasing") on the break's last element, which also takes
+! the light-path drift correction; absolute mode adds the delay's carrier phase in
+! the walk. Only a CLOSED BUMP keeps the light on the next undulator's axis --
+! anything else is refused by name, as is any geometry element under the
+! genesis-model interludes (Genesis's drift/quad set cannot represent it).
+
+subroutine setup_break_geometry ()
+
+real(rp) arc
+integer i0, ie_g, last_in_break
+logical geom
+
+!
+
+i0 = 0                    ! Break start: exit face of the last FEL element (0 = origin).
+arc = 0;  geom = .false.;  last_in_break = 0
+
+do ie_g = 1, branch%n_ele_track
+  ele => branch%ele(ie_g)
+  if (is_fel(ie_g)) then
+    if (geom .and. last_in_break > 0) call close_geometry_break (i0, last_in_break, arc)
+    i0 = ie_g;  arc = 0;  geom = .false.;  last_in_break = 0
+  elseif (ele%value(l$) /= 0 .or. ele%key == patch$) then
+    arc = arc + ele%value(l$)
+    last_in_break = ie_g
+    if (ele%key == sbend$ .or. ele%key == patch$) then
+      geom = .true.
+      if (interlude_model == 'genesis') then
+        print '(3a)', 'fel_track_test: geometry element ', trim(ele%name), ' (a bend or patch) inside a'
+        print '(a)', '   GENESIS-MODEL interlude: Genesis''s drift/quad set cannot represent it.'
+        print '(a)', '   Use interlude_model = "bmad" (the seam tracks it exactly).'
+        stop 1
+      endif
+    endif
+  endif
+enddo
+! A trailing geometry break (no following undulator) needs no phasing: there is no
+! next segment to phase against.
+
+end subroutine setup_break_geometry
+
+!------------------------------------------------------------------------------
+! One geometry break: the chord, the closed-bump refusal, the delay's rotations and
+! the light-path correction (see setup_break_geometry's header).
+
+subroutine close_geometry_break (ib0, iblast, arc)
+
+type (ele_struct), pointer :: e1, e2
+real(rp) arc, chord, dvec(3), axis(3), delay_geo, tol
+integer ib0, iblast
+
+!
+
+e1 => branch%ele(ib0)         ! Exit face of the upstream FEL element (or the origin).
+e2 => branch%ele(iblast)      ! Exit face of the break's last element = the entry face
+                              ! of the next FEL element.
+dvec = e2%floor%r - e1%floor%r
+chord = norm2(dvec)
+axis = e1%floor%w(:,3)
+tol = 1e-9_rp * max(1.0_rp, chord)
+
+if (abs(e2%floor%theta - e1%floor%theta) > 1e-9_rp .or. abs(e2%floor%phi - e1%floor%phi) > 1e-9_rp .or. &
+    abs(e2%floor%psi - e1%floor%psi) > 1e-9_rp .or. norm2(dvec - chord * axis) > tol) then
+  print '(3a)', 'fel_track_test: the break ending at ', trim(branch%ele(iblast)%name), ' bends the reference'
+  print '(a)', '   and is NOT A CLOSED BUMP: the radiation would leave the next undulator''s axis.'
+  print '(a)', '   Only closed-bump chicanes are modeled; close the geometry or straighten the line.'
+  stop 1
+endif
+
+delay_geo = arc - chord
+ele_slip(iblast) = ele_slip(iblast) + floor(delay_geo / wf%wavelength)
+light_corr(iblast) = delay_geo
+
+end subroutine close_geometry_break
+
+!------------------------------------------------------------------------------
 ! concatenate into one bunch in global window coordinates and Bmad's wake machinery
 ! applies unmodified. What is checked here, by name: lr (multi-bunch) wakes are not
 ! supported; a pseudomode wake whose z_max is shorter than the window would have Bmad

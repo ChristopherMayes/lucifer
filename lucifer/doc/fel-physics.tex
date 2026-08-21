@@ -981,6 +981,60 @@ and the carried Python patch (\code{bsim/fel/openpmd/}, the class's future
 \code{from\_openpmd}/\code{write\_openpmd}) reads and round-trips the files
 exactly, exercised every harness run.
 
+\subsection{Phasing between segments}\label{sec:phasing}
+
+What the beam-field phase does between undulator segments, measured before it was
+built (every claim below is a scan in \code{check\_phasing.py}). In the RELATIVE
+mode -- the default, \code{absolute\_time\_tracking} false -- segments are
+autophased: scanning an inter-segment gap by fractions of $2\gamma^2\lambda$ (one
+full turn of drift slip, 25.8 mm at the benchmark) leaves the
+bunching phase entering the next segment FLAT, measured on Genesis and on this code
+alike, both interlude models. The mechanism is the co-moving reference convention:
+\code{fel\_phi0\_rate} tracks the beam through a drift, and the window rotations are
+whole wavelengths, carrier-neutral -- the fractional beam-vs-light slip
+$k_s L/(2\gamma^2)$ never reaches the coupling. (Genesis's \code{calcSlippage}
+carries commented-out code that would have applied that fraction to $\theta$;
+the active code re-anchors, as the measurement shows.)
+
+The deliberate off-phase knob is the wiggler's own \code{z\_offset} -- standard
+Bmad misalignment, girder-composed, no new element or attribute. The autophase
+anchor is the element's NOMINAL reference position, so a physical displacement
+$\delta$ adds the real, never-re-anchored entry phase
+$\Delta\phi = -2\pi\,\delta/(2\gamma^2\lambda)$, returned at exit (the downstream
+break is shorter by the same $\delta$; downstream elements stay anchored). Measured
+against the analytic slope, and against GENESIS'S OWN
+\code{PHASESHIFTER} element scanned over $\phi = 2\pi\,\delta/(2\gamma^2\lambda)$:
+the two bunching-phase curves agree digit for digit (the sign is Genesis's ``delay
+goes backwards'', $\theta \to \theta - \phi$, applied persistently -- and note
+Genesis's phase shifter must have FINITE LENGTH to register at all; a zero-length
+one silently does nothing).
+
+In the ABSOLUTE mode -- \code{bmad\_com[absolute\_time\_tracking] = T} in the
+lattice, honored per element through Bmad's own resolver, never a namelist knob --
+the walk keeps the real carrier phase of every break:
+$\phi_0 \mathrel{-}= 2\pi L/(2\gamma^2\lambda)$ per interlude element, no floors
+(whole turns wrap). Inter-segment phasing then follows the real spacings, the
+recirculating-linac discipline: a wrong-length break visibly detunes the next
+segment, and moving an element moves its phase -- the absolute-mode gap scan
+reproduces the relative-mode \code{z\_offset} scan point by point (cross-mode
+identity).
+
+CHICANES: a break whose elements bend the reference (sbends, patches) detours the
+beam while the radiation goes straight, so the light's path is the CHORD between
+the flanking undulator faces -- computed from \code{ele\%floor}, never entered by
+hand -- while \code{vec(5)} is measured against the reference arc. The
+arc-minus-chord delay is charged as whole-wavelength window rotations on the
+break's last element (Genesis's chicane semantics: ``always autophasing'') plus,
+in absolute mode, its carrier phase; the light drift is shortened by the same
+delay. Relative mode drops the geometric fraction (measured flat under an angle
+scan); absolute mode ramps at exactly the slope an independent 2D geometric
+computation of $d(\mathrm{arc}-\mathrm{chord})/d\alpha$ predicts. Only a CLOSED
+BUMP keeps the light on the next undulator's axis: floor orientations and the
+chord direction are asserted, anything else refused by name, as are bends and
+patches under the genesis-model interludes (Genesis's drift/quad set cannot
+represent them) and a \code{z\_offset} that exceeds its upstream break. The
+unaveraged energy ledger closes across a chicane sandwich.
+
 \section{Diagnostic output}\label{sec:stats}
 
 \emph{The stats file} \code{<out\_root>.stats.h5} carries the production statistics in

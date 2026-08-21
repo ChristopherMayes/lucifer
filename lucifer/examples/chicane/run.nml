@@ -1,0 +1,26 @@
+! Chicane re-phasing, one command (see the README; run both nml files):
+!
+!   fel_track_test run.nml
+!
+! Absolute-time phasing: the bend angle sets the light's re-injection phase onto the
+! bunched beam. This lattice: chicane.bmad.
+
+&fel_track_params
+  lat_file = "chicane.bmad"
+  out_root = "chicane"
+
+  lambda0 = 1e-10
+
+  beam_init%n_particle = 8192
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+
+  seed_power = 2e8
+  seed_waist_size = 30e-6
+  grid_n_pts = 151
+  grid_half_width = 2e-4
+  ran_seed = 12345
+/

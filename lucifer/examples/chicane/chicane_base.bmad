@@ -1,0 +1,32 @@
+! Chicane-between-segments example line (manual sec:phasing): two undulator segments
+! with a four-bend closed-bump chicane in the break. ABSOLUTE TIME TRACKING is on, so
+! the inter-segment phase follows the real geometry: the beam detours the bump while
+! the radiation drifts the chord, and the arc-minus-chord delay -- thousands of
+! wavelengths -- re-injects the light onto the bunched beam at whatever carrier phase
+! the bend angle dictates. The wrappers define ANG before calling this file: two
+! angles a half-wavelength of delay apart flip the second segment between absorbing
+! and amplifying.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+
+beginning[beta_a] = 15
+beginning[beta_b] = 15
+
+bmad_com[absolute_time_tracking] = T
+
+UND: wiggler, l = 0.99, l_period = 0.015, field_calc = helical_model, &
+     b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+     tracking_method = custom, ds_step = 0.015
+
+B1: sbend, l = 0.05, g =  ANG / 0.05
+B2: sbend, l = 0.05, g = -ANG / 0.05
+B3: sbend, l = 0.05, g = -ANG / 0.05
+B4: sbend, l = 0.05, g =  ANG / 0.05
+DD: pipe, l = 0.025
+
+SEG: line = (UND, DD, B1, DD, B2, DD, B3, DD, B4, DD, UND)
+
+use, SEG

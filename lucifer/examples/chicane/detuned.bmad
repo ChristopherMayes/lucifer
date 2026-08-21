@@ -1,0 +1,2 @@
+ANG = 1e-3 + 4.29e-7           ! Half a wavelength more delay than chicane.bmad.
+call, file = chicane_base.bmad

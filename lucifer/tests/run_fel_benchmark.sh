@@ -436,6 +436,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$WORK_DIR/harmonics" --
 fi
 
 echo
+echo "--- phasing checks (autophase, z_offset knob, absolute mode, chicanes) ---------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$WORK_DIR/phasing" --exe "$EXE" --genesis "$GENESIS"; then
+  echo "FAIL: phasing checks; outputs kept in: $WORK_DIR/phasing" >&2
+  exit 1
+fi
+
+echo
 echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
   echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2

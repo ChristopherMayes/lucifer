@@ -1,0 +1,2 @@
+ANG = 1e-3                     ! The reference bend angle.
+call, file = chicane_base.bmad

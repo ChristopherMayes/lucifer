@@ -29,6 +29,7 @@ python ../plot_fel.py <example>.stats.h5            # needs h5py + matplotlib; w
 | `unaveraged/` | One seeded segment with NO period averaging: the real quiver, the coupling as an outcome — plus its averaged twin for the overlay | ~1 min |
 | `crossed_undulator/` | The two-polarization afterburner: an x-planar set bunches, its quarter-turn twin radiates orthogonally from that bunching | ~30 s |
 | `harmonics/` | Harmonic lasing: the field set — a dark third harmonic grows from the fundamental's bunching on a planar segment; openPMD wavefront output | ~2 min |
+| `chicane/` | A four-bend chicane between segments in absolute-time mode: half a wavelength of geometric delay flips the second segment between amplifying and absorbing | ~2 min |
 | `saturation_demo/` | The one exception to "no Genesis": the full 57 m SASE case to saturation, three trackers (Genesis4 MPI, Bmad averaged, Bmad unaveraged) from identical dumps, one clock — its own `run.sh`, every input a real file in the directory | ~25 min |
 
 With no dump files named in the namelist, the program generates its own starting state
@@ -57,8 +58,8 @@ fields (field/harm<h>). `<example>.diag.txt` remains the Genesis-comparison inst
 (same columns as always) and is what the benchmark harness reads.
 
 The sections below cover the single-command examples; `crossed_undulator/`,
-`harmonics/` and `saturation_demo/` carry their own READMEs with their measured
-tables.
+`harmonics/`, `chicane/` and `saturation_demo/` carry their own READMEs with their
+measured tables.
 
 ## steady_state
 
