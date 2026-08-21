@@ -1004,10 +1004,14 @@ $\Delta\phi = -2\pi\,\delta/(2\gamma^2\lambda)$, returned at exit (the downstrea
 break is shorter by the same $\delta$; downstream elements stay anchored). Measured
 against the analytic slope, and against GENESIS'S OWN
 \code{PHASESHIFTER} element scanned over $\phi = 2\pi\,\delta/(2\gamma^2\lambda)$:
-the two bunching-phase curves agree digit for digit (the sign is Genesis's ``delay
-goes backwards'', $\theta \to \theta - \phi$, applied persistently -- and note
-Genesis's phase shifter must have FINITE LENGTH to register at all; a zero-length
-one silently does nothing).
+the two bunching-phase curves agree at $1.9\times10^{-8}$ and the exit POWER against
+$\phi$ at $9.3\times10^{-9}$, both codes tracking the same Genesis-written initial
+dumps -- so the phase reaches the physics identically, not just the bookkeeping. (On
+independently loaded beams the same power comparison sits at $1.4\times10^{-4}$,
+which measures the two loaders; hence the shared start.) The sign is Genesis's
+``delay goes backwards'', $\theta \to \theta - \phi$, applied persistently -- and
+note Genesis's phase shifter must have FINITE LENGTH to register at all; a
+zero-length one silently does nothing.
 
 In the ABSOLUTE mode -- \code{bmad\_com[absolute\_time\_tracking] = T} in the
 lattice, honored per element through Bmad's own resolver, never a namelist knob --
@@ -1033,7 +1037,15 @@ BUMP keeps the light on the next undulator's axis: floor orientations and the
 chord direction are asserted, anything else refused by name, as are bends and
 patches under the genesis-model interludes (Genesis's drift/quad set cannot
 represent them) and a \code{z\_offset} that exceeds its upstream break. The
-unaveraged energy ledger closes across a chicane sandwich.
+unaveraged energy ledger closes across a chicane sandwich. The window ROTATIONS the
+delay buys are checked time-dependently (steady state never exercises them): a
+chicane banks exactly $\lfloor \mathrm{delay}/\lambda \rfloor$ more escaped slices
+than its arc-matched straight twin, at three delays, and the run is byte-identical
+at 1 and 8 threads. Delays for that check are chosen MID-INTERVAL: a target of
+exactly $3.000\lambda$ lands on the floor boundary, where the $6\times10^{-8}$
+difference between the exact trace and the small-angle form decides between 2 and 3
+-- the boundary was located at $2.99 \to 2$, $3.01 \to 3$, which independently
+confirms the walk's floor-derived delay against the trace at that scale.
 
 \section{Diagnostic output}\label{sec:stats}
 

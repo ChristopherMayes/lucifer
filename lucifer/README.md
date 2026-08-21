@@ -958,8 +958,11 @@ deliberate off-phase knob is the wiggler's own `z_offset` (standard Bmad
 misalignment, anchored at the nominal position): a displacement delta shifts the
 entry phase by exactly -2 pi delta/(2 gamma^2 lambda), and the same scan run as
 Genesis's own PHASESHIFTER element (which needs FINITE length to register -- a
-zero-length one silently does nothing) reproduces our curve at 6.0e-6. No new
-element, no new attribute.
+zero-length one silently does nothing) reproduces our curve at 1.9e-8 -- and the
+exit POWER against phi at 9.3e-9, so the phase reaches the physics identically, not
+just the bookkeeping (both codes tracking the same Genesis-written initial dumps;
+on independently loaded beams the same comparison sits at 1.4e-4, which measures
+the two loaders, not the phasing). No new element, no new attribute.
 
 With `bmad_com[absolute_time_tracking] = T` in the lattice (honored per element
 through Bmad's own resolver), phasing follows the REAL spacings instead -- the
@@ -979,10 +982,14 @@ Measured (check_phasing.py, tenth harness section):
 | re-anchor baseline: gap scan flat (rad span) | 1.5e-3 |
 | z_offset knob vs -2pi delta/(2 gamma^2 lambda) | 1.5e-3 |
 | cross-mode identity (absolute gap == relative knob) | 1.2e-3 |
-| our knob curve vs Genesis's PHASESHIFTER curve | 6.0e-6 |
-| chicane, relative mode: geometric fraction dropped | 6.8e-6 |
-| chicane, absolute mode vs independent 2D geometry | 6.8e-4 |
+| our knob curve vs Genesis's PHASESHIFTER curve (shared dumps) | 1.9e-8 |
+| exit power vs phi: our knob vs Genesis's shifter (shared dumps) | 9.3e-9 |
+| chicane, relative mode: geometric fraction dropped | 6.3e-6 |
+| chicane, absolute mode vs independent 2D geometry | 6.7e-4 |
+| 2D trace vs the small-angle closed form theta^2(2L_b/3 + L_d) | 6.4e-8 |
 | unaveraged ledger closure across the chicane | 4.0e-6 |
+| TD chicane: extra banked slices == floor(delay/lambda) at 3.5, 6.5, 10.5 lambda | exact |
+| TD chicane 1 vs 8 threads | byte-identical |
 | four refusals (open bump, genesis-model bend, oversize z_offset, first-element z_offset) | by name |
 
 ## Spontaneous emission: the two FEL modes against Bmad's own radiation

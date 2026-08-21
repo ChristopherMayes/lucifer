@@ -23,9 +23,15 @@ undulator segments, held by symmetries, closed forms and Genesis itself.
      the radiation drifts the CHORD from ele%floor). Relative mode drops the
      geometric fraction (Genesis's "chicane is always autophasing"); absolute mode
      ramps with the bend angle at the slope an INDEPENDENT geometric computation of
-     d(arc - chord)/d(angle) predicts. The unaveraged ledger closes across a
-     chicane sandwich.
-  6. REFUSALS by name: a non-closed-bump break; a bend under the genesis-model
+     d(arc - chord)/d(angle) predicts -- itself cross-checked against the textbook
+     small-angle path lengthening theta^2 (2 L_bend/3 + L_drift). The unaveraged
+     ledger closes across a chicane sandwich.
+  6. TIME-DEPENDENT CHICANE: the WINDOW ROTATIONS the geometric delay buys (the
+     steady-state sections above never exercise them -- slippage is a no-op with one
+     slice). A delay of a few wavelengths must bank exactly floor(delay/lambda) more
+     escaped slices than the straight-line twin of the same arc length, and the run
+     must be byte-identical at 1 and 8 threads.
+  7. REFUSALS by name: a non-closed-bump break; a bend under the genesis-model
      interludes; a z_offset exceeding its upstream break; a z_offset on the first
      element (no break to displace into).
 
@@ -50,10 +56,14 @@ LAM = 1e-10
 TOL_FLAT = 5e-3          # measured 1.5e-3 span: the re-anchor baseline's adiabatic trend.
 TOL_KNOB = 5e-3          # measured 1.5e-3: knob ramp vs the exact analytic slope.
 TOL_XMODE = 5e-3         # measured 1.2e-3: absolute gap scan vs relative knob scan.
-TOL_PARITY = 1e-4        # measured 6.0e-6: our knob curve vs Genesis's PHASESHIFTER curve.
+TOL_PARITY = 1e-6        # measured 1.9e-8 from shared dumps: knob curve vs PHASESHIFTER.
 TOL_CHIC_SLOPE = 2e-3    # measured 6.8e-4: absolute chicane ramp vs the geometric slope
                          #   (583 wavelengths of delay at the base angle).
 TOL_LEDGER = 1e-4        # measured 4.0e-6: unaveraged ledger closure across the chicane.
+TOL_CF = 1e-6            # measured 6.4e-8: the 2D trace vs the small-angle closed form.
+TOL_POWER = 1e-6         # measured 9.3e-9 from SHARED dumps: exit power vs phi, our knob
+                         #   vs Genesis's shifter (1.4e-4 on independently loaded beams --
+                         #   that measures the loaders, so this tier shares the start).
 
 LAT2SEG = """no_digested
 parameter[geometry] = open
@@ -117,6 +127,50 @@ NML = """&fel_track_params
 /
 """
 
+LATSTRAIGHT = """no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 15
+beginning[beta_b] = 15
+{absline}
+UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+DD: pipe, l = 0.025
+STR: pipe, l = 0.275               ! ARC-MATCHED to the bump (5*0.025 + 4*0.05 = 0.325
+                                   ! total with the flanking DDs), so the two runs share
+                                   ! the autophase term and ONLY the geometric delay differs.
+SEG: line = (UND, DD, STR, DD, UND)
+use, SEG
+{modeline}
+"""
+
+NML_TD = """&fel_track_params
+  lat_file = "{tag}.bmad"
+  out_root = "{tag}"
+  lambda0 = 1e-10
+  interlude_model = 'bmad'
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 1.6e-14
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -8e-10
+  beam_init%grid(3)%x_max = 8e-10
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  nbins = 8
+  seed_power = 1e6
+  seed_waist_size = 30e-6
+  grid_n_pts = 63
+  grid_half_width = 2e-4
+  window_length = 1.6e-9
+  window_sample = 1
+  ran_seed = 777
+  keep_escaped_field = T
+/
+"""
+
 GEN_DECK = """&setup
 rootname={root}
 lattice={lat}
@@ -150,6 +204,73 @@ fft_fieldsolver = true
 &end
 """
 
+GEN_PREP = """&setup
+rootname=PSP
+lattice=ps0.lat
+beamline=SEG
+lambda0=1e-10
+gamma0=11357.82
+delz=0.015
+shotnoise=0
+nbins = 8
+&end
+
+&field
+power=1e7
+dgrid=2.000000e-04
+ngrid=151
+waist_size=30e-6
+&end
+
+&beam
+current=3000
+delgam=1.000000
+ex=4.000000e-07
+ey=4.000000e-07
+betax=15
+betay=15
+&end
+
+&write
+field = PSP-initial
+beam = PSP-initial
+&end
+"""
+
+GEN_IMPORT = """&setup
+rootname={root}
+lattice={lat}
+beamline=SEG
+lambda0=1e-10
+gamma0=11357.82
+delz=0.015
+shotnoise=0
+nbins = 8
+field_global_stat = true
+&end
+
+&importfield
+file = PSP-initial.fld.h5
+&end
+
+&importbeam
+file = PSP-initial.par.h5
+&end
+
+&track
+fft_fieldsolver = true
+&end
+"""
+
+NML_IMP = """&fel_track_params
+  lat_file = "{tag}.bmad"
+  out_root = "{tag}"
+  beam_file = "PSP-initial.par.h5"
+  field_file = "PSP-initial.fld.h5"
+  interlude_model = '{imodel}'
+/
+"""
+
 GEN_LAT_PS = """UND: UNDULATOR = {{ lambdau=0.015000, nwig=30, aw=0.84853, helical=True}};
 D1: DRIFT = {{ l = 0.1425 }};
 PS: PHASESHIFTER = {{ l = 0.015, phi = {phi} }};
@@ -170,14 +291,14 @@ def wrap(dp):
     return (np.asarray(dp) + np.pi) % (2 * np.pi) - np.pi
 
 
-def run(exe, wd, tag, lat_text, imodel="bmad", extra=""):
+def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"):
     (wd / f"{tag}.bmad").write_text(lat_text)
-    nml = NML.format(tag=tag, imodel=imodel)
+    nml = (nml_t or NML).format(tag=tag, imodel=imodel)
     if extra:
         nml = nml.replace("/\n", extra + "/\n")
     (wd / f"{tag}.nml").write_text(nml)
     r = subprocess.run([str(exe), f"{tag}.nml"], cwd=wd, capture_output=True, text=True,
-                       env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+                       env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {tag} exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
@@ -195,6 +316,16 @@ def bphase(wd, tag, z_probe):
     d = np.loadtxt(wd / f"{tag}.diag.txt").reshape(-1, 1, 12)
     z = d[:, 0, 0]
     return float(d[np.searchsorted(z, z_probe), 0, 5])
+
+
+def exit_power(wd, tag):
+    d = np.loadtxt(wd / f"{tag}.diag.txt").reshape(-1, 1, 12)
+    return float(d[-1, 0, 2])
+
+
+def escaped_count(wd, tag):
+    with h5py.File(wd / f"{tag}-escaped.fld.h5") as h5:
+        return int(h5["slicecount"][0])
 
 
 def chicane_delay(ang):
@@ -238,17 +369,18 @@ def main():
 
     # ------------------------------------------------------------------
     print("== re-anchor baseline + z_offset knob + cross-mode identity ==")
-    base_bp, knob_bp, xmode_bp = [], [], []
+    base_bp, knob_bp, xmode_bp, knob_pw = [], [], [], []
     for k in range(NSCAN):
         f = k / 8
         run(exe, wd, f"pb{k}", LAT2SEG.format(absline="", zoff="0",
-            gap=repr(0.30 + f * TWO_G2L), modeline=TRANSCRIBED), imodel="genesis")
+            gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis")
         base_bp.append(bphase(wd, f"pb{k}", 0.76))
-        run(exe, wd, f"pk{k}", LAT2SEG.format(absline="", zoff=repr(f * TWO_G2L),
+        run(exe, wd, f"pk{k}", LAT2SEG.format(absline="", zoff=f"{f * TWO_G2L:.12e}",
             gap="0.30", modeline=TRANSCRIBED), imodel="genesis")
         knob_bp.append(bphase(wd, f"pk{k}", 0.76))
+        knob_pw.append(exit_power(wd, f"pk{k}"))
         run(exe, wd, f"px{k}", LAT2SEG.format(absline=ABS, zoff="0",
-            gap=repr(0.30 + f * TWO_G2L), modeline=TRANSCRIBED), imodel="genesis")
+            gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis")
         xmode_bp.append(bphase(wd, f"px{k}", 0.76))
 
     d_base = wrap(np.array(base_bp) - base_bp[0])
@@ -264,11 +396,30 @@ def main():
           float(np.max(np.abs(wrap(d_x - d_knob)))), TOL_XMODE)
 
     # ------------------------------------------------------------------
-    print("== phase-shifter parity vs Genesis4 ==")
-    gen_bp = []
+    print("== phase-shifter parity vs Genesis4 (SHARED initial dumps) ==")
+
+    # Both codes start from the SAME particles and field: Genesis writes the dumps
+    # once (the loaders are independently written, so comparing power on
+    # independently generated beams would measure the loaders, not the phasing --
+    # measured at 1.4e-4 that way, against a 2.2e-2 power swing).
+
+    (wd / "ps0.lat").write_text(GEN_LAT_PS.format(phi="0"))
+    (wd / "psp.in").write_text(GEN_PREP)
+    r = subprocess.run([args.genesis, "psp.in"], cwd=wd, capture_output=True, text=True,
+                       env={"PATH": "/usr/bin:/bin", "FI_PROVIDER": "tcp"})
+    if r.returncode != 0:
+        print(f"FAIL: genesis prep run:\n{r.stdout[-800:]}")
+        sys.exit(1)
+
+    knob_bp2, knob_pw2 = [], []
+    gen_bp, gen_pw = [], []
     for k in range(NSCAN):
-        (wd / f"ps{k}.lat").write_text(GEN_LAT_PS.format(phi=repr(2 * np.pi * k / 8)))
-        (wd / f"ps{k}.in").write_text(GEN_DECK.format(root=f"PS{k}", lat=f"ps{k}.lat"))
+        run(exe, wd, f"pi{k}", LAT2SEG.format(absline="", zoff=f"{k / 8 * TWO_G2L:.12e}",
+            gap="0.30", modeline=TRANSCRIBED), imodel="genesis", nml_t=NML_IMP)
+        knob_bp2.append(bphase(wd, f"pi{k}", 0.76))
+        knob_pw2.append(exit_power(wd, f"pi{k}"))
+        (wd / f"ps{k}.lat").write_text(GEN_LAT_PS.format(phi=f"{2 * np.pi * k / 8:.12e}"))
+        (wd / f"ps{k}.in").write_text(GEN_IMPORT.format(root=f"PS{k}", lat=f"ps{k}.lat"))
         r = subprocess.run([args.genesis, f"ps{k}.in"], cwd=wd, capture_output=True, text=True,
                            env={"PATH": "/usr/bin:/bin", "FI_PROVIDER": "tcp"})
         if r.returncode != 0:
@@ -278,13 +429,24 @@ def main():
             z = h5["Lattice/zplot"][:].ravel()
             aw = h5["Lattice/aw"][:].ravel()
             bp = h5["Beam/bunchingphase"][:].ravel()
+            pw = h5["Field/power"][:].ravel()
         n = min(len(z), len(aw), len(bp))
         i2 = np.where((aw[:n] > 0) & (z[:n] > 0.5))[0][0] + 1
         gen_bp.append(float(bp[i2]))
+        gen_pw.append(float(pw[-1]))
     d_gen = wrap(np.array(gen_bp) - gen_bp[0])
+    d_knob2 = wrap(np.array(knob_bp2) - knob_bp2[0])
     check("our z_offset curve == Genesis PHASESHIFTER curve",
-          float(np.max(np.abs(wrap(d_knob - d_gen)))), TOL_PARITY,
+          float(np.max(np.abs(wrap(d_knob2 - d_gen)))), TOL_PARITY,
           note="[delta = phi 2 gamma^2 lambda / 2pi]")
+
+    # The phase must reach the PHYSICS identically, not just the bookkeeping: exit
+    # power against phi, code vs code, from the shared start.
+
+    gp = np.array(gen_pw);  kp = np.array(knob_pw2)
+    check("exit power vs phi: our knob == Genesis shifter (max rel)",
+          float(np.max(np.abs(kp - gp) / gp)), TOL_POWER,
+          note=f"[power swing over the scan {np.ptp(gp)/gp.mean():.2e}]")
 
     # ------------------------------------------------------------------
     print("== chicane: relative flat, absolute at the geometric slope, ledger ==")
@@ -293,10 +455,10 @@ def main():
     rel_bp, abs_bp, delays = [], [], []
     for k in range(NSCAN):
         a = a0 + k * da
-        run(exe, wd, f"cr{k}", LATCHIC.format(absline="", ang=repr(a), mid=CHIC_MID,
+        run(exe, wd, f"cr{k}", LATCHIC.format(absline="", ang=f"{a:.12e}", mid=CHIC_MID,
                                               modeline=TRANSCRIBED))
         rel_bp.append(bphase(wd, f"cr{k}", 0.83))
-        run(exe, wd, f"ca{k}", LATCHIC.format(absline=ABS, ang=repr(a), mid=CHIC_MID,
+        run(exe, wd, f"ca{k}", LATCHIC.format(absline=ABS, ang=f"{a:.12e}", mid=CHIC_MID,
                                               modeline=TRANSCRIBED))
         abs_bp.append(bphase(wd, f"ca{k}", 0.83))
         delays.append(chicane_delay(a))
@@ -310,15 +472,63 @@ def main():
           float(np.max(np.abs(wrap(d_abs - d_pred)))), TOL_CHIC_SLOPE,
           note=f"[delay(a0) = {delays[0]:.3e} m = {delays[0]/LAM:.0f} wavelengths]")
 
+    # The 2D trace itself against the textbook small-angle path lengthening
+    # theta^2 (2 L_bend/3 + L_drift): two independent derivations of the same delay.
+
+    cf = np.array([a0 + k * da for k in range(NSCAN)]) ** 2 * (2 * 0.05 / 3 + 0.025)
+    check("2D trace vs the small-angle closed form", float(np.max(np.abs(np.array(delays) / cf - 1))),
+          TOL_CF)
+
     # The unaveraged ledger closes across a chicane sandwich (energy bookkeeping
     # survives the seam detour; the ledger's columns cover the unaveraged segments).
-    run(exe, wd, "cled", LATCHIC.format(absline="", ang=repr(a0), mid=CHIC_MID,
+    run(exe, wd, "cled", LATCHIC.format(absline="", ang=f"{a0:.12e}", mid=CHIC_MID,
                                         modeline=UNAVG))
     led = np.loadtxt(wd / "cled.ledger.txt")
     closure = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
     turnover = np.max(np.abs(led[:, 1])) + np.max(np.abs(led[:, 2]))
     check("unaveraged ledger closure across the chicane",
           float(np.max(np.abs(closure - closure[0])) / turnover), TOL_LEDGER)
+
+    # ------------------------------------------------------------------
+    # The window rotations the geometric delay buys. Steady state never exercises
+    # them (slippage is a no-op with one slice), so this runs TIME DEPENDENT with a
+    # bend angle tuned for a few wavelengths of delay: the chicane must bank exactly
+    # floor(delay/lambda) MORE escaped slices than its straight-line twin of the same
+    # arc length, and the run must be thread-invariant.
+
+    print("== time-dependent chicane: window rotations and threads ==")
+
+    # Delays chosen MID-INTERVAL (x.5 wavelengths), never on an integer: a target of
+    # exactly 3.000 lambda sits on the floor boundary, where the 6e-8 difference
+    # between the exact trace and the small-angle form decides between 2 and 3 (the
+    # boundary was located: 2.99 -> 2, 3.01 -> 3, which is itself an independent
+    # confirmation of the walk's floor geometry against the trace at this scale).
+
+    run(exe, wd, "tds", LATSTRAIGHT.format(absline="", modeline=TRANSCRIBED), nml_t=NML_TD)
+    n_str = escaped_count(wd, "tds")
+    worst, detail = 0.0, []
+    for target in (3.5, 6.5, 10.5):
+        a = float(np.sqrt(target * LAM / (2 * 0.05 / 3 + 0.025)))
+        tag = f"tdc{int(target)}"
+        run(exe, wd, tag, LATCHIC.format(absline="", ang=f"{a:.12e}", mid=CHIC_MID,
+            modeline=TRANSCRIBED), nml_t=NML_TD)
+        n_expect = int(np.floor(chicane_delay(a) / LAM))
+        got = escaped_count(wd, tag) - n_str
+        worst = max(worst, abs(got - n_expect))
+        detail.append(f"{n_expect}:{got}")
+    check("extra banked slices == floor(delay/lambda), three delays", float(worst), 0.5,
+          note="[expected:got " + " ".join(detail) + "]")
+
+    a_td = float(np.sqrt(3.5 * LAM / (2 * 0.05 / 3 + 0.025)))
+    run(exe, wd, "tdc", LATCHIC.format(absline="", ang=f"{a_td:.12e}", mid=CHIC_MID,
+        modeline=TRANSCRIBED), nml_t=NML_TD)
+    run(exe, wd, "tdc8", LATCHIC.format(absline="", ang=f"{a_td:.12e}", mid=CHIC_MID,
+        modeline=TRANSCRIBED), nml_t=NML_TD, threads="8")
+    same = (wd / "tdc.diag.txt").read_bytes() == (wd / "tdc8.diag.txt").read_bytes()
+    with h5py.File(wd / "tdc-final.fld.h5") as a, h5py.File(wd / "tdc8-final.fld.h5") as b:
+        for k in a["slice000001"]:
+            same = same and bool(np.array_equal(a[f"slice000001/{k}"][:], b[f"slice000001/{k}"][:]))
+    check("TD chicane 1 vs 8 threads byte/dataset-identical", 0.0 if same else 1.0, 0.5)
 
     # ------------------------------------------------------------------
     print("== refusals ==")
