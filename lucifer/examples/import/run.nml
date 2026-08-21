@@ -21,20 +21,15 @@
 ! Set write_dist_file to also write the bunch as a Genesis &importdistribution input,
 ! or write_opmd_file for openPMD-beamphysics.
 
-&fel_track_params
+&fel_params
   lat_file = "../aramis.bmad"
-  out_root = "import"
+  global%out_root = "import"
+  global%ran_seed = 12345
+/
 
-  lambda0 = 1e-10              ! 1 Angstrom.
-
-  window_sample = 3            ! Slice spacing 3*lambda0, slippage-matched.
+&fel_beam_init
   imp%npart = 2048             ! Macroparticles per slice after resampling...
   imp%nbins = 8                ! ...in beamlets of 8.
-  ran_seed = 12345
-
-  seed_power = 0               ! Dark start: the light grows from the imported bunch.
-  grid_n_pts = 255
-  grid_half_width = 2e-4
 
   use_beam_init = T            ! The bunch, in Bmad's native description:
   beam_init%n_particle = 50000
@@ -45,4 +40,15 @@
   beam_init%bunch_charge = 3.01e-14
 
   imp%slicewidth = 0.01        ! Genesis's slicewidth: the sampling window.
-&end
+/
+
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10              ! 1 Angstrom.
+
+  wavefront_init%window_sample = 3            ! Slice spacing 3*lambda0, slippage-matched.
+
+  wavefront_init%seed_power = 0               ! Dark start: the light grows from the imported bunch.
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+/

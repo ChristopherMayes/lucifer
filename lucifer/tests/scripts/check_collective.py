@@ -30,9 +30,11 @@ import sys
 
 import numpy as np
 
+from nml import to_groups
+
 M_ELECTRON = 0.51099895069e6
 
-BASE = """&fel_track_params
+BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -65,7 +67,7 @@ BASE = """&fel_track_params
 
 
 def run(exe, wd, name, text):
-    (wd / name).write_text(text)
+    (wd / name).write_text(to_groups(text))
     r = subprocess.run([str(exe), name], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:

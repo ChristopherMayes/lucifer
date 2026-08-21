@@ -41,6 +41,8 @@ import sys
 
 import h5py
 import numpy as np
+
+from nml import to_groups
 from scipy.special import jv
 
 FAILED = False
@@ -132,7 +134,7 @@ fel_transcribed = -1
 wiggler::*[FEL_TRACKING] = fel_transcribed
 """
 
-NML_IMPORT = """&fel_track_params
+NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   beam_file = "{beam}"
@@ -142,7 +144,7 @@ NML_IMPORT = """&fel_track_params
 {extra}&end
 """
 
-NML_TD = """&fel_track_params
+NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -178,7 +180,7 @@ def check(name, value, tol, note=""):
 
 
 def run(exe, wd, name, text, threads="8"):
-    (wd / (name + ".nml")).write_text(text)
+    (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
@@ -187,7 +189,7 @@ def run(exe, wd, name, text, threads="8"):
 
 
 def refuse(exe, wd, name, text, fragment):
-    (wd / (name + ".nml")).write_text(text)
+    (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in (r.stdout + r.stderr)

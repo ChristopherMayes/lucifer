@@ -1027,9 +1027,9 @@ distribution, which is that estimate's own accuracy at a_w ~ 1 -- so the test ch
 the shape tightly and the magnitude loosely, which is the honest split.
 
 RESOLVED: both FEL modes now honor Bmad's GLOBAL switches
-`bmad_com%radiation_damping_on` / `%radiation_fluctuations_on` (set from the driver's
-`radiation_damping` / `radiation_fluctuations` namelist conveniences; interludes always
-honored them through track1). Measured, same instrument:
+`bmad_com%radiation_damping_on` / `%radiation_fluctuations_on` (set directly in
+`&fel_params`, which exposes `bmad_com` the way Tao's `&tao_params` does; interludes
+always honored them through track1). Measured, same instrument:
 
 | with the switches on | measured | check level |
 |---|---|---|

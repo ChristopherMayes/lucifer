@@ -207,14 +207,18 @@ make_deck perf-serial.in 1
 make_deck perf-parallel.in 0
 
 cat > perf.nml <<NML
-&fel_track_params
+&fel_params
   lat_file = "aramis.bmad"
+  global%out_root = "perf"
+  global%interlude_model = "bmad"
+  global%write_diag = T
+/
+&fel_beam_init
   beam_file = "AramisPerf-initial.par.h5"
+/
+&fel_wavefront_init
   field_file = "AramisPerf-initial.fld.h5"
-  out_root = "perf"
-  interlude_model = "bmad"
-  write_diag = T
-&end
+/
 NML
 
 # timed <label> <log> <command...>: uniform external wall clock.

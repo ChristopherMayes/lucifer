@@ -13,11 +13,23 @@
 ! distribution_type(3) = "GRID" (Bmad's uniform) over the window extent, with the
 ! current DERIVED as I = Q*c/extent -- bunch_charge below encodes 3 kA exactly.
 
-&fel_track_params
+&fel_params
   lat_file = "../aramis.bmad"
-  out_root = "sase"
+  global%out_root = "sase"
 
-  lambda0 = 1e-10              ! 1 Angstrom.
+  ! Diagnostics (manual sec:stats). The stats file <out_root>.stats.h5 is always
+  ! written. Uncomment to also dump at named elements and bank the escaped field
+  ! (full pulse reconstructed at the exit as <out_root>-pulse.fld.h5):
+  ! global%dump_beam_at = "UND3"
+  ! global%dump_field_at = "UND3"
+  ! global%keep_escaped_field = T
+  ! Spontaneous radiation (Bmad's global switches; off by default, like Genesis's
+  ! &sponrad). At 1 Angstrom the loss is ~0.5 rho of detuning over the full line:
+  ! bmad_com%radiation_damping_on = T
+  ! bmad_com%radiation_fluctuations_on = T
+/
+
+&fel_beam_init
 
   beam_init%n_particle = 2048              ! Macroparticles per slice.
   beam_init%bunch_charge = 2.881993782512e-13  ! 3 kA flat: I = Q*c/extent.
@@ -27,23 +39,17 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-
-  seed_power = 0               ! Dark start: SASE from shot noise alone.
-  grid_n_pts = 255
-  grid_half_width = 2e-4
-
-  window_length = 2.88e-8      ! 96 slices (&time slen)...
-  window_sample = 3            ! ...of spacing 3*lambda0, slippage one slice per step.
   shotnoise = T
+/
 
-  ! Diagnostics (manual sec:stats). The stats file <out_root>.stats.h5 is always
-  ! written. Uncomment to also dump at named elements and bank the escaped field
-  ! (full pulse reconstructed at the exit as <out_root>-pulse.fld.h5):
-  ! dump_beam_at = "UND3"
-  ! dump_field_at = "UND3"
-  ! keep_escaped_field = T
-  ! Spontaneous radiation (Bmad's global switches; off by default, like Genesis's
-  ! &sponrad). At 1 Angstrom the loss is ~0.5 rho of detuning over the full line:
-  ! radiation_damping = T
-  ! radiation_fluctuations = T
-&end
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10              ! 1 Angstrom.
+
+  wavefront_init%seed_power = 0               ! Dark start: SASE from shot noise alone.
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+
+  wavefront_init%window_length = 2.88e-8      ! 96 slices (&time slen)...
+  wavefront_init%window_sample = 3            ! ...of spacing 3*lambda0, slippage one slice per step.
+/

@@ -46,6 +46,8 @@ import sys
 
 import numpy as np
 
+from nml import to_groups
+
 import pool
 
 M_ELECTRON = 0.51099895069e6
@@ -59,7 +61,7 @@ NGRID_REF = 255
 
 FAILED = False
 
-NML = """&fel_track_params
+NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -109,7 +111,7 @@ def check(name, value, lo, hi, note=""):
 
 
 def run(exe, wd, name, text, threads="8"):
-    (wd / (name + ".nml")).write_text(text)
+    (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:

@@ -5,11 +5,13 @@
 ! Absolute-time phasing: the bend angle sets the light's re-injection phase onto the
 ! bunched beam. This lattice: chicane.bmad.
 
-&fel_track_params
+&fel_params
   lat_file = "chicane.bmad"
-  out_root = "chicane"
+  global%out_root = "chicane"
+  global%ran_seed = 12345
+/
 
-  lambda0 = 1e-10
+&fel_beam_init
 
   beam_init%n_particle = 8192
   beam_init%bunch_charge = 1.000692285594e-15
@@ -17,10 +19,14 @@
   beam_init%sig_pz = 8.804506566858e-5
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
+/
 
-  seed_power = 2e8
-  seed_waist_size = 30e-6
-  grid_n_pts = 151
-  grid_half_width = 2e-4
-  ran_seed = 12345
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%seed_power = 2e8
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 151
+  wavefront_init%grid_half_width = 2e-4
 /

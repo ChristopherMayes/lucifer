@@ -3,21 +3,27 @@
 ! the bmad_standard kernel's transverse maps). Compare unaveraged.diag.txt against
 ! averaged.diag.txt -- two independent formulations, one gain curve to ~3e-3 ln.
 
-&fel_track_params
+&fel_params
   lat_file = "seg1_averaged.bmad"
-  out_root = "averaged"
+  global%out_root = "averaged"
+  global%write_diag = T          ! the two-formulation overlay compares diag files.
+/
 
-  lambda0 = 1e-10
+&fel_beam_init
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 1.000692285594e-15  ! 3 kA: I = Q*c/spacing at sig_z = 0.
   beam_init%sig_z = 0                      ! Steady state.
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
+/
 
-  seed_power = 5e3
-  seed_waist_size = 30e-6
-  grid_n_pts = 129
-  grid_half_width = 2e-4
-  write_diag = T          ! the two-formulation overlay compares diag files.
-&end
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%seed_power = 5e3
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_half_width = 2e-4
+/

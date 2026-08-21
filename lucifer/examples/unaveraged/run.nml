@@ -17,11 +17,13 @@
 ! splitting between two INDEPENDENT formulations of the same physics. That agreement is what pins the averaged mode's
 ! coupling factor; the harness measures it precisely (fc to ~6e-4, README).
 
-&fel_track_params
+&fel_params
   lat_file = "seg1.bmad"
-  out_root = "unaveraged"
+  global%out_root = "unaveraged"
+  global%write_diag = T          ! the two-formulation overlay compares diag files.
+/
 
-  lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
+&fel_beam_init
 
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 1.000692285594e-15  ! 3 kA: I = Q*c/spacing at sig_z = 0.
@@ -29,10 +31,14 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
+/
 
-  seed_power = 5e3             ! 5 kW seed...
-  seed_waist_size = 30e-6      ! ...with a 30 um waist at the entrance.
-  grid_n_pts = 129             ! Field grid (129 keeps the run around a minute;
-  grid_half_width = 2e-4       !   the physics checks use the same size).
-  write_diag = T          ! the two-formulation overlay compares diag files.
-&end
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
+
+  wavefront_init%seed_power = 5e3             ! 5 kW seed...
+  wavefront_init%seed_waist_size = 30e-6      ! ...with a 30 um waist at the entrance.
+  wavefront_init%grid_n_pts = 129             ! Field grid (129 keeps the run around a minute;
+  wavefront_init%grid_half_width = 2e-4       !   the physics checks use the same size).
+/

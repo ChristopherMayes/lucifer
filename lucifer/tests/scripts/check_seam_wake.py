@@ -46,6 +46,8 @@ import sys
 import h5py
 import numpy as np
 
+from nml import to_groups
+
 LAMBDA0 = 1e-10
 SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
@@ -73,7 +75,7 @@ WAKE_MODE = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
 WAKE_ZLONG = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
   z_long = {{position_dependence = none, w = {{ call::{table} }}}}}}"""
 
-NML_GEN = """&fel_track_params
+NML_GEN = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -96,14 +98,18 @@ NML_GEN = """&fel_track_params
 {extra}&end
 """
 
+def imp_nml(**kw):
+    return to_groups(NML_IMP.format(**kw))
+
+
 def gen_nml(**kw):
     """NML_GEN with the flat-bunch charge DERIVED from the window: I = Q*c/extent."""
     slen = float(kw["slen"])
     kw.setdefault("q", f"{3000 * slen / 2.99792458e8:.12e}")
     kw.setdefault("half", f"{slen / 2:.9e}")
-    return NML_GEN.format(**kw)
+    return to_groups(NML_GEN.format(**kw))
 
-NML_IMP = """&fel_track_params
+NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -237,8 +243,8 @@ def main():
         ok = False
 
     # ---------------- causality: spike at the tail, probes ahead get EXACTLY zero
-    (w/"wc_a.nml").write_text(NML_IMP.format(lat="wl_mode.bmad", root="wca", sample=SAMPLE, extra=""))
-    (w/"wc_b.nml").write_text(NML_IMP.format(lat="wl_none.bmad", root="wcb", sample=SAMPLE, extra=""))
+    (w/"wc_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE, extra=""))
+    (w/"wc_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE, extra=""))
     run(exe, "wc_a.nml", "wca.log", w)
     run(exe, "wc_b.nml", "wcb.log", w)
     A, B = load_par(w, "wca"), load_par(w, "wcb")
@@ -253,7 +259,7 @@ def main():
         print("FAIL: wake kicked slices AHEAD of all charge (acausal or direction flipped)")
         ok = False
     # d8 direction cross-check: wake_on on the same beam marks the same mask.
-    (w/"wc_d8.nml").write_text(NML_IMP.format(lat="wl_none.bmad", root="wcd8", sample=SAMPLE,
+    (w/"wc_d8.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcd8", sample=SAMPLE,
         extra="  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n"))
     run(exe, "wc_d8.nml", "wcd8.log", w)
     eloss = []
@@ -271,7 +277,7 @@ def main():
 
     # ---------------- z_long cross-validation with the d8 resistive-wall kernel
     # Export the kernel from a wake_on run (any beam; kernels are beam-independent).
-    (w/"wz_k.nml").write_text(NML_IMP.format(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
+    (w/"wz_k.nml").write_text(imp_nml(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
         extra='  load_only = T\n  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n'
               '  wake_relaxation = 8.1e-6\n  write_wake_kernels = "kern.txt"\n'))
     run(exe, "wz_k.nml", "wzk.log", w)
@@ -293,7 +299,7 @@ def main():
         for z, wv in zip(z_tab, w_tab):
             fh.write(f"{z:.9e} {wv:.9e},\n")
     (w/"wl_zlong.bmad").write_text(LAT_BASE.format(l=L_ELE, wake=WAKE_ZLONG.format(table="ztable.wake")))
-    (w/"wz_a.nml").write_text(NML_IMP.format(lat="wl_zlong.bmad", root="wza", sample=SAMPLE, extra=""))
+    (w/"wz_a.nml").write_text(imp_nml(lat="wl_zlong.bmad", root="wza", sample=SAMPLE, extra=""))
     run(exe, "wz_a.nml", "wza.log", w)
     A = load_par(w, "wza")
     B = load_par(w, "wcb")                            # the no-wake twin from causality
@@ -389,9 +395,9 @@ def main():
         ok = False
 
     # ---------------- split-weight invariance through the wake
-    (w/"ws_a.nml").write_text(NML_IMP.format(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
+    (w/"ws_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
                                              extra="  imp_split_weights = T\n"))
-    (w/"ws_b.nml").write_text(NML_IMP.format(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
+    (w/"ws_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
                                              extra="  imp_split_weights = T\n"))
     run(exe, "ws_a.nml", "wsa.log", w)
     run(exe, "ws_b.nml", "wsb.log", w)
@@ -413,7 +419,7 @@ def main():
         ok = False
 
     # ---------------- thread determinism with a wake element
-    (w/"wt8.nml").write_text(NML_IMP.format(lat="wl_mode.bmad", root="wt8", sample=SAMPLE, extra=""))
+    (w/"wt8.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wt8", sample=SAMPLE, extra=""))
     run(exe, "wt8.nml", "wt8.log", w, threads="8")
     d1 = re.sub(rb"wca", b"", (w/"wca.diag.txt").read_bytes())
     d8 = re.sub(rb"wt8", b"", (w/"wt8.diag.txt").read_bytes())

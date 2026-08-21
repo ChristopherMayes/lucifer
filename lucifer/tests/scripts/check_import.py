@@ -44,6 +44,8 @@ import sys
 import h5py
 import numpy as np
 
+from nml import to_groups
+
 import pool
 
 # The test bunch: Gaussian, peak current ~3 kA at sigma_z = 1.2 nm (charge 30.1 fC),
@@ -60,7 +62,7 @@ SIG_PZ = 1 / GAMMA0            # gen_delgam = 1 in fractional momentum
 # exists in the import -- a Bmad lattice IS the optics specification).
 LATTICE_TWISS = dict(betax=8.53711, alphax=-0.703306, betay=17.3899, alphay=1.40348)
 
-NML = """&fel_track_params
+NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
   lambda0 = {lambda0}
@@ -160,8 +162,8 @@ BEAM_INIT_SOURCE = """  use_beam_init = T
 
 
 def write_nml(path, root, seed, extra="", source=BEAM_INIT_SOURCE):
-    path.write_text(NML.format(root=root, seed=seed, lambda0=LAMBDA0,
-                               sample=SAMPLE, nslice=NSLICE, source=source, extra=extra))
+    path.write_text(to_groups(NML.format(root=root, seed=seed, lambda0=LAMBDA0,
+                              sample=SAMPLE, nslice=NSLICE, source=source, extra=extra)))
 
 
 def parse_stdout(log):
@@ -359,7 +361,7 @@ def main():
     # imported (real particles resampled). The quiet-load must match the analytic
     # Gaussian profile EXACTLY -- this is also the sqrt(2pi) mutation check on the
     # driver's current derivation -- and the import must match it statistically.
-    (w/"imp_xq.nml").write_text(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
+    (w/"imp_xq.nml").write_text(to_groups(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
         sample=SAMPLE, nslice=NSLICE, extra='  load_only = T\n',
         source="""  beam_init%n_particle = 512
   beam_init%a_norm_emit = {emit}
@@ -367,7 +369,7 @@ def main():
   beam_init%sig_z = 1.2e-9
   beam_init%sig_pz = {sig_pz}
   beam_init%bunch_charge = 3.01e-14
-""".format(emit=NORM_EMIT, sig_pz=SIG_PZ)))
+""".format(emit=NORM_EMIT, sig_pz=SIG_PZ))))
     run([args.exe, "imp_xq.nml"], w/"imp_xq.log", env=env1)
     cur_q = load_dump_currents(w/"impxq-initial.par.h5")
     sp = SAMPLE * LAMBDA0

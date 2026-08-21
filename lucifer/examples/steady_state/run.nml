@@ -13,11 +13,12 @@
 ! steady state -- the whole charge in the one slice window, I = Q*c/slice_spacing --
 ! so bunch_charge below encodes 3 kA exactly.
 
-&fel_track_params
+&fel_params
   lat_file = "../aramis.bmad"
-  out_root = "steady_state"
+  global%out_root = "steady_state"
+/
 
-  lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
+&fel_beam_init
 
   beam_init%n_particle = 8192              ! Macroparticles per slice.
   beam_init%bunch_charge = 1.000692285594e-15  ! 3 kA: I = Q*c/spacing (spacing = lambda0).
@@ -25,9 +26,14 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = beta0*p0_mc*sig_pz = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7             ! 0.4 um normalized emittance.
   beam_init%b_norm_emit = 4e-7
+/
 
-  seed_power = 5e3             ! 5 kW seed (Genesis &field power)...
-  seed_waist_size = 30e-6      ! ...with a 30 um waist at the entrance (&field waist_size).
-  grid_n_pts = 255             ! Field grid: 255 x 255 points (&field ngrid)...
-  grid_half_width = 2e-4       ! ...spanning +-0.2 mm (&field dgrid).
-&end
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10              ! 1 Angstrom, resonant with the lattice undulator at 5.8 GeV.
+
+  wavefront_init%seed_power = 5e3             ! 5 kW seed (Genesis &field power)...
+  wavefront_init%seed_waist_size = 30e-6      ! ...with a 30 um waist at the entrance (&field waist_size).
+  wavefront_init%grid_n_pts = 255             ! Field grid: 255 x 255 points (&field ngrid)...
+  wavefront_init%grid_half_width = 2e-4       ! ...spanning +-0.2 mm (&field dgrid).
+/

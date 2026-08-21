@@ -8,11 +8,20 @@
 !   fel_track_test run.nml           (run from this directory)
 !   python ../plot_fel.py sase_wake.stats.h5
 
-&fel_track_params
+&fel_params
   lat_file = "../aramis.bmad"
-  out_root = "sase_wake"
+  global%out_root = "sase_wake"
 
-  lambda0 = 1e-10
+  wake%on = T
+  wake%radius = 0.5e-3         ! Narrow chamber: the tuned, visible case.
+  wake%material = "CU"         ! Copper: conductivity + AC relaxation shortcuts.
+  wake%gap = 0.5e-3            ! Undulator gap wake...
+  wake%lgap = 0.015            ! ...one gap per period.
+  wake%hrough = 100e-9         ! 100 nm surface roughness...
+  wake%lrough = 100e-6         ! ...with 100 um correlation length.
+/
+
+&fel_beam_init
 
 
   beam_init%n_particle = 2048
@@ -23,20 +32,17 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-
-  seed_power = 0
-  grid_n_pts = 255
-  grid_half_width = 2e-4
-
-  window_length = 2.88e-8      ! 96 slices of spacing 3*lambda0, as sase/run.nml.
-  window_sample = 3
   shotnoise = T
+/
 
-  wake_on = T
-  wake_radius = 0.5e-3         ! Narrow chamber: the tuned, visible case.
-  wake_material = "CU"         ! Copper: conductivity + AC relaxation shortcuts.
-  wake_gap = 0.5e-3            ! Undulator gap wake...
-  wake_lgap = 0.015            ! ...one gap per period.
-  wake_hrough = 100e-9         ! 100 nm surface roughness...
-  wake_lrough = 100e-6         ! ...with 100 um correlation length.
-&end
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+
+  wavefront_init%window_length = 2.88e-8      ! 96 slices of spacing 3*lambda0, as sase/run.nml.
+  wavefront_init%window_sample = 3
+/

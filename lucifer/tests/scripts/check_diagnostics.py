@@ -30,12 +30,14 @@ import sys
 import h5py
 import numpy as np
 
+from nml import to_groups
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront  # noqa: E402
 
 FAILED = False
 
-NML = """&fel_track_params
+NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -77,7 +79,7 @@ def check(name, value, tol, note=""):
 
 
 def run(exe, wd, name, text, threads="8"):
-    (wd / (name + ".nml")).write_text(text)
+    (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
@@ -221,8 +223,8 @@ def main():
           0.0 if same else 1.0, 0.5)
 
     # 6. Refusal: dump list entry matching nothing, refused by name.
-    (wd / "dg_bad.nml").write_text(NML.format(lat="dg_wrap.bmad", root="dg_bad",
-                                              extra='  dump_beam_at(2) = "NO_SUCH_ELEMENT"\n'))
+    (wd / "dg_bad.nml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_bad",
+                                             extra='  dump_beam_at(2) = "NO_SUCH_ELEMENT"\n')))
     r = subprocess.run([str(exe), "dg_bad.nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = r.returncode != 0 and "NO_SUCH_ELEMENT" in (r.stdout + r.stderr)

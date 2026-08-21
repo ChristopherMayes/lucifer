@@ -32,15 +32,29 @@
 ! after every integration step, one step per interlude element -- one row per slice
 ! per record, in time-window order.
 !
-! Input is a namelist file:
+! Input is a namelist file of THREE GROUPS, laid out the way Tao lays out its init file
+! (manual sec:program; the structs live in fel_struct, the parsing in fel_input_mod,
+! both library). &fel_params carries the run: the lattice, the global%... switches,
+! Bmad's own bmad_com and space_charge_com set directly (Tao's &tao_params pattern),
+! and the wake%/sc% collective descriptions. &fel_beam_init carries the beam:
+! Bmad's beam_init%... description, the imp%... resampler, source/output files and the
+! beam-side check knobs. &fel_wavefront_init carries the radiation: the
+! wavefront_init%... starting condition (the beam_init analog -- the field record IS
+! the time window, so the window lives here) and field_file imports. The retired flat
+! &fel_track_params group is refused by name, each parameter mapped to its new home.
 !
-!   &fel_track_params
+!   &fel_params
 !     lat_file = "aramis.bmad"                 ! Bmad lattice.
+!     global%out_root = "fel_td"               ! Prefix for the output files.
+!     global%interlude_model = "bmad"          ! "bmad" (the seam, default) or "genesis".
+!   /
+!   &fel_beam_init
 !     beam_file = "Aramis-initial.par.h5"      ! Genesis particle dump to start from.
-!     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
-!     out_root = "fel_td"                      ! Prefix for the output files.
-!     interlude_model = "bmad"                 ! "bmad" (the seam, default) or "genesis".
 !     split_weights = F                        ! Weight-invariance test mode; see below.
+!   /
+!   &fel_wavefront_init
+!     field_file = "Aramis-initial.fld.h5"     ! Genesis field dump to start from.
+!   /
 !
 ! The FEL tracking mode and unaveraged parameters are per-element LATTICE attributes
 ! (registered by this program; usable on any wiggler/undulator, class-settable as
@@ -62,23 +76,28 @@
 !     fel_ramp_periods      ! sin^2 entry/exit ramp length [periods]. unset/0 -> 2;
 !                           !   a TRUE hard edge (test configuration) is the explicit
 !                           !   sentinel -1 -- silence never means hard edge.
-!     write_initial = F                        ! Also dump the initial state (Genesis format).
-!     dump_beam_at = "UND3", "quadrupole::*"   ! Dump the beam (Genesis .par.h5 format) at the
-!                                              !   end of the named elements (Bmad locator
-!                                              !   syntax, class::name allowed; an entry
-!                                              !   matching nothing is refused by name).
-!     dump_field_at = "UND3"                   ! Same for the field (Genesis .fld.h5, unrotated).
-!     keep_escaped_field = F                   ! Bank the field slices slippage transmits out of
+! The remaining global%... switches of &fel_params:
+!
+!     global%write_initial = F                 ! Also dump the initial state (Genesis format).
+!     global%dump_beam_at = "UND3", "quadrupole::*"  ! Dump the beam (Genesis .par.h5 format)
+!                                              !   at the end of the named elements (Bmad
+!                                              !   locator syntax, class::name allowed; an
+!                                              !   entry matching nothing is refused by name).
+!     global%dump_field_at = "UND3"            ! Same for the field (Genesis .fld.h5, unrotated).
+!     global%keep_escaped_field = F            ! Bank the field slices slippage transmits out of
 !                                              !   the window (<out_root>-escaped.fld.h5, with
 !                                              !   wavefront_params and z_transmit per slice) and
 !                                              !   reconstruct the FULL PULSE at the exit plane
 !                                              !   (<out_root>-pulse.fld.h5) by free-space
 !                                              !   propagation at finalize. Manual sec:stats.
-!     migrate = F                              ! Slice migration (see below).
-!     migrate_check = F                        ! Verify phase continuity at each migration.
-!   &end
+!     global%migrate = F                       ! Slice migration (see below).
+!     global%migrate_check = F                 ! Verify phase continuity at each migration.
+!     global%ran_seed = 12345                  ! The one RNG seed (generation, import, noise).
+!     global%load_only = F                     ! Build the initial state, dump it, exit
+!                                              !   without tracking (shot-noise checks).
+!     global%reference_run = F                 ! NO FEL interaction: Bmad tracks everything.
 !
-! migrate = T moves particles between slices when their ponderomotive phase leaves the
+! global%migrate = T moves particles between slices when their ponderomotive phase leaves the
 ! slice window (fel_migrate_slices, manual sec:migration), called serially after every
 ! element. OFF BY DEFAULT, deliberately: the Genesis-comparison tiers run against
 ! Genesis WITHOUT one4one, which never migrates, so migration would be a physics-model
@@ -114,30 +133,35 @@
 !
 ! EVERY other beam_init field that is set is REFUSED BY NAME (see
 ! check_beam_init_contract) -- a standard structure that silently drops fields would
-! be worse than a custom one. Remaining generation knobs, with the Genesis4
-! &field / &time names they map to:
+! be worse than a custom one. The radiation starting condition is
+! &fel_wavefront_init's wavefront_init%... (the beam_init analog), with the Genesis4
+! &field / &time names each field maps to:
 !
-!     lambda0 = 1e-10          ! Radiation wavelength [m], REQUIRED (with dumps it comes
-!                              !   from the file). Deliberately not defaulted from the
-!                              !   lattice resonance: the first undulator may be off.
+!     wavefront_init%lambda0 = 1e-10          ! Radiation wavelength [m], REQUIRED (with
+!                              !   dumps it comes from the file). Deliberately not
+!                              !   defaulted from the lattice resonance: the first
+!                              !   undulator may be off.
+!     wavefront_init%seed_power = 5e3         ! Seed power [W] (&field power); 0 = dark start.
+!     wavefront_init%seed_waist_size = 30e-6  ! Seed 1/e^2 intensity radius w0 [m]
+!                              !   (&field waist_size).
+!     wavefront_init%seed_polarization = 'x'  ! 'x' or 'y'.
+!     wavefront_init%grid_n_pts = 255         ! Transverse grid points per side (&field ngrid).
+!     wavefront_init%grid_half_width = 2e-4   ! Grid half width [m] (&field dgrid).
+!     wavefront_init%window_length = 0        ! Time window [m] (&time slen). 0: derived from
+!                              !   the bunch (+-4 sig_z Gaussian; the grid extent flat;
+!                              !   one slice steady state). Override it for slippage
+!                              !   headroom; a window that clips the bunch warns.
+!     wavefront_init%window_sample = 1        ! Slice spacing / lambda0 (integer, &time sample).
+!     wavefront_init%harmonics = 1, 3         ! The field set (manual sec:field-set).
+!
+! The beam-side generation knobs of &fel_beam_init:
+!
 !     nbins = 8                ! Beamlet size of the quiet start (quiet below nbins).
-!     seed_power = 5e3         ! Seed power [W] (Genesis &field power); 0 = dark start.
-!     seed_waist_size = 30e-6  ! Seed 1/e^2 intensity radius w0 [m] (&field waist_size).
-!     grid_n_pts = 255         ! Transverse grid points per side (&field ngrid).
-!     grid_half_width = 2e-4   ! Grid half width [m] (&field dgrid).
-!     ran_seed = 12345         ! Random seed (Bmad's ran_seed_put), for reproducibility.
-!     window_length = 0        ! Time window [m] (&time slen). 0: derived from the bunch
-!                              !   (+-4 sig_z Gaussian; the grid extent flat; one slice
-!                              !   steady state). Override it for slippage headroom; a
-!                              !   window that clips the bunch warns with numbers.
-!     window_sample = 1        ! Slice spacing / lambda0 (integer, &time sample).
 !     shotnoise = F            ! Impose physical shot noise (&time shotnoise;
 !                              !   time-dependent windows only, Genesis's dotime rule).
 !     gen_test_weights = F     ! Validation knob: alternate beamlet weights 0.25x/1.75x
 !                              !   (charge preserving, uniform within each beamlet) to
 !                              !   exercise the weighted-noise paths. Not physics input.
-!     load_only = F            ! Generate, write <out_root>-initial dumps, exit without
-!                              !   tracking. For the shot-noise statistical check.
 !
 ! Element wakes: elements carrying Bmad sr_wake definitions -- pseudomodes or a
 ! tabular z_long -- act across the WHOLE time window via slice concatenation (manual
@@ -184,7 +208,7 @@
 ! identical to the unsplit run. This checks the weighted paths, which no Genesis
 ! comparison can (Genesis dumps carry no weights).
 !
-! Outputs: <out_root>.diag.txt, ONLY with write_diag = T (one row per slice per record: z, slice, field and beam
+! Outputs: <out_root>.diag.txt, ONLY with global%write_diag = T (one row per slice per record: z, slice, field and beam
 ! diagnostics), <out_root>.stats.h5 (the production statistics file, manual sec:stats:
 ! per-record per-slice beam moments named as bunch_params_struct components, per-record
 ! per-slice wavefront_params, and the evaluated calc_bunch_params at element ends;
@@ -195,6 +219,8 @@
 
 program fel_track_test
 
+use fel_struct
+use fel_input_mod
 use fel_track_mod
 use fel_unaveraged_mod
 use fel_import_mod
@@ -205,6 +231,13 @@ use beam_mod
 use wake_mod
 
 implicit none
+
+! The run state and the input structs (fel_struct; manual sec:program). The namelist
+! layer fills run's input structs; the locals below are the walk's working aliases,
+! copied from the structs right after the parse (the split into library modules moves
+! the walk onto run%... directly).
+
+type (fel_run_struct), target :: run
 
 type (lat_struct), target :: lat
 type (branch_struct), pointer :: branch
@@ -232,12 +265,9 @@ real(rp) :: gamma0 = 0                  ! DERIVED from the lattice e_tot.
 logical :: split_weights = .false.
 logical :: write_initial = .false.
 logical :: migrate = .false., migrate_check = .false.
-! Bmad's own synchrotron radiation, for elements Bmad tracks (interludes and any
-! wiggler whose tracking_method is not custom). The FEL path has its own radiation
-! physics -- these knobs do not touch it. Used by check_spontaneous.py to measure
-! Bmad's independent spontaneous-loss implementation against the FEL modes and the
-! analytic rate; off by default, as in Bmad.
-logical :: radiation_damping = .false., radiation_fluctuations = .false.
+! (Bmad's own synchrotron-radiation switches are bmad_com%radiation_damping_on /
+! %radiation_fluctuations_on, set directly in &fel_params -- the old radiation_damping
+! / radiation_fluctuations namelist scalars retired with the group cutover.)
 ! A deliberate run with NO FEL interaction: Bmad tracks every element, the field just
 ! drifts. The reference leg of check_spontaneous.py, which measures Bmad's own
 ! radiation physics through the same wiggler the FEL modes use.
@@ -342,7 +372,7 @@ type (fel_und_struct), allocatable :: und_of(:)   ! Per-element FEL parameters, 
 logical, allocatable :: is_fel(:)                 ! Which tracked elements are FEL segments.
 real(rp) z_now, ks, qf, und_slip_step, Lz, gamma0_ref
 real(rp) charge_dropped_tot, b_dev_max
-integer ie, is, ih, istep, n_arg, iu_diag, iu_nml, nslice, prev_ie, n_moved_tot, iu_wake
+integer ie, is, ih, istep, n_arg, iu_diag, nslice, prev_ie, n_moved_tot, iu_wake
 logical err, timerun
 
 type (fel_collective_struct) coll
@@ -381,23 +411,9 @@ character(8) :: wavefront_format = 'genesis'
 character(400) param_file
 character(*), parameter :: r_name = 'fel_track_test'
 
-namelist / fel_track_params / lat_file, beam_file, field_file, out_root, &
-                           interlude_model, &
-                           split_weights, write_initial, lambda0, nbins, &
-                           seed_power, seed_waist_size, grid_n_pts, &
-                           grid_half_width, ran_seed, window_length, window_sample, shotnoise, &
-                           gen_test_weights, load_only, migrate, migrate_check, &
-                           wake_on, wake_loss, wake_radius, wake_conductivity, wake_relaxation, &
-                           wake_roundpipe, wake_material, wake_gap, wake_lgap, wake_hrough, &
-                           wake_lrough, sc_rmax, sc_ngrid, sc_nz, sc_nphi, sc_longrange, &
-                           beam_init, imp, use_beam_init, dist_file, write_dist_file, &
-                           write_opmd_file, imp_split_weights, write_wake_kernels, &
-                           dump_beam_at, dump_field_at, keep_escaped_field, &
-                           radiation_damping, radiation_fluctuations, reference_run, &
-                           seed_polarization, swap_beam_xy, harmonics, wavefront_format, &
-                           write_diag
-
-! Read parameters.
+! Read parameters: the three namelist groups (fel_input_mod; the retired flat
+! &fel_track_params group is refused there by name, each parameter mapped to its
+! new home).
 
 n_arg = command_argument_count()
 if (n_arg /= 1) then
@@ -406,9 +422,67 @@ if (n_arg /= 1) then
 endif
 call get_command_argument (1, param_file)
 
-open (newunit = iu_nml, file = param_file, status = 'old', action = 'read')
-read (iu_nml, nml = fel_track_params)
-close (iu_nml)
+call fel_read_input (param_file, run, write_wake_kernels, err)
+if (err) stop 1
+
+! The working aliases (the library split moves the code onto run%... directly).
+
+lat_file = run%lat_file
+field_file = run%field_file
+out_root = run%global%out_root
+interlude_model = run%global%interlude_model
+wavefront_format = run%global%wavefront_format
+write_diag = run%global%write_diag
+write_initial = run%global%write_initial
+load_only = run%global%load_only
+keep_escaped_field = run%global%keep_escaped_field
+dump_beam_at = run%global%dump_beam_at
+dump_field_at = run%global%dump_field_at
+ran_seed = run%global%ran_seed
+migrate = run%global%migrate
+migrate_check = run%global%migrate_check
+reference_run = run%global%reference_run
+
+lambda0 = run%winit%lambda0
+window_length = run%winit%window_length
+window_sample = run%winit%window_sample
+grid_n_pts = run%winit%grid_n_pts
+grid_half_width = run%winit%grid_half_width
+seed_power = run%winit%seed_power
+seed_waist_size = run%winit%seed_waist_size
+seed_polarization = run%winit%seed_polarization
+harmonics = run%winit%harmonics
+
+wake_on = run%wake_init%on
+wake_loss = run%wake_init%loss
+wake_radius = run%wake_init%radius
+wake_conductivity = run%wake_init%conductivity
+wake_relaxation = run%wake_init%relaxation
+wake_roundpipe = run%wake_init%roundpipe
+wake_material = run%wake_init%material
+wake_gap = run%wake_init%gap
+wake_lgap = run%wake_init%lgap
+wake_hrough = run%wake_init%hrough
+wake_lrough = run%wake_init%lrough
+sc_rmax = run%sc_init%rmax
+sc_ngrid = run%sc_init%ngrid
+sc_nz = run%sc_init%nz
+sc_nphi = run%sc_init%nphi
+sc_longrange = run%sc_init%longrange
+
+beam_init = run%beam_init
+imp = run%imp
+beam_file = run%bparam%beam_file
+dist_file = run%bparam%dist_file
+write_dist_file = run%bparam%write_dist_file
+write_opmd_file = run%bparam%write_opmd_file
+use_beam_init = run%bparam%use_beam_init
+nbins = run%bparam%nbins
+shotnoise = run%bparam%shotnoise
+split_weights = run%bparam%split_weights
+swap_beam_xy = run%bparam%swap_beam_xy
+gen_test_weights = run%bparam%gen_test_weights
+imp_split_weights = run%bparam%imp_split_weights
 
 ! (The FEL tracking mode is a lattice attribute; its refusals live in
 ! setup_fel_elements, and the unaveraged-vs-collective refusal follows setup, once
@@ -419,10 +493,10 @@ if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
   stop 1
 endif
 
-bmad_com%radiation_damping_on = radiation_damping
-bmad_com%radiation_fluctuations_on = radiation_fluctuations
+! (bmad_com%radiation_damping_on / %radiation_fluctuations_on come straight from the
+! &fel_params namelist -- Bmad's own switches, exposed directly as Tao exposes them.)
 
-if (radiation_fluctuations .and. migrate) then
+if (bmad_com%radiation_fluctuations_on .and. migrate) then
   print '(a)', 'fel_track_test: radiation_fluctuations draws one kick per BEAMLET (the quiet start'
   print '(a)', '  cancels per beamlet), and slice migration scrambles beamlet grouping. Pick one.'
   stop 1

@@ -48,6 +48,8 @@ import sys
 import h5py
 import numpy as np
 
+from nml import to_groups
+
 import pool
 
 FAILED = False
@@ -110,7 +112,7 @@ OPEN_MID = "B1, DD, B2, DD, B3"          # Three bends: NOT a closed bump.
 TRANSCRIBED = "fel_transcribed = -1\nwiggler::*[FEL_TRACKING] = fel_transcribed"
 UNAVG = "fel_unaveraged = 1\nwiggler::*[FEL_TRACKING] = fel_unaveraged"
 
-NML = """&fel_track_params
+NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
   lambda0 = 1e-10
@@ -149,7 +151,7 @@ use, SEG
 {modeline}
 """
 
-NML_TD = """&fel_track_params
+NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
   lambda0 = 1e-10
@@ -266,7 +268,7 @@ fft_fieldsolver = true
 &end
 """
 
-NML_IMP = """&fel_track_params
+NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
   beam_file = "PSP-initial.par.h5"
@@ -301,7 +303,7 @@ def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"
     nml = (nml_t or NML).format(tag=tag, imodel=imodel)
     if extra:
         nml = nml.replace("/\n", extra + "/\n")
-    (wd / f"{tag}.nml").write_text(nml)
+    (wd / f"{tag}.nml").write_text(to_groups(nml))
     r = subprocess.run([str(exe), f"{tag}.nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
@@ -311,7 +313,7 @@ def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"
 
 def refuse(exe, wd, tag, lat_text, fragment, imodel="bmad"):
     (wd / f"{tag}.bmad").write_text(lat_text)
-    (wd / f"{tag}.nml").write_text(NML.format(tag=tag, imodel=imodel))
+    (wd / f"{tag}.nml").write_text(to_groups(NML.format(tag=tag, imodel=imodel)))
     r = subprocess.run([str(exe), f"{tag}.nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in (r.stdout + r.stderr)

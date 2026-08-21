@@ -6,11 +6,13 @@
 !   fel_track_test run.nml           (run from this directory)
 !   python ../plot_fel.py bmad_wake.stats.h5
 
-&fel_track_params
+&fel_params
   lat_file = "wake_lattice.bmad"
-  out_root = "bmad_wake"
+  global%out_root = "bmad_wake"
+  global%ran_seed = 12345
+/
 
-  lambda0 = 1e-10
+&fel_beam_init
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 2.881993782512e-13  ! 3 kA flat: I = Q*c/extent.
   beam_init%distribution_type(3) = "GRID"  ! Flat bunch (Bmad's uniform)...
@@ -19,12 +21,16 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-
-  seed_power = 0
-  grid_n_pts = 255
-  grid_half_width = 2e-4
-  window_length = 2.88e-8
-  window_sample = 3
   shotnoise = T
-  ran_seed = 12345
-&end
+/
+
+&fel_wavefront_init
+
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+  wavefront_init%window_length = 2.88e-8
+  wavefront_init%window_sample = 3
+/

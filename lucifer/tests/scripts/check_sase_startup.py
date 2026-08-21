@@ -28,6 +28,8 @@ import sys
 import h5py
 import numpy as np
 
+from nml import to_groups
+
 import pool
 
 GENESIS_DECK = """&setup
@@ -69,7 +71,7 @@ fft_fieldsolver = true
 &end
 """
 
-BMAD_NML = """&fel_track_params
+BMAD_NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
   lambda0 = 1e-10
@@ -115,7 +117,7 @@ def main():
             print(f"FAIL: Genesis seed {seed} exited {r.returncode}");  sys.exit(1)
 
     def bmad_one(seed):
-        (wd / f"bsase{seed}.nml").write_text(BMAD_NML.format(seed=seed))
+        (wd / f"bsase{seed}.nml").write_text(to_groups(BMAD_NML.format(seed=seed)))
         r = subprocess.run([str(exe), f"bsase{seed}.nml"], cwd=wd, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:

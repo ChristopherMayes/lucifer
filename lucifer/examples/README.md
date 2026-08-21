@@ -33,7 +33,7 @@ python ../plot_fel.py <example>.stats.h5            # needs h5py + matplotlib; w
 | `saturation_demo/` | The one exception to "no Genesis": the full 57 m SASE case to saturation, three trackers (Genesis4 MPI, Bmad averaged, Bmad unaveraged) from identical dumps, one clock — its own `run.sh`, every input a real file in the directory | ~25 min |
 
 With no dump files named in the namelist, the program generates its own starting state
-(quiet-start beam, and a Gaussian seed where `seed_power > 0`). The BEAM is described
+(quiet-start beam, and a Gaussian seed where `wavefront_init%seed_power > 0`). The BEAM is described
 by Bmad's standard `beam_init` block — one bulk-bunch description shared with the
 import path — with the current DERIVED, never input: a Gaussian profile from
 `bunch_charge` + `sig_z`, a flat bunch via Bmad's `distribution_type(3) = "GRID"`, and

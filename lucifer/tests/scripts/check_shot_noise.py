@@ -29,9 +29,11 @@ import sys
 import h5py
 import numpy as np
 
+from nml import to_groups
+
 E_CHARGE = 1.602176634e-19
 
-NML = """&fel_track_params
+NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -88,8 +90,8 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
     for seed in range(1, seeds + 1):
         root = f"sn_{'w' if test_weights else 'u'}_{seed}"
         nml = workdir / f"{root}.nml"
-        nml.write_text(NML.format(lat=lat, root=root, seed=1000 + 7 * seed,
-                                  testw="T" if test_weights else "F"))
+        nml.write_text(to_groups(NML.format(lat=lat, root=root, seed=1000 + 7 * seed,
+                                             testw="T" if test_weights else "F")))
         r = subprocess.run([str(exe), nml.name], cwd=workdir,
                            capture_output=True, text=True)
         if r.returncode != 0:

@@ -156,43 +156,50 @@ done
 section_time genesis-references
 echo
 
-# make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [extra]
+# make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
+# The three input groups (manual sec:program): extra &fel_params content (wake/sc) as
+# argument 6, extra &fel_beam_init content (check knobs) as argument 7.
 
 make_nml () {
   cat > "$1" <<NML
-&fel_track_params
+&fel_params
   lat_file = "$2"
-  beam_file = "$5-initial.par.h5"
-  field_file = "$5-initial.fld.h5"
-  out_root = "$3"
-  interlude_model = "$4"
+  global%out_root = "$3"
+  global%interlude_model = "$4"
+  global%write_diag = T
 ${6:+  $6}
-  write_diag = T
-&end
+/
+&fel_beam_init
+  beam_file = "$5-initial.par.h5"
+${7:+  $7}
+/
+&fel_wavefront_init
+  field_file = "$5-initial.fld.h5"
+/
 NML
 }
 
 make_nml tier1.nml  aramis_1seg_val.bmad tier1  bmad    Aramis
 make_nml tier2.nml  aramis_val.bmad      tier2  bmad    Aramis
 make_nml tier2g.nml aramis_val.bmad      tier2g genesis Aramis
-make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "split_weights = T"
+make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "" "split_weights = T"
 make_nml tier1u.nml aramis_1seg_unavg.bmad tier1u bmad Aramis
 make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis_val.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis_val.bmad      td2g   genesis AramisTD
 make_nml tdsase.nml aramis_val.bmad      tdsase genesis AramisTDSASE
-make_nml tdsc.nml   aramis_1seg_val.bmad tdsc   genesis AramisTD "sc_rmax = 250e-6
-  sc_nz = 2
-  sc_nphi = 1
-  sc_longrange = T"
-make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "wake_on = T
-  wake_radius = 2.5e-3
-  wake_conductivity = 5.813e7
-  wake_relaxation = 8.1e-6
-  wake_gap = 0.5e-3
-  wake_lgap = 0.015
-  wake_hrough = 100e-9
-  wake_lrough = 100e-6"
+make_nml tdsc.nml   aramis_1seg_val.bmad tdsc   genesis AramisTD "sc%rmax = 250e-6
+  sc%nz = 2
+  sc%nphi = 1
+  sc%longrange = T"
+make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "wake%on = T
+  wake%radius = 2.5e-3
+  wake%conductivity = 5.813e7
+  wake%relaxation = 8.1e-6
+  wake%gap = 0.5e-3
+  wake%lgap = 0.015
+  wake%hrough = 100e-9
+  wake%lrough = 100e-6"
 
 # Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
 # uses a fieldmap field_calc (deliverable 9, brief 7.5), or that carries Bmad wakes on

@@ -8,12 +8,15 @@
 ! and read the harmonic panel: each harmonic's power against the fundamental's.
 ! The stats file carries the harmonic's full wavefront_params under field/harm3/.
 
-&fel_track_params
+&fel_params
   lat_file = "harmonics.bmad"
-  out_root = "harmonics"
+  global%out_root = "harmonics"
+  global%ran_seed = 12345
 
-  lambda0 = 1e-10
-  harmonics = 1, 3             ! The field set: fundamental + third harmonic.
+  global%wavefront_format = 'both'    ! Genesis dumps AND openPMD EXT_Wavefront (.wf.h5).
+/
+
+&fel_beam_init
 
   beam_init%n_particle = 8192
   beam_init%bunch_charge = 1.000692285594e-15   ! 3 kA (I = Q*c/spacing, SS).
@@ -21,12 +24,15 @@
   beam_init%sig_pz = 8.804506566858e-5
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
+/
 
-  seed_power = 2e8             ! Hard seed: reach the nonlinear regime inside 4 m.
-  seed_waist_size = 30e-6
-  grid_n_pts = 151
-  grid_half_width = 2e-4
-  ran_seed = 12345
+&fel_wavefront_init
 
-  wavefront_format = 'both'    ! Genesis dumps AND openPMD EXT_Wavefront (.wf.h5).
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%harmonics = 1, 3             ! The field set: fundamental + third harmonic.
+
+  wavefront_init%seed_power = 2e8             ! Hard seed: reach the nonlinear regime inside 4 m.
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 151
+  wavefront_init%grid_half_width = 2e-4
 /

@@ -1,8 +1,14 @@
-&fel_track_params
+&fel_params
   lat_file = "sat_unavg.bmad"
+  global%out_root = "sat-unavg"
+  global%interlude_model = "bmad"
+  global%write_diag = T          ! the PDF report's Genesis comparison parses this file.
+/
+
+&fel_beam_init
   beam_file = "AramisSat-initial.par.h5"
+/
+
+&fel_wavefront_init
   field_file = "AramisSat-initial.fld.h5"
-  out_root = "sat-unavg"
-  interlude_model = "bmad"
-  write_diag = T          ! the PDF report's Genesis comparison parses this file.
-&end
+/

@@ -94,14 +94,18 @@ call, file = aramis.bmad
 UND[ds_step] = $delz
 LAT
   cat > "sweep_p$np.nml" <<NML
-&fel_track_params
+&fel_params
   lat_file = "sweep_p$np.bmad"
+  global%out_root = "sweep_p$np"
+  global%interlude_model = "bmad"
+  global%write_diag = T
+/
+&fel_beam_init
   beam_file = "AramisS12-initial.par.h5"
+/
+&fel_wavefront_init
   field_file = "AramisS12-initial.fld.h5"
-  out_root = "sweep_p$np"
-  interlude_model = "bmad"
-  write_diag = T
-&end
+/
 NML
   echo "--- fel_track_test: ds_step = $np period(s) -----------------------------------"
   if ! "$EXE" "sweep_p$np.nml" > "sweep_p$np.log" 2>&1; then
