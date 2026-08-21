@@ -113,60 +113,47 @@ cd "$WORK_DIR" || exit 1
 # (FINDINGS.md / design brief 11.1).
 export FI_PROVIDER=tcp
 
-echo "--- Genesis: full line (writes the shared initial dumps) ---------------------"
-if ! "$GENESIS" Aramis-ss.in > genesis-full.log 2>&1; then
-  echo "Genesis full-line run FAILED; log tail:" >&2
-  tail -20 genesis-full.log >&2
+# Every section prints its wall time, so a regression in test cost is visible from the
+# harness output itself.
+
+BENCH_T_LAST=$SECONDS
+section_time () {   # <label>
+  echo "  [time: $1 $((SECONDS - BENCH_T_LAST)) s]"
+  BENCH_T_LAST=$SECONDS
+}
+
+# The Genesis reference runs form three independent chains -- [ss -> 1seg],
+# [td -> td-1seg, td-sc, td-wake], [td-sase] -- which run concurrently (same
+# decks, same single-process runs; only the wall clock changes).
+
+echo "--- Genesis references: three chains, concurrently ---------------------------"
+run_genesis () {   # <deck> ...: the decks of one chain, in order
+  for deck in "$@"; do
+    if ! "$GENESIS" $deck.in > genesis-$deck.log 2>&1; then
+      echo "Genesis $deck run FAILED; log tail:" >&2
+      tail -20 genesis-$deck.log >&2
+      return 1
+    fi
+  done
+}
+run_genesis Aramis-ss Aramis-1seg &
+GEN_PID_SS=$!
+run_genesis Aramis-td Aramis-td-1seg Aramis-td-sc Aramis-td-wake &
+GEN_PID_TD=$!
+run_genesis Aramis-td-sase &
+GEN_PID_SASE=$!
+GEN_OK=1
+wait $GEN_PID_SS   || GEN_OK=0
+wait $GEN_PID_TD   || GEN_OK=0
+wait $GEN_PID_SASE || GEN_OK=0
+if [[ $GEN_OK -ne 1 ]]; then
+  echo "FAIL: a Genesis reference chain failed (see above)" >&2
   exit 1
 fi
-tail -3 genesis-full.log
-echo
-
-echo "--- Genesis: single segment (imports the same dumps) -------------------------"
-if ! "$GENESIS" Aramis-1seg.in > genesis-1seg.log 2>&1; then
-  echo "Genesis single-segment run FAILED; log tail:" >&2
-  tail -20 genesis-1seg.log >&2
-  exit 1
-fi
-tail -3 genesis-1seg.log
-echo
-
-echo "--- Genesis: full line, time dependent (writes the TD initial dumps) ---------"
-if ! "$GENESIS" Aramis-td.in > genesis-td.log 2>&1; then
-  echo "Genesis time-dependent run FAILED; log tail:" >&2
-  tail -20 genesis-td.log >&2
-  exit 1
-fi
-tail -3 genesis-td.log
-echo
-
-echo "--- Genesis: single segment, time dependent (imports the TD dumps) -----------"
-if ! "$GENESIS" Aramis-td-1seg.in > genesis-td1seg.log 2>&1; then
-  echo "Genesis time-dependent single-segment run FAILED; log tail:" >&2
-  tail -20 genesis-td1seg.log >&2
-  exit 1
-fi
-tail -3 genesis-td1seg.log
-echo
-
-echo "--- Genesis: full line, pure SASE (dark start; writes its own dumps) ---------"
-if ! "$GENESIS" Aramis-td-sase.in > genesis-tdsase.log 2>&1; then
-  echo "Genesis pure-SASE run FAILED; log tail:" >&2
-  tail -20 genesis-tdsase.log >&2
-  exit 1
-fi
-tail -3 genesis-tdsase.log
-echo
-
-echo "--- Genesis: space-charge and wake tiers (import the TD dumps) ---------------"
-for deck in Aramis-td-sc Aramis-td-wake; do
-  if ! "$GENESIS" $deck.in > genesis-$deck.log 2>&1; then
-    echo "Genesis $deck run FAILED; log tail:" >&2
-    tail -20 genesis-$deck.log >&2
-    exit 1
-  fi
+for log in genesis-Aramis-ss genesis-Aramis-td genesis-Aramis-td-sase; do
+  tail -3 $log.log
 done
-tail -2 genesis-Aramis-td-wake.log
+section_time genesis-references
 echo
 
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [extra]
@@ -258,6 +245,7 @@ if [ "$GATES_OK" -ne 1 ]; then
   echo "FAIL: FEL-element assertion checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time refusals
 echo
 
 # The documented tier numbers are single-thread runs; results must not depend on the
@@ -265,16 +253,33 @@ echo
 
 export OMP_NUM_THREADS=1
 
-for tier in tier1 tier1u tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk; do
-  echo "--- fel_track_test: $tier -------------------------------------------------------"
-  if ! "$EXE" $tier.nml > fel-$tier.log 2>&1; then
+# The tiers are independent single-thread processes over the shared dumps; they
+# run concurrently (12 performance cores hold all eleven) and their logs print
+# in the usual order afterwards. Same configurations, same single-thread
+# arithmetic -- the documented tier numbers are unchanged.
+
+TIERS="tier1 tier1u tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk"
+TIER_PIDS=""
+for tier in $TIERS; do
+  "$EXE" $tier.nml > fel-$tier.log 2>&1 &
+  TIER_PIDS="$TIER_PIDS $tier:$!"
+done
+TIERS_OK=1
+for entry in $TIER_PIDS; do
+  tier=${entry%%:*}
+  if ! wait "${entry##*:}"; then
     echo "fel_track_test $tier FAILED; log tail:" >&2
     tail -20 fel-$tier.log >&2
-    exit 1
+    TIERS_OK=0
   fi
+done
+if [[ $TIERS_OK -ne 1 ]]; then exit 1; fi
+for tier in $TIERS; do
+  echo "--- fel_track_test: $tier -------------------------------------------------------"
   tail -4 fel-$tier.log
   echo
 done
+section_time tiers-all-eleven
 
 # Thread-count independence: the time-dependent single-segment configuration rerun with
 # eight threads must reproduce the one-thread run BIT FOR BIT -- each slice's arithmetic
@@ -329,6 +334,7 @@ if [[ $THREADS_OK -ne 1 ]]; then
   exit 1
 fi
 echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dataset-equal)"
+section_time thread-independence
 echo
 
 # Shot-noise checks (deliverable 6). The statistical check is self-referenced (FINDINGS
@@ -341,6 +347,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_shot_noise.py" --exe "$EXE" --workdir 
   echo "FAIL: shot-noise statistics; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time shot-noise
 echo
 
 echo "--- SASE startup cross-check against Genesis's loader -------------------------"
@@ -348,6 +355,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesi
   echo "FAIL: SASE startup level; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time sase-startup
 echo
 
 # Seam-wake checks (deliverable 11): element sr wakes across the whole window --
@@ -361,6 +369,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_seam_wake.py" --exe "$EXE" --workdir "
   echo "FAIL: seam-wake checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time seam-wake
 echo
 
 # Distribution-import checks (deliverable 10): the bunch_struct resampler transcribed
@@ -374,6 +383,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_import.py" --exe "$EXE" --genesis "$GE
   echo "FAIL: distribution-import checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time import
 echo
 
 # Slice-migration checks (deliverable 7): conservation under heavy migration, exact
@@ -385,6 +395,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_migration.py" --exe "$EXE" --workdir "
   echo "FAIL: migration checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time migration
 echo
 
 # Collective-effects self-referenced checks (deliverable 8): exact energy bookkeeping of
@@ -396,6 +407,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir 
   echo "FAIL: collective checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time collective
 echo
 
 # Unaveraged-mode checks (deliverable 13; fel-physics.tex sec:unaveraged): the energy
@@ -414,6 +426,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_unaveraged.py" --exe "$EXE" --latdir "
   echo "FAIL: unaveraged checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time unaveraged
 
 echo
 echo "--- spontaneous-emission checks (FEL modes vs Bmad radiation vs analytic) -----"
@@ -421,6 +434,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_spontaneous.py" --exe "$EXE" --latdir 
   echo "FAIL: spontaneous checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time spontaneous
 
 echo
 echo "--- two-polarization checks (vector radiation, tilt, crossed undulator) -------"
@@ -428,6 +442,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_two_polarization.py" --exe "$EXE" --la
   echo "FAIL: two-polarization checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time two-polarization
 
 echo
 echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"
@@ -435,6 +450,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$WORK_DIR/harmonics" --
   echo "FAIL: harmonic/openPMD checks; outputs kept in: $WORK_DIR/harmonics" >&2
   exit 1
 fi
+section_time harmonics
 
 echo
 echo "--- phasing checks (autophase, z_offset knob, absolute mode, chicanes) ---------"
@@ -442,6 +458,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$WORK_DIR/phasing" --exe 
   echo "FAIL: phasing checks; outputs kept in: $WORK_DIR/phasing" >&2
   exit 1
 fi
+section_time phasing
 
 echo
 echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
@@ -449,10 +466,12 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir 
   echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
+section_time diagnostics
 echo
 
 "$PYTHON" "$SCRIPT_DIR/scripts/compare_fel.py" "$WORK_DIR"
 STATUS=$?
+section_time tier-comparison
 
 if [[ $STATUS -eq 0 && $KEEP_WORK_DIR -eq 0 ]]; then
   rm -rf "$WORK_DIR"

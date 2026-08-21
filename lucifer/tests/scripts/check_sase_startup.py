@@ -28,6 +28,8 @@ import sys
 import h5py
 import numpy as np
 
+import pool
+
 GENESIS_DECK = """&setup
 rootname=SASE{seed}
 lattice=Aramis-1seg.lat
@@ -104,24 +106,30 @@ def main():
     exe = pathlib.Path(a.exe).resolve()
     env = dict(os.environ, FI_PROVIDER="tcp", OMP_NUM_THREADS="8")
 
-    gp, bp = [], []
-    for s in range(1, a.seeds + 1):
-        seed = 100000 + 991 * s
-
+    # Every seed's two runs are independent processes; the pool runs them all.
+    def gen_one(seed):
         (wd / f"gsase{seed}.in").write_text(GENESIS_DECK.format(seed=seed))
         r = subprocess.run([a.genesis, f"gsase{seed}.in"], cwd=wd, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL: Genesis seed {seed} exited {r.returncode}");  sys.exit(1)
-        with h5py.File(wd / f"SASE{seed}.out.h5") as h5:
-            gp.extend(h5["Field/power"][-1, :])
 
+    def bmad_one(seed):
         (wd / f"bsase{seed}.nml").write_text(BMAD_NML.format(seed=seed))
         r = subprocess.run([str(exe), f"bsase{seed}.nml"], cwd=wd, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL: fel_track_test seed {seed} exited {r.returncode}:\n{r.stdout[-1500:]}")
             sys.exit(1)
+
+    seeds = [100000 + 991 * s for s in range(1, a.seeds + 1)]
+    pool.run_all([lambda sd=sd: gen_one(sd) for sd in seeds]
+                 + [lambda sd=sd: bmad_one(sd) for sd in seeds], threads_per_job=8)
+
+    gp, bp = [], []
+    for seed in seeds:
+        with h5py.File(wd / f"SASE{seed}.out.h5") as h5:
+            gp.extend(h5["Field/power"][-1, :])
         d = np.loadtxt(wd / f"bsase{seed}.diag.txt")
         nslice = int(d[:, 1].max())
         bp.extend(d.reshape(-1, nslice, d.shape[1])[-1, :, 2])

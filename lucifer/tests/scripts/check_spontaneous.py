@@ -46,6 +46,8 @@ import sys
 
 import numpy as np
 
+import pool
+
 M_ELECTRON = 0.51099895069e6
 R_E = 2.8179403262e-15
 GAMMA0 = 11357.82
@@ -165,12 +167,37 @@ def main():
     print(f"--- analytic spontaneous loss over {L_UND} m: {analytic:.6f} in gamma "
           f"({analytic/L_UND:.5f}/m; = Genesis Incoherent.cpp doLoss)")
 
-    # 1-2. Bmad's own tracking through the same wiggler, radiation on and off.
-    run(exe, wd, "sp_rk", NML.format(lat="spont_probe_rk.bmad", root="sp_rk",
-                                     ngrid=NGRID_REF,
-                                     extra="  radiation_damping = T\n  reference_run = T\n"))
-    run(exe, wd, "sp_rk0", NML.format(lat="spont_probe_rk.bmad", root="sp_rk0",
-                                      ngrid=NGRID_REF, extra="  reference_run = T\n"))
+    # Every run of this section is independent of the others (distinct roots, all
+    # analysis afterwards), so the pool runs them all; the checks read in order.
+    jobs = [
+        lambda: run(exe, wd, "sp_rk", NML.format(lat="spont_probe_rk.bmad", root="sp_rk",
+                    ngrid=NGRID_REF, extra="  radiation_damping = T\n  reference_run = T\n")),
+        lambda: run(exe, wd, "sp_rk0", NML.format(lat="spont_probe_rk.bmad", root="sp_rk0",
+                    ngrid=NGRID_REF, extra="  reference_run = T\n")),
+        lambda: run(exe, wd, "sp_avg", NML.format(lat="spont_probe.bmad", root="sp_avg",
+                    ngrid=NGRID_REF, extra="")),
+        lambda: run(exe, wd, "sp_avg_d", NML.format(lat="spont_probe.bmad", root="sp_avg_d",
+                    ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
+        lambda: run(exe, wd, "sp_uv_d", NML.format(lat="sp_uv.bmad", root="sp_uv_d",
+                    ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
+        lambda: run(exe, wd, "sp_uv_f1", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f1",
+                    ngrid=NGRID_REF,
+                    extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="1"),
+        lambda: run(exe, wd, "sp_uv_f8", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f8",
+                    ngrid=NGRID_REF,
+                    extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8"),
+    ]
+    for ngrid in (127, NGRID_REF, 511):
+        jobs.append(lambda ngrid=ngrid: run(exe, wd, f"sp_uv{ngrid}",
+                    NML.format(lat="sp_uv.bmad", root=f"sp_uv{ngrid}", ngrid=ngrid, extra="")))
+    for root, lat, extra in (("sp_avg_f", "spont_probe.bmad", "  radiation_fluctuations = T\n"),
+                             ("sp_uv_f", "sp_uv.bmad", "  radiation_fluctuations = T\n"),
+                             ("sp_rk_f", "spont_probe_rk.bmad",
+                              "  radiation_fluctuations = T\n  reference_run = T\n")):
+        jobs.append(lambda root=root, lat=lat, extra=extra: run(exe, wd, root,
+                    cold(NML.format(lat=lat, root=root, ngrid=NGRID_REF, extra=extra))))
+    pool.run_all(jobs, threads_per_job=8)
+
     l_rk, l_rk0 = loss(wd, "sp_rk"), loss(wd, "sp_rk0")
     check("Bmad runge_kutta + radiation vs analytic, |ratio - 1|",
           abs(l_rk / analytic - 1), 0.0, 5e-3,
@@ -179,8 +206,6 @@ def main():
           abs(l_rk0), 0.0, 1e-9)
 
     # 3. The averaged mode: a known, documented zero.
-    run(exe, wd, "sp_avg", NML.format(lat="spont_probe.bmad", root="sp_avg",
-                                      ngrid=NGRID_REF, extra=""))
     f_avg = abs(loss(wd, "sp_avg")) / analytic
     check("averaged mode: beam debit / analytic (KMR does NOT charge the beam)",
           f_avg, 0.0, 2e-2, note="(model property; Genesis has &sponrad for it)")
@@ -190,7 +215,6 @@ def main():
     meas, pred = {}, {}
     for ngrid in (127, NGRID_REF, 511):
         root = f"sp_uv{ngrid}"
-        run(exe, wd, root, NML.format(lat="sp_uv.bmad", root=root, ngrid=ngrid, extra=""))
         theta, u = acceptance(ngrid)
         meas[ngrid] = loss(wd, root)
         pred[ngrid] = dipole_fraction(u) * analytic
@@ -216,10 +240,6 @@ def main():
     #    self-field work measured in step (4) adds on top. Measured 0.9703 vs
     #    predicted 0.9705 at the defaults.
     print("--- bmad_com%radiation_damping_on, both FEL modes:")
-    run(exe, wd, "sp_avg_d", NML.format(lat="spont_probe.bmad", root="sp_avg_d",
-                                        ngrid=NGRID_REF, extra="  radiation_damping = T\n"))
-    run(exe, wd, "sp_uv_d", NML.format(lat="sp_uv.bmad", root="sp_uv_d",
-                                       ngrid=NGRID_REF, extra="  radiation_damping = T\n"))
     check("damping: averaged mode vs analytic, |ratio - 1|",
           abs(loss(wd, "sp_avg_d") / analytic - 1), 0.0, 5e-3)
     l_ramp = 2 * LAMBDA_U                       # fel_ramp_periods default 2
@@ -237,11 +257,6 @@ def main():
     print("--- bmad_com%radiation_fluctuations_on (cold beam):")
     f_aw = 1.42 * AW + 1 / (1 + 1.5 * AW + 0.95 * AW**2)      # helical fit
     sig_an = np.sqrt(1.015e-27 * ku**3 * AW**2 * f_aw * GAMMA0**4 * L_UND)
-    for root, lat, extra in (("sp_avg_f", "spont_probe.bmad", "  radiation_fluctuations = T\n"),
-                             ("sp_uv_f", "sp_uv.bmad", "  radiation_fluctuations = T\n"),
-                             ("sp_rk_f", "spont_probe_rk.bmad",
-                              "  radiation_fluctuations = T\n  reference_run = T\n")):
-        run(exe, wd, root, cold(NML.format(lat=lat, root=root, ngrid=NGRID_REF, extra=extra)))
     sig = {r: sigma_gamma(wd, r) for r in ("sp_avg_f", "sp_uv_f", "sp_rk_f")}
     check("fluctuations: averaged sigma growth vs analytic, |ratio - 1|",
           abs(sig["sp_avg_f"] / sig_an - 1), 0.0, 5e-2)
@@ -253,10 +268,6 @@ def main():
 
     # 7. Determinism with fluctuations on: draws are serial in fixed slice order from
     #    the one seeded stream, so 1 vs 8 threads must be byte-identical.
-    run(exe, wd, "sp_uv_f1", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f1",
-        ngrid=NGRID_REF, extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="1")
-    run(exe, wd, "sp_uv_f8", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f8",
-        ngrid=NGRID_REF, extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8")
     same = all((wd / f"sp_uv_f1{s}").read_bytes() == (wd / f"sp_uv_f8{s}").read_bytes()
                for s in (".diag.txt", ".ledger.txt"))
     check("fluctuations: 1-thread vs 8-thread byte-identical (1 = yes)",

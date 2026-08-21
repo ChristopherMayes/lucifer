@@ -48,6 +48,8 @@ import sys
 import h5py
 import numpy as np
 
+import pool
+
 FAILED = False
 
 TWO_G2L = 2 * 11357.82**2 * 1e-10       # 2 gamma^2 lambda: one full turn of gap phase.
@@ -372,19 +374,23 @@ def main():
 
     # ------------------------------------------------------------------
     print("== re-anchor baseline + z_offset knob + cross-mode identity ==")
-    base_bp, knob_bp, xmode_bp, knob_pw = [], [], [], []
+
+    # The scan points are independent processes; the pool runs them a few at a
+    # time (same configurations, same thread counts, same tolerances).
+    jobs = []
     for k in range(NSCAN):
         f = k / 8
-        run(exe, wd, f"pb{k}", LAT2SEG.format(absline="", zoff="0",
-            gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis")
-        base_bp.append(bphase(wd, f"pb{k}", 0.76))
-        run(exe, wd, f"pk{k}", LAT2SEG.format(absline="", zoff=f"{f * TWO_G2L:.12e}",
-            gap="0.30", modeline=TRANSCRIBED), imodel="genesis")
-        knob_bp.append(bphase(wd, f"pk{k}", 0.76))
-        knob_pw.append(exit_power(wd, f"pk{k}"))
-        run(exe, wd, f"px{k}", LAT2SEG.format(absline=ABS, zoff="0",
-            gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis")
-        xmode_bp.append(bphase(wd, f"px{k}", 0.76))
+        jobs.append(lambda k=k, f=f: run(exe, wd, f"pb{k}", LAT2SEG.format(absline="",
+            zoff="0", gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis"))
+        jobs.append(lambda k=k, f=f: run(exe, wd, f"pk{k}", LAT2SEG.format(absline="",
+            zoff=f"{f * TWO_G2L:.12e}", gap="0.30", modeline=TRANSCRIBED), imodel="genesis"))
+        jobs.append(lambda k=k, f=f: run(exe, wd, f"px{k}", LAT2SEG.format(absline=ABS,
+            zoff="0", gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis"))
+    pool.run_all(jobs, threads_per_job=4)
+    base_bp = [bphase(wd, f"pb{k}", 0.76) for k in range(NSCAN)]
+    knob_bp = [bphase(wd, f"pk{k}", 0.76) for k in range(NSCAN)]
+    knob_pw = [exit_power(wd, f"pk{k}") for k in range(NSCAN)]
+    xmode_bp = [bphase(wd, f"px{k}", 0.76) for k in range(NSCAN)]
 
     d_base = wrap(np.array(base_bp) - base_bp[0])
     check("re-anchor baseline: gap scan flat (rad, span)", float(np.ptp(d_base)), TOL_FLAT)
@@ -414,13 +420,7 @@ def main():
         print(f"FAIL: genesis prep run:\n{r.stdout[-800:]}")
         sys.exit(1)
 
-    knob_bp2, knob_pw2 = [], []
-    gen_bp, gen_pw = [], []
-    for k in range(NSCAN):
-        run(exe, wd, f"pi{k}", LAT2SEG.format(absline="", zoff=f"{k / 8 * TWO_G2L:.12e}",
-            gap="0.30", modeline=TRANSCRIBED), imodel="genesis", nml_t=NML_IMP)
-        knob_bp2.append(bphase(wd, f"pi{k}", 0.76))
-        knob_pw2.append(exit_power(wd, f"pi{k}"))
+    def gen_ps(k):
         (wd / f"ps{k}.lat").write_text(GEN_LAT_PS.format(phi=f"{2 * np.pi * k / 8:.12e}"))
         (wd / f"ps{k}.in").write_text(GEN_IMPORT.format(root=f"PS{k}", lat=f"ps{k}.lat"))
         r = subprocess.run([args.genesis, f"ps{k}.in"], cwd=wd, capture_output=True, text=True,
@@ -428,6 +428,20 @@ def main():
         if r.returncode != 0:
             print(f"FAIL: genesis ps{k}:\n{r.stdout[-800:]}")
             sys.exit(1)
+
+    jobs = []
+    for k in range(NSCAN):
+        jobs.append(lambda k=k: run(exe, wd, f"pi{k}", LAT2SEG.format(absline="",
+            zoff=f"{k / 8 * TWO_G2L:.12e}", gap="0.30", modeline=TRANSCRIBED),
+            imodel="genesis", nml_t=NML_IMP))
+        jobs.append(lambda k=k: gen_ps(k))
+    pool.run_all(jobs, threads_per_job=4)
+
+    knob_bp2, knob_pw2 = [], []
+    gen_bp, gen_pw = [], []
+    for k in range(NSCAN):
+        knob_bp2.append(bphase(wd, f"pi{k}", 0.76))
+        knob_pw2.append(exit_power(wd, f"pi{k}"))
         with h5py.File(wd / f"PS{k}.out.h5") as h5:
             z = h5["Lattice/zplot"][:].ravel()
             aw = h5["Lattice/aw"][:].ravel()
@@ -455,16 +469,19 @@ def main():
     print("== chicane: relative flat, absolute at the geometric slope, ledger ==")
     a0 = 1e-3
     da = LAM / 8 / (2 * a0 * 0.058)     # ~lam/8 of delay per step at the true L_eff scale
-    rel_bp, abs_bp, delays = [], [], []
+    jobs = []
     for k in range(NSCAN):
         a = a0 + k * da
-        run(exe, wd, f"cr{k}", LATCHIC.format(absline="", ang=f"{a:.12e}", mid=CHIC_MID,
-                                              modeline=TRANSCRIBED))
-        rel_bp.append(bphase(wd, f"cr{k}", 0.83))
-        run(exe, wd, f"ca{k}", LATCHIC.format(absline=ABS, ang=f"{a:.12e}", mid=CHIC_MID,
-                                              modeline=TRANSCRIBED))
-        abs_bp.append(bphase(wd, f"ca{k}", 0.83))
-        delays.append(chicane_delay(a))
+        jobs.append(lambda k=k, a=a: run(exe, wd, f"cr{k}", LATCHIC.format(absline="",
+            ang=f"{a:.12e}", mid=CHIC_MID, modeline=TRANSCRIBED)))
+        jobs.append(lambda k=k, a=a: run(exe, wd, f"ca{k}", LATCHIC.format(absline=ABS,
+            ang=f"{a:.12e}", mid=CHIC_MID, modeline=TRANSCRIBED)))
+    jobs.append(lambda: run(exe, wd, "cled", LATCHIC.format(absline="", ang=f"{a0:.12e}",
+        mid=CHIC_MID, modeline=UNAVG)))
+    pool.run_all(jobs, threads_per_job=4)
+    rel_bp = [bphase(wd, f"cr{k}", 0.83) for k in range(NSCAN)]
+    abs_bp = [bphase(wd, f"ca{k}", 0.83) for k in range(NSCAN)]
+    delays = [chicane_delay(a0 + k * da) for k in range(NSCAN)]
 
     check("chicane, relative mode: geometric fraction dropped (flat, rad span)",
           float(np.ptp(wrap(np.array(rel_bp) - rel_bp[0]))), TOL_FLAT)
@@ -484,8 +501,7 @@ def main():
 
     # The unaveraged ledger closes across a chicane sandwich (energy bookkeeping
     # survives the seam detour; the ledger's columns cover the unaveraged segments).
-    run(exe, wd, "cled", LATCHIC.format(absline="", ang=f"{a0:.12e}", mid=CHIC_MID,
-                                        modeline=UNAVG))
+    # The cled run itself went through the pool above.
     led = np.loadtxt(wd / "cled.ledger.txt")
     closure = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
     turnover = np.max(np.abs(led[:, 1])) + np.max(np.abs(led[:, 2]))
@@ -507,26 +523,30 @@ def main():
     # boundary was located: 2.99 -> 2, 3.01 -> 3, which is itself an independent
     # confirmation of the walk's floor geometry against the trace at this scale).
 
-    run(exe, wd, "tds", LATSTRAIGHT.format(absline="", modeline=TRANSCRIBED), nml_t=NML_TD)
+    a_td = float(np.sqrt(3.5 * LAM / (2 * 0.05 / 3 + 0.025)))
+    jobs = [lambda: run(exe, wd, "tds", LATSTRAIGHT.format(absline="", modeline=TRANSCRIBED),
+                        nml_t=NML_TD),
+            lambda: run(exe, wd, "tdc", LATCHIC.format(absline="", ang=f"{a_td:.12e}",
+                        mid=CHIC_MID, modeline=TRANSCRIBED), nml_t=NML_TD),
+            lambda: run(exe, wd, "tdc8", LATCHIC.format(absline="", ang=f"{a_td:.12e}",
+                        mid=CHIC_MID, modeline=TRANSCRIBED), nml_t=NML_TD, threads="8")]
+    for target in (3.5, 6.5, 10.5):
+        a = float(np.sqrt(target * LAM / (2 * 0.05 / 3 + 0.025)))
+        jobs.append(lambda a=a, tag=f"tdc{int(target)}": run(exe, wd, tag,
+            LATCHIC.format(absline="", ang=f"{a:.12e}", mid=CHIC_MID,
+                           modeline=TRANSCRIBED), nml_t=NML_TD))
+    pool.run_all(jobs, threads_per_job=4)
+
     n_str = escaped_count(wd, "tds")
     worst, detail = 0.0, []
     for target in (3.5, 6.5, 10.5):
         a = float(np.sqrt(target * LAM / (2 * 0.05 / 3 + 0.025)))
-        tag = f"tdc{int(target)}"
-        run(exe, wd, tag, LATCHIC.format(absline="", ang=f"{a:.12e}", mid=CHIC_MID,
-            modeline=TRANSCRIBED), nml_t=NML_TD)
         n_expect = int(np.floor(chicane_delay(a) / LAM))
-        got = escaped_count(wd, tag) - n_str
+        got = escaped_count(wd, f"tdc{int(target)}") - n_str
         worst = max(worst, abs(got - n_expect))
         detail.append(f"{n_expect}:{got}")
     check("extra banked slices == floor(delay/lambda), three delays", float(worst), 0.5,
           note="[expected:got " + " ".join(detail) + "]")
-
-    a_td = float(np.sqrt(3.5 * LAM / (2 * 0.05 / 3 + 0.025)))
-    run(exe, wd, "tdc", LATCHIC.format(absline="", ang=f"{a_td:.12e}", mid=CHIC_MID,
-        modeline=TRANSCRIBED), nml_t=NML_TD)
-    run(exe, wd, "tdc8", LATCHIC.format(absline="", ang=f"{a_td:.12e}", mid=CHIC_MID,
-        modeline=TRANSCRIBED), nml_t=NML_TD, threads="8")
     same = (wd / "tdc.diag.txt").read_bytes() == (wd / "tdc8.diag.txt").read_bytes()
     with h5py.File(wd / "tdc-final.fld.h5") as a, h5py.File(wd / "tdc8-final.fld.h5") as b:
         for k in a["slice000001"]:
@@ -535,29 +555,23 @@ def main():
 
     # ------------------------------------------------------------------
     print("== refusals ==")
-    ok = refuse(exe, wd, "rf_open", LATCHIC.format(absline="", ang="1e-3", mid=OPEN_MID,
-                                                   modeline=TRANSCRIBED), "NOT A CLOSED BUMP")
-    print(f"--- refusal non-closed-bump break: {'ok' if ok else '** FAIL **'}")
-    FAILED = FAILED or not ok
-
-    ok = refuse(exe, wd, "rf_genb", LATCHIC.format(absline="", ang="1e-3", mid=CHIC_MID,
-                                                   modeline=TRANSCRIBED),
-                "GENESIS-MODEL interlude", imodel="genesis")
-    print(f"--- refusal bend under genesis-model interludes: {'ok' if ok else '** FAIL **'}")
-    FAILED = FAILED or not ok
-
-    ok = refuse(exe, wd, "rf_zbig", LAT2SEG.format(absline="", zoff="0.35", gap="0.30",
-                                                   modeline=TRANSCRIBED),
-                "exceeds its upstream break")
-    print(f"--- refusal z_offset exceeding the break: {'ok' if ok else '** FAIL **'}")
-    FAILED = FAILED or not ok
-
     first = LAT2SEG.format(absline="", zoff="0", gap="0.30", modeline=TRANSCRIBED)
     first = first.replace("SEG: line = (UND, D, UND2)", "SEG: line = (UND2, D, UND)")
     first = first.replace("UND2: UND, z_offset = 0", "UND2: UND, z_offset = 0.01")
-    ok = refuse(exe, wd, "rf_zfirst", first, "no upstream break")
-    print(f"--- refusal z_offset on the first element: {'ok' if ok else '** FAIL **'}")
-    FAILED = FAILED or not ok
+    oks = pool.run_all([
+        lambda: refuse(exe, wd, "rf_open", LATCHIC.format(absline="", ang="1e-3",
+                       mid=OPEN_MID, modeline=TRANSCRIBED), "NOT A CLOSED BUMP"),
+        lambda: refuse(exe, wd, "rf_genb", LATCHIC.format(absline="", ang="1e-3",
+                       mid=CHIC_MID, modeline=TRANSCRIBED),
+                       "GENESIS-MODEL interlude", imodel="genesis"),
+        lambda: refuse(exe, wd, "rf_zbig", LAT2SEG.format(absline="", zoff="0.35",
+                       gap="0.30", modeline=TRANSCRIBED), "exceeds its upstream break"),
+        lambda: refuse(exe, wd, "rf_zfirst", first, "no upstream break"),
+    ], threads_per_job=4)
+    for name, ok in zip(("non-closed-bump break", "bend under genesis-model interludes",
+                         "z_offset exceeding the break", "z_offset on the first element"), oks):
+        print(f"--- refusal {name}: {'ok' if ok else '** FAIL **'}")
+        FAILED = FAILED or not ok
 
     print("checks: " + ("FAIL" if FAILED else "PASS"))
     sys.exit(1 if FAILED else 0)

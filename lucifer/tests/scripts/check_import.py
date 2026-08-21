@@ -44,6 +44,8 @@ import sys
 import h5py
 import numpy as np
 
+import pool
+
 # The test bunch: Gaussian, peak current ~3 kA at sigma_z = 1.2 nm (charge 30.1 fC),
 # Benchmark1-SASE energy and emittance. The window: 24 slices of 3 wavelengths.
 LAMBDA0 = 1e-10
@@ -323,18 +325,23 @@ def main():
         ok = False
 
     # startup (statistical): both codes resample the same file with their own RNG.
-    ours, theirs = [], []
-    for k in range(args.seeds):
+    # Each seed's pair is a chain (our run writes the dist file its genesis twin
+    # imports); the chains are independent across seeds and go through the pool.
+    def seed_chain(k):
         seed = 2000 + 17*k
         dist = f"impdist_s{k}.h5"
         write_nml(w/f"imp_s{k}.nml", f"imps{k}", seed,
                   extra=f'  write_dist_file = "{dist}"\n')
         run([args.exe, f"imp_s{k}.nml"], w/f"imp_s{k}.log", env=env8)
-        ours.append(final_powers(w/f"imps{k}.diag.txt", NSLICE))
         (w/f"imp_g{k}.in").write_text(GENESIS_TRACK_DECK.format(
             root=f"impg{k}", dist=dist, lambda0=LAMBDA0, gamma0=GAMMA0,
             slen=SLEN, sample=SAMPLE))
         run([args.genesis, f"imp_g{k}.in"], w/f"imp_g{k}.log", env=env1)
+
+    pool.run_all([lambda k=k: seed_chain(k) for k in range(args.seeds)], threads_per_job=8)
+    ours, theirs = [], []
+    for k in range(args.seeds):
+        ours.append(final_powers(w/f"imps{k}.diag.txt", NSLICE))
         with h5py.File(w/f"impg{k}.out.h5") as h5:
             theirs.append(h5["Field/power"][-1, :])
     # Compare over slices that carry beam in both (the Gaussian tail slices are dark).
