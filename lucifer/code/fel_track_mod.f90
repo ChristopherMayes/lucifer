@@ -185,9 +185,11 @@ integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode
 
 type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
-! One libm call for the (sin, cos) pair (bsim/code/fel_sincos.c) -- VALUE-PRESERVING:
-! bitwise-identical to the separate sin/cos pair (verified over a 44M-point sweep of
-! the physical theta domain), so every keystone bit-for-bit identity holds.
+! One libm call for the (sin, cos) pair (bsim/code/fel_sincos.c). NOT bit-identical
+! to gfortran's own sin/cos intrinsics: they differ from libm by one ulp on ~2e-6 of
+! arguments (73 mismatches in a 44M-point sweep of the theta domain), so adopting
+! this was a NAMED VALUE CHANGE -- every benchmark tier re-measured and re-recorded
+! (README, "The particle-path cost").
 
 interface
   subroutine fel_sincos (theta, s, c) bind(c, name = 'fel_sincos_c')
