@@ -7,7 +7,7 @@ polarization-blind, so the y set radiates ORTHOGONALLY polarized light seeded by
 bunching the x set built, while the x field passes through gaining nothing (the
 harness holds that isolation at 1.6e-14; manual sec:field vector convention).
 
-    ../../../../production/bin/fel_track_test run.nml
+    ../../../../production/bin/lucifer run.nml
     python ../plot_fel.py crossed.stats.h5
 
 Measured by this example (1 MW x seed, 0.6 m x-set, 0.2 m gap, 0.6 m y-set):

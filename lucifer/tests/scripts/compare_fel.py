@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare the Bmad FEL tracker (fel_track_test) against Genesis 1.3 Version 4, over the
+Compare the Bmad FEL tracker (lucifer) against Genesis 1.3 Version 4, over the
 Benchmark1-SASE configuration: steady state and time dependent with slippage. Run through
 run_fel_benchmark.sh, which produces all the inputs; this script only reads and compares.
 
@@ -209,8 +209,8 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
     # theta is reported but NOT checked. It is the phase of a particle in its ponderomotive
     # bucket, and at saturation neighboring trajectories separate exponentially, so the
     # worst-particle theta difference measures the Lyapunov amplification of whatever
-    # difference exists, not the size of that difference (design brief 9.1: chaotic growth
-    # is not a usable comparison metric). The distribution tells the story: the median is
+    # difference exists, not the size of that difference (chaotic growth is not a usable
+    # comparison metric). The distribution tells the story: the median is
     # the typical particle, the max is the separatrix tail. theta's collective effect IS
     # checked, through the bunching curve and the final field above.
     dth = pf["theta"] - pg["theta"]

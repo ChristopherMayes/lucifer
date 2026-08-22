@@ -4,7 +4,7 @@
 ! In-undulator collective effects for the FEL tracker: wakefields applied as a
 ! per-slice energy-loss rate, and longitudinal space charge entering the pendulum
 ! equation as a per-particle ez. Physics, Genesis provenance, and validation:
-! bsim/fel/doc/fel-physics.tex (sec:wakes, sec:spacecharge, sec:seamwake).
+! lucifer/doc/fel-physics.tex (sec:wakes, sec:spacecharge, sec:seamwake).
 !
 ! Placement in the step: the wake's gamma decrement lands BETWEEN the longitudinal
 ! advance and the second transverse half step; ez is computed per slice before the RK

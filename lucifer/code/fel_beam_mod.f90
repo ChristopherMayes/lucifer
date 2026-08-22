@@ -60,7 +60,7 @@ implicit none
 ! carries its own values -- notably an impedance of free space truncated to 376.73 where
 ! mu_0_vac*c_light is 376.7303... -- and during the deliverable-3 validation this module
 ! transcribed them to get transcription-level agreement. That validation is banked
-! (bsim/fel/README.md); the code now uses Bmad's constants, and the ~8e-7 relative
+! (lucifer/README.md); the code now uses Bmad's constants, and the ~8e-7 relative
 ! difference against Genesis is the accepted comparison floor.
 
 !+

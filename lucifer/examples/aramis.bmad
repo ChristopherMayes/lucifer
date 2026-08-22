@@ -2,7 +2,7 @@
 ! examples in this directory.
 !
 ! The undulator segments are real Bmad wiggler elements with tracking_method = custom
-! (Bmad's semantics for program-supplied tracking, which fel_track_test provides): the
+! (Bmad's semantics for program-supplied tracking, which lucifer provides): the
 ! FEL parameters derive from the element attributes -- aw from b_max and l_period,
 ! helicity from field_calc -- and everything else (D1, QF, QD, D2) is tracked by Bmad.
 ! Outside the FEL walk the element behaves as the plain periodic wiggler it is.

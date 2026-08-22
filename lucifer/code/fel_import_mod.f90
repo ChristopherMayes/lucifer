@@ -5,7 +5,7 @@
 ! bunch_struct -- arbitrary times, arbitrary weights -- into the evenly spaced,
 ! equal-population slices the FEL step wants, by Genesis 1.3 v4's own method,
 ! transcribed from SDDSBeam.cpp (the class name is historical: it reads plain HDF5).
-! Method, Genesis provenance, and validation: bsim/fel/doc/fel-physics.tex
+! Method, Genesis provenance, and validation: lucifer/doc/fel-physics.tex
 ! (sec:import). The only weighted generalization: the slice current is c*sum(w)/dslen
 ! where Genesis counts particles (identical for uniform weights).
 !

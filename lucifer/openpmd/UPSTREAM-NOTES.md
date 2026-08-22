@@ -2,7 +2,7 @@
 
 Notes for the openPMD-standard maintainers (branch `upcoming-2.0.0`,
 `EXT_Wavefront.md`), from implementing the extension independently in Fortran (the
-Bmad FEL tracker, `bsim/modules/wavefront_openpmd_mod.f90`) and Python (the carried
+Bmad FEL tracker, `lucifer/code/wavefront_openpmd_mod.f90`) and Python (the carried
 `wavefront_openpmd_patch.py` beside this file, targeting openPMD-beamphysics'
 `Wavefront` class), with the two implementations validated against each other every
 harness run. Each item is a place where the extension's text under-determines the

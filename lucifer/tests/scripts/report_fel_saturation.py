@@ -108,7 +108,7 @@ def cover(pdf, d, checks):
     lines = [
         ("The saturation demo: one SASE case, three trackers, one clock", 15, 1),
         ("", 10, 0),
-        (f"Generated {time.strftime('%Y-%m-%d %H:%M')} from bsim/fel/examples/saturation_demo.", 10, 0),
+        (f"Generated {time.strftime('%Y-%m-%d %H:%M')} from lucifer/examples/saturation_demo.", 10, 0),
         ("", 10, 0),
         ("THE CASE.  Genesis's own Benchmark1-SASE configuration run to saturation: the", 10, 0),
         ("full 57 m 6-FODO Aramis line (12 undulator segments, aw = 0.85 rms helical,", 10, 0),
@@ -148,9 +148,9 @@ def cover(pdf, d, checks):
         ("       radiation without debiting the beam; the unaveraged mode conserves and", 10, 0),
         ("       pays, at the analytically correct magnitude.", 10, 0),
         ("", 10, 0),
-        ("The measured levels, attributions and methodology live in bsim/fel/README.md", 10, 0),
+        ("The measured levels, attributions and methodology live in lucifer/README.md", 10, 0),
         ("(sections: The saturation demo, Diagnostic output) and the physics manual", 10, 0),
-        ("(bsim/fel/doc/fel-physics.tex, sec:unaveraged, sec:stats).", 10, 0),
+        ("(lucifer/doc/fel-physics.tex, sec:unaveraged, sec:stats).", 10, 0),
     ]
     y = 0.94
     for text, size, kind in lines:

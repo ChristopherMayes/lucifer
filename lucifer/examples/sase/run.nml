@@ -1,9 +1,9 @@
 ! Time-dependent SASE example: one command, no Genesis, no seed field, no dump files.
 !
-!   fel_track_test run.nml           (run from this directory)
+!   lucifer run.nml           (run from this directory)
 !
 ! The program generates a 96-slice time window of quiet-start beam, imposes physical
-! shot noise (weighted Fawley loading -- see the fel_track_test.f90 header), starts the
+! shot noise (weighted Fawley loading -- see the lucifer.f90 header), starts the
 ! field dark (seed_power = 0), and tracks the full 6-FODO helical line. The FEL grows
 ! from its own electron shot noise: pure SASE. Slippage is active; each slice lases
 ! independently and the per-slice power spread is the SASE fluctuation. Measured

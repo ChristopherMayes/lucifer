@@ -13,7 +13,7 @@
 # check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
 # decks stay static. Measured results: the "The saturation demo" section of
-# bsim/fel/README.md.
+# lucifer/README.md.
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]
 #                  [--python <path>] [--work-dir <path>]
@@ -22,8 +22,8 @@
 set -o pipefail
 
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$DEMO_DIR/../../../.." && pwd)"
-SCRIPTS="$BMAD_ROOT/bsim/fel/tests/scripts"
+BMAD_ROOT="$(cd "$DEMO_DIR/../../.." && pwd)"
+SCRIPTS="$BMAD_ROOT/lucifer/tests/scripts"
 
 GENESIS="$HOME/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4"
 EXE="";  PYTHON="";  MPIRUN="";  WORKERS=""
@@ -63,12 +63,12 @@ fi
 [[ -x "$MPIRUN" ]] || { echo "Error: no MPI launcher (use --mpirun)." >&2; exit 1; }
 
 if [[ -z "$EXE" ]]; then
-  for c in "$BMAD_ROOT/production/bin/fel_track_test" "$BMAD_ROOT/debug/bin/fel_track_test"; do
+  for c in "$BMAD_ROOT/production/bin/lucifer" "$BMAD_ROOT/debug/bin/lucifer"; do
     [[ -x "$c" ]] && { EXE="$c"; break; }
   done
 fi
-[[ -x "$EXE" ]] || { echo "Error: fel_track_test not found; build with util/conda_compile." >&2; exit 1; }
-[[ "$EXE" == *"/debug/"* ]] && echo "WARNING: debug fel_track_test; timings not comparable to a release Genesis."
+[[ -x "$EXE" ]] || { echo "Error: lucifer not found; build with util/conda_compile." >&2; exit 1; }
+[[ "$EXE" == *"/debug/"* ]] && echo "WARNING: debug lucifer; timings not comparable to a release Genesis."
 
 if [[ -z "$PYTHON" ]]; then
   for c in "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/python3" \

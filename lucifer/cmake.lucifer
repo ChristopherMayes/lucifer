@@ -1,14 +1,14 @@
-set (EXENAME fel_track_test)
+set (EXENAME lucifer)
 
 set (SRC_FILES
-	fel/fel_track_test.f90
+  program/lucifer.f90
 )
 
 set (INC_DIRS
 )
 
 set (LINK_LIBS
-  bsim
+  lucifer
   bmad
   sim_utils
   ${ACC_BMAD_LINK_LIBS}

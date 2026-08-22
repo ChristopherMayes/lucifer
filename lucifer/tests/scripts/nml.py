@@ -1,7 +1,7 @@
-"""Route flat fel_track_test namelist text into the three input groups.
+"""Route flat lucifer namelist text into the three input groups.
 
 The check scripts assemble their run configurations as flat key = value blocks
-(many of them templated). fel_track_test's input is the three groups
+(many of them templated). lucifer's input is the three groups
 &fel_params / &fel_beam_init / &fel_wavefront_init (manual sec:program); this
 router rewrites a flat block into them, one key at a time, with the same
 old-name -> new-home mapping the program's own retired-group refusal prints.

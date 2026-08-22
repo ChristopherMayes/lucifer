@@ -23,7 +23,7 @@ Three checks:
    bit for bit (diag byte-equal, dumps dataset-equal): migration must not fire
    spuriously and its inactive presence must change nothing.
 
-Usage: check_migration.py --exe <fel_track_test> --workdir <dir>
+Usage: check_migration.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis.bmad and aramis_1seg.bmad. Exit 0 only if all pass.
 """
 

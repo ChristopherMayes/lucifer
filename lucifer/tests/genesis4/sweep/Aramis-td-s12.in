@@ -1,5 +1,5 @@
-# Initial-dump generator for the coarse-step (delz) sweep of the design brief's section
-# 8.3. Differences from Aramis-td.in, each with its reason:
+# Initial-dump generator for the coarse-step (delz) sweep (run_delz_sweep.sh).
+# Differences from Aramis-td.in, each with its reason:
 #
 #   - sample = 12 with slen = 3.84e-8: 32 slices of spacing 12*lambda0. This is the slice
 #     spacing of SIMPLEX's reference case (twelve periods per step with slippage exactly

@@ -1,7 +1,8 @@
-# FEL tracker, validated against Genesis 1.3 Version 4
+# Lucifer: an FEL tracker, validated against Genesis 1.3 Version 4
 
-An FEL tracker whose physics is transcribed from Genesis 1.3 Version 4 (GPL permits
-transcription), embedded in Bmad's lattice machinery by the seam of the design brief's
+Lucifer (*lux ferre*, light-bringer) is an FEL tracker whose physics is transcribed
+from Genesis 1.3 Version 4 (GPL permits transcription), embedded in Bmad's lattice
+machinery by the seam of the design brief's
 section 4.1, and validated against Genesis over its `benchmark/Benchmark1-SASE`
 configuration from bitwise-identical starting states.
 
@@ -10,6 +11,13 @@ configuration from bitwise-identical starting states.
 Genesis provenance, and which check pins it at what measured level. This README carries
 the measured numbers, the validation methodology, and how to run everything; where it
 touches physics it cites the manual's sections (`sec:core`, `sec:slippage`, ...).
+
+Citations of the form "brief §x.y" and "FINDINGS.md n.m" refer to the port's two
+working documents: the design brief (the deliverable sequence and its decisions) and
+the transcription-findings log (the numbered defects and lessons found while
+validating against Genesis). Both are development records maintained with the
+project, outside this repository; the citations stay because they are the audit
+trail behind the measured numbers below.
 
 No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 10 is in — including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the brief's 7.5 assertions enforced by name; see the FEL element section. Per-particle weights are carried from day one (brief section 5): the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
@@ -24,40 +32,40 @@ section.
 
 | Path | Contents |
 |---|---|
-| `bsim/fel/doc/fel-physics.tex` | **The physics manual**: equations, conventions, Genesis provenance and validation pointers, one section per subsystem |
-| `bsim/modules/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
-| `bsim/modules/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
-| `bsim/fel/fel_track_test.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes; see the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
-| `bsim/fel/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
-| `bsim/fel/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
-| `bsim/fel/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis's, independent RNGs |
-| `bsim/fel/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
-| `bsim/modules/fel_import_mod.f90` | The distribution import (brief 10 step 10): a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer; see the distribution-import section |
-| `bsim/fel/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
-| `bsim/fel/tests/scripts/check_import.py` | Import checks: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
-| `bsim/modules/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
-| `bsim/fel/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
-| `bsim/fel/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
-| `bsim/modules/fel_unaveraged_mod.f90` | The unaveraged verification mode (brief 6.6, manual `sec:unaveraged`): full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
-| `bsim/fel/tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
-| `bsim/fel/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
-| `bsim/fel/tests/run_fel_benchmark.sh` | The whole validation, one command |
-| `bsim/fel/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count; see the parallelism section |
-| `bsim/fel/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
-| `bsim/fel/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, checked relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
-| `bsim/fel/tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
-| `bsim/fel/tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
-| `bsim/fel/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
-| `bsim/fel/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
-| `bsim/fel/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
-| `bsim/fel/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding the element attribute) |
+| `lucifer/doc/fel-physics.tex` | **The physics manual**: equations, conventions, Genesis provenance and validation pointers, one section per subsystem |
+| `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
+| `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
+| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes; see the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
+| `lucifer/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
+| `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
+| `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis's, independent RNGs |
+| `lucifer/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
+| `lucifer/code/fel_import_mod.f90` | The distribution import (brief 10 step 10): a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer; see the distribution-import section |
+| `lucifer/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
+| `lucifer/tests/scripts/check_import.py` | Import checks: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
+| `lucifer/code/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
+| `lucifer/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
+| `lucifer/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
+| `lucifer/code/fel_unaveraged_mod.f90` | The unaveraged verification mode (brief 6.6, manual `sec:unaveraged`): full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
+| `lucifer/tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
+| `lucifer/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
+| `lucifer/tests/run_fel_benchmark.sh` | The whole validation, one command |
+| `lucifer/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count; see the parallelism section |
+| `lucifer/tests/scripts/compare_fel.py` | Comparison: three steady-state tiers plus five time-dependent tiers against Genesis, plus the split-weight invariance check |
+| `lucifer/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis curves (power, checked relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
+| `lucifer/tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis deck: pure SASE — the TD window with the seed removed (`power = 0`), writing its own shared dumps |
+| `lucifer/tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis deck: Benchmark1-SASE steady state, modified as documented in the deck header |
+| `lucifer/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
+| `lucifer/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
+| `lucifer/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
+| `lucifer/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding the element attribute) |
 
 ## Running
 
 ```
 cd <bmad-ecosystem>
-BUILD_PRODUCTION=N ./util/conda_compile                      # builds fel_track_test
-./bsim/fel/tests/run_fel_benchmark.sh [--genesis <path to genesis4>]
+BUILD_PRODUCTION=N ./util/conda_compile                      # builds lucifer
+./lucifer/tests/run_fel_benchmark.sh [--genesis <path to genesis4>]
 ```
 
 The harness runs Genesis six times (full line and single segment, steady state and time
@@ -382,7 +390,7 @@ the floor of the scaling, not its ceiling.
 One command reproduces this measurement on any machine:
 
 ```
-./bsim/fel/tests/run_perf_benchmark.sh
+./lucifer/tests/run_perf_benchmark.sh
 ```
 
 It detects the performance-core count (`--workers N` to override), sizes the window to
@@ -399,7 +407,7 @@ agree at the documented seam level (4.0e-2) before any timing is quoted:
 | | Serial | 12 workers | Parallel speedup |
 |---|---|---|---|
 | Genesis 1.3 v4 (MPI) | 152.7 s | 35.8 s (12 ranks) | 4.3x |
-| `fel_track_test` (OpenMP) | 123.6 s | 19.4 s (12 threads) | 6.4x |
+| `lucifer` (OpenMP) | 123.6 s | 19.4 s (12 threads) | 6.4x |
 
 The tracker is 1.2x faster serial and 1.85x faster at 12 workers. The parallel gap is
 the design brief's section 4.3 bet showing up in a measurement: Genesis's 12-rank run
@@ -741,7 +749,7 @@ skipping the exit handoff flag is refused by name at the first seam element.
 ## The saturation demo: one practical SASE case, three trackers, one clock
 
 ```
-bsim/fel/examples/saturation_demo/run.sh
+lucifer/examples/saturation_demo/run.sh
 ```
 
 Every input of the demo is a real file in `examples/saturation_demo/` (Genesis decks,
@@ -833,7 +841,7 @@ and files; `&fel_wavefront_init` with `wavefront_init%...` and `field_file`), an
 work in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` /
 `fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops --
 errors return and the driver decides -- and `track_fel_line` is re-entrant (twice in
-one process is bit-identical to two processes; `tests/fel_smoke_test.f90` drives the
+one process is bit-identical to two processes; `tests/lucifer_smoke_test.f90` drives the
 library with no namelist anywhere). The retired flat `&fel_track_params` group is
 refused by name with each parameter's new home. `global%comb_ds_save` is the stats
 comb (Bmad's `ds_save` semantics verbatim; default 0 = every record, bit-for-bit the
@@ -949,7 +957,7 @@ complex128 natively -- one file per harmonic, photonEnergy identifying it). The
 STANDARD DOCUMENT is authoritative: the harness verifies every required attribute
 against its text independently of the writer. Import auto-detects the format by
 signature. The Python-side reader/writer is carried as a patch in
-`bsim/fel/openpmd/` (with the upstream clarification notes the implementation
+`lucifer/openpmd/` (with the upstream clarification notes the implementation
 surfaced), exercised against the Fortran writer every harness run.
 
 Measured (check_harmonics.py, ninth harness section):
@@ -1078,7 +1086,7 @@ did not (164 vs 99 s). The per-element time stamps and an in-wiggler profile put
 gap in ONE place: the FEL step's particle path (the RK4 + gather), whose cost
 quadrupled with the particles while the per-slice field FFTs (~68 s) stayed constant.
 
-`tests/fel_advance_bench.f90` (built as `fel_advance_bench`) times the path serially
+`tests/lucifer_advance_bench.f90` (built as `lucifer_advance_bench`) times the path serially
 at fixed state -- measured (min-of-5, this machine): full fel_advance **152
 ns/particle-step**, the RK4+ODE alone 87.5, the four sin/cos pairs the ODE evaluates
 48. A clang -O3 twin of the same verbatim RK loop runs 68 ns, and its sincos loop

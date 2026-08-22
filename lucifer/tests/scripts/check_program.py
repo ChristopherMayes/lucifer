@@ -3,12 +3,12 @@
 Program-structure checks (manual sec:program): the library contract, the comb, and
 the tracking window.
 
-  1. LIBRARY: fel_smoke_test drives the tracker with NO namelist anywhere -- structs
+  1. LIBRARY: lucifer_smoke_test drives the tracker with NO namelist anywhere -- structs
      filled in code -- and runs TWICE IN ONE PROCESS. Pass 1 must reproduce a
      namelist-driven run of the same configuration dataset-identically (the library
      IS the program), and pass 2 must reproduce pass 1 bit-for-bit (re-entrancy:
      twice in one process = two processes).
-  2. LIBRARY ERRORS RETURN: fel_smoke_test on an unreadable lattice must print its
+  2. LIBRARY ERRORS RETURN: lucifer_smoke_test on an unreadable lattice must print its
      proof-of-return line and exit with its own code 2 -- the library returned, the
      PROGRAM decided (no exit inside the library).
   3. RETIRED GROUP: the flat &fel_track_params is refused BY NAME, the error mapping
@@ -71,7 +71,7 @@ SEG: line = (UND, D, UND2)
 use, SEG
 """
 
-# The namelist twin of fel_smoke_test's in-code configuration (same values).
+# The namelist twin of lucifer_smoke_test's in-code configuration (same values).
 NML_TWIN = """&fel_params
   lat_file = "smoke.bmad"
   global%out_root = "{root}"
@@ -164,7 +164,7 @@ def main():
 
     r = run([str(smoke), "smoke.bmad", "sp1", "sp2"], wd)
     if r.returncode != 0:
-        print(f"FAIL: fel_smoke_test exited {r.returncode}:\n{r.stdout[-2000:]}")
+        print(f"FAIL: lucifer_smoke_test exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
     run_nml(exe, wd, "snml", NML_TWIN.format(root="snml", extra="", bextra=""))
 

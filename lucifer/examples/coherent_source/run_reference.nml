@@ -1,6 +1,6 @@
 ! Steady-state FEL example: one command, no Genesis anywhere.
 !
-!   fel_track_test run.nml           (run from this directory)
+!   lucifer run.nml           (run from this directory)
 !
 ! The program generates its own starting condition -- a quiet-start beam slice and a
 ! Gaussian seed field -- and tracks it through the 6-FODO helical undulator line of

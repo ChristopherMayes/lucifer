@@ -5,7 +5,7 @@
 ! inside an undulator segment, operating on the Bmad-coordinate packed beam of
 ! fel_beam_mod; steady state (one slice) or time dependent (many slices with slippage).
 ! The physics is transcribed from Genesis 1.3 Version 4, which GPL permits. Physics,
-! Genesis provenance (routine by routine), and validation: bsim/fel/doc/fel-physics.tex
+! Genesis provenance (routine by routine), and validation: lucifer/doc/fel-physics.tex
 ! (sec:core, sec:transverse, sec:field, sec:slippage).
 !
 ! The step composition (transverse half step, longitudinal advance, transverse half
@@ -225,7 +225,7 @@ integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode
 
 type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
-! One libm call for the (sin, cos) pair (bsim/code/fel_sincos.c). NOT bit-identical
+! One libm call for the (sin, cos) pair (lucifer/code/fel_sincos.c). NOT bit-identical
 ! to gfortran's own sin/cos intrinsics: they differ from libm by one ulp on ~2e-6 of
 ! arguments (73 mismatches in a 44M-point sweep of the theta domain), so adopting
 ! this was a NAMED VALUE CHANGE -- every benchmark tier re-measured and re-recorded

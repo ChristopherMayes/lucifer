@@ -15,7 +15,7 @@
 #
 # Prerequisites:
 #
-#   1. Bmad built, so debug/bin/fel_track_test (or production/bin) exists:
+#   1. Bmad built, so debug/bin/lucifer (or production/bin) exists:
 #        BUILD_PRODUCTION=N ./util/conda_compile        # from the bmad-ecosystem root
 #
 #   2. A genesis4 binary (CPU is fine). Default location below; override with --genesis.
@@ -23,11 +23,11 @@
 #      compiled in, since it runs with fft_fieldsolver = true.
 #
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
-#      (conda env create -f ../../wavefront/tests/environment.yml).
+#      (conda env create -f ../wavefront/tests/environment.yml).
 #
 # Options:
 #   --genesis <path>    genesis4 binary. Default: ~/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4
-#   --exe <path>        fel_track_test binary. Default: debug then production.
+#   --exe <path>        lucifer binary. Default: debug then production.
 #   --python <path>     Python interpreter. Default: the bmad-fel-validate conda env.
 #   --work-dir <path>   Where to run. Default: a temporary directory (kept on failure).
 #
@@ -36,7 +36,7 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 GENESIS="$HOME/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4"
 EXE=""
@@ -64,12 +64,12 @@ if [[ ! -x "$GENESIS" ]]; then
 fi
 
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/debug/bin/fel_track_test" "$BMAD_ROOT/production/bin/fel_track_test"; do
+  for candidate in "$BMAD_ROOT/debug/bin/lucifer" "$BMAD_ROOT/production/bin/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: fel_track_test not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
+  echo "Error: lucifer not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
   exit 1
 fi
 
@@ -81,7 +81,7 @@ if [[ -z "$PYTHON" ]]; then
 fi
 if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   echo "Error: Python not found. Create the environment:" >&2
-  echo "  conda env create -f $BMAD_ROOT/bsim/wavefront/tests/environment.yml" >&2
+  echo "  conda env create -f $BMAD_ROOT/lucifer/wavefront/tests/environment.yml" >&2
   exit 1
 fi
 
@@ -95,7 +95,7 @@ mkdir -p "$WORK_DIR"
 echo "=============================================================================="
 echo "FEL steady-state benchmark"
 echo "=============================================================================="
-echo "  fel_track_test: $EXE"
+echo "  lucifer: $EXE"
 echo "  genesis4:    $GENESIS"
 echo "  python:      $PYTHON"
 echo "  workdir:     $WORK_DIR"
@@ -109,8 +109,8 @@ cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/genesis4/*/*.in \
 
 cd "$WORK_DIR" || exit 1
 
-# Without FI_PROVIDER=tcp the MPI runtime's provider search adds tens of seconds
-# (FINDINGS.md / design brief 11.1).
+# Without FI_PROVIDER=tcp the MPI runtime's provider search adds tens of seconds to
+# every Genesis launch (measured; the tcp provider is always sufficient on one node).
 export FI_PROVIDER=tcp
 
 # Every section prints its wall time, so a regression in test cost is visible from the
@@ -275,14 +275,14 @@ TIERS_OK=1
 for entry in $TIER_PIDS; do
   tier=${entry%%:*}
   if ! wait "${entry##*:}"; then
-    echo "fel_track_test $tier FAILED; log tail:" >&2
+    echo "lucifer $tier FAILED; log tail:" >&2
     tail -20 fel-$tier.log >&2
     TIERS_OK=0
   fi
 done
 if [[ $TIERS_OK -ne 1 ]]; then exit 1; fi
 for tier in $TIERS; do
-  echo "--- fel_track_test: $tier -------------------------------------------------------"
+  echo "--- lucifer: $tier -------------------------------------------------------"
   tail -4 fel-$tier.log
   echo
 done
@@ -297,7 +297,7 @@ section_time tiers-all-eleven
 echo "--- thread independence: td1 with OMP_NUM_THREADS=8 --------------------------"
 sed 's/out_root = "td1"/out_root = "td1t8"/' td1.nml > td1t8.nml
 if ! OMP_NUM_THREADS=8 "$EXE" td1t8.nml > fel-td1t8.log 2>&1; then
-  echo "fel_track_test td1t8 FAILED; log tail:" >&2
+  echo "lucifer td1t8 FAILED; log tail:" >&2
   tail -20 fel-td1t8.log >&2
   exit 1
 fi
@@ -424,7 +424,7 @@ echo
 # unaveraged path must not touch the averaged coupling quantities it measures.
 
 echo "--- unaveraged-mode checks ------------------------------------------------------"
-if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../../modules/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
+if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../code/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
   echo "FAIL: averaged coupling quantities (fc/faw) leaked into the unaveraged path" >&2
   exit 1
 fi
@@ -477,7 +477,7 @@ section_time coherent-source
 
 echo
 echo "--- program-structure checks (library contract, the comb, the window) ---------"
-SMOKE="${EXE%fel_track_test}fel_smoke_test"
+SMOKE="${EXE%lucifer}lucifer_smoke_test"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$WORK_DIR/program" --exe "$EXE" --smoke "$SMOKE"; then
   echo "FAIL: program-structure checks; outputs kept in: $WORK_DIR/program" >&2
   exit 1

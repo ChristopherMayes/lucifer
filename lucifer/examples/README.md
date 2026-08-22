@@ -3,8 +3,8 @@
 Self-contained runs of the FEL tracker: one command each, no Genesis, no dump files
 (one exception: `saturation_demo/`, the three-way comparison, needs the genesis4 binary). For
 the validation benchmark against Genesis — which is where the physics is proven — see
-`bsim/fel/tests/`. The physics itself (equations, conventions, provenance) is the
-manual, `bsim/fel/doc/fel-physics.tex`.
+`lucifer/tests/`. The physics itself (equations, conventions, provenance) is the
+manual, `lucifer/doc/fel-physics.tex`.
 
 One directory per example, each holding a `run.nml`. Shared pieces live at this level:
 `aramis.bmad` (the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator
@@ -13,8 +13,8 @@ segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom) and
 directory:
 
 ```
-cd bsim/fel/examples/<example>
-../../../../debug/bin/fel_track_test run.nml        # or production/bin
+cd lucifer/examples/<example>
+../../../../debug/bin/lucifer run.nml        # or production/bin
 python ../plot_fel.py <example>.stats.h5            # needs h5py + matplotlib; writes <example>.png
 ```
 
@@ -39,7 +39,7 @@ import path — with the current DERIVED, never input: a Gaussian profile from
 `bunch_charge` + `sig_z`, a flat bunch via Bmad's `distribution_type(3) = "GRID"`, and
 `sig_z = 0` meaning steady state (the whole charge in one slice window). Any set
 `beam_init` field the quiet start does not honor is refused by name. The header of
-`fel_track_test.f90` documents every parameter and the honored-fields table. The undulator segments in the lattices
+`lucifer.f90` documents every parameter and the honored-fields table. The undulator segments in the lattices
 are real Bmad wiggler elements with `tracking_method = custom`, and their FEL parameters
 live on the lattice — the attribute-to-parameter map and the parse-time refusals are the
 manual's `sec:element`. There are no per-undulator namelist parameters.

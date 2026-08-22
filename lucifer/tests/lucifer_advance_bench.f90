@@ -1,5 +1,5 @@
 !+
-! Program fel_advance_bench
+! Program lucifer_advance_bench
 !
 ! The FEL-step particle-path microbenchmark (perf goal item 0): time fel_advance on a
 ! synthetic single slice at fixed state and decompose the per-particle-step cost --
@@ -7,7 +7,7 @@
 ! pair -- so each optimization lever gets a number, not a guess. Serial on purpose:
 ! this measures the per-particle CONSTANT; parallel scaling is the perf harness's job.
 !
-!   fel_advance_bench [npart] [nstep]      (defaults 8192, 400)
+!   lucifer_advance_bench [npart] [nstep]      (defaults 8192, 400)
 !
 ! Prints ns per particle-step for: full fel_advance, fel_runge_kutta only, sincos
 ! only, and a checksum (so the compiler cannot elide the work). Genesis parity note:
@@ -15,7 +15,7 @@
 ! a clang-built twin of the same loop is compiler/libm, not physics.
 !-
 
-program fel_advance_bench
+program lucifer_advance_bench
 
 use fel_track_mod
 
@@ -143,4 +143,4 @@ print '(a, f8.2, a)', '  fel_runge_kutta only:  ', 1e9_rp * t_rk / npart / nstep
 print '(a, f8.2, a)', '  4x (sin+cos) only:     ', 1e9_rp * t_sc / npart / nstep, ' ns/particle-step'
 print '(a, es12.4)', '  checksum (do not optimize away): ', chk + sum(sl%pz(1:10))
 
-end program fel_advance_bench
+end program lucifer_advance_bench

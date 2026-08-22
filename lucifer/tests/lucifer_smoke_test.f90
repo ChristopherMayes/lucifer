@@ -1,5 +1,5 @@
 !+
-! Program fel_smoke_test
+! Program lucifer_smoke_test
 !
 ! The library-contract check (manual sec:program): drive the FEL tracker WITHOUT the
 ! namelist layer -- fill the input structs in code, call the library, write the dumps.
@@ -7,14 +7,14 @@
 ! of the same configuration, and runs it TWICE IN ONE PROCESS (both passes here) to
 ! prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 !
-!   fel_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>
+!   lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>
 !
 ! With an unreadable lattice file the library must RETURN an error (never exit): this
 ! program then prints its proof-of-return line and stops with code 2 -- the harness's
 ! library-error check requires exactly that behavior.
 !-
 
-program fel_smoke_test
+program lucifer_smoke_test
 
 use fel_struct
 use fel_setup_mod
@@ -91,4 +91,4 @@ enddo
 
 call wavefront_fft_free()
 
-end program fel_smoke_test
+end program lucifer_smoke_test

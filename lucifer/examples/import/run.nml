@@ -3,7 +3,7 @@
 ! FEL slices by the transcribed Genesis importdistribution method (fel_import_mod),
 ! and tracked dark through the full line: SASE from an imported bunch.
 !
-!   fel_track_test run.nml           (run from this directory)
+!   lucifer run.nml           (run from this directory)
 !   python ../plot_fel.py import.stats.h5
 !
 ! The lattice is the whole optics specification: the reference energy comes from its

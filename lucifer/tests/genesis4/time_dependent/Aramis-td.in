@@ -6,7 +6,7 @@
 #     round(slen/(sample*lambda0)) (GenTime.cpp:70), so this is exactly 32 slices of
 #     spacing 3*lambda0. sample = 3 matches the slice spacing to the slippage of one
 #     delz = 0.045 m = 3-period step (one slice per step at resonance), the matched
-#     configuration of the design brief's section 8.3, and the 32-slice window keeps the
+#     configuration of the coarse-step sweep, and the 32-slice window keeps the
 #     benchmark's runtime in check -- slippage physics does not depend on window length.
 #
 #   - shotnoise = 1. In steady state shot noise was disabled to make the run

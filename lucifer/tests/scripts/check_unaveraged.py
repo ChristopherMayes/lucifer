@@ -37,7 +37,7 @@ the averaged mode's inputs (the coupling factor fc).
    integrator-structure difference (ramps + split + quiver diagnostics), FINDINGS 6.4
    style: measured and bounded, not litigated.
 
-Usage: check_unaveraged.py --exe <fel_track_test> --latdir <tests/bmad> --workdir <dir>
+Usage: check_unaveraged.py --exe <lucifer> --latdir <tests/bmad> --workdir <dir>
 """
 
 from __future__ import annotations

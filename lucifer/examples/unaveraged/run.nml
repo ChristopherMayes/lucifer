@@ -2,7 +2,7 @@
 ! real undulator field, quiver and all, and the coupling the averaged map assumes is
 ! simply what happens (fel-physics.tex sec:unaveraged).
 !
-!   fel_track_test run.nml           (run from this directory; ~1 min)
+!   lucifer run.nml           (run from this directory; ~1 min)
 !
 ! One seeded steady-state segment of the benchmark line. The unaveraged mode is
 ! seg1.bmad's OWN attribute (fel_tracking = 1; steps/period and ramps default to

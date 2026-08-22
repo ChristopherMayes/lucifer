@@ -2,7 +2,7 @@
 
 One command, Bmad only:
 
-    ../../../../production/bin/fel_track_test run.nml
+    ../../../../production/bin/lucifer run.nml
     python ../plot_fel.py harmonics.stats.h5
 
 A strongly seeded steady-state run on a planar segment carrying TWO radiation

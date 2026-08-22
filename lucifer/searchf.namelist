@@ -1,0 +1,181 @@
+
+File: tests/lucifer_smoke_test.f90
+lucifer_smoke_test
+
+File: tests/lucifer_advance_bench.f90
+lucifer_advance_bench
+
+File: code/fel_struct.f90
+fel_struct
+fel_global_struct
+wavefront_init_struct
+fel_wake_init_struct
+fel_beam_init_param_struct
+fel_run_struct
+fel_comb_take
+
+File: code/fel_import_mod.f90
+fel_import_mod
+fel_import_param_struct
+fel_import_bunch
+analyse_window
+fel_write_genesis4_distribution
+
+File: code/fel_unaveraged_mod.f90
+fel_unaveraged_mod
+fel_unavg_struct
+fel_unavg_setup
+fel_unavg_envelope
+fel_unavg_bfield
+fel_unavg_step
+
+File: code/wavefront_hdf5_mod.f90
+wavefront_hdf5_mod
+wavefront_write_genesis4
+wavefront_read_genesis4
+slice_size_ok
+
+File: code/fel_track_line_mod.f90
+fel_track_line_mod
+track_fel_line
+
+File: code/fel_input_mod.f90
+fel_input_mod
+fel_read_input
+fel_write_resolved_input
+group_present
+has_retired_group
+
+File: code/fel_beam_mod.f90
+fel_beam_mod
+fel_slice_struct
+fel_beam_struct
+fel_slice_diag_struct
+fel_gamma_of
+fel_beta_of
+fel_p0_mc
+fel_gamma0
+fel_assert_averaged_chart
+fel_theta
+fel_read_genesis4_beam
+fel_write_genesis4_beam
+fel_slice_reallocate
+fel_fawley_noise
+fel_slice_to_bunch
+fel_bunch_to_slice
+fel_concat_slices
+fel_split_slices
+fel_migrate_slices
+fel_phi0_rate
+fel_slice_diag
+
+File: code/fel_sincos.c
+fel_sincos_c
+fel_sincos_c
+
+File: code/wavefront_openpmd_mod.f90
+wavefront_openpmd_mod
+wavefront_file_is_openpmd
+wavefront_write_openpmd
+wavefront_read_openpmd
+
+File: code/fel_collective_mod.f90
+fel_collective_mod
+fel_wake_struct
+fel_efield_struct
+fel_collective_struct
+fel_resistive_wall_wake
+fel_wake_init
+fel_wake_update
+fel_wake_apply
+fel_wake_apply_slice
+fel_longrange_esc
+fel_shortrange_ez
+
+File: code/fel_track_mod.f90
+fel_track_mod
+fel_und_struct
+fel_coherent_struct
+fel_slip_struct
+fel_bank_struct
+fel_field_struct
+fel_kernel_struct
+fel_source_deposit$
+fel_source_coherent$
+fel_transcribed$
+fel_averaged$
+fel_unaveraged$
+
+File: code/fel_init_mod.f90
+fel_init_mod
+fel_init_beam
+fel_init_wavefront
+
+File: code/fel_setup_mod.f90
+fel_setup_mod
+fel_setup_lattice
+fel_setup_schedule
+
+File: code/wavefront_mod.f90
+wavefront_mod
+wf_rp
+wf_fft_forward$
+wf_fft_backward$
+wavefront_struct
+wavefront_params_struct
+wavefront_init
+wavefront_check
+wavefront_shape
+wavefront_k0
+wavefront_photon_energy
+wavefront_coord_vec
+wavefront_xvec
+wavefront_yvec
+wavefront_zvec
+wavefront_fft_wavenumber_vec
+wavefront_intensity
+wavefront_energy
+wavefront_fluence
+wavefront_power
+wavefront_transverse_moments
+wavefront_drift
+wavefront_drift_kernel
+wavefront_drift_reference
+wavefront_dft_1d
+wavefront_fft2
+wavefront_fft2_plan
+wavefront_fft2_plan_threads
+wavefront_fft_free
+wavefront_params_of_plane
+
+File: code/fel_stats_mod.f90
+fel_stats_mod
+fel_stats_struct
+fel_stats_n_bp$
+fel_stats_modes$
+fel_stats_twiss$
+fel_stats_init
+fel_stats_record
+fel_stats_element_end
+fel_stats_write
+
+File: code/fel_io_mod.f90
+fel_io_mod
+fel_dump_field_set
+fel_read_openpmd_into_field
+fel_import_harmonic_field
+fel_drain_bank
+fel_escaped_file_name
+fel_finalize_diagnostics
+fel_write_pulse_file
+fel_write_wake_block
+fel_write_meta
+resolved_input_text
+file_text
+unit_text
+
+File: program/lucifer.f90
+lucifer
+
+File: wavefront/wavefront_drift_test.f90
+wavefront_drift_test

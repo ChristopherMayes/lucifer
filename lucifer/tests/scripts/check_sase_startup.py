@@ -2,7 +2,7 @@
 """
 Cross-code validation of the shot-noise LEVEL (deliverable 6): a dark start (no seed
 field), one undulator segment, each code generating its OWN noisy beam -- Genesis with
-its loader and RNG, fel_track_test with its weighted Fawley loader -- so the two noise
+its loader and RNG, lucifer with its weighted Fawley loader -- so the two noise
 implementations are fully independent. SASE startup power is proportional to the
 imposed <|b|^2>, and the tracking itself is validated elsewhere at 1e-6, so agreement of
 the mean startup power validates the noise level and nothing else.
@@ -13,7 +13,7 @@ sigma of about 1/sqrt(n); the check is |ln(P_bmad/P_genesis)| < 0.30, roughly 3 
 the default 6 seeds x 32 slices per side and far below the factor-type errors a wrong
 noise normalization produces.
 
-Usage: check_sase_startup.py --exe <fel_track_test> --genesis <genesis4> --workdir <dir> [--seeds N]
+Usage: check_sase_startup.py --exe <lucifer> --genesis <genesis4> --workdir <dir> [--seeds N]
 The workdir must hold Aramis-1seg.lat and aramis_1seg.bmad. Exit 0 on pass.
 """
 
@@ -121,7 +121,7 @@ def main():
         r = subprocess.run([str(exe), f"bsase{seed}.nml"], cwd=wd, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:
-            print(f"FAIL: fel_track_test seed {seed} exited {r.returncode}:\n{r.stdout[-1500:]}")
+            print(f"FAIL: lucifer seed {seed} exited {r.returncode}:\n{r.stdout[-1500:]}")
             sys.exit(1)
 
     seeds = [100000 + 991 * s for s in range(1, a.seeds + 1)]

@@ -1,14 +1,14 @@
-set (EXENAME fel_smoke_test)
+set (EXENAME lucifer_smoke_test)
 
 set (SRC_FILES
-	fel/tests/fel_smoke_test.f90
+  tests/lucifer_smoke_test.f90
 )
 
 set (INC_DIRS
 )
 
 set (LINK_LIBS
-  bsim
+  lucifer
   bmad
   sim_utils
   ${ACC_BMAD_LINK_LIBS}

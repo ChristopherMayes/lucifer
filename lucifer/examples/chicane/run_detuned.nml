@@ -1,6 +1,6 @@
 ! Chicane re-phasing, one command (see the README; run both nml files):
 !
-!   fel_track_test run_detuned.nml
+!   lucifer run_detuned.nml
 !
 ! Absolute-time phasing: the bend angle sets the light's re-injection phase onto the
 ! bunched beam. This lattice: detuned.bmad.

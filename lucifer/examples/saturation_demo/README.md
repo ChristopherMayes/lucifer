@@ -31,5 +31,5 @@ unaveraged ledger closing exactly along z.
 Measured results, attribution of every difference (the averaged mode matches Genesis
 at 4.9e-4 through saturation; the unaveraged mode rides +0.6 ln on the shot-noise
 radiation channel it physically resolves, FINDINGS 7.27), and the banked report live
-in the "The saturation demo" section of `bsim/fel/README.md` and
+in the "The saturation demo" section of `lucifer/README.md` and
 `fel-benchmark-plots/sat-demo-report.pdf` at the project root.

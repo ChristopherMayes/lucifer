@@ -5,7 +5,7 @@
 ! to sase_wake.wake.txt; the mean-energy panel of plot_fel.py shows the wake-driven
 ! decline on top of the FEL's own energy extraction.
 !
-!   fel_track_test run.nml           (run from this directory)
+!   lucifer run.nml           (run from this directory)
 !   python ../plot_fel.py sase_wake.stats.h5
 
 &fel_params

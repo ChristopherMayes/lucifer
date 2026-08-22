@@ -10,7 +10,7 @@
 !
 ! This mirrors the Wavefront class of openPMD-beamphysics
 ! (beamphysics/wavefront/wavefront.py) closely enough that the two can be compared field
-! by field. See bsim/wavefront/tests/run_validation.sh, which drifts the same input
+! by field. See lucifer/wavefront/tests/run_validation.sh, which drifts the same input
 ! through both and reports the largest relative difference.
 !
 ! Genesis 1.3 Version 4 HDF5 input and output for this structure is in

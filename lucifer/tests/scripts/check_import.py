@@ -28,7 +28,7 @@ STATISTICAL (the resampling and loading RNG):
             resampling with its OWN RNG from the same file: mean over seeds and
             slices within |ln ratio| < 0.30 (the check_sase_startup check, reused).
 
-Usage: check_import.py --exe <fel_track_test> --genesis <genesis4> --workdir <dir> [--seeds N]
+Usage: check_import.py --exe <lucifer> --genesis <genesis4> --workdir <dir> [--seeds N]
 The workdir must hold Aramis-1seg.lat and aramis_1seg.bmad. Exit 0 on pass.
 """
 

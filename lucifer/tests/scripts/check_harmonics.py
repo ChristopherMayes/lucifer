@@ -342,7 +342,7 @@ def main():
         print(f"FAIL: cannot import the Python Wavefront class from {args.pyrepo}: {exc}")
         FAILED = True
 
-    # The carried Python patch (bsim/fel/openpmd/): its reader must recover the
+    # The carried Python patch (lucifer/openpmd/): its reader must recover the
     # Genesis dump's complex values from the .wf.h5 through its own transpose logic,
     # and its writer must round-trip through its reader exactly.
 

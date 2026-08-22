@@ -21,7 +21,7 @@
 #     code's self-report. Serial Genesis runs the plain binary (one rank, no launcher);
 #     parallel Genesis runs mpirun -np <workers>; the Bmad tracker runs the same binary
 #     with OMP_NUM_THREADS=1 and =<workers>.
-#   - Use production builds. A debug fel_track_test is accepted with a loud warning,
+#   - Use production builds. A debug lucifer is accepted with a loud warning,
 #     and its numbers are not comparable.
 #
 # Usage:
@@ -30,12 +30,12 @@
 #
 # Defaults: workers = the machine's performance-core count (hw.perflevel0.physicalcpu on
 # macOS, nproc on Linux); binaries and python found as in run_fel_benchmark.sh, except
-# the PRODUCTION fel_track_test is preferred. The work directory is kept.
+# the PRODUCTION lucifer is preferred. The work directory is kept.
 
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 GENESIS="$HOME/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4"
 EXE=""
@@ -92,12 +92,12 @@ fi
 
 DEBUG_EXE_WARNING=0
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/production/bin/fel_track_test" "$BMAD_ROOT/debug/bin/fel_track_test"; do
+  for candidate in "$BMAD_ROOT/production/bin/lucifer" "$BMAD_ROOT/debug/bin/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: fel_track_test not found. Build with: cd $BMAD_ROOT && ./util/conda_compile" >&2
+  echo "Error: lucifer not found. Build with: cd $BMAD_ROOT && ./util/conda_compile" >&2
   exit 1
 fi
 [[ "$EXE" == *"/debug/"* ]] && DEBUG_EXE_WARNING=1
@@ -126,13 +126,13 @@ echo "FEL performance benchmark: Bmad tracker (OpenMP) vs Genesis4 (MPI)"
 echo "=============================================================================="
 echo "  workers:     $WORKERS (performance cores)"
 echo "  window:      $NSLICE slices (4 per worker; sample = 3)"
-echo "  fel_track_test: $EXE"
+echo "  lucifer: $EXE"
 echo "  genesis4:    $GENESIS"
 echo "  mpirun:      $MPIRUN"
 echo "  workdir:     $WORK_DIR"
 if [[ $DEBUG_EXE_WARNING -eq 1 ]]; then
   echo
-  echo "  WARNING: using a DEBUG fel_track_test. Its timings are not comparable to a"
+  echo "  WARNING: using a DEBUG lucifer. Its timings are not comparable to a"
   echo "  release Genesis build; compile production (./util/conda_compile) for real numbers."
 fi
 echo
@@ -243,10 +243,10 @@ timed "Genesis4, serial (1 rank; writes the shared dumps)" genesis-serial.log \
   "$GENESIS" perf-serial.in
 timed "Genesis4, $WORKERS MPI ranks" genesis-parallel.log \
   "$MPIRUN" -np "$WORKERS" "$GENESIS" perf-parallel.in
-timed "fel_track_test, 1 thread" fel-serial.log \
+timed "lucifer, 1 thread" fel-serial.log \
   env OMP_NUM_THREADS=1 "$EXE" perf.nml
 mv perf.diag.txt perf-serial.diag.txt
-timed "fel_track_test, $WORKERS threads" fel-parallel.log \
+timed "lucifer, $WORKERS threads" fel-parallel.log \
   env OMP_NUM_THREADS="$WORKERS" "$EXE" perf.nml
 echo
 
@@ -278,9 +278,9 @@ echo "==========================================================================
 g1, gp, f1, fp = [float(t) for t in "${TIMES[@]}".split()]
 print(f"  {'':26s} {'serial':>10s} {'$WORKERS workers':>13s} {'speedup':>9s}")
 print(f"  {'Genesis 1.3 v4 (MPI)':26s} {g1:>9.1f}s {gp:>11.1f}s {g1/gp:>8.1f}x")
-print(f"  {'fel_track_test (OpenMP)':26s} {f1:>9.1f}s {fp:>11.1f}s {f1/fp:>8.1f}x")
+print(f"  {'lucifer (OpenMP)':26s} {f1:>9.1f}s {fp:>11.1f}s {f1/fp:>8.1f}x")
 print()
-print(f"  fel_track_test vs Genesis: {g1/f1:.2f}x faster serial, {gp/fp:.2f}x faster at $WORKERS workers")
+print(f"  lucifer vs Genesis: {g1/f1:.2f}x faster serial, {gp/fp:.2f}x faster at $WORKERS workers")
 EOF
 
 echo

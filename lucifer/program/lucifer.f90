@@ -1,11 +1,11 @@
 !+
-! Program fel_track_test
+! Program lucifer
 !
 ! FEL tracker validated against Genesis 1.3 Version 4. The PHYSICS -- coordinates and
 ! conventions, the FEL step, the field solver, slippage, loading, import, migration,
 ! collective effects, and each piece's Genesis provenance and measured validation
-! level -- lives in the manual, bsim/fel/doc/fel-physics.tex. Measured numbers and how
-! to run the checks: bsim/fel/README.md. This header documents the inputs.
+! level -- lives in the manual, lucifer/doc/fel-physics.tex. Measured numbers and how
+! to run the checks: lucifer/README.md. This header documents the inputs.
 !
 ! The program walks a Bmad lattice and applies the seam of the design (manual
 ! sec:element, sec:seam): FEL segments are real Bmad wiggler/undulator elements with
@@ -107,7 +107,7 @@
 !
 ! Alternatively, leave beam_file and field_file blank and the program generates its own
 ! starting condition -- a quiet-start beam and a Gaussian seed field -- making a
-! self-contained single run with no Genesis anywhere (see bsim/fel/examples). The BEAM
+! self-contained single run with no Genesis anywhere (see lucifer/examples). The BEAM
 ! is described by Bmad's standard beam_init_struct (the same block the import path
 ! uses: one bulk-bunch description, two generation methods -- the import resamples
 ! real particles from it, the quiet-start loader evaluates it analytically per slice).
@@ -217,7 +217,7 @@
 ! order first, as writeFieldHDF5 does).
 !-
 
-program fel_track_test
+program lucifer
 
 use fel_struct
 use fel_input_mod
@@ -311,4 +311,4 @@ if (err) stop 1
 
 call wavefront_fft_free()
 
-end program fel_track_test
+end program lucifer

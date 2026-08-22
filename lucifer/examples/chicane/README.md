@@ -2,8 +2,8 @@
 
 Two commands, Bmad only:
 
-    ../../../../production/bin/fel_track_test run.nml
-    ../../../../production/bin/fel_track_test run_detuned.nml
+    ../../../../production/bin/lucifer run.nml
+    ../../../../production/bin/lucifer run_detuned.nml
 
 Two undulator segments with a four-bend closed-bump chicane in the break, in
 ABSOLUTE TIME TRACKING mode (`bmad_com[absolute_time_tracking] = T` in the

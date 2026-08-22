@@ -3,7 +3,7 @@
 ! physical kernel the wake_on model (sase_wake) convolves per step. See ../README.md's bmad_wake section
 ! for the two-implementation comparison and measured numbers.
 !
-!   fel_track_test run.nml           (run from this directory)
+!   lucifer run.nml           (run from this directory)
 !   python ../plot_fel.py bmad_wake.stats.h5
 
 &fel_params

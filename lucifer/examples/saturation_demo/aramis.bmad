@@ -32,7 +32,7 @@ beginning[beta_b] = 17.3899
 beginning[alpha_b] = 1.40348
 
 ! The FEL element proper (deliverable 9): a real wiggler with tracking_method = custom
-! (Bmad's semantics for program-supplied tracking, which fel_track_test provides). The
+! (Bmad's semantics for program-supplied tracking, which lucifer provides). The
 ! FEL parameters derive from the attributes: aw = c*b_max/(k_u*m_e c^2) for a helical
 ! device (rms convention), so b_max below encodes aw = 0.84853 exactly as an expression
 ! in Bmad's own constants; helicity from field_calc; period from l_period.

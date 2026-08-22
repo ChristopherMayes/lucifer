@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Measure the coarse-step question of the design brief's section 8.3: how does the gain
+# Measure the coarse-step question: how does the gain
 # curve converge with the undulator integration step delz, up to SIMPLEX's matched
 # configuration of twelve periods per step with slippage exactly one slice per step?
 #
@@ -12,7 +12,7 @@
 # slices) at the twelve undulator-segment exits, positions every run records regardless
 # of delz, against the finest run; a convergence order is fitted from successive step
 # halvings/triplings. This is a measurement, not a check: results are recorded in
-# bsim/fel/README.md.
+# lucifer/README.md.
 #
 #   ./run_delz_sweep.sh [--genesis <path>] [--exe <path>] [--python <path>] [--work-dir <path>]
 #
@@ -21,7 +21,7 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 GENESIS="$HOME/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4"
 EXE=""
@@ -45,12 +45,12 @@ if [[ ! -x "$GENESIS" ]]; then
 fi
 
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/debug/bin/fel_track_test" "$BMAD_ROOT/production/bin/fel_track_test"; do
+  for candidate in "$BMAD_ROOT/debug/bin/lucifer" "$BMAD_ROOT/production/bin/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: fel_track_test not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
+  echo "Error: lucifer not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
   exit 1
 fi
 
@@ -107,9 +107,9 @@ LAT
   field_file = "AramisS12-initial.fld.h5"
 /
 NML
-  echo "--- fel_track_test: ds_step = $np period(s) -----------------------------------"
+  echo "--- lucifer: ds_step = $np period(s) -----------------------------------"
   if ! "$EXE" "sweep_p$np.nml" > "sweep_p$np.log" 2>&1; then
-    echo "fel_track_test ds_step=$delz FAILED; log tail:" >&2
+    echo "lucifer ds_step=$delz FAILED; log tail:" >&2
     tail -20 "sweep_p$np.log" >&2
     exit 1
   fi

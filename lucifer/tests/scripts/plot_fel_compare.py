@@ -82,7 +82,7 @@ def plot_field_overlay(fld_f, fld_g, name, plt):
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("bmad_diag", help="fel_track_test diag file (<out_root>.diag.txt)")
+    p.add_argument("bmad_diag", help="lucifer diag file (<out_root>.diag.txt)")
     p.add_argument("genesis_out", help="Genesis .out.h5 of the same configuration")
     p.add_argument("-o", "--out", default=None,
                    help="Output figure (default: <bmad_diag stem>.compare.png)")

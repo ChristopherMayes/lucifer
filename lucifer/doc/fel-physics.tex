@@ -9,8 +9,8 @@
 \newenvironment{provenance}{\par\small\textbf{Provenance.}}{\par}
 \newenvironment{validation}{\par\small\textbf{Validation.}}{\par}
 
-\title{The Bmad FEL Tracker: Physics Manual}
-\author{\code{bsim/fel} --- \code{fel\_beam\_mod}, \code{fel\_track\_mod},
+\title{Lucifer, the Bmad FEL Tracker: Physics Manual}
+\author{\code{lucifer} --- \code{fel\_beam\_mod}, \code{fel\_track\_mod},
         \code{fel\_collective\_mod}, \code{fel\_import\_mod}, \code{fel\_track\_test}}
 \date{\today}
 
@@ -21,13 +21,16 @@
 
 This manual states the physics and the numerical conventions of the Bmad FEL tracker.
 The code references these sections by label; the validation harness
-(\code{bsim/fel/tests/}) proves each statement against Genesis 1.3 Version 4, against
+(\code{lucifer/tests/}) proves each statement against Genesis 1.3 Version 4, against
 closed forms, or against independent implementations, and the measured levels live in
-\code{bsim/fel/README.md}. Each section ends with a \emph{Provenance} note (the Genesis
+\code{lucifer/README.md}. Each section ends with a \emph{Provenance} note (the Genesis
 routine the physics was transcribed from, moved here from the source comments) and a
 \emph{Validation} note (which check pins it). The physics was transcribed from Genesis
 (GPL permits transcription), validated at transcription level, and then re-expressed in
 Bmad's units and conventions; the transcription-era agreement is banked in the README.
+Citations of the form FINDINGS.md~n.m (and ``design brief \S x.y'') refer to the
+port's development records --- the transcription-findings log and the design brief ---
+maintained with the project outside this repository.
 
 Throughout: $m_e c^2$ is Bmad's \code{m\_electron} (eV), $c$ is \code{c\_light},
 $Z_0 = \mu_0 c$ (\code{mu\_0\_vac*c\_light}), $e$ is \code{e\_charge}, and
@@ -953,7 +956,7 @@ per-harmonic openPMD imports are matched to the field whose photon energy they
 carry, and a file matching none is refused by name.
 
 The mapping, one decision per row where the extension's text under-determines the
-file (each also recorded for upstream in \code{bsim/fel/openpmd/UPSTREAM-NOTES.md}):
+file (each also recorded for upstream in \code{lucifer/openpmd/UPSTREAM-NOTES.md}):
 
 \begin{center}
 \begin{tabular}{ll}
@@ -977,7 +980,7 @@ spec text in h5py; Genesis-format and openPMD dumps of the same field agree
 complex-value-wise at $1.4\times10^{-16}$; the Fortran reader's re-dump is
 dataset-identical to the original; the openPMD-beamphysics \code{Wavefront} class
 agrees on the field energy through its own Genesis path at $1.2\times10^{-12}$;
-and the carried Python patch (\code{bsim/fel/openpmd/}, the class's future
+and the carried Python patch (\code{lucifer/openpmd/}, the class's future
 \code{from\_openpmd}/\code{write\_openpmd}) reads and round-trips the files
 exactly, exercised every harness run.
 

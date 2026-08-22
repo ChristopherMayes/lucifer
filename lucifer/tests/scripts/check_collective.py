@@ -16,7 +16,7 @@ tiers live in compare_fel.py).
    loudly. The checker parses the driver's record of recomputes rather than
    reimplementing the convolution (FINDINGS 4.3).
 
-Usage: check_collective.py --exe <fel_track_test> --workdir <dir>
+Usage: check_collective.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad and aramis.bmad. Exit 0 only if all pass.
 """
 

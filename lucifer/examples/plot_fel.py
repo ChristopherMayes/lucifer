@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Plot the standard diagnostics of a fel_track_test run from its stats file.
+Plot the standard diagnostics of a lucifer run from its stats file.
 
     python plot_fel.py run.stats.h5              # writes run.png
     python plot_fel.py run.stats.h5 -o gain.png --show
@@ -113,7 +113,7 @@ def panel_series(ax, z, a2d, color, label=None, reduce="mean"):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    p.add_argument("stats", help="fel_track_test .stats.h5 file")
+    p.add_argument("stats", help="lucifer .stats.h5 file")
     p.add_argument("-o", "--output", help="Output image (default: <stats stem>.png)")
     p.add_argument("--show", action="store_true", help="Also open a window")
     args = p.parse_args()

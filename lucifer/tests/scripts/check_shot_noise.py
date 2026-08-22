@@ -7,7 +7,7 @@ Physics under test: after quiet loading plus Fawley-style noise, each slice's bu
 satisfies <|b(h)|^2> = 1/N_lambda per imposed harmonic, with N_lambda the slice's real
 electron count (charge/e) -- for uniform AND nonuniform per-particle weights.
 
-Method: run fel_track_test with load_only = T over many seeds, in both weight modes
+Method: run lucifer with load_only = T over many seeds, in both weight modes
 (uniform, and gen_test_weights = T which alternates beamlet weights 0.25x/1.75x at
 constant charge). Read each .par.h5, compute the charge-weighted |b(h)|^2 per slice for
 the imposed harmonics, and test the scaled mean m = <|b(h)|^2 * N_lambda> against 1.
@@ -15,7 +15,7 @@ b is a sum of many independent beamlet contributions, so |b|^2*N_lambda is Exp(1
 excellent approximation and the mean over n samples has sigma = 1/sqrt(n); the check is
 |m - 1| < 5/sqrt(n) per weight mode, plus a looser per-harmonic check (n/3 samples).
 
-Usage: check_shot_noise.py --exe <fel_track_test> --workdir <dir> [--seeds N] [--lat <bmad file>]
+Usage: check_shot_noise.py --exe <lucifer> --workdir <dir> [--seeds N] [--lat <bmad file>]
 Exit 0 only if every check passes.
 """
 

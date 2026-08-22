@@ -29,7 +29,7 @@ Checks:
             profile unchanged to roundoff (the wake is linear in charge).
   threads   1 vs 8 threads with a wake element: byte-identical diag.
 
-Usage: check_seam_wake.py --exe <fel_track_test> --workdir <dir>
+Usage: check_seam_wake.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad. Exit 0 on pass.
 """
 
