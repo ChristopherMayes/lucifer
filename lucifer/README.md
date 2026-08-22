@@ -1122,6 +1122,27 @@ Genesis on the 8192 case (143 vs 99 s) now sits in the per-slice field FFTs and 
 wake-path interludes, with the clang-twin numbers bounding what further particle-path
 codegen work could still buy (~68 ns vs our ~125 per particle-step).
 
+## The coherent source (SIMPLEX hybrid, manual sec:coherent-source)
+
+`global%source_model = "coherent"` swaps the per-particle source deposit for Tanaka's
+coherent retrieval (PRAB 27, 030703 (2024), implemented from the paper): the spatially
+incoherent part of the bunching -- whose per-cell sampling noise makes under-populated
+runs overestimate gain -- is dropped from the source; the coherent part deposits as an
+analytic Gaussian carrying the slice's exact source phasor, centered and tilted by
+phasor-weighted moments (this port's extension) with Tanaka's kappa width fit. The
+field, gather, and every diagnostic are untouched; `"deposit"` stays the default and
+the referee.
+
+Measured (check_coherent.py, the harness's thirteenth section): at M = 128/slice the
+plain deposit fakes ln P by +0.42 on a curve that truly absorbs, the coherent source
+stays at 0.048 -- a 64x particle reduction at the model's own bias (1.9e-2 at large
+M). Guarded by name: per-slice Gaussianity vs sampling significance (charge-gated),
+and refusals for unaveraged/harmonics/two-polarization and for DARK STARTS -- measured
+~175x startup deficit: spontaneous spatially-incoherent emission dominates SASE
+startup and the coherent model drops it, so seeded runs only. Also priced once:
+SIMPLEX's coarse stepping (12 periods/step) costs 2.6e-3 in |ln P| here (taper and
+harmonics untested at coarse steps).
+
 ## The coarse-step measurement (brief 8.3)
 
 (Summarized in manual `sec:numerics`.)

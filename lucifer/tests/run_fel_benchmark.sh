@@ -468,6 +468,14 @@ fi
 section_time phasing
 
 echo
+echo "--- coherent-source checks (SIMPLEX hybrid: limit, claim, guards, refusals) ----"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_coherent.py" "$WORK_DIR/coherent" --exe "$EXE"; then
+  echo "FAIL: coherent-source checks; outputs kept in: $WORK_DIR/coherent" >&2
+  exit 1
+fi
+section_time coherent-source
+
+echo
 echo "--- program-structure checks (library contract, the comb, the window) ---------"
 SMOKE="${EXE%fel_track_test}fel_smoke_test"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$WORK_DIR/program" --exe "$EXE" --smoke "$SMOKE"; then

@@ -174,6 +174,51 @@ if (n_harm > 1 .and. run%two_pol) then
   print '(a)', '  together yet; run one or the other.'
   err_flag = .true.;  return
 endif
+
+! The source model (manual sec:coherent-source): validated, then stamped onto every
+! FEL element. v1 scope refusals, each by name: the coherent source carries the
+! FUNDAMENTAL of one polarization (even harmonics are invalid in the method itself --
+! F(z,0) = 0 -- and odd ones are a named follow-on), and it cannot live inside the
+! unaveraged referee (variance reduction inside the explicit-everything mode).
+
+select case (run%global%source_model)
+case ('deposit')
+case ('coherent')
+  if (any(fel_mode == fel_unaveraged$ .and. is_fel)) then
+    print '(a)', 'fel_track_test: source_model = "coherent" with an UNAVERAGED element: the'
+    print '(a)', '  unaveraged mode is the explicit referee; variance reduction inside it is refused.'
+    err_flag = .true.;  return
+  endif
+  if (n_harm > 1) then
+    print '(a)', 'fel_track_test: source_model = "coherent" with HARMONIC fields is not in v1'
+    print '(a)', '  (even harmonics are invalid in the method; odd ones are a named follow-on).'
+    err_flag = .true.;  return
+  endif
+  if (run%two_pol) then
+    print '(a)', 'fel_track_test: source_model = "coherent" with TWO LIVE POLARIZATIONS is not in v1.'
+    err_flag = .true.;  return
+  endif
+  if (run%winit%seed_power <= 0 .and. run%field_file(1) == '') then
+
+    ! MEASURED, not assumed (check_coherent's SASE experiment): the coherent source
+    ! understates dark-start startup by ~175x on the reference configuration --
+    ! spontaneous, spatially-INCOHERENT emission dominates SASE startup and is
+    ! exactly what the coherent model drops. The slice bunch factor's physical noise
+    ! (Fawley, <|B|^2> N_lambda = 1) is present but is not the dominant seed. The
+    ! goal's fallback applies: refused by name; seeded runs are fully supported.
+
+    print '(a)', 'fel_track_test: source_model = "coherent" with a DARK START is refused: the'
+    print '(a)', '  coherent source drops the spatially-incoherent spontaneous emission that'
+    print '(a)', '  dominates SASE startup (measured ~175x low). Seed the field (seed_power or'
+    print '(a)', '  field_file) or use source_model = "deposit".'
+    err_flag = .true.;  return
+  endif
+  where (is_fel) und_of%source_model = fel_source_coherent$
+case default
+  print '(a)', 'fel_track_test: source_model must be "deposit" or "coherent", got: ' // &
+                trim(run%global%source_model)
+  err_flag = .true.;  return
+end select
 select case (wavefront_format)
 case ('genesis', 'openpmd', 'both')
 case default

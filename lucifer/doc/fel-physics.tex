@@ -1233,4 +1233,37 @@ lattice file's text and name, an ISO timestamp, user, cwd and the Bmad
 version, all as HDF5 attributes so dataset-level identity comparisons are
 untouched by run-specific provenance.
 
+
+\subsection{The coherent source (SIMPLEX hybrid)}\label{sec:coherent-source}
+
+\texttt{global\%source\_model = 'coherent'} replaces the per-particle source deposit
+with Tanaka's coherent retrieval (PRAB \textbf{27}, 030703 (2024); implemented from
+the paper -- SIMPLEX's own source is unlicensed): the slice bunch factor splits
+$b = b_C + b_S$, the spatially incoherent $b_S$ -- whose radiation diffracts away,
+and whose per-cell sampling noise is the artifact that makes under-populated runs
+overestimate gain -- is dropped, and $b_C$ deposits as one analytic Gaussian carrying
+the slice's exact source phasor $S$ (the deposit's own normalization contract,
+$\sum \mathrm{crsource} = S$). The width is $\kappa\,\sigma$ with $\kappa$ from the
+order-0/1 Laguerre-Gauss sums (the paper's Eq.~26), charge-weighted across the window
+so near-empty edge slices cannot poison the fit; the centering and the full
+$2\times2$ second-moment matrix (tilt included) are this port's extension, letting
+offset and mismatched -- but transversely Gaussian -- beams through. Everything else
+is untouched: the grid, the FFT diffraction, slippage, banking, the stats file, and
+the per-particle gather.
+
+Measured on the seeded 6\,GeV lethargy configuration (the regime where the artifact
+bites hardest): the plain deposit at $M=128$ per slice fakes $\ln P$ by $+0.42$
+where the $M=8192$ reference absorbs; the coherent source at the same $M=128$ stays
+within $0.05$ -- a demonstrated $64\times$ particle reduction at the model's own bias,
+which is $1.9\times10^{-2}$ in $|\ln P|$ at large $M$. Guards, all by name: a
+per-slice excess-kurtosis test against its sampling significance
+($\sqrt{24/m_\mathrm{ind}}$), charge-gated so sparse edge slices are exempt; refusals
+for the unaveraged mode, harmonics (even harmonics are invalid in the method itself),
+two polarizations, and -- measured, a $\sim$175$\times$ startup deficit -- dark
+starts: spontaneous, spatially incoherent emission dominates SASE startup and is
+exactly what the coherent model drops, so seeded runs only. The related SIMPLEX
+coarse-stepping observation was priced separately: 12 undulator periods per step
+costs $2.6\times10^{-3}$ in $|\ln P|$ on the same configuration (taper and harmonics
+not yet tested at coarse steps).
+
 \end{document}

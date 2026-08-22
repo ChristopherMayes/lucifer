@@ -99,6 +99,37 @@ type fel_und_struct
                                        !   or the flattened Bmad periodic-wiggler kernel.
   integer :: nstep = 0        ! Number of integration steps over the segment.
   real(rp) :: dz = 0          ! Step length [m].
+  integer :: source_model = 0 ! fel_source_deposit$ (default) or fel_source_coherent$.
+end type
+
+!+
+! Struct fel_coherent_struct
+!
+! One slice's coherent-source summary (manual sec:coherent-source), computed from the
+! just-advanced particles each step: the source phasor S (exactly the sum the deposit
+! would scatter -- SUM crsource = S is the normalization contract), the charge-weighted
+! centroid and 2x2 second moments (widths + tilt; the centering and tilt are this
+! port's extension of the paper, which assumes an on-axis untilted beam), the
+! Laguerre-Gauss order-0/1 sums feeding the global kappa fit, and the Gaussianity
+! guard metric (excess kurtosis, worst plane).
+!-
+
+type fel_coherent_struct
+  complex(rp) :: S = 0                   ! Source phasor: SUM part_j (sin+icos theta_j).
+  real(rp) :: x0 = 0, y0 = 0             ! Charge-weighted centroid [m].
+  real(rp) :: sxx = 0, sxy = 0, syy = 0  ! Charge-weighted central second moments [m^2].
+  real(rp) :: g2sum = 0                  ! |g0|^2 + |g1|^2 (Eq 20 sums, charge-weighted).
+  real(rp) :: b2 = 0                     ! |B|^2, same weighting (kappa's Eq 26 ratio).
+  real(rp) :: kurt = 0                   ! max plane |excess kurtosis| (guard metric).
+  real(rp) :: m_ind = 1                  ! Independent transverse samples: N_eff/nbins
+                                         !   (beamlet copies share coordinates); the
+                                         !   guard tests SIGNIFICANCE, not raw kurtosis
+                                         !   (sample kurtosis spreads as sqrt(24/m_ind)).
+  real(rp) :: wsum = 0                   ! Slice charge [C]: the guard gates on it
+                                         !   (edge slices resample from few source
+                                         !   points and look degenerate while their
+                                         !   source is negligible).
+  logical :: ok = .false.                ! Enough charge and spread to fit.
 end type
 
 !+
@@ -176,6 +207,15 @@ end type
 ! Named values of the fel_tracking lattice attribute (manual sec:element), in Bmad's
 ! named-integer convention. Lattices use the same names via one-line variable
 ! definitions (e.g. "fel_unaveraged = 1" before the element that sets it).
+
+! The source model (manual sec:coherent-source): the standard per-particle deposit
+! (the referee) or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27,
+! 030703 (2024); arXiv:2310.20197): the spatially incoherent artifact is dropped, the
+! slice bunch factor keeps the physical shot noise, the transverse shape is a guarded
+! Gaussian from phasor sums and charge moments.
+
+integer, parameter :: fel_source_deposit$ = 0
+integer, parameter :: fel_source_coherent$ = 1
 
 integer, parameter :: fel_transcribed$ = -1   ! Transcribed-Genesis transverse maps
                                               !   (validation-internal; Genesis tiers).
@@ -606,7 +646,8 @@ type (fel_field_struct), target :: ff(:)
 type (fel_collective_struct) coll
 logical err_flag
 
-real(rp) ks, phi0_new
+real(rp) ks, phi0_new, kappa, b2_tot, g2_tot
+type (fel_coherent_struct), allocatable :: coh(:)
 integer is, io, nslice, nslice_f, ngrid_arr(3)
 logical any_err, err
 character(*), parameter :: r_name = 'fel_track_und_step'
@@ -671,19 +712,81 @@ enddo
 
 beam%phi0 = phi0_new
 
+! The coherent source (manual sec:coherent-source): per-slice phasor, moments and LG
+! sums from the just-advanced particles (slice-parallel, each slice its own data),
+! then the ONE global kappa (Tanaka Eq 26 -- the integrals run over the whole window,
+! so this is the cross-slice serial point), then the guard: a slice whose transverse
+! charge profile is measurably non-Gaussian is refused BY NAME with its number (the
+! Gaussian model would bias the gain there; thresholds set by the distorted-beam
+! checks).
+
+if (und%source_model == fel_source_coherent$) then
+  allocate (coh(size(beam%slice)))
+  !$OMP parallel do
+  do is = 1, size(beam%slice)
+    call fel_coherent_prep (und, beam, beam%slice(is), ks, coh(is))
+  enddo
+  !$OMP end parallel do
+
+  ! The kappa fit's window sums (Eq 26), CHARGE-WEIGHTED: g_q and B are built from
+  ! normalized weights, so an unweighted sum would let near-empty edge slices --
+  ! whose normalized phasors are O(1) noise -- poison the global width fit for any
+  ! real bunch profile. wsum^2 keeps both sums quadratic in the same measure.
+
+  b2_tot = 0;  g2_tot = 0
+  do is = 1, size(beam%slice)
+    b2_tot = b2_tot + coh(is)%b2 * coh(is)%wsum**2
+    g2_tot = g2_tot + coh(is)%g2sum * coh(is)%wsum**2
+  enddo
+  do is = 1, size(beam%slice)
+
+    ! Charge-gated: an edge slice (Gaussian tail, resampled from few source points)
+    ! looks degenerate while contributing negligible source; only slices carrying
+    ! real charge are held to the Gaussian-profile requirement.
+
+    if (coh(is)%wsum < 0.05_rp * maxval(coh%wsum)) cycle
+    if (coh(is)%ok .and. coh(is)%kurt > max(0.5_rp, 5 * sqrt(24.0_rp / coh(is)%m_ind))) then
+
+      ! Significance, not raw kurtosis: the sample statistic spreads as sqrt(24/m_ind)
+      ! (m_ind independent transverse samples), so a small-M Gaussian beam does not trip
+      ! the guard on noise while a genuinely structured profile (double horn ~ -1.5)
+      ! does at any M where it is resolvable.
+
+      call out_io (s_error$, r_name, 'COHERENT SOURCE: slice \i0\ transverse charge profile is NOT', &
+        'GAUSSIAN ENOUGH (excess kurtosis \es10.2\ , threshold \es10.2\ at this sample size):', &
+        'the coherent-Gaussian model would bias the gain here. Use source_model = "deposit".', &
+        i_array = [is], r_array = [coh(is)%kurt, max(0.5_rp, 5 * sqrt(24.0_rp / coh(is)%m_ind))])
+      return
+    endif
+  enddo
+  kappa = 1
+  if (g2_tot > 0) kappa = sqrt(b2_tot / (4 * pi * g2_tot))
+endif
+
 ! Field solve, harmonic loop outermost (each pass is self-contained; brief 6.1). The
 ! deposit reads the just-advanced particles, so every field sees the same beam state.
 
 do io = 1, size(ff)
   nslice_f = size(ff(io)%wf%Ex, 3)
   any_err = .false.
-  !$OMP parallel do private(err) reduction(.or.: any_err)
-  do is = 1, size(beam%slice)
-    call fel_field_step (und, beam, beam%slice(is), ff(io)%wf, &
-                         fel_field_index(ff(io)%slip, is, nslice_f), und%dz, ff(io)%harm, ks, err)
-    any_err = any_err .or. err
-  enddo
-  !$OMP end parallel do
+  if (und%source_model == fel_source_coherent$) then
+    !$OMP parallel do private(err) reduction(.or.: any_err)
+    do is = 1, size(beam%slice)
+      call fel_field_step (und, beam, beam%slice(is), ff(io)%wf, &
+                           fel_field_index(ff(io)%slip, is, nslice_f), und%dz, ff(io)%harm, ks, err, &
+                           coh(is), kappa)
+      any_err = any_err .or. err
+    enddo
+    !$OMP end parallel do
+  else
+    !$OMP parallel do private(err) reduction(.or.: any_err)
+    do is = 1, size(beam%slice)
+      call fel_field_step (und, beam, beam%slice(is), ff(io)%wf, &
+                           fel_field_index(ff(io)%slip, is, nslice_f), und%dz, ff(io)%harm, ks, err)
+      any_err = any_err .or. err
+    enddo
+    !$OMP end parallel do
+  endif
   if (any_err) return
 enddo
 
@@ -1565,6 +1668,109 @@ end subroutine fel_grid_weights_pre
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_coherent_prep (und, beam, sl, xks1, coh)
+!
+! One slice's coherent-source summary (manual sec:coherent-source; Tanaka PRAB 27,
+! 030703 (2024), implemented from the paper): the source phasor S computed EXACTLY as
+! the deposit would (same theta, same part factors, post-advance particles -- the
+! normalization contract is SUM crsource = S), the charge-weighted centroid and
+! central second moments (this port's extension for offset/mismatched/tilted beams),
+! the Laguerre-Gauss order-0/1 sums g_q = SUM w_j Psi_q((x-x0)/sx, (y-y0)/sy) e^{-i
+! theta_j} with Psi_q(u,v) = (1/sqrt(pi)) L_q(u^2+v^2) exp(-(u^2+v^2)/2) (Eqs 19-20,
+! charge-normalized weights), and the guard metric (worst-plane excess kurtosis).
+! Scale factors constant across the slice (scl_w) are NOT folded into S here; the
+! caller applies them, so S matches the deposit's sum with part = sqrt(faw2)*w/gam.
+!-
+
+subroutine fel_coherent_prep (und, beam, sl, xks1, coh)
+
+type (fel_und_struct) und
+type (fel_beam_struct) beam
+type (fel_slice_struct) sl
+type (fel_coherent_struct) coh
+real(rp) xks1
+
+real(rp) p0_mc, p_mc, gam, beta, theta, part, w, wsum, w2sum, s_t, c_t
+real(rp) sx, sy, u, v, r2, e2, psi0, psi1, x4, y4
+complex(rp) g0, g1, bsum, ephase
+integer ip
+
+!
+
+coh = fel_coherent_struct()
+if (sl%n < 8) return
+p0_mc = fel_p0_mc(beam)
+
+! Pass 1: the source phasor (deposit-identical) and the charge moments.
+
+wsum = 0
+w2sum = 0
+do ip = 1, sl%n
+  p_mc = p0_mc * (1 + sl%pz(ip))
+  gam = sqrt(p_mc**2 + 1)
+  beta = p_mc / gam
+  theta = beam%phi0 + xks1 * sl%z(ip) / beta
+  part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * sl%weight(ip) / gam
+  call fel_sincos (theta, s_t, c_t)
+  coh%S = coh%S + cmplx(s_t, c_t, rp) * part
+  w = sl%weight(ip)
+  wsum = wsum + w
+  w2sum = w2sum + w*w
+  coh%x0 = coh%x0 + w * sl%x(ip)
+  coh%y0 = coh%y0 + w * sl%y(ip)
+enddo
+if (wsum <= 0) return
+coh%wsum = wsum
+coh%x0 = coh%x0 / wsum
+coh%y0 = coh%y0 / wsum
+
+do ip = 1, sl%n
+  w = sl%weight(ip)
+  coh%sxx = coh%sxx + w * (sl%x(ip) - coh%x0)**2
+  coh%sxy = coh%sxy + w * (sl%x(ip) - coh%x0) * (sl%y(ip) - coh%y0)
+  coh%syy = coh%syy + w * (sl%y(ip) - coh%y0)**2
+enddo
+coh%sxx = coh%sxx / wsum;  coh%sxy = coh%sxy / wsum;  coh%syy = coh%syy / wsum
+if (coh%sxx <= 0 .or. coh%syy <= 0 .or. coh%sxx * coh%syy - coh%sxy**2 <= 0) return
+sx = sqrt(coh%sxx)
+sy = sqrt(coh%syy)
+
+! Pass 2: the LG sums (Eqs 19-20; principal widths, centered) and the guard's fourth
+! moments. B in the same charge weighting, so the Eq 26 ratio is weight-consistent.
+
+g0 = 0;  g1 = 0;  bsum = 0;  x4 = 0;  y4 = 0
+do ip = 1, sl%n
+  p_mc = p0_mc * (1 + sl%pz(ip))
+  gam = sqrt(p_mc**2 + 1)
+  beta = p_mc / gam
+  theta = beam%phi0 + xks1 * sl%z(ip) / beta
+  call fel_sincos (theta, s_t, c_t)
+  ephase = cmplx(c_t, -s_t, rp)                 ! e^{-i theta}
+  w = sl%weight(ip) / wsum
+  u = (sl%x(ip) - coh%x0) / sx
+  v = (sl%y(ip) - coh%y0) / sy
+  r2 = u*u + v*v
+  e2 = exp(-r2 / 2) / sqrt(pi)
+  psi0 = e2
+  psi1 = (1 - r2) * e2
+  g0 = g0 + w * psi0 * ephase
+  g1 = g1 + w * psi1 * ephase
+  bsum = bsum + w * ephase
+  x4 = x4 + w * u**4
+  y4 = y4 + w * v**4
+enddo
+coh%g2sum = abs(g0)**2 + abs(g1)**2
+coh%b2 = abs(bsum)**2
+coh%kurt = max(abs(x4 - 3), abs(y4 - 3))        ! Excess kurtosis, worst plane.
+coh%m_ind = max(1.0_rp, wsum**2 / w2sum / max(1, beam%nbins))
+coh%ok = .true.
+
+end subroutine fel_coherent_prep
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_field_step (und, beam, sl, wf, ifld, delz, err_flag)
 !
 ! Routine to advance field slice ifld (the rotated-record index, fel_field_index) one
@@ -1582,7 +1788,7 @@ end subroutine fel_grid_weights_pre
 ! with the bilinear weights, added times 2 in real space after the transform pair.
 !-
 
-subroutine fel_field_step (und, beam, sl, wf, ifld, delz, harm, xks1, err_flag)
+subroutine fel_field_step (und, beam, sl, wf, ifld, delz, harm, xks1, err_flag, coh, kappa)
 
 type (fel_und_struct) und
 type (fel_beam_struct) beam
@@ -1591,6 +1797,8 @@ type (wavefront_struct), target :: wf
 integer ifld, harm
 real(rp) delz, xks1
 logical err_flag
+type (fel_coherent_struct), optional :: coh    ! Coherent source (manual sec:coherent-source):
+real(rp), optional :: kappa                    !   present together when und%source_model says so.
 
 real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc, s_t, c_t
 complex(rp) cpart
@@ -1625,7 +1833,18 @@ crsource = 0
 scl_w = fel_und_coupling(und, harm) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * delz
 scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
 
-if (scl_w /= 0) then
+if (scl_w /= 0 .and. und%source_model == fel_source_coherent$) then
+
+  ! The coherent-Gaussian source (manual sec:coherent-source): the slice's whole
+  ! phasor S -- carrying the PHYSICAL shot noise through B(s), which the Fawley
+  ! loading pins to <|B|^2> N_lambda = 1 -- deposited as one analytic Gaussian at the
+  ! phasor's charge centroid with covariance kappa^2 * (second-moment matrix). The
+  ! discrete sum is normalized to exactly S (the deposit's own contract, SUM crsource
+  ! = SUM cpart), so edge truncation loses nothing silently.
+
+  call coherent_gaussian_source ()
+
+elseif (scl_w /= 0) then
   do ip = 1, sl%n
     call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
     if (.not. on_grid) cycle
@@ -1675,6 +1894,50 @@ else
 endif
 
 err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+subroutine coherent_gaussian_source ()
+
+real(rp) det, a11, a12, a22, xg, yg, dx_c, dy_c, q, gsum, gridmax
+real(rp), allocatable :: gk(:,:)
+complex(rp) s_scaled
+integer i, j
+
+! Covariance kappa^2 * [[sxx, sxy],[sxy, syy]]; its inverse for the quad form.
+
+if (.not. (present(coh) .and. present(kappa))) return
+s_scaled = scl_w * coh%S
+if (.not. coh%ok .or. abs(s_scaled) == 0) return
+
+det = (kappa**2)**2 * (coh%sxx * coh%syy - coh%sxy**2)
+a11 =  kappa**2 * coh%syy / det
+a22 =  kappa**2 * coh%sxx / det
+a12 = -kappa**2 * coh%sxy / det
+
+allocate (gk(ngrid, ngrid))
+gridmax = (ngrid - 1) * dgrid / 2
+gsum = 0
+do j = 1, ngrid
+  yg = (j - 1) * dgrid - gridmax
+  dy_c = yg - coh%y0
+  do i = 1, ngrid
+    xg = (i - 1) * dgrid - gridmax
+    dx_c = xg - coh%x0
+    q = 0.5_rp * (a11 * dx_c*dx_c + 2 * a12 * dx_c*dy_c + a22 * dy_c*dy_c)
+    if (q < 60.0_rp) then
+      gk(i, j) = exp(-q)
+      gsum = gsum + gk(i, j)
+    else
+      gk(i, j) = 0
+    endif
+  enddo
+enddo
+if (gsum <= 0) return
+crsource = crsource + (s_scaled / gsum) * gk
+
+end subroutine coherent_gaussian_source
 
 end subroutine fel_field_step
 

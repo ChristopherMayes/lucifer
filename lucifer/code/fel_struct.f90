@@ -55,6 +55,12 @@ type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
   character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
   character(8) :: wavefront_format = 'genesis'  ! Field dumps: 'genesis', 'openpmd' or 'both'.
+  ! The FEL source model (manual sec:coherent-source): 'deposit' is the standard
+  ! per-particle scatter (the referee, bit-for-bit unchanged); 'coherent' is the
+  ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)) -- the
+  ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
+  ! physical shot noise, and the transverse shape is a guarded Gaussian.
+  character(16) :: source_model = 'deposit'
   ! The tracking window, Tao's names (tao_beam_init carries track_start/track_end) and
   ! Genesis's zstop parity: element locators (lat_ele_locator syntax). Blank = the whole
   ! line. The schedule (slippage, autophasing, break geometry) is always built on the
