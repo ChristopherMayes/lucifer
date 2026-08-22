@@ -1070,6 +1070,58 @@ beam paid) and the measurement-design lesson (cold beam for fluctuation growth: 
 real energy spread the sigma^2 differencing drowns in cross-covariance sampling
 noise).
 
+## The particle-path cost (perf goal 2026-08-21): measured, two levers adopted
+
+A real 42 m case (131 slices) at 2048 particles/slice ran at parity with Genesis4
+(96 vs 94 s, 12 threads vs 12 MPI ranks, same machine back-to-back); at 8192/slice it
+did not (164 vs 99 s). The per-element time stamps and an in-wiggler profile put the
+gap in ONE place: the FEL step's particle path (the RK4 + gather), whose cost
+quadrupled with the particles while the per-slice field FFTs (~68 s) stayed constant.
+
+`tests/fel_advance_bench.f90` (built as `fel_advance_bench`) times the path serially
+at fixed state -- measured (min-of-5, this machine): full fel_advance **152
+ns/particle-step**, the RK4+ODE alone 87.5, the four sin/cos pairs the ODE evaluates
+48. A clang -O3 twin of the same verbatim RK loop runs 68 ns, and its sincos loop
+13.7 ns -- the gap is codegen and libm, not physics (macOS gfortran has no vectorized
+libm and emits scalar calls).
+
+Adopted, as ONE NAMED VALUE CHANGE (each pays nothing alone; together full
+fel_advance drops to ~108-125 ns and the real case 164 -> 143 s):
+
+- per-file `-O3` on `fel_track_mod` (CMakeLists `set_source_files_properties`), and
+- the paired-sincos shim (`code/fel_sincos.c`): one libm call for the (sin, cos)
+  pair at the ODE's three call sites.
+
+The change is 1-ulp-level: gfortran's sin/cos INTRINSICS differ from libm's sincos
+by one ulp on ~2e-6 of arguments (measured: 73 mismatches in a 44M-point sweep of
+the theta domain -- the C-side test of __sincos against libm sin/cos was clean, so
+the divergence is gfortran's intrinsic lowering), and -O3 re-contracts floating
+arithmetic. Per the tier contract, the full benchmark re-ran and every tier holds
+its Genesis tolerance; four recorded values moved at the ulp-amplified level
+(tier1_unavg 6.934012e-02 -> 6.933979e-02, tier2_genesis 1.772017e-05 ->
+1.771895e-05, tdsase 2.292890e-06 -> 2.292906e-06, weight_split 7.917158e-13 ->
+3.508953e-13); the other seven are unchanged.
+
+The interludes (the seam) now track SLICE-PARALLEL where they can: the per-slice
+track1_bunch loop runs one slice per thread (coarse granularity instead of
+per-particle inner threading), BIT-FOR-BIT at any thread count against the serial
+baseline (checked at 1 and 8 threads on tier2 and td2). Two boundaries, both
+deliberate: radiation fluctuations keep the serial loop (they draw from the one
+shared RNG stream inside track1, whose order must stay fixed), and wake-carrying
+elements were always whole-window concatenations (sec:seamwake), so lattices whose
+interludes all carry wakes see no change. One hard-won implementation note: the
+scratch bunch is BLOCK-LOCAL inside the loop body, not an OMP `private` variable --
+gfortran left a `private` copy of the allocatable-component derived type improperly
+initialized (a deterministic 2x bunching shift, present even at one thread), while a
+block-local declaration gets Fortran's own default initialization.
+
+Also measured and worth knowing: the production (-O2) and debug (-O0) trees were
+NEVER bit-identical to each other (FP contraction) -- the bit-for-bit keystone is a
+WITHIN-tree contract, and the harness runs the debug tree. And the remaining gap to
+Genesis on the 8192 case (143 vs 99 s) now sits in the per-slice field FFTs and the
+wake-path interludes, with the clang-twin numbers bounding what further particle-path
+codegen work could still buy (~68 ns vs our ~125 per particle-step).
+
 ## The coarse-step measurement (brief 8.3)
 
 (Summarized in manual `sec:numerics`.)

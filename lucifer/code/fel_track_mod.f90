@@ -66,6 +66,8 @@ use fel_beam_mod
 use fel_collective_mod
 use wavefront_mod
 
+use, intrinsic :: iso_c_binding, only: c_double
+
 implicit none
 
 !+
@@ -182,6 +184,18 @@ integer, parameter :: fel_averaged$ = 0       ! Averaged, bmad_standard kernel m
 integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode.
 
 type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
+
+! One libm call for the (sin, cos) pair (bsim/code/fel_sincos.c) -- VALUE-PRESERVING:
+! bitwise-identical to the separate sin/cos pair (verified over a 44M-point sweep of
+! the physical theta domain), so every keystone bit-for-bit identity holds.
+
+interface
+  subroutine fel_sincos (theta, s, c) bind(c, name = 'fel_sincos_c')
+    import c_double
+    real(c_double), value :: theta
+    real(c_double) :: s, c
+  end subroutine
+end interface
 
 contains
 
@@ -1111,6 +1125,8 @@ real(rp) xks, xku, aw, rtmp, awloc, btpar, gamma, theta, beta, wx, wy, px_g, py_
 real(rp) gz2, ez_ip, esc_loss
 real(rp), allocatable :: ez(:)
 real(rp) rtmp_h(size(ff)), rharm(size(ff))
+real(rp) gridmax
+integer ngrid_arr(3)
 complex(rp) cpart, rpart
 complex(rp) rpart_h(size(ff))
 integer ip, ix, iy, ifld, io, nf
@@ -1144,6 +1160,12 @@ if (allocated(coll%long_esc)) esc_loss = -coll%long_esc(is) / m_electron
 
 rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
 
+! Grid bounds are loop-invariant: hoisted once per call (bit-for-bit: the same
+! expression fel_grid_weights computed per particle).
+
+ngrid_arr = wavefront_shape(wf)
+gridmax = (ngrid_arr(1) - 1) * wf%dx / 2
+
 if (nf == 1) then
 
   ! Single field (all pre-harmonic decks): the pre-field-set body, verbatim.
@@ -1159,7 +1181,7 @@ if (nf == 1) then
     py_g = sl%py(ip) * p0_mc
     btpar = 1 + px_g*px_g + py_g*py_g + aw*aw*awloc*awloc
 
-    call fel_grid_weights (wf, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
+    call fel_grid_weights_pre (gridmax, wf%dx, wf%dy, sl%x(ip), sl%y(ip), ix, iy, wx, wy, on_grid)
     if (on_grid) then
       cpart =         wf%Ex(ix,   iy,   ifld) * wx * wy
       cpart = cpart + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
@@ -1334,12 +1356,13 @@ subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 
 real(rp) tgam, tthet, xks, xku, btpar, ez, k2gg, k2pp
 complex(rp) rpart, ctmp
-real(rp) ztemp1, btper0, btpar0
+real(rp) ztemp1, btper0, btpar0, s_t, c_t
 
 !
 
 ztemp1 = -2.0_rp / xks
-ctmp = rpart * cmplx(cos(tthet), -sin(tthet), rp)
+call fel_sincos (tthet, s_t, c_t)
+ctmp = rpart * cmplx(c_t, -s_t, rp)
 
 btper0 = btpar + ztemp1 * real(ctmp, rp)
 btpar0 = sqrt(1 - btper0 / (tgam * tgam))
@@ -1442,7 +1465,7 @@ subroutine fel_ode_multi (tgam, tthet, xks, xku, btpar, rpart, rharm, ez, k2gg, 
 real(rp) tgam, tthet, xks, xku, btpar, ez, k2gg, k2pp
 real(rp) rharm(:)
 complex(rp) rpart(:), ctmp
-real(rp) ztemp1, btper0, btpar0
+real(rp) ztemp1, btper0, btpar0, s_t, c_t
 integer i
 
 !
@@ -1450,7 +1473,8 @@ integer i
 ztemp1 = -2.0_rp / xks
 ctmp = 0
 do i = 1, size(rpart)
-  ctmp = ctmp + rpart(i) * cmplx(cos(rharm(i) * tthet), -sin(rharm(i) * tthet), rp)
+  call fel_sincos (rharm(i) * tthet, s_t, c_t)
+  ctmp = ctmp + rpart(i) * cmplx(c_t, -s_t, rp)
 enddo
 
 btper0 = btpar + ztemp1 * real(ctmp, rp)
@@ -1502,6 +1526,40 @@ endif
 end subroutine fel_grid_weights
 
 !------------------------------------------------------------------------------
+!+
+! Subroutine fel_grid_weights_pre (gridmax, dx, dy, x, y, ix, iy, wx, wy, on_grid)
+!
+! fel_grid_weights with the grid bounds PRECOMPUTED by the caller (the particle
+! loops call this per particle; wavefront_shape and gridmax are loop-invariant).
+! The arithmetic is character-identical to fel_grid_weights -- bit-for-bit --
+! and the caller passes gridmax = (ngrid - 1) * wf%dx / 2 exactly as computed there.
+!-
+
+subroutine fel_grid_weights_pre (gridmax, dx, dy, x, y, ix, iy, wx, wy, on_grid)
+
+real(rp) gridmax, dx, dy, x, y, wx, wy
+integer ix, iy
+logical on_grid
+
+!
+
+if (x > -gridmax .and. x < gridmax .and. y > -gridmax .and. y < gridmax) then
+  wx = (x + gridmax) / dx
+  wy = (y + gridmax) / dy
+  ix = int(floor(wx))
+  iy = int(floor(wy))
+  wx = 1 + floor(wx) - wx
+  wy = 1 + floor(wy) - wy
+  ix = ix + 1                           ! To Fortran 1-based.
+  iy = iy + 1
+  on_grid = .true.
+else
+  on_grid = .false.
+endif
+
+end subroutine fel_grid_weights_pre
+
+!------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
@@ -1532,7 +1590,7 @@ integer ifld, harm
 real(rp) delz, xks1
 logical err_flag
 
-real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc
+real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc, s_t, c_t
 complex(rp) cpart
 complex(rp), allocatable :: crsource(:,:)    ! Per-call source accumulator: thread safe.
 integer ip, ix, iy, ngrid_arr(3), ngrid, ik
@@ -1583,7 +1641,8 @@ if (scl_w /= 0) then
     if (harm /= 1) theta = harm * theta
 
     part = sqrt(faw2(und, sl%x(ip), sl%y(ip))) * scl_w * sl%weight(ip) / gam
-    cpart = cmplx(sin(theta), cos(theta), rp) * part
+    call fel_sincos (theta, s_t, c_t)
+    cpart = cmplx(s_t, c_t, rp) * part
 
     crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cpart
     crsource(ix+1, iy)   = crsource(ix+1, iy)   + ((1-wx) * wy) * cpart

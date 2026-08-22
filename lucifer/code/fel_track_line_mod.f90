@@ -292,21 +292,60 @@ do ie = run%i_start, run%i_end
         err_flag = .true.;  return
       endif
     else
-      do is = 1, nslice
-        call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch, err)
-        if (err) then
-          err_flag = .true.;  return
-        endif
-        call track1_bunch (bunch, ele, err)
-        if (err) then
+
+      ! The slices are independent (disjoint data, one private bunch scratch per
+      ! thread), so the loop runs slice-parallel; track1_bunch's own particle-level
+      ! OMP region nests inside and, with nesting off (the OpenMP default), runs
+      ! serial per thread -- coarse slice granularity replaces fine particle
+      ! granularity, and each slice's arithmetic is untouched (bit-for-bit; the
+      ! thread-identity checks cover it). Radiation FLUCTUATIONS draw from the one
+      ! shared RNG stream inside track1, whose draw ORDER must stay fixed: that
+      ! (rare, check-mode) configuration keeps the serial loop.
+
+      if (bmad_com%radiation_fluctuations_on) then
+        do is = 1, nslice
+          call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch, err)
+          if (err) then
+            err_flag = .true.;  return
+          endif
+          call track1_bunch (bunch, ele, err)
+          if (err) then
+            print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
+            err_flag = .true.;  return
+          endif
+          call fel_bunch_to_slice (bunch, ele, fbeam%slice(is), err)
+          if (err) then
+            err_flag = .true.;  return
+          endif
+        enddo
+      else
+        err = .false.
+        !$OMP parallel do firstprivate(err) reduction(.or.: err_flag) schedule(static)
+        do is = 1, nslice
+          if (.not. err) then
+
+            ! The scratch bunch is BLOCK-LOCAL: freshly default-initialized each
+            ! iteration by Fortran's own semantics. (An OMP private clause on the
+            ! subroutine-level scratch left the derived type's components
+            ! improperly initialized under gfortran -- found as a deterministic
+            ! 2x bunching shift -- so the scratch's definition lives here, where
+            ! no clause semantics are involved.)
+
+            block
+              type (bunch_struct) bunch_l
+              call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch_l, err)
+              if (.not. err) call track1_bunch (bunch_l, ele, err)
+              if (.not. err) call fel_bunch_to_slice (bunch_l, ele, fbeam%slice(is), err)
+              if (err) err_flag = .true.
+            end block
+          endif
+        enddo
+        !$OMP end parallel do
+        if (err_flag) then
           print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
-          err_flag = .true.;  return
+          return
         endif
-        call fel_bunch_to_slice (bunch, ele, fbeam%slice(is), err)
-        if (err) then
-          err_flag = .true.;  return
-        endif
-      enddo
+      endif
     endif
 
     fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &

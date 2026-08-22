@@ -1,0 +1,15 @@
+set (EXENAME fel_advance_bench)
+
+set (SRC_FILES
+	fel/tests/fel_advance_bench.f90
+)
+
+set (INC_DIRS
+)
+
+set (LINK_LIBS
+  bsim
+  bmad
+  sim_utils
+  ${ACC_BMAD_LINK_LIBS}
+)
