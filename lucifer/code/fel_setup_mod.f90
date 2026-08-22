@@ -585,11 +585,60 @@ if (err_flag) return
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
 
+! The tracking window (global%track_start/track_end, Tao's names; Genesis zstop
+! parity). Resolved through Bmad's own locator; the SCHEDULE above was built on the
+! full lattice, so a windowed run composes exactly with the full one -- the walk
+! simply covers [i_start, i_end], and no end-of-lattice fixup moves.
+
+run%i_start = 1
+run%i_end = branch%n_ele_track
+if (run%global%track_start /= '') then
+  call resolve_window_ele (run%global%track_start, 'track_start', run%i_start)
+  if (err_flag) return
+endif
+if (run%global%track_end /= '') then
+  call resolve_window_ele (run%global%track_end, 'track_end', run%i_end)
+  if (err_flag) return
+endif
+if (run%i_start > run%i_end) then
+  print '(a, i0, a, i0, a)', 'fel_track_test: track_start (element ', run%i_start, &
+        ') is past track_end (element ', run%i_end, ').'
+  err_flag = .true.;  return
+endif
+
 call setup_diagnostics ()
 if (err_flag) return
 
 !------------------------------------------------------------------------------
 contains
+
+!------------------------------------------------------------------------------
+! Resolve one tracking-window locator to a single tracked-element index, refused by
+! name when it matches nothing or more than one element.
+
+subroutine resolve_window_ele (locator, which, ix)
+
+type (ele_pointer_struct), allocatable :: eles(:)
+character(*) locator, which
+integer ix, n_loc
+logical lerr
+
+call lat_ele_locator (locator, lat, eles, n_loc, lerr)
+if (lerr .or. n_loc == 0) then
+  print '(4a)', 'fel_track_test: ', which, ' matches no element: ', trim(locator)
+  err_flag = .true.;  return
+endif
+if (n_loc > 1) then
+  print '(4a)', 'fel_track_test: ', which, ' matches more than one element: ', trim(locator)
+  err_flag = .true.;  return
+endif
+if (eles(1)%ele%ix_ele < 1 .or. eles(1)%ele%ix_ele > branch%n_ele_track) then
+  print '(4a)', 'fel_track_test: ', which, ' is not a tracked element: ', trim(locator)
+  err_flag = .true.;  return
+endif
+ix = eles(1)%ele%ix_ele
+
+end subroutine resolve_window_ele
 
 !------------------------------------------------------------------------------
 ! concatenate into one bunch in global window coordinates and Bmad's wake machinery
@@ -726,7 +775,8 @@ end subroutine close_geometry_break
 subroutine setup_diagnostics ()
 
 type (ele_pointer_struct), allocatable :: eles(:)
-integer i, j, n_loc
+integer i, j, n_loc, nstep_r, istep_r
+real(rp) comb_r, z_r, z_last_r, dz_r
 logical derr
 
 !
@@ -761,17 +811,31 @@ do i = 1, size(dump_field_at)
   enddo
 enddo
 
-nrec_stats = 1
+! The record count REPLAYS the walk's skip rule, its window, its z arithmetic and
+! the comb rule (fel_comb_take, the one authority), so the stats arrays are
+! exact-sized in every mode -- never grown, never padded.
+
+comb_r = run%global%comb_ds_save
+z_r = branch%ele(run%i_start - 1)%s
+z_last_r = -1e30_rp
+nrec_stats = 0
 nend_stats = 0
-do i = 1, branch%n_ele_track
+if (fel_comb_take(comb_r, z_r, z_last_r, .false.)) nrec_stats = nrec_stats + 1
+do i = run%i_start, run%i_end
   ele => branch%ele(i)
   wake_src => pointer_to_wake_ele(ele)
   if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
   nend_stats = nend_stats + 1
   if (is_fel(i)) then
-    nrec_stats = nrec_stats + max(1, nint(ele%value(num_steps$)))
+    nstep_r = max(1, nint(ele%value(num_steps$)))
+    dz_r = ele%value(l$) / nstep_r
+    do istep_r = 1, nstep_r
+      z_r = z_r + dz_r
+      if (fel_comb_take(comb_r, z_r, z_last_r, istep_r == nstep_r)) nrec_stats = nrec_stats + 1
+    enddo
   else
-    nrec_stats = nrec_stats + 1
+    z_r = z_r + ele%value(l$)
+    if (fel_comb_take(comb_r, z_r, z_last_r, .true.)) nrec_stats = nrec_stats + 1
   endif
 enddo
 

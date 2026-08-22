@@ -222,4 +222,40 @@ type fel_run_struct
   integer :: iu_diag = 0, iu_ledger = 0, iu_wake = 0
 end type
 
+contains
+
+!------------------------------------------------------------------------------
+!+
+! Function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
+!
+! THE COMB RULE, in one place: Bmad's bunch_track_struct%ds_save semantics verbatim
+! (save_a_bunch_step's guards; Tao's comb_ds_save note "< 0 => No comb calculated"):
+!   comb < 0: no per-record rows at all (element ends, dumps and finals remain
+!             through their own arrays);
+!   comb = 0: a row at every record position;
+!   comb > 0: a row when z has advanced comb_ds_save past the last row, and always
+!             at an element end.
+! z_last updates when the row is taken. The walk consults this rule live and the
+! setup's nrec precompute REPLAYS it with the same z arithmetic, so the stats
+! arrays are exact-sized in every mode.
+!-
+
+function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
+
+real(rp) comb_ds_save, z, z_last
+logical at_end, take
+
+!
+
+if (comb_ds_save < 0) then
+  take = .false.
+elseif (at_end) then
+  take = .true.
+else
+  take = (z >= z_last + comb_ds_save)
+endif
+if (take) z_last = z
+
+end function fel_comb_take
+
 end module fel_struct

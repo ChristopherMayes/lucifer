@@ -57,7 +57,7 @@ integer, pointer :: n_moved_tot, iu_diag, iu_ledger, iu_wake
 type (bunch_struct) bunch
 type (fel_und_struct) und
 real(rp), allocatable :: e_rad_slice(:), rad_kick(:,:)
-real(rp) gamma0_ref, phase_rate, ks, qf, und_slip_step, lat_length, dE_step, dU_step
+real(rp) gamma0_ref, phase_rate, ks, qf, und_slip_step, lat_length, dE_step, dU_step, comb
 integer nslice, n_harm, ie, is, ih, istep
 integer(8) prog_count0, prog_count_last, prog_rate
 logical write_diag, keep_escaped_field, migrate, migrate_check, any_unavg, two_pol, err
@@ -111,6 +111,8 @@ migrate = run%global%migrate
 migrate_check = run%global%migrate_check
 out_root = run%global%out_root
 interlude_model = run%global%interlude_model
+comb = run%global%comb_ds_save
+run%z_last_rec = -1e30_rp
 
                                ! delay's rotations, the light-path correction, and
                                ! the closed-bump and genesis-model refusals.
@@ -149,14 +151,16 @@ call system_clock (prog_count0, prog_rate)
 prog_count_last = prog_count0
 lat_length = branch%ele(branch%n_ele_track)%s
 
-z_now = 0
-call take_stats_record (.true.)   ! Evaluates the diag instrument too; the writer prints.
-if (err_flag) return
-call write_diag_rows()            ! Initial record, matching Genesis's diag before the first step.
+z_now = branch%ele(run%i_start - 1)%s      ! 0 for a full run; the window's entry face.
+if (fel_comb_take(comb, z_now, run%z_last_rec, .false.)) then
+  call take_stats_record (.true.)   ! Evaluates the diag instrument too; the writer prints.
+  if (err_flag) return
+  call write_diag_rows()            ! Initial record, matching Genesis's diag before the first step.
+endif
 
 
 
-do ie = 1, branch%n_ele_track
+do ie = run%i_start, run%i_end
   ele => branch%ele(ie)
 
   ! Zero length elements (Bmad's end marker, for one) get no step and no diagnostic
@@ -241,10 +245,13 @@ do ie = 1, branch%n_ele_track
         if (err_flag) return
       endif
       if (istep == und%nstep) call do_migrate ()
-      call take_stats_record (istep == und%nstep)
       if (err_flag) return
-      if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
-      call write_diag_rows()
+      if (fel_comb_take(comb, z_now, run%z_last_rec, istep == und%nstep)) then
+        call take_stats_record (istep == und%nstep)
+        if (err_flag) return
+        if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
+        call write_diag_rows()
+      endif
       call progress_line (istep == und%nstep, istep, und%nstep)
     enddo
     if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
@@ -334,11 +341,12 @@ do ie = 1, branch%n_ele_track
     if (err_flag) return
 
     call do_migrate ()
-
     if (err_flag) return
-    call take_stats_record (.true.)
-    if (err_flag) return
-    call write_diag_rows()
+    if (fel_comb_take(comb, z_now, run%z_last_rec, .true.)) then
+      call take_stats_record (.true.)
+      if (err_flag) return
+      call write_diag_rows()
+    endif
     call progress_line (.true., 1, 1)
     call end_of_element ()
     if (err_flag) return
@@ -365,11 +373,12 @@ do ie = 1, branch%n_ele_track
     if (err_flag) return
 
     call do_migrate ()
-
     if (err_flag) return
-    call take_stats_record (.true.)
-    if (err_flag) return
-    call write_diag_rows()
+    if (fel_comb_take(comb, z_now, run%z_last_rec, .true.)) then
+      call take_stats_record (.true.)
+      if (err_flag) return
+      call write_diag_rows()
+    endif
     call progress_line (.true., 1, 1)
     call end_of_element ()
     if (err_flag) return
@@ -678,6 +687,7 @@ integer i_step, n_step
 integer(8) now
 real(rp) elapsed
 
+if (stats%irec == 0) return          ! No record yet (comb < 0): nothing to read.
 call system_clock (now)
 if (.not. at_element_end .and. real(now - prog_count_last, rp) / prog_rate < 2.0_rp) return
 prog_count_last = now

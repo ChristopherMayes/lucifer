@@ -823,6 +823,25 @@ The report is banked at `fel-benchmark-plots/sat-demo-report.pdf` in the project
 
 ## Diagnostic output: the stats file, dumps at elements, the escaped-field bank
 
+## Program structure (manual sec:program)
+
+The tracker is laid out the way Tao is laid out: the input structs in `fel_struct`
+(defaults in the declarations), the namelist layer quarantined in `fel_input_mod`
+(three groups in one file -- `&fel_params` with `global%...`, `bmad_com`,
+`space_charge_com`, `wake%`, `sc%`; `&fel_beam_init` with `beam_init%...`, `imp%...`
+and files; `&fel_wavefront_init` with `wavefront_init%...` and `field_file`), and the
+work in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` /
+`fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops --
+errors return and the driver decides -- and `track_fel_line` is re-entrant (twice in
+one process is bit-identical to two processes; `tests/fel_smoke_test.f90` drives the
+library with no namelist anywhere). The retired flat `&fel_track_params` group is
+refused by name with each parameter's new home. `global%comb_ds_save` is the stats
+comb (Bmad's `ds_save` semantics verbatim; default 0 = every record, bit-for-bit the
+pre-comb file); `global%track_start`/`track_end` bound the walk over a schedule always
+built on the full lattice (windowed runs compose exactly); `stats.h5` carries `Meta/`
+provenance (the resolved input echo, the lattice text, timestamp, user, version) as
+attributes.
+
 The production statistics live in `<out_root>.stats.h5` (manual sec:stats), in FIXED
 Bmad units (m, rad, eV, s, C, J, W -- units attributes are documentation, never
 load-bearing): per-record, per-slice arrays in the Genesis4 visualization layout

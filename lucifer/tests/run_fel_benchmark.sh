@@ -468,6 +468,15 @@ fi
 section_time phasing
 
 echo
+echo "--- program-structure checks (library contract, the comb, the window) ---------"
+SMOKE="${EXE%fel_track_test}fel_smoke_test"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$WORK_DIR/program" --exe "$EXE" --smoke "$SMOKE"; then
+  echo "FAIL: program-structure checks; outputs kept in: $WORK_DIR/program" >&2
+  exit 1
+fi
+section_time program-structure
+
+echo
 echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
   echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2

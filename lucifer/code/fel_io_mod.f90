@@ -13,6 +13,7 @@
 module fel_io_mod
 
 use fel_struct
+use fel_input_mod
 use wavefront_hdf5_mod
 use wavefront_openpmd_mod
 
@@ -63,20 +64,20 @@ do ihh = 1, n_harm
   if (wavefront_format /= 'openpmd') then         ! genesis or both
     if (allocated(ffield(ihh)%wf%Ey)) then        ! One component per Genesis file.
       call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-x.fld.h5', eerr, 'x')
-      if (eerr) stop 1
+      if (eerr) return
       call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-y.fld.h5', eerr, 'y')
-      if (eerr) stop 1
+      if (eerr) return
       print '(a)', '  ' // prefix // trim(hsuf) // '-{x,y}.fld.h5'
     else
       call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '.fld.h5', eerr, 'x')
-      if (eerr) stop 1
+      if (eerr) return
       print '(a)', '  ' // prefix // trim(hsuf) // '.fld.h5'
     endif
   endif
 
   if (wavefront_format /= 'genesis') then         ! openpmd or both
     call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
-    if (eerr) stop 1
+    if (eerr) return
     print '(a)', '  ' // prefix // trim(hsuf) // '.wf.h5'
   endif
 enddo
@@ -108,7 +109,7 @@ ffield => run%ffield
 fbeam => run%fbeam
 
 call wavefront_read_openpmd (ffield(ihh)%wf, fname, rerr, e_photon)
-if (rerr) stop 1
+if (rerr) return
 if (abs(ffield(ihh)%wf%wavelength - fbeam%wavelength) > 1e-6_rp * fbeam%wavelength) then
   print '(a)', 'fel_track_test: the openPMD file in field_file(1) does not carry the FUNDAMENTAL:'
   print '(a, 2es20.12)', '  its photonEnergy wavelength vs the beam: ', &
@@ -150,7 +151,7 @@ wf => run%ffield(1)%wf
 n_harm = run%n_harm
 
 call wavefront_read_openpmd (wtmp, fname, rerr, e_photon)
-if (rerr) stop 1
+if (rerr) return
 e1 = h_planck * c_light / fbeam%wavelength * e_charge
 
 do ihh = 2, n_harm
@@ -227,7 +228,7 @@ allocate (work(nx*nx))
 
 if (run%esc_id(ihh) == 0) then
   call hdf5_open_file (trim(fel_escaped_file_name(run, ihh)), 'WRITE', run%esc_id(ihh), berr)
-  if (berr) stop 1
+  if (berr) return
 endif
 
 do k = 1, bnk%n
@@ -243,7 +244,7 @@ do k = 1, bnk%n
 
   call wavefront_params_of_plane (bnk%plane(:,:,k), wfl%dx, wfl%wavelength, &
                                   fbeam%slice_spacing, pms, .true., berr)
-  if (berr) stop 1
+  if (berr) return
   pms%s = z_now
   run%bank_z(run%n_banked(ihh), ihh) = z_now
   run%bank_pms(:, run%n_banked(ihh), ihh) = [pms%centroid, reshape(pms%sigma, [16]), &
@@ -251,27 +252,27 @@ do k = 1, bnk%n
   if (two_pol) then             ! The y component's params add to the banked energy.
     call wavefront_params_of_plane (bnk%plane_y(:,:,k), wfl%dx, wfl%wavelength, &
                                     fbeam%slice_spacing, pms, .true., berr)
-    if (berr) stop 1
+    if (berr) return
   endif
 
   write (gname, '(a, i0.6)') 'slice', run%n_banked(ihh)
   call H5Gcreate_f (run%esc_id(ihh), trim(gname), g_id, h5e)
-  if (h5e < 0) stop 1
+  if (h5e < 0) return
   work = dfl_scale * reshape(real(bnk%plane(:,:,k), rp), [nx*nx])
-  call hdf5_write_dataset_real (g_id, 'field-real', work, berr);  if (berr) stop 1
+  call hdf5_write_dataset_real (g_id, 'field-real', work, berr);  if (berr) return
   work = dfl_scale * reshape(aimag(bnk%plane(:,:,k)), [nx*nx])
-  call hdf5_write_dataset_real (g_id, 'field-imag', work, berr);  if (berr) stop 1
+  call hdf5_write_dataset_real (g_id, 'field-imag', work, berr);  if (berr) return
   if (two_pol) then
     work = dfl_scale * reshape(real(bnk%plane_y(:,:,k), rp), [nx*nx])
-    call hdf5_write_dataset_real (g_id, 'field-real-y', work, berr);  if (berr) stop 1
+    call hdf5_write_dataset_real (g_id, 'field-real-y', work, berr);  if (berr) return
     work = dfl_scale * reshape(aimag(bnk%plane_y(:,:,k)), [nx*nx])
-    call hdf5_write_dataset_real (g_id, 'field-imag-y', work, berr);  if (berr) stop 1
+    call hdf5_write_dataset_real (g_id, 'field-imag-y', work, berr);  if (berr) return
     call hdf5_write_dataset_real (g_id, 'wavefront_params_y', &
             [pms%centroid, reshape(pms%sigma, [16]), pms%energy, pms%power, &
-             pms%on_axis_intensity, pms%emit_x, pms%emit_y], berr);  if (berr) stop 1
+             pms%on_axis_intensity, pms%emit_x, pms%emit_y], berr);  if (berr) return
   endif
-  call hdf5_write_dataset_real (g_id, 'z_transmit', [z_now], berr);  if (berr) stop 1
-  call hdf5_write_dataset_real (g_id, 'wavefront_params', run%bank_pms(:, run%n_banked(ihh), ihh), berr);  if (berr) stop 1
+  call hdf5_write_dataset_real (g_id, 'z_transmit', [z_now], berr);  if (berr) return
+  call hdf5_write_dataset_real (g_id, 'wavefront_params', run%bank_pms(:, run%n_banked(ihh), ihh), berr);  if (berr) return
   call H5Gclose_f (g_id, h5e)
 enddo
 
@@ -334,7 +335,8 @@ keep_escaped_field = run%global%keep_escaped_field
 out_root = run%global%out_root
 
 call fel_stats_write (run%stats, trim(out_root) // '.stats.h5', ferr)
-if (ferr) stop 1
+if (ferr) return
+call fel_write_meta (run, trim(out_root) // '.stats.h5')
 print '(a)', '  ' // trim(out_root) // '.stats.h5'
 
 if (.not. keep_escaped_field) then
@@ -423,7 +425,7 @@ if (use_y) then
   dset_r = 'field-real-y';  dset_i = 'field-imag-y'
 endif
 
-call hdf5_open_file (trim(fname), 'WRITE', p_id, ferr);  if (ferr) stop 1
+call hdf5_open_file (trim(fname), 'WRITE', p_id, ferr);  if (ferr) return
 call hdf5_write_dataset_int  (p_id, 'gridpoints',   [nx],                       ferr)
 call hdf5_write_dataset_real (p_id, 'gridsize',     [wfl%dx],                   ferr)
 call hdf5_write_dataset_real (p_id, 'refposition',  [wfl%ref_position],         ferr)
@@ -441,13 +443,13 @@ do is_f = 1, nslice
   else
     work = dfl_scale * reshape(real(wfl%Ex(:,:,is_f), rp), [nx*nx])
   endif
-  call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1
+  call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) return
   if (use_y) then
     work = dfl_scale * reshape(aimag(wfl%Ey(:,:,is_f)), [nx*nx])
   else
     work = dfl_scale * reshape(aimag(wfl%Ex(:,:,is_f)), [nx*nx])
   endif
-  call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) stop 1
+  call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) return
   call H5Gclose_f (g_id, h5e)
 enddo
 
@@ -458,23 +460,23 @@ if (run%n_banked(ihh) > 0) then
   endif
   wf1%wavelength = wfl%wavelength      ! Per field: banked light drifts at ITS wavelength.
 
-  call hdf5_open_file (trim(fel_escaped_file_name(run, ihh)), 'READ', e_id, ferr);  if (ferr) stop 1
+  call hdf5_open_file (trim(fel_escaped_file_name(run, ihh)), 'READ', e_id, ferr);  if (ferr) return
   do k = 1, run%n_banked(ihh)
     write (gname, '(a, i0.6)') 'slice', k
-    g_id = hdf5_open_group (e_id, trim(gname), ferr, .true.);  if (ferr) stop 1
-    call hdf5_read_dataset_real (g_id, trim(dset_r), re_w, ferr, trim(gname));  if (ferr) stop 1
-    call hdf5_read_dataset_real (g_id, trim(dset_i), im_w, ferr, trim(gname));  if (ferr) stop 1
+    g_id = hdf5_open_group (e_id, trim(gname), ferr, .true.);  if (ferr) return
+    call hdf5_read_dataset_real (g_id, trim(dset_r), re_w, ferr, trim(gname));  if (ferr) return
+    call hdf5_read_dataset_real (g_id, trim(dset_i), im_w, ferr, trim(gname));  if (ferr) return
     call H5Gclose_f (g_id, h5e)
     wf1%Ex(:,:,1) = reshape(cmplx(re_w, im_w, wf_rp), [nx, nx]) / dfl_scale
 
-    call wavefront_drift (wf1, z_now - run%bank_z(k, ihh), ferr);  if (ferr) stop 1
+    call wavefront_drift (wf1, z_now - run%bank_z(k, ihh), ferr);  if (ferr) return
 
     write (gname, '(a, i0.6)') 'slice', nslice + (run%n_banked(ihh) - k + 1)
     call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
     work = dfl_scale * reshape(real(wf1%Ex(:,:,1), rp), [nx*nx])
-    call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) stop 1
+    call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) return
     work = dfl_scale * reshape(aimag(wf1%Ex(:,:,1)), [nx*nx])
-    call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) stop 1
+    call hdf5_write_dataset_real (g_id, 'field-imag', work, ferr);  if (ferr) return
     call H5Gclose_f (g_id, h5e)
   enddo
   call H5Fclose_f (e_id, h5e)
@@ -505,5 +507,122 @@ do is_w = 1, run%nslice
 enddo
 
 end subroutine fel_write_wake_block
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_meta (run, stats_file)
+!
+! The provenance group (Genesis parity: its Meta embeds the entire input and
+! lattice plus timestamp/user/cwd/version): Meta/ carries the RESOLVED input echo
+! (every default explicit, straight from the structs), the lattice file's text and
+! name, an ISO timestamp, user, cwd and the Bmad version -- all as ATTRIBUTES, so
+! every dataset-level identity comparison (thread runs, re-entrancy passes) is
+! untouched by run-specific provenance. Best effort: a failure warns, never fails
+! the run (HDF5 caps compact attributes near 64 kB; a very large lattice would hit
+! it).
+!-
+
+subroutine fel_write_meta (run, stats_file)
+
+type (fel_run_struct), target :: run
+character(*) stats_file
+character(:), allocatable :: txt
+character(24) stamp
+character(200) user_name, cwd
+character(8) date_s
+character(10) time_s
+integer(hid_t) f_id, g_id
+integer h5e
+logical merr
+
+!
+
+call hdf5_open_file (stats_file, 'APPEND', f_id, merr)
+if (merr) then
+  print '(a)', 'fel_track_test: WARNING: could not reopen the stats file for Meta/.'
+  return
+endif
+call H5Gcreate_f (f_id, 'Meta', g_id, h5e)
+if (h5e < 0) then
+  call H5Fclose_f (f_id, h5e)
+  return
+endif
+
+call resolved_input_text (run, txt)
+call hdf5_write_attribute_string (g_id, 'input_echo', txt, merr)
+if (merr) print '(a)', 'fel_track_test: WARNING: Meta/input_echo did not fit an attribute.'
+
+call file_text (trim(run%lat_file), txt)
+call hdf5_write_attribute_string (g_id, 'lattice_text', txt, merr)
+if (merr) print '(a)', 'fel_track_test: WARNING: Meta/lattice_text did not fit an attribute.'
+call hdf5_write_attribute_string (g_id, 'lattice_file', trim(run%lat_file), merr)
+
+call date_and_time (date_s, time_s)
+stamp = date_s(1:4) // '-' // date_s(5:6) // '-' // date_s(7:8) // 'T' // &
+        time_s(1:2) // ':' // time_s(3:4) // ':' // time_s(5:6)
+call hdf5_write_attribute_string (g_id, 'timestamp', stamp, merr)
+call get_environment_variable ('USER', user_name)
+call hdf5_write_attribute_string (g_id, 'user', trim(user_name), merr)
+call get_environment_variable ('PWD', cwd)
+call hdf5_write_attribute_string (g_id, 'cwd', trim(cwd), merr)
+call hdf5_write_attribute_int (g_id, 'bmad_inc_version', bmad_inc_version$, merr)
+
+call H5Gclose_f (g_id, h5e)
+call H5Fclose_f (f_id, h5e)
+
+end subroutine fel_write_meta
+
+!------------------------------------------------------------------------------
+! The resolved input echo as one string (fel_write_resolved_input through a
+! scratch file; namelist output needs an external unit).
+
+subroutine resolved_input_text (run, txt)
+
+type (fel_run_struct), target :: run
+character(:), allocatable :: txt
+integer iu
+
+open (newunit = iu, status = 'scratch', action = 'readwrite')
+call fel_write_resolved_input (run, iu)
+call unit_text (iu, txt)
+close (iu)
+
+end subroutine resolved_input_text
+
+!------------------------------------------------------------------------------
+
+subroutine file_text (file_name, txt)
+
+character(*) file_name
+character(:), allocatable :: txt
+integer iu, ios
+
+open (newunit = iu, file = file_name, status = 'old', action = 'read', iostat = ios)
+if (ios /= 0) then
+  txt = '(unreadable)'
+  return
+endif
+call unit_text (iu, txt)
+close (iu)
+
+end subroutine file_text
+
+!------------------------------------------------------------------------------
+
+subroutine unit_text (iu, txt)
+
+integer iu, ios
+character(:), allocatable :: txt
+character(1000) line
+
+rewind (iu)
+txt = ''
+do
+  read (iu, '(a)', iostat = ios) line
+  if (ios /= 0) exit
+  txt = txt // trim(line) // new_line('a')
+enddo
+
+end subroutine unit_text
 
 end module fel_io_mod

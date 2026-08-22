@@ -179,6 +179,70 @@ end subroutine fel_read_input
 
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_write_resolved_input (run, iu)
+!
+! Write run's RESOLVED inputs -- every default made explicit -- as the three
+! namelist groups, to an open unit. The stats file's Meta/ provenance echo
+! (Genesis parity: its Meta group embeds the entire input file); an embedding
+! program may also use it to persist a configuration built in code.
+!-
+
+subroutine fel_write_resolved_input (run, iu)
+
+type (fel_run_struct), target :: run
+integer iu
+
+type (fel_global_struct) :: global
+type (wavefront_init_struct) :: wavefront_init
+type (fel_wake_init_struct) :: wake
+type (fel_efield_struct) :: sc
+type (beam_init_struct) :: beam_init
+type (fel_import_param_struct) :: imp
+character(400) :: lat_file, beam_file, dist_file, write_dist_file, write_opmd_file
+character(400) :: write_wake_kernels
+character(400) :: field_file(9)
+logical :: use_beam_init, shotnoise
+logical :: split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
+integer :: nbins
+
+namelist / fel_params / lat_file, global, bmad_com, space_charge_com, wake, sc, &
+                        write_wake_kernels
+namelist / fel_beam_init / beam_init, imp, beam_file, dist_file, write_dist_file, &
+                        write_opmd_file, use_beam_init, nbins, shotnoise, &
+                        split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
+namelist / fel_wavefront_init / wavefront_init, field_file
+
+!
+
+lat_file = run%lat_file
+field_file = run%field_file
+global = run%global
+wavefront_init = run%winit
+wake = run%wake_init
+sc = run%sc_init
+beam_init = run%beam_init
+imp = run%imp
+beam_file = run%bparam%beam_file
+dist_file = run%bparam%dist_file
+write_dist_file = run%bparam%write_dist_file
+write_opmd_file = run%bparam%write_opmd_file
+use_beam_init = run%bparam%use_beam_init
+nbins = run%bparam%nbins
+shotnoise = run%bparam%shotnoise
+split_weights = run%bparam%split_weights
+swap_beam_xy = run%bparam%swap_beam_xy
+gen_test_weights = run%bparam%gen_test_weights
+imp_split_weights = run%bparam%imp_split_weights
+write_wake_kernels = run%wake_init%write_kernels
+
+write (iu, nml = fel_params)
+write (iu, nml = fel_beam_init)
+write (iu, nml = fel_wavefront_init)
+
+end subroutine fel_write_resolved_input
+
+!------------------------------------------------------------------------------
+!+
 ! Function group_present (iu, group_name) result (found)
 !
 ! Is the namelist group &group_name present in the (open) file? A textual scan --
@@ -236,7 +300,7 @@ character(*), parameter :: r_name = 'fel_read_input'
 
 ! old-name -> new-home table. Names not listed moved verbatim under the shown group.
 
-character(40), parameter :: moved(2, 44) = reshape([ character(40) :: &
+character(56), parameter :: moved(2, 44) = reshape([ character(56) :: &
   'lat_file',           '&fel_params lat_file',                        &
   'out_root',           '&fel_params global%out_root',                 &
   'interlude_model',    '&fel_params global%interlude_model',          &

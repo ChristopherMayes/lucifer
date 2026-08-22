@@ -40,7 +40,7 @@ use bmad
 use beam_utils, only: calc_bunch_params, calc_emittances_and_twiss_from_sigma_matrix
 use fel_beam_mod
 use wavefront_mod
-use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel_field_diag
+use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel_field_diag, fel_slice_to_bunch
 use hdf5_interface
 
 implicit none
@@ -350,6 +350,21 @@ call pack_bp (bp, stats%e_bunch(:, ie))
 ! its last record -- instead of re-summing every particle through a bunch conversion.
 ! Measured: this is what moved the element-end cost from 7% of the demo run into the
 ! noise (2208 conversions + re-summations retired per run).
+
+! With NO per-record rows at all (the comb's "< 0 => No comb calculated"), there is
+! no current record to read the slice moments from: evaluate each slice through
+! Bmad's own calc_bunch_params directly -- the same authority, one evaluation per
+! element end (the comb exists to make runs cheap; this is nothing).
+
+if (stats%irec == 0) then
+  do is = 1, size(beam%slice)
+    call fel_slice_to_bunch (beam, beam%slice(is), ele, bunch, err);  if (err) return
+    call calc_bunch_params (bunch, bp, error)
+    call pack_bp (bp, stats%e_slice(:, is, ie))
+  enddo
+  err_flag = .false.
+  return
+endif
 
 do is = 1, size(beam%slice)
   bp = bunch_params_struct()

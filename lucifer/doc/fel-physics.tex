@@ -1154,4 +1154,83 @@ thread check and its shared-accumulator mutation (7.0 relative between thread co
 bit-identical single-threaded).
 \end{validation}
 
+
+\section{The program}\label{sec:program}
+
+The tracker is laid out the way Tao is laid out: the structs in one file, the
+namelist layer quarantined, the work in library modules, and a driver that is
+read-parse-call. Every user-visible input struct lives in \texttt{fel\_struct}
+(defaults in the declarations); \texttt{fel\_input\_mod} reads THREE namelist
+groups from one input file, each setting structs directly, Tao's
+\texttt{\&tao\_params} pattern:
+
+\begin{itemize}
+\item \texttt{\&fel\_params}: \texttt{lat\_file}, the \texttt{global\%...}
+  run switches, Bmad's own \texttt{bmad\_com} and \texttt{space\_charge\_com}
+  set directly (the old \texttt{radiation\_damping} / \texttt{radiation\_fluctuations}
+  scalars retired with this), and the \texttt{wake\%} / \texttt{sc\%} collective
+  descriptions.
+\item \texttt{\&fel\_beam\_init}: Bmad's \texttt{beam\_init\%...} bunch
+  description, the \texttt{imp\%...} resampler, source/output files and the
+  beam-side check instruments.
+\item \texttt{\&fel\_wavefront\_init}: \texttt{wavefront\_init\%...}, the
+  \texttt{beam\_init} analog for radiation -- the field record IS the time
+  window, so the window lives here -- plus \texttt{field\_file} imports.
+\end{itemize}
+
+The retired flat \texttt{\&fel\_track\_params} group is refused by name, the
+error mapping each parameter found in it to its new home.
+
+The work is four library modules -- \texttt{fel\_setup\_mod} (recognition,
+refusals, the slippage/autophasing schedule, geometry breaks, diagnostics
+setup), \texttt{fel\_init\_mod} (beam and wavefront starting states),
+\texttt{fel\_track\_line\_mod} (\texttt{track\_fel\_line(run)}, the walk) and
+\texttt{fel\_io\_mod} (dumps, the escaped bank, the pulse, the stats finalize)
+-- all operating on one explicit \texttt{fel\_run\_struct} (no singleton: an
+oscillator or scan driver wants several passes over one state). The library
+contract: nothing in these modules stops; every error returns through
+\texttt{err\_flag} and the program decides. \texttt{track\_fel\_line} is
+re-entrant -- twice in one process is bit-identical to two processes (checked)
+-- and \texttt{tests/fel\_smoke\_test.f90} drives the whole library with no
+namelist anywhere, reproducing a namelist run dataset-identically.
+
+\subsection{The comb}\label{sec:comb}
+
+\texttt{global\%comb\_ds\_save} is Bmad's \texttt{bunch\_track\_struct\%ds\_save}
+name and semantics verbatim (Tao's \texttt{comb\_ds\_save}; ``$< 0$ $\Rightarrow$
+no comb calculated''): negative keeps NO per-record rows at all (the
+\texttt{element\_end/} arrays, dumps and finals remain -- with no records the
+element-end slice evaluation falls back to Bmad's own
+\texttt{calc\_bunch\_params} per slice); zero (the default) records every
+position, bit-for-bit today's file; positive records a row when $z$ has
+advanced \texttt{comb\_ds\_save} past the last one, element ends always. The
+one deliberate deviation from Tao is the default (0 where Tao uses $-1$):
+our per-record arrays are the primary stats contract where Tao's comb is an
+optional extra. The rule lives in ONE place (\texttt{fel\_comb\_take});
+the setup's record-count precompute replays it with the walk's own $z$
+arithmetic, so the stats arrays are exact-sized in every mode. The
+\texttt{diag} file and the unaveraged ledger follow the comb; on the profiled
+fodo cell the diagnostics were 28\% of wall time, so the comb is also the top
+remaining performance lever.
+
+\subsection{The tracking window}\label{sec:window}
+
+\texttt{global\%track\_start} / \texttt{track\_end} (Tao's names; Genesis's
+\texttt{zstop} parity) are element locators bounding the walk. The schedule --
+slippage, autophasing, break geometry, including the end-of-lattice fixup --
+is always built on the FULL lattice, so a windowed run composes exactly with
+the full one: $[{\rm start}, D]$ then $[{\rm after}\ D, {\rm end}]$ from its
+dumps reproduces the one-shot run to the dump format's own round-trip floor
+(measured $3\times10^{-13}$; the walk itself is bit-for-bit, and a windowed
+run's finals equal the full run's mid-line dumps exactly).
+
+\subsection{Provenance}\label{sec:meta}
+
+\texttt{stats.h5} carries a \texttt{Meta/} group (Genesis parity: its
+\texttt{Meta} embeds the entire input and lattice): the RESOLVED input echo
+-- every default made explicit, written from the structs themselves -- the
+lattice file's text and name, an ISO timestamp, user, cwd and the Bmad
+version, all as HDF5 attributes so dataset-level identity comparisons are
+untouched by run-specific provenance.
+
 \end{document}
