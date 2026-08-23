@@ -403,11 +403,16 @@ call pack_bp (bp, stats%e_bunch(:, ie))
 ! no current record to read the slice moments from: evaluate each slice through
 ! Bmad's own calc_bunch_params directly -- the same authority, one evaluation per
 ! element end (the comb exists to make runs cheap; this is nothing).
+! print_err = false mirrors the per-record path below, which computes twiss only for
+! slices with at least 6 live particles and never prints: a time window's near-empty
+! edge slices are degenerate BY CONSTRUCTION (zero charge, collapsed sigma modes),
+! and per-slice message spam is not an error channel. The whole-window call above
+! keeps its printing -- a degenerate whole window IS worth an error.
 
 if (stats%irec == 0) then
   do is = 1, size(beam%slice)
     call fel_slice_to_bunch (beam, beam%slice(is), ele, bunch, err);  if (err) return
-    call calc_bunch_params (bunch, bp, error)
+    call calc_bunch_params (bunch, bp, error, print_err = .false.)
     call pack_bp (bp, stats%e_slice(:, is, ie))
   enddo
   err_flag = .false.
