@@ -835,7 +835,7 @@ character(500) fname
 
 !
 
-call fel_stats_element_end (stats, fbeam, ele, z_now, eerr)
+call fel_stats_element_end (stats, fbeam, ffield, ele, z_now, eerr)
 if (eerr) then
   err_flag = .true.;  return
 endif

@@ -179,6 +179,19 @@ def main():
               0.0 if worst_nobg > 1e-3 else 1.0, 0.5,
               note=f"[dropping it moves the row by {worst_nobg:.2e}]")
 
+        # 1c. The element_end row also carries the FIELD, so it stands alone when the
+        # comb keeps no per-record rows. With records present those values are the
+        # record's own, so they must agree exactly.
+        zr = h5["z"][()]
+        ze = ee["s"][()]
+        idx = [int(np.argmin(abs(zr - z))) for z in ze]
+        worst_ef = 0.0
+        for k, src in (("power", "field/power"), ("energy", "field/energy"),
+                       ("on_axis_intensity", "field/on_axis_intensity"),
+                       ("bunching", "beam/bunching")):
+            worst_ef = max(worst_ef, float(np.max(np.abs(h5[src][()][idx] - ee[f"field/{k}"][()]))))
+        check("stats: element_end/field vs the record at that z (abs)", worst_ef, 1e-30)
+
         f_cen = h5["field/centroid"][-1]
         f_sig = h5["field/sigma"][-1]
         f_en = h5["field/energy"][-1]

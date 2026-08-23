@@ -1211,8 +1211,8 @@ precision, so a parser matches the line's own leading text.
 name and semantics verbatim (Tao's \texttt{comb\_ds\_save}; ``$< 0$ $\Rightarrow$
 no comb calculated''): negative keeps NO per-record rows at all (the
 \texttt{element\_end/} arrays, dumps and finals remain -- with no records the
-element-end moments are taken by one parallel sweep over slices instead of being
-read from the current record); zero (the default) records every
+element-end moments and field values are evaluated there, by one parallel sweep over
+slices, instead of being read from the current record); zero (the default) records every
 position, bit-for-bit today's file; positive records a row when $z$ has
 advanced \texttt{comb\_ds\_save} past the last one, element ends always. The
 one deliberate deviation from Tao is the default (0 where Tao uses $-1$):
@@ -1220,7 +1220,12 @@ our per-record arrays are the primary stats contract where Tao's comb is an
 optional extra. The rule lives in ONE place (\texttt{fel\_comb\_take});
 the setup's record-count precompute replays it with the walk's own $z$
 arithmetic, so the stats arrays are exact-sized in every mode. The
-\texttt{diag} file and the unaveraged ledger follow the comb.
+\texttt{diag} file and the unaveraged ledger follow the comb. Because the negative
+mode keeps nothing per record, the \texttt{element\_end/} group is made
+self-sufficient: beam moments and Twiss for the whole window and per slice, AND the
+radiation power, energy, on-axis intensity and bunching per slice. Where a record
+exists those field values are copied from it, so the two agree exactly; where none
+exists they are evaluated at the element end by the same routines.
 
 Either way the element-end row for the WHOLE WINDOW is assembled from the per-slice
 moments by the pooled-covariance identity,

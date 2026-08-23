@@ -926,6 +926,22 @@ bunch, where the transverse moments nearly vanish) the z cross terms agree only 
 4e-6 relative while agreeing to 1e-29 ABSOLUTE -- physically the same number. That is
 why the check measures on a physical configuration, and why it compares the whole
 matrix rather than chasing the relative error of an individual near-zero entry.
+The `element_end/` group is SELF-SUFFICIENT: beam moments and Twiss (whole window and
+per slice) plus the radiation power, energy, on-axis intensity and bunching per slice.
+That is what makes `comb_ds_save < 0` usable rather than a trap. Bmad's comb semantics
+are kept verbatim ("< 0 => no comb calculated"), so that mode writes no per-record
+rows at all -- and the element-end row is then the only record of the run, which is why
+it carries the field as well as the beam. With records present those field values ARE
+the record's own (copied, so the datasets agree exactly); with no records they are
+evaluated at the element end by the same routines, angle moments not needed. Measured
+on the 96-slice SASE example: the two paths agree bit-for-bit.
+
+Measured cost of the modes on a 131-slice x 8192, 103-element case (12 threads):
+`comb_ds_save = -1` 124 s and 9.0 MB (element ends only, no per-record rows);
+a large positive value 133 s and 15.7 MB (a record at each element end, since element
+ends always record when the comb is not negative); `= 0.1` 132 s and 35.4 MB. The
+per-record sweep is not the cost driver -- 86 records and 338 records time the same.
+
 Known scaling limit, named for the follow-on: the stats accumulate in memory and write
 once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.

@@ -93,6 +93,12 @@ type fel_stats_struct
   ! Element ends: the evaluated bunch_params_struct, whole bunch and per slice.
   integer, allocatable :: e_ix_ele(:)             ! (nend)
   real(rp), allocatable :: e_s(:)                 ! (nend) [m]
+  real(rp), allocatable :: e_f_power(:,:)         ! (nslice, nend) [W] radiation power, TOTAL over
+                                                  !   polarizations, as the per-record dataset is.
+  real(rp), allocatable :: e_f_energy(:,:)        ! (nslice, nend) [J] total.
+  real(rp), allocatable :: e_f_on_axis(:,:)       ! (nslice, nend) total.
+  real(rp), allocatable :: e_bunching(:,:)        ! (nslice, nend) |b| at the fundamental.
+  real(rp), allocatable :: e_bunching_phase(:,:)  ! (nslice, nend) [rad]
   real(rp), allocatable :: e_bunch(:,:)           ! (n_bp, nend)
   real(rp), allocatable :: e_slice(:,:,:)         ! (n_bp, nslice, nend)
 end type
@@ -170,6 +176,10 @@ if (size(harm_extra) > 0) then
 endif
 allocate (stats%e_ix_ele(nend), stats%e_s(nend))
 allocate (stats%e_bunch(fel_stats_n_bp$, nend), stats%e_slice(fel_stats_n_bp$, nslice, nend))
+allocate (stats%e_f_power(nslice, nend), stats%e_f_energy(nslice, nend), stats%e_f_on_axis(nslice, nend))
+allocate (stats%e_bunching(nslice, nend), stats%e_bunching_phase(nslice, nend))
+stats%e_f_power = 0;  stats%e_f_energy = 0;  stats%e_f_on_axis = 0
+stats%e_bunching = 0; stats%e_bunching_phase = 0
 
 end subroutine fel_stats_init
 
@@ -352,9 +362,16 @@ end subroutine fel_stats_record
 ! (all slices as one bunch in global window coordinates) and per slice -- the Tao
 ! end-of-element pattern, using Bmad's own statistics machinery.
 !
+! The row is SELF-SUFFICIENT: beam moments and Twiss for the whole window and per
+! slice, plus the radiation power, energy, on-axis intensity and bunching per slice.
+! That matters when comb_ds_save < 0 keeps no per-record rows at all (Bmad's comb
+! semantics, kept verbatim) -- the element-end row is then the only record of the run,
+! and it carries the field as well as the beam.
+!
 ! Input:
 !   stats     -- fel_stats_struct: Accumulator; the current record supplies the slice moments.
 !   beam      -- fel_beam_struct: The sliced beam.
+!   ff(:)     -- fel_field_struct: The field set, for the field values when there is no record.
 !   ele       -- ele_struct: The element just ended.
 !   z_now     -- real(rp): Position of the element end [m].
 !
@@ -363,18 +380,22 @@ end subroutine fel_stats_record
 !   err_flag  -- logical: Set True on a conversion error or row overflow. False otherwise.
 !-
 
-subroutine fel_stats_element_end (stats, beam, ele, z_now, err_flag)
+subroutine fel_stats_element_end (stats, beam, ff, ele, z_now, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_beam_struct), target :: beam
+type (fel_field_struct), target :: ff(:)
+type (wavefront_struct), pointer :: wf
 type (fel_slice_struct), pointer :: sl
+type (wavefront_params_struct) pms
+type (fel_slice_diag_struct) bdg
 type (ele_struct) ele
 type (bunch_params_struct) bp
 real(rp), allocatable :: cen_s(:,:), sig_s(:,:,:), w_s(:), dz_s(:), shear_s(:)
 integer, allocatable :: n_s(:)
-real(rp) z_now, p0_mc, p_mc, w, wsum, mean(6), sig(6,6), v(6)
+real(rp) z_now, p0_mc, p_mc, w, wsum, mean(6), sig(6,6), v(6), ks
 integer ie, is, ip, i, j, nslice
-logical err_flag, error
+logical err_flag, error, err, any_err
 character(*), parameter :: r_name = 'fel_stats_element_end'
 
 !
@@ -390,7 +411,52 @@ stats%e_ix_ele(ie) = ele%ix_ele
 stats%e_s(ie) = z_now
 
 nslice = size(beam%slice)
+wf => ff(1)%wf
 allocate (cen_s(6,nslice), sig_s(6,6,nslice), w_s(nslice), dz_s(nslice), shear_s(nslice), n_s(nslice))
+
+! The field and bunching side of the row. With a current record they are already
+! evaluated there, so copy (the datasets then agree exactly); with no records evaluate
+! them here, the same routines the record sweep uses, angle moments not needed.
+
+if (stats%irec > 0) then
+  stats%e_f_power(:,ie) = stats%f_power(:, stats%irec)
+  stats%e_f_energy(:,ie) = stats%f_energy(:, stats%irec)
+  stats%e_f_on_axis(:,ie) = stats%f_on_axis(:, stats%irec)
+  if (allocated(stats%f2_energy)) then
+    stats%e_f_power(:,ie) = stats%e_f_power(:,ie) + stats%f2_power(:, stats%irec)
+    stats%e_f_energy(:,ie) = stats%e_f_energy(:,ie) + stats%f2_energy(:, stats%irec)
+    stats%e_f_on_axis(:,ie) = stats%e_f_on_axis(:,ie) + stats%f2_on_axis(:, stats%irec)
+  endif
+  stats%e_bunching(:,ie) = stats%bunching(:, stats%irec)
+  stats%e_bunching_phase(:,ie) = stats%bunching_phase(:, stats%irec)
+
+else
+  any_err = .false.
+  ks = twopi / wf%wavelength
+  !$OMP parallel do private(sl, pms, bdg, err) reduction(.or.: any_err)
+  do is = 1, nslice
+    sl => beam%slice(is)
+    call wavefront_params_of_plane (wf%Ex(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
+                                    wf%wavelength, beam%slice_spacing, pms, .false., err)
+    any_err = any_err .or. err
+    stats%e_f_power(is,ie) = pms%power
+    stats%e_f_energy(is,ie) = pms%energy
+    stats%e_f_on_axis(is,ie) = pms%on_axis_intensity
+    if (allocated(wf%Ey)) then
+      call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
+                                      wf%wavelength, beam%slice_spacing, pms, .false., err)
+      any_err = any_err .or. err
+      stats%e_f_power(is,ie) = stats%e_f_power(is,ie) + pms%power
+      stats%e_f_energy(is,ie) = stats%e_f_energy(is,ie) + pms%energy
+      stats%e_f_on_axis(is,ie) = stats%e_f_on_axis(is,ie) + pms%on_axis_intensity
+    endif
+    call fel_slice_diag (beam, sl, ks, bdg)
+    stats%e_bunching(is,ie) = bdg%bunching
+    stats%e_bunching_phase(is,ie) = bdg%bunching_phase
+  enddo
+  !$OMP end parallel do
+  if (any_err) return
+endif
 
 ! ONE source of per-slice moments for both the per-slice rows and the whole-window
 ! row. With per-record rows (the comb >= 0) the current record already holds them --
@@ -750,6 +816,18 @@ call H5Gclose_f (b_id, h5_err)
 
 call H5Gcreate_f (g_id, 'slice', s_id, h5_err)
 call write_bp_group_slices (s_id, stats%e_slice(:, :, 1:stats%iend), err);  if (err) return
+call H5Gclose_f (s_id, h5_err)
+
+! The field and bunching at each element end, so the element_end group stands alone
+! when the comb keeps no per-record rows. Power/energy/intensity are totals over
+! polarizations, as the per-record datasets are.
+
+call H5Gcreate_f (g_id, 'field', s_id, h5_err)
+call hdf5_write_dataset_real (s_id, 'power', stats%e_f_power(:, 1:stats%iend), err);  if (err) return
+call hdf5_write_dataset_real (s_id, 'energy', stats%e_f_energy(:, 1:stats%iend), err);  if (err) return
+call hdf5_write_dataset_real (s_id, 'on_axis_intensity', stats%e_f_on_axis(:, 1:stats%iend), err);  if (err) return
+call hdf5_write_dataset_real (s_id, 'bunching', stats%e_bunching(:, 1:stats%iend), err);  if (err) return
+call hdf5_write_dataset_real (s_id, 'bunching_phase', stats%e_bunching_phase(:, 1:stats%iend), err);  if (err) return
 call H5Gclose_f (s_id, h5_err)
 call H5Gclose_f (g_id, h5_err)
 
