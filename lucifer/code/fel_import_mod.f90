@@ -1,10 +1,10 @@
 !+
 ! Module fel_import_mod
 !
-! The importdistribution equivalent (design brief section 10 step 10): resample a Bmad
-! bunch_struct -- arbitrary times, arbitrary weights -- into the evenly spaced,
-! equal-population slices the FEL step wants, by Genesis 1.3 v4's own method,
-! transcribed from SDDSBeam.cpp (the class name is historical: it reads plain HDF5).
+! This module is the importdistribution equivalent: it resamples a Bmad bunch_struct --
+! arbitrary times, arbitrary weights -- into the evenly spaced, equal-population slices
+! the FEL step wants, by Genesis 1.3 v4's own method, transcribed from SDDSBeam.cpp
+! (the class name is historical: it reads plain HDF5).
 ! Method, Genesis provenance, and validation: lucifer/doc/fel-physics.tex
 ! (sec:import). The only weighted generalization: the slice current is c*sum(w)/dslen
 ! where Genesis counts particles (identical for uniform weights).
@@ -65,14 +65,24 @@ contains
 !+
 ! Subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
 !
-! Resample a bunch_struct into FEL slices by the transcribed Genesis method (module
-! header). gamma0 is the FEL reference, resolved from the lattice by the caller (it is
-! also the filler energy for empty slices); lambda0 the radiation wavelength;
+! Routine to resample a bunch_struct into FEL slices by the transcribed Genesis method
+! (module header). gamma0 is the FEL reference, resolved from the lattice by the caller
+! (it is also the filler energy for empty slices); lambda0 the radiation wavelength;
 ! slice_spacing = sample*lambda0. The caller seeds Bmad's RNG.
 !
-! moments_out, if present, receives the RNG-free analysis moments in Genesis's
-! analyse order (gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay) -- the
-! deterministic quantities the exactness checks read.
+! Input:
+!   bunch           -- bunch_struct: Bunch to resample; dead particles are skipped.
+!   gamma0          -- real(rp): FEL reference gamma; sets fbeam%p0c.
+!   lambda0         -- real(rp): Radiation wavelength [m].
+!   slice_spacing   -- real(rp): Longitudinal slice spacing, sample*lambda0 [m].
+!   prm             -- fel_import_param_struct: The &importdistribution knobs.
+!
+! Output:
+!   fbeam           -- fel_beam_struct: The resampled packed beam.
+!   err_flag        -- logical: Set True on error, False otherwise.
+!   moments_out(11) -- real(rp), optional: The RNG-free analysis moments in Genesis's
+!                       analyse order (gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by,
+!                       ax, ay) -- the deterministic quantities the exactness checks read.
 !-
 
 subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
@@ -204,7 +214,7 @@ do islice = 1, nslice
   do i = 1, nalive
     if (s(i) > sloc - 0.5_rp*dslen .and. s(i) < sloc + 0.5_rp*dslen) then
       cur = cur + wt(i)
-      if (ncand < mpart) then          ! keep up to mpart directly; excess handled below
+      if (ncand < mpart) then          ! Keep up to mpart directly; excess handled below.
         ncand = ncand + 1
         cg(ncand) = gam(i); cx(ncand) = x(i); cy(ncand) = y(i)
         cpx(ncand) = xp(i) * gam(i)    ! Genesis's slope-to-momentum conversion.
@@ -215,7 +225,7 @@ do islice = 1, nslice
         ! from the full set is equivalent to reservoir-style replacement only if the
         ! transcription keeps Genesis's exact rule, so transcribe the rule: append,
         ! then delete. Appending needs storage: do it in two passes instead.
-        ncand = ncand + 1              ! count only; second pass below when oversized
+        ncand = ncand + 1              ! Count only; second pass below when oversized.
       endif
     endif
   enddo
@@ -240,8 +250,13 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
-! Gather every window candidate (needs its own storage: there can be far more than
-! npart), then Genesis's removeParticles: overwrite a random index with the last.
+!+
+! Subroutine gather_and_remove ()
+!
+! Routine to gather every window candidate (needs its own storage: there can be far more
+! than npart), then apply Genesis's removeParticles: overwrite a random index with the
+! last and shrink until mpart remain.
+!-
 
 subroutine gather_and_remove ()
 
@@ -259,7 +274,7 @@ do k = 1, nalive
   endif
 enddo
 
-do while (m > mpart)                               ! removeParticles' exact rule.
+do while (m > mpart)                               ! removeParticles's exact rule.
   call ran_uniform (uu)
   k = int(m * uu) + 1
   if (k > m) k = m
@@ -275,8 +290,13 @@ ncand = mpart
 end subroutine gather_and_remove
 
 !..............................................................................
-! Bring the candidate set to mpart seeds (addParticles when short), refill theta,
-! mirror into nbins, impose the shot noise, store the slice.
+!+
+! Subroutine fill_slice ()
+!
+! Routine to bring the candidate set to mpart seeds (Genesis's addParticles when short),
+! refill theta, mirror into nbins beamlet copies, impose the shot noise, and store the
+! slice.
+!-
 
 subroutine fill_slice ()
 
@@ -316,14 +336,14 @@ if (nd < mpart) then
   cpx(1:nd) = (cpx(1:nd) - px1) * px2
   cpy(1:nd) = (cpy(1:nd) - py1) * py2
 
-  nd0 = nd                                         ! parents only from the originals
+  nd0 = nd                                         ! Parents only from the originals.
   do while (nd < mpart)
     call ran_uniform (uu)
     n1 = int(nd0 * uu) + 1
     if (n1 > nd0) n1 = nd0
     rmin = 1e9_rp
     n2 = n1
-    do k = 1, nd0                                  ! nearest neighbor, random metric
+    do k = 1, nd0                                  ! Nearest neighbor, random metric.
       if (k == n1) cycle                           ! Genesis's distance skips self.
       tmp = cg(n1)-cg(k);  call ran_uniform (uu);  r = tmp*tmp*uu
       tmp = cx(n1)-cx(k);  call ran_uniform (uu);  r = r + tmp*tmp*uu
@@ -348,7 +368,7 @@ if (nd < mpart) then
     cpy(nd) = 0.5_rp*(cpy(n1)+cpy(n2)) + (2*uu-1)*(cpy(n1)-cpy(n2))
   enddo
 
-  cg(1:nd) = cg(1:nd)/g2 + g1                      ! scale back
+  cg(1:nd) = cg(1:nd)/g2 + g1                      ! Scale back.
   cx(1:nd) = cx(1:nd)/x2 + x1
   cy(1:nd) = cy(1:nd)/y2 + y1
   cpx(1:nd) = cpx(1:nd)/px2 + px1
@@ -407,10 +427,28 @@ end subroutine fel_import_bunch
 !+
 ! Subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
 !
-! Genesis's analyse (fel-physics.tex sec:import): UNWEIGHTED means, variances and
-! Twiss over the particles with s0 < s < s1, on the slopes. Emittance ex = sqrt(|var_x*var_px -
-! cov^2|)*gavg (a normalized emittance through the mean energy), bx = var_x*gavg/ex,
-! ax = -cov*gavg/ex. Unweighted deliberately -- see the module header.
+! Routine to compute Genesis's analyse moments (fel-physics.tex sec:import): UNWEIGHTED
+! means, variances and Twiss over the particles with s0 < s < s1, on the slopes.
+! Emittance ex = sqrt(|var_x*var_px - cov^2|)*gavg (a normalized emittance through the
+! mean energy), bx = var_x*gavg/ex, ax = -cov*gavg/ex. Unweighted deliberately -- see
+! the module header.
+!
+! Input:
+!   s(:)          -- real(rp): Window positions tau [m], min-shifted to zero.
+!   gam(:)        -- real(rp): Lorentz factors.
+!   x(:), y(:)    -- real(rp): Transverse positions [m].
+!   xp(:), yp(:)  -- real(rp): Transverse slopes.
+!   s0, s1        -- real(rp): Window bounds; only particles with s0 < s < s1 count
+!                     (strict, so the two extreme particles are excluded, as Genesis's
+!                     eval defaults do).
+!
+! Output:
+!   gavg          -- real(rp): Mean gamma.
+!   xavg, yavg    -- real(rp): Mean positions [m].
+!   pxavg, pyavg  -- real(rp): Mean slopes.
+!   ex, ey        -- real(rp): Normalized emittances through the mean energy.
+!   bx, by        -- real(rp): Twiss beta functions [m].
+!   ax, ay        -- real(rp): Twiss alpha functions.
 !-
 
 subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
@@ -466,11 +504,19 @@ end subroutine analyse_window
 !+
 ! Subroutine fel_write_genesis4_distribution (bunch, file_name, err_flag)
 !
-! Write a bunch_struct as a Genesis 1.3 v4 DISTRIBUTION file (the &importdistribution
-! input; not a dump): flat datasets t [s], p [gamma*beta], x, y [m], xp, yp [slopes],
-! plus the total charge. t = -tau/c with tau = -z/beta, so Genesis's s = -c*t
-! reproduces this port's window position exactly and both codes bin the identical
-! particle set identically (sec:import). Dead particles are skipped.
+! Routine to write a bunch_struct as a Genesis 1.3 v4 DISTRIBUTION file (the
+! &importdistribution input; not a dump): flat datasets t [s], p [gamma*beta], x, y [m],
+! xp, yp [slopes], plus the total charge. t = -tau/c with tau = -z/beta, so Genesis's
+! s = -c*t reproduces this port's window position exactly and both codes bin the
+! identical particle set identically (fel-physics.tex sec:import). Dead particles are
+! skipped.
+!
+! Input:
+!   bunch       -- bunch_struct: Bunch to write.
+!   file_name   -- character(*): File to create.
+!
+! Output:
+!   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
 subroutine fel_write_genesis4_distribution (bunch, file_name, err_flag)

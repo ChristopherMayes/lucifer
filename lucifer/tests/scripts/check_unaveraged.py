@@ -349,7 +349,7 @@ def main():
     (wd / "sandwich_wake.bmad").write_text(SAND_WAKE_LAT)
     refused = run_expect_refusal(exe, wd, "uv_sandw",
         GAIN.format(root="uv_sandw", lat="sandwich_wake.bmad"),
-        "element sr wakes are not supported in the unaveraged mode")
+        "ELEMENT SR WAKES ARE NOT SUPPORTED IN THE UNAVERAGED MODE")
     check("sandwich: wake on the unaveraged segment refused by name (1 = yes)",
           0.0 if refused else 1.0, 0.5)
 

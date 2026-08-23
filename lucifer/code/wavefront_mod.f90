@@ -125,9 +125,9 @@ end type
 ! caller's array, so the plan always sees the alignment it was created with; FFTW's
 ! new-array execute rule makes executing a plan on a differently aligned array undefined.
 ! Second, the cache is threadprivate: every OpenMP thread carries its own plans and work
-! buffer, so wavefront_fft2 is callable from a parallel loop over slices (deliverable 5,
-! the design anticipated when this cache was module-global and single threaded). The cost
-! is one planner run and one nx*ny buffer per thread, paid once per grid size.
+! buffer, so wavefront_fft2 is callable from a parallel loop over slices, which is how
+! wavefront_drift and the FEL field solve use it. The cost is one planner run and one
+! nx*ny buffer per thread, paid once per grid size.
 !
 ! On the critical section inside wavefront_fft2: it guards FFTW's rule that plan creation
 ! is not reentrant, and nothing else -- the FFTW planner is globally serialised no matter
@@ -182,8 +182,7 @@ character(4) pol
 
 !
 
-pol = 'x'
-if (present(polarization)) pol = polarization
+pol = string_option('x', polarization)
 
 if (pol /= 'x' .and. pol /= 'y' .and. pol /= 'xy') then
   call out_io (s_error$, r_name, 'POLARIZATION MUST BE "x", "y" OR "xy". GOT: ' // pol)
@@ -300,6 +299,12 @@ end function wavefront_shape
 ! Function wavefront_k0 (wf) result (k0)
 !
 ! Routine to return the central wavenumber twopi / wavelength [rad/m].
+!
+! Input:
+!   wf    -- wavefront_struct: Wavefront.
+!
+! Output:
+!   k0    -- real(rp): Central wavenumber [rad/m].
 !-
 
 function wavefront_k0 (wf) result (k0)
@@ -320,6 +325,12 @@ end function wavefront_k0
 ! Function wavefront_photon_energy (wf) result (e_photon)
 !
 ! Routine to return the central photon energy h_bar * c * k0 [eV].
+!
+! Input:
+!   wf        -- wavefront_struct: Wavefront.
+!
+! Output:
+!   e_photon  -- real(rp): Central photon energy [eV].
 !-
 
 function wavefront_photon_energy (wf) result (e_photon)
@@ -374,6 +385,12 @@ end function wavefront_coord_vec
 ! Function wavefront_xvec (wf) result (vec)
 !
 ! Routine to return the x coordinates of the grid points [m].
+!
+! Input:
+!   wf        -- wavefront_struct: Wavefront.
+!
+! Output:
+!   vec(nx)   -- real(rp), allocatable: x coordinates [m].
 !-
 
 function wavefront_xvec (wf) result (vec)
@@ -396,6 +413,12 @@ end function wavefront_xvec
 ! Function wavefront_yvec (wf) result (vec)
 !
 ! Routine to return the y coordinates of the grid points [m].
+!
+! Input:
+!   wf        -- wavefront_struct: Wavefront.
+!
+! Output:
+!   vec(ny)   -- real(rp), allocatable: y coordinates [m].
 !-
 
 function wavefront_yvec (wf) result (vec)
@@ -418,6 +441,12 @@ end function wavefront_yvec
 ! Function wavefront_zvec (wf) result (vec)
 !
 ! Routine to return the z coordinates of the slices [m].
+!
+! Input:
+!   wf        -- wavefront_struct: Wavefront.
+!
+! Output:
+!   vec(nz)   -- real(rp), allocatable: z coordinates [m].
 !-
 
 function wavefront_zvec (wf) result (vec)
@@ -479,6 +508,9 @@ end function wavefront_fft_wavenumber_vec
 !
 ! Routine to return the field intensity c * eps_0 / 2 * (|Ex|^2 + |Ey|^2) [W/m^2].
 !
+! Input:
+!   wf                   -- wavefront_struct: Wavefront.
+!
 ! Output:
 !   intensity(nx,ny,nz)  -- real(rp), allocatable: Intensity.
 !-
@@ -513,6 +545,12 @@ end function wavefront_intensity
 ! Note this is conserved exactly by wavefront_drift, since the propagation kernel has unit
 ! modulus everywhere and the transform pair is unitary up to the 1/(nx*ny) factor. It is
 ! therefore a useful invariant to watch.
+!
+! Input:
+!   wf      -- wavefront_struct: Wavefront.
+!
+! Output:
+!   energy  -- real(rp): Total field energy [J].
 !-
 
 function wavefront_energy (wf) result (energy)
@@ -533,6 +571,9 @@ end function wavefront_energy
 ! Function wavefront_fluence (wf) result (fluence)
 !
 ! Routine to return the transverse fluence eps_0/2 * Integral |E(x,y,z)|^2 dz [J/m^2].
+!
+! Input:
+!   wf             -- wavefront_struct: Wavefront.
 !
 ! Output:
 !   fluence(nx,ny) -- real(rp), allocatable: Fluence.
@@ -556,6 +597,9 @@ end function wavefront_fluence
 ! Function wavefront_power (wf) result (power)
 !
 ! Routine to return the longitudinal power profile Integral I(x,y,z) dx dy [W].
+!
+! Input:
+!   wf         -- wavefront_struct: Wavefront.
 !
 ! Output:
 !   power(nz)  -- real(rp), allocatable: Power per slice.
@@ -657,7 +701,7 @@ end subroutine wavefront_transverse_moments
 ! Input:
 !   wf          -- wavefront_struct: Wavefront to propagate.
 !   z_drift     -- real(rp): Drift distance [m]. May be negative.
-!   curvature   -- real(rp), optional: Accepted only as zero. A nonzero curvature selects
+!   curvature   -- real(rp), optional: Accepted only as zero. Default is 0. A nonzero curvature selects
 !                    quadratic phase rescaling with an expanding grid, which is not
 !                    implemented here; passing one is an error rather than being silently
 !                    ignored.

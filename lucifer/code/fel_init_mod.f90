@@ -19,15 +19,25 @@ implicit none
 contains
 
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 !+
 ! Subroutine fel_init_beam (run, err_flag)
 !
-! Build the beam: read a Genesis particle dump (beam_file), import a distribution
-! (dist_file or use_beam_init: the resample of fel_import_mod), or generate the
-! quiet start from beam_init. Applies the beam-side check instruments
+! Routine to build the beam: read a Genesis particle dump (beam_file), import a
+! distribution (dist_file or use_beam_init: the resample of fel_import_mod), or generate
+! the quiet start from beam_init. Applies the beam-side check instruments
 ! (split_weights, swap_beam_xy) and sets run%nslice. One seed (global%ran_seed)
 ! governs generation, resampling and noise, exactly as before the split. Errors
 ! return through err_flag; nothing here stops.
+!
+! Input:
+!   run       -- fel_run_struct: Run state after fel_setup_lattice (needs %gamma0, %lat and
+!                  the parsed beam inputs).
+!
+! Output:
+!   run       -- fel_run_struct: Beam built (%fbeam, %nslice).
+!   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_init_beam (run, err_flag)
@@ -39,15 +49,16 @@ type (lat_struct), pointer :: lat
 type (branch_struct), pointer :: branch
 type (fel_beam_struct), pointer :: fbeam
 type (beam_init_struct), pointer :: beam_init
-type (fel_import_param_struct) :: imp
+type (fel_import_param_struct) imp
 character(400) beam_file, dist_file, write_dist_file, write_opmd_file
-character(400) :: field_file(9)
+character(400) field_file(9)
 logical use_beam_init, shotnoise, gen_test_weights, imp_split_weights
 logical split_weights, swap_beam_xy, err
 integer nbins, ran_seed, is, ih
 real(rp) gamma0, lambda0, window_length, seed_power, seed_waist_size, grid_half_width
 integer window_sample, grid_n_pts, npart_gen
 real(rp) delgam_gen, tw_beta_x, tw_alpha_x, tw_beta_y, tw_alpha_y
+character(*), parameter :: r_name = 'fel_init_beam'
 
 !
 
@@ -85,23 +96,22 @@ seed_waist_size = run%winit%seed_waist_size
 ! e_tot, the two disagreed at 1.4e-9, and the run died mid-tracking on the seam's
 ! backstop p0c check with raw numbers -- the FEL physics ran on one reference while
 ! Bmad's momenta were normalized by the other. Two specifications of one truth is the
-! defect; the redundant one was removed (the deliverable-9 rule: parameters live on
-! the lattice).
+! defect; the redundant one was removed (parameters live on the lattice).
 
 if ((beam_file == '') .neqv. (field_file(1) == '')) then
-  print '(a)', 'fel_track_test: give both beam_file and field_file, or neither (to generate).'
+  call out_io (s_error$, r_name, 'GIVE BOTH BEAM_FILE AND FIELD_FILE, OR NEITHER (TO GENERATE).')
   err_flag = .true.;  return
 endif
 if (field_file(1) == '' .and. any(field_file(2:) /= '')) then
-  print '(a)', 'fel_track_test: harmonic field files need the fundamental in field_file(1).'
+  call out_io (s_error$, r_name, 'HARMONIC FIELD FILES NEED THE FUNDAMENTAL IN FIELD_FILE(1).')
   err_flag = .true.;  return
 endif
 if (beam_file /= '' .and. (dist_file /= '' .or. use_beam_init)) then
-  print '(a)', 'fel_track_test: dump files and a distribution import are mutually exclusive.'
+  call out_io (s_error$, r_name, 'DUMP FILES AND A DISTRIBUTION IMPORT ARE MUTUALLY EXCLUSIVE.')
   err_flag = .true.;  return
 endif
 if (dist_file /= '' .and. use_beam_init) then
-  print '(a)', 'fel_track_test: give dist_file or use_beam_init, not both.'
+  call out_io (s_error$, r_name, 'GIVE DIST_FILE OR USE_BEAM_INIT, NOT BOTH.')
   err_flag = .true.;  return
 endif
 
@@ -134,6 +144,14 @@ endif
 !------------------------------------------------------------------------------
 contains
 
+!------------------------------------------------------------------------------
+!+
+! Subroutine generate_initial_state ()
+!
+! Routine to generate the quiet-start beam from the beam_init description (manual
+! sec:loading): matched Gaussian transverse planes on the lattice Twiss, beamlets on a
+! uniform ponderomotive phase grid, the derived per-slice current, and optional Fawley
+! shot noise.
 !-
 
 subroutine generate_initial_state ()
@@ -147,13 +165,13 @@ real(rp) nl_min, nl_max, neff_min, neff_max, floor_max
 real(rp) spacing_gen, zlen_gen, s_i
 integer ib, im, ip, mbase, ix, iy, is_g, nslice_gen, ih, nharm, n_clamp
 logical flat_z
-character(*), parameter :: r_name = 'fel_track_test'
+character(*), parameter :: r_name = 'generate_initial_state'
 
 !
 
 if (lambda0 <= 0) then
-  print '(a)', 'fel_track_test: generation needs lambda0 > 0 (required by decision; not defaulted'
-  print '(a)', '  from the lattice resonance -- the first undulator may be off).'
+  call out_io (s_error$, r_name, 'GENERATION NEEDS LAMBDA0 > 0 (REQUIRED BY DECISION; NOT DEFAULTED', &
+                                 'FROM THE LATTICE RESONANCE -- THE FIRST UNDULATOR MAY BE OFF).')
   err_flag = .true.;  return
 endif
 
@@ -161,17 +179,17 @@ call check_beam_init_contract ()
 
 npart_gen = beam_init%n_particle
 if (npart_gen < 1 .or. nbins < 1 .or. mod(npart_gen, nbins) /= 0) then
-  print '(a)', 'fel_track_test: beam_init%n_particle (macroparticles PER SLICE here) must be a'
-  print '(a)', '  positive multiple of nbins.'
+  call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE (MACROPARTICLES PER SLICE HERE) MUST BE A', &
+                                 'POSITIVE MULTIPLE OF NBINS.')
   err_flag = .true.;  return
 endif
 if (beam_init%a_norm_emit <= 0 .or. beam_init%b_norm_emit <= 0) then
-  print '(a)', 'fel_track_test: beam_init%a_norm_emit and %b_norm_emit must be positive.'
+  call out_io (s_error$, r_name, 'BEAM_INIT%A_NORM_EMIT AND %B_NORM_EMIT MUST BE POSITIVE.')
   err_flag = .true.;  return
 endif
 if (beam_init%bunch_charge <= 0) then
-  print '(a)', 'fel_track_test: the current is DERIVED from the description; beam_init%bunch_charge'
-  print '(a)', '  must be positive (there is no current parameter).'
+  call out_io (s_error$, r_name, 'THE CURRENT IS DERIVED FROM THE DESCRIPTION; BEAM_INIT%BUNCH_CHARGE', &
+                                 'MUST BE POSITIVE (THERE IS NO CURRENT PARAMETER).')
   err_flag = .true.;  return
 endif
 
@@ -182,18 +200,18 @@ endif
 tw_beta_x = branch%ele(0)%a%beta;  tw_alpha_x = branch%ele(0)%a%alpha
 tw_beta_y = branch%ele(0)%b%beta;  tw_alpha_y = branch%ele(0)%b%alpha
 if (tw_beta_x <= 0 .or. tw_beta_y <= 0) then
-  print '(a)', 'fel_track_test: the lattice carries no beginning Twiss (beginning[beta_a], etc.);'
-  print '(a)', '  the generated quiet start is matched to the lattice, so the lattice must say.'
+  call out_io (s_error$, r_name, 'THE LATTICE CARRIES NO BEGINNING TWISS (BEGINNING[BETA_A], ETC.);', &
+                                 'THE GENERATED QUIET START IS MATCHED TO THE LATTICE, SO THE LATTICE MUST SAY.')
   err_flag = .true.;  return
 endif
 if (beam_init%sig_pz < 0 .or. seed_power < 0 .or. grid_n_pts < 3 .or. grid_half_width <= 0 .or. &
     window_sample < 1) then
-  print '(a)', 'fel_track_test: check beam_init%sig_pz, seed_power, grid_n_pts, grid_half_width,'
-  print '(a)', '  window_sample.'
+  call out_io (s_error$, r_name, 'CHECK BEAM_INIT%SIG_PZ, SEED_POWER, GRID_N_PTS, GRID_HALF_WIDTH,', &
+                                 'WINDOW_SAMPLE.')
   err_flag = .true.;  return
 endif
 if (seed_power > 0 .and. seed_waist_size <= 0) then
-  print '(a)', 'fel_track_test: seed_waist_size must be positive when seed_power > 0.'
+  call out_io (s_error$, r_name, 'SEED_WAIST_SIZE MUST BE POSITIVE WHEN SEED_POWER > 0.')
   err_flag = .true.;  return
 endif
 
@@ -210,9 +228,9 @@ case ('', 'RAN_GAUSS', 'ran_gauss', 'Ran_Gauss')
 case ('GRID', 'grid', 'Grid')
   flat_z = .true.
 case default
-  print '(a)', 'fel_track_test: beam_init%distribution_type(3) must be RAN_GAUSS (Gaussian bunch)'
-  print '(a)', '  or GRID (flat, Bmad''s uniform) for the quiet-start generator, got: ' // &
-        trim(beam_init%distribution_type(3))
+  call out_io (s_error$, r_name, 'BEAM_INIT%DISTRIBUTION_TYPE(3) MUST BE RAN_GAUSS (GAUSSIAN BUNCH)', &
+               'OR GRID (FLAT, BMAD''S UNIFORM) FOR THE QUIET-START GENERATOR, GOT: ' // &
+               trim(beam_init%distribution_type(3)))
   err_flag = .true.;  return
 end select
 
@@ -221,7 +239,7 @@ spacing_gen = window_sample * lambda0
 if (flat_z) then
   zlen_gen = beam_init%grid(3)%x_max - beam_init%grid(3)%x_min
   if (zlen_gen <= 0) then
-    print '(a)', 'fel_track_test: a GRID (flat) z-plane needs beam_init%grid(3)%x_min < %x_max.'
+    call out_io (s_error$, r_name, 'A GRID (FLAT) Z-PLANE NEEDS BEAM_INIT%GRID(3)%X_MIN < %X_MAX.')
     err_flag = .true.;  return
   endif
 elseif (beam_init%sig_z > 0) then
@@ -232,13 +250,13 @@ endif
 
 if (window_length > 0) then
   if (zlen_gen == 0 .and. window_length > 1.5_rp * spacing_gen) then
-    print '(a)', 'fel_track_test: sig_z = 0 (the steady-state description) is invalid for a'
-    print '(a)', '  time-dependent window. Give the bunch a length (sig_z, or a GRID extent).'
+    call out_io (s_error$, r_name, 'SIG_Z = 0 (THE STEADY-STATE DESCRIPTION) IS INVALID FOR A', &
+                 'TIME-DEPENDENT WINDOW. GIVE THE BUNCH A LENGTH (SIG_Z, OR A GRID EXTENT).')
     err_flag = .true.;  return
   endif
   if (window_length < zlen_gen) then
-    print '(a, es10.3, a, es10.3, a)', 'fel_track_test: WARNING: window_length = ', window_length, &
-          ' m CLIPS the described bunch (', zlen_gen, ' m).'
+    call out_io (s_warn$, r_name, 'window_length = \es10.3\ m CLIPS the described bunch (\es10.3\ m).', &
+                 r_array = [window_length, zlen_gen])
   endif
   nslice_gen = max(1, nint(window_length / spacing_gen))
 else
@@ -246,13 +264,13 @@ else
 endif
 
 if (shotnoise .and. nslice_gen < 2) then
-  print '(a)', 'fel_track_test: shotnoise needs a time-dependent window, the same rule as Genesis.'
+  call out_io (s_error$, r_name, 'SHOTNOISE NEEDS A TIME-DEPENDENT WINDOW, THE SAME RULE AS GENESIS.')
   err_flag = .true.;  return
 endif
 
 mbase = npart_gen / nbins
 if (gen_test_weights .and. mod(mbase, 2) /= 0) then
-  print '(a)', 'fel_track_test: gen_test_weights needs an even number of beamlets.'
+  call out_io (s_error$, r_name, 'GEN_TEST_WEIGHTS NEEDS AN EVEN NUMBER OF BEAMLETS.')
   err_flag = .true.;  return
 endif
 
@@ -354,7 +372,7 @@ do is_g = 1, nslice_gen
     enddo
   endif
 
-  ! Bookkeeping the brief's 6.2 demands: real electrons N_lambda = charge/e, effective
+  ! Noise bookkeeping (manual sec:noise): real electrons N_lambda = charge/e, effective
   ! macroparticle number N_eff = (sum w)^2/sum w^2, both per slice.
 
   wsum = sum(sl%weight(1:npart_gen))
@@ -391,10 +409,11 @@ do is_g = 1, nslice_gen
     floor_max = max(floor_max, floor_b2 * n_lambda)
 
     if (floor_b2 > 0.01_rp * target_b2) then
-      print '(a, i0, a)',      'fel_track_test: slice ', is_g, ': the quiet-start floor is not far below the'
-      print '(a)',             '  physical shot-noise level -- this representation cannot carry the requested noise.'
-      print '(a, es10.2, a, es10.2)', '  max_h |b(h)|^2 = ', floor_b2, '  vs target 1/N_lambda = ', target_b2
-      print '(a, es10.2, a, es10.2)', '  N_eff = ', n_eff, '  N_lambda = ', n_lambda
+      call out_io (s_error$, r_name, 'SLICE \i0\ : THE QUIET-START FLOOR IS NOT FAR BELOW THE', &
+                   'PHYSICAL SHOT-NOISE LEVEL -- THIS REPRESENTATION CANNOT CARRY THE REQUESTED NOISE.', &
+                   'MAX_H |B(H)|^2 = \es10.2\ VS TARGET 1/N_LAMBDA = \es10.2\ ', &
+                   'N_EFF = \es10.2\ N_LAMBDA = \es10.2\ ', &
+                   i_array = [is_g], r_array = [floor_b2, target_b2, n_eff, n_lambda])
       err_flag = .true.;  return
     endif
 
@@ -416,33 +435,39 @@ enddo
 deallocate (theta_work, beta_work)
 
 if (shotnoise) then
-  print '(a, i0, a)',        'fel_track_test: shot noise imposed on ', nslice_gen, ' slices.'
-  print '(2(a, es10.3))',    '  N_lambda per slice: ', nl_min, ' to ', nl_max
-  print '(2(a, es10.3))',    '  N_eff per slice:    ', neff_min, ' to ', neff_max
-  print '(a, es10.2)',       '  worst quiet floor, |b|^2 * N_lambda: ', floor_max
+  call out_io (s_info$, r_name, 'Shot noise imposed on \i0\ slices.', &
+               '  N_lambda per slice: \es10.3\ to \es10.3\ ', &
+               '  N_eff per slice:    \es10.3\ to \es10.3\ ', &
+               '  worst quiet floor, |b|^2 * N_lambda: \es10.2\ ', &
+               i_array = [nslice_gen], r_array = [nl_min, nl_max, neff_min, neff_max, floor_max])
   if (n_clamp > 0) then
-    print '(a, i0, a)',      '  WARNING: ', n_clamp, ' beamlet draws had fewer than one real electron'
-    print '(a)',             '  (nbl clamped to 1, as Genesis does silently). The noise level in those'
-    print '(a)',             '  beamlets is not physical; use fewer macroparticles or more charge.'
+    call out_io (s_warn$, r_name, '\i0\ beamlet draws had fewer than one real electron', &
+                 '(nbl clamped to 1, as Genesis does silently). The noise level in those', &
+                 'beamlets is not physical; use fewer macroparticles or more charge.', &
+                 i_array = [n_clamp])
   endif
 endif
-
 
 end subroutine generate_initial_state
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine check_beam_init_contract ()
+!
+! Routine to check the beam_init contract: the quiet-start generator honors the beam_init
+! fields in the header table and REFUSES BY NAME every other field that is set -- a
+! standard structure that silently dropped fields would be worse than a custom one. (The
+! import path is exempt: init_beam_distribution honors everything Bmad honors.)
+! renorm_center/renorm_sigma, random_engine defaults and n_bunch = 0/1 are generation
+! details with no analytic counterpart and are accepted at their defaults only.
+!-
 
 subroutine check_beam_init_contract ()
 
-! The quiet-start generator honors the beam_init fields in the header table and
-! REFUSES BY NAME every other field that is set -- a standard structure that silently
-! dropped fields would be worse than a custom one. (The import path is exempt:
-! init_beam_distribution honors everything Bmad honors.) renorm_center/renorm_sigma,
-! random_engine defaults and n_bunch = 0/1 are generation details with no analytic
-! counterpart and are accepted at their defaults only.
-
 character(60) bad
+character(*), parameter :: r_name = 'check_beam_init_contract'
 
 !
 
@@ -475,9 +500,9 @@ if (trim(beam_init%distribution_type(2)) /= '' .and. trim(beam_init%distribution
     .and. trim(beam_init%distribution_type(2)) /= 'ran_gauss') bad = 'distribution_type(2) (transverse: RAN_GAUSS only)'
 
 if (bad /= '') then
-  print '(a)', 'fel_track_test: beam_init%' // trim(bad) // ' is set but NOT honored by the'
-  print '(a)', '  quiet-start generator (see the honored-fields table in the program header).'
-  print '(a)', '  Refusing rather than silently ignoring it.'
+  call out_io (s_error$, r_name, 'BEAM_INIT%' // trim(bad) // ' IS SET BUT NOT HONORED BY THE', &
+                                 'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN THE PROGRAM HEADER).', &
+                                 'REFUSING RATHER THAN SILENTLY IGNORING IT.')
   err_flag = .true.;  return
 endif
 
@@ -485,31 +510,37 @@ end subroutine check_beam_init_contract
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine import_initial_state ()
+!
+! Routine to import a distribution (manual sec:import): a bunch_struct -- generated from
+! Bmad's beam_init_struct (the native equivalent of Genesis's &beam description) or read
+! from an openPMD-beamphysics file -- is resampled into FEL slices by the transcribed
+! Genesis importdistribution method (fel_import_mod, where the algorithm and its
+! provenance are documented). The seed field comes from the same generator as the
+! built-in loader. The RNG-free outputs the exactness checks read -- the analysis
+! moments and the per-slice current profile -- are printed at full precision.
+!-
 
 subroutine import_initial_state ()
-
-! Deliverable 10: a bunch_struct -- generated from Bmad's beam_init_struct (the native
-! equivalent of Genesis's &beam description) or read from an openPMD-beamphysics file
-! -- resampled into FEL slices by the transcribed Genesis importdistribution method
-! (fel_import_mod, where the algorithm and its provenance are documented). The seed
-! field comes from the same generator as the built-in loader. The RNG-free outputs the
-! exactness checks read -- the analysis moments and the per-slice current profile --
-! are printed at full precision.
 
 type (beam_struct), target :: beam_b
 type (bunch_struct), pointer :: bp
 real(rp) moments(11)
 integer is_g, ip_g, n0
 logical err_i
+character(400) line
+character(*), parameter :: r_name = 'import_initial_state'
 
 !
 
 if (lambda0 <= 0) then
-  print '(a)', 'fel_track_test: import needs lambda0 > 0.'
+  call out_io (s_error$, r_name, 'IMPORT NEEDS LAMBDA0 > 0.')
   err_flag = .true.;  return
 endif
 if (window_sample < 1) then
-  print '(a)', 'fel_track_test: window_sample must be a positive integer (Genesis''s sample).'
+  call out_io (s_error$, r_name, 'WINDOW_SAMPLE MUST BE A POSITIVE INTEGER (GENESIS''S SAMPLE).')
   err_flag = .true.;  return
 endif
 
@@ -522,7 +553,7 @@ call ran_seed_put (ran_seed)
 
 if (use_beam_init) then
   if (beam_init%n_particle < 1) then
-    print '(a)', 'fel_track_test: beam_init%n_particle must be positive.'
+    call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE MUST BE POSITIVE.')
     err_flag = .true.;  return
   endif
   beam_init%n_bunch = 1
@@ -530,15 +561,15 @@ if (use_beam_init) then
   if (err_i) then
     err_flag = .true.;  return
   endif
-  print '(a, i0, a)', 'fel_track_test: generated ', size(beam_b%bunch(1)%particle), &
-                      ' particles from beam_init.'
+  call out_io (s_info$, r_name, 'Generated \i0\ particles from beam_init.', &
+               i_array = [size(beam_b%bunch(1)%particle)])
 else
   call hdf5_read_beam (dist_file, beam_b, err_i, branch%ele(0))
   if (err_i) then
     err_flag = .true.;  return
   endif
-  print '(a, i0, a)', 'fel_track_test: read ', size(beam_b%bunch(1)%particle), &
-                      ' particles from: ' // trim(dist_file)
+  call out_io (s_info$, r_name, 'Read \i0\ particles from: ' // trim(dist_file), &
+               i_array = [size(beam_b%bunch(1)%particle)])
 endif
 
 bp => beam_b%bunch(1)
@@ -562,7 +593,7 @@ if (write_dist_file /= '') then
   if (err_i) then
     err_flag = .true.;  return
   endif
-  print '(a)', 'fel_track_test: wrote Genesis distribution file: ' // trim(write_dist_file)
+  call out_io (s_info$, r_name, 'Wrote Genesis distribution file: ' // trim(write_dist_file))
 endif
 
 if (write_opmd_file /= '') then
@@ -570,7 +601,7 @@ if (write_opmd_file /= '') then
   if (err_i) then
     err_flag = .true.;  return
   endif
-  print '(a)', 'fel_track_test: wrote openPMD-beamphysics file: ' // trim(write_opmd_file)
+  call out_io (s_info$, r_name, 'Wrote openPMD-beamphysics file: ' // trim(write_opmd_file))
 endif
 
 ! imp%npart and imp%nbins come from the imp block directly (the resample's own knobs;
@@ -579,25 +610,34 @@ call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, imp, fbeam,
 if (err_i) then
   err_flag = .true.;  return
 endif
-print '(a, i0, a, i0, a)', 'fel_track_test: imported into ', size(fbeam%slice), &
-                           ' slices of ', imp%npart, ' particles.'
-print '(a, 11es24.15e3)', 'import moments (gavg xavg pxavg yavg pyavg ex ey bx by ax ay):', moments
-do is_g = 1, size(fbeam%slice)
-  print '(a, i0, a, es24.15e3)', 'import current ', is_g, ': ', &
-        c_light * sum(fbeam%slice(is_g)%weight(1:fbeam%slice(is_g)%n)) / fbeam%slice_spacing
-enddo
+call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
+             i_array = [size(fbeam%slice), imp%npart])
 
+! The RNG-free data lines the exactness checks parse (check_import.py parse_stdout):
+! full precision, exact format, s_blank$ so the text is bare.
+
+write (line, '(a, 11es24.15e3)') 'import moments (gavg xavg pxavg yavg pyavg ex ey bx by ax ay):', moments
+call out_io (s_blank$, r_name, trim(line))
+do is_g = 1, size(fbeam%slice)
+  write (line, '(a, i0, a, es24.15e3)') 'import current ', is_g, ': ', &
+        c_light * sum(fbeam%slice(is_g)%weight(1:fbeam%slice(is_g)%n)) / fbeam%slice_spacing
+  call out_io (s_blank$, r_name, trim(line))
+enddo
 
 end subroutine import_initial_state
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine do_split_weights (beam)
+!
+! Routine to replace each particle by two coincident copies with weights w/3 and 2w/3.
+! The order -- all first copies, then all second copies -- keeps the original particles'
+! storage order, which keeps the RK4 arithmetic per copy identical to the unsplit run.
+!-
 
 subroutine do_split_weights (beam)
-
-! Replace each particle by two coincident copies with weights w/3 and 2w/3. The order --
-! all first copies, then all second copies -- keeps the original particles' storage
-! order, which keeps the RK4 arithmetic per copy identical to the unsplit run.
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sp
@@ -620,8 +660,14 @@ enddo
 end subroutine do_split_weights
 
 !------------------------------------------------------------------------------
-
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine swap_arrays (a, b)
+!
+! Routine to swap the contents of the two arrays a and b.
+!-
+
 subroutine swap_arrays (a, b)
 
 real(rp) a(:), b(:), tmp(size(a))
@@ -633,15 +679,25 @@ end subroutine swap_arrays
 end subroutine fel_init_beam
 
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 !+
 ! Subroutine fel_init_wavefront (run, err_flag)
 !
-! Build the field set: read the fundamental (field_file(1): a Genesis dump or an
-! openPMD EXT_Wavefront, auto-detected by signature) or generate the Gaussian seed
+! Routine to build the field set: read the fundamental (field_file(1): a Genesis dump or
+! an openPMD EXT_Wavefront, auto-detected by signature) or generate the Gaussian seed
 ! (wavefront_init; seed_power = 0 is a dark start); initialize the harmonic entries
 ! on the fundamental's grid; fill any from openPMD imports matched by photon energy;
 ! and check the beam/field window consistency. Needs the beam (fel_init_beam first).
 ! Errors return through err_flag; nothing here stops.
+!
+! Input:
+!   run       -- fel_run_struct: Run state after fel_setup_lattice and fel_init_beam (needs
+!                  %fbeam, %nslice, %two_pol, %n_harm and the parsed field inputs).
+!
+! Output:
+!   run       -- fel_run_struct: Field set filled (%ffield(:)%wf, %ks).
+!   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_init_wavefront (run, err_flag)
@@ -652,12 +708,13 @@ logical err_flag
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
 type (wavefront_struct), pointer :: wf
-character(400) :: field_file(9)
+character(400) field_file(9)
 character(1) seed_polarization
 logical two_pol, err
 integer n_harm, nslice, ih, is
 real(rp) lambda0, seed_power, seed_waist_size, grid_half_width
 integer grid_n_pts
+character(*), parameter :: r_name = 'fel_init_wavefront'
 
 !
 
@@ -710,8 +767,8 @@ enddo
 do is = 2, 9
   if (field_file(is) == '') cycle
   if (.not. wavefront_file_is_openpmd(field_file(is))) then
-    print '(a)', 'fel_track_test: harmonic field files must be openPMD EXT_Wavefront'
-    print '(a)', '  (the Genesis format carries no photon energy to match on): ' // trim(field_file(is))
+    call out_io (s_error$, r_name, 'HARMONIC FIELD FILES MUST BE openPMD EXT_WAVEFRONT', &
+                 '(THE GENESIS FORMAT CARRIES NO PHOTON ENERGY TO MATCH ON): ' // trim(field_file(is)))
     err_flag = .true.;  return
   endif
   call fel_import_harmonic_field (run, field_file(is), err)
@@ -723,15 +780,16 @@ enddo
 run%ks = twopi / wf%wavelength
 
 ! The beam and field must describe the same time window: one field slice per beam slice,
-! at the same wavelength. Checked, never assumed (FINDINGS.md section 5).
+! at the same wavelength. Checked, never assumed.
 
 if (size(wf%Ex, 3) /= nslice) then
-  print '(2(a, i0))', 'fel_track_test: beam has ', nslice, ' slices but the field has ', size(wf%Ex, 3)
+  call out_io (s_error$, r_name, 'BEAM HAS \i0\ SLICES BUT THE FIELD HAS \i0\ ', &
+               i_array = [nslice, size(wf%Ex, 3)])
   err_flag = .true.;  return
 endif
 if (abs(wf%wavelength - fbeam%wavelength) > 1e-12_rp * fbeam%wavelength) then
-  print '(a, 2es20.12)', 'fel_track_test: beam and field disagree on the wavelength: ', &
-                         fbeam%wavelength, wf%wavelength
+  call out_io (s_error$, r_name, 'BEAM AND FIELD DISAGREE ON THE WAVELENGTH: \2es20.12\ ', &
+               r_array = [fbeam%wavelength, wf%wavelength])
   err_flag = .true.;  return
 endif
 
@@ -739,14 +797,17 @@ endif
 contains
 
 !------------------------------------------------------------------------------
+!+
+! Subroutine generate_seed_field (nslice_f)
+!
+! Routine to generate the seed field: a Gaussian seed at its waist in every slice,
+! E = E0*exp(-r^2/w0^2), intensity 1/e^2 radius w0, integrating to seed_power;
+! seed_power = 0 is a dark start. Grid convention matches Genesis's dgrid: ngrid points
+! spanning +-dgrid, dx = 2*dgrid/(ngrid-1), center on axis. Shared by the built-in
+! generator and the distribution import (both make their own beam, neither brings a field).
+!-
 
 subroutine generate_seed_field (nslice_f)
-
-! The field: a Gaussian seed at its waist in every slice, E = E0*exp(-r^2/w0^2),
-! intensity 1/e^2 radius w0, integrating to seed_power; seed_power = 0 is a dark start.
-! Grid convention matches Genesis's dgrid: ngrid points spanning +-dgrid,
-! dx = 2*dgrid/(ngrid-1), center on axis. Shared by the built-in generator and the
-! distribution import (both make their own beam, neither brings a field).
 
 integer nslice_f, ix, iy, is_g
 real(rp) dx_grid, e0, xg, yg
@@ -754,11 +815,11 @@ real(rp) dx_grid, e0, xg, yg
 !
 
 if (grid_n_pts < 3 .or. grid_half_width <= 0) then
-  print '(a)', 'fel_track_test: check grid_n_pts and grid_half_width.'
+  call out_io (s_error$, r_name, 'CHECK GRID_N_PTS AND GRID_HALF_WIDTH.')
   err_flag = .true.;  return
 endif
 if (seed_power > 0 .and. seed_waist_size <= 0) then
-  print '(a)', 'fel_track_test: seed_waist_size must be positive when seed_power > 0.'
+  call out_io (s_error$, r_name, 'SEED_WAIST_SIZE MUST BE POSITIVE WHEN SEED_POWER > 0.')
   err_flag = .true.;  return
 endif
 

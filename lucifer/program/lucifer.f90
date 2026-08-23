@@ -4,8 +4,8 @@
 ! FEL tracker validated against Genesis 1.3 Version 4. The PHYSICS -- coordinates and
 ! conventions, the FEL step, the field solver, slippage, loading, import, migration,
 ! collective effects, and each piece's Genesis provenance and measured validation
-! level -- lives in the manual, lucifer/doc/fel-physics.tex. Measured numbers and how
-! to run the checks: lucifer/README.md. This header documents the inputs.
+! level -- lives in the manual, lucifer/doc/fel-physics.tex. The measured numbers and
+! how to run the checks are in lucifer/README.md. This header documents the inputs.
 !
 ! The program walks a Bmad lattice and applies the seam of the design (manual
 ! sec:element, sec:seam): FEL segments are real Bmad wiggler/undulator elements with
@@ -208,13 +208,14 @@
 ! identical to the unsplit run. This checks the weighted paths, which no Genesis
 ! comparison can (Genesis dumps carry no weights).
 !
-! Outputs: <out_root>.diag.txt, ONLY with global%write_diag = T (one row per slice per record: z, slice, field and beam
-! diagnostics), <out_root>.stats.h5 (the production statistics file, manual sec:stats:
-! per-record per-slice beam moments named as bunch_params_struct components, per-record
-! per-slice wavefront_params, and the evaluated calc_bunch_params at element ends;
-! fixed Bmad units), <out_root>-final.fld.h5 and <out_root>-final.par.h5 (Genesis-format dumps
-! of the end state, for field-by-field comparison; the field dump is unrotated to time
-! order first, as writeFieldHDF5 does).
+! Outputs: <out_root>.diag.txt, ONLY with global%write_diag = T (one row per slice per
+! record: z, slice, field and beam diagnostics); <out_root>.stats.h5 (the production
+! statistics file, manual sec:stats: per-record per-slice beam moments named as
+! bunch_params_struct components, per-record per-slice wavefront_params, and the
+! evaluated calc_bunch_params at element ends; fixed Bmad units); and
+! <out_root>-final.fld.h5 and <out_root>-final.par.h5 (Genesis-format dumps of the end
+! state, for field-by-field comparison; the field dump is unrotated to time order
+! first, as writeFieldHDF5 does).
 !-
 
 program lucifer
@@ -238,12 +239,13 @@ type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k
 logical err
 character(400) param_file
+character(*), parameter :: r_name = 'lucifer'
 
 !
 
 n_arg = command_argument_count()
 if (n_arg /= 1) then
-  print '(a)', 'Usage: fel_track_test <param_file>'
+  print '(a)', 'Usage: lucifer <param_file>'
   stop 1
 endif
 call get_command_argument (1, param_file)
@@ -263,9 +265,10 @@ if (err) stop 1
 call fel_setup_schedule (run, err)
 if (err) stop 1
 
-! Check instrument: the transcribed single-particle wake kernels, for the
-! deliverable-11 cross-validation (built by fel_setup_schedule's fel_wake_init).
-! NOTE the s = 0 entries carry the Bane self-slice half factor.
+! Check instrument: export the transcribed single-particle wake kernels for
+! cross-validation against Genesis (manual sec:wakes; the kernels are built by
+! fel_setup_schedule's fel_wake_init). NOTE the s = 0 entries carry the Bane
+! self-slice half factor.
 
 if (run%wake_init%write_kernels /= '' .and. run%coll%wake%on) then
   open (newunit = iu_k, file = trim(run%wake_init%write_kernels), action = 'write')
@@ -275,7 +278,7 @@ if (run%wake_init%write_kernels /= '' .and. run%coll%wake%on) then
                                  run%coll%wake%wakegeo(i_k), run%coll%wake%wakerou(i_k)
   enddo
   close (iu_k)
-  print '(a)', 'fel_track_test: wrote wake kernels: ' // trim(run%wake_init%write_kernels)
+  call out_io (s_info$, r_name, 'Wrote wake kernels: ' // trim(run%wake_init%write_kernels))
 endif
 
 if (run%global%write_initial .or. run%global%load_only) then
@@ -286,25 +289,25 @@ if (run%global%write_initial .or. run%global%load_only) then
 endif
 
 if (run%global%load_only) then
-  print '(a)', 'fel_track_test: load_only set; initial state written, no tracking.'
+  call out_io (s_info$, r_name, 'load_only set; initial state written, no tracking.')
   stop 0
 endif
 
 call track_fel_line (run, err)
 if (err) stop 1
 
-! Final dumps. The field records are unrotated to time order first -- time window
-! position is holds record slice 1 + mod(is-1+first, nslice) -- which is what
+! Final dumps. The field records are unrotated to time order first -- position is of
+! the time window holds record slice 1 + mod(is-1+first, nslice) -- which is what
 ! Genesis's field writer does on the fly (manual sec:slippage).
 
 call fel_write_genesis4_beam (run%fbeam, trim(run%global%out_root) // '-final.par.h5', err)
 if (err) stop 1
 
-print '(a)', 'fel_track_test done.'
-if (run%global%write_diag) print '(a)', '  ' // trim(run%global%out_root) // '.diag.txt'
+call out_io (s_blank$, r_name, 'lucifer done.')
+if (run%global%write_diag) call out_io (s_blank$, r_name, '  ' // trim(run%global%out_root) // '.diag.txt')
 call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err)
 if (err) stop 1
-print '(a)', '  ' // trim(run%global%out_root) // '-final.par.h5'
+call out_io (s_blank$, r_name, '  ' // trim(run%global%out_root) // '-final.par.h5')
 
 call fel_finalize_diagnostics (run, err)
 if (err) stop 1

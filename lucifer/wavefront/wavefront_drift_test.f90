@@ -64,7 +64,9 @@ contains
 
 !------------------------------------------------------------------------------
 !+
-! Read a Genesis4 field file, drift it, write it back out.
+! Subroutine file_drift_mode ()
+!
+! Routine to read a Genesis4 field file, drift it, and write it back out.
 !-
 
 subroutine file_drift_mode ()
@@ -161,7 +163,9 @@ end subroutine file_drift_mode
 
 !------------------------------------------------------------------------------
 !+
-! Compare wavefront_drift against wavefront_drift_reference on rectangular grids.
+! Subroutine self_check_mode ()
+!
+! Routine to compare wavefront_drift against wavefront_drift_reference on rectangular grids.
 !-
 
 subroutine self_check_mode ()
@@ -217,7 +221,9 @@ end subroutine self_check_mode
 
 !------------------------------------------------------------------------------
 !+
-! One rectangular grid case: build a field, drift it both ways, compare.
+! Subroutine one_self_check (nx, ny, d_rel, err)
+!
+! Routine to run one rectangular grid case: build a field, drift it both ways, and compare.
 !-
 
 subroutine one_self_check (nx, ny, d_rel, err)
@@ -267,7 +273,9 @@ end subroutine one_self_check
 
 !------------------------------------------------------------------------------
 !+
-! Fill a wavefront with a deterministic asymmetric test field.
+! Subroutine fill_test_field (wf)
+!
+! Routine to fill a wavefront with a deterministic asymmetric test field.
 !
 ! Asymmetry is the point, and every feature below breaks a symmetry that would otherwise
 ! let a bug through. The centroid is off axis in both planes and differently in each, so an

@@ -26,8 +26,9 @@
 ! reproduces these stored values.
 !
 ! Beam moments are computed two-pass (mean first, then centered second moments -- the
-! FINDINGS 4.8 variance lesson), weighted by macroparticle charge, parallel over
-! slices with fixed-order results (each slice's sums are its own).
+! manual sec:numerics variance rule: the one-pass form loses the entire sigma to
+! cancellation), weighted by macroparticle charge, parallel over slices with
+! fixed-order results (each slice's sums are its own).
 !
 ! t and sigma_t derive from the stored chart: t = z_now/c - <z>/(beta0 c) and
 ! sigma_t = sigma_z/(beta0 c) with beta0 the reference beta -- exact for the reference
@@ -44,6 +45,14 @@ use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel
 use hdf5_interface
 
 implicit none
+
+!+
+! Structure fel_stats_struct
+!
+! The accumulated statistics of one run: the per-record per-slice beam and field
+! arrays, and the element-end evaluated bunch_params rows. Sized once by
+! fel_stats_init from exact counts precomputed on the lattice walk.
+!-
 
 type fel_stats_struct
   real(rp) :: p0c = 0                 ! Reference momentum [eV] (for norm_emit reconstruction).
@@ -101,10 +110,21 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_stats_init (stats, nrec, nend, nslice)
+! Subroutine fel_stats_init (stats, nrec, nend, nslice, p0c, two_pol, harm_extra)
 !
 ! Routine to size the accumulation arrays. nrec and nend are exact counts precomputed
 ! from the lattice walk (records = 1 + sum of undulator steps + one per interlude).
+!
+! Input:
+!   nrec           -- integer: Number of per-slice records to allocate.
+!   nend           -- integer: Number of element-end rows to allocate.
+!   nslice         -- integer: Number of beam slices.
+!   p0c            -- real(rp): Reference momentum [eV] (for norm_emit reconstruction).
+!   two_pol        -- logical: If True, allocate the second-polarization (f2_*) arrays.
+!   harm_extra(:)  -- integer: Harmonic numbers of field-set entries 2+ (may be empty).
+!
+! Output:
+!   stats          -- fel_stats_struct: Allocated accumulator with zero fill counts.
 !-
 
 subroutine fel_stats_init (stats, nrec, nend, nslice, p0c, two_pol, harm_extra)
@@ -112,7 +132,7 @@ subroutine fel_stats_init (stats, nrec, nend, nslice, p0c, two_pol, harm_extra)
 type (fel_stats_struct) stats
 real(rp) p0c
 integer nrec, nend, nslice
-integer harm_extra(:)          ! Harmonic numbers of field-set entries 2+ (may be empty).
+integer harm_extra(:)
 logical two_pol
 
 !
@@ -157,10 +177,27 @@ end subroutine fel_stats_init
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_stats_record (stats, beam, wf, slip, z_now, with_angles, err_flag)
+! Subroutine fel_stats_record (stats, beam, ff, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
 !
 ! Routine to take one per-record row: beam sufficient statistics and wavefront params
-! for every slice. with_angles fills the field theta moments (element ends).
+! for every slice. with_angles fills the field theta moments (element ends). The same
+! loop also evaluates the diag instrument for every slice, so the diag writer then
+! only prints.
+!
+! Input:
+!   stats         -- fel_stats_struct: Accumulator.
+!   beam          -- fel_beam_struct: The sliced beam.
+!   ff(:)         -- fel_field_struct: The field set; entry 1 is the fundamental.
+!   z_now         -- real(rp): Position of the record [m].
+!   with_angles   -- logical: If True fill the field theta moments (they cost FFTs,
+!                      so element ends only).
+!
+! Output:
+!   stats         -- fel_stats_struct: Row stats%irec filled.
+!   bdiag_arr(:)  -- fel_slice_diag_struct: The diag instrument, one per slice.
+!   fpow(:)       -- real(rp): fel_field_diag's power per slice [W].
+!   fonax(:)      -- real(rp): fel_field_diag's on-axis intensity per slice.
+!   err_flag      -- logical: Set True on a wavefront_params error or record overflow.
 !-
 
 subroutine fel_stats_record (stats, beam, ff, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
@@ -172,8 +209,8 @@ type (wavefront_struct), pointer :: wf
 type (fel_slice_struct), pointer :: sl
 type (wavefront_params_struct) pms
 integer io
-type (fel_slice_diag_struct) bdiag_arr(:)   ! OUT: the diag instrument, one per slice.
-real(rp) fpow(:), fonax(:)                  ! OUT: fel_field_diag's power/on-axis per slice.
+type (fel_slice_diag_struct) bdiag_arr(:)
+real(rp) fpow(:), fonax(:)
 real(rp) z_now
 logical with_angles, err_flag
 
@@ -211,7 +248,8 @@ do is = 1, nslice
   call fel_field_diag (wf, fel_field_index(ff(1)%slip, is, nslice), fpow(is), fonax(is))
   call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
-  ! Two-pass weighted moments (the FINDINGS 4.8 variance lesson).
+  ! Two-pass weighted moments -- mean first, then centered second moments (manual
+  ! sec:numerics).
 
   wsum = 0;  mean = 0
   do ip = 1, sl%n
@@ -313,6 +351,16 @@ end subroutine fel_stats_record
 ! Routine to take one element-end row: Bmad's calc_bunch_params for the whole window
 ! (all slices as one bunch in global window coordinates) and per slice -- the Tao
 ! end-of-element pattern, using Bmad's own statistics machinery.
+!
+! Input:
+!   stats     -- fel_stats_struct: Accumulator; the current record supplies the slice moments.
+!   beam      -- fel_beam_struct: The sliced beam.
+!   ele       -- ele_struct: The element just ended.
+!   z_now     -- real(rp): Position of the element end [m].
+!
+! Output:
+!   stats     -- fel_stats_struct: Row stats%iend filled.
+!   err_flag  -- logical: Set True on a conversion error or row overflow. False otherwise.
 !-
 
 subroutine fel_stats_element_end (stats, beam, ele, z_now, err_flag)
@@ -386,6 +434,14 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
+!+
+! Subroutine pack_bp (bp, row)
+!
+! Routine to flatten one bunch_params_struct into a stats row: centroid, sigma,
+! charge_live, n_particle_live, twiss_valid, then the nine twiss parameters of each
+! of the six modes.
+!-
+
 subroutine pack_bp (bp, row)
 
 type (bunch_params_struct) bp
@@ -427,6 +483,13 @@ end subroutine fel_stats_element_end
 ! Routine to write the stats file. Datasets appear to h5py with the record index first:
 ! Fortran (a, nslice, nrec) reads as (nrec, nslice, a). Units attributes are written as
 ! documentation; the units are FIXED and the attributes are never load-bearing.
+!
+! Input:
+!   stats      -- fel_stats_struct: The filled accumulator.
+!   file_name  -- character(*): File to write.
+!
+! Output:
+!   err_flag   -- logical: Set True on a write error. False otherwise.
 !-
 
 subroutine fel_stats_write (stats, file_name, err_flag)
@@ -539,6 +602,13 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
+!+
+! Subroutine write_bp_group (id, rows, err)
+!
+! Routine to write the whole-bunch bunch_params rows as named datasets under
+! group id.
+!-
+
 subroutine write_bp_group (id, rows, err)
 
 integer(hid_t) id, mm_id
@@ -565,6 +635,12 @@ err = .false.
 
 end subroutine write_bp_group
 
+!+
+! Subroutine write_twiss (id, rows, k, err)
+!
+! Routine to write the nine twiss datasets of one mode, reading rows(k+1:k+9, :).
+!-
+
 subroutine write_twiss (id, rows, k, err)
 
 integer(hid_t) id
@@ -578,6 +654,12 @@ do jp = 1, 9
 enddo
 
 end subroutine write_twiss
+
+!+
+! Subroutine write_bp_group_slices (id, rows, err)
+!
+! Routine to write the per-slice bunch_params rows as named datasets under group id.
+!-
 
 subroutine write_bp_group_slices (id, rows, err)
 

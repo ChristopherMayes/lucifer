@@ -51,18 +51,18 @@ subroutine fel_read_input (param_file, run, err_flag)
 type (fel_run_struct), target :: run
 
 ! The namelist member names, as the input file writes them.
-type (fel_global_struct) :: global
-type (wavefront_init_struct) :: wavefront_init
-type (fel_wake_init_struct) :: wake
-type (fel_efield_struct) :: sc
-type (beam_init_struct) :: beam_init
-type (fel_import_param_struct) :: imp
-character(400) :: lat_file, beam_file, dist_file, write_dist_file, write_opmd_file
-character(400) :: write_wake_kernels
-character(400) :: field_file(9)
-logical :: use_beam_init, shotnoise
-logical :: split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
-integer :: nbins
+type (fel_global_struct) global
+type (wavefront_init_struct) wavefront_init
+type (fel_wake_init_struct) wake
+type (fel_efield_struct) sc
+type (beam_init_struct) beam_init
+type (fel_import_param_struct) imp
+character(400) lat_file, beam_file, dist_file, write_dist_file, write_opmd_file
+character(400) write_wake_kernels
+character(400) field_file(9)
+logical use_beam_init, shotnoise
+logical split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
+integer nbins
 
 character(*) param_file
 logical err_flag
@@ -185,6 +185,14 @@ end subroutine fel_read_input
 ! namelist groups, to an open unit. The stats file's Meta/ provenance echo
 ! (Genesis parity: its Meta group embeds the entire input file); an embedding
 ! program may also use it to persist a configuration built in code.
+!
+! Input:
+!   run -- fel_run_struct: The run state after parsing (resolved values).
+!   iu  -- integer: Open unit to write the namelist echo to.
+!
+! Output:
+!   None beyond the write: the three groups, every value resolved, in namelist
+!   syntax (the Meta/input_echo content).
 !-
 
 subroutine fel_write_resolved_input (run, iu)
@@ -192,18 +200,18 @@ subroutine fel_write_resolved_input (run, iu)
 type (fel_run_struct), target :: run
 integer iu
 
-type (fel_global_struct) :: global
-type (wavefront_init_struct) :: wavefront_init
-type (fel_wake_init_struct) :: wake
-type (fel_efield_struct) :: sc
-type (beam_init_struct) :: beam_init
-type (fel_import_param_struct) :: imp
-character(400) :: lat_file, beam_file, dist_file, write_dist_file, write_opmd_file
-character(400) :: write_wake_kernels
-character(400) :: field_file(9)
-logical :: use_beam_init, shotnoise
-logical :: split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
-integer :: nbins
+type (fel_global_struct) global
+type (wavefront_init_struct) wavefront_init
+type (fel_wake_init_struct) wake
+type (fel_efield_struct) sc
+type (beam_init_struct) beam_init
+type (fel_import_param_struct) imp
+character(400) lat_file, beam_file, dist_file, write_dist_file, write_opmd_file
+character(400) write_wake_kernels
+character(400) field_file(9)
+logical use_beam_init, shotnoise
+logical split_weights, swap_beam_xy, gen_test_weights, imp_split_weights
+integer nbins
 
 namelist / fel_params / lat_file, global, bmad_com, space_charge_com, wake, sc, &
                         write_wake_kernels
@@ -248,6 +256,13 @@ end subroutine fel_write_resolved_input
 ! Is the namelist group &group_name present in the (open) file? A textual scan --
 ! the standard gives no portable "group absent" iostat -- tolerant of leading blanks
 ! and case.
+!
+! Input:
+!   iu         -- integer: Open unit positioned at the file start.
+!   group_name -- character(*): Namelist group name to look for (with the &).
+!
+! Output:
+!   found      -- logical: True when the group appears in the file.
 !-
 
 function group_present (iu, group_name) result (found)
@@ -285,6 +300,13 @@ end function group_present
 ! Refuse the retired flat &fel_track_params group BY NAME: list every parameter set
 ! in it together with the group and name it moved to, so migration is a mechanical
 ! edit of the input file.
+!
+! Input:
+!   param_file -- character(*): Input file name.
+!
+! Output:
+!   found      -- logical: True when the retired &fel_track_params group is present
+!                   (the caller then refuses with the parameter mapping table).
 !-
 
 function has_retired_group (param_file) result (found)

@@ -1,8 +1,8 @@
 !+
 ! Program lucifer_advance_bench
 !
-! The FEL-step particle-path microbenchmark (perf goal item 0): time fel_advance on a
-! synthetic single slice at fixed state and decompose the per-particle-step cost --
+! The FEL-step particle-path microbenchmark: time fel_advance on a synthetic single
+! slice at fixed state and decompose the per-particle-step cost --
 ! the full path, the RK4+ODE alone (no gather, fixed rpart), and the bare sin/cos
 ! pair -- so each optimization lever gets a number, not a guess. Serial on purpose:
 ! this measures the per-particle CONSTANT; parallel scaling is the perf harness's job.
@@ -137,7 +137,7 @@ enddo
 call system_clock (c1)
 t_sc = real(c1 - c0, rp) / crate
 
-print '(a, i0, a, i0, a)', 'fel_advance_bench: ', npart, ' particles x ', nstep, ' steps, serial'
+print '(a, i0, a, i0, a)', 'lucifer_advance_bench: ', npart, ' particles x ', nstep, ' steps, serial'
 print '(a, f8.2, a)', '  full fel_advance:      ', 1e9_rp * t_full / npart / nstep, ' ns/particle-step'
 print '(a, f8.2, a)', '  fel_runge_kutta only:  ', 1e9_rp * t_rk / npart / nstep, ' ns/particle-step'
 print '(a, f8.2, a)', '  4x (sin+cos) only:     ', 1e9_rp * t_sc / npart / nstep, ' ns/particle-step'

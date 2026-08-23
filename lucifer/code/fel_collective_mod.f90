@@ -44,7 +44,7 @@ implicit none
 ! Wake configuration and state: the single-particle kernels at wavelength resolution
 ! over the full window, the external loss, and the per-slice eloss they produce. built
 ! (kernels) once; the convolution is hoisted when currents cannot change and recomputed
-! at the caller's migration stride when they can (brief 4.3's premise predates
+! at the caller's migration stride when they can (the hoist's premise predates
 ! migration).
 !-
 
@@ -115,6 +115,18 @@ contains
 ! points, trapezoid half weights at every endpoint. Kept separable: this routine is
 ! the future port target into Bmad proper as a wake source, and nothing in it knows
 ! about the FEL.
+!
+! Input:
+!   radius       -- real(rp): Chamber radius (round) or half-gap (flat) [m].
+!   conductivity -- real(rp): Wall conductivity [1/(Ohm m)].
+!   relaxation   -- real(rp): AC relaxation time [s] (0 = DC).
+!   roundpipe    -- logical: Round chamber (True) or parallel plates (False).
+!   ns           -- integer: Number of kernel samples.
+!   ds           -- real(rp): Kernel sample spacing [m].
+!
+! Output:
+!   wake(:)      -- real(rp): Single-particle resistive-wall kernel [eV/(m electron)];
+!                     the s = 0 entry carries the Bane self-slice half factor.
 !-
 
 subroutine fel_resistive_wall_wake (radius, conductivity, relaxation, roundpipe, ns, ds, wake)
@@ -211,6 +223,16 @@ end subroutine fel_resistive_wall_wake
 ! Build the single-particle kernels over the window at wavelength resolution
 ! (Wake::init): material shortcuts, the three kernels, the self-loading half weight on
 ! the s = 0 bin (fel-physics.tex sec:wakes).
+!
+! Input:
+!   wake       -- fel_wake_struct: The wake description (radius, materials, roughness).
+!   nslice     -- integer: Number of beam slices.
+!   sample     -- integer: Slice spacing in wavelengths (Genesis's sample).
+!   wavelength -- real(rp): Radiation wavelength [m].
+!
+! Output:
+!   wake       -- fel_wake_struct: Kernels built (%wakeres/%wakegeo/%wakerou, %ns, %ds).
+!   err_flag   -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_wake_init (wake, nslice, sample, wavelength, err_flag)
@@ -331,6 +353,14 @@ end subroutine fel_wake_init
 ! wakes of the charge ahead of it -- averaging over the sample steps within the slice.
 ! Serial by design; the caller holds the barrier. Call once when currents cannot change
 ! (Genesis's hoisting), and at the migration stride when they can.
+!
+! Input:
+!   wake -- fel_wake_struct: Built kernels.
+!   beam -- fel_beam_struct: The beam (per-slice charge -> current profile).
+!
+! Output:
+!   wake -- fel_wake_struct: %eloss per slice, the causal convolution of the kernels
+!             with the current profile.
 !-
 
 subroutine fel_wake_update (wake, beam)
@@ -394,6 +424,14 @@ end subroutine fel_wake_update
 ! to hold the phase fixed through the kick -- the same bookkeeping fel_advance does at
 ! its exit. Parallel-safe per slice (pure per-slice arithmetic); the caller may place
 ! it inside the slice loop or outside.
+!
+! Input:
+!   wake -- fel_wake_struct: %eloss per slice.
+!   beam -- fel_beam_struct: The beam.
+!   delz -- real(rp): Step length [m].
+!
+! Output:
+!   beam -- fel_beam_struct: Every slice's particles decelerated by eloss*delz.
 !-
 
 subroutine fel_wake_apply (wake, beam, delz)
@@ -421,6 +459,16 @@ end subroutine fel_wake_apply
 ! One slice's share of fel_wake_apply, per-slice pure so it can sit inside the parallel
 ! slice loop at Genesis's position in the step (between the longitudinal advance and the
 ! second transverse half).
+!
+! Input:
+!   wake -- fel_wake_struct: %eloss per slice.
+!   beam -- fel_beam_struct: The beam.
+!   ic   -- integer: Slice index.
+!   delz -- real(rp): Step length [m].
+!
+! Output:
+!   beam -- fel_beam_struct: Slice ic's particles decelerated (chart z rescaled to
+!             hold theta, Genesis's convention).
 !-
 
 subroutine fel_wake_apply_slice (wake, beam, ic, delz)
@@ -466,6 +514,15 @@ end subroutine fel_wake_apply_slice
 ! the whole-window weighted current and rms-size profiles, in Genesis's longESC units
 ! (eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.tex
 ! sec:spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
+!
+! Input:
+!   ef       -- fel_efield_struct: Space-charge configuration.
+!   beam     -- fel_beam_struct: The beam.
+!   gamma0   -- real(rp): Reference Lorentz factor.
+!   aw       -- real(rp): Undulator parameter (parallel-velocity correction).
+!
+! Output:
+!   long_esc(:) -- real(rp): Long-range space-charge Ez per slice [eV/m scale].
 !-
 
 subroutine fel_longrange_esc (ef, beam, gamma0, aw, long_esc)
@@ -556,6 +613,16 @@ end subroutine fel_longrange_esc
 !
 ! This is the interface a Bmad-slice space-charge implementation can later fill
 ! (module header); callers depend on (beam, slice, gz2, ks) -> ez only.
+!
+! Input:
+!   ef    -- fel_efield_struct: Space-charge configuration (grid, harmonics).
+!   beam  -- fel_beam_struct: The beam.
+!   sl    -- fel_slice_struct: One slice's packed particles.
+!   gz2   -- real(rp): Longitudinal gamma^2 (with the undulator correction).
+!   ks    -- real(rp): Radiation wavenumber [1/m].
+!
+! Output:
+!   ez(:) -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
 !-
 
 subroutine fel_shortrange_ez (ef, beam, sl, gz2, ks, ez)

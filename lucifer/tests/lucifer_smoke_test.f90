@@ -33,7 +33,7 @@ character(400) lat_file, out_root(2)
 
 n_arg = command_argument_count()
 if (n_arg /= 3) then
-  print '(a)', 'Usage: fel_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>'
+  print '(a)', 'Usage: lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>'
   stop 1
 endif
 call get_command_argument (1, lat_file)
@@ -83,10 +83,10 @@ do ipass = 1, 2
   if (.not. err) call fel_finalize_diagnostics (run, err)
 
   if (err) then
-    print '(a)', 'fel_smoke_test: the library returned an error (no exit inside the library).'
+    print '(a)', 'lucifer_smoke_test: the library returned an error (no exit inside the library).'
     stop 2
   endif
-  print '(a, i0, a)', 'fel_smoke_test: pass ', ipass, ' complete.'
+  print '(a, i0, a)', 'lucifer_smoke_test: pass ', ipass, ' complete.'
 enddo
 
 call wavefront_fft_free()

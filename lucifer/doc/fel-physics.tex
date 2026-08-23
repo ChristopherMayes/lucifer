@@ -11,7 +11,7 @@
 
 \title{Lucifer, the Bmad FEL Tracker: Physics Manual}
 \author{\code{lucifer} --- \code{fel\_beam\_mod}, \code{fel\_track\_mod},
-        \code{fel\_collective\_mod}, \code{fel\_import\_mod}, \code{fel\_track\_test}}
+        \code{fel\_collective\_mod}, \code{fel\_import\_mod}, \code{liblucifer}}
 \date{\today}
 
 \begin{document}
@@ -1194,8 +1194,16 @@ oscillator or scan driver wants several passes over one state). The library
 contract: nothing in these modules stops; every error returns through
 \texttt{err\_flag} and the program decides. \texttt{track\_fel\_line} is
 re-entrant -- twice in one process is bit-identical to two processes (checked)
--- and \texttt{tests/fel\_smoke\_test.f90} drives the whole library with no
+-- and \texttt{tests/lucifer\_smoke\_test.f90} drives the whole library with no
 namelist anywhere, reproducing a namelist run dataset-identically.
+
+All terminal output goes through Bmad's \texttt{out\_io} (never \texttt{print}
+in the library), which fixes the message contract scripts parse: refusals are
+\texttt{[ERROR]}/\texttt{[FATAL]}-tagged blocks naming the offending input in
+capitals, notes are \texttt{[INFO]}/\texttt{[WARNING]} blocks, and machine-read
+data lines (the import moments and per-slice currents, the \texttt{progress:}
+lines, the written-file listing) are emitted untagged and unindented at full
+precision, so a parser matches the line's own leading text.
 
 \subsection{The comb}\label{sec:comb}
 

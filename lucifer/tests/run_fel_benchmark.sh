@@ -243,11 +243,11 @@ SEGW: line = (UND, PW)
 use, SEGW
 LAT
 
-run_assert_refusal bmax     "zero b_max"
-run_assert_refusal lperiod  "zero l_period"
-run_assert_refusal fieldmap "field_calc must be planar_model"
-run_assert_refusal lrwake   "lr (multi-bunch) wakes are not supported"
-run_assert_refusal zmax     "sr wake z_max can handle"
+run_assert_refusal bmax     "ZERO B_MAX"
+run_assert_refusal lperiod  "ZERO L_PERIOD"
+run_assert_refusal fieldmap "FIELD_CALC MUST BE PLANAR_MODEL"
+run_assert_refusal lrwake   "LR (MULTI-BUNCH) WAKES ARE NOT SUPPORTED"
+run_assert_refusal zmax     "Z_MAX CAN HANDLE"
 if [ "$GATES_OK" -ne 1 ]; then
   echo "FAIL: FEL-element assertion checks; outputs kept in: $WORK_DIR" >&2
   exit 1

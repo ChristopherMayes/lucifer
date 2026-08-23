@@ -452,7 +452,7 @@ def main():
 
     ok = refuse(exe, wd, "rf_anchor",
                 base.replace("harmonics = 1, 3", "harmonics = 3").format(extra=""),
-                "harmonics(1) must be 1")
+                "HARMONICS(1) MUST BE 1")
     print(f"--- refusal harmonics without the fundamental: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
@@ -487,7 +487,7 @@ def main():
     nomatch = nomatch.replace("harmonics = 1, 3", "harmonics = 1, 5")
     nomatch = nomatch.replace('field_file = "H3-initial.fld.h5"',
                               'field_file = "H3-initial.fld.h5", "h3both-final-h3.wf.h5"')
-    ok = refuse(exe, wd, "rf_match", nomatch, "matches NO field")
+    ok = refuse(exe, wd, "rf_match", nomatch, "MATCHES NO FIELD")
     print(f"--- refusal harmonic import matching no field: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
@@ -495,7 +495,7 @@ def main():
                                 beam="h3both-final.par.h5", field="H3-initial.fld.h5", extra="")
     genharm = genharm.replace('field_file = "H3-initial.fld.h5"',
                               'field_file = "H3-initial.fld.h5", "h3both-final-h3.fld.h5"')
-    ok = refuse(exe, wd, "rf_genh", genharm, "must be openPMD")
+    ok = refuse(exe, wd, "rf_genh", genharm, "MUST BE openPMD")
     print(f"--- refusal Genesis-format harmonic import: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 

@@ -82,7 +82,7 @@ type fel_global_struct
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
   logical :: keep_escaped_field = .false.    ! Keep the escaped-slice bank file.
-  logical :: migrate = .false.               ! Slice migration (deliverable 7).
+  logical :: migrate = .false.               ! Slice migration (manual sec:migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
 end type
@@ -244,6 +244,16 @@ contains
 ! z_last updates when the row is taken. The walk consults this rule live and the
 ! setup's nrec precompute REPLAYS it with the same z arithmetic, so the stats
 ! arrays are exact-sized in every mode.
+!
+! Input:
+!   comb_ds_save -- real(rp): The comb setting (see above).
+!   z            -- real(rp): Current position [m].
+!   z_last       -- real(rp): Position of the last row taken [m].
+!   at_end       -- logical: True at an element end.
+!
+! Output:
+!   z_last       -- real(rp): Updated when the row is taken.
+!   take         -- logical: True when a stats row is due.
 !-
 
 function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)

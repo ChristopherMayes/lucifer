@@ -1,13 +1,15 @@
 !+
 ! Module fel_track_line_mod
 !
-! THE WALK: track_fel_line(run) is the main loop of the FEL tracker, moved verbatim
-! from the driver -- FEL segments stepped with the transcribed Genesis physics,
-! every other element through the Bmad seam (or the transcribed Genesis interlude
-! model), slippage and phasing per the precomputed schedule, stats/diag records at
-! Genesis's record positions. Callable repeatedly in one process (the re-entrancy
-! contract: all state lives in run; the RNG is seeded at init). Errors return
-! through err_flag; nothing here stops.
+! The walk: track_fel_line(run) is the main loop of the FEL tracker, moved verbatim
+! from the driver. FEL segments are stepped with the transcribed Genesis physics,
+! every other element goes through the Bmad seam (or the transcribed Genesis
+! interlude model), slippage and phasing follow the precomputed schedule, and
+! stats/diag records are taken at Genesis's record positions.
+!
+! The routine is callable repeatedly in one process (the re-entrancy contract: all
+! state lives in run; the RNG is seeded at init). Errors return through err_flag;
+! nothing here stops.
 !-
 
 module fel_track_line_mod
@@ -22,12 +24,22 @@ implicit none
 contains
 
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 !+
 ! Subroutine track_fel_line (run, err_flag)
 !
-! Walk the lattice: run%i_start through run%i_end (the resolved tracking window;
-! the schedule was built on the full lattice, so a windowed run composes exactly
-! with the full one). Opens and closes the run's stream files (diag/ledger).
+! Routine to walk the lattice from run%i_start through run%i_end (the resolved
+! tracking window; the schedule was built on the full lattice, so a windowed run
+! composes exactly with the full one). Opens and closes the run's stream files
+! (diag/ledger/wake).
+!
+! Input:
+!   run       -- fel_run_struct: Run state, fully initialized.
+!
+! Output:
+!   run       -- fel_run_struct: Beam, fields, stats, and counters advanced to run%i_end.
+!   err_flag  -- logical: Set True on any tracking or I/O error. False otherwise.
 !-
 
 subroutine track_fel_line (run, err_flag)
@@ -63,6 +75,7 @@ integer(8) prog_count0, prog_count_last, prog_rate
 logical write_diag, keep_escaped_field, migrate, migrate_check, any_unavg, two_pol, err
 character(400) out_root
 character(16) interlude_model
+character(*), parameter :: r_name = 'track_fel_line'
 
 !
 
@@ -113,9 +126,6 @@ out_root = run%global%out_root
 interlude_model = run%global%interlude_model
 comb = run%global%comb_ds_save
 run%z_last_rec = -1e30_rp
-
-                               ! delay's rotations, the light-path correction, and
-                               ! the closed-bump and genesis-model refusals.
 
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
@@ -170,8 +180,8 @@ do ie = run%i_start, run%i_end
   ! lords: a wake on a superimposed or split element lives on the LORD, and ele%wake is
   ! null on its slaves (pointer_to_wake_ele; the resolution also picks exactly ONE
   ! slave of a split lord -- the one containing the lord's midpoint -- so a split wake
-  ! applies once, Bmad's own convention). Checking ele%wake directly was the deliverable
-  ! 11 hole: lord wakes fell through to the per-slice path, where Bmad applied them
+  ! applies once, Bmad's own convention). Checking ele%wake directly was once a real
+  ! hole: lord wakes fell through to the per-slice path, where Bmad applied them
   ! within single slices and noted every zero-charge filler.
 
   wake_src => pointer_to_wake_ele(ele)
@@ -195,8 +205,8 @@ do ie = run%i_start, run%i_end
       ! The concatenated wake kick would meet the quiver-carrying chart mid-segment;
       ! nothing in this mode needs element wakes, so refuse rather than approximate.
       if (associated(wake_src)) then
-        print '(a)', 'fel_track_test: element sr wakes are not supported in the unaveraged mode,'
-        print '(a)', '  at element: ' // trim(ele%name)
+        call out_io (s_error$, r_name, 'ELEMENT SR WAKES ARE NOT SUPPORTED IN THE UNAVERAGED MODE.', &
+                                       'AT ELEMENT: ' // trim(ele%name))
         err_flag = .true.;  return
       endif
       call fel_unavg_setup (und, run%ustate, ele%value(l$), und%dz, fel_spp(ie), fel_ramp(ie), err)
@@ -228,8 +238,8 @@ do ie = run%i_start, run%i_end
 
       ! Element sr wake, Bmad's once-per-passage convention mirrored: one kick at the
       ! step nearest mid-element, scaled to the full element length (scale_with_length
-      ! uses ele's l), applied across the WHOLE window (deliverable 11). Direct kick,
-      ! no transport -- this walk owns transport inside wigglers.
+      ! uses ele's l), applied across the WHOLE window (manual sec:seamwake). Direct
+      ! kick, no transport -- this walk owns transport inside wigglers.
 
       if (associated(wake_src) .and. istep == (und%nstep + 1)/2) then
         call apply_bmad_wake_kick (wake_src)
@@ -275,8 +285,8 @@ do ie = run%i_start, run%i_end
 
       ! Wake-carrying interlude: ALL slices as one bunch in global window coordinates,
       ! through Bmad's own track1_bunch, which applies the sr wake at ds_wake with the
-      ! whole window visible head to tail (deliverable 11). The per-slice path below is
-      ! untouched for everything else, keeping its numerics bit-identical.
+      ! whole window visible head to tail (manual sec:seamwake). The per-slice path below
+      ! is untouched for everything else, keeping its numerics bit-identical.
 
       call fel_concat_slices (fbeam, ele, run%wake_bunch, run%wake_beta0, err)
       if (err) then
@@ -284,7 +294,7 @@ do ie = run%i_start, run%i_end
       endif
       call track1_bunch (run%wake_bunch, ele, err)
       if (err) then
-        print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
+        call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
         err_flag = .true.;  return
       endif
       call fel_split_slices (run%wake_bunch, ele, fbeam, run%wake_beta0, .false., err)
@@ -310,7 +320,7 @@ do ie = run%i_start, run%i_end
           endif
           call track1_bunch (bunch, ele, err)
           if (err) then
-            print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
+            call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
             err_flag = .true.;  return
           endif
           call fel_bunch_to_slice (bunch, ele, fbeam%slice(is), err)
@@ -342,7 +352,7 @@ do ie = run%i_start, run%i_end
         enddo
         !$OMP end parallel do
         if (err_flag) then
-          print '(2a)', 'fel_track_test: tracking error in element ', trim(ele%name)
+          call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
           return
         endif
       endif
@@ -429,10 +439,11 @@ if (any_unavg) close (iu_ledger)
 if (run%coll%wake%on) close (iu_wake)
 
 if (migrate) then
-  print '(a, i0, a, es12.4, a)', 'fel_track_test: migration moved ', n_moved_tot, &
-        ' particles; dropped charge ', charge_dropped_tot, ' C off the window ends.'
+  call out_io (s_info$, r_name, 'Migration moved \i0\ particles; dropped charge \es12.4\ C off the window ends.', &
+               i_array = [n_moved_tot], r_array = [charge_dropped_tot])
   if (migrate_check) then
-    print '(a, es10.2)', '  worst whole-beam bunching deviation across migrations: ', b_dev_max
+    call out_io (s_info$, r_name, 'Worst whole-beam bunching deviation across migrations: \es10.2\ ', &
+                 r_array = [b_dev_max])
   endif
 endif
 
@@ -441,17 +452,21 @@ endif
 contains
 
 !------------------------------------------------------------------------------
+!+
+! Subroutine apply_bmad_wake_kick (wake_ele)
+!
+! Routine to apply one whole-window application of an element's Bmad sr wake, as a
+! pure kick (manual sec:seamwake): concatenate the slices into global window
+! coordinates, let Bmad's own machinery order and kick (track1_sr_wake: pseudomode
+! accumulation head to tail, z_long binned FFT), split back holding theta --
+! Genesis's convention for wake energy loss, the same z rescale fel_wake_apply_slice
+! does -- so the phase every deposition sees is continuous through the kick. Used
+! inside wigglers (mid-element) and after genesis-model interludes; Bmad-model
+! interludes instead go through track1_bunch, where the wake applies at ds_wake in
+! Bmad's own chart.
+!-
 
 subroutine apply_bmad_wake_kick (wake_ele)
-
-! One whole-window application of an element's Bmad sr wake, as a pure kick
-! (deliverable 11): concatenate the slices into global window coordinates, let Bmad's
-! own machinery order and kick (track1_sr_wake: pseudomode accumulation head to tail,
-! z_long binned FFT), split back holding theta -- Genesis's convention for wake energy
-! loss, the same z rescale fel_wake_apply_slice does -- so the phase every deposition
-! sees is continuous through the kick. Used inside wigglers (mid-element) and after
-! genesis-model interludes; Bmad-model interludes instead go through track1_bunch,
-! where the wake applies at ds_wake in Bmad's own chart.
 
 type (ele_struct) wake_ele
 logical err_w
@@ -472,17 +487,21 @@ end subroutine apply_bmad_wake_kick
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!+
+! Subroutine do_migrate ()
+!
+! Routine to run slice migration at the per-element stride, serial, between the
+! parallel regions (the thread check stays untouched). Called AFTER z_now is advanced,
+! so per-event drop reports carry the z of the diagnostic record they precede -- the
+! conservation timeline reconstructs exactly from the log. With migrate_check, the
+! whole-beam weighted phasor S = sum(w e^{i theta}) must satisfy
+! S_before = S_after + S_dropped to rounding: every mover's phase shifts by an exact
+! multiple of 2*pi*sample and a drop removes exactly its own term, so any deviation
+! beyond rounding is a bookkeeping bug (wrong z adjustment, weight not moved), not
+! statistics.
+!-
 
 subroutine do_migrate ()
-
-! Slice migration at the per-element stride, serial, between the parallel regions (the
-! thread check stays untouched). Called AFTER z_now is advanced, so per-event drop
-! reports carry the z of the diagnostic record they precede -- the conservation
-! timeline reconstructs exactly from the log. With migrate_check, the whole-beam
-! weighted phasor S = sum(w e^{i theta}) must satisfy S_before = S_after + S_dropped to
-! rounding: every mover's phase shifts by an exact multiple of 2*pi*sample and a drop
-! removes exactly its own term, so any deviation beyond rounding is a bookkeeping bug
-! (wrong z adjustment, weight not moved), not statistics.
 
 real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum
 integer nm
@@ -499,8 +518,8 @@ n_moved_tot = n_moved_tot + nm
 charge_dropped_tot = charge_dropped_tot + chd
 
 ! Migration changes the current profile, which the wake convolution was hoisted on
-! (brief 4.3's premise predates migration): recompute at this stride. Every recompute
-! appends a z-stamped block to <out_root>.wake.txt, so "the wake followed the currents"
+! (the hoist predates migration): recompute at this stride. Every recompute appends
+! a z-stamped block to <out_root>.wake.txt, so "the wake followed the currents"
 ! is a structural fact a check can parse without reimplementing the convolution.
 
 if (nm > 0 .and. coll%wake%on) then
@@ -508,8 +527,8 @@ if (nm > 0 .and. coll%wake%on) then
   call fel_write_wake_block (run, z_now)
 endif
 if (chd > 0) then
-  print '(a, es22.14, a, es22.14, a)', 'fel_track_test: migration dropped ', chd, &
-                                       ' C off the window ends at z = ', z_now, ' m.'
+  call out_io (s_info$, r_name, 'Migration dropped \es22.14\ C off the window ends at z = \es22.14\ m.', &
+               r_array = [chd, z_now])
 endif
 
 if (migrate_check .and. (nm > 0 .or. chd > 0)) then
@@ -523,12 +542,16 @@ end subroutine do_migrate
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!+
+! Subroutine whole_beam_phasor (s_re, s_im, wsum)
+!
+! Routine to compute the whole-beam weighted phasor sum(w e^{i theta}) and the total
+! weight over all slices. Exactly conserved across migration (moves shift phases by
+! 2*pi*sample multiples; drops are accounted separately), which is what migrate_check
+! verifies.
+!-
 
 subroutine whole_beam_phasor (s_re, s_im, wsum)
-
-! The whole-beam weighted phasor sum(w e^{i theta}) and total weight, all slices.
-! Exactly conserved across migration (moves shift phases by 2*pi*sample multiples;
-! drops are accounted separately), which is what migrate_check verifies.
 
 real(rp) s_re, s_im, wsum, theta, beta, p0_mc, w
 integer is, ip
@@ -551,15 +574,18 @@ end subroutine whole_beam_phasor
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!+
+! Subroutine write_diag_rows ()
+!
+! Routine to write one diag row per slice, slices in time-window order: beam slice is
+! against field slice fel_field_index(slip, is, nslice), the unrotation of manual
+! sec:slippage. The values are the ones the stats loop just evaluated with the SAME
+! fel_field_diag and fel_slice_diag calls, slice-parallel (each slice's arithmetic
+! identical to the old serial sweep, so this file is bit-for-bit what it always was);
+! this routine only prints. take_stats_record must have run for this record first.
+!-
 
 subroutine write_diag_rows ()
-
-! One row per slice, slices in time-window order: beam slice is against field slice
-! fel_field_index(slip, is, nslice), the unrotation of manual sec:slippage. The values
-! are the ones the stats loop just evaluated with the SAME fel_field_diag and
-! fel_slice_diag calls, slice-parallel (each slice's arithmetic identical to the old
-! serial sweep, so this file is bit-for-bit what it always was); this routine only
-! prints. take_stats_record must have run for this record first.
 
 integer is
 
@@ -576,13 +602,14 @@ end subroutine write_diag_rows
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
-subroutine write_ledger_row ()
-
-! One energy-ledger row (unaveraged mode): beam energy RELATIVE to the reference,
-! sum(w*(gamma-gamma0))*me [C*eV = J] -- relative so the per-record change is not
-! differenced off a large baseline at its own summation-rounding floor (the
-! FINDINGS 4.8 lesson) -- total window field energy sum(P_is)*slice_spacing/c [J],
-! and the kick-side change dE_step returned by fel_unavg_step. The last column is the
+!+
+! Subroutine write_ledger_row ()
+!
+! Routine to write one energy-ledger row (unaveraged mode): beam energy RELATIVE to
+! the reference, sum(w*(gamma-gamma0))*me [C*eV = J] -- relative so the per-record
+! change is not differenced off a large baseline at its own summation-rounding floor
+! (manual sec:numerics) -- total window field energy sum(P_is)*slice_spacing/c [J],
+! and the kick-side change dE_step returned by fel_unavg_step. The last columns are the
 ! cumulative energy transmitted out of the window by slippage (banked at the zero fill
 ! in fel_apply_slippage), the cumulative spontaneous deposit energy sum|dE_src|^2 (the
 ! one field-energy term the kick/deposit duality does not charge to the beam), and the
@@ -591,6 +618,9 @@ subroutine write_ledger_row ()
 ! off). In a time-dependent run the window is an open system, and the EXACTLY closing
 ! quantity is E_beam + U_field + U_escaped - U_spont + E_radiated. Wakes would be a
 ! second, unbanked exit channel; this ledger only exists where they are refused.
+!-
+
+subroutine write_ledger_row ()
 
 real(rp) e_beam, u_field, p_mc_l, g0_l
 integer is, ip
@@ -616,11 +646,14 @@ end subroutine write_ledger_row
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
-! Spontaneous radiation inside FEL elements, honoring Bmad's GLOBAL switches
-! bmad_com%radiation_damping_on / %radiation_fluctuations_on -- the same switches every
-! Bmad tracking path honors (interludes get theirs through track1; this covers the
-! custom-tracked FEL step, whose radiation reaction cannot emerge from Newton-Lorentz:
-! FINDINGS 7.27). Per record:
+!+
+! Subroutine apply_radiation ()
+!
+! Routine to apply spontaneous radiation inside FEL elements, honoring Bmad's GLOBAL
+! switches bmad_com%radiation_damping_on / %radiation_fluctuations_on -- the same
+! switches every Bmad tracking path honors (interludes get theirs through track1; this
+! covers the custom-tracked FEL step, whose radiation reaction cannot emerge from its
+! Newton-Lorentz equations of motion). Per record:
 !
 !   damping:      dgamma_j = -(2/3) r_e gamma_j^2 ku^2 aw^2 * INT g^2 ds
 !                 (each particle's own gamma; the envelope integral over the record, so
@@ -642,6 +675,7 @@ end subroutine write_ledger_row
 ! this double-counts the grid-captured band (~3% at the reference grid, bounded live by
 ! check_spontaneous.py) -- accepted, smaller than the angular-distribution estimate's
 ! own uncertainty.
+!-
 
 subroutine apply_radiation ()
 
@@ -714,10 +748,15 @@ end subroutine apply_radiation
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
-! One progress line to stdout: where the walk is and what the light and beam are
-! doing, so the slow modes (the unaveraged mode runs ~30x the averaged) show signs of
-! life. Element boundaries always print; inside elements a wall-clock throttle (2 s)
-! keeps fast runs quiet. All numbers are read from the stats row just taken.
+!+
+! Subroutine progress_line (at_element_end, i_step, n_step)
+!
+! Routine to print one progress line to stdout: where the walk is and what the light
+! and beam are doing, so the slow modes (the unaveraged mode runs ~30x the averaged)
+! show signs of life. Element boundaries always print; inside elements a wall-clock
+! throttle (2 s) keeps fast runs quiet. All numbers are read from the stats row just
+! taken.
+!-
 
 subroutine progress_line (at_element_end, i_step, n_step)
 
@@ -725,6 +764,7 @@ logical at_element_end
 integer i_step, n_step
 integer(8) now
 real(rp) elapsed
+character(200) line
 
 if (stats%irec == 0) return          ! No record yet (comb < 0): nothing to read.
 call system_clock (now)
@@ -732,17 +772,25 @@ if (.not. at_element_end .and. real(now - prog_count_last, rp) / prog_rate < 2.0
 prog_count_last = now
 elapsed = real(now - prog_count0, rp) / prog_rate
 
-print '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, es9.2, a, es9.2, a, f8.5, a, i0, a)', &
+write (line, '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, es9.2, a, es9.2, a, f8.5, a, i0, a)') &
       'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
       branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
       '  P = ', sum(stats%f_power(:, stats%irec)), ' W  U = ', sum(stats%f_energy(:, stats%irec)), &
       ' J  <|b|> = ', sum(stats%bunching(:, stats%irec)) / nslice, '  t = ', nint(elapsed), ' s'
+call out_io (s_blank$, r_name, trim(line))
 
 end subroutine progress_line
 
 !------------------------------------------------------------------------------
-
 !------------------------------------------------------------------------------
+!+
+! Subroutine take_stats_record (with_angles)
+!
+! Routine to take one stats record at the current z_now through fel_stats_record.
+! with_angles fills the field theta moments (element ends). Sets the host err_flag
+! on error.
+!-
+
 subroutine take_stats_record (with_angles)
 
 logical with_angles, serr
@@ -754,11 +802,15 @@ endif
 end subroutine take_stats_record
 
 !------------------------------------------------------------------------------
-
 !------------------------------------------------------------------------------
-! End of element: the evaluated bunch_params (the Tao end-of-element pattern) and any
-! requested dumps. Mid-run field dumps unrotate exactly as the final dump does -- the
-! rotation is a gauge, and re-zeroing slip%first keeps the mapping consistent.
+!+
+! Subroutine end_of_element ()
+!
+! Routine to handle the end of an element: the evaluated bunch_params (the Tao
+! end-of-element pattern) and any requested dumps. Mid-run field dumps unrotate
+! exactly as the final dump does -- the rotation is a gauge, and re-zeroing slip%first
+! keeps the mapping consistent.
+!-
 
 subroutine end_of_element ()
 
@@ -790,17 +842,23 @@ endif
 end subroutine end_of_element
 
 !------------------------------------------------------------------------------
-
 !------------------------------------------------------------------------------
+!+
+! Subroutine apply_slippage_banked (slippage)
+!
+! Routine to apply slippage to every field of the set and drain the escape bank when
+! the escaped field is kept. Every field slips by the same amount in
+! fundamental-wavelength units (one window, lockstep rotation; the harm argument only
+! fixes the escape bank's slice light-time for a harmonic field).
+!-
+
 subroutine apply_slippage_banked (slippage)
 
 real(rp) slippage
 integer ihh
 logical err_b
 
-! Every field of the set slips by the same amount in fundamental-wavelength units
-! (one window, lockstep rotation; the harm argument only fixes the escape bank's
-! slice light-time for a harmonic field).
+!
 
 if (keep_escaped_field) then
   do ihh = 1, n_harm

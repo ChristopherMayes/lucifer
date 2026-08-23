@@ -565,10 +565,10 @@ def main():
                        mid=OPEN_MID, modeline=TRANSCRIBED), "NOT A CLOSED BUMP"),
         lambda: refuse(exe, wd, "rf_genb", LATCHIC.format(absline="", ang="1e-3",
                        mid=CHIC_MID, modeline=TRANSCRIBED),
-                       "GENESIS-MODEL interlude", imodel="genesis"),
+                       "GENESIS-MODEL INTERLUDE", imodel="genesis"),
         lambda: refuse(exe, wd, "rf_zbig", LAT2SEG.format(absline="", zoff="0.35",
-                       gap="0.30", modeline=TRANSCRIBED), "exceeds its upstream break"),
-        lambda: refuse(exe, wd, "rf_zfirst", first, "no upstream break"),
+                       gap="0.30", modeline=TRANSCRIBED), "EXCEEDS ITS UPSTREAM BREAK"),
+        lambda: refuse(exe, wd, "rf_zfirst", first, "NO UPSTREAM BREAK"),
     ], threads_per_job=4)
     for name, ok in zip(("non-closed-bump break", "bend under genesis-model interludes",
                          "z_offset exceeding the break", "z_offset on the first element"), oks):

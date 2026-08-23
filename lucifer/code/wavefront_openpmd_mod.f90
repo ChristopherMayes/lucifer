@@ -6,7 +6,7 @@
 ! THE STANDARD DOCUMENT IS AUTHORITATIVE for this format; this module and the harness's
 ! h5py reader validate against its text independently).
 !
-! Layout decisions (design brief 7.4 resolution, 2026-08-20; manual sec:field-set):
+! Layout decisions (see the physics manual, fel-physics.tex sec:field-set):
 !
 !   /                        openPMD "2.0.0", openPMDextension "Wavefront",
 !                            basePath "/data/%T/", meshesPath "meshes/",
@@ -22,7 +22,7 @@
 !                            gridUnitSI 1, unitDimension (1,1,-3,-1,0,0,0) (V/m),
 !                            timeOffset 0, photonEnergy [J], temporalDomain 'time',
 !                            spatialDomain 'r', zCoordinate [m].
-!   .../electricField/x      complex compound {r,i} dataset, h5py-native (brief 7.1);
+!   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively;
 !   .../electricField/y      present only when the wavefront carries Ey. BOTH transverse
 !                            polarizations live in ONE file as components -- the
 !                            improvement over the Genesis format's one-per-file. The z
@@ -59,8 +59,15 @@ contains
 !+
 ! Function wavefront_file_is_openpmd (file_name) result (is_pmd)
 !
-! Format signature probe for import auto-detection: an openPMD file carries the
-! required root attribute "openPMD"; a Genesis field dump has none.
+! Routine to test whether a file is an openPMD file. This is the format signature probe
+! for import auto-detection: an openPMD file carries the required root attribute
+! "openPMD"; a Genesis field dump has none.
+!
+! Input:
+!   file_name   -- character(*): File to probe.
+!
+! Output:
+!   is_pmd      -- logical: True if the file carries the openPMD root attribute.
 !-
 
 function wavefront_file_is_openpmd (file_name) result (is_pmd)
@@ -88,13 +95,17 @@ end function wavefront_file_is_openpmd
 !+
 ! Subroutine wavefront_write_openpmd (wf, file_name, s_pos, err_flag)
 !
-! Write one wavefront as an openPMD EXT_Wavefront file (module header layout).
-! The field is in V/m already (temporalDomain 'time'), so unitSI = 1 throughout.
+! Routine to write one wavefront as an openPMD EXT_Wavefront file, using the layout
+! described in the module header. The field is in V/m already (temporalDomain 'time'),
+! so unitSI = 1 throughout.
 !
 ! Input:
 !   wf         -- wavefront_struct: The field; Ey written when allocated.
 !   file_name  -- character(*): Output file.
 !   s_pos      -- real(rp): Lattice position of the dump plane [m] (zCoordinate).
+!
+! Output:
+!   err_flag   -- logical: Set True on error, False otherwise.
 !-
 
 subroutine wavefront_write_openpmd (wf, file_name, s_pos, err_flag)
@@ -189,11 +200,20 @@ end subroutine wavefront_write_openpmd
 !+
 ! Subroutine wavefront_read_openpmd (wf, file_name, err_flag, photon_energy)
 !
-! Read an openPMD EXT_Wavefront file written to the module header's layout.
+! Routine to read an openPMD EXT_Wavefront file written to the module header's layout.
 ! Everything this reader cannot represent is refused BY NAME: a frequency-domain or
 ! k-space field, an axis order other than (z,y,x), a missing required attribute.
-! photon_energy [J] is returned so the caller can match the file to the field set
-! entry whose harmonic it carries; wf%wavelength is derived from it.
+!
+! photon_energy is returned so the caller can match the file to the field set entry
+! whose harmonic it carries; wf%wavelength is derived from it.
+!
+! Input:
+!   file_name      -- character(*): File to read.
+!
+! Output:
+!   wf             -- wavefront_struct: Wavefront read from the file.
+!   err_flag       -- logical: Set True on error, False otherwise.
+!   photon_energy  -- real(rp): Central photon energy from the file [J].
 !-
 
 subroutine wavefront_read_openpmd (wf, file_name, err_flag, photon_energy)
@@ -313,6 +333,12 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
+!+
+! Subroutine read_component (name, fld, cerr)
+!
+! Routine to read one polarisation component dataset of the mesh record into fld.
+!-
+
 subroutine read_component (name, fld, cerr)
 
 character(*) name
@@ -335,6 +361,4 @@ end subroutine read_component
 
 end subroutine wavefront_read_openpmd
 
-
-!------------------------------------------------------------------------------
 end module wavefront_openpmd_mod

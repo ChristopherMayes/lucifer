@@ -182,7 +182,7 @@ def main():
         "beginning[beta_a] = 15\nbeginning[beta_b] = 15\n", ""))
     r = run([str(smoke), "bad.bmad", "se1", "se2"], wd)
     ok = (r.returncode == 2 and "the library returned an error" in r.stdout
-          and "no beginning Twiss" in r.stdout)
+          and "NO BEGINNING TWISS" in r.stdout)
     check("a library error RETURNS (no beginning Twiss -> err to the program, exit 2)", ok,
           note=f"[exit {r.returncode}]")
 

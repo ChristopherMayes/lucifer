@@ -231,6 +231,13 @@ type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 ! this was a NAMED VALUE CHANGE -- every benchmark tier re-measured and re-recorded
 ! (README, "The particle-path cost").
 
+!+
+! Subroutine fel_sincos (theta, s, c)
+!
+! Routine to compute the (sin, cos) pair with one libm sincos call (C shim,
+! fel_sincos.c). See the named-value-change note above.
+!-
+
 interface
   subroutine fel_sincos (theta, s, c) bind(c, name = 'fel_sincos_c')
     import c_double
@@ -250,10 +257,21 @@ contains
 ! track1_custom hook: outside a driver's own FEL walk, an FEL element (a wiggler with
 ! tracking_method = custom) is just a periodic wiggler, so delegate to Bmad's standard
 ! kernel. The reference time/energy pass inside bmad_parser and any seam-side track1
-! resolve through this, so the element carries the resonant undulation delay (brief 7.5)
+! resolve through this, so the element carries the resonant undulation delay
 ! from Bmad's own code. Kept at module scope deliberately: gfortran implements pointers
 ! to internal procedures with stack trampolines, which Apple Silicon's non-executable
 ! stack turns into a segfault at the first call.
+!
+! Input:
+!   orbit     -- coord_struct: Starting orbit.
+!   ele       -- ele_struct: The FEL wiggler/undulator element.
+!   param     -- lat_param_struct: Lattice parameters.
+!   track     -- track_struct, optional: Ignored (no step-by-step recording here).
+!
+! Output:
+!   orbit     -- coord_struct: Orbit at the element exit.
+!   err_flag  -- logical: Set True if there is an error. False otherwise.
+!   finished  -- logical: Set True (the hook fully handles the element).
 !-
 
 subroutine fel_ele_as_wiggler (orbit, ele, param, err_flag, finished, track)
@@ -287,37 +305,49 @@ end subroutine fel_ele_as_wiggler
 ! the parse itself. Refusal is by name so a lattice author knows which attribute to fix.
 ! (The reference pass runs before lat_sanity_check, so these fire first; Bmad's own
 ! sanity check would also refuse a missing l_period by name if this were removed.)
+!
+! Input:
+!   ele -- ele_struct: The FEL wiggler/undulator element to validate.
+!
+! Output:
+!   None. Every violation is fatal: the message names the attribute and the program
+!   stops with a nonzero exit.
 !-
 
 subroutine fel_assert_wiggler_sane (ele)
 
 type (ele_struct) ele
 
-!
+character(*), parameter :: r_name = 'fel_assert_wiggler_sane'
+
+! These refusals fire at parse time from the tracking hooks and must end the program
+! with a NONZERO exit (the harness's refusal checks assert it). err_exit cannot be
+! used here: its deliberate integer-divide traceback bomb does not trap on arm64 and
+! its final bare stop exits 0, so the stops below stay.
 
 if (ele%field_calc /= planar_model$ .and. ele%field_calc /= helical_model$) then
-  print '(2a)', 'fel_track_test: FEL element field_calc must be planar_model or ', &
-                'helical_model (a fieldmap gets no focusing here): ' // trim(ele%name)
+  call out_io (s_fatal$, r_name, 'FEL ELEMENT FIELD_CALC MUST BE PLANAR_MODEL OR HELICAL_MODEL', &
+                                 '(A FIELDMAP GETS NO FOCUSING HERE): ' // trim(ele%name))
   stop 1
 endif
 if (ele%value(b_max$) <= 0) then
-  print '(2a)', 'fel_track_test: FEL element has zero b_max (no field, no resonance, ', &
-                'and Bmad itself would not warn): ' // trim(ele%name)
+  call out_io (s_fatal$, r_name, 'FEL ELEMENT HAS ZERO B_MAX (NO FIELD, NO RESONANCE,', &
+                                 'AND BMAD ITSELF WOULD NOT WARN): ' // trim(ele%name))
   stop 1
 endif
 if (ele%value(l_period$) <= 0) then
-  print '(2a)', 'fel_track_test: FEL element has zero l_period (osc_amplitude would be ', &
-                'silently zero): ' // trim(ele%name)
+  call out_io (s_fatal$, r_name, 'FEL ELEMENT HAS ZERO L_PERIOD (OSC_AMPLITUDE WOULD BE', &
+                                 'SILENTLY ZERO): ' // trim(ele%name))
   stop 1
 endif
 if (ele%value(kx$) /= 0) then
-  print '(2a)', 'fel_track_test: the Bmad kx roll-off attribute is not yet mapped to ', &
-                'the FEL focusing split; set kx = 0 on: ' // trim(ele%name)
+  call out_io (s_fatal$, r_name, 'THE BMAD KX ROLL-OFF ATTRIBUTE IS NOT YET MAPPED TO THE FEL FOCUSING SPLIT.', &
+                                 'POSSIBLE SOLUTION: SET KX = 0 ON: ' // trim(ele%name))
   stop 1
 endif
 if (ele%value(tilt$) /= 0 .and. ele%field_calc == helical_model$) then
-  print '(2a)', 'fel_track_test: tilt on a HELICAL FEL element is a rotation of a ', &
-                'circularly symmetric field -- a no-op that reads as a mistake: ' // trim(ele%name)
+  call out_io (s_fatal$, r_name, 'TILT ON A HELICAL FEL ELEMENT IS A ROTATION OF A CIRCULARLY', &
+                                 'SYMMETRIC FIELD -- A NO-OP THAT READS AS A MISTAKE: ' // trim(ele%name))
   stop 1
 endif
 
@@ -327,10 +357,10 @@ endif
 ! an FEL element must say its step.
 
 if (ele%value(ds_step$) == bmad_com%default_ds_step) then
-  print '(2a)', 'fel_track_test: FEL element has no integration step; set ds_step ', &
-                '(Genesis''s delz) or num_steps on: ' // trim(ele%name)
-  print '(a)',  '  (Its ds_step equals bmad_com%default_ds_step, the unset fallback. If you'
-  print '(a)',  '  really want that exact value, set it explicitly via num_steps.)'
+  call out_io (s_fatal$, r_name, 'FEL ELEMENT HAS NO INTEGRATION STEP; SET DS_STEP (GENESIS''S DELZ)', &
+                                 'OR NUM_STEPS ON: ' // trim(ele%name), &
+                                 '(ITS DS_STEP EQUALS BMAD_COM%DEFAULT_DS_STEP, THE UNSET FALLBACK. IF YOU', &
+                                 'REALLY WANT THAT EXACT VALUE, SET IT EXPLICITLY VIA NUM_STEPS.)')
   stop 1
 endif
 
@@ -348,12 +378,22 @@ end subroutine fel_assert_wiggler_sane
 ! program that leaves it null segfaults at a jump to address zero. Delegate to the
 ! standard periodic-wiggler kernel with matrix propagation, filling ele%mat6, ele%vec0
 ! and end_orb per the make_mat6_bmad convention.
+!
+! Input:
+!   ele        -- ele_struct: The FEL wiggler/undulator element.
+!   param      -- lat_param_struct: Lattice parameters.
+!   start_orb  -- coord_struct: Orbit at the element entrance.
+!
+! Output:
+!   ele        -- ele_struct: %mat6, %vec0 filled per the make_mat6_bmad convention.
+!   end_orb    -- coord_struct: Orbit at the element exit.
+!   err_flag   -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_mat6_as_wiggler (ele, param, start_orb, end_orb, err_flag)
 
 type (ele_struct), target :: ele
-type (coord_struct) :: start_orb, end_orb
+type (coord_struct) start_orb, end_orb
 type (lat_param_struct) param
 logical err_flag
 
@@ -522,7 +562,15 @@ end subroutine fel_apply_slippage
 ! The coupling factor fc(h), transcribed from Undulator::fc: helical couples the
 ! fundamental with strength aw and nothing else; planar couples odd harmonics through
 ! JJ = J_{(h-1)/2}(xi) - J_{(h+1)/2}(xi), xi = h/2 * aw^2/(1+aw^2), sign (-1)^((h-1)/2);
-! even harmonics not at all (a polarisation limitation, brief section 5).
+! even harmonics not at all (a polarisation limitation of the planar coupling).
+!
+! Input:
+!   und -- fel_und_struct: Undulator parameters (aw, helicity).
+!   h   -- integer: Harmonic number.
+!
+! Output:
+!   fc  -- real(rp): The coupling factor aw*JJ(h) (planar) or aw (helical, h = 1;
+!            0 for helical harmonics).
 !-
 
 function fel_und_coupling (und, h) result (fc)
@@ -564,6 +612,13 @@ end function fel_und_coupling
 !
 ! Transverse dependence of the undulator field, first order form used in the particle
 ! gather. Undulator::faw.
+!
+! Input:
+!   und  -- fel_und_struct: Undulator parameters (roll-off kx/ky, offsets, tilt).
+!   x, y -- real(rp): Transverse position [m].
+!
+! Output:
+!   value -- real(rp): aw(x,y), the transversely rolled-off undulator parameter.
 !-
 
 function faw (und, x, y) result (value)
@@ -591,6 +646,14 @@ end function faw
 ! Function faw2 (und, x, y) result (value)
 !
 ! Square of the transverse dependence, used in the source deposition. Undulator::faw2.
+!
+! Input:
+!   und  -- fel_und_struct: Undulator parameters (roll-off kx/ky, offsets, tilt).
+!   x, y -- real(rp): Transverse position [m].
+!
+! Output:
+!   value -- real(rp): aw^2(x,y), Genesis's faw2 (the squared roll-off used by the
+!            ponderomotive phase).
 !-
 
 function faw2 (und, x, y) result (value)
@@ -763,7 +826,7 @@ if (und%source_model == fel_source_coherent$) then
   if (g2_tot > 0) kappa = sqrt(b2_tot / (4 * pi * g2_tot))
 endif
 
-! Field solve, harmonic loop outermost (each pass is self-contained; brief 6.1). The
+! Field solve, harmonic loop outermost (each pass is self-contained; manual sec:field-set). The
 ! deposit reads the just-advanced particles, so every field sees the same beam state.
 
 do io = 1, size(ff)
@@ -819,6 +882,18 @@ end subroutine fel_track_und_step
 ! it isolates what the Bmad seam changes: the seam integrates the path-length term
 ! exactly through the quad map where this samples it once. See the benchmark README; the
 ! production configuration is the seam.
+!
+! Input:
+!   qf       -- real(rp): Quadrupole focusing strength of the interlude [1/m^2].
+!   length   -- real(rp): Interlude length [m].
+!   beam     -- fel_beam_struct: The beam.
+!   ff(:)    -- fel_field_struct: The field set (phi0 advances with the drift).
+!   coll     -- fel_collective_struct: Collective terms (space charge acts here).
+!
+! Output:
+!   beam     -- fel_beam_struct: Advanced through the interlude.
+!   ff(:)    -- fel_field_struct: phi0 advanced.
+!   err_flag -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_track_interlude_genesis (qf, length, beam, ff, coll, err_flag)
@@ -933,6 +1008,13 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
+!+
+! Subroutine interlude_transverse_half (sl, q_hat, dz)
+!
+! Routine to apply half an interlude's transverse map to one slice: the focusing
+! map per plane at the interlude's quad strength (Genesis's drift/quad composite).
+!-
+
 subroutine interlude_transverse_half (sl, q_hat, dz)
 
 type (fel_slice_struct) sl
@@ -948,6 +1030,12 @@ enddo
 end subroutine interlude_transverse_half
 
 !------------------------------------------------------------------------------
+!+
+! Subroutine interlude_advance_full_rk (sl, is)
+!
+! Routine to advance one slice's longitudinal coordinates through the interlude:
+! the field-free RK4 step (rpart = 0) plus the collective Ez, Genesis's method.
+!-
 
 subroutine interlude_advance_full_rk (sl, is)
 
@@ -1012,6 +1100,15 @@ end subroutine fel_track_interlude_genesis
 !
 ! The effective strengths (fel-physics.tex sec:natfocus): qnat_{x,y} = k_{x,y}*aw^2/
 ! (gamma0*betpar0), betpar0 = sqrt(1 - (1+aw^2)/gamma0^2), with Genesis's reference gamma.
+!
+! Input:
+!   und  -- fel_und_struct: Undulator parameters.
+!   beam -- fel_beam_struct: The beam (reference energy).
+!   sl   -- fel_slice_struct: One slice's packed particles.
+!   delz -- real(rp): Step length [m].
+!
+! Output:
+!   sl   -- fel_slice_struct: Transverse coordinates advanced by delz.
 !-
 
 subroutine fel_transverse_track (und, beam, sl, delz)
@@ -1048,7 +1145,7 @@ end subroutine fel_transverse_track
 !+
 ! Subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
 !
-! The priced transport alternative (brief 10 step 9): the transverse maps of Bmad's own
+! The priced transport alternative (manual sec:element): the transverse maps of Bmad's own
 ! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened -- quadrupole bodies
 ! via quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
 ! half-octupole edge kicks, using the TRACKING-LOCAL k1 values (7.5: never the stored
@@ -1067,6 +1164,16 @@ end subroutine fel_transverse_track
 !
 ! g_max reconstructs from aw: c*b_max = K*ku*m_e with K = aw (helical) or aw*sqrt(2)
 ! (planar), so g_max = K*ku/p0_mc.
+!
+! Input:
+!   und     -- fel_und_struct: Undulator parameters.
+!   beam    -- fel_beam_struct: The beam (reference energy).
+!   sl      -- fel_slice_struct: One slice's packed particles.
+!   delz    -- real(rp): Step length [m].
+!   leading -- logical: True for the leading half-step (entrance fringe applies).
+!
+! Output:
+!   sl      -- fel_slice_struct: Transverse coordinates advanced by delz.
 !-
 
 subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
@@ -1123,12 +1230,26 @@ enddo
 !------------------------------------------------------------------------------
 contains
 
+!+
+! Subroutine octupole_kick ()
+!
+! Routine to apply the wiggle-plane octupole-like kick of Bmad's wiggler body map
+! (the k3l term of track_a_wiggler, transcribed to the packed arrays).
+!-
+
 subroutine octupole_kick ()
 sl%py(ip) = sl%py(ip) + k3l * rel_p * kz**2 * sl%y(ip)**3 / 3
 if (und%helical) then
   sl%px(ip) = sl%px(ip) + k3l * rel_p * kz**2 * sl%x(ip)**3 / 3
 endif
 end subroutine octupole_kick
+
+!+
+! Subroutine rot_xy (x, px, y, py, c, s)
+!
+! Routine to rotate one particle's transverse coordinates by the tilt angle whose
+! cosine/sine are (c, s).
+!-
 
 subroutine rot_xy (x, px, y, py, c, s)
 
@@ -1140,6 +1261,12 @@ t1 = c * x + s * y;   y = -s * x + c * y;   x = t1
 t1 = c * px + s * py; py = -s * px + c * py; px = t1
 
 end subroutine rot_xy
+
+!+
+! Subroutine apply_mat2 (v, vp)
+!
+! Routine to apply the cached 2x2 plane map m2 to one (position, momentum) pair.
+!-
 
 subroutine apply_mat2 (v, vp)
 real(rp) v, vp, v1, v2
@@ -1159,6 +1286,15 @@ end subroutine fel_transverse_track_bmad
 ! One transverse plane's map over delz: TrackBeam::applyDrift for q_hat = 0, applyFQuad
 ! for q_hat > 0, applyDQuad for q_hat < 0, in the normalized variables of
 ! fel_transverse_track (px = P_x/p0, gz_hat = gammaz/p0, q_hat = q/p0).
+!
+! Input:
+!   delz   -- real(rp): Step length [m].
+!   q_hat  -- real(rp): Scaled focusing strength (sign selects focus/defocus/drift).
+!   x, px  -- real(rp): One transverse plane's position and momentum.
+!   gz_hat -- real(rp): Longitudinal Lorentz factor scale.
+!
+! Output:
+!   x, px  -- real(rp): Advanced through the focusing map.
 !-
 
 subroutine fel_apply_focus (delz, q_hat, x, px, gz_hat)
@@ -1213,6 +1349,19 @@ end subroutine fel_apply_focus
 ! (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
 ! using phi0_new, the common phase at the end of this step; see the module header for why
 ! this chart change is exact for RK4 and ~1 ulp for the energy.
+!
+! Input:
+!   und      -- fel_und_struct: Undulator parameters (incl. source model).
+!   beam     -- fel_beam_struct: The beam (reference energy, wavelength).
+!   sl       -- fel_slice_struct: One slice's packed particles.
+!   ff(:)    -- fel_field_struct: The field set (gathered per particle each stage).
+!   delz     -- real(rp): Step length [m].
+!   phi0_new -- real(rp): The field's phi0 after this step.
+!   coll     -- fel_collective_struct: Collective terms (wake/space-charge Ez).
+!   is       -- integer: Slice index (for the collective lookups).
+!
+! Output:
+!   sl       -- fel_slice_struct: gamma/theta (and chart z) advanced by delz.
 !-
 
 subroutine fel_advance (und, beam, sl, ff, delz, phi0_new, coll, is)
@@ -1381,6 +1530,20 @@ end subroutine fel_advance
 ! The RK4 stage bookkeeping of BeamSolver::RungeKutta, VERBATIM -- the in-place stage
 ! algebra is kept exactly for bit identity, do not "clean up" (fel-physics.tex sec:eom).
 ! ez is held fixed through the stages, as Genesis holds it.
+!
+! Input:
+!   delz   -- real(rp): Step length [m].
+!   xks    -- real(rp): Radiation wavenumber [1/m].
+!   xku    -- real(rp): Undulator wavenumber [1/m].
+!   btpar  -- real(rp): Parallel velocity beta_par.
+!   rpart  -- complex(rp): The particle's gathered field phasor times coupling.
+!   ez     -- real(rp): Collective longitudinal field at the particle [eV/m scale].
+!   gamma  -- real(rp): Particle Lorentz factor.
+!   theta  -- real(rp): Ponderomotive phase.
+!
+! Output:
+!   gamma  -- real(rp): Advanced by the RK4 step.
+!   theta  -- real(rp): Advanced by the RK4 step.
 !-
 
 subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, ez, gamma, theta)
@@ -1455,6 +1618,16 @@ end subroutine fel_runge_kutta
 ! (short-range harmonics plus the long-range loss), zero when space charge is off --
 ! in which case the arithmetic is bit-identical to the pre-collective code because
 ! subtracting a literal zero is exact.
+!
+! Input:
+!   tgam, tthet -- real(rp): Stage values of gamma and theta.
+!   xks, xku    -- real(rp): Radiation and undulator wavenumbers [1/m].
+!   btpar       -- real(rp): Parallel velocity beta_par.
+!   rpart       -- complex(rp): Field phasor times coupling.
+!   ez          -- real(rp): Collective longitudinal field.
+!
+! Output:
+!   k2gg, k2pp  -- real(rp): The stage derivatives of gamma and theta.
 !-
 
 subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, ez, k2gg, k2pp)
@@ -1488,6 +1661,20 @@ end subroutine fel_ode
 ! field's harmonic phase (fel_ode_multi). The single-field walk never calls this --
 ! fel_advance keeps the scalar path verbatim -- so the pre-harmonic arithmetic is
 ! untouched by construction.
+!
+! Input:
+!   delz     -- real(rp): Step length [m].
+!   xks, xku -- real(rp): Fundamental radiation and undulator wavenumbers [1/m].
+!   btpar    -- real(rp): Parallel velocity beta_par.
+!   rpart(:) -- complex(rp): Per-field gathered phasors times couplings.
+!   rharm(:) -- real(rp): The harmonic number of each field, as a real factor.
+!   ez       -- real(rp): Collective longitudinal field.
+!   gamma    -- real(rp): Particle Lorentz factor.
+!   theta    -- real(rp): Fundamental ponderomotive phase.
+!
+! Output:
+!   gamma    -- real(rp): Advanced by the RK4 step.
+!   theta    -- real(rp): Advanced by the RK4 step.
 !-
 
 subroutine fel_runge_kutta_multi (delz, xks, xku, btpar, rpart, rharm, ez, gamma, theta)
@@ -1563,6 +1750,17 @@ end subroutine fel_runge_kutta_multi
 ! theta -- the couplings held fixed through the stages, the harmonic phases live
 ! (BeamSolver.cpp:150). xks is the FUNDAMENTAL wavenumber (the theta equation is the
 ! fundamental's; harmonics enter the slope only through ctmp).
+!
+! Input:
+!   tgam, tthet -- real(rp): Stage values of gamma and the fundamental theta.
+!   xks, xku    -- real(rp): Fundamental radiation and undulator wavenumbers [1/m].
+!   btpar       -- real(rp): Parallel velocity beta_par.
+!   rpart(:)    -- complex(rp): Per-field phasors times couplings.
+!   rharm(:)    -- real(rp): Harmonic numbers as real factors (phase h*theta live).
+!   ez          -- real(rp): Collective longitudinal field.
+!
+! Output:
+!   k2gg, k2pp  -- real(rp): The stage derivatives of gamma and theta.
 !-
 
 subroutine fel_ode_multi (tgam, tthet, xks, xku, btpar, rpart, rharm, ez, k2gg, k2pp)
@@ -1599,6 +1797,15 @@ end subroutine fel_ode_multi
 ! Routine to map a particle position to its lower-left grid cell corner and bilinear
 ! weights. Transcribed from Field::getLLGridpoint; wx is the weight of the LOWER x point.
 ! A particle outside |x|,|y| < gridmax neither feels the field nor radiates into it.
+!
+! Input:
+!   wf      -- wavefront_struct: The field (grid geometry).
+!   x, y    -- real(rp): Transverse position [m].
+!
+! Output:
+!   ix, iy  -- integer: Lower-left grid cell of the bilinear stencil.
+!   wx, wy  -- real(rp): Fractional weights within the cell.
+!   on_grid -- logical: False when the particle is outside the grid.
 !-
 
 subroutine fel_grid_weights (wf, x, y, ix, iy, wx, wy, on_grid)
@@ -1638,6 +1845,16 @@ end subroutine fel_grid_weights
 ! loops call this per particle; wavefront_shape and gridmax are loop-invariant).
 ! The arithmetic is character-identical to fel_grid_weights -- bit-for-bit --
 ! and the caller passes gridmax = (ngrid - 1) * wf%dx / 2 exactly as computed there.
+!
+! Input:
+!   gridmax -- real(rp): Grid half-width [m].
+!   dx, dy  -- real(rp): Grid spacings [m].
+!   x, y    -- real(rp): Transverse position [m].
+!
+! Output:
+!   ix, iy  -- integer: Lower-left grid cell of the bilinear stencil.
+!   wx, wy  -- real(rp): Fractional weights within the cell.
+!   on_grid -- logical: False when the particle is outside the grid.
 !-
 
 subroutine fel_grid_weights_pre (gridmax, dx, dy, x, y, ix, iy, wx, wy, on_grid)
@@ -1680,6 +1897,16 @@ end subroutine fel_grid_weights_pre
 ! charge-normalized weights), and the guard metric (worst-plane excess kurtosis).
 ! Scale factors constant across the slice (scl_w) are NOT folded into S here; the
 ! caller applies them, so S matches the deposit's sum with part = sqrt(faw2)*w/gam.
+!
+! Input:
+!   und  -- fel_und_struct: Undulator parameters (source model, tilt frame).
+!   beam -- fel_beam_struct: The beam (reference energy, wavelength).
+!   sl   -- fel_slice_struct: One slice's packed particles.
+!   xks1 -- real(rp): Fundamental radiation wavenumber [1/m].
+!
+! Output:
+!   coh  -- fel_coherent_struct: The slice's phasor-weighted moments, LG reduction
+!             sums, Gaussianity statistics and validity flag.
 !-
 
 subroutine fel_coherent_prep (und, beam, sl, xks1, coh)
@@ -1786,6 +2013,23 @@ end subroutine fel_coherent_prep
 ! in which the rest energy and the wavenumber have cancelled. Per particle
 ! part = sqrt(faw2(x,y))*scl_w*w_j/gamma, deposited as (sin theta + i cos theta)*part
 ! with the bilinear weights, added times 2 in real space after the transform pair.
+!
+! Input:
+!   und      -- fel_und_struct: Undulator parameters (incl. source model).
+!   beam     -- fel_beam_struct: The beam (reference energy, wavelength).
+!   sl       -- fel_slice_struct: One slice's packed particles.
+!   wf       -- wavefront_struct: One field of the set.
+!   ifld     -- integer: Field-record index of the slice.
+!   delz     -- real(rp): Step length [m].
+!   harm     -- integer: This field's harmonic number.
+!   xks1     -- real(rp): Fundamental radiation wavenumber [1/m].
+!   coh      -- fel_coherent_struct, optional: The slice's coherent-source moments
+!                 (source_model = 'coherent' only).
+!   kappa    -- real(rp), optional: The fitted coherent width ratio.
+!
+! Output:
+!   wf       -- wavefront_struct: Source deposited into the slice's field record.
+!   err_flag -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_field_step (und, beam, sl, wf, ifld, delz, harm, xks1, err_flag, coh, kappa)
@@ -1898,6 +2142,14 @@ err_flag = .false.
 !------------------------------------------------------------------------------
 contains
 
+!+
+! Subroutine coherent_gaussian_source ()
+!
+! Routine to deposit the coherent-Gaussian source (manual sec:coherent-source):
+! the slice's bunching phasor as a Gaussian of the phasor-weighted second moments
+! scaled by kappa, normalized so the deposited sum equals the particle deposit's.
+!-
+
 subroutine coherent_gaussian_source ()
 
 real(rp) det, a11, a12, a22, xg, yg, dx_c, dy_c, q, gsum, gridmax
@@ -1957,6 +2209,16 @@ end subroutine fel_field_step
 ! MUST be called serially -- fel_track_und_step and fel_track_interlude_genesis call it
 ! before their parallel slice loops. fel_field_step only reads the kernel and errors on a
 ! mismatch rather than rebuilding, so that nothing writes module state concurrently.
+!
+! Input:
+!   ngrid -- integer: Grid points per side.
+!   dgrid -- real(rp): Grid half-width [m].
+!   ks    -- real(rp): Radiation wavenumber [1/m].
+!   dz    -- real(rp): Step length [m].
+!
+! Output:
+!   None directly: the module kernel cache (fel_kernels) gains an entry, and the
+!   FFTW plans are warmed serially (the parallel loops then only execute).
 !-
 
 subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz)
@@ -2033,6 +2295,15 @@ end subroutine fel_field_kernel_init
 !
 ! Look up the cached kernel entry matching all four keys exactly; 0 on a miss.
 ! Read-only, so callable from inside the parallel slice loops.
+!
+! Input:
+!   ngrid -- integer: Grid points per side.
+!   dgrid -- real(rp): Grid half-width [m].
+!   ks    -- real(rp): Radiation wavenumber [1/m].
+!   dz    -- real(rp): Step length [m].
+!
+! Output:
+!   ik    -- integer: Index into the module kernel cache (0 = not cached).
 !-
 
 function fel_kernel_index (ngrid, dgrid, ks, dz) result (ik)
@@ -2064,6 +2335,15 @@ end function fel_kernel_index
 ! sec:unaveraged) shares with the averaged solver; the caller deposits its own source.
 ! The kernel cache must have been initialized serially (fel_field_kernel_init) for
 ! this grid, wavelength and step; a mismatch errors, exactly as fel_field_step.
+!
+! Input:
+!   wf       -- wavefront_struct: The field.
+!   ifld     -- integer: Field-record index to diffract.
+!   dz       -- real(rp): Step length [m].
+!
+! Output:
+!   wf       -- wavefront_struct: The record advanced by the cached exp(K2 dz) kernel.
+!   err_flag -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_field_diffract (wf, ifld, dz, err_flag)
@@ -2123,6 +2403,14 @@ end subroutine fel_field_diffract
 !
 ! ifld is the raw record index. To report the field at time window position is, pass
 ! fel_field_index(slip, is, nslice), the unrotation of fel-physics.tex sec:slippage.
+!
+! Input:
+!   wf    -- wavefront_struct: The field.
+!   ifld  -- integer: Field-record index to evaluate.
+!
+! Output:
+!   power             -- real(rp): Radiation power of the record [W].
+!   on_axis_intensity -- real(rp): Genesis's on-axis intensity diagnostic.
 !-
 
 subroutine fel_field_diag (wf, ifld, power, on_axis_intensity)

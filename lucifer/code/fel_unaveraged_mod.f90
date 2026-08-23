@@ -1,7 +1,7 @@
 !+
 ! Module fel_unaveraged_mod
 !
-! The unaveraged verification mode (design brief 6.6; fel-physics.tex sec:unaveraged):
+! The unaveraged verification mode (fel-physics.tex sec:unaveraged):
 ! particles integrated through the undulator's REAL field -- the full Newton-Lorentz
 ! quiver, no period averaging -- with the radiation field as a co-evolving kick, so the
 ! coupling factor fc, the harmonic content, and the entry/exit behavior of the averaged
@@ -21,7 +21,7 @@
 !      a = e*A/(m_e c), with gamma exact (B does no work). The vector potential carries
 !      a sin^2 amplitude envelope g(s) over n_ramp periods at each end, with g' terms
 !      retained in b, so the quiver builds adiabatically and vanishes at the segment
-!      ends -- the averaged<->unaveraged handoff (brief 6.6's K/gamma hazard) happens
+!      ends -- the averaged<->unaveraged handoff (the K/gamma chart hazard) happens
 !      where the two momentum conventions coincide. Each handoff also applies the
 !      ramp's slippage compensation as a discrete phase jump (unavg_ramp_phase_jump:
 !      the ramped ends slip ~3 rad of optical phase less than the contracted
@@ -62,7 +62,7 @@
 ! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
 ! composition; the ballistic check is the instrument that will say when.
 !
-! Parallel over slices with the averaged step's own guarantees (deliverable 5's
+! Parallel over slices with the averaged step's own guarantees (the OpenMP design's
 ! design): disjoint particle arrays and field slices per iteration, serial kernel
 ! init, threadprivate FFT plans, per-slice energy summed in fixed order -- results
 ! are bit-identical across thread counts, and the harness checks it.
@@ -104,6 +104,17 @@ contains
 ! requested steps per period (MINERVA's envelope: 10 floor, 20-30 recommended), ramps
 ! from the requested periods. Refuses a ramp pair longer than the segment and a record
 ! step that does not hold an integer substep count.
+!
+! Input:
+!   und              -- fel_und_struct: Undulator parameters.
+!   l                -- real(rp): Segment length [m].
+!   dz_record        -- real(rp): Record step (the element's ds_step) [m].
+!   steps_per_period -- integer: Substeps per undulator period (floor 10).
+!   ramp_periods     -- real(rp): sin^2 end-ramp length in periods (0 = hard edge).
+!
+! Output:
+!   ustate           -- fel_unavg_struct: Substep grid, ramp geometry, work arrays.
+!   err_flag         -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_unavg_setup (und, ustate, l, dz_record, steps_per_period, ramp_periods, err_flag)
@@ -154,6 +165,14 @@ end subroutine fel_unavg_setup
 ! flat 1, sin^2 down over the last l_ramp -- continuous amplitude AND slope (the
 ! slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
 ! the hard-edge MUTATION configuration; the handoff check exists to catch it.
+!
+! Input:
+!   ustate -- fel_unavg_struct: Ramp geometry.
+!   s      -- real(rp): Position inside the segment [m].
+!
+! Output:
+!   gp     -- real(rp): The envelope derivative dg/ds [1/m].
+!   g      -- real(rp): The field envelope g(s) (sin^2 ramps, 1 in the body).
 !-
 
 function fel_unavg_envelope (ustate, s, gp) result (g)
@@ -195,6 +214,15 @@ end function fel_unavg_envelope
 ! terms. The transverse profiles are the near-axis models whose ponderomotive-average
 ! focusing reproduces the averaged mode's natural-focusing split exactly (planar
 ! kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec:unaveraged.
+!
+! Input:
+!   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
+!   ustate     -- fel_unavg_struct: Ramp geometry.
+!   x, y, s    -- real(rp): Position [m].
+!
+! Output:
+!   bx, by, bz -- real(rp): The analytic undulator field B = curl(a), with the
+!                   envelope's g' terms so the ramps stay divergence-free [T].
 !-
 
 subroutine fel_unavg_bfield (und, ustate, x, y, s, bx, by, bz)
@@ -256,6 +284,23 @@ end subroutine fel_unavg_bfield
 ! rate so every diagnostic row stays comparable; the optical carrier used internally
 ! is Psi = (phi0 - ku*s) - ks*tau. dE_beam returns the weighted particle energy
 ! change of this step [J] for the energy-ledger check.
+!
+! Input:
+!   und       -- fel_und_struct: Undulator parameters.
+!   ustate    -- fel_unavg_struct: Substep grid and work arrays.
+!   beam      -- fel_beam_struct: The beam in the quiver chart.
+!   wf        -- wavefront_struct: The fundamental field.
+!   slip      -- fel_slip_struct: The rotating field record.
+!   dz_record -- real(rp): The record step to advance by [m].
+!   first     -- logical: True on the segment's first record step (entry handoff).
+!   last      -- logical: True on the last (exit handoff and ramp phase jump).
+!
+! Output:
+!   beam      -- fel_beam_struct: Advanced by Newton-Lorentz RK4 through the field.
+!   wf        -- wavefront_struct: Sources deposited, records diffracted.
+!   dE_beam   -- real(rp): The step's kick-side beam energy change [J] (ledger).
+!   dU_spont  -- real(rp): The step's spontaneous source energy [J] (ledger).
+!   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
 subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, dU_spont, err_flag)
@@ -337,7 +382,7 @@ dE_slice = 0
 dU_sp_slice = 0
 any_err = .false.
 
-! Parallel over slices, the averaged step's own design (deliverable 5): each slice
+! Parallel over slices, the averaged step's own design: each slice
 ! touches only its own particle arrays and its own field slice (the beam-to-field
 ! mapping is a bijection), the kernel cache is read-only here (initialized serially
 ! above), the FFT plan cache is threadprivate, and the per-slice energy lands in

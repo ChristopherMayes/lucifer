@@ -105,6 +105,32 @@ fel_source_coherent$
 fel_transcribed$
 fel_averaged$
 fel_unaveraged$
+fel_ele_as_wiggler
+fel_assert_wiggler_sane
+fel_mat6_as_wiggler
+fel_field_index
+fel_apply_slippage
+fel_und_coupling
+faw
+faw2
+fel_track_und_step
+fel_track_interlude_genesis
+fel_transverse_track
+fel_transverse_track_bmad
+fel_apply_focus
+fel_advance
+fel_runge_kutta
+fel_ode
+fel_runge_kutta_multi
+fel_ode_multi
+fel_grid_weights
+fel_grid_weights_pre
+fel_coherent_prep
+fel_field_step
+fel_field_kernel_init
+fel_kernel_index
+fel_field_diffract
+fel_field_diag
 
 File: code/fel_init_mod.f90
 fel_init_mod
