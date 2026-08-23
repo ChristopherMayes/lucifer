@@ -51,6 +51,7 @@ type (fel_beam_struct), pointer :: fbeam
 type (beam_init_struct), pointer :: beam_init
 type (fel_import_param_struct) imp
 character(400) beam_file, dist_file, write_dist_file, write_opmd_file
+character(400) out_root
 character(400) field_file(9)
 logical use_beam_init, shotnoise, gen_test_weights, imp_split_weights
 logical split_weights, swap_beam_xy, err
@@ -81,6 +82,7 @@ imp_split_weights = run%bparam%imp_split_weights
 split_weights = run%bparam%split_weights
 swap_beam_xy = run%bparam%swap_beam_xy
 ran_seed = run%global%ran_seed
+out_root = run%global%out_root
 field_file = run%field_file
 lambda0 = run%winit%lambda0
 window_length = run%winit%window_length
@@ -528,7 +530,7 @@ subroutine import_initial_state ()
 type (beam_struct), target :: beam_b
 type (bunch_struct), pointer :: bp
 real(rp) moments(11)
-integer is_g, ip_g, n0
+integer is_g, ip_g, n0, iu_i
 logical err_i
 character(400) line
 character(*), parameter :: r_name = 'import_initial_state'
@@ -613,16 +615,23 @@ endif
 call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
              i_array = [size(fbeam%slice), imp%npart])
 
-! The RNG-free data lines the exactness checks parse (check_import.py parse_stdout):
-! full precision, exact format, s_blank$ so the text is bare.
+! The RNG-free instruments the exactness checks read -- the analysis moments and the
+! per-slice current profile -- go to a FILE, not stdout: stdout is for humans and
+! nslice current lines are not (manual sec:program). Full precision, one row per slice.
+! Written here, at import time, because load_only stops before tracking.
 
-write (line, '(a, 11es24.15e3)') 'import moments (gavg xavg pxavg yavg pyavg ex ey bx by ax ay):', moments
-call out_io (s_blank$, r_name, trim(line))
+open (newunit = iu_i, file = trim(out_root) // '.import.txt', action = 'write')
+write (iu_i, '(a)') '# The distribution import, at full precision. Machine-readable; stdout is not.'
+write (iu_i, '(a, i0, a, i0)') '# nslice = ', size(fbeam%slice), '   npart_per_slice = ', imp%npart
+write (iu_i, '(a)') '# moments: gavg xavg pxavg yavg pyavg ex ey bx by ax ay'
+write (iu_i, '(a, 11es24.15e3)') 'moments', moments
+write (iu_i, '(a)') '#  slice            current [A]'
 do is_g = 1, size(fbeam%slice)
-  write (line, '(a, i0, a, es24.15e3)') 'import current ', is_g, ': ', &
+  write (iu_i, '(a, i0, a, es24.15e3)') 'current ', is_g, ' ', &
         c_light * sum(fbeam%slice(is_g)%weight(1:fbeam%slice(is_g)%n)) / fbeam%slice_spacing
-  call out_io (s_blank$, r_name, trim(line))
 enddo
+close (iu_i)
+call out_io (s_info$, r_name, 'Wrote ' // trim(out_root) // '.import.txt (moments and the current profile).')
 
 end subroutine import_initial_state
 

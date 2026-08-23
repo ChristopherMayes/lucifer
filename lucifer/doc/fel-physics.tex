@@ -1198,12 +1198,26 @@ re-entrant -- twice in one process is bit-identical to two processes (checked)
 namelist anywhere, reproducing a namelist run dataset-identically.
 
 All terminal output goes through Bmad's \texttt{out\_io} (never \texttt{print}
-in the library), which fixes the message contract scripts parse: refusals are
-\texttt{[ERROR]}/\texttt{[FATAL]}-tagged blocks naming the offending input in
-capitals, notes are \texttt{[INFO]}/\texttt{[WARNING]} blocks, and machine-read
-data lines (the import moments and per-slice currents, the \texttt{progress:}
-lines, the written-file listing) are emitted untagged and unindented at full
-precision, so a parser matches the line's own leading text.
+in the library): refusals are \texttt{[ERROR]}/\texttt{[FATAL]}-tagged blocks
+naming the offending input in capitals, notes are
+\texttt{[INFO]}/\texttt{[WARNING]} blocks.
+
+\textbf{stdout is for humans, and parsing it is discouraged.} It is formatted for
+reading -- units chosen for the eye, columns aligned, wording free to improve -- and
+carries no contract beyond that. Everything a program should read is written to a
+FILE at full precision: the per-record diagnostics
+(\texttt{<out\_root>.diag.txt}), the unaveraged energy ledger
+(\texttt{.ledger.txt}), the distribution import's analysis moments and per-slice
+current profile (\texttt{.import.txt}, written at import time so it exists under
+\texttt{load\_only}), the per-event slice-migration record
+(\texttt{.migration.txt}), and of course \texttt{.stats.h5} and the dumps. This is
+Tao's division: \texttt{show ele} is for people, \texttt{show value} and pytao are
+for precision.
+
+There is exactly ONE exception, and it is deliberate: a refusal must be recognizable
+BY NAME, so the validation suite matches the ALL-CAPS text of a refusal together with
+a nonzero exit status. Those texts are therefore a supported contract and change only
+with their checks, in the same commit. Nothing else in stdout is.
 
 \subsection{The comb}\label{sec:comb}
 

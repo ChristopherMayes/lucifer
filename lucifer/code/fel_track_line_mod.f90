@@ -65,6 +65,7 @@ type (fel_slice_diag_struct), pointer :: bdiag_arr(:)
 real(rp), pointer :: fpow_arr(:), fonax_arr(:)
 real(rp), pointer :: z_now, u_spont_cum, e_rad_cum, charge_dropped_tot, b_dev_max
 integer, pointer :: n_moved_tot, iu_diag, iu_ledger, iu_wake
+integer iu_mig
 
 type (bunch_struct) bunch
 type (fel_und_struct) und
@@ -152,6 +153,14 @@ endif
 n_moved_tot = 0
 charge_dropped_tot = 0
 b_dev_max = 0
+
+! The migration stream, one row per event, opened like the diag and ledger streams.
+
+if (migrate) then
+  open (newunit = iu_mig, file = trim(out_root) // '.migration.txt', action = 'write')
+  write (iu_mig, '(a)') '# Slice migration, one row per event. Machine-readable; stdout is not.'
+  write (iu_mig, '(a)') '#          s [m]        moved      charge_dropped [C]     phasor_deviation'
+endif
 
 ! Progress goes to stdout, throttled by wall clock (slow modes print a steady trickle,
 ! fast runs just the element boundaries); scripts that redirect stdout get it as their
@@ -446,12 +455,14 @@ if (any_unavg) close (iu_ledger)
 if (run%coll%wake%on) close (iu_wake)
 
 if (migrate) then
-  call out_io (s_info$, r_name, 'Migration moved \i0\ particles; dropped charge \es12.4\ C off the window ends.', &
+  write (iu_mig, '(a)') '#'
+  write (iu_mig, '(a, i0)') 'moved ', n_moved_tot
+  write (iu_mig, '(a, es24.15e3)') 'charge_dropped_total ', charge_dropped_tot
+  if (migrate_check) write (iu_mig, '(a, es24.15e3)') 'worst_bunching_deviation ', b_dev_max
+  close (iu_mig)
+  call out_io (s_info$, r_name, 'Migration moved \i0\ particles, dropped \es12.4\ C off the window ends;' // &
+               ' per-event rows in ' // trim(out_root) // '.migration.txt', &
                i_array = [n_moved_tot], r_array = [charge_dropped_tot])
-  if (migrate_check) then
-    call out_io (s_info$, r_name, 'Worst whole-beam bunching deviation across migrations: \es10.2\ ', &
-                 r_array = [b_dev_max])
-  endif
 endif
 
 
@@ -510,7 +521,7 @@ end subroutine apply_bmad_wake_kick
 
 subroutine do_migrate ()
 
-real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum
+real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum, dev
 integer nm
 
 if (.not. migrate) return
@@ -533,16 +544,21 @@ if (nm > 0 .and. coll%wake%on) then
   call fel_wake_update (coll%wake, fbeam)
   call fel_write_wake_block (run, z_now)
 endif
-if (chd > 0) then
-  call out_io (s_info$, r_name, 'Migration dropped \es22.14\ C off the window ends at z = \es22.14\ m.', &
-               r_array = [chd, z_now])
-endif
-
+dev = 0
 if (migrate_check .and. (nm > 0 .or. chd > 0)) then
   call whole_beam_phasor (sa_re, sa_im, wsum)
   if (wsum > 0) then
-    b_dev_max = max(b_dev_max, sqrt((sb_re - sa_re - d_re)**2 + (sb_im - sa_im - d_im)**2) / wsum)
+    dev = sqrt((sb_re - sa_re - d_re)**2 + (sb_im - sa_im - d_im)**2) / wsum
+    b_dev_max = max(b_dev_max, dev)
   endif
+endif
+
+! One row per event, at full precision, to the migration file: the charge that left the
+! window ends and where, plus the phase-continuity residual. A file, not stdout, because
+! this is data (manual sec:program).
+
+if (nm > 0 .or. chd > 0) then
+  write (iu_mig, '(es22.14, i12, 2es24.15e3)') z_now, nm, chd, dev
 endif
 
 end subroutine do_migrate

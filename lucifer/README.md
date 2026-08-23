@@ -946,6 +946,31 @@ Known scaling limit, named for the follow-on: the stats accumulate in memory and
 once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.
 
+## Output: stdout is for humans, files are for programs
+
+The program's terminal output is formatted for reading and carries no contract beyond
+that: units chosen for the eye, columns aligned, wording free to improve. **Parsing it
+is discouraged.** Everything a program should read is written to a file, at full
+precision:
+
+| File | What |
+|---|---|
+| `<out_root>.stats.h5` | The run: per-record and element-end beam, field and Twiss data (see the diagnostics section) |
+| `<out_root>-final.par.h5`, `-final.fld.h5` | Final beam and field, Genesis conventions; `.wf.h5` for openPMD |
+| `<out_root>.diag.txt` | The per-record Genesis-comparison instrument, one row per slice per record |
+| `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
+| `<out_root>.import.txt` | The distribution import's analysis moments and per-slice current profile. Written at import time, so it exists under `load_only = T` |
+| `<out_root>.migration.txt` | Slice migration: one row per event (s, particles moved, charge dropped, phase-continuity residual) plus the run summary |
+
+This is Tao's division of labour — `show ele` is for people, `show value` and pytao are
+for precision — and it is why the validation suite reads files rather than scraping the
+screen.
+
+There is exactly **one** deliberate exception. A refusal has to be recognizable *by
+name*, so the checks match the ALL-CAPS text of a refusal together with a nonzero exit
+status. Those texts are a supported contract and change only together with their
+checks, in the same commit. Nothing else printed to the terminal is.
+
 ## Two polarizations: vector radiation, tilt honored, the crossed undulator
 
 The radiation carries (Ex, Ey) when any FEL element is TILTED -- `UNDY: UNDX,

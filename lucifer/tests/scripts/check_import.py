@@ -166,14 +166,23 @@ def write_nml(path, root, seed, extra="", source=BEAM_INIT_SOURCE):
                               sample=SAMPLE, nslice=NSLICE, source=source, extra=extra)))
 
 
-def parse_stdout(log):
-    """The RNG-free lines the exactness checks read: moments and per-slice currents."""
-    text = pathlib.Path(log).read_text()
-    m = re.search(r"import moments \([^)]*\):\s*(.*)", text)
-    moments = np.array([float(v) for v in m.group(1).split()])
-    currents = np.array([float(line.rsplit(":", 1)[1])
-                         for line in text.splitlines() if line.startswith("import current ")])
-    return moments, currents
+def read_import_file(wd, root):
+    """The RNG-free instruments the exactness checks read -- the analysis moments and the
+    per-slice current profile -- from <out_root>.import.txt. Program stdout is for humans
+    and is deliberately not parsed (manual sec:program)."""
+    path = pathlib.Path(wd) / (root + ".import.txt")
+    moments = None
+    currents = []
+    for line in path.read_text().splitlines():
+        if line.startswith("#"):
+            continue
+        if line.startswith("moments"):
+            moments = np.array([float(v) for v in line.split()[1:]])
+        elif line.startswith("current "):
+            currents.append(float(line.split()[2]))
+    if moments is None:
+        raise RuntimeError(f"no moments row in {path}")
+    return moments, np.array(currents)
 
 
 def load_dump_currents(fn):
@@ -219,7 +228,7 @@ def main():
               extra='  write_dist_file = "impdist.h5"\n'
                     '  write_opmd_file = "impopmd.h5"\n  load_only = T\n')
     run([args.exe, "imp_ref.nml"], w/"imp_ref.log", env=env1)
-    mom_ref, cur_ref = parse_stdout(w/"imp_ref.log")
+    mom_ref, cur_ref = read_import_file(w, "impref")
 
     # moments sanity: the bunch is generated matched to the lattice Twiss by
     # init_beam_distribution; the measured whole-bunch moments must carry the spec.
@@ -252,7 +261,7 @@ def main():
     write_nml(w/"imp_split.nml", "impsplit", 1000,
               extra='  imp_split_weights = T\n  load_only = T\n')
     run([args.exe, "imp_split.nml"], w/"imp_split.log", env=env1)
-    mom_s, cur_s = parse_stdout(w/"imp_split.log")
+    mom_s, cur_s = read_import_file(w, "impsplit")
     dm = np.abs(mom_s - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_s - cur_ref).max() / max(cur_ref.max(), 1e-30)
     print(f"split-weight invariance: moments {dm:.3e}, currents {dc:.3e}")
@@ -267,7 +276,7 @@ def main():
               extra='  load_only = T\n',
               source='  dist_file = "impopmd.h5"\n')
     run([args.exe, "imp_opmd.nml"], w/"imp_opmd.log", env=env1)
-    mom_o, cur_o = parse_stdout(w/"imp_opmd.log")
+    mom_o, cur_o = read_import_file(w, "impopmd")
     dm = np.abs(mom_o - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_o - cur_ref).max() / max(cur_ref.max(), 1e-30)
     print(f"openPMD round trip (write_opmd_file -> dist_file): moments {dm:.3e}, currents {dc:.3e}")

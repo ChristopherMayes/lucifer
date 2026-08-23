@@ -78,6 +78,28 @@ def run(exe, wd, nml_name, text):
     return r.stdout
 
 
+def read_migration_file(wd, root):
+    """Per-event migration rows and the summary from <out_root>.migration.txt. Program
+    stdout is for humans and is deliberately not parsed (manual sec:program).
+    Returns (moved, worst_bunching_deviation, [(s, charge_dropped), ...])."""
+    moved = 0
+    bdev = 0.0
+    drops = []
+    for line in (pathlib.Path(wd) / (root + ".migration.txt")).read_text().splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        f = line.split()
+        if f[0] == "moved":
+            moved = int(f[1])
+        elif f[0] == "worst_bunching_deviation":
+            bdev = float(f[1])
+        elif f[0] == "charge_dropped_total":
+            pass
+        else:
+            drops.append((float(f[0]), float(f[2])))
+    return moved, bdev, drops
+
+
 def in_window_charge(diag_file):
     d = np.loadtxt(diag_file)
     ns = int(d[:, 1].max())
@@ -104,10 +126,7 @@ def main():
     # 1 + 2: conservation and phase continuity under heavy migration.
     out = run(exe, wd, "migc.nml", BASE.format(lat="aramis.bmad", root="migc",
               sig_pz="5.282703940115e-03", emit="4e-7", npart=1024, slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9", mig="T"))
-    moved = int(re.search(r"Migration moved (\d+)", out).group(1))
-    bdev = float(re.search(r"bunching deviation across migrations:\s+(\S+)", out).group(1))
-    drops = [(float(m[1]), float(m[0])) for m in
-             re.findall(r"dropped\s+(\S+) C off the window ends at z =\s+(\S+)", out)]
+    moved, bdev, drops = read_migration_file(wd, "migc")
     z, q_win = in_window_charge(wd / "migc.diag.txt")
     q0 = q_win[0]
     worst = max(abs(q_win[i] + sum(q for zd, q in drops if zd <= zr + 1e-9) - q0) / q0
@@ -141,7 +160,7 @@ def main():
     for mig, root in (("F", "mignf"), ("T", "mignt")):
         out = run(exe, wd, f"{root}.nml", BASE.format(lat="aramis_1seg.bmad", root=root,
                   sig_pz="8.804506566858e-08", emit="1e-13", npart=256, slen="1.2e-9", q="1.200830742713e-14", half="6e-10", mig=mig))
-    moved = int(re.search(r"Migration moved (\d+)", out).group(1))
+    moved = read_migration_file(wd, "mignt")[0]
     diag_eq = (wd / "mignf.diag.txt").read_bytes() == (wd / "mignt.diag.txt").read_bytes()
     d_eq = all(dumps_equal(wd / f"mignf-final.{s}.h5", wd / f"mignt-final.{s}.h5")
                for s in ("fld", "par"))
