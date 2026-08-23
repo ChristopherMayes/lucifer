@@ -184,7 +184,14 @@ do ie = run%i_start, run%i_end
   ! hole: lord wakes fell through to the per-slice path, where Bmad applied them
   ! within single slices and noted every zero-charge filler.
 
-  wake_src => pointer_to_wake_ele(ele)
+  ! With bmad_com%sr_wakes_on off, track1_bunch applies no wake and the whole-window
+  ! concatenation below buys nothing but its serial cost: a wake-carrying element then
+  ! routes like any other interlude (the slice loop, parallel). Measured on a user's
+  ! 103-element line with 74 wake pipes at 12 threads: the switch was the difference
+  ! between the serial and parallel interlude paths for the entire lattice.
+
+  wake_src => null()
+  if (bmad_com%sr_wakes_on) wake_src => pointer_to_wake_ele(ele)
   if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
 
   if (is_fel(ie)) then
