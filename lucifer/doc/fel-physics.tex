@@ -1211,8 +1211,8 @@ precision, so a parser matches the line's own leading text.
 name and semantics verbatim (Tao's \texttt{comb\_ds\_save}; ``$< 0$ $\Rightarrow$
 no comb calculated''): negative keeps NO per-record rows at all (the
 \texttt{element\_end/} arrays, dumps and finals remain -- with no records the
-element-end slice evaluation falls back to Bmad's own
-\texttt{calc\_bunch\_params} per slice); zero (the default) records every
+element-end moments are taken by one parallel sweep over slices instead of being
+read from the current record); zero (the default) records every
 position, bit-for-bit today's file; positive records a row when $z$ has
 advanced \texttt{comb\_ds\_save} past the last one, element ends always. The
 one deliberate deviation from Tao is the default (0 where Tao uses $-1$):
@@ -1220,9 +1220,33 @@ our per-record arrays are the primary stats contract where Tao's comb is an
 optional extra. The rule lives in ONE place (\texttt{fel\_comb\_take});
 the setup's record-count precompute replays it with the walk's own $z$
 arithmetic, so the stats arrays are exact-sized in every mode. The
-\texttt{diag} file and the unaveraged ledger follow the comb; on the profiled
-fodo cell the diagnostics were 28\% of wall time, so the comb is also the top
-remaining performance lever.
+\texttt{diag} file and the unaveraged ledger follow the comb.
+
+Either way the element-end row for the WHOLE WINDOW is assembled from the per-slice
+moments by the pooled-covariance identity,
+\begin{equation}
+  m = \frac{\sum_s w_s m_s}{\sum_s w_s}, \qquad
+  S = \frac{\sum_s w_s \left[ S_s + (m_s - m)(m_s - m)^{\mathsf T} \right]}{\sum_s w_s},
+  \label{eq:pool}
+\end{equation}
+never by concatenating the window's particles into one bunch. The between-group term
+is what makes \eqref{eq:pool} exact rather than an average of covariances. Each slice
+enters moved from its local $z$ chart to the global window chart; because
+\texttt{fel\_concat\_slices} places a particle at $z_{\rm global} = z_{\rm local} +
+\beta (i_s - 1)\Delta$ with the particle's own $\beta$, that move is a SHEAR of
+$(z, p_z)$ once $\beta$ is linearized about the slice's mean $p_z$, and the pool
+applies it as $S \to J S J^{\mathsf T}$ with the single off-diagonal
+$J_{56} = (i_s - 1)\Delta \, {\rm d}\beta/{\rm d}p_z$. The residual is second order
+in that expansion.
+
+\begin{validation}
+check\_diagnostics reproduces \eqref{eq:pool} and its shear independently and holds
+the stored row to it, and confirms the between-group term is load-bearing (dropping it
+moves the row by order unity). Against the particle sum it replaced: worst relative
+4.0e-12 over every whole-window quantity on that configuration, 5.0e-11 over the
+96-slice SASE example's 48 element ends. It removed 110 million single-threaded
+particle visits from a 131-slice run (16.5\% of its wall clock).
+\end{validation}
 
 \subsection{The tracking window}\label{sec:window}
 

@@ -896,6 +896,36 @@ the tracker 12% faster, net. Per-slice element-end twiss is evaluated through Bm
 own calc_emittances_and_twiss_from_sigma_matrix FED FROM the already-computed
 per-record moments (an element end always coincides with its last record), not by
 re-summing particles.
+
+The WHOLE-WINDOW element-end row is assembled the same way, from the per-slice
+moments, by the pooled-covariance identity
+
+    m = Sum_s w_s m_s / Sum_s w_s
+    S = Sum_s w_s [S_s + (m_s - m)(m_s - m)^T] / Sum_s w_s
+
+with each slice moved from its local z chart to the global window chart. That move is
+not a plain offset: `fel_concat_slices` places a particle at
+z_global = z_local + beta*(is-1)*spacing with the particle's OWN beta, so within a
+slice z depends on pz. Linearizing beta about the slice's mean pz makes the move an
+exact shear of (z, pz), and the pool applies it as S -> J S J^T with the single
+off-diagonal J(5,6) = (is-1)*spacing*dbeta/dpz. This replaced a concatenation of every
+particle in the window into one bunch plus Bmad's full 6D moments and Twiss on it, at
+every element end -- 110 million particle visits on a 131-slice x 8192 case, all on
+one thread. Measured against that particle sum when it landed: 4.0e-12 worst relative
+over every whole-window quantity on the diagnostics config, 5.0e-11 over 48 element
+ends of the 96-slice SASE example. Cost: the SASE example went 28.2 -> 26.7 s, and a
+131-slice x 8192, 103-element case went 137.7 -> 126.9 s with core utilization
+931% -> 1048% (the serial block it removed was 16.5% of that run's wall clock).
+Across every configuration the harness runs, the element-end rows moved by 1e-15 to
+1e-13 on most configs, with the moments themselves (centroid, sigma) worst at 2.7e-9
+and a tail reaching 1.1e-7 confined to the normal modes' `eta`/`etap` -- dispersion
+parameters that are ratios of near-cancelling small terms, so their relative agreement
+says more about their conditioning than about either computation. The same caution
+applies to whole beams: on a degenerate one (a window resampled far shorter than its
+bunch, where the transverse moments nearly vanish) the z cross terms agree only to
+4e-6 relative while agreeing to 1e-29 ABSOLUTE -- physically the same number. That is
+why the check measures on a physical configuration, and why it compares the whole
+matrix rather than chasing the relative error of an individual near-zero entry.
 Known scaling limit, named for the follow-on: the stats accumulate in memory and write
 once (demo: 64 MB); a tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.

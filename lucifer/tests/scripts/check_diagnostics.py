@@ -33,7 +33,7 @@ import numpy as np
 from nml import to_groups
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from bunch_params_from_stats import bunch_params_at, pool_wavefront  # noqa: E402
+from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
 
 FAILED = False
 
@@ -121,6 +121,63 @@ def main():
                 worst = max(worst, abs(m0 - s0) / max(abs(s0), 1e-30))
         # Measured 4.6e-8 (numpy eig vs mat_eigen); the projected planes agree exactly.
         check("stats: bunch_params reconstruction vs stored calc_bunch_params", worst, 1e-6)
+
+        # 1b. The whole-window row is ASSEMBLED from the per-slice moments by the
+        # pooled-covariance identity rather than summed over particles. Re-implement the
+        # identity here, independently, including the local-to-global z map: a shift of
+        # beta*(is-1)*spacing plus the pz shear that map carries because beta is the
+        # particle's own. Measured against the particle sum when this landed: 4.0e-12 on
+        # this config, 5.0e-11 on the 96-slice SASE example.
+        spacing = 1e-10           # lambda0 * window_sample of the NML above.
+        p0_mc = float(h5["p0c"][0]) / M_ELECTRON
+        worst_pool = 0.0
+        worst_nobg = 0.0
+        for ie in range(ee["bunch/sigma"].shape[0]):
+            cen = ee["slice/centroid"][ie]
+            sig = ee["slice/sigma"][ie]
+            wsl = ee["slice/charge_live"][ie]
+            wtot = wsl.sum()
+            if wtot <= 0:
+                continue
+            pmc = p0_mc * (1.0 + cen[:, 5])
+            beta = pmc / np.sqrt(pmc**2 + 1)
+            ell = np.arange(len(wsl)) * spacing
+            shear = ell * p0_mc / np.sqrt(pmc**2 + 1)**3
+            cg = cen.copy()
+            cg[:, 4] = cg[:, 4] + beta * ell
+            m = (wsl[:, None] * cg).sum(0) / wtot
+            pooled = np.zeros((6, 6))
+            nobg = np.zeros((6, 6))
+            for isl in range(len(wsl)):
+                s6 = sig[isl].reshape(6, 6).copy()
+                k = shear[isl]
+                s0 = sig[isl].reshape(6, 6)
+                s6[4, 4] = s0[4, 4] + 2 * k * s0[4, 5] + k * k * s0[5, 5]
+                for j in range(6):
+                    if j == 4:
+                        continue
+                    s6[4, j] = s0[4, j] + k * s0[5, j]
+                    s6[j, 4] = s6[4, j]
+                d = cg[isl] - m
+                pooled += wsl[isl] * (s6 + np.outer(d, d))
+                nobg += wsl[isl] * s6
+            pooled /= wtot
+            nobg /= wtot
+            st_c = ee["bunch/centroid"][ie]
+            st_s = ee["bunch/sigma"][ie].reshape(6, 6)
+            den = np.maximum(np.abs(st_s), np.abs(pooled))
+            worst_pool = max(worst_pool, float(np.max(np.where(den > 0, np.abs(st_s - pooled) / np.where(den > 0, den, 1), 0.0))))
+            dc = np.maximum(np.abs(st_c), np.abs(m))
+            worst_pool = max(worst_pool, float(np.max(np.where(dc > 0, np.abs(st_c - m) / np.where(dc > 0, dc, 1), 0.0))))
+            den = np.maximum(np.abs(st_s), np.abs(nobg))
+            worst_nobg = max(worst_nobg, float(np.max(np.where(den > 0, np.abs(st_s - nobg) / np.where(den > 0, den, 1), 0.0))))
+        check("stats: whole-window row vs the pooled-covariance identity", worst_pool, 1e-9)
+        # The check has teeth: dropping the between-group term (m_s - m)(m_s - m)^T --
+        # the term that makes the identity exact -- must be caught, not absorbed. It
+        # collapses sigma(5,5) from the window length squared to a slice length squared.
+        check("stats: the between-group term is load-bearing (0 = confirmed)",
+              0.0 if worst_nobg > 1e-3 else 1.0, 0.5,
+              note=f"[dropping it moves the row by {worst_nobg:.2e}]")
 
         f_cen = h5["field/centroid"][-1]
         f_sig = h5["field/sigma"][-1]

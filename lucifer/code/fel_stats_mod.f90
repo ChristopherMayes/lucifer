@@ -367,13 +367,14 @@ subroutine fel_stats_element_end (stats, beam, ele, z_now, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
-type (bunch_struct) bunch
 type (bunch_params_struct) bp
-real(rp), allocatable :: beta0(:)
-real(rp) z_now
-integer ie, is
-logical err_flag, err, error
+real(rp), allocatable :: cen_s(:,:), sig_s(:,:,:), w_s(:), dz_s(:), shear_s(:)
+integer, allocatable :: n_s(:)
+real(rp) z_now, p0_mc, p_mc, w, wsum, mean(6), sig(6,6), v(6)
+integer ie, is, ip, i, j, nslice
+logical err_flag, error
 character(*), parameter :: r_name = 'fel_stats_element_end'
 
 !
@@ -388,51 +389,107 @@ ie = stats%iend
 stats%e_ix_ele(ie) = ele%ix_ele
 stats%e_s(ie) = z_now
 
-call fel_concat_slices (beam, ele, bunch, beta0, err);  if (err) return
-call calc_bunch_params (bunch, bp, error)
-call pack_bp (bp, stats%e_bunch(:, ie))
+nslice = size(beam%slice)
+allocate (cen_s(6,nslice), sig_s(6,6,nslice), w_s(nslice), dz_s(nslice), shear_s(nslice), n_s(nslice))
 
-! Per slice: the twiss evaluation is Bmad's own (calc_emittances_and_twiss_from_
-! sigma_matrix, the identical code path calc_bunch_params ends in), but fed from the
-! moments the CURRENT record already computed -- an element end always coincides with
-! its last record -- instead of re-summing every particle through a bunch conversion.
-! Measured: this is what moved the element-end cost from 7% of the demo run into the
-! noise (2208 conversions + re-summations retired per run).
+! ONE source of per-slice moments for both the per-slice rows and the whole-window
+! row. With per-record rows (the comb >= 0) the current record already holds them --
+! an element end always coincides with its last record. With NO per-record rows (the
+! comb's "< 0 => No comb calculated") take them here, in one parallel sweep whose
+! two-pass weighted arithmetic is the per-record sweep's own.
 
-! With NO per-record rows at all (the comb's "< 0 => No comb calculated"), there is
-! no current record to read the slice moments from: evaluate each slice through
-! Bmad's own calc_bunch_params directly -- the same authority, one evaluation per
-! element end (the comb exists to make runs cheap; this is nothing).
-! print_err = false mirrors the per-record path below, which computes twiss only for
-! slices with at least 6 live particles and never prints: a time window's near-empty
-! edge slices are degenerate BY CONSTRUCTION (zero charge, collapsed sigma modes),
-! and per-slice message spam is not an error channel. The whole-window call above
-! keeps its printing -- a degenerate whole window IS worth an error.
-
-if (stats%irec == 0) then
-  do is = 1, size(beam%slice)
-    call fel_slice_to_bunch (beam, beam%slice(is), ele, bunch, err);  if (err) return
-    call calc_bunch_params (bunch, bp, error, print_err = .false.)
-    call pack_bp (bp, stats%e_slice(:, is, ie))
+if (stats%irec > 0) then
+  do is = 1, nslice
+    cen_s(:,is) = stats%b_centroid(:, is, stats%irec)
+    sig_s(:,:,is) = reshape(stats%b_sigma(:, is, stats%irec), [6, 6])
+    w_s(is) = stats%charge_live(is, stats%irec)
+    n_s(is) = stats%n_particle_live(is, stats%irec)
   enddo
-  err_flag = .false.
-  return
+
+else
+  !$OMP parallel do private(sl, ip, i, j, w, wsum, mean, sig, v)
+  do is = 1, nslice
+    sl => beam%slice(is)
+    wsum = 0;  mean = 0
+    do ip = 1, sl%n
+      w = sl%weight(ip)
+      wsum = wsum + w
+      mean = mean + w * [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)]
+    enddo
+    if (wsum > 0) mean = mean / wsum
+
+    sig = 0
+    do ip = 1, sl%n
+      v = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)] - mean
+      w = sl%weight(ip)
+      do j = 1, 6
+        do i = 1, j
+          sig(i,j) = sig(i,j) + w * v(i) * v(j)
+        enddo
+      enddo
+    enddo
+    if (wsum > 0) sig = sig / wsum
+    do j = 1, 6
+      do i = j+1, 6
+        sig(i,j) = sig(j,i)
+      enddo
+    enddo
+
+    cen_s(:,is) = mean;  sig_s(:,:,is) = sig
+    w_s(is) = wsum;      n_s(is) = sl%n
+  enddo
+  !$OMP end parallel do
 endif
 
-do is = 1, size(beam%slice)
+! Per slice: the twiss evaluation is Bmad's own (calc_emittances_and_twiss_from_
+! sigma_matrix, the identical code path calc_bunch_params ends in), fed from the
+! moments above instead of re-summing every particle through a bunch conversion.
+! Twiss only where there are enough live particles: a time window's near-empty edge
+! slices are degenerate BY CONSTRUCTION (zero charge, collapsed sigma modes).
+
+do is = 1, nslice
   bp = bunch_params_struct()
-  bp%centroid%vec = stats%b_centroid(:, is, stats%irec)
+  bp%centroid%vec = cen_s(:,is)
   bp%centroid%p0c = stats%p0c
   bp%centroid%species = electron$
-  bp%sigma = reshape(stats%b_sigma(:, is, stats%irec), [6, 6])
-  bp%charge_live = stats%charge_live(is, stats%irec)
-  bp%n_particle_live = stats%n_particle_live(is, stats%irec)
+  bp%sigma = sig_s(:,:,is)
+  bp%charge_live = w_s(is)
+  bp%n_particle_live = n_s(is)
   bp%n_particle_tot = bp%n_particle_live
   if (bp%n_particle_live >= 6) then
     call calc_emittances_and_twiss_from_sigma_matrix (bp%sigma, bp, error, .false.)
   endif
   call pack_bp (bp, stats%e_slice(:, is, ie))
 enddo
+
+! The whole window, from the same per-slice moments -- no particle visit at all. Each
+! slice's stored moments live in its LOCAL z chart and enter the pool moved to the
+! global window chart by the migration invariant fel_concat_slices uses,
+! z_global = z_local + beta*(is-1)*slice_spacing.
+!
+! That map is NOT a constant offset: fel_concat_slices evaluates beta per particle, so
+! within a slice z_global depends on pz. Linearizing beta about the slice's own mean pz
+! makes the map an exact SHEAR of (z, pz),
+!   z_global = z_local + L*beta_bar + (L*dbeta/dpz)*(pz - pz_bar),   L = (is-1)*spacing,
+! whose effect on the slice covariance is S -> J S J^T with the single off-diagonal
+! J(5,6) = L*dbeta/dpz. Dropping that shear leaves var(z) and cov(z,pz) right (they are
+! dominated by the window-scale spread) but biases every cov(v,z) cross term, which are
+! small by near-cancellation: measured 4e-6 relative on those terms, against 2e-13 for
+! the rest, and it flipped the whole-window normal-mode decomposition from valid to
+! invalid. The residual after the shear is second order, O(d2beta/dpz2 * sigma_pz^2).
+
+p0_mc = fel_p0_mc(beam)
+do is = 1, nslice
+  p_mc = p0_mc * (1 + cen_s(6,is))
+  dz_s(is) = fel_beta_of(p0_mc, cen_s(6,is)) * (is-1) * beam%slice_spacing
+  shear_s(is) = (is-1) * beam%slice_spacing * p0_mc / sqrt(p_mc**2 + 1)**3
+enddo
+
+call fel_pool_bunch_params (cen_s, sig_s, w_s, n_s, dz_s, shear_s, stats%p0c, bp)
+if (bp%n_particle_live >= 6) then
+  call calc_emittances_and_twiss_from_sigma_matrix (bp%sigma, bp, error, .false.)
+endif
+call pack_bp (bp, stats%e_bunch(:, ie))
 
 err_flag = .false.
 
@@ -478,6 +535,101 @@ enddo
 end subroutine pack_bp
 
 end subroutine fel_stats_element_end
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_pool_bunch_params (cen_s, sig_s, w_s, n_s, dz_s, p0c, bp)
+!
+! Routine to assemble one bunch_params_struct for the whole time window from the
+! per-slice moments, without visiting particles. This is the beam-side twin of
+! pool_wavefront (wavefront_mod), and it is the pooled-covariance identity, exact for
+! any set of groups:
+!
+!   m = Sum_s w_s m_s / Sum_s w_s
+!   S = Sum_s w_s [S_s + (m_s - m)(m_s - m)^T] / Sum_s w_s
+!
+! The between-group term (m_s - m)(m_s - m)^T is what makes it exact rather than an
+! average of covariances: without it the window's sigma(5,5) would collapse from the
+! window length squared to a slice length squared.
+!
+! Only the components pack_bp writes are filled (centroid, sigma, charge_live,
+! n_particle_live and, by the caller, the twiss groups from the assembled sigma).
+! rel_max/rel_min are extrema, beyond this identity's reach, and are not written to
+! the stats file -- they are deliberately left at their defaults.
+!
+! Input:
+!   cen_s(:,:)    -- real(rp): (6, nslice) per-slice centroid, in each slice's local chart.
+!   sig_s(:,:,:)  -- real(rp): (6, 6, nslice) per-slice covariance.
+!   w_s(:)        -- real(rp): (nslice) per-slice live charge, the pooling weight [C].
+!   n_s(:)        -- integer: (nslice) per-slice live particle count.
+!   dz_s(:)       -- real(rp): (nslice) local-to-global-chart z offset of each slice [m].
+!   shear_s(:)    -- real(rp): (nslice) dz_global/dpz of that map, J(5,6) of the shear.
+!   p0c           -- real(rp): Reference momentum [eV], for the norm_emit scale.
+!
+! Output:
+!   bp            -- bunch_params_struct: Whole-window centroid, sigma, charge and count.
+!-
+
+subroutine fel_pool_bunch_params (cen_s, sig_s, w_s, n_s, dz_s, shear_s, p0c, bp)
+
+type (bunch_params_struct) bp
+real(rp) cen_s(:,:), sig_s(:,:,:), w_s(:), dz_s(:), shear_s(:), p0c
+integer n_s(:)
+real(rp) wtot, m(6), c(6), d(6), s6(6,6), k
+integer is, i, j, nslice
+
+!
+
+nslice = size(w_s)
+wtot = sum(w_s)
+
+bp = bunch_params_struct()
+bp%centroid%p0c = p0c
+bp%centroid%species = electron$
+bp%n_particle_live = sum(n_s)
+bp%n_particle_tot = bp%n_particle_live
+bp%charge_live = wtot
+bp%charge_tot = wtot
+if (wtot <= 0) return
+
+m = 0
+do is = 1, nslice
+  c = cen_s(:,is);  c(5) = c(5) + dz_s(is)
+  m = m + w_s(is) * c
+enddo
+m = m / wtot
+
+do is = 1, nslice
+  c = cen_s(:,is);  c(5) = c(5) + dz_s(is)
+  d = c - m
+
+  ! S -> J S J^T with the one off-diagonal J(5,6) = shear_s: the z row and column pick
+  ! up the pz coupling of the local-to-global map, in that order (the (5,5) update uses
+  ! the ORIGINAL (5,6) and (6,6), so it goes first).
+
+  s6 = sig_s(:,:,is)
+  k = shear_s(is)
+  if (k /= 0) then
+    s6(5,5) = s6(5,5) + 2 * k * sig_s(5,6,is) + k**2 * sig_s(6,6,is)
+    do j = 1, 6
+      if (j == 5) cycle
+      s6(5,j) = sig_s(5,j,is) + k * sig_s(6,j,is)
+      s6(j,5) = s6(5,j)
+    enddo
+  endif
+
+  do j = 1, 6
+    do i = 1, 6
+      bp%sigma(i,j) = bp%sigma(i,j) + w_s(is) * (s6(i,j) + d(i) * d(j))
+    enddo
+  enddo
+enddo
+bp%sigma = bp%sigma / wtot
+bp%centroid%vec = m
+
+end subroutine fel_pool_bunch_params
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
