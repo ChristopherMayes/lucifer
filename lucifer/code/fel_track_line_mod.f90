@@ -766,17 +766,26 @@ integer(8) now
 real(rp) elapsed
 character(200) line
 
-if (stats%irec == 0) return          ! No record yet (comb < 0): nothing to read.
 call system_clock (now)
 if (.not. at_element_end .and. real(now - prog_count_last, rp) / prog_rate < 2.0_rp) return
 prog_count_last = now
 elapsed = real(now - prog_count0, rp) / prog_rate
 
-write (line, '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, es9.2, a, es9.2, a, f8.5, a, i0, a)') &
-      'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
-      branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
-      '  P = ', sum(stats%f_power(:, stats%irec)), ' W  U = ', sum(stats%f_energy(:, stats%irec)), &
-      ' J  <|b|> = ', sum(stats%bunching(:, stats%irec)) / nslice, '  t = ', nint(elapsed), ' s'
+! With no stats record to read (comb_ds_save < 0), the walk still shows signs of
+! life: the same line without the physics numbers the records would carry.
+
+if (stats%irec == 0) then
+  write (line, '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, i0, a)') &
+        'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
+        branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
+        '  t = ', nint(elapsed), ' s'
+else
+  write (line, '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, es9.2, a, es9.2, a, f8.5, a, i0, a)') &
+        'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
+        branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
+        '  P = ', sum(stats%f_power(:, stats%irec)), ' W  U = ', sum(stats%f_energy(:, stats%irec)), &
+        ' J  <|b|> = ', sum(stats%bunching(:, stats%irec)) / nslice, '  t = ', nint(elapsed), ' s'
+endif
 call out_io (s_blank$, r_name, trim(line))
 
 end subroutine progress_line
