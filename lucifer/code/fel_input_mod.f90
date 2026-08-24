@@ -3,7 +3,7 @@
 !
 ! The namelist layer of the FEL tracker, quarantined the way Tao quarantines its
 ! tao_init_* files: three groups, all read from ONE input file, each filling the
-! structs of fel_struct directly (Tao's &tao_params pattern -- set global%out_root,
+! structs of fel_struct directly (Tao's &tao_params pattern: set global%out_root,
 ! bmad_com%radiation_damping_on, wake%radius, sc%nz, beam_init%n_particle,
 ! wavefront_init%lambda0 by component). This module is itself library: an embedding
 ! program may reuse the parsing, or skip it and fill the structs in code.
@@ -16,7 +16,7 @@
 !                        imp_split_weights
 !   &fel_wavefront_init  wavefront_init, field_file
 !
-! A group that is absent keeps its defaults; a group that is present must parse.
+! A group that is absent keeps its defaults. A group that is present must parse.
 ! The retired flat &fel_track_params group is refused BY NAME: the error lists each
 ! parameter found in it and the group it moved to.
 !-
@@ -181,9 +181,9 @@ end subroutine fel_read_input
 !+
 ! Subroutine fel_write_resolved_input (run, iu)
 !
-! Write run's RESOLVED inputs -- every default made explicit -- as the three
+! Write run's RESOLVED inputs (every default made explicit) as the three
 ! namelist groups, to an open unit. The stats file's Meta/ provenance echo
-! (Genesis parity: its Meta group embeds the entire input file); an embedding
+! (Genesis parity: its Meta group embeds the entire input file). An embedding
 ! program may also use it to persist a configuration built in code.
 !
 ! Input:
@@ -253,8 +253,8 @@ end subroutine fel_write_resolved_input
 !+
 ! Function group_present (iu, group_name) result (found)
 !
-! Is the namelist group &group_name present in the (open) file? A textual scan --
-! the standard gives no portable "group absent" iostat -- tolerant of leading blanks
+! Is the namelist group &group_name present in the (open) file? A textual scan
+! (the standard gives no portable "group absent" iostat), tolerant of leading blanks
 ! and case.
 !
 ! Input:

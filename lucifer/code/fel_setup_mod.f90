@@ -6,7 +6,7 @@
 ! collective configuration, the slippage/autophasing schedule, geometry breaks and
 ! the diagnostics setup. Split as fel_setup_lattice (needs only the inputs) and
 ! fel_setup_schedule (needs the built starting state). Library contract: errors
-! return through err_flag; nothing here stops. All terminal output goes through
+! return through err_flag, and nothing here stops. All terminal output goes through
 ! out_io.
 !-
 
@@ -32,7 +32,7 @@ contains
 ! Routine to turn the parsed inputs into a recognized lattice: the tracking hooks
 ! and FEL lattice attributes (registered once per process), the parse itself,
 ! element recognition and its refusals (setup_fel_elements), the harmonics-request
-! validation and the field-set allocation. Errors return through err_flag; nothing
+! validation and the field-set allocation. Errors return through err_flag, and nothing
 ! here stops (the library contract).
 !
 ! Input:
@@ -79,7 +79,7 @@ migrate = run%global%migrate
 reference_run = run%global%reference_run
 harmonics = run%winit%harmonics
 
-! (The FEL tracking mode is a lattice attribute; its refusals live in
+! (The FEL tracking mode is a lattice attribute. Its refusals live in
 ! setup_fel_elements, and the unaveraged-vs-collective refusal follows setup, once
 ! any_unavg is known.)
 
@@ -89,7 +89,7 @@ if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
 endif
 
 ! (bmad_com%radiation_damping_on / %radiation_fluctuations_on come straight from the
-! &fel_params namelist -- Bmad's own switches, exposed directly as Tao exposes them.)
+! &fel_params namelist: Bmad's own switches, exposed directly as Tao exposes them.)
 
 if (bmad_com%radiation_fluctuations_on .and. migrate) then
   call out_io (s_error$, r_name, 'RADIATION_FLUCTUATIONS DRAWS ONE KICK PER BEAMLET (THE QUIET START', &
@@ -103,7 +103,7 @@ endif
 !
 ! FEL elements carry tracking_method = custom, and Bmad's bookkeeping (the reference
 ! time/energy pass inside bmad_parser, any track1 at the seam) resolves custom tracking
-! through track1_custom_ptr: point it at the standard periodic-wiggler kernel, so the
+! through track1_custom_ptr. Point it at the standard periodic-wiggler kernel, so the
 ! element behaves as the plain Bmad wiggler it is everywhere EXCEPT inside this
 ! driver's own FEL walk. In particular the reference time acquires the resonant
 ! undulation delay from Bmad's own code, not from anything written here.
@@ -133,7 +133,7 @@ if (.not. fel_attributes_registered) then
 endif
 
 ! err_flag matters: bmad_parser reports attribute errors (e.g. a wake on an element
-! type that cannot carry one) and RETURNS -- without the check the run continues on a
+! type that cannot carry one) and RETURNS. Without the check the run continues on a
 ! partial lattice, found when an example's drift wakes silently never attached.
 
 call bmad_parser (lat_file, lat, err_flag = err)
@@ -146,7 +146,7 @@ branch => lat%branch(0)
 run%gamma0 = branch%ele(0)%value(e_tot$) / m_electron
 call out_io (s_info$, r_name, 'gamma0 = \f0.6\ (from the lattice e_tot).', r_array = [run%gamma0])
 
-call setup_fel_elements ()   ! Needs only the parsed lattice; sets run%two_pol for the
+call setup_fel_elements ()   ! Needs only the parsed lattice. Sets run%two_pol for the
                              ! beam/field construction below.
 if (err_flag) return
 is_fel => run%is_fel
@@ -190,9 +190,9 @@ endif
 
 ! The source model (manual sec:coherent-source): validated, then stamped onto every
 ! FEL element. v1 scope refusals, each by name: the coherent source carries the
-! FUNDAMENTAL of one polarization (even harmonics are invalid in the method itself --
-! F(z,0) = 0 -- and odd ones are a named follow-on), and it cannot live inside the
-! unaveraged referee (variance reduction inside the explicit-everything mode).
+! FUNDAMENTAL of one polarization, and it cannot live inside the unaveraged referee
+! (variance reduction inside the explicit-everything mode). Even harmonics are invalid
+! in the method itself -- F(z,0) = 0 -- and odd ones are a named follow-on.
 
 select case (run%global%source_model)
 case ('deposit')
@@ -214,11 +214,11 @@ case ('coherent')
   if (run%winit%seed_power <= 0 .and. run%field_file(1) == '') then
 
     ! MEASURED, not assumed (check_coherent's SASE experiment): the coherent source
-    ! understates dark-start startup by ~175x on the reference configuration --
-    ! spontaneous, spatially-INCOHERENT emission dominates SASE startup and is
+    ! understates dark-start startup by ~175x on the reference configuration.
+    ! Spontaneous, spatially-INCOHERENT emission dominates SASE startup and is
     ! exactly what the coherent model drops. The slice bunch factor's physical noise
     ! (Fawley, <|B|^2> N_lambda = 1) is present but is not the dominant seed.
-    ! Refused by name; seeded runs are fully supported.
+    ! Refused by name. Seeded runs are fully supported.
 
     call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH A DARK START IS REFUSED: THE', &
                  'COHERENT SOURCE DROPS THE SPATIALLY-INCOHERENT SPONTANEOUS EMISSION THAT', &
@@ -256,15 +256,15 @@ contains
 !+
 ! Subroutine setup_fel_elements ()
 !
-! Routine to recognize FEL segments -- wiggler/undulator elements with tracking_method =
-! custom, Bmad's own semantics for program-supplied tracking, which this driver is -- and
-! derive their FEL parameters from lattice attributes (Bmad's kx roll-off attribute is
-! not yet mapped and must be zero). The wiggler sanity assertions are enforced: a wiggler
-! with zero b_max or l_period would silently get factor = 0 in Bmad's own kernel (no
-! resonance, no error), and a fieldmap field_calc gets osc_amplitude without focusing --
-! both are refused by name. The stored k1x/k1y wiggler attributes are deliberately NOT
-! read: their helical sign disagrees with the tracking locals; nothing here cross-uses
-! them.
+! Routine to recognize FEL segments and derive their FEL parameters from lattice
+! attributes (Bmad's kx roll-off attribute is not yet mapped and must be zero). An FEL
+! segment is a wiggler/undulator element with tracking_method = custom: Bmad's own
+! semantics for program-supplied tracking, which this driver is. The wiggler sanity
+! assertions are enforced: a wiggler with zero b_max or l_period would silently get
+! factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
+! gets osc_amplitude without focusing. Both are refused by name. The stored k1x/k1y
+! wiggler attributes are deliberately NOT read: their helical sign disagrees with the
+! tracking locals. Nothing here cross-uses them.
 !-
 
 subroutine setup_fel_elements ()
@@ -288,9 +288,9 @@ do je = 1, branch%n_ele_track
 
   ! The FEL mode and unaveraged parameters, from the element's own attributes.
   ! fel_tracking: unset/0 = averaged with the bmad_standard kernel's transverse maps
-  ! (Bmad's own kernel is the default); 1 = unaveraged; -1 = averaged with the
+  ! (Bmad's own kernel is the default). 1 = unaveraged. -1 = averaged with the
   ! transcribed-Genesis maps (validation-internal: the Genesis tiers require
-  ! transcription-level transport; no production lattice writes it).
+  ! transcription-level transport, and no production lattice writes it).
 
   rv = value_of_attribute(w, 'FEL_TRACKING', err_a)
   if (err_a) then
@@ -317,7 +317,7 @@ do je = 1, branch%n_ele_track
   endif
 
   ! fel_ramp_periods: an attribute's unset value is 0, and a silent hard edge would
-  ! reintroduce the K/gamma handoff hazard by omission -- so unset/0 means the default
+  ! reintroduce the K/gamma handoff hazard by omission. Thus unset/0 means the default
   ! of 2 periods, and a TRUE hard edge (the mutation/test configuration) must be asked
   ! for by name with the explicit sentinel -1.
 
@@ -337,10 +337,11 @@ do je = 1, branch%n_ele_track
     fel_ramp(je) = rv
   endif
 
-  ! The wiggler sanity assertions live in fel_assert_wiggler_sane, ONE authority called from the
-  ! track1/mat6 hooks (where they fire first, during the parse) and again here. Keeping
-  ! a second copy inline was tried and rejected: redundant assertions mask the removal
-  ! of either copy, which defeats mutation testing of the refusal checks.
+  ! The wiggler sanity assertions live in fel_assert_wiggler_sane, ONE authority. It is
+  ! called from the track1/mat6 hooks (where they fire first, during the parse) and
+  ! again here. Keeping a second copy inline was tried and rejected: redundant
+  ! assertions mask the removal of either copy, which defeats mutation testing of the
+  ! refusal checks.
 
   call fel_assert_wiggler_sane (w)
 
@@ -348,8 +349,8 @@ do je = 1, branch%n_ele_track
   kw = twopi / w%value(l_period$)
 
   ! aw (rms, Genesis's convention) from the peak field:
-  ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy;
-  ! helical aw = K, planar aw = K/sqrt(2). Focusing split: Genesis's defaults by
+  ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy.
+  ! Helical aw = K, planar aw = K/sqrt(2). Focusing split: Genesis's defaults by
   ! helicity, scaled by ku^2 as Genesis's unroll does (manual sec:element).
 
   kk = c_light * w%value(b_max$) / (kw * m_electron)
@@ -366,8 +367,8 @@ do je = 1, branch%n_ele_track
     und_of(je)%ky = kw**2
   endif
 
-  ! Tilt: the wiggle-plane rotation (planar only -- a tilted helical is a no-op that
-  ! reads as confusion, refused; the transcribed-Genesis maps know no tilt, refused).
+  ! Tilt: the wiggle-plane rotation, planar only. A tilted helical is a no-op that
+  ! reads as confusion, refused. The transcribed-Genesis maps know no tilt, refused.
   ! The polarization 2-vector on (Ex, Ey): planar (cos t, sin t); helical (1,-i)/sqrt2.
 
   und_of(je)%tilt = w%value(tilt_tot$)
@@ -420,8 +421,8 @@ end subroutine fel_setup_lattice
 ! Routine to build everything that needs BOTH the lattice and the built starting state:
 ! the collective configuration and wake kernels, the wake-window and unaveraged-collective
 ! refusals, the slippage/autophasing schedule, the geometry breaks (chicanes), and the
-! diagnostics setup (dump locators; the exact record/element-end counts). Errors
-! return through err_flag; nothing here stops.
+! diagnostics setup (dump locators and the exact record/element-end counts). Errors
+! return through err_flag, and nothing here stops.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state after fel_setup_lattice, fel_init_beam and
@@ -539,7 +540,7 @@ if (wake_on) then
   ! The single-particle kernels, written for cross-validation: the same physical
   ! wake fed to Bmad's z_long machinery must reproduce these kernels'
   ! convolution. NOTE the s = 0 entries carry the Bane self-slice half factor
-  ! (fel_wake_init halves them); a plain W(z) table wants the unhalved value.
+  ! (fel_wake_init halves them). A plain W(z) table wants the unhalved value.
 
   if (run%wake_init%write_kernels /= '') then
     block
@@ -556,7 +557,7 @@ if (wake_on) then
   endif
 endif
 
-! More than one slice means a time-dependent run with slippage active; one slice is the
+! More than one slice means a time-dependent run with slippage active. One slice is the
 ! steady state and fel_apply_slippage is a no-op.
 
 timerun = (nslice > 1)
@@ -584,15 +585,15 @@ if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
 endif
 
 
-! The rest of the schedule: drift autophasing. Interludes accumulate Lz; the last
+! The rest of the schedule: drift autophasing. Interludes accumulate Lz, and the last
 ! interlude before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
 ! (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
 ! (Lattice.cpp:191-193) is UNGUARDED in Genesis: the last element always gets
 ! floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at all
-! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is --
+! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is:
 ! omitting that +1 leaves the field record one rotation short at the very end, found the
 ! hard way against the single-segment time-dependent run. (Citations kept AT THE LINES:
-! this quirk's exactness matters here, at the call site; manual sec:slippage.)
+! this quirk's exactness matters here, at the call site. Manual sec:slippage.)
 
 allocate (run%ele_slip(branch%n_ele_track))
 allocate (run%fel_zoff(branch%n_ele_track), run%light_corr(branch%n_ele_track))
@@ -649,9 +650,9 @@ if (err_flag) return
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
 
-! The tracking window (global%track_start/track_end, Tao's names; Genesis zstop
-! parity). Resolved through Bmad's own locator; the SCHEDULE above was built on the
-! full lattice, so a windowed run composes exactly with the full one -- the walk
+! The tracking window (global%track_start/track_end: Tao's names, with Genesis zstop
+! parity). Resolved through Bmad's own locator. The SCHEDULE above was built on the
+! full lattice, so a windowed run composes exactly with the full one. The walk
 ! simply covers [i_start, i_end], and no end-of-lattice fixup moves.
 
 run%i_start = 1
@@ -717,10 +718,10 @@ end subroutine resolve_window_ele
 ! Routine to check the Bmad element wakes against the time window. Element sr wakes act
 ! across the WHOLE window (manual sec:seamwake): all slices concatenate into one bunch
 ! in global window coordinates and Bmad's wake machinery applies unmodified. What is
-! checked here, by name: lr (multi-bunch) wakes are not supported; a pseudomode wake
-! whose z_max is shorter than the window would have Bmad kill the bunch mid-run; a
+! checked here, by name: lr (multi-bunch) wakes are not supported. A pseudomode wake
+! whose z_max is shorter than the window would have Bmad kill the bunch mid-run. A
 ! z_long table narrower than the window would overflow its binning grid the same way.
-! Runs AFTER the beam is built (the window length is the subject); setup_fel_elements
+! Runs AFTER the beam is built (the window length is the subject). setup_fel_elements
 ! runs before it (two_pol must precede the field).
 !-
 
@@ -761,14 +762,14 @@ end subroutine check_wake_window
 ! Subroutine setup_break_geometry ()
 !
 ! Routine to set up chicane breaks (manual sec:phasing): a break whose elements bend the
-! reference (sbends, patches) detours the BEAM while the RADIATION goes straight -- so the
+! reference (sbends, patches) detours the BEAM while the RADIATION goes straight. The
 ! light's path is the CHORD between the flanking undulator faces, from ele%floor,
 ! never the reference arc that vec(5) is measured against. The arc-minus-chord
 ! delay is charged as whole-wavelength window rotations (Genesis's chicane
 ! semantics: "always autophasing") on the break's last element, which also takes
-! the light-path drift correction; absolute mode adds the delay's carrier phase in
-! the walk. Only a CLOSED BUMP keeps the light on the next undulator's axis --
-! anything else is refused by name, as is any geometry element under the
+! the light-path drift correction. Absolute mode adds the delay's carrier phase in
+! the walk. Only a CLOSED BUMP keeps the light on the next undulator's axis.
+! Anything else is refused by name, as is any geometry element under the
 ! genesis-model interludes (Genesis's drift/quad set cannot represent it).
 !-
 
@@ -857,9 +858,9 @@ end subroutine close_geometry_break
 ! Subroutine setup_diagnostics ()
 !
 ! Routine to set up the diagnostics (manual sec:stats): resolve the dump-at lists through
-! Bmad's own lat_ele_locator (class::name syntax for free; an entry matching nothing is
-! refused by name) and precompute the EXACT record and element-end counts by replaying
-! the walk's skip rule -- the stats arrays are sized once, never grown.
+! Bmad's own lat_ele_locator (class::name syntax for free) and precompute the EXACT
+! record and element-end counts by replaying the walk's skip rule, so the stats arrays
+! are sized once, never grown. An entry matching nothing is refused by name.
 !-
 
 subroutine setup_diagnostics ()

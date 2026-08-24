@@ -70,7 +70,7 @@ def b2_samples(par_file, harmonics):
             theta = g["theta"][:]
             current = float(g["current"][0])
             n_lambda = current * spacing / (E_CHARGE * 2.99792458e8)
-            # The dump format carries no weights; reconstruct the loader's test pattern:
+            # The dump format carries no weights. Reconstruct the loader's test pattern:
             # uniform within beamlets of nbins=8, alternating 0.25/1.75 across beamlets
             # when the test mode is on. The generator wrote current = c*sum(w)/spacing,
             # so relative weights are all the statistic needs.

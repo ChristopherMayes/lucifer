@@ -128,7 +128,7 @@ def main():
     a = ax[0, 0]
     a.semilogy(z, np.maximum(total_g, 1e-30), color="0.25", lw=2.4, label="Genesis4")
     a.semilogy(z, np.maximum(total_f, 1e-30), color="tab:orange", lw=1.2, label="Bmad")
-    # A dark start's z = 0 record is exactly zero; don't let it stretch the axis.
+    # A dark start's z = 0 record is exactly zero. Don't let it stretch the axis.
     pos = total_g[total_g > 0]
     if len(pos):
         a.set_ylim(bottom=max(pos.min() * 0.3, total_g.max() * 1e-14),

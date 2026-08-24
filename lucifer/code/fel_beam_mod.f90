@@ -19,33 +19,33 @@
 ! own convention, asserted against each element's p0c at conversion time. The equivalent
 ! quantities Genesis works in are derived, never stored: p0/(m_e c) from fel_p0_mc and
 ! the reference gamma from fel_gamma0. (Genesis carries its reference gamma, gammaref, as
-! an independent run parameter; importing a dump defines p0c from it, so deriving gamma
+! an independent run parameter, and importing a dump defines p0c from it. Deriving gamma
 ! back from p0c reproduces gammaref to ~1 ulp, far below the 8e-7 constants floor of any
 ! Genesis comparison.)
 !
 ! The ponderomotive phase is derived, not stored. Genesis's per-particle theta is the sum
 ! of a common reference advance (the undulator's ku term, and the drift slippage term
 ! ks/(2 gamma0^2)) and a particle-specific lag. The common part lives in one scalar per
-! beam, phi0, maintained by the tracker; the particle part is the Bmad z:
+! beam, phi0, maintained by the tracker. The particle part is the Bmad z:
 !
 !   theta_j = phi0 - ks * tau_j,     tau_j = -z_j / beta_j = c*(t_j - t_ref)
 !
 ! This reference-offset split is the FP32-safe formulation, and it removes the theta-wrap
 ! hazard outright: z does not wrap, so there is no theta-wrap-plus-slice-index update to
-! get wrong at slice migration; the slice index is derived from z when needed. (A future
+! get wrong at slice migration. The slice index is derived from z when needed. (A future
 ! single precision GPU struct still needs per-slice re-referencing of z, since the phase
-! needs ~1e-6 rad across ~1e5 wavelengths of bunch; that is a choice deferred to the
+! needs ~1e-6 rad across ~1e5 wavelengths of bunch. That is a choice deferred to the
 ! device struct.)
 !
 ! Weights are carried from day one: every reduction here and in
-! fel_track_mod is weighted, slice current is derived as I = c * sum(w) / slice_spacing, and
+! fel_track_mod is weighted. Slice current is derived as I = c * sum(w) / slice_spacing, and
 ! N_eff = (sum w)^2 / sum w^2 is a per-slice diagnostic. A uniform-weight beam reproduces
 ! Genesis, which the benchmark checks.
 !
 ! Why packed arrays at all: the FEL step advances every particle every internal step, and
 ! coord_struct is ~224 bytes against the ~56 needed. coord_struct appears only at element
-! boundaries. The arrays are allocated to a capacity that may exceed the fill count n, so
-! slice migration can move particles without per-step reallocation (fel-physics.tex
+! boundaries. The arrays are allocated to a capacity that may exceed the fill count n.
+! Slice migration can then move particles without per-step reallocation (fel-physics.tex
 ! sec:migration).
 !-
 
@@ -57,17 +57,17 @@ use hdf5_interface
 implicit none
 
 ! All physical constants come from sim_utils (m_electron, c_light, mu_0_vac). Genesis
-! carries its own values -- notably an impedance of free space truncated to 376.73 where
-! mu_0_vac*c_light is 376.7303... -- and during the original transcription validation this
+! carries its own values (EG an impedance of free space truncated to 376.73 where
+! mu_0_vac*c_light is 376.7303...). During the original transcription validation this
 ! module transcribed them to get transcription-level agreement. That validation is banked
-! (lucifer/README.md); the code now uses Bmad's constants, and the ~8e-7 relative
+! (lucifer/README.md). The code now uses Bmad's constants, and the ~8e-7 relative
 ! difference against Genesis is the accepted comparison floor.
 
 !+
 ! Struct fel_slice_struct
 !
 ! One beam slice in packed structure-of-arrays form, Bmad coordinates plus weight.
-! Live particles are 1:n; the arrays may be larger.
+! Live particles are 1:n. The arrays may be larger.
 !-
 
 type fel_slice_struct
@@ -91,7 +91,7 @@ end type
 type fel_beam_struct
   type (fel_slice_struct), allocatable :: slice(:)
   real(rp) :: p0c = 0              ! Reference momentum times c [eV]. The single stored
-                                   !   reference; derive p0/(m_e c) and the reference gamma
+                                   !   reference. Derive p0/(m_e c) and the reference gamma
                                    !   with fel_p0_mc and fel_gamma0.
   real(rp) :: phi0 = 0             ! Common ponderomotive reference phase [rad].
   real(rp) :: wavelength = 0       ! Radiation wavelength [m]. 'slicelength' in a Genesis dump.
@@ -102,7 +102,7 @@ type fel_beam_struct
   logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.tex
                                    !   sec:unaveraged): False = stored px excludes the
                                    !   undulator quiver (the averaged chart, and the only
-                                   !   convention any averaged/seam code accepts); True =
+                                   !   convention any averaged/seam code accepts). True =
                                    !   the unaveraged tracker is mid-region and px is the
                                    !   full kinetic momentum. Asserted at region edges: a
                                    !   hard-edge handoff injects K/gamma of spurious px.
@@ -113,7 +113,7 @@ end type
 !
 ! Per-slice beam diagnostics at one output position: the quantities of Genesis's
 ! DiagBeam::calc, weighted, under Bmad-style names and normalizations. mean_/sigma_
-! follow the convention of wavefront_transverse_moments; gamma is the Lorentz factor,
+! follow the convention of wavefront_transverse_moments. gamma is the Lorentz factor,
 ! named as such because Bmad's 'energy' is the total energy in eV, which none of these
 ! are. The Genesis output dataset each one compares against is noted.
 !
@@ -124,9 +124,9 @@ end type
 !-
 
 type fel_slice_diag_struct
-  real(rp) :: mean_energy = 0      ! Weighted <E> = <gamma>*m_e c^2 [eV] -- Bmad's
+  real(rp) :: mean_energy = 0      ! Weighted <E> = <gamma>*m_e c^2 [eV], Bmad's
                                    !   convention (energy means eV). Genesis 'energy'
-                                   !   is <gamma>; divide by m_electron to compare.
+                                   !   is <gamma>. Divide by m_electron to compare.
   real(rp) :: sigma_energy = 0     ! rms energy spread [eV]. Genesis 'energyspread'
                                    !   is the same in units of gamma.
   real(rp) :: bunching = 0         ! |sum w e^{i theta}| / sum w. Genesis 'bunching'.
@@ -199,7 +199,7 @@ end function
 !
 ! Routine to return the dimensionless reference momentum p0/(m_e c) = p0c/m_electron,
 ! derived from the beam's one stored reference p0c. Bmad px times this is Genesis px.
-! Hoist this out of particle loops; it is one division, but there is no reason to pay
+! Hoist this out of particle loops. It is one division, but there is no reason to pay
 ! it per particle.
 !
 ! Input:
@@ -221,8 +221,8 @@ end function
 !+
 ! Function fel_gamma0 (beam) result (gamma0)
 !
-! Routine to return the gamma of the reference momentum -- Genesis's gammaref -- derived
-! from the beam's one stored reference p0c. Hoist this out of particle loops; it is one
+! Routine to return the gamma of the reference momentum (Genesis's gammaref), derived
+! from the beam's one stored reference p0c. Hoist this out of particle loops. It is one
 ! sqrt, but there is no reason to pay it per particle.
 !
 ! Input:
@@ -325,7 +325,7 @@ end function fel_theta
 !   px_bmad = px_genesis / p0_mc                    (p0_mc = sqrt(gamma0^2 - 1))
 !   pz      = (sqrt(gamma^2 - 1) - p0_mc) / p0_mc
 !   tau     = -theta / ks,   z = -beta * tau        (phi0 starts at zero)
-!   weight  = I * slice_spacing / (c * n)  [C]      (uniform; the dump carries no weights)
+!   weight  = I * slice_spacing / (c * n)  [C]      (uniform: the dump carries no weights)
 !
 ! ks comes from the dump's own wavelength. p0c is set from gamma0 and Bmad's electron
 ! mass, which is what makes the Bmad-side tracking see exactly this normalization.
@@ -421,7 +421,7 @@ do is = 1, n_slice
   call hdf5_read_dataset_real (g_id, 'px', sl%px(1:np), err, trim(group_name) // '/px');  if (err) return
   call hdf5_read_dataset_real (g_id, 'py', sl%py(1:np), err, trim(group_name) // '/py');  if (err) return
 
-  ! Convert in place: px, py from gamma*beta to P/p0; (theta, gamma) to (z, pz).
+  ! Convert in place: px, py from gamma*beta to P/p0, and (theta, gamma) to (z, pz).
 
   w_uniform = 0
   if (np > 0) w_uniform = current * beam%slice_spacing / (c_light * np)
@@ -461,8 +461,8 @@ end subroutine fel_read_genesis4_beam
 ! back from Bmad coordinates. Inverse of fel_read_genesis4_beam: theta = phi0 - ks*tau
 ! reconstructs Genesis's unwrapped theta including the accumulated common phase, gamma
 ! from pz, px py rescaled by p0_mc, current from the weights. The dump format carries no
-! per-particle weight, so nonuniform weights do not survive a round trip; that is the
-! format's limitation, not this representation's.
+! per-particle weight, so nonuniform weights do not survive a round trip. That limit is
+! the format's and not this representation's.
 !
 ! Input:
 !   beam        -- fel_beam_struct: Beam to write.
@@ -598,16 +598,17 @@ end subroutine fel_slice_reallocate
 ! Subroutine fel_fawley_noise (theta, weight, n, nbins, n_clamp)
 !
 ! Routine to impose Fawley-style shot noise on a quiet-loaded slice, transcribed from
-! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights: each
+! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights. Each
 ! beamlet's amplitude draws on its REAL electron count, the beamlet's charge over e
-! (Genesis's slice-uniform ne/mpart for uniform weights), which makes <|b(h)|^2> =
+! (Genesis's slice-uniform ne/mpart for uniform weights). This makes <|b(h)|^2> =
 ! 1/N_lambda exact for any cross-beamlet weight distribution (fel-physics.tex
 ! sec:noise). Weights must be uniform WITHIN a beamlet (the quiet cancellation is per
-! beamlet); the first particle's weight speaks for its beamlet. Genesis's silent
+! beamlet). The first particle's weight speaks for its beamlet. Genesis's silent
 ! nbl < 1 clamp is kept but counted into n_clamp for the caller to report. Kicks
-! accumulate from the unperturbed phases, exactly as Genesis's work array does; two
-! ran_uniform draws per (harmonic, beamlet), in Genesis's loop order -- shared by the
-! built-in loader and the distribution import, so the two stay one implementation.
+! accumulate from the unperturbed phases, exactly as Genesis's work array does: two
+! ran_uniform draws per (harmonic, beamlet), in Genesis's loop order. The routine is
+! shared by the built-in loader and the distribution import, so the two stay one
+! implementation.
 !
 ! Input:
 !   theta(:)    -- real(rp): Quiet-loaded ponderomotive phases [rad], beamlet-contiguous.
@@ -669,7 +670,7 @@ end subroutine fel_fawley_noise
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
 ! stored coordinates are coord_struct's. The element's p0c must match the beam's
-! normalization; a mismatch is refused, not rescaled, since nothing on this path
+! normalization. A mismatch is refused, not rescaled, since nothing on this path
 ! changes the reference momentum.
 !
 ! Input:
@@ -734,14 +735,14 @@ end subroutine fel_slice_to_bunch
 !+
 ! Subroutine fel_bunch_to_slice (bunch, ele, sl, err_flag)
 !
-! Routine to copy a tracked Bmad bunch back into the packed slice. Plain copies; the
+! Routine to copy a tracked Bmad bunch back into the packed slice. Plain copies. The
 ! phase bookkeeping is one phi0 update per element, done by the caller
 ! (fel_phi0_advance), not here, because it is per beam and not per particle.
 !
 ! Input:
-!   bunch       -- bunch_struct: Tracked bunch; every particle must be alive.
+!   bunch       -- bunch_struct: Tracked bunch. Every particle must be alive.
 !   ele         -- ele_struct: Element just tracked through (for the error message).
-!   sl          -- fel_slice_struct: Destination slice; the fill count n is unchanged.
+!   sl          -- fel_slice_struct: Destination slice. The fill count n is unchanged.
 !
 ! Output:
 !   sl          -- fel_slice_struct: Slice with the tracked coordinates copied back.
@@ -793,16 +794,16 @@ end subroutine fel_bunch_to_slice
 !   z_global = z_local + beta * (islice-1) * slice_spacing
 !
 ! Higher slice index is the window HEAD (larger Bmad z). The direction and the formula
-! are not new conventions: fel_migrate_slices documents "positive theta drift moves
-! toward higher slice index, the head", shifts a mover's z by exactly
-! -atar*beta*slice_spacing -- which makes z_global the migration INVARIANT -- and
+! are not new conventions. fel_migrate_slices documents "positive theta drift moves
+! toward higher slice index, the head", and shifts a mover's z by exactly
+! -atar*beta*slice_spacing (which makes z_global the migration INVARIANT).
 ! fel_wake_update's convolution collects current(is+i) from higher indices, the wake
-! trailing its source. (An earlier specification guessed the opposite sign; the
+! trailing its source. (An earlier specification guessed the opposite sign. The
 ! causality check and these two authorities pinned it.)
 !
 ! beta0 records each particle's entry beta, slice-major in bunch order, for the exact
 ! inverse in fel_split_slices. Particles are stored slice-major (slice 1 first), and
-! nothing downstream may permute bunch%particle storage -- Bmad's wake routines order
+! nothing downstream may permute bunch%particle storage. Bmad's wake routines order
 ! through the bunch%ix_z index array, never by moving particles, so the split can
 ! address segments by position.
 !
@@ -886,14 +887,14 @@ end subroutine fel_concat_slices
 ! is by storage position (slice-major), which Bmad's wake routines never permute.
 !
 ! hold_theta: rescale the restored z by beta_new/beta_old, so the derived phase
-! theta = phi0 + ks*z/beta is untouched by an energy kick -- Genesis's convention for
-! wake energy loss (fel_wake_apply_slice does the same), used when the caller applied a
-! pure kick with no transport (the in-wiggler wake). A track1_bunch passage uses
+! theta = phi0 + ks*z/beta is untouched by an energy kick. This is Genesis's convention
+! for wake energy loss (fel_wake_apply_slice does the same), used when the caller applied
+! a pure kick with no transport (the in-wiggler wake). A track1_bunch passage uses
 ! hold_theta = false: there the element transported vec(5) in Bmad's own chart and the
 ! restored z IS the tracked z.
 !
 ! Input:
-!   bunch       -- bunch_struct: Whole-window bunch after the passage; all alive.
+!   bunch       -- bunch_struct: Whole-window bunch after the passage. All alive.
 !   ele         -- ele_struct: Element just passed through (for the error message).
 !   beam        -- fel_beam_struct: The beam whose slices receive the particles.
 !   beta0(:)    -- real(rp), allocatable: Entry betas recorded by fel_concat_slices.
@@ -959,16 +960,16 @@ end subroutine fel_split_slices
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
 ! slice window: the weighted generalization of Genesis's one4one-only Sorting::localSort
-! (fel-physics.tex sec:migration), which this port can offer for ANY beam because each
+! (fel-physics.tex sec:migration). This port can offer it for ANY beam because each
 ! particle carries its own charge -- weights and migration are the same feature.
 !
 ! The criterion is Genesis's, in this code's chart: the derived phase
 ! theta = phi0 + ks*z/beta is Genesis's bounded theta, the slice window is
 ! [0, slen) with slen = ks*slice_spacing = 2*pi*sample, and
-! atar = floor(theta/slen) is the relative destination (localSort's exact formula;
+! atar = floor(theta/slen) is the relative destination (localSort's exact formula:
 ! positive theta drift moves toward higher slice index, the head of the window). A
 ! mover's z shifts by exactly -atar*beta*slice_spacing, which changes theta by
-! -atar*2*pi*sample: for integer sample the phase seen by every deposition and
+! -atar*2*pi*sample. For integer sample the phase seen by every deposition and
 ! diagnostic is continuous across the move to rounding -- no wrap protocol, the
 ! unwrapped-z coordinate choice (module header) paying off. sample is asserted integer
 ! for that reason.
@@ -976,22 +977,22 @@ end subroutine fel_split_slices
 ! Removal is Genesis's swap-with-last, and the while-loop re-examines the swapped-in
 ! particle exactly as localSort does. A particle appended to a HIGHER slice is
 ! re-examined when the scan reaches that slice (its adjusted theta then lies inside the
-! window, so it stays); one appended to a LOWER slice waits for the next call, as in
+! window, so it stays). One appended to a LOWER slice waits for the next call, as in
 ! Genesis. Particles whose destination lies beyond the window are DROPPED WITH THEIR
-! CHARGE COUNTED into charge_dropped -- Genesis discards them silently at the world
-! edges (sec:migration); the accounting is this port's deviation, chosen so
+! CHARGE COUNTED into charge_dropped. Genesis discards them silently at the world
+! edges (sec:migration). The accounting is this port's deviation, chosen so
 ! conservation is checkable.
 !
 ! Serial by design: called between the parallel regions at the caller's stride, so
 ! thread-count independence is untouched. Single-slice beams return immediately (a
-! steady-state slice is periodic; migration has no meaning).
+! steady-state slice is periodic, so migration has no meaning).
 !
 ! Input:
 !   beam        -- fel_beam_struct: The beam.
 !   ks          -- real(rp): Radiation wavenumber twopi/wavelength [1/m].
 !
 ! Output:
-!   beam             -- fel_beam_struct: Particles re-sliced; slice fill counts updated.
+!   beam             -- fel_beam_struct: Particles re-sliced. Slice fill counts updated.
 !   n_moved          -- integer: Number of particles moved between slices (this call).
 !   charge_dropped   -- real(rp): Charge of particles dropped off the window ends [C].
 !   drop_re, drop_im -- real(rp): Weighted phasor sum(w*e^{i theta}) of the dropped
@@ -1096,8 +1097,8 @@ end subroutine fel_migrate_slices
 !   dphi0/ds = ku_like + ks*(1 - 1/beta0)
 !
 ! where ku_like is the undulator wavenumber inside an undulator, or Genesis's drift
-! surrogate ks/(2*gamma0^2) in field-free regions (fel-physics.tex sec:chart; the
-! caller supplies it), and beta0 is the reference beta from p0_mc. Combined with the
+! surrogate ks/(2*gamma0^2) in field-free regions, supplied by the caller
+! (fel-physics.tex sec:chart), and beta0 is the reference beta from p0_mc. Combined with the
 ! per-particle theta_j = phi0 - ks*tau_j this reproduces Genesis's
 ! dtheta/ds = ks*(1 - 1/beta_z) + ku_like exactly, because
 ! -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
@@ -1135,8 +1136,8 @@ end function fel_phi0_rate
 !
 ! Routine to compute the per-slice beam diagnostics, weighted. Genesis's DiagBeam::calc
 ! definitions with 1/N generalized to w_j/sum(w) (two-pass variances by REQUIREMENT:
-! fel-physics.tex sec:numerics); uniform weights reproduce Genesis exactly up to the
-! regrouped arithmetic. Positions and sizes are of x, y directly; mean_px, mean_py are
+! fel-physics.tex sec:numerics). Uniform weights reproduce Genesis exactly up to the
+! regrouped arithmetic. Positions and sizes are of x, y directly. mean_px, mean_py are
 ! in Bmad's normalization P/p0 (multiply by fel_p0_mc for Genesis's gamma*beta). Adds
 ! N_eff and the derived current.
 !
@@ -1146,7 +1147,7 @@ end function fel_phi0_rate
 !   ks      -- real(rp): Radiation wavenumber twopi/wavelength [1/m].
 !
 ! Output:
-!   diag    -- fel_slice_diag_struct: The weighted diagnostics; zeroed if the slice
+!   diag    -- fel_slice_diag_struct: The weighted diagnostics. Zeroed if the slice
 !               carries no charge.
 !-
 
@@ -1168,7 +1169,7 @@ p0_mc = fel_p0_mc(beam)
 do ip = 1, sl%n
   w = sl%weight(ip)
   p_mc = p0_mc * (1 + sl%pz(ip))         ! gamma and theta's beta = P/gamma share one
-  gam = sqrt(p_mc**2 + 1)                ! sqrt; bit-identical to fel_gamma_of/fel_theta.
+  gam = sqrt(p_mc**2 + 1)                ! sqrt. Bit-identical to fel_gamma_of/fel_theta.
   beta = p_mc / gam
   theta = beam%phi0 + ks * sl%z(ip) / beta
 
@@ -1193,7 +1194,7 @@ x1 = x1/wsum
 y1 = y1/wsum
 
 ! Second pass for the variances (fel-physics.tex sec:numerics): the one-pass <v^2> - <v>^2 form loses
-! sigma to cancellation once the mean is large against the spread -- for gamma ~ 1e4
+! sigma to cancellation once the mean is large against the spread. For gamma ~ 1e4
 ! with sigma ~ 1e-3 the one-pass noise is of order sigma itself, seen as spurious
 ! sigma_gamma jitter under uniform wake kicks before this was rewritten.
 

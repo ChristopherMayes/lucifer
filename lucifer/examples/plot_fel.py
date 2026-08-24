@@ -44,7 +44,7 @@ import matplotlib.pyplot as plt
 M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
 # Fixed series colors (validated categorical palette, assigned in order, never
-# cycled); per-slice context lines are neutral gray so identity stays with the
+# cycled). Per-slice context lines are neutral gray so identity stays with the
 # bold aggregate.
 BLUE, ORANGE, GRAY = "#2a78d6", "#eb6834", "#b0afa9"
 INK, INK2 = "#0b0b0b", "#52514e"
@@ -66,7 +66,7 @@ def load(fn):
             "f_valid": h5["field/angle_moments_valid"][:].astype(bool),
         }
         # Two live polarizations: field/power is the TOTAL and field/* the x
-        # component; field/y/ carries the second. Absent on single-polarization runs.
+        # component. Field/y/ carries the second. Absent on single-polarization runs.
         if "field/y" in h5:
             q["power_y"] = h5["field/y/power"][:]
             q["power_x"] = q["power"] - q["power_y"]
@@ -149,7 +149,7 @@ def main():
     # Radiation power and window field energy, log then linear. The multi-slice
     # aggregate is a sum: total power is what a detector sees, and the window energy
     # is the honest SASE growth curve (per-slice power churns as light slips through
-    # and out of the window; the energy integrates it).
+    # and out of the window, while the energy integrates it).
     for key, quant, ylab in (("power", "power", "radiation power (W)"),
                              ("energy", "energy", "field energy (J)")):
         label = "total" if nslice > 1 else None
@@ -194,7 +194,7 @@ def main():
     axd["fsize"].set_ylabel(r"rms field size ($\mu$m)")
     axd["fsize"].legend(**above)
 
-    # Emittances: beam normalized (projected, dispersion removed); field
+    # Emittances: beam normalized (projected, dispersion removed). Field
     # sqrt(det sigma_plane) at the records where angle moments exist (element ends),
     # against the diffraction limit lambda/4pi.
     panel_series(axd["bemit"], z, 1e6 * norm_emit(q, 0, 1), BLUE, label=r"$\gamma\epsilon_x$")

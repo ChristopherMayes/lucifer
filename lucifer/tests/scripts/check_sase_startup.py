@@ -108,7 +108,7 @@ def main():
     exe = pathlib.Path(a.exe).resolve()
     env = dict(os.environ, FI_PROVIDER="tcp", OMP_NUM_THREADS="8")
 
-    # Every seed's two runs are independent processes; the pool runs them all.
+    # Every seed's two runs are independent processes. The pool runs them all.
     def gen_one(seed):
         (wd / f"gsase{seed}.in").write_text(GENESIS_DECK.format(seed=seed))
         r = subprocess.run([a.genesis, f"gsase{seed}.in"], cwd=wd, env=env,

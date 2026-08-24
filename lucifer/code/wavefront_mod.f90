@@ -16,7 +16,7 @@
 ! Genesis 1.3 Version 4 HDF5 input and output for this structure is in
 ! wavefront_hdf5_mod.
 !
-! Index order. Fortran is column major, so Ex(:,:,iz) -- one longitudinal slice -- is
+! Index order. Fortran is column major, so Ex(:,:,iz) (one longitudinal slice) is
 ! contiguous. That is simultaneously what a per-slice 2D FFTW plan wants and what
 ! parallelising over slices wants. The Python class uses the same (nx, ny, nz) shape but
 ! in C order, so there its slices are strided.
@@ -52,7 +52,7 @@ integer, parameter :: wf_rp = rp
 
 ! Transform directions for wavefront_fft2. Same sign convention as FFTW and as numpy.fft:
 ! forward carries exp(-i k x) and is unnormalized, backward carries exp(+i k x) and is
-! unnormalized. Neither direction applies the 1/(nx*ny) factor; the caller does.
+! unnormalized. Neither direction applies the 1/(nx*ny) factor. The caller does.
 !
 ! Worth knowing when reading the validation results. Interchanging these two values does not
 ! change what wavefront_drift computes, and no test could be written that would notice. The
@@ -69,7 +69,7 @@ integer, parameter :: wf_fft_forward$ = -1, wf_fft_backward$ = 1
 !
 ! Ex, Ey are allocated independently. An unallocated component means that polarisation
 ! component is absent, which is how the Python class's Ex = None is represented. At least
-! one of the two must be allocated for the wavefront to be usable; wavefront_check tests
+! one of the two must be allocated for the wavefront to be usable. wavefront_check tests
 ! that along with the rest of the Python class's __post_init__ validation.
 !-
 
@@ -95,15 +95,15 @@ end type
 ! and named to match it: centroid and sigma are the intensity-weighted first and second
 ! Wigner moments over the transverse phase space (x, theta_x, y, theta_y), so sizes come
 ! out as sqrt(sigma(1,1)) in both structs and free-space propagation is the ABCD map on
-! sigma (sigma_x^2(z) is quadratic in z -- how banked slices are folded into pulse
-! statistics without numerical propagation). emit = sqrt(det of a plane's 2x2 block) is
+! sigma (sigma_x^2(z) is quadratic in z, which is how banked slices are folded into
+! pulse statistics without numerical propagation). emit = sqrt(det of a plane's 2x2 block) is
 ! the field-quality analog (= M^2 lambda/4pi). Pulse-level values are POOLED from slice
 ! instances downstream (energy-weighted mean of sigmas plus variance of centroids),
 ! never stored. Fixed Bmad units.
 !
 ! The theta rows of sigma cost FFT-side sums, so they are filled only where needed
-! (element ends, bank time); angle_moments_valid says whether they were -- the
-! twiss_valid pattern.
+! (element ends, bank time). angle_moments_valid says whether they were (the
+! twiss_valid pattern).
 !-
 
 type wavefront_params_struct
@@ -122,7 +122,7 @@ end type
 ! Following bmad/space_charge/fft_interface_mod.f90: plans are created once per transverse
 ! grid size and reused. Two differences from that routine. First, the work buffer here is
 ! allocated by fftw_alloc_complex and transforms are executed on it rather than on the
-! caller's array, so the plan always sees the alignment it was created with; FFTW's
+! caller's array, so the plan always sees the alignment it was created with. FFTW's
 ! new-array execute rule makes executing a plan on a differently aligned array undefined.
 ! Second, the cache is threadprivate: every OpenMP thread carries its own plans and work
 ! buffer, so wavefront_fft2 is callable from a parallel loop over slices, which is how
@@ -130,7 +130,7 @@ end type
 ! nx*ny buffer per thread, paid once per grid size.
 !
 ! On the critical section inside wavefront_fft2: it guards FFTW's rule that plan creation
-! is not reentrant, and nothing else -- the FFTW planner is globally serialised no matter
+! is not reentrant, and nothing else. The FFTW planner is globally serialised no matter
 ! how many per-thread buffers exist. Plan EXECUTION is thread safe by FFTW's own
 ! guarantee, and each execution here touches only the calling thread's buffer.
 
@@ -703,7 +703,7 @@ end subroutine wavefront_transverse_moments
 !   z_drift     -- real(rp): Drift distance [m]. May be negative.
 !   curvature   -- real(rp), optional: Accepted only as zero. Default is 0. A nonzero curvature selects
 !                    quadratic phase rescaling with an expanding grid, which is not
-!                    implemented here; passing one is an error rather than being silently
+!                    implemented here. Passing one is an error rather than being silently
 !                    ignored.
 !
 ! Output:
@@ -764,7 +764,7 @@ kernel = wavefront_drift_kernel(wf, z_drift)
 ! per field-free element, and at production slice counts the serial version was the
 ! largest single serial block in the walk (a 590-slice, 256-point case measured ~0.5 s
 ! per element on one core). wavefront_fft2_plan_threads warms every thread's plans from
-! the serial context first -- FFTW's planner is not reentrant, and creating a plan
+! the serial context first: FFTW's planner is not reentrant, and creating a plan
 ! inside this loop would race with the transforms.
 
 call wavefront_fft2_plan_threads (nx, ny, err);  if (err) return
@@ -861,7 +861,7 @@ end function wavefront_drift_kernel
 ! This exists as a validation instrument, not as a propagator anyone should use: it costs
 ! O(nx*ny*(nx+ny)) per slice against the FFT's O(nx*ny*log(nx*ny)). It builds its own
 ! propagation kernel and performs its own transform, so it is independent both of
-! wavefront_drift_kernel and of every FFTW convention -- the dimension order handed to
+! wavefront_drift_kernel and of every FFTW convention: the dimension order handed to
 ! fftw_plan_dft_2d, the sign attached to each direction, the normalization factor, and the
 ! alignment rules for executing a cached plan on a differently allocated array.
 !
@@ -990,7 +990,7 @@ end subroutine wavefront_drift_reference
 !   out(k) = Sum_j dat(j) * exp(direction * i * twopi * (j-1) * (k-1) / n)
 !
 ! with direction = wf_fft_forward$ giving the negative exponent, matching FFTW and
-! numpy.fft. Used only by wavefront_drift_reference; see the discussion there.
+! numpy.fft. Used only by wavefront_drift_reference. See the discussion there.
 !
 ! Input:
 !   dat(:)      -- complex(wf_rp): Data to transform.
@@ -1037,7 +1037,7 @@ end function wavefront_dft_1d
 ! Routine to apply an unnormalized in-place 2D complex FFT to dat using a cached FFTW plan.
 !
 ! Neither direction applies a normalization factor, so a forward followed by a backward
-! transform multiplies the data by nx*ny. This matches FFTW and matches numpy.fft.fft2;
+! transform multiplies the data by nx*ny. This matches FFTW and matches numpy.fft.fft2.
 ! numpy's ifft2 differs from wf_fft_backward$ only by that factor.
 !
 ! Plans are created once per grid size and cached per thread, following
@@ -1047,8 +1047,8 @@ end function wavefront_dft_1d
 !
 ! Thread safe: the plan cache and its work buffer are threadprivate, so concurrent calls
 ! from a parallel loop over slices each use their own. Callers running transforms in a
-! parallel loop MUST warm every thread's cache first (wavefront_fft2_plan_threads) --
-! a lazy first-call plan would run the planner concurrently with other threads' transform
+! parallel loop MUST warm every thread's cache first (wavefront_fft2_plan_threads).
+! A lazy first-call plan would run the planner concurrently with other threads' transform
 ! execution, which FFTW does not promise to be safe. See wavefront_fft2_plan's note.
 !
 ! Input:
@@ -1121,7 +1121,7 @@ end subroutine wavefront_fft2
 !
 ! Routine to fill the calling thread's plan cache for an nx by ny transform (a no-op when
 ! it already holds this size). The critical section guards one specific thing: FFTW's rule
-! that only fftw_execute is reentrant -- the planner is globally serialised even though
+! that only fftw_execute is reentrant. The planner is globally serialised even though
 ! every thread builds into its own threadprivate cache.
 !
 ! That same rule is why wavefront_fft2_plan_threads exists: a thread that plans lazily on
@@ -1206,7 +1206,7 @@ end subroutine wavefront_fft2_plan
 ! Routine to fill EVERY OpenMP thread's plan cache for an nx by ny transform, so that no
 ! planner runs concurrently with transform execution afterwards (see wavefront_fft2_plan's
 ! note: only fftw_execute is reentrant). Call serially, before any parallel loop that
-! executes transforms of this size; a no-op when every thread already holds this size.
+! executes transforms of this size. A no-op when every thread already holds this size.
 !
 ! Input:
 !   nx, ny      -- integer: Transform size.
@@ -1249,8 +1249,8 @@ end subroutine wavefront_fft2_plan_threads
 !
 ! Routine to destroy the cached FFTW plans and free the work buffer OF THE CALLING
 ! THREAD. The cache is threadprivate, so a serial call after parallel work leaves the
-! worker threads' caches allocated until program end; freeing those would need a call
-! from inside a parallel region. Not needed for correctness; useful for making a
+! worker threads' caches allocated until program end. Freeing those would need a call
+! from inside a parallel region. Not needed for correctness. Useful for making a
 ! single-threaded leak check clean.
 !-
 
@@ -1284,8 +1284,8 @@ end subroutine wavefront_fft_free
 ! Spatial moments come from the intensity |E|^2 in one grid pass. The theta moments use
 ! the spectral representation: with theta = k_perp/ks, <theta^2> comes from |FFT(E)|^2
 ! and the cross moment from <x theta>_sym = Im INT conj(E) x dE/dx / (ks INT |E|^2) with
-! the derivative evaluated spectrally -- one forward and two inverse FFTs, which is why
-! angle moments are computed only where needed (with_angles; the angle_moments_valid
+! the derivative evaluated spectrally: one forward and two inverse FFTs, which is why
+! angle moments are computed only where needed (with_angles, the angle_moments_valid
 ! pattern). Grid k ordering matches the field solver's kernel (fftshift index mapping).
 !
 ! Input:
@@ -1321,9 +1321,9 @@ nx = size(plane, 1);  ny = size(plane, 2)
 ks = twopi / wavelength
 
 ! Intensity moments, one pass, SEPARABLE: the inner loop only accumulates row and
-! column intensity sums (the vectorizable part); the 1-D moments follow. Coordinates
+! column intensity sums (the vectorizable part). The 1-D moments follow. Coordinates
 ! are grid-centered, matching the solver. This runs per slice per record, so its cost
-! is the stats file's overhead -- keep it lean.
+! is the stats file's overhead. Keep it lean.
 
 shift = -0.5_rp * (nx - 1)
 block

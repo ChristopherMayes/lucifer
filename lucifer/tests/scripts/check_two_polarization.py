@@ -211,7 +211,7 @@ def main():
     #    TD run with physical shot noise (a quiet start's dark power is the numerical
     #    floor, meaningless to compare). The helical quiver's spontaneous radiation is
     #    purely co-rotating, which the scalar envelope holds whole and the vector path
-    #    splits into (Ex, Ey); the TOTAL power must agree. Ey is forced live by a
+    #    splits into (Ex, Ey). The TOTAL power must agree. Ey is forced live by a
     #    negligible y seed (1e-30 W).
     (wd / "p2_hel.bmad").write_text("call, file = spont_probe.bmad\n")
     run(exe, wd, "p2h_v0", NML.format(lat="p2_hel.bmad", root="p2h_v0",

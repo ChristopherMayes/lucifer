@@ -317,7 +317,7 @@ def main():
         check(f"formats agree complex-wise ({fn})", d, TOL_RT_FORMATS)
 
     # Fortran read-back: import the .wf.h5, write_initial + load_only re-dumps
-    # Genesis-format; datasets must be identical to the original Genesis dump.
+    # Genesis-format. Datasets must be identical to the original Genesis dump.
 
     run(exe, wd, "h3rt", NML_IMPORT.format(lat="planar_val.bmad", root="h3rt",
         beam="h3both-final.par.h5", field="h3both-final.wf.h5",
@@ -421,7 +421,7 @@ def main():
         for dx_i, dy_i, wgt in ((0, 0, fx * fy), (1, 0, (1 - fx) * fy),
                                 (0, 1, fx * (1 - fy)), (1, 1, (1 - fx) * (1 - fy))):
             np.add.at(crs, (ix[on] + dx_i, iy[on] + dy_i), (wgt * cpart)[on])
-        # Common factors (weights, delz, spacing, mu0 c) cancel in the ratio; keep fc.
+        # Common factors (weights, delz, spacing, mu0 c) cancel in the ratio. Keep fc.
         return abs(fc_planar(aw, h)) ** 2 * float((abs(crs) ** 2).sum())
 
     with h5py.File(wd / "h3dep.stats.h5") as h5:

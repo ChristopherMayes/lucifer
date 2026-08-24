@@ -58,7 +58,7 @@ contains
 !   wf            -- wavefront_struct: Wavefront to write.
 !   file_name     -- character(*): File to create. Conventionally ends in ".fld.h5".
 !   polarization  -- character(*), optional: 'x' or 'y'. Default is whichever single
-!                      component is present; required if both are present.
+!                      component is present. Required if both are present.
 !
 ! Output:
 !   err_flag      -- logical: Set True on error, False otherwise.
@@ -181,7 +181,7 @@ end subroutine wavefront_write_genesis4
 !
 ! Routine to read a wavefront from a Genesis 1.3 Version 4 field file.
 !
-! The field is read into Ex; Ey is left unallocated. This matches
+! The field is read into Ex. Ey is left unallocated. This matches
 ! Wavefront.from_genesis4, and reflects that the format carries no polarisation state.
 !
 ! Input:

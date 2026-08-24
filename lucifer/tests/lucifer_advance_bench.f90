@@ -2,10 +2,10 @@
 ! Program lucifer_advance_bench
 !
 ! The FEL-step particle-path microbenchmark: time fel_advance on a synthetic single
-! slice at fixed state and decompose the per-particle-step cost --
+! slice at fixed state and decompose the per-particle-step cost into
 ! the full path, the RK4+ODE alone (no gather, fixed rpart), and the bare sin/cos
-! pair -- so each optimization lever gets a number, not a guess. Serial on purpose:
-! this measures the per-particle CONSTANT; parallel scaling is the perf harness's job.
+! pair. Each optimization lever then gets a number, not a guess. Serial on purpose:
+! this measures the per-particle CONSTANT. Parallel scaling is the perf harness's job.
 !
 !   lucifer_advance_bench [npart] [nstep]      (defaults 8192, 400)
 !

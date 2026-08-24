@@ -12,14 +12,14 @@
 #   - The window is 4 slices per worker (sample = 3), so the slice count divides the
 #     worker count exactly and Genesis does not pad its time window -- padding would
 #     charge Genesis for slices the Bmad side does not track.
-#   - Genesis writes the initial dumps; the Bmad tracker imports them, so both track
+#   - Genesis writes the initial dumps. The Bmad tracker imports them, so both track
 #     identical particles and field. Before any timing is quoted, the final total powers
 #     are required to agree at the documented seam level (the Bmad tracker runs its
 #     production configuration, interlude_model = "bmad", which differs from Genesis by
 #     the priced transport model difference of ~4e-2 -- see the README).
 #   - Wall times come from one uniform external clock (/usr/bin/time -p), not from each
-#     code's self-report. Serial Genesis runs the plain binary (one rank, no launcher);
-#     parallel Genesis runs mpirun -np <workers>; the Bmad tracker runs the same binary
+#     code's self-report. Serial Genesis runs the plain binary (one rank, no launcher),
+#     and parallel Genesis runs mpirun -np <workers>. The Bmad tracker runs the same binary
 #     with OMP_NUM_THREADS=1 and =<workers>.
 #   - Use production builds. A debug lucifer is accepted with a loud warning,
 #     and its numbers are not comparable.
@@ -29,7 +29,7 @@
 #                           [--mpirun <path>] [--python <path>] [--work-dir <path>]
 #
 # Defaults: workers = the machine's performance-core count (hw.perflevel0.physicalcpu on
-# macOS, nproc on Linux); binaries and python found as in run_fel_benchmark.sh, except
+# macOS, nproc on Linux). Binaries and python found as in run_fel_benchmark.sh, except
 # the PRODUCTION lucifer is preferred. The work directory is kept.
 
 set -o pipefail
@@ -75,7 +75,7 @@ fi
 
 # The launcher must match the MPI the Genesis binary links (an OpenMPI mpirun aborts an
 # MPICH-linked genesis4 with "unsupported PMI version PMIx", and vice versa). On macOS
-# the binary's LC_RPATH names the MPI installation it loads from; prefer the mpiexec
+# the binary's LC_RPATH names the MPI installation it loads from. Prefer the mpiexec
 # that lives beside it, and fall back to PATH only if that turns up nothing.
 if [[ -z "$MPIRUN" && "$(uname)" == "Darwin" ]]; then
   while read -r rpath; do
@@ -142,10 +142,10 @@ cd "$WORK_DIR" || exit 1
 export FI_PROVIDER=tcp
 
 # The deck is Aramis-td.in's configuration with the window sized to the worker count.
-# The serial run carries the &write blocks (the dumps the Bmad side imports); the timed
+# The serial run carries the &write blocks (the dumps the Bmad side imports). The timed
 # parallel run drops them so neither code is charged for dump I/O asymmetrically --
 # the Bmad runs write only their final dumps, Genesis's serial run writes initial+final.
-# Dump I/O is seconds against minutes of tracking; the asymmetry is noted, not modeled.
+# Dump I/O is seconds against minutes of tracking. The asymmetry is noted, not modeled.
 
 make_deck () {   # <file> <with_write: 1|0>
   cat > "$1" <<DECK
@@ -251,7 +251,7 @@ timed "lucifer, $WORKERS threads" fel-parallel.log \
 echo
 
 # Sanity before quoting numbers: same physics on both sides. The Bmad seam differs from
-# Genesis by the priced ~4e-2 transport model difference; a factor-level disagreement
+# Genesis by the priced ~4e-2 transport model difference. A factor-level disagreement
 # means the runs are not comparable and the timings are meaningless.
 
 "$PYTHON" - <<EOF

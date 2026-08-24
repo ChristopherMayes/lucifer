@@ -25,11 +25,11 @@
 !   /
 !
 ! (bmad_com and space_charge_com are Bmad's own globals, exposed directly as Tao's
-! &tao_params exposes them; the parsing lives in fel_input_mod, which an embedding
+! &tao_params exposes them. The parsing lives in fel_input_mod, which an embedding
 ! program may reuse or skip by filling the structs itself.)
 !
 ! One deliberate deviation from Tao: no module-level singleton. Tao's super-universe s
-! serves its command loop; a library wants explicit state, and an oscillator or scan
+! serves its command loop. A library wants explicit state, and an oscillator or scan
 ! driver wants several passes over one state. fel_run_struct passes as an argument
 ! everywhere.
 !-
@@ -47,7 +47,7 @@ implicit none
 ! Struct fel_global_struct
 !
 ! The run-level switches and names, exposed in &fel_params as global%... (the
-! tao_global_struct analog). Everything here is about ONE run of the tracker; the
+! tao_global_struct analog). Everything here is about ONE run of the tracker. The
 ! physics description lives in the lattice, beam_init and wavefront_init.
 !-
 
@@ -55,9 +55,9 @@ type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
   character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
   character(8) :: wavefront_format = 'genesis'  ! Field dumps: 'genesis', 'openpmd' or 'both'.
-  ! The FEL source model (manual sec:coherent-source): 'deposit' is the standard
-  ! per-particle scatter (the referee, bit-for-bit unchanged); 'coherent' is the
-  ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)) -- the
+  ! The FEL source model (manual sec:coherent-source). 'deposit' is the standard
+  ! per-particle scatter (the referee, bit-for-bit unchanged). 'coherent' is the
+  ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the
   ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
   ! physical shot noise, and the transverse shape is a guarded Gaussian.
   character(16) :: source_model = 'deposit'
@@ -71,9 +71,9 @@ type fel_global_struct
   ! comb_ds_save): the minimum z advance between per-record stats rows.
   !   < 0: no per-record rows at all (element ends, dumps and the final state remain).
   !   = 0: a row at every record position (the default here: the per-record arrays are
-  !        the primary stats contract, where Tao's comb is an optional extra -- the one
-  !        deliberate deviation from Tao's -1 default; the semantics are identical).
-  !   > 0: a row when z has advanced comb_ds_save past the last row; element ends always.
+  !        the primary stats contract, where Tao's comb is an optional extra. The one
+  !        deliberate deviation from Tao's -1 default, with identical semantics).
+  !   > 0: a row when z has advanced comb_ds_save past the last row, and element ends always.
   real(rp) :: comb_ds_save = 0
   character(60) :: dump_beam_at(40) = ''     ! Element locators for mid-run beam dumps.
   character(60) :: dump_field_at(40) = ''    ! Element locators for mid-run field dumps.
@@ -93,20 +93,20 @@ end type
 ! The radiation starting condition, the beam_init_struct analog (&fel_wavefront_init).
 ! The field record IS the time window, so the window lives here: window_length and
 ! window_sample set the slice count and spacing for the field AND the generated beam
-! (one window, one definition). harmonics requests the field set; field_file imports
+! (one window, one definition). harmonics requests the field set. field_file imports
 ! override the seed.
 !-
 
 type wavefront_init_struct
   real(rp) :: lambda0 = 0            ! Resonant wavelength [m]. Required for generation.
-  real(rp) :: window_length = 0      ! Time window [m]; 0 = derived from the bunch.
+  real(rp) :: window_length = 0      ! Time window [m]. 0 = derived from the bunch.
   integer :: window_sample = 1       ! Slice spacing in wavelengths (Genesis's sample).
   integer :: grid_n_pts = 255        ! Transverse grid points per side (Genesis ngrid).
   real(rp) :: grid_half_width = 0    ! Transverse half width [m] (Genesis dgrid).
-  real(rp) :: seed_power = 0         ! Gaussian seed power [W]; 0 = dark start.
+  real(rp) :: seed_power = 0         ! Gaussian seed power [W]. 0 = dark start.
   real(rp) :: seed_waist_size = 0    ! Seed intensity 1/e^2 radius [m].
   character(1) :: seed_polarization = 'x'   ! 'x' or 'y'.
-  ! The field set: harmonics(1) must be 1 (the fundamental); further entries are
+  ! The field set: harmonics(1) must be 1 (the fundamental). Further entries are
   ! harmonic numbers in increasing order, 0 = unused.
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
 end type
@@ -116,7 +116,7 @@ end type
 !
 ! The chamber-wake description (&fel_params wake%...), Genesis &wake names. A plain
 ! mirror of fel_wake_struct's configuration fields (that struct carries allocatable
-! state, which a namelist object cannot); fel_setup copies these in.
+! state, which a namelist object cannot). fel_setup copies these in.
 !-
 
 type fel_wake_init_struct
@@ -125,7 +125,7 @@ type fel_wake_init_struct
   real(rp) :: radius = 2.5e-3_rp   ! Chamber radius, or half gap if flat [m].
   real(rp) :: conductivity = 0     ! DC conductivity [1/(Ohm m)]. 0: no resistive wake.
   real(rp) :: relaxation = 0       ! AC relaxation distance c*tau [m].
-  logical :: roundpipe = .true.    ! Round chamber; false: flat (parallel plates).
+  logical :: roundpipe = .true.    ! Round chamber. False: flat (parallel plates).
   character(8) :: material = ''    ! 'CU' or 'AL' shortcut for conductivity+relaxation.
   real(rp) :: gap = 0              ! Undulator gap [m]. 0: no geometric wake.
   real(rp) :: lgap = 1             ! Period of the gaps [m].
@@ -166,9 +166,9 @@ end type
 !
 ! The assembled state of one run: the parsed lattice, the beam, the field set, the
 ! collective-effects state, the schedule the setup pass computed, the diagnostics
-! state, and copies of every input struct (so the resolved inputs are one object --
+! state, and copies of every input struct (so the resolved inputs are one object:
 ! the Meta/ provenance echo and any embedding caller read them from here). Passed
-! explicitly; no singleton.
+! explicitly, no singleton.
 !-
 
 type fel_run_struct
@@ -293,7 +293,7 @@ end function fel_si_str
 ! Function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
 !
 ! THE COMB RULE, in one place: Bmad's bunch_track_struct%ds_save semantics verbatim
-! (save_a_bunch_step's guards; Tao's comb_ds_save note "< 0 => No comb calculated"):
+! (save_a_bunch_step's guards, and Tao's comb_ds_save note "< 0 => No comb calculated"):
 !   comb < 0: no per-record rows at all (element ends, dumps and finals remain
 !             through their own arrays);
 !   comb = 0: a row at every record position;

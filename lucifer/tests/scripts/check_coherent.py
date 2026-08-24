@@ -211,7 +211,7 @@ def main():
     # Measured 8.9e-2: the SS model bias (1.9e-2) plus the residual emission
     # difference from the 3 slices of window slippage this TD config still has
     # (the deposit refills slipped-in slices with its inflated spontaneous
-    # emission; the coherent source, correctly, does not). Without the centering
+    # emission, and the coherent source, correctly, does not). Without the centering
     # extension the Gaussian would sit 0.87 sigma off the beam and the error
     # would be O(1) -- that is what this check pins.
     check("offset+tilted beam: coherent tracks its deposit twin",

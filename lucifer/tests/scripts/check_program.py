@@ -209,7 +209,7 @@ def main():
                  stats_of(wd / "cbn.stats.h5")
 
     # comb > 0: the rows are a subset of the every-record run's rows, dataset-equal
-    # at the matching z; element ends always present (here: the final record).
+    # at the matching z. Element ends always present (here: the final record).
     idx = np.searchsorted(s0["z"], sp["z"])
     ok = bool(np.array_equal(s0["z"][idx], sp["z"]))
     ok = ok and np.array_equal(s0["field/power"][idx, :], sp["field/power"])
@@ -220,7 +220,7 @@ def main():
     check("comb > 0: rows == every-record rows at the comb positions (subset)", ok,
           note=f"[{len(sp['z'])} of {len(s0['z'])} rows]")
 
-    # comb < 0: no per-record rows at all; element-end arrays remain.
+    # comb < 0: no per-record rows at all. Element-end arrays remain.
     ok = len(sn.get("z", [])) == 0 and len(sn["element_end/s"]) == len(s0["element_end/s"]) \
          and bool(np.array_equal(sn["element_end/s"], s0["element_end/s"]))
     check("comb < 0: no per-record rows; element ends remain", ok,

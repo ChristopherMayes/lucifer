@@ -10,7 +10,7 @@
 # conditions -- one shot-noise realization -- make the run-to-run differences pure
 # integration error, not SASE statistics. The comparison samples total power (summed over
 # slices) at the twelve undulator-segment exits, positions every run records regardless
-# of delz, against the finest run; a convergence order is fitted from successive step
+# of delz, against the finest run. A convergence order is fitted from successive step
 # halvings/triplings. This is a measurement, not a check: results are recorded in
 # lucifer/README.md.
 #
@@ -83,7 +83,7 @@ if ! "$GENESIS" Aramis-td-s12.in > genesis-s12.log 2>&1; then
   exit 1
 fi
 
-# The step in undulator periods (lambdau = 0.015 m); 1 period is the reference. The
+# The step in undulator periods (lambdau = 0.015 m). 1 period is the reference. The
 # step lives on the element (ds_step), so each point of the sweep is a two-line wrapper
 # lattice overriding it -- there is no namelist step size.
 
@@ -124,7 +124,7 @@ periods = [1, 2, 3, 6, 12]
 lambdau, l_und = 0.015, 3.99
 
 # Total power (summed over slices) per record, from the diag files. Element-end records
-# exist in every run; undulator-segment exits are located by z value.
+# exist in every run. Undulator-segment exits are located by z value.
 
 def curve(np_periods):
     d = np.loadtxt(f"{w}/sweep_p{np_periods}.diag.txt")

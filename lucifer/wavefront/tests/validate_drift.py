@@ -373,7 +373,7 @@ def main() -> int:
         # is the entire discrepancy: nothing about the wavefront enters it.
         #
         # energy. A sum over every grid point, which is 20480 of them at the default size.
-        # NumPy sums pairwise, with error growing as log(N) * eps; the Fortran sum intrinsic
+        # NumPy sums pairwise, with error growing as log(N) * eps. The Fortran sum intrinsic
         # sums sequentially, with error growing as N * eps, and N * eps here is 4.5e-12. The
         # two also differ in association: Fortran forms the intensity in W/m^2 and divides
         # the sum by c, where Python forms the energy density directly.

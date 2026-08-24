@@ -2,17 +2,17 @@
 ! Module fel_unaveraged_mod
 !
 ! The unaveraged verification mode (fel-physics.tex sec:unaveraged):
-! particles integrated through the undulator's REAL field -- the full Newton-Lorentz
-! quiver, no period averaging -- with the radiation field as a co-evolving kick, so the
+! particles integrated through the undulator's REAL field (the full Newton-Lorentz
+! quiver, no period averaging) with the radiation field as a co-evolving kick, so the
 ! coupling factor fc, the harmonic content, and the entry/exit behavior of the averaged
-! mode become measured OUTPUTS instead of assumed inputs. MINERVA (Freund & van der
-! Slot; minerva-code-analysis.md) is the production existence proof for this physics;
-! this mode differs by keeping the GRID field and the Lorentz force where MINERVA
+! mode become measured OUTPUTS instead of assumed inputs. MINERVA (Freund and van der
+! Slot) is the production existence proof for this physics.
+! This mode differs by keeping the GRID field and the Lorentz force where MINERVA
 ! evaluates modal fields, and it is a verification mode: run on a handful of slices
 ! where the ~100x cost against the averaged path is irrelevant.
 !
 ! DELIBERATELY ABSENT from this path: fc, faw, and every other period-averaged
-! coupling quantity -- those are what this mode measures, and their appearance here
+! coupling quantity. Those are what this mode measures, and their appearance here
 ! would make the check circular. The harness greps this file for them.
 !
 ! The step, per substep delta (Strang split, second order):
@@ -25,7 +25,7 @@
 !      where the two momentum conventions coincide. Each handoff also applies the
 !      ramp's slippage compensation as a discrete phase jump (unavg_ramp_phase_jump:
 !      the ramped ends slip ~3 rad of optical phase less than the contracted
-!      hard-edge element; uncompensated, that scrambles the bunching-to-field phase
+!      hard-edge element. Uncompensated, that scrambles the bunching-to-field phase
 !      of every pre-bunched segment entry).
 !   2. radiation kick + source deposit at the substep midpoint:
 !        dgamma/ds = -Re[W conj(j)]/(u_s m_e),   W = -i*Ehat*e^{i Psi}
@@ -38,8 +38,8 @@
 !        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
 !      followed by the shared pure diffraction (fel_field_diffract) and the +2*src
 !      convention. The /u_s (where the averaged solver has Genesis's /gamma) makes the
-!      kick/deposit pair EXACT energy duals per substep -- same operands, same bilinear
-!      weights, unitary diffraction between -- so the ledger closes to the physical
+!      kick/deposit pair EXACT energy duals per substep (same operands, same bilinear
+!      weights, unitary diffraction between), so the ledger closes to the physical
 !      spontaneous-emission term and rounding, by construction. Period-averaging the
 !      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
 !      emerges from the figure-8).
@@ -47,24 +47,24 @@
 !
 ! Units: E in V/m (wavefront convention), m_electron in eV, b in 1/m. The physical
 ! field of the scalar envelope: planar E_x = Re[-i Ehat e^{i Psi}]; helical
-! (E_x, E_y) = (Re[-i Ehat e^{i Psi}], -Re[Ehat e^{i Psi}])/sqrt(2) -- both give
+! (E_x, E_y) = (Re[-i Ehat e^{i Psi}], -Re[Ehat e^{i Psi}])/sqrt(2). Both give
 ! intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 !
-! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables --
+! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables,
 ! chosen ON MERIT, not because MINERVA uses it: for a verification mode the currency
 ! is short-probe ACCURACY, and 4th order is what makes fc measurable at 6e-4 with 20
 ! steps/period (a 2nd-order symplectic scheme needs ~100 steps/period to match, and
 ! no explicit symplectic method exists for this non-separable Hamiltonian without
 ! paying implicit iterations). The structural cost is measured, not argued: gamma is
-! conserved EXACTLY by construction (B does no work; gamma changes only in the kick),
-! and over the longest benchmark segment -- 266 periods, 5320 steps -- the dark-run
+! conserved EXACTLY by construction (B does no work: gamma changes only in the kick),
+! and over the longest benchmark segment (266 periods, 5320 steps) the dark-run
 ! emittance drifts by <= 3.3e-6, orders below every check. If production-length
 ! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
-! composition; the ballistic check is the instrument that will say when.
+! composition. The ballistic check is the instrument that will say when.
 !
 ! Parallel over slices with the averaged step's own guarantees (the OpenMP design's
 ! design): disjoint particle arrays and field slices per iteration, serial kernel
-! init, threadprivate FFT plans, per-slice energy summed in fixed order -- results
+! init, threadprivate FFT plans, per-slice energy summed in fixed order. Results
 ! are bit-identical across thread counts, and the harness checks it.
 !-
 
@@ -162,9 +162,9 @@ end subroutine fel_unavg_setup
 ! Function fel_unavg_envelope (ustate, s, gp) result (g)
 !
 ! The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
-! flat 1, sin^2 down over the last l_ramp -- continuous amplitude AND slope (the
+! flat 1, sin^2 down over the last l_ramp. Amplitude AND slope are continuous (the
 ! slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
-! the hard-edge MUTATION configuration; the handoff check exists to catch it.
+! the hard-edge MUTATION configuration. The handoff check exists to catch it.
 !
 ! Input:
 !   ustate -- fel_unavg_struct: Ramp geometry.
@@ -281,7 +281,7 @@ end subroutine fel_unavg_bfield
 ! boundaries: entry asserts and takes the averaged chart (the ramp guarantees a = 0
 ! there, so kinetic momentum equals the stored canonical-convention px), exit hands
 ! it back and restores the flag. beam%phi0 advances at the averaged ponderomotive
-! rate so every diagnostic row stays comparable; the optical carrier used internally
+! rate so every diagnostic row stays comparable. The optical carrier used internally
 ! is Psi = (phi0 - ku*s) - ks*tau. dE_beam returns the weighted particle energy
 ! change of this step [J] for the energy-ledger check.
 !
@@ -367,7 +367,7 @@ phi0_rate_avg = fel_phi0_rate(ks, und%ku, p0_mc)
 scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_spacing)
 
 ! Entry handoff: the ramp makes a = 0 here, so the stored (averaged-convention) px IS
-! the kinetic momentum; the flag records that px now carries the quiver.
+! the kinetic momentum. The flag records that px now carries the quiver.
 
 if (first) then
   call fel_assert_averaged_chart (beam, r_name // ' (segment entry)', err)
@@ -386,7 +386,7 @@ any_err = .false.
 ! touches only its own particle arrays and its own field slice (the beam-to-field
 ! mapping is a bijection), the kernel cache is read-only here (initialized serially
 ! above), the FFT plan cache is threadprivate, and the per-slice energy lands in
-! dE_slice so the final sum is a fixed-order serial reduction -- results are
+! dE_slice so the final sum is a fixed-order serial reduction. Results are
 ! bit-identical across thread counts, and the harness checks that.
 
 !$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, crsource_y, s_sub, isub, ip, &
@@ -438,9 +438,9 @@ do is = 1, nslice
       call fel_grid_weights (wf, xx(ip), yy(ip), ix, iy, wx, wy, on_grid)
       if (on_grid .and. two_pol) then
 
-        ! Two live polarizations: COMPONENT-WISE duals -- the instantaneous kinetic
+        ! Two live polarizations: COMPONENT-WISE duals. The instantaneous kinetic
         ! momenta u_x, u_y are real numbers, each working against and depositing into
-        ! its own field component; no polarization convention enters at all (manual
+        ! its own field component. No polarization convention enters at all (manual
         ! sec:field vector convention). The scalar branch below keeps the folded
         ! ĵ-convention verbatim for single-polarization lines.
 
@@ -506,8 +506,8 @@ do is = 1, nslice
 
     ! The deposit's own energy |dE|^2 = 4|src|^2: the ONE term of the field-energy
     ! increment the kick/deposit duality does not charge to the beam (the beam pays the
-    ! cross term 2 Re<E, dE> exactly; manual eq:ledger). Physically this is the
-    ! spontaneous emission of the substep; numerically it is banked here so the
+    ! cross term 2 Re<E, dE> exactly, manual eq:ledger). Physically this is the
+    ! spontaneous emission of the substep. Numerically it is banked here so the
     ! time-dependent ledger closes EXACTLY: E_beam + U_window + U_escaped - U_spont.
 
     dU_sp_slice(is) = dU_sp_slice(is) + 4 * sum(real(crsource, rp)**2 + aimag(crsource)**2) &
@@ -520,7 +520,7 @@ do is = 1, nslice
     s_sub = s_sub + dsub
   enddo
 
-  ! Back to the stored chart. px carries the quiver mid-segment (the flag says so);
+  ! Back to the stored chart. px carries the quiver mid-segment (the flag says so).
   ! z = -beta*tau with the full-momentum beta, the chart's own convention.
 
   do ip = 1, sl%n
@@ -561,15 +561,15 @@ contains
 
 ! The ramp's slippage compensation, applied as one discrete jump per segment end,
 ! at the handoffs where the envelope is exactly zero and nothing couples. The
-! element's contract is L meters of full-strength undulator; the entry/exit ramps
+! element's contract is L meters of full-strength undulator. The entry/exit ramps
 ! are a numerical device (an adiabatic switch-on), and an electron under a ramped
 ! quiver <u_perp^2> = g^2 aw^2 lags the wave LESS than the contracted hard-edge
-! element would have it -- by dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds, which
+! element would have it, by dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds, which
 ! is ks*dtau ~ 2.6 rad of optical phase per end at the benchmark parameters
 ! (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp per end). Uncompensated, every
 ! segment after the first receives a pre-bunched beam with its bunching-to-field
-! phase rotated by that much -- the first segment is immune, nothing is bunched
-! yet, and that is exactly how it was caught: per-segment ln-power deviations vs
+! phase rotated by that much. The first segment is immune (nothing is bunched
+! yet), and that is exactly how it was caught: per-segment ln-power deviations vs
 ! the averaged mode of {0.0000, +0.08, +0.005, +0.02, +0.01, +0.13}. The jump must
 ! be discrete AND at the ends: compensating continuously inside the ramp detunes
 ! the live interaction where the coupling is already substantial (measured -0.9%

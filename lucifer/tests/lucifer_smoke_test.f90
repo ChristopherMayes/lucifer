@@ -2,7 +2,7 @@
 ! Program lucifer_smoke_test
 !
 ! The library-contract check (manual sec:program): drive the FEL tracker WITHOUT the
-! namelist layer -- fill the input structs in code, call the library, write the dumps.
+! namelist layer. Fill the input structs in code, call the library, write the dumps.
 ! The harness compares its outputs dataset-identically against a namelist-driven run
 ! of the same configuration, and runs it TWICE IN ONE PROCESS (both passes here) to
 ! prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
@@ -10,7 +10,7 @@
 !   lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>
 !
 ! With an unreadable lattice file the library must RETURN an error (never exit): this
-! program then prints its proof-of-return line and stops with code 2 -- the harness's
+! program then prints its proof-of-return line and stops with code 2. The harness's
 ! library-error check requires exactly that behavior.
 !-
 
@@ -47,7 +47,7 @@ do ipass = 1, 2
 
   run = fel_run_struct()
 
-  ! The configuration, set in code -- no namelist anywhere. A small seeded
+  ! The configuration, set in code, no namelist anywhere. A small seeded
   ! steady-state case (the harness's twin namelist file carries the same values).
 
   run%lat_file = lat_file
@@ -69,7 +69,7 @@ do ipass = 1, 2
   run%beam_init%a_norm_emit = 4e-7_rp
   run%beam_init%b_norm_emit = 4e-7_rp
 
-  ! The library sequence. Every error RETURNS; the proof-of-return line below is
+  ! The library sequence. Every error RETURNS. The proof-of-return line below is
   ! what the harness's library-error check greps for.
 
   err = .false.

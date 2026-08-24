@@ -340,8 +340,8 @@ def chicane_delay(ang):
     the walk's floor arithmetic: bends of arc length lb and bend angle +a,-a,-a,+a
     with drifts ld between (and the outer DD pieces adding straight length only)."""
     lb, ld = 0.05, 0.025
-    # Trace the reference: (x, z, angle); bend of angle a: chord lb*sin(a/2)/(a/2) at
-    # heading (angle_in + a/2); drift: ld at current heading.
+    # Trace the reference: (x, z, angle). Bend of angle a: chord lb*sin(a/2)/(a/2) at
+    # heading (angle_in + a/2). Drift: ld at current heading.
     x = z = th = 0.0
     arc = 0.0
     for piece, a in (("b", ang), ("d", 0), ("b", -ang), ("d", 0), ("b", -ang), ("d", 0), ("b", ang)):
@@ -377,7 +377,7 @@ def main():
     # ------------------------------------------------------------------
     print("== re-anchor baseline + z_offset knob + cross-mode identity ==")
 
-    # The scan points are independent processes; the pool runs them a few at a
+    # The scan points are independent processes. The pool runs them a few at a
     # time (same configurations, same thread counts, same tolerances).
     jobs = []
     for k in range(NSCAN):
@@ -502,7 +502,7 @@ def main():
           TOL_CF)
 
     # The unaveraged ledger closes across a chicane sandwich (energy bookkeeping
-    # survives the seam detour; the ledger's columns cover the unaveraged segments).
+    # survives the seam detour, and the ledger's columns cover the unaveraged segments).
     # The cled run itself went through the pool above.
     led = np.loadtxt(wd / "cled.ledger.txt")
     closure = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]

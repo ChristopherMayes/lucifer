@@ -16,7 +16,7 @@ that a later FEL tracker will carry, and the transport step it will use outside 
 |---|---|
 | `lucifer/code/wavefront_mod.f90` | `wavefront_struct`, derived quantities, `wavefront_drift`, the cached FFTW plan, and `wavefront_drift_reference` |
 | `lucifer/code/wavefront_hdf5_mod.f90` | `wavefront_read_genesis4`, `wavefront_write_genesis4` |
-| `lucifer/code/wavefront_openpmd_mod.f90` | openPMD EXT_Wavefront: `wavefront_write_openpmd`, `wavefront_read_openpmd`, `wavefront_file_is_openpmd` (manual sec:openpmd; validated by the FEL harness's harmonic section) |
+| `lucifer/code/wavefront_openpmd_mod.f90` | openPMD EXT_Wavefront: `wavefront_write_openpmd`, `wavefront_read_openpmd`, `wavefront_file_is_openpmd` (manual sec:openpmd, validated by the FEL harness's harmonic section) |
 | `lucifer/wavefront/wavefront_drift_test.f90` | Test driver, both modes |
 | `lucifer/wavefront/tests/run_validation.sh` | The whole validation, one command |
 | `lucifer/wavefront/tests/validate_drift.py` | Python side: builds the test input, drifts it, compares |
@@ -42,8 +42,8 @@ if they are not. It exits nonzero unless every comparison passes.
 Two independent comparisons, because neither alone is sufficient.
 
 **Against openPMD-beamphysics.** A test wavefront is built in Python and written in Genesis4
-format; Fortran reads it, drifts it and writes it back; the same input is drifted in Python
-with `drift_wavefront`; the two results are compared. This exercises the whole path against
+format. Fortran reads it, drifts it and writes it back. The same input is drifted in Python
+with `drift_wavefront`, and the two results are compared. This exercises the whole path against
 an independent implementation. Five cases run: an even grid, an odd grid, a non-power-of-two
 grid, a long drift and a zero drift. The structure and the root scalar values of the Fortran
 output file are also compared against a file written by `Wavefront.write_genesis4`, because
@@ -55,12 +55,12 @@ kernel and performs a direct DFT rather than using FFTW. It exists because the G
 format requires `nx = ny` and `dx = dy`, and on a square grid with equal spacings the
 propagation kernel is symmetric under interchanging the two transverse axes. A transposed
 transform, or an interchanged `dx` and `dy`, is therefore invisible to the first comparison
-no matter how asymmetric the test field is — both were confirmed by mutation to pass it at
+no matter how asymmetric the test field is. Both were confirmed by mutation to pass it at
 round-off. The reference runs on rectangular grids with unequal spacings and catches them.
 
-Current result: agreement at **8.7e-16**, about four ulp of double precision.
+Current result: agreement at 8.7e-16, about four ulp of double precision.
 
-The test field is deliberately asymmetric — off axis, elliptical, tilted, with a steering
+The test field is deliberately asymmetric: off axis, elliptical, tilted, with a steering
 phase and opposite curvature in the two planes, varying slice to slice. A centered symmetric
 Gaussian is invariant under most of the mistakes worth catching.
 
@@ -102,16 +102,16 @@ from the exact post-2019 CODATA value of `h/e`, `4.135667696923859e-15`. That ac
 the whole difference.
 
 `energy` differs by about 1e-12. It is a sum over every grid point, 20480 of them at the
-default size. NumPy sums pairwise, with error growing as `log(N)·eps`; the Fortran `sum`
+default size. NumPy sums pairwise, with error growing as `log(N)·eps`. The Fortran `sum`
 intrinsic sums sequentially, with error growing as `N·eps`, which is 4.5e-12 here.
 
 ### A finding about the Python writer
 
-`Wavefront.write_genesis4` writes `refposition` as **int64** whenever the default argument is
+`Wavefront.write_genesis4` writes `refposition` as int64 whenever the default argument is
 used, because the default is the Python int `0` and `np.asarray([0])` infers an integer type.
 Pass a float and it writes float64. Genesis writes this field as a double with a unit
 attribute of `"m"`, and reads it with `H5Dread` into `H5T_NATIVE_DOUBLE`, so the integer file
-is read correctly and nothing breaks — but a position in meters is being stored as an
+is read correctly and nothing breaks. But a position in meters is being stored as an
 integer. This Fortran writer writes float64 deliberately. The harness reports the difference
 rather than failing on it. Worth fixing on the Python side.
 
@@ -121,7 +121,7 @@ rather than failing on it. Worth fixing on the Python side.
 array and of every argument that carries field values. It is `rp` (double). Changing it to
 single will not silently work: the plan cache's work buffer is declared `complex(wf_rp)` and
 the double precision FFTW entry points are bound, so a single precision field fails to
-compile at `fftw_execute_dft` with a type mismatch. That is the intended behaviour — the
+compile at `fftw_execute_dft` with a type mismatch. That is the intended behaviour. The
 `fftwf_*` entry points have to be bound deliberately, not fallen into.
 
 **Nonzero curvature is refused, not ignored.** `wavefront_drift` accepts a `curvature`
@@ -136,7 +136,7 @@ limitation Genesis has.
 **The transform is single threaded on purpose.** `fftw_plan_with_nthreads` is not called: the
 parallelisation axis for a wavefront is the slice index, and threading a small 2D transform
 underneath a loop over slices would only oversubscribe. `wavefront_fft2` is not thread safe,
-since its plan cache and work buffer are module state; parallelising over slices wants one
+since its plan cache and work buffer are module state. Parallelising over slices wants one
 cache per thread, which is a change confined to six variables and one routine.
 
 **Slices are contiguous.** `Ex(:,:,iz)` is one slice and is contiguous in Fortran's column

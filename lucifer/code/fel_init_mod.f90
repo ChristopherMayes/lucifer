@@ -4,7 +4,7 @@
 ! The starting state of a run: fel_init_beam (a Genesis dump, an imported
 ! distribution, or the generated quiet start) and fel_init_wavefront (a field dump,
 ! an openPMD wavefront, or the generated Gaussian seed, plus the harmonic entries).
-! Library contract: errors return through err_flag; nothing here stops. The print
+! Library contract: errors return through err_flag, and nothing here stops. The print
 ! lines are unchanged from when this code lived in the driver.
 !-
 
@@ -29,7 +29,7 @@ contains
 ! the quiet start from beam_init. Applies the beam-side check instruments
 ! (split_weights, swap_beam_xy) and sets run%nslice. One seed (global%ran_seed)
 ! governs generation, resampling and noise, exactly as before the split. Errors
-! return through err_flag; nothing here stops.
+! return through err_flag, and nothing here stops.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state after fel_setup_lattice (needs %gamma0, %lat and
@@ -94,11 +94,11 @@ seed_waist_size = run%winit%seed_waist_size
 
 ! ONE reference energy, and the lattice is it: gamma0 = e_tot/m_e c^2 from the lattice
 ! header, never a namelist input. There used to be a namelist gamma0 for Genesis-deck
-! symmetry; the first external user fed it a hand-rounded value against a round lattice
-! e_tot, the two disagreed at 1.4e-9, and the run died mid-tracking on the seam's
-! backstop p0c check with raw numbers -- the FEL physics ran on one reference while
+! symmetry. The first external user fed it a hand-rounded value against a round lattice
+! e_tot, and the two disagreed at 1.4e-9. The run died mid-tracking on the seam's
+! backstop p0c check with raw numbers: the FEL physics ran on one reference while
 ! Bmad's momenta were normalized by the other. Two specifications of one truth is the
-! defect; the redundant one was removed (parameters live on the lattice).
+! defect. The redundant one was removed (parameters live on the lattice).
 
 if ((beam_file == '') .neqv. (field_file(1) == '')) then
   call out_io (s_error$, r_name, 'GIVE BOTH BEAM_FILE AND FIELD_FILE, OR NEITHER (TO GENERATE).')
@@ -220,9 +220,9 @@ endif
 ! The window and the per-slice current derive from the beam_init description (manual
 ! sec:loading): one bulk bunch, evaluated analytically at the slice centers. The
 ! default window covers the described bunch (as the import derives its window from
-! real particles); window_length overrides it for slippage headroom and warns when it
-! clips the bunch. sig_z = 0 is the steady state -- the whole charge in one slice
-! window -- and is refused by name for time-dependent windows.
+! real particles). window_length overrides it for slippage headroom and warns when it
+! clips the bunch. sig_z = 0 is the steady state (the whole charge in one slice
+! window) and is refused by name for time-dependent windows.
 
 flat_z = .false.
 select case (trim(beam_init%distribution_type(3)))
@@ -290,8 +290,8 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 
-! The derived per-slice current: flat Q*c/extent inside the GRID extent; Gaussian
-! profile at the slice centers, bunch centered in the window; steady state = the
+! The derived per-slice current: flat Q*c/extent inside the GRID extent. Gaussian
+! profile at the slice centers, bunch centered in the window. Steady state = the
 ! whole charge in the one slice window, I = Q*c/spacing.
 
 if (flat_z) then
@@ -365,7 +365,7 @@ do is_g = 1, nslice_gen
   ! within each beamlet so the quiet cancellation is untouched. Exercises every
   ! weighted-noise path (the asymmetry is strong enough that using a slice-uniform
   ! electron count where the beamlet's charge belongs mis-sets <|b|^2> by 56 percent,
-  ! far outside the statistical check); not a physics input.
+  ! far outside the statistical check). Not a physics input.
 
   if (gen_test_weights) then
     do ib = 1, mbase
@@ -384,19 +384,19 @@ do is_g = 1, nslice_gen
   nl_min = min(nl_min, n_lambda);  nl_max = max(nl_max, n_lambda)
   neff_min = min(neff_min, n_eff); neff_max = max(neff_max, n_eff)
 
-  ! Zero-current slices (Gaussian tails, outside a flat extent) carry no noise --
+  ! Zero-current slices (Gaussian tails, outside a flat extent) carry no noise:
   ! Genesis's own zero-current skip, shared with the import.
 
   if (shotnoise .and. wsum > 0) then
 
     ! The N_eff guard: measure the pre-noise quiet floor. A representation whose floor
-    ! is not far below the target 1/N_lambda cannot carry physical noise -- imposing on
+    ! is not far below the target 1/N_lambda cannot carry physical noise: imposing on
     ! top would give a silently wrong startup level. The sweep covers EVERY harmonic the
-    ! beamlet structure can resolve (1..nbins-1), not just the imposed ones: an
+    ! beamlet structure can resolve (1..nbins-1), not just the imposed ones. An
     ! unquiet weight pattern can park its floor on a harmonic the imposition never
-    ! touches (an alternating within-beamlet pattern lands exactly on nbins/2, found
-    ! by the guard's own mutation test) and still corrupt the dynamics through the
-    ! nonlinear phase evolution.
+    ! touches, and still corrupt the dynamics through the nonlinear phase evolution.
+    ! (An alternating within-beamlet pattern lands exactly on nbins/2, found by the
+    ! guard's own mutation test.)
 
     target_b2 = 1 / n_lambda
     floor_b2 = 0
@@ -521,8 +521,8 @@ end subroutine check_beam_init_contract
 ! from an openPMD-beamphysics file -- is resampled into FEL slices by the transcribed
 ! Genesis importdistribution method (fel_import_mod, where the algorithm and its
 ! provenance are documented). The seed field comes from the same generator as the
-! built-in loader. The RNG-free outputs the exactness checks read -- the analysis
-! moments and the per-slice current profile -- are printed at full precision.
+! built-in loader. The RNG-free outputs the exactness checks read (the analysis
+! moments and the per-slice current profile) are printed at full precision.
 !-
 
 subroutine import_initial_state ()
@@ -548,7 +548,7 @@ endif
 
 ! One seed governs the whole import: the bunch generation, the resampler's draws and
 ! the shot noise. Seeding AFTER generation was the first mutation this path caught in
-! development -- every run then imports a different bunch, and the split-weight and
+! development: every run then imports a different bunch. The split-weight and
 ! thread-determinism checks both fail on what looks like resampler noise.
 
 call ran_seed_put (ran_seed)
@@ -606,8 +606,8 @@ if (write_opmd_file /= '') then
   call out_io (s_info$, r_name, 'Wrote openPMD-beamphysics file: ' // trim(write_opmd_file))
 endif
 
-! imp%npart and imp%nbins come from the imp block directly (the resample's own knobs;
-! beam_init%n_particle is the BUNCH particle count on this path).
+! imp%npart and imp%nbins come from the imp block directly: the resample's own knobs.
+! beam_init%n_particle is the BUNCH particle count on this path.
 call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, imp, fbeam, err_i, moments)
 if (err_i) then
   err_flag = .true.;  return
@@ -615,8 +615,8 @@ endif
 call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
              i_array = [size(fbeam%slice), imp%npart])
 
-! The RNG-free instruments the exactness checks read -- the analysis moments and the
-! per-slice current profile -- go to a FILE, not stdout: stdout is for humans and
+! The RNG-free instruments the exactness checks read (the analysis moments and the
+! per-slice current profile) go to a FILE, not stdout: stdout is for humans and
 ! nslice current lines are not (manual sec:program). Full precision, one row per slice.
 ! Written here, at import time, because load_only stops before tracking.
 
@@ -693,12 +693,12 @@ end subroutine fel_init_beam
 !+
 ! Subroutine fel_init_wavefront (run, err_flag)
 !
-! Routine to build the field set: read the fundamental (field_file(1): a Genesis dump or
+! Routine to build the field set. Read the fundamental (field_file(1): a Genesis dump or
 ! an openPMD EXT_Wavefront, auto-detected by signature) or generate the Gaussian seed
-! (wavefront_init; seed_power = 0 is a dark start); initialize the harmonic entries
-! on the fundamental's grid; fill any from openPMD imports matched by photon energy;
-! and check the beam/field window consistency. Needs the beam (fel_init_beam first).
-! Errors return through err_flag; nothing here stops.
+! (wavefront_init: seed_power = 0 is a dark start). Initialize the harmonic entries
+! on the fundamental's grid. Fill any from openPMD imports matched by photon energy.
+! Check the beam/field window consistency. Needs the beam (fel_init_beam first).
+! Errors return through err_flag, and nothing here stops.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state after fel_setup_lattice and fel_init_beam (needs
@@ -765,7 +765,7 @@ endif
 
 ! Harmonic fields: the fundamental's grid and window, its wavelength / h, dark. An
 ! openPMD import (field_file entries 2+) fills the entry whose photon energy it
-! carries; the fundamental's grid must match, per the same one-window rule the
+! carries. The fundamental's grid must match, per the same one-window rule the
 ! fundamental import obeys.
 
 do ih = 2, n_harm
@@ -810,7 +810,7 @@ contains
 ! Subroutine generate_seed_field (nslice_f)
 !
 ! Routine to generate the seed field: a Gaussian seed at its waist in every slice,
-! E = E0*exp(-r^2/w0^2), intensity 1/e^2 radius w0, integrating to seed_power;
+! E = E0*exp(-r^2/w0^2), intensity 1/e^2 radius w0, integrating to seed_power.
 ! seed_power = 0 is a dark start. Grid convention matches Genesis's dgrid: ngrid points
 ! spanning +-dgrid, dx = 2*dgrid/(ngrid-1), center on axis. Shared by the built-in
 ! generator and the distribution import (both make their own beam, neither brings a field).

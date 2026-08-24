@@ -88,7 +88,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 
 # sig_pz override for the fluctuation rows: with a real energy spread the
 # sigma^2-differencing measurement is dominated by the cross-covariance sampling term
-# (beamlet-common kicks against 2048-particle sample variances, ~50% noise); starting
+# (beamlet-common kicks against 2048-particle sample variances, ~50% noise). Starting
 # from (near-)zero spread measures the kicks directly. Measured and learned, not
 # guessed -- see FINDINGS 7.27's instrument notes.
 def cold(nml):
@@ -170,7 +170,7 @@ def main():
           f"({analytic/L_UND:.5f}/m; = Genesis Incoherent.cpp doLoss)")
 
     # Every run of this section is independent of the others (distinct roots, all
-    # analysis afterwards), so the pool runs them all; the checks read in order.
+    # analysis afterwards), so the pool runs them all. The checks read in order.
     jobs = [
         lambda: run(exe, wd, "sp_rk", NML.format(lat="spont_probe_rk.bmad", root="sp_rk",
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n  reference_run = T\n")),
@@ -251,8 +251,8 @@ def main():
           note=f"(composite = {composite:.4f} of analytic)")
 
     # 6. FLUCTUATIONS ON: the Genesis/Saldin variance 1.015e-27 ku^3 aw^2 F(aw) g0^4
-    #    per meter (Genesis reaches it with uniform*sqrt(3) draws; ours are Gaussian).
-    #    Cold beam (see cold()); the FEL modes must sit on the analytic form, and Bmad's
+    #    per meter (Genesis reaches it with uniform*sqrt(3) draws, ours are Gaussian).
+    #    Cold beam (see cold()). The FEL modes must sit on the analytic form, and Bmad's
     #    own runge_kutta + fluctuations is the independent cross-reference -- measured
     #    11% below the fit form, the two references' own convention spread, recorded
     #    as a |ln| level rather than absorbed.

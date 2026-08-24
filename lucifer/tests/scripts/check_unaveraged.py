@@ -254,18 +254,18 @@ def main():
     turnover = np.abs(np.diff(led[:, 2])).sum()  # cumulative field-energy turnover |dU|
     ledger_dev = np.abs(etot - etot[0]).max() / max(turnover, 1e-300)
     # The /u_s deposit makes kick and source exact energy duals, so this closes at the
-    # gamma<->pz round-trip floor (measured 1.0e-5; it was 6.7e-4 with Genesis's
+    # gamma<->pz round-trip floor (measured 1.0e-5, it was 6.7e-4 with Genesis's
     # averaged /gamma convention in the deposit).
     check("energy ledger: max|d(E_beam+U_field)| / sum|dU|", ledger_dev, 1e-4)
     # Internal consistency: the kick-side column must equal the realized beam change.
     # The floor is the per-record gamma <-> pz round trip (~1 ulp of gamma per particle
-    # per record, summed); a missing or double-counted kick would sit at O(1).
+    # per record, summed). A missing or double-counted kick would sit at O(1).
     dE_beam = np.diff(led[:, 1])
     kick_col = led[1:, 3]
     check("ledger internal: |dE_kick - dE_beam| / max|dE|",
           np.abs(kick_col - dE_beam).max() / max(np.abs(dE_beam).max(), 1e-300), 1e-4)
 
-    # 2. Ballistic dark run: B does no work; ramps hand the emittance back.
+    # 2. Ballistic dark run: B does no work. Ramps hand the emittance back.
     run(exe, wd, "uv_dark", probe_nml(wd, lat="unavg_probe_planar_b.bmad", root="uv_dark",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=0.0, w0=SEED_W0))
     d0 = read_par(wd / "uv_dark-initial.par.h5")
@@ -278,7 +278,7 @@ def main():
     # explicit test sentinel) starts the quiver about the wrong DC (pi = -a0 instead of 0), which
     # integrates to a centroid displacement ~a0*L/gamma -- measured 3.2e-5 m against
     # 1.9e-9 pristine, 19 sigma of this beam -- and a non-integer-period hard exit
-    # would additionally leave the coherent quiver ~a0 in <px>. Both watched.
+    # would also leave the coherent quiver ~a0 in <px>. Both watched.
     check("handoff: |<x>_out - <x>_in| (dark) [m]",
           abs(float(d1["x"].mean() - d0["x"].mean())), 1e-7)
     check("handoff: |<px>_out - <px>_in| (dark, gamma*beta units)",
@@ -326,8 +326,8 @@ def main():
 
     # 7. Mixed line (Stage A): averaged / unaveraged / averaged sandwich with pipe
     # interludes. Completing at all exercises the convention-flag asserts at REAL
-    # internal boundaries; the ledger must be confined to and conserved over the
-    # unaveraged segment; a wake on that segment must refuse by name; and the exit
+    # internal boundaries. The ledger must be confined to and conserved over the
+    # unaveraged segment. A wake on that segment must refuse by name, and the exit
     # power is priced against the all-averaged twin.
     (wd / "sandwich_avg.bmad").write_text(
         "call, file = unavg_sandwich.bmad\nfel_averaged = 0\n"
@@ -372,7 +372,7 @@ def main():
     # to the beam (physically: the substep's spontaneous emission). BOTH are banked as
     # ledger columns, so the closing quantity is exact:
     #     E_beam + U_window + U_escaped - U_spont = const.
-    # Wakes would be a second, unbanked exit channel from the beam; they are refused in
+    # Wakes would be a second, unbanked exit channel from the beam. They are refused in
     # this mode, which is what entitles this check to exist.
     led = np.loadtxt(wd / "uv_tid1.ledger.txt")
     etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]

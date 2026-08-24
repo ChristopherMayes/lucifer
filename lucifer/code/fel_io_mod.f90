@@ -7,7 +7,7 @@
 !
 ! Every procedure takes the run state (fel_run_struct) explicitly, and nothing here
 ! stops: errors return through err_flag and the caller decides -- the library contract
-! (manual sec:program). All terminal output goes through out_io; the file-name echo
+! (manual sec:program). All terminal output goes through out_io. The file-name echo
 ! lines are s_blank$ so scripts see bare names.
 !-
 
@@ -32,9 +32,9 @@ contains
 ! Routine to write the whole field set at the given filename prefix, honoring
 ! wavefront_format: Genesis dumps (one polarization per file: -x/-y when Ey is live)
 ! and/or openPMD EXT_Wavefront (both polarizations as components of ONE mesh record).
-! The fundamental keeps the pre-harmonic names; a harmonic's files carry -h<h>.
-! Every record is unrotated to time order first: each field owns its rotation state;
-! they move in lockstep, but the cshift must run per record.
+! The fundamental keeps the pre-harmonic names. A harmonic's files carry -h<h>.
+! Every record is unrotated to time order first: each field owns its rotation state.
+! The fields move in lockstep, but the cshift must run per record.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state with the field set to dump.
@@ -175,7 +175,7 @@ end subroutine fel_write_header
 !
 ! Routine to close a run for a human: how far it went and how long it took, what the
 ! light ended up as, and which files were written. The file names were formerly printed
-! as the writers went; collecting them here means the last thing on screen is the list
+! as the writers went. Collecting them here means the last thing on screen is the list
 ! of what to open.
 !
 ! Input:
@@ -279,7 +279,7 @@ end subroutine fel_write_footer
 ! Subroutine fel_read_openpmd_into_field (run, fname, ihh, err_flag)
 !
 ! Routine to read an openPMD wavefront into field-set entry ihh (the fundamental
-! import path). The photon energy must be the fundamental's -- a file carrying a
+! import path). The photon energy must be the fundamental's: a file carrying a
 ! harmonic in field_file(1) is refused by name.
 !
 ! Input:
@@ -404,17 +404,17 @@ end subroutine fel_import_harmonic_field
 !
 ! Routine to drain the slippage bank: each transmitted slice streams to
 ! <out_root>-escaped.fld.h5 as it leaves (peak memory a handful of grid planes), with
-! its wavefront_params (the full 4x4 at bank time -- exactly what the analytic
+! its wavefront_params (the full 4x4 at bank time: exactly what the analytic
 ! free-space propagation of pulse statistics needs) and its transmission z. Genesis
-! field-file conventions (dfl units) are used so existing tooling reads the file;
-! the root datasets land at finalize.
+! field-file conventions (dfl units) are used so existing tooling reads the file.
+! The root datasets land at finalize.
 !
 ! Input:
-!   run       -- fel_run_struct: Run state; run%ffield(ihh)%bank holds the slices to drain.
+!   run       -- fel_run_struct: Run state. run%ffield(ihh)%bank holds the slices to drain.
 !   ihh       -- integer: Field-set index whose bank is drained.
 !
 ! Output:
-!   run       -- fel_run_struct: Banked params appended to run%bank_z / run%bank_pms;
+!   run       -- fel_run_struct: Banked params appended to run%bank_z / run%bank_pms.
 !                  run%n_banked(ihh) and run%esc_id(ihh) updated.
 !   err_flag  -- logical: Set True on a write error. False otherwise.
 !-
@@ -518,7 +518,7 @@ end subroutine fel_drain_bank
 ! Function fel_escaped_file_name (run, ihh) result (fname)
 !
 ! Routine to construct the escaped-field file name of field ihh. The fundamental
-! keeps its pre-harmonic name; a harmonic's file carries -h<h>.
+! keeps its pre-harmonic name. A harmonic's file carries -h<h>.
 !
 ! Input:
 !   run    -- fel_run_struct: Run state (out_root and the field set).
@@ -553,10 +553,10 @@ end function fel_escaped_file_name
 !+
 ! Subroutine fel_finalize_diagnostics (run, err_flag)
 !
-! Routine to finalize the run's file diagnostics: the stats file always; with
+! Routine to finalize the run's file diagnostics: the stats file always, and with
 ! keep_escaped_field also the escaped file's root datasets and the FULL PULSE at the
-! exit plane -- each banked slice read back, free-space propagated over
-! z_end - z_transmit (transmitted light is fixed information; undulator vacuum is
+! exit plane. For the pulse, each banked slice is read back, free-space propagated over
+! z_end - z_transmit (transmitted light is fixed information, and undulator vacuum is
 ! free space for light with no beam under it), and concatenated above the live
 ! window. Earliest-transmitted light is furthest ahead, so banked slice k lands at
 ! pulse index nslice + (run%n_banked - k + 1). The caller has already unrotated the
@@ -616,7 +616,7 @@ do ihh = 1, n_harm
     call out_io (s_blank$, r_name, '  ' // trim(fel_escaped_file_name(run, ihh)))
   endif
 
-  ! The full pulse at the exit plane; with two live polarizations, one file per
+  ! The full pulse at the exit plane. With two live polarizations, one file per
   ! component (Genesis's format holds one). Harmonic pulses carry -h<h>.
 
   if (two_pol) then
@@ -767,11 +767,11 @@ end subroutine fel_write_pulse_file
 ! Subroutine fel_write_wake_block (run, z)
 !
 ! Routine to write one block of per-slice wake eloss, z-stamped, to the run's open
-! wake file. Written at the hoisted update and at every migration-stride recompute;
-! the energy-bookkeeping and stale-wake checks parse these blocks.
+! wake file. Written at the hoisted update and at every migration-stride recompute.
+! The energy-bookkeeping and stale-wake checks parse these blocks.
 !
 ! Input:
-!   run  -- fel_run_struct: Run state; run%coll%wake%eloss holds the current losses.
+!   run  -- fel_run_struct: Run state. run%coll%wake%eloss holds the current losses.
 !   z    -- real(rp): The z position stamped on the block [m].
 !
 ! Output:
@@ -801,12 +801,12 @@ end subroutine fel_write_wake_block
 ! Routine to write the provenance group into the stats file (Genesis parity: its Meta
 ! embeds the entire input and lattice plus timestamp/user/cwd/version). Meta/ carries
 ! the RESOLVED input echo (every default explicit, straight from the structs), the
-! lattice file's text and name, an ISO timestamp, user, cwd and the Bmad version --
-! all as ATTRIBUTES, so every dataset-level identity comparison (thread runs,
+! lattice file's text and name, an ISO timestamp, user, cwd and the Bmad version.
+! All are ATTRIBUTES, so every dataset-level identity comparison (thread runs,
 ! re-entrancy passes) is untouched by run-specific provenance.
 !
-! Note: This is best effort: a failure warns, never fails the run (HDF5 caps compact
-! attributes near 64 kB; a very large lattice would hit it).
+! Note: This is best effort. A failure warns, never fails the run (HDF5 caps compact
+! attributes near 64 kB, and a very large lattice would hit it).
 !
 ! Input:
 !   run         -- fel_run_struct: Run state.

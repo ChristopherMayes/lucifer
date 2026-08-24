@@ -7,7 +7,7 @@
 !
 ! Reads a Genesis 1.3 Version 4 field file into a wavefront_struct, drifts it, and writes
 ! the result back out in the same format. This is the Fortran half of the Fortran against
-! Python comparison; tests/run_validation.sh drives both halves and reports the largest
+! Python comparison. tests/run_validation.sh drives both halves and reports the largest
 ! relative difference.
 !
 ! The input carries a single polarisation component, which the reader puts in Ex. This mode
@@ -26,7 +26,7 @@
 ! cannot close. That comparison passes through the Genesis4 file format, which requires
 ! nx = ny and dx = dy, and on a square grid with equal spacings the propagation kernel is
 ! symmetric under interchanging the two transverse axes. A transposed transform is therefore
-! invisible to it however asymmetric the test field is -- confirmed by mutation: swapping
+! invisible to it however asymmetric the test field is. Confirmed by mutation: swapping
 ! the two arguments of fftw_plan_dft_2d passes the Python comparison at 6e-16. Only a
 ! rectangular grid can see it, and the reference propagator is what supplies a trustworthy
 ! answer on one.
@@ -145,8 +145,8 @@ if (err) stop 1
 print '(a, a)',         '  Output file:           ', trim(out_file)
 
 ! Machine readable lines for validate_drift.py, which recomputes each of these from the
-! output file and checks it. Without this the Fortran side of the mirrored quantities --
-! wavefront_energy, wavefront_transverse_moments and the coordinate vectors they rest on --
+! output file and checks it. Without this the Fortran side of the mirrored quantities
+! (wavefront_energy, wavefront_transverse_moments and the coordinate vectors they rest on)
 ! would be printed but never verified against anything.
 
 print '(a)', ''

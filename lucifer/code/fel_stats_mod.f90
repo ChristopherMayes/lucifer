@@ -3,35 +3,35 @@
 !
 ! The tracker's production statistics file <out_root>.stats.h5 (manual sec:stats).
 !
-! Fixed Bmad units everywhere -- m, rad, eV, s, C, J, W -- with units attributes written
+! Fixed Bmad units everywhere (m, rad, eV, s, C, J, W), with units attributes written
 ! as documentation only, never load-bearing. Per-record datasets are (nrec, nslice)
 ! arrays as read by h5py (Genesis4-style per-slice export for visualization), with beam
 ! datasets named EXACTLY as bunch_params_struct components, sufficient to construct one
-! from any (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 36 -- the
-! 6x6 flattened; symmetric, so the flattening order cannot mislead), charge_live,
+! from any (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 36: the
+! 6x6 flattened, symmetric, so the flattening order cannot mislead), charge_live,
 ! charge_tot, n_particle_live, n_particle_tot, t, sigma_t, plus z(nrec) and s == z.
 ! The field side stores wavefront_params_struct components per slice: centroid
 ! (nrec, nslice, 4), sigma (nrec, nslice, 16), energy, power, on_axis_intensity,
-! emit_x, emit_y, angle_moments_valid (0/1; theta moments cost FFTs, so they fill at
-! element ends only -- the twiss_valid pattern). Pulse-level values are POOLED
+! emit_x, emit_y, angle_moments_valid (0/1). Theta moments cost FFTs, so they fill
+! at element ends only (the twiss_valid pattern). Pulse-level values are POOLED
 ! downstream (scripts), never stored: the file stays raw.
 !
 ! At ELEMENT ENDS the fully evaluated Bmad bunch_params_struct lands under
 ! element_end/: per whole-window bunch AND per slice, via Bmad's own calc_bunch_params
-! (the Tao end-of-element pattern) -- twiss groups x/y/z/a/b/c each carrying beta,
+! (the Tao end-of-element pattern): twiss groups x/y/z/a/b/c each carrying beta,
 ! alpha, gamma, emit, norm_emit, sigma, sigma_p, eta, etap; plus centroid, sigma,
 ! charge_live, n_particle_live, ix_ele, s, twiss_valid. scripts/
 ! bunch_params_from_stats.py reconstructs a bunch_params dict from any (record, slice)
-! of the per-record sufficient statistics; the harness checks that at element ends it
+! of the per-record sufficient statistics. The harness checks that at element ends it
 ! reproduces these stored values.
 !
-! Beam moments are computed two-pass (mean first, then centered second moments -- the
+! Beam moments are computed two-pass (mean first, then centered second moments, the
 ! manual sec:numerics variance rule: the one-pass form loses the entire sigma to
 ! cancellation), weighted by macroparticle charge, parallel over slices with
 ! fixed-order results (each slice's sums are its own).
 !
 ! t and sigma_t derive from the stored chart: t = z_now/c - <z>/(beta0 c) and
-! sigma_t = sigma_z/(beta0 c) with beta0 the reference beta -- exact for the reference
+! sigma_t = sigma_z/(beta0 c) with beta0 the reference beta. Exact for the reference
 ! particle, and documented rather than hidden inside a convention.
 !-
 
@@ -69,9 +69,9 @@ type fel_stats_struct
   real(rp), allocatable :: bunching_phase(:,:)    ! (nslice, nrec) [rad]
   integer, allocatable :: n_particle_live(:,:)    ! (nslice, nrec)
   ! Field side, wavefront_params_struct names. With ONE live polarization these are
-  ! the whole story; with two, they carry the X component, the f2_* arrays carry Y
+  ! the whole story. With two, they carry the X component, the f2_* arrays carry Y
   ! (written as a field/y/ group), and the power/energy/on_axis datasets are written
-  ! as TOTALS -- single-polarization files are unchanged.
+  ! as TOTALS. Single-polarization files are unchanged.
   real(rp), allocatable :: f_centroid(:,:,:)      ! (4, nslice, nrec)
   real(rp), allocatable :: f_sigma(:,:,:)         ! (16, nslice, nrec)
   real(rp), allocatable :: f_energy(:,:), f_power(:,:), f_on_axis(:,:)
@@ -82,7 +82,7 @@ type fel_stats_struct
   real(rp), allocatable :: f2_emit_x(:,:), f2_emit_y(:,:)
   ! Harmonic fields (field-set entries 2+): full wavefront_params per harmonic,
   ! written as field/harm<h>/ groups. The fundamental's datasets above are NEVER
-  ! summed with these -- harmonics are distinct wavelengths (a detector separates
+  ! summed with these: harmonics are distinct wavelengths (a detector separates
   ! colors), unlike the two polarization components of one wave.
   integer, allocatable :: fh_harm(:)                ! (n_extra) harmonic numbers.
   real(rp), allocatable :: fh_centroid(:,:,:,:)     ! (4, nslice, nrec, n_extra)
@@ -197,7 +197,7 @@ end subroutine fel_stats_init
 ! Input:
 !   stats         -- fel_stats_struct: Accumulator.
 !   beam          -- fel_beam_struct: The sliced beam.
-!   ff(:)         -- fel_field_struct: The field set; entry 1 is the fundamental.
+!   ff(:)         -- fel_field_struct: The field set. Entry 1 is the fundamental.
 !   z_now         -- real(rp): Position of the record [m].
 !   with_angles   -- logical: If True fill the field theta moments (they cost FFTs,
 !                      so element ends only).
@@ -247,8 +247,8 @@ ks = twopi / wf%wavelength
 any_err = .false.
 
 ! This loop ALSO evaluates the diag instrument (fel_slice_diag, fel_field_diag) for
-! every slice -- the diag writer then only prints. Each slice's arithmetic is the
-! identical serial code, so diag.txt is bit-for-bit what it always was; what changed
+! every slice: the diag writer then only prints. Each slice's arithmetic is the
+! identical serial code, so diag.txt is bit-for-bit what it always was. What changed
 ! is that the formerly SERIAL per-record diag sweeps now ride this parallel loop.
 
 !$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, io, pms, err) &
@@ -258,7 +258,7 @@ do is = 1, nslice
   call fel_field_diag (wf, fel_field_index(ff(1)%slip, is, nslice), fpow(is), fonax(is))
   call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
-  ! Two-pass weighted moments -- mean first, then centered second moments (manual
+  ! Two-pass weighted moments: mean first, then centered second moments (manual
   ! sec:numerics).
 
   wsum = 0;  mean = 0
@@ -294,8 +294,8 @@ do is = 1, nslice
   stats%t(is, ir) = z_now / c_light - cen(5) / (beta0 * c_light)
   stats%sigma_t(is, ir) = sqrt(max(0.0_rp, sig(5,5))) / (beta0 * c_light)
 
-  ! Bunching from the diag instrument just evaluated (|b| at the fundamental; the
-  ! phase carries the common phi0, Genesis's own convention).
+  ! Bunching from the diag instrument just evaluated: |b| at the fundamental. The
+  ! phase carries the common phi0, Genesis's own convention.
 
   stats%bunching(is, ir) = bdiag_arr(is)%bunching
   stats%bunching_phase(is, ir) = bdiag_arr(is)%bunching_phase
@@ -359,17 +359,17 @@ end subroutine fel_stats_record
 ! Subroutine fel_stats_element_end (stats, beam, ele, z_now, err_flag)
 !
 ! Routine to take one element-end row: Bmad's calc_bunch_params for the whole window
-! (all slices as one bunch in global window coordinates) and per slice -- the Tao
-! end-of-element pattern, using Bmad's own statistics machinery.
+! (all slices as one bunch in global window coordinates) and per slice (the Tao
+! end-of-element pattern), using Bmad's own statistics machinery.
 !
 ! The row is SELF-SUFFICIENT: beam moments and Twiss for the whole window and per
 ! slice, plus the radiation power, energy, on-axis intensity and bunching per slice.
 ! That matters when comb_ds_save < 0 keeps no per-record rows at all (Bmad's comb
-! semantics, kept verbatim) -- the element-end row is then the only record of the run,
+! semantics, kept verbatim). The element-end row is then the only record of the run,
 ! and it carries the field as well as the beam.
 !
 ! Input:
-!   stats     -- fel_stats_struct: Accumulator; the current record supplies the slice moments.
+!   stats     -- fel_stats_struct: Accumulator. The current record supplies the slice moments.
 !   beam      -- fel_beam_struct: The sliced beam.
 !   ff(:)     -- fel_field_struct: The field set, for the field values when there is no record.
 !   ele       -- ele_struct: The element just ended.
@@ -415,7 +415,7 @@ wf => ff(1)%wf
 allocate (cen_s(6,nslice), sig_s(6,6,nslice), w_s(nslice), dz_s(nslice), shear_s(nslice), n_s(nslice))
 
 ! The field and bunching side of the row. With a current record they are already
-! evaluated there, so copy (the datasets then agree exactly); with no records evaluate
+! evaluated there, so copy (the datasets then agree exactly). With no records evaluate
 ! them here, the same routines the record sweep uses, angle moments not needed.
 
 if (stats%irec > 0) then
@@ -459,7 +459,7 @@ else
 endif
 
 ! ONE source of per-slice moments for both the per-slice rows and the whole-window
-! row. With per-record rows (the comb >= 0) the current record already holds them --
+! row. With per-record rows (the comb >= 0) the current record already holds them:
 ! an element end always coincides with its last record. With NO per-record rows (the
 ! comb's "< 0 => No comb calculated") take them here, in one parallel sweep whose
 ! two-pass weighted arithmetic is the per-record sweep's own.
@@ -528,7 +528,7 @@ do is = 1, nslice
   call pack_bp (bp, stats%e_slice(:, is, ie))
 enddo
 
-! The whole window, from the same per-slice moments -- no particle visit at all. Each
+! The whole window, from the same per-slice moments, no particle visit at all. Each
 ! slice's stored moments live in its LOCAL z chart and enter the pool moved to the
 ! global window chart by the migration invariant fel_concat_slices uses,
 ! z_global = z_local + beta*(is-1)*slice_spacing.
@@ -623,7 +623,7 @@ end subroutine fel_stats_element_end
 ! Only the components pack_bp writes are filled (centroid, sigma, charge_live,
 ! n_particle_live and, by the caller, the twiss groups from the assembled sigma).
 ! rel_max/rel_min are extrema, beyond this identity's reach, and are not written to
-! the stats file -- they are deliberately left at their defaults.
+! the stats file. They are deliberately left at their defaults.
 !
 ! Input:
 !   cen_s(:,:)    -- real(rp): (6, nslice) per-slice centroid, in each slice's local chart.
@@ -705,7 +705,7 @@ end subroutine fel_pool_bunch_params
 !
 ! Routine to write the stats file. Datasets appear to h5py with the record index first:
 ! Fortran (a, nslice, nrec) reads as (nrec, nslice, a). Units attributes are written as
-! documentation; the units are FIXED and the attributes are never load-bearing.
+! documentation. The units are FIXED and the attributes are never load-bearing.
 !
 ! Input:
 !   stats      -- fel_stats_struct: The filled accumulator.
@@ -735,7 +735,7 @@ call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
 call hdf5_write_dataset_real (f_id, 'z', stats%z(1:ir), err);  if (err) return
 call hdf5_write_dataset_real (f_id, 'p0c', [stats%p0c], err);  if (err) return
 
-! One root attribute documents the fixed units; it is never load-bearing.
+! One root attribute documents the fixed units. It is never load-bearing.
 
 call hdf5_write_attribute_string (f_id, 'units_note', &
         'Fixed Bmad units: m, rad, eV, s, C, J, W. Bmad phase space (x, px/p0, y, py/p0, z, pz).', err)
@@ -758,7 +758,7 @@ call H5Gcreate_f (f_id, 'field', g_id, h5_err)
 call hdf5_write_dataset_real (g_id, 'centroid', stats%f_centroid(:,:,1:ir), err);  if (err) return
 call hdf5_write_dataset_real (g_id, 'sigma', stats%f_sigma(:,:,1:ir), err);  if (err) return
 if (allocated(stats%f2_energy)) then
-  ! Two live polarizations: power/energy/intensity are TOTALS; the x-component params
+  ! Two live polarizations: power/energy/intensity are TOTALS. The x-component params
   ! stay in this group's centroid/sigma/emit, the y component's under field/y/.
   call hdf5_write_dataset_real (g_id, 'energy', stats%f_energy(:,1:ir) + stats%f2_energy(:,1:ir), err);  if (err) return
   call hdf5_write_dataset_real (g_id, 'power', stats%f_power(:,1:ir) + stats%f2_power(:,1:ir), err);  if (err) return
@@ -785,7 +785,7 @@ if (allocated(stats%f2_energy)) then
 endif
 
 ! Harmonic fields: field/harm<h>/ groups, one full wavefront_params set each. The
-! fundamental's datasets above are untouched -- harmonics are separate wavelengths.
+! fundamental's datasets above are untouched: harmonics are separate wavelengths.
 
 if (allocated(stats%fh_energy)) then
   do ihh = 1, size(stats%fh_harm)

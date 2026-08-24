@@ -176,7 +176,7 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
     # Curves: elementwise relative for power (it spans decades and every point matters),
     # peak normalized for bunching (near zero at the quiet start, where elementwise
     # relative measures nothing but the quiet loading noise floor). In time-dependent
-    # runs the power comparison is per slice per record; the denominator is floored at
+    # runs the power comparison is per slice per record. The denominator is floored at
     # 1e-9 of the global peak so a freshly slipped-in vacuum slice cannot divide by an
     # exact zero (inactive in steady state).
     den = np.maximum(np.abs(g["power"][:n]), 1e-9 * np.abs(g["power"][:n]).max())
@@ -255,7 +255,7 @@ def main():
     # The unaveraged tier is a PRICED MODEL DIFFERENCE, not a transcription check: sin^2
     # end ramps vs Genesis's hard edges, no period averaging, RK4-vs-RK4 of different
     # equations. The self-referenced physics checks (check_unaveraged.py) pin the mode's
-    # correctness; this tier pins its distance to Genesis so drift is visible.
+    # correctness. This tier pins its distance to Genesis so drift is visible.
     p.add_argument("--tol-tier1-unavg", type=float, default=1.5e-1)  # measured 6.9e-2
     p.add_argument("--tol-tier2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-tier2-bmad", type=float, default=1.0e-1)
@@ -263,11 +263,11 @@ def main():
     p.add_argument("--tol-td1", type=float, default=1.0e-4)
     p.add_argument("--tol-td2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-td2-bmad", type=float, default=1.0e-1)
-    # Pure SASE: dark start, so the whole curve is startup-from-noise; same transcribed
+    # Pure SASE: dark start, so the whole curve is startup-from-noise. Same transcribed
     # interlude model and constants floor as td2_genesis.
     p.add_argument("--tol-tdsase", type=float, default=1.0e-3)
     # Collective tiers: the sc floor is Genesis's truncated epsilon_0 in longRange
-    # (8.85e-12, 4.7e-4 relative; measured 2.4e-4); the wake tier measured 8.7e-7.
+    # (8.85e-12, 4.7e-4 relative, measured 2.4e-4). The wake tier measured 8.7e-7.
     p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
     p.add_argument("--tol-tdwk", type=float, default=1.0e-4)
     args = p.parse_args()

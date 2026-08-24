@@ -119,7 +119,7 @@ def main():
             mine = sorted(bp[m]["emit"] for m in ("a", "b", "c"))
             for s0, m0 in zip(st, mine):
                 worst = max(worst, abs(m0 - s0) / max(abs(s0), 1e-30))
-        # Measured 4.6e-8 (numpy eig vs mat_eigen); the projected planes agree exactly.
+        # Measured 4.6e-8 (numpy eig vs mat_eigen). The projected planes agree exactly.
         check("stats: bunch_params reconstruction vs stored calc_bunch_params", worst, 1e-6)
 
         # 1b. The whole-window row is ASSEMBLED from the per-slice moments by the
@@ -249,7 +249,7 @@ def main():
     check("bank: analytic vs FFT-propagated rms at exit, max rel", rel.max(), 2e-2)
 
     # 4. Pulse pooling: pooled per-slice params vs directly computed pulse moments.
-    #    Banked side: params propagated analytically to the exit; live side: the last
+    #    Banked side: params propagated analytically to the exit. Live side: the last
     #    stats record (angles valid there). Compare sigma_xx of the pooled result
     #    against pooling the pulse file's numerically computed per-slice moments.
     cen_b = np.stack([pms[:, 0] + dz * pms[:, 1], pms[:, 1],

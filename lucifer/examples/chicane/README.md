@@ -6,14 +6,14 @@ Two commands, Bmad only:
     ../../../../production/bin/lucifer run_detuned.nml
 
 Two undulator segments with a four-bend closed-bump chicane in the break, in
-ABSOLUTE TIME TRACKING mode (`bmad_com[absolute_time_tracking] = T` in the
+absolute time tracking mode (`bmad_com[absolute_time_tracking] = T` in the
 lattice): the inter-segment phase follows the real geometry. The beam detours the
 bump while the radiation drifts the chord between the undulator faces (computed
-from `ele%floor`, never entered by hand); the arc-minus-chord delay -- 583
-wavelengths at the reference angle -- re-injects the light onto the bunched beam
+from `ele%floor`, never entered by hand). The arc-minus-chord delay (583
+wavelengths at the reference angle) re-injects the light onto the bunched beam
 at whatever carrier phase the bend angle dictates.
 
-The two lattices differ by 0.43 microradians of bend angle: HALF A WAVELENGTH of
+The two lattices differ by 0.43 microradians of bend angle: half a wavelength of
 delay. Measured (200 MW seed, two 0.99 m helical segments):
 
 | lattice | P at segment-1 exit | P at line exit | segment-2 ratio |
@@ -23,8 +23,8 @@ delay. Measured (200 MW seed, two 0.99 m helical segments):
 
 The second segment amplifies or absorbs on a half-wavelength of geometry -- the
 re-phasing knob a real machine turns by trimming its chicane. In the default
-RELATIVE mode the same two lattices produce identical output (the geometric
-fraction is autophased away, Genesis's chicane semantics); the deliberate
+relative mode the same two lattices produce identical output (the geometric
+fraction is autophased away, Genesis's chicane semantics). The deliberate
 off-phase knob there is the wiggler's own `z_offset` (manual sec:phasing).
 
 Validated by the harness's phasing section: the re-anchor baseline flat, the

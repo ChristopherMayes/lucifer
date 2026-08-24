@@ -5,7 +5,7 @@ One command, Bmad only:
     ../../../../production/bin/lucifer run.nml
     python ../plot_fel.py harmonics.stats.h5
 
-A strongly seeded steady-state run on a planar segment carrying TWO radiation
+A strongly seeded steady-state run on a planar segment carrying two radiation
 fields (namelist `harmonics = 1, 3`): the fundamental at 1 Angstrom and a third
 harmonic at 1/3 Angstrom that starts dark and grows from the bunching the
 fundamental drives -- nonlinear harmonic generation, at three times the
@@ -22,12 +22,12 @@ Measured by this example (200 MW seed, 3.96 m planar, rms aw = 0.84853):
 
 `plot_fel.py`'s harmonic panel shows both curves on one log scale (banked as
 `fel-benchmark-plots/harmonic-lasing.png`). The harmonic's full wavefront_params
-live under `field/harm3/` in the stats file; its dumps carry `-h3` in the name --
+live under `field/harm3/` in the stats file. Its dumps carry `-h3` in the name:
 Genesis format (`harmonics-final-h3.fld.h5`, Genesis's own `.h3` convention
 adapted) and, because this example sets `wavefront_format = 'both'`, openPMD
 EXT_Wavefront files (`.wf.h5`) with the photon energy identifying the harmonic.
 
-A HELICAL undulator would give exactly nothing here: its coupling fc(h) vanishes
+A helical undulator would give exactly nothing here: its coupling fc(h) vanishes
 for every harmonic (manual sec:field-set), which is why this example is planar.
 Validated against Genesis4 running the same configuration (fundamental 5.3e-8,
 harmonic growth 1.3e-4) and against the exact Bessel deposit sum (3.3e-16) by the

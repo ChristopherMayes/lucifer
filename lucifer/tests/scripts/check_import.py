@@ -231,7 +231,7 @@ def main():
     mom_ref, cur_ref = read_import_file(w, "impref")
 
     # moments sanity: the bunch is generated matched to the lattice Twiss by
-    # init_beam_distribution; the measured whole-bunch moments must carry the spec.
+    # init_beam_distribution. The measured whole-bunch moments must carry the spec.
     ex, ey = mom_ref[5], mom_ref[6]
     print(f"bunch moments: normalized emittance ex = {ex:.6e}, ey = {ey:.6e} (spec {NORM_EMIT:.1e})")
     if not (0.9*NORM_EMIT < ex < 1.1*NORM_EMIT and 0.9*NORM_EMIT < ey < 1.1*NORM_EMIT):
@@ -322,7 +322,7 @@ def main():
         print("FAIL: imported slices do not recover the specified optics")
         ok = False
 
-    # threads (exact): same seed, 1 vs 8 threads, tracked this time; diag byte-equal.
+    # threads (exact): same seed, 1 vs 8 threads, tracked this time. Diag byte-equal.
     write_nml(w/"imp_t1.nml", "impt1", 1000)
     write_nml(w/"imp_t8.nml", "impt8", 1000)
     run([args.exe, "imp_t1.nml"], w/"imp_t1.log", env=env1)
@@ -337,7 +337,7 @@ def main():
 
     # startup (statistical): both codes resample the same file with their own RNG.
     # Each seed's pair is a chain (our run writes the dist file its genesis twin
-    # imports); the chains are independent across seeds and go through the pool.
+    # imports). The chains are independent across seeds and go through the pool.
     def seed_chain(k):
         seed = 2000 + 17*k
         dist = f"impdist_s{k}.h5"
@@ -394,7 +394,7 @@ def main():
     # The import's profile (cur_ref, measured earlier from the same description):
     # its own slice centers, bunch center fitted (the import min-shifts positions, and
     # imp%nslice truncates the +4 sigma tail, so the fit is over a clipped profile --
-    # rms over the live slices is the honest statistic; the mutations this check exists
+    # rms over the live slices is the honest statistic. The mutations this check exists
     # to catch, a dropped sqrt(2pi) or dslen-for-spacing, sit at 0.65-1.5 of peak).
     si = np.arange(len(cur_ref)) * sp
     c0 = (cur_ref * si).sum() / cur_ref.sum()

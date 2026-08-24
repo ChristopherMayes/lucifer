@@ -6,10 +6,10 @@
 # the full 57 m Aramis line, dark start, 96 slices x 2048 particles -- tracked three
 # ways from IDENTICAL initial dumps, each on the machine's full performance-core count:
 # Genesis4 (MPI), the Bmad averaged mode (the bmad_standard default), and the Bmad
-# unaveraged mode (~32x the averaged cost; the progress lines show it working).
+# unaveraged mode (~32x the averaged cost, the progress lines show it working).
 #
 # Methodology: an untimed Genesis prep run (same ranks, same seed, no &track) writes
-# the shared initial dumps; wall times come from one external clock (/usr/bin/time -p);
+# the shared initial dumps. Wall times come from one external clock (/usr/bin/time -p).
 # check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
 # decks stay static. Measured results: the "The saturation demo" section of
@@ -17,7 +17,7 @@
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]
 #                  [--python <path>] [--work-dir <path>]
-# Outputs land in ./output (or --work-dir); the summary report: output/sat-demo-report.pdf.
+# Outputs land in ./output (or --work-dir). The summary report: output/sat-demo-report.pdf.
 
 set -o pipefail
 

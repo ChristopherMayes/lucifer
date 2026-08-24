@@ -9,7 +9,7 @@
 # Two independent comparisons are made.
 #
 # 1. Against openPMD-beamphysics. A test wavefront is built in Python and written in
-#    Genesis4 HDF5 format; the Fortran program reads it, drifts it and writes it back; the
+#    Genesis4 HDF5 format. The Fortran program reads it, drifts it and writes it back. The
 #    same input is drifted in Python with drift_wavefront and the two results compared. This
 #    exercises the whole path -- HDF5 read, propagation, HDF5 write -- against an
 #    independent implementation, and it is the comparison the deliverable is defined by.
@@ -33,7 +33,7 @@
 #        conda env create -f environment.yml
 #
 #   3. An openPMD-beamphysics checkout. Found automatically if it sits beside the
-#      bmad-ecosystem checkout; otherwise pass --beamphysics <path>.
+#      bmad-ecosystem checkout. Otherwise pass --beamphysics <path>.
 #
 # Options:
 #   --beamphysics <path>  openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.

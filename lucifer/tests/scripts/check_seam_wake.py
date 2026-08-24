@@ -197,7 +197,7 @@ def main():
         dpz = pz_a - pz_b
         q_ahead = q[i+1:].sum()
         w_part = q[i] / B[i]["npart"]
-        # Within the slice every particle has a distinct z (quiet-start phases); for a
+        # Within the slice every particle has a distinct z (quiet-start phases). For a
         # constant wake each particle sees all in-slice particles ahead of it plus half
         # itself. Mean over the slice: q_ahead + (q_i - w_part)/2 + w_part/2 = q_ahead + q_i/2.
         expect_mean = -f * (q_ahead + q[i]/2)
@@ -211,7 +211,7 @@ def main():
 
     # ---------------- lord resolution: the same constant wake on a PIPE that a
     # superimposed marker has SPLIT into super_slaves. The wake then lives on the
-    # LORD (ele%wake is null on every tracked slave; pointer_to_wake_ele resolves it,
+    # LORD (ele%wake is null on every tracked slave, pointer_to_wake_ele resolves it,
     # applying once at the slave containing the lord's midpoint). Checking ele%wake
     # directly was the deliverable-11 hole: lord wakes fell through to the per-slice
     # path. Closed form as in ramp, with the pipe's length in f.
@@ -276,7 +276,7 @@ def main():
         ok = False
 
     # ---------------- z_long cross-validation with the d8 resistive-wall kernel
-    # Export the kernel from a wake_on run (any beam; kernels are beam-independent).
+    # Export the kernel from a wake_on run (any beam, kernels are beam-independent).
     (w/"wz_k.nml").write_text(imp_nml(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
         extra='  load_only = T\n  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n'
               '  wake_relaxation = 8.1e-6\n  write_wake_kernels = "kern.txt"\n'))
@@ -285,13 +285,13 @@ def main():
     s_k, w_res = kern[:, 0], kern[:, 1].copy()
     w_res[0] *= 2                                    # unhalve the Bane self-slice factor
     # Causal table for Bmad: W(z) acts on particles BEHIND the source. Bmad's z_long
-    # table is W(z_test - z_source); trailing means z_test < z_source, so the causal
+    # table is W(z_test - z_source). Trailing means z_test < z_source, so the causal
     # side is z < 0: w(-s) = kernel(s) in V/C/m (kernel is eV/(m e-)).
     dz_t = s_k[1] - s_k[0]
     npad = len(s_k) // 2 + 2                        # extend past the window with zeros
     s_ext = np.concatenate([s_k, s_k[-1] + dz_t * np.arange(1, npad + 1)])
     # Sign: the d8 kernels are stored SIGNED as energy loss (wakeres < 0, applied as
-    # dgamma = eloss*dz/m); Bmad's z_long table is positive-decelerating (vec6 -= conv).
+    # dgamma = eloss*dz/m). Bmad's z_long table is positive-decelerating (vec6 -= conv).
     w_ext = np.concatenate([-w_res / E_CHARGE, np.zeros(npad)])
     z_tab = np.concatenate([-s_ext[::-1], s_ext[1:]])
     w_tab = np.concatenate([w_ext[::-1], np.zeros(len(s_ext) - 1)])
@@ -409,8 +409,8 @@ def main():
         d1 = (A1[i]["gamma"] - B1[i]["gamma"]).mean()
         d2 = (A2[i]["gamma"] - B2[i]["gamma"]).mean()
         worst_s = max(worst_s, abs(d1 - d2) / denom)
-    # Tolerance: the exact invariant is the CHARGE-weighted kick; the dump carries no
-    # weights, and the unweighted slice mean additionally moves because splitting
+    # Tolerance: the exact invariant is the CHARGE-weighted kick. The dump carries no
+    # weights, and the unweighted slice mean also moves because splitting
     # changes the resampler's candidate pools (same currents, different draws) -- an
     # in-slice self-term-scale effect, ~q_slice/(2*Q_tot*npart) of the kick. Check 2e-9.
     print(f"split-weight invariance of the kick profile: {worst_s:.3e} (check 2e-9)")

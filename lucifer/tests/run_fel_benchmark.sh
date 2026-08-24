@@ -18,8 +18,8 @@
 #   1. Bmad built, so debug/bin/lucifer (or production/bin) exists:
 #        BUILD_PRODUCTION=N ./util/conda_compile        # from the bmad-ecosystem root
 #
-#   2. A genesis4 binary (CPU is fine). Default location below; override with --genesis.
-#      Built per the Genesis repository's instructions; the benchmark needs FFTW support
+#   2. A genesis4 binary (CPU is fine). Default location below. Override with --genesis.
+#      Built per the Genesis repository's instructions. The benchmark needs FFTW support
 #      compiled in, since it runs with fft_fieldsolver = true.
 #
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# The comparison is against Genesis; without the binary there is nothing to compare and
+# The comparison is against Genesis. Without the binary there is nothing to compare and
 # the only correct behavior is to fail loudly, not to skip.
 
 if [[ ! -x "$GENESIS" ]]; then
@@ -102,7 +102,7 @@ echo "  workdir:     $WORK_DIR"
 echo
 
 # Inputs are grouped by consumer and configuration (genesis4/<config>/*.in with the
-# shared .lat files one level up; bmad/*.bmad); the run itself is flat in WORK_DIR, so
+# shared .lat files one level up, bmad/*.bmad). The run itself is flat in WORK_DIR, so
 # the decks' internal lattice= references need no paths.
 cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/genesis4/*/*.in \
    "$SCRIPT_DIR"/bmad/*.bmad "$WORK_DIR/"
@@ -110,7 +110,7 @@ cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/genesis4/*/*.in \
 cd "$WORK_DIR" || exit 1
 
 # Without FI_PROVIDER=tcp the MPI runtime's provider search adds tens of seconds to
-# every Genesis launch (measured; the tcp provider is always sufficient on one node).
+# every Genesis launch (measured, the tcp provider is always sufficient on one node).
 export FI_PROVIDER=tcp
 
 # Every section prints its wall time, so a regression in test cost is visible from the
@@ -124,7 +124,7 @@ section_time () {   # <label>
 
 # The Genesis reference runs form three independent chains -- [ss -> 1seg],
 # [td -> td-1seg, td-sc, td-wake], [td-sase] -- which run concurrently (same
-# decks, same single-process runs; only the wall clock changes).
+# decks, same single-process runs, so only the wall clock changes).
 
 echo "--- Genesis references: three chains, concurrently ---------------------------"
 run_genesis () {   # <deck> ...: the decks of one chain, in order
@@ -255,12 +255,12 @@ fi
 section_time refusals
 echo
 
-# The documented tier numbers are single-thread runs; results must not depend on the
+# The documented tier numbers are single-thread runs. Results must not depend on the
 # thread count, and the explicit check for that follows the loop.
 
 export OMP_NUM_THREADS=1
 
-# The tiers are independent single-thread processes over the shared dumps; they
+# The tiers are independent single-thread processes over the shared dumps. They
 # run concurrently (12 performance cores hold all eleven) and their logs print
 # in the usual order afterwards. Same configurations, same single-thread
 # arithmetic -- the documented tier numbers are unchanged.
@@ -291,7 +291,7 @@ section_time tiers-all-eleven
 # Thread-count independence: the time-dependent single-segment configuration rerun with
 # eight threads must reproduce the one-thread run BIT FOR BIT -- each slice's arithmetic
 # is independent of which thread runs it, so any difference at all is a race. The diag
-# file is compared byte for byte; the dumps dataset by dataset, exactly (HDF5 object
+# file is compared byte for byte. The dumps dataset by dataset, exactly (HDF5 object
 # headers carry timestamps, so whole-file cmp would false-alarm).
 
 echo "--- thread independence: td1 with OMP_NUM_THREADS=8 --------------------------"
@@ -345,7 +345,7 @@ section_time thread-independence
 echo
 
 # Shot-noise checks (deliverable 6). The statistical check is self-referenced (FINDINGS
-# 6.9: Genesis cannot represent weighted noise); the SASE startup cross-check pits the
+# 6.9: Genesis cannot represent weighted noise). The SASE startup cross-check pits the
 # two codes' fully independent loaders and RNGs against each other at the level the
 # noise sets, the startup power.
 
@@ -369,7 +369,7 @@ echo
 # closed-form pseudomode ramp, exact causality with the d8 direction cross-check, the
 # z_long kernel cross-validation against the deliverable-8 wake model (first-principles
 # tight, resolved-beam at the derived boundary bound), split-weight invariance and
-# thread determinism. Self-referenced; needs no Genesis.
+# thread determinism. Self-referenced. Needs no Genesis.
 
 echo "--- seam-wake checks -------------------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_seam_wake.py" --exe "$EXE" --workdir "$WORK_DIR"; then
@@ -381,8 +381,8 @@ echo
 
 # Distribution-import checks (deliverable 10): the bunch_struct resampler transcribed
 # from Genesis's SDDSBeam.cpp -- exact where no RNG enters (the per-slice current
-# profile against Genesis importing the SAME distribution file; the match transform
-# hitting its Twiss targets; split-weight invariance; thread determinism), statistical
+# profile against Genesis importing the SAME distribution file, the match transform
+# hitting its Twiss targets, split-weight invariance, thread determinism), statistical
 # where the resampling RNG forces it (slice Twiss recovery, startup power cross-code).
 
 echo "--- distribution-import checks --------------------------------------------------"
@@ -417,7 +417,7 @@ fi
 section_time collective
 echo
 
-# Unaveraged-mode checks (deliverable 13; fel-physics.tex sec:unaveraged): the energy
+# Unaveraged-mode checks (deliverable 13, fel-physics.tex sec:unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
 # comparison against the averaged mode. The fc/faw leak grep is part of the check: the

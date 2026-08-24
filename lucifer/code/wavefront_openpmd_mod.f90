@@ -2,9 +2,9 @@
 ! Module wavefront_openpmd_mod
 !
 ! openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
-! Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md --
-! THE STANDARD DOCUMENT IS AUTHORITATIVE for this format; this module and the harness's
-! h5py reader validate against its text independently).
+! Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
+! THE STANDARD DOCUMENT IS AUTHORITATIVE for this format. This module and the
+! harness's h5py reader validate against its text independently.
 !
 ! Layout decisions (see the physics manual, fel-physics.tex sec:field-set):
 !
@@ -14,24 +14,24 @@
 !   /data/1/                 one iteration per file; time = 0, dt = 0, timeUnitSI = 1
 !   /data/1/meshes/electricField
 !                            the one mesh record. Attributes ON THE MESH RECORD (the
-!                            extension's heading; its body says "series", the
-!                            contradiction is resolved here in the record's favor --
+!                            extension's heading. Its body says "series", and the
+!                            contradiction is resolved here in the record's favor:
 !                            photonEnergy is a property of one field):
 !                            geometry 'cartesian', axisLabels ['z','y','x'],
 !                            gridSpacing [dz,dy,dx], gridGlobalOffset [0,-gmax,-gmax],
 !                            gridUnitSI 1, unitDimension (1,1,-3,-1,0,0,0) (V/m),
 !                            timeOffset 0, photonEnergy [J], temporalDomain 'time',
 !                            spatialDomain 'r', zCoordinate [m].
-!   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively;
+!   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively.
 !   .../electricField/y      present only when the wavefront carries Ey. BOTH transverse
-!                            polarizations live in ONE file as components -- the
+!                            polarizations live in ONE file as components, the
 !                            improvement over the Genesis format's one-per-file. The z
 !                            component is never written: a paraxial code has none, and
 !                            an absent component is ordinary openPMD.
 !
 ! The dataset is stored exactly as the Fortran (nx, ny, nslice) array, which the HDF5
-! Fortran API records as a C-order (nslice, ny, nx) dataspace -- zero-copy, and
-! numpy-natural for per-slice access. axisLabels declare that stored order; the slice
+! Fortran API records as a C-order (nslice, ny, nx) dataspace: zero-copy, and
+! numpy-natural for per-slice access. axisLabels declare that stored order. The slice
 ! axis is the one LABELED z (third in the logical x,y,z reading). Slices are
 ! simultaneous, so they are a MESH axis, never the openPMD iteration.
 !
@@ -61,7 +61,7 @@ contains
 !
 ! Routine to test whether a file is an openPMD file. This is the format signature probe
 ! for import auto-detection: an openPMD file carries the required root attribute
-! "openPMD"; a Genesis field dump has none.
+! "openPMD". A Genesis field dump has none.
 !
 ! Input:
 !   file_name   -- character(*): File to probe.
@@ -100,7 +100,7 @@ end function wavefront_file_is_openpmd
 ! so unitSI = 1 throughout.
 !
 ! Input:
-!   wf         -- wavefront_struct: The field; Ey written when allocated.
+!   wf         -- wavefront_struct: The field. Ey written when allocated.
 !   file_name  -- character(*): Output file.
 !   s_pos      -- real(rp): Lattice position of the dump plane [m] (zCoordinate).
 !
@@ -133,7 +133,7 @@ call hdf5_write_attribute_string (f_id, 'meshesPath', 'meshes/', err)
 call hdf5_write_attribute_string (f_id, 'iterationEncoding', 'groupBased', err)
 call hdf5_write_attribute_string (f_id, 'iterationFormat', '/data/%T/', err)
 
-! One iteration; slices are a mesh axis, so the iteration carries no time structure.
+! One iteration. Slices are a mesh axis, so the iteration carries no time structure.
 
 call h5gcreate_f (f_id, 'data', it_id, h5_err);  call h5gclose_f (it_id, h5_err)
 call h5gcreate_f (f_id, trim(iter_path), it_id, h5_err)
@@ -154,7 +154,7 @@ endif
 
 gmax_x = (size(wf%Ex,1) - 1) * wf%dx / 2
 gmax_y = (size(wf%Ex,2) - 1) * wf%dy / 2
-e_photon = h_planck * c_light / wf%wavelength * e_charge     ! [J]; h_planck is eV s.
+e_photon = h_planck * c_light / wf%wavelength * e_charge     ! [J]. h_planck is eV s.
 
 call hdf5_write_attribute_string (m_id, 'geometry', 'cartesian', err)
 call hdf5_write_attribute_string (m_id, 'axisLabels', [character(1):: 'z', 'y', 'x'], err)
@@ -205,7 +205,7 @@ end subroutine wavefront_write_openpmd
 ! k-space field, an axis order other than (z,y,x), a missing required attribute.
 !
 ! photon_energy is returned so the caller can match the file to the field set entry
-! whose harmonic it carries; wf%wavelength is derived from it.
+! whose harmonic it carries. wf%wavelength is derived from it.
 !
 ! Input:
 !   file_name      -- character(*): File to read.
@@ -243,7 +243,7 @@ if (.not. hdf5_exists(f_id, trim(mesh_path), err, .false.)) then
 endif
 m_id = hdf5_open_group (f_id, trim(mesh_path), err, .true.);  if (err) return
 
-! The Wavefront extension's required attributes; each missing one is named.
+! The Wavefront extension's required attributes. Each missing one is named.
 
 call hdf5_read_attribute_string (m_id, 'temporalDomain', sval, err, .false.)
 if (err) then
@@ -307,7 +307,7 @@ wf%wavelength = h_planck * c_light * e_charge / photon_energy
 call hdf5_read_attribute_real (m_id, 'gridGlobalOffset', offset, err, .false.)   ! Read, unused:
                                             ! the walk's grid is centered by convention.
 
-! The components. Dataset dims come back in Fortran order (nx, ny, nz) -- the same API
+! The components. Dataset dims come back in Fortran order (nx, ny, nz), the same API
 ! symmetry the writer used.
 
 info = hdf5_object_info (m_id, 'x', err, .true.);  if (err) return

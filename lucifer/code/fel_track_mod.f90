@@ -3,7 +3,8 @@
 !
 ! The FEL step: period-averaged particle push, source deposition and FFT field solve
 ! inside an undulator segment, operating on the Bmad-coordinate packed beam of
-! fel_beam_mod; steady state (one slice) or time dependent (many slices with slippage).
+! fel_beam_mod. Runs steady state (one slice) or time dependent (many slices with
+! slippage).
 ! The physics is transcribed from Genesis 1.3 Version 4, which GPL permits. Physics,
 ! Genesis provenance (routine by routine), and validation: lucifer/doc/fel-physics.tex
 ! (sec:core, sec:transverse, sec:field, sec:slippage).
@@ -15,16 +16,16 @@
 ! = 1 + mod(is-1 + first, nslice), where first is Genesis's Field::first: the field
 ! record is a circular buffer over the wavefront's third index, rotated by slippage
 ! rather than moved. Slippage accumulates in units of the radiation wavelength and
-! rotates the record one slice whenever it exceeds 0.8 of the slice spacing; the field
+! rotates the record one slice whenever it exceeds 0.8 of the slice spacing. The field
 ! slice that was coupled to the head of the time window is discarded and re-enters at
-! the tail zeroed -- radiation slips out of the window at the head, fresh vacuum enters
+! the tail zeroed. Radiation slips out of the window at the head and fresh vacuum enters
 ! behind the bunch. The caller owns the schedule (what slips when, including the drift
-! autophasing of Lattice::calcSlippage); this module owns the mechanics. Anything
-! reading the field record in time order -- dumps, per-slice field diagnostics -- must
+! autophasing of Lattice::calcSlippage). This module owns the mechanics. Anything
+! reading the field record in time order (dumps, per-slice field diagnostics) must
 ! unrotate through fel_field_index, exactly as Genesis's writers do (sec:slippage).
 !
-! Coordinates. The stored state is Bmad's (x, px/p0, y, py/p0, z, pz) plus weight; see
-! fel_beam_mod. The longitudinal RK4, however, runs in Genesis's chart (theta, gamma) as
+! Coordinates. The stored state is Bmad's (x, px/p0, y, py/p0, z, pz) plus weight (see
+! fel_beam_mod). The longitudinal RK4 runs in Genesis's chart (theta, gamma) as
 ! per-particle working variables, derived at step entry and converted back at step exit:
 !
 !   entry:  gamma = sqrt((p0_mc*(1+pz))^2 + 1),  theta = phi0 + ks*z/beta
@@ -32,32 +33,32 @@
 !
 ! Two facts make this clean rather than a compromise. First, theta <-> (phi0, z) is an
 ! affine change of variables with a state-independent shift, and RK4 is exactly invariant
-! under affine maps, so integrating in theta is not a different discretization from
-! integrating in z -- it lets the audited, verbatim RK4 transcription survive unchanged.
+! under affine maps. Integrating in theta is therefore the same discretization as
+! integrating in z, and the audited, verbatim RK4 transcription survives unchanged.
 ! Second, the per-step gamma <-> pz round trip costs ~1 ulp of gamma per step (the
-! subtraction in pz is exact once P is formed), which is the same order as the step's own
+! subtraction in pz is exact once P is formed). That is the same order as the step's own
 ! rounding. The common reference phase phi0 advances once per step per beam
-! (fel_phi0_rate in fel_beam_mod); the split keeps z small and bunch-scale.
+! (fel_phi0_rate in fel_beam_mod). The split keeps z small and bunch-scale.
 !
 ! Weights: the source deposition scales per particle as c*w_j/slice_spacing where Genesis
-! has current/N -- identical algebra for uniform weights, and correct for nonuniform ones
-! (each macroparticle radiates its own charge).
+! has current/N. The algebra is identical for uniform weights, and correct for nonuniform
+! ones (each macroparticle radiates its own charge).
 !
-! Units. The field is in V/m throughout, the wavefront_struct convention; there is no
+! Units. The field is in V/m throughout, the wavefront_struct convention. There is no
 ! internal unit system. The formulas here follow from Genesis's internal-unit forms via
 ! the exact relation u = E*ks/(sqrt(2)*m_electron) (composing the dump scale
-! dfl = u*dgrid*eev/(ks*sqrt(Z0)) with E = dfl*sqrt(2*Z0)/dgrid), under which the
+! dfl = u*dgrid*eev/(ks*sqrt(Z0)) with E = dfl*sqrt(2*Z0)/dgrid). Under this relation the
 ! coupling, source and power expressions come out simpler than the originals: the energy
 ! exchange coupling is fc*conj(E)/(sqrt(2)*m_electron), the source scale is
 ! fc*Z0*sqrt(2)*c*delz*w_j/(4*dgrid^2*slice_spacing), and power is sum|E|^2*dgrid^2/(2*Z0).
-! Constants are Bmad's (m_electron equals Genesis's eev exactly; Z0 = mu_0_vac*c_light
+! Constants are Bmad's. m_electron equals Genesis's eev exactly. Z0 = mu_0_vac*c_light
 ! differs from Genesis's truncated 376.73 by 8e-7 relative, the accepted floor of the
-! Genesis comparison).
+! Genesis comparison.
 !
 ! Deliberately absent, per the deliverable: space charge, wakes, incoherent synchrotron
 ! radiation, harmonics beyond the coupling formula, the source filter, orbit or field
 ! errors, one4one sorting and slice migration, and the periodic time-window boundary
-! (Genesis's periodic option; the non-periodic zero fill is what is transcribed).
+! (Genesis's periodic option: the non-periodic zero fill is what is transcribed).
 !-
 
 module fel_track_mod
@@ -89,10 +90,10 @@ type fel_und_struct
   real(rp) :: cos_t = 1, sin_t = 0   !   e = (cos_t, sin_t). Cached for the maps.
   complex(rp) :: pol(2) = [(1.0_rp, 0.0_rp), (0.0_rp, 0.0_rp)]
                               ! Polarization 2-vector on the (Ex, Ey) pair (manual
-                              ! sec:field vector convention): planar (cos t, sin t);
+                              ! sec:field vector convention): planar (cos t, sin t),
                               ! helical (1, -i)/sqrt(2). The averaged kick reads
-                              ! E_eff = conj(pol).E and the deposit writes pol*src,
-                              ! which reproduces the scalar path exactly when only
+                              ! E_eff = conj(pol).E and the deposit writes pol*src.
+                              ! This reproduces the scalar path exactly when only
                               ! one polarization is live.
   logical :: helical = .false.
   logical :: bmad_transport = .false.  ! Transverse maps: transcribed TrackBeam (default)
@@ -107,8 +108,8 @@ end type
 !
 ! One slice's coherent-source summary (manual sec:coherent-source), computed from the
 ! just-advanced particles each step: the source phasor S (exactly the sum the deposit
-! would scatter -- SUM crsource = S is the normalization contract), the charge-weighted
-! centroid and 2x2 second moments (widths + tilt; the centering and tilt are this
+! would scatter: SUM crsource = S is the normalization contract), the charge-weighted
+! centroid and 2x2 second moments (widths + tilt: the centering and tilt are this
 ! port's extension of the paper, which assumes an on-axis untilted beam), the
 ! Laguerre-Gauss order-0/1 sums feeding the global kappa fit, and the Gaussianity
 ! guard metric (excess kurtosis, worst plane).
@@ -122,10 +123,10 @@ type fel_coherent_struct
   real(rp) :: b2 = 0                     ! |B|^2, same weighting (kappa's Eq 26 ratio).
   real(rp) :: kurt = 0                   ! max plane |excess kurtosis| (guard metric).
   real(rp) :: m_ind = 1                  ! Independent transverse samples: N_eff/nbins
-                                         !   (beamlet copies share coordinates); the
+                                         !   (beamlet copies share coordinates). The
                                          !   guard tests SIGNIFICANCE, not raw kurtosis
                                          !   (sample kurtosis spreads as sqrt(24/m_ind)).
-  real(rp) :: wsum = 0                   ! Slice charge [C]: the guard gates on it
+  real(rp) :: wsum = 0                   ! Slice charge [C]: the guard tests on it
                                          !   (edge slices resample from few source
                                          !   points and look degenerate while their
                                          !   source is negligible).
@@ -137,7 +138,7 @@ end type
 !
 ! The slippage state of one field record: Genesis's Field::first and Field::accuslip,
 ! plus the two run facts they are meaningless without. One per wavefront. The default is
-! the steady state -- timerun false makes fel_apply_slippage a no-op (as Genesis's)
+! the steady state: timerun false makes fel_apply_slippage a no-op (as Genesis's)
 ! and first = 0 makes fel_field_index the identity.
 !-
 
@@ -147,9 +148,9 @@ type fel_slip_struct
   real(rp) :: accuslip = 0      ! Accumulated slippage [radiation wavelengths] (Field::accuslip).
   real(rp) :: sample = 1        ! Slice spacing / radiation wavelength (Control::sample).
   real(rp) :: u_escaped = 0     ! Energy [J] transmitted out of the window by slippage
-                                ! (summed over every zero-filled slice; the TD energy
+                                ! (summed over every zero-filled slice). The TD energy
                                 ! ledger's escape column, so E_beam + U_window + U_escaped
-                                ! closes in a wake-free run).
+                                ! closes in a wake-free run.
 end type
 
 !+
@@ -157,7 +158,7 @@ end type
 !
 ! Scratch carrier for the field slices one fel_apply_slippage call transmits out of the
 ! window: the caller passes it when it wants the light itself, not just its banked
-! energy (keep_escaped_field). Reset and refilled per call; the caller drains it
+! energy (keep_escaped_field). Reset and refilled per call. The caller drains it
 ! immediately (streams to file), so peak memory is a handful of grid planes -- one per
 ! rotation of the call, ~1 inside undulators, ~10 over an interlude.
 !-
@@ -173,13 +174,14 @@ end type
 !
 ! One radiation field of the walk's field set: the harmonic number, the wavefront
 ! record, and that field's own slippage state and escape bank. The walk carries an
-! ordered set of these -- Genesis's vector<Field*> -- with the FUNDAMENTAL always
-! entry 1 (the ponderomotive phase, the phi0 advance and the slippage schedule are
-! all defined against it; a harmonic field couples through fc(h) and the phase h*theta
-! and diffracts at its own wavelength). A single-entry set is the pre-harmonic walk,
-! bit for bit. wf%wavelength = fundamental wavelength / harm; every field shares the
-! time window, so the slippage state advances in fundamental-wavelength units for all
-! of them (Genesis's one Control::sample) and the records rotate in lockstep.
+! ordered set of these (Genesis's vector<Field*>), with the FUNDAMENTAL always
+! entry 1. The ponderomotive phase, the phi0 advance and the slippage schedule are
+! all defined against the fundamental. A harmonic field couples through fc(h) and the
+! phase h*theta and diffracts at its own wavelength. A single-entry set is the
+! pre-harmonic walk, bit for bit. wf%wavelength = fundamental wavelength / harm. Every
+! field shares the time window, so the slippage state advances in fundamental-wavelength
+! units for all of them (Genesis's one Control::sample) and the records rotate in
+! lockstep.
 !-
 
 type fel_field_struct
@@ -190,9 +192,9 @@ type fel_field_struct
 end type
 
 ! Cached kernels for fel_field_step, mirroring FieldSolverFFT::init: ONE ENTRY PER
-! WAVELENGTH (per harmonic), each rebuilt when its grid or step changes, all module
+! WAVELENGTH (per harmonic), each rebuilt when its grid or step changes. All module
 ! state, built SERIALLY by fel_field_kernel_init before any parallel slice loop and
-! read-only ever after -- fel_field_step never rebuilds, it only looks its entry up
+! read-only ever after. fel_field_step never rebuilds: it looks its entry up
 ! (fel_kernel_index) and errors on a miss, because a rebuild from inside a parallel
 ! loop would race. The per-call source accumulator is a local of fel_field_step, one
 ! per invocation, so concurrent slices deposit into their own.
@@ -210,15 +212,15 @@ end type
 
 ! The source model (manual sec:coherent-source): the standard per-particle deposit
 ! (the referee) or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27,
-! 030703 (2024); arXiv:2310.20197): the spatially incoherent artifact is dropped, the
-! slice bunch factor keeps the physical shot noise, the transverse shape is a guarded
-! Gaussian from phasor sums and charge moments.
+! 030703 (2024); arXiv:2310.20197). In the coherent source the spatially incoherent
+! artifact is dropped. The slice bunch factor keeps the physical shot noise. The
+! transverse shape is a guarded Gaussian from phasor sums and charge moments.
 
 integer, parameter :: fel_source_deposit$ = 0
 integer, parameter :: fel_source_coherent$ = 1
 
 integer, parameter :: fel_transcribed$ = -1   ! Transcribed-Genesis transverse maps
-                                              !   (validation-internal; Genesis tiers).
+                                              !   (validation-internal, Genesis tiers).
 integer, parameter :: fel_averaged$ = 0       ! Averaged, bmad_standard kernel maps
                                               !   (the unset default).
 integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode.
@@ -227,9 +229,9 @@ type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
 ! One libm call for the (sin, cos) pair (lucifer/code/fel_sincos.c). NOT bit-identical
 ! to gfortran's own sin/cos intrinsics: they differ from libm by one ulp on ~2e-6 of
-! arguments (73 mismatches in a 44M-point sweep of the theta domain), so adopting
-! this was a NAMED VALUE CHANGE -- every benchmark tier re-measured and re-recorded
-! (README, "The particle-path cost").
+! arguments (73 mismatches in a 44M-point sweep of the theta domain). Adopting
+! this was therefore a NAMED VALUE CHANGE -- every benchmark tier re-measured and
+! re-recorded (README, "The particle-path cost").
 
 !+
 ! Subroutine fel_sincos (theta, s, c)
@@ -255,12 +257,12 @@ contains
 ! Subroutine fel_ele_as_wiggler (orbit, ele, param, err_flag, finished, track)
 !
 ! track1_custom hook: outside a driver's own FEL walk, an FEL element (a wiggler with
-! tracking_method = custom) is just a periodic wiggler, so delegate to Bmad's standard
+! tracking_method = custom) is just a periodic wiggler. Delegate to Bmad's standard
 ! kernel. The reference time/energy pass inside bmad_parser and any seam-side track1
 ! resolve through this, so the element carries the resonant undulation delay
 ! from Bmad's own code. Kept at module scope deliberately: gfortran implements pointers
-! to internal procedures with stack trampolines, which Apple Silicon's non-executable
-! stack turns into a segfault at the first call.
+! to internal procedures with stack trampolines. Apple Silicon's non-executable
+! stack turns those into a segfault at the first call.
 !
 ! Input:
 !   orbit     -- coord_struct: Starting orbit.
@@ -298,12 +300,12 @@ end subroutine fel_ele_as_wiggler
 !+
 ! Subroutine fel_assert_wiggler_sane (ele)
 !
-! The brief's 7.5 assertions, enforced at the first touch of the element -- which is
-! the reference time/energy pass INSIDE bmad_parser, through the hooks above. Enforcing
-! them any later is too late: a missing b_max parses cleanly and only fails downstream
-! with an unrelated message, and a fieldmap field_calc segfaults track_a_wiggler during
+! The brief's 7.5 assertions, enforced at the first touch of the element: the
+! reference time/energy pass INSIDE bmad_parser, through the hooks above. Enforcing
+! them any later is too late. A missing b_max parses cleanly and only fails downstream
+! with an unrelated message. A fieldmap field_calc segfaults track_a_wiggler during
 ! the parse itself. Refusal is by name so a lattice author knows which attribute to fix.
-! (The reference pass runs before lat_sanity_check, so these fire first; Bmad's own
+! (The reference pass runs before lat_sanity_check, so these fire first. Bmad's own
 ! sanity check would also refuse a missing l_period by name if this were removed.)
 !
 ! Input:
@@ -323,7 +325,7 @@ character(*), parameter :: r_name = 'fel_assert_wiggler_sane'
 ! These refusals fire at parse time from the tracking hooks and must end the program
 ! with a NONZERO exit (the harness's refusal checks assert it). err_exit cannot be
 ! used here: its deliberate integer-divide traceback bomb does not trap on arm64 and
-! its final bare stop exits 0, so the stops below stay.
+! its final bare stop exits 0. The stops below stay.
 
 if (ele%field_calc /= planar_model$ .and. ele%field_calc /= helical_model$) then
   call out_io (s_fatal$, r_name, 'FEL ELEMENT FIELD_CALC MUST BE PLANAR_MODEL OR HELICAL_MODEL', &
@@ -353,8 +355,8 @@ endif
 
 ! The integration step: with neither ds_step nor num_steps set, Bmad's bookkeeper
 ! falls back to bmad_com%default_ds_step (0.2 m -- thirteen periods of this device,
-! garbage FEL physics that would run without complaint). Bmad itself only warns;
-! an FEL element must say its step.
+! garbage FEL physics that would run without complaint). Bmad itself only warns.
+! An FEL element must say its step.
 
 if (ele%value(ds_step$) == bmad_com%default_ds_step) then
   call out_io (s_fatal$, r_name, 'FEL ELEMENT HAS NO INTEGRATION STEP; SET DS_STEP (GENESIS''S DELZ)', &
@@ -374,8 +376,8 @@ end subroutine fel_assert_wiggler_sane
 !
 ! make_mat6_custom hook, the transfer-matrix companion of fel_ele_as_wiggler: an FEL
 ! element's mat6_calc_method resolves to custom (auto follows tracking_method = custom),
-! and Bmad's bookkeeping calls through make_mat6_custom_ptr -- unconditionally, so a
-! program that leaves it null segfaults at a jump to address zero. Delegate to the
+! and Bmad's bookkeeping calls through make_mat6_custom_ptr unconditionally. A
+! program that leaves the pointer null segfaults at a jump to address zero. Delegate to the
 ! standard periodic-wiggler kernel with matrix propagation, filling ele%mat6, ele%vec0
 ! and end_orb per the make_mat6_bmad convention.
 !
@@ -442,18 +444,18 @@ end function fel_field_index
 !
 ! Routine to account the slippage of one step and rotate the field record when it
 ! crosses a slice boundary. Transcribed from Control::applySlippage (fel-physics.tex
-! sec:slippage) reduced to one shared-memory node: the MPI ring exchange between
-! adjacent ranks is the identity when the ring has one member, and this node is
+! sec:slippage) reduced to one shared-memory node. The MPI ring exchange between
+! adjacent ranks is the identity when the ring has one member. This node is
 ! simultaneously rank 0 and rank size-1, so the non-periodic zero fill always applies
 ! to the transmitted slice. What remains is Genesis's exact bookkeeping: accumulate in
 ! units of the radiation wavelength, and while |accuslip| exceeds 0.8*sample, rotate
 ! the record one slice -- the slice coupled to the head of the time window is zeroed
-! and becomes the new tail (radiation leaves the window at the head; fresh vacuum
+! and becomes the new tail (radiation leaves the window at the head and fresh vacuum
 ! enters behind the bunch). Backward slippage is transcribed with the same fidelity,
 ! direction reversed.
 !
-! The caller owns the schedule -- per-step undulator slippage and the drift autophasing
-! of Lattice::calcSlippage -- and calls this after the field step, Gencore's step 5.
+! The caller owns the schedule (per-step undulator slippage and the drift autophasing
+! of Lattice::calcSlippage) and calls this after the field step, Gencore's step 5.
 ! A steady-state record (timerun false) is left untouched, exactly as Genesis's.
 !
 ! Input:
@@ -479,9 +481,9 @@ integer nslice, last, direction
 
 ! The transmitted slice's light time, for the escape bank: slice_spacing / c. For a
 ! harmonic field wf%wavelength is the fundamental's / harm while sample stays in
-! fundamental units (every field shares the window and rotates in lockstep), so the
-! product must be scaled back up by harm. harm absent or 1 leaves the fundamental's
-! expression untouched.
+! fundamental units (every field shares the window and rotates in lockstep). The
+! product must therefore be scaled back up by harm. harm absent or 1 leaves the
+! fundamental's expression untouched.
 
 t_slice = (slip%sample * wf%wavelength / c_light)
 if (present(harm)) then
@@ -506,10 +508,10 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   if (direction < 0) last = mod(last + 1, nslice)
 
   ! One node: send/receive to self, then the non-periodic zero fill of the transmitted
-  ! slice. Its energy leaves the simulation here -- bank it first, so the time-dependent
+  ! slice. Its energy leaves the simulation here. Bank it first, so the time-dependent
   ! energy ledger can close: the slice's power (same convention as fel_field_diag) times
   ! its light-time slice_spacing/c. Wakes would be a second, unbanked exit channel from
-  ! the beam; the unaveraged mode, whose ledger this feeds, refuses them by name.
+  ! the beam. The unaveraged mode, whose ledger this feeds, refuses them by name.
 
   slip%u_escaped = slip%u_escaped + sum(real(wf%Ex(:,:,last+1), rp)**2 + aimag(wf%Ex(:,:,last+1))**2) &
                      * wf%dx**2 / (2 * (mu_0_vac * c_light)) * t_slice
@@ -559,18 +561,18 @@ end subroutine fel_apply_slippage
 !+
 ! Function fel_und_coupling (und, h) result (fc)
 !
-! The coupling factor fc(h), transcribed from Undulator::fc: helical couples the
-! fundamental with strength aw and nothing else; planar couples odd harmonics through
-! JJ = J_{(h-1)/2}(xi) - J_{(h+1)/2}(xi), xi = h/2 * aw^2/(1+aw^2), sign (-1)^((h-1)/2);
-! even harmonics not at all (a polarisation limitation of the planar coupling).
+! The coupling factor fc(h), transcribed from Undulator::fc. Helical couples the
+! fundamental with strength aw and nothing else. Planar couples odd harmonics through
+! JJ = J_{(h-1)/2}(xi) - J_{(h+1)/2}(xi), xi = h/2 * aw^2/(1+aw^2), sign (-1)^((h-1)/2),
+! and even harmonics not at all (a polarisation limitation of the planar coupling).
 !
 ! Input:
 !   und -- fel_und_struct: Undulator parameters (aw, helicity).
 !   h   -- integer: Harmonic number.
 !
 ! Output:
-!   fc  -- real(rp): The coupling factor aw*JJ(h) (planar) or aw (helical, h = 1;
-!            0 for helical harmonics).
+!   fc  -- real(rp): The coupling factor aw*JJ(h) (planar) or aw (helical, h = 1).
+!            Zero for helical harmonics.
 !-
 
 function fel_und_coupling (und, h) result (fc)
@@ -692,7 +694,7 @@ end function faw2
 ! Input:
 !   und         -- fel_und_struct: Segment parameters.
 !   beam        -- fel_beam_struct: The beam. Steady state: one slice.
-!   ff          -- fel_field_struct(:): The field set [V/m]; entry 1 the fundamental,
+!   ff          -- fel_field_struct(:): The field set [V/m]. Entry 1 is the fundamental,
 !                    one field slice per beam slice each.
 !   coll        -- fel_collective_struct: Collective-effects state.
 !
@@ -729,7 +731,7 @@ if (size(beam%slice) /= nslice) then
   return
 endif
 
-! ks, phi0 and the slippage schedule are all FUNDAMENTAL quantities (field 1); a
+! ks, phi0 and the slippage schedule are all FUNDAMENTAL quantities (field 1). A
 ! harmonic field enters only through its coupling fc(h), its phase h*theta and its own
 ! diffraction kernel.
 
@@ -739,8 +741,8 @@ phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 ! Everything cross-slice happens serially here, before and between the parallel loops:
 ! the phi0 advance above, the kernel builds and the long-range space-charge profile
 ! below, and slippage in the caller. Inside the loops each slice touches only its own
-! particle arrays and its own field slice (the beam-to-field mapping is a bijection),
-! and each slice's arithmetic is independent of which thread runs it, so results are
+! particle arrays and its own field slice (the beam-to-field mapping is a bijection).
+! Each slice's arithmetic is independent of which thread runs it, so results are
 ! bit-identical across thread counts -- the check the benchmark harness holds.
 
 do io = 1, size(ff)
@@ -777,11 +779,11 @@ beam%phi0 = phi0_new
 
 ! The coherent source (manual sec:coherent-source): per-slice phasor, moments and LG
 ! sums from the just-advanced particles (slice-parallel, each slice its own data),
-! then the ONE global kappa (Tanaka Eq 26 -- the integrals run over the whole window,
-! so this is the cross-slice serial point), then the guard: a slice whose transverse
-! charge profile is measurably non-Gaussian is refused BY NAME with its number (the
-! Gaussian model would bias the gain there; thresholds set by the distorted-beam
-! checks).
+! then the ONE global kappa (Tanaka Eq 26: the integrals run over the whole window,
+! so this is the cross-slice serial point), then the guard. A slice whose transverse
+! charge profile is measurably non-Gaussian is refused BY NAME with its number: the
+! Gaussian model would bias the gain there. Thresholds are set by the distorted-beam
+! checks.
 
 if (und%source_model == fel_source_coherent$) then
   allocate (coh(size(beam%slice)))
@@ -792,8 +794,8 @@ if (und%source_model == fel_source_coherent$) then
   !$OMP end parallel do
 
   ! The kappa fit's window sums (Eq 26), CHARGE-WEIGHTED: g_q and B are built from
-  ! normalized weights, so an unweighted sum would let near-empty edge slices --
-  ! whose normalized phasors are O(1) noise -- poison the global width fit for any
+  ! normalized weights. An unweighted sum would let near-empty edge slices (their
+  ! normalized phasors are O(1) noise) poison the global width fit for any
   ! real bunch profile. wsum^2 keeps both sums quadratic in the same measure.
 
   b2_tot = 0;  g2_tot = 0
@@ -803,17 +805,17 @@ if (und%source_model == fel_source_coherent$) then
   enddo
   do is = 1, size(beam%slice)
 
-    ! Charge-gated: an edge slice (Gaussian tail, resampled from few source points)
-    ! looks degenerate while contributing negligible source; only slices carrying
+    ! Charge-weighted: an edge slice (Gaussian tail, resampled from few source points)
+    ! looks degenerate while contributing negligible source. Only slices carrying
     ! real charge are held to the Gaussian-profile requirement.
 
     if (coh(is)%wsum < 0.05_rp * maxval(coh%wsum)) cycle
     if (coh(is)%ok .and. coh(is)%kurt > max(0.5_rp, 5 * sqrt(24.0_rp / coh(is)%m_ind))) then
 
       ! Significance, not raw kurtosis: the sample statistic spreads as sqrt(24/m_ind)
-      ! (m_ind independent transverse samples), so a small-M Gaussian beam does not trip
-      ! the guard on noise while a genuinely structured profile (double horn ~ -1.5)
-      ! does at any M where it is resolvable.
+      ! (m_ind independent transverse samples). A small-M Gaussian beam thus does not
+      ! trip the guard on noise, while a genuinely structured profile (double horn
+      ! ~ -1.5) does at any M where it is resolvable.
 
       call out_io (s_error$, r_name, 'COHERENT SOURCE: slice \i0\ transverse charge profile is NOT', &
         'GAUSSIAN ENOUGH (excess kurtosis \es10.2\ , threshold \es10.2\ at this sample size):', &
@@ -826,7 +828,7 @@ if (und%source_model == fel_source_coherent$) then
   if (g2_tot > 0) kappa = sqrt(b2_tot / (4 * pi * g2_tot))
 endif
 
-! Field solve, harmonic loop outermost (each pass is self-contained; manual sec:field-set). The
+! Field solve, harmonic loop outermost (each pass is self-contained, manual sec:field-set). The
 ! deposit reads the just-advanced particles, so every field sees the same beam state.
 
 do io = 1, size(ff)
@@ -863,25 +865,25 @@ end subroutine fel_track_und_step
 !+
 ! Subroutine fel_track_interlude_genesis (qf, length, beam, ff, coll, err_flag)
 !
-! Routine to advance one field-free interlude element -- a drift or a quadrupole -- the
+! Routine to advance one field-free interlude element (a drift or a quadrupole) the
 ! way Genesis does it, as one integration step: transverse half step, the longitudinal
 ! advance with the path-length term sampled at mid element and Genesis's drift
-! reference xku = ks*0.5/gamma0/gamma0 (division order kept for bit identity;
+! reference xku = ks*0.5/gamma0/gamma0 (division order kept for bit identity,
 ! fel-physics.tex sec:interlude), the wake's gamma decrement, transverse half step,
 ! field diffraction with zero source.
-! Slippage is NOT applied here; the caller schedules it after the step, as with
+! Slippage is NOT applied here. The caller schedules it after the step, as with
 ! fel_track_und_step.
 !
 ! The longitudinal advance has two paths. With space charge off, the RK4 collapses
 ! exactly (slope theta-independent, gamma constant) and the collapsed step is kept for
 ! bit-identity with the pre-collective code. With space charge on, gamma changes inside
-! the step, so the full RK4 runs with rpart = 0 and the per-particle ez -- which is
+! the step, so the full RK4 runs with rpart = 0 and the per-particle ez. That is
 ! Genesis's actual code path in drifts (BeamSolver::advance with aw = 0).
 !
-! This is the Genesis interlude model, transcribed, so that running the full lattice with
+! This is the Genesis interlude model, transcribed. Running the full lattice with
 ! it isolates what the Bmad seam changes: the seam integrates the path-length term
-! exactly through the quad map where this samples it once. See the benchmark README; the
-! production configuration is the seam.
+! exactly through the quad map where this samples it once. See the benchmark README.
+! The production configuration is the seam.
 !
 ! Input:
 !   qf       -- real(rp): Quadrupole focusing strength of the interlude [1/m^2].
@@ -931,7 +933,7 @@ if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(size(beam%slice)))
 call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
 
 ! The per-particle temporaries live at routine scope, so the parallel loop must make
-! them private explicitly; a missed one here is a race, which is what the harness's
+! them private explicitly. A missed one here is a race, which is what the harness's
 ! thread-count-independence check exists to catch.
 
 !$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope, p_mc)
@@ -963,8 +965,8 @@ do is = 1, size(beam%slice)
       slope = xks * (1 - 1/btpar0) + xku
       theta = theta + length * slope
 
-      ! Back to z: tau = (phi0_new - theta)/ks; pz unchanged (no energy change), so beta
-      ! is unchanged too.
+      ! Back to z: tau = (phi0_new - theta)/ks. pz is unchanged (no energy change), so
+      ! beta is unchanged too.
       sl%z(ip) = -beta * (phi0_new - theta) / xks
     enddo
   endif
@@ -1041,7 +1043,7 @@ subroutine interlude_advance_full_rk (sl, is)
 
 ! Genesis's actual drift path (BeamSolver::advance with aw = 0): the full RK4 with
 ! rpart = 0 and the per-particle space-charge ez held through the stages. gamma changes
-! here, so the chart round trip at exit is fel_advance's. Locals only; safe inside the
+! here, so the chart round trip at exit is fel_advance's. Locals only, safe inside the
 ! parallel slice loop.
 
 type (fel_slice_struct) sl
@@ -1085,7 +1087,7 @@ end subroutine fel_track_interlude_genesis
 !
 ! Routine to advance the transverse coordinates over delz inside an undulator: drift plus
 ! natural focusing, transcribed from TrackBeam::track (quad, corrector and chicane
-! branches dropped; they never overlap undulator fields here).
+! branches dropped: they never overlap undulator fields here).
 !
 ! In the stored normalization the per particle longitudinal factor is
 !
@@ -1146,20 +1148,20 @@ end subroutine fel_transverse_track
 ! Subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
 !
 ! The priced transport alternative (manual sec:element): the transverse maps of Bmad's own
-! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened -- quadrupole bodies
+! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened. Quadrupole bodies go
 ! via quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
 ! half-octupole edge kicks, using the TRACKING-LOCAL k1 values (7.5: never the stored
 ! k1x/k1y attributes, whose helical sign disagrees). The z bookkeeping of the kernel
 ! (path-length dz terms, low-energy correction, the end-of-element undulation factor)
 ! is deliberately ABSENT: the ponderomotive phase evolution, including the aw^2 and
-! px^2+py^2 path terms, lives in fel_advance's RK, and applying it here too would
+! px^2+py^2 path terms, lives in fel_advance's RK. Applying it here too would
 ! double-count.
 !
-! Structure: every leading half-step applies half the octupole kick then the quad body;
-! every trailing half-step the body then half the kick. Adjacent half-kicks between
-! steps sum to Bmad's full inter-step kick; the segment faces get the half kick, exactly
-! Bmad's n_step loop. Model differences from the transcribed TrackBeam (measured, not
-! argued): Bmad's 1/rel_p^2 chromaticity against Genesis's 1/gz_hat, and the octupole
+! Structure: every leading half-step applies half the octupole kick then the quad body.
+! Every trailing half-step applies the body then half the kick. Adjacent half-kicks
+! between steps sum to Bmad's full inter-step kick. The segment faces get the half kick,
+! exactly Bmad's n_step loop. Model differences from the transcribed TrackBeam (measured,
+! not argued): Bmad's 1/rel_p^2 chromaticity against Genesis's 1/gz_hat, and the octupole
 ! edge kicks Genesis does not have.
 !
 ! g_max reconstructs from aw: c*b_max = K*ku*m_e with K = aw (helical) or aw*sqrt(2)
@@ -1207,7 +1209,7 @@ do ip = 1, sl%n
   rel_p = 1 + sl%pz(ip)
   k1yy = k1y_loc / rel_p**2
   k1xx = k1x_loc / rel_p**2
-  k3l = 2 * delz * k1yy                    ! Half of Bmad's per-step kick; see header.
+  k3l = 2 * delz * k1yy                    ! Half of Bmad's per-step kick. See header.
 
   ! A tilted planar element focuses in its own wiggle frame: rotate in, apply the
   ! untilted map, rotate out -- exactly Bmad's tilt_coords composition. sin_t = 0
@@ -1335,19 +1337,19 @@ end subroutine fel_apply_focus
 ! Subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new, coll, is)
 !
 ! Routine to advance the longitudinal plane of every particle over delz. Transcribed from
-! BeamSolver::advance: gather the field at (x, y) by bilinear interpolation from field
-! slice ifld (the rotated-record index, fel_field_index), form
-! rpart = (fc(h)/ks)*faw*conj(E_h) per field of the set ff (the fundamental is entry 1;
-! a single-entry set takes the pre-harmonic scalar path verbatim), and integrate
+! BeamSolver::advance. Gather the field at (x, y) by bilinear interpolation from field
+! slice ifld (the rotated-record index, fel_field_index). Form
+! rpart = (fc(h)/ks)*faw*conj(E_h) per field of the set ff (the fundamental is entry 1,
+! and a single-entry set takes the pre-harmonic scalar path verbatim). Integrate
 ! (theta, gamma) by the verbatim RK4 with the rpart set, px, py, faw AND the
-! space-charge ez held fixed through the stages; the harmonic phases h*theta are live
+! space-charge ez held fixed through the stages. The harmonic phases h*theta are live
 ! per stage (fel_ode_multi). ez per particle is
 ! fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
-! ez = getEField(ip) + eloss (fel-physics.tex sec:eom, sec:spacecharge); is is this
+! ez = getEField(ip) + eloss (fel-physics.tex sec:eom, sec:spacecharge). is is this
 ! slice's beam index.
 !
 ! (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
-! using phi0_new, the common phase at the end of this step; see the module header for why
+! using phi0_new, the common phase at the end of this step. See the module header for why
 ! this chart change is exact for RK4 and ~1 ulp for the energy.
 !
 ! Input:
@@ -1400,7 +1402,7 @@ aw = und%aw
 
 ! Space charge of this slice, computed once per step and held through the RK stages
 ! (BeamSolver::advance's order). The short-range solve is per-call-local, so this is
-! parallel-slice safe; long_esc was refreshed serially by the caller.
+! parallel-slice safe. long_esc was refreshed serially by the caller.
 
 allocate (ez(max(1, sl%n)))
 gz2 = fel_gamma0(beam)**2 / (1 + aw**2)
@@ -1472,8 +1474,8 @@ if (nf == 1) then
 
 else
 
-  ! The field set: every field works the beam at once, BeamSolver::advance's structure
-  ! -- per-field coupling fc(h) and record index held outside the particle loop, the
+  ! The field set: every field works the beam at once, BeamSolver::advance's structure.
+  ! Per-field coupling fc(h) and record index held outside the particle loop, the
   ! per-field rpart (coupling times that field's interpolated amplitude, no phase) held
   ! through the RK stages, and the harmonic phase h*theta applied per stage inside
   ! fel_ode_multi (BeamSolver.cpp:24-30,150).
@@ -1615,8 +1617,8 @@ end subroutine fel_runge_kutta
 !
 ! The longitudinal equations of motion, BeamSolver::ODE (fel-physics.tex sec:eom),
 ! fundamental only. ez is the per-particle space-charge term in m_e c^2 per meter
-! (short-range harmonics plus the long-range loss), zero when space charge is off --
-! in which case the arithmetic is bit-identical to the pre-collective code because
+! (short-range harmonics plus the long-range loss), zero when space charge is off.
+! In that case the arithmetic is bit-identical to the pre-collective code because
 ! subtracting a literal zero is exact.
 !
 ! Input:
@@ -1658,8 +1660,8 @@ end subroutine fel_ode
 !
 ! The field-set form of fel_runge_kutta: identical RK4 stage bookkeeping
 ! (BeamSolver::RungeKutta), with the slope summing every field's contribution at that
-! field's harmonic phase (fel_ode_multi). The single-field walk never calls this --
-! fel_advance keeps the scalar path verbatim -- so the pre-harmonic arithmetic is
+! field's harmonic phase (fel_ode_multi). The single-field walk never calls this
+! (fel_advance keeps the scalar path verbatim), so the pre-harmonic arithmetic is
 ! untouched by construction.
 !
 ! Input:
@@ -1747,9 +1749,9 @@ end subroutine fel_runge_kutta_multi
 !
 ! The longitudinal equations of motion over a field set, BeamSolver::ODE verbatim:
 ! ctmp sums rpart(i) * exp(-i * rharm(i) * theta) over the fields at the CURRENT stage
-! theta -- the couplings held fixed through the stages, the harmonic phases live
+! theta: the couplings held fixed through the stages, the harmonic phases live
 ! (BeamSolver.cpp:150). xks is the FUNDAMENTAL wavenumber (the theta equation is the
-! fundamental's; harmonics enter the slope only through ctmp).
+! fundamental's, and harmonics enter the slope only through ctmp).
 !
 ! Input:
 !   tgam, tthet -- real(rp): Stage values of gamma and the fundamental theta.
@@ -1795,7 +1797,7 @@ end subroutine fel_ode_multi
 ! Subroutine fel_grid_weights (wf, x, y, ix, iy, wx, wy, on_grid)
 !
 ! Routine to map a particle position to its lower-left grid cell corner and bilinear
-! weights. Transcribed from Field::getLLGridpoint; wx is the weight of the LOWER x point.
+! weights. Transcribed from Field::getLLGridpoint. wx is the weight of the LOWER x point.
 ! A particle outside |x|,|y| < gridmax neither feels the field nor radiates into it.
 !
 ! Input:
@@ -1819,7 +1821,7 @@ logical on_grid
 
 ngrid_arr = wavefront_shape(wf)
 ngrid = ngrid_arr(1)
-gridmax = (ngrid - 1) * wf%dx / 2       ! Genesis's gridmax; dgrid = 2*gridmax/(ngrid-1).
+gridmax = (ngrid - 1) * wf%dx / 2       ! Genesis's gridmax. dgrid = 2*gridmax/(ngrid-1).
 
 if (x > -gridmax .and. x < gridmax .and. y > -gridmax .and. y < gridmax) then
   wx = (x + gridmax) / wf%dx
@@ -1842,7 +1844,7 @@ end subroutine fel_grid_weights
 ! Subroutine fel_grid_weights_pre (gridmax, dx, dy, x, y, ix, iy, wx, wy, on_grid)
 !
 ! fel_grid_weights with the grid bounds PRECOMPUTED by the caller (the particle
-! loops call this per particle; wavefront_shape and gridmax are loop-invariant).
+! loops call this per particle: wavefront_shape and gridmax are loop-invariant).
 ! The arithmetic is character-identical to fel_grid_weights -- bit-for-bit --
 ! and the caller passes gridmax = (ngrid - 1) * wf%dx / 2 exactly as computed there.
 !
@@ -1888,14 +1890,14 @@ end subroutine fel_grid_weights_pre
 ! Subroutine fel_coherent_prep (und, beam, sl, xks1, coh)
 !
 ! One slice's coherent-source summary (manual sec:coherent-source; Tanaka PRAB 27,
-! 030703 (2024), implemented from the paper): the source phasor S computed EXACTLY as
-! the deposit would (same theta, same part factors, post-advance particles -- the
+! 030703 (2024), implemented from the paper). Computed: the source phasor S, EXACTLY as
+! the deposit would (same theta, same part factors, post-advance particles: the
 ! normalization contract is SUM crsource = S), the charge-weighted centroid and
 ! central second moments (this port's extension for offset/mismatched/tilted beams),
 ! the Laguerre-Gauss order-0/1 sums g_q = SUM w_j Psi_q((x-x0)/sx, (y-y0)/sy) e^{-i
 ! theta_j} with Psi_q(u,v) = (1/sqrt(pi)) L_q(u^2+v^2) exp(-(u^2+v^2)/2) (Eqs 19-20,
 ! charge-normalized weights), and the guard metric (worst-plane excess kurtosis).
-! Scale factors constant across the slice (scl_w) are NOT folded into S here; the
+! Scale factors constant across the slice (scl_w) are NOT folded into S here. The
 ! caller applies them, so S matches the deposit's sum with part = sqrt(faw2)*w/gam.
 !
 ! Input:
@@ -1962,7 +1964,7 @@ if (coh%sxx <= 0 .or. coh%syy <= 0 .or. coh%sxx * coh%syy - coh%sxy**2 <= 0) ret
 sx = sqrt(coh%sxx)
 sy = sqrt(coh%syy)
 
-! Pass 2: the LG sums (Eqs 19-20; principal widths, centered) and the guard's fourth
+! Pass 2: the LG sums (Eqs 19-20: principal widths, centered) and the guard's fourth
 ! moments. B in the same charge weighting, so the Eq 26 ratio is weight-consistent.
 
 g0 = 0;  g1 = 0;  bsum = 0;  x4 = 0;  y4 = 0
@@ -2061,8 +2063,8 @@ xks = twopi / wf%wavelength
 dgrid = wf%dx
 p0_mc = fel_p0_mc(beam)
 
-! The kernel is read-only here; a rebuild would race with concurrent slices. The caller
-! initializes it serially (fel_field_kernel_init); a mismatch is a caller bug.
+! The kernel is read-only here: a rebuild would race with concurrent slices. The caller
+! initializes it serially (fel_field_kernel_init). A mismatch is a caller bug.
 
 ik = fel_kernel_index(ngrid, dgrid, xks, delz)
 if (ik == 0) then
@@ -2080,9 +2082,9 @@ scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
 if (scl_w /= 0 .and. und%source_model == fel_source_coherent$) then
 
   ! The coherent-Gaussian source (manual sec:coherent-source): the slice's whole
-  ! phasor S -- carrying the PHYSICAL shot noise through B(s), which the Fawley
-  ! loading pins to <|B|^2> N_lambda = 1 -- deposited as one analytic Gaussian at the
-  ! phasor's charge centroid with covariance kappa^2 * (second-moment matrix). The
+  ! phasor S, deposited as one analytic Gaussian at the phasor's charge centroid
+  ! with covariance kappa^2 * (second-moment matrix). S carries the PHYSICAL shot
+  ! noise through B(s), which the Fawley loading pins to <|B|^2> N_lambda = 1. The
   ! discrete sum is normalized to exactly S (the deposit's own contract, SUM crsource
   ! = SUM cpart), so edge truncation loses nothing silently.
 
@@ -2099,7 +2101,7 @@ elseif (scl_w /= 0) then
 
     ! The fundamental ponderomotive phase (xks1 = the FUNDAMENTAL wavenumber, passed by
     ! the caller so a harmonic field never reconstructs it from its own wavelength's
-    ! rounding), scaled to harm*theta for a harmonic source -- FieldSolver.cpp's
+    ! rounding), scaled to harm*theta for a harmonic source: FieldSolver.cpp's
     ! theta = harm * particle.theta. harm = 1 leaves the phase untouched.
 
     theta = beam%phi0 + xks1 * sl%z(ip) / beta
@@ -2157,7 +2159,7 @@ real(rp), allocatable :: gk(:,:)
 complex(rp) s_scaled
 integer i, j
 
-! Covariance kappa^2 * [[sxx, sxy],[sxy, syy]]; its inverse for the quad form.
+! Covariance kappa^2 * [[sxx, sxy],[sxy, syy]]. Its inverse for the quad form.
 
 if (.not. (present(coh) .and. present(kappa))) return
 s_scaled = scl_w * coh%S
@@ -2201,12 +2203,12 @@ end subroutine fel_field_step
 !
 ! Routine to (re)build the K2 kernel when the grid or the step changes, exactly as
 ! FieldSolverFFT::init builds it: dk = twopi/(ngrid*dgrid), integer offsets from the grid
-! center, fftshift index mapping, K2 = -i*(dx^2+dy^2)*dk^2/(2*ks) -- plus the step
-! propagator exp(K2*dz), K2 being constant and dz constant across each caller's whole
+! center, fftshift index mapping, K2 = -i*(dx^2+dy^2)*dk^2/(2*ks). Also built: the step
+! propagator exp(K2*dz). K2 and dz are constant across each caller's whole
 ! parallel loop, so the ngrid^2 complex exponentials are paid once per (grid, ks, dz)
 ! rather than once per slice per step.
 !
-! MUST be called serially -- fel_track_und_step and fel_track_interlude_genesis call it
+! MUST be called serially: fel_track_und_step and fel_track_interlude_genesis call it
 ! before their parallel slice loops. fel_field_step only reads the kernel and errors on a
 ! mismatch rather than rebuilding, so that nothing writes module state concurrently.
 !
@@ -2233,7 +2235,7 @@ logical err
 
 !
 
-! Warm every thread's FFT plan cache from this serial context, so no FFTW planner ever
+! Warm every thread's FFT plan cache from this serial context. No FFTW planner then
 ! runs concurrently with transform execution in the parallel slice loops that follow
 ! (wavefront_fft2_plan_threads' note). Runs even on a kernel-cache hit: the thread team
 ! may have grown since the plans were made. A planning failure reports there and then
@@ -2293,7 +2295,7 @@ end subroutine fel_field_kernel_init
 !+
 ! Function fel_kernel_index (ngrid, dgrid, ks, dz) result (ik)
 !
-! Look up the cached kernel entry matching all four keys exactly; 0 on a miss.
+! Look up the cached kernel entry matching all four keys exactly. A miss returns 0.
 ! Read-only, so callable from inside the parallel slice loops.
 !
 ! Input:
@@ -2331,10 +2333,10 @@ end function fel_kernel_index
 !
 ! Pure free-space diffraction of field slice ifld over the step dz: FFT, multiply
 ! the cached exp(K2 dz), inverse FFT, normalize. No source, no coupling factor, no
-! undulator knowledge -- this is the field half the unaveraged mode (fel-physics.tex
-! sec:unaveraged) shares with the averaged solver; the caller deposits its own source.
+! undulator knowledge: this is the field half the unaveraged mode (fel-physics.tex
+! sec:unaveraged) shares with the averaged solver. The caller deposits its own source.
 ! The kernel cache must have been initialized serially (fel_field_kernel_init) for
-! this grid, wavelength and step; a mismatch errors, exactly as fel_field_step.
+! this grid, wavelength and step. A mismatch errors, exactly as fel_field_step.
 !
 ! Input:
 !   wf       -- wavefront_struct: The field.
@@ -2435,8 +2437,8 @@ do iy = 1, ngrid
   enddo
 enddo
 
-! With a live second polarization, power and intensity are TOTALS (|Ex|^2 + |Ey|^2);
-! single-polarization lines never take this branch, keeping them bit-identical.
+! With a live second polarization, power and intensity are TOTALS (|Ex|^2 + |Ey|^2).
+! Single-polarization lines never take this branch, keeping them bit-identical.
 
 if (allocated(wf%Ey)) then
   do iy = 1, ngrid
