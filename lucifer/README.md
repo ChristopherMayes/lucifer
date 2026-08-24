@@ -966,6 +966,48 @@ This is Tao's division of labour — `show ele` is for people, `show value` and 
 for precision — and it is why the validation suite reads files rather than scraping the
 screen.
 
+What a run looks like: a framed block naming the configuration, a progress table, and a
+completion block listing what was written.
+
+```
+================================================================================
+ Lucifer -- FEL tracking in Bmad
+--------------------------------------------------------------------------------
+ Lattice     aramis.bmad
+             49 elements, 57.000 m, 12 FEL segments
+ Beam        1 slice x 8192 particles, gamma0 = 11357.82
+ Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid half width 200.000 um
+ Switches    sr wakes F, space charge F, radiation damping F
+ Output      out_root "steady_state", threads 12
+================================================================================
+     %        s       ele       step        power       energy    <|b|>  elapsed  element
+    7.0     3.990      1/49      89/89     4.230 kW     1.411 fJ   0.0006    0:00  UND
+   15.3     8.740      5/49      89/89    34.562 kW    11.529 fJ   0.0017    0:00  UND
+  100.0    57.000     48/49              761.499 MW   254.009 pJ   0.1854    0:06  D2
+--------------------------------------------------------------------------------
+ Done        57.000 m, 48 element ends
+ Exit        power 761.499 MW, pulse energy 254.009 pJ, <|b|> 0.1854
+ Wrote       steady_state-final.par.h5                       401.888 kB
+             steady_state-final.fld.h5                       1.049 MB
+             steady_state.stats.h5                           841.220 kB
+================================================================================
+```
+
+Four choices in that table are deliberate. Values carry an **SI prefix** chosen per
+value, so one column holds both `4.230 kW` at startup and `761.499 MW` at saturation
+without losing the early digits a fixed unit would flatten. The **element name is
+last**, unpadded, so every numeric column is fixed however long a name gets — no
+truncation rule, no name shoving the numbers rightward. The **step column is blank for
+one-step elements**, which is most of a real lattice. And the distance column is **`s`**,
+Bmad's arc length along the reference orbit: through a bending break the arc exceeds the
+chord the light takes, which is exactly what the light-path correction accounts for.
+
+The physics columns are filled whatever the comb setting: with per-record rows they come
+from the current record, and with `comb_ds_save < 0` from the element-end row, which is
+filled just before the row that reads it. Between element ends in that mode the last
+element-end values are carried forward rather than blanked — a mid-element row exists to
+answer "is it alive and roughly where".
+
 There is exactly **one** deliberate exception. A refusal has to be recognizable *by
 name*, so the checks match the ALL-CAPS text of a refusal together with a nonzero exit
 status. Those texts are a supported contract and change only together with their

@@ -73,6 +73,8 @@ real(rp), allocatable :: e_rad_slice(:), rad_kick(:,:)
 real(rp) gamma0_ref, phase_rate, ks, qf, und_slip_step, lat_length, dE_step, dU_step, comb
 integer nslice, n_harm, ie, is, ih, istep
 integer(8) prog_count0, prog_count_last, prog_rate
+real(rp) prog_power, prog_energy, prog_bunch
+logical prog_header_done
 logical write_diag, keep_escaped_field, migrate, migrate_check, any_unavg, two_pol, err
 character(400) out_root
 character(16) interlude_model
@@ -168,6 +170,8 @@ endif
 
 call system_clock (prog_count0, prog_rate)
 prog_count_last = prog_count0
+prog_power = 0;  prog_energy = 0;  prog_bunch = 0
+prog_header_done = .false.
 lat_length = branch%ele(branch%n_ele_track)%s
 
 z_now = branch%ele(run%i_start - 1)%s      ! 0 for a full run; the window's entry face.
@@ -278,11 +282,12 @@ do ie = run%i_start, run%i_end
         if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
         call write_diag_rows()
       endif
-      call progress_line (istep == und%nstep, istep, und%nstep)
+      if (istep /= und%nstep) call progress_line (.false., istep, und%nstep)
     enddo
     if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
-    call end_of_element ()
-    if (err_flag) return
+    call end_of_element ()              ! Fills the element-end row BEFORE this element's
+    if (err_flag) return                !   last progress row reads it.
+    call progress_line (.true., und%nstep, und%nstep)
 
   elseif (interlude_model == 'bmad') then
 
@@ -412,8 +417,9 @@ do ie = run%i_start, run%i_end
       if (err_flag) return
       call write_diag_rows()
     endif
+    call end_of_element ()              ! Fills the element-end row BEFORE the progress
+    if (err_flag) return                !   row that reads it when there are no records.
     call progress_line (.true., 1, 1)
-    call end_of_element ()
     if (err_flag) return
 
   else
@@ -444,8 +450,9 @@ do ie = run%i_start, run%i_end
       if (err_flag) return
       call write_diag_rows()
     endif
+    call end_of_element ()              ! Fills the element-end row BEFORE the progress
+    if (err_flag) return                !   row that reads it when there are no records.
     call progress_line (.true., 1, 1)
-    call end_of_element ()
     if (err_flag) return
   endif
 enddo
@@ -774,11 +781,20 @@ end subroutine apply_radiation
 !+
 ! Subroutine progress_line (at_element_end, i_step, n_step)
 !
-! Routine to print one progress line to stdout: where the walk is and what the light
+! Routine to print one row of the progress table: where the walk is and what the light
 ! and beam are doing, so the slow modes (the unaveraged mode runs ~30x the averaged)
 ! show signs of life. Element boundaries always print; inside elements a wall-clock
-! throttle (2 s) keeps fast runs quiet. All numbers are read from the stats row just
-! taken.
+! throttle (2 s) keeps fast runs quiet.
+!
+! The row is FOR A HUMAN (manual sec:program): SI-prefixed values so a column of them
+! lines up and the startup climb is readable, the element NAME LAST so every numeric
+! column is fixed however long the name is, and no step field for the one-step elements
+! that dominate a real lattice. The files carry full precision; nothing parses this.
+!
+! Where the numbers come from: the stats record just taken, or -- when the comb keeps
+! no records -- the element-end row, which is filled before this is called. Between
+! element ends in that mode the last element-end values are carried forward rather than
+! blanked: the question a mid-element row answers is "is it alive and roughly where".
 !-
 
 subroutine progress_line (at_element_end, i_step, n_step)
@@ -786,29 +802,53 @@ subroutine progress_line (at_element_end, i_step, n_step)
 logical at_element_end
 integer i_step, n_step
 integer(8) now
-real(rp) elapsed
-character(200) line
+real(rp) elapsed, pow, ene, bun
+character(300) line
+character(12) step_str, ela_str
+
+!
 
 call system_clock (now)
 if (.not. at_element_end .and. real(now - prog_count_last, rp) / prog_rate < 2.0_rp) return
 prog_count_last = now
 elapsed = real(now - prog_count0, rp) / prog_rate
 
-! With no stats record to read (comb_ds_save < 0), the walk still shows signs of
-! life: the same line without the physics numbers the records would carry.
-
-if (stats%irec == 0) then
-  write (line, '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, i0, a)') &
-        'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
-        branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
-        '  t = ', nint(elapsed), ' s'
-else
-  write (line, '(a, f5.1, a, f8.3, a, i0, a, i0, 3a, i0, a, i0, a, es9.2, a, es9.2, a, f8.5, a, i0, a)') &
-        'progress: ', 100 * z_now / lat_length, '%  z = ', z_now, ' m  ele ', ie, '/', &
-        branch%n_ele_track, ' ', trim(ele%name), '  step ', i_step, '/', n_step, &
-        '  P = ', sum(stats%f_power(:, stats%irec)), ' W  U = ', sum(stats%f_energy(:, stats%irec)), &
-        ' J  <|b|> = ', sum(stats%bunching(:, stats%irec)) / nslice, '  t = ', nint(elapsed), ' s'
+if (stats%irec > 0) then
+  prog_power = sum(stats%f_power(:, stats%irec))
+  prog_energy = sum(stats%f_energy(:, stats%irec))
+  prog_bunch = sum(stats%bunching(:, stats%irec)) / nslice
+elseif (stats%iend > 0) then
+  prog_power = sum(stats%e_f_power(:, stats%iend))
+  prog_energy = sum(stats%e_f_energy(:, stats%iend))
+  prog_bunch = sum(stats%e_bunching(:, stats%iend)) / nslice
 endif
+pow = prog_power;  ene = prog_energy;  bun = prog_bunch
+
+! One-step elements (every interlude) say nothing with "1/1".
+
+step_str = ''
+if (n_step > 1) write (step_str, '(i4, a, i0)') i_step, '/', n_step
+
+if (elapsed < 3600) then
+  write (ela_str, '(i0, a, i2.2)') int(elapsed) / 60, ':', mod(int(elapsed), 60)
+else
+  write (ela_str, '(i0, a, i2.2, a, i2.2)') int(elapsed) / 3600, ':', &
+        mod(int(elapsed) / 60, 60), ':', mod(int(elapsed), 60)
+endif
+
+! Header once, then the rows. s is the ARC LENGTH along the reference orbit (meters):
+! through a bending break it exceeds the chord the light takes, which is what
+! light_corr accounts for.
+
+if (.not. prog_header_done) then
+  call out_io (s_blank$, r_name, &
+        '     %        s       ele       step          power         energy    <|b|>  elapsed  element')
+  prog_header_done = .true.
+endif
+
+write (line, '(f7.1, f10.3, i7, a, i0, 2x, a9, 1x, a14, 1x, a14, f9.4, a8, 2x, a)') &
+      100 * z_now / lat_length, z_now, ie, '/', branch%n_ele_track, adjustr(step_str(1:9)), &
+      fel_si_str(pow, 'W'), fel_si_str(ene, 'J'), bun, trim(ela_str), trim(ele%name)
 call out_io (s_blank$, r_name, trim(line))
 
 end subroutine progress_line

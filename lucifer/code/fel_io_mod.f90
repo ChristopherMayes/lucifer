@@ -17,6 +17,7 @@ use fel_struct
 use fel_input_mod
 use wavefront_hdf5_mod
 use wavefront_openpmd_mod
+!$ use omp_lib
 
 implicit none
 
@@ -83,24 +84,193 @@ do ihh = 1, n_harm
       if (eerr) return
       call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-y.fld.h5', eerr, 'y')
       if (eerr) return
-      call out_io (s_blank$, r_name, '  ' // prefix // trim(hsuf) // '-{x,y}.fld.h5')
     else
       call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '.fld.h5', eerr, 'x')
       if (eerr) return
-      call out_io (s_blank$, r_name, '  ' // prefix // trim(hsuf) // '.fld.h5')
     endif
   endif
 
   if (wavefront_format /= 'genesis') then         ! openpmd or both
     call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
     if (eerr) return
-    call out_io (s_blank$, r_name, '  ' // prefix // trim(hsuf) // '.wf.h5')
   endif
 enddo
 
 err_flag = .false.
 
 end subroutine fel_dump_field_set
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_header (run)
+!
+! Routine to print the run's configuration as one framed block for a human to read:
+! what lattice, what beam, what radiation, what is switched on, where the output goes.
+! This replaces a scatter of loose informational messages. Display only -- the same
+! values, resolved, are echoed machine-readably into the stats file's Meta group.
+!
+! Input:
+!   run -- fel_run_struct: The fully set-up run state.
+!-
+
+subroutine fel_write_header (run)
+
+type (fel_run_struct), target :: run
+type (branch_struct), pointer :: branch
+character(200) line
+character(*), parameter :: r_name = 'lucifer'
+character(*), parameter :: rule = &
+      '================================================================================'
+integer nfel, n_omp
+
+!
+
+branch => run%lat%branch(0)
+nfel = count(run%is_fel)
+n_omp = 1
+!$ n_omp = omp_get_max_threads()
+
+call out_io (s_blank$, r_name, rule)
+call out_io (s_blank$, r_name, ' Lucifer -- FEL tracking in Bmad')
+call out_io (s_blank$, r_name, &
+      '--------------------------------------------------------------------------------')
+
+write (line, '(a, a)') ' Lattice     ', trim(run%lat_file)
+call out_io (s_blank$, r_name, trim(line))
+write (line, '(a, i0, a, f0.3, a, i0, a)') '             ', branch%n_ele_track, ' elements, ', &
+      branch%ele(branch%n_ele_track)%s, ' m, ', nfel, ' FEL segments'
+call out_io (s_blank$, r_name, trim(line))
+
+if (run%nslice == 1) then
+  write (line, '(a, i0, a, f0.2)') ' Beam        1 slice x ', run%fbeam%slice(1)%n, &
+        ' particles, gamma0 = ', run%gamma0
+else
+  write (line, '(a, i0, a, i0, a, f0.2)') ' Beam        ', run%nslice, ' slices x ', &
+        run%fbeam%slice(1)%n, ' particles per slice, gamma0 = ', run%gamma0
+endif
+call out_io (s_blank$, r_name, trim(line))
+
+write (line, '(5a, i0, 2a)') ' Radiation   lambda0 = ', trim(adjustl(fel_si_str(run%winit%lambda0, 'm'))), &
+      ', slice spacing ', trim(adjustl(fel_si_str(run%fbeam%slice_spacing, 'm'))), ', ', &
+      run%n_harm, ' field(s), grid half width ', trim(adjustl(fel_si_str(run%winit%grid_half_width, 'm')))
+call out_io (s_blank$, r_name, trim(line))
+
+write (line, '(a, l1, a, l1, a, l1)') ' Switches    sr wakes ', run%coll%wake%on, &
+      ', space charge ', run%coll%efield%on, ', radiation damping ', bmad_com%radiation_damping_on
+call out_io (s_blank$, r_name, trim(line))
+
+write (line, '(3a, i0)') ' Output      out_root "', trim(run%global%out_root), '", threads ', n_omp
+call out_io (s_blank$, r_name, trim(line))
+call out_io (s_blank$, r_name, rule)
+
+end subroutine fel_write_header
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_footer (run)
+!
+! Routine to close a run for a human: how far it went and how long it took, what the
+! light ended up as, and which files were written. The file names were formerly printed
+! as the writers went; collecting them here means the last thing on screen is the list
+! of what to open.
+!
+! Input:
+!   run -- fel_run_struct: The finished run state.
+!-
+
+subroutine fel_write_footer (run)
+
+type (fel_run_struct), target :: run
+type (fel_stats_struct), pointer :: stats
+character(300) line
+character(*), parameter :: r_name = 'lucifer'
+integer ir, ih, n_listed
+real(rp) pow, ene, bun
+character(8) hsuf
+
+!
+
+stats => run%stats
+call out_io (s_blank$, r_name, &
+      '--------------------------------------------------------------------------------')
+
+write (line, '(a, f0.3, a, i0, a)') ' Done        ', run%z_now, ' m, ', run%stats%iend, ' element ends'
+call out_io (s_blank$, r_name, trim(line))
+
+! The exit light, from whichever row holds the run's last state.
+
+pow = 0;  ene = 0;  bun = 0
+if (stats%irec > 0) then
+  pow = sum(stats%f_power(:, stats%irec));  ene = sum(stats%f_energy(:, stats%irec))
+  bun = sum(stats%bunching(:, stats%irec)) / run%nslice
+elseif (stats%iend > 0) then
+  pow = sum(stats%e_f_power(:, stats%iend));  ene = sum(stats%e_f_energy(:, stats%iend))
+  bun = sum(stats%e_bunching(:, stats%iend)) / run%nslice
+endif
+write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
+      ', pulse energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', <|b|> ', bun
+call out_io (s_blank$, r_name, trim(line))
+
+! The file list is by EXISTENCE, not by replaying which switches were on: a candidate
+! name that is there gets listed with its size, and the naming rules stay in the one
+! place that owns them (the writers).
+
+n_listed = 0
+call note_file (trim(run%global%out_root) // '-final.par.h5')
+do ih = 1, run%n_harm
+  hsuf = ''
+  if (run%ffield(ih)%harm /= 1) write (hsuf, '(a, i0)') '-h', run%ffield(ih)%harm
+  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '.fld.h5')
+  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '-x.fld.h5')
+  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '-y.fld.h5')
+  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '.wf.h5')
+  call note_file (trim(run%global%out_root) // '-pulse' // trim(hsuf) // '.fld.h5')
+enddo
+call note_file (trim(run%global%out_root) // '.stats.h5')
+call note_file (trim(run%global%out_root) // '.diag.txt')
+call note_file (trim(run%global%out_root) // '.ledger.txt')
+call note_file (trim(run%global%out_root) // '.import.txt')
+call note_file (trim(run%global%out_root) // '.migration.txt')
+
+call out_io (s_blank$, r_name, &
+      '================================================================================')
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine note_file (name)
+!
+! Routine to list one output file with its size, if it is there. Existence is the test,
+! so the footer never claims a file the run did not write.
+!-
+
+subroutine note_file (name)
+
+character(*) name
+character(300) row
+integer(8) fsize
+logical there
+
+!
+
+inquire (file = name, exist = there, size = fsize)
+if (.not. there) return
+n_listed = n_listed + 1
+if (n_listed == 1) then
+  write (row, '(2a, t62, a)') ' Wrote       ', trim(name), trim(adjustl(fel_si_str(real(fsize, rp), 'B')))
+else
+  write (row, '(2a, t62, a)') '             ', trim(name), trim(adjustl(fel_si_str(real(fsize, rp), 'B')))
+endif
+call out_io (s_blank$, r_name, trim(row))
+
+end subroutine note_file
+
+end subroutine fel_write_footer
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -425,7 +595,6 @@ out_root = run%global%out_root
 call fel_stats_write (run%stats, trim(out_root) // '.stats.h5', ferr)
 if (ferr) return
 call fel_write_meta (run, trim(out_root) // '.stats.h5')
-call out_io (s_blank$, r_name, '  ' // trim(out_root) // '.stats.h5')
 
 if (.not. keep_escaped_field) then
   err_flag = .false.

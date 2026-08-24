@@ -265,6 +265,8 @@ if (err) stop 1
 call fel_setup_schedule (run, err)
 if (err) stop 1
 
+call fel_write_header (run)
+
 ! Check instrument: export the transcribed single-particle wake kernels for
 ! cross-validation against Genesis (manual sec:wakes; the kernels are built by
 ! fel_setup_schedule's fel_wake_init). NOTE the s = 0 entries carry the Bane
@@ -303,14 +305,13 @@ if (err) stop 1
 call fel_write_genesis4_beam (run%fbeam, trim(run%global%out_root) // '-final.par.h5', err)
 if (err) stop 1
 
-call out_io (s_blank$, r_name, 'lucifer done.')
-if (run%global%write_diag) call out_io (s_blank$, r_name, '  ' // trim(run%global%out_root) // '.diag.txt')
 call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err)
 if (err) stop 1
-call out_io (s_blank$, r_name, '  ' // trim(run%global%out_root) // '-final.par.h5')
 
 call fel_finalize_diagnostics (run, err)
 if (err) stop 1
+
+call fel_write_footer (run)
 
 call wavefront_fft_free()
 

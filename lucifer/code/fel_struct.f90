@@ -232,6 +232,64 @@ contains
 
 !------------------------------------------------------------------------------
 !+
+! Function fel_si_str (value, unit) result (str)
+!
+! Routine to format a value for a human: an SI prefix chosen so the mantissa lands in
+! [1, 1000), three decimals, and the whole thing right-justified to a fixed width so a
+! column of them lines up (4.230 kW and 105.000 GW under each other). This is display
+! only -- stdout is for humans and the files carry full precision (manual sec:program).
+!
+! Values outside the prefix range, and exact zero, fall back to es10.3 with the bare
+! unit rather than inventing a prefix.
+!
+! Input:
+!   value -- real(rp): The value, in the unit's own base (W, J, m, ...).
+!   unit  -- character(*): The unit symbol, appended after the prefix.
+!
+! Output:
+!   str   -- character(14): The formatted value, right-justified so a column of them
+!              lines up. Callers wanting it inline use trim(adjustl(...)).
+!-
+
+function fel_si_str (value, unit) result (str)
+
+real(rp) value, av, mant
+character(*) unit
+character(14) str
+character(14) num
+integer ip
+
+! The table spans yocto to peta, which covers everything this program reports: a wake
+! run's pulse energy is attojoules and a saturated pulse is millijoules. Index 9 is the
+! bare unit. Outside the table, and for exact zero, no prefix is invented.
+
+character(1), parameter :: pfx(14) = &
+      ['y', 'z', 'a', 'f', 'p', 'n', 'u', 'm', ' ', 'k', 'M', 'G', 'T', 'P']
+
+!
+
+av = abs(value)
+if (av == 0) then
+  write (num, '(f8.3, 1x, a)') 0.0_rp, trim(unit)
+  str = adjustr(num)
+  return
+endif
+
+ip = 9 + floor(log10(av) / 3.0_rp)
+if (ip < 1 .or. ip > 14) then
+  write (num, '(es11.3, 1x, a)') value, trim(unit)
+else
+  mant = value / 10.0_rp**(3 * (ip - 9))
+  write (num, '(f8.3, 1x, 2a)') mant, pfx(ip), trim(unit)
+endif
+str = adjustr(num)
+
+end function fel_si_str
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
 !
 ! THE COMB RULE, in one place: Bmad's bunch_track_struct%ds_save semantics verbatim
