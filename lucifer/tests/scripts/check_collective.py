@@ -62,7 +62,6 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
   wake_hrough = 100e-9
   wake_lrough = 100e-6
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 

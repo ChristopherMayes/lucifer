@@ -5,31 +5,31 @@
 !
 !   wavefront_drift_test <input_file> <output_file> <z_drift>
 !
-! Reads a Genesis 1.3 Version 4 field file into a wavefront_struct, drifts it, and writes
+! Reads an openPMD EXT_Wavefront field file into a wavefront_struct, drifts it, and writes
 ! the result back out in the same format. This is the Fortran half of the Fortran against
 ! Python comparison. tests/run_validation.sh drives both halves and reports the largest
 ! relative difference.
 !
-! The input carries a single polarisation component, which the reader puts in Ex. This mode
-! copies it to Ey as well, so that both components are propagated, and then checks that they
-! came out identical. That is a cheap test of the claim that free-space propagation does not
-! couple the two: the components go through separate arrays and separate transforms, so a
-! mistake that mixed them up, or treated one differently, would show. Only Ex is written to
-! the output file, since the Genesis4 format holds one component.
+! The input carries both transverse polarisations, with a different field in each, and both
+! are propagated and written back. On top of that this mode makes a second copy whose Ey is
+! a duplicate of its Ex, and checks that the two come out identical. That is a cheap test of
+! the claim that free-space propagation does not couple the two: the components go through
+! separate arrays and separate transforms, so a mistake that mixed them up, or treated one
+! differently, would show. The copy also says that Ex is unmoved by what Ey holds.
 !
 !   wavefront_drift_test -self_check [tolerance]
 !
 ! Compares wavefront_drift against wavefront_drift_reference, the longhand DFT
 ! implementation, on rectangular grids with unequal transverse spacings.
 !
-! This mode exists because the comparison against openPMD-beamphysics has a blind spot it
-! cannot close. That comparison passes through the Genesis4 file format, which requires
-! nx = ny and dx = dy, and on a square grid with equal spacings the propagation kernel is
-! symmetric under interchanging the two transverse axes. A transposed transform is therefore
-! invisible to it however asymmetric the test field is. Confirmed by mutation: swapping
-! the two arguments of fftw_plan_dft_2d passes the Python comparison at 6e-16. Only a
-! rectangular grid can see it, and the reference propagator is what supplies a trustworthy
-! answer on one.
+! This mode dates from the Genesis4 file format, which required nx = ny and dx = dy. On a
+! square grid with equal spacings the propagation kernel is symmetric under interchanging
+! the two transverse axes, so a transposed transform was invisible to the Python comparison
+! however asymmetric the test field was. Confirmed by mutation: swapping the two arguments
+! of fftw_plan_dft_2d passed that comparison at 6e-16. openPMD puts no such constraint on
+! the grid and the Python comparison now runs a rectangular case of its own, so the blind
+! spot is covered twice. Two independent references on rectangular grids is worth keeping:
+! this one shares no line of code with FFTW.
 !
 ! Invariants printed in both modes: the total field energy, which the propagator conserves
 ! exactly because its kernel has unit modulus, and the intensity weighted transverse rms
@@ -38,7 +38,7 @@
 
 program wavefront_drift_test
 
-use wavefront_hdf5_mod
+use wavefront_openpmd_mod
 
 implicit none
 
@@ -74,7 +74,7 @@ subroutine file_drift_mode ()
 type (wavefront_struct) wf, wf_pol
 integer n_grid(3)
 real(rp) z_drift, energy0, energy1, sigma_x0, sigma_y0, sigma_x1, sigma_y1
-real(rp) mean_x0, mean_y0, mean_x1, mean_y1, d_pol, d_ex
+real(rp) mean_x0, mean_y0, mean_x1, mean_y1, d_pol, d_ex, e_photon
 logical err
 character(200) in_file, out_file
 character(40) z_str
@@ -86,7 +86,7 @@ call get_command_argument (2, out_file)
 call get_command_argument (3, z_str)
 read (z_str, *) z_drift
 
-call wavefront_read_genesis4 (wf, in_file, err)
+call wavefront_read_openpmd (wf, in_file, err, e_photon)
 if (err) stop 1
 
 n_grid = wavefront_shape(wf)
@@ -139,10 +139,11 @@ if (d_ex /= 0) then
   stop 1
 endif
 
-call wavefront_write_genesis4 (wf, out_file, err, 'x')
+call wavefront_write_openpmd (wf, out_file, wf%ref_position, err)
 if (err) stop 1
 
 print '(a, a)',         '  Output file:           ', trim(out_file)
+print '(a, es16.8)',    '  Ref position out [m]:  ', wf%ref_position
 
 ! Machine readable lines for validate_drift.py, which recomputes each of these from the
 ! output file and checks it. Without this the Fortran side of the mirrored quantities

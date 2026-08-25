@@ -9,7 +9,7 @@ electron count (charge/e) -- for uniform AND nonuniform per-particle weights.
 
 Method: run lucifer with load_only = T over many seeds, in both weight modes
 (uniform, and gen_test_weights = T which alternates beamlet weights 0.25x/1.75x at
-constant charge). Read each .par.h5, compute the charge-weighted |b(h)|^2 per slice for
+constant charge). Read each .beam.h5, compute the charge-weighted |b(h)|^2 per slice for
 the imposed harmonics, and test the scaled mean m = <|b(h)|^2 * N_lambda> against 1.
 b is a sum of many independent beamlet contributions, so |b|^2*N_lambda is Exp(1) to
 excellent approximation and the mean over n samples has sigma = 1/sqrt(n); the check is
@@ -34,10 +34,14 @@ from nml import to_groups
 
 E_CHARGE = 1.602176634e-19
 
+# The window the deck below states. A dump carries the slice partition and not the
+# radiation it was sliced on, so the reader is told.
+LAMBDA0 = 1e-10
+SPACING = 3 * LAMBDA0
+
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
-  beam_formats = 'openpmd'
   lambda0 = 1e-10
   beam_init%n_particle = 1024
   beam_init%bunch_charge = 4.803322970853e-14
@@ -67,9 +71,12 @@ def b2_samples(dump_file, harmonics):
     The dump is openPMD, so the weights are the ones the loader wrote. An earlier
     version read Genesis format, which carries one current per slice, and had to
     RECONSTRUCT the alternating test pattern to weight the sum. Reading the weights
-    tests the loader instead of assuming it."""
+    tests the loader instead of assuming it.
+
+    |b(h)| is invariant under a constant shift of theta, which is what a dump's missing
+    reference phase amounts to, so this measurement is unaffected by it."""
     out = []
-    for sl in beamio.read_slices(dump_file):
+    for sl in beamio.read_slices(dump_file, LAMBDA0, SPACING):
         if sl["n"] == 0:
             continue
         n_lambda = sl["weight"].sum() / E_CHARGE

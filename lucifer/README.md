@@ -33,7 +33,7 @@ shot-noise section.
 | Path | Contents |
 |---|---|
 | `lucifer/doc/fel-physics.tex` | **The physics manual**: equations, conventions, Genesis provenance and validation pointers, one section per subsystem |
-| `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, Genesis `.par.h5` dump read/write (converting), copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
+| `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
 | `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
 | `lucifer/examples/` | Self-contained single-command examples (no Genesis, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
@@ -69,9 +69,12 @@ BUILD_PRODUCTION=N ./util/conda_compile                      # builds lucifer
 ```
 
 The harness runs Genesis six times (full line and single segment, steady state and time
-dependent, plus the collective tiers), the Bmad tracker for every tier and check, and
-prints the largest relative difference of each check. It fails loudly if the genesis4 binary is missing. There is no comparison
-without it, so there is nothing to skip to. Genesis must be built with FFTW, since the
+dependent, plus the collective tiers), converts each chain's initial dumps to openPMD,
+which is the only format the tracker reads, runs the Bmad tracker for every tier and
+check, and prints the largest relative difference of each check. It fails loudly if the
+genesis4 binary is missing, and likewise without an openPMD-beamphysics checkout
+(`--beamphysics <path>`, a sibling of bmad-ecosystem by default), which is what performs
+the conversion. There is no comparison without either, so there is nothing to skip to. Genesis must be built with FFTW, since the
 benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver,
 and Genesis's default ADI solver is out of scope).
 
@@ -252,7 +255,7 @@ tier rather than check it, run from a kept work directory:
 `scripts/plot_fel_compare.py <tier>.diag.txt <GenesisRoot>.out.h5` overlays the two codes' power
 and bunching curves, plots the checked elementwise relative power difference along the
 line, and the per-slice exit power, e.g. `plot_fel_compare.py tdsase.diag.txt
-AramisTDSASE.out.h5`. Add `--fld <tier>-final.fld.h5 <GenesisRoot>-final.fld.h5` for a
+AramisTDSASE.out.h5`. Add `--fld <tier>-final.wf.h5 <GenesisRoot>-final.fld.h5` for a
 second figure overlaying the FINAL FIELD (on-axis amplitude and unwrapped-phase
 lineouts, plus the transverse map of the complex difference). That panel shows
 what a phase-dominated tier number is made of: for `tier1_unavg`, an amplitude overlay
@@ -866,10 +869,11 @@ harness holds the reconstruction against the stored values. The field side store
 (= M^2 lambda/4pi), with `angle_moments_valid` marking where the FFT-costed theta
 rows were filled (element ends and bank time -- the `twiss_valid` pattern). Pulse
 values are pooled downstream. The file stays raw. `dump_beam_at` / `dump_field_at`
-dump Genesis-format files at named elements (Bmad locator syntax, unknown names
+dump openPMD files at named elements (Bmad locator syntax, unknown names
 refused). `keep_escaped_field` banks every slice slippage transmits out of the window
-(`-escaped.fld.h5`, with per-slice wavefront_params and z_transmit) and reconstructs
-the FULL PULSE at the exit plane (`-pulse.fld.h5`) by free-space propagation at
+(`-escaped.fld.h5`, with per-slice wavefront_params and z_transmit, the one place that
+keeps Genesis field conventions since those two records have no home in the wavefront
+extension) and reconstructs the FULL PULSE at the exit plane (`-pulse.fld.h5`) by free-space propagation at
 finalize, because transmitted light is fixed information and never re-interacts, so
 whole-pulse statistics use the ABCD map on the banked moment matrices and never
 propagate numerically.
@@ -958,8 +962,7 @@ precision:
 | File | What |
 |---|---|
 | `<out_root>.stats.h5` | The run: per-record and element-end beam, field and Twiss data (see the diagnostics section) |
-| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD. The beam file carries the per-particle weight, which no Genesis dump can |
-| `<out_root>-final.par.h5`, `-final.fld.h5` | The same state in Genesis conventions, for feeding Genesis or comparing against it |
+| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis dump can. `lucifer/tests/scripts/convert_genesis.py` converts either kind to Genesis conventions, for feeding Genesis |
 | `<out_root>.diag.txt` | The per-record Genesis-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
 | `<out_root>.import.txt` | The distribution import's analysis moments and per-slice current profile. Written at import time, so it exists under `load_only = T` |
@@ -990,8 +993,8 @@ completion block listing what was written.
 --------------------------------------------------------------------------------
  Done        57.000 m, 48 element ends
  Exit        power 761.499 MW, pulse energy 254.009 pJ, <|b|> 0.1854
- Wrote       steady_state-final.par.h5                       401.888 kB
-             steady_state-final.fld.h5                       1.049 MB
+ Wrote       steady_state-final.beam.h5                      710.760 kB
+             steady_state-final.wf.h5                        1.048 MB
              steady_state.stats.h5                           841.220 kB
 ================================================================================
 ```
@@ -1025,8 +1028,9 @@ single-component path runs untouched (every tier bit-for-bit, the compatibility
 keystone). Kick and deposit act through each element's polarization 2-vector (planar:
 (cos t, sin t), helical (1,-i)/sqrt2). The unaveraged mode needs no polarization
 code at all, since its real per-particle currents work against and deposit into their own
-components. Dumps hold one polarization per Genesis-format file (-final-{x,y}),
-stats.h5's field group carries totals plus the x component, with a field/y/ group.
+components. One openPMD dump holds both polarizations as components x and y of its
+mesh record, stats.h5's field group carries totals plus the x component, with a field/y/
+group.
 
 Measured (check_two_polarization.py, in the harness -- symmetries and physics, not
 reference files):
@@ -1065,20 +1069,23 @@ pre-harmonic walk BIT FOR BIT (the two-polarization overlay discipline again).
 Harmonics with two live polarizations, and with an unaveraged element, are refused
 by name, so unvalidated combinations refuse rather than guess.
 
-Dumps speak two formats, and each kind of dump takes a LIST rather than an enum, so
-naming a third code later adds a token instead of another combination:
-`wavefront_formats = 'genesis', 'openpmd'` for the radiation and
-`beam_formats = 'openpmd', 'genesis'` for the particles. Unset means genesis for the
-radiation and openpmd for the particles, an unknown token is refused by name, and the
-suffix always says the format. The radiation choices are the Genesis field dump (the
-tiers' shared-state format, harmonic files carrying `-h<h>`) and openPMD EXT_Wavefront (`.wf.h5`, both
-polarizations as complex components of ONE mesh record (h5py reads them as
-complex128 natively), one file per harmonic, photonEnergy identifying it). The
-STANDARD DOCUMENT is authoritative: the harness verifies every required attribute
-against its text independently of the writer. Import auto-detects the format by
-signature. The Python side of the round trip is openPMD-beamphysics's own
+Dumps speak ONE format, openPMD, in both directions. A field dump is an openPMD
+EXT_Wavefront file (`.wf.h5`), both polarizations as complex components of ONE mesh
+record (h5py reads them as complex128 natively), one file per harmonic with
+photonEnergy identifying it, and a harmonic's file carrying `-h<h>`. The STANDARD
+DOCUMENT is authoritative: the harness verifies every required attribute against its
+text independently of the writer. A file that is not openPMD is refused by name on
+import, with the conversion command in the message, and
+`lucifer/tests/scripts/convert_genesis.py` converts either kind of file in either
+direction. The Python side of the round trip is openPMD-beamphysics's own
 `Wavefront.from_openpmd`/`write_openpmd`, exercised against the Fortran writer and
 reader every harness run.
+
+One format rather than a choice of formats is a decision, and its cost is one
+conversion step in the benchmark: the Genesis reference chains write their own dumps
+and the harness converts them once per chain before the tiers read them. What that
+buys is that no writer in the physics code has to hold a second chart, no deck names a
+format, and every dump carries the per-particle weight.
 
 Measured (check_harmonics.py, the harness's harmonics section):
 
@@ -1087,8 +1094,8 @@ Measured (check_harmonics.py, the harness's harmonics section):
 | planar SS tier vs Genesis4, fundamental power | 5.3e-8 |
 | planar SS tier vs Genesis4, dark harmonic-3 growth | 1.3e-4 |
 | one-step dark deposit P3/P1 vs the exact Bessel sum | 3.3e-16 |
-| Genesis-format vs openPMD dumps, complex values | 1.4e-16 |
-| Fortran openPMD read-back, Genesis re-dump | dataset-identical |
+| the converter's Genesis view of a dump, complex values | 1.5e-16 |
+| Fortran openPMD read-back, re-dump | dataset-identical |
 | Python Wavefront class energy (its Genesis path) | 1.2e-12 |
 | Python openPMD read + round trip | 1.4e-16 / exact |
 | Fortran reads the Python writer's file | dataset-identical |
@@ -1097,46 +1104,53 @@ Measured (check_harmonics.py, the harness's harmonics section):
 
 ## Particle dumps: openPMD carries the weights, Genesis .par cannot
 
-A Genesis `.par.h5` holds one current per slice. The writer sends
+A Genesis `.par.h5` holds one current per slice. A writer sends
 `c*sum(w)/slice_spacing` and a reader divides it back out uniformly, so a beam whose
-particles carry different weights comes back uniform. Since per-particle weights are
-this port's day-one difference from Genesis, writing that beam in Genesis format is
-REFUSED BY NAME, with the weight spread and the total charge in the message. Uniform
-beams still write it, which is what the tiers use.
+particles carry different weights comes back uniform. Per-particle weights are this
+port's day-one difference from Genesis, so that format cannot hold this code's state,
+and the dump is openPMD (`.beam.h5`): Bmad's own `hdf5_write_beam`, where openPMD's
+macro-charge IS the per-particle weight. Converting such a beam to a Genesis `.par.h5`
+is REFUSED BY NAME by the converter, with the slice, the weight spread and the total
+charge in the message.
 
-The openPMD dump (`.beam.h5`) is Bmad's own `hdf5_write_beam`, one bunch per slice, and
-openPMD's macro-charge IS the per-particle weight. Two consequences worth knowing:
+THE SLICE PARTITION IS `particlePatches`, the standard's own partition of a species
+record: one patch per slice, in window order, and an empty slice is a patch of no
+particles. So the patch count IS the window, and the file needs no attributes of this
+code's invention to describe it. What openPMD has no place for comes from the deck
+instead: the wavelength, the slice spacing (`lambda0` and `window_sample`) and the
+beamlet size (`nbins`). Reading a dump without `lambda0` is refused by name rather than
+defaulted, since a wrong wavelength rescales every phase in the run. `one4one` needs no
+storage at all: the flag asserts that every macroparticle carries one electron, which is
+what the weights say.
 
-- An EMPTY SLICE is skipped rather than written, because `hdf5_write_beam` takes the
-  species from `p(1)` and a zero-particle bunch has no `p(1)`. The window therefore
-  rides in root attributes (`felNumSlice`, `felSliceIndex`, `felSliceSpacing`,
-  `felWavelength`, `felWindowStart`, `felNbins`, `felOne4one`) instead of being implied
-  by the bunch count, and a read restores the empty slices exactly.
-- A file WITHOUT those attributes is refused, with `dist_file` named. Such a file
-  describes a bunch, not a sliced time window, so its slicing is unknown and resampling
-  is the honest path.
-
-`beam_file` takes either format: the file's own openPMD signature picks the reader.
+THE REFERENCE PHASE is folded into the file's time coordinate. The chart splits a
+particle's ponderomotive phase into a per-beam reference and a per-particle lag,
+`theta_j = phi0 + ks z_j / beta_j`, and no dump format has anywhere to put `phi0`, so
+every reader restarts it at zero. A dump therefore writes the lag the whole phase
+implies, which makes the file's time `-theta_j/(ks c)` and a restart exact. This is not
+bookkeeping: the beam's phase against the field's phase is what the next segment's gain
+is made of, and without the fold a mid-line restart lands 2.1e-2 away on the
+windowed-composition check. Genesis stores `theta` itself and its reader does the same
+fold, and the converter maps a Genesis `theta` to the same time, so the two formats mean
+the same thing.
 
 Measured (check_beam_format.py, the harness's beam-format section):
 
 | check | level |
 |---|---|
 | openPMD file write, read, write | dataset-identical |
-| packed x, y, gamma through openPMD | exact |
-| packed px, py through openPMD | 1.1e-16 |
-| packed x, y, px, py through Genesis format | exact |
-| theta offset after an openPMD restart, spread about the constant | 3.6e-12 rad |
+| x, y, px, py, gamma, current through a restart, in Genesis's chart | exact |
+| theta through a restart, absolute | exact |
 | split weights stored per particle, and bit-identical on read | exact |
 | per-slice counts restored with an empty slice in the window | identical |
-| three refusals (nonuniform weights, unknown token, no window attributes) | by name |
+| one patch per slice, empty ones included | identical |
+| four refusals (nonuniform weights to Genesis, not openPMD, patch count, no charge) | by name |
 
-Neither format is the identity on the packed arrays, and the reason is the chart, not
-the file: openPMD stores absolute momenta and a time, so `px`, `py` and `z` make a
-round trip through `P/p0` and `-beta*c*dt`, while Genesis stores `(theta, gamma)` and
-loses its ulp there instead. `theta` additionally shifts by a CONSTANT on any restart,
-because a reader sets `phi0 = 0` and the particle lag lives in `z`. That the offset is
-constant to rounding is the check that `z` survived.
+The chart, not the file, is what could cost a digit here: openPMD stores absolute
+momenta and a time where this code keeps `px`, `py` and a lag, so those pass through
+`P/p0` and `-beta*c*dt` on the way out and back. On this configuration every column
+comes back exact, so the levels above are bounds on what the chart could cost rather
+than expected values.
 
 ## Phasing between segments (brief proposal 2026-08-20): measured, then built
 

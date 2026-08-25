@@ -13,8 +13,8 @@
 ! by field. See lucifer/wavefront/tests/run_validation.sh, which drifts the same input
 ! through both and reports the largest relative difference.
 !
-! Genesis 1.3 Version 4 HDF5 input and output for this structure is in
-! wavefront_hdf5_mod.
+! openPMD EXT_Wavefront input and output for this structure is in
+! wavefront_openpmd_mod.
 !
 ! Index order. Fortran is column major, so Ex(:,:,iz) (one longitudinal slice) is
 ! contiguous. That is simultaneously what a per-slice 2D FFTW plan wants and what

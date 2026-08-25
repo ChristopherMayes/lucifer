@@ -214,10 +214,13 @@ cat > perf.nml <<NML
   global%write_diag = T
 /
 &fel_beam_init
-  beam_file = "AramisPerf-initial.par.h5"
+  beam_file = "AramisPerf-initial.beam.h5"
+  nbins = 8
 /
 &fel_wavefront_init
-  field_file = "AramisPerf-initial.fld.h5"
+  field_file = "AramisPerf-initial.wf.h5"
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%window_sample = 3
 /
 NML
 
@@ -243,6 +246,17 @@ timed "Genesis4, serial (1 rank; writes the shared dumps)" genesis-serial.log \
   "$GENESIS" perf-serial.in
 timed "Genesis4, $WORKERS MPI ranks" genesis-parallel.log \
   "$MPIRUN" -np "$WORKERS" "$GENESIS" perf-parallel.in
+
+# The tracker reads openPMD only, so the Genesis dumps convert once here. The conversion
+# is outside every timed section: it is harness work, not either code's.
+
+for pair in "AramisPerf-initial.par.h5 AramisPerf-initial.beam.h5" \
+            "AramisPerf-initial.fld.h5 AramisPerf-initial.wf.h5"; do
+  if ! "$PYTHON" "$SCRIPT_DIR/scripts/convert_genesis.py" to-openpmd $pair; then
+    echo "FAIL: could not convert $pair" >&2
+    exit 1
+  fi
+done
 timed "lucifer, 1 thread" fel-serial.log \
   env OMP_NUM_THREADS=1 "$EXE" perf.nml
 mv perf.diag.txt perf-serial.diag.txt

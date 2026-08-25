@@ -96,7 +96,6 @@ NML_GEN = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   window_length = {slen}
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -132,7 +131,6 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   imp%nslice = 12
   imp%slicewidth = 0.01
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -148,14 +146,12 @@ def run(exe, nml, log, w, threads="1"):
 
 
 def load_par(w, root):
-    """Per-slice per-particle gamma and slice charge from a final dump, either format.
-    The split-weight runs must write openPMD, since Genesis format refuses a weighted
-    beam, so the file name follows the format rather than the other way round."""
-    pmd = w / f"{root}-final.beam.h5"
-    src = pmd if pmd.exists() else w / f"{root}-final.par.h5"
+    """Per-slice per-particle gamma and slice charge from a final openPMD dump. The
+    wavelength and the spacing are the deck's, since a beam file states the slice
+    partition and not the radiation it was sliced on."""
     out = []
-    for sl in beamio.read_slices(src):
-        out.append(dict(gamma=sl["gamma"], theta=sl["theta"],
+    for sl in beamio.read_slices(w / f"{root}-final.beam.h5", LAMBDA0, SPACING):
+        out.append(dict(gamma=sl["gamma"], pz=sl["pz"], theta=sl["theta"],
                         q=sl["current"] * SPACING / 2.99792458e8, npart=sl["n"]))
     return out
 
@@ -191,12 +187,10 @@ def main():
     f = L_ELE * AMP / P0C
     worst = 0.0
     for i in range(nsl):
-        dg = A[i]["gamma"] - B[i]["gamma"]
-        # gamma kick = p0_mc * dpz * dgamma/dp ~ exact: gamma = sqrt(1+(p0(1+pz))^2)
-        # Compare in pz: pz = (sqrt(g^2-1) - p0)/p0
-        pz_a = (np.sqrt(A[i]["gamma"]**2 - 1) - P0_MC) / P0_MC
-        pz_b = (np.sqrt(B[i]["gamma"]**2 - 1) - P0_MC) / P0_MC
-        dpz = pz_a - pz_b
+        # In pz, which the dump states directly. Recovering it from gamma instead would
+        # subtract two numbers near 11358 to get a kick of 3e-8, which costs eight digits
+        # of the very quantity under test: measured 1.2e-8 that way against rounding here.
+        dpz = A[i]["pz"] - B[i]["pz"]
         q_ahead = q[i+1:].sum()
         w_part = q[i] / B[i]["npart"]
         # Within the slice every particle has a distinct z (quiet-start phases). For a
@@ -234,10 +228,8 @@ def main():
     f = L_PIPE * AMP / P0C
     worst_l = 0.0
     for i in range(len(A)):
-        pz_a = (np.sqrt(A[i]["gamma"]**2 - 1) - P0_MC) / P0_MC
-        pz_b = (np.sqrt(B[i]["gamma"]**2 - 1) - P0_MC) / P0_MC
         expect = -f * (q[i+1:].sum() + q[i]/2)
-        got = (pz_a - pz_b).mean()
+        got = (A[i]["pz"] - B[i]["pz"]).mean()
         worst_l = max(worst_l, abs(got - expect) / abs(expect))
     print(f"lord resolution (wake on a superimposition-split pipe): worst rel err = {worst_l:.3e}")
     if worst_l > 1e-9:
@@ -246,9 +238,9 @@ def main():
 
     # ---------------- causality: spike at the tail, probes ahead get EXACTLY zero
     (w/"wc_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE,
-                                      extra="  beam_formats = 'openpmd'\n"))
+                                      extra=""))
     (w/"wc_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE,
-                                      extra="  beam_formats = 'openpmd'\n"))
+                                      extra=""))
     run(exe, "wc_a.nml", "wca.log", w)
     run(exe, "wc_b.nml", "wcb.log", w)
     A, B = load_par(w, "wca"), load_par(w, "wcb")
@@ -400,9 +392,9 @@ def main():
 
     # ---------------- split-weight invariance through the wake
     (w/"ws_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
-                                             extra="  imp_split_weights = T\n  beam_formats = 'openpmd'\n"))
+                                             extra="  imp_split_weights = T\n"))
     (w/"ws_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
-                                             extra="  imp_split_weights = T\n  beam_formats = 'openpmd'\n"))
+                                             extra="  imp_split_weights = T\n"))
     run(exe, "ws_a.nml", "wsa.log", w)
     run(exe, "ws_b.nml", "wsb.log", w)
     A2, B2 = load_par(w, "wsa"), load_par(w, "wsb")

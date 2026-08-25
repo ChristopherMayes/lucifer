@@ -12,18 +12,18 @@ time-dependent tiers both work unannounced) and writes a four-panel figure:
      window (or two dots for steady state).
   4. Slice-averaged bunching vs z, both codes overlaid.
 
-With --fld <bmad .fld.h5> <genesis .fld.h5>, a second figure overlays the FINAL FIELD:
+With --fld <bmad .wf.h5> <genesis .fld.h5>, a second figure overlays the FINAL FIELD:
 on-axis lineouts of amplitude and unwrapped phase, plus the transverse profile of the
 complex difference -- the panel that shows what a phase-dominated tier difference
 (tier1_unavg's 6.9e-2) actually looks like.
 
 Usage:
   plot_fel_compare.py <bmad diag.txt> <genesis .out.h5> [-o out.png]
-                      [--fld <bmad fld.h5> <genesis fld.h5>]
+                      [--fld <bmad wf.h5> <genesis fld.h5>]
 
 e.g., from a benchmark work directory:
   plot_fel_compare.py tdsase.diag.txt AramisTDSASE.out.h5
-  plot_fel_compare.py tier1u.diag.txt Aramis1seg.out.h5 --fld tier1u-final.fld.h5 Aramis1seg-final.fld.h5
+  plot_fel_compare.py tier1u.diag.txt Aramis1seg.out.h5 --fld tier1u-final.wf.h5 Aramis1seg-final.fld.h5
 """
 
 from __future__ import annotations

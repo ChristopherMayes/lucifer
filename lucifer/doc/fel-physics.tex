@@ -526,46 +526,57 @@ an equivalent mutant, correctly passed (FINDINGS 7.16).
 
 \subsection{Particle dumps}\label{sec:pardump}
 
-A run writes its beam in the formats \code{beam\_formats} names, a LIST rather than an
-enum so a third code costs a token: \code{openpmd} (unset takes this alone) writes
-\code{.beam.h5} through Bmad's \code{hdf5\_write\_beam}, one bunch per slice, and
-\code{genesis} writes the \code{.par.h5} of \S\ref{sec:units}'s conventions. An
-unknown token is refused by name. \code{beam\_file} reads either: the openPMD root
-attribute is the signature.
+A run writes its beam as openPMD (\code{.beam.h5}) through Bmad's own
+\code{hdf5\_write\_beam}, and reads the same. There is no second format and no knob to
+select one: a \code{beam\_file} that is not openPMD is refused by name, with the
+conversion command in the message, and
+\code{lucifer/tests/scripts/convert\_genesis.py} converts a Genesis \code{.par.h5} of
+\S\ref{sec:units}'s conventions either way.
 
-The formats are not equivalent, and the difference is charge. openPMD's macro-charge IS
-the per-particle weight $w_j$, so a weighted beam survives. Genesis \code{.par.h5}
-carries one current per slice, Eq.~\ref{eq:importcurrent} read backwards, so a reader
-must divide it out uniformly. Writing a nonuniform-weight beam in that format is
-therefore refused by name rather than written and silently read back uniform.
+The reason is charge. openPMD's macro-charge IS the per-particle weight $w_j$, so a
+weighted beam survives. Genesis \code{.par.h5} carries one current per slice,
+Eq.~\ref{eq:importcurrent} read backwards, so a reader must divide it out uniformly, and
+per-particle weights are this port's day-one difference from Genesis. The converter
+refuses to write a nonuniform-weight beam in that format rather than writing one that
+would silently read back uniform.
 
-Two consequences of using Bmad's writer. An EMPTY SLICE is skipped, because that
-routine takes the species from its first particle and a zero-particle bunch has none.
-The window therefore rides in root attributes (\code{felNumSlice},
-\code{felSliceIndex}, \code{felSliceSpacing}, \code{felWavelength},
-\code{felWindowStart}, \code{felNbins}, \code{felOne4one}), which restores the empty
-slices on read. And a file without those attributes is refused with \code{dist\_file}
-named: it describes a bunch, not a sliced window.
+THE SLICE PARTITION IS \code{particlePatches}, the standard's own partition of a species
+record: one patch per slice, in window order, an empty slice as a patch of no particles.
+The patch count is therefore the window, and the file states nothing else about it. What
+openPMD has no place for comes from the deck: \code{lambda0}, \code{window\_sample} and
+\code{nbins}. Reading a dump with no \code{lambda0} is refused rather than defaulted,
+since a wrong wavelength rescales every phase in the run. \code{one4one} is not stored
+either: the flag asserts that every macroparticle carries one electron, which is what the
+weights say.
 
-Neither format is the identity on the packed arrays, for a reason that is the chart's
-and not the file's. openPMD stores absolute momenta and a time, so $\hat p_x$,
-$\hat p_y$ and $z$ round trip through $P/p_0$ and $-\beta c\,\delta t$. Genesis
-stores $(\theta, \gamma)$ and pays there instead. Either way $\varphi_0$ restarts at
-zero, since the particle lag lives in $z$, so $\theta$ shifts by a constant on any
-restart.
+THE REFERENCE PHASE is folded into the file's time coordinate. Neither format has
+anywhere to put $\varphi_0$, so every reader restarts it at zero, and a dump that wrote
+the lag $z_j$ alone would come back with every $\theta_j$ short by $\varphi_0$: a
+different phase against the same dumped field, which is a change of state and not of
+bookkeeping. So a dump writes $\beta_j \theta_j / k_s$, making the file's time
+$-\theta_j/(k_s c)$ and a $\varphi_0 = 0$ reader exact. Genesis stores $\theta$ itself and
+its reader does the same fold, so the two formats agree on what a dump means.
+
+The chart, not the file, is what could cost a digit: openPMD stores absolute momenta and
+a time, so $\hat p_x$, $\hat p_y$ and $z$ pass through $P/p_0$ and
+$-\beta c\,\delta t$. A check that DIFFERENCES energies between two runs should read
+$\hat p_z$, which the file states, rather than $\gamma$, which costs an ulp of $\gamma$
+against a difference many orders smaller.
 
 \begin{provenance}
-\code{hdf5\_write\_beam} and \code{hdf5\_read\_beam} (Bmad's own openPMD particle
-I/O, macro-charge as \code{weight}); \code{fel\_slice\_to\_bunch} and
-\code{fel\_bunch\_to\_slice} for the chart, the same pair the seam uses every step.
+\code{hdf5\_write\_beam} and \code{hdf5\_read\_beam} (Bmad's own openPMD particle I/O,
+macro-charge as \code{weight}, \code{particlePatches} added for the window);
+\code{fel\_slice\_to\_bunch} and \code{fel\_bunch\_to\_slice} for the chart, the same
+pair the seam uses every step, with \code{fold\_phi0} set for a dump alone.
 \end{provenance}
 \begin{validation}
-openPMD file write/read/write dataset-identical; packed $x$, $y$, $\gamma$ exact and
-$\hat p_x$, $\hat p_y$ at $1.1\times10^{-16}$ through openPMD, the mirror pattern
-through Genesis format; the $\theta$ offset constant to $3.6\times10^{-12}$ rad; split
-weights stored per particle and bit-identical on read; per-slice counts restored with an
-empty slice present; three refusals by name; mutations (weight unwritten, window count
-from the bunch count, bunches placed in file order) each caught by their own check.
+openPMD file write/read/write dataset-identical; every coordinate exact through a
+restart, read out in Genesis's chart through the converter, $\theta$ included and
+absolute; split weights stored per particle and bit-identical on read; per-slice counts
+restored with an empty slice present, one patch per slice; four refusals by name;
+mutations (weight unwritten, the reference phase not folded, bunches placed in file
+order) each caught by their own check, the unfolded phase at $2.1\times10^{-2}$ on the
+windowed-composition check.
 \end{validation}
 
 \section{Slice migration}\label{sec:migration}
@@ -991,14 +1002,14 @@ runnable instance.
 
 \subsection{The openPMD wavefront}\label{sec:openpmd}
 
-Radiation dumps speak two formats, selected by \code{wavefront\_format}: the
-Genesis 1.3 v4 field dump (the default, the validation tiers' shared-state
-format. One polarization per file, harmonic files carrying \code{-h<h>}) and the
-openPMD \code{Wavefront} extension (\code{EXT\_Wavefront.md}, standard branch
-\code{upcoming-2.0.0}). THE STANDARD DOCUMENT IS AUTHORITATIVE: the harness
-verifies the written attributes against its text independently of the writer.
-Import auto-detects the format by the \code{openPMD} root-attribute signature.
-Per-harmonic openPMD imports are matched to the field whose photon energy they
+Radiation dumps speak one format, the openPMD \code{Wavefront} extension
+(\code{EXT\_Wavefront.md}, standard branch \code{upcoming-2.0.0}), written as
+\code{.wf.h5} with a harmonic's file carrying \code{-h<h>}. THE STANDARD DOCUMENT IS
+AUTHORITATIVE: the harness verifies the written attributes against its text
+independently of the writer. A \code{field\_file} that is not openPMD is refused by
+name, with the conversion command in the message, and
+\code{lucifer/tests/scripts/convert\_genesis.py} converts a Genesis 1.3 v4 field dump
+either way. Per-harmonic imports are matched to the field whose photon energy they
 carry, and a file matching none is refused by name.
 
 The mapping, one decision per row where the extension's text under-determines the
@@ -1022,9 +1033,9 @@ harmonics & one file per harmonic (the record name is fixed by the extension) \\
 \end{center}
 
 Validation: every required attribute and \code{unitDimension} checked against the
-spec text in h5py. Genesis-format and openPMD dumps of the same field agree
-complex-value-wise at $1.4\times10^{-16}$. The Fortran reader's re-dump is
-dataset-identical to the original. The openPMD-beamphysics \code{Wavefront} class
+spec text in h5py. The converter's Genesis view of a dump agrees complex-value-wise at
+$1.5\times10^{-16}$. The Fortran reader's re-dump is dataset-identical to the file it
+read. The openPMD-beamphysics \code{Wavefront} class
 agrees on the field energy through its own Genesis path at $1.2\times10^{-12}$.
 Its \code{from\_openpmd} reads the harmonic file to the same complex values,
 \code{write\_openpmd} round-trips exactly, and the Fortran reader takes what that
@@ -1130,15 +1141,17 @@ centroids, in the analysis scripts). The file stays raw.
 
 \emph{Dumps at elements.} \code{dump\_beam\_at} / \code{dump\_field\_at} name
 elements through Bmad's own locator (\code{class::name} syntax for free). An entry
-matching nothing is refused by name. Genesis formats. openPMD wavefront output is the
-named follow-on (deliverable 2).
+matching nothing is refused by name. openPMD, like every other dump.
 
 \emph{The escaped-field bank} (\code{keep\_escaped\_field}). Field that slippage has
 transmitted beyond the window is fixed information: slippage is one-directional, so it
 never re-interacts and evolves by free space alone. Each transmitted slice streams to
 \code{<out\_root>-escaped.fld.h5} at the zero fill (peak memory a handful of grid
 planes. One banked slice per \code{sample}$\cdot\lambda$ of slippage, inheriting the
-window's decimation) with its \code{wavefront\_params} and transmission $z$. At
+window's decimation) with its \code{wavefront\_params} and transmission $z$. These two
+diagnostic files keep Genesis field conventions rather than openPMD, since the
+per-slice \code{wavefront\_params} and transmission $z$ beside each plane have no home
+in the wavefront extension. They are diagnostics: nothing reads them back as state. At
 finalize each is propagated to the exit plane by the \code{exp(K2\,dz)} kernel and the
 FULL PULSE is written (\code{<out\_root>-pulse.fld.h5}, live window + banked, the
 earliest-transmitted light furthest ahead). Whole-pulse statistics never propagate

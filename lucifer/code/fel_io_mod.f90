@@ -15,7 +15,6 @@ module fel_io_mod
 
 use fel_struct
 use fel_input_mod
-use wavefront_hdf5_mod
 use wavefront_openpmd_mod
 !$ use omp_lib
 
@@ -29,13 +28,12 @@ contains
 !+
 ! Subroutine fel_dump_beam (run, ele, prefix, err_flag)
 !
-! Routine to write the beam at the given filename prefix, honoring beam_formats. The
-! suffix says the format: .beam.h5 is openPMD-beamphysics, which carries the
-! per-particle weight, and .par.h5 is a Genesis 1.3 v4 dump, which does not and refuses
-! a weighted beam.
+! Routine to write the beam at the given filename prefix as openPMD (.beam.h5), the
+! only particle format this tracker writes. Genesis .par.h5 conversion lives in
+! lucifer/tests/scripts/convert_genesis.py, outside the physics.
 !
 ! Input:
-!   run       -- fel_run_struct: Run state, for the format flags.
+!   run       -- fel_run_struct: Run state.
 !   ele       -- ele_struct: Element the beam sits at.
 !   prefix    -- character(*): Filename prefix. Format suffixes are appended.
 !
@@ -55,15 +53,8 @@ logical eerr
 
 err_flag = .true.
 
-if (run%fmt_beam%openpmd) then
-  call fel_write_openpmd_beam (run%fbeam, ele, prefix // '.beam.h5', eerr)
-  if (eerr) return
-endif
-
-if (run%fmt_beam%genesis) then
-  call fel_write_genesis4_beam (run%fbeam, prefix // '.par.h5', eerr)
-  if (eerr) return
-endif
+call fel_write_openpmd_beam (run%fbeam, ele, prefix // '.beam.h5', eerr)
+if (eerr) return
 
 err_flag = .false.
 
@@ -75,9 +66,9 @@ end subroutine fel_dump_beam
 !+
 ! Subroutine fel_dump_field_set (run, prefix, err_flag)
 !
-! Routine to write the whole field set at the given filename prefix, honoring
-! wavefront_formats: Genesis dumps (one polarization per file: -x/-y when Ey is live)
-! and/or openPMD EXT_Wavefront (both polarizations as components of ONE mesh record).
+! Routine to write the whole field set at the given filename prefix as openPMD
+! EXT_Wavefront (.wf.h5), both polarizations as components of ONE mesh record. Genesis
+! .fld.h5 conversion lives in lucifer/tests/scripts/convert_genesis.py.
 ! The fundamental keeps the pre-harmonic names. A harmonic's files carry -h<h>.
 ! Every record is unrotated to time order first: each field owns its rotation state.
 ! The fields move in lockstep, but the cshift must run per record.
@@ -100,7 +91,6 @@ logical err_flag
 integer ihh
 logical eerr
 character(8) hsuf
-type (fel_format_struct) fmt
 real(rp), pointer :: z_now
 integer n_harm
 character(*), parameter :: r_name = 'fel_dump_field_set'
@@ -110,7 +100,6 @@ character(*), parameter :: r_name = 'fel_dump_field_set'
 err_flag = .true.
 ffield => run%ffield
 z_now => run%z_now
-fmt = run%fmt_wavefront
 n_harm = run%n_harm
 
 do ihh = 1, n_harm
@@ -124,22 +113,8 @@ do ihh = 1, n_harm
   hsuf = ''
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
 
-  if (fmt%genesis) then
-    if (allocated(ffield(ihh)%wf%Ey)) then        ! One component per Genesis file.
-      call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-x.fld.h5', eerr, 'x')
-      if (eerr) return
-      call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-y.fld.h5', eerr, 'y')
-      if (eerr) return
-    else
-      call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '.fld.h5', eerr, 'x')
-      if (eerr) return
-    endif
-  endif
-
-  if (fmt%openpmd) then
-    call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
-    if (eerr) return
-  endif
+  call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
+  if (eerr) return
 enddo
 
 err_flag = .false.
@@ -266,14 +241,12 @@ call out_io (s_blank$, r_name, trim(line))
 ! place that owns them (the writers).
 
 n_listed = 0
-call note_file (trim(run%global%out_root) // '-final.par.h5')
+call note_file (trim(run%global%out_root) // '-final.beam.h5')
 do ih = 1, run%n_harm
   hsuf = ''
   if (run%ffield(ih)%harm /= 1) write (hsuf, '(a, i0)') '-h', run%ffield(ih)%harm
-  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '.fld.h5')
-  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '-x.fld.h5')
-  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '-y.fld.h5')
   call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '.wf.h5')
+  call note_file (trim(run%global%out_root) // '-escaped' // trim(hsuf) // '.fld.h5')
   call note_file (trim(run%global%out_root) // '-pulse' // trim(hsuf) // '.fld.h5')
 enddo
 call note_file (trim(run%global%out_root) // '.stats.h5')

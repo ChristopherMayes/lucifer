@@ -4,8 +4,9 @@
 # time dependent with slippage.
 #
 # One command runs everything: Genesis over the Benchmark1-SASE lattice (writing the
-# initial dumps both codes start from), Genesis over a single undulator segment importing
-# the same dumps, the same pair again time dependent (32 slices, Aramis-td.in), the Bmad
+# initial dumps both codes start from), a conversion of those dumps to openPMD, which is
+# the only format the tracker reads, Genesis over a single undulator segment importing the
+# same dumps, the same pair again time dependent (32 slices, Aramis-td.in), the Bmad
 # tracker over every configuration (each full line twice, once with the Bmad seam and
 # once with the transcribed Genesis interlude model), a thread-count-independence rerun
 # of the time-dependent single segment (8 threads must reproduce 1 thread bit for bit),
@@ -26,15 +27,16 @@
 #      (conda env create -f ../wavefront/tests/environment.yml).
 #
 #   4. An openPMD-beamphysics checkout carrying beamphysics/wavefront/openpmd.py, at
-#      ../openPMD-beamphysics by default. The harmonics section round-trips the
-#      wavefront files through that class in both directions, and refuses by name if
-#      the class is missing.
+#      ../openPMD-beamphysics by default. It converts the Genesis reference dumps at the
+#      boundary, and the harmonics section round-trips the wavefront files through that
+#      class in both directions. Both refuse by name if the checkout is missing.
 #
 # Options:
 #   --genesis <path>    genesis4 binary. Default: ~/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4
 #   --exe <path>        lucifer binary. Default: debug then production.
 #   --python <path>     Python interpreter. Default: the bmad-fel-validate conda env.
 #   --work-dir <path>   Where to run. Default: a temporary directory (kept on failure).
+#   --beamphysics <p>   openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
 #
 # Exit status is zero only if every tier passes its tolerance.
 
@@ -47,6 +49,7 @@ GENESIS="$HOME/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4"
 EXE=""
 PYTHON=""
 WORK_DIR=""
+BEAMPHYSICS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -54,7 +57,8 @@ while [[ $# -gt 0 ]]; do
     --exe)      EXE="$2";      shift 2 ;;
     --python)   PYTHON="$2";   shift 2 ;;
     --work-dir) WORK_DIR="$2"; shift 2 ;;
-    -h|--help)  sed -n '2,32p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
+    -h|--help)  sed -n '2,41p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -90,6 +94,23 @@ if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
+# openPMD-beamphysics. The boundary conversion of the Genesis reference dumps needs it,
+# so it is located here rather than left to each script's own default.
+
+if [[ -z "$BEAMPHYSICS" ]]; then
+  for candidate in "$BMAD_ROOT/../openPMD-beamphysics" "$HOME/Code/GitHub/openPMD-beamphysics"; do
+    if [[ -d "$candidate/beamphysics/wavefront" ]]; then
+      BEAMPHYSICS="$(cd "$candidate" && pwd)"
+      break
+    fi
+  done
+fi
+if [[ -z "$BEAMPHYSICS" || ! -d "$BEAMPHYSICS/beamphysics/wavefront" ]]; then
+  echo "Error: openPMD-beamphysics checkout not found (looked for beamphysics/wavefront)." >&2
+  echo "Pass it with --beamphysics <path>." >&2
+  exit 1
+fi
+
 KEEP_WORK_DIR=1
 if [[ -z "$WORK_DIR" ]]; then
   WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fel_benchmark.XXXXXX")"
@@ -103,6 +124,7 @@ echo "==========================================================================
 echo "  lucifer: $EXE"
 echo "  genesis4:    $GENESIS"
 echo "  python:      $PYTHON"
+echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"
 echo
 
@@ -161,29 +183,70 @@ done
 section_time genesis-references
 echo
 
+# The boundary. The tracker reads openPMD only, so each chain's initial dumps are
+# converted once, here, and every tier reads the converted file. Genesis keeps reading its
+# own dumps, so both codes still start from the same particles and the same field: the
+# conversion is exact (validated at 2.2e-15 for particles and 2.1e-16 for fields by
+# convert_genesis.py round-trip, and a converted read matches a direct read at 1.7e-15).
+
+echo "--- convert the reference dumps to openPMD (the tracker reads openPMD only) ---"
+for root in Aramis AramisTD AramisTDSASE; do
+  for pair in "$root-initial.par.h5 $root-initial.beam.h5" \
+              "$root-initial.fld.h5 $root-initial.wf.h5"; do
+    if ! "$PYTHON" "$SCRIPT_DIR/scripts/convert_genesis.py" to-openpmd $pair \
+            --pyrepo "$BEAMPHYSICS"; then
+      echo "FAIL: could not convert $pair" >&2
+      exit 1
+    fi
+  done
+done
+section_time convert-reference-dumps
+echo
+
+# The window each chain's dumps were sliced on, read from the Genesis dump itself. An
+# openPMD file carries the slice partition and not the radiation it was sliced on, so a
+# deck has to state the wavelength and the sample, and taking them from the reference file
+# is one truth rather than two.
+
+read_window () {   # <genesis .par.h5>  ->  "<lambda0> <sample>"
+  "$PYTHON" - "$1" <<'WINEOF'
+import sys
+import h5py
+with h5py.File(sys.argv[1]) as f:
+    lam = float(f["slicelength"][0])
+    spacing = float(f["slicespacing"][0])
+sample = round(spacing / lam)
+assert abs(sample * lam - spacing) < 1e-9 * spacing, "the slice spacing is not a whole sample"
+print(f"{lam:.12e} {sample}")
+WINEOF
+}
+
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
-# BEAM_FMT overrides the particle dump format for one deck. The tiers write Genesis
-# format because their dumps face Genesis. The split-weight tier cannot, since that
-# format carries one current per slice and its beam has two weights per position.
-# The three input groups (manual sec:program): extra &fel_params content (wake/sc) as
-# argument 6, extra &fel_beam_init content (check knobs) as argument 7.
+# Every deck reads the converted openPMD dumps and writes openPMD, the only format the
+# tracker speaks. The three input groups (manual sec:program): extra &fel_params content
+# (wake/sc) as argument 6, extra &fel_beam_init content (check knobs) as argument 7.
+# nbins is the beamlet size the Genesis decks load with, which no dump format carries.
 
 make_nml () {
+  local lam sample
+  read -r lam sample <<<"$(read_window "$5-initial.par.h5")"
   cat > "$1" <<NML
 &fel_params
   lat_file = "$2"
   global%out_root = "$3"
   global%interlude_model = "$4"
   global%write_diag = T
-  global%beam_formats = ${BEAM_FMT:-'genesis'}
 ${6:+  $6}
 /
 &fel_beam_init
-  beam_file = "$5-initial.par.h5"
+  beam_file = "$5-initial.beam.h5"
+  nbins = 8
 ${7:+  $7}
 /
 &fel_wavefront_init
-  field_file = "$5-initial.fld.h5"
+  field_file = "$5-initial.wf.h5"
+  wavefront_init%lambda0 = $lam
+  wavefront_init%window_sample = $sample
 /
 NML
 }
@@ -191,7 +254,6 @@ NML
 make_nml tier1.nml  aramis_1seg_val.bmad tier1  bmad    Aramis
 make_nml tier2.nml  aramis_val.bmad      tier2  bmad    Aramis
 make_nml tier2g.nml aramis_val.bmad      tier2g genesis Aramis
-BEAM_FMT="'openpmd'" \
 make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "" "split_weights = T"
 make_nml tier1u.nml aramis_1seg_unavg.bmad tier1u bmad Aramis
 make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
@@ -335,8 +397,8 @@ def identical(fa, fb):
     return bad
 
 ok = True
-for fa, fb in (("td1-final.fld.h5", "td1t8-final.fld.h5"),
-               ("td1-final.par.h5", "td1t8-final.par.h5")):
+for fa, fb in (("td1-final.wf.h5", "td1t8-final.wf.h5"),
+               ("td1-final.beam.h5", "td1t8-final.beam.h5")):
     bad = identical(fa, fb)
     if bad:
         ok = False
@@ -471,7 +533,7 @@ section_time beam-format
 
 echo
 echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$WORK_DIR/harmonics" --exe "$EXE" --genesis "$GENESIS"; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$WORK_DIR/harmonics" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS"; then
   echo "FAIL: harmonic/openPMD checks; outputs kept in: $WORK_DIR/harmonics" >&2
   exit 1
 fi
@@ -479,7 +541,7 @@ section_time harmonics
 
 echo
 echo "--- phasing checks (autophase, z_offset knob, absolute mode, chicanes) ---------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$WORK_DIR/phasing" --exe "$EXE" --genesis "$GENESIS"; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$WORK_DIR/phasing" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS"; then
   echo "FAIL: phasing checks; outputs kept in: $WORK_DIR/phasing" >&2
   exit 1
 fi

@@ -2,16 +2,16 @@
 """
 Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
 
-  1. openPMD ROUND TRIP: a run writing both formats must produce an EXT_Wavefront
-     file carrying EVERY required attribute of the standard (verified against the
-     spec text's names and values here, independently of the Fortran writer), whose
-     complex values agree with the Genesis-format dump of the same field at the
-     constants floor, and which the Fortran READER reproduces exactly: re-importing
-     the .wf.h5 and re-dumping Genesis-format must be dataset-identical to the
-     original Genesis-format dump. The Python Wavefront class reads the Genesis dump
-     through its own path and must agree on the field energy, reads the harmonic
-     .wf.h5 to the same complex values, round-trips its own writer exactly, and what
-     its writer produces must come back through the Fortran reader unchanged.
+  1. openPMD ROUND TRIP: a run's field dump must carry EVERY required attribute of
+     the standard (verified against the spec text's names and values here,
+     independently of the Fortran writer), its complex values must agree with the
+     converter's Genesis view of the same field, and the Fortran READER must
+     reproduce it exactly: re-importing the .wf.h5 and re-dumping must be
+     dataset-identical to the file that was read. The Python Wavefront class reads
+     the converted Genesis file through its own path and must agree on the field
+     energy, reads the harmonic .wf.h5 to the same complex values, round-trips its
+     own writer exactly, and what its writer produces must come back through the
+     Fortran reader unchanged.
   2. HARMONIC TIER vs Genesis4: a planar steady-state segment (the benchmark's
      gamma, wavelength and rms aw -- planar so fc(3) is alive), both codes tracking
      the SAME Genesis-written starting state with a dark third-harmonic field:
@@ -26,7 +26,8 @@ Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
   5. REFUSALS, each by name: harmonics not anchored on the fundamental; harmonic
      fields with an unaveraged element; harmonic fields with two live polarizations;
      an openPMD import declaring the frequency domain; a harmonic import whose
-     photonEnergy matches no field of the run; a Genesis-format harmonic import.
+     photonEnergy matches no field of the run; a Genesis-format harmonic import,
+     which carries no photon energy to match on.
 
 Run by the benchmark harness. Exits nonzero on failure. Needs the genesis4 binary
 (--genesis) for section 2, and a beamphysics checkout carrying
@@ -45,6 +46,9 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
+import convert_genesis
+import fieldio
 from nml import to_groups
 from scipy.special import jv
 
@@ -137,14 +141,18 @@ fel_transcribed = -1
 wiggler::*[FEL_TRACKING] = fel_transcribed
 """
 
+# lambda0 and nbins are the deck's now: an openPMD beam file carries the slice partition
+# and not the radiation it was sliced on, nor the beamlet size. Both match the Genesis deck
+# above, which is where the imported state comes from.
 NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
   beam_file = "{beam}"
   field_file = "{field}"
+  lambda0 = 1e-10
+  nbins = 8
   harmonics = 1, 3
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -171,7 +179,6 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   ran_seed = 777
   harmonics = 1, 3
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -206,6 +213,16 @@ def fc_planar(aw, h):
     xi = 0.5 * aw * aw / (1 + aw * aw) * h
     h0 = (h - 1) // 2
     return aw * (jv(h0, xi) - jv(h0 + 1, xi)) * (-1) ** h0
+
+
+def fields_identical(fa, fb):
+    """Every field component of two openPMD wavefront files, value for value."""
+    ua = fieldio.read_field(fa)
+    ub = fieldio.read_field(fb)
+    if ua["components"] != ub["components"]:
+        return False
+    return all(np.array_equal(fieldio.read_field(fa, c)["u"], fieldio.read_field(fb, c)["u"])
+               for c in ua["components"])
 
 
 def dfl_to_vperm(fname, dx_expected=None):
@@ -254,8 +271,14 @@ def main():
         print(f"FAIL: genesis exited {r.returncode}:\n{r.stdout[-2000:]}\n{r.stderr[-500:]}")
         sys.exit(1)
 
+    # The tracker reads openPMD only, so Genesis's starting state converts once here and
+    # both codes still track the same beam and the same field.
+    for src, dst in (("H3-initial.par.h5", "H3-initial.beam.h5"),
+                     ("H3-initial.fld.h5", "H3-initial.wf.h5")):
+        convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
+
     run(exe, wd, "h3bmad", NML_IMPORT.format(lat="planar_val.bmad", root="h3bmad",
-        beam="H3-initial.par.h5", field="H3-initial.fld.h5", extra=""))
+        beam="H3-initial.beam.h5", field="H3-initial.wf.h5", extra=""))
 
     with h5py.File(wd / "H3.out.h5") as h5:
         zg = h5["Lattice/zplot"][:]
@@ -283,8 +306,12 @@ def main():
 
     print("== openPMD EXT_Wavefront round trip ==")
     run(exe, wd, "h3both", NML_IMPORT.format(lat="planar_val.bmad", root="h3both",
-        beam="H3-initial.par.h5", field="H3-initial.fld.h5",
-        extra="  wavefront_formats = 'genesis', 'openpmd'\n"))
+        beam="H3-initial.beam.h5", field="H3-initial.wf.h5", extra=""))
+
+    # The Genesis view of each dump, through the converter: the second reading of the same
+    # field that the complex comparison below needs.
+    for fn in ("h3both-final.wf.h5", "h3both-final-h3.wf.h5"):
+        convert_genesis.to_openpmd(wd / fn, wd / fn.replace(".wf.h5", ".fld.h5"), args.pyrepo)
 
     for fn, lam in (("h3both-final.wf.h5", 1e-10), ("h3both-final-h3.wf.h5", 1e-10 / 3)):
         with h5py.File(wd / fn) as f:
@@ -302,7 +329,8 @@ def main():
                     print(f"FAIL: {fn} mesh attribute {a} = {m.attrs[a]!r}, want {want!r}")
                     FAILED = True
             for a in ("axisLabels", "gridSpacing", "gridGlobalOffset", "gridUnitSI",
-                      "unitDimension", "timeOffset", "photonEnergy", "zCoordinate"):
+                      "gridUnitDimension", "unitDimension", "timeOffset", "photonEnergy",
+                      "zCoordinate"):
                 if a not in m.attrs:
                     print(f"FAIL: {fn} required mesh attribute {a} MISSING")
                     FAILED = True
@@ -319,19 +347,17 @@ def main():
 
         E_gen, dsp = dfl_to_vperm(wd / fn.replace(".wf.h5", ".fld.h5"))
         d = float(np.max(np.abs(E_gen - E_pmd)) / np.max(np.abs(E_gen)))
-        check(f"formats agree complex-wise ({fn})", d, TOL_RT_FORMATS)
+        check(f"the converter's Genesis view agrees complex-wise ({fn})", d, TOL_RT_FORMATS)
 
-    # Fortran read-back: import the .wf.h5, write_initial + load_only re-dumps
-    # Genesis-format. Datasets must be identical to the original Genesis dump.
+    # Fortran read-back: import the .wf.h5, write_initial + load_only re-dumps it. The
+    # field datasets must be identical to the file that was read.
 
     run(exe, wd, "h3rt", NML_IMPORT.format(lat="planar_val.bmad", root="h3rt",
-        beam="h3both-final.par.h5", field="h3both-final.wf.h5",
+        beam="h3both-final.beam.h5", field="h3both-final.wf.h5",
         extra="  write_initial = T\n  load_only = T\n"))
-    same = True
-    with h5py.File(wd / "h3rt-initial.fld.h5") as a, h5py.File(wd / "h3both-final.fld.h5") as b:
-        for k in ("slice000001/field-real", "slice000001/field-imag"):
-            same = same and bool(np.array_equal(a[k][:], b[k][:]))
-    check("Fortran openPMD read-back, Genesis re-dump dataset-identical", 0.0 if same else 1.0, 0.5)
+    check("Fortran openPMD read-back, re-dump dataset-identical",
+          0.0 if fields_identical(wd / "h3rt-initial.wf.h5", wd / "h3both-final.wf.h5") else 1.0,
+          0.5)
 
     # The Python Wavefront class, via its own Genesis path, agrees on the energy.
 
@@ -372,14 +398,12 @@ def main():
                      ("h3both-final-h3.wf.h5", "pyw-final-h3.wf.h5")):
         Wavefront.from_openpmd(wd / src).write_openpmd(wd / dst)
     run(exe, wd, "pywrt", NML_IMPORT.format(lat="planar_val.bmad", root="pywrt",
-        beam="h3both-final.par.h5", field="pyw-final.wf.h5",
+        beam="h3both-final.beam.h5", field="pyw-final.wf.h5",
         extra="  write_initial = T\n  load_only = T\n"))
-    same = True
-    with h5py.File(wd / "pywrt-initial.fld.h5") as a, h5py.File(wd / "h3both-final.fld.h5") as b:
-        for k in ("slice000001/field-real", "slice000001/field-imag"):
-            same = same and bool(np.array_equal(a[k][:], b[k][:]))
-    check("Fortran reads the Python writer's file, Genesis re-dump identical",
-          0.0 if same else 1.0, 0.5)
+    u_py = fieldio.read_field(wd / "pywrt-initial.wf.h5")["u"]
+    u_f = fieldio.read_field(wd / "h3both-final.wf.h5")["u"]
+    check("Fortran reads the Python writer's file, re-dump identical",
+          0.0 if np.array_equal(u_py, u_f) else 1.0, 0.5)
 
     # ------------------------------------------------------------------
     # 3. Deposit closed form: dark two-step restart from the bunched exit beam.
@@ -402,10 +426,9 @@ def main():
     buncher = buncher.replace("grid_n_pts = 63", "grid_n_pts = 151")
     run(exe, wd, "h3bunch", buncher)
 
-    shutil.copy(wd / "h3bunch-final.fld.h5", wd / "dark.fld.h5")
-    with h5py.File(wd / "dark.fld.h5", "r+") as h5:
-        h5["slice000001/field-real"][:] = 0.0
-        h5["slice000001/field-imag"][:] = 0.0
+    shutil.copy(wd / "h3bunch-final.wf.h5", wd / "dark.wf.h5")
+    with h5py.File(wd / "dark.wf.h5", "r+") as h5:
+        h5[fieldio.MESH_PATH + "/x"][...] = 0.0
 
     # ONE step, dark start: the field at exit is EXACTLY twice the source deposit of
     # the post-advance particles (a zero field diffracts to zero before the add), and
@@ -414,16 +437,12 @@ def main():
     # Bessel fc(h) and the harmonic phase h*theta, with no evolution approximation.
 
     run(exe, wd, "h3dep", NML_IMPORT.format(lat="short_val.bmad", root="h3dep",
-        beam="h3bunch-final.par.h5", field="dark.fld.h5", extra=""))
+        beam="h3bunch-final.beam.h5", field="dark.wf.h5", extra=""))
 
-    with h5py.File(wd / "h3dep-final.par.h5") as h5:
-        theta = h5["slice000001/theta"][:]
-        gam = h5["slice000001/gamma"][:]
-        xp = h5["slice000001/x"][:]
-        yp = h5["slice000001/y"][:]
-    with h5py.File(wd / "dark.fld.h5") as h5:
-        ng = int(h5["gridpoints"][0])
-        dgrid = float(h5["gridsize"][0])
+    sl = beamio.read_slices(wd / "h3dep-final.beam.h5", 1e-10, 1e-10)[0]
+    theta, gam, xp, yp = sl["theta"], sl["gamma"], sl["x"], sl["y"]
+    dark = fieldio.read_field(wd / "dark.wf.h5")
+    ng, dgrid = dark["u"].shape[1], dark["dx"]
 
     aw = 0.84853
     ku = 2 * np.pi / 0.015
@@ -460,9 +479,7 @@ def main():
     run(exe, wd, "h3t1", NML_TD.format(lat="planar_val.bmad", root="h3t1", extra=""), threads="1")
     run(exe, wd, "h3t8", NML_TD.format(lat="planar_val.bmad", root="h3t8", extra=""), threads="8")
     same = (wd / "h3t1.diag.txt").read_bytes() == (wd / "h3t8.diag.txt").read_bytes()
-    with h5py.File(wd / "h3t1-final-h3.fld.h5") as a, h5py.File(wd / "h3t8-final-h3.fld.h5") as b:
-        for k in a["slice000001"]:
-            same = same and bool(np.array_equal(a[f"slice000001/{k}"][:], b[f"slice000001/{k}"][:]))
+    same = same and fields_identical(wd / "h3t1-final-h3.wf.h5", wd / "h3t8-final-h3.wf.h5")
     check("1 vs 8 threads byte/dataset-identical", 0.0 if same else 1.0, 0.5)
 
     # ------------------------------------------------------------------
@@ -498,24 +515,24 @@ def main():
         del m.attrs["temporalDomain"]
         m.attrs["temporalDomain"] = np.bytes_("frequency")
     ok = refuse(exe, wd, "rf_freq", NML_IMPORT.format(lat="planar_val.bmad", root="rf_freq",
-                beam="h3both-final.par.h5", field="freq.wf.h5", extra=""),
+                beam="h3both-final.beam.h5", field="freq.wf.h5", extra=""),
                 "ONLY THE time DOMAIN")
     print(f"--- refusal frequency-domain openPMD import: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
     nomatch = NML_IMPORT.format(lat="planar_val.bmad", root="rf_match",
-                                beam="h3both-final.par.h5", field="H3-initial.fld.h5", extra="")
+                                beam="h3both-final.beam.h5", field="H3-initial.wf.h5", extra="")
     nomatch = nomatch.replace("harmonics = 1, 3", "harmonics = 1, 5")
-    nomatch = nomatch.replace('field_file = "H3-initial.fld.h5"',
-                              'field_file = "H3-initial.fld.h5", "h3both-final-h3.wf.h5"')
+    nomatch = nomatch.replace('field_file = "H3-initial.wf.h5"',
+                              'field_file = "H3-initial.wf.h5", "h3both-final-h3.wf.h5"')
     ok = refuse(exe, wd, "rf_match", nomatch, "MATCHES NO FIELD")
     print(f"--- refusal harmonic import matching no field: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
     genharm = NML_IMPORT.format(lat="planar_val.bmad", root="rf_genh",
-                                beam="h3both-final.par.h5", field="H3-initial.fld.h5", extra="")
-    genharm = genharm.replace('field_file = "H3-initial.fld.h5"',
-                              'field_file = "H3-initial.fld.h5", "h3both-final-h3.fld.h5"')
+                                beam="h3both-final.beam.h5", field="H3-initial.wf.h5", extra="")
+    genharm = genharm.replace('field_file = "H3-initial.wf.h5"',
+                              'field_file = "H3-initial.wf.h5", "h3both-final-h3.fld.h5"')
     ok = refuse(exe, wd, "rf_genh", genharm, "MUST BE openPMD")
     print(f"--- refusal Genesis-format harmonic import: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok

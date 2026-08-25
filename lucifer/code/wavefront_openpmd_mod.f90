@@ -19,10 +19,13 @@
 !                            photonEnergy is a property of one field):
 !                            geometry 'cartesian', axisLabels ['z','y','x'],
 !                            gridSpacing [dz,dy,dx], gridGlobalOffset [0,-gmax,-gmax],
-!                            gridUnitSI 1, unitDimension (1,1,-3,-1,0,0,0) (V/m),
+!                            gridUnitSI [1,1,1], gridUnitDimension (a length per axis),
+!                            unitDimension (1,1,-3,-1,0,0,0) (V/m),
 !                            timeOffset 0, photonEnergy [J], temporalDomain 'time',
 !                            spatialDomain 'r', zCoordinate [m].
 !   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively.
+!                            Component attributes: unitSI 1 and position [0,0,0], the
+!                            sample's offset within its cell in units of gridSpacing.
 !   .../electricField/y      present only when the wavefront carries Ey. BOTH transverse
 !                            polarizations live in ONE file as components, the
 !                            improvement over the Genesis format's one-per-file. The z
@@ -59,10 +62,10 @@ contains
 !+
 ! Function file_is_openpmd (file_name) result (is_pmd)
 !
-! Routine to test whether a file is an openPMD file. This is the format signature probe
-! for import auto-detection, and it holds for any openPMD file, particles as well as
-! fields: an openPMD file carries the required root attribute "openPMD", and a Genesis
-! dump of either kind has none.
+! Routine to test whether a file is an openPMD file. This is what the import path refuses
+! on, and it holds for any openPMD file, particles as well as fields: an openPMD file
+! carries the required root attribute "openPMD", and a Genesis dump of either kind has
+! none.
 !
 ! Input:
 !   file_name   -- character(*): File to probe.
@@ -115,9 +118,12 @@ type (wavefront_struct), target :: wf
 character(*) file_name
 real(rp) s_pos, gmax_x, gmax_y, e_photon
 integer(hid_t) f_id, it_id, m_id, complex_t
-integer h5_err
+integer h5_err, i
 logical err_flag, err
 character(*), parameter :: r_name = 'wavefront_write_openpmd'
+! The dimension exponents of one grid axis: a length, so L = 1 and the rest zero.
+! gridUnitDimension repeats them once per axis (openPMD 2.0, "Mesh Based Records").
+real(rp), parameter :: len_dim(7) = [1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp]
 
 !
 
@@ -161,7 +167,8 @@ call hdf5_write_attribute_string (m_id, 'geometry', 'cartesian', err)
 call hdf5_write_attribute_string (m_id, 'axisLabels', [character(1):: 'z', 'y', 'x'], err)
 call hdf5_write_attribute_real (m_id, 'gridSpacing', [wf%dz, wf%dy, wf%dx], err)
 call hdf5_write_attribute_real (m_id, 'gridGlobalOffset', [0.0_rp, -gmax_y, -gmax_x], err)
-call hdf5_write_attribute_real (m_id, 'gridUnitSI', 1.0_rp, err)
+call hdf5_write_attribute_real (m_id, 'gridUnitSI', [1.0_rp, 1.0_rp, 1.0_rp], err)
+call hdf5_write_attribute_real (m_id, 'gridUnitDimension', [(len_dim, i = 1, 3)], err)
 call hdf5_write_attribute_real (m_id, 'unitDimension', [1.0_rp, 1.0_rp, -3.0_rp, -1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp], err)
 call hdf5_write_attribute_real (m_id, 'timeOffset', 0.0_rp, err)
 call hdf5_write_attribute_real (m_id, 'photonEnergy', e_photon, err)
@@ -176,7 +183,7 @@ if (err) then
   call pmd_kill_compound_complex (complex_t)
   return
 endif
-call hdf5_write_attribute_real (f_id, trim(mesh_path) // '/x/position', [0.0_rp, 0.0_rp, 0.0_rp], err)
+call write_position ('x')
 
 if (allocated(wf%Ey)) then
   call pmd_write_complex_to_dataset (m_id, 'y', complex_t, 'y', unit_V_per_m, wf%Ey, err)
@@ -184,7 +191,7 @@ if (allocated(wf%Ey)) then
     call pmd_kill_compound_complex (complex_t)
     return
   endif
-  call hdf5_write_attribute_real (f_id, trim(mesh_path) // '/y/position', [0.0_rp, 0.0_rp, 0.0_rp], err)
+  call write_position ('y')
 endif
 
 call pmd_kill_compound_complex (complex_t)
@@ -192,6 +199,33 @@ call h5gclose_f (m_id, h5_err)
 call h5fclose_f (f_id, h5_err)
 
 err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine write_position (name)
+!
+! Routine to write the required openPMD component attribute "position" on one
+! polarisation component dataset. The value is the sample's offset within its cell in
+! units of gridSpacing, and a wavefront's samples sit on the cell corners, so it is zero
+! on all three axes.
+!
+! The attribute goes on the dataset, which is why this takes the dataset name and hands it
+! to the H5LT call that writes through a parent: the plain attribute writers take an object
+! id, and passing a path as the attribute name puts a slash-laden attribute on the root
+! group instead. Caught by the validation's file comparison against the Python writer.
+!-
+
+subroutine write_position (name)
+
+character(*) name
+
+!
+
+call H5LTset_attribute_double_f (m_id, name, 'position', [0.0_rp, 0.0_rp, 0.0_rp], 3_size_t, h5_err)
+
+end subroutine write_position
 
 end subroutine wavefront_write_openpmd
 

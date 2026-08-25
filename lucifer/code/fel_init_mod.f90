@@ -1,9 +1,9 @@
 !+
 ! Module fel_init_mod
 !
-! The starting state of a run: fel_init_beam (a Genesis dump, an imported
-! distribution, or the generated quiet start) and fel_init_wavefront (a field dump,
-! an openPMD wavefront, or the generated Gaussian seed, plus the harmonic entries).
+! The starting state of a run: fel_init_beam (an openPMD dump, an imported distribution,
+! or the generated quiet start) and fel_init_wavefront (an openPMD wavefront or the
+! generated Gaussian seed, plus the harmonic entries).
 ! Library contract: errors return through err_flag, and nothing here stops. The print
 ! lines are unchanged from when this code lived in the driver.
 !-
@@ -24,7 +24,7 @@ contains
 !+
 ! Subroutine fel_init_beam (run, err_flag)
 !
-! Routine to build the beam: read a Genesis particle dump (beam_file), import a
+! Routine to build the beam: read an openPMD particle dump (beam_file), import a
 ! distribution (dist_file or use_beam_init: the resample of fel_import_mod), or generate
 ! the quiet start from beam_init. Applies the beam-side check instruments
 ! (split_weights, swap_beam_xy) and sets run%nslice. One seed (global%ran_seed)
@@ -57,6 +57,7 @@ logical use_beam_init, shotnoise, gen_test_weights, imp_split_weights
 logical split_weights, swap_beam_xy, err
 integer nbins, ran_seed, is, ih
 real(rp) gamma0, lambda0, window_length, seed_power, seed_waist_size, grid_half_width
+integer n_win
 integer window_sample, grid_n_pts, npart_gen
 real(rp) delgam_gen, tw_beta_x, tw_alpha_x, tw_beta_y, tw_alpha_y
 character(*), parameter :: r_name = 'fel_init_beam'
@@ -118,12 +119,31 @@ if (dist_file /= '' .and. use_beam_init) then
 endif
 
 if (beam_file /= '') then
-  ! One name, either format: the file's own signature says which reader takes it.
-  if (file_is_openpmd(beam_file)) then
-    call fel_read_openpmd_beam (fbeam, beam_file, gamma0, branch%ele(0), err)
-  else
-    call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
+  if (.not. file_is_openpmd(beam_file)) then
+    call out_io (s_error$, r_name, 'BEAM FILE IS NOT openPMD: ' // trim(beam_file), &
+                 'THIS TRACKER READS openPMD ONLY. CONVERT A GENESIS DUMP FIRST:', &
+                 '  lucifer/tests/scripts/convert_genesis.py to-openpmd <in.par.h5> <out.beam.h5>')
+    err_flag = .true.;  return
   endif
+
+  ! An openPMD beam file carries the slice partition and not the radiation it was sliced
+  ! on, so the deck states the window. Refused rather than defaulted: a wrong wavelength
+  ! rescales every phase in the run.
+  if (lambda0 <= 0) then
+    call out_io (s_error$, r_name, 'READING A BEAM DUMP NEEDS LAMBDA0 > 0.', &
+                 'AN openPMD BEAM FILE CARRIES THE SLICE PARTITION AND NOT THE RADIATION', &
+                 'IT WAS SLICED ON, SO THE DECK MUST STATE lambda0 AND window_sample.', &
+                 'FILE: ' // trim(beam_file))
+    err_flag = .true.;  return
+  endif
+
+  ! window_length states a window, so the file must match it. Without one the file's own
+  ! patch count is the window, which is the usual restart.
+  n_win = -1
+  if (window_length > 0 .and. window_sample > 0) &
+                              n_win = nint(window_length / (window_sample * lambda0))
+  call fel_read_openpmd_beam (fbeam, beam_file, gamma0, n_win, lambda0, &
+                              window_sample * lambda0, nbins, branch%ele(0), err)
   if (err) then
     err_flag = .true.;  return
   endif
@@ -334,7 +354,7 @@ do is_g = 1, nslice_gen
   ! Quiet start: mbase base samples, each replicated at nbins equally spaced
   ! ponderomotive phases (theta0 spread on a uniform grid within one beamlet spacing),
   ! so bunching harmonics below nbins vanish to roundoff. Weights and coordinates
-  ! follow fel_read_genesis4_beam: z = beta*theta/ks with phi0 = 0,
+  ! follow the Genesis chart's own map: z = beta*theta/ks with phi0 = 0,
   ! weight = I*slice_spacing/(c*npart). theta and beta are held in work arrays so noise
   ! can kick the phases before the z conversion.
 
@@ -698,8 +718,8 @@ end subroutine fel_init_beam
 !+
 ! Subroutine fel_init_wavefront (run, err_flag)
 !
-! Routine to build the field set. Read the fundamental (field_file(1): a Genesis dump or
-! an openPMD EXT_Wavefront, auto-detected by signature) or generate the Gaussian seed
+! Routine to build the field set. Read the fundamental (field_file(1): an openPMD
+! EXT_Wavefront) or generate the Gaussian seed
 ! (wavefront_init: seed_power = 0 is a dark start). Initialize the harmonic entries
 ! on the fundamental's grid. Fill any from openPMD imports matched by photon energy.
 ! Check the beam/field window consistency. Needs the beam (fel_init_beam first).
@@ -748,16 +768,15 @@ grid_n_pts = run%winit%grid_n_pts
 grid_half_width = run%winit%grid_half_width
 
 if (field_file(1) /= '') then
-  if (file_is_openpmd(field_file(1))) then
-    call fel_read_openpmd_into_field (run, field_file(1), 1, err)
-    if (err) then
-      err_flag = .true.;  return
-    endif
-  else
-    call wavefront_read_genesis4 (wf, field_file(1), err)
-    if (err) then
-      err_flag = .true.;  return
-    endif
+  if (.not. file_is_openpmd(field_file(1))) then
+    call out_io (s_error$, r_name, 'FIELD FILE IS NOT openPMD: ' // trim(field_file(1)), &
+                 'THIS TRACKER READS openPMD ONLY. CONVERT A GENESIS DUMP FIRST:', &
+                 '  lucifer/tests/scripts/convert_genesis.py to-openpmd <in.fld.h5> <out.wf.h5>')
+    err_flag = .true.;  return
+  endif
+  call fel_read_openpmd_into_field (run, field_file(1), 1, err)
+  if (err) then
+    err_flag = .true.;  return
   endif
   if (two_pol .and. .not. allocated(wf%Ey)) then
     allocate (wf%Ey(size(wf%Ex,1), size(wf%Ex,2), size(wf%Ex,3)))

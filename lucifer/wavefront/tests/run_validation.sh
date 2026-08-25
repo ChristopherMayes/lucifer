@@ -8,21 +8,23 @@
 #
 # Two independent comparisons are made.
 #
-# 1. Against openPMD-beamphysics. A test wavefront is built in Python and written in
-#    Genesis4 HDF5 format. The Fortran program reads it, drifts it and writes it back. The
-#    same input is drifted in Python with drift_wavefront and the two results compared. This
+# 1. Against openPMD-beamphysics. A test wavefront is built in Python and written as an
+#    openPMD EXT_Wavefront file, both transverse polarisations in the one file. The Fortran
+#    program reads it, drifts it and writes it back. The same input is drifted in Python with
+#    drift_wavefront and the two results compared, field arrays and file metadata alike. This
 #    exercises the whole path -- HDF5 read, propagation, HDF5 write -- against an
 #    independent implementation, and it is the comparison the deliverable is defined by.
 #    Several grid sizes and drift distances are run, including an odd number of transverse
-#    points and a negative drift.
+#    points, a rectangular grid and a negative drift.
 #
 # 2. Against an in-Fortran reference propagator, wavefront_drift_reference, which builds its
-#    own kernel and performs a direct DFT instead of using FFTW. This exists because the
-#    Genesis4 format requires nx = ny and dx = dy, and on a square grid with equal spacings
-#    the propagation kernel is symmetric under interchanging the two transverse axes, so
-#    comparison 1 structurally cannot see a transposed transform or an interchanged dx and
-#    dy. Both were confirmed by mutation to pass comparison 1 at round-off. This one runs on
-#    rectangular grids with unequal spacings and catches them.
+#    own kernel and performs a direct DFT instead of using FFTW. It dates from the Genesis4
+#    format, which required nx = ny and dx = dy: on a square grid with equal spacings the
+#    propagation kernel is symmetric under interchanging the two transverse axes, so
+#    comparison 1 structurally could not see a transposed transform or an interchanged dx and
+#    dy. Both were confirmed by mutation to pass a square-grid comparison at round-off.
+#    openPMD carries a rectangular grid, so comparison 1 now covers that case as well, and
+#    this comparison stays as a second reference that shares no line of code with FFTW.
 #
 # Prerequisites:
 #
@@ -146,25 +148,32 @@ echo "  Tolerance:           $TOLERANCE"
 echo
 
 # ---------------------------------------------------------------------------------
-# Comparison 1: against openPMD-beamphysics, through the Genesis4 file format.
+# Comparison 1: against openPMD-beamphysics, through the openPMD EXT_Wavefront format.
 #
-# Case columns: label, nx (= ny), nz, drift [m].
+# Case columns: label, nx, ny, nz, drift [m].
 #
-#   even_grid       power of two grid, the usual case
+#   even_grid       power of two square grid, the usual case
 #   odd_grid        odd nx, which indexes the negative wavenumber half of the FFT
 #                     ordering differently from even nx
 #   non_power_of_2  a size FFTW must handle with mixed radix rather than radix 2
+#   rect_grid       nx /= ny and dx /= dy, which the Genesis4 format could not carry. On a
+#                     square grid with equal spacings the kernel is symmetric under
+#                     interchanging the transverse axes, so only this case sees a transposed
+#                     transform or an interchanged dx and dy
+#
+# A sixth column sets dy [m] where a case wants dy /= dx. Empty means dy = dx.
 #   negative_drift  backward propagation, which must be the inverse of forward
 #   long_drift      far enough that the field diffracts substantially over the grid
 #   zero_drift      a no-op, which must return the input unchanged
 # ---------------------------------------------------------------------------------
 
 CASES=(
-  "even_grid       64  5   0.05"
-  "odd_grid        63  4  -0.03"
-  "non_power_of_2  48  3   0.02"
-  "long_drift      64  2   0.40"
-  "zero_drift      32  3   0.0"
+  "even_grid       64  64  5   0.05"
+  "odd_grid        63  63  4  -0.03"
+  "non_power_of_2  48  48  3   0.02"
+  "rect_grid       40  27  3   0.06  3.0e-6"
+  "long_drift      64  64  2   0.40"
+  "zero_drift      32  32  3   0.0"
 )
 
 if [[ "$QUICK" == "1" ]]; then
@@ -176,18 +185,22 @@ WORST="0"
 SUMMARY=()
 
 for case_spec in "${CASES[@]}"; do
-  read -r LABEL NX NZ Z <<<"$case_spec"
+  read -r LABEL NX NY NZ Z DY <<<"$case_spec"
 
-  IN_FILE="$WORK_DIR/${LABEL}_in.fld.h5"
-  OUT_FILE="$WORK_DIR/${LABEL}_fortran.fld.h5"
+  IN_FILE="$WORK_DIR/${LABEL}_in.wf.h5"
+  OUT_FILE="$WORK_DIR/${LABEL}_fortran.wf.h5"
   LOG_FILE="$WORK_DIR/${LABEL}_fortran.log"
 
+  DY_ARG=()
+  [[ -n "$DY" ]] && DY_ARG=(--dy "$DY")
+
   echo "=============================================================================="
-  echo "Case $LABEL:  nx = ny = $NX,  nz = $NZ,  drift = $Z m"
+  echo "Case $LABEL:  nx = $NX,  ny = $NY,  nz = $NZ,  drift = $Z m${DY:+,  dy = $DY m}"
   echo "=============================================================================="
 
   echo "--- build the test wavefront in Python --------------------------------------"
-  if ! "$PYTHON" "$SCRIPT_DIR/validate_drift.py" write "$IN_FILE" --nx "$NX" --nz "$NZ"; then
+  if ! "$PYTHON" "$SCRIPT_DIR/validate_drift.py" write "$IN_FILE" --nx "$NX" --ny "$NY" \
+          --nz "$NZ" "${DY_ARG[@]}"; then
     echo "Case $LABEL FAILED: could not write the input file"
     SUMMARY+=("$LABEL FAIL (input)")
     OVERALL_STATUS=1

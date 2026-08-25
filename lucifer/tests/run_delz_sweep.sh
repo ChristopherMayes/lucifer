@@ -83,6 +83,16 @@ if ! "$GENESIS" Aramis-td-s12.in > genesis-s12.log 2>&1; then
   exit 1
 fi
 
+# The tracker reads openPMD only, so the Genesis dumps convert once here.
+
+for pair in "AramisS12-initial.par.h5 AramisS12-initial.beam.h5" \
+            "AramisS12-initial.fld.h5 AramisS12-initial.wf.h5"; do
+  if ! "$PYTHON" "$SCRIPT_DIR/scripts/convert_genesis.py" to-openpmd $pair; then
+    echo "FAIL: could not convert $pair" >&2
+    exit 1
+  fi
+done
+
 # The step in undulator periods (lambdau = 0.015 m). 1 period is the reference. The
 # step lives on the element (ds_step), so each point of the sweep is a two-line wrapper
 # lattice overriding it -- there is no namelist step size.
@@ -101,10 +111,13 @@ LAT
   global%write_diag = T
 /
 &fel_beam_init
-  beam_file = "AramisS12-initial.par.h5"
+  beam_file = "AramisS12-initial.beam.h5"
+  nbins = 8
 /
 &fel_wavefront_init
-  field_file = "AramisS12-initial.fld.h5"
+  field_file = "AramisS12-initial.wf.h5"
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%window_sample = 12
 /
 NML
   echo "--- lucifer: ds_step = $np period(s) -----------------------------------"

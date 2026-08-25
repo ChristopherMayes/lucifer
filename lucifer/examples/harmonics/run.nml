@@ -13,7 +13,6 @@
   global%out_root = "harmonics"
   global%ran_seed = 12345
 
-  global%wavefront_formats = 'genesis', 'openpmd'  ! Genesis dumps AND openPMD (.wf.h5).
 /
 
 &fel_beam_init

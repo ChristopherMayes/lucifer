@@ -36,8 +36,9 @@ import re
 import subprocess
 import sys
 
-import h5py
 import numpy as np
+
+import fieldio
 
 from nml import to_groups
 
@@ -66,7 +67,6 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   shotnoise = T
   ran_seed = 777
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -117,13 +117,17 @@ def diag(wd, root):
     return np.loadtxt(fn).reshape(-1, ns, 12)
 
 
-def dump_power(wd, fname):
-    """Sum of |dfl|^2 over a Genesis field dump: the power in that component."""
-    with h5py.File(wd / fname) as h5:
-        n = int(h5["slicecount"][0])
-        return sum(float((h5[f"slice{k:06d}/field-real"][:]**2
-                          + h5[f"slice{k:06d}/field-imag"][:]**2).sum())
-                   for k in range(1, n + 1))
+def dump_power(wd, fname, component="x"):
+    """Total power [W] in one polarization of a field dump, summed over every slice.
+
+    One openPMD file carries both transverse polarizations as components of the
+    electricField record, so the two are read out of one file rather than out of a file
+    each. A component the file does not carry is no power: the tracker allocates the
+    second component only for a field that can have one."""
+    if component not in fieldio.components(wd / fname):
+        return 0.0
+    f = fieldio.read_field(wd / fname, component)
+    return float(fieldio.field_power(f["u"], f["dx"], f["dy"]).sum())
 
 
 def main():
@@ -180,9 +184,9 @@ def main():
                                   ("unaveraged", "p2_c_uv.bmad", "p2_xd_uv.bmad", "uv")):
         run(exe, wd, f"p2c_{tag}", ss(NML.format(lat=clat, root=f"p2c_{tag}", extra="")))
         run(exe, wd, f"p2r_{tag}", ss(NML.format(lat=dlat, root=f"p2r_{tag}", extra="")))
-        px = dump_power(wd, f"p2c_{tag}-final-x.fld.h5")
-        py = dump_power(wd, f"p2c_{tag}-final-y.fld.h5")
-        p_ref = dump_power(wd, f"p2r_{tag}-final.fld.h5")
+        px = dump_power(wd, f"p2c_{tag}-final.wf.h5", "x")
+        py = dump_power(wd, f"p2c_{tag}-final.wf.h5", "y")
+        p_ref = dump_power(wd, f"p2r_{tag}-final.wf.h5", "x")
         iso = abs(np.log(px / p_ref))
         check(f"crossed, {mode}: x-field gain ISOLATION through the y set, |ln(Px/P_drift)|",
               iso, 5e-2, note="(the y set must only diffract Ex)")

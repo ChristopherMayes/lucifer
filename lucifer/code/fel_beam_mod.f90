@@ -1,9 +1,9 @@
 !+
 ! Module fel_beam_mod
 !
-! This module holds the packed particle representation for FEL tracking, its Genesis 1.3
-! Version 4 particle dump I/O, its conversion to and from Bmad's coord_struct at element
-! boundaries, and the per-slice beam diagnostics.
+! This module holds the packed particle representation for FEL tracking, its openPMD
+! particle dump I/O, its conversion to and from Bmad's coord_struct at element boundaries,
+! and the per-slice beam diagnostics.
 !
 ! Coordinates: Bmad's, exactly. Each slice carries structure-of-arrays copies of
 ! coord_struct%vec(1:6) plus a weight:
@@ -94,9 +94,9 @@ type fel_beam_struct
                                    !   reference. Derive p0/(m_e c) and the reference gamma
                                    !   with fel_p0_mc and fel_gamma0.
   real(rp) :: phi0 = 0             ! Common ponderomotive reference phase [rad].
-  real(rp) :: wavelength = 0       ! Radiation wavelength [m]. 'slicelength' in a Genesis dump.
-  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. 'slicespacing' in a Genesis dump.
-  real(rp) :: s0 = 0               ! Start of the time window [m]. 'refposition' in a Genesis dump.
+  real(rp) :: wavelength = 0       ! Radiation wavelength [m]. From the deck: no dump carries it.
+  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. From the deck likewise.
+  real(rp) :: s0 = 0               ! Start of the time window [m].
   integer :: nbins = 0             ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
   logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.tex
@@ -314,178 +314,47 @@ end function fel_theta
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
-!+
-! Subroutine fel_read_genesis4_beam (beam, file_name, gamma0, err_flag)
-!
-! Routine to read a Genesis 1.3 Version 4 particle dump (.par.h5) into a packed beam,
-! converting Genesis coordinates (x, y in m; px, py = gamma*beta; theta; gamma) to Bmad's.
-!
-! The conversion, exact:
-!
-!   px_bmad = px_genesis / p0_mc                    (p0_mc = sqrt(gamma0^2 - 1))
-!   pz      = (sqrt(gamma^2 - 1) - p0_mc) / p0_mc
-!   tau     = -theta / ks,   z = -beta * tau        (phi0 starts at zero)
-!   weight  = I * slice_spacing / (c * n)  [C]      (uniform: the dump carries no weights)
-!
-! ks comes from the dump's own wavelength. p0c is set from gamma0 and Bmad's electron
-! mass, which is what makes the Bmad-side tracking see exactly this normalization.
-!
-! Input:
-!   file_name   -- character(*): File to read.
-!   gamma0      -- real(rp): Genesis's reference gamma for the run.
-!
-! Output:
-!   beam        -- fel_beam_struct: Beam read from the file.
-!   err_flag    -- logical: Set True on error, False otherwise.
-!-
-
-subroutine fel_read_genesis4_beam (beam, file_name, gamma0, err_flag)
-
-type (fel_beam_struct), target :: beam
-type (fel_slice_struct), pointer :: sl
-integer(hid_t) f_id, g_id
-integer is, ip, n_slice, np, ivec(1), h5_err
-real(rp) rvec(1), gamma0, ks, current, w_uniform, gam, p_mc, beta, tau, p0_mc
-real(rp), allocatable :: work_gamma(:), work_theta(:)
-logical err_flag, err
-character(*) file_name
-character(*), parameter :: r_name = 'fel_read_genesis4_beam'
-character(20) group_name
-type (hdf5_info_struct) info
-
-!
-
-err_flag = .true.
-
-if (gamma0 <= 1) then
-  call out_io (s_error$, r_name, 'gamma0 MUST EXCEED 1. GOT: \es12.4\ ', r_array = [gamma0])
-  return
-endif
-
-call hdf5_open_file (file_name, 'READ', f_id, err);  if (err) return
-
-call hdf5_read_dataset_int (f_id, 'slicecount', ivec, err, 'slicecount');  if (err) return
-n_slice = ivec(1)
-if (n_slice < 1) then
-  call out_io (s_error$, r_name, 'FILE HAS A NON-POSITIVE slicecount: \i0\ ', i_array = [n_slice])
-  return
-endif
-
-call hdf5_read_dataset_int (f_id, 'beamletsize', ivec, err, 'beamletsize');  if (err) return
-beam%nbins = ivec(1)
-
-call hdf5_read_dataset_int (f_id, 'one4one', ivec, err, 'one4one');  if (err) return
-beam%one4one = (ivec(1) /= 0)
-
-call hdf5_read_dataset_real (f_id, 'slicelength', rvec, err, 'slicelength');  if (err) return
-beam%wavelength = rvec(1)
-
-call hdf5_read_dataset_real (f_id, 'slicespacing', rvec, err, 'slicespacing');  if (err) return
-beam%slice_spacing = rvec(1)
-
-call hdf5_read_dataset_real (f_id, 'refposition', rvec, err, 'refposition');  if (err) return
-beam%s0 = rvec(1)
-
-! p0c is the one stored reference: the momentum whose gamma is Genesis's gammaref.
-
-p0_mc = sqrt(gamma0**2 - 1)
-beam%p0c = p0_mc * m_electron
-beam%phi0 = 0
-ks = twopi / beam%wavelength
-
-if (allocated(beam%slice)) deallocate(beam%slice)
-allocate (beam%slice(n_slice))
-
-do is = 1, n_slice
-  sl => beam%slice(is)
-  write (group_name, '(a, i0.6)') 'slice', is
-  g_id = hdf5_open_group (f_id, trim(group_name), err, .true.);  if (err) return
-
-  ! Particle count from the actual dataset extent: H5LT reads have no buffer bound, so
-  ! extents are checked, never assumed.
-
-  info = hdf5_object_info (g_id, 'gamma', err, .true.);  if (err) return
-  np = int(info%data_dim(1))
-
-  call fel_slice_reallocate (sl, np)
-  sl%n = np
-
-  call hdf5_read_dataset_real (g_id, 'current', rvec, err, trim(group_name) // '/current');  if (err) return
-  current = rvec(1)
-
-  allocate (work_gamma(np), work_theta(np))
-  call hdf5_read_dataset_real (g_id, 'gamma', work_gamma, err, trim(group_name) // '/gamma');  if (err) return
-  call hdf5_read_dataset_real (g_id, 'theta', work_theta, err, trim(group_name) // '/theta');  if (err) return
-  call hdf5_read_dataset_real (g_id, 'x',  sl%x(1:np),  err, trim(group_name) // '/x');   if (err) return
-  call hdf5_read_dataset_real (g_id, 'y',  sl%y(1:np),  err, trim(group_name) // '/y');   if (err) return
-  call hdf5_read_dataset_real (g_id, 'px', sl%px(1:np), err, trim(group_name) // '/px');  if (err) return
-  call hdf5_read_dataset_real (g_id, 'py', sl%py(1:np), err, trim(group_name) // '/py');  if (err) return
-
-  ! Convert in place: px, py from gamma*beta to P/p0, and (theta, gamma) to (z, pz).
-
-  w_uniform = 0
-  if (np > 0) w_uniform = current * beam%slice_spacing / (c_light * np)
-
-  do ip = 1, np
-    gam = work_gamma(ip)
-    p_mc = sqrt(gam**2 - 1)
-    beta = p_mc / gam
-
-    sl%px(ip) = sl%px(ip) / p0_mc
-    sl%py(ip) = sl%py(ip) / p0_mc
-    sl%pz(ip) = (p_mc - p0_mc) / p0_mc
-
-    tau = -work_theta(ip) / ks              ! theta = phi0 - ks*tau with phi0 = 0.
-    sl%z(ip) = -beta * tau
-
-    sl%weight(ip) = w_uniform
-  enddo
-  deallocate (work_gamma, work_theta)
-
-  call H5Gclose_f (g_id, h5_err)
-enddo
-
-call H5Fclose_f (f_id, h5_err)
-
-err_flag = .false.
-
-end subroutine fel_read_genesis4_beam
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_read_openpmd_beam (beam, file_name, gamma0, ele, err_flag)
+! Subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing,
+!                                                                nbins, ele, err_flag)
 !
 ! Routine to read an openPMD-beamphysics particle file written by
 ! fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
-! routine: one bunch per nonempty slice, placed by the file's felSliceIndex, with the
-! window's empty slices restored empty.
+! routine: one particlePatch per slice, in window order, empty patches included.
 !
-! A file without the fel* window attributes is refused by name. Such a file describes a
-! bunch, not an FEL time window, and belongs on the import path (dist_file), which
-! resamples it into slices instead of assuming a slicing it does not carry.
+! n_slice is the window the deck asked for, and the file must agree: a dump carries one
+! patch per slice, so a different patch count means the deck and the file describe
+! different runs, and that is refused by name. Pass -1 when the deck states no window,
+! which is the usual case for a restart, and the file's patch count defines it. A bunch
+! that is not a sliced window belongs on the import path (dist_file), which resamples it
+! instead of assuming a slicing it does not carry.
+!
+! one4one is not read either. The flag asserts that every macroparticle carries one
+! electron, so the weights decide it.
 !
 ! Input:
 !   file_name   -- character(*): File to read.
 !   gamma0      -- real(rp): Reference gamma for the run, from the lattice.
+!   n_slice     -- integer: Slices the deck's window has, or -1 to take the file's.
 !   ele         -- ele_struct: Element to convert the coordinates against.
+!   wavelength  -- real(rp): Radiation wavelength [m], from the deck.
+!   spacing     -- real(rp): Slice spacing [m], from the deck.
+!   nbins       -- integer: Beamlet size, from the deck. A dump does not carry it.
 !
 ! Output:
 !   beam        -- fel_beam_struct: Beam read from the file.
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_read_openpmd_beam (beam, file_name, gamma0, ele, err_flag)
+subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, nbins, ele, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
-integer(hid_t) f_id
-integer ib, is, np, nb, n_slice, h5_err, ivec(1)
-integer, allocatable :: slice_ix(:)
-real(rp) gamma0, rvec(1)
+integer is, np, nb, n_slice, n_win, nbins
+real(rp) gamma0, q_file, wavelength, spacing
 logical err_flag, err
 character(*) file_name
 character(*), parameter :: r_name = 'fel_read_openpmd_beam'
@@ -499,73 +368,66 @@ if (gamma0 <= 1) then
   return
 endif
 
-! The window attributes first: without them the file cannot be placed into slices.
-
-call hdf5_open_file (file_name, 'READ', f_id, err);  if (err) return
-
-n_slice = -1
-call hdf5_read_attribute_int (f_id, 'felNumSlice', n_slice, err, .false.)
-if (err .or. n_slice == -1) then
-  call out_io (s_error$, r_name, &
-      'openPMD PARTICLE FILE CARRIES NO FEL WINDOW ATTRIBUTES: ' // trim(file_name), &
-      'IT DESCRIBES A BUNCH, NOT A SLICED TIME WINDOW, SO ITS SLICING IS UNKNOWN.', &
-      'READ IT WITH dist_file, WHICH RESAMPLES A BUNCH INTO SLICES.')
-  return
-endif
-
-if (n_slice < 1) then
-  call out_io (s_error$, r_name, 'FILE HAS A NON-POSITIVE felNumSlice: \i0\ ', i_array = [n_slice])
-  return
-endif
-
-call re_allocate (slice_ix, n_slice)
-call hdf5_read_attribute_int (f_id, 'felSliceIndex', slice_ix, err, .true.);  if (err) return
-call hdf5_read_attribute_int (f_id, 'felNbins', beam%nbins, err, .true.);  if (err) return
-call hdf5_read_attribute_int (f_id, 'felOne4one', ivec(1), err, .true.);  if (err) return
-beam%one4one = (ivec(1) /= 0)
-call hdf5_read_attribute_real (f_id, 'felSliceSpacing', beam%slice_spacing, err, .true.);  if (err) return
-call hdf5_read_attribute_real (f_id, 'felWavelength', beam%wavelength, err, .true.);  if (err) return
-call hdf5_read_attribute_real (f_id, 'felWindowStart', beam%s0, err, .true.);  if (err) return
-call H5Fclose_f (f_id, h5_err)
-
-! p0c is the one stored reference, as on the Genesis path. phi0 restarts at zero: the
-! particle lag lives in z, so the reference phase is free.
+! p0c is the one stored reference, and phi0 restarts at zero since the particle lag
+! lives in z. The wavelength and spacing are the deck's: a dump carries the beam, not
+! the run's parameters.
 
 beam%p0c = sqrt(gamma0**2 - 1) * m_electron
 beam%phi0 = 0
+beam%wavelength = wavelength
+beam%slice_spacing = spacing
+beam%nbins = nbins
+beam%s0 = 0
 
 call hdf5_read_beam (file_name, beam_b, err, ele)
 if (err) return
 
 nb = size(beam_b%bunch)
-if (nb > n_slice) then
-  call out_io (s_error$, r_name, 'FILE HAS MORE BUNCHES THAN SLICES: \i0\ VS \i0\ ', &
-               'FILE: ' // trim(file_name), i_array = [nb, n_slice])
+n_win = nb
+if (n_slice > 0) n_win = n_slice
+
+if (nb /= n_win) then
+  call out_io (s_error$, r_name, &
+      'FILE HAS \i0\ PARTICLE PATCHES BUT THE DECK ASKED FOR \i0\ SLICES.', &
+      'FILE: ' // trim(file_name), &
+      'A DUMP CARRIES ONE PATCH PER SLICE, SO THE DECK AND THE FILE DESCRIBE DIFFERENT RUNS.', &
+      i_array = [nb, n_win])
   return
 endif
 
 if (allocated(beam%slice)) deallocate(beam%slice)
-allocate (beam%slice(n_slice))
+allocate (beam%slice(n_win))
 
-do is = 1, n_slice
-  call fel_slice_reallocate (beam%slice(is), 0)
-  beam%slice(is)%n = 0
-enddo
-
-do ib = 1, nb
-  is = slice_ix(ib)
-  if (is < 1 .or. is > n_slice) then
-    call out_io (s_error$, r_name, 'FILE felSliceIndex \i0\ IS OUTSIDE THE WINDOW OF \i0\ SLICES.', &
-                 i_array = [is, n_slice])
-    return
-  endif
-  sl => beam%slice(is)
-  np = size(beam_b%bunch(ib)%particle)
-  call fel_slice_reallocate (sl, np)
-  sl%n = np
-  call fel_bunch_to_slice (beam_b%bunch(ib), ele, sl, err)
+do is = 1, n_win
+  np = size(beam_b%bunch(is)%particle)
+  call fel_slice_reallocate (beam%slice(is), np)
+  beam%slice(is)%n = np
+  if (np == 0) cycle
+  call fel_bunch_to_slice (beam_b%bunch(is), ele, beam%slice(is), err)
   if (err) return
 enddo
+
+! one4one is not stored: the flag asserts that every macroparticle carries exactly one
+! electron, so the weights say it.
+
+beam%one4one = .true.
+do is = 1, n_win
+  sl => beam%slice(is)
+  if (sl%n == 0) cycle
+  if (any(abs(sl%weight(1:sl%n) - e_charge) > 1e-9_rp * e_charge)) beam%one4one = .false.
+enddo
+
+q_file = 0
+do is = 1, n_win
+  sl => beam%slice(is)
+  if (sl%n > 0) q_file = q_file + sum(sl%weight(1:sl%n))
+enddo
+
+if (q_file <= 0) then
+  call out_io (s_error$, r_name, 'FILE CARRIES NO CHARGE: ' // trim(file_name), &
+               'EVERY WEIGHT IS ZERO, SO THE BEAM WOULD TRACK AND RADIATE NOTHING.')
+  return
+endif
 
 err_flag = .false.
 
@@ -581,11 +443,14 @@ end subroutine fel_read_openpmd_beam
 ! PER-PARTICLE weight, as openPMD's macro-charge, so a weighted beam survives the round
 ! trip.
 !
-! An empty slice is skipped rather than written: hdf5_write_beam takes the species from
-! p(1), which a zero-particle bunch does not have. The window geometry therefore rides
-! in root attributes instead of being implied by the file's bunch count, and
-! felSliceIndex says which slice each written bunch came from. Reading them back
-! restores the empty slices exactly.
+! One slice per openPMD particlePatch, in window order, so an empty slice is a
+! zero-count patch rather than a gap. The patch count IS the window, and nothing else
+! about the window is written: the wavelength, spacing and beamlet size belong to the
+! deck, and one4one follows from the weights.
+!
+! The reference phase is folded into each particle's time coordinate (fel_slice_to_bunch's
+! fold_phi0), so the file states the whole ponderomotive phase and a reader that restarts
+! phi0 at zero gets the state back exactly. Read that header before changing this call.
 !
 ! Input:
 !   beam        -- fel_beam_struct: Beam to write.
@@ -602,9 +467,7 @@ type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
-integer(hid_t) f_id
-integer is, nb, nslice, h5_err
-integer, allocatable :: slice_ix(:)
+integer is, nb, nslice
 logical err_flag, err
 character(*) file_name
 character(*), parameter :: r_name = 'fel_write_openpmd_beam'
@@ -614,162 +477,33 @@ character(*), parameter :: r_name = 'fel_write_openpmd_beam'
 err_flag = .true.
 nslice = size(beam%slice)
 
-nb = count(beam%slice(1:nslice)%n > 0)
-if (nb == 0) then
+if (sum(beam%slice(1:nslice)%n) == 0) then
   call out_io (s_error$, r_name, 'BEAM HAS NO PARTICLES IN ANY SLICE; NOTHING TO WRITE.', &
                'FILE: ' // trim(file_name))
   return
 endif
 
-call reallocate_beam (beam_b, nb)
-call re_allocate (slice_ix, nb)
+! Every slice becomes a patch, empty ones included: the patch count IS the window.
 
-nb = 0
+call reallocate_beam (beam_b, nslice)
+
 do is = 1, nslice
-  sl => beam%slice(is)
-  if (sl%n == 0) cycle
-  nb = nb + 1
-  slice_ix(nb) = is
-  call fel_slice_to_bunch (beam, sl, ele, beam_b%bunch(nb), err)
+  call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is), err, fold_phi0 = .true.)
   if (err) return
 enddo
+nb = nslice
 
-call hdf5_write_beam (file_name, beam_b%bunch(1:nb), .false., err)
+! The patches ARE the window: one per slice, in order, empty ones as zero-count
+! patches. Nothing else about the window goes in the file. The wavelength, the slice
+! spacing and the beamlet size are what the deck states, so storing them here would be
+! a second copy of a truth the run already has, and one4one is what the weights say.
+
+call hdf5_write_beam (file_name, beam_b%bunch(1:nb), .false., err, as_patches = .true.)
 if (err) return
-
-! The window the bunches came from. openPMD readers ignore attributes they do not know,
-! and Bmad's reader ignores everything outside its base path.
-
-call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
-call hdf5_write_attribute_int (f_id, 'felSliceIndex', slice_ix(1:nb), err);       if (err) return
-call hdf5_write_attribute_int (f_id, 'felNumSlice', nslice, err);                 if (err) return
-call hdf5_write_attribute_int (f_id, 'felNbins', beam%nbins, err);                if (err) return
-call hdf5_write_attribute_real (f_id, 'felSliceSpacing', beam%slice_spacing, err); if (err) return
-call hdf5_write_attribute_real (f_id, 'felWavelength', beam%wavelength, err);      if (err) return
-call hdf5_write_attribute_real (f_id, 'felWindowStart', beam%s0, err);             if (err) return
-call hdf5_write_attribute_int (f_id, 'felOne4one', merge(1, 0, beam%one4one), err); if (err) return
-call H5Fclose_f (f_id, h5_err)
 
 err_flag = .false.
 
 end subroutine fel_write_openpmd_beam
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine fel_write_genesis4_beam (beam, file_name, err_flag)
-!
-! Routine to write a packed beam as a Genesis 1.3 Version 4 particle dump, converting
-! back from Bmad coordinates. Inverse of fel_read_genesis4_beam: theta = phi0 - ks*tau
-! reconstructs Genesis's unwrapped theta including the accumulated common phase, gamma
-! from pz, px py rescaled by p0_mc, current from the weights. The dump format carries no
-! per-particle weight, so a nonuniform-weight beam is REFUSED BY NAME here rather than
-! written and silently read back uniform. That limit is the format's, not this
-! representation's: fel_write_openpmd_beam carries the weights.
-!
-! Input:
-!   beam        -- fel_beam_struct: Beam to write.
-!   file_name   -- character(*): File to create.
-!
-! Output:
-!   err_flag    -- logical: Set True on error, False otherwise.
-!-
-
-subroutine fel_write_genesis4_beam (beam, file_name, err_flag)
-
-type (fel_beam_struct), target :: beam
-type (fel_slice_struct), pointer :: sl
-integer(hid_t) f_id, g_id
-integer is, ip, h5_err, one4one_int
-real(rp) ks, gam, beta, p_mc, p0_mc, wmin, wmax
-real(rp), allocatable :: work(:)
-logical err_flag, err
-character(*) file_name
-character(*), parameter :: r_name = 'fel_write_genesis4_beam'
-character(20) group_name
-
-!
-
-err_flag = .true.
-
-if (.not. allocated(beam%slice)) then
-  call out_io (s_error$, r_name, 'BEAM HAS NO SLICES.')
-  return
-endif
-
-! This format has one current per slice and no per-particle weight, so a weighted beam
-! would come back uniform. Refuse rather than write a beam nothing can read back.
-
-do is = 1, size(beam%slice)
-  sl => beam%slice(is)
-  if (sl%n < 2) cycle
-  wmin = minval(sl%weight(1:sl%n));  wmax = maxval(sl%weight(1:sl%n))
-  if (wmax - wmin <= 1e-12_rp * wmax) cycle
-  call out_io (s_error$, r_name, &
-      'GENESIS FORMAT CANNOT CARRY PER-PARTICLE WEIGHTS, AND THIS BEAM HAS NONUNIFORM WEIGHTS.', &
-      'SLICE \i0\ SPREADS \es12.4\ TO \es12.4\ C OVER \i0\ PARTICLES, TOTAL \es12.4\ C.', &
-      'THE FORMAT STORES ONE CURRENT PER SLICE, SO A READ-BACK WOULD RETURN A UNIFORM BEAM.', &
-      'WRITE openpmd INSTEAD (beam_formats), WHICH CARRIES THE WEIGHTS.', &
-      i_array = [is, sl%n], r_array = [wmin, wmax, sum(sl%weight(1:sl%n))])
-  return
-enddo
-
-ks = twopi / beam%wavelength
-p0_mc = fel_p0_mc(beam)
-
-call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
-
-one4one_int = 0
-if (beam%one4one) one4one_int = 1
-
-call hdf5_write_dataset_real (f_id, 'slicelength',  [beam%wavelength],    err);  if (err) return
-call hdf5_write_dataset_real (f_id, 'slicespacing', [beam%slice_spacing], err);  if (err) return
-call hdf5_write_dataset_real (f_id, 'refposition',  [beam%s0],            err);  if (err) return
-call hdf5_write_dataset_int  (f_id, 'beamletsize',  [beam%nbins],       err);  if (err) return
-call hdf5_write_dataset_int  (f_id, 'slicecount',   [size(beam%slice)], err);  if (err) return
-call hdf5_write_dataset_int  (f_id, 'one4one',      [one4one_int],      err);  if (err) return
-
-do is = 1, size(beam%slice)
-  sl => beam%slice(is)
-  write (group_name, '(a, i0.6)') 'slice', is
-  call H5Gcreate_f (f_id, trim(group_name), g_id, h5_err)
-  if (h5_err < 0) then
-    call out_io (s_error$, r_name, 'CANNOT CREATE GROUP: ' // trim(group_name))
-    return
-  endif
-
-  call hdf5_write_dataset_real (g_id, 'current', [c_light * sum(sl%weight(1:sl%n)) / beam%slice_spacing], err)
-  if (err) return
-
-  allocate (work(sl%n))
-
-  do ip = 1, sl%n                                             ! gamma
-    work(ip) = fel_gamma_of(p0_mc, sl%pz(ip))
-  enddo
-  call hdf5_write_dataset_real (g_id, 'gamma', work, err);  if (err) return
-
-  do ip = 1, sl%n                                             ! theta = phi0 + ks*z/beta
-    work(ip) = beam%phi0 + ks * sl%z(ip) / fel_beta_of(p0_mc, sl%pz(ip))
-  enddo
-  call hdf5_write_dataset_real (g_id, 'theta', work, err);  if (err) return
-
-  call hdf5_write_dataset_real (g_id, 'x', sl%x(1:sl%n), err);  if (err) return
-  call hdf5_write_dataset_real (g_id, 'y', sl%y(1:sl%n), err);  if (err) return
-
-  work = sl%px(1:sl%n) * p0_mc                                ! Back to gamma*beta_x.
-  call hdf5_write_dataset_real (g_id, 'px', work, err);  if (err) return
-  work = sl%py(1:sl%n) * p0_mc
-  call hdf5_write_dataset_real (g_id, 'py', work, err);  if (err) return
-
-  deallocate (work)
-  call H5Gclose_f (g_id, h5_err)
-enddo
-
-call H5Fclose_f (f_id, h5_err)
-
-err_flag = .false.
-
-end subroutine fel_write_genesis4_beam
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -886,32 +620,52 @@ end subroutine fel_fawley_noise
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag)
+! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0)
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
 ! stored coordinates are coord_struct's. The element's p0c must match the beam's
 ! normalization. A mismatch is refused, not rescaled, since nothing on this path
 ! changes the reference momentum.
 !
+! fold_phi0 IS FOR A DUMP AND NOTHING ELSE. The chart splits a particle's ponderomotive
+! phase into a per-beam reference and a per-particle lag,
+!
+!   theta_j = phi0 + ks * z_j / beta_j,
+!
+! and a beam file carries the lag, since that is what a time coordinate is. A reader
+! restarts phi0 at zero (there is nowhere in either dump format to put a run's reference
+! phase), so a dump written from z_j alone comes back with every theta short by phi0. The
+! beam's phase against the field's phase is what the next segment's gain is made of, and
+! the field is dumped with its absolute phase, so that shift is a real change of state:
+! measured 2.1e-2 on the windowed-composition check, which restarts mid-line.
+!
+! So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks, which
+! makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact. Genesis
+! stores theta itself and its reader does the same fold, and convert_genesis.py maps a
+! Genesis theta to the same time, so the two formats agree on what a dump means.
+!
 ! Input:
-!   beam        -- fel_beam_struct: The beam (for p0c and the chart assertion).
+!   beam        -- fel_beam_struct: The beam (for p0c, phi0 and the chart assertion).
 !   sl          -- fel_slice_struct: Slice to convert.
 !   ele         -- ele_struct: Element at whose upstream end the coords are initialized.
+!   fold_phi0   -- logical, optional: Fold the reference phase into the lag, for a dump.
+!                    Default False, which is what tracking wants.
 !
 ! Output:
 !   bunch       -- bunch_struct: The slice as a Bmad bunch.
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag)
+subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0)
 
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (ele_struct) ele
 type (bunch_struct) bunch
-real(rp) vec(6)
+real(rp) vec(6), dz_phi0, p0_mc
 integer ip
 logical err_flag
+logical, optional :: fold_phi0
 character(*), parameter :: r_name = 'fel_slice_to_bunch'
 
 !
@@ -933,8 +687,15 @@ if (allocated(bunch%particle)) then
 endif
 if (.not. allocated(bunch%particle)) allocate(bunch%particle(sl%n))
 
+p0_mc = fel_p0_mc(beam)
+dz_phi0 = 0
+if (logic_option(.false., fold_phi0)) dz_phi0 = beam%phi0 * beam%wavelength / twopi
+
 do ip = 1, sl%n
   vec = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)]
+
+  ! z -> beta*theta/ks when folding: beta*phi0/ks added to the lag. See the header.
+  if (dz_phi0 /= 0) vec(5) = vec(5) + fel_beta_of(p0_mc, sl%pz(ip)) * dz_phi0
 
   ! init_coord derives beta, t and state consistently. shift_vec6 exists for elements
   ! whose reference momentum changes and must not touch vec(6) here.

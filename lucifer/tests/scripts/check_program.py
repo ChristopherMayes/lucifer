@@ -37,7 +37,12 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
+import fieldio
+
 FAILED = False
+
+LAMBDA0 = 1e-10          # the wavelength both decks below state
 
 LAT1 = """no_digested
 parameter[geometry] = open
@@ -77,7 +82,6 @@ NML_TWIN = """&fel_params
   global%out_root = "{root}"
   global%interlude_model = "genesis"
   global%write_diag = T
-  global%beam_formats = 'genesis'
   global%ran_seed = 777
 {extra}/
 &fel_beam_init
@@ -170,12 +174,12 @@ def main():
     run_nml(exe, wd, "snml", NML_TWIN.format(root="snml", extra="", bextra=""))
 
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "snml.diag.txt").read_bytes()
-    for s in ("-final.par.h5", "-final.fld.h5"):
+    for s in ("-final.beam.h5", "-final.wf.h5"):
         same = same and h5_identical(wd / f"sp1{s}", wd / f"snml{s}")
     check("no-namelist library run == namelist run (diag byte, dumps dataset)", same)
 
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "sp2.diag.txt").read_bytes()
-    for s in ("-final.par.h5", "-final.fld.h5", ".stats.h5"):
+    for s in ("-final.beam.h5", "-final.wf.h5", ".stats.h5"):
         same = same and h5_identical(wd / f"sp1{s}", wd / f"sp2{s}")
     check("re-entrant: twice in one process bit-identical (pass 2 == pass 1)", same)
 
@@ -246,32 +250,35 @@ def main():
             extra='  global%track_end = "D"\n', bextra=""))
 
     # A = [start, D]: its finals equal the full run's mid-line dumps at D.
-    ok = h5_identical(wd / "wa-final.par.h5", wd / "wfull-at2-D.par.h5")
-    ok = ok and h5_identical(wd / "wa-final.fld.h5", wd / "wfull-at2-D.fld.h5")
+    ok = h5_identical(wd / "wa-final.beam.h5", wd / "wfull-at2-D.beam.h5")
+    ok = ok and h5_identical(wd / "wa-final.wf.h5", wd / "wfull-at2-D.wf.h5")
     check("windowed [start, D] finals == full run's dumps at D", ok)
 
     # B = [after D, end] from A's finals: composes to the full run's finals.
     run_nml(exe, wd, "wb", two.format(root="wb",
-            extra='  global%track_start = "UND2"\n', bextra="""  beam_file = "wa-final.par.h5"
+            extra='  global%track_start = "UND2"\n', bextra="""  beam_file = "wa-final.beam.h5"
 """).replace("&fel_wavefront_init\n", """&fel_wavefront_init
-  field_file = "wa-final.fld.h5"
+  field_file = "wa-final.wf.h5"
 """))
-    # B's state passed through the Genesis dump format once more than the full run
-    # (theta/gamma/px folds and back), so the composition sits at the dump
-    # round-trip's conversion floor, not at zero: measured 2.6e-13 rad in theta,
-    # 3e-14 of the field scale, 7e-18 in px (the walk itself is bit-for-bit -- check
-    # A above IS exact, both sides dumping the same in-memory state).
+    # B's state passed through the dump format once more than the full run (a pack and an
+    # unpack of every coordinate), so the composition sits at the dump round-trip's
+    # conversion floor, not at zero: measured 2.6e-13 rad in theta, 3e-14 of the field
+    # scale, 7e-18 in px (the walk itself is bit-for-bit -- check A above IS exact, both
+    # sides dumping the same in-memory state).
+    #
+    # theta is the sharpest column here. A dump carries the particle lag and the reader
+    # restarts the reference phase at zero, so a restart reproduces the absolute phase only
+    # if the writer folded the reference in. Nothing else in this check can see that, and
+    # the beam's phase against the field's is what the next segment's gain is made of.
     worst = 0.0
-    with h5py.File(wd / "wb-final.par.h5") as a, h5py.File(wd / "wfull-final.par.h5") as b:
-        for k in ("gamma", "theta", "x", "y", "px", "py", "current"):
-            da, db = a[f"slice000001/{k}"][()], b[f"slice000001/{k}"][()]
-            scale = max(np.max(np.abs(db)), 1e-300)
-            worst = max(worst, float(np.max(np.abs(da - db)) / scale))
-    with h5py.File(wd / "wb-final.fld.h5") as a, h5py.File(wd / "wfull-final.fld.h5") as b:
-        fs = max(float(np.max(np.abs(b["slice000001/field-real"][()]))), 1e-300)
-        for k in ("field-real", "field-imag"):
-            worst = max(worst, float(np.max(np.abs(a[f"slice000001/{k}"][()]
-                                                   - b[f"slice000001/{k}"][()])) / fs))
+    pa = beamio.read_slices(wd / "wb-final.beam.h5", LAMBDA0, LAMBDA0)[0]
+    pb = beamio.read_slices(wd / "wfull-final.beam.h5", LAMBDA0, LAMBDA0)[0]
+    for k in ("gamma", "theta", "x", "y", "px", "py", "weight"):
+        scale = max(float(np.max(np.abs(pb[k]))), 1e-300)
+        worst = max(worst, float(np.max(np.abs(pa[k] - pb[k])) / scale))
+    fa = fieldio.read_field(wd / "wb-final.wf.h5")["u"]
+    fb = fieldio.read_field(wd / "wfull-final.wf.h5")["u"]
+    worst = max(worst, float(np.max(np.abs(fa - fb))) / max(float(np.max(np.abs(fb))), 1e-300))
     check("windowed [after D, end] from A's dumps == full run's finals (composition)",
           worst <= 1e-10,
           note=f"[max rel {worst:.2e} vs 1e-10; the dump round-trip's floor, measured 3e-13]")

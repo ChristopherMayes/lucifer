@@ -44,6 +44,7 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
 from nml import to_groups
 
 import pool
@@ -52,6 +53,7 @@ import pool
 # Benchmark1-SASE energy and emittance. The window: 24 slices of 3 wavelengths.
 LAMBDA0 = 1e-10
 SAMPLE = 3
+SPACING = SAMPLE * LAMBDA0
 NSLICE = 24
 SLEN = NSLICE * SAMPLE * LAMBDA0
 GAMMA0 = 11357.82
@@ -76,7 +78,6 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 {source}  imp%nslice = {nslice}
   imp%slicewidth = 0.01
   write_diag = T
-  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -186,22 +187,22 @@ def read_import_file(wd, root):
     return moments, np.array(currents)
 
 
+# Both formats appear here: the tracker's dumps are openPMD and Genesis's are its own, and
+# beamio reads either. It is told the window, which an openPMD dump does not carry and a
+# Genesis dump states, so for a Genesis file the arguments are a cross-check on what the
+# deck asked for.
+
+
 def load_dump_currents(fn):
-    with h5py.File(fn) as h5:
-        n = int(h5["slicecount"][0])
-        return np.array([h5[f"slice{i+1:06d}/current"][0] for i in range(n)])
+    """Per-slice current [A] of a particle dump, either format."""
+    return np.array([sl["current"] for sl in beamio.read_slices(fn, LAMBDA0, SPACING)])
 
 
 def load_dump_slices(fn):
-    """Per-slice particle arrays of a Genesis-format dump (our writer's layout)."""
-    out = []
-    with h5py.File(fn) as h5:
-        n = int(h5["slicecount"][0])
-        for i in range(n):
-            g = h5[f"slice{i+1:06d}"]
-            out.append({k: g[k][:] for k in ("gamma", "x", "y", "px", "py")})
-        cur = np.array([h5[f"slice{i+1:06d}/current"][0] for i in range(n)])
-    return out, cur
+    """Per-slice particle arrays and per-slice current of a particle dump, either format."""
+    slices = beamio.read_slices(fn, LAMBDA0, SPACING)
+    return ([{k: sl[k] for k in ("gamma", "x", "y", "px", "py")} for sl in slices],
+            np.array([sl["current"] for sl in slices]))
 
 
 def final_powers(diag, nslice):
@@ -245,7 +246,7 @@ def main():
         slen=SLEN, sample=SAMPLE))
     run([args.genesis, "imp_gen_write.in"], w/"imp_gen_write.log", env=env1)
     cur_gen = load_dump_currents(w/"impgw-imp.par.h5")
-    cur_ours = load_dump_currents(w/"impref-initial.par.h5")
+    cur_ours = load_dump_currents(w/"impref-initial.beam.h5")
     if len(cur_gen) != len(cur_ours):
         print(f"FAIL: slice counts differ (ours {len(cur_ours)}, genesis {len(cur_gen)})")
         ok = False
@@ -260,7 +261,7 @@ def main():
 
     # split: coincident copies leave the RNG-free outputs unchanged to roundoff.
     write_nml(w/"imp_split.nml", "impsplit", 1000,
-              extra="  imp_split_weights = T\n  load_only = T\n  beam_formats = 'openpmd'\n")
+              extra="  imp_split_weights = T\n  load_only = T\n")
     run([args.exe, "imp_split.nml"], w/"imp_split.log", env=env1)
     mom_s, cur_s = read_import_file(w, "impsplit")
     dm = np.abs(mom_s - mom_ref).max() / np.abs(mom_ref).max()
@@ -302,7 +303,7 @@ def main():
     # Statistics note: each slice has npart/nbins = 256 independent phase-space seeds,
     # so a single slice's Twiss carries ~1/sqrt(256) = 6% noise and a max over slices
     # would check on order statistics. Check on the MEAN over central slices instead.
-    slices, cur = load_dump_slices(w/"impref-initial.par.h5")
+    slices, cur = load_dump_slices(w/"impref-initial.beam.h5")
     central = [i for i in range(len(slices)) if cur[i] > 0.5*cur.max()]
     berr, aerr, eerr = [], [], []
     for i in central:
@@ -381,7 +382,7 @@ def main():
   beam_init%bunch_charge = 3.01e-14
 """.format(emit=NORM_EMIT, sig_pz=SIG_PZ))))
     run([args.exe, "imp_xq.nml"], w/"imp_xq.log", env=env1)
-    cur_q = load_dump_currents(w/"impxq-initial.par.h5")
+    cur_q = load_dump_currents(w/"impxq-initial.beam.h5")
     sp = SAMPLE * LAMBDA0
     sig_z, q_charge = 1.2e-9, 3.01e-14
     n_q = len(cur_q)

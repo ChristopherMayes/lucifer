@@ -95,9 +95,9 @@ if (bmad_com%radiation_fluctuations_on .and. migrate) then
   err_flag = .true.;  return
 endif
 
-! Read the lattice and the starting state: a pair of Genesis dumps (the shared-start
-! benchmark methodology), or a self-generated steady-state condition when both file
-! names are blank.
+! Read the lattice and the starting state: a pair of openPMD dumps (the shared-start
+! benchmark methodology, where the reference code's dumps are converted at the harness
+! boundary), or a self-generated steady-state condition when both file names are blank.
 !
 ! FEL elements carry tracking_method = custom, and Bmad's bookkeeping (the reference
 ! time/energy pass inside bmad_parser, any track1 at the seam) resolves custom tracking
@@ -230,15 +230,6 @@ case default
                trim(run%global%source_model))
   err_flag = .true.;  return
 end select
-call fel_parse_formats (run%global%wavefront_formats, 'WAVEFRONT_FORMATS', 'genesis', run%fmt_wavefront, err)
-if (err) then
-  err_flag = .true.;  return
-endif
-
-call fel_parse_formats (run%global%beam_formats, 'BEAM_FORMATS', 'openpmd', run%fmt_beam, err)
-if (err) then
-  err_flag = .true.;  return
-endif
 
 allocate (run%ffield(n_harm))
 ffield => run%ffield
@@ -938,59 +929,5 @@ end subroutine setup_diagnostics
 
 end subroutine fel_setup_schedule
 
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine fel_parse_formats (list, what, default, fmt, err_flag)
-!
-! Routine to turn a dump-format list from the namelist into a flag set. Blank entries
-! are skipped, duplicates collapse, and an all-blank list takes the default. An unknown
-! token is refused by name, listing what is taken, since a misspelled format that wrote
-! nothing would be worse than a stop.
-!
-! Input:
-!   list      -- character(*): The format tokens, blanks allowed anywhere.
-!   what      -- character(*): Namelist parameter name, for the refusal text.
-!   default   -- character(*): Format to use when every entry is blank.
-!
-! Output:
-!   fmt       -- fel_format_struct: One logical per named format.
-!   err_flag  -- logical: Set True if a token is not a format name.
-!-
-
-subroutine fel_parse_formats (list, what, default, fmt, err_flag)
-
-character(*) list(:), what, default
-type (fel_format_struct) fmt
-logical err_flag
-integer i
-character(*), parameter :: r_name = 'fel_parse_formats'
-
-!
-
-err_flag = .false.
-fmt = fel_format_struct()
-
-do i = 1, size(list)
-  if (list(i) == '') cycle
-  select case (list(i))
-  case ('genesis');   fmt%genesis = .true.
-  case ('openpmd');   fmt%openpmd = .true.
-  case default
-    call out_io (s_error$, r_name, trim(what) // ' HAS AN UNKNOWN FORMAT: "' // trim(list(i)) // '"', &
-                 'TAKEN: genesis, openpmd')
-    err_flag = .true.;  return
-  end select
-enddo
-
-if (.not. (fmt%genesis .or. fmt%openpmd)) then
-  select case (default)
-  case ('genesis');   fmt%genesis = .true.
-  case ('openpmd');   fmt%openpmd = .true.
-  end select
-endif
-
-end subroutine fel_parse_formats
 
 end module fel_setup_mod

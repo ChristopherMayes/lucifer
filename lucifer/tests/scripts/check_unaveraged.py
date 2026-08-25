@@ -48,15 +48,15 @@ import pathlib
 import subprocess
 import sys
 
-import h5py
 import numpy as np
 
+import beamio
 from nml import to_groups
 from scipy.special import jv
 
 C_LIGHT = 2.99792458e8
 M_ELECTRON = 510998.95069  # eV, Bmad's value
-Z0 = 4e-7 * math.pi * C_LIGHT  # mu_0 * c with mu_0 = 4 pi e-7 (Bmad's mu_0_vac)
+Z0 = 1.25663706127e-6 * C_LIGHT  # Bmad's mu_0_vac (2018 CODATA) times c
 
 AW = 0.84853
 LAMBDA_W = 0.015
@@ -86,7 +86,6 @@ PROBE = """! flat keys; routed into the three groups by nml.to_groups
   ran_seed = 4242
   write_initial = T
   write_diag = T
-  beam_formats = 'genesis'
 &end
 """
 
@@ -114,7 +113,6 @@ GAIN = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   ran_seed = 4242
   write_diag = T
-  beam_formats = 'genesis'
 &end
 """
 
@@ -140,7 +138,6 @@ TDID = """! flat keys; routed into the three groups by nml.to_groups
   shotnoise = T
   ran_seed = 999
   write_diag = T
-  beam_formats = 'genesis'
 &end
 """
 
@@ -192,21 +189,24 @@ use, SEGW
 """
 
 
-def read_par(path):
-    """Genesis .par.h5 -> dict of concatenated per-slice arrays (single-slice probes)."""
-    out = {}
-    with h5py.File(path, "r") as f:
-        keys = sorted(k for k in f.keys()
-                      if k.startswith("slice") and isinstance(f[k], h5py.Group))
-        for q in ("gamma", "theta", "x", "y", "px", "py"):
-            out[q] = np.concatenate([np.asarray(f[k][q]).ravel() for k in keys])
-    return out
+def read_par(path, lam):
+    """A dump -> dict of concatenated per-slice arrays (these probes are single slice).
+
+    Read through beamio, which is told the run's wavelength: an openPMD beam file states
+    the slice partition and not the radiation it was sliced on. These probes are steady
+    state, so the slice spacing is one wavelength."""
+    slices = beamio.read_slices(path, lam, lam)
+    return {q: np.concatenate([sl[q] for sl in slices])
+            for q in ("gamma", "theta", "x", "y", "px", "py")}
 
 
-def phasor(root, wd):
-    """F = (2/N) sum dgamma * exp(+i theta0) between the initial and final dumps."""
-    p0 = read_par(wd / f"{root}-initial.par.h5")
-    p1 = read_par(wd / f"{root}-final.par.h5")
+def phasor(root, wd, lam):
+    """F = (2/N) sum dgamma * exp(+i theta0) between the initial and final dumps.
+
+    theta0 comes from the INITIAL dump, where the reference phase phi0 is still zero, so
+    the phase here is the absolute one the tracker used."""
+    p0 = read_par(wd / f"{root}-initial.beam.h5", lam)
+    p1 = read_par(wd / f"{root}-final.beam.h5", lam)
     dg = p1["gamma"] - p0["gamma"]
     return 2.0 * np.mean(dg * np.exp(1j * p0["theta"]))
 
@@ -271,8 +271,8 @@ def main():
     # 2. Ballistic dark run: B does no work. Ramps hand the emittance back.
     run(exe, wd, "uv_dark", probe_nml(wd, lat="unavg_probe_planar_b.bmad", root="uv_dark",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=0.0, w0=SEED_W0))
-    d0 = read_par(wd / "uv_dark-initial.par.h5")
-    d1 = read_par(wd / "uv_dark-final.par.h5")
+    d0 = read_par(wd / "uv_dark-initial.beam.h5", LAMBDA1)
+    d1 = read_par(wd / "uv_dark-final.beam.h5", LAMBDA1)
     check("ballistic: max|dgamma| (B does no work)",
           float(np.abs(d1["gamma"] - d0["gamma"]).max() / GAMMA0), 1e-12)
     check("ballistic: |emit_x out/in - 1| (ramp handoff)",
@@ -296,8 +296,8 @@ def main():
         for tag, lat in (("a", lat_a), ("b", lat_b)):
             run(exe, wd, f"uv_{pol}_{tag}", probe_nml(wd, lat=lat, root=f"uv_{pol}_{tag}",
                 spp=20, ramp=N_RAMP, lam=lam, power=SEED_P, w0=SEED_W0))
-        fa = phasor(f"uv_{pol}_a", wd)
-        fb = phasor(f"uv_{pol}_b", wd)
+        fa = phasor(f"uv_{pol}_a", wd, lam)
+        fb = phasor(f"uv_{pol}_b", wd, lam)
         fm = fc_measured(fa, fb, lam, h)
         fx = AW if (pol == "helical") else fc_closed(h)
         results[pol] = (fm, fx)
@@ -311,7 +311,8 @@ def main():
         for tag, lat in (("a", "unavg_probe_planar_a.bmad"), ("b", "unavg_probe_planar_b.bmad")):
             run(exe, wd, f"uv_cv{spp}_{tag}", probe_nml(wd, lat=lat, root=f"uv_cv{spp}_{tag}",
                 spp=spp, ramp=N_RAMP, lam=LAMBDA1, power=SEED_P, w0=SEED_W0))
-        fcs[spp] = fc_measured(phasor(f"uv_cv{spp}_a", wd), phasor(f"uv_cv{spp}_b", wd), LAMBDA1, 1)
+        fcs[spp] = fc_measured(phasor(f"uv_cv{spp}_a", wd, LAMBDA1),
+                               phasor(f"uv_cv{spp}_b", wd, LAMBDA1), LAMBDA1, 1)
     fcs[20] = results["planar"][0]
     for spp in (10, 20, 30):
         print(f"      {spp:3d} steps/period: fc = {fcs[spp]:.6f}")

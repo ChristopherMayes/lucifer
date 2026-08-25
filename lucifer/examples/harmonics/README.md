@@ -22,10 +22,9 @@ Measured by this example (200 MW seed, 3.96 m planar, rms aw = 0.84853):
 
 `plot_fel.py`'s harmonic panel shows both curves on one log scale (banked as
 `fel-benchmark-plots/harmonic-lasing.png`). The harmonic's full wavefront_params
-live under `field/harm3/` in the stats file. Its dumps carry `-h3` in the name:
-Genesis format (`harmonics-final-h3.fld.h5`, Genesis's own `.h3` convention
-adapted) and, because this example sets `wavefront_formats = 'genesis', 'openpmd'`, openPMD
-EXT_Wavefront files (`.wf.h5`) with the photon energy identifying the harmonic.
+live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name,
+`harmonics-final-h3.wf.h5`, an openPMD EXT_Wavefront file with the photon energy
+identifying the harmonic.
 
 A helical undulator would give exactly nothing here: its coupling fc(h) vanishes
 for every harmonic (manual sec:field-set), which is why this example is planar.

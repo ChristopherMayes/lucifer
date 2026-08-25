@@ -38,6 +38,8 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
+
 from nml import to_groups
 
 C_LIGHT = 2.99792458e8
@@ -64,7 +66,6 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
   migrate = {mig}
   migrate_check = T
   write_diag = T
-  beam_formats = 'genesis'
 &end
 """
 
@@ -143,15 +144,19 @@ def main():
           f"(tol 1e-10)  {'ok' if p_ok else 'FAIL'}")
 
     # Window residency: the routine's postcondition. The final dump is written right
-    # after the last migration, so every surviving particle's theta must lie in its
-    # slice window [0, 2*pi*sample). An unadjusted z on the move survives conservation
-    # (the cascade drops are accounted) but not this.
+    # after the last migration, so every surviving particle's theta must lie in its slice
+    # window [0, 2*pi*sample). An unadjusted z on the move survives conservation (the
+    # cascade drops are accounted) but not this.
+    #
+    # The window is the same [0, slen) for every slice, since theta is the phase inside a
+    # slice and a move shifts z by exactly one spacing. The dump carries the lag rather
+    # than the phase, and the writer folds the reference phase into it, so theta comes
+    # back here as the absolute phase the tracker held.
     slen = 2 * np.pi * 3
     n_out = 0
-    with h5py.File(wd / "migc-final.par.h5") as h5:
-        for i in range(int(h5["slicecount"][0])):
-            th = h5[f"slice{i+1:06d}/theta"][:]
-            n_out += int(np.sum((th < -1e-9) | (th >= slen + 1e-9)))
+    for sl in beamio.read_slices(wd / "migc-final.beam.h5", 1e-10, 3e-10):
+        th = sl["theta"]
+        n_out += int(np.sum((th < -1e-9) | (th >= slen + 1e-9)))
     w_ok = n_out == 0
     ok = ok and w_ok
     print(f"--- migration window residency: {n_out} particles outside their window "
@@ -164,7 +169,7 @@ def main():
     moved = read_migration_file(wd, "mignt")[0]
     diag_eq = (wd / "mignf.diag.txt").read_bytes() == (wd / "mignt.diag.txt").read_bytes()
     d_eq = all(dumps_equal(wd / f"mignf-final.{s}.h5", wd / f"mignt-final.{s}.h5")
-               for s in ("fld", "par"))
+               for s in ("wf", "beam"))
     n_ok = moved == 0 and diag_eq and d_eq
     ok = ok and n_ok
     print(f"--- migration no-op: {moved} moves, diag byte-equal {diag_eq}, "

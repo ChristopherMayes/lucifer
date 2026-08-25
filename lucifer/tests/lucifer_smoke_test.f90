@@ -53,8 +53,6 @@ do ipass = 1, 2
   run%lat_file = lat_file
   run%global%out_root = out_root(ipass)
   run%global%interlude_model = 'genesis'
-  run%global%beam_formats(1) = 'genesis'   ! The namelist twin this is compared against
-                                          !   writes Genesis format, so this must too.
   run%global%write_diag = .true.
   run%global%ran_seed = 777
 

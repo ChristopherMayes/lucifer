@@ -48,6 +48,7 @@ import sys
 import h5py
 import numpy as np
 
+import convert_genesis
 from nml import to_groups
 
 import pool
@@ -129,7 +130,6 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   ran_seed = 777
   write_diag = T
-  beam_formats = 'genesis'
 /
 """
 
@@ -175,7 +175,6 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   ran_seed = 777
   keep_escaped_field = T
   write_diag = T
-  beam_formats = 'genesis'
 /
 """
 
@@ -270,14 +269,17 @@ fft_fieldsolver = true
 &end
 """
 
+# lambda0 and nbins are the deck's: an openPMD beam file carries the slice partition and
+# not the radiation it was sliced on. Both match GEN_PREP, which writes the shared dumps.
 NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
-  beam_file = "PSP-initial.par.h5"
-  field_file = "PSP-initial.fld.h5"
+  beam_file = "PSP-initial.beam.h5"
+  field_file = "PSP-initial.wf.h5"
+  lambda0 = 1e-10
+  nbins = 8
   interlude_model = '{imodel}'
   write_diag = T
-  beam_formats = 'genesis'
 /
 """
 
@@ -369,6 +371,8 @@ def main():
     ap.add_argument("workdir")
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
+    ap.add_argument("--pyrepo", default=convert_genesis.DEFAULT_PYREPO,
+                    help="openPMD-beamphysics checkout, for the dump conversion")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -424,6 +428,12 @@ def main():
     if r.returncode != 0:
         print(f"FAIL: genesis prep run:\n{r.stdout[-800:]}")
         sys.exit(1)
+
+    # The tracker reads openPMD only, so the shared dumps convert once here. Genesis keeps
+    # reading its own, so both codes still start from the same particles and field.
+    for src, dst in (("PSP-initial.par.h5", "PSP-initial.beam.h5"),
+                     ("PSP-initial.fld.h5", "PSP-initial.wf.h5")):
+        convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
 
     def gen_ps(k):
         (wd / f"ps{k}.lat").write_text(GEN_LAT_PS.format(phi=f"{2 * np.pi * k / 8:.12e}"))
@@ -553,9 +563,12 @@ def main():
     check("extra banked slices == floor(delay/lambda), three delays", float(worst), 0.5,
           note="[expected:got " + " ".join(detail) + "]")
     same = (wd / "tdc.diag.txt").read_bytes() == (wd / "tdc8.diag.txt").read_bytes()
-    with h5py.File(wd / "tdc-final.fld.h5") as a, h5py.File(wd / "tdc8-final.fld.h5") as b:
-        for k in a["slice000001"]:
-            same = same and bool(np.array_equal(a[f"slice000001/{k}"][:], b[f"slice000001/{k}"][:]))
+    with h5py.File(wd / "tdc-final.wf.h5") as a, h5py.File(wd / "tdc8-final.wf.h5") as b:
+        names = []
+        a.visititems(lambda n, o: names.append(n) if isinstance(o, h5py.Dataset) else None)
+        same = same and bool(names)
+        for n in names:
+            same = same and bool(np.array_equal(a[n][...], b[n][...]))
     check("TD chicane 1 vs 8 threads byte/dataset-identical", 0.0 if same else 1.0, 0.5)
 
     # ------------------------------------------------------------------

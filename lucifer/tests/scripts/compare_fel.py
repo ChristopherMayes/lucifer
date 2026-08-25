@@ -35,6 +35,14 @@ Each tier compares the per-record power and bunching curves, and the final field
 particle dumps element by element. Particle ordering is preserved by both codes (no
 sorting happens in steady state), so the dumps compare particle by particle.
 
+The two codes write different formats and nothing is converted on disk to compare them.
+The tracker writes openPMD: a .beam.h5 particle file carrying one patch per slice, and a
+.wf.h5 field file in V/m. Genesis writes its own .par.h5 and .fld.h5. beamio and fieldio
+read either format into the same arrays in memory, scaling Genesis's field amplitude to
+V/m on the way in, and the comparison happens there. The window the tracker's beam file
+does not state, the wavelength and the slice spacing, comes from the Genesis dump it is
+being compared against.
+
 A fourth check compares Fortran against itself: tier1 rerun with every particle split
 into two coincident copies of weights w/3 and 2w/3 (split_weights = T). Collective
 observables are linear in the weights, so the curves and the final field must be
@@ -77,6 +85,9 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
+import fieldio
+
 
 def load_genesis_out(fn, nslice=1):
     """
@@ -97,9 +108,8 @@ def load_genesis_out(fn, nslice=1):
 
 
 def load_nslice(fn):
-    """slicecount of a Genesis dump (.par.h5 or .fld.h5)."""
-    with h5py.File(fn) as h5:
-        return int(h5["slicecount"][0])
+    """The window's slice count, from either code's particle dump."""
+    return beamio.n_slice(fn)
 
 
 def load_fortran_diag(fn, nslice=1):
@@ -129,26 +139,29 @@ def load_fortran_diag(fn, nslice=1):
 
 
 def load_fld(fn, nslice=1):
-    """Field dump as (nslice, n, n), slices in time-window order (Genesis unrotates on write)."""
-    with h5py.File(fn) as h5:
-        n = int(h5["gridpoints"][0])
-        u = np.empty((nslice, n, n), dtype=complex)
-        for i in range(nslice):
-            g = h5[f"slice{i+1:06d}"]
-            u[i] = (g["field-real"][:].reshape(n, n)
-                    + 1j * g["field-imag"][:].reshape(n, n))
-        return u if nslice > 1 else u[0]
+    """
+    Field dump as (nslice, ny, nx) complex V/m, slices in time-window order (both codes
+    unrotate on write). Either format, read through fieldio, so the tracker's openPMD dump
+    and Genesis's own dump arrive in the same units and the same axis order.
+    """
+    return fieldio.read_field(fn, nslice=nslice)["u"]
 
 
-def load_par(fn, nslice=1):
-    """Particle dump with all slices concatenated, slice-major (beam slices never rotate)."""
-    with h5py.File(fn) as h5:
-        out = {k: [] for k in ("gamma", "theta", "x", "y", "px", "py")}
-        for i in range(nslice):
-            s = h5[f"slice{i+1:06d}"]
-            for k in out:
-                out[k].append(s[k][:])
-        return {k: np.concatenate(v) for k, v in out.items()}
+def load_par(fn, nslice=1, window=None):
+    """
+    Particle dump with all slices concatenated, slice-major (beam slices never rotate).
+    Either format, read through beamio.
+
+    window is the {wavelength, spacing} the run used, needed for an openPMD dump and
+    ignored for a Genesis one, which states its own. In a tier comparison it comes from the
+    Genesis dump on the other side.
+    """
+    window = window or {}
+    slices = beamio.read_slices(fn, window.get("wavelength"), window.get("spacing"))
+    if len(slices) != nslice:
+        raise ValueError(f"{fn}: {len(slices)} slices, expected {nslice}")
+    return {k: np.concatenate([sl[k] for sl in slices])
+            for k in ("gamma", "theta", "x", "y", "px", "py")}
 
 
 def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
@@ -194,8 +207,11 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
     print(f"  final field                     peak normalized     = {rel_fld:.3e}")
 
     # Final particle dump, particle by particle, all slices. gamma relative to itself,
-    # transverse peak normalized. These are checked.
-    pf, pg = load_par(fortran_par, nslice), load_par(genesis_par, nslice)
+    # transverse peak normalized. These are checked. The window comes from the Genesis dump,
+    # since an openPMD beam file states the slice partition but not the wavelength it was
+    # sliced on: that belongs to the run.
+    window = beamio.genesis_window(genesis_par)
+    pf, pg = load_par(fortran_par, nslice, window), load_par(genesis_par, nslice)
     scales = {"gamma": np.abs(pg["gamma"]).max(),
               "x": np.abs(pg["x"]).max(), "y": np.abs(pg["y"]).max(),
               "px": np.abs(pg["px"]).max(), "py": np.abs(pg["py"]).max()}
@@ -213,6 +229,10 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
     # comparison metric). The distribution tells the story: the median is
     # the typical particle, the max is the separatrix tail. theta's collective effect IS
     # checked, through the bunching curve and the final field above.
+    #
+    # These are absolute phases on both sides. Neither dump format has a place for the
+    # run's reference phase, so each code folds it into what it writes: Genesis stores
+    # theta itself, and an openPMD beam file stores the lag that theta implies.
     dth = pf["theta"] - pg["theta"]
     print(f"  final theta (not checked; see comment)  max {np.abs(dth).max():.1e}, "
           f"rms {dth.std():.1e}, median {np.median(np.abs(dth)):.1e} rad")
@@ -285,53 +305,53 @@ def main():
     for name, diag, out, ffld, gfld, fpar, gpar, tol, nsl in (
         ("tier1: FEL core, one undulator segment",
          f"{w}/tier1.diag.txt", f"{w}/Aramis1seg.out.h5",
-         f"{w}/tier1-final.fld.h5", f"{w}/Aramis1seg-final.fld.h5",
-         f"{w}/tier1-final.par.h5", f"{w}/Aramis1seg-final.par.h5",
+         f"{w}/tier1-final.wf.h5", f"{w}/Aramis1seg-final.fld.h5",
+         f"{w}/tier1-final.beam.h5", f"{w}/Aramis1seg-final.par.h5",
          args.tol_tier1, 1),
         ("tier1_unavg: one segment, UNAVERAGED dynamics vs Genesis (priced model difference)",
          f"{w}/tier1u.diag.txt", f"{w}/Aramis1seg.out.h5",
-         f"{w}/tier1u-final.fld.h5", f"{w}/Aramis1seg-final.fld.h5",
-         f"{w}/tier1u-final.par.h5", f"{w}/Aramis1seg-final.par.h5",
+         f"{w}/tier1u-final.wf.h5", f"{w}/Aramis1seg-final.fld.h5",
+         f"{w}/tier1u-final.beam.h5", f"{w}/Aramis1seg-final.par.h5",
          args.tol_tier1_unavg, 1),
         ("tier2_genesis: full line, transcribed interludes",
          f"{w}/tier2g.diag.txt", f"{w}/Aramis.out.h5",
-         f"{w}/tier2g-final.fld.h5", f"{w}/Aramis-final.fld.h5",
-         f"{w}/tier2g-final.par.h5", f"{w}/Aramis-final.par.h5",
+         f"{w}/tier2g-final.wf.h5", f"{w}/Aramis-final.fld.h5",
+         f"{w}/tier2g-final.beam.h5", f"{w}/Aramis-final.par.h5",
          args.tol_tier2_genesis, 1),
         ("tier2_bmad: full line, Bmad seam interludes",
          f"{w}/tier2.diag.txt", f"{w}/Aramis.out.h5",
-         f"{w}/tier2-final.fld.h5", f"{w}/Aramis-final.fld.h5",
-         f"{w}/tier2-final.par.h5", f"{w}/Aramis-final.par.h5",
+         f"{w}/tier2-final.wf.h5", f"{w}/Aramis-final.fld.h5",
+         f"{w}/tier2-final.beam.h5", f"{w}/Aramis-final.par.h5",
          args.tol_tier2_bmad, 1),
         ("td1: FEL core + slippage, one undulator segment",
          f"{w}/td1.diag.txt", f"{w}/AramisTD1seg.out.h5",
-         f"{w}/td1-final.fld.h5", f"{w}/AramisTD1seg-final.fld.h5",
-         f"{w}/td1-final.par.h5", f"{w}/AramisTD1seg-final.par.h5",
+         f"{w}/td1-final.wf.h5", f"{w}/AramisTD1seg-final.fld.h5",
+         f"{w}/td1-final.beam.h5", f"{w}/AramisTD1seg-final.par.h5",
          args.tol_td1, nslice_td),
         ("td2_genesis: full line time dependent, transcribed interludes",
          f"{w}/td2g.diag.txt", f"{w}/AramisTD.out.h5",
-         f"{w}/td2g-final.fld.h5", f"{w}/AramisTD-final.fld.h5",
-         f"{w}/td2g-final.par.h5", f"{w}/AramisTD-final.par.h5",
+         f"{w}/td2g-final.wf.h5", f"{w}/AramisTD-final.fld.h5",
+         f"{w}/td2g-final.beam.h5", f"{w}/AramisTD-final.par.h5",
          args.tol_td2_genesis, nslice_td),
         ("td2_bmad: full line time dependent, Bmad seam interludes",
          f"{w}/td2.diag.txt", f"{w}/AramisTD.out.h5",
-         f"{w}/td2-final.fld.h5", f"{w}/AramisTD-final.fld.h5",
-         f"{w}/td2-final.par.h5", f"{w}/AramisTD-final.par.h5",
+         f"{w}/td2-final.wf.h5", f"{w}/AramisTD-final.fld.h5",
+         f"{w}/td2-final.beam.h5", f"{w}/AramisTD-final.par.h5",
          args.tol_td2_bmad, nslice_td),
         ("tdsase: full line, pure SASE (dark start, growth from shot noise alone)",
          f"{w}/tdsase.diag.txt", f"{w}/AramisTDSASE.out.h5",
-         f"{w}/tdsase-final.fld.h5", f"{w}/AramisTDSASE-final.fld.h5",
-         f"{w}/tdsase-final.par.h5", f"{w}/AramisTDSASE-final.par.h5",
+         f"{w}/tdsase-final.wf.h5", f"{w}/AramisTDSASE-final.fld.h5",
+         f"{w}/tdsase-final.beam.h5", f"{w}/AramisTDSASE-final.par.h5",
          args.tol_tdsase, nslice_tdsase),
         ("tdsc: one segment TD, space charge on (short range + long range)",
          f"{w}/tdsc.diag.txt", f"{w}/AramisTDSC.out.h5",
-         f"{w}/tdsc-final.fld.h5", f"{w}/AramisTDSC-final.fld.h5",
-         f"{w}/tdsc-final.par.h5", f"{w}/AramisTDSC-final.par.h5",
+         f"{w}/tdsc-final.wf.h5", f"{w}/AramisTDSC-final.fld.h5",
+         f"{w}/tdsc-final.beam.h5", f"{w}/AramisTDSC-final.par.h5",
          args.tol_tdsc, nslice_td),
         ("tdwk: one segment TD, all wake kernels on",
          f"{w}/tdwk.diag.txt", f"{w}/AramisTDWK.out.h5",
-         f"{w}/tdwk-final.fld.h5", f"{w}/AramisTDWK-final.fld.h5",
-         f"{w}/tdwk-final.par.h5", f"{w}/AramisTDWK-final.par.h5",
+         f"{w}/tdwk-final.wf.h5", f"{w}/AramisTDWK-final.fld.h5",
+         f"{w}/tdwk-final.beam.h5", f"{w}/AramisTDWK-final.par.h5",
          args.tol_tdwk, nslice_td),
     ):
         worst, ok = compare_tier(name, diag, out, ffld, gfld, fpar, gpar, tol, nsl)
@@ -340,7 +360,7 @@ def main():
     worst, ok = compare_split(
         "weight_split: nonuniform weights must be invisible",
         f"{w}/tier1s.diag.txt", f"{w}/tier1.diag.txt",
-        f"{w}/tier1s-final.fld.h5", f"{w}/tier1-final.fld.h5",
+        f"{w}/tier1s-final.wf.h5", f"{w}/tier1-final.wf.h5",
         args.tol_split)
     results.append(("weight_split: nonuniform weights must be invisible", worst, ok))
 

@@ -66,7 +66,6 @@ use, SEG
 NML = """&fel_params
   lat_file = "{lat}"
   global%out_root = "{root}"
-  global%beam_formats = 'genesis'
   global%interlude_model = "genesis"
   global%ran_seed = {seed}
 {extra}/
