@@ -958,7 +958,7 @@ Per-harmonic openPMD imports are matched to the field whose photon energy they
 carry, and a file matching none is refused by name.
 
 The mapping, one decision per row where the extension's text under-determines the
-file (each also recorded for upstream in \code{lucifer/openpmd/UPSTREAM-NOTES.md}):
+file (each carried upstream into openPMD-beamphysics's own openPMD I/O):
 
 \begin{center}
 \begin{tabular}{ll}
@@ -981,10 +981,11 @@ Validation: every required attribute and \code{unitDimension} checked against th
 spec text in h5py. Genesis-format and openPMD dumps of the same field agree
 complex-value-wise at $1.4\times10^{-16}$. The Fortran reader's re-dump is
 dataset-identical to the original. The openPMD-beamphysics \code{Wavefront} class
-agrees on the field energy through its own Genesis path at $1.2\times10^{-12}$,
-and the carried Python patch (\code{lucifer/openpmd/}, the class's future
-\code{from\_openpmd}/\code{write\_openpmd}) reads and round-trips the files
-exactly, exercised every harness run.
+agrees on the field energy through its own Genesis path at $1.2\times10^{-12}$.
+Its \code{from\_openpmd} reads the harmonic file to the same complex values,
+\code{write\_openpmd} round-trips exactly, and the Fortran reader takes what that
+writer produces and re-dumps it dataset-identical. All of it runs every harness
+pass, so the two implementations of this extension stay in step.
 
 \subsection{Phasing between segments}\label{sec:phasing}
 

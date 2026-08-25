@@ -9,7 +9,9 @@ Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
      constants floor, and which the Fortran READER reproduces exactly: re-importing
      the .wf.h5 and re-dumping Genesis-format must be dataset-identical to the
      original Genesis-format dump. The Python Wavefront class reads the Genesis dump
-     through its own path and must agree on the field energy.
+     through its own path and must agree on the field energy, reads the harmonic
+     .wf.h5 to the same complex values, round-trips its own writer exactly, and what
+     its writer produces must come back through the Fortran reader unchanged.
   2. HARMONIC TIER vs Genesis4: a planar steady-state segment (the benchmark's
      gamma, wavelength and rms aw -- planar so fc(3) is alive), both codes tracking
      the SAME Genesis-written starting state with a dark third-harmonic field:
@@ -26,8 +28,9 @@ Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
      an openPMD import declaring the frequency domain; a harmonic import whose
      photonEnergy matches no field of the run; a Genesis-format harmonic import.
 
-Run by the benchmark harness; exits nonzero on failure. Needs the genesis4 binary
-(--genesis) for section 2.
+Run by the benchmark harness. Exits nonzero on failure. Needs the genesis4 binary
+(--genesis) for section 2, and a beamphysics checkout carrying
+beamphysics/wavefront/openpmd.py (--pyrepo) for the openPMD checks of section 1.
 """
 
 from __future__ import annotations
@@ -333,32 +336,48 @@ def main():
     sys.path.insert(0, args.pyrepo)
     try:
         from beamphysics.wavefront import Wavefront
-        wf_py = Wavefront.from_genesis4(str(wd / "h3both-final.fld.h5"))
-        E_gen, dsp = dfl_to_vperm(wd / "h3both-final.fld.h5")
-        u_here = power_of(E_gen, dsp) * 1e-10 / C_LIGHT   # SS: dz = wavelength
-        d = abs(wf_py.energy - u_here) / u_here
-        check("Python Wavefront class energy (its Genesis path)", d, TOL_PY_ENERGY)
     except ImportError as exc:
         print(f"FAIL: cannot import the Python Wavefront class from {args.pyrepo}: {exc}")
-        FAILED = True
+        print("      The openPMD path needs a beamphysics carrying "
+              "beamphysics/wavefront/openpmd.py.")
+        sys.exit(1)
+    wf_py = Wavefront.from_genesis4(str(wd / "h3both-final.fld.h5"))
+    E_gen, dsp = dfl_to_vperm(wd / "h3both-final.fld.h5")
+    u_here = power_of(E_gen, dsp) * 1e-10 / C_LIGHT   # SS: dz = wavelength
+    d = abs(wf_py.energy - u_here) / u_here
+    check("Python Wavefront class energy (its Genesis path)", d, TOL_PY_ENERGY)
 
-    # The carried Python patch (lucifer/openpmd/): its reader must recover the
-    # Genesis dump's complex values from the .wf.h5 through its own transpose logic,
-    # and its writer must round-trip through its reader exactly.
+    # The Python class's own openPMD path (upstream): its reader must recover the
+    # Genesis dump's complex values from the harmonic .wf.h5 through its own axis
+    # handling, its writer must round-trip through its reader exactly, and the
+    # Fortran reader must accept what it writes.
 
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "openpmd"))
-    import wavefront_openpmd_patch as wpp
-    kw = wpp.from_openpmd(wd / "h3both-final-h3.wf.h5")
+    wf_h = Wavefront.from_openpmd(wd / "h3both-final-h3.wf.h5")
     E_gen, dsp = dfl_to_vperm(wd / "h3both-final-h3.fld.h5")
-    d = float(np.max(np.abs(kw["Ex"][:, :, 0].T - E_gen)) / np.max(np.abs(E_gen)))
-    check("carried Python patch reads the file (vs Genesis dump)", d, TOL_RT_FORMATS)
-    class _WF:                                    # the class's constructor surface
-        def __init__(self, **k): self.__dict__.update(k)
-    wpp.write_openpmd(_WF(**kw), wd / "pyrt.wf.h5", z_coordinate=3.96)
-    kw2 = wpp.from_openpmd(wd / "pyrt.wf.h5")
-    ok = (np.array_equal(kw["Ex"], kw2["Ex"]) and kw2["Ey"] is None
-          and kw["wavelength"] == kw2["wavelength"])
-    check("carried Python patch write/read round trip exact", 0.0 if ok else 1.0, 0.5)
+    d = float(np.max(np.abs(wf_h.Ex[:, :, 0].T - E_gen)) / np.max(np.abs(E_gen)))
+    check("Python openPMD reader (vs Genesis dump)", d, TOL_RT_FORMATS)
+    wf_h.write_openpmd(wd / "pyrt.wf.h5")
+    wf_rt = Wavefront.from_openpmd(wd / "pyrt.wf.h5")
+    ok = (np.array_equal(wf_h.Ex, wf_rt.Ex) and wf_rt.Ey is None
+          and wf_h.wavelength == wf_rt.wavelength)
+    check("Python openPMD write/read round trip exact", 0.0 if ok else 1.0, 0.5)
+
+    # Python writer to Fortran reader: rewrite both fields of the run through the
+    # Python class, import that pair, and re-dump Genesis-format. The fundamental
+    # must come back dataset-identical to the run's own Genesis dump.
+
+    for src, dst in (("h3both-final.wf.h5", "pyw-final.wf.h5"),
+                     ("h3both-final-h3.wf.h5", "pyw-final-h3.wf.h5")):
+        Wavefront.from_openpmd(wd / src).write_openpmd(wd / dst)
+    run(exe, wd, "pywrt", NML_IMPORT.format(lat="planar_val.bmad", root="pywrt",
+        beam="h3both-final.par.h5", field="pyw-final.wf.h5",
+        extra="  write_initial = T\n  load_only = T\n"))
+    same = True
+    with h5py.File(wd / "pywrt-initial.fld.h5") as a, h5py.File(wd / "h3both-final.fld.h5") as b:
+        for k in ("slice000001/field-real", "slice000001/field-imag"):
+            same = same and bool(np.array_equal(a[k][:], b[k][:]))
+    check("Fortran reads the Python writer's file, Genesis re-dump identical",
+          0.0 if same else 1.0, 0.5)
 
     # ------------------------------------------------------------------
     # 3. Deposit closed form: dark two-step restart from the bunched exit beam.

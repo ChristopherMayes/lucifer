@@ -1071,9 +1071,9 @@ polarizations as complex components of ONE mesh record (h5py reads them as
 complex128 natively), one file per harmonic, photonEnergy identifying it). The
 STANDARD DOCUMENT is authoritative: the harness verifies every required attribute
 against its text independently of the writer. Import auto-detects the format by
-signature. The Python-side reader/writer is carried as a patch in
-`lucifer/openpmd/` (with the upstream clarification notes the implementation
-surfaced), exercised against the Fortran writer every harness run.
+signature. The Python side of the round trip is openPMD-beamphysics's own
+`Wavefront.from_openpmd`/`write_openpmd`, exercised against the Fortran writer and
+reader every harness run.
 
 Measured (check_harmonics.py, ninth harness section):
 
@@ -1085,7 +1085,8 @@ Measured (check_harmonics.py, ninth harness section):
 | Genesis-format vs openPMD dumps, complex values | 1.4e-16 |
 | Fortran openPMD read-back, Genesis re-dump | dataset-identical |
 | Python Wavefront class energy (its Genesis path) | 1.2e-12 |
-| carried Python patch read + round trip | 1.4e-16 / exact |
+| Python openPMD read + round trip | 1.4e-16 / exact |
+| Fortran reads the Python writer's file | dataset-identical |
 | 1 vs 8 threads (TD harmonic run) | byte-identical |
 | six refusals (anchor, unavg, two-pol, frequency domain, no-match, format) | by name |
 

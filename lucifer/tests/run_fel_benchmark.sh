@@ -25,6 +25,11 @@
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
 #      (conda env create -f ../wavefront/tests/environment.yml).
 #
+#   4. An openPMD-beamphysics checkout carrying beamphysics/wavefront/openpmd.py, at
+#      ../openPMD-beamphysics by default. The harmonics section round-trips the
+#      wavefront files through that class in both directions, and refuses by name if
+#      the class is missing.
+#
 # Options:
 #   --genesis <path>    genesis4 binary. Default: ~/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4
 #   --exe <path>        lucifer binary. Default: debug then production.
