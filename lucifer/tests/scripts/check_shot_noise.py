@@ -29,6 +29,7 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
 from nml import to_groups
 
 E_CHARGE = 1.602176634e-19
@@ -36,6 +37,7 @@ E_CHARGE = 1.602176634e-19
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  beam_formats = 'openpmd'
   lambda0 = 1e-10
   beam_init%n_particle = 1024
   beam_init%bunch_charge = 4.803322970853e-14
@@ -59,29 +61,22 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 """
 
 
-def b2_samples(par_file, harmonics):
-    """Charge-weighted |b(h)|^2 * N_lambda for every slice and harmonic."""
+def b2_samples(dump_file, harmonics):
+    """Charge-weighted |b(h)|^2 * N_lambda for every slice and harmonic.
+
+    The dump is openPMD, so the weights are the ones the loader wrote. An earlier
+    version read Genesis format, which carries one current per slice, and had to
+    RECONSTRUCT the alternating test pattern to weight the sum. Reading the weights
+    tests the loader instead of assuming it."""
     out = []
-    with h5py.File(par_file) as h5:
-        nslice = int(h5["slicecount"][0])
-        spacing = float(h5["slicespacing"][0])
-        for i in range(nslice):
-            g = h5[f"slice{i+1:06d}"]
-            theta = g["theta"][:]
-            current = float(g["current"][0])
-            n_lambda = current * spacing / (E_CHARGE * 2.99792458e8)
-            # The dump format carries no weights. Reconstruct the loader's test pattern:
-            # uniform within beamlets of nbins=8, alternating 0.25/1.75 across beamlets
-            # when the test mode is on. The generator wrote current = c*sum(w)/spacing,
-            # so relative weights are all the statistic needs.
-            w = np.ones(len(theta))
-            if PARSED.reconstruct_weights:
-                nb = 8
-                scale = np.where(np.arange(len(theta)) // nb % 2 == 0, 0.25, 1.75)
-                w = scale
-            for h in harmonics:
-                b = np.sum(w * np.exp(-1j * h * theta)) / np.sum(w)
-                out.append(abs(b) ** 2 * n_lambda)
+    for sl in beamio.read_slices(dump_file):
+        if sl["n"] == 0:
+            continue
+        n_lambda = sl["weight"].sum() / E_CHARGE
+        w, theta = sl["weight"], sl["theta"]
+        for h in harmonics:
+            b = np.sum(w * np.exp(-1j * h * theta)) / np.sum(w)
+            out.append(abs(b) ** 2 * n_lambda)
     return out
 
 
@@ -97,8 +92,7 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
         if r.returncode != 0:
             print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
             sys.exit(1)
-        PARSED.reconstruct_weights = test_weights
-        vals = b2_samples(workdir / f"{root}-initial.par.h5", (1, 2, 3))
+        vals = b2_samples(workdir / f"{root}-initial.beam.h5", (1, 2, 3))
         for k, h in enumerate((1, 2, 3)):
             samples[h].extend(vals[k::3])
     return samples
@@ -112,7 +106,6 @@ def main():
     p.add_argument("--seeds", type=int, default=25)
     global PARSED
     PARSED = p.parse_args()
-    PARSED.reconstruct_weights = False
 
     workdir = pathlib.Path(PARSED.workdir)
     exe = pathlib.Path(PARSED.exe).resolve()

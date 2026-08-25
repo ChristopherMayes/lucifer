@@ -46,6 +46,7 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
 from nml import to_groups
 
 LAMBDA0 = 1e-10
@@ -95,6 +96,7 @@ NML_GEN = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   window_length = {slen}
   write_diag = T
+  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -130,6 +132,7 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   imp%nslice = 12
   imp%slicewidth = 0.01
   write_diag = T
+  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -145,16 +148,15 @@ def run(exe, nml, log, w, threads="1"):
 
 
 def load_par(w, root):
-    """Per-slice per-particle gamma and weight-derived charge from a final dump."""
+    """Per-slice per-particle gamma and slice charge from a final dump, either format.
+    The split-weight runs must write openPMD, since Genesis format refuses a weighted
+    beam, so the file name follows the format rather than the other way round."""
+    pmd = w / f"{root}-final.beam.h5"
+    src = pmd if pmd.exists() else w / f"{root}-final.par.h5"
     out = []
-    with h5py.File(w/f"{root}-final.par.h5") as h5:
-        n = int(h5["slicecount"][0])
-        for i in range(n):
-            g = h5[f"slice{i+1:06d}"]
-            cur = g["current"][0]
-            npart = len(g["gamma"][:])
-            q = cur * SPACING / 2.99792458e8   # slice charge
-            out.append(dict(gamma=g["gamma"][:], theta=g["theta"][:], q=q, npart=npart))
+    for sl in beamio.read_slices(src):
+        out.append(dict(gamma=sl["gamma"], theta=sl["theta"],
+                        q=sl["current"] * SPACING / 2.99792458e8, npart=sl["n"]))
     return out
 
 
@@ -243,8 +245,10 @@ def main():
         ok = False
 
     # ---------------- causality: spike at the tail, probes ahead get EXACTLY zero
-    (w/"wc_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE, extra=""))
-    (w/"wc_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE, extra=""))
+    (w/"wc_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE,
+                                      extra="  beam_formats = 'openpmd'\n"))
+    (w/"wc_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE,
+                                      extra="  beam_formats = 'openpmd'\n"))
     run(exe, "wc_a.nml", "wca.log", w)
     run(exe, "wc_b.nml", "wcb.log", w)
     A, B = load_par(w, "wca"), load_par(w, "wcb")
@@ -396,9 +400,9 @@ def main():
 
     # ---------------- split-weight invariance through the wake
     (w/"ws_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
-                                             extra="  imp_split_weights = T\n"))
+                                             extra="  imp_split_weights = T\n  beam_formats = 'openpmd'\n"))
     (w/"ws_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
-                                             extra="  imp_split_weights = T\n"))
+                                             extra="  imp_split_weights = T\n  beam_formats = 'openpmd'\n"))
     run(exe, "ws_a.nml", "wsa.log", w)
     run(exe, "ws_b.nml", "wsb.log", w)
     A2, B2 = load_par(w, "wsa"), load_par(w, "wsb")

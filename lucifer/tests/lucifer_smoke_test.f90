@@ -53,6 +53,8 @@ do ipass = 1, 2
   run%lat_file = lat_file
   run%global%out_root = out_root(ipass)
   run%global%interlude_model = 'genesis'
+  run%global%beam_formats(1) = 'genesis'   ! The namelist twin this is compared against
+                                          !   writes Genesis format, so this must too.
   run%global%write_diag = .true.
   run%global%ran_seed = 777
 
@@ -78,7 +80,7 @@ do ipass = 1, 2
   if (.not. err) call fel_init_wavefront (run, err)
   if (.not. err) call fel_setup_schedule (run, err)
   if (.not. err) call track_fel_line (run, err)
-  if (.not. err) call fel_write_genesis4_beam (run%fbeam, trim(out_root(ipass)) // '-final.par.h5', err)
+  if (.not. err) call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(out_root(ipass)) // '-final', err)
   if (.not. err) call fel_dump_field_set (run, trim(out_root(ipass)) // '-final', err)
   if (.not. err) call fel_finalize_diagnostics (run, err)
 

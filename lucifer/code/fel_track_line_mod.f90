@@ -895,8 +895,8 @@ if (eerr) then
   err_flag = .true.;  return
 endif
 if (dump_beam_here(ie)) then
-  write (fname, '(2a, i0, 3a)') trim(out_root), '-at', ie, '-', trim(ele%name), '.par.h5'
-  call fel_write_genesis4_beam (fbeam, trim(fname), eerr)
+  write (fname, '(2a, i0, 2a)') trim(out_root), '-at', ie, '-', trim(ele%name)
+  call fel_dump_beam (run, ele, trim(fname), eerr)
   if (eerr) then
     err_flag = .true.;  return
   endif

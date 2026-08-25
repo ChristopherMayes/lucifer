@@ -524,6 +524,50 @@ $6.5\times10^{-1}$, $\ln{-57}$, $\ln{+4.7}$; the ``$\theta$ over $2\pi$'' mutati
 an equivalent mutant, correctly passed (FINDINGS 7.16).
 \end{validation}
 
+\subsection{Particle dumps}\label{sec:pardump}
+
+A run writes its beam in the formats \code{beam\_formats} names, a LIST rather than an
+enum so a third code costs a token: \code{openpmd} (unset takes this alone) writes
+\code{.beam.h5} through Bmad's \code{hdf5\_write\_beam}, one bunch per slice, and
+\code{genesis} writes the \code{.par.h5} of \S\ref{sec:units}'s conventions. An
+unknown token is refused by name. \code{beam\_file} reads either: the openPMD root
+attribute is the signature.
+
+The formats are not equivalent, and the difference is charge. openPMD's macro-charge IS
+the per-particle weight $w_j$, so a weighted beam survives. Genesis \code{.par.h5}
+carries one current per slice, Eq.~\ref{eq:importcurrent} read backwards, so a reader
+must divide it out uniformly. Writing a nonuniform-weight beam in that format is
+therefore refused by name rather than written and silently read back uniform.
+
+Two consequences of using Bmad's writer. An EMPTY SLICE is skipped, because that
+routine takes the species from its first particle and a zero-particle bunch has none.
+The window therefore rides in root attributes (\code{felNumSlice},
+\code{felSliceIndex}, \code{felSliceSpacing}, \code{felWavelength},
+\code{felWindowStart}, \code{felNbins}, \code{felOne4one}), which restores the empty
+slices on read. And a file without those attributes is refused with \code{dist\_file}
+named: it describes a bunch, not a sliced window.
+
+Neither format is the identity on the packed arrays, for a reason that is the chart's
+and not the file's. openPMD stores absolute momenta and a time, so $\hat p_x$,
+$\hat p_y$ and $z$ round trip through $P/p_0$ and $-\beta c\,\delta t$. Genesis
+stores $(\theta, \gamma)$ and pays there instead. Either way $\varphi_0$ restarts at
+zero, since the particle lag lives in $z$, so $\theta$ shifts by a constant on any
+restart.
+
+\begin{provenance}
+\code{hdf5\_write\_beam} and \code{hdf5\_read\_beam} (Bmad's own openPMD particle
+I/O, macro-charge as \code{weight}); \code{fel\_slice\_to\_bunch} and
+\code{fel\_bunch\_to\_slice} for the chart, the same pair the seam uses every step.
+\end{provenance}
+\begin{validation}
+openPMD file write/read/write dataset-identical; packed $x$, $y$, $\gamma$ exact and
+$\hat p_x$, $\hat p_y$ at $1.1\times10^{-16}$ through openPMD, the mirror pattern
+through Genesis format; the $\theta$ offset constant to $3.6\times10^{-12}$ rad; split
+weights stored per particle and bit-identical on read; per-slice counts restored with an
+empty slice present; three refusals by name; mutations (weight unwritten, window count
+from the bunch count, bunches placed in file order) each caught by their own check.
+\end{validation}
+
 \section{Slice migration}\label{sec:migration}
 
 With per-particle weights, migration needs no one4one: a mover carries its own charge.

@@ -326,7 +326,7 @@ character(56), parameter :: moved(2, 44) = reshape([ character(56) :: &
   'lat_file',           '&fel_params lat_file',                        &
   'out_root',           '&fel_params global%out_root',                 &
   'interlude_model',    '&fel_params global%interlude_model',          &
-  'wavefront_format',   '&fel_params global%wavefront_format',         &
+  'wavefront_format',   '&fel_params global%wavefront_formats (list)', &
   'write_diag',         '&fel_params global%write_diag',               &
   'write_initial',      '&fel_params global%write_initial',            &
   'load_only',          '&fel_params global%load_only',                &

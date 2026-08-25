@@ -24,7 +24,7 @@ Measured by this example (200 MW seed, 3.96 m planar, rms aw = 0.84853):
 `fel-benchmark-plots/harmonic-lasing.png`). The harmonic's full wavefront_params
 live under `field/harm3/` in the stats file. Its dumps carry `-h3` in the name:
 Genesis format (`harmonics-final-h3.fld.h5`, Genesis's own `.h3` convention
-adapted) and, because this example sets `wavefront_format = 'both'`, openPMD
+adapted) and, because this example sets `wavefront_formats = 'genesis', 'openpmd'`, openPMD
 EXT_Wavefront files (`.wf.h5`) with the photon energy identifying the harmonic.
 
 A helical undulator would give exactly nothing here: its coupling fc(h) vanishes

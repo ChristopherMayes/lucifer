@@ -2,6 +2,9 @@
 *.diag.txt
 *.png
 *-final.fld.h5
+*-final.beam.h5
+*-initial.beam.h5
+*-at*.beam.h5
 *-final.par.h5
 *-initial.fld.h5
 *-initial.par.h5

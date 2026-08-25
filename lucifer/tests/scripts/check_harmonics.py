@@ -144,6 +144,7 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   field_file = "{field}"
   harmonics = 1, 3
   write_diag = T
+  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -170,6 +171,7 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   ran_seed = 777
   harmonics = 1, 3
   write_diag = T
+  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -282,7 +284,7 @@ def main():
     print("== openPMD EXT_Wavefront round trip ==")
     run(exe, wd, "h3both", NML_IMPORT.format(lat="planar_val.bmad", root="h3both",
         beam="H3-initial.par.h5", field="H3-initial.fld.h5",
-        extra="  wavefront_format = 'both'\n"))
+        extra="  wavefront_formats = 'genesis', 'openpmd'\n"))
 
     for fn, lam in (("h3both-final.wf.h5", 1e-10), ("h3both-final-h3.wf.h5", 1e-10 / 3)):
         with h5py.File(wd / fn) as f:

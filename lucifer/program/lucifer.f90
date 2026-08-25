@@ -47,9 +47,18 @@
 !     lat_file = "aramis.bmad"                 ! Bmad lattice.
 !     global%out_root = "fel_td"               ! Prefix for the output files.
 !     global%interlude_model = "bmad"          ! "bmad" (the seam, default) or "genesis".
+!     global%beam_formats = 'openpmd'          ! Particle dump formats, a LIST: 'openpmd'
+!                                              !   (.beam.h5, the default, carries the
+!                                              !   per-particle weight) and/or 'genesis'
+!                                              !   (.par.h5, one current per slice, so a
+!                                              !   weighted beam is refused by name).
+!     global%wavefront_formats = 'genesis'     ! Field dump formats, same list shape:
+!                                              !   'genesis' (.fld.h5, default) and/or
+!                                              !   'openpmd' (.wf.h5).
 !   /
 !   &fel_beam_init
-!     beam_file = "Aramis-initial.par.h5"      ! Genesis particle dump to start from.
+!     beam_file = "Aramis-initial.par.h5"      ! Particle dump to start from, either
+!                                              !   format: the file's signature decides.
 !     split_weights = F                        ! Weight-invariance test mode (see below).
 !   /
 !   &fel_wavefront_init
@@ -78,8 +87,8 @@
 !                           !   sentinel -1: silence never means hard edge.
 ! The remaining global%... switches of &fel_params:
 !
-!     global%write_initial = F                 ! Also dump the initial state (Genesis format).
-!     global%dump_beam_at = "UND3", "quadrupole::*"  ! Dump the beam (Genesis .par.h5 format)
+!     global%write_initial = F                 ! Also dump the initial state.
+!     global%dump_beam_at = "UND3", "quadrupole::*"  ! Dump the beam, in beam_formats,
 !                                              !   at the end of the named elements (Bmad
 !                                              !   locator syntax, class::name allowed).
 !                                              !   An entry matching nothing is refused by name.
@@ -213,9 +222,10 @@
 ! statistics file (manual sec:stats): per-record per-slice beam moments named as
 ! bunch_params_struct components, per-record per-slice wavefront_params, and the
 ! evaluated calc_bunch_params at element ends, in fixed Bmad units.
-! <out_root>-final.fld.h5 and <out_root>-final.par.h5 are Genesis-format dumps of the
-! end state, for field-by-field comparison. The field dump is unrotated to time order
-! first, as writeFieldHDF5 does.
+! The end state is dumped in whatever beam_formats and wavefront_formats name:
+! <out_root>-final.beam.h5 and -final.wf.h5 are openPMD, <out_root>-final.par.h5 and
+! -final.fld.h5 are Genesis format, for field-by-field comparison against Genesis. The
+! field dump is unrotated to time order first, as writeFieldHDF5 does.
 !-
 
 program lucifer
@@ -286,7 +296,7 @@ endif
 if (run%global%write_initial .or. run%global%load_only) then
   call wavefront_write_genesis4 (run%ffield(1)%wf, trim(run%global%out_root) // '-initial.fld.h5', err, 'x')
   if (err) stop 1
-  call fel_write_genesis4_beam (run%fbeam, trim(run%global%out_root) // '-initial.par.h5', err)
+  call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_start), trim(run%global%out_root) // '-initial', err)
   if (err) stop 1
 endif
 
@@ -302,7 +312,7 @@ if (err) stop 1
 ! the time window holds record slice 1 + mod(is-1+first, nslice)), which is what
 ! Genesis's field writer does on the fly (manual sec:slippage).
 
-call fel_write_genesis4_beam (run%fbeam, trim(run%global%out_root) // '-final.par.h5', err)
+call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err)
 if (err) stop 1
 
 call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err)

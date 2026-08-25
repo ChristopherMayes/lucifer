@@ -455,14 +455,217 @@ end subroutine fel_read_genesis4_beam
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_read_openpmd_beam (beam, file_name, gamma0, ele, err_flag)
+!
+! Routine to read an openPMD-beamphysics particle file written by
+! fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
+! routine: one bunch per nonempty slice, placed by the file's felSliceIndex, with the
+! window's empty slices restored empty.
+!
+! A file without the fel* window attributes is refused by name. Such a file describes a
+! bunch, not an FEL time window, and belongs on the import path (dist_file), which
+! resamples it into slices instead of assuming a slicing it does not carry.
+!
+! Input:
+!   file_name   -- character(*): File to read.
+!   gamma0      -- real(rp): Reference gamma for the run, from the lattice.
+!   ele         -- ele_struct: Element to convert the coordinates against.
+!
+! Output:
+!   beam        -- fel_beam_struct: Beam read from the file.
+!   err_flag    -- logical: Set True on error, False otherwise.
+!-
+
+subroutine fel_read_openpmd_beam (beam, file_name, gamma0, ele, err_flag)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
+type (ele_struct) ele
+type (beam_struct) beam_b
+integer(hid_t) f_id
+integer ib, is, np, nb, n_slice, h5_err, ivec(1)
+integer, allocatable :: slice_ix(:)
+real(rp) gamma0, rvec(1)
+logical err_flag, err
+character(*) file_name
+character(*), parameter :: r_name = 'fel_read_openpmd_beam'
+
+!
+
+err_flag = .true.
+
+if (gamma0 <= 1) then
+  call out_io (s_error$, r_name, 'gamma0 MUST EXCEED 1. GOT: \es12.4\ ', r_array = [gamma0])
+  return
+endif
+
+! The window attributes first: without them the file cannot be placed into slices.
+
+call hdf5_open_file (file_name, 'READ', f_id, err);  if (err) return
+
+n_slice = -1
+call hdf5_read_attribute_int (f_id, 'felNumSlice', n_slice, err, .false.)
+if (err .or. n_slice == -1) then
+  call out_io (s_error$, r_name, &
+      'openPMD PARTICLE FILE CARRIES NO FEL WINDOW ATTRIBUTES: ' // trim(file_name), &
+      'IT DESCRIBES A BUNCH, NOT A SLICED TIME WINDOW, SO ITS SLICING IS UNKNOWN.', &
+      'READ IT WITH dist_file, WHICH RESAMPLES A BUNCH INTO SLICES.')
+  return
+endif
+
+if (n_slice < 1) then
+  call out_io (s_error$, r_name, 'FILE HAS A NON-POSITIVE felNumSlice: \i0\ ', i_array = [n_slice])
+  return
+endif
+
+call re_allocate (slice_ix, n_slice)
+call hdf5_read_attribute_int (f_id, 'felSliceIndex', slice_ix, err, .true.);  if (err) return
+call hdf5_read_attribute_int (f_id, 'felNbins', beam%nbins, err, .true.);  if (err) return
+call hdf5_read_attribute_int (f_id, 'felOne4one', ivec(1), err, .true.);  if (err) return
+beam%one4one = (ivec(1) /= 0)
+call hdf5_read_attribute_real (f_id, 'felSliceSpacing', beam%slice_spacing, err, .true.);  if (err) return
+call hdf5_read_attribute_real (f_id, 'felWavelength', beam%wavelength, err, .true.);  if (err) return
+call hdf5_read_attribute_real (f_id, 'felWindowStart', beam%s0, err, .true.);  if (err) return
+call H5Fclose_f (f_id, h5_err)
+
+! p0c is the one stored reference, as on the Genesis path. phi0 restarts at zero: the
+! particle lag lives in z, so the reference phase is free.
+
+beam%p0c = sqrt(gamma0**2 - 1) * m_electron
+beam%phi0 = 0
+
+call hdf5_read_beam (file_name, beam_b, err, ele)
+if (err) return
+
+nb = size(beam_b%bunch)
+if (nb > n_slice) then
+  call out_io (s_error$, r_name, 'FILE HAS MORE BUNCHES THAN SLICES: \i0\ VS \i0\ ', &
+               'FILE: ' // trim(file_name), i_array = [nb, n_slice])
+  return
+endif
+
+if (allocated(beam%slice)) deallocate(beam%slice)
+allocate (beam%slice(n_slice))
+
+do is = 1, n_slice
+  call fel_slice_reallocate (beam%slice(is), 0)
+  beam%slice(is)%n = 0
+enddo
+
+do ib = 1, nb
+  is = slice_ix(ib)
+  if (is < 1 .or. is > n_slice) then
+    call out_io (s_error$, r_name, 'FILE felSliceIndex \i0\ IS OUTSIDE THE WINDOW OF \i0\ SLICES.', &
+                 i_array = [is, n_slice])
+    return
+  endif
+  sl => beam%slice(is)
+  np = size(beam_b%bunch(ib)%particle)
+  call fel_slice_reallocate (sl, np)
+  sl%n = np
+  call fel_bunch_to_slice (beam_b%bunch(ib), ele, sl, err)
+  if (err) return
+enddo
+
+err_flag = .false.
+
+end subroutine fel_read_openpmd_beam
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag)
+!
+! Routine to write a packed beam as an openPMD-beamphysics particle file, one bunch per
+! slice through Bmad's own hdf5_write_beam. Unlike a Genesis dump this carries the
+! PER-PARTICLE weight, as openPMD's macro-charge, so a weighted beam survives the round
+! trip.
+!
+! An empty slice is skipped rather than written: hdf5_write_beam takes the species from
+! p(1), which a zero-particle bunch does not have. The window geometry therefore rides
+! in root attributes instead of being implied by the file's bunch count, and
+! felSliceIndex says which slice each written bunch came from. Reading them back
+! restores the empty slices exactly.
+!
+! Input:
+!   beam        -- fel_beam_struct: Beam to write.
+!   ele         -- ele_struct: Element the beam sits at, for the coord_struct conversion.
+!   file_name   -- character(*): File to create.
+!
+! Output:
+!   err_flag    -- logical: Set True on error, False otherwise.
+!-
+
+subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
+type (ele_struct) ele
+type (beam_struct) beam_b
+integer(hid_t) f_id
+integer is, nb, nslice, h5_err
+integer, allocatable :: slice_ix(:)
+logical err_flag, err
+character(*) file_name
+character(*), parameter :: r_name = 'fel_write_openpmd_beam'
+
+!
+
+err_flag = .true.
+nslice = size(beam%slice)
+
+nb = count(beam%slice(1:nslice)%n > 0)
+if (nb == 0) then
+  call out_io (s_error$, r_name, 'BEAM HAS NO PARTICLES IN ANY SLICE; NOTHING TO WRITE.', &
+               'FILE: ' // trim(file_name))
+  return
+endif
+
+call reallocate_beam (beam_b, nb)
+call re_allocate (slice_ix, nb)
+
+nb = 0
+do is = 1, nslice
+  sl => beam%slice(is)
+  if (sl%n == 0) cycle
+  nb = nb + 1
+  slice_ix(nb) = is
+  call fel_slice_to_bunch (beam, sl, ele, beam_b%bunch(nb), err)
+  if (err) return
+enddo
+
+call hdf5_write_beam (file_name, beam_b%bunch(1:nb), .false., err)
+if (err) return
+
+! The window the bunches came from. openPMD readers ignore attributes they do not know,
+! and Bmad's reader ignores everything outside its base path.
+
+call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
+call hdf5_write_attribute_int (f_id, 'felSliceIndex', slice_ix(1:nb), err);       if (err) return
+call hdf5_write_attribute_int (f_id, 'felNumSlice', nslice, err);                 if (err) return
+call hdf5_write_attribute_int (f_id, 'felNbins', beam%nbins, err);                if (err) return
+call hdf5_write_attribute_real (f_id, 'felSliceSpacing', beam%slice_spacing, err); if (err) return
+call hdf5_write_attribute_real (f_id, 'felWavelength', beam%wavelength, err);      if (err) return
+call hdf5_write_attribute_real (f_id, 'felWindowStart', beam%s0, err);             if (err) return
+call hdf5_write_attribute_int (f_id, 'felOne4one', merge(1, 0, beam%one4one), err); if (err) return
+call H5Fclose_f (f_id, h5_err)
+
+err_flag = .false.
+
+end subroutine fel_write_openpmd_beam
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_write_genesis4_beam (beam, file_name, err_flag)
 !
 ! Routine to write a packed beam as a Genesis 1.3 Version 4 particle dump, converting
 ! back from Bmad coordinates. Inverse of fel_read_genesis4_beam: theta = phi0 - ks*tau
 ! reconstructs Genesis's unwrapped theta including the accumulated common phase, gamma
 ! from pz, px py rescaled by p0_mc, current from the weights. The dump format carries no
-! per-particle weight, so nonuniform weights do not survive a round trip. That limit is
-! the format's and not this representation's.
+! per-particle weight, so a nonuniform-weight beam is REFUSED BY NAME here rather than
+! written and silently read back uniform. That limit is the format's, not this
+! representation's: fel_write_openpmd_beam carries the weights.
 !
 ! Input:
 !   beam        -- fel_beam_struct: Beam to write.
@@ -478,7 +681,7 @@ type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 integer(hid_t) f_id, g_id
 integer is, ip, h5_err, one4one_int
-real(rp) ks, gam, beta, p_mc, p0_mc
+real(rp) ks, gam, beta, p_mc, p0_mc, wmin, wmax
 real(rp), allocatable :: work(:)
 logical err_flag, err
 character(*) file_name
@@ -493,6 +696,23 @@ if (.not. allocated(beam%slice)) then
   call out_io (s_error$, r_name, 'BEAM HAS NO SLICES.')
   return
 endif
+
+! This format has one current per slice and no per-particle weight, so a weighted beam
+! would come back uniform. Refuse rather than write a beam nothing can read back.
+
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  if (sl%n < 2) cycle
+  wmin = minval(sl%weight(1:sl%n));  wmax = maxval(sl%weight(1:sl%n))
+  if (wmax - wmin <= 1e-12_rp * wmax) cycle
+  call out_io (s_error$, r_name, &
+      'GENESIS FORMAT CANNOT CARRY PER-PARTICLE WEIGHTS, AND THIS BEAM HAS NONUNIFORM WEIGHTS.', &
+      'SLICE \i0\ SPREADS \es12.4\ TO \es12.4\ C OVER \i0\ PARTICLES, TOTAL \es12.4\ C.', &
+      'THE FORMAT STORES ONE CURRENT PER SLICE, SO A READ-BACK WOULD RETURN A UNIFORM BEAM.', &
+      'WRITE openpmd INSTEAD (beam_formats), WHICH CARRIES THE WEIGHTS.', &
+      i_array = [is, sl%n], r_array = [wmin, wmax, sum(sl%weight(1:sl%n))])
+  return
+enddo
 
 ks = twopi / beam%wavelength
 p0_mc = fel_p0_mc(beam)

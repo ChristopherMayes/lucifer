@@ -76,6 +76,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 {source}  imp%nslice = {nslice}
   imp%slicewidth = 0.01
   write_diag = T
+  beam_formats = 'genesis'
 {extra}&end
 """
 
@@ -259,7 +260,7 @@ def main():
 
     # split: coincident copies leave the RNG-free outputs unchanged to roundoff.
     write_nml(w/"imp_split.nml", "impsplit", 1000,
-              extra='  imp_split_weights = T\n  load_only = T\n')
+              extra="  imp_split_weights = T\n  load_only = T\n  beam_formats = 'openpmd'\n")
     run([args.exe, "imp_split.nml"], w/"imp_split.log", env=env1)
     mom_s, cur_s = read_import_file(w, "impsplit")
     dm = np.abs(mom_s - mom_ref).max() / np.abs(mom_ref).max()

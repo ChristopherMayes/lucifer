@@ -958,7 +958,8 @@ precision:
 | File | What |
 |---|---|
 | `<out_root>.stats.h5` | The run: per-record and element-end beam, field and Twiss data (see the diagnostics section) |
-| `<out_root>-final.par.h5`, `-final.fld.h5` | Final beam and field, Genesis conventions, with `.wf.h5` for openPMD |
+| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD. The beam file carries the per-particle weight, which no Genesis dump can |
+| `<out_root>-final.par.h5`, `-final.fld.h5` | The same state in Genesis conventions, for feeding Genesis or comparing against it |
 | `<out_root>.diag.txt` | The per-record Genesis-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
 | `<out_root>.import.txt` | The distribution import's analysis moments and per-slice current profile. Written at import time, so it exists under `load_only = T` |
@@ -1064,9 +1065,13 @@ pre-harmonic walk BIT FOR BIT (the two-polarization overlay discipline again).
 Harmonics with two live polarizations, and with an unaveraged element, are refused
 by name, so unvalidated combinations refuse rather than guess.
 
-Radiation dumps speak two formats (`wavefront_format = 'genesis' | 'openpmd' |
-'both'`): the Genesis field dump (the default, the tiers' shared-state format,
-harmonic files carrying `-h<h>`) and openPMD EXT_Wavefront (`.wf.h5`, both
+Dumps speak two formats, and each kind of dump takes a LIST rather than an enum, so
+naming a third code later adds a token instead of another combination:
+`wavefront_formats = 'genesis', 'openpmd'` for the radiation and
+`beam_formats = 'openpmd', 'genesis'` for the particles. Unset means genesis for the
+radiation and openpmd for the particles, an unknown token is refused by name, and the
+suffix always says the format. The radiation choices are the Genesis field dump (the
+tiers' shared-state format, harmonic files carrying `-h<h>`) and openPMD EXT_Wavefront (`.wf.h5`, both
 polarizations as complex components of ONE mesh record (h5py reads them as
 complex128 natively), one file per harmonic, photonEnergy identifying it). The
 STANDARD DOCUMENT is authoritative: the harness verifies every required attribute
@@ -1075,7 +1080,7 @@ signature. The Python side of the round trip is openPMD-beamphysics's own
 `Wavefront.from_openpmd`/`write_openpmd`, exercised against the Fortran writer and
 reader every harness run.
 
-Measured (check_harmonics.py, ninth harness section):
+Measured (check_harmonics.py, the harness's harmonics section):
 
 | check | level |
 |---|---|
@@ -1089,6 +1094,49 @@ Measured (check_harmonics.py, ninth harness section):
 | Fortran reads the Python writer's file | dataset-identical |
 | 1 vs 8 threads (TD harmonic run) | byte-identical |
 | six refusals (anchor, unavg, two-pol, frequency domain, no-match, format) | by name |
+
+## Particle dumps: openPMD carries the weights, Genesis .par cannot
+
+A Genesis `.par.h5` holds one current per slice. The writer sends
+`c*sum(w)/slice_spacing` and a reader divides it back out uniformly, so a beam whose
+particles carry different weights comes back uniform. Since per-particle weights are
+this port's day-one difference from Genesis, writing that beam in Genesis format is
+REFUSED BY NAME, with the weight spread and the total charge in the message. Uniform
+beams still write it, which is what the tiers use.
+
+The openPMD dump (`.beam.h5`) is Bmad's own `hdf5_write_beam`, one bunch per slice, and
+openPMD's macro-charge IS the per-particle weight. Two consequences worth knowing:
+
+- An EMPTY SLICE is skipped rather than written, because `hdf5_write_beam` takes the
+  species from `p(1)` and a zero-particle bunch has no `p(1)`. The window therefore
+  rides in root attributes (`felNumSlice`, `felSliceIndex`, `felSliceSpacing`,
+  `felWavelength`, `felWindowStart`, `felNbins`, `felOne4one`) instead of being implied
+  by the bunch count, and a read restores the empty slices exactly.
+- A file WITHOUT those attributes is refused, with `dist_file` named. Such a file
+  describes a bunch, not a sliced time window, so its slicing is unknown and resampling
+  is the honest path.
+
+`beam_file` takes either format: the file's own openPMD signature picks the reader.
+
+Measured (check_beam_format.py, the harness's beam-format section):
+
+| check | level |
+|---|---|
+| openPMD file write, read, write | dataset-identical |
+| packed x, y, gamma through openPMD | exact |
+| packed px, py through openPMD | 1.1e-16 |
+| packed x, y, px, py through Genesis format | exact |
+| theta offset after an openPMD restart, spread about the constant | 3.6e-12 rad |
+| split weights stored per particle, and bit-identical on read | exact |
+| per-slice counts restored with an empty slice in the window | identical |
+| three refusals (nonuniform weights, unknown token, no window attributes) | by name |
+
+Neither format is the identity on the packed arrays, and the reason is the chart, not
+the file: openPMD stores absolute momenta and a time, so `px`, `py` and `z` make a
+round trip through `P/p0` and `-beta*c*dt`, while Genesis stores `(theta, gamma)` and
+loses its ulp there instead. `theta` additionally shifts by a CONSTANT on any restart,
+because a reader sets `phi0 = 0` and the particle lag lives in `z`. That the offset is
+constant to rounding is the check that `z` survived.
 
 ## Phasing between segments (brief proposal 2026-08-20): measured, then built
 
@@ -1118,7 +1166,7 @@ window rotations plus, in absolute mode, its carrier phase. examples/chicane/
 flips a second segment between 1.32x gain and 0.94x absorption on 0.43 urad of
 bend angle -- half a wavelength of geometric delay.
 
-Measured (check_phasing.py, tenth harness section):
+Measured (check_phasing.py, the harness's phasing section):
 
 | check | level |
 |---|---|
@@ -1257,7 +1305,7 @@ phasor-weighted moments (this port's extension) with Tanaka's kappa width fit. T
 field, gather, and every diagnostic are untouched. `"deposit"` stays the default and
 the referee.
 
-Measured (check_coherent.py, the harness's thirteenth section): at M = 128/slice the
+Measured (check_coherent.py, the harness's coherent-source section): at M = 128/slice the
 plain deposit fakes ln P by +0.42 on a curve that truly absorbs, the coherent source
 stays at 0.048 -- a 64x particle reduction at the model's own bias (1.9e-2 at large
 M). Guarded by name: per-slice Gaussianity vs sampling significance (weighted by charge),

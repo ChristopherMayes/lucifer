@@ -44,6 +44,19 @@ use fel_stats_mod
 implicit none
 
 !+
+! Struct fel_format_struct
+!
+! Which dump formats a run writes, parsed once from a global%*_formats list so no
+! writer compares strings. One logical per format: a third code adds a logical here
+! and a token to the parser, and every write site keeps its shape.
+!-
+
+type fel_format_struct
+  logical :: genesis = .false.       ! Genesis 1.3 v4 dumps (.fld.h5, .par.h5).
+  logical :: openpmd = .false.       ! openPMD (.wf.h5 for fields, .beam.h5 for particles).
+end type
+
+!+
 ! Struct fel_global_struct
 !
 ! The run-level switches and names, exposed in &fel_params as global%... (the
@@ -54,7 +67,11 @@ implicit none
 type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
   character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
-  character(8) :: wavefront_format = 'genesis'  ! Field dumps: 'genesis', 'openpmd' or 'both'.
+  ! Dump formats, one list per kind rather than an enum: naming a third code later adds a
+  ! token and nothing else. Unset takes the default in the comment. Unknown tokens are
+  ! refused by name at setup, and duplicates collapse.
+  character(12) :: wavefront_formats(4) = ''  ! Field dumps. Unset = genesis.
+  character(12) :: beam_formats(4) = ''       ! Particle dumps. Unset = openpmd.
   ! The FEL source model (manual sec:coherent-source). 'deposit' is the standard
   ! per-particle scatter (the referee, bit-for-bit unchanged). 'coherent' is the
   ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the
@@ -174,6 +191,8 @@ end type
 type fel_run_struct
   ! The resolved inputs.
   type (fel_global_struct) :: global
+  ! The dump-format lists, parsed once at setup so no writer compares strings.
+  type (fel_format_struct) :: fmt_wavefront, fmt_beam
   type (wavefront_init_struct) :: winit
   type (fel_wake_init_struct) :: wake_init
   type (fel_efield_struct) :: sc_init

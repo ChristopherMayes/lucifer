@@ -86,6 +86,7 @@ PROBE = """! flat keys; routed into the three groups by nml.to_groups
   ran_seed = 4242
   write_initial = T
   write_diag = T
+  beam_formats = 'genesis'
 &end
 """
 
@@ -113,6 +114,7 @@ GAIN = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   ran_seed = 4242
   write_diag = T
+  beam_formats = 'genesis'
 &end
 """
 
@@ -138,6 +140,7 @@ TDID = """! flat keys; routed into the three groups by nml.to_groups
   shotnoise = T
   ran_seed = 999
   write_diag = T
+  beam_formats = 'genesis'
 &end
 """
 

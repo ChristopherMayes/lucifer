@@ -64,6 +64,7 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
   migrate = {mig}
   migrate_check = T
   write_diag = T
+  beam_formats = 'genesis'
 &end
 """
 

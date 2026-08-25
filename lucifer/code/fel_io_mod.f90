@@ -27,10 +27,56 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_dump_beam (run, ele, prefix, err_flag)
+!
+! Routine to write the beam at the given filename prefix, honoring beam_formats. The
+! suffix says the format: .beam.h5 is openPMD-beamphysics, which carries the
+! per-particle weight, and .par.h5 is a Genesis 1.3 v4 dump, which does not and refuses
+! a weighted beam.
+!
+! Input:
+!   run       -- fel_run_struct: Run state, for the format flags.
+!   ele       -- ele_struct: Element the beam sits at.
+!   prefix    -- character(*): Filename prefix. Format suffixes are appended.
+!
+! Output:
+!   err_flag  -- logical: Set True if a file could not be written. False otherwise.
+!-
+
+subroutine fel_dump_beam (run, ele, prefix, err_flag)
+
+type (fel_run_struct), target :: run
+type (ele_struct) ele
+character(*) prefix
+logical err_flag
+logical eerr
+
+!
+
+err_flag = .true.
+
+if (run%fmt_beam%openpmd) then
+  call fel_write_openpmd_beam (run%fbeam, ele, prefix // '.beam.h5', eerr)
+  if (eerr) return
+endif
+
+if (run%fmt_beam%genesis) then
+  call fel_write_genesis4_beam (run%fbeam, prefix // '.par.h5', eerr)
+  if (eerr) return
+endif
+
+err_flag = .false.
+
+end subroutine fel_dump_beam
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_dump_field_set (run, prefix, err_flag)
 !
 ! Routine to write the whole field set at the given filename prefix, honoring
-! wavefront_format: Genesis dumps (one polarization per file: -x/-y when Ey is live)
+! wavefront_formats: Genesis dumps (one polarization per file: -x/-y when Ey is live)
 ! and/or openPMD EXT_Wavefront (both polarizations as components of ONE mesh record).
 ! The fundamental keeps the pre-harmonic names. A harmonic's files carry -h<h>.
 ! Every record is unrotated to time order first: each field owns its rotation state.
@@ -54,7 +100,7 @@ logical err_flag
 integer ihh
 logical eerr
 character(8) hsuf
-character(8) wavefront_format
+type (fel_format_struct) fmt
 real(rp), pointer :: z_now
 integer n_harm
 character(*), parameter :: r_name = 'fel_dump_field_set'
@@ -64,7 +110,7 @@ character(*), parameter :: r_name = 'fel_dump_field_set'
 err_flag = .true.
 ffield => run%ffield
 z_now => run%z_now
-wavefront_format = run%global%wavefront_format
+fmt = run%fmt_wavefront
 n_harm = run%n_harm
 
 do ihh = 1, n_harm
@@ -78,7 +124,7 @@ do ihh = 1, n_harm
   hsuf = ''
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
 
-  if (wavefront_format /= 'openpmd') then         ! genesis or both
+  if (fmt%genesis) then
     if (allocated(ffield(ihh)%wf%Ey)) then        ! One component per Genesis file.
       call wavefront_write_genesis4 (ffield(ihh)%wf, prefix // trim(hsuf) // '-x.fld.h5', eerr, 'x')
       if (eerr) return
@@ -90,7 +136,7 @@ do ihh = 1, n_harm
     endif
   endif
 
-  if (wavefront_format /= 'genesis') then         ! openpmd or both
+  if (fmt%openpmd) then
     call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
     if (eerr) return
   endif

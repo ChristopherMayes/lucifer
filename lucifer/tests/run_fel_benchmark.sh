@@ -162,6 +162,9 @@ section_time genesis-references
 echo
 
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
+# BEAM_FMT overrides the particle dump format for one deck. The tiers write Genesis
+# format because their dumps face Genesis. The split-weight tier cannot, since that
+# format carries one current per slice and its beam has two weights per position.
 # The three input groups (manual sec:program): extra &fel_params content (wake/sc) as
 # argument 6, extra &fel_beam_init content (check knobs) as argument 7.
 
@@ -172,6 +175,7 @@ make_nml () {
   global%out_root = "$3"
   global%interlude_model = "$4"
   global%write_diag = T
+  global%beam_formats = ${BEAM_FMT:-'genesis'}
 ${6:+  $6}
 /
 &fel_beam_init
@@ -187,6 +191,7 @@ NML
 make_nml tier1.nml  aramis_1seg_val.bmad tier1  bmad    Aramis
 make_nml tier2.nml  aramis_val.bmad      tier2  bmad    Aramis
 make_nml tier2g.nml aramis_val.bmad      tier2g genesis Aramis
+BEAM_FMT="'openpmd'" \
 make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "" "split_weights = T"
 make_nml tier1u.nml aramis_1seg_unavg.bmad tier1u bmad Aramis
 make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
@@ -455,6 +460,14 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_two_polarization.py" --exe "$EXE" --la
   exit 1
 fi
 section_time two-polarization
+
+echo
+echo "--- particle dump format checks (openPMD and Genesis .par) ---------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: beam-format checks; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+section_time beam-format
 
 echo
 echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"

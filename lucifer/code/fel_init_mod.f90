@@ -118,7 +118,12 @@ if (dist_file /= '' .and. use_beam_init) then
 endif
 
 if (beam_file /= '') then
-  call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
+  ! One name, either format: the file's own signature says which reader takes it.
+  if (file_is_openpmd(beam_file)) then
+    call fel_read_openpmd_beam (fbeam, beam_file, gamma0, branch%ele(0), err)
+  else
+    call fel_read_genesis4_beam (fbeam, beam_file, gamma0, err)
+  endif
   if (err) then
     err_flag = .true.;  return
   endif
@@ -743,7 +748,7 @@ grid_n_pts = run%winit%grid_n_pts
 grid_half_width = run%winit%grid_half_width
 
 if (field_file(1) /= '') then
-  if (wavefront_file_is_openpmd(field_file(1))) then
+  if (file_is_openpmd(field_file(1))) then
     call fel_read_openpmd_into_field (run, field_file(1), 1, err)
     if (err) then
       err_flag = .true.;  return
@@ -775,7 +780,7 @@ enddo
 
 do is = 2, 9
   if (field_file(is) == '') cycle
-  if (.not. wavefront_file_is_openpmd(field_file(is))) then
+  if (.not. file_is_openpmd(field_file(is))) then
     call out_io (s_error$, r_name, 'HARMONIC FIELD FILES MUST BE openPMD EXT_WAVEFRONT', &
                  '(THE GENESIS FORMAT CARRIES NO PHOTON ENERGY TO MATCH ON): ' // trim(field_file(is)))
     err_flag = .true.;  return

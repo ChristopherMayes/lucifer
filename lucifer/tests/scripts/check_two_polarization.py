@@ -66,6 +66,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   shotnoise = T
   ran_seed = 777
   write_diag = T
+  beam_formats = 'genesis'
 {extra}&end
 """
 

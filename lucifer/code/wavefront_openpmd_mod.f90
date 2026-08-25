@@ -57,11 +57,12 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Function wavefront_file_is_openpmd (file_name) result (is_pmd)
+! Function file_is_openpmd (file_name) result (is_pmd)
 !
 ! Routine to test whether a file is an openPMD file. This is the format signature probe
-! for import auto-detection: an openPMD file carries the required root attribute
-! "openPMD". A Genesis field dump has none.
+! for import auto-detection, and it holds for any openPMD file, particles as well as
+! fields: an openPMD file carries the required root attribute "openPMD", and a Genesis
+! dump of either kind has none.
 !
 ! Input:
 !   file_name   -- character(*): File to probe.
@@ -70,7 +71,7 @@ contains
 !   is_pmd      -- logical: True if the file carries the openPMD root attribute.
 !-
 
-function wavefront_file_is_openpmd (file_name) result (is_pmd)
+function file_is_openpmd (file_name) result (is_pmd)
 
 character(*) file_name
 logical is_pmd, err
@@ -87,7 +88,7 @@ call hdf5_read_attribute_string (f_id, 'openPMD', version, err, .false.)
 is_pmd = .not. err
 call h5fclose_f (f_id, h5_err)
 
-end function wavefront_file_is_openpmd
+end function file_is_openpmd
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

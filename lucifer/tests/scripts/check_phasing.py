@@ -129,6 +129,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   ran_seed = 777
   write_diag = T
+  beam_formats = 'genesis'
 /
 """
 
@@ -174,6 +175,7 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   ran_seed = 777
   keep_escaped_field = T
   write_diag = T
+  beam_formats = 'genesis'
 /
 """
 
@@ -275,6 +277,7 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   field_file = "PSP-initial.fld.h5"
   interlude_model = '{imodel}'
   write_diag = T
+  beam_formats = 'genesis'
 /
 """
 

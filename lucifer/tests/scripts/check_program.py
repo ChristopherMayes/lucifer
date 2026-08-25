@@ -77,6 +77,7 @@ NML_TWIN = """&fel_params
   global%out_root = "{root}"
   global%interlude_model = "genesis"
   global%write_diag = T
+  global%beam_formats = 'genesis'
   global%ran_seed = 777
 {extra}/
 &fel_beam_init
