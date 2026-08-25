@@ -706,8 +706,15 @@ end subroutine wavefront_transverse_moments
 !                    implemented here. Passing one is an error rather than being silently
 !                    ignored.
 !
+! ref_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate
+! and is co-moving, so the kernel leaves it alone and ref_position is the only place a
+! propagation along the beamline can be recorded. openPMD-beamphysics splits the two the
+! same way, and its drift advances s_position, which is what a Genesis dump's
+! refposition holds. Operations that do not move the pulse down the line (crop, pad, a
+! lens phase) leave it alone.
+!
 ! Output:
-!   wf          -- wavefront_struct: Propagated wavefront.
+!   wf          -- wavefront_struct: Propagated wavefront, ref_position advanced.
 !   err_flag    -- logical, optional: Set True on error, False otherwise.
 !-
 
@@ -792,6 +799,8 @@ do i_pol = 1, 2
   !$OMP end parallel do
   if (any_err) return
 enddo
+
+wf%ref_position = wf%ref_position + z_drift
 
 if (present(err_flag)) err_flag = .false.
 
