@@ -39,6 +39,7 @@ import numpy as np
 
 import beamio
 import fieldio
+from read_stats import read_stats, same_data
 
 FAILED = False
 
@@ -137,16 +138,15 @@ def h5_identical(fa, fb):
         b.visititems(lambda n, o: nb.append(n) if isinstance(o, h5py.Dataset) else None)
         if sorted(na) != sorted(nb):
             return False
-        return all(np.array_equal(a[n][()], b[n][()]) for n in na)
+        return all(same_data(a[n][()], b[n][()]) for n in na)
 
 
 def stats_of(path):
-    out = {}
-    with h5py.File(path) as h5:
-        for k in ("z", "field/power", "beam/bunching", "element_end/s"):
-            if k in h5:
-                out[k] = h5[k][()]
-    return out
+    """The comb-relevant content of a stats file: the record axis, two per-record
+    quantities, and the element-end mask that now selects the ends out of it."""
+    with read_stats(path) as st:
+        return {"z": st.z, "power": st["field/total/power"],
+                "bunching": st["beam/slice/bunching"], "at_end": st.at_end}
 
 
 def main():
@@ -217,25 +217,31 @@ def main():
     # at the matching z. Element ends always present (here: the final record).
     idx = np.searchsorted(s0["z"], sp["z"])
     ok = bool(np.array_equal(s0["z"][idx], sp["z"]))
-    ok = ok and np.array_equal(s0["field/power"][idx, :], sp["field/power"])
-    ok = ok and np.array_equal(s0["beam/bunching"][idx, :], sp["beam/bunching"])
+    ok = ok and np.array_equal(s0["power"][idx, :], sp["power"])
+    ok = ok and np.array_equal(s0["bunching"][idx, :], sp["bunching"])
     ok = ok and sp["z"][-1] == s0["z"][-1]
     # the spacing rule itself: consecutive rows at least comb apart (ends exempt).
     ok = ok and bool(np.all(np.diff(sp["z"][:-1]) >= 0.05 - 1e-12))
     check("comb > 0: rows == every-record rows at the comb positions (subset)", ok,
           note=f"[{len(sp['z'])} of {len(s0['z'])} rows]")
 
-    # comb < 0: no per-record rows at all. Element-end arrays remain.
-    ok = len(sn.get("z", [])) == 0 and len(sn["element_end/s"]) == len(s0["element_end/s"]) \
-         and bool(np.array_equal(sn["element_end/s"], s0["element_end/s"]))
-    check("comb < 0: no per-record rows; element ends remain", ok,
-          note=f"[nrec {len(sn.get('z', []))}, ends {len(sn['element_end/s'])}]")
+    # comb < 0: the ELEMENT ENDS, and nothing else. Bmad's comb semantics drop the comb
+    # there; this tracker always keeps the element ends, because the stats file carries
+    # one record axis and marks the ends inside it (manual sec:stats). So a comb < 0 run
+    # is a file whose every record is an element end, at the same positions the
+    # every-record run put them.
+    ok = bool(np.all(sn["at_end"])) and len(sn["z"]) == int(s0["at_end"].sum())
+    ok = ok and bool(np.array_equal(sn["z"], s0["z"][s0["at_end"]]))
+    ok = ok and bool(np.array_equal(sn["power"], s0["power"][s0["at_end"]]))
+    check("comb < 0: the rows are exactly the element ends", ok,
+          note=f"[{len(sn['z'])} rows, all element ends]")
 
     # nrec exact: the arrays are sized by the same rule the walk replays -- full,
     # never padded (h5 dataset lengths ARE nrec).
-    ok = len(s0["z"]) == 31 and len(sn.get("z", [])) == 0
+    ok = len(s0["z"]) == 31 and len(sn["z"]) == int(s0["at_end"].sum())
     check("nrec exact in every mode (sized once, never grown)", ok,
-          note=f"[comb0 {len(s0['z'])} rows = 30 steps + initial]")
+          note=f"[comb0 {len(s0['z'])} rows = 30 steps + initial, "
+               f"comb<0 {len(sn['z'])} ends]")
 
     # The keystone locally: comb 0 (the default) is bit-for-bit the pre-comb run --
     # cb0 above ran with the default (no comb key at all) and fed every comparison.

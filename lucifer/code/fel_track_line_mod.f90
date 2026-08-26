@@ -175,6 +175,10 @@ prog_header_done = .false.
 lat_length = branch%ele(branch%n_ele_track)%s
 
 z_now = branch%ele(run%i_start - 1)%s      ! 0 for a full run, else the window's entry face.
+ie = run%i_start - 1                      ! The element this record sits at: the entry face,
+                                          !   which is element 0 for a full run. The element
+                                          !   loop has not started, so ie is not set yet, and
+                                          !   the record must still say where it is.
 if (fel_comb_take(comb, z_now, run%z_last_rec, .false.)) then
   call take_stats_record (.true.)   ! Evaluates the diag instrument too. The writer prints.
   if (err_flag) return
@@ -812,15 +816,7 @@ if (.not. at_element_end .and. real(now - prog_count_last, rp) / prog_rate < 2.0
 prog_count_last = now
 elapsed = real(now - prog_count0, rp) / prog_rate
 
-if (stats%irec > 0) then
-  prog_power = sum(stats%f_power(:, stats%irec))
-  prog_energy = sum(stats%f_energy(:, stats%irec))
-  prog_bunch = sum(stats%bunching(:, stats%irec)) / nslice
-elseif (stats%iend > 0) then
-  prog_power = sum(stats%e_f_power(:, stats%iend))
-  prog_energy = sum(stats%e_f_energy(:, stats%iend))
-  prog_bunch = sum(stats%e_bunching(:, stats%iend)) / nslice
-endif
+if (stats%irec > 0) call fel_stats_exit_light (stats, prog_power, prog_energy, prog_bunch)
 pow = prog_power;  ene = prog_energy;  bun = prog_bunch
 
 ! One-step elements (every interlude) say nothing with "1/1".
@@ -866,7 +862,7 @@ subroutine take_stats_record (with_angles)
 
 logical with_angles, serr
 
-call fel_stats_record (stats, fbeam, ffield, z_now, with_angles, bdiag_arr, fpow_arr, fonax_arr, serr)
+call fel_stats_record (stats, fbeam, ffield, z_now, ie, with_angles, bdiag_arr, fpow_arr, fonax_arr, serr)
 if (serr) then
   err_flag = .true.;  return
 endif
@@ -890,7 +886,7 @@ character(500) fname
 
 !
 
-call fel_stats_element_end (stats, fbeam, ffield, ele, z_now, eerr)
+call fel_stats_element_end (stats, fbeam, z_now, eerr)
 if (eerr) then
   err_flag = .true.;  return
 endif

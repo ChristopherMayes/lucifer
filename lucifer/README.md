@@ -849,26 +849,66 @@ errors return and the driver decides, and `track_fel_line` is re-entrant (twice 
 one process is bit-identical to two processes. `tests/lucifer_smoke_test.f90` drives the
 library with no namelist anywhere). The retired flat `&fel_track_params` group is
 refused by name with each parameter's new home. `global%comb_ds_save` is the stats
-comb (Bmad's `ds_save` semantics verbatim, default 0 = every record, bit-for-bit the
-pre-comb file). `global%track_start`/`track_end` bound the walk over a schedule always
-built on the full lattice (windowed runs compose exactly). `stats.h5` carries `Meta/`
+comb (Bmad's `ds_save` semantics with one deliberate difference: an element end is
+always a record, whatever the comb, which is what lets the file carry one record axis
+and a mask instead of a second axis. Default 0 = every record).
+`global%track_start`/`track_end` bound the walk over a schedule always
+built on the full lattice (windowed runs compose exactly). `stats.h5` carries `meta/`
 provenance (the resolved input echo, the lattice text, timestamp, user, version) as
 attributes.
 
-The production statistics live in `<out_root>.stats.h5` (manual sec:stats), in FIXED
-Bmad units (m, rad, eV, s, C, J, W; units attributes are documentation, never
-load-bearing): per-record, per-slice arrays in the Genesis4 visualization layout
-(record index first under h5py), with beam datasets named exactly as
-`bunch_params_struct` components. Those per-record datasets are SUFFICIENT statistics
--- `scripts/bunch_params_from_stats.py` reconstructs a bunch_params dict from any
-(record, slice), and at element ends (where the tracker stores Bmad's own
-`calc_bunch_params`, whole-window and per slice, the Tao end-of-element pattern) the
-harness holds the reconstruction against the stored values. The field side stores
+## The stats file describes itself
+
+The production statistics live in `<out_root>.stats.h5` (manual sec:stats), and the
+file says what it holds. Every dataset carries `@unit`, `@description` and `@axes`, the
+last naming the `coords/` datasets its dimensions run over, so a reader needs no table
+of names: `scripts/read_stats.py` is the one reader everything in the tree uses, and it
+hard-codes nothing. Units are FIXED Bmad units (m, rad, eV, s, C, J, W) and the
+attributes are DOCUMENTATION, never load-bearing, which is the opposite of openPMD's
+`unitSI` and deliberately not mixed with it in one file.
+
+| group | what |
+|---|---|
+| `coords/` | every axis once: `z` (the one record axis), `ix_ele`, `at_element_end`, and the slice axis `s_slice`, `t_slice` |
+| `params/` | every scalar as data: the window (`lambda0`, `window_sample`, `slice_spacing`, `nbins`), `p0c`, the charge, the seed, the grid, the counts |
+| `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), plus `current` and `energy` in eV |
+| `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end grid |
+| `field/total/`, `field/x/`, `field/y/`, `field/harm<h>/` | one wavelength's total and each component, all with the same dataset names |
+| `lattice/` | one row per element, indexed by `ix_ele`, for layout plots |
+| `meta/` | provenance in attributes |
+
+Four rules earn their keep. **One record axis**: an element end is always a record, so
+`at_element_end` is a boolean mask where a duplicated copy of every element-end
+quantity used to be. That mask is information only the writer has, since `z` repeats at
+an element boundary and no reader can recover afterwards which record was the end.
+**The slice axis exists**: `s_slice` with `@head_direction`, publishing the migration
+invariant that the high slice index is the window head, without which no per-slice
+profile can be trusted, let alone overlaid on another code's. **No dataset's meaning
+depends on what else the file holds**: `field/total/power` is the sum over live
+polarizations whether one or two are live, and `field/x/power` is always the x
+component. **Not computed is NaN**, not a zero that reads as an answer: the theta
+moments away from element ends, an empty slice's moments, the twiss of a degenerate
+slice.
+
+The per-record beam datasets are SUFFICIENT statistics, so
+`scripts/bunch_params_from_stats.py` reconstructs a bunch_params dict from any
+(record, slice), and the harness holds that reconstruction against the twiss the
+tracker stored from Bmad's own `calc_bunch_params`. The field side stores
 `wavefront_params_struct` per slice: `centroid(4)` = (x, theta_x, y, theta_y),
 `sigma(4,4)` Wigner moments, energy, power, on_axis_intensity, emit_x/y = sqrt(det)
 (= M^2 lambda/4pi), with `angle_moments_valid` marking where the FFT-costed theta
 rows were filled (element ends and bank time -- the `twiss_valid` pattern). Pulse
-values are pooled downstream. The file stays raw. `dump_beam_at` / `dump_field_at`
+values are pooled downstream. The file stays raw.
+
+`lattice/` is what a layout plot needs and what the file did without for too long: one
+row per tracked element with element 0 included, indexed BY `ix_ele` so a join is a
+gather, carrying `name`, `key`, `s_start`, `s_end`, `l`, `ds_step`, `is_fel`,
+`fel_tracking`, `b_max`, `aw` as the physics used it, `l_period`, `ku`, `helical`,
+`k1`, `tilt` and `z_offset`. Genesis writes per-step arrays; a table plus the existing
+join says the same thing without a second copy of the record axis, and says what
+Genesis cannot: signed quad strengths with a length, wake-carrying pipes, and the
+tracking mode per element. It is not a lattice serialization, and
+`meta/lattice_file`/`lattice_text` stay the reproducibility record. `dump_beam_at` / `dump_field_at`
 dump openPMD files at named elements (Bmad locator syntax, unknown names
 refused). `keep_escaped_field` banks every slice slippage transmits out of the window
 (`-escaped.fld.h5`, with per-slice wavefront_params and z_transmit, the one place that
@@ -961,7 +1001,7 @@ precision:
 
 | File | What |
 |---|---|
-| `<out_root>.stats.h5` | The run: per-record and element-end beam, field and Twiss data (see the diagnostics section) |
+| `<out_root>.stats.h5` | The run: per-record beam, field and Twiss data, the lattice table, and the axes and parameters to read them by. Self-describing (see the stats section) |
 | `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis dump can. `lucifer/tests/scripts/convert_genesis.py` converts either kind to Genesis conventions, for feeding Genesis |
 | `<out_root>.diag.txt` | The per-record Genesis-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
@@ -1029,8 +1069,8 @@ keystone). Kick and deposit act through each element's polarization 2-vector (pl
 (cos t, sin t), helical (1,-i)/sqrt2). The unaveraged mode needs no polarization
 code at all, since its real per-particle currents work against and deposit into their own
 components. One openPMD dump holds both polarizations as components x and y of its
-mesh record, stats.h5's field group carries totals plus the x component, with a field/y/
-group.
+mesh record, and the stats file carries field/total, field/x and field/y under the same
+dataset names.
 
 Measured (check_two_polarization.py, in the harness -- symmetries and physics, not
 reference files):

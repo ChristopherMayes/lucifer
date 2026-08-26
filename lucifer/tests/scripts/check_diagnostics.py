@@ -34,6 +34,7 @@ from nml import to_groups
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
+from read_stats import read_stats, same_data  # noqa: E402
 
 FAILED = False
 
@@ -103,21 +104,49 @@ def main():
 
     run(exe, wd, "dg", NML.format(lat="dg_wrap.bmad", root="dg", extra=""))
 
-    with h5py.File(wd / "dg.stats.h5") as h5:
-        nslice = h5["beam/centroid"].shape[1]
-        ee = h5["element_end"]
+    with read_stats(wd / "dg.stats.h5") as st:
+        nslice = int(st.params["n_slice"])
+
+        # 0a. THE FILE DESCRIBES ITSELF: a walk of every dataset, checking that it says
+        # what it is and what its dimensions run over. This is what makes a generic
+        # reader possible, so it is checked generically rather than name by name.
+        bad = []
+        for name, unit, axes, descrip in st.units_table():
+            if unit == '' or descrip == '':
+                bad.append(f"{name}: no unit or description")
+            for ax in axes:
+                if f"coords/{ax}" not in st and ax not in ("element_end", "ix_ele"):
+                    bad.append(f"{name}: @axes names {ax}, which is not a coords entry")
+        check("stats: every dataset carries unit, description and axes", len(bad), 0.5,
+              note=f"[{len(st.units_table())} datasets" +
+                   (f"; first problem {bad[0]}]" if bad else "]"))
+
+        # 0b. THE JOIN. at_element_end selects the element-end rows, and every record
+        # sits inside the element its ix_ele names. An off-by-one in either would break
+        # every layout plot and no physics check would see it.
+        n_end = int(st.at_end.sum())
+        check("stats: at_element_end selects exactly the element ends",
+              abs(n_end - int(st.params["n_element_end"])), 0.5,
+              note=f"[{n_end} of {len(st.z)} records]")
+        check("stats: element-end arrays are aligned with the mask",
+              abs(st["beam/bunch/centroid"].shape[0] - n_end), 0.5)
+        s1, s2 = st["lattice/s_start"], st["lattice/s_end"]
+        ix = st.ix_ele
+        outside = int(np.sum((st.z < s1[ix] - 1e-9) | (st.z > s2[ix] + 1e-9)))
+        check("stats: every record sits inside the element ix_ele names", outside, 0.5,
+              note=f"[{len(st.z)} records against {len(s1)} lattice rows]")
 
         # 1. Reconstruction at the element end (= the last record).
         worst = 0.0
         for isl in range(nslice):
-            bp = bunch_params_at(h5, -1, isl)
+            bp = bunch_params_at(st, -1, isl)
             for m in ("x", "y", "z"):
                 for pn in ("beta", "alpha", "emit", "norm_emit", "sigma", "sigma_p", "eta", "etap"):
-                    stored = ee[f"slice/{m}/{pn}"][0, isl]
+                    stored = st[f"beam/slice_twiss/{m}/{pn}"][0, isl]
                     worst = max(worst, abs(bp[m][pn] - stored) / max(abs(stored), 1e-30))
-            st = sorted(ee[f"slice/{m}/emit"][0, isl] for m in ("a", "b", "c"))
+            modes = sorted(st[f"beam/slice_twiss/{m}/emit"][0, isl] for m in ("a", "b", "c"))
             mine = sorted(bp[m]["emit"] for m in ("a", "b", "c"))
-            for s0, m0 in zip(st, mine):
+            for s0, m0 in zip(modes, mine):
                 worst = max(worst, abs(m0 - s0) / max(abs(s0), 1e-30))
         # Measured 4.6e-8 (numpy eig vs mat_eigen). The projected planes agree exactly.
         check("stats: bunch_params reconstruction vs stored calc_bunch_params", worst, 1e-6)
@@ -128,14 +157,14 @@ def main():
         # beta*(is-1)*spacing plus the pz shear that map carries because beta is the
         # particle's own. Measured against the particle sum when this landed: 4.0e-12 on
         # this config, 5.0e-11 on the 96-slice SASE example.
-        spacing = 1e-10           # lambda0 * window_sample of the NML above.
-        p0_mc = float(h5["p0c"][0]) / M_ELECTRON
+        spacing = float(st.params["slice_spacing"])
+        p0_mc = float(st.params["p0c"]) / M_ELECTRON
         worst_pool = 0.0
         worst_nobg = 0.0
-        for ie in range(ee["bunch/sigma"].shape[0]):
-            cen = ee["slice/centroid"][ie]
-            sig = ee["slice/sigma"][ie]
-            wsl = ee["slice/charge_live"][ie]
+        for ie in range(st["beam/bunch/sigma"].shape[0]):
+            cen = st["beam/slice_twiss/centroid"][ie]
+            sig = st["beam/slice_twiss/sigma"][ie]
+            wsl = st["beam/slice_twiss/charge_live"][ie]
             wtot = wsl.sum()
             if wtot <= 0:
                 continue
@@ -149,9 +178,9 @@ def main():
             pooled = np.zeros((6, 6))
             nobg = np.zeros((6, 6))
             for isl in range(len(wsl)):
-                s6 = sig[isl].reshape(6, 6).copy()
+                s6 = sig[isl].copy()
                 k = shear[isl]
-                s0 = sig[isl].reshape(6, 6)
+                s0 = sig[isl]
                 s6[4, 4] = s0[4, 4] + 2 * k * s0[4, 5] + k * k * s0[5, 5]
                 for j in range(6):
                     if j == 4:
@@ -163,8 +192,8 @@ def main():
                 nobg += wsl[isl] * s6
             pooled /= wtot
             nobg /= wtot
-            st_c = ee["bunch/centroid"][ie]
-            st_s = ee["bunch/sigma"][ie].reshape(6, 6)
+            st_c = st["beam/bunch/centroid"][ie]
+            st_s = st["beam/bunch/sigma"][ie]
             den = np.maximum(np.abs(st_s), np.abs(pooled))
             worst_pool = max(worst_pool, float(np.max(np.where(den > 0, np.abs(st_s - pooled) / np.where(den > 0, den, 1), 0.0))))
             dc = np.maximum(np.abs(st_c), np.abs(m))
@@ -179,22 +208,40 @@ def main():
               0.0 if worst_nobg > 1e-3 else 1.0, 0.5,
               note=f"[dropping it moves the row by {worst_nobg:.2e}]")
 
-        # 1c. The element_end row also carries the FIELD, so it stands alone when the
-        # comb keeps no per-record rows. With records present those values are the
-        # record's own, so they must agree exactly.
-        zr = h5["z"][()]
-        ze = ee["s"][()]
-        idx = [int(np.argmin(abs(zr - z))) for z in ze]
-        worst_ef = 0.0
-        for k, src in (("power", "field/power"), ("energy", "field/energy"),
-                       ("on_axis_intensity", "field/on_axis_intensity"),
-                       ("bunching", "beam/bunching")):
-            worst_ef = max(worst_ef, float(np.max(np.abs(h5[src][()][idx] - ee[f"field/{k}"][()]))))
-        check("stats: element_end/field vs the record at that z (abs)", worst_ef, 1e-30)
+        # 1c. The moments the element-end twiss rests on are the RECORD's, not a second
+        # copy: beam/slice_twiss/centroid at an element end must be beam/slice/centroid
+        # at the record the mask selects. Exactly, since one is written from the other.
+        worst_ef = float(np.max(np.abs(st["beam/slice/centroid"][st.at_end] -
+                                      st["beam/slice_twiss/centroid"])))
+        worst_ef = max(worst_ef, float(np.max(np.abs(st["beam/slice/sigma"][st.at_end] -
+                                                    st["beam/slice_twiss/sigma"]))))
+        check("stats: the element-end moments ARE the record's (abs)", worst_ef, 1e-30)
 
-        f_cen = h5["field/centroid"][-1]
-        f_sig = h5["field/sigma"][-1]
-        f_en = h5["field/energy"][-1]
+        # And the field's theta moments are computed where the file says they are:
+        # (nz, ns) per slice, at every element end that HAS field, plus the initial
+        # record (the walk takes that one with angles so the starting state is
+        # complete). An empty slice has no moments to compute and says so.
+        valid = st["field/x/angle_moments_valid"].astype(bool)
+        has_field = st["field/x/power"] > 0
+        rows = np.zeros(len(st.z), bool)
+        rows[0] = True
+        rows |= st.at_end
+        want = has_field & rows[:, None]
+        check("stats: angle moments valid exactly where they were computed",
+              int(np.sum(valid != want)), 0.5,
+              note=f"[{int(valid.sum())} of {valid.size} slice-records]")
+
+        # NaN, not a zero that reads as an answer, everywhere else. This is what lets a
+        # consumer tell an empty slice's missing moments from a real measurement.
+        cen = st["field/x/centroid"]
+        check("stats: theta moments are NaN where they were not computed",
+              0.0 if np.all(np.isnan(cen[..., 1][~valid])) else 1.0, 0.5)
+        check("stats: and finite where they were",
+              0.0 if np.all(np.isfinite(cen[..., 1][valid])) else 1.0, 0.5)
+
+        f_cen = st["field/x/centroid"][-1]
+        f_sig = st["field/x/sigma"][-1]
+        f_en = st["field/total/energy"][-1]
 
     # 2. Banked energy == ledger U_escaped.
     led = np.loadtxt(wd / "dg.ledger.txt")
@@ -257,7 +304,7 @@ def main():
     sig_b = np.zeros((nb, 4, 4))
     sig_b[:, 0, 0] = sxx_ana;  sig_b[:, 2, 2] = syy_ana
     en_b = pms[:, 20]
-    cen_l = f_cen;  sig_l = f_sig.reshape(-1, 4, 4);  en_l = f_en
+    cen_l = f_cen;  sig_l = f_sig;  en_l = f_en
     _, pooled_ana, _ = pool_wavefront(np.vstack([cen_l, cen_b]),
                                       np.vstack([sig_l.reshape(-1, 16), sig_b.reshape(-1, 16)]),
                                       np.concatenate([en_l, en_b]))
@@ -285,7 +332,9 @@ def main():
             b.visititems(lambda n, o: names_b.append(n) if isinstance(o, h5py.Dataset) else None)
             if sorted(names_a) != sorted(names_b):
                 return False
-            return all(np.array_equal(a[n][()], b[n][()]) for n in names_a)
+            # same_data counts NaN as equal to NaN, which the stats file needs: see
+            # read_stats.
+            return all(same_data(a[n][()], b[n][()]) for n in names_a)
 
     same = all(h5_identical(wd / f"dg{s}", wd / f"dg1{s}")
                for s in (".stats.h5", "-escaped.fld.h5", "-pulse.fld.h5"))

@@ -32,6 +32,8 @@ module wavefront_mod
 use, intrinsic :: iso_c_binding
 use sim_utils
 
+use, intrinsic :: ieee_arithmetic
+
 implicit none
 
 ! Kind of the complex field arrays.
@@ -1314,6 +1316,7 @@ subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with
 complex(wf_rp) plane(:,:)
 real(rp) dx, wavelength, dz_slice
 type (wavefront_params_struct) pms
+real(rp) nan
 logical with_angles, err_flag
 
 complex(wf_rp), allocatable :: ft(:,:), dxe(:,:), dye(:,:)
@@ -1373,7 +1376,19 @@ if (wsum > 0) then
   pms%sigma(3,3) = syy / wsum - pms%centroid(3)**2
 endif
 
+! Not computed is NaN, not zero: zero is a legal value for a centroid and for a
+! covariance entry, so a consumer cannot tell it from an answer. angle_moments_valid
+! says which case this is, and now the numbers say it too. A NaN also propagates through
+! whatever a consumer does with it, where Bmad's real_garbage$ sentinel would quietly
+! plot as a number.
+
 if (.not. with_angles .or. wsum <= 0) then
+  nan = ieee_value(1.0_rp, ieee_quiet_nan)
+  pms%centroid(2) = nan
+  pms%centroid(4) = nan
+  pms%sigma(2,:) = nan;  pms%sigma(:,2) = nan
+  pms%sigma(4,:) = nan;  pms%sigma(:,4) = nan
+  pms%emit_x = nan;      pms%emit_y = nan
   err_flag = .false.
   return
 endif

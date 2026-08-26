@@ -1110,23 +1110,61 @@ confirms the walk's floor-derived delay against the trace at that scale.
 
 \section{Diagnostic output}\label{sec:stats}
 
-\emph{The stats file} \code{<out\_root>.stats.h5} carries the production statistics in
-FIXED Bmad units (m, rad, eV, s, C, J, W, units attributes are documentation only,
-never load-bearing): \code{z(nrec)} plus per-record, per-slice arrays, the
-Genesis4-style per-slice export for visualization, read by h5py with the record index
-first. Beam datasets are named exactly as \code{bunch\_params\_struct} components and
-are SUFFICIENT statistics: \code{centroid} (nrec, nslice, 6), \code{sigma}
-(nrec, nslice, 36, the $6\times6$ flattened and symmetric, so the flattening order
-cannot mislead), \code{charge\_live}, \code{n\_particle\_live}, \code{t},
-\code{sigma\_t}, computed two-pass (the \S\ref{sec:numerics} variance lesson). Any
-(record, slice) reconstructs a \code{bunch\_params\_struct}
+\emph{The stats file} \code{<out\_root>.stats.h5} DESCRIBES ITSELF. Every dataset
+carries three attributes: \code{@unit}, \code{@description} and \code{@axes}, the last
+naming the \code{coords/} datasets its dimensions run over. Units are fixed Bmad units
+(m, rad, eV, s, C, J, W) and the attributes are DOCUMENTATION: the values are already
+SI and eV, so a reader must not scale by \code{@unit}. That is the opposite of
+openPMD's \code{unitSI} (\S\ref{sec:openpmd}), and the two conventions are deliberately
+not mixed in one file. \code{@file\_format\_version} lets a reader dispatch.
+
+Five groups, each answering one question. \code{coords/} holds every axis once: \code{z}
+the one record axis, \code{ix\_ele} beside it, \code{at\_element\_end} marking which
+records are element ends, and the slice axis \code{s\_slice} and \code{t\_slice}.
+\code{s\_slice} carries \code{@head\_direction}, publishing the migration invariant
+(\S\ref{sec:migration}) that the HIGH slice index is the window head: without it a
+per-slice profile cannot be drawn, let alone compared with another code's.
+\code{params/} holds every scalar as data, the window (\code{lambda0},
+\code{window\_sample}, \code{slice\_spacing}, \code{nbins}) included, so nothing
+downstream parses the echoed namelist. \code{beam/slice/} holds the per-record
+SUFFICIENT statistics, named exactly as \code{bunch\_params\_struct} components:
+\code{centroid} (nrec, nslice, 6), \code{sigma} (nrec, nslice, 6, 6) at its natural
+rank, \code{charge\_live}, \code{n\_particle\_live}, \code{t}, \code{sigma\_t},
+computed two-pass (the \S\ref{sec:numerics} variance lesson), plus \code{current} and
+\code{energy} in eV, which every consumer would otherwise re-derive.
+\code{beam/slice\_twiss/} and \code{beam/bunch/} hold the fully evaluated struct from
+Bmad's own \code{calc\_bunch\_params}, per slice and for the whole window, on the
+ELEMENT-END grid. \code{field/} is described below, and \code{meta/} carries the
+provenance with \code{lattice/} beside it.
+
+ONE RECORD AXIS. An element end is always a record whatever the comb
+(\code{fel\_comb\_take}), so the element-end arrays need no axis of their own:
+\code{at\_element\_end} selects them, and their rows align with
+\code{z(at\_element\_end)} in order. That is a boolean mask in place of a duplicated
+copy of every element-end quantity, and it is information only the writer has: \code{z}
+repeats at an element boundary, so which record is the end cannot be recovered
+afterwards from positions alone.
+
+Any (record, slice) reconstructs a \code{bunch\_params\_struct}
 (\code{scripts/bunch\_params\_from\_stats.py}, transcribing Bmad's
-\code{projected\_twiss\_calc} and Wolski's eigen-emittances). At ELEMENT ENDS the
-fully evaluated struct from Bmad's own \code{calc\_bunch\_params} lands under
-\code{element\_end/}, whole-window and per slice (the Tao end-of-element pattern),
-and the harness holds the reconstruction against it (measured $4.6\times10^{-8}$,
-the numpy-vs-\code{mat\_eigen} eigensystem difference. The projected planes agree
-exactly).
+\code{projected\_twiss\_calc} and Wolski's eigen-emittances), and the harness holds that
+reconstruction against the stored twiss (measured $4.6\times10^{-8}$, the
+numpy-vs-\code{mat\_eigen} eigensystem difference. The projected planes agree exactly).
+\code{scripts/read\_stats.py} is the reader everything in the tree uses; because the
+file is self-describing it hard-codes no dataset names, so a file that grows a
+polarization or a harmonic needs no change in it.
+
+\emph{The lattice table} \code{lattice/} carries one row per tracked element, indexed BY
+\code{ix\_ele} with element 0 included, which is what a layout plot needs: \code{name},
+\code{key}, \code{s\_start}, \code{s\_end}, \code{l}, \code{ds\_step} (what sets the
+record density), \code{is\_fel}, \code{fel\_tracking}, \code{b\_max}, \code{aw} as the
+physics used it, \code{l\_period}, \code{ku}, \code{helical}, \code{k1}, \code{tilt},
+\code{z\_offset}. Genesis writes its \code{Lattice/} group as per-step arrays; a table
+joined through \code{ix\_ele} says the same thing without a second copy of the record
+axis, and it says what Genesis cannot: signed quadrupole strengths with a length,
+wake-carrying pipes, and the tracking mode per element. It is NOT a lattice
+serialization: \code{meta/lattice\_file} and \code{meta/lattice\_text} remain the
+reproducibility record.
 
 \emph{Wavefront params.} The field analog (\code{wavefront\_params\_struct},
 \code{wavefront\_mod}) describes ONE FIELD SLICE: \code{centroid(4)} $= (x,
@@ -1135,9 +1173,19 @@ exactly).
 $= \sqrt{\det}$ of a plane's $2\times2$ block ($= M^2\lambda/4\pi$), and
 \code{angle\_moments\_valid}, which follows the \code{twiss\_valid} pattern: spatial moments
 come from $|E|^2$ every record, the $\theta$ rows need spectral sums (one forward, two
-inverse FFTs) and fill at element ends and bank time only. Pulse-level values are
-POOLED downstream (energy-weighted mean of slice sigmas plus the variance of slice
-centroids, in the analysis scripts). The file stays raw.
+inverse FFTs) and fill at element ends and bank time only. NOT COMPUTED IS NaN, never a
+zero that reads as an answer: an empty slice has no moments and says so, and a NaN
+propagates through whatever a consumer does with it where a sentinel would quietly plot.
+Pulse-level values are POOLED downstream (energy-weighted mean of slice sigmas plus the
+variance of slice centroids, in the analysis scripts). The file stays raw.
+
+In the file these live under \code{field/}, and the rule there is that NO dataset's
+meaning depends on what else the file holds. \code{field/total/} carries \code{power},
+\code{energy} and \code{on\_axis\_intensity} summed over the live polarizations of ONE
+wavelength, and it is written whether one polarization is live or two.
+\code{field/x/}, \code{field/y/} when a second polarization is live, and
+\code{field/harm<h>/} per harmonic all carry the same dataset names and their own
+\code{total/}. Nothing is ever summed across harmonics: a detector separates colors.
 
 \emph{Dumps at elements.} \code{dump\_beam\_at} / \code{dump\_field\_at} name
 elements through Bmad's own locator (\code{class::name} syntax for free). An entry
@@ -1167,8 +1215,14 @@ pulse agrees at max $8.4\times10^{-3}$ over 267 banked slices (grid-edge wrap of
 FFT route on divergent noise slices is the residual; checked at $2\times10^{-2}$);
 pooled pulse $\sigma_{xx}$ by both routes at $3.4\times10^{-3}$; the
 \code{bunch\_params} reconstruction at $4.6\times10^{-8}$ (checked at $10^{-6}$);
-all three files dataset-identical at 1 vs 8 threads; unknown dump elements refused by
-name. \code{diag.txt} is untouched: every benchmark tier reproduces bit for bit.
+all three files dataset-identical at 1 vs 8 threads (NaN counting as NaN, which is what
+a not-computed entry means); unknown dump elements refused by name. Two structural
+checks hold the self-description itself: a walk of every dataset for its three
+attributes with \code{@axes} naming real \code{coords/} entries, and the join, that
+\code{at\_element\_end} selects exactly the element ends and that every record sits
+inside the element \code{ix\_ele} names. A silent off-by-one in that join would break
+every layout plot while no physics check noticed. \code{diag.txt} is untouched: every
+benchmark tier reproduces bit for bit.
 \end{validation}
 
 \section{Numerical practices}\label{sec:numerics}

@@ -5,9 +5,9 @@ Plot the standard diagnostics of a lucifer run from its stats file.
     python plot_fel.py run.stats.h5              # writes run.png
     python plot_fel.py run.stats.h5 -o gain.png --show
 
-The stats file (manual sec:stats) carries per-record, per-slice beam MOMENTS (named as
-bunch_params_struct components) and wavefront_params, in fixed Bmad units -- everything
-below derives from it, no text files involved. Ten panels against z:
+The stats file (manual sec:stats) describes itself: every dataset carries its unit and
+the axes it runs over, so this script reads named datasets through read_stats and does
+no conversions at all -- no text files, no reshapes, no unit juggling. Ten panels against z:
 
   radiation power and window field energy (log and linear -- the log pair shows the
   exponential gain regime, the linear pair shows where the energy actually is);
@@ -21,9 +21,10 @@ below derives from it, no text files involved. Ten panels against z:
 Works on steady-state and time-dependent runs alike: with more than one slice, thin
 gray lines show every slice and the bold line the total (power, energy) or the slice
 average (everything else). When the run carries TWO POLARIZATIONS (any tilted FEL
-element; the stats file then has a field/y group) an eleventh panel splits the power
+element; the file then has a field/y group beside field/x) an eleventh panel splits the power
 by polarization -- on a crossed line that panel IS the afterburner story. When it
-carries HARMONIC FIELDS (namelist harmonics; field/harm<h> groups) a panel plots each
+carries HARMONIC FIELDS (namelist harmonics; field/harm<h> groups, each with its own
+total) a panel plots each
 harmonic's power against the fundamental's.
 
 Needs numpy, h5py and matplotlib (the bmad-fel-validate environment has all three).
@@ -33,10 +34,13 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import sys
 
-import h5py
 import numpy as np
 import matplotlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tests" / "scripts"))
+from read_stats import read_stats  # noqa: E402
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -51,45 +55,46 @@ INK, INK2 = "#0b0b0b", "#52514e"
 
 
 def load(fn):
-    """Everything the panels need, all (nrec, nslice) except z and p0c."""
-    with h5py.File(fn) as h5:
-        q = {
-            "z": h5["z"][:], "p0c": float(h5["p0c"][0]),
-            "centroid": h5["beam/centroid"][:],          # (nrec, nslice, 6)
-            "sigma": h5["beam/sigma"][:],                # (nrec, nslice, 36)
-            "bunching": h5["beam/bunching"][:],
-            "power": h5["field/power"][:],
-            "energy": h5["field/energy"][:],
-            "f_sigma": h5["field/sigma"][:],             # (nrec, nslice, 16)
-            "f_emit_x": h5["field/emit_x"][:],
-            "f_emit_y": h5["field/emit_y"][:],
-            "f_valid": h5["field/angle_moments_valid"][:].astype(bool),
-        }
-        # Two live polarizations: field/power is the TOTAL and field/* the x
-        # component. Field/y/ carries the second. Absent on single-polarization runs.
-        if "field/y" in h5:
-            q["power_y"] = h5["field/y/power"][:]
-            q["power_x"] = q["power"] - q["power_y"]
-        # Harmonic fields: field/harm<h>/ groups, one per harmonic beyond the
-        # fundamental. field/power stays the FUNDAMENTAL's -- harmonics are separate
-        # wavelengths, never summed with it.
-        q["harmonics"] = {}
-        for k in h5["field"]:
-            if k.startswith("harm"):
-                q["harmonics"][int(k[4:])] = h5[f"field/{k}/power"][:]
+    """Everything the panels need, straight out of the file through read_stats.
+
+    There are no conversions and no reshapes here: the file states its own shapes and
+    units (manual sec:stats), so this is a gather of named datasets. field/total is the
+    sum over polarizations of the fundamental and field/x is the x component, whether
+    or not a y component exists, so no branch changes what a name means."""
+    st = read_stats(fn)
+    q = {
+        "z": st.z, "p0c": float(st.params["p0c"]),
+        "centroid": st["beam/slice/centroid"],        # (nrec, nslice, 6)
+        "sigma": st["beam/slice/sigma"],              # (nrec, nslice, 6, 6)
+        "bunching": st["beam/slice/bunching"],
+        "energy_ev": st["beam/slice/energy"],         # eV, stated not derived
+        "sigma_energy": st["beam/slice/sigma_energy"],
+        "power": st["field/total/power"],
+        "energy": st["field/total/energy"],
+        "f_sigma": st["field/x/sigma"],               # (nrec, nslice, 4, 4)
+        "f_emit_x": st["field/x/emit_x"],
+        "f_emit_y": st["field/x/emit_y"],
+        "f_valid": st["field/x/angle_moments_valid"].astype(bool),
+        "power_x": st["field/x/power"],
+    }
+    if "y" in st.components:
+        q["power_y"] = st["field/y/power"]
+    # Harmonics: each group carries its own total, since a detector separates colors
+    # and nothing sums across wavelengths.
+    q["harmonics"] = {h: st[f"field/harm{h}/total/power"] for h in st.harmonics}
+    st.close()
     return q
 
 
 def beam_energy_ev(q):
-    """Mean total energy per slice [eV] from the stored chart: E = sqrt(P^2 + m^2)."""
-    p_hat = q["p0c"] * (1.0 + q["centroid"][:, :, 5])
-    return np.sqrt(p_hat**2 + M_ELECTRON**2)
+    """Mean total energy per slice [eV], as the file states it (beam/slice/energy)."""
+    return q["energy_ev"]
 
 
 def norm_emit(q, i, j):
     """Projected normalized emittance per (record, slice), dispersion removed --
     the bunch_params convention (Bmad's projected_twiss_calc)."""
-    s = q["sigma"].reshape(q["sigma"].shape[0], -1, 6, 6)
+    s = q["sigma"]
     s66 = s[:, :, 5, 5]
     with np.errstate(divide="ignore", invalid="ignore"):
         x2 = s[:, :, i, i] - np.where(s66 > 0, s[:, :, i, 5] ** 2 / s66, 0)

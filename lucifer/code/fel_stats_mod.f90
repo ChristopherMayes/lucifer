@@ -3,27 +3,46 @@
 !
 ! The tracker's production statistics file <out_root>.stats.h5 (manual sec:stats).
 !
-! Fixed Bmad units everywhere (m, rad, eV, s, C, J, W), with units attributes written
-! as documentation only, never load-bearing. Per-record datasets are (nrec, nslice)
-! arrays as read by h5py (Genesis4-style per-slice export for visualization), with beam
-! datasets named EXACTLY as bunch_params_struct components, sufficient to construct one
-! from any (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 36: the
-! 6x6 flattened, symmetric, so the flattening order cannot mislead), charge_live,
-! charge_tot, n_particle_live, n_particle_tot, t, sigma_t, plus z(nrec) and s == z.
-! The field side stores wavefront_params_struct components per slice: centroid
-! (nrec, nslice, 4), sigma (nrec, nslice, 16), energy, power, on_axis_intensity,
-! emit_x, emit_y, angle_moments_valid (0/1). Theta moments cost FFTs, so they fill
-! at element ends only (the twiss_valid pattern). Pulse-level values are POOLED
-! downstream (scripts), never stored: the file stays raw.
+! THE FILE DESCRIBES ITSELF. Every dataset goes through fel_h5_mod and carries @unit,
+! @description and @axes, the last naming the coords/ datasets its dimensions run over.
+! Units are fixed Bmad units (m, rad, eV, s, C, J, W) and the attributes are
+! DOCUMENTATION: a reader must not scale by them.
 !
-! At ELEMENT ENDS the fully evaluated Bmad bunch_params_struct lands under
-! element_end/: per whole-window bunch AND per slice, via Bmad's own calc_bunch_params
-! (the Tao end-of-element pattern): twiss groups x/y/z/a/b/c each carrying beta,
-! alpha, gamma, emit, norm_emit, sigma, sigma_p, eta, etap; plus centroid, sigma,
-! charge_live, n_particle_live, ix_ele, s, twiss_valid. scripts/
-! bunch_params_from_stats.py reconstructs a bunch_params dict from any (record, slice)
-! of the per-record sufficient statistics. The harness checks that at element ends it
-! reproduces these stored values.
+! Five groups, and each answers one question.
+!
+!   coords/  Every axis, once. z (the one record axis), ix_ele and ele_name beside it,
+!            at_element_end marking which records are element ends, and the slice axis
+!            s_slice and t_slice. s_slice carries @head_direction, publishing the
+!            migration invariant (higher slice index is the window head) that a
+!            per-slice plot cannot be drawn without.
+!   params/  Every scalar as data: the window (lambda0, window_sample, slice_spacing,
+!            nbins), p0c, the charge, the species, the seed, the grid, the counts.
+!            Nothing a reader needs is left in the echoed namelist.
+!   beam/    slice/ holds the per-record sufficient statistics, named EXACTLY as
+!            bunch_params_struct components, enough to construct one from any
+!            (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 6, 6) at
+!            its natural rank, charge_live, n_particle_live, t, sigma_t, bunching,
+!            bunching_phase, plus current and energy which every consumer would
+!            otherwise re-derive. slice_twiss/ and bunch/ hold the fully evaluated Bmad
+!            bunch_params, per slice and for the whole window, on the ELEMENT-END grid,
+!            aligned with coords/z(at_element_end).
+!   field/   total/ (always written, both polarizations of one wavelength), x/, y/ when
+!            a second polarization is live, harm<h>/ per harmonic, all carrying the same
+!            dataset names and their own total. No dataset's meaning depends on what
+!            else the file holds.
+!   meta/    Provenance, in attributes (fel_write_meta), and lattice/ beside it for
+!            layout plots (fel_write_lattice).
+!
+! Theta moments cost FFTs, so they fill at element ends only, and angle_moments_valid
+! says where (the twiss_valid pattern). Pulse-level values are POOLED downstream
+! (scripts), never stored: the file stays raw.
+!
+! ONE RECORD AXIS. Element ends are always recorded whatever the comb (fel_comb_take),
+! so an element end IS a record and the element-end arrays need no axis of their own:
+! at_element_end selects them. scripts/read_stats.py is the reader everything uses, and
+! scripts/bunch_params_from_stats.py reconstructs a bunch_params dict from any (record,
+! slice) of the sufficient statistics. The harness checks that at element ends it
+! reproduces the stored twiss.
 !
 ! Beam moments are computed two-pass (mean first, then centered second moments, the
 ! manual sec:numerics variance rule: the one-pass form loses the entire sigma to
@@ -43,6 +62,8 @@ use fel_beam_mod
 use wavefront_mod
 use fel_track_mod, only: fel_slip_struct, fel_field_struct, fel_field_index, fel_field_diag, fel_slice_to_bunch
 use hdf5_interface
+use fel_h5_mod
+use, intrinsic :: ieee_arithmetic
 
 implicit none
 
@@ -61,6 +82,11 @@ type fel_stats_struct
   integer :: nend = 0, iend = 0       ! Capacity / fill of element-end arrays.
   ! Per record, per slice. Beam side, bunch_params_struct names.
   real(rp), allocatable :: z(:)                   ! (nrec) [m]
+  integer, allocatable :: ix_ele(:)               ! (nrec) Lattice element of the record.
+  integer, allocatable :: at_end(:)               ! (nrec) 1 where the record is an element
+                                                  !   end. THE mask: element ends are always
+                                                  !   recorded, so the element-end arrays
+                                                  !   below need no axis of their own.
   real(rp), allocatable :: b_centroid(:,:,:)      ! (6, nslice, nrec)
   real(rp), allocatable :: b_sigma(:,:,:)         ! (36, nslice, nrec)
   real(rp), allocatable :: charge_live(:,:)       ! (nslice, nrec) [C]
@@ -90,17 +116,32 @@ type fel_stats_struct
   real(rp), allocatable :: fh_energy(:,:,:), fh_power(:,:,:), fh_on_axis(:,:,:)
   real(rp), allocatable :: fh_emit_x(:,:,:), fh_emit_y(:,:,:)
   integer, allocatable :: fh_angles_valid(:,:,:)
-  ! Element ends: the evaluated bunch_params_struct, whole bunch and per slice.
-  integer, allocatable :: e_ix_ele(:)             ! (nend)
-  real(rp), allocatable :: e_s(:)                 ! (nend) [m]
-  real(rp), allocatable :: e_f_power(:,:)         ! (nslice, nend) [W] radiation power, TOTAL over
-                                                  !   polarizations, as the per-record dataset is.
-  real(rp), allocatable :: e_f_energy(:,:)        ! (nslice, nend) [J] total.
-  real(rp), allocatable :: e_f_on_axis(:,:)       ! (nslice, nend) total.
-  real(rp), allocatable :: e_bunching(:,:)        ! (nslice, nend) |b| at the fundamental.
-  real(rp), allocatable :: e_bunching_phase(:,:)  ! (nslice, nend) [rad]
+  ! Element ends: the evaluated bunch_params_struct, whole bunch and per slice. The
+  ! rows align with the records at_end marks, so they carry no z or ix_ele of their
+  ! own, and nothing here duplicates a per-record array.
   real(rp), allocatable :: e_bunch(:,:)           ! (n_bp, nend)
   real(rp), allocatable :: e_slice(:,:,:)         ! (n_bp, nslice, nend)
+end type
+
+!+
+! Structure fel_stats_params_struct
+!
+! The run parameters the stats file states as DATA, so nothing downstream scrapes them
+! out of the echoed namelist. Filled by the caller (fel_io_mod, which sees the whole
+! run) and written into params/ verbatim.
+!-
+
+type fel_stats_params_struct
+  real(rp) :: lambda0 = 0          ! Fundamental radiation wavelength [m].
+  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m] (window_sample * lambda0).
+  real(rp) :: bunch_charge = 0     ! Total live charge [C].
+  real(rp) :: grid_half_width = 0  ! Transverse grid half width [m].
+  real(rp) :: beta0 = 1            ! Reference beta, for the slice time axis.
+  integer :: window_sample = 0     ! Slice spacing in wavelengths (Genesis's sample).
+  integer :: nbins = 0             ! Beamlet size.
+  integer :: grid_n_pts = 0        ! Transverse grid points per side.
+  integer :: ran_seed = 0          ! The run's random seed.
+  character(20) :: species = ''    ! Particle species name.
 end type
 
 ! The flattened bunch_params record: 6 centroid + 36 sigma + charge_live +
@@ -109,6 +150,11 @@ integer, parameter :: fel_stats_n_bp$ = 99
 character(*), parameter :: fel_stats_modes$(6) = [character(1):: 'x', 'y', 'z', 'a', 'b', 'c']
 character(9), parameter :: fel_stats_twiss$(9) = [character(9):: &
         'beta', 'alpha', 'gamma', 'emit', 'norm_emit', 'sigma', 'sigma_p', 'eta', 'etap']
+! The unit of each twiss quantity above, in the same order, for the file's @unit
+! attributes. beta is in meters, the emittances in meter radians, alpha and gamma and
+! the dispersions dimensionless or in meters as Bmad defines them.
+character(6), parameter :: fel_stats_tunit$(9) = [character(6):: &
+        'm', '1', '1/m', 'm rad', 'm rad', 'm', '1', 'm', '1']
 
 contains
 
@@ -148,7 +194,8 @@ stats%nslice = nslice
 stats%nrec = nrec;  stats%irec = 0
 stats%nend = nend;  stats%iend = 0
 
-allocate (stats%z(nrec))
+allocate (stats%z(nrec), stats%ix_ele(nrec), stats%at_end(nrec))
+stats%ix_ele = 0;  stats%at_end = 0
 allocate (stats%b_centroid(6, nslice, nrec), stats%b_sigma(36, nslice, nrec))
 allocate (stats%charge_live(nslice, nrec), stats%t(nslice, nrec), stats%sigma_t(nslice, nrec))
 allocate (stats%bunching(nslice, nrec), stats%bunching_phase(nslice, nrec))
@@ -174,12 +221,7 @@ if (size(harm_extra) > 0) then
             stats%fh_emit_y(nslice, nrec, size(harm_extra)))
   allocate (stats%fh_angles_valid(nslice, nrec, size(harm_extra)))
 endif
-allocate (stats%e_ix_ele(nend), stats%e_s(nend))
 allocate (stats%e_bunch(fel_stats_n_bp$, nend), stats%e_slice(fel_stats_n_bp$, nslice, nend))
-allocate (stats%e_f_power(nslice, nend), stats%e_f_energy(nslice, nend), stats%e_f_on_axis(nslice, nend))
-allocate (stats%e_bunching(nslice, nend), stats%e_bunching_phase(nslice, nend))
-stats%e_f_power = 0;  stats%e_f_energy = 0;  stats%e_f_on_axis = 0
-stats%e_bunching = 0; stats%e_bunching_phase = 0
 
 end subroutine fel_stats_init
 
@@ -187,7 +229,7 @@ end subroutine fel_stats_init
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_stats_record (stats, beam, ff, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
+! Subroutine fel_stats_record (stats, beam, ff, z_now, ix_ele, with_angles, bdiag_arr, fpow, fonax, err_flag)
 !
 ! Routine to take one per-record row: beam sufficient statistics and wavefront params
 ! for every slice. with_angles fills the field theta moments (element ends). The same
@@ -199,6 +241,8 @@ end subroutine fel_stats_init
 !   beam          -- fel_beam_struct: The sliced beam.
 !   ff(:)         -- fel_field_struct: The field set. Entry 1 is the fundamental.
 !   z_now         -- real(rp): Position of the record [m].
+!   ix_ele        -- integer: Lattice element the record sits in. Written to coords/
+!                      beside z, and what a layout plot joins the lattice table on.
 !   with_angles   -- logical: If True fill the field theta moments (they cost FFTs,
 !                      so element ends only).
 !
@@ -210,7 +254,7 @@ end subroutine fel_stats_init
 !   err_flag      -- logical: Set True on a wavefront_params error or record overflow.
 !-
 
-subroutine fel_stats_record (stats, beam, ff, z_now, with_angles, bdiag_arr, fpow, fonax, err_flag)
+subroutine fel_stats_record (stats, beam, ff, z_now, ix_ele, with_angles, bdiag_arr, fpow, fonax, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_beam_struct), target :: beam
@@ -222,6 +266,7 @@ integer io
 type (fel_slice_diag_struct) bdiag_arr(:)
 real(rp) fpow(:), fonax(:)
 real(rp) z_now
+integer ix_ele
 logical with_angles, err_flag
 
 real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), beta0, ks
@@ -241,6 +286,7 @@ endif
 stats%irec = stats%irec + 1
 ir = stats%irec
 stats%z(ir) = z_now
+stats%ix_ele(ir) = ix_ele
 beta0 = fel_p0_mc(beam) / sqrt(fel_p0_mc(beam)**2 + 1)
 ks = twopi / wf%wavelength
 
@@ -356,46 +402,37 @@ end subroutine fel_stats_record
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_stats_element_end (stats, beam, ele, z_now, err_flag)
+! Subroutine fel_stats_element_end (stats, beam, z_now, err_flag)
 !
 ! Routine to take one element-end row: Bmad's calc_bunch_params for the whole window
 ! (all slices as one bunch in global window coordinates) and per slice (the Tao
 ! end-of-element pattern), using Bmad's own statistics machinery.
 !
-! The row is SELF-SUFFICIENT: beam moments and Twiss for the whole window and per
-! slice, plus the radiation power, energy, on-axis intensity and bunching per slice.
-! That matters when comb_ds_save < 0 keeps no per-record rows at all (Bmad's comb
-! semantics, kept verbatim). The element-end row is then the only record of the run,
-! and it carries the field as well as the beam.
+! The row carries the TWISS and nothing else. Everything else an element end has is
+! already in the record at the same z, since an element end is always recorded
+! (fel_comb_take), and this routine MARKS that record rather than copying it. The
+! coincidence is a structural invariant, so it is asserted here rather than assumed.
 !
 ! Input:
-!   stats     -- fel_stats_struct: Accumulator. The current record supplies the slice moments.
-!   beam      -- fel_beam_struct: The sliced beam.
-!   ff(:)     -- fel_field_struct: The field set, for the field values when there is no record.
-!   ele       -- ele_struct: The element just ended.
+!   stats     -- fel_stats_struct: Accumulator. The current record supplies the moments.
+!   beam      -- fel_beam_struct: The sliced beam, for the window chart and p0c.
 !   z_now     -- real(rp): Position of the element end [m].
 !
 ! Output:
-!   stats     -- fel_stats_struct: Row stats%iend filled.
+!   stats     -- fel_stats_struct: Row stats%iend filled, at_end set on the record.
 !   err_flag  -- logical: Set True on a conversion error or row overflow. False otherwise.
 !-
 
-subroutine fel_stats_element_end (stats, beam, ff, ele, z_now, err_flag)
+subroutine fel_stats_element_end (stats, beam, z_now, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_beam_struct), target :: beam
-type (fel_field_struct), target :: ff(:)
-type (wavefront_struct), pointer :: wf
-type (fel_slice_struct), pointer :: sl
-type (wavefront_params_struct) pms
-type (fel_slice_diag_struct) bdg
-type (ele_struct) ele
 type (bunch_params_struct) bp
 real(rp), allocatable :: cen_s(:,:), sig_s(:,:,:), w_s(:), dz_s(:), shear_s(:)
 integer, allocatable :: n_s(:)
-real(rp) z_now, p0_mc, p_mc, w, wsum, mean(6), sig(6,6), v(6), ks
-integer ie, is, ip, i, j, nslice
-logical err_flag, error, err, any_err
+real(rp) z_now, p0_mc, p_mc
+integer ie, is, nslice
+logical err_flag, error
 character(*), parameter :: r_name = 'fel_stats_element_end'
 
 !
@@ -405,107 +442,39 @@ if (stats%iend >= stats%nend) then
   call out_io (s_error$, r_name, 'MORE ELEMENT ENDS THAN THE PRECOMPUTED COUNT. INTERNAL BUG.')
   return
 endif
+
+! The invariant this row rests on: the record at this z exists, and IS this element
+! end. fel_comb_take takes a row at every element end whatever the comb, so a walk
+! that reordered its stats call against its element-end call would land here.
+
+if (stats%irec < 1) then
+  call out_io (s_error$, r_name, 'AN ELEMENT END WITH NO RECORD. INTERNAL BUG.')
+  return
+endif
+if (stats%z(stats%irec) /= z_now) then
+  call out_io (s_error$, r_name, 'THE LAST RECORD IS NOT AT THIS ELEMENT END. INTERNAL BUG.', &
+               'RECORD \es16.8\ AGAINST ELEMENT END \es16.8\ ', &
+               r_array = [stats%z(stats%irec), z_now])
+  return
+endif
+
 stats%iend = stats%iend + 1
 ie = stats%iend
-stats%e_ix_ele(ie) = ele%ix_ele
-stats%e_s(ie) = z_now
+stats%at_end(stats%irec) = 1
 
 nslice = size(beam%slice)
-wf => ff(1)%wf
 allocate (cen_s(6,nslice), sig_s(6,6,nslice), w_s(nslice), dz_s(nslice), shear_s(nslice), n_s(nslice))
 
-! The field and bunching side of the row. With a current record they are already
-! evaluated there, so copy (the datasets then agree exactly). With no records evaluate
-! them here, the same routines the record sweep uses, angle moments not needed.
+! ONE source of per-slice moments, the record at this z. Its two-pass weighted
+! arithmetic is then the only copy of that code in the module, so nothing here can
+! drift from what the per-record datasets hold.
 
-if (stats%irec > 0) then
-  stats%e_f_power(:,ie) = stats%f_power(:, stats%irec)
-  stats%e_f_energy(:,ie) = stats%f_energy(:, stats%irec)
-  stats%e_f_on_axis(:,ie) = stats%f_on_axis(:, stats%irec)
-  if (allocated(stats%f2_energy)) then
-    stats%e_f_power(:,ie) = stats%e_f_power(:,ie) + stats%f2_power(:, stats%irec)
-    stats%e_f_energy(:,ie) = stats%e_f_energy(:,ie) + stats%f2_energy(:, stats%irec)
-    stats%e_f_on_axis(:,ie) = stats%e_f_on_axis(:,ie) + stats%f2_on_axis(:, stats%irec)
-  endif
-  stats%e_bunching(:,ie) = stats%bunching(:, stats%irec)
-  stats%e_bunching_phase(:,ie) = stats%bunching_phase(:, stats%irec)
-
-else
-  any_err = .false.
-  ks = twopi / wf%wavelength
-  !$OMP parallel do private(sl, pms, bdg, err) reduction(.or.: any_err)
-  do is = 1, nslice
-    sl => beam%slice(is)
-    call wavefront_params_of_plane (wf%Ex(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
-                                    wf%wavelength, beam%slice_spacing, pms, .false., err)
-    any_err = any_err .or. err
-    stats%e_f_power(is,ie) = pms%power
-    stats%e_f_energy(is,ie) = pms%energy
-    stats%e_f_on_axis(is,ie) = pms%on_axis_intensity
-    if (allocated(wf%Ey)) then
-      call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
-                                      wf%wavelength, beam%slice_spacing, pms, .false., err)
-      any_err = any_err .or. err
-      stats%e_f_power(is,ie) = stats%e_f_power(is,ie) + pms%power
-      stats%e_f_energy(is,ie) = stats%e_f_energy(is,ie) + pms%energy
-      stats%e_f_on_axis(is,ie) = stats%e_f_on_axis(is,ie) + pms%on_axis_intensity
-    endif
-    call fel_slice_diag (beam, sl, ks, bdg)
-    stats%e_bunching(is,ie) = bdg%bunching
-    stats%e_bunching_phase(is,ie) = bdg%bunching_phase
-  enddo
-  !$OMP end parallel do
-  if (any_err) return
-endif
-
-! ONE source of per-slice moments for both the per-slice rows and the whole-window
-! row. With per-record rows (the comb >= 0) the current record already holds them:
-! an element end always coincides with its last record. With NO per-record rows (the
-! comb's "< 0 => No comb calculated") take them here, in one parallel sweep whose
-! two-pass weighted arithmetic is the per-record sweep's own.
-
-if (stats%irec > 0) then
-  do is = 1, nslice
-    cen_s(:,is) = stats%b_centroid(:, is, stats%irec)
-    sig_s(:,:,is) = reshape(stats%b_sigma(:, is, stats%irec), [6, 6])
-    w_s(is) = stats%charge_live(is, stats%irec)
-    n_s(is) = stats%n_particle_live(is, stats%irec)
-  enddo
-
-else
-  !$OMP parallel do private(sl, ip, i, j, w, wsum, mean, sig, v)
-  do is = 1, nslice
-    sl => beam%slice(is)
-    wsum = 0;  mean = 0
-    do ip = 1, sl%n
-      w = sl%weight(ip)
-      wsum = wsum + w
-      mean = mean + w * [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)]
-    enddo
-    if (wsum > 0) mean = mean / wsum
-
-    sig = 0
-    do ip = 1, sl%n
-      v = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)] - mean
-      w = sl%weight(ip)
-      do j = 1, 6
-        do i = 1, j
-          sig(i,j) = sig(i,j) + w * v(i) * v(j)
-        enddo
-      enddo
-    enddo
-    if (wsum > 0) sig = sig / wsum
-    do j = 1, 6
-      do i = j+1, 6
-        sig(i,j) = sig(j,i)
-      enddo
-    enddo
-
-    cen_s(:,is) = mean;  sig_s(:,:,is) = sig
-    w_s(is) = wsum;      n_s(is) = sl%n
-  enddo
-  !$OMP end parallel do
-endif
+do is = 1, nslice
+  cen_s(:,is) = stats%b_centroid(:, is, stats%irec)
+  sig_s(:,:,is) = reshape(stats%b_sigma(:, is, stats%irec), [6, 6])
+  w_s(is) = stats%charge_live(is, stats%irec)
+  n_s(is) = stats%n_particle_live(is, stats%irec)
+enddo
 
 ! Per slice: the twiss evaluation is Bmad's own (calc_emittances_and_twiss_from_
 ! sigma_matrix, the identical code path calc_bunch_params ends in), fed from the
@@ -584,6 +553,16 @@ row(7:42) = reshape(bp%sigma, [36])
 row(43) = bp%charge_live
 row(44) = bp%n_particle_live
 row(45) = merge(1.0_rp, 0.0_rp, bp%twiss_valid)
+
+! Not evaluated is NaN, not zero. A slice at the window's edge is degenerate by
+! construction (no charge, collapsed modes), and a beta of zero there reads as an
+! answer. twiss_valid says which case it is, and so do the numbers.
+
+if (.not. bp%twiss_valid) then
+  row(46:) = ieee_value(1.0_rp, ieee_quiet_nan)
+  return
+endif
+
 k = 45
 do im = 1, 6
   select case (fel_stats_modes$(im))
@@ -701,25 +680,75 @@ end subroutine fel_pool_bunch_params
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_stats_write (stats, file_name, err_flag)
+! Subroutine fel_stats_exit_light (stats, pow, ene, bun)
 !
-! Routine to write the stats file. Datasets appear to h5py with the record index first:
-! Fortran (a, nslice, nrec) reads as (nrec, nslice, a). Units attributes are written as
-! documentation. The units are FIXED and the attributes are never load-bearing.
+! Routine to return the radiation the run holds at its last record: total power and
+! total window energy over the live polarizations, and the mean bunching over slices.
+!
+! The ONE place that sums the polarizations for display, so the progress line and the
+! completion block cannot come to differ about what power means. Zero before the first
+! record, which only happens on a run that took none.
+!
+! Input:
+!   stats -- fel_stats_struct: Accumulator, filled through record stats%irec.
+!
+! Output:
+!   pow   -- real(rp): Total radiation power [W].
+!   ene   -- real(rp): Total window field energy [J].
+!   bun   -- real(rp): Mean |b| over slices.
+!-
+
+subroutine fel_stats_exit_light (stats, pow, ene, bun)
+
+type (fel_stats_struct) stats
+real(rp) pow, ene, bun
+integer ir
+
+!
+
+pow = 0;  ene = 0;  bun = 0
+if (stats%irec < 1) return
+ir = stats%irec
+
+pow = sum(stats%f_power(:, ir))
+ene = sum(stats%f_energy(:, ir))
+if (allocated(stats%f2_power)) then
+  pow = pow + sum(stats%f2_power(:, ir))
+  ene = ene + sum(stats%f2_energy(:, ir))
+endif
+bun = sum(stats%bunching(:, ir)) / stats%nslice
+
+end subroutine fel_stats_exit_light
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_stats_write (stats, prm, file_name, err_flag)
+!
+! Routine to write the stats file: coords/, params/, beam/ and field/ (module header).
+! meta/ and lattice/ are appended afterwards by fel_io_mod, which can see the run.
+!
+! Every dataset goes through fel_h5_mod, so every dataset carries @unit, @description
+! and @axes. Shapes appear to h5py with the record index first: a Fortran
+! (a, nslice, nrec) array reads as (nrec, nslice, a).
 !
 ! Input:
 !   stats      -- fel_stats_struct: The filled accumulator.
+!   prm        -- fel_stats_params_struct: The run parameters, written to params/.
 !   file_name  -- character(*): File to write.
 !
 ! Output:
 !   err_flag   -- logical: Set True on a write error. False otherwise.
 !-
 
-subroutine fel_stats_write (stats, file_name, err_flag)
+subroutine fel_stats_write (stats, prm, file_name, err_flag)
 
 type (fel_stats_struct) stats
+type (fel_stats_params_struct) prm
 integer(hid_t) f_id, g_id, b_id, s_id
-integer h5_err, ir, ihh
+integer h5_err, ir, ie, ns, ihh, is
+real(rp), allocatable :: s_slice(:), t_slice(:), cur(:,:), energy(:,:), sig_energy(:,:)
 logical err_flag, err
 character(*) file_name
 character(12) hname
@@ -728,108 +757,189 @@ character(*), parameter :: r_name = 'fel_stats_write'
 !
 
 err_flag = .true.
+err = .false.
 ir = stats%irec
+ie = stats%iend
+ns = stats%nslice
 
 call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
 
-call hdf5_write_dataset_real (f_id, 'z', stats%z(1:ir), err);  if (err) return
-call hdf5_write_dataset_real (f_id, 'p0c', [stats%p0c], err);  if (err) return
-
-! One root attribute documents the fixed units. It is never load-bearing.
-
+call hdf5_write_attribute_string (f_id, 'file_format', 'lucifer-stats', err)
+call hdf5_write_attribute_string (f_id, 'file_format_version', '2.0', err)
+call hdf5_write_attribute_string (f_id, 'phase_space', 'bmad', err)
 call hdf5_write_attribute_string (f_id, 'units_note', &
-        'Fixed Bmad units: m, rad, eV, s, C, J, W. Bmad phase space (x, px/p0, y, py/p0, z, pz).', err)
+        'Fixed Bmad units: m, rad, eV, s, C, J, W. Every dataset carries @unit as ' // &
+        'DOCUMENTATION: the values are already SI and eV, so a reader must not scale by it.', err)
+if (err) return
 
-call H5Gcreate_f (f_id, 'beam', g_id, h5_err)
-call hdf5_write_dataset_real (g_id, 'centroid', stats%b_centroid(:,:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'sigma', stats%b_sigma(:,:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'charge_live', stats%charge_live(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'charge_tot', stats%charge_live(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_int (g_id, 'n_particle_live', stats%n_particle_live(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_int (g_id, 'n_particle_tot', stats%n_particle_live(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 't', stats%t(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'sigma_t', stats%sigma_t(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'bunching', stats%bunching(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'bunching_phase', stats%bunching_phase(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 's', stats%z(1:ir), err);  if (err) return
+! ------------------------------------------------------------------
+! coords/: every axis, once. The record axis carries the element index and the
+! element-end mask beside it, so the element-end rows below need no axis of their own.
+! The element NAME is not here: it lives once in lattice/name, which ix_ele indexes.
+
+allocate (s_slice(ns), t_slice(ns))
+do is = 1, ns
+  s_slice(is) = (is - 1) * prm%slice_spacing
+enddo
+t_slice = -s_slice / (prm%beta0 * c_light)
+
+call H5Gcreate_f (f_id, 'coords', g_id, h5_err)
+call fel_h5_real (g_id, 'z', 'm', 'Path length along the line at each record.', '', stats%z(1:ir), err)
+call fel_h5_int (g_id, 'ix_ele', '1', &
+      'Lattice element holding each record. Indexes the lattice/ table.', 'z', stats%ix_ele(1:ir), err)
+call fel_h5_flag (g_id, 'at_element_end', &
+      'One where the record is an element end. Selects the beam/bunch and ' // &
+      'beam/slice_twiss rows, in order.', 'z', stats%at_end(1:ir), err)
+call fel_h5_real (g_id, 's_slice', 'm', &
+      'Slice position in the time window, slice 1 at zero.', '', s_slice, err)
+call fel_h5_real (g_id, 't_slice', 's', &
+      'Arrival-time offset of each slice, negative toward the window head.', '', t_slice, err)
+if (err) return
+
+! The head convention, which no per-slice plot can be drawn without: the migration
+! invariant z_global = z_local + beta*(islice-1)*spacing puts the HEAD at the high
+! index, so s_slice increases toward the head.
+
+call H5LTset_attribute_string_f (g_id, 's_slice', 'head_direction', '+index', h5_err)
+err = err .or. (h5_err < 0)
 call H5Gclose_f (g_id, h5_err)
+if (err) return
 
-call H5Gcreate_f (f_id, 'field', g_id, h5_err)
-call hdf5_write_dataset_real (g_id, 'centroid', stats%f_centroid(:,:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'sigma', stats%f_sigma(:,:,1:ir), err);  if (err) return
-if (allocated(stats%f2_energy)) then
-  ! Two live polarizations: power/energy/intensity are TOTALS. The x-component params
-  ! stay in this group's centroid/sigma/emit, the y component's under field/y/.
-  call hdf5_write_dataset_real (g_id, 'energy', stats%f_energy(:,1:ir) + stats%f2_energy(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (g_id, 'power', stats%f_power(:,1:ir) + stats%f2_power(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (g_id, 'on_axis_intensity', &
-                                stats%f_on_axis(:,1:ir) + stats%f2_on_axis(:,1:ir), err);  if (err) return
+! ------------------------------------------------------------------
+! params/: every scalar as data.
+
+call H5Gcreate_f (f_id, 'params', g_id, h5_err)
+call fel_h5_real (g_id, 'lambda0', 'm', 'Fundamental radiation wavelength.', '', prm%lambda0, err)
+call fel_h5_int (g_id, 'window_sample', '1', &
+      'Slice spacing in wavelengths (Genesis''s sample).', '', prm%window_sample, err)
+call fel_h5_real (g_id, 'slice_spacing', 'm', &
+      'Longitudinal slice spacing, window_sample * lambda0.', '', prm%slice_spacing, err)
+call fel_h5_int (g_id, 'nbins', '1', 'Beamlet size of the quiet loading.', '', prm%nbins, err)
+call fel_h5_real (g_id, 'p0c', 'eV', 'Reference momentum times c.', '', stats%p0c, err)
+call fel_h5_real (g_id, 'bunch_charge', 'C', 'Total live charge of the window.', '', prm%bunch_charge, err)
+call fel_h5_int (g_id, 'ran_seed', '1', 'Random seed of the run.', '', prm%ran_seed, err)
+call fel_h5_int (g_id, 'grid_n_pts', '1', 'Transverse grid points per side.', '', prm%grid_n_pts, err)
+call fel_h5_real (g_id, 'grid_half_width', 'm', 'Transverse grid half width.', '', prm%grid_half_width, err)
+call fel_h5_int (g_id, 'n_record', '1', 'Records taken.', '', ir, err)
+call fel_h5_int (g_id, 'n_element_end', '1', &
+      'Element ends taken. Equals the count of coords/at_element_end.', '', ie, err)
+call fel_h5_int (g_id, 'n_slice', '1', 'Slices in the time window.', '', ns, err)
+call fel_h5_str (g_id, 'species', 'Particle species.', '', [prm%species], err)
+call H5Gclose_f (g_id, h5_err)
+if (err) return
+
+! ------------------------------------------------------------------
+! beam/slice/: the per-record sufficient statistics, bunch_params_struct names, plus
+! the two derived quantities every consumer would otherwise re-derive.
+
+allocate (cur(ns, ir), energy(ns, ir), sig_energy(ns, ir))
+cur = c_light * stats%charge_live(:,1:ir) / prm%slice_spacing
+energy = sqrt((stats%p0c * (1 + stats%b_centroid(6,:,1:ir)))**2 + m_electron**2)
+! sigma_E = beta * p0c * sigma_pz, since dE/dp = p/E = beta. The factor is 1 to a few
+! parts in 1e9 at an X-ray FEL's energy and it is not 1 for everything this tracker
+! could be pointed at, so it is here rather than dropped.
+sig_energy = stats%p0c * sqrt(max(0.0_rp, stats%b_sigma(36,:,1:ir))) * &
+             stats%p0c * (1 + stats%b_centroid(6,:,1:ir)) / energy
+
+call H5Gcreate_f (f_id, 'beam', b_id, h5_err)
+call H5Gcreate_f (b_id, 'slice', g_id, h5_err)
+call fel_h5_real (g_id, 'centroid', 'm,1,m,1,m,1', &
+      'Weighted centroid, Bmad phase space (x, px/p0, y, py/p0, z, pz).', &
+      'z,s_slice', stats%b_centroid(:,:,1:ir), err)
+call fel_h5_real (g_id, 'sigma', 'm,1,m,1,m,1 squared', &
+      'Second moments about the centroid, the 6x6 at its natural rank.', &
+      'z,s_slice', reshape(stats%b_sigma(:,:,1:ir), [6, 6, ns, ir]), err)
+call fel_h5_real (g_id, 'charge_live', 'C', 'Live charge of the slice.', &
+      'z,s_slice', stats%charge_live(:,1:ir), err)
+call fel_h5_int (g_id, 'n_particle_live', '1', 'Live macroparticles in the slice.', &
+      'z,s_slice', stats%n_particle_live(:,1:ir), err)
+call fel_h5_real (g_id, 't', 's', &
+      'Mean arrival time of the slice at this plane, relative to the reference.', &
+      'z,s_slice', stats%t(:,1:ir), err)
+call fel_h5_real (g_id, 'sigma_t', 's', 'Rms arrival-time spread within the slice.', &
+      'z,s_slice', stats%sigma_t(:,1:ir), err)
+call fel_h5_real (g_id, 'bunching', '1', &
+      'Bunching |b| at the fundamental, charge weighted.', 'z,s_slice', stats%bunching(:,1:ir), err)
+call fel_h5_real (g_id, 'bunching_phase', 'rad', &
+      'Bunching phase arg(b), carrying the run''s reference phase.', &
+      'z,s_slice', stats%bunching_phase(:,1:ir), err)
+call fel_h5_real (g_id, 'current', 'A', &
+      'Slice current, c * charge_live / slice_spacing.', 'z,s_slice', cur, err)
+call fel_h5_real (g_id, 'energy', 'eV', &
+      'Mean total energy of the slice, Bmad''s convention (energy is eV, never gamma).', &
+      'z,s_slice', energy, err)
+call fel_h5_real (g_id, 'sigma_energy', 'eV', 'Rms energy spread of the slice.', &
+      'z,s_slice', sig_energy, err)
+call H5Gclose_f (g_id, h5_err)
+if (err) return
+
+! beam/slice_twiss/ and beam/bunch/: the evaluated bunch_params, on the ELEMENT-END
+! grid. They align with the records coords/at_element_end marks, in order.
+
+call H5Gcreate_f (b_id, 'slice_twiss', g_id, h5_err)
+call write_bp_slices (g_id, stats%e_slice(:, :, 1:ie), err)
+call H5Gclose_f (g_id, h5_err)
+if (err) return
+
+call H5Gcreate_f (b_id, 'bunch', g_id, h5_err)
+call write_bp_bunch (g_id, stats%e_bunch(:, 1:ie), err)
+call H5Gclose_f (g_id, h5_err)
+call H5Gclose_f (b_id, h5_err)
+if (err) return
+
+! ------------------------------------------------------------------
+! field/: total/ always, then one group per component and per harmonic, all carrying
+! the same dataset names. Nothing here changes meaning when a sibling appears.
+
+call H5Gcreate_f (f_id, 'field', b_id, h5_err)
+
+if (allocated(stats%f2_power)) then
+  call write_field_total (b_id, stats%f_power(:,1:ir) + stats%f2_power(:,1:ir), &
+                          stats%f_energy(:,1:ir) + stats%f2_energy(:,1:ir), &
+                          stats%f_on_axis(:,1:ir) + stats%f2_on_axis(:,1:ir), 1, err)
 else
-  call hdf5_write_dataset_real (g_id, 'energy', stats%f_energy(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (g_id, 'power', stats%f_power(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (g_id, 'on_axis_intensity', stats%f_on_axis(:,1:ir), err);  if (err) return
+  call write_field_total (b_id, stats%f_power(:,1:ir), stats%f_energy(:,1:ir), &
+                          stats%f_on_axis(:,1:ir), 1, err)
 endif
-call hdf5_write_dataset_real (g_id, 'emit_x', stats%f_emit_x(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 'emit_y', stats%f_emit_y(:,1:ir), err);  if (err) return
-call hdf5_write_dataset_int (g_id, 'angle_moments_valid', stats%f_angles_valid(:,1:ir), err);  if (err) return
-if (allocated(stats%f2_energy)) then
-  call H5Gcreate_f (g_id, 'y', b_id, h5_err)
-  call hdf5_write_dataset_real (b_id, 'centroid', stats%f2_centroid(:,:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (b_id, 'sigma', stats%f2_sigma(:,:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (b_id, 'energy', stats%f2_energy(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (b_id, 'power', stats%f2_power(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (b_id, 'on_axis_intensity', stats%f2_on_axis(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (b_id, 'emit_x', stats%f2_emit_x(:,1:ir), err);  if (err) return
-  call hdf5_write_dataset_real (b_id, 'emit_y', stats%f2_emit_y(:,1:ir), err);  if (err) return
-  call H5Gclose_f (b_id, h5_err)
+if (err) return
+
+call H5Gcreate_f (b_id, 'x', g_id, h5_err)
+call write_field_component (g_id, stats%f_centroid(:,:,1:ir), stats%f_sigma(:,:,1:ir), &
+        stats%f_power(:,1:ir), stats%f_energy(:,1:ir), stats%f_on_axis(:,1:ir), &
+        stats%f_emit_x(:,1:ir), stats%f_emit_y(:,1:ir), stats%f_angles_valid(:,1:ir), err)
+call H5Gclose_f (g_id, h5_err)
+if (err) return
+
+if (allocated(stats%f2_power)) then
+  call H5Gcreate_f (b_id, 'y', g_id, h5_err)
+  call write_field_component (g_id, stats%f2_centroid(:,:,1:ir), stats%f2_sigma(:,:,1:ir), &
+          stats%f2_power(:,1:ir), stats%f2_energy(:,1:ir), stats%f2_on_axis(:,1:ir), &
+          stats%f2_emit_x(:,1:ir), stats%f2_emit_y(:,1:ir), stats%f_angles_valid(:,1:ir), err)
+  call H5Gclose_f (g_id, h5_err)
+  if (err) return
 endif
 
-! Harmonic fields: field/harm<h>/ groups, one full wavefront_params set each. The
-! fundamental's datasets above are untouched: harmonics are separate wavelengths.
+! Harmonics: a group each, with its own total, since a detector separates colors and
+! nothing may sum across wavelengths.
 
-if (allocated(stats%fh_energy)) then
+if (allocated(stats%fh_power)) then
   do ihh = 1, size(stats%fh_harm)
     write (hname, '(a, i0)') 'harm', stats%fh_harm(ihh)
-    call H5Gcreate_f (g_id, trim(hname), b_id, h5_err)
-    call hdf5_write_dataset_real (b_id, 'centroid', stats%fh_centroid(:,:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_real (b_id, 'sigma', stats%fh_sigma(:,:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_real (b_id, 'energy', stats%fh_energy(:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_real (b_id, 'power', stats%fh_power(:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_real (b_id, 'on_axis_intensity', stats%fh_on_axis(:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_real (b_id, 'emit_x', stats%fh_emit_x(:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_real (b_id, 'emit_y', stats%fh_emit_y(:,1:ir,ihh), err);  if (err) return
-    call hdf5_write_dataset_int (b_id, 'angle_moments_valid', stats%fh_angles_valid(:,1:ir,ihh), err);  if (err) return
-    call H5Gclose_f (b_id, h5_err)
+    call H5Gcreate_f (b_id, trim(hname), s_id, h5_err)
+    call H5LTset_attribute_int_f (b_id, trim(hname), 'harmonic', [stats%fh_harm(ihh)], 1_size_t, h5_err)
+    call write_field_total (s_id, stats%fh_power(:,1:ir,ihh), stats%fh_energy(:,1:ir,ihh), &
+                            stats%fh_on_axis(:,1:ir,ihh), stats%fh_harm(ihh), err)
+    call H5Gcreate_f (s_id, 'x', g_id, h5_err)
+    call write_field_component (g_id, stats%fh_centroid(:,:,1:ir,ihh), stats%fh_sigma(:,:,1:ir,ihh), &
+            stats%fh_power(:,1:ir,ihh), stats%fh_energy(:,1:ir,ihh), stats%fh_on_axis(:,1:ir,ihh), &
+            stats%fh_emit_x(:,1:ir,ihh), stats%fh_emit_y(:,1:ir,ihh), stats%fh_angles_valid(:,1:ir,ihh), err)
+    call H5Gclose_f (g_id, h5_err)
+    call H5Gclose_f (s_id, h5_err)
+    if (err) return
   enddo
 endif
-call H5Gclose_f (g_id, h5_err)
 
-! Element ends: the evaluated bunch_params_struct, unpacked into named datasets.
-
-call H5Gcreate_f (f_id, 'element_end', g_id, h5_err)
-call hdf5_write_dataset_int (g_id, 'ix_ele', stats%e_ix_ele(1:stats%iend), err);  if (err) return
-call hdf5_write_dataset_real (g_id, 's', stats%e_s(1:stats%iend), err);  if (err) return
-
-call H5Gcreate_f (g_id, 'bunch', b_id, h5_err)
-call write_bp_group (b_id, stats%e_bunch(:, 1:stats%iend), err);  if (err) return
 call H5Gclose_f (b_id, h5_err)
-
-call H5Gcreate_f (g_id, 'slice', s_id, h5_err)
-call write_bp_group_slices (s_id, stats%e_slice(:, :, 1:stats%iend), err);  if (err) return
-call H5Gclose_f (s_id, h5_err)
-
-! The field and bunching at each element end, so the element_end group stands alone
-! when the comb keeps no per-record rows. Power/energy/intensity are totals over
-! polarizations, as the per-record datasets are.
-
-call H5Gcreate_f (g_id, 'field', s_id, h5_err)
-call hdf5_write_dataset_real (s_id, 'power', stats%e_f_power(:, 1:stats%iend), err);  if (err) return
-call hdf5_write_dataset_real (s_id, 'energy', stats%e_f_energy(:, 1:stats%iend), err);  if (err) return
-call hdf5_write_dataset_real (s_id, 'on_axis_intensity', stats%e_f_on_axis(:, 1:stats%iend), err);  if (err) return
-call hdf5_write_dataset_real (s_id, 'bunching', stats%e_bunching(:, 1:stats%iend), err);  if (err) return
-call hdf5_write_dataset_real (s_id, 'bunching_phase', stats%e_bunching_phase(:, 1:stats%iend), err);  if (err) return
-call H5Gclose_f (s_id, h5_err)
-call H5Gclose_f (g_id, h5_err)
 
 call H5Fclose_f (f_id, h5_err)
 err_flag = .false.
@@ -838,92 +948,162 @@ err_flag = .false.
 contains
 
 !+
-! Subroutine write_bp_group (id, rows, err)
+! Subroutine write_field_total (id, pow, ene, onax, harm, err)
 !
-! Routine to write the whole-bunch bunch_params rows as named datasets under
-! group id.
+! Routine to write the total/ group of one wavelength: the sum over the live
+! polarizations. ALWAYS written, whether one polarization is live or two, so that no
+! reader has to ask what else the file holds before it knows what power means.
 !-
 
-subroutine write_bp_group (id, rows, err)
+subroutine write_field_total (id, pow, ene, onax, harm, err)
 
-integer(hid_t) id, mm_id
-real(rp) rows(:,:)
-integer im, k, h5e
+integer(hid_t) id, tt_id
+integer harm, h5e
+real(rp) pow(:,:), ene(:,:), onax(:,:)
 logical err
+character(60) note
 
 !
 
-err = .true.
-call hdf5_write_dataset_real (id, 'centroid', rows(1:6, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'sigma', rows(7:42, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'charge_live', rows(43, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'n_particle_live', rows(44, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'twiss_valid', rows(45, :), err);  if (err) return
-k = 45
-do im = 1, 6
-  call H5Gcreate_f (id, fel_stats_modes$(im), mm_id, h5e)
-  call write_twiss (mm_id, rows, k, err);  if (err) return
-  call H5Gclose_f (mm_id, h5e)
-  k = k + 9
-enddo
-err = .false.
+write (note, '(a, i0, a)') ' Summed over the live polarizations of harmonic ', harm, '.'
 
-end subroutine write_bp_group
+call H5Gcreate_f (id, 'total', tt_id, h5e)
+call fel_h5_real (tt_id, 'power', 'W', 'Radiation power of the slice.' // trim(note), &
+      'z,s_slice', pow, err)
+call fel_h5_real (tt_id, 'energy', 'J', 'Field energy of the slice.' // trim(note), &
+      'z,s_slice', ene, err)
+call fel_h5_real (tt_id, 'on_axis_intensity', 'W/m^2', &
+      'Intensity at the grid center.' // trim(note), 'z,s_slice', onax, err)
+call H5Gclose_f (tt_id, h5e)
+
+end subroutine write_field_total
 
 !+
-! Subroutine write_twiss (id, rows, k, err)
+! Subroutine write_field_component (id, cen, sig, pow, ene, onax, ex, ey, valid, err)
 !
-! Routine to write the nine twiss datasets of one mode, reading rows(k+1:k+9, :).
+! Routine to write one polarization component: the full wavefront_params set under the
+! same dataset names every component and harmonic uses.
 !-
 
-subroutine write_twiss (id, rows, k, err)
+subroutine write_field_component (id, cen, sig, pow, ene, onax, ex, ey, valid, err)
 
 integer(hid_t) id
-real(rp) rows(:,:)
-integer k, jp
+real(rp) cen(:,:,:), sig(:,:,:), pow(:,:), ene(:,:), onax(:,:), ex(:,:), ey(:,:)
+integer valid(:,:)
 logical err
 
-do jp = 1, 9
-  call hdf5_write_dataset_real (id, trim(fel_stats_twiss$(jp)), rows(k+jp, :), err)
-  if (err) return
-enddo
+!
 
-end subroutine write_twiss
+call fel_h5_real (id, 'centroid', 'm,rad,m,rad', &
+      'Intensity-weighted (x, theta_x, y, theta_y). The theta entries are NaN where ' // &
+      'the angle moments were not computed.', 'z,s_slice', cen, err)
+call fel_h5_real (id, 'sigma', 'm,rad,m,rad squared', &
+      'Wigner second moments, the 4x4 at its natural rank. The theta rows are NaN ' // &
+      'where the angle moments were not computed.', &
+      'z,s_slice', reshape(sig, [4, 4, size(sig,2), size(sig,3)]), err)
+call fel_h5_real (id, 'power', 'W', 'Radiation power of this component.', 'z,s_slice', pow, err)
+call fel_h5_real (id, 'energy', 'J', 'Field energy of this component.', 'z,s_slice', ene, err)
+call fel_h5_real (id, 'on_axis_intensity', 'W/m^2', &
+      'Intensity of this component at the grid center.', 'z,s_slice', onax, err)
+call fel_h5_real (id, 'emit_x', 'm rad', &
+      'sqrt(det sigma_x-plane) = M^2 lambda / 4 pi. NaN without angle moments.', &
+      'z,s_slice', ex, err)
+call fel_h5_real (id, 'emit_y', 'm rad', &
+      'sqrt(det sigma_y-plane) = M^2 lambda / 4 pi. NaN without angle moments.', &
+      'z,s_slice', ey, err)
+call fel_h5_flag (id, 'angle_moments_valid', &
+      'One where the theta moments were computed (they cost three FFTs, so element ' // &
+      'ends only).', 'z,s_slice', valid, err)
+
+end subroutine write_field_component
 
 !+
-! Subroutine write_bp_group_slices (id, rows, err)
+! Subroutine write_bp_bunch (id, rows, err)
 !
-! Routine to write the per-slice bunch_params rows as named datasets under group id.
+! Routine to write the whole-window bunch_params rows: the packed 99-number row
+! unpacked into named datasets, twiss modes in their own groups.
 !-
 
-subroutine write_bp_group_slices (id, rows, err)
+subroutine write_bp_bunch (id, rows, err)
 
 integer(hid_t) id, mm_id
-real(rp) rows(:,:,:)
-integer im, k, jp, h5e
+real(rp) rows(:,:)
+integer im, k, jp, h5e, nr
 logical err
 
 !
 
-err = .true.
-call hdf5_write_dataset_real (id, 'centroid', rows(1:6, :, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'sigma', rows(7:42, :, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'charge_live', rows(43, :, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'n_particle_live', rows(44, :, :), err);  if (err) return
-call hdf5_write_dataset_real (id, 'twiss_valid', rows(45, :, :), err);  if (err) return
+nr = size(rows, 2)
+call fel_h5_real (id, 'centroid', 'm,1,m,1,m,1', &
+      'Weighted centroid of the whole window, Bmad phase space.', &
+      'element_end', rows(1:6, :), err)
+call fel_h5_real (id, 'sigma', 'm,1,m,1,m,1 squared', &
+      'Second moments of the whole window, the 6x6 at its natural rank.', &
+      'element_end', reshape(rows(7:42, :), [6, 6, nr]), err)
+call fel_h5_real (id, 'charge_live', 'C', 'Live charge of the whole window.', &
+      'element_end', rows(43, :), err)
+call fel_h5_int (id, 'n_particle_live', '1', 'Live macroparticles in the whole window.', &
+      'element_end', nint(rows(44, :)), err)
+call fel_h5_flag (id, 'twiss_valid', &
+      'One where Bmad evaluated the twiss (it needs six live particles).', &
+      'element_end', nint(rows(45, :)), err)
 k = 45
 do im = 1, 6
   call H5Gcreate_f (id, fel_stats_modes$(im), mm_id, h5e)
   do jp = 1, 9
-    call hdf5_write_dataset_real (mm_id, trim(fel_stats_twiss$(jp)), rows(k+jp, :, :), err)
-    if (err) return
+    call fel_h5_real (mm_id, trim(fel_stats_twiss$(jp)), trim(fel_stats_tunit$(jp)), &
+          trim(fel_stats_modes$(im)) // '-mode ' // trim(fel_stats_twiss$(jp)) // &
+          '. NaN where twiss_valid is zero.', 'element_end', rows(k+jp, :), err)
   enddo
   call H5Gclose_f (mm_id, h5e)
   k = k + 9
 enddo
-err = .false.
 
-end subroutine write_bp_group_slices
+end subroutine write_bp_bunch
+
+!+
+! Subroutine write_bp_slices (id, rows, err)
+!
+! Routine to write the per-slice bunch_params rows, the same names as write_bp_bunch
+! with the slice axis added.
+!-
+
+subroutine write_bp_slices (id, rows, err)
+
+integer(hid_t) id, mm_id
+real(rp) rows(:,:,:)
+integer im, k, jp, h5e, nsl, nr
+logical err
+
+!
+
+nsl = size(rows, 2);  nr = size(rows, 3)
+call fel_h5_real (id, 'centroid', 'm,1,m,1,m,1', &
+      'Weighted centroid per slice, Bmad phase space.', &
+      'element_end,s_slice', rows(1:6, :, :), err)
+call fel_h5_real (id, 'sigma', 'm,1,m,1,m,1 squared', &
+      'Second moments per slice, the 6x6 at its natural rank.', &
+      'element_end,s_slice', reshape(rows(7:42, :, :), [6, 6, nsl, nr]), err)
+call fel_h5_real (id, 'charge_live', 'C', 'Live charge of the slice.', &
+      'element_end,s_slice', rows(43, :, :), err)
+call fel_h5_int (id, 'n_particle_live', '1', 'Live macroparticles in the slice.', &
+      'element_end,s_slice', nint(rows(44, :, :)), err)
+call fel_h5_flag (id, 'twiss_valid', &
+      'One where Bmad evaluated the twiss (it needs six live particles).', &
+      'element_end,s_slice', nint(rows(45, :, :)), err)
+k = 45
+do im = 1, 6
+  call H5Gcreate_f (id, fel_stats_modes$(im), mm_id, h5e)
+  do jp = 1, 9
+    call fel_h5_real (mm_id, trim(fel_stats_twiss$(jp)), trim(fel_stats_tunit$(jp)), &
+          trim(fel_stats_modes$(im)) // '-mode ' // trim(fel_stats_twiss$(jp)) // &
+          ' per slice. NaN where twiss_valid is zero.', 'element_end,s_slice', rows(k+jp, :, :), err)
+  enddo
+  call H5Gclose_f (mm_id, h5e)
+  k = k + 9
+enddo
+
+end subroutine write_bp_slices
 
 end subroutine fel_stats_write
 

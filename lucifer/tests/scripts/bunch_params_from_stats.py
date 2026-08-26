@@ -3,8 +3,9 @@
 Reconstruct a Bmad bunch_params_struct-shaped dict from any (record, slice) of the
 tracker's stats file <out_root>.stats.h5 -- the per-record beam datasets (centroid,
 sigma, charge_live, n_particle_live) are SUFFICIENT statistics, and this module is
-the proof by construction: at element ends its output must reproduce the values the
-tracker stored from Bmad's own calc_bunch_params (the harness holds that).
+the proof by construction: at element ends its output must reproduce the TWISS the
+tracker stored from Bmad's own calc_bunch_params (the harness holds that). The moments
+themselves are stored once, per record, so there is nothing there to compare against.
 
 The formulas are transcribed from Bmad's calc_emittances_and_twiss_from_sigma_matrix
 (beam_utils.f90): projected x/y/z twiss with dispersion removed via sigma(i,6)
@@ -28,10 +29,13 @@ Or from the command line, for a quick look:
 
 from __future__ import annotations
 
+import pathlib
 import sys
 
-import h5py
 import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from read_stats import Stats, read_stats  # noqa: E402
 
 M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
@@ -101,21 +105,22 @@ def bunch_params_from_moments(centroid, sigma36, charge_live, n_live, p0c):
     return bp
 
 
-def bunch_params_at(h5, record, islice):
-    """bunch_params dict from stats file h5 (path or open file) at (record, slice)."""
+def bunch_params_at(stats, record, islice):
+    """bunch_params dict from a stats file (path, or an open Stats) at (record, slice)."""
     close = False
-    if not isinstance(h5, h5py.File):
-        h5 = h5py.File(h5, "r")
+    if not isinstance(stats, Stats):
+        stats = read_stats(stats)
         close = True
     try:
-        b = h5["beam"]
         bp = bunch_params_from_moments(
-            b["centroid"][record, islice], b["sigma"][record, islice],
-            float(b["charge_live"][record, islice]),
-            int(b["n_particle_live"][record, islice]), float(h5["p0c"][0]))
+            stats["beam/slice/centroid"][record, islice],
+            stats["beam/slice/sigma"][record, islice],
+            float(stats["beam/slice/charge_live"][record, islice]),
+            int(stats["beam/slice/n_particle_live"][record, islice]),
+            float(stats.params["p0c"]))
     finally:
         if close:
-            h5.close()
+            stats.close()
     return bp
 
 

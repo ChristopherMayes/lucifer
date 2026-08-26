@@ -49,6 +49,7 @@ import numpy as np
 import beamio
 import convert_genesis
 import fieldio
+from read_stats import read_stats
 from nml import to_groups
 from scipy.special import jv
 
@@ -284,10 +285,10 @@ def main():
         zg = h5["Lattice/zplot"][:]
         p1g = h5["Field/power"][:].ravel()
         p3g = h5["Field3/power"][:].ravel()
-    with h5py.File(wd / "h3bmad.stats.h5") as h5:
-        zb = h5["z"][:]
-        p1b = h5["field/power"][:, 0]
-        p3b = h5["field/harm3/power"][:, 0]
+    with read_stats(wd / "h3bmad.stats.h5") as st:
+        zb = st.z
+        p1b = st["field/total/power"][:, 0]
+        p3b = st["field/harm3/total/power"][:, 0]
 
     n = min(len(zg), len(zb))
     if not np.allclose(zg[:n], zb[:n], atol=1e-9):
@@ -464,9 +465,9 @@ def main():
         # Common factors (weights, delz, spacing, mu0 c) cancel in the ratio. Keep fc.
         return abs(fc_planar(aw, h)) ** 2 * float((abs(crs) ** 2).sum())
 
-    with h5py.File(wd / "h3dep.stats.h5") as h5:
-        p1 = float(h5["field/power"][-1, 0])
-        p3 = float(h5["field/harm3/power"][-1, 0])
+    with read_stats(wd / "h3dep.stats.h5") as st:
+        p1 = float(st["field/total/power"][-1, 0])
+        p3 = float(st["field/harm3/total/power"][-1, 0])
     expect = predicted_power(3) / predicted_power(1)
     d = abs(p3 / p1 / expect - 1)
     check("one-step deposit P3/P1 vs the Bessel fc + h*theta sum", d, TOL_DEPOSIT,

@@ -41,6 +41,7 @@ import h5py
 import numpy as np
 
 from pool import run_all
+from read_stats import read_stats
 
 FAILED = False
 
@@ -131,13 +132,13 @@ def run(exe, wd, root, m, coherent, seed=777, bextra="", wextra="", pextra="", t
 
 
 def curve(wd, root):
-    with h5py.File(wd / f"{root}.stats.h5") as f:
-        return f["z"][()], np.sum(f["field/power"][()], axis=1)   # window total
+    with read_stats(wd / f"{root}.stats.h5") as st:
+        return st.z, np.sum(st["field/total/power"], axis=1)   # window total
 
 
 def sase_startup(wd, root):
-    with h5py.File(wd / f"{root}.stats.h5") as f:
-        return float(np.mean(f["field/power"][()][-1, :]))
+    with read_stats(wd / f"{root}.stats.h5") as st:
+        return float(np.mean(st["field/total/power"][-1, :]))
 
 
 def main():
@@ -245,9 +246,9 @@ def main():
     run(exe, wd, "ct1", 2048, True, threads="1")
     run(exe, wd, "ct8", 2048, True, threads="8")
     same = True
-    with h5py.File(wd / "ct1.stats.h5") as a, h5py.File(wd / "ct8.stats.h5") as b:
-        same = bool(np.array_equal(a["field/power"][()], b["field/power"][()]) and
-                    np.array_equal(a["beam/bunching"][()], b["beam/bunching"][()]))
+    with read_stats(wd / "ct1.stats.h5") as a, read_stats(wd / "ct8.stats.h5") as b:
+        same = bool(np.array_equal(a["field/total/power"], b["field/total/power"]) and
+                    np.array_equal(a["beam/slice/bunching"], b["beam/slice/bunching"]))
     check("coherent run 1 vs 8 threads dataset-identical (0 = yes)",
           0.0 if same else 1.0, 0.5)
 

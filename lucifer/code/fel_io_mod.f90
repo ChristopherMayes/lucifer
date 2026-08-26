@@ -224,14 +224,7 @@ call out_io (s_blank$, r_name, trim(line))
 
 ! The exit light, from whichever row holds the run's last state.
 
-pow = 0;  ene = 0;  bun = 0
-if (stats%irec > 0) then
-  pow = sum(stats%f_power(:, stats%irec));  ene = sum(stats%f_energy(:, stats%irec))
-  bun = sum(stats%bunching(:, stats%irec)) / run%nslice
-elseif (stats%iend > 0) then
-  pow = sum(stats%e_f_power(:, stats%iend));  ene = sum(stats%e_f_energy(:, stats%iend))
-  bun = sum(stats%e_bunching(:, stats%iend)) / run%nslice
-endif
+call fel_stats_exit_light (stats, pow, ene, bun)
 write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
       ', pulse energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', <|b|> ', bun
 call out_io (s_blank$, r_name, trim(line))
@@ -594,7 +587,8 @@ subroutine fel_finalize_diagnostics (run, err_flag)
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
-integer nx, h5e, ihh, n_harm, nslice
+type (fel_stats_params_struct) sprm
+integer nx, h5e, ihh, n_harm, nslice, is
 logical ferr, err_flag, two_pol, keep_escaped_field
 character(400) out_root
 character(420) fname_h
@@ -611,8 +605,26 @@ two_pol = run%two_pol
 keep_escaped_field = run%global%keep_escaped_field
 out_root = run%global%out_root
 
-call fel_stats_write (run%stats, trim(out_root) // '.stats.h5', ferr)
+! The parameters the file states as data. Assembled here because this is where the
+! whole run is visible; fel_stats_mod knows the accumulator and nothing else.
+
+sprm%lambda0 = run%winit%lambda0
+sprm%window_sample = run%winit%window_sample
+sprm%slice_spacing = fbeam%slice_spacing
+sprm%nbins = fbeam%nbins
+sprm%bunch_charge = 0
+do is = 1, nslice
+  sprm%bunch_charge = sprm%bunch_charge + sum(fbeam%slice(is)%weight(1:fbeam%slice(is)%n))
+enddo
+sprm%grid_n_pts = run%winit%grid_n_pts
+sprm%grid_half_width = run%winit%grid_half_width
+sprm%ran_seed = run%global%ran_seed
+sprm%species = 'electron'
+sprm%beta0 = fel_p0_mc(fbeam) / sqrt(fel_p0_mc(fbeam)**2 + 1)
+
+call fel_stats_write (run%stats, sprm, trim(out_root) // '.stats.h5', ferr)
 if (ferr) return
+call fel_write_lattice (run, trim(out_root) // '.stats.h5')
 call fel_write_meta (run, trim(out_root) // '.stats.h5')
 
 if (.not. keep_escaped_field) then
@@ -853,10 +865,10 @@ character(*), parameter :: r_name = 'fel_write_meta'
 
 call hdf5_open_file (stats_file, 'APPEND', f_id, merr)
 if (merr) then
-  call out_io (s_warn$, r_name, 'Could not reopen the stats file for Meta/.')
+  call out_io (s_warn$, r_name, 'Could not reopen the stats file for meta/.')
   return
 endif
-call H5Gcreate_f (f_id, 'Meta', g_id, h5e)
+call H5Gcreate_f (f_id, 'meta', g_id, h5e)
 if (h5e < 0) then
   call H5Fclose_f (f_id, h5e)
   return
@@ -864,11 +876,11 @@ endif
 
 call resolved_input_text (run, txt)
 call hdf5_write_attribute_string (g_id, 'input_echo', txt, merr)
-if (merr) call out_io (s_warn$, r_name, 'Meta/input_echo did not fit an attribute.')
+if (merr) call out_io (s_warn$, r_name, 'meta/input_echo did not fit an attribute.')
 
 call file_text (trim(run%lat_file), txt)
 call hdf5_write_attribute_string (g_id, 'lattice_text', txt, merr)
-if (merr) call out_io (s_warn$, r_name, 'Meta/lattice_text did not fit an attribute.')
+if (merr) call out_io (s_warn$, r_name, 'meta/lattice_text did not fit an attribute.')
 call hdf5_write_attribute_string (g_id, 'lattice_file', trim(run%lat_file), merr)
 
 call date_and_time (date_s, time_s)
@@ -885,6 +897,133 @@ call H5Gclose_f (g_id, h5e)
 call H5Fclose_f (f_id, h5e)
 
 end subroutine fel_write_meta
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_lattice (run, stats_file)
+!
+! Routine to write the lattice table into the stats file: one row per tracked element,
+! which is what a layout plot needs and what the file has never carried. Genesis writes
+! its Lattice/ group as per-step arrays; this is a table instead, joined to the records
+! through coords/ix_ele, so nothing is duplicated per record and the two cannot drift.
+!
+! NOT a lattice serialization. It carries what a plot and a join need, and anything
+! that needs the real lattice reads meta/lattice_file or meta/lattice_text, which stay
+! the reproducibility record. Bmad has no portable HDF5 lattice format, and a
+! statistics file is the wrong place to invent one.
+!
+! aw is the value THE PHYSICS USED, derived through b_max and l_period with the
+! helical or planar factor, not the raw attribute: that is the number a Genesis user
+! compares against Lattice/aw, and deriving it here would repeat fel_setup_lattice.
+!
+! Best effort, like fel_write_meta: a failure warns and never fails the run.
+!
+! Input:
+!   run         -- fel_run_struct: Run state, after setup.
+!   stats_file  -- character(*): The stats file to reopen and annotate.
+!-
+
+subroutine fel_write_lattice (run, stats_file)
+
+type (fel_run_struct), target :: run
+type (branch_struct), pointer :: branch
+type (ele_struct), pointer :: ele
+character(*) stats_file
+character(fel_h5_str_len$), allocatable :: names(:), keys(:)   ! 0:n_ele_track
+real(rp), allocatable :: s1(:), s2(:), len_(:), dstep(:), b_max(:), aw(:), l_per(:)
+real(rp), allocatable :: ku(:), k1(:), tilt(:), z_off(:)
+integer, allocatable :: is_fel(:), helical(:), mode(:)
+integer(hid_t) f_id, g_id
+integer h5e, ie, ne
+logical merr
+character(*), parameter :: r_name = 'fel_write_lattice'
+
+!
+
+! The table is indexed BY ix_ele, element 0 (Bmad's beginning element) included, so
+! coords/ix_ele indexes it with no offset arithmetic anywhere: lattice/name(ix_ele) is
+! the record's element. The first record of a run sits at element 0.
+
+branch => run%lat%branch(0)
+ne = branch%n_ele_track
+
+allocate (names(0:ne), keys(0:ne), s1(0:ne), s2(0:ne), len_(0:ne), dstep(0:ne))
+allocate (b_max(0:ne), aw(0:ne), l_per(0:ne), ku(0:ne), k1(0:ne), tilt(0:ne), z_off(0:ne))
+allocate (is_fel(0:ne), helical(0:ne), mode(0:ne))
+
+do ie = 0, ne
+  ele => branch%ele(ie)
+  names(ie) = ele%name
+  keys(ie) = key_name(ele%key)
+  s1(ie) = ele%s_start
+  s2(ie) = ele%s
+  len_(ie) = ele%value(l$)
+  dstep(ie) = ele%value(ds_step$)
+  b_max(ie) = ele%value(b_max$)
+  l_per(ie) = ele%value(l_period$)
+  k1(ie) = ele%value(k1$)
+  tilt(ie) = ele%value(tilt_tot$)
+  z_off(ie) = ele%value(z_offset_tot$)
+  is_fel(ie) = 0
+  if (ie > 0) is_fel(ie) = merge(1, 0, run%is_fel(ie))
+  aw(ie) = 0;  ku(ie) = 0;  helical(ie) = 0;  mode(ie) = 0
+  if (is_fel(ie) == 1) then
+    aw(ie) = run%und_of(ie)%aw
+    ku(ie) = run%und_of(ie)%ku
+    helical(ie) = merge(1, 0, run%und_of(ie)%helical)
+    mode(ie) = run%fel_mode(ie)
+  endif
+enddo
+
+call hdf5_open_file (stats_file, 'APPEND', f_id, merr)
+if (merr) then
+  call out_io (s_warn$, r_name, 'Could not reopen the stats file for lattice/.')
+  return
+endif
+call H5Gcreate_f (f_id, 'lattice', g_id, h5e)
+if (h5e < 0) then
+  call H5Fclose_f (f_id, h5e)
+  return
+endif
+
+merr = .false.
+call fel_h5_str (g_id, 'name', 'Element name. Indexed BY ix_ele, element 0 included.', &
+      'ix_ele', names, merr)
+call fel_h5_str (g_id, 'key', 'Bmad element class, as key_name gives it.', 'ix_ele', keys, merr)
+call fel_h5_real (g_id, 's_start', 'm', 'Upstream end of the element.', 'ix_ele', s1, merr)
+call fel_h5_real (g_id, 's_end', 'm', 'Downstream end of the element.', 'ix_ele', s2, merr)
+call fel_h5_real (g_id, 'l', 'm', 'Element length.', 'ix_ele', len_, merr)
+call fel_h5_real (g_id, 'ds_step', 'm', &
+      'Integration step the walk used, which is what sets the record density.', 'ix_ele', dstep, merr)
+call fel_h5_flag (g_id, 'is_fel', &
+      'One where the element is an FEL segment the FEL step tracked.', 'ix_ele', is_fel, merr)
+call fel_h5_int (g_id, 'fel_tracking', '1', &
+      'Tracking mode of an FEL segment: -1 transcribed Genesis maps, 0 averaged ' // &
+      '(the default, Bmad''s own kernel), 1 unaveraged. Zero off an FEL segment.', &
+      'ix_ele', mode, merr)
+call fel_h5_real (g_id, 'b_max', 'T', 'Peak undulator field, zero elsewhere.', 'ix_ele', b_max, merr)
+call fel_h5_real (g_id, 'aw', '1', &
+      'Rms undulator parameter as the physics used it: c*b_max/(ku*m_e c^2), ' // &
+      'divided by sqrt(2) for a planar device. Zero off an FEL segment.', 'ix_ele', aw, merr)
+call fel_h5_real (g_id, 'l_period', 'm', 'Undulator period.', 'ix_ele', l_per, merr)
+call fel_h5_real (g_id, 'ku', '1/m', 'Undulator wavenumber, twopi/l_period.', 'ix_ele', ku, merr)
+call fel_h5_flag (g_id, 'helical', 'One for a helical device, zero for planar.', 'ix_ele', helical, merr)
+call fel_h5_real (g_id, 'k1', '1/m^2', &
+      'Quadrupole strength, signed as Bmad signs it.', 'ix_ele', k1, merr)
+call fel_h5_real (g_id, 'tilt', 'rad', &
+      'Element tilt. On a planar FEL segment this is the wiggle-plane rotation, ' // &
+      'which is the polarization spec.', 'ix_ele', tilt, merr)
+call fel_h5_real (g_id, 'z_offset', 'm', &
+      'Longitudinal misalignment, the inter-segment phasing knob.', 'ix_ele', z_off, merr)
+
+if (merr) call out_io (s_warn$, r_name, 'Could not write all of lattice/.')
+
+call H5Gclose_f (g_id, h5e)
+call H5Fclose_f (f_id, h5e)
+
+end subroutine fel_write_lattice
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

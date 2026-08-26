@@ -291,13 +291,17 @@ end function fel_si_str
 !+
 ! Function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
 !
-! THE COMB RULE, in one place: Bmad's bunch_track_struct%ds_save semantics verbatim
-! (save_a_bunch_step's guards, and Tao's comb_ds_save note "< 0 => No comb calculated"):
-!   comb < 0: no per-record rows at all (element ends, dumps and finals remain
-!             through their own arrays);
+! THE COMB RULE, in one place: Bmad's bunch_track_struct%ds_save semantics, with one
+! deliberate difference (save_a_bunch_step's guards, and Tao's comb_ds_save note
+! "< 0 => No comb calculated"):
+!   comb < 0: element ends only;
 !   comb = 0: a row at every record position;
-!   comb > 0: a row when z has advanced comb_ds_save past the last row, and always
-!             at an element end.
+!   comb > 0: a row when z has advanced comb_ds_save past the last row.
+! AN ELEMENT END IS ALWAYS A ROW, whatever the comb. That is the difference, and it is
+! what lets the stats file carry ONE record axis with a boolean mask (coords/
+! at_element_end) instead of a second axis and a duplicated copy of every element-end
+! quantity. Bmad's comb < 0 drops the comb, and here that leaves the element ends,
+! which are the positions the evaluated bunch_params live on.
 ! z_last updates when the row is taken. The walk consults this rule live and the
 ! setup's nrec precompute REPLAYS it with the same z arithmetic, so the stats
 ! arrays are exact-sized in every mode.
@@ -320,10 +324,10 @@ logical at_end, take
 
 !
 
-if (comb_ds_save < 0) then
-  take = .false.
-elseif (at_end) then
+if (at_end) then
   take = .true.
+elseif (comb_ds_save < 0) then
+  take = .false.
 else
   take = (z >= z_last + comb_ds_save)
 endif
