@@ -111,15 +111,50 @@ def main():
         # what it is and what its dimensions run over. This is what makes a generic
         # reader possible, so it is checked generically rather than name by name.
         bad = []
-        for name, unit, axes, descrip in st.units_table():
-            if unit == '' or descrip == '':
-                bad.append(f"{name}: no unit or description")
-            for ax in axes:
-                if f"coords/{ax}" not in st and ax not in ("element_end", "ix_ele"):
-                    bad.append(f"{name}: @axes names {ax}, which is not a coords entry")
-        check("stats: every dataset carries unit, description and axes", len(bad), 0.5,
-              note=f"[{len(st.units_table())} datasets" +
+        for name, unit, label, axes, descrip in st.units_table():
+            if unit == '' or descrip == '' or label == '':
+                bad.append(f"{name}: no unit, label or description")
+        for name, kind in st.kind.items():
+            if kind == '' or st.group_description[name] == '':
+                bad.append(f"{name}/: group carries no kind or description")
+        check("stats: every dataset carries unit, label, description and axes", len(bad), 0.5,
+              note=f"[{len(st.units_table())} datasets, {len(st.kind)} groups" +
                    (f"; first problem {bad[0]}]" if bad else "]"))
+
+        # 0a2. THE ACCEPTANCE TEST IS A GENERIC LOAD: label every dimension of every
+        # dataset from @axes alone. It fails if a name does not resolve to a coordinate,
+        # if a dimension has no name, if a length disagrees with its coordinate, or if
+        # one dataset names an axis twice, which is what would force a reader to guess
+        # from a length or to dedupe by rule. Nothing here knows a dataset name.
+        bad = []
+        for name, unit, label, axes, descrip in st.units_table():
+            shape = st[name].shape
+            if len(axes) != len(shape):
+                bad.append(f"{name}: {len(shape)} dimensions, {len(axes)} named")
+                continue
+            if len(set(axes)) != len(axes):
+                bad.append(f"{name}: names an axis twice ({','.join(axes)})")
+            for k, ax in enumerate(axes):
+                if ax not in st.axis_names:
+                    bad.append(f"{name}: @axes names {ax}, which is not an axis")
+                elif len(st.coord(ax)) != shape[k]:
+                    bad.append(f"{name}: dimension {k} is {shape[k]} long, {ax} is "
+                               f"{len(st.coord(ax))}")
+        check("stats: every dimension of every dataset labels itself", len(bad), 0.5,
+              note=f"[{len(st.axis_names)} axes: {', '.join(st.axis_names)}" +
+                   (f"; first problem {bad[0]}]" if bad else "]"))
+
+        # 0a3. THE RECORD NUMBER IS THE AXIS, and z is a variable on it. z must be
+        # non-decreasing, and where it repeats the two records must sit in DIFFERENT
+        # elements: a boundary is one plane reached twice, once as an end and once as
+        # the next element's start. Two records at one plane inside one element would
+        # be a defect in the walk, and this axis change would hide it.
+        dz = np.diff(st.z)
+        dup = np.flatnonzero(dz == 0)
+        unexplained = [int(i) for i in dup if st.ix_ele[i] == st.ix_ele[i + 1]]
+        check("stats: z is non-decreasing along the record axis", int(np.sum(dz < 0)), 0.5)
+        check("stats: every repeated z straddles an element boundary", len(unexplained), 0.5,
+              note=f"[{len(dup)} repeats in {len(st.z)} records]")
 
         # 0b. THE JOIN. at_element_end selects the element-end rows, and every record
         # sits inside the element its ix_ele names. An off-by-one in either would break
@@ -136,15 +171,19 @@ def main():
         check("stats: every record sits inside the element ix_ele names", outside, 0.5,
               note=f"[{len(st.z)} records against {len(s1)} lattice rows]")
 
-        # 1. Reconstruction at the element end (= the last record).
+        # 1. Reconstruction at the element end (= the last record). The plane is an
+        # index into coords/plane, looked up rather than assumed: that lookup is the
+        # only thing standing between a reader and a silent transposition.
+        plane = {name: i for i, name in enumerate(st.coord("plane"))}
         worst = 0.0
         for isl in range(nslice):
             bp = bunch_params_at(st, -1, isl)
             for m in ("x", "y", "z"):
                 for pn in ("beta", "alpha", "emit", "norm_emit", "sigma", "sigma_p", "eta", "etap"):
-                    stored = st[f"beam/slice_twiss/{m}/{pn}"][0, isl]
+                    stored = st[f"beam/slice_twiss/twiss/{pn}"][0, isl, plane[m]]
                     worst = max(worst, abs(bp[m][pn] - stored) / max(abs(stored), 1e-30))
-            modes = sorted(st[f"beam/slice_twiss/{m}/emit"][0, isl] for m in ("a", "b", "c"))
+            modes = sorted(st["beam/slice_twiss/twiss/emit"][0, isl, plane[m]]
+                           for m in ("a", "b", "c"))
             mine = sorted(bp[m]["emit"] for m in ("a", "b", "c"))
             for s0, m0 in zip(modes, mine):
                 worst = max(worst, abs(m0 - s0) / max(abs(s0), 1e-30))

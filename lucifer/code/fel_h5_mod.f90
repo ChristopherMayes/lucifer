@@ -3,17 +3,18 @@
 !
 ! Annotated HDF5 writes for the statistics file (manual sec:stats). ONE RULE: no array
 ! reaches the file without saying what it is. Every routine here writes a dataset and
-! three string attributes with it:
+! four string attributes with it:
 !
 !   @unit         The SI or eV unit of the values, or '1' for a dimensionless count.
+!   @long_name    Three words, for an axis label or a table heading.
 !   @description  One sentence, for a reader who has never seen the file.
 !   @axes         The coords/ datasets this dataset's dimensions run over, in h5py
-!                 order, comma separated: 'z,s_slice' means (n_record, n_slice) with
-!                 coords/z down and coords/s_slice across. 'none' marks a dataset that
-!                 is itself an axis or a scalar. ONE reserved name, 'element_end',
-!                 stands for the records coords/at_element_end selects, in order: that
-!                 axis is a subset of coords/z rather than a dataset of its own, which
-!                 is the whole point of the mask.
+!                 order, comma separated: 'record,s_slice' means (n_record, n_slice)
+!                 with coords/record down and coords/s_slice across. EVERY name in it
+!                 resolves to a coords/ dataset, including the trailing label axes of a
+!                 vector or a matrix, so a reader never guesses a dimension from its
+!                 length. 'none' marks a scalar and nothing else: a coordinate names the
+!                 axis it defines.
 !
 ! UNITS ARE DOCUMENTATION, NEVER LOAD-BEARING. The file's numbers are already SI and
 ! eV, so a reader must not scale by @unit. That is the opposite of openPMD's unitSI,
@@ -71,26 +72,27 @@ contains
 !+
 ! Subroutine annotate (id, name, unit, descrip, axes, error)
 !
-! Routine to attach the three documentation attributes to a dataset just written.
+! Routine to attach the four documentation attributes to a dataset just written.
 ! The attributes go on the dataset, reached through its parent by name.
 !
 ! Input:
 !   id       -- integer(hid_t): Group holding the dataset.
 !   name     -- character(*): Dataset name.
 !   unit     -- character(*): Unit of the values (documentation only).
+!   label    -- character(*): Short label, for an axis or a heading.
 !   descrip  -- character(*): One-sentence description.
-!   axes     -- character(*): Comma separated coords/ names, or '' for an axis or scalar.
+!   axes     -- character(*): Comma separated coords/ names, or '' for a scalar.
 !
 ! Output:
 !   error    -- logical: Accumulates True on any failure.
 !-
 
-subroutine annotate (id, name, unit, descrip, axes, error)
+subroutine annotate (id, name, unit, label, descrip, axes, error)
 
 integer(hid_t) id
 integer h5_err
 logical error
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 character(200) ax
 
 !
@@ -105,6 +107,8 @@ if (ax == '') ax = 'none'
 
 call H5LTset_attribute_string_f (id, name, 'unit', unit, h5_err)
 error = error .or. (h5_err < 0)
+call H5LTset_attribute_string_f (id, name, 'long_name', label, h5_err)
+error = error .or. (h5_err < 0)
 call H5LTset_attribute_string_f (id, name, 'description', descrip, h5_err)
 error = error .or. (h5_err < 0)
 call H5LTset_attribute_string_f (id, name, 'axes', trim(ax), h5_err)
@@ -116,15 +120,17 @@ end subroutine annotate
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_h5_real_rank<n> (id, name, unit, descrip, axes, val, error)
+! Subroutine fel_h5_real_rank<n> (id, name, unit, label, descrip, axes, val, error)
 !
-! Routine to write a real dataset with its three documentation attributes. Overloaded
-! for ranks 0 through 4 by the interface fel_h5_real.
+! Routine to write a real dataset with its four documentation attributes. Overloaded for
+! ranks 0 through 4 by the interface fel_h5_real. Rank 0 writes a TRUE HDF5 scalar, so a
+! scalar's shape and its @axes = 'none' say the same thing.
 !
 ! Input:
 !   id       -- integer(hid_t): Group to write into.
 !   name     -- character(*): Dataset name.
 !   unit     -- character(*): Unit of the values (documentation only).
+!   label    -- character(*): Short label, for an axis or a heading.
 !   descrip  -- character(*): One-sentence description.
 !   axes     -- character(*): Comma separated coords/ names, or ''.
 !   val      -- real(rp): The values.
@@ -133,86 +139,101 @@ end subroutine annotate
 !   error    -- logical: Accumulates True on any failure.
 !-
 
-subroutine fel_h5_real_rank0 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_real_rank0 (id, name, unit, label, descrip, axes, val, error)
 
-integer(hid_t) id
+integer(hid_t) id, s_id, d_id
+integer h5_err
 real(rp) val
-logical error, err
-character(*) name, unit, descrip, axes
+real(rp), target :: buf
+logical error
+character(*) name, unit, label, descrip, axes
+type (c_ptr) f_ptr
 
-!
+! A scalar dataspace, not a one-element array: Bmad's rank-0 writer makes shape (1,),
+! and then the shape and @axes = 'none' contradict each other and every read needs a [0].
 
-call hdf5_write_dataset_real (id, name, val, err)
-error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
+call H5Dcreate_f (id, name, H5T_NATIVE_DOUBLE, s_id, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  return
+endif
+buf = val
+f_ptr = c_loc(buf)
+call H5Dwrite_f (d_id, H5T_NATIVE_DOUBLE, f_ptr, h5_err)
+error = error .or. (h5_err < 0)
+call H5Dclose_f (d_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_real_rank0
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_real_rank1 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_real_rank1 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
 real(rp) val(:)
 logical error, err
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 
 !
 
 call hdf5_write_dataset_real (id, name, val, err)
 error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_real_rank1
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_real_rank2 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_real_rank2 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
 real(rp) val(:,:)
 logical error, err
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 
 !
 
 call hdf5_write_dataset_real (id, name, val, err)
 error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_real_rank2
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_real_rank3 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_real_rank3 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
 real(rp) val(:,:,:)
 logical error, err
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 
 !
 
 call hdf5_write_dataset_real (id, name, val, err)
 error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_real_rank3
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_real_rank4 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_real_rank4 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
 real(rp) val(:,:,:,:)
 logical error, err
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 
 !
 
 call hdf5_write_dataset_real (id, name, val, err)
 error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_real_rank4
 
@@ -220,61 +241,74 @@ end subroutine fel_h5_real_rank4
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_h5_int_rank<n> (id, name, unit, descrip, axes, val, error)
+! Subroutine fel_h5_int_rank<n> (id, name, unit, label, descrip, axes, val, error)
 !
-! Routine to write an integer dataset with its three documentation attributes.
-! Overloaded for ranks 0 through 2 by the interface fel_h5_int. Counts are integers
-! here, not floats: see the module header.
+! Routine to write an integer dataset with its four documentation attributes. Overloaded
+! for ranks 0 through 2 by the interface fel_h5_int, rank 0 being a true HDF5 scalar.
+! Counts are integers here, not floats: see the module header.
 !
 ! Input and output as fel_h5_real, with val integer.
 !-
 
-subroutine fel_h5_int_rank0 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_int_rank0 (id, name, unit, label, descrip, axes, val, error)
 
-integer(hid_t) id
-integer val
-logical error, err
-character(*) name, unit, descrip, axes
+integer(hid_t) id, s_id, d_id
+integer h5_err, val
+integer, target :: buf
+logical error
+character(*) name, unit, label, descrip, axes
+type (c_ptr) f_ptr
 
-!
+! A scalar dataspace: see fel_h5_real_rank0.
 
-call hdf5_write_dataset_int (id, name, val, err)
-error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
+call H5Dcreate_f (id, name, H5T_NATIVE_INTEGER, s_id, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  return
+endif
+buf = val
+f_ptr = c_loc(buf)
+call H5Dwrite_f (d_id, H5T_NATIVE_INTEGER, f_ptr, h5_err)
+error = error .or. (h5_err < 0)
+call H5Dclose_f (d_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_int_rank0
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_int_rank1 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_int_rank1 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
 integer val(:)
 logical error, err
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 
 !
 
 call hdf5_write_dataset_int (id, name, val, err)
 error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_int_rank1
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_int_rank2 (id, name, unit, descrip, axes, val, error)
+subroutine fel_h5_int_rank2 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
 integer val(:,:)
 logical error, err
-character(*) name, unit, descrip, axes
+character(*) name, unit, label, descrip, axes
 
 !
 
 call hdf5_write_dataset_int (id, name, val, err)
 error = error .or. err
-call annotate (id, name, unit, descrip, axes, error)
+call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_int_rank2
 
@@ -282,10 +316,13 @@ end subroutine fel_h5_int_rank2
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_h5_flag_rank<n> (id, name, descrip, axes, val, error)
+! Subroutine fel_h5_flag_rank<n> (id, name, label, descrip, axes, val, error)
 !
 ! Routine to write a one-byte flag dataset from an ordinary integer buffer of zeros
 ! and ones. Overloaded for ranks 1 and 2 by the interface fel_h5_flag.
+!
+! int8 with @unit = '1' IS the format's boolean, stated in the file's units_note: HDF5
+! has no boolean type, and a flag stored as a float would be a lie about what it is.
 !
 ! The file type is H5T_STD_I8LE and the memory type is the native integer, so HDF5
 ! converts on write. h5py reads the result as int8, which is the closest thing HDF5
@@ -302,33 +339,33 @@ end subroutine fel_h5_int_rank2
 !   error    -- logical: Accumulates True on any failure.
 !-
 
-subroutine fel_h5_flag_rank1 (id, name, descrip, axes, val, error)
+subroutine fel_h5_flag_rank1 (id, name, label, descrip, axes, val, error)
 
 integer(hid_t) id
 integer val(:)
 logical error
-character(*) name, descrip, axes
+character(*) name, label, descrip, axes
 
 !
 
 call write_flag_dataset (id, name, 1, [size(val)], val, error)
-call annotate (id, name, '1', descrip, axes, error)
+call annotate (id, name, '1', label, descrip, axes, error)
 
 end subroutine fel_h5_flag_rank1
 
 !------------------------------------------------------------------------------
 
-subroutine fel_h5_flag_rank2 (id, name, descrip, axes, val, error)
+subroutine fel_h5_flag_rank2 (id, name, label, descrip, axes, val, error)
 
 integer(hid_t) id
 integer val(:,:)
 logical error
-character(*) name, descrip, axes
+character(*) name, label, descrip, axes
 
 !
 
 call write_flag_dataset (id, name, 2, [size(val,1), size(val,2)], val, error)
-call annotate (id, name, '1', descrip, axes, error)
+call annotate (id, name, '1', label, descrip, axes, error)
 
 end subroutine fel_h5_flag_rank2
 
@@ -378,7 +415,7 @@ end subroutine write_flag_dataset
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_h5_str (id, name, descrip, axes, val, error)
+! Subroutine fel_h5_str (id, name, label, descrip, axes, val, error)
 !
 ! Routine to write a fixed-length string dataset, which h5py reads as an S<n> array.
 ! Bmad's HDF5 layer writes single strings only, so the datatype is built here: a copy
@@ -397,13 +434,13 @@ end subroutine write_flag_dataset
 !   error    -- logical: Accumulates True on any failure.
 !-
 
-subroutine fel_h5_str (id, name, descrip, axes, val, error)
+subroutine fel_h5_str (id, name, label, descrip, axes, val, error)
 
 integer(hid_t) id, s_id, d_id, t_id
 integer h5_err, i, j, n
 integer(hsize_t) hdims(1)
 logical error
-character(*) name, descrip, axes, val(:)
+character(*) name, label, descrip, axes, val(:)
 character(kind = c_char), allocatable, target :: buf(:)
 type (c_ptr) f_ptr
 
@@ -422,7 +459,11 @@ enddo
 
 call H5Tcopy_f (H5T_NATIVE_CHARACTER, t_id, h5_err)
 call H5Tset_size_f (t_id, int(fel_h5_str_len$, size_t), h5_err)
-call H5Screate_simple_f (1, hdims, s_id, h5_err)
+if (n == 1 .and. axes == '') then
+  call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)      ! One string with no axis IS a scalar.
+else
+  call H5Screate_simple_f (1, hdims, s_id, h5_err)
+endif
 call H5Dcreate_f (id, name, t_id, s_id, d_id, h5_err)
 if (h5_err < 0) then
   error = .true.
@@ -437,7 +478,7 @@ call H5Dclose_f (d_id, h5_err)
 call H5Sclose_f (s_id, h5_err)
 call H5Tclose_f (t_id, h5_err)
 
-call annotate (id, name, '1', descrip, axes, error)
+call annotate (id, name, '1', label, descrip, axes, error)
 
 end subroutine fel_h5_str
 

@@ -146,7 +146,8 @@ def stats_of(path):
     quantities, and the element-end mask that now selects the ends out of it."""
     with read_stats(path) as st:
         return {"z": st.z, "power": st["field/total/power"],
-                "bunching": st["beam/slice/bunching"], "at_end": st.at_end}
+                "bunching": st["beam/slice/bunching"], "at_end": st.at_end,
+                "ix_ele": st.ix_ele}
 
 
 def main():
@@ -212,6 +213,20 @@ def main():
 
     s0, sp, sn = stats_of(wd / "cb0.stats.h5"), stats_of(wd / "cbp.stats.h5"), \
                  stats_of(wd / "cbn.stats.h5")
+
+    # First, what the comparison below rests on. The record NUMBER is the axis and z is
+    # a variable on it (manual sec:stats), so matching rows BY z is only legitimate
+    # while z does not repeat, and on a three-element line it can: a boundary is one
+    # plane reached twice, once as an end and once as the next element's start. Every
+    # repeat must therefore straddle a boundary. A repeat INSIDE one element would be a
+    # defect in the walk, and every z-keyed comparison in this file would silently pick
+    # the wrong row.
+    dz = np.diff(s0["z"])
+    dup = np.flatnonzero(dz == 0)
+    ok = bool(np.all(dz >= 0))
+    ok = ok and not any(s0["ix_ele"][i] == s0["ix_ele"][i + 1] for i in dup)
+    check("the record axis: z non-decreasing, every repeat at an element boundary", ok,
+          note=f"[{len(dup)} repeats in {len(s0['z'])} rows over 3 elements]")
 
     # comb > 0: the rows are a subset of the every-record run's rows, dataset-equal
     # at the matching z. Element ends always present (here: the final record).

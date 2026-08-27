@@ -873,6 +873,9 @@ if (h5e < 0) then
   call H5Fclose_f (f_id, h5e)
   return
 endif
+call H5LTset_attribute_string_f (f_id, 'meta', 'kind', 'provenance', h5e)
+call H5LTset_attribute_string_f (f_id, 'meta', 'description', &
+      'How this file was made. Attributes only, so no dataset comparison sees it.', h5e)
 
 call resolved_input_text (run, txt)
 call hdf5_write_attribute_string (g_id, 'input_echo', txt, merr)
@@ -913,6 +916,11 @@ end subroutine fel_write_meta
 ! that needs the real lattice reads meta/lattice_file or meta/lattice_text, which stay
 ! the reproducibility record. Bmad has no portable HDF5 lattice format, and a
 ! statistics file is the wrong place to invent one.
+!
+! The table's axis is named ele and gets its own coordinate here, coords/ele = 0..n_ele.
+! coords/ix_ele is then a VARIABLE on the record axis whose values index that one, which
+! is the join. Both were called ix_ele before, and one name for two axes of different
+! length is a collision every reader has to resolve by hand.
 !
 ! aw is the value THE PHYSICS USED, derived through b_max and l_period with the
 ! helical or planar factor, not the raw attribute: that is the number a Genesis user
@@ -989,38 +997,62 @@ if (h5e < 0) then
 endif
 
 merr = .false.
-call fel_h5_str (g_id, 'name', 'Element name. Indexed BY ix_ele, element 0 included.', &
-      'ix_ele', names, merr)
-call fel_h5_str (g_id, 'key', 'Bmad element class, as key_name gives it.', 'ix_ele', keys, merr)
-call fel_h5_real (g_id, 's_start', 'm', 'Upstream end of the element.', 'ix_ele', s1, merr)
-call fel_h5_real (g_id, 's_end', 'm', 'Downstream end of the element.', 'ix_ele', s2, merr)
-call fel_h5_real (g_id, 'l', 'm', 'Element length.', 'ix_ele', len_, merr)
-call fel_h5_real (g_id, 'ds_step', 'm', &
-      'Integration step the walk used, which is what sets the record density.', 'ix_ele', dstep, merr)
-call fel_h5_flag (g_id, 'is_fel', &
-      'One where the element is an FEL segment the FEL step tracked.', 'ix_ele', is_fel, merr)
-call fel_h5_int (g_id, 'fel_tracking', '1', &
+call H5LTset_attribute_string_f (f_id, 'lattice', 'kind', 'table', h5e)
+call H5LTset_attribute_string_f (f_id, 'lattice', 'description', &
+      'One row per tracked element, indexed by the ele axis.', h5e)
+
+call fel_h5_str (g_id, 'name', 'name', &
+      'Element name. Indexed BY the ele axis, element 0 included.', 'ele', names, merr)
+call fel_h5_str (g_id, 'key', 'class', 'Bmad element class, as key_name gives it.', &
+      'ele', keys, merr)
+call fel_h5_real (g_id, 's_start', 'm', 's start', 'Upstream end of the element.', &
+      'ele', s1, merr)
+call fel_h5_real (g_id, 's_end', 'm', 's end', 'Downstream end of the element.', 'ele', s2, merr)
+call fel_h5_real (g_id, 'l', 'm', 'length', 'Element length.', 'ele', len_, merr)
+call fel_h5_real (g_id, 'ds_step', 'm', 'ds_step', &
+      'Integration step the walk used, which is what sets the record density.', &
+      'ele', dstep, merr)
+call fel_h5_flag (g_id, 'is_fel', 'is FEL', &
+      'One where the element is an FEL segment the FEL step tracked.', 'ele', is_fel, merr)
+call fel_h5_int (g_id, 'fel_tracking', '1', 'tracking mode', &
       'Tracking mode of an FEL segment: -1 transcribed Genesis maps, 0 averaged ' // &
       '(the default, Bmad''s own kernel), 1 unaveraged. Zero off an FEL segment.', &
-      'ix_ele', mode, merr)
-call fel_h5_real (g_id, 'b_max', 'T', 'Peak undulator field, zero elsewhere.', 'ix_ele', b_max, merr)
-call fel_h5_real (g_id, 'aw', '1', &
+      'ele', mode, merr)
+call fel_h5_real (g_id, 'b_max', 'T', 'b_max', 'Peak undulator field, zero elsewhere.', &
+      'ele', b_max, merr)
+call fel_h5_real (g_id, 'aw', '1', 'aw', &
       'Rms undulator parameter as the physics used it: c*b_max/(ku*m_e c^2), ' // &
-      'divided by sqrt(2) for a planar device. Zero off an FEL segment.', 'ix_ele', aw, merr)
-call fel_h5_real (g_id, 'l_period', 'm', 'Undulator period.', 'ix_ele', l_per, merr)
-call fel_h5_real (g_id, 'ku', '1/m', 'Undulator wavenumber, twopi/l_period.', 'ix_ele', ku, merr)
-call fel_h5_flag (g_id, 'helical', 'One for a helical device, zero for planar.', 'ix_ele', helical, merr)
-call fel_h5_real (g_id, 'k1', '1/m^2', &
-      'Quadrupole strength, signed as Bmad signs it.', 'ix_ele', k1, merr)
-call fel_h5_real (g_id, 'tilt', 'rad', &
+      'divided by sqrt(2) for a planar device. Zero off an FEL segment.', 'ele', aw, merr)
+call fel_h5_real (g_id, 'l_period', 'm', 'period', 'Undulator period.', 'ele', l_per, merr)
+call fel_h5_real (g_id, 'ku', '1/m', 'ku', 'Undulator wavenumber, twopi/l_period.', &
+      'ele', ku, merr)
+call fel_h5_flag (g_id, 'helical', 'helical', &
+      'One for a helical device, zero for planar.', 'ele', helical, merr)
+call fel_h5_real (g_id, 'k1', '1/m^2', 'k1', &
+      'Quadrupole strength, signed as Bmad signs it.', 'ele', k1, merr)
+call fel_h5_real (g_id, 'tilt', 'rad', 'tilt', &
       'Element tilt. On a planar FEL segment this is the wiggle-plane rotation, ' // &
-      'which is the polarization spec.', 'ix_ele', tilt, merr)
-call fel_h5_real (g_id, 'z_offset', 'm', &
-      'Longitudinal misalignment, the inter-segment phasing knob.', 'ix_ele', z_off, merr)
+      'which is the polarization spec.', 'ele', tilt, merr)
+call fel_h5_real (g_id, 'z_offset', 'm', 'z offset', &
+      'Longitudinal misalignment, the inter-segment phasing knob.', 'ele', z_off, merr)
+call H5Gclose_f (g_id, h5e)
+
+! The axis itself, into the coords/ group the stats writer left open for it. Every name
+! in an @axes attribute resolves to a coords/ dataset, and lattice/ is the only table
+! whose axis this routine knows the length of.
+
+call H5Gopen_f (f_id, 'coords', g_id, h5e)
+if (h5e < 0) then
+  merr = .true.
+else
+  call fel_h5_int (g_id, 'ele', '1', 'element', &
+        'Lattice element index, the axis the lattice/ table runs over. coords/ix_ele ' // &
+        'is a variable whose values index it.', 'ele', [(ie, ie = 0, ne)], merr)
+  call H5Gclose_f (g_id, h5e)
+endif
 
 if (merr) call out_io (s_warn$, r_name, 'Could not write all of lattice/.')
 
-call H5Gclose_f (g_id, h5e)
 call H5Fclose_f (f_id, h5e)
 
 end subroutine fel_write_lattice

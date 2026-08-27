@@ -860,34 +860,41 @@ attributes.
 ## The stats file describes itself
 
 The production statistics live in `<out_root>.stats.h5` (manual sec:stats), and the
-file says what it holds. Every dataset carries `@unit`, `@description` and `@axes`, the
-last naming the `coords/` datasets its dimensions run over, so a reader needs no table
-of names: `scripts/read_stats.py` is the one reader everything in the tree uses, and it
+file says what it holds. Every dataset carries `@unit`, `@long_name`, `@description` and
+`@axes`, and EVERY NAME IN `@axes` RESOLVES TO A `coords/` DATASET, trailing label axes
+included, so a reader needs no table of names and never infers a dimension from its
+length: `scripts/read_stats.py` is the one reader everything in the tree uses, and it
 hard-codes nothing. Units are FIXED Bmad units (m, rad, eV, s, C, J, W) and the
 attributes are DOCUMENTATION, never load-bearing, which is the opposite of openPMD's
-`unitSI` and deliberately not mixed with it in one file.
+`unitSI` and deliberately not mixed with it in one file. The version is refused by name
+rather than negotiated, and it resets to 1.0 at the first external release.
 
 | group | what |
 |---|---|
-| `coords/` | every axis once: `z` (the one record axis), `ix_ele`, `at_element_end`, and the slice axis `s_slice`, `t_slice` |
-| `params/` | every scalar as data: the window (`lambda0`, `window_sample`, `slice_spacing`, `nbins`), `p0c`, the charge, the seed, the grid, the counts |
+| `coords/` | every axis once: `record` (THE record axis) with `z`, `ix_ele` and `at_element_end` as variables on it, `element_end` and `s_element_end`, the slice axis `s_slice` with `t_slice`, the `ele` axis, and the label axes `bmad`, `bmad_col`, `wavefront`, `wavefront_col`, `plane` |
+| `params/` | every scalar as data, as a true HDF5 scalar: the window (`lambda0`, `window_sample`, `slice_spacing`, `nbins`), `p0c`, the charge, the seed, the grid, the counts |
 | `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), plus `current` and `energy` in eV |
-| `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end grid |
+| `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end axis, the nine twiss quantities in `twiss/` over the `plane` axis |
 | `field/total/`, `field/x/`, `field/y/`, `field/harm<h>/` | one wavelength's total and each component, all with the same dataset names |
-| `lattice/` | one row per element, indexed by `ix_ele`, for layout plots |
+| `lattice/` | one row per element on the `ele` axis, for layout plots |
 | `meta/` | provenance in attributes |
 
-Four rules earn their keep. **One record axis**: an element end is always a record, so
-`at_element_end` is a boolean mask where a duplicated copy of every element-end
-quantity used to be. That mask is information only the writer has, since `z` repeats at
-an element boundary and no reader can recover afterwards which record was the end.
-**The slice axis exists**: `s_slice` with `@head_direction`, publishing the migration
-invariant that the high slice index is the window head, without which no per-slice
-profile can be trusted, let alone overlaid on another code's. **No dataset's meaning
-depends on what else the file holds**: `field/total/power` is the sum over live
-polarizations whether one or two are live, and `field/x/power` is always the x
-component. **Not computed is NaN**, not a zero that reads as an answer: the theta
-moments away from element ends, an empty slice's moments, the twiss of a degenerate
+Six rules earn their keep. **The record number is the axis**: `z` rides along as a
+variable, because `z` repeats wherever two records land on one plane and a selection on
+a repeating index answers silently wrong. **One record axis**: an element end is always
+a record, so `at_element_end` is a boolean mask where a duplicated copy of every
+element-end quantity used to be. That mask is information only the writer has, and no
+reader can recover afterwards which record was the end. **Every axis has a coordinate**,
+label axes included, and a square matrix's two sides are named apart (`bmad`,
+`bmad_col`) so that selecting one entry needs no rule. **The slice axis exists**:
+`s_slice` and `t_slice`, both with `@head_direction`, publishing the migration invariant
+that the high slice index is the window head, without which no per-slice profile can be
+trusted, let alone overlaid on another code's. **No dataset's meaning depends on what
+else the file holds**: `field/total/power` is the sum over live polarizations whether one
+or two are live, `field/x/power` is always the x component, and `@components`,
+`@harmonics` and `@derived_from` say which children are which so that a sum over them
+cannot double-count. **Not computed is NaN**, not a zero that reads as an answer: the
+theta moments away from element ends, an empty slice's moments, the twiss of a degenerate
 slice.
 
 The per-record beam datasets are SUFFICIENT statistics, so
@@ -901,8 +908,8 @@ rows were filled (element ends and bank time -- the `twiss_valid` pattern). Puls
 values are pooled downstream. The file stays raw.
 
 `lattice/` is what a layout plot needs and what the file did without for too long: one
-row per tracked element with element 0 included, indexed BY `ix_ele` so a join is a
-gather, carrying `name`, `key`, `s_start`, `s_end`, `l`, `ds_step`, `is_fel`,
+row per tracked element with element 0 included, on the `ele` axis that `coords/ix_ele`
+indexes so a join is a gather, carrying `name`, `key`, `s_start`, `s_end`, `l`, `ds_step`, `is_fel`,
 `fel_tracking`, `b_max`, `aw` as the physics used it, `l_period`, `ku`, `helical`,
 `k1`, `tilt` and `z_offset`. Genesis writes per-step arrays; a table plus the existing
 join says the same thing without a second copy of the record axis, and says what

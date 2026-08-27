@@ -1111,31 +1111,53 @@ confirms the walk's floor-derived delay against the trace at that scale.
 \section{Diagnostic output}\label{sec:stats}
 
 \emph{The stats file} \code{<out\_root>.stats.h5} DESCRIBES ITSELF. Every dataset
-carries three attributes: \code{@unit}, \code{@description} and \code{@axes}, the last
-naming the \code{coords/} datasets its dimensions run over. Units are fixed Bmad units
-(m, rad, eV, s, C, J, W) and the attributes are DOCUMENTATION: the values are already
-SI and eV, so a reader must not scale by \code{@unit}. That is the opposite of
-openPMD's \code{unitSI} (\S\ref{sec:openpmd}), and the two conventions are deliberately
-not mixed in one file. \code{@file\_format\_version} lets a reader dispatch.
+carries four attributes: \code{@unit}, \code{@long\_name} (three words, for an axis
+label), \code{@description} (a sentence) and \code{@axes}. Units are fixed Bmad units
+(m, rad, eV, s, C, J, W) and they are DOCUMENTATION: the values are already SI and eV,
+so a reader must not scale by \code{@unit}. That is the opposite of openPMD's
+\code{unitSI} (\S\ref{sec:openpmd}), and the two conventions are deliberately not mixed
+in one file. A one-byte integer dataset with \code{@unit} of 1 is this format's boolean,
+HDF5 having none. Every group carries \code{@kind} and \code{@description} of its own.
 
-Five groups, each answering one question. \code{coords/} holds every axis once: \code{z}
-the one record axis, \code{ix\_ele} beside it, \code{at\_element\_end} marking which
-records are element ends, and the slice axis \code{s\_slice} and \code{t\_slice}.
-\code{s\_slice} carries \code{@head\_direction}, publishing the migration invariant
-(\S\ref{sec:migration}) that the HIGH slice index is the window head: without it a
-per-slice profile cannot be drawn, let alone compared with another code's.
-\code{params/} holds every scalar as data, the window (\code{lambda0},
-\code{window\_sample}, \code{slice\_spacing}, \code{nbins}) included, so nothing
-downstream parses the echoed namelist. \code{beam/slice/} holds the per-record
-SUFFICIENT statistics, named exactly as \code{bunch\_params\_struct} components:
-\code{centroid} (nrec, nslice, 6), \code{sigma} (nrec, nslice, 6, 6) at its natural
-rank, \code{charge\_live}, \code{n\_particle\_live}, \code{t}, \code{sigma\_t},
+EVERY NAME IN \code{@axes} RESOLVES TO A \code{coords/} DATASET, trailing label axes
+included, so no reader ever infers a dimension from its length: an array of shape (nrec,
+nslice, 6, 6) says which 6 is which. \code{@file\_format\_version} is refused by name
+rather than negotiated. This is internal development, the version is a marker of where
+the format stands, and it resets to 1.0 at the first external release.
+
+Six groups, each answering one question. \code{coords/} holds every axis once, each
+saying which axis it IS. THE RECORD NUMBER is the axis, \code{coords/record}, and
+\code{z} is a VARIABLE on it: \code{z} repeats wherever two records land on one plane,
+so an index on \code{z} would answer silently wrong. \code{ix\_ele} is a variable there
+too, whose values index the \code{ele} axis, which makes it the join key onto
+\code{lattice/}. \code{at\_element\_end} marks which records are element ends and
+selects the \code{element\_end} axis, whose own coordinates are \code{element\_end} (the
+element index) and \code{s\_element\_end} (the position). The slice axis is
+\code{s\_slice}, with \code{t\_slice} beside it. Both carry \code{@head\_direction},
+publishing the migration invariant (\S\ref{sec:migration}) that the HIGH slice index is
+the window head: without it a per-slice profile cannot be drawn, let alone compared with
+another code's. Stating it on one of a pair would invite the reader to assume the pair
+agrees. Last are the label axes: \code{bmad} and \code{bmad\_col} naming the six phase
+space coordinates, \code{wavefront} and \code{wavefront\_col} the four field moments,
+\code{plane} the six twiss planes. A square matrix's two sides are named APART so that
+selecting one entry needs no rule.
+
+\code{params/} holds every scalar as data, as a true HDF5 scalar, the window
+(\code{lambda0}, \code{window\_sample}, \code{slice\_spacing}, \code{nbins}) included,
+so nothing downstream parses the echoed namelist. \code{beam/slice/} holds the
+per-record SUFFICIENT statistics, named exactly as \code{bunch\_params\_struct}
+components: \code{centroid} (nrec, nslice, 6), \code{sigma} (nrec, nslice, 6, 6) at its
+natural rank, \code{charge\_live}, \code{n\_particle\_live}, \code{t}, \code{sigma\_t},
 computed two-pass (the \S\ref{sec:numerics} variance lesson), plus \code{current} and
 \code{energy} in eV, which every consumer would otherwise re-derive.
 \code{beam/slice\_twiss/} and \code{beam/bunch/} hold the fully evaluated struct from
 Bmad's own \code{calc\_bunch\_params}, per slice and for the whole window, on the
-ELEMENT-END grid. \code{field/} is described below, and \code{meta/} carries the
-provenance with \code{lattice/} beside it.
+element-end axis, with the nine twiss quantities in a \code{twiss/} subgroup, each ONE
+dataset over the \code{plane} axis. The planes are an axis rather than six groups: a
+group named \code{z} cannot sit beside a \code{z} coordinate, which xarray and netCDF
+both refuse, and one array per quantity is 18 datasets where six groups per set were
+108. \code{field/} is described below, and \code{meta/} carries the provenance with
+\code{lattice/} beside it.
 
 ONE RECORD AXIS. An element end is always a record whatever the comb
 (\code{fel\_comb\_take}), so the element-end arrays need no axis of their own:
@@ -1154,14 +1176,14 @@ numpy-vs-\code{mat\_eigen} eigensystem difference. The projected planes agree ex
 file is self-describing it hard-codes no dataset names, so a file that grows a
 polarization or a harmonic needs no change in it.
 
-\emph{The lattice table} \code{lattice/} carries one row per tracked element, indexed BY
-\code{ix\_ele} with element 0 included, which is what a layout plot needs: \code{name},
+\emph{The lattice table} \code{lattice/} carries one row per tracked element on the
+\code{ele} axis, element 0 included, which is what a layout plot needs: \code{name},
 \code{key}, \code{s\_start}, \code{s\_end}, \code{l}, \code{ds\_step} (what sets the
 record density), \code{is\_fel}, \code{fel\_tracking}, \code{b\_max}, \code{aw} as the
 physics used it, \code{l\_period}, \code{ku}, \code{helical}, \code{k1}, \code{tilt},
-\code{z\_offset}. Genesis writes its \code{Lattice/} group as per-step arrays; a table
-joined through \code{ix\_ele} says the same thing without a second copy of the record
-axis, and it says what Genesis cannot: signed quadrupole strengths with a length,
+\code{z\_offset}. Genesis writes its \code{Lattice/} group as per-step arrays. A table
+joined through \code{coords/ix\_ele} says the same thing without a second copy of the
+record axis, and it says what Genesis cannot: signed quadrupole strengths with a length,
 wake-carrying pipes, and the tracking mode per element. It is NOT a lattice
 serialization: \code{meta/lattice\_file} and \code{meta/lattice\_text} remain the
 reproducibility record.
@@ -1186,6 +1208,10 @@ wavelength, and it is written whether one polarization is live or two.
 \code{field/x/}, \code{field/y/} when a second polarization is live, and
 \code{field/harm<h>/} per harmonic all carry the same dataset names and their own
 \code{total/}. Nothing is ever summed across harmonics: a detector separates colors.
+NOTHING IS DERIVED IN SILENCE either. \code{field/@components} names the polarizations
+present and \code{field/@harmonics} the harmonics, while \code{total/@derived\_from}
+names what it sums, so a reader adding up the children of \code{field/} cannot take the
+derived sibling for a component and double-count.
 
 \emph{Dumps at elements.} \code{dump\_beam\_at} / \code{dump\_field\_at} name
 elements through Bmad's own locator (\code{class::name} syntax for free). An entry
@@ -1216,13 +1242,21 @@ FFT route on divergent noise slices is the residual; checked at $2\times10^{-2}$
 pooled pulse $\sigma_{xx}$ by both routes at $3.4\times10^{-3}$; the
 \code{bunch\_params} reconstruction at $4.6\times10^{-8}$ (checked at $10^{-6}$);
 all three files dataset-identical at 1 vs 8 threads (NaN counting as NaN, which is what
-a not-computed entry means); unknown dump elements refused by name. Two structural
-checks hold the self-description itself: a walk of every dataset for its three
-attributes with \code{@axes} naming real \code{coords/} entries, and the join, that
+a not-computed entry means); unknown dump elements refused by name.
+
+Four structural checks hold the self-description itself. A walk of every dataset for its
+four attributes and of every group for its two. Then THE ACCEPTANCE TEST, which is a
+generic load: label every dimension of every dataset from \code{@axes} alone, failing if
+a name does not resolve to a coordinate, if a dimension has no name, if a length
+disagrees with its coordinate, or if one dataset names an axis twice. Nothing in it
+knows a dataset name, which is the property being checked. Third, the join: that
 \code{at\_element\_end} selects exactly the element ends and that every record sits
-inside the element \code{ix\_ele} names. A silent off-by-one in that join would break
-every layout plot while no physics check noticed. \code{diag.txt} is untouched: every
-benchmark tier reproduces bit for bit.
+inside the element \code{ix\_ele} names. A silent off-by-one there would break every
+layout plot while no physics check noticed. Fourth, the record axis itself: \code{z}
+non-decreasing, and every repeated \code{z} straddling an element boundary, since one
+plane is reached twice at a boundary and a repeat INSIDE an element would be a defect in
+the walk that demoting \code{z} to a variable would otherwise hide. \code{diag.txt} is
+untouched: every benchmark tier reproduces bit for bit.
 \end{validation}
 
 \section{Numerical practices}\label{sec:numerics}
