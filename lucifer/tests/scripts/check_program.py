@@ -132,10 +132,15 @@ def run_nml(exe, wd, root, nml_text):
 
 
 def h5_identical(fa, fb):
+    # meta/ IS EXCLUDED, deliberately. Provenance is datasets rather than attributes,
+    # for HDF5's 64 kB attribute cap (manual sec:meta), and meta/timestamp differs
+    # between any two runs by construction. Nothing in meta/ is physics. Before the
+    # move, the exclusion existed only by the accident of being attributes.
     with h5py.File(fa) as a, h5py.File(fb) as b:
         na, nb = [], []
-        a.visititems(lambda n, o: na.append(n) if isinstance(o, h5py.Dataset) else None)
-        b.visititems(lambda n, o: nb.append(n) if isinstance(o, h5py.Dataset) else None)
+        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith("meta/")
+        a.visititems(lambda n, o: na.append(n) if keep(n, o) else None)
+        b.visititems(lambda n, o: nb.append(n) if keep(n, o) else None)
         if sorted(na) != sorted(nb):
             return False
         return all(same_data(a[n][()], b[n][()]) for n in na)

@@ -84,6 +84,12 @@ type fel_global_struct
   logical :: migrate = .false.               ! Slice migration (manual sec:migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
+  ! Provenance detail in stats.h5's meta/ group. OFF by default because a stats file is
+  ! meant to travel: attached to a paper, mailed to a collaborator, posted beside a
+  ! figure. On, meta/ also records the user name and the working directory, which is
+  ! useful in a lab notebook and a leak outside one. Genesis records them always. Parity
+  ! is not a reason to leak.
+  logical :: record_environment = .false.
 end type
 
 !+

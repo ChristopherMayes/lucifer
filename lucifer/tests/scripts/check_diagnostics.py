@@ -156,6 +156,45 @@ def main():
         check("stats: every repeated z straddles an element boundary", len(unexplained), 0.5,
               note=f"[{len(dup)} repeats in {len(st.z)} records]")
 
+        # 0a4. PROVENANCE IS DATA, NOT AN ATTRIBUTE. HDF5 caps one attribute at 64 kB
+        # (measured: 65495 bytes is the largest that writes), and the echoed namelist is
+        # already 12 kB with a real lattice text at 37 kB, so meta/ as attributes was at
+        # half the cap with a warning for a failure path: the provenance would have gone
+        # missing silently. Every text in meta/ is a dataset now, and nothing anywhere in
+        # the file leans on the cap.
+        meta = st.meta
+        big = []
+
+        def note_attrs(name, obj):
+            for key, val in obj.attrs.items():
+                if isinstance(val, bytes) and len(val) > 60000:
+                    big.append(f"{name}@{key} is {len(val)} bytes")
+
+        with h5py.File(wd / "dg.stats.h5") as h5:
+            h5.visititems(note_attrs)
+            note_attrs("/", h5)
+            n_meta_attrs = len([k for k in h5["meta"].attrs if k not in ("kind", "description")])
+        check("stats: no attribute is near HDF5's 64 kB cap", len(big), 0.5,
+              note=f"[{'; '.join(big) if big else 'largest well under'}]")
+        check("stats: meta/ holds its texts as datasets", n_meta_attrs, 0.5,
+              note=f"[{len(meta)} datasets, input_echo {len(meta['input_echo'])} bytes]")
+
+        # 0a5. AND IT DOES NOT OVERSTATE ITSELF. dg tracks a WRAPPER lattice, so the
+        # parser opened two files and lattice_source holds only the outer one. Recording
+        # the count is what keeps that honest, and this run is the case that proves it:
+        # a reader of lattice_source alone would think it had the lattice.
+        check("stats: n_lattice_files reports the wrapper's second file",
+              abs(int(meta["n_lattice_files"]) - 2), 0.5,
+              note=f"[{meta['n_lattice_files']} files, source "
+                   f"{len(meta['lattice_source'])} bytes]")
+
+        # 0a6. A STATS FILE TRAVELS. Nothing identifies a person or a machine unless the
+        # run asked for it, and a path is a basename.
+        leaks = [k for k in ("user", "cwd") if k in meta]
+        leaks += ["lattice_file has a directory"] if "/" in meta["lattice_file"] else []
+        check("stats: the default file carries no machine-local values", len(leaks), 0.5,
+              note=f"[{', '.join(leaks) if leaks else 'clean'}]")
+
         # 0b. THE JOIN. at_element_end selects the element-end rows, and every record
         # sits inside the element its ix_ele names. An off-by-one in either would break
         # every layout plot and no physics check would see it.
@@ -171,10 +210,13 @@ def main():
         check("stats: every record sits inside the element ix_ele names", outside, 0.5,
               note=f"[{len(st.z)} records against {len(s1)} lattice rows]")
 
-        # 1. Reconstruction at the element end (= the last record). The plane is an
-        # index into coords/plane, looked up rather than assumed: that lookup is the
-        # only thing standing between a reader and a silent transposition.
+        # 1. Reconstruction at the element end (= the last record). The entry is an index
+        # into the group's own axis, looked up rather than assumed: that lookup is the
+        # only thing standing between a reader and a silent transposition. The projected
+        # planes and the normal modes are separate groups over separate axes, because an
+        # eigen-emittance and a projected emittance are different quantities.
         plane = {name: i for i, name in enumerate(st.coord("plane"))}
+        mode = {name: i for i, name in enumerate(st.coord("mode"))}
         worst = 0.0
         for isl in range(nslice):
             bp = bunch_params_at(st, -1, isl)
@@ -182,7 +224,9 @@ def main():
                 for pn in ("beta", "alpha", "emit", "norm_emit", "sigma", "sigma_p", "eta", "etap"):
                     stored = st[f"beam/slice_twiss/twiss/{pn}"][0, isl, plane[m]]
                     worst = max(worst, abs(bp[m][pn] - stored) / max(abs(stored), 1e-30))
-            modes = sorted(st["beam/slice_twiss/twiss/emit"][0, isl, plane[m]]
+            # Bmad's mat_eigen labels modes by eigenvector structure rather than by
+            # magnitude, which coords/mode says, so this compares them as a sorted set.
+            modes = sorted(st["beam/slice_twiss/modes/emit"][0, isl, mode[m]]
                            for m in ("a", "b", "c"))
             mine = sorted(bp[m]["emit"] for m in ("a", "b", "c"))
             for s0, m0 in zip(modes, mine):
@@ -365,10 +409,16 @@ def main():
     run(exe, wd, "dg1", NML.format(lat="dg_wrap.bmad", root="dg1", extra=""), threads="1")
 
     def h5_identical(fa, fb):
+        # meta/ IS EXCLUDED, deliberately. Provenance moved from attributes to datasets
+        # for the 64 kB cap, and input_echo carries out_root, so the two runs of this
+        # check differ there by construction. It used to sit outside every dataset
+        # comparison by the accident of being attributes; now it is named. Nothing in
+        # meta/ is physics, and the timestamp alone would break any byte comparison.
         with h5py.File(fa) as a, h5py.File(fb) as b:
             names_a, names_b = [], []
-            a.visititems(lambda n, o: names_a.append(n) if isinstance(o, h5py.Dataset) else None)
-            b.visititems(lambda n, o: names_b.append(n) if isinstance(o, h5py.Dataset) else None)
+            keep = lambda n, o: (isinstance(o, h5py.Dataset) and not n.startswith("meta/"))
+            a.visititems(lambda n, o: names_a.append(n) if keep(n, o) else None)
+            b.visititems(lambda n, o: names_b.append(n) if keep(n, o) else None)
             if sorted(names_a) != sorted(names_b):
                 return False
             # same_data counts NaN as equal to NaN, which the stats file needs: see
@@ -379,6 +429,14 @@ def main():
                for s in (".stats.h5", "-escaped.fld.h5", "-pulse.fld.h5"))
     check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes)",
           0.0 if same else 1.0, 0.5)
+
+    # 5b. The environment switch: opt-in, so the fields appear only when asked for.
+    run(exe, wd, "dgenv", NML.format(lat="dg_wrap.bmad", root="dgenv",
+        extra="  global%record_environment = T\n"), threads="2")
+    with read_stats(wd / "dgenv.stats.h5") as st:
+        got = sorted(k for k in st.meta if k in ("user", "cwd"))
+    check("provenance: global%record_environment restores user and cwd",
+          abs(len(got) - 2), 0.5, note=f"[{', '.join(got) if got else 'neither'}]")
 
     # 6. Refusal: dump list entry matching nothing, refused by name.
     (wd / "dg_bad.nml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_bad",

@@ -147,7 +147,14 @@ end type
 ! The flattened bunch_params record: 6 centroid + 36 sigma + charge_live +
 ! n_particle_live + twiss_valid + 6 modes x 9 params = 99.
 integer, parameter :: fel_stats_n_bp$ = 99
+! The PACKED order of a bunch_params row's twiss blocks. The first three are the
+! projected planes and the last three the normal modes, which is why the file puts them
+! on two axes: they are two decompositions of one beam, and an eigen-emittance is not a
+! projected emittance.
+
 character(*), parameter :: fel_stats_modes$(6) = [character(1):: 'x', 'y', 'z', 'a', 'b', 'c']
+character(*), parameter :: fel_stats_planes$(3) = [character(1):: 'x', 'y', 'z']
+character(*), parameter :: fel_stats_norm$(3) = [character(1):: 'a', 'b', 'c']
 
 ! The label axes of a vector and of a matrix, written into coords/ so that no reader has
 ! to guess a trailing dimension from its length, with the unit list that goes with each.
@@ -156,6 +163,15 @@ character(5), parameter :: fel_stats_bmad$(6) = [character(5):: 'x', 'px', 'y', 
 character(7), parameter :: fel_stats_wf$(4) = [character(7):: 'x', 'theta_x', 'y', 'theta_y']
 character(*), parameter :: fel_stats_bmad_unit$ = 'm,1,m,1,m,1'
 character(*), parameter :: fel_stats_wf_unit$ = 'm,rad,m,rad'
+! The same two unit lists PER ENTRY, written into coords/ beside the labels they belong
+! to. A unit is a property of the axis, so a dataset over that axis says only which axis
+! carries its units and to what power.
+character(3), parameter :: fel_stats_bmad_u$(6) = [character(3):: 'm', '1', 'm', '1', 'm', '1']
+character(3), parameter :: fel_stats_wf_u$(4) = [character(3):: 'm', 'rad', 'm', 'rad']
+! Every value @kind takes, enumerated on the root so a reader that sorts groups by kind
+! does not have to discover the vocabulary by inspection.
+character(*), parameter :: fel_stats_kinds$ = 'axis,scalar,beam,per_slice,projected,' // &
+        'twiss,modes,field,component,derived,harmonic,table,provenance'
 character(9), parameter :: fel_stats_twiss$(9) = [character(9):: &
         'beta', 'alpha', 'gamma', 'emit', 'norm_emit', 'sigma', 'sigma_p', 'eta', 'etap']
 ! The unit of each twiss quantity above, in the same order, for the file's @unit
@@ -777,13 +793,15 @@ ns = stats%nslice
 call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
 
 call hdf5_write_attribute_string (f_id, 'file_format', 'lucifer-stats', err)
-call hdf5_write_attribute_string (f_id, 'file_format_version', '2.1', err)
+call hdf5_write_attribute_string (f_id, 'file_format_version', '2.2', err)
 call hdf5_write_attribute_string (f_id, 'phase_space', 'bmad', err)
+call hdf5_write_attribute_string (f_id, 'kinds', fel_stats_kinds$, err)
 call hdf5_write_attribute_string (f_id, 'units_note', &
         'Fixed Bmad units: m, rad, eV, s, C, J, W. Every dataset carries @unit as ' // &
         'DOCUMENTATION: the values are already SI and eV, so a reader must not scale ' // &
         'by it. Every name in @axes is a coords/ dataset. A one-byte integer dataset ' // &
-        'with @unit = 1 is this format''s boolean, HDF5 having none.', err)
+        'with @unit = 1 and @dtype_hint = bool is this format''s boolean, HDF5 ' // &
+        'having none. Every group carries @kind, from the root''s @kinds list.', err)
 if (err) return
 
 ! ------------------------------------------------------------------
@@ -844,10 +862,32 @@ call fel_h5_str (g_id, 'wavefront', 'wavefront', &
 call fel_h5_str (g_id, 'wavefront_col', 'wavefront', &
       'The second axis of a field sigma, the same coordinates as wavefront.', &
       'wavefront_col', fel_stats_wf$, err)
+call fel_h5_str (g_id, 'bmad_unit', 'unit', &
+      'The unit of each bmad coordinate. A dataset over that axis names it through ' // &
+      '@unit_of_axis rather than spelling the list out where nothing can parse it.', &
+      'bmad', fel_stats_bmad_u$, err)
+call fel_h5_str (g_id, 'wavefront_unit', 'unit', &
+      'The unit of each wavefront coordinate. See coords/bmad_unit.', &
+      'wavefront', fel_stats_wf_u$, err)
 call fel_h5_str (g_id, 'plane', 'plane', &
-      'Twiss plane names: the three projected planes x, y, z and the three normal ' // &
-      'modes a, b, c, which are exactly bunch_params_struct''s components.', 'plane', &
-      fel_stats_modes$, err)
+      'The three PROJECTED twiss planes, bunch_params_struct''s x, y and z.', 'plane', &
+      fel_stats_planes$, err)
+call fel_h5_str (g_id, 'mode', 'mode', &
+      'The three NORMAL modes, bunch_params_struct''s a, b and c. A separate axis from ' // &
+      'plane because the two are different decompositions of one beam, so nothing may ' // &
+      'average across them. The labels are eigenvector-identified rather than ' // &
+      'magnitude-sorted, which is why the harness compares mode emittances as a set.', &
+      'mode', fel_stats_norm$, err)
+if (err) return
+
+! Which variable a viewer should put on the axis when it plots against the record or the
+! element end. Both are indices, both have a path length riding on them as a variable,
+! and only the writer knows which variable that is.
+
+call H5LTset_attribute_string_f (g_id, 'record', 'plot_against', 'z', h5_err)
+err = err .or. (h5_err < 0)
+call H5LTset_attribute_string_f (g_id, 'element_end', 'plot_against', 's_element_end', h5_err)
+err = err .or. (h5_err < 0)
 if (err) return
 
 ! The head convention, which no per-slice plot can be drawn without: the migration
@@ -884,10 +924,18 @@ call fel_h5_int (g_id, 'grid_n_pts', '1', 'grid points', &
       'Transverse grid points per side.', '', prm%grid_n_pts, err)
 call fel_h5_real (g_id, 'grid_half_width', 'm', 'grid half width', &
       'Transverse grid half width.', '', prm%grid_half_width, err)
-call fel_h5_int (g_id, 'n_record', '1', 'records', 'Records taken.', '', ir, err)
+! The three counts restate axis lengths, which is redundant on purpose. n_element_end
+! comes from the ACCUMULATOR's own counter rather than from the mask, so the harness
+! checking one against the other tests the walk's bookkeeping. coords/element_end is
+! packed from that mask, so no check on it could see the same disagreement.
+
+call fel_h5_int (g_id, 'n_record', '1', 'records', &
+      'Records taken, the length of the record axis.', '', ir, err)
 call fel_h5_int (g_id, 'n_element_end', '1', 'element ends', &
-      'Element ends taken. Equals the count of coords/at_element_end.', '', ie, err)
-call fel_h5_int (g_id, 'n_slice', '1', 'slices', 'Slices in the time window.', '', ns, err)
+      'Element ends taken, the length of the element_end axis. From the accumulator''s ' // &
+      'counter, and equal to the count of coords/at_element_end.', '', ie, err)
+call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
+      'Slices in the time window, the length of the s_slice axis.', '', ns, err)
 call fel_h5_str (g_id, 'species', 'species', 'Particle species.', '', [prm%species], err)
 call H5Gclose_f (g_id, h5_err)
 if (err) return
@@ -914,10 +962,11 @@ call group_note (b_id, 'slice', 'per_slice', &
 call fel_h5_real (g_id, 'centroid', fel_stats_bmad_unit$, 'centroid', &
       'Weighted centroid, Bmad phase space.', 'record,s_slice,bmad', &
       stats%b_centroid(:,:,1:ir), err)
+call unit_axis_note (g_id, 'centroid', 'bmad', 1, err)
 call fel_h5_real (g_id, 'sigma', fel_stats_bmad_unit$ // ' squared', 'sigma', &
       'Second moments about the centroid, the 6x6 at its natural rank.', &
       'record,s_slice,bmad,bmad_col', reshape(stats%b_sigma(:,:,1:ir), [6, 6, ns, ir]), err)
-call sigma_note (g_id, 'bmad', err)
+call unit_axis_note (g_id, 'sigma', 'bmad', 2, err)
 call fel_h5_real (g_id, 'charge_live', 'C', 'charge', 'Live charge of the slice.', &
       'record,s_slice', stats%charge_live(:,1:ir), err)
 call fel_h5_int (g_id, 'n_particle_live', '1', 'particles', &
@@ -944,11 +993,13 @@ call H5Gclose_f (g_id, h5_err)
 if (err) return
 
 ! beam/slice_twiss/ and beam/bunch/: the evaluated bunch_params, on the ELEMENT-END
-! axis. The six twiss planes are an AXIS, not six groups: a group named z cannot sit
-! beside a z coordinate, which xarray and netCDF both refuse, and one array per quantity
-! is 18 datasets where six groups per set were 108. The nine go in a twiss/ subgroup
-! because one of them is named sigma, as bunch_params_struct names it, and the
-! covariance matrix beside them is named sigma too.
+! axis. The twiss planes are an AXIS, not six groups: a group named z cannot sit beside
+! a z coordinate, which xarray and netCDF both refuse, and one array per quantity is 18
+! datasets where six groups per set were 108. TWO axes, though, not one: twiss/ over the
+! three projected planes and modes/ over the three normal modes, since averaging a
+! projected emittance against an eigen-emittance is meaningless. They are subgroups
+! rather than datasets here because one of the nine is named sigma, as
+! bunch_params_struct names it, and the covariance matrix beside them is sigma too.
 
 call H5Gcreate_f (b_id, 'slice_twiss', g_id, h5_err)
 call group_note (b_id, 'slice_twiss', 'per_slice', &
@@ -1070,6 +1121,10 @@ end subroutine group_note
 ! @components names the polarizations a field group holds and @derived_from what a
 ! derived group sums, so the always-written total/ cannot be taken for a component and
 ! then summed twice.
+!
+! Both are COMMA LISTS, one entry or several, rather than string arrays. One split reads
+! either ('x' splits to one name), and a string-array attribute would need a hand-rolled
+! writer here for nothing a reader gains.
 !-
 
 subroutine string_note (parent, name, attrib, val, err)
@@ -1087,29 +1142,30 @@ err = err .or. (h5e < 0)
 end subroutine string_note
 
 !+
-! Subroutine sigma_note (id, family, err)
+! Subroutine unit_axis_note (id, name, family, power, err)
 !
-! Routine to give a sigma matrix a MACHINE-READABLE unit beside the human one. The
-! human string is a comma list per coordinate with "squared" on the end, which nothing
-! can parse, so @unit_of_axis names the axis whose labels carry the units and
-! @unit_power says how many factors of them one entry holds.
+! Routine to give a dataset whose entries have DIFFERENT units a machine-readable one
+! beside the human string. That string is a comma list per coordinate, sometimes with
+! "squared" on the end, which nothing can parse, so @unit_of_axis names the axis whose
+! coords/<axis>_unit carries the units and @unit_power says how many factors of them one
+! entry holds: 1 for a centroid, 2 for a second moment.
 !-
 
-subroutine sigma_note (id, family, err)
+subroutine unit_axis_note (id, name, family, power, err)
 
 integer(hid_t) id
-integer h5e
+integer h5e, power
 logical err
-character(*) family
+character(*) name, family
 
 !
 
-call H5LTset_attribute_string_f (id, 'sigma', 'unit_of_axis', family, h5e)
+call H5LTset_attribute_string_f (id, name, 'unit_of_axis', family, h5e)
 err = err .or. (h5e < 0)
-call H5LTset_attribute_int_f (id, 'sigma', 'unit_power', [2], 1_size_t, h5e)
+call H5LTset_attribute_int_f (id, name, 'unit_power', [power], 1_size_t, h5e)
 err = err .or. (h5e < 0)
 
-end subroutine sigma_note
+end subroutine unit_axis_note
 
 !+
 ! Subroutine write_field_total (id, pow, ene, onax, harm, comps, err)
@@ -1166,12 +1222,13 @@ logical err
 call fel_h5_real (id, 'centroid', fel_stats_wf_unit$, 'centroid', &
       'Intensity-weighted (x, theta_x, y, theta_y). The theta entries are NaN where ' // &
       'the angle moments were not computed.', 'record,s_slice,wavefront', cen, err)
+call unit_axis_note (id, 'centroid', 'wavefront', 1, err)
 call fel_h5_real (id, 'sigma', fel_stats_wf_unit$ // ' squared', 'sigma', &
       'Wigner second moments, the 4x4 at its natural rank. The theta rows are NaN ' // &
       'where the angle moments were not computed.', &
       'record,s_slice,wavefront,wavefront_col', &
       reshape(sig, [4, 4, size(sig,2), size(sig,3)]), err)
-call sigma_note (id, 'wavefront', err)
+call unit_axis_note (id, 'sigma', 'wavefront', 2, err)
 call fel_h5_real (id, 'power', 'W', 'power', 'Radiation power of this component.', &
       'record,s_slice', pow, err)
 call fel_h5_real (id, 'energy', 'J', 'field energy', 'Field energy of this component.', &
@@ -1199,10 +1256,9 @@ end subroutine write_field_component
 
 subroutine write_bp_bunch (id, rows, err)
 
-integer(hid_t) id, t_id
+integer(hid_t) id
 real(rp) rows(:,:)
-real(rp), allocatable :: tw(:,:)
-integer im, k, jp, nr, h5e
+integer nr
 logical err
 
 !
@@ -1211,10 +1267,11 @@ nr = size(rows, 2)
 call fel_h5_real (id, 'centroid', fel_stats_bmad_unit$, 'centroid', &
       'Weighted centroid of the whole window, Bmad phase space.', &
       'element_end,bmad', rows(1:6, :), err)
+call unit_axis_note (id, 'centroid', 'bmad', 1, err)
 call fel_h5_real (id, 'sigma', fel_stats_bmad_unit$ // ' squared', 'sigma', &
       'Second moments of the whole window, the 6x6 at its natural rank.', &
       'element_end,bmad,bmad_col', reshape(rows(7:42, :), [6, 6, nr]), err)
-call sigma_note (id, 'bmad', err)
+call unit_axis_note (id, 'sigma', 'bmad', 2, err)
 call fel_h5_real (id, 'charge_live', 'C', 'charge', 'Live charge of the whole window.', &
       'element_end', rows(43, :), err)
 call fel_h5_int (id, 'n_particle_live', '1', 'particles', &
@@ -1224,28 +1281,56 @@ call fel_h5_flag (id, 'twiss_valid', 'twiss valid', &
       'element_end', nint(rows(45, :)), err)
 if (err) return
 
-! Packed row layout: after the 45 leading numbers come six blocks of nine, one per plane
-! in fel_stats_modes$ order, so one quantity across the planes is a stride-9 gather.
+! Packed row layout: after the 45 leading numbers come six blocks of nine, one per
+! decomposition entry in fel_stats_modes$ order, so one quantity is a stride-9 gather.
+! Blocks 1 to 3 are the projected planes and 4 to 6 the normal modes, and they go to
+! SEPARATE groups over separate axes: an eigen-emittance and a projected emittance are
+! different quantities, and one axis holding both invites an average across them.
 
-call H5Gcreate_f (id, 'twiss', t_id, h5e)
-call group_note (id, 'twiss', 'twiss', &
-      'The nine twiss quantities, each over the plane axis.', err)
-allocate (tw(6, nr))
+call write_twiss_group (id, 'twiss', 'plane', 0, rows, err)
+call write_twiss_group (id, 'modes', 'mode', 3, rows, err)
+
+end subroutine write_bp_bunch
+
+!+
+! Subroutine write_twiss_group (id, gname, axis, off, rows, err)
+!
+! Routine to write one decomposition's nine twiss quantities as nine datasets over its
+! own axis, gathered from the packed rows starting at block off+1.
+!-
+
+subroutine write_twiss_group (id, gname, axis, off, rows, err)
+
+integer(hid_t) id, t_id
+real(rp) rows(:,:)
+real(rp), allocatable :: tw(:,:)
+integer off, im, k, jp, nr, h5e
+logical err
+character(*) gname, axis
+
+!
+
+nr = size(rows, 2)
+call H5Gcreate_f (id, gname, t_id, h5e)
+call group_note (id, gname, gname, 'The nine twiss quantities over the ' // axis // &
+      ' axis, for the whole window.', err)
+
+allocate (tw(3, nr))
 do jp = 1, 9
-  k = 45
-  do im = 1, 6
+  k = 45 + 9 * off
+  do im = 1, 3
     tw(im, :) = rows(k + jp, :)
     k = k + 9
   enddo
   call fel_h5_real (t_id, trim(fel_stats_twiss$(jp)), trim(fel_stats_tunit$(jp)), &
         trim(fel_stats_twiss$(jp)), 'Twiss ' // trim(fel_stats_twiss$(jp)) // &
-        ' of the whole window, per plane. NaN where twiss_valid is zero.', &
-        'element_end,plane', tw, err)
+        ' of the whole window, per ' // axis // '. NaN where twiss_valid is zero.', &
+        'element_end,' // axis, tw, err)
   if (err) exit
 enddo
 call H5Gclose_f (t_id, h5e)
 
-end subroutine write_bp_bunch
+end subroutine write_twiss_group
 
 !+
 ! Subroutine write_bp_slices (id, rows, err)
@@ -1256,10 +1341,9 @@ end subroutine write_bp_bunch
 
 subroutine write_bp_slices (id, rows, err)
 
-integer(hid_t) id, t_id
+integer(hid_t) id
 real(rp) rows(:,:,:)
-real(rp), allocatable :: tw(:,:,:)
-integer im, k, jp, nsl, nr, h5e
+integer nsl, nr
 logical err
 
 !
@@ -1268,10 +1352,11 @@ nsl = size(rows, 2);  nr = size(rows, 3)
 call fel_h5_real (id, 'centroid', fel_stats_bmad_unit$, 'centroid', &
       'Weighted centroid per slice, Bmad phase space.', &
       'element_end,s_slice,bmad', rows(1:6, :, :), err)
+call unit_axis_note (id, 'centroid', 'bmad', 1, err)
 call fel_h5_real (id, 'sigma', fel_stats_bmad_unit$ // ' squared', 'sigma', &
       'Second moments per slice, the 6x6 at its natural rank.', &
       'element_end,s_slice,bmad,bmad_col', reshape(rows(7:42, :, :), [6, 6, nsl, nr]), err)
-call sigma_note (id, 'bmad', err)
+call unit_axis_note (id, 'sigma', 'bmad', 2, err)
 call fel_h5_real (id, 'charge_live', 'C', 'charge', 'Live charge of the slice.', &
       'element_end,s_slice', rows(43, :, :), err)
 call fel_h5_int (id, 'n_particle_live', '1', 'particles', &
@@ -1281,25 +1366,52 @@ call fel_h5_flag (id, 'twiss_valid', 'twiss valid', &
       'element_end,s_slice', nint(rows(45, :, :)), err)
 if (err) return
 
-call H5Gcreate_f (id, 'twiss', t_id, h5e)
-call group_note (id, 'twiss', 'twiss', &
-      'The nine twiss quantities, each over the plane axis.', err)
-allocate (tw(6, nsl, nr))
+! Two groups over two axes: see write_bp_bunch.
+
+call write_slice_twiss_group (id, 'twiss', 'plane', 0, rows, err)
+call write_slice_twiss_group (id, 'modes', 'mode', 3, rows, err)
+
+end subroutine write_bp_slices
+
+!+
+! Subroutine write_slice_twiss_group (id, gname, axis, off, rows, err)
+!
+! Routine to write one decomposition's nine twiss quantities per slice, the same names
+! as write_twiss_group with the slice axis added.
+!-
+
+subroutine write_slice_twiss_group (id, gname, axis, off, rows, err)
+
+integer(hid_t) id, t_id
+real(rp) rows(:,:,:)
+real(rp), allocatable :: tw(:,:,:)
+integer off, im, k, jp, nsl, nr, h5e
+logical err
+character(*) gname, axis
+
+!
+
+nsl = size(rows, 2);  nr = size(rows, 3)
+call H5Gcreate_f (id, gname, t_id, h5e)
+call group_note (id, gname, gname, 'The nine twiss quantities over the ' // axis // &
+      ' axis, per slice.', err)
+
+allocate (tw(3, nsl, nr))
 do jp = 1, 9
-  k = 45
-  do im = 1, 6
+  k = 45 + 9 * off
+  do im = 1, 3
     tw(im, :, :) = rows(k + jp, :, :)
     k = k + 9
   enddo
   call fel_h5_real (t_id, trim(fel_stats_twiss$(jp)), trim(fel_stats_tunit$(jp)), &
         trim(fel_stats_twiss$(jp)), 'Twiss ' // trim(fel_stats_twiss$(jp)) // &
-        ' per slice and plane. NaN where twiss_valid is zero.', &
-        'element_end,s_slice,plane', tw, err)
+        ' per slice and ' // axis // '. NaN where twiss_valid is zero.', &
+        'element_end,s_slice,' // axis, tw, err)
   if (err) exit
 enddo
 call H5Gclose_f (t_id, h5e)
 
-end subroutine write_bp_slices
+end subroutine write_slice_twiss_group
 
 end subroutine fel_stats_write
 

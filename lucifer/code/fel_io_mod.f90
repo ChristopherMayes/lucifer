@@ -16,6 +16,9 @@ module fel_io_mod
 use fel_struct
 use fel_input_mod
 use wavefront_openpmd_mod
+! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read in
+! fel_write_meta, which is the only place this module reaches into the parser.
+use bmad_parser_struct, only: bp_com
 !$ use omp_lib
 
 implicit none
@@ -829,15 +832,38 @@ end subroutine fel_write_wake_block
 !+
 ! Subroutine fel_write_meta (run, stats_file)
 !
-! Routine to write the provenance group into the stats file (Genesis parity: its Meta
-! embeds the entire input and lattice plus timestamp/user/cwd/version). Meta/ carries
-! the RESOLVED input echo (every default explicit, straight from the structs), the
-! lattice file's text and name, an ISO timestamp, user, cwd and the Bmad version.
-! All are ATTRIBUTES, so every dataset-level identity comparison (thread runs,
-! re-entrancy passes) is untouched by run-specific provenance.
+! Routine to write the provenance group into the stats file: the RESOLVED input echo
+! (every default explicit, straight from the structs), the top-level lattice file's name
+! and text, how many files the parser opened, an ISO timestamp and the Bmad version.
 !
-! Note: This is best effort. A failure warns, never fails the run (HDF5 caps compact
-! attributes near 64 kB, and a very large lattice would hit it).
+! DATASETS, not attributes. HDF5 caps a single attribute at 64 kB and the largest that
+! writes here is 65495 bytes, while a scalar string dataset took 3 MB. An echoed namelist
+! runs to 12 kB and a lattice text to 37 kB on a real lattice, so the old attributes were
+! at half the cap already, and the failure path was a warning: the provenance would have
+! gone missing silently on a lattice of no unusual size (FINDINGS 7.31). The cost is that
+! meta/ no longer escapes dataset-level identity comparisons for free, since input_echo
+! carries out_root and two runs differ there. The harness excludes meta/ by name instead.
+!
+! NOT A REPRODUCIBILITY RECORD, and it no longer claims to be. lattice_source is the
+! TOP-LEVEL file only: Bmad's "call, file =" pulls in more, and every wrapper lattice in
+! this tree records a call statement while the lattice it calls is absent.
+! n_lattice_files says how many files the parser actually opened, so a reader can see at
+! a glance whether the text is the whole story. What the file offers for reproduction is
+! the lattice/ table (every tracked element with the values the physics used) beside the
+! input echo. Serializing the lattice is not an option: write_bmad_lattice_file inlines a
+! grid_field as ASCII under one_file$ and writes sibling binary files otherwise, so no
+! output_form is both complete and bounded, and Bmad has no HDF5 lattice format to
+! borrow. lat%creation_hash is not a substitute either, hashing inode and size, which
+! makes it machine specific rather than a fingerprint of content.
+!
+! A STATS FILE IS MEANT TO TRAVEL, so nothing here identifies a PERSON by default. The
+! timestamp and the Bmad version identify the run. The user name and working directory
+! go in only under global%record_environment, and the file records a lattice BASENAME.
+! What a user types into the namelist is echoed as typed, so an absolute path there is
+! still an absolute path in the file. Genesis records user and cwd always. Parity is not
+! a reason to leak.
+!
+! Note: This is best effort. A failure warns, never fails the run.
 !
 ! Input:
 !   run         -- fel_run_struct: Run state.
@@ -854,10 +880,11 @@ character(*) stats_file
 character(:), allocatable :: txt
 character(24) stamp
 character(200) user_name, cwd
+character(400) base, path
 character(8) date_s
 character(10) time_s
 integer(hid_t) f_id, g_id
-integer h5e
+integer h5e, nfile, ix
 logical merr
 character(*), parameter :: r_name = 'fel_write_meta'
 
@@ -875,26 +902,60 @@ if (h5e < 0) then
 endif
 call H5LTset_attribute_string_f (f_id, 'meta', 'kind', 'provenance', h5e)
 call H5LTset_attribute_string_f (f_id, 'meta', 'description', &
-      'How this file was made. Attributes only, so no dataset comparison sees it.', h5e)
+      'How this file was made. Which lattice, not the lattice itself.', h5e)
 
+merr = .false.
 call resolved_input_text (run, txt)
-call hdf5_write_attribute_string (g_id, 'input_echo', txt, merr)
-if (merr) call out_io (s_warn$, r_name, 'meta/input_echo did not fit an attribute.')
+call fel_h5_text (g_id, 'input_echo', 'input echo', &
+      'The run''s input with every default made explicit, written from the structs. ' // &
+      'File names appear as the user typed them.', txt, merr)
+
+! The lattice: which one, and how much of it is here. bmad_parser opens the top-level
+! file plus every file its "call, file =" statements reach, and file_text reads ONE of
+! them, so a wrapper lattice records a call statement and drops what it calls. The count
+! is the honesty signal. It comes from the parser's own tally, which outlives the parse
+! because parser_end_stuff deallocates only the array of names, and zero means the tally
+! was not available rather than that no file was read.
+
+ix = splitfilename(run%lat_file, path, base)
+call fel_h5_text (g_id, 'lattice_file', 'lattice file', &
+      'Base name of the top-level lattice file. The directory is deliberately absent: ' // &
+      'a stats file travels, and a path is machine local.', base, merr)
 
 call file_text (trim(run%lat_file), txt)
-call hdf5_write_attribute_string (g_id, 'lattice_text', txt, merr)
-if (merr) call out_io (s_warn$, r_name, 'meta/lattice_text did not fit an attribute.')
-call hdf5_write_attribute_string (g_id, 'lattice_file', trim(run%lat_file), merr)
+call fel_h5_text (g_id, 'lattice_source', 'lattice source', &
+      'Text of the TOP-LEVEL lattice file only. A file reached by "call, file =" is ' // &
+      'NOT here, so this is not a reproducibility record. See n_lattice_files, and ' // &
+      'read lattice/ for the tracked line as the physics used it.', txt, merr)
+
+nfile = max(bp_com%num_lat_files, 0)
+call fel_h5_int (g_id, 'n_lattice_files', '1', 'lattice files', &
+      'How many files the parser opened, so one means lattice_source is the whole ' // &
+      'story. Zero means the parser did not report a count.', '', nfile, merr)
 
 call date_and_time (date_s, time_s)
 stamp = date_s(1:4) // '-' // date_s(5:6) // '-' // date_s(7:8) // 'T' // &
         time_s(1:2) // ':' // time_s(3:4) // ':' // time_s(5:6)
-call hdf5_write_attribute_string (g_id, 'timestamp', stamp, merr)
-call get_environment_variable ('USER', user_name)
-call hdf5_write_attribute_string (g_id, 'user', trim(user_name), merr)
-call get_environment_variable ('PWD', cwd)
-call hdf5_write_attribute_string (g_id, 'cwd', trim(cwd), merr)
-call hdf5_write_attribute_int (g_id, 'bmad_inc_version', bmad_inc_version$, merr)
+call fel_h5_text (g_id, 'timestamp', 'timestamp', &
+      'Local time the run finished, ISO 8601 without a zone.', stamp, merr)
+call fel_h5_int (g_id, 'bmad_inc_version', '1', 'Bmad version', &
+      'The bmad_inc_version$ the run was built against.', '', bmad_inc_version$, merr)
+
+! The environment, only when asked for: these identify a PERSON and a MACHINE, and they
+! are of no use to a reader elsewhere.
+
+if (run%global%record_environment) then
+  call get_environment_variable ('USER', user_name)
+  call fel_h5_text (g_id, 'user', 'user', &
+        'Who ran it, from $USER. Present because global%record_environment was set.', &
+        user_name, merr)
+  call get_environment_variable ('PWD', cwd)
+  call fel_h5_text (g_id, 'cwd', 'directory', &
+        'Where it ran, from $PWD. Present because global%record_environment was set.', &
+        cwd, merr)
+endif
+
+if (merr) call out_io (s_warn$, r_name, 'Could not write all of meta/.')
 
 call H5Gclose_f (g_id, h5e)
 call H5Fclose_f (f_id, h5e)

@@ -1116,8 +1116,14 @@ label), \code{@description} (a sentence) and \code{@axes}. Units are fixed Bmad 
 (m, rad, eV, s, C, J, W) and they are DOCUMENTATION: the values are already SI and eV,
 so a reader must not scale by \code{@unit}. That is the opposite of openPMD's
 \code{unitSI} (\S\ref{sec:openpmd}), and the two conventions are deliberately not mixed
-in one file. A one-byte integer dataset with \code{@unit} of 1 is this format's boolean,
-HDF5 having none. Every group carries \code{@kind} and \code{@description} of its own.
+in one file. A one-byte integer dataset with \code{@unit} of 1 and
+\code{@dtype\_hint} of \code{bool} is this format's boolean, HDF5 having none. Every
+group carries \code{@kind} and \code{@description} of its own, and the root's
+\code{@kinds} enumerates the vocabulary so a reader that sorts groups by kind need not
+discover it. Where the entries of one dataset have DIFFERENT units, as a centroid's and
+a sigma's do, the human \code{@unit} is a comma list that nothing can parse, so
+\code{@unit\_of\_axis} names the axis whose \code{coords/<axis>\_unit} carries them and
+\code{@unit\_power} says how many factors of them one entry holds.
 
 EVERY NAME IN \code{@axes} RESOLVES TO A \code{coords/} DATASET, trailing label axes
 included, so no reader ever infers a dimension from its length: an array of shape (nrec,
@@ -1137,10 +1143,15 @@ element index) and \code{s\_element\_end} (the position). The slice axis is
 publishing the migration invariant (\S\ref{sec:migration}) that the HIGH slice index is
 the window head: without it a per-slice profile cannot be drawn, let alone compared with
 another code's. Stating it on one of a pair would invite the reader to assume the pair
-agrees. Last are the label axes: \code{bmad} and \code{bmad\_col} naming the six phase
-space coordinates, \code{wavefront} and \code{wavefront\_col} the four field moments,
-\code{plane} the six twiss planes. A square matrix's two sides are named APART so that
-selecting one entry needs no rule.
+agrees. Both also carry \code{@plot\_against}, naming the variable a
+viewer should put on the axis in place of the index, which only the writer knows. Last
+are the label axes: \code{bmad} and \code{bmad\_col} naming the six phase space
+coordinates, \code{wavefront} and \code{wavefront\_col} the four field moments,
+\code{plane} the three PROJECTED twiss planes and \code{mode} the three NORMAL modes. A
+square matrix's two sides are named APART so that selecting one entry needs no rule, and
+the planes and the modes are named apart because they are two decompositions of one beam:
+an eigen-emittance is not a projected emittance, and one axis carrying both invites an
+average across them.
 
 \code{params/} holds every scalar as data, as a true HDF5 scalar, the window
 (\code{lambda0}, \code{window\_sample}, \code{slice\_spacing}, \code{nbins}) included,
@@ -1152,12 +1163,20 @@ computed two-pass (the \S\ref{sec:numerics} variance lesson), plus \code{current
 \code{energy} in eV, which every consumer would otherwise re-derive.
 \code{beam/slice\_twiss/} and \code{beam/bunch/} hold the fully evaluated struct from
 Bmad's own \code{calc\_bunch\_params}, per slice and for the whole window, on the
-element-end axis, with the nine twiss quantities in a \code{twiss/} subgroup, each ONE
-dataset over the \code{plane} axis. The planes are an axis rather than six groups: a
-group named \code{z} cannot sit beside a \code{z} coordinate, which xarray and netCDF
-both refuse, and one array per quantity is 18 datasets where six groups per set were
-108. \code{field/} is described below, and \code{meta/} carries the provenance with
-\code{lattice/} beside it.
+element-end axis, with the nine twiss quantities in a \code{twiss/} subgroup over the
+\code{plane} axis and again in \code{modes/} over the \code{mode} axis. Those are axes
+rather than six groups per set: a group named \code{z} cannot sit beside a \code{z}
+coordinate, which xarray and netCDF both refuse, and one array per quantity is 18
+datasets where six groups per set were 108. They are subgroups because one of the nine
+is named \code{sigma}, as \code{bunch\_params\_struct} names it, and the covariance
+matrix beside them is \code{sigma} too. \code{field/} is described below, and
+\code{meta/} carries the provenance with \code{lattice/} beside it.
+
+The three counts in \code{params/} (\code{n\_record}, \code{n\_element\_end},
+\code{n\_slice}) restate axis lengths, which is redundant on purpose:
+\code{n\_element\_end} comes from the accumulator's own counter, so checking it against
+\code{coords/at\_element\_end} tests the walk's bookkeeping, where
+\code{coords/element\_end} is packed from that mask and could not disagree with it.
 
 ONE RECORD AXIS. An element end is always a record whatever the comb
 (\code{fel\_comb\_take}), so the element-end arrays need no axis of their own:
@@ -1185,8 +1204,7 @@ physics used it, \code{l\_period}, \code{ku}, \code{helical}, \code{k1}, \code{t
 joined through \code{coords/ix\_ele} says the same thing without a second copy of the
 record axis, and it says what Genesis cannot: signed quadrupole strengths with a length,
 wake-carrying pipes, and the tracking mode per element. It is NOT a lattice
-serialization: \code{meta/lattice\_file} and \code{meta/lattice\_text} remain the
-reproducibility record.
+serialization, and nothing else in the file is one either (\S\ref{sec:meta}).
 
 \emph{Wavefront params.} The field analog (\code{wavefront\_params\_struct},
 \code{wavefront\_mod}) describes ONE FIELD SLICE: \code{centroid(4)} $= (x,
@@ -1244,7 +1262,7 @@ pooled pulse $\sigma_{xx}$ by both routes at $3.4\times10^{-3}$; the
 all three files dataset-identical at 1 vs 8 threads (NaN counting as NaN, which is what
 a not-computed entry means); unknown dump elements refused by name.
 
-Four structural checks hold the self-description itself. A walk of every dataset for its
+Eight structural checks hold the self-description itself. A walk of every dataset for its
 four attributes and of every group for its two. Then THE ACCEPTANCE TEST, which is a
 generic load: label every dimension of every dataset from \code{@axes} alone, failing if
 a name does not resolve to a coordinate, if a dimension has no name, if a length
@@ -1255,8 +1273,11 @@ inside the element \code{ix\_ele} names. A silent off-by-one there would break e
 layout plot while no physics check noticed. Fourth, the record axis itself: \code{z}
 non-decreasing, and every repeated \code{z} straddling an element boundary, since one
 plane is reached twice at a boundary and a repeat INSIDE an element would be a defect in
-the walk that demoting \code{z} to a variable would otherwise hide. \code{diag.txt} is
-untouched: every benchmark tier reproduces bit for bit.
+the walk that demoting \code{z} to a variable would otherwise hide. Then four on the
+provenance: no attribute anywhere near HDF5's 64 kB cap, every text in \code{meta/} a
+dataset, \code{n\_lattice\_files} reporting the wrapper lattice's second file, and no
+machine-local value in a default run. \code{diag.txt} is untouched: every benchmark tier
+reproduces bit for bit.
 \end{validation}
 
 \section{Numerical practices}\label{sec:numerics}
@@ -1431,12 +1452,41 @@ run's finals equal the full run's mid-line dumps exactly).
 
 \subsection{Provenance}\label{sec:meta}
 
-\texttt{stats.h5} carries a \texttt{Meta/} group (Genesis parity: its
-\texttt{Meta} embeds the entire input and lattice): the RESOLVED input echo
--- every default made explicit, written from the structs themselves -- the
-lattice file's text and name, an ISO timestamp, user, cwd and the Bmad
-version, all as HDF5 attributes so dataset-level identity comparisons are
-untouched by run-specific provenance.
+\texttt{stats.h5} carries a \texttt{meta/} group: the RESOLVED input echo, every default
+made explicit and written from the structs themselves, the top-level lattice file's base
+name and text, how many files the parser opened, an ISO timestamp and the Bmad version.
+
+DATASETS, not attributes. HDF5 caps a single attribute at 64 kB, the largest that writes
+being 65495 bytes here, while a scalar string dataset took 3 MB. The echoed namelist
+already runs to 12 kB and a real lattice text to 37 kB, so the attributes were at half
+the cap, and the failure path was a warning: the provenance would have gone missing
+SILENTLY on a lattice of no unusual size. The cost is that \texttt{meta/} no longer sits
+outside dataset-level identity comparisons for free, since \texttt{input\_echo} carries
+\texttt{out\_root}; the harness excludes it by name instead, which is the same exclusion
+made deliberate.
+
+NOT A REPRODUCIBILITY RECORD, and it does not claim to be.
+\texttt{meta/lattice\_source} is the TOP-LEVEL file only: Bmad's \texttt{call, file =}
+pulls in more, and every wrapper lattice in this tree records a call statement while the
+lattice it calls is absent. \texttt{n\_lattice\_files} says how many files the parser
+actually opened, so a reader sees at a glance whether the text is the whole story. What
+the file offers for reproduction is the \texttt{lattice/} table, every tracked element
+with the values the physics used, beside the input echo. Serialization is not an option:
+\texttt{write\_bmad\_lattice\_file} inlines a \texttt{grid\_field} as ASCII under
+\texttt{one\_file\$} and writes sibling binary files otherwise, so no \texttt{output\_form}
+is both complete and bounded, and Bmad has no HDF5 lattice format to borrow.
+\texttt{lat\%creation\_hash} is no substitute either, hashing inode and size, which makes
+it machine specific rather than a fingerprint of content. The complete record wants an
+upstream change: \texttt{bmad\_parser} builds the full list of files it opened, uses it
+for that hash, and deallocates it before returning.
+
+A STATS FILE IS MEANT TO TRAVEL -- attached to a paper, mailed to a collaborator, posted
+beside a figure -- so nothing here identifies a PERSON by default. The timestamp and the
+Bmad version identify the run. The user name and working directory go in only under
+\texttt{global\%record\_environment}, and the lattice file is recorded as a base name.
+What a user types into the namelist is echoed as typed, so an absolute path in the input
+is still an absolute path in the file: relative paths are the user's half of that
+contract. Genesis records user and cwd unconditionally. Parity is not a reason to leak.
 
 
 \subsection{The coherent source (SIMPLEX hybrid)}\label{sec:coherent-source}

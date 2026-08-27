@@ -854,8 +854,9 @@ always a record, whatever the comb, which is what lets the file carry one record
 and a mask instead of a second axis. Default 0 = every record).
 `global%track_start`/`track_end` bound the walk over a schedule always
 built on the full lattice (windowed runs compose exactly). `stats.h5` carries `meta/`
-provenance (the resolved input echo, the lattice text, timestamp, user, version) as
-attributes.
+provenance (the resolved input echo, which lattice, a timestamp and the Bmad version) as
+datasets, and `global%record_environment` adds the user name and working directory for a
+lab notebook, off by default because a stats file travels.
 
 ## The stats file describes itself
 
@@ -871,13 +872,13 @@ rather than negotiated, and it resets to 1.0 at the first external release.
 
 | group | what |
 |---|---|
-| `coords/` | every axis once: `record` (THE record axis) with `z`, `ix_ele` and `at_element_end` as variables on it, `element_end` and `s_element_end`, the slice axis `s_slice` with `t_slice`, the `ele` axis, and the label axes `bmad`, `bmad_col`, `wavefront`, `wavefront_col`, `plane` |
+| `coords/` | every axis once: `record` (THE record axis) with `z`, `ix_ele` and `at_element_end` as variables on it, `element_end` and `s_element_end`, the slice axis `s_slice` with `t_slice`, the `ele` axis, and the label axes `bmad`, `bmad_col`, `wavefront`, `wavefront_col`, `plane`, `mode` |
 | `params/` | every scalar as data, as a true HDF5 scalar: the window (`lambda0`, `window_sample`, `slice_spacing`, `nbins`), `p0c`, the charge, the seed, the grid, the counts |
 | `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), plus `current` and `energy` in eV |
-| `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end axis, the nine twiss quantities in `twiss/` over the `plane` axis |
+| `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end axis, the nine twiss quantities in `twiss/` over the `plane` axis and in `modes/` over the `mode` axis |
 | `field/total/`, `field/x/`, `field/y/`, `field/harm<h>/` | one wavelength's total and each component, all with the same dataset names |
 | `lattice/` | one row per element on the `ele` axis, for layout plots |
-| `meta/` | provenance in attributes |
+| `meta/` | which lattice and which input, as datasets. Not the lattice, and not a person |
 
 Six rules earn their keep. **The record number is the axis**: `z` rides along as a
 variable, because `z` repeats wherever two records land on one plane and a selection on
@@ -885,8 +886,11 @@ a repeating index answers silently wrong. **One record axis**: an element end is
 a record, so `at_element_end` is a boolean mask where a duplicated copy of every
 element-end quantity used to be. That mask is information only the writer has, and no
 reader can recover afterwards which record was the end. **Every axis has a coordinate**,
-label axes included, and a square matrix's two sides are named apart (`bmad`,
-`bmad_col`) so that selecting one entry needs no rule. **The slice axis exists**:
+label axes included, and things that must not be confused are named apart: a square
+matrix's two sides (`bmad`, `bmad_col`) so that selecting one entry needs no rule, and
+the projected twiss planes (`plane`) from the normal modes (`mode`), because an
+eigen-emittance is not a projected emittance and one axis carrying both invites an
+average across them. **The slice axis exists**:
 `s_slice` and `t_slice`, both with `@head_direction`, publishing the migration invariant
 that the high slice index is the window head, without which no per-slice profile can be
 trusted, let alone overlaid on another code's. **No dataset's meaning depends on what
@@ -914,8 +918,8 @@ indexes so a join is a gather, carrying `name`, `key`, `s_start`, `s_end`, `l`, 
 `k1`, `tilt` and `z_offset`. Genesis writes per-step arrays; a table plus the existing
 join says the same thing without a second copy of the record axis, and says what
 Genesis cannot: signed quad strengths with a length, wake-carrying pipes, and the
-tracking mode per element. It is not a lattice serialization, and
-`meta/lattice_file`/`lattice_text` stay the reproducibility record. `dump_beam_at` / `dump_field_at`
+tracking mode per element. It is not a lattice serialization, and nothing else in
+the file is one either: see below. `dump_beam_at` / `dump_field_at`
 dump openPMD files at named elements (Bmad locator syntax, unknown names
 refused). `keep_escaped_field` banks every slice slippage transmits out of the window
 (`-escaped.fld.h5`, with per-slice wavefront_params and z_transmit, the one place that
@@ -924,6 +928,20 @@ extension) and reconstructs the FULL PULSE at the exit plane (`-pulse.fld.h5`) b
 finalize, because transmitted light is fixed information and never re-interacts, so
 whole-pulse statistics use the ABCD map on the banked moment matrices and never
 propagate numerically.
+
+`meta/` says which lattice and which input, and deliberately not more. Everything in it
+is a DATASET rather than an attribute, because HDF5 caps one attribute at 64 kB (the
+largest that writes here is 65495 bytes) while the echoed namelist is 12 kB and a real
+lattice text 37 kB, and the failure path was a warning: provenance whose failure mode is
+silent absence must not sit on a resource limit. `meta/lattice_source` is the TOP-LEVEL
+lattice file only, and says so, because Bmad's `call, file =` pulls in more and every
+wrapper lattice here recorded a call statement while the lattice it called was absent.
+`n_lattice_files` reports how many files the parser opened, so one means the text is the
+whole story. Reproduction rests on the `lattice/` table and the input echo, not on this
+group. And nothing here identifies a PERSON by default: the timestamp and the Bmad
+version identify the run, `lattice_file` is a base name, and the user and working
+directory go in only under `global%record_environment`. Note that `input_echo` echoes
+file names as the user typed them, so relative paths are the user's half of that.
 
 Measured (check_diagnostics.py, in the harness -- cross-identities, not references):
 

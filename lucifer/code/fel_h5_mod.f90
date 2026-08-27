@@ -27,9 +27,12 @@
 !
 !   flag datasets    One byte in the file (H5T_STD_I8LE) written from an ordinary
 !                    integer buffer, since HDF5 has no boolean type and a flag stored
-!                    as a float is a lie about what it is. HDF5 converts on write.
+!                    as a float is a lie about what it is. HDF5 converts on write, and
+!                    each one carries @dtype_hint = 'bool'.
 !   string datasets  A fixed-length string array, which h5py reads as an S<n> array.
 !                    Bmad's HDF5 layer writes single strings only.
+!   text datasets    One string of any length as a scalar dataset (fel_h5_text), for
+!                    provenance too big for HDF5's 64 kB attribute cap.
 !-
 
 module fel_h5_mod
@@ -321,8 +324,10 @@ end subroutine fel_h5_int_rank2
 ! Routine to write a one-byte flag dataset from an ordinary integer buffer of zeros
 ! and ones. Overloaded for ranks 1 and 2 by the interface fel_h5_flag.
 !
-! int8 with @unit = '1' IS the format's boolean, stated in the file's units_note: HDF5
-! has no boolean type, and a flag stored as a float would be a lie about what it is.
+! int8 with @unit = '1' IS the format's boolean: HDF5 has no boolean type, and a flag
+! stored as a float would be a lie about what it is. Each one also carries
+! @dtype_hint = 'bool', stamped here so the convention is a thing the DATASET says
+! rather than a rule a reader has to find in the root attributes and pattern-match on.
 !
 ! The file type is H5T_STD_I8LE and the memory type is the native integer, so HDF5
 ! converts on write. h5py reads the result as int8, which is the closest thing HDF5
@@ -350,6 +355,7 @@ character(*) name, label, descrip, axes
 
 call write_flag_dataset (id, name, 1, [size(val)], val, error)
 call annotate (id, name, '1', label, descrip, axes, error)
+call hint_bool (id, name, error)
 
 end subroutine fel_h5_flag_rank1
 
@@ -366,8 +372,31 @@ character(*) name, label, descrip, axes
 
 call write_flag_dataset (id, name, 2, [size(val,1), size(val,2)], val, error)
 call annotate (id, name, '1', label, descrip, axes, error)
+call hint_bool (id, name, error)
 
 end subroutine fel_h5_flag_rank2
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine hint_bool (id, name, error)
+!
+! Routine to mark a flag dataset as this format's boolean, so a reader converts on an
+! attribute it can test rather than on a dtype-and-unit pattern it has to infer.
+!-
+
+subroutine hint_bool (id, name, error)
+
+integer(hid_t) id
+integer h5_err
+logical error
+character(*) name
+
+!
+
+call H5LTset_attribute_string_f (id, name, 'dtype_hint', 'bool', h5_err)
+error = error .or. (h5_err < 0)
+
+end subroutine hint_bool
 
 !------------------------------------------------------------------------------
 !+
@@ -481,5 +510,77 @@ call H5Tclose_f (t_id, h5_err)
 call annotate (id, name, '1', label, descrip, axes, error)
 
 end subroutine fel_h5_str
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_h5_text (id, name, label, descrip, val, error)
+!
+! Routine to write one string of ANY length as a scalar string dataset.
+!
+! A dataset, not an attribute, and that is the whole point: HDF5 caps a single attribute
+! at 64 kB (measured here: the largest that writes is 65495 bytes), while a scalar string
+! dataset took 3 MB without complaint. An echoed namelist or a lattice file passes that
+! cap on a lattice of no unusual size, and the failure is silent unless someone checks
+! the error, so provenance belongs in a dataset (FINDINGS 7.31).
+!
+! Where fel_h5_str writes a FIXED-width array for label axes, this writes exactly one
+! string at exactly its own length. An empty value becomes '(unrecorded)': a zero-length
+! HDF5 string type is invalid, and the value would be indistinguishable from a recorded
+! blank in any case.
+!
+! Input:
+!   id       -- integer(hid_t): Group to write into.
+!   name     -- character(*): Dataset name.
+!   label    -- character(*): Short label, for a heading.
+!   descrip  -- character(*): One-sentence description.
+!   val      -- character(*): The text. Trailing blanks are dropped.
+!
+! Output:
+!   error    -- logical: Accumulates True on any failure.
+!-
+
+subroutine fel_h5_text (id, name, label, descrip, val, error)
+
+integer(hid_t) id, s_id, d_id, t_id
+integer h5_err, i, n
+logical error
+character(*) name, label, descrip, val
+character(:), allocatable :: txt
+character(kind = c_char), allocatable, target :: buf(:)
+type (c_ptr) f_ptr
+
+!
+
+txt = trim(val)
+if (txt == '') txt = '(unrecorded)'
+n = len(txt)
+
+allocate (buf(n))
+do i = 1, n
+  buf(i) = txt(i:i)
+enddo
+
+call H5Tcopy_f (H5T_NATIVE_CHARACTER, t_id, h5_err)
+call H5Tset_size_f (t_id, int(n, size_t), h5_err)
+call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
+call H5Dcreate_f (id, name, t_id, s_id, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  return
+endif
+
+f_ptr = c_loc(buf(1))
+call H5Dwrite_f (d_id, t_id, f_ptr, h5_err)
+error = error .or. (h5_err < 0)
+
+call H5Dclose_f (d_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+call H5Tclose_f (t_id, h5_err)
+
+call annotate (id, name, '1', label, descrip, '', error)
+
+end subroutine fel_h5_text
 
 end module fel_h5_mod

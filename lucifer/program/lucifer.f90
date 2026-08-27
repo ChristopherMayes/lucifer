@@ -104,6 +104,11 @@
 !     global%load_only = F                     ! Build the initial state, dump it, exit
 !                                              !   without tracking (shot-noise checks).
 !     global%reference_run = F                 ! NO FEL interaction: Bmad tracks everything.
+!     global%record_environment = F            ! Also record the user name and working
+!                                              !   directory in stats.h5's meta/ group. OFF
+!                                              !   by default: a stats file is meant to
+!                                              !   travel, and those identify a person and a
+!                                              !   machine. Manual sec:meta.
 !
 ! global%migrate = T moves particles between slices when their ponderomotive phase leaves the
 ! slice window (fel_migrate_slices, manual sec:migration), called serially after every

@@ -9,8 +9,8 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st.z                         # (nz,) path length, a VARIABLE on the record axis
     st["beam/slice/current"]     # (nz, ns) A, as the file states it
     st.at_end                    # (nz,) bool, True where a record is an element end
-    st["beam/bunch/twiss/beta"]  # (ne, 6) on the element-end axis, plane last
-    st.coord("plane")            # ('x', 'y', 'z', 'a', 'b', 'c')
+    st["beam/bunch/twiss/beta"]  # (ne, 3) on the element-end axis, plane last
+    st.coord("plane")            # ('x', 'y', 'z'), the projected planes
     st.dim_coords("beam/slice/sigma")   # the coordinate of each dimension, in order
     st.ele_name                  # (nz,) element name per record, gathered through ix_ele
     st.units["beam/slice/t"]     # 's'
@@ -42,7 +42,7 @@ import h5py
 import numpy as np
 
 # The format versions this reader understands. No older ones: see the module docstring.
-KNOWN_VERSIONS = ("2.1",)
+KNOWN_VERSIONS = ("2.2",)
 
 
 class Stats:
@@ -195,6 +195,32 @@ class Stats:
         """The harmonic numbers present beyond the fundamental, from field/@harmonics."""
         return tuple(int(h) for h in self._h5["field"].attrs.get("harmonics", []))
 
+    def unit_of(self, path):
+        """The per-entry units of `path`, or its plain @unit string.
+
+        A dataset whose entries have different units carries @unit_of_axis and
+        @unit_power instead of a parseable unit: the units live on the axis, in
+        coords/<axis>_unit. Returns (units, power) in that case and (unit, 1) otherwise,
+        so a caller never parses a comma list.
+        """
+        attrs = self._h5[path].attrs
+        if "unit_of_axis" not in attrs:
+            return (self.units[path],), 1
+        axis = _text(attrs["unit_of_axis"])
+        power = int(np.atleast_1d(attrs["unit_power"])[0])
+        return self.coord(f"{axis}_unit"), power
+
+    @property
+    def meta(self):
+        """The provenance group as a dict. Datasets, not attributes, so an echoed
+        namelist of any size fits: see the manual on HDF5's 64 kB attribute cap. NOT a
+        reproducibility record, and meta/lattice_source says so itself."""
+        out = {}
+        for key, dset in self._h5["meta"].items():
+            val = np.atleast_1d(dset[()])[0]
+            out[key] = _text(val) if isinstance(val, bytes) else val
+        return out
+
     def derived_from(self, group):
         """What a derived group sums, from its @derived_from. A caller that adds up the
         children of field/ must skip these or it double-counts."""
@@ -252,5 +278,8 @@ if __name__ == "__main__":
           f"{st.params['window_sample']}, spacing {st.params['slice_spacing']:.4e} m, "
           f"head at {st.head_direction}")
     print(f"  axes: {', '.join(f'{a}[{len(st.coord(a))}]' for a in st.axis_names)}")
+    m = st.meta
+    print(f"  lattice: {m['lattice_file']}, {m['n_lattice_files']} file(s) parsed, "
+          f"source {len(m['lattice_source'])} bytes")
     for name, unit, label, axes, descrip in st.units_table():
         print(f"  {name:44s} [{unit:12s}] ({','.join(axes) or 'none'})  {descrip[:60]}")
