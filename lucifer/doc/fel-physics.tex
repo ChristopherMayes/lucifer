@@ -1415,12 +1415,15 @@ moves the row by order unity). Against the particle sum it replaced: worst relat
 particle visits from a 131-slice run (16.5\% of its wall clock).
 \end{validation}
 
-\subsection{The tracking window}\label{sec:window}
+\subsection{The tracking window}\label{sec:trackwindow}
 
 \texttt{global\%track\_start} / \texttt{track\_end} (Tao's names, Genesis's
-\texttt{zstop} parity) are element locators bounding the walk. The schedule
-(slippage, autophasing, break geometry, including the end-of-lattice fixup)
-is always built on the FULL lattice, so a windowed run composes exactly with
+\texttt{zstop} parity) are element locators bounding the walk. A span of the
+LATTICE, and the only window in this manual that is not the time window of
+\S\ref{sec:window}, which is what the code and every other section mean by the
+word. The schedule (slippage, autophasing, break geometry, including the
+end-of-lattice fixup) is always built on the FULL lattice, so a windowed run
+composes exactly with
 the full one: $[{\rm start}, D]$ then $[{\rm after}\ D, {\rm end}]$ from its
 dumps reproduces the one-shot run to the dump format's own round-trip floor
 (measured $3\times10^{-13}$, the walk itself is bit-for-bit, and a windowed
