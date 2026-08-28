@@ -83,17 +83,34 @@ drift surrogate $k_u^{\mathrm{like}} = k_s/(2\gamma_0^2)$ is used
 
 \subsection{The time window}\label{sec:window}
 
-A time-dependent beam is a set of slices with longitudinal spacing
-$\Delta s = \code{sample}\cdot\lambda_s$ (integer \code{sample}). \emph{Higher slice
+A time-dependent beam is a set of slices spaced by
+$\Delta = \code{sample}\cdot\lambda_s$ (integer \code{sample}). \emph{Higher slice
 index is the window head} (earlier arrival, larger Bmad $z$). The global window
 position of a particle in slice $i$ is
 \begin{equation}\label{eq:zglobal}
-  z_{\mathrm{global}} = z_{\mathrm{local}} + \beta\,(i-1)\,\Delta s ,
+  z_{\mathrm{global}} = z_{\mathrm{local}} + \beta\,(i-1)\,\Delta ,
 \end{equation}
 the invariant that slice migration preserves (\S\ref{sec:migration}) and that the
 whole-window wake concatenation uses directly (\S\ref{sec:seamwake}). A single-slice
 beam is the steady state: slippage is a no-op and the window degenerates to one
 $\lambda_s$-periodic slice.
+
+$\Delta$ IS A LIGHT-TRAVEL DISTANCE, not a separation in Bmad's $z$, and the difference
+is not a convention. The $\beta$ in Eq.~\ref{eq:zglobal} is the PARTICLE's, and with
+$z = -\beta c\,(t - t_{\mathrm{ref}})$ it cancels at a grid point:
+\begin{equation}\label{eq:tslice}
+  t - t_{\mathrm{ref}} = -(i-1)\,\Delta/c ,
+\end{equation}
+so the grid is exactly uniform in arrival time and in $ct$, and only $\beta$-dependently
+uniform in $z$. That is why the concatenation stores every particle's entry $\beta$
+rather than one number. It is also what makes slippage an exact integer shift: the light
+advances one $\lambda_s$ per undulator period, at the rate
+$(1+a_w^2)/(2\gamma^2\lambda_s)$ per unit length, so one slice is exactly \code{sample}
+periods of slippage and the field record rotates by one index with no interpolation
+(\S\ref{sec:slippage}). Uniformity in $ct$ is the reason that works. The file therefore
+publishes the two exact coordinates, $t$ and $ct$, and Bmad's $z$ only at the reference
+$\beta$, which is the one of the three that needs a reference at all
+(\S\ref{sec:stats}).
 
 \subsection{Units}\label{sec:units}
 
@@ -1133,17 +1150,23 @@ the format stands, and it resets to 1.0 at the first external release.
 
 Six groups, each answering one question. \code{coords/} holds every axis once, each
 saying which axis it IS. THE RECORD NUMBER is the axis, \code{coords/record}, and
-\code{z} is a VARIABLE on it: \code{z} repeats wherever two records land on one plane,
-so an index on \code{z} would answer silently wrong. \code{ix\_ele} is a variable there
+\code{s} is a VARIABLE on it: \code{s} repeats wherever two records land on one plane,
+which is what a zero-length element applying a wake kick does, so an index on \code{s}
+would answer silently wrong. It is \code{s} and not \code{z} because in Bmad \code{s} is
+the position along the lattice while \code{z} is the phase-space coordinate, and this
+file uses \code{z} for that in \code{coords/bmad} and for the longitudinal twiss plane in
+\code{coords/plane}. \code{ix\_ele} is a variable there
 too, whose values index the \code{ele} axis, which makes it the join key onto
 \code{lattice/}. \code{at\_element\_end} marks which records are element ends and
 selects the \code{element\_end} axis, whose own coordinates are \code{element\_end} (the
-element index) and \code{s\_element\_end} (the position). The slice axis is
-\code{s\_slice}, with \code{t\_slice} beside it. Both carry \code{@head\_direction},
-publishing the migration invariant (\S\ref{sec:migration}) that the HIGH slice index is
-the window head: without it a per-slice profile cannot be drawn, let alone compared with
-another code's. Stating it on one of a pair would invite the reader to assume the pair
-agrees. Both also carry \code{@plot\_against}, naming the variable a
+element index) and \code{s\_element\_end} (the position). The slice axis is \code{slice}, the
+slice NUMBER, with three positions as variables on it: \code{ct\_slice} and
+\code{t\_slice}, which are exact and free of $\beta$, and \code{z\_slice}, which is
+Bmad's $z$ at the reference $\beta$ and says so (Eq.~\ref{eq:tslice} and
+\S\ref{sec:window}). All three carry \code{@head\_direction}, publishing the migration
+invariant (\S\ref{sec:migration}) that the HIGH slice index is the window head: without
+it a per-slice profile cannot be drawn, let alone compared with another code's. Stating
+it on one of a set would invite the reader to assume the set agrees. Both also carry \code{@plot\_against}, naming the variable a
 viewer should put on the axis in place of the index, which only the writer knows. Last
 are the label axes: \code{bmad} and \code{bmad\_col} naming the six phase space
 coordinates, \code{wavefront} and \code{wavefront\_col} the four field moments,
@@ -1262,7 +1285,7 @@ pooled pulse $\sigma_{xx}$ by both routes at $3.4\times10^{-3}$; the
 all three files dataset-identical at 1 vs 8 threads (NaN counting as NaN, which is what
 a not-computed entry means); unknown dump elements refused by name.
 
-Eight structural checks hold the self-description itself. A walk of every dataset for its
+Twelve structural checks hold the self-description itself. A walk of every dataset for its
 four attributes and of every group for its two. Then THE ACCEPTANCE TEST, which is a
 generic load: label every dimension of every dataset from \code{@axes} alone, failing if
 a name does not resolve to a coordinate, if a dimension has no name, if a length
@@ -1276,7 +1299,11 @@ plane is reached twice at a boundary and a repeat INSIDE an element would be a d
 the walk that demoting \code{z} to a variable would otherwise hide. Then four on the
 provenance: no attribute anywhere near HDF5's 64 kB cap, every text in \code{meta/} a
 dataset, \code{n\_lattice\_files} reporting the wrapper lattice's second file, and no
-machine-local value in a default run. \code{diag.txt} is untouched: every benchmark tier
+machine-local value in a default run. Then three on the slice coordinates:
+\code{t\_slice} exactly $-\code{ct\_slice}/c$, \code{z\_slice} equal to
+$\beta_0\code{ct\_slice}$, and the axis being the index. And one on the zero-length wake
+lattice, where \code{s} really does repeat, so the repeated-\code{s} check meets its
+target rather than a run with no duplicates in it. \code{diag.txt} is untouched: every benchmark tier
 reproduces bit for bit.
 \end{validation}
 

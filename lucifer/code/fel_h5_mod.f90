@@ -9,8 +9,8 @@
 !   @long_name    Three words, for an axis label or a table heading.
 !   @description  One sentence, for a reader who has never seen the file.
 !   @axes         The coords/ datasets this dataset's dimensions run over, in h5py
-!                 order, comma separated: 'record,s_slice' means (n_record, n_slice)
-!                 with coords/record down and coords/s_slice across. EVERY name in it
+!                 order, comma separated: 'record,slice' means (n_record, n_slice)
+!                 with coords/record down and coords/slice across. EVERY name in it
 !                 resolves to a coords/ dataset, including the trailing label axes of a
 !                 vector or a matrix, so a reader never guesses a dimension from its
 !                 length. 'none' marks a scalar and nothing else: a coordinate names the
@@ -510,6 +510,87 @@ call H5Tclose_f (t_id, h5_err)
 call annotate (id, name, '1', label, descrip, axes, error)
 
 end subroutine fel_h5_str
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_h5_attr_int (obj_id, attrib, val, error)
+!
+! Routine to attach a TRUE SCALAR integer attribute to an open object.
+!
+! SHAPE EXPRESSES ARITY. One value is a scalar, a list is an array. HDF5's high-level
+! Fortran layer cannot write a scalar attribute at all: H5LTset_attribute_int_f takes a
+! count and an array, so it makes shape (1,) whatever the caller means, and Bmad's
+! hdf5_write_attribute_int_rank0 wraps exactly that call. A reader then has to unwrap
+! every scalar it reads, and cannot tell a one-entry list from a single value. Hence this.
+!
+! Input:
+!   obj_id   -- integer(hid_t): Open dataset or group to attach to.
+!   attrib   -- character(*): Attribute name.
+!   val      -- integer: The value.
+!
+! Output:
+!   error    -- logical: Accumulates True on any failure.
+!-
+
+subroutine fel_h5_attr_int (obj_id, attrib, val, error)
+
+integer(hid_t) obj_id, s_id, a_id
+integer h5_err, val
+integer, target :: buf
+logical error
+character(*) attrib
+type (c_ptr) f_ptr
+
+!
+
+call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
+call H5Acreate_f (obj_id, attrib, H5T_NATIVE_INTEGER, s_id, a_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  call H5Sclose_f (s_id, h5_err)
+  return
+endif
+
+buf = val
+f_ptr = c_loc(buf)
+call H5Awrite_f (a_id, H5T_NATIVE_INTEGER, f_ptr, h5_err)
+error = error .or. (h5_err < 0)
+
+call H5Aclose_f (a_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+
+end subroutine fel_h5_attr_int
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_h5_dset_attr_int (id, name, attrib, val, error)
+!
+! Routine to attach a true scalar integer attribute to a dataset reached by name from
+! its parent group. See fel_h5_attr_int for why the high-level layer will not do.
+!-
+
+subroutine fel_h5_dset_attr_int (id, name, attrib, val, error)
+
+integer(hid_t) id, d_id
+integer h5_err, val
+logical error
+character(*) name, attrib
+
+!
+
+call H5Dopen_f (id, name, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  return
+endif
+call fel_h5_attr_int (d_id, attrib, val, error)
+call H5Dclose_f (d_id, h5_err)
+
+end subroutine fel_h5_dset_attr_int
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

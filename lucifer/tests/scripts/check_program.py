@@ -147,10 +147,10 @@ def h5_identical(fa, fb):
 
 
 def stats_of(path):
-    """The comb-relevant content of a stats file: the record axis, two per-record
-    quantities, and the element-end mask that now selects the ends out of it."""
+    """The comb-relevant content of a stats file: path length, two per-record
+    quantities, and the element-end mask that selects the ends out of the record axis."""
     with read_stats(path) as st:
-        return {"z": st.z, "power": st["field/total/power"],
+        return {"s": st.s, "power": st["field/total/power"],
                 "bunching": st["beam/slice/bunching"], "at_end": st.at_end,
                 "ix_ele": st.ix_ele}
 
@@ -219,49 +219,48 @@ def main():
     s0, sp, sn = stats_of(wd / "cb0.stats.h5"), stats_of(wd / "cbp.stats.h5"), \
                  stats_of(wd / "cbn.stats.h5")
 
-    # First, what the comparison below rests on. The record NUMBER is the axis and z is
-    # a variable on it (manual sec:stats), so matching rows BY z is only legitimate
-    # while z does not repeat, and on a three-element line it can: a boundary is one
-    # plane reached twice, once as an end and once as the next element's start. Every
-    # repeat must therefore straddle a boundary. A repeat INSIDE one element would be a
-    # defect in the walk, and every z-keyed comparison in this file would silently pick
-    # the wrong row.
-    dz = np.diff(s0["z"])
-    dup = np.flatnonzero(dz == 0)
-    ok = bool(np.all(dz >= 0))
+    # First, what the comparison below rests on. The record NUMBER is the axis and s is
+    # a variable on it (manual sec:stats), so matching rows BY s is only legitimate while
+    # s does not repeat, and it can: a zero-length element that applies a wake kick sits
+    # at the plane the element before it ended on. Every repeat must therefore straddle
+    # an element boundary. A repeat INSIDE one element would be a defect in the walk, and
+    # every s-keyed comparison in this file would then silently pick the wrong row.
+    ds = np.diff(s0["s"])
+    dup = np.flatnonzero(ds == 0)
+    ok = bool(np.all(ds >= 0))
     ok = ok and not any(s0["ix_ele"][i] == s0["ix_ele"][i + 1] for i in dup)
-    check("the record axis: z non-decreasing, every repeat at an element boundary", ok,
-          note=f"[{len(dup)} repeats in {len(s0['z'])} rows over 3 elements]")
+    check("the record axis: s non-decreasing, every repeat at an element boundary", ok,
+          note=f"[{len(dup)} repeats in {len(s0['s'])} rows over 3 elements]")
 
     # comb > 0: the rows are a subset of the every-record run's rows, dataset-equal
-    # at the matching z. Element ends always present (here: the final record).
-    idx = np.searchsorted(s0["z"], sp["z"])
-    ok = bool(np.array_equal(s0["z"][idx], sp["z"]))
+    # at the matching s. Element ends always present (here: the final record).
+    idx = np.searchsorted(s0["s"], sp["s"])
+    ok = bool(np.array_equal(s0["s"][idx], sp["s"]))
     ok = ok and np.array_equal(s0["power"][idx, :], sp["power"])
     ok = ok and np.array_equal(s0["bunching"][idx, :], sp["bunching"])
-    ok = ok and sp["z"][-1] == s0["z"][-1]
+    ok = ok and sp["s"][-1] == s0["s"][-1]
     # the spacing rule itself: consecutive rows at least comb apart (ends exempt).
-    ok = ok and bool(np.all(np.diff(sp["z"][:-1]) >= 0.05 - 1e-12))
+    ok = ok and bool(np.all(np.diff(sp["s"][:-1]) >= 0.05 - 1e-12))
     check("comb > 0: rows == every-record rows at the comb positions (subset)", ok,
-          note=f"[{len(sp['z'])} of {len(s0['z'])} rows]")
+          note=f"[{len(sp['s'])} of {len(s0['s'])} rows]")
 
     # comb < 0: the ELEMENT ENDS, and nothing else. Bmad's comb semantics drop the comb
     # there; this tracker always keeps the element ends, because the stats file carries
     # one record axis and marks the ends inside it (manual sec:stats). So a comb < 0 run
     # is a file whose every record is an element end, at the same positions the
     # every-record run put them.
-    ok = bool(np.all(sn["at_end"])) and len(sn["z"]) == int(s0["at_end"].sum())
-    ok = ok and bool(np.array_equal(sn["z"], s0["z"][s0["at_end"]]))
+    ok = bool(np.all(sn["at_end"])) and len(sn["s"]) == int(s0["at_end"].sum())
+    ok = ok and bool(np.array_equal(sn["s"], s0["s"][s0["at_end"]]))
     ok = ok and bool(np.array_equal(sn["power"], s0["power"][s0["at_end"]]))
     check("comb < 0: the rows are exactly the element ends", ok,
-          note=f"[{len(sn['z'])} rows, all element ends]")
+          note=f"[{len(sn['s'])} rows, all element ends]")
 
     # nrec exact: the arrays are sized by the same rule the walk replays -- full,
     # never padded (h5 dataset lengths ARE nrec).
-    ok = len(s0["z"]) == 31 and len(sn["z"]) == int(s0["at_end"].sum())
+    ok = len(s0["s"]) == 31 and len(sn["s"]) == int(s0["at_end"].sum())
     check("nrec exact in every mode (sized once, never grown)", ok,
-          note=f"[comb0 {len(s0['z'])} rows = 30 steps + initial, "
-               f"comb<0 {len(sn['z'])} ends]")
+          note=f"[comb0 {len(s0['s'])} rows = 30 steps + initial, "
+               f"comb<0 {len(sn['s'])} ends]")
 
     # The keystone locally: comb 0 (the default) is bit-for-bit the pre-comb run --
     # cb0 above ran with the default (no comb key at all) and fed every comparison.

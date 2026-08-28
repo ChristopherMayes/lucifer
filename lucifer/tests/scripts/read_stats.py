@@ -6,7 +6,7 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st = read_stats("run.stats.h5")
 
     st.record                    # (nz,) the record axis, 0..nz-1
-    st.z                         # (nz,) path length, a VARIABLE on the record axis
+    st.s                         # (nz,) path length, a VARIABLE on the record axis
     st["beam/slice/current"]     # (nz, ns) A, as the file states it
     st.at_end                    # (nz,) bool, True where a record is an element end
     st["beam/bunch/twiss/beta"]  # (ne, 3) on the element-end axis, plane last
@@ -42,7 +42,7 @@ import h5py
 import numpy as np
 
 # The format versions this reader understands. No older ones: see the module docstring.
-KNOWN_VERSIONS = ("2.2",)
+KNOWN_VERSIONS = ("2.3",)
 
 
 class Stats:
@@ -136,29 +136,54 @@ class Stats:
 
     @property
     def record(self):
-        """(nz,) the record axis. THE axis: coords/z repeats where two records land on
-        one plane, so z indexes nothing."""
+        """(nz,) the record axis. THE axis: coords/s repeats where two records land on
+        one plane, so s indexes nothing."""
         return self["coords/record"]
 
     @property
-    def z(self):
-        """(nz,) path length along the line [m], a variable on the record axis."""
-        return self["coords/z"]
+    def s(self):
+        """(nz,) path length along the line [m], Bmad's s. A variable on the record axis.
+
+        Named s, not z: in Bmad s is the position along the lattice and z is the
+        phase-space coordinate, which is the fifth entry of coords/bmad and the third of
+        coords/plane.
+        """
+        return self["coords/s"]
 
     @property
-    def s_slice(self):
-        """(ns,) slice position in the time window [m], increasing toward the head."""
-        return self["coords/s_slice"]
+    def slice(self):
+        """(ns,) the slice axis, 0..ns-1. THE axis, with three positions on it."""
+        return self["coords/slice"]
+
+    @property
+    def ct_slice(self):
+        """(ns,) light-travel distance of each slice ahead of the reference [m].
+
+        EXACT and free of beta, and the coordinate slippage counts in: one slice is
+        window_sample wavelengths of it. See t_slice and z_slice.
+        """
+        return self["coords/ct_slice"]
 
     @property
     def t_slice(self):
-        """(ns,) arrival time of each slice [s], more negative toward the head."""
+        """(ns,) arrival time of each slice [s], -ct_slice/c exactly. More negative
+        toward the head."""
         return self["coords/t_slice"]
+
+    @property
+    def z_slice(self):
+        """(ns,) Bmad z of each slice AT THE REFERENCE beta [m].
+
+        The one member of the three that needs a reference: a particle's own offset is
+        its own beta times ct_slice, which is why the slice-to-bunch conversion stores
+        every entry beta rather than one number.
+        """
+        return self["coords/z_slice"]
 
     @property
     def head_direction(self):
         """Which end of the slice index is the window head, as the file states it."""
-        return _text(self._h5["coords/s_slice"].attrs["head_direction"])
+        return _text(self._h5["coords/ct_slice"].attrs["head_direction"])
 
     @property
     def at_end(self):
@@ -178,7 +203,7 @@ class Stats:
         return names[self.ix_ele]
 
     @property
-    def z_end(self):
+    def s_end(self):
         """(ne,) the element-end positions, which the element-end arrays run over."""
         return self["coords/s_element_end"]
 
@@ -240,9 +265,13 @@ def _text(val):
 
 
 def _list(val):
-    """A comma-separated attribute as a tuple of str, empty for an absent one."""
-    txt = _text(val)
-    return tuple(p for p in txt.split(",") if p) if txt else ()
+    """A list-valued string attribute as a tuple of str, empty for an absent one.
+
+    The file writes these as string ARRAYS, length one included, so that a
+    one-component file parses exactly like a two-component one: shape expresses arity.
+    """
+    arr = np.atleast_1d(val)
+    return tuple(_text(v) for v in arr if _text(v))
 
 
 def read_stats(path):
@@ -271,7 +300,7 @@ if __name__ == "__main__":
 
     st = read_stats(sys.argv[1])
     print(f"{st.path.name}: {st.file_format} {st.version}")
-    print(f"  {len(st.z)} records, {st.at_end.sum()} element ends, "
+    print(f"  {len(st.s)} records, {st.at_end.sum()} element ends, "
           f"{st.params['n_slice']} slices, components {st.components}, "
           f"harmonics {st.harmonics}")
     print(f"  window: lambda0 {st.params['lambda0']:.4e} m, sample "

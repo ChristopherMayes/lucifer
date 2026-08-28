@@ -133,7 +133,7 @@ def run(exe, wd, root, m, coherent, seed=777, bextra="", wextra="", pextra="", t
 
 def curve(wd, root):
     with read_stats(wd / f"{root}.stats.h5") as st:
-        return st.z, np.sum(st["field/total/power"], axis=1)   # window total
+        return st.s, np.sum(st["field/total/power"], axis=1)   # window total
 
 
 def sase_startup(wd, root):

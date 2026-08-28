@@ -7,7 +7,7 @@ Plot the standard diagnostics of a lucifer run from its stats file.
 
 The stats file (manual sec:stats) describes itself: every dataset carries its unit and
 the axes it runs over, so this script reads named datasets through read_stats and does
-no conversions at all -- no text files, no reshapes, no unit juggling. Ten panels against z:
+no conversions at all -- no text files, no reshapes, no unit juggling. Ten panels against s:
 
   radiation power and window field energy (log and linear -- the log pair shows the
   exponential gain regime, the linear pair shows where the energy actually is);
@@ -63,7 +63,7 @@ def load(fn):
     or not a y component exists, so no branch changes what a name means."""
     st = read_stats(fn)
     q = {
-        "z": st.z, "p0c": float(st.params["p0c"]),
+        "s": st.s, "p0c": float(st.params["p0c"]),
         "centroid": st["beam/slice/centroid"],        # (nrec, nslice, 6)
         "sigma": st["beam/slice/sigma"],              # (nrec, nslice, 6, 6)
         "bunching": st["beam/slice/bunching"],
@@ -105,15 +105,15 @@ def norm_emit(q, i, j):
     return f_emit * emit
 
 
-def panel_series(ax, z, a2d, color, label=None, reduce="mean"):
+def panel_series(ax, s, a2d, color, label=None, reduce="mean"):
     """One quantity: thin gray per-slice lines (if several) plus a bold aggregate."""
     nslice = a2d.shape[1]
     if nslice > 1:
-        ax.plot(z, a2d, color=GRAY, lw=0.6, alpha=0.6, zorder=1)
+        ax.plot(s, a2d, color=GRAY, lw=0.6, alpha=0.6, zorder=1)
         agg = a2d.sum(axis=1) if reduce == "sum" else a2d.mean(axis=1)
     else:
         agg = a2d[:, 0]
-    ax.plot(z, agg, color=color, lw=1.8, label=label, zorder=3)
+    ax.plot(s, agg, color=color, lw=1.8, label=label, zorder=3)
 
 
 def main():
@@ -128,7 +128,7 @@ def main():
                          "(the diag file remains the Genesis-comparison instrument).")
 
     q = load(args.stats)
-    z = q["z"]
+    s = q["s"]
     nslice = q["power"].shape[1]
     out = args.output or str(pathlib.Path(args.stats).name.removesuffix(".stats.h5") + ".png")
 
@@ -158,17 +158,17 @@ def main():
     for key, quant, ylab in (("power", "power", "radiation power (W)"),
                              ("energy", "energy", "field energy (J)")):
         label = "total" if nslice > 1 else None
-        panel_series(axd[key], z, q[quant], BLUE, label=label, reduce="sum")
+        panel_series(axd[key], s, q[quant], BLUE, label=label, reduce="sum")
         axd[key].set_yscale("log")
         axd[key].set_ylabel(ylab)
         if nslice > 1:
             axd[key].legend(frameon=False)
-        panel_series(axd[key + "_lin"], z, q[quant], BLUE, reduce="sum")
+        panel_series(axd[key + "_lin"], s, q[quant], BLUE, reduce="sum")
         axd[key + "_lin"].set_ylabel(ylab)
 
     # Bunching factor.
     label = "slice average" if nslice > 1 else None
-    panel_series(axd["bunching"], z, q["bunching"], BLUE, label=label)
+    panel_series(axd["bunching"], s, q["bunching"], BLUE, label=label)
     axd["bunching"].set_ylabel("bunching |b|")
     if nslice > 1:
         axd["bunching"].legend(frameon=False)
@@ -178,58 +178,58 @@ def main():
 
     # Beam energy: change of the mean and the rms spread share the unit MeV.
     e_mean = beam_energy_ev(q)
-    sig = q["sigma"].reshape(len(z), nslice, 6, 6)
+    sig = q["sigma"].reshape(len(s), nslice, 6, 6)
     beta = q["p0c"] * (1 + q["centroid"][:, :, 5]) / e_mean
     sig_e = beta * q["p0c"] * np.sqrt(np.maximum(0.0, sig[:, :, 5, 5]))
-    panel_series(axd["gamma"], z, (e_mean - e_mean[0]) / 1e6, BLUE, label=r"$\Delta\langle E\rangle$")
-    panel_series(axd["gamma"], z, sig_e / 1e6, ORANGE, label=r"$\sigma_E$")
+    panel_series(axd["gamma"], s, (e_mean - e_mean[0]) / 1e6, BLUE, label=r"$\Delta\langle E\rangle$")
+    panel_series(axd["gamma"], s, sig_e / 1e6, ORANGE, label=r"$\sigma_E$")
     axd["gamma"].set_ylabel("beam energy (MeV)")
     axd["gamma"].legend(**above)
 
     # Transverse rms sizes: beam from the 6x6, FIELD from the wavefront 4x4 --
     # gain guiding is the field-size curve bending toward the beam-size curve.
-    panel_series(axd["bsize"], z, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
-    panel_series(axd["bsize"], z, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
+    panel_series(axd["bsize"], s, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
+    panel_series(axd["bsize"], s, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
     axd["bsize"].set_ylabel(r"rms beam size ($\mu$m)")
     axd["bsize"].legend(**above)
 
-    fsig = q["f_sigma"].reshape(len(z), nslice, 4, 4)
-    panel_series(axd["fsize"], z, 1e6 * np.sqrt(np.maximum(0, fsig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
-    panel_series(axd["fsize"], z, 1e6 * np.sqrt(np.maximum(0, fsig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
+    fsig = q["f_sigma"].reshape(len(s), nslice, 4, 4)
+    panel_series(axd["fsize"], s, 1e6 * np.sqrt(np.maximum(0, fsig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
+    panel_series(axd["fsize"], s, 1e6 * np.sqrt(np.maximum(0, fsig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
     axd["fsize"].set_ylabel(r"rms field size ($\mu$m)")
     axd["fsize"].legend(**above)
 
     # Emittances: beam normalized (projected, dispersion removed). Field
     # sqrt(det sigma_plane) at the records where angle moments exist (element ends),
     # against the diffraction limit lambda/4pi.
-    panel_series(axd["bemit"], z, 1e6 * norm_emit(q, 0, 1), BLUE, label=r"$\gamma\epsilon_x$")
-    panel_series(axd["bemit"], z, 1e6 * norm_emit(q, 2, 3), ORANGE, label=r"$\gamma\epsilon_y$")
+    panel_series(axd["bemit"], s, 1e6 * norm_emit(q, 0, 1), BLUE, label=r"$\gamma\epsilon_x$")
+    panel_series(axd["bemit"], s, 1e6 * norm_emit(q, 2, 3), ORANGE, label=r"$\gamma\epsilon_y$")
     axd["bemit"].set_ylabel(r"norm. emittance ($\mu$m)")
     axd["bemit"].legend(**above)
 
     valid = q["f_valid"].any(axis=1)
     if valid.any():
-        zv = z[valid]
+        sv = s[valid]
         ex = np.where(q["f_valid"][valid], q["f_emit_x"][valid], np.nan)
         ey = np.where(q["f_valid"][valid], q["f_emit_y"][valid], np.nan)
-        axd["femit"].plot(zv, 1e12 * np.nanmean(ex, axis=1), "o-", color=BLUE, ms=4, label=r"$\epsilon_x$")
-        axd["femit"].plot(zv, 1e12 * np.nanmean(ey, axis=1), "o-", color=ORANGE, ms=4, label=r"$\epsilon_y$")
+        axd["femit"].plot(sv, 1e12 * np.nanmean(ex, axis=1), "o-", color=BLUE, ms=4, label=r"$\epsilon_x$")
+        axd["femit"].plot(sv, 1e12 * np.nanmean(ey, axis=1), "o-", color=ORANGE, ms=4, label=r"$\epsilon_y$")
     axd["femit"].set_ylabel(r"field emit (pm$\,$rad)")
     axd["femit"].legend(**above)
 
-    axd["bemit"].set_xlabel("z (m)")
-    axd["femit"].set_xlabel("z (m)")
+    axd["bemit"].set_xlabel("s (m)")
+    axd["femit"].set_xlabel("s (m)")
 
-    # The polarization split (two live components only): x and y power against z. On a
+    # The polarization split (two live components only): x and y power against s. On a
     # crossed line this is the afterburner -- the x set amplifies Ex and bunches the
     # beam, then the tilted set radiates Ey from that bunching while Ex only diffracts.
     if two_pol:
         A = axd["pol"]
-        A.semilogy(z, np.maximum(q["power_x"][:len(z)].sum(axis=1), 1e-30),
+        A.semilogy(s, np.maximum(q["power_x"][:len(s)].sum(axis=1), 1e-30),
                    color=BLUE, lw=1.8, label="x polarization")
-        A.semilogy(z, np.maximum(q["power_y"][:len(z)].sum(axis=1), 1e-30),
+        A.semilogy(s, np.maximum(q["power_y"][:len(s)].sum(axis=1), 1e-30),
                    color=ORANGE, lw=1.8, label="y polarization")
-        A.set_xlabel("z (m)"); A.set_ylabel("radiation power by polarization (W)")
+        A.set_xlabel("s (m)"); A.set_ylabel("radiation power by polarization (W)")
         A.legend(frameon=False)
         axd["bemit"].set_xlabel("")
         axd["femit"].set_xlabel("")
@@ -239,12 +239,12 @@ def main():
     # off the vertical gaps.
     if q["harmonics"]:
         A = axd["harm"]
-        A.semilogy(z, np.maximum(q["power"][:len(z)].sum(axis=1), 1e-30),
+        A.semilogy(s, np.maximum(q["power"][:len(s)].sum(axis=1), 1e-30),
                    color=BLUE, lw=1.8, label="fundamental")
         for hh, ph in sorted(q["harmonics"].items()):
-            A.semilogy(z, np.maximum(ph[:len(z)].sum(axis=1), 1e-30),
+            A.semilogy(s, np.maximum(ph[:len(s)].sum(axis=1), 1e-30),
                        color=ORANGE, lw=1.8, label=f"harmonic {hh}")
-        A.set_xlabel("z (m)"); A.set_ylabel("radiation power by harmonic (W)")
+        A.set_xlabel("s (m)"); A.set_ylabel("radiation power by harmonic (W)")
         A.legend(frameon=False)
         axd["bemit"].set_xlabel("")
         axd["femit"].set_xlabel("")

@@ -70,6 +70,56 @@ fel_unaveraged = 1
 wiggler::*[FEL_TRACKING] = fel_unaveraged
 """
 
+# Zero-length wake elements, both polarities, for check 7. A zero-length element carrying
+# an sr wake is a standard Bmad idiom and legitimate: a wake assigned over an element
+# range or a class lands on zero-length members as a matter of course. What differs is
+# whether the kick can act. scale_with_length = F means it does, and the element must be
+# tracked, take a record, and repeat coords/s at the plane the element before it ended
+# on. T means the kick is identically zero (wake_mod scales by l$), so the element is
+# skipped and the file must come out as though the wake were not there at all. WKT_NONE
+# replaces the T pipes with plain ones to make that comparison.
+ZL_WAKE = """no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 15
+beginning[beta_b] = 15
+{wkt}
+WKF: pipe, l = 0, sr_wake = {{amp_scale = 1, scale_with_length = F,
+  longitudinal = {{1e12, 0, 0, 0.25, none}}}}
+UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      tracking_method = custom, ds_step = 0.015
+SEG: line = (WKT, UND, WKF, WKT)
+use, SEG
+"""
+
+WKT_WAKE = """WKT: pipe, l = 0, sr_wake = {amp_scale = 1, scale_with_length = T,
+  longitudinal = {1e12, 0, 0, 0.25, none}}"""
+
+WKT_NONE = """WKT: pipe, l = 0"""
+
+
+def h5_identical(fa, fb):
+    """Whether two HDF5 files hold the same data, meta/ excluded.
+
+    meta/ IS EXCLUDED, deliberately. Provenance moved from attributes to datasets for
+    HDF5's 64 kB attribute cap (manual sec:meta), and input_echo carries out_root while
+    timestamp carries the clock, so any two runs differ there by construction. Nothing in
+    meta/ is physics. Before the move the exclusion existed only by the accident of being
+    attributes, which is not something a reader of this check could have reasoned about.
+
+    same_data counts NaN as equal to NaN, which the stats file needs: see read_stats.
+    """
+    with h5py.File(fa) as a, h5py.File(fb) as b:
+        names_a, names_b = [], []
+        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith("meta/")
+        a.visititems(lambda n, o: names_a.append(n) if keep(n, o) else None)
+        b.visititems(lambda n, o: names_b.append(n) if keep(n, o) else None)
+        if sorted(names_a) != sorted(names_b):
+            return False
+        return all(same_data(a[n][()], b[n][()]) for n in names_a)
+
 
 def check(name, value, tol, note=""):
     global FAILED
@@ -144,17 +194,18 @@ def main():
               note=f"[{len(st.axis_names)} axes: {', '.join(st.axis_names)}" +
                    (f"; first problem {bad[0]}]" if bad else "]"))
 
-        # 0a3. THE RECORD NUMBER IS THE AXIS, and z is a variable on it. z must be
+        # 0a3. THE RECORD NUMBER IS THE AXIS, and s is a variable on it. s must be
         # non-decreasing, and where it repeats the two records must sit in DIFFERENT
-        # elements: a boundary is one plane reached twice, once as an end and once as
-        # the next element's start. Two records at one plane inside one element would
-        # be a defect in the walk, and this axis change would hide it.
-        dz = np.diff(st.z)
-        dup = np.flatnonzero(dz == 0)
+        # elements, which is what a zero-length element applying a wake kick does: it
+        # records at the plane the element before it ended on. Two records at one plane
+        # INSIDE one element would be a defect in the walk that this axis choice hides.
+        # The zero-length wake lattice below is what makes this fire on real duplicates.
+        ds = np.diff(st.s)
+        dup = np.flatnonzero(ds == 0)
         unexplained = [int(i) for i in dup if st.ix_ele[i] == st.ix_ele[i + 1]]
-        check("stats: z is non-decreasing along the record axis", int(np.sum(dz < 0)), 0.5)
-        check("stats: every repeated z straddles an element boundary", len(unexplained), 0.5,
-              note=f"[{len(dup)} repeats in {len(st.z)} records]")
+        check("stats: s is non-decreasing along the record axis", int(np.sum(ds < 0)), 0.5)
+        check("stats: every repeated s straddles an element boundary", len(unexplained), 0.5,
+              note=f"[{len(dup)} repeats in {len(st.s)} records]")
 
         # 0a4. PROVENANCE IS DATA, NOT AN ATTRIBUTE. HDF5 caps one attribute at 64 kB
         # (measured: 65495 bytes is the largest that writes), and the echoed namelist is
@@ -195,20 +246,39 @@ def main():
         check("stats: the default file carries no machine-local values", len(leaks), 0.5,
               note=f"[{', '.join(leaks) if leaks else 'clean'}]")
 
+        # 0a7. THE SLICE COORDINATES ARE EXACT, AND ONE OF THEM IS NOT. The grid is
+        # uniform in TIME: the migration invariant carries each particle's own beta, and
+        # z = -beta*c*(t-t_ref), so at a grid point the beta CANCELS and the arrival-time
+        # separation is ct_slice/c with no beta anywhere. t_slice must therefore be
+        # -ct_slice/c EXACTLY, which it was not until 2.3 (it carried a spurious beta0,
+        # 3.9e-9). z_slice is the one that needs a reference, so it is only equal to
+        # beta0*ct_slice to the rounding of two ways of forming beta0.
+        c_light = 299792458.0
+        p0c = float(st.params["p0c"])
+        beta0 = p0c / np.sqrt(p0c**2 + M_ELECTRON**2)
+        ct = st.ct_slice
+        check("stats: t_slice is -ct_slice/c exactly (abs)",
+              float(np.max(np.abs(st.t_slice + ct / c_light))), 1e-30)
+        rel = np.abs(st.z_slice[1:] / (beta0 * ct[1:]) - 1)
+        check("stats: z_slice is beta0*ct_slice", float(np.max(rel)), 1e-15,
+              note=f"[beta0 = 1 - {1 - beta0:.3e}]")
+        check("stats: the slice axis is the index", abs(len(st.slice) - nslice), 0.5,
+              note=f"[{nslice} slices, positions ct_slice, t_slice, z_slice on it]")
+
         # 0b. THE JOIN. at_element_end selects the element-end rows, and every record
         # sits inside the element its ix_ele names. An off-by-one in either would break
         # every layout plot and no physics check would see it.
         n_end = int(st.at_end.sum())
         check("stats: at_element_end selects exactly the element ends",
               abs(n_end - int(st.params["n_element_end"])), 0.5,
-              note=f"[{n_end} of {len(st.z)} records]")
+              note=f"[{n_end} of {len(st.s)} records]")
         check("stats: element-end arrays are aligned with the mask",
               abs(st["beam/bunch/centroid"].shape[0] - n_end), 0.5)
         s1, s2 = st["lattice/s_start"], st["lattice/s_end"]
         ix = st.ix_ele
-        outside = int(np.sum((st.z < s1[ix] - 1e-9) | (st.z > s2[ix] + 1e-9)))
+        outside = int(np.sum((st.s < s1[ix] - 1e-9) | (st.s > s2[ix] + 1e-9)))
         check("stats: every record sits inside the element ix_ele names", outside, 0.5,
-              note=f"[{len(st.z)} records against {len(s1)} lattice rows]")
+              note=f"[{len(st.s)} records against {len(s1)} lattice rows]")
 
         # 1. Reconstruction at the element end (= the last record). The entry is an index
         # into the group's own axis, looked up rather than assumed: that lookup is the
@@ -306,7 +376,7 @@ def main():
         # complete). An empty slice has no moments to compute and says so.
         valid = st["field/x/angle_moments_valid"].astype(bool)
         has_field = st["field/x/power"] > 0
-        rows = np.zeros(len(st.z), bool)
+        rows = np.zeros(len(st.s), bool)
         rows[0] = True
         rows |= st.at_end
         want = has_field & rows[:, None]
@@ -408,26 +478,36 @@ def main():
     #    data is the invariance claim, the container metadata is not.
     run(exe, wd, "dg1", NML.format(lat="dg_wrap.bmad", root="dg1", extra=""), threads="1")
 
-    def h5_identical(fa, fb):
-        # meta/ IS EXCLUDED, deliberately. Provenance moved from attributes to datasets
-        # for the 64 kB cap, and input_echo carries out_root, so the two runs of this
-        # check differ there by construction. It used to sit outside every dataset
-        # comparison by the accident of being attributes; now it is named. Nothing in
-        # meta/ is physics, and the timestamp alone would break any byte comparison.
-        with h5py.File(fa) as a, h5py.File(fb) as b:
-            names_a, names_b = [], []
-            keep = lambda n, o: (isinstance(o, h5py.Dataset) and not n.startswith("meta/"))
-            a.visititems(lambda n, o: names_a.append(n) if keep(n, o) else None)
-            b.visititems(lambda n, o: names_b.append(n) if keep(n, o) else None)
-            if sorted(names_a) != sorted(names_b):
-                return False
-            # same_data counts NaN as equal to NaN, which the stats file needs: see
-            # read_stats.
-            return all(same_data(a[n][()], b[n][()]) for n in names_a)
-
     same = all(h5_identical(wd / f"dg{s}", wd / f"dg1{s}")
                for s in (".stats.h5", "-escaped.fld.h5", "-pulse.fld.h5"))
     check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes)",
+          0.0 if same else 1.0, 0.5)
+
+    # 5a. ZERO-LENGTH WAKE ELEMENTS, BOTH POLARITIES. This is the lattice the repeated-s
+    # check was written for, and until it existed that check had only ever seen zero
+    # repeats, which is to say it was untested. WKF can kick, so it is tracked and its
+    # record lands on the plane UND ended at, repeating coords/s. The two WKT pipes
+    # cannot kick, so they are skipped and the file must be IDENTICAL to one whose
+    # zero-length pipes carry no wake at all.
+    (wd / "zlw.bmad").write_text(ZL_WAKE.format(wkt=WKT_WAKE))
+    (wd / "zlwn.bmad").write_text(ZL_WAKE.format(wkt=WKT_NONE))
+    run(exe, wd, "zlw", NML.format(lat="zlw.bmad", root="zlw", extra=""), threads="4")
+    run(exe, wd, "zlwn", NML.format(lat="zlwn.bmad", root="zlwn", extra=""), threads="4")
+
+    with read_stats(wd / "zlw.stats.h5") as st:
+        ds = np.diff(st.s)
+        dup = np.flatnonzero(ds == 0)
+        unexplained = [int(i) for i in dup if st.ix_ele[i] == st.ix_ele[i + 1]]
+        names = st.ele_name
+        check("zero-length wake: coords/s repeats where one CAN kick", 1.0 / max(len(dup), 1) - 1.0,
+              0.5, note=f"[{len(dup)} repeat(s), at " +
+                        ", ".join(f"{names[i]}->{names[i+1]}" for i in dup) + "]")
+        check("zero-length wake: and every repeat straddles an element boundary",
+              len(unexplained), 0.5)
+        check("zero-length wake: s is still non-decreasing", int(np.sum(ds < 0)), 0.5)
+
+    same = h5_identical(wd / "zlw.stats.h5", wd / "zlwn.stats.h5")
+    check("zero-length wake: one that CANNOT kick leaves the file unchanged (0 = yes)",
           0.0 if same else 1.0, 0.5)
 
     # 5b. The environment switch: opt-in, so the fields appear only when asked for.

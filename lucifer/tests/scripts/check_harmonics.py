@@ -286,7 +286,7 @@ def main():
         p1g = h5["Field/power"][:].ravel()
         p3g = h5["Field3/power"][:].ravel()
     with read_stats(wd / "h3bmad.stats.h5") as st:
-        zb = st.z
+        zb = st.s
         p1b = st["field/total/power"][:, 0]
         p3b = st["field/harm3/total/power"][:, 0]
 

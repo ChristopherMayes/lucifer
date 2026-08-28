@@ -872,7 +872,7 @@ rather than negotiated, and it resets to 1.0 at the first external release.
 
 | group | what |
 |---|---|
-| `coords/` | every axis once: `record` (THE record axis) with `z`, `ix_ele` and `at_element_end` as variables on it, `element_end` and `s_element_end`, the slice axis `s_slice` with `t_slice`, the `ele` axis, and the label axes `bmad`, `bmad_col`, `wavefront`, `wavefront_col`, `plane`, `mode` |
+| `coords/` | every axis once: `record` (THE record axis) with `s`, `ix_ele` and `at_element_end` as variables on it, `element_end` and `s_element_end`, the `slice` axis with `ct_slice`, `t_slice` and `z_slice` on it, the `ele` axis, and the label axes `bmad`, `bmad_col`, `wavefront`, `wavefront_col`, `plane`, `mode` |
 | `params/` | every scalar as data, as a true HDF5 scalar: the window (`lambda0`, `window_sample`, `slice_spacing`, `nbins`), `p0c`, the charge, the seed, the grid, the counts |
 | `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), plus `current` and `energy` in eV |
 | `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end axis, the nine twiss quantities in `twiss/` over the `plane` axis and in `modes/` over the `mode` axis |
@@ -880,9 +880,11 @@ rather than negotiated, and it resets to 1.0 at the first external release.
 | `lattice/` | one row per element on the `ele` axis, for layout plots |
 | `meta/` | which lattice and which input, as datasets. Not the lattice, and not a person |
 
-Six rules earn their keep. **The record number is the axis**: `z` rides along as a
-variable, because `z` repeats wherever two records land on one plane and a selection on
-a repeating index answers silently wrong. **One record axis**: an element end is always
+Six rules earn their keep. **The record number is the axis**: `s` rides along as a
+variable, because `s` repeats wherever two records land on one plane, which is what a
+zero-length element applying a wake kick does, and a selection on a repeating index
+answers silently wrong. It is `s`, Bmad's name for position along the lattice, and `z` is
+left to mean the phase-space coordinate. **One record axis**: an element end is always
 a record, so `at_element_end` is a boolean mask where a duplicated copy of every
 element-end quantity used to be. That mask is information only the writer has, and no
 reader can recover afterwards which record was the end. **Every axis has a coordinate**,
@@ -890,9 +892,12 @@ label axes included, and things that must not be confused are named apart: a squ
 matrix's two sides (`bmad`, `bmad_col`) so that selecting one entry needs no rule, and
 the projected twiss planes (`plane`) from the normal modes (`mode`), because an
 eigen-emittance is not a projected emittance and one axis carrying both invites an
-average across them. **The slice axis exists**:
-`s_slice` and `t_slice`, both with `@head_direction`, publishing the migration invariant
-that the high slice index is the window head, without which no per-slice profile can be
+average across them. **The slice axis exists**, and its
+coordinates are exact: the slice NUMBER is the axis, with `ct_slice` and `t_slice` on it
+free of any beta and `z_slice` marked as Bmad's z at the reference beta. The slice grid is
+uniform in TIME, not in z, which is what makes slippage an exact integer shift of the
+field record. All three carry `@head_direction`, publishing the migration invariant that
+the high slice index is the window head, without which no per-slice profile can be
 trusted, let alone overlaid on another code's. **No dataset's meaning depends on what
 else the file holds**: `field/total/power` is the sum over live polarizations whether one
 or two are live, `field/x/power` is always the x component, and `@components`,

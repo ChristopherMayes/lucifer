@@ -209,6 +209,22 @@ do ie = run%i_start, run%i_end
 
   wake_src => null()
   if (bmad_com%sr_wakes_on) wake_src => pointer_to_wake_ele(ele)
+
+  ! A zero-length element whose wake CANNOT ACT is skipped like any other zero-length
+  ! element. Bmad's scale_with_length defaults true and wake_mod scales the kick by l$,
+  ! so at zero length it is identically zero: measured, such a run is the no-wake run
+  ! exactly. This is not a user error and is not refused, since a wake assigned over an
+  ! element range or a class lands on zero-length members as a matter of course. But
+  ! honoring one costs the SERIAL interlude path, a record, an element end and a repeated
+  ! coords/s, all for nothing. A long-range wake has no scale_with_length and WOULD act
+  ! at zero length, so it keeps the element.
+
+  if (associated(wake_src) .and. ele%value(l$) == 0) then
+    if (wake_src%wake%sr%scale_with_length .and. .not. lr_wake_acts(wake_src)) then
+      wake_src => null()
+    endif
+  endif
+
   if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
 
   if (is_fel(ie)) then
@@ -867,6 +883,30 @@ if (serr) then
   err_flag = .true.;  return
 endif
 end subroutine take_stats_record
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function lr_wake_acts (wake_ele) result (acts)
+!
+! Routine to say whether an element's LONG-RANGE wake can act. A long-range wake has no
+! scale_with_length, so unlike a short-range one it is not silenced by a zero length,
+! which is what makes it the exception to the zero-length skip above.
+!-
+
+function lr_wake_acts (wake_ele) result (acts)
+
+type (ele_struct), pointer :: wake_ele
+logical acts
+
+!
+
+acts = .false.
+if (.not. bmad_com%lr_wakes_on) return
+if (.not. allocated(wake_ele%wake%lr%mode)) return
+acts = (size(wake_ele%wake%lr%mode) > 0)
+
+end function lr_wake_acts
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
