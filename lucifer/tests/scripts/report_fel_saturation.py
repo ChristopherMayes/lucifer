@@ -110,14 +110,14 @@ def cover(pdf, d, checks):
         ("", 10, 0),
         (f"Generated {time.strftime('%Y-%m-%d %H:%M')} from lucifer/examples/saturation_demo.", 10, 0),
         ("", 10, 0),
-        ("THE CASE.  Genesis's own Benchmark1-SASE configuration run to saturation: the", 10, 0),
+        ("The case.  Genesis's own Benchmark1-SASE configuration run to saturation: the", 10, 0),
         ("full 57 m 6-FODO Aramis line (12 undulator segments, aw = 0.85 rms helical,", 10, 0),
         ("15 mm period, 5.8 GeV, resonant at 1 Angstrom), dark start, growth from shot", 10, 0),
         (f"noise alone. {d['nslice']} slices x 2048 particles, 255^2 field grid. All three", 10, 0),
         ("trackers start from IDENTICAL initial dumps written by an untimed Genesis prep", 10, 0),
         ("run; wall clocks come from one external clock (/usr/bin/time).", 10, 0),
         ("", 10, 0),
-        ("WALL CLOCK (12 performance cores each)", 11, 1),
+        ("Wall clock (12 performance cores each)", 11, 1),
         (f"    Genesis 1.3 v4, 12 MPI ranks              {t['genesis']:8.1f} s", 10, 2),
         (f"    Bmad averaged (bmad_standard default)     {t['avg']:8.1f} s   "
          f"({t['genesis']/t['avg']:.2f}x faster than Genesis)", 10, 2),
@@ -126,18 +126,18 @@ def cover(pdf, d, checks):
         ("    Each code computes its own in-run diagnostics; the Bmad runs write the", 10, 0),
         ("    full moment-matrix stats file while Genesis writes scalar columns.", 10, 0),
         ("", 10, 0),
-        ("THE ANSWER CHECKS (recomputed here, must pass before timings mean anything)", 11, 1),
+        ("The answer checks (recomputed here, must pass before timings mean anything)", 11, 1),
         (f"    exit total power, Genesis:            {checks['p_gen']:.4e} W", 10, 2),
         (f"    Bmad averaged:    {checks['p_avg']:.4e} W    rel. difference {checks['rel']:.2e}   (<= 0.15)", 10, 2),
         (f"    Bmad unaveraged:  {checks['p_unavg']:.4e} W    |ln ratio| {checks['lnr']:.3f}        (<= 1.0)", 10, 2),
         ("", 10, 0),
-        ("WHAT TO EXPECT IN THE PAGES THAT FOLLOW", 11, 1),
+        ("What to expect in the pages that follow", 11, 1),
         ("    1. Gain curves: the averaged mode lies on Genesis through eight decades of z", 10, 0),
         ("       and three of power (4.9e-4 at the exit). The unaveraged mode -- an", 10, 0),
         ("       independent integrator through the real undulator field, with the", 10, 0),
         ("       coupling factor nowhere in its inputs -- reproduces startup, gain shape", 10, 0),
         ("       and saturation location, riding ~2%/m above the averaged codes while its", 10, 0),
-        ("       beam gives up ~14x more energy -- see page 4 (FINDINGS 7.27).", 10, 0),
+        ("       beam gives up ~14x more energy -- see page 4.", 10, 0),
         ("    2. Pulse structure: per-slice exit power and bunching evolution.", 10, 0),
         ("    3. Beam evolution: energy loss and spread -- where the unaveraged mode's", 10, 0),
         ("       extra physics is visible on the beam itself.", 10, 0),
@@ -182,7 +182,7 @@ def gain_page(pdf, d):
     a2.legend(frameon=False)
     style(fig)
     caption(fig,
-        "HOW TO READ THIS.  Top: total radiation power against distance, all three\n"
+        "How to read this.  Top: total radiation power against distance, all three\n"
         "trackers from the same initial particles and field. The orange (Bmad averaged)\n"
         "curve lies on the gray (Genesis) curve everywhere -- the bottom panel shows the\n"
         "difference staying at the 1e-4..1e-3 level through saturation. The blue curve is\n"
@@ -193,7 +193,7 @@ def gain_page(pdf, d):
         "is the beam's real shot-noise radiation, which the unaveraged dynamics resolves\n"
         "and the period-averaged model does not track (it injects shot noise once, at\n"
         "load time). The channel is measured independent of particle count and of\n"
-        "integrator resolution -- physics, not noise (FINDINGS 7.27); its beam-side cost\n"
+        "integrator resolution -- physics, not noise. Its beam-side cost\n"
         "is on the beam-evolution and energy-accounting pages.")
     page(pdf, fig)
 
@@ -217,7 +217,7 @@ def pulse_page(pdf, d):
     a2.legend(frameon=False)
     style(fig)
     caption(fig,
-        "HOW TO READ THIS.  Top: the SASE pulse at the undulator exit, slice by slice\n"
+        "How to read this.  Top: the SASE pulse at the undulator exit, slice by slice\n"
         "across the time window. The first ~12 slices are dark: light continuously slips\n"
         "forward through the bunch (one slice spacing per three undulator periods), so\n"
         "fresh vacuum enters at the tail while radiation leaves at the head -- the\n"
@@ -247,7 +247,7 @@ def beam_page(pdf, d):
     a2.legend(frameon=False)
     style(fig)
     caption(fig,
-        "HOW TO READ THIS.  Top: the energy the beam gives up. Genesis and the Bmad\n"
+        "How to read this.  Top: the energy the beam gives up. Genesis and the Bmad\n"
         "averaged mode show essentially only the coherent FEL exchange. The unaveraged\n"
         "beam loses ~14x more, and the reason is a MODEL difference, not a bug: both\n"
         "models emit spontaneous shot-noise radiation of the same magnitude, but the\n"
@@ -259,7 +259,7 @@ def beam_page(pdf, d):
         "construction, so its beam pays -- at a rate that agrees to 8% with the analytic\n"
         "spontaneous power (2/3)r_e g^2 ku^2 aw^2 restricted to the grid's angular\n"
         "acceptance. Neither model yet carries the ~90% of spontaneous power radiated\n"
-        "outside that acceptance (FINDINGS 7.27). Bottom: the same physics as heating --\n"
+        "outside that acceptance. Bottom: the same physics as heating --\n"
         "the unaveraged spread grows faster (spontaneous diffusion) on top of the\n"
         "FEL-induced spread both models share.")
     page(pdf, fig)
@@ -328,7 +328,7 @@ def energy_page(pdf, d, checks):
     style(fig)
 
     caption(fig,
-        "HOW TO READ THIS.  The time window travels with the BEAM, and light travels\n"
+        "How to read this.  The time window travels with the beam, and light travels\n"
         "faster: every three undulator periods the radiation slips one slice forward, so\n"
         "light continuously exits the head of the window and is gone from the simulated\n"
         "volume. The window is an open box: energy in the window never equals the energy\n"
@@ -340,7 +340,7 @@ def energy_page(pdf, d, checks):
         "radiation is made late, near saturation, and has not had time to escape. The\n"
         "unaveraged beam gave ~14x more and keeps only ~10%: it is charged for the\n"
         "spontaneous radiation both models emit (the averaged model creates that field\n"
-        "energy without debiting the beam -- page 4's caption and FINDINGS 7.27), and\n"
+        "energy without debiting the beam, page 4's caption), and\n"
         "that emission is spread uniformly along all 57 m, so anything radiated more than\n"
         "~4 m of undulator ago has fully crossed the 96-slice window and left. For\n"
         "Genesis and the averaged mode the escaped part is INFERRED\n"

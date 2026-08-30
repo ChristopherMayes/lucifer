@@ -28,9 +28,6 @@ routine the physics was transcribed from, moved here from the source comments) a
 \emph{Validation} note (which check pins it). The physics was transcribed from Genesis
 (GPL permits transcription), validated at transcription level, and then re-expressed in
 Bmad's units and conventions. The transcription-era agreement is banked in the README.
-Citations of the form FINDINGS.md~n.m (and ``design brief \S x.y'') refer to the
-port's development records: the transcription-findings log and the design brief,
-maintained with the project outside this repository.
 
 Throughout: $m_e c^2$ is Bmad's \code{m\_electron} (eV), $c$ is \code{c\_light},
 $Z_0 = \mu_0 c$ (\code{mu\_0\_vac*c\_light}), $e$ is \code{e\_charge}, and
@@ -66,7 +63,7 @@ advanced once per step) and the particle lag carried by Bmad's $z$:
   \theta_j \;=\; \varphi_0 + k_s\, z_j/\beta_j \;=\; \varphi_0 - k_s\,\tau_j ,
   \qquad k_s = 2\pi/\lambda_s .
 \end{equation}
-This reference-offset split is the FP32-safe formulation (design brief \S8) and removes
+This reference-offset split is the FP32-safe formulation and removes
 the wrap hazard outright: $z$ does not wrap, so slice migration
 (\S\ref{sec:migration}) needs no $\theta$-wrap protocol. The common advance rate over
 an element with reference wavenumber $k_u^{\mathrm{like}}$ is computed
@@ -95,8 +92,8 @@ whole-window wake concatenation uses directly (\S\ref{sec:seamwake}). A single-s
 beam is the steady state: slippage is a no-op and the window degenerates to one
 $\lambda_s$-periodic slice.
 
-$\Delta$ IS A LIGHT-TRAVEL DISTANCE, not a separation in Bmad's $z$, and the difference
-is not a convention. The $\beta$ in Eq.~\ref{eq:zglobal} is the PARTICLE's, and with
+$\Delta$ is a light-travel distance, not a separation in Bmad's $z$, and the difference
+is not a convention. The $\beta$ in Eq.~\ref{eq:zglobal} is the particle's, and with
 $z = -\beta c\,(t - t_{\mathrm{ref}})$ it cancels at a grid point:
 \begin{equation}\label{eq:tslice}
   t - t_{\mathrm{ref}} = -(i-1)\,\Delta/c ,
@@ -124,7 +121,7 @@ was converted from its internal-unit original. The converted forms are simpler
 (\S\ref{sec:eom}, \S\ref{sec:field}).
 
 \begin{provenance}
-The chart and window conventions are this port's own (design brief \S4.2, \S8).
+The chart and window conventions are this port's own.
 Genesis stores $(\theta,\gamma)$ per particle with per-slice bounded $\theta$. The
 unit identity composes Genesis's dump scale (\code{writeFieldHDF5.cpp}) with
 $E = \mathit{dfl}\,\sqrt{2 Z_0}/\mathit{dgrid}$.
@@ -158,7 +155,7 @@ unroll.
 The FEL tracking mode and unaveraged parameters are likewise per-element lattice
 attributes (registered program-side, class-settable as
 \code{wiggler::*[attr] = ...}), so averaged and unaveraged segments mix freely in one
-line. Lattices use NAMED values via one-line variable definitions
+line. Lattices use named values via one-line variable definitions
 (\code{fel\_unaveraged = 1}, matching the code's \code{fel\_unaveraged\$}-style
 parameters). \code{fel\_tracking} selects the transport: unset/0
 (\code{fel\_averaged}) is the averaged
@@ -330,7 +327,7 @@ per quadrupole, compounding to the documented tier2\_bmad difference.
 
 \subsection{The Bmad-kernel default}\label{sec:undbmad}
 
-The DEFAULT transverse maps (\code{fel\_tracking} unset, \S\ref{sec:element}) are
+The default transverse maps (\code{fel\_tracking} unset, \S\ref{sec:element}) are
 Bmad's own: the \code{bmad\_standard} periodic-wiggler kernel, flattened to per-step
 granularity. The transcribed maps of \S\ref{sec:natfocus} remain selectable as
 \code{fel\_tracking = -1}, validation-internal. The Genesis comparisons require
@@ -438,8 +435,8 @@ standard \code{beam\_init} structure in both generated paths. The import
 evaluates it \emph{analytically} per slice. The loader honors
 \code{n\_particle} (per slice), \code{a\_norm\_emit}/\code{b\_norm\_emit},
 \code{sig\_pz} ($\delta\gamma = \beta_0 p_0 \,\code{sig\_pz}/mc$),
-\code{bunch\_charge}, \code{sig\_z} and \code{distribution\_type(3)}, and REFUSES BY
-NAME every other field that is set. A standard structure that silently dropped
+\code{bunch\_charge}, \code{sig\_z} and \code{distribution\_type(3)}, and refuses by
+Name every other field that is set. A standard structure that silently dropped
 fields would be worse than a custom one. The Twiss is always the lattice's
 (\S\ref{sec:element}'s one-truth rule), and the current is \emph{derived}, never
 input:
@@ -538,7 +535,7 @@ Per-slice current vs Genesis importing the same file: $8.2\times10^{-13}$ of pea
 the 1\% level; startup power vs Genesis's independent resampling at $\ln$ ratio
 $+0.02$; mutations (dslen/spacing, no noise, collapsed mirroring) caught at
 $6.5\times10^{-1}$, $\ln{-57}$, $\ln{+4.7}$; the ``$\theta$ over $2\pi$'' mutation is
-an equivalent mutant, correctly passed (FINDINGS 7.16).
+an equivalent mutant, correctly passed (uniformity mod the beamlet spacing under mirroring makes it indistinguishable).
 \end{validation}
 
 \subsection{Particle dumps}\label{sec:pardump}
@@ -557,7 +554,7 @@ per-particle weights are this port's day-one difference from Genesis. The conver
 refuses to write a nonuniform-weight beam in that format rather than writing one that
 would silently read back uniform.
 
-THE SLICE PARTITION IS \code{particlePatches}, the standard's own partition of a species
+The slice partition is \code{particlePatches}, the standard's own partition of a species
 record: one patch per slice, in window order, an empty slice as a patch of no particles.
 The patch count is therefore the window, and the file states nothing else about it. What
 openPMD has no place for comes from the deck: \code{lambda0}, \code{window\_sample} and
@@ -566,7 +563,7 @@ since a wrong wavelength rescales every phase in the run. \code{one4one} is not 
 either: the flag asserts that every macroparticle carries one electron, which is what the
 weights say.
 
-THE REFERENCE PHASE is folded into the file's time coordinate. Neither format has
+The reference phase is folded into the file's time coordinate. Neither format has
 anywhere to put $\varphi_0$, so every reader restarts it at zero, and a dump that wrote
 the lag $z_j$ alone would come back with every $\theta_j$ short by $\varphi_0$: a
 different phase against the same dumped field, which is a change of state and not of
@@ -576,7 +573,7 @@ its reader does the same fold, so the two formats agree on what a dump means.
 
 The chart, not the file, is what could cost a digit: openPMD stores absolute momenta and
 a time, so $\hat p_x$, $\hat p_y$ and $z$ pass through $P/p_0$ and
-$-\beta c\,\delta t$. A check that DIFFERENCES energies between two runs should read
+$-\beta c\,\delta t$. A check that differences energies between two runs should read
 $\hat p_z$, which the file states, rather than $\gamma$, which costs an ulp of $\gamma$
 against a difference many orders smaller.
 
@@ -619,7 +616,7 @@ world-edge discard replaced by counted drops.
 Conservation with drop accounting $1.5\times10^{-14}$ under 74k moves; exact phasor
 continuity $S_{\mathrm{before}} = S_{\mathrm{after}} + S_{\mathrm{dropped}}$ at
 $6.9\times10^{-15}$; window residency (the postcondition that catches accounted
-evaporation, FINDINGS 7.8); no-op bit identity.
+evaporation); no-op bit identity.
 \end{validation}
 
 \section{Collective effects}\label{sec:collective}
@@ -775,7 +772,7 @@ the averaged codes and deepens the beam's energy loss. The effect is independent
 particle count and steps per period (physics, not statistics or resolution), and
 quiet-start probes are blind to it by design (the beamlet loading cancels shot noise).
 Its absolute calibration against the analytic undulator spectrum is the named future
-check (FINDINGS 7.27). Like the averaged path it is parallel over slices with
+check. Like the averaged path it is parallel over slices with
 bit-identical results at any thread count (per-slice private state, fixed-order
 energy reduction. The harness runs a 1-thread/8-thread byte comparison). Nothing
 from the averaged coupling path may
@@ -875,7 +872,7 @@ Nyquist $\theta_{\max} = \lambda/2\,dx$. Measured at the benchmark parameters th
 3.3\% of the analytic rate, and the evidence that this is acceptance-limited undulator
 radiation is its scaling: over a $16\times$ range in captured solid angle the loss
 moves $0.84\% \to 11.4\%$, a measured $13.7\times$ against a predicted $10.5\times$.
-Both modes now honor Bmad's GLOBAL switches
+Both modes now honor Bmad's global switches
 \code{bmad\_com\%radiation\_damping\_on} and
 \code{\%radiation\_fluctuations\_on}, the same switches every Bmad tracking path
 honors. Interludes get theirs through \code{track1}, and this covers the custom-tracked
@@ -887,8 +884,8 @@ ramp+capture composite $(1 - \tfrac{5}{4}l_{\mathrm{ramp}}/L) + f_{\mathrm{cap}}
 at $2\times10^{-6}$ (its grid-captured self-field work adds to the explicit term).
 Fluctuations apply the standard quantum-diffusion variance
 $1.015\times10^{-27} k_u^3 a_w^2 F(a_w)\gamma_0^4$ per meter (Genesis's
-\code{Incoherent.cpp} fits of the Saldin form), ONE DRAW PER
-BEAMLET exactly as Genesis (independent per-particle kicks would break the quiet
+\code{Incoherent.cpp} fits of the Saldin form), one draw per
+beamlet exactly as Genesis (independent per-particle kicks would break the quiet
 start's per-beamlet cancellation), drawn serially in fixed slice order so thread
 count stays invisible. Genesis reaches the same variance with uniform$\times\sqrt3$
 draws where ours are Gaussian, the physical limit. Measured: both FEL modes sit on the
@@ -919,7 +916,7 @@ Brief 6.6 (the mode's charter, the Strang split, the handoff hazard and its
 convention flag); MINERVA 2.0 (Freund and van der Slot), the production
 existence proof: the 10--30 steps/period envelope, the energy-ledger practice, the
 $\sin^2$ ramp treatment, kinematic phase everywhere. MINERVA's standing here is a
-statistical $\sim$$10^{-3}$-class reference ONLY, never a bit check: truncated
+statistical $\sim$$10^{-3}$-class reference only, never a bit check: truncated
 constants (emass to six digits, awfac), Runge-Kutta-Gill. No MINERVA code was
 transcribed, and MINERVA precedent decided nothing here on its own. The magnetic
 push is explicit RK4 on merit: fourth order is what makes $f_c$ measurable at
@@ -940,14 +937,14 @@ $0.84853$, $h{=}3$ planar $0.21287$ vs $0.21302$, all $\sim$$6\times10^{-4}$
 relative (checks $5\times10^{-3}$); step-size convergence $f_c(10/20/30$ per period$)
 = 0.750582/0.750505/0.750502$; full-segment gain curve vs the averaged default
 $|\ln$ ratio$| = 2.7\times10^{-3}$ at exit (priced). The benchmark's
-\code{tier1\_unavg} compares this mode DIRECTLY against Genesis from the same
+\code{tier1\_unavg} compares this mode directly against Genesis from the same
 starting dumps: $6.9\times10^{-2}$ overall (a priced model difference dominated by
 the final-field phase; power $6.1\times10^{-3}$, per-particle $\gamma$
 $3.7\times10^{-6}$, and a constant $\sim$6.6 rad ramp-phase offset in $\theta$ with
 $2.8\times10^{-3}$ rms about it). Mutations: the
 $E\cdot v$ sign fails the ledger at $2.0$ and the gain comparison at $0.69$ (the
 magnitude-blind $f_c$ checks pass it, which is why the ledger is check zero); a hard-edge
-entry fails the orbit-handoff check at $3.2\times10^{-5}$ m ($19\sigma$; NOTE the
+entry fails the orbit-handoff check at $3.2\times10^{-5}$ m ($19\sigma$; note the
 exit momentum re-absorbs the quiver at integer periods, so the orbit, not
 $\langle p_x\rangle$, is the reliable instrument); a skipped exit handoff is refused
 by name at the first seam element.
@@ -985,7 +982,7 @@ tilt on helical and tilt with the transcribed maps refused by name.
 
 \subsection{The field set: harmonic radiation}\label{sec:field-set}
 
-The walk carries an ordered SET of radiation fields (\code{fel\_field\_struct}:
+The walk carries an ordered set of radiation fields (\code{fel\_field\_struct}:
 harmonic number, wavefront, slippage state, escape bank, Genesis's
 \code{vector<Field*>}), with the fundamental always entry~1: the ponderomotive
 phase, the \code{phi0} advance and the slippage schedule are all defined against it.
@@ -1021,8 +1018,8 @@ runnable instance.
 
 Radiation dumps speak one format, the openPMD \code{Wavefront} extension
 (\code{EXT\_Wavefront.md}, standard branch \code{upcoming-2.0.0}), written as
-\code{.wf.h5} with a harmonic's file carrying \code{-h<h>}. THE STANDARD DOCUMENT IS
-AUTHORITATIVE: the harness verifies the written attributes against its text
+\code{.wf.h5} with a harmonic's file carrying \code{-h<h>}. The standard document is
+authoritative: the harness verifies the written attributes against its text
 independently of the writer. A \code{field\_file} that is not openPMD is refused by
 name, with the conversion command in the message, and
 \code{lucifer/tests/scripts/convert\_genesis.py} converts a Genesis 1.3 v4 field dump
@@ -1036,13 +1033,13 @@ file (each carried upstream into openPMD-beamphysics's own openPMD I/O):
 \begin{tabular}{ll}
 one mesh record \code{electricField} & complex compound $\{r,i\}$ components
 \code{x}, \code{y} (V/m); \\
-& both polarizations in ONE file; \code{z} never written (paraxial) \\
-required attributes & ON THE MESH RECORD (the extension's heading; its body says \\
+& both polarizations in one file; \code{z} never written (paraxial) \\
+required attributes & on the mesh record (the extension's heading; its body says \\
 & ``series'' -- resolved for the record: \code{photonEnergy} is per field) \\
-\code{photonEnergy} & $h_{\rm Planck} c/\lambda$ in JOULES; identifies the harmonic \\
+\code{photonEnergy} & $h_{\rm Planck} c/\lambda$ in joules; identifies the harmonic \\
 \code{temporalDomain}, \code{spatialDomain} & \code{time} (field in
 V/m) and \code{r} only; the rest refused by name \\
-slice axis & a MESH axis (slices are simultaneous; the iteration is not time): \\
+slice axis & a mesh axis (slices are simultaneous; the iteration is not time): \\
 & stored order $(z,y,x)$, declared by \code{axisLabels}, zero-copy for \\
 & Fortran and numpy alike; one iteration per file \\
 harmonics & one file per harmonic (the record name is fixed by the extension) \\
@@ -1062,11 +1059,11 @@ pass, so the two implementations of this extension stay in step.
 \subsection{Phasing between segments}\label{sec:phasing}
 
 What the beam-field phase does between undulator segments, measured before it was
-built (every claim below is a scan in \code{check\_phasing.py}). In the RELATIVE
+built (every claim below is a scan in \code{check\_phasing.py}). In the relative
 mode (the default, \code{absolute\_time\_tracking} false) segments are
 autophased: scanning an inter-segment gap by fractions of $2\gamma^2\lambda$ (one
 full turn of drift slip, 25.8 mm at the benchmark) leaves the
-bunching phase entering the next segment FLAT, measured on Genesis and on this code
+bunching phase entering the next segment flat, measured on Genesis and on this code
 alike, both interlude models. The mechanism is the co-moving reference convention:
 \code{fel\_phi0\_rate} tracks the beam through a drift, and the window rotations are
 whole wavelengths, carrier-neutral. The fractional beam-vs-light slip
@@ -1076,22 +1073,22 @@ The active code re-anchors, as the measurement shows.)
 
 The deliberate off-phase knob is the wiggler's own \code{z\_offset}: standard
 Bmad misalignment, girder-composed, no new element or attribute. The autophase
-anchor is the element's NOMINAL reference position, so a physical displacement
+anchor is the element's nominal reference position, so a physical displacement
 $\delta$ adds the real, never-re-anchored entry phase
 $\Delta\phi = -2\pi\,\delta/(2\gamma^2\lambda)$, returned at exit (the downstream
 break is shorter by the same $\delta$, and downstream elements stay anchored). Measured
-against the analytic slope, and against GENESIS'S OWN
+against the analytic slope, and against Genesis's own
 \code{PHASESHIFTER} element scanned over $\phi = 2\pi\,\delta/(2\gamma^2\lambda)$:
-the two bunching-phase curves agree at $1.9\times10^{-8}$ and the exit POWER against
+the two bunching-phase curves agree at $1.9\times10^{-8}$ and the exit power against
 $\phi$ at $9.3\times10^{-9}$, both codes tracking the same Genesis-written initial
 dumps, so the phase reaches the physics identically, not just the bookkeeping. (On
 independently loaded beams the same power comparison sits at $1.4\times10^{-4}$,
 which measures the two loaders. Hence the shared start.) The sign is Genesis's
 ``delay goes backwards'', $\theta \to \theta - \phi$, applied persistently.
-Note: Genesis's phase shifter must have FINITE LENGTH to register at all. A
+Note: Genesis's phase shifter must have finite length to register at all. A
 zero-length one silently does nothing.
 
-In the ABSOLUTE mode (\code{bmad\_com[absolute\_time\_tracking] = T} in the
+In the absolute mode (\code{bmad\_com[absolute\_time\_tracking] = T} in the
 lattice, honored per element through Bmad's own resolver, never a namelist knob)
 the walk keeps the real carrier phase of every break:
 $\phi_0 \mathrel{-}= 2\pi L/(2\gamma^2\lambda)$ per interlude element, no floors
@@ -1101,8 +1098,8 @@ segment, and moving an element moves its phase. The absolute-mode gap scan
 reproduces the relative-mode \code{z\_offset} scan point by point (cross-mode
 identity).
 
-CHICANES: a break whose elements bend the reference (sbends, patches) detours the
-beam while the radiation goes straight, so the light's path is the CHORD between
+Chicanes: a break whose elements bend the reference (sbends, patches) detours the
+beam while the radiation goes straight, so the light's path is the chord between
 the flanking undulator faces (computed from \code{ele\%floor}, never entered by
 hand) while \code{vec(5)} is measured against the reference arc. The
 arc-minus-chord delay is charged as whole-wavelength window rotations on the
@@ -1110,16 +1107,16 @@ break's last element (Genesis's chicane semantics: ``always autophasing'') plus,
 in absolute mode, its carrier phase. The light drift is shortened by the same
 delay. Relative mode drops the geometric fraction (measured flat under an angle
 scan). Absolute mode ramps at exactly the slope an independent 2D geometric
-computation of $d(\mathrm{arc}-\mathrm{chord})/d\alpha$ predicts. Only a CLOSED
-BUMP keeps the light on the next undulator's axis: floor orientations and the
+computation of $d(\mathrm{arc}-\mathrm{chord})/d\alpha$ predicts. Only a closed
+bump keeps the light on the next undulator's axis: floor orientations and the
 chord direction are asserted, anything else refused by name, as are bends and
 patches under the genesis-model interludes (Genesis's drift/quad set cannot
 represent them) and a \code{z\_offset} that exceeds its upstream break. The
-unaveraged energy ledger closes across a chicane sandwich. The window ROTATIONS the
+unaveraged energy ledger closes across a chicane sandwich. The window rotations the
 delay buys are checked time-dependently (steady state never exercises them): a
 chicane banks exactly $\lfloor \mathrm{delay}/\lambda \rfloor$ more escaped slices
 than its arc-matched straight twin, at three delays, and the run is byte-identical
-at 1 and 8 threads. Delays for that check are chosen MID-INTERVAL: a target of
+at 1 and 8 threads. Delays for that check are chosen mid-interval: a target of
 exactly $3.000\lambda$ lands on the floor boundary, where the $6\times10^{-8}$
 difference between the exact trace and the small-angle form decides between 2 and 3.
 The boundary was located at $2.99 \to 2$, $3.01 \to 3$, which independently
@@ -1127,78 +1124,80 @@ confirms the walk's floor-derived delay against the trace at that scale.
 
 \section{Diagnostic output}\label{sec:stats}
 
-\emph{The stats file} \code{<out\_root>.stats.h5} DESCRIBES ITSELF. Its format is
+\emph{The stats file} \code{<out\_root>.stats.h5} describes itself. Its format is
 \code{bmad-stats} 1.0 with the \code{fel} extension: the layout is deliberately not
 FEL-specific, so the root states \code{@file\_format}, \code{@file\_format\_version},
 \code{@writer}, \code{@extensions} and \code{@kinds} (the group vocabulary, an array),
 and a reader refuses an unknown version by name. This is the planned reset from the
-development format \code{lucifer-stats} 2.x. Every dataset
+development format \code{lucifer-stats} 2.x. The normative definition of the layout is
+\code{doc/BMAD-STATS-SPEC.md} with \code{doc/BMAD-STATS-EXT-FEL.md}, which this section
+summarizes rather than restates. Every dataset
 carries four attributes: \code{@unit}, \code{@long\_name} (three words, for an axis
 label), \code{@description} (a sentence) and \code{@axes}. Units are fixed Bmad units
-(m, rad, eV, s, C, J, W) and they are DOCUMENTATION: the values are already SI and eV,
+(m, rad, eV, s, C, J, W) and they are documentation: the values are already SI and eV,
 so a reader must not scale by \code{@unit}. That is the opposite of openPMD's
 \code{unitSI} (\S\ref{sec:openpmd}), and the two conventions are deliberately not mixed
 in one file. A one-byte integer dataset with \code{@unit} of 1 and
 \code{@dtype\_hint} of \code{bool} is this format's boolean, HDF5 having none. Every
 group carries \code{@kind} and \code{@description} of its own, and the root's
 \code{@kinds} enumerates the vocabulary so a reader that sorts groups by kind need not
-discover it. Where the entries of one dataset have DIFFERENT units, as a centroid's and
+discover it. Where the entries of one dataset have different units, as a centroid's and
 a sigma's do, the human \code{@unit} is a comma list that nothing can parse, so
 \code{@unit\_of\_axis} names the axis whose \code{coords/<axis>\_unit} carries them and
 \code{@unit\_power} says how many factors of them one entry holds.
 
-EVERY NAME IN \code{@axes} RESOLVES TO A \code{coords/} DATASET, trailing label axes
+Every name in \code{@axes} resolves to a \code{coords/} dataset, trailing label axes
 included, so no reader ever infers a dimension from its length: an array of shape (nrec,
 nslice, 6, 6) says which 6 is which. \code{@file\_format\_version} is refused by name
 rather than negotiated. This is internal development, the version is a marker of where
 the format stands, and it resets to 1.0 at the first external release.
 
 Six groups, each answering one question. \code{coords/} holds every axis once, each
-saying which axis it IS. THE RECORD NUMBER is the axis, \code{coords/record}, and
-\code{s} is a VARIABLE on it: \code{s} repeats wherever two records land on one plane,
+saying which axis it is. The record number is the axis, \code{coords/record}, and
+\code{s} is a variable on it: \code{s} repeats wherever two records land on one plane,
 which is what a zero-length element applying a wake kick does, so an index on \code{s}
 would answer silently wrong. It is \code{s} and not \code{z} because in Bmad \code{s} is
 the position along the lattice while \code{z} is the phase-space coordinate, and this
 file uses \code{z} for that in \code{coords/bmad} and for the longitudinal twiss plane in
 \code{coords/plane}. \code{ix\_ele} is a variable there
 too, whose values index the \code{ele} axis, which makes it the join key onto
-\code{lattice/}, and it SAYS so: \code{@indexes = 'ele'}. \code{at\_element\_end} marks
+\code{lattice/}, and it says so: \code{@indexes = 'ele'}. \code{at\_element\_end} marks
 which records are element ends and selects the \code{element\_end} axis
 (\code{@selects = 'element\_end'}), whose own coordinates are \code{element\_end} (the
 element index) and \code{s\_element\_end} (the position). A join key and a mask are
 machine-readable relationships, not prose. The slice axis is \code{slice}, the
-slice NUMBER, with three positions as variables on it: \code{ct\_slice} and
+slice number, with three positions as variables on it: \code{ct\_slice} and
 \code{t\_slice}, which are exact and free of $\beta$, and \code{z\_slice}, which is
 Bmad's $z$ at the reference $\beta$ and says so (Eq.~\ref{eq:tslice} and
 \S\ref{sec:window}). All three carry \code{@head\_direction}, publishing the migration
-invariant (\S\ref{sec:migration}) that the HIGH slice index is the window head: without
+invariant (\S\ref{sec:migration}) that the high slice index is the window head: without
 it a per-slice profile cannot be drawn, let alone compared with another code's. Stating
 it on one of a set would invite the reader to assume the set agrees. Both also carry \code{@plot\_against}, naming the variable a
 viewer should put on the axis in place of the index, which only the writer knows. Last
 are the label axes: \code{bmad} and \code{bmad\_col} naming the six phase space
 coordinates, \code{wavefront} and \code{wavefront\_col} the four field moments,
-\code{plane} the three PROJECTED twiss planes, \code{mode} the three NORMAL modes,
+\code{plane} the three projected twiss planes, \code{mode} the three normal modes,
 and \code{bmad\_t} the six phase-space names plus $t$, the label axis of the per-slice
 extremes. A
-square matrix's two sides are named APART so that selecting one entry needs no rule, and
+square matrix's two sides are named apart so that selecting one entry needs no rule, and
 the planes and the modes are named apart because they are two decompositions of one beam:
 an eigen-emittance is not a projected emittance, and one axis carrying both invites an
 average across them.
 
-\code{params/} is the INPUT TREE: one subgroup per input structure the program
-honors, each carrying \code{@struct} naming the Fortran type and holding the RESOLVED
+\code{params/} is the input tree: one subgroup per input structure the program
+honors, each carrying \code{@struct} naming the Fortran type and holding the resolved
 value of every honored component as a true HDF5 scalar, so nothing downstream parses
 the echoed namelist, no reader needs a defaults table, and two runs diff by their
 inputs. (\code{out\_root} alone is left out: it is the run's own name, and as data it
 would make two otherwise identical runs compare different.) List-valued inputs are
-array attributes on their subgroup. What the run PRODUCED, apart from what the user
+array attributes on their subgroup. What the run produced, apart from what the user
 set, is \code{run/}: \code{p0c}, the species, \code{slice\_spacing} and the axis
 lengths, kept as bookkeeping cross-checks. \code{beam/slice/} holds the
-per-record SUFFICIENT statistics, named exactly as \code{bunch\_params\_struct}
+per-record sufficient statistics, named exactly as \code{bunch\_params\_struct}
 components: \code{centroid} (nrec, nslice, 6), \code{sigma} (nrec, nslice, 6, 6) at its
 natural rank, \code{charge\_live}, \code{n\_particle\_live}, \code{t}, \code{sigma\_t},
 computed two-pass (the \S\ref{sec:numerics} variance lesson), the per-coordinate
-extremes \code{rel\_max} and \code{rel\_min} over the \code{bmad\_t} axis (RELATIVE to
+extremes \code{rel\_max} and \code{rel\_min} over the \code{bmad\_t} axis (relative to
 the centroid, Bmad's own convention, so the envelope a plot wants is centroid plus
 rel: order statistics no moment can reconstruct, accumulated in the same sweep), plus
 \code{current} and \code{energy} in eV, which every consumer would otherwise
@@ -1223,7 +1222,7 @@ The three counts in \code{params/} (\code{n\_record}, \code{n\_element\_end},
 \code{coords/at\_element\_end} tests the walk's bookkeeping, where
 \code{coords/element\_end} is packed from that mask and could not disagree with it.
 
-ONE RECORD AXIS. An element end is always a record whatever the comb
+There is one record axis. An element end is always a record whatever the comb
 (\code{fel\_comb\_take}), so the element-end arrays need no axis of their own:
 \code{at\_element\_end} selects them, and their rows align with
 \code{z(at\_element\_end)} in order. That is a boolean mask in place of a duplicated
@@ -1252,26 +1251,26 @@ wake-carrying pipes, and the tracking mode per element. It is NOT a lattice
 serialization, and nothing else in the file is one either (\S\ref{sec:meta}).
 
 \emph{Wavefront params.} The field analog (\code{wavefront\_params\_struct},
-\code{wavefront\_mod}) describes ONE FIELD SLICE: \code{centroid(4)} $= (x,
+\code{wavefront\_mod}) describes one field slice: \code{centroid(4)} $= (x,
 \theta_x, y, \theta_y)$ intensity-weighted, \code{sigma(4,4)} Wigner second moments,
 \code{energy}, \code{power}, \code{on\_axis\_intensity}, \code{emit\_x/y}
 $= \sqrt{\det}$ of a plane's $2\times2$ block ($= M^2\lambda/4\pi$), and
 \code{angle\_moments\_valid}, which follows the \code{twiss\_valid} pattern: spatial moments
 come from $|E|^2$ every record, the $\theta$ rows need spectral sums (one forward, two
-inverse FFTs) and fill at element ends and bank time only. NOT COMPUTED IS NaN, never a
+inverse FFTs) and fill at element ends and bank time only. Not computed is NaN, never a
 zero that reads as an answer: an empty slice has no moments and says so, and a NaN
 propagates through whatever a consumer does with it where a sentinel would quietly plot.
-Pulse-level values are POOLED downstream (energy-weighted mean of slice sigmas plus the
+Pulse-level values are pooled downstream (energy-weighted mean of slice sigmas plus the
 variance of slice centroids, in the analysis scripts). The file stays raw.
 
 In the file these live under \code{field/}, and the rule there is that NO dataset's
 meaning depends on what else the file holds. \code{field/total/} carries \code{power},
-\code{energy} and \code{on\_axis\_intensity} summed over the live polarizations of ONE
+\code{energy} and \code{on\_axis\_intensity} summed over the live polarizations of one
 wavelength, and it is written whether one polarization is live or two.
 \code{field/x/}, \code{field/y/} when a second polarization is live, and
 \code{field/harm<h>/} per harmonic all carry the same dataset names and their own
 \code{total/}. Nothing is ever summed across harmonics: a detector separates colors.
-NOTHING IS DERIVED IN SILENCE either. \code{field/@components} names the polarizations
+Nothing is derived in silence either. \code{field/@components} names the polarizations
 present and \code{field/@harmonics} the harmonics, while \code{total/@derived\_from}
 names what it sums, so a reader adding up the children of \code{field/} cannot take the
 derived sibling for a component and double-count.
@@ -1289,8 +1288,8 @@ window's decimation) with its \code{wavefront\_params} and transmission $z$. The
 diagnostic files keep Genesis field conventions rather than openPMD, since the
 per-slice \code{wavefront\_params} and transmission $z$ beside each plane have no home
 in the wavefront extension. They are diagnostics: nothing reads them back as state. At
-finalize each is propagated to the exit plane by the \code{exp(K2\,dz)} kernel and the
-FULL PULSE is written (\code{<out\_root>-pulse.fld.h5}, live window + banked, the
+finalize each is propagated to the exit plane by the \code{exp(K2\,dz)} kernel and
+the full pulse is written (\code{<out\_root>-pulse.fld.h5}, live window + banked, the
 earliest-transmitted light furthest ahead). Whole-pulse statistics never propagate
 numerically: free-space propagation is an ABCD map on \code{sigma(4,4)}, so
 $\sigma_x^2(z) = \sigma_x^2 + 2z\,\sigma_{x\theta} + z^2\sigma_\theta^2$ per
@@ -1309,9 +1308,9 @@ a not-computed entry means); unknown dump elements refused by name.
 
 The acceptance test is the format's own conformance checker,
 \code{tests/scripts/validate\_bmad\_stats.py}: program-blind, numpy and h5py only, run
-by the harness on every diagnostics check and required to report ZERO failures against
+by the harness on every diagnostics check and required to report zero failures against
 the rules it can see. The structural checks below hold what it cannot. A walk of every dataset for its
-four attributes and of every group for its two. Then THE ACCEPTANCE TEST, which is a
+four attributes and of every group for its two. Then the acceptance test, which is a
 generic load: label every dimension of every dataset from \code{@axes} alone, failing if
 a name does not resolve to a coordinate, if a dimension has no name, if a length
 disagrees with its coordinate, or if one dataset names an axis twice. Nothing in it
@@ -1320,7 +1319,7 @@ knows a dataset name, which is the property being checked. Third, the join: that
 inside the element \code{ix\_ele} names. A silent off-by-one there would break every
 layout plot while no physics check noticed. Fourth, the record axis itself: \code{z}
 non-decreasing, and every repeated \code{z} straddling an element boundary, since one
-plane is reached twice at a boundary and a repeat INSIDE an element would be a defect in
+plane is reached twice at a boundary and a repeat inside an element would be a defect in
 the walk that demoting \code{z} to a variable would otherwise hide. Then four on the
 provenance: no attribute anywhere near HDF5's 64 kB cap, every text in \code{meta/} a
 dataset, \code{n\_lattice\_files} reporting the wrapper lattice's second file, and no
@@ -1328,7 +1327,7 @@ machine-local value in a default run. Then three on the slice coordinates:
 \code{t\_slice} exactly $-\code{ct\_slice}/c$, \code{z\_slice} equal to
 $\beta_0\code{ct\_slice}$, and the axis being the index. Then the envelope: the
 position extremes equal numpy extremes over a \code{dump\_beam\_at} file's particles at
-the same plane EXACTLY (same particles, and IEEE subtraction of the stored centroid is
+the same plane exactly (same particles, and IEEE subtraction of the stored centroid is
 deterministic), the momentum entries match across the dump's unit round trip at
 $3\times10^{-16}$, and the $t$ entry is the $z$ entry through $-\Delta z/(\beta_0 c)$
 exactly. And one on the zero-length wake lattice, where \code{s} really does repeat, so
@@ -1378,8 +1377,8 @@ the only instrument that catches shared-accumulator races (invisible to every
 single-threaded check).
 
 \begin{validation}
-FINDINGS.md 4.8, 7.9, 7.10, 7.14, 7.18; the coarse-step table in the README; the
-thread check and its shared-accumulator mutation (7.0 relative between thread counts,
+The coarse-step table in the README, and the
+thread check with its shared-accumulator mutation (7.0 relative between thread counts,
 bit-identical single-threaded).
 \end{validation}
 
@@ -1389,7 +1388,7 @@ bit-identical single-threaded).
 The tracker is laid out the way Tao is laid out: the structs in one file, the
 namelist layer quarantined, the work in library modules, and a driver that is
 read-parse-call. Every user-visible input struct lives in \texttt{fel\_struct}
-(defaults in the declarations). \texttt{fel\_input\_mod} reads THREE namelist
+(defaults in the declarations). \texttt{fel\_input\_mod} reads three namelist
 groups from one input file, each setting structs directly, Tao's
 \texttt{\&tao\_params} pattern:
 
@@ -1440,8 +1439,8 @@ current profile (\texttt{.import.txt}, written at import time so it exists under
 Tao's division: \texttt{show ele} is for people, \texttt{show value} and pytao are
 for precision.
 
-There is exactly ONE exception, and it is deliberate: a refusal must be recognizable
-BY NAME, so the validation suite matches the ALL-CAPS text of a refusal together with
+There is exactly one exception, and it is deliberate: a refusal must be recognizable
+by name, so the validation suite matches the all-caps text of a refusal together with
 a nonzero exit status. Those texts are therefore a supported contract and change only
 with their checks, in the same commit. Nothing else in stdout is.
 
@@ -1457,7 +1456,7 @@ position, bit-for-bit today's file. Positive records a row when $z$ has
 advanced \texttt{comb\_ds\_save} past the last one, element ends always. The
 one deliberate deviation from Tao is the default (0 where Tao uses $-1$):
 our per-record arrays are the primary stats contract where Tao's comb is an
-optional extra. The rule lives in ONE place (\texttt{fel\_comb\_take}).
+optional extra. The rule lives in one place (\texttt{fel\_comb\_take}).
 The setup's record-count precompute replays it with the walk's own $z$
 arithmetic, so the stats arrays are exact-sized in every mode. The
 \texttt{diag} file and the unaveraged ledger follow the comb. Because the negative
@@ -1467,7 +1466,7 @@ radiation power, energy, on-axis intensity and bunching per slice. Where a recor
 exists those field values are copied from it, so the two agree exactly. Where none
 exists they are evaluated at the element end by the same routines.
 
-Either way the element-end row for the WHOLE WINDOW is assembled from the per-slice
+Either way the element-end row for the whole window is assembled from the per-slice
 moments by the pooled-covariance identity,
 \begin{equation}
   m = \frac{\sum_s w_s m_s}{\sum_s w_s}, \qquad
@@ -1478,7 +1477,7 @@ never by concatenating the window's particles into one bunch. The between-group 
 is what makes \eqref{eq:pool} exact rather than an average of covariances. Each slice
 enters moved from its local $z$ chart to the global window chart. Because
 \texttt{fel\_concat\_slices} places a particle at $z_{\rm global} = z_{\rm local} +
-\beta (i_s - 1)\Delta$ with the particle's own $\beta$, that move is a SHEAR of
+\beta (i_s - 1)\Delta$ with the particle's own $\beta$, that move is a shear of
 $(z, p_z)$ once $\beta$ is linearized about the slice's mean $p_z$, and the pool
 applies it as $S \to J S J^{\mathsf T}$ with the single off-diagonal
 $J_{56} = (i_s - 1)\Delta \, {\rm d}\beta/{\rm d}p_z$. The residual is second order
@@ -1497,10 +1496,10 @@ particle visits from a 131-slice run (16.5\% of its wall clock).
 
 \texttt{global\%track\_start} / \texttt{track\_end} (Tao's names, Genesis's
 \texttt{zstop} parity) are element locators bounding the walk. A span of the
-LATTICE, and the only window in this manual that is not the time window of
+lattice, and the only window in this manual that is not the time window of
 \S\ref{sec:window}, which is what the code and every other section mean by the
 word. The schedule (slippage, autophasing, break geometry, including the
-end-of-lattice fixup) is always built on the FULL lattice, so a windowed run
+end-of-lattice fixup) is always built on the full lattice, so a windowed run
 composes exactly with
 the full one: $[{\rm start}, D]$ then $[{\rm after}\ D, {\rm end}]$ from its
 dumps reproduces the one-shot run to the dump format's own round-trip floor
@@ -1509,21 +1508,21 @@ run's finals equal the full run's mid-line dumps exactly).
 
 \subsection{Provenance}\label{sec:meta}
 
-\texttt{stats.h5} carries a \texttt{meta/} group: the RESOLVED input echo, every default
+\texttt{stats.h5} carries a \texttt{meta/} group: the resolved input echo, every default
 made explicit and written from the structs themselves, the top-level lattice file's base
 name and text, how many files the parser opened, an ISO timestamp and the Bmad version.
 
-DATASETS, not attributes. HDF5 caps a single attribute at 64 kB, the largest that writes
+Datasets, not attributes. HDF5 caps a single attribute at 64 kB, the largest that writes
 being 65495 bytes here, while a scalar string dataset took 3 MB. The echoed namelist
 already runs to 12 kB and a real lattice text to 37 kB, so the attributes were at half
 the cap, and the failure path was a warning: the provenance would have gone missing
-SILENTLY on a lattice of no unusual size. The cost is that \texttt{meta/} no longer sits
+silently on a lattice of no unusual size. The cost is that \texttt{meta/} no longer sits
 outside dataset-level identity comparisons for free, since \texttt{input\_echo} carries
 \texttt{out\_root}; the harness excludes it by name instead, which is the same exclusion
 made deliberate.
 
-NOT A REPRODUCIBILITY RECORD, and it does not claim to be.
-\texttt{meta/lattice\_source} is the TOP-LEVEL file only: Bmad's \texttt{call, file =}
+It is not a reproducibility record, and it does not claim to be.
+\texttt{meta/lattice\_source} is the top-level file only: Bmad's \texttt{call, file =}
 pulls in more, and every wrapper lattice in this tree records a call statement while the
 lattice it calls is absent. \texttt{n\_lattice\_files} says how many files the parser
 actually opened, so a reader sees at a glance whether the text is the whole story. What
@@ -1537,8 +1536,8 @@ it machine specific rather than a fingerprint of content. The complete record wa
 upstream change: \texttt{bmad\_parser} builds the full list of files it opened, uses it
 for that hash, and deallocates it before returning.
 
-A STATS FILE IS MEANT TO TRAVEL -- attached to a paper, mailed to a collaborator, posted
-beside a figure -- so nothing here identifies a PERSON by default. The timestamp and the
+A stats file is meant to travel -- attached to a paper, mailed to a collaborator, posted
+beside a figure -- so nothing here identifies a person by default. The timestamp and the
 Bmad version identify the run. The user name and working directory go in only under
 \texttt{global\%record\_environment}, and the lattice file is recorded as a base name.
 What a user types into the namelist is echoed as typed, so an absolute path in the input

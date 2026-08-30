@@ -20,10 +20,10 @@ no conversions at all -- no text files, no reshapes, no unit juggling. Ten panel
 
 Works on steady-state and time-dependent runs alike: with more than one slice, thin
 gray lines show every slice and the bold line the total (power, energy) or the slice
-average (everything else). When the run carries TWO POLARIZATIONS (any tilted FEL
+average (everything else). When the run carries two polarizations (any tilted FEL
 element; the file then has a field/y group beside field/x) an eleventh panel splits the power
-by polarization -- on a crossed line that panel IS the afterburner story. When it
-carries HARMONIC FIELDS (namelist harmonics; field/harm<h> groups, each with its own
+by polarization -- on a crossed line that panel is the afterburner story. When it
+carries harmonic fields (namelist harmonics; field/harm<h> groups, each with its own
 total) a panel plots each
 harmonic's power against the fundamental's.
 

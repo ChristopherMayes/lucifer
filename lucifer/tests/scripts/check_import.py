@@ -25,7 +25,7 @@ STATISTICAL (the resampling and loading RNG):
   twiss     Per-slice Twiss/emittance measured from the imported dump must recover
             the lattice Twiss and the beam_init emittance, central slices, ~percent.
   startup   Dark-start SASE power after one segment, ours vs Genesis's, each code
-            resampling with its OWN RNG from the same file: mean over seeds and
+            resampling with its own RNG from the same file: mean over seeds and
             slices within |ln ratio| < 0.30 (the check_sase_startup check, reused).
 
 Usage: check_import.py --exe <lucifer> --genesis <genesis4> --workdir <dir> [--seeds N]

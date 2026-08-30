@@ -11,10 +11,10 @@ tiers live in compare_fel.py).
 
 2. Stale-wake structure. With migration on and a large energy spread, the current
    profile changes, and the wake convolution must follow: <out_root>.wake.txt must hold
-   MORE THAN ONE z-stamped eloss block, and the blocks must differ. Removing the
+   more than one z-stamped eloss block, and the blocks must differ. Removing the
    migration-stride recompute (the stale-wake mutation) leaves one block and fails
    loudly. The checker parses the driver's record of recomputes rather than
-   reimplementing the convolution (FINDINGS 4.3).
+   reimplementing the convolution.
 
 Usage: check_collective.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad and aramis.bmad. Exit 0 only if all pass.

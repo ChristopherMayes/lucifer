@@ -4,21 +4,21 @@ Program-structure checks (manual sec:program): the library contract, the comb, a
 the tracking window.
 
   1. LIBRARY: lucifer_smoke_test drives the tracker with NO namelist anywhere -- structs
-     filled in code -- and runs TWICE IN ONE PROCESS. Pass 1 must reproduce a
+     filled in code -- and runs twice in one process. Pass 1 must reproduce a
      namelist-driven run of the same configuration dataset-identically (the library
      IS the program), and pass 2 must reproduce pass 1 bit-for-bit (re-entrancy:
      twice in one process = two processes).
-  2. LIBRARY ERRORS RETURN: lucifer_smoke_test on an unreadable lattice must print its
+  2. Library errors return: lucifer_smoke_test on an unreadable lattice must print its
      proof-of-return line and exit with its own code 2 -- the library returned, the
      PROGRAM decided (no exit inside the library).
-  3. RETIRED GROUP: the flat &fel_track_params is refused BY NAME, the error mapping
+  3. Retired group: the flat &fel_track_params is refused by name, the error mapping
      each parameter found to its new group.
-  4. THE COMB (global%comb_ds_save, Bmad's ds_save semantics verbatim): a comb > 0
+  4. The comb (global%comb_ds_save, Bmad's ds_save semantics verbatim): a comb > 0
      run's per-record rows must be EXACTLY the every-record run's rows at the comb
      positions (subset, dataset-equal), element ends always present; comb < 0 keeps
      NO per-record rows (element-end arrays and dumps remain); the precomputed nrec
      is exact in every mode (the arrays are sized once, never grown).
-  5. THE WINDOW (global%track_start/track_end, Tao's names): the schedule is built
+  5. The window (global%track_start/track_end, Tao's names): the schedule is built
      on the FULL lattice, so a windowed run composes exactly -- run A = [start, D]
      dumps its final state; run B = [after D, end] imports it; B's finals must be
      dataset-identical to the one-shot full run's finals, and A's finals to the full
@@ -132,7 +132,7 @@ def run_nml(exe, wd, root, nml_text):
 
 
 def h5_identical(fa, fb):
-    # meta/ IS EXCLUDED, deliberately. Provenance is datasets rather than attributes,
+    # meta/ is excluded, deliberately. Provenance is datasets rather than attributes,
     # for HDF5's 64 kB attribute cap (manual sec:meta), and meta/timestamp differs
     # between any two runs by construction. Nothing in meta/ is physics. Before the
     # move, the exclusion existed only by the accident of being attributes.
@@ -244,7 +244,7 @@ def main():
     check("comb > 0: rows == every-record rows at the comb positions (subset)", ok,
           note=f"[{len(sp['s'])} of {len(s0['s'])} rows]")
 
-    # comb < 0: the ELEMENT ENDS, and nothing else. Bmad's comb semantics drop the comb
+    # comb < 0: the element ends, and nothing else. Bmad's comb semantics drop the comb
     # there; this tracker always keeps the element ends, because the stats file carries
     # one record axis and marks the ends inside it (manual sec:stats). So a comb < 0 run
     # is a file whose every record is an element end, at the same positions the

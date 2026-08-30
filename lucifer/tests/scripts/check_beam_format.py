@@ -4,11 +4,11 @@ Checks for the particle dump format (manual sec:import). The tracker writes and 
 openPMD and nothing else, so every claim here is a round trip against the beam that was
 written, never against another code.
 
-1. THE FILE ROUND TRIP is exact. A run writes .beam.h5, a second run reads it back and
+1. The file round trip is exact. A run writes .beam.h5, a second run reads it back and
    writes it again, and every dataset of the two files must be bit-identical. This is the
    claim the format exists for: the file is a faithful container.
 
-2. THE STATE ROUND TRIP. The file stores absolute momenta and a time where the tracker
+2. The state round trip. The file stores absolute momenta and a time where the tracker
    keeps packed (px, py) and a lag, so those pass through P/p0 and -beta*c*dt on the way
    out and back, while x and y are untouched. The state is read out here through the
    CONVERTER, in Genesis's chart, which is the only other view of the beam there is now:
@@ -17,19 +17,19 @@ written, never against another code.
    expected values: which coordinate pays is fixed, whether it pays is configuration
    dependent.
 
-3. THE PHASE SURVIVES. A dump carries the particle lag, and a reader restarts the
+3. The phase survives. A dump carries the particle lag, and a reader restarts the
    reference phase phi0 at zero, so the writer folds phi0 into the lag. theta must
    therefore come back with NO offset at all, constant or otherwise. Without the fold the
    restarted beam sits at a different phase against the field, which is a real change of
    state and not a bookkeeping one: 2.1e-2 on the windowed-composition check.
 
-4. WEIGHTS SURVIVE, which the Genesis format cannot do. The split-weight instrument makes
+4. Weights survive, which the Genesis format cannot do. The split-weight instrument makes
    every particle two coincident copies of w/3 and 2w/3, so the file's weight record is a
    real dataset of two distinct values. It must come back bit-identical. Converting that
-   beam to a Genesis .par.h5 must be REFUSED BY NAME, since that format carries one
+   beam to a Genesis .par.h5 must be refused by name, since that format carries one
    current per slice and a read-back would silently return a uniform beam.
 
-5. AN EMPTY SLICE SURVIVES. Every slice is a particlePatch, in window order, and an empty
+5. An empty slice survives. Every slice is a particlePatch, in window order, and an empty
    slice is a patch of no particles, so the patch list IS the window. A heavy migration run
    (sig_pz = 0.15) empties a slice; the restored beam must have the same per-slice counts,
    empty slice included, and the file must hold one patch per slice.

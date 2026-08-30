@@ -3,10 +3,10 @@
 !
 ! The tracker's production statistics file <out_root>.stats.h5 (manual sec:stats).
 !
-! THE FILE DESCRIBES ITSELF. Every dataset goes through fel_h5_mod and carries @unit,
+! The file describes itself. Every dataset goes through fel_h5_mod and carries @unit,
 ! @description and @axes, the last naming the coords/ datasets its dimensions run over.
 ! Units are fixed Bmad units (m, rad, eV, s, C, J, W) and the attributes are
-! DOCUMENTATION: a reader must not scale by them.
+! documentation: a reader must not scale by them.
 !
 ! Five groups, and each answers one question.
 !
@@ -19,13 +19,13 @@
 !   params/  Every scalar as data: the window (lambda0, window_sample, slice_spacing,
 !            nbins), p0c, the charge, the species, the seed, the grid, the counts.
 !            Nothing a reader needs is left in the echoed namelist.
-!   beam/    slice/ holds the per-record sufficient statistics, named EXACTLY as
+!   beam/    slice/ holds the per-record sufficient statistics, named exactly as
 !            bunch_params_struct components, enough to construct one from any
 !            (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 6, 6) at
 !            its natural rank, charge_live, n_particle_live, t, sigma_t, bunching,
 !            bunching_phase, plus current and energy which every consumer would
 !            otherwise re-derive. slice_twiss/ and bunch/ hold the fully evaluated Bmad
-!            bunch_params, per slice and for the whole window, on the ELEMENT-END grid,
+!            bunch_params, per slice and for the whole window, on the element-end grid,
 !            aligned with coords/z(at_element_end).
 !   field/   total/ (always written, both polarizations of one wavelength), x/, y/ when
 !            a second polarization is live, harm<h>/ per harmonic, all carrying the same
@@ -35,10 +35,10 @@
 !            layout plots (fel_write_lattice).
 !
 ! Theta moments cost FFTs, so they fill at element ends only, and angle_moments_valid
-! says where (the twiss_valid pattern). Pulse-level values are POOLED downstream
+! says where (the twiss_valid pattern). Pulse-level values are pooled downstream
 ! (scripts), never stored: the file stays raw.
 !
-! ONE RECORD AXIS. Element ends are always recorded whatever the comb (fel_comb_take),
+! There is one record axis. Element ends are always recorded whatever the comb (fel_comb_take),
 ! so an element end IS a record and the element-end arrays need no axis of their own:
 ! at_element_end selects them. scripts/read_stats.py is the reader everything uses, and
 ! scripts/bunch_params_from_stats.py reconstructs a bunch_params dict from any (record,
@@ -85,7 +85,7 @@ type fel_stats_struct
   real(rp), allocatable :: z(:)                   ! (nrec) [m]
   integer, allocatable :: ix_ele(:)               ! (nrec) Lattice element of the record.
   integer, allocatable :: at_end(:)               ! (nrec) 1 where the record is an element
-                                                  !   end. THE mask: element ends are always
+                                                  !   end. The mask: element ends are always
                                                   !   recorded, so the element-end arrays
                                                   !   below need no axis of their own.
   real(rp), allocatable :: b_centroid(:,:,:)      ! (6, nslice, nrec)
@@ -95,15 +95,15 @@ type fel_stats_struct
   real(rp), allocatable :: bunching(:,:)          ! (nslice, nrec) |b| at the fundamental
   real(rp), allocatable :: bunching_phase(:,:)    ! (nslice, nrec) [rad]
   integer, allocatable :: n_particle_live(:,:)    ! (nslice, nrec)
-  ! Per-coordinate extremes RELATIVE TO THE CENTROID, bunch_params_struct's rel_max and
+  ! Per-coordinate extremes relative to the centroid, bunch_params_struct's rel_max and
   ! rel_min: six phase-space entries plus time. Order statistics, which no moment can
   ! reconstruct, kept for envelope plots. NaN for an empty slice.
   real(rp), allocatable :: b_rel_max(:,:,:)       ! (7, nslice, nrec)
   real(rp), allocatable :: b_rel_min(:,:,:)       ! (7, nslice, nrec)
-  ! Field side, wavefront_params_struct names. With ONE live polarization these are
+  ! Field side, wavefront_params_struct names. With one live polarization these are
   ! the whole story. With two, they carry the X component, the f2_* arrays carry Y
   ! (written as a field/y/ group), and the power/energy/on_axis datasets are written
-  ! as TOTALS. Single-polarization files are unchanged.
+  ! as totals. Single-polarization files are unchanged.
   real(rp), allocatable :: f_centroid(:,:,:)      ! (4, nslice, nrec)
   real(rp), allocatable :: f_sigma(:,:,:)         ! (16, nslice, nrec)
   real(rp), allocatable :: f_energy(:,:), f_power(:,:), f_on_axis(:,:)
@@ -113,7 +113,7 @@ type fel_stats_struct
   real(rp), allocatable :: f2_energy(:,:), f2_power(:,:), f2_on_axis(:,:)
   real(rp), allocatable :: f2_emit_x(:,:), f2_emit_y(:,:)
   ! Harmonic fields (field-set entries 2+): full wavefront_params per harmonic,
-  ! written as field/harm<h>/ groups. The fundamental's datasets above are NEVER
+  ! written as field/harm<h>/ groups. The fundamental's datasets above are never
   ! summed with these: harmonics are distinct wavelengths (a detector separates
   ! colors), unlike the two polarization components of one wave.
   integer, allocatable :: fh_harm(:)                ! (n_extra) harmonic numbers.
@@ -133,7 +133,7 @@ end type
 ! Structure fel_stats_params_struct
 !
 ! The few run scalars the stats writer itself needs, filled by the caller (fel_io_mod,
-! which sees the whole run) and written into run/. The INPUT tree params/ is written by
+! which sees the whole run) and written into run/. The input tree params/ is written by
 ! fel_io_mod directly, one subgroup per honored struct, since only it sees the run.
 !-
 
@@ -146,7 +146,7 @@ end type
 ! The flattened bunch_params record: 6 centroid + 36 sigma + charge_live +
 ! n_particle_live + twiss_valid + 6 modes x 9 params = 99.
 integer, parameter :: fel_stats_n_bp$ = 99
-! The PACKED order of a bunch_params row's twiss blocks. The first three are the
+! The packed order of a bunch_params row's twiss blocks. The first three are the
 ! projected planes and the last three the normal modes, which is why the file puts them
 ! on two axes: they are two decompositions of one beam, and an eigen-emittance is not a
 ! projected emittance.
@@ -164,13 +164,13 @@ character(7), parameter :: fel_stats_wf$(4) = [character(7):: 'x', 'theta_x', 'y
 character(*), parameter :: fel_stats_pol$(2) = [character(1):: 'x', 'y']
 character(*), parameter :: fel_stats_bmad_unit$ = 'm,1,m,1,m,1'
 character(*), parameter :: fel_stats_wf_unit$ = 'm,rad,m,rad'
-! The same two unit lists PER ENTRY, written into coords/ beside the labels they belong
+! The same two unit lists per entry, written into coords/ beside the labels they belong
 ! to. A unit is a property of the axis, so a dataset over that axis says only which axis
 ! carries its units and to what power.
 character(3), parameter :: fel_stats_bmad_u$(6) = [character(3):: 'm', '1', 'm', '1', 'm', '1']
 character(3), parameter :: fel_stats_wf_u$(4) = [character(3):: 'm', 'rad', 'm', 'rad']
 ! Every value @kind takes, enumerated on the root so a reader that sorts groups by kind
-! does not have to discover the vocabulary by inspection. An ARRAY: shape expresses
+! does not have to discover the vocabulary by inspection. An array: shape expresses
 ! arity, and this holds a list.
 character(10), parameter :: fel_stats_kinds$(14) = [character(10):: 'axis', 'input', &
         'run', 'beam', 'per_slice', 'projected', 'twiss', 'modes', 'field', &
@@ -324,10 +324,10 @@ ks = twopi / wf%wavelength
 
 any_err = .false.
 
-! This loop ALSO evaluates the diag instrument (fel_slice_diag, fel_field_diag) for
+! This loop also evaluates the diag instrument (fel_slice_diag, fel_field_diag) for
 ! every slice: the diag writer then only prints. Each slice's arithmetic is the
 ! identical serial code, so diag.txt is bit-for-bit what it always was. What changed
-! is that the formerly SERIAL per-record diag sweeps now ride this parallel loop.
+! is that the formerly serial per-record diag sweeps now ride this parallel loop.
 
 !$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, err) &
 !$OMP&   reduction(.or.: any_err)
@@ -382,7 +382,7 @@ do is = 1, nslice
 
   ! The per-coordinate extremes, relative to the centroid just computed: order
   ! statistics that ride the sweep for free. The time entry maps through
-  ! t - <t> = -(z - <z>)/(beta0 c), so the LARGEST time offset is the SMALLEST z one.
+  ! t - <t> = -(z - <z>)/(beta0 c), so the largest time offset is the smallest z one.
 
   if (sl%n > 0) then
     stats%b_rel_max(1:6, is, ir) = vmax
@@ -422,7 +422,7 @@ do is = 1, nslice
     stats%f2_emit_y(is, ir) = pms%emit_y
   endif
 
-  ! Harmonic fields: full wavefront_params per extra field, at ITS wavelength and
+  ! Harmonic fields: full wavefront_params per extra field, at its wavelength and
   ! record rotation.
 
   do io = 2, size(ff)
@@ -456,9 +456,9 @@ end subroutine fel_stats_record
 ! (all slices as one bunch in global window coordinates) and per slice (the Tao
 ! end-of-element pattern), using Bmad's own statistics machinery.
 !
-! The row carries the TWISS and nothing else. Everything else an element end has is
+! The row carries the twiss and nothing else. Everything else an element end has is
 ! already in the record at the same z, since an element end is always recorded
-! (fel_comb_take), and this routine MARKS that record rather than copying it. The
+! (fel_comb_take), and this routine marks that record rather than copying it. The
 ! coincidence is a structural invariant, so it is asserted here rather than assumed.
 !
 ! Input:
@@ -513,7 +513,7 @@ stats%at_end(stats%irec) = 1
 nslice = size(beam%slice)
 allocate (cen_s(6,nslice), sig_s(6,6,nslice), w_s(nslice), dz_s(nslice), shear_s(nslice), n_s(nslice))
 
-! ONE source of per-slice moments, the record at this z. Its two-pass weighted
+! One source of per-slice moments, the record at this z. Its two-pass weighted
 ! arithmetic is then the only copy of that code in the module, so nothing here can
 ! drift from what the per-record datasets hold.
 
@@ -528,7 +528,7 @@ enddo
 ! sigma_matrix, the identical code path calc_bunch_params ends in), fed from the
 ! moments above instead of re-summing every particle through a bunch conversion.
 ! Twiss only where there are enough live particles: a time window's near-empty edge
-! slices are degenerate BY CONSTRUCTION (zero charge, collapsed sigma modes).
+! slices are degenerate by construction (zero charge, collapsed sigma modes).
 
 do is = 1, nslice
   bp = bunch_params_struct()
@@ -546,13 +546,13 @@ do is = 1, nslice
 enddo
 
 ! The whole window, from the same per-slice moments, no particle visit at all. Each
-! slice's stored moments live in its LOCAL z chart and enter the pool moved to the
+! slice's stored moments live in its local z chart and enter the pool moved to the
 ! global window chart by the migration invariant fel_concat_slices uses,
 ! z_global = z_local + beta*(is-1)*slice_spacing.
 !
 ! That map is NOT a constant offset: fel_concat_slices evaluates beta per particle, so
 ! within a slice z_global depends on pz. Linearizing beta about the slice's own mean pz
-! makes the map an exact SHEAR of (z, pz),
+! makes the map an exact shear of (z, pz),
 !   z_global = z_local + L*beta_bar + (L*dbeta/dpz)*(pz - pz_bar),   L = (is-1)*spacing,
 ! whose effect on the slice covariance is S -> J S J^T with the single off-diagonal
 ! J(5,6) = L*dbeta/dpz. Dropping that shear leaves var(z) and cov(z,pz) right (they are
@@ -700,7 +700,7 @@ do is = 1, nslice
 
   ! S -> J S J^T with the one off-diagonal J(5,6) = shear_s: the z row and column pick
   ! up the pz coupling of the local-to-global map, in that order (the (5,5) update uses
-  ! the ORIGINAL (5,6) and (6,6), so it goes first).
+  ! the original (5,6) and (6,6), so it goes first).
 
   s6 = sig_s(:,:,is)
   k = shear_s(is)
@@ -733,7 +733,7 @@ end subroutine fel_pool_bunch_params
 ! Routine to return the radiation the run holds at its last record: total power and
 ! total window energy over the live polarizations, and the mean bunching over slices.
 !
-! The ONE place that sums the polarizations for display, so the progress line and the
+! The one place that sums the polarizations for display, so the progress line and the
 ! completion block cannot come to differ about what power means. Zero before the first
 ! record, which only happens on a run that took none.
 !
@@ -779,7 +779,7 @@ end subroutine fel_stats_exit_light
 ! fel_io_mod, which can see the run.
 !
 ! Every dataset goes through fel_h5_mod, so every dataset carries @unit, @long_name,
-! @description and @axes, and EVERY NAME IN @axes RESOLVES TO A coords/ DATASET,
+! @description and @axes, and every name in @axes resolves to a coords/ dataset,
 ! trailing label axes included. Shapes appear to h5py with the record index first: a
 ! Fortran (a, nslice, nrec) array reads as (nrec, nslice, a).
 !
@@ -820,7 +820,7 @@ ns = stats%nslice
 
 call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
 
-! The identity (bmad-stats R1 to R5): the FORMAT is bmad-stats with the fel extension,
+! The identity (bmad-stats R1 to R5): the format is bmad-stats with the fel extension,
 ! the planned reset from lucifer-stats 2.x, and the writer is this program, whose only
 ! version is the Bmad it was built against.
 
@@ -836,18 +836,18 @@ call hdf5_write_attribute_string_rank1 (f_id, 'kinds', fel_stats_kinds$, merr)
 err = err .or. merr
 call hdf5_write_attribute_string (f_id, 'units_note', &
         'Fixed Bmad units: m, rad, eV, s, C, J, W. Every dataset carries @unit as ' // &
-        'DOCUMENTATION: the values are already SI and eV, so a reader must not scale ' // &
+        'documentation: the values are already SI and eV, so a reader must not scale ' // &
         'by it. Every name in @axes is a coords/ dataset. A one-byte integer dataset ' // &
         'with @unit = 1 and @dtype_hint = bool is this format''s boolean, HDF5 ' // &
         'having none. Every group carries @kind, from the root''s @kinds list. An ' // &
-        'attribute holding ONE value is a scalar and one holding a list is an array, ' // &
-        'length one included. A coordinate VARIABLE may repeat: coords/s does, wherever ' // &
+        'attribute holding one value is a scalar and one holding a list is an array, ' // &
+        'length one included. A coordinate variable may repeat: coords/s does, wherever ' // &
         'a zero-length element applies a wake kick, which is why the record number and ' // &
         'not s is the axis.', err)
 if (err) return
 
 ! ------------------------------------------------------------------
-! coords/: every axis, once, each saying which axis it IS. The record NUMBER is the
+! coords/: every axis, once, each saying which axis it is. The record number is the
 ! axis, not z: z repeats wherever two records land on one plane, and an index that
 ! repeats answers a selection silently wrong. z rides along as a variable on it.
 
@@ -861,17 +861,17 @@ allocate (e_ix(ne), e_s(ne))
 e_ix = pack(stats%ix_ele(1:ir), mask)
 e_s = pack(stats%z(1:ir), mask)
 
-! The slice grid is uniform in TIME, and that is not a convention. fel_concat_slices
-! holds z_global = z_local + beta_j*(islice-1)*spacing with the PARTICLE's beta, and
+! The slice grid is uniform in time, and that is not a convention. fel_concat_slices
+! holds z_global = z_local + beta_j*(islice-1)*spacing with the particle's beta, and
 ! z = -beta*c*(t - t_ref), so at a grid point t - t_ref = -(islice-1)*spacing/c and the
-! beta CANCELS. fel_apply_slippage accumulates in radiation wavelengths and rotates the
+! beta cancels. fel_apply_slippage accumulates in radiation wavelengths and rotates the
 ! record one slice at window_sample, and the slippage rate (1+aw^2)/(2 gamma^2 lambda)
 ! is exactly one wavelength per undulator period, so one slice is exactly
 ! window_sample wavelengths of slippage and the rotation needs no interpolation. That
 ! is what makes the light-travel distance the field's own coordinate.
 !
-! So ct_slice and t_slice are EXACT and carry no beta. z_slice is Bmad's z at the
-! REFERENCE beta only: a particle's own offset uses its own beta, which is why the
+! So ct_slice and t_slice are exact and carry no beta. z_slice is Bmad's z at the
+! reference beta only: a particle's own offset uses its own beta, which is why the
 ! concatenation stores every entry beta rather than one number.
 
 do is = 1, ns
@@ -887,7 +887,7 @@ call group_note (f_id, 'coords', 'axis', 'Every axis of this file, once each.', 
 call fel_h5_int (g_id, 'record', '1', 'record', &
       'Record number, the axis every per-record dataset runs over.', 'record', rec, err)
 call fel_h5_real (g_id, 's', 'm', 's', &
-      'Path length along the line at each record, Bmad''s s. A VARIABLE on the record ' // &
+      'Path length along the line at each record, Bmad''s s. A variable on the record ' // &
       'axis: it repeats wherever two records land on one plane, so it cannot index.', &
       'record', stats%z(1:ir), err)
 call fel_h5_int (g_id, 'ix_ele', '1', 'element', &
@@ -906,13 +906,13 @@ call fel_h5_int (g_id, 'slice', '1', 'slice', &
       'Slice number, the axis every per-slice dataset runs over.', 'slice', sl, err)
 call fel_h5_real (g_id, 'ct_slice', 'm', 'ct', &
       'Light-travel distance of each slice ahead of the reference, window_sample ' // &
-      'wavelengths per slice. EXACT and free of beta, and the coordinate slippage ' // &
+      'wavelengths per slice. Exact and free of beta, and the coordinate slippage ' // &
       'counts in.', 'slice', ct_slice, err)
 call fel_h5_real (g_id, 't_slice', 's', 't', &
       'Arrival time of each slice relative to the reference, -ct_slice/c exactly. More ' // &
       'negative toward the window head.', 'slice', t_slice, err)
 call fel_h5_real (g_id, 'z_slice', 'm', 'z', &
-      'Bmad z of each slice AT THE REFERENCE beta, beta0*ct_slice. A given particle''s ' // &
+      'Bmad z of each slice at the reference beta, beta0*ct_slice. A given particle''s ' // &
       'own offset uses its own beta, so this one number cannot serve for all of them.', &
       'slice', z_slice, err)
 call fel_h5_str (g_id, 'bmad', 'phase space', &
@@ -943,10 +943,10 @@ call fel_h5_str (g_id, 'bmad_t_unit', 'unit', &
       'The unit of each bmad_t entry. See coords/bmad_unit.', 'bmad_t', &
       fel_stats_bmad_t_u$, err)
 call fel_h5_str (g_id, 'plane', 'plane', &
-      'The three PROJECTED twiss planes, bunch_params_struct''s x, y and z.', 'plane', &
+      'The three projected twiss planes, bunch_params_struct''s x, y and z.', 'plane', &
       fel_stats_planes$, err)
 call fel_h5_str (g_id, 'mode', 'mode', &
-      'The three NORMAL modes, bunch_params_struct''s a, b and c. A separate axis from ' // &
+      'The three normal modes, bunch_params_struct''s a, b and c. A separate axis from ' // &
       'plane because the two are different decompositions of one beam, so nothing may ' // &
       'average across them. The labels are eigenvector-identified rather than ' // &
       'magnitude-sorted, which is why the harness compares mode emittances as a set.', &
@@ -964,7 +964,7 @@ err = err .or. (h5_err < 0)
 call H5LTset_attribute_string_f (g_id, 'slice', 'plot_against', 't_slice', h5_err)
 err = err .or. (h5_err < 0)
 
-! The join key and the mask say MACHINE-READABLY what their descriptions say in prose
+! The join key and the mask say machine-readably what their descriptions say in prose
 ! (bmad-stats R18, R19): ix_ele's values index the ele axis, and at_element_end selects
 ! the element_end axis's entries, in order.
 
@@ -975,8 +975,8 @@ err = err .or. (h5_err < 0)
 if (err) return
 
 ! The head convention, which no per-slice plot can be drawn without: the migration
-! invariant z_global = z_local + beta*(islice-1)*spacing puts the HEAD at the high slice
-! index. The attribute states where the head sits on the INDEX, so both coordinates of
+! invariant z_global = z_local + beta*(islice-1)*spacing puts the head at the high slice
+! index. The attribute states where the head sits on the index, so both coordinates of
 ! that axis carry the same value while each description gives its own direction. A
 ! convention stated on one of a pair invites the reader to assume the pair agrees.
 
@@ -990,9 +990,9 @@ call H5Gclose_f (g_id, h5_err)
 if (err) return
 
 ! ------------------------------------------------------------------
-! run/: the scalars the RUN produced, apart from params/, which holds what the user
+! run/: the scalars the run produced, apart from params/, which holds what the user
 ! set and is written by fel_io_mod (one subgroup per honored input struct). The three
-! counts restate axis lengths on purpose: n_element_end comes from the ACCUMULATOR's
+! counts restate axis lengths on purpose: n_element_end comes from the accumulatOR's
 ! counter, so the harness checking it against the mask tests the walk's bookkeeping,
 ! which coords/element_end, packed from that mask, cannot.
 
@@ -1001,7 +1001,7 @@ call group_note (f_id, 'run', 'run', 'What the run produced, one scalar each.', 
 call fel_h5_real (g_id, 'p0c', 'eV', 'p0c', 'Reference momentum times c.', '', stats%p0c, err)
 call fel_h5_str (g_id, 'species', 'species', 'Particle species.', '', [prm%species], err)
 call fel_h5_real (g_id, 'slice_spacing', 'm', 'slice spacing', &
-      'Slice spacing, window_sample * lambda0. A LIGHT-TRAVEL distance, c times the ' // &
+      'Slice spacing, window_sample * lambda0. A light-travel distance, c times the ' // &
       'slice time separation: the grid is exactly uniform in t and ct, which is what ' // &
       'makes slippage a whole-slice shift. In Bmad z the separation is beta*this, per ' // &
       'particle. See coords/ct_slice.', '', prm%slice_spacing, err)
@@ -1058,7 +1058,7 @@ call fel_h5_real (g_id, 'bunching_phase', 'rad', 'bunching phase', &
       'Bunching phase arg(b), carrying the run''s reference phase.', &
       'record,slice', stats%bunching_phase(:,1:ir), err)
 call fel_h5_real (g_id, 'rel_max', 'm,1,m,1,m,1,s', 'max - centroid', &
-      'Per-coordinate maximum over the slice RELATIVE TO THE CENTROID, ' // &
+      'Per-coordinate maximum over the slice relative to the centroid, ' // &
       'bunch_params_struct''s rel_max: order statistics no moment can reconstruct. ' // &
       'The envelope is centroid + rel_max. NaN for an empty slice.', &
       'record,slice,bmad_t', stats%b_rel_max(:,:,1:ir), err)
@@ -1086,10 +1086,10 @@ call fel_h5_dset_attr_strs (g_id, 'sigma_energy', 'derived_from', &
 call H5Gclose_f (g_id, h5_err)
 if (err) return
 
-! beam/slice_twiss/ and beam/bunch/: the evaluated bunch_params, on the ELEMENT-END
-! axis. The twiss planes are an AXIS, not six groups: a group named z cannot sit beside
+! beam/slice_twiss/ and beam/bunch/: the evaluated bunch_params, on the element-END
+! axis. The twiss planes are an axis, not six groups: a group named z cannot sit beside
 ! a z coordinate, which xarray and netCDF both refuse, and one array per quantity is 18
-! datasets where six groups per set were 108. TWO axes, though, not one: twiss/ over the
+! datasets where six groups per set were 108. Two axes, though, not one: twiss/ over the
 ! three projected planes and modes/ over the three normal modes, since averaging a
 ! projected emittance against an eigen-emittance is meaningless. They are subgroups
 ! rather than datasets here because one of the nine is named sigma, as
@@ -1114,7 +1114,7 @@ if (err) return
 
 ! ------------------------------------------------------------------
 ! field/: total/ always, then one group per component and per harmonic, all carrying
-! the same dataset names. The group attributes say WHICH children are components and
+! the same dataset names. The group attributes say which children are components and
 ! which are derived, so a reader summing children cannot double-count.
 
 call H5Gcreate_f (f_id, 'field', b_id, h5_err)
@@ -1227,7 +1227,7 @@ character(*) attrib, val(:)
 
 !
 
-! An ARRAY, length one included, because these hold a LIST. A one-component file then
+! An array, length one included, because these hold a list. A one-component file then
 ! parses exactly like a two-component one, where a bare string and a comma list would
 ! read as different types to anything that did not know to split.
 
@@ -1239,7 +1239,7 @@ end subroutine string_note
 !+
 ! Subroutine unit_axis_note (id, name, family, power, err)
 !
-! Routine to give a dataset whose entries have DIFFERENT units a machine-readable one
+! Routine to give a dataset whose entries have different units a machine-readable one
 ! beside the human string. That string is a comma list per coordinate, sometimes with
 ! "squared" on the end, which nothing can parse, so @unit_of_axis names the axis whose
 ! coords/<axis>_unit carries the units and @unit_power says how many factors of them one
@@ -1266,7 +1266,7 @@ end subroutine unit_axis_note
 ! Subroutine write_field_total (id, pow, ene, onax, harm, comps, err)
 !
 ! Routine to write the total/ group of one wavelength: the sum over the live
-! polarizations. ALWAYS written, whether one polarization is live or two, so that no
+! polarizations. Always written, whether one polarization is live or two, so that no
 ! reader has to ask what else the file holds before it knows what power means, and
 ! marked @derived_from so that summing the children of field/ cannot double-count.
 !-
@@ -1380,7 +1380,7 @@ if (err) return
 ! Packed row layout: after the 45 leading numbers come six blocks of nine, one per
 ! decomposition entry in fel_stats_modes$ order, so one quantity is a stride-9 gather.
 ! Blocks 1 to 3 are the projected planes and 4 to 6 the normal modes, and they go to
-! SEPARATE groups over separate axes: an eigen-emittance and a projected emittance are
+! separate groups over separate axes: an eigen-emittance and a projected emittance are
 ! different quantities, and one axis holding both invites an average across them.
 
 call write_twiss_group (id, 'twiss', 'plane', 0, rows, err)

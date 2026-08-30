@@ -20,7 +20,7 @@ Genesis dump states gamma alone and carries no reference momentum, so pz is not
 available there and the key is absent. Nor is it available from an openPMD file written
 against the lattice's reference rather than its own, which is what the converter writes.
 
-ONE CAVEAT, about the wavelength. An openPMD dump does not carry it, since it belongs to
+One caveat, about the wavelength. An openPMD dump does not carry it, since it belongs to
 the run rather than to the beam. theta scales with it, so a caller reading an openPMD file
 must say which wavelength its deck used. A Genesis file states its own and the argument is
 then a cross-check.

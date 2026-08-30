@@ -2,7 +2,7 @@
 """
 Seam-wake checks (deliverable 11): Bmad element sr wakes applied across the WHOLE time
 window, validated without Genesis (self-referenced and against the deliverable-8 wake
-model; FINDINGS 6.9). Every wake measurement is an A-B difference between a run with
+model). Every wake measurement is an A-B difference between a run with
 the wake and a bit-identical run without it, on a single one-step wiggler, so the FEL
 evolution cancels exactly and what remains IS the kick.
 
@@ -369,7 +369,7 @@ def main():
     eloss_u = np.array(eloss_u[:len(AU)])
     # The dominant, DERIVED difference: Genesis's wake model (Collective.cpp,
     # transcribed in d8) represents the beam as a linearly interpolated current with a
-    # ZERO PAD past the head slice -- a trapezoidal density missing half a slice of
+    # Zero pad past the head slice -- a trapezoidal density missing half a slice of
     # charge at the head -- while the particle-level z_long sees the full charge. On
     # this window the kernel is effectively constant (its scale, ~8 um, dwarfs the nm
     # window), so slice i's kick collects (n - i + 1/2) slices of charge ahead+self and

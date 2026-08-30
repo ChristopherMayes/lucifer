@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conformance checker for bmad-stats files (BMAD-STATS-SPEC.md, draft 1.0).
+"""Conformance checker for bmad-stats files (lucifer/doc/BMAD-STATS-SPEC.md, 1.0).
 
     python3 validate_bmad_stats.py run.stats.h5 [more.h5 ...]
 

@@ -416,8 +416,8 @@ echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dat
 section_time thread-independence
 echo
 
-# Shot-noise checks (deliverable 6). The statistical check is self-referenced (FINDINGS
-# 6.9: Genesis cannot represent weighted noise). The SASE startup cross-check pits the
+# Shot-noise checks (deliverable 6). The statistical check is self-referenced
+# (no cross-code reference exists: Genesis cannot represent weighted noise). The SASE startup cross-check pits the
 # two codes' fully independent loaders and RNGs against each other at the level the
 # noise sets, the startup power.
 
@@ -466,7 +466,7 @@ section_time import
 echo
 
 # Slice-migration checks (deliverable 7): conservation under heavy migration, exact
-# phase continuity of the moves, and no-op bit identity (self-referenced, FINDINGS 6.9
+# phase continuity of the moves, and no-op bit identity (self-referenced
 # -- Genesis migrates only under one4one).
 
 echo "--- slice-migration checks ------------------------------------------------------"

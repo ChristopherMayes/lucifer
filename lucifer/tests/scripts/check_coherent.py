@@ -6,22 +6,22 @@ implemented from the paper -- the SIMPLEX hybrid: their source, our field).
   1. KEYSTONE: source_model is defaulted -- the deposit path -- everywhere else in the
      harness, so the benchmark's own tiers hold the default-path contract. Here: a
      coherent run exists and runs clean on the reference configuration.
-  2. LIMIT IDENTITY (the model's measured bias, not zero): coherent vs deposit at
+  2. Limit identity (the model's measured bias, not zero): coherent vs deposit at
      LARGE M on the seeded 6 GeV segment -- the |ln P| curve difference is the
      coherent-Gaussian model's intrinsic error in the lethargy regime, measured
      2.0e-2, checked at 5e-2. The regime is deliberate: lethargy/absorption is the
      energy exchange where the low-M artifact bites hardest.
-  3. THE CLAIM (variance reduction): at M = 128 the plain deposit FAKES gain
+  3. The claim (variance reduction): at M = 128 the plain deposit fakes gain
      (measured ln +0.41 on a curve that truly absorbs -- the per-cell shot-noise
      artifact of the survey's 5.1), while the coherent source at the SAME M stays
      within the model bias of the large-M reference (measured 0.05). Both measured
      here, both checked: the artifact must exceed 0.2, the coherent error stay
      under 0.1.
-  4. MOMENTS EXTENSION: an offset + tilted (but Gaussian) beam, imported via an
+  4. Moments extension: an offset + tilted (but Gaussian) beam, imported via an
      openPMD file this check writes, runs coherent and tracks its own deposit twin
      (same tolerance as 2); a DOUBLE-HORN beam is refused by name by the
      significance guard (excess kurtosis against sqrt(24/m_ind)).
-  5. DARK START REFUSED BY NAME: measured ~175x startup deficit (spontaneous,
+  5. Dark start refused by name: measured ~175x startup deficit (spontaneous,
      spatially-incoherent emission dominates SASE startup; the coherent model drops
      it by construction) -- the goal's fallback clause, executed. B(s) does carry
      the physical Fawley noise, but it is not the dominant seed at startup.

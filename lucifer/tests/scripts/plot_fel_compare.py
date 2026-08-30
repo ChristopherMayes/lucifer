@@ -12,7 +12,7 @@ time-dependent tiers both work unannounced) and writes a four-panel figure:
      window (or two dots for steady state).
   4. Slice-averaged bunching vs z, both codes overlaid.
 
-With --fld <bmad .wf.h5> <genesis .fld.h5>, a second figure overlays the FINAL FIELD:
+With --fld <bmad .wf.h5> <genesis .fld.h5>, a second figure overlays the finAL FIELD:
 on-axis lineouts of amplitude and unwrapped phase, plus the transverse profile of the
 complex difference -- the panel that shows what a phase-dominated tier difference
 (tier1_unavg's 6.9e-2) actually looks like.

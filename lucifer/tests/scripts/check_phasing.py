@@ -3,19 +3,19 @@
 Phasing checks (manual sec:phasing): how the beam-field phase behaves between
 undulator segments, held by symmetries, closed forms and Genesis itself.
 
-  1. RE-ANCHOR BASELINE (relative mode, the default): scanning an inter-segment gap
+  1. Re-anchor baseline (relative mode, the default): scanning an inter-segment gap
      by fractions of 2 gamma^2 lambda leaves the bunching phase entering the next
      segment FLAT -- the transcription of Genesis's drift autophasing (measured flat
      on Genesis itself the same way; the residual is a slow adiabatic trend).
   2. THE Z_OFFSET KNOB: displacing the downstream wiggler by delta (standard Bmad
      misalignment, anchor at the nominal position) shifts that phase by EXACTLY
      -2 pi delta / (2 gamma^2 lambda) -- the analytic drift slip rate, no fit.
-  3. CROSS-MODE IDENTITY: in absolute mode (bmad_com[absolute_time_tracking] = T in
+  3. Cross-mode identity: in absolute mode (bmad_com[absolute_time_tracking] = T in
      the lattice, honored through Bmad's own resolver) the same phase arrives via the
      real gap length instead: the absolute-mode gap scan must reproduce the relative-
      mode knob scan point by point.
-  4. PHASE-SHIFTER PARITY vs GENESIS4: Genesis scans PHASESHIFTER phi (which needs
-     FINITE LENGTH to register -- a zero-length one silently does nothing); we scan
+  4. Phase-shifter parity vs Genesis4: Genesis scans PHASESHIFTER phi (which needs
+     finite length to register -- a zero-length one silently does nothing); we scan
      z_offset with delta = phi * 2 gamma^2 lambda / (2 pi). Same physical scan; the
      bunching-phase curves must agree point by point. This anchors the SIGN
      convention ("delay goes backwards") against Genesis's own element.
@@ -26,7 +26,7 @@ undulator segments, held by symmetries, closed forms and Genesis itself.
      d(arc - chord)/d(angle) predicts -- itself cross-checked against the textbook
      small-angle path lengthening theta^2 (2 L_bend/3 + L_drift). The unaveraged
      ledger closes across a chicane sandwich.
-  6. TIME-DEPENDENT CHICANE: the WINDOW ROTATIONS the geometric delay buys (the
+  6. Time-dependent chicane: the window rotations the geometric delay buys (the
      steady-state sections above never exercise them -- slippage is a no-op with one
      slice). A delay of a few wavelengths must bank exactly floor(delay/lambda) more
      escaped slices than the straight-line twin of the same arc length, and the run
@@ -525,7 +525,7 @@ def main():
 
     # ------------------------------------------------------------------
     # The window rotations the geometric delay buys. Steady state never exercises
-    # them (slippage is a no-op with one slice), so this runs TIME DEPENDENT with a
+    # them (slippage is a no-op with one slice), so this runs time dependent with a
     # bend angle tuned for a few wavelengths of delay: the chicane must bank exactly
     # floor(delay/lambda) MORE escaped slices than its straight-line twin of the same
     # arc length, and the run must be thread-invariant.

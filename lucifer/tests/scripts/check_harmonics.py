@@ -2,7 +2,7 @@
 """
 Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
 
-  1. openPMD ROUND TRIP: a run's field dump must carry EVERY required attribute of
+  1. openPMD round trip: a run's field dump must carry every required attribute of
      the standard (verified against the spec text's names and values here,
      independently of the Fortran writer), its complex values must agree with the
      converter's Genesis view of the same field, and the Fortran READER must
@@ -12,16 +12,16 @@ Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
      energy, reads the harmonic .wf.h5 to the same complex values, round-trips its
      own writer exactly, and what its writer produces must come back through the
      Fortran reader unchanged.
-  2. HARMONIC TIER vs Genesis4: a planar steady-state segment (the benchmark's
+  2. Harmonic tier vs Genesis4: a planar steady-state segment (the benchmark's
      gamma, wavelength and rms aw -- planar so fc(3) is alive), both codes tracking
      the SAME Genesis-written starting state with a dark third-harmonic field:
      fundamental and third-harmonic power curves compared per record.
-  3. DEPOSIT CLOSED FORM: from the tier's bunched exit beam, a two-step dark restart
+  3. Deposit closed form: from the tier's bunched exit beam, a two-step dark restart
      radiates P_h proportional to (fc(h) |b_h|)^2 -- the ratio P3/P1 against the
      Bessel closed form with b_h measured directly from the dumped particles. No
      gain, no diffraction to speak of: this pins the harmonic DEPOSIT normalization
      independently of Genesis.
-  4. THREAD IDENTITY: 1 vs 8 threads byte-identical on a time-dependent harmonic run
+  4. Thread identity: 1 vs 8 threads byte-identical on a time-dependent harmonic run
      (diag byte-equal, harmonic dumps dataset-equal).
   5. REFUSALS, each by name: harmonics not anchored on the fundamental; harmonic
      fields with an unaveraged element; harmonic fields with two live polarizations;

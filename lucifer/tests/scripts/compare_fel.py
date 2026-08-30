@@ -272,7 +272,7 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("workdir", help="Directory holding all run outputs")
     p.add_argument("--tol-tier1", type=float, default=1.0e-4)
-    # The unaveraged tier is a PRICED MODEL DIFFERENCE, not a transcription check: sin^2
+    # The unaveraged tier is a priced model difference, not a transcription check: sin^2
     # end ramps vs Genesis's hard edges, no period averaging, RK4-vs-RK4 of different
     # equations. The self-referenced physics checks (check_unaveraged.py) pin the mode's
     # correctness. This tier pins its distance to Genesis so drift is visible.

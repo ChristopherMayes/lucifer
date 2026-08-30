@@ -5,7 +5,7 @@ sec:unaveraged). Self-referenced by design where the point is self-consistency (
 energy ledger, ballistic conservation) and closed-form where the point is measuring
 the averaged mode's inputs (the coupling factor fc).
 
-1. ENERGY LEDGER (check zero). A strong-seed helical probe: at every record,
+1. Energy ledger (check zero). A strong-seed helical probe: at every record,
    E_beam + U_field must be conserved -- the radiation kick and the source deposit are
    independent transcriptions of one wave equation, and only their consistency makes
    this hold. Check: max |d(E+U)| over the cumulative field-energy turnover.
@@ -32,9 +32,9 @@ the averaged mode's inputs (the coupling factor fc).
 
 5. CONVERGENCE: fc at 10/20/30 steps per period, tabulated (MINERVA's envelope).
 
-6. GAIN CURVE: the benchmark single segment, seeded steady state, unaveraged vs
+6. Gain curve: the benchmark single segment, seeded steady state, unaveraged vs
    averaged from the same generated start. The exit ln power ratio prices the
-   integrator-structure difference (ramps + split + quiver diagnostics), FINDINGS 6.4
+   integrator-structure difference (ramps + split + quiver diagnostics)
    style: measured and bounded, not litigated.
 
 Usage: check_unaveraged.py --exe <lucifer> --latdir <tests/bmad> --workdir <dir>
@@ -385,7 +385,7 @@ def main():
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
 
     if FAILED:
-        print("UNAVERAGED CHECKS: FAIL")
+        print("unaveraged checks: FAIL")
         sys.exit(1)
     print("unaveraged checks: PASS")
 

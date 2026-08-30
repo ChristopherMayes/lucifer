@@ -32,4 +32,4 @@ Measured results, attribution of every difference, and the banked report live
 in the "The saturation demo" section of `lucifer/README.md` and
 `fel-benchmark-plots/sat-demo-report.pdf` at the project root. The averaged mode
 matches Genesis at 4.9e-4 through saturation. The unaveraged mode rides +0.6 ln on
-the shot-noise radiation channel it physically resolves (FINDINGS 7.27).
+the shot-noise radiation channel it physically resolves.

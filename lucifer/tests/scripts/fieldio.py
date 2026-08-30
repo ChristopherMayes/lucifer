@@ -12,7 +12,7 @@ wavelength and the dump's position along the lattice. Both formats are read with
 alone, which keeps this an independent reader of our own writer: nothing here shares a
 line with the Fortran that produced the file.
 
-UNITS ARE THE ONE REAL DIFFERENCE. openPMD carries the electric field in V/m, the SI
+Units are the one real difference. openPMD carries the electric field in V/m, the SI
 quantity, while Genesis carries a dimensionless amplitude dfl in sqrt(W) with
 
     E = dfl * sqrt(2 * Z0) / dx,      Z0 = mu_0 * c
@@ -22,7 +22,7 @@ converts the Genesis side, leaving every comparison in V/m. Any common factor ca
 relative difference, so the choice of which side to convert cannot move a measurement; the
 choice of Z0 can, at the 1e-9 level of the two codes' impedances, and Bmad's is used here.
 
-A POLARIZATION NOTE. One openPMD file holds both transverse components as components x and
+A polarization note. One openPMD file holds both transverse components as components x and
 y of the electricField record, where Genesis holds one component per file. Callers say
 which they want, and asking for a component the file does not carry is an error rather than
 a silent zero.

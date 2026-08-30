@@ -70,7 +70,7 @@ end subroutine fel_dump_beam
 ! Subroutine fel_dump_field_set (run, prefix, err_flag)
 !
 ! Routine to write the whole field set at the given filename prefix as openPMD
-! EXT_Wavefront (.wf.h5), both polarizations as components of ONE mesh record. Genesis
+! EXT_Wavefront (.wf.h5), both polarizations as components of one mesh record. Genesis
 ! .fld.h5 conversion lives in lucifer/tests/scripts/convert_genesis.py.
 ! The fundamental keeps the pre-harmonic names. A harmonic's files carry -h<h>.
 ! Every record is unrotated to time order first: each field owns its rotation state.
@@ -232,7 +232,7 @@ write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, '
       ', pulse energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', <|b|> ', bun
 call out_io (s_blank$, r_name, trim(line))
 
-! The file list is by EXISTENCE, not by replaying which switches were on: a candidate
+! The file list is by existence, not by replaying which switches were on: a candidate
 ! name that is there gets listed with its size, and the naming rules stay in the one
 ! place that owns them (the writers).
 
@@ -569,7 +569,7 @@ end function fel_escaped_file_name
 ! Subroutine fel_finalize_diagnostics (run, err_flag)
 !
 ! Routine to finalize the run's file diagnostics: the stats file always, and with
-! keep_escaped_field also the escaped file's root datasets and the FULL PULSE at the
+! keep_escaped_field also the escaped file's root datasets and the full pulse at the
 ! exit plane. For the pulse, each banked slice is read back, free-space propagated over
 ! z_end - z_transmit (transmitted light is fixed information, and undulator vacuum is
 ! free space for light with no beam under it), and concatenated above the live
@@ -755,7 +755,7 @@ if (run%n_banked(ihh) > 0) then
     allocate (wf1%Ex(nx, nx, 1))
     wf1%dx = wfl%dx;  wf1%dy = wfl%dy;  wf1%dz = fbeam%slice_spacing
   endif
-  wf1%wavelength = wfl%wavelength      ! Per field: banked light drifts at ITS wavelength.
+  wf1%wavelength = wfl%wavelength      ! Per field: banked light drifts at its wavelength.
 
   call hdf5_open_file (trim(fel_escaped_file_name(run, ihh)), 'READ', e_id, ferr);  if (ferr) return
   do k = 1, run%n_banked(ihh)
@@ -823,20 +823,20 @@ end subroutine fel_write_wake_block
 !+
 ! Subroutine fel_write_meta (run, stats_file)
 !
-! Routine to write the provenance group into the stats file: the RESOLVED input echo
+! Routine to write the provenance group into the stats file: the resolved input echo
 ! (every default explicit, straight from the structs), the top-level lattice file's name
 ! and text, how many files the parser opened, an ISO timestamp and the Bmad version.
 !
-! DATASETS, not attributes. HDF5 caps a single attribute at 64 kB and the largest that
+! Datasets, not attributes. HDF5 caps a single attribute at 64 kB and the largest that
 ! writes here is 65495 bytes, while a scalar string dataset took 3 MB. An echoed namelist
 ! runs to 12 kB and a lattice text to 37 kB on a real lattice, so the old attributes were
 ! at half the cap already, and the failure path was a warning: the provenance would have
-! gone missing silently on a lattice of no unusual size (FINDINGS 7.31). The cost is that
+! gone missing silently on a lattice of no unusual size. The cost is that
 ! meta/ no longer escapes dataset-level identity comparisons for free, since input_echo
 ! carries out_root and two runs differ there. The harness excludes meta/ by name instead.
 !
-! NOT A REPRODUCIBILITY RECORD, and it no longer claims to be. lattice_source is the
-! TOP-LEVEL file only: Bmad's "call, file =" pulls in more, and every wrapper lattice in
+! It is not a reproducibility record, and it no longer claims to be. lattice_source is the
+! Top-level file only: Bmad's "call, file =" pulls in more, and every wrapper lattice in
 ! this tree records a call statement while the lattice it calls is absent.
 ! n_lattice_files says how many files the parser actually opened, so a reader can see at
 ! a glance whether the text is the whole story. What the file offers for reproduction is
@@ -847,9 +847,9 @@ end subroutine fel_write_wake_block
 ! borrow. lat%creation_hash is not a substitute either, hashing inode and size, which
 ! makes it machine specific rather than a fingerprint of content.
 !
-! A STATS FILE IS MEANT TO TRAVEL, so nothing here identifies a PERSON by default. The
+! A stats file is meant to travel, so nothing here identifies a person by default. The
 ! timestamp and the Bmad version identify the run. The user name and working directory
-! go in only under global%record_environment, and the file records a lattice BASENAME.
+! go in only under global%record_environment, and the file records a lattice basenAME.
 ! What a user types into the namelist is echoed as typed, so an absolute path there is
 ! still an absolute path in the file. Genesis records user and cwd always. Parity is not
 ! a reason to leak.
@@ -902,7 +902,7 @@ call fel_h5_text (g_id, 'input_echo', 'input echo', &
       'File names appear as the user typed them.', txt, merr)
 
 ! The lattice: which one, and how much of it is here. bmad_parser opens the top-level
-! file plus every file its "call, file =" statements reach, and file_text reads ONE of
+! file plus every file its "call, file =" statements reach, and file_text reads one of
 ! them, so a wrapper lattice records a call statement and drops what it calls. The count
 ! is the honesty signal. It comes from the parser's own tally, which outlives the parse
 ! because parser_end_stuff deallocates only the array of names, and zero means the tally
@@ -915,7 +915,7 @@ call fel_h5_text (g_id, 'lattice_file', 'lattice file', &
 
 call file_text (trim(run%lat_file), txt)
 call fel_h5_text (g_id, 'lattice_source', 'lattice source', &
-      'Text of the TOP-LEVEL lattice file only. A file reached by "call, file =" is ' // &
+      'Text of the top-level lattice file only. A file reached by "call, file =" is ' // &
       'NOT here, so this is not a reproducibility record. See n_lattice_files, and ' // &
       'read lattice/ for the tracked line as the physics used it.', txt, merr)
 
@@ -932,7 +932,7 @@ call fel_h5_text (g_id, 'timestamp', 'timestamp', &
 call fel_h5_int (g_id, 'bmad_inc_version', '1', 'Bmad version', &
       'The bmad_inc_version$ the run was built against.', '', bmad_inc_version$, merr)
 
-! The environment, only when asked for: these identify a PERSON and a MACHINE, and they
+! The environment, only when asked for: these identify a person and a machine, and they
 ! are of no use to a reader elsewhere.
 
 if (run%global%record_environment) then
@@ -959,16 +959,16 @@ end subroutine fel_write_meta
 !+
 ! Subroutine fel_write_params (run, stats_file)
 !
-! Routine to write the INPUT tree into the stats file: params/, one subgroup per input
-! structure the program honors, each carrying @struct and holding the RESOLVED value of
+! Routine to write the input tree into the stats file: params/, one subgroup per input
+! structure the program honors, each carrying @struct and holding the resolved value of
 ! every honored component. What the user controlled, as data, so two runs diff by their
-! inputs and no reader needs a defaults table. What the run PRODUCED is run/, written by
+! inputs and no reader needs a defaults table. What the run produced is run/, written by
 ! fel_stats_write, and the literal text stays in meta/input_echo.
 !
 ! Components the program refuses are not here: recording a knob that did nothing would
 ! lie about the run (the quiet start's honored beam_init set is the driver header's
 ! table). List-valued inputs (the dump locators, the harmonic set, the field files) are
-! string or integer ARRAY ATTRIBUTES on their subgroup rather than datasets, since a
+! string or integer array attributes on their subgroup rather than datasets, since a
 ! dataset needs an axis and a list of inputs has none worth defining. A blank file-name
 ! input is omitted: absence means unset. bmad_com and space_charge_com are written
 ! whole, since the namelist exposes them whole and all of Bmad's tracking reads them.
@@ -1064,7 +1064,7 @@ call fel_h5_int (g_id, 'n_particle', '1', 'particles per slice', &
       'Macroparticles per slice (the import path reads it as bunch particles).', '', &
       run%beam_init%n_particle, merr)
 call fel_h5_real (g_id, 'bunch_charge', 'C', 'charge', &
-      'Total bunch charge. The current is DERIVED from it, never input.', '', &
+      'Total bunch charge. The current is derived from it, never input.', '', &
       run%beam_init%bunch_charge, merr)
 call fel_h5_real (g_id, 'a_norm_emit', 'm rad', 'a norm emit', &
       'Normalized a-mode emittance.', '', run%beam_init%a_norm_emit, merr)
@@ -1255,7 +1255,7 @@ end subroutine sub_open
 !+
 ! Subroutine loc_note (attrib, list)
 !
-! Routine to record a locator LIST as a string-array attribute of the nonblank
+! Routine to record a locator list as a string-array attribute of the nonblank
 ! entries. An attribute rather than a dataset, since a dataset needs an axis and a
 ! list of inputs has none worth defining. Omitted when empty: absence means unset.
 !-
@@ -1494,11 +1494,11 @@ end subroutine fel_write_params
 ! statistics file is the wrong place to invent one.
 !
 ! The table's axis is named ele and gets its own coordinate here, coords/ele = 0..n_ele.
-! coords/ix_ele is then a VARIABLE on the record axis whose values index that one, which
+! coords/ix_ele is then a variable on the record axis whose values index that one, which
 ! is the join. Both were called ix_ele before, and one name for two axes of different
 ! length is a collision every reader has to resolve by hand.
 !
-! aw is the value THE PHYSICS USED, derived through b_max and l_period with the
+! aw is the value the physics used, derived through b_max and l_period with the
 ! helical or planar factor, not the raw attribute: that is the number a Genesis user
 ! compares against Lattice/aw, and deriving it here would repeat fel_setup_lattice.
 !

@@ -4,13 +4,13 @@ Two-polarization checks (manual sec:field vector convention): the radiation carr
 (Ex, Ey) when any FEL element is tilted, and an x-planar set followed by a y-planar
 set does the right thing. Held by symmetries and physics, not reference files:
 
-  1. ROTATION IDENTITY: an all-y line (every element tilt = pi/2; symmetric probe --
+  1. Rotation identity: an all-y line (every element tilt = pi/2; symmetric probe --
      round beam, no quads) fed the x/y-SWAPPED beam (the driver's swap_beam_xy check
      instrument: the RNG draws its planes sequentially, so the generated beam itself
      is never swap-symmetric) must reproduce the all-x line fed the original beam:
      total power identical, sizes swapped. Both FEL modes. The only asymmetry left is
      cos(pi/2) = 6e-17, so the level is near machine precision.
-  2. CROSSED UNDULATOR (x-set then y-set): the x field only DIFFRACTS through the
+  2. Crossed undulator (x-set then y-set): the x field only diffracts through the
      y set -- its polarization-resolved dump power must match the same line with the
      y set replaced by an equal drift (pure-diffraction reference) -- while the y
      field GROWS from the x-set's microbunching (bunching is longitudinal and
@@ -19,7 +19,7 @@ set does the right thing. Held by symmetries and physics, not reference files:
   3. LEDGER: the unaveraged TD closure holds on the crossed line (kick/deposit are
      exact duals per component).
   4. Thread identity: 1 vs 8 threads byte-identical on the crossed unaveraged run.
-  5. HELICAL RE-ANCHOR: a helical run forced onto the two-polarization path (a
+  5. Helical re-anchor: a helical run forced onto the two-polarization path (a
      y-polarized zero-power seed makes Ey live) reproduces the scalar-path run's
      diag -- measured level (the vector path evaluates the same physics through
      differently-ordered arithmetic).
@@ -156,7 +156,7 @@ def main():
         "call, file = crossed_probe.bmad\n" + UV +
         "DEQ: pipe, l = 0.60\nXDRIFT: line = (UNDX, D1, DEQ)\nuse, XDRIFT\n")
 
-    # 1. ROTATION IDENTITY.
+    # 1. Rotation identity.
     print("--- rotation identity (all-x vs all-y line with the swapped beam, SS):")
     for mode, xlat, ylat, tag in (("averaged", "crossed_probe.bmad", "p2_y.bmad", "av"),
                                   ("unaveraged", "p2_x_uv.bmad", "p2_y_uv.bmad", "uv")):
@@ -177,7 +177,7 @@ def main():
         check(f"rotation, {mode}: power |x-run - y-run| / max, all records", pwr, tol_p)
         check(f"rotation, {mode}: beam-size swap identity at exit", sw, 1e-8)
 
-    # 2. CROSSED UNDULATOR.
+    # 2. Crossed undulator.
     print("--- crossed undulator (x-set then y-set; x-seeded; SS):")
     lnr_modes = {}
     for mode, clat, dlat, tag in (("averaged", "p2_c.bmad", "p2_xd.bmad", "av"),
@@ -190,7 +190,7 @@ def main():
         iso = abs(np.log(px / p_ref))
         check(f"crossed, {mode}: x-field gain ISOLATION through the y set, |ln(Px/P_drift)|",
               iso, 5e-2, note="(the y set must only diffract Ex)")
-        check(f"crossed, {mode}: afterburner floor, Px/Py (y must LIGHT UP)",
+        check(f"crossed, {mode}: afterburner floor, Px/Py (y must light up)",
               px / max(py, 1e-300), 2e2, note=f"(Py/Px = {py/max(px,1e-300):.3e})")
         lnr_modes[mode] = (px, py)
     lnr = abs(np.log(lnr_modes["averaged"][1] / lnr_modes["unaveraged"][1]))
@@ -212,7 +212,7 @@ def main():
                for s in (".diag.txt", ".ledger.txt"))
     check("crossed: 1-thread vs 8-thread byte-identical (1 = yes)", 0.0 if same else 1.0, 0.5)
 
-    # 5. HELICAL RE-ANCHOR: scalar path vs the vector path, on REAL PHYSICS -- a dark
+    # 5. Helical re-anchor: scalar path vs the vector path, on real physics -- a dark
     #    TD run with physical shot noise (a quiet start's dark power is the numerical
     #    floor, meaningless to compare). The helical quiver's spontaneous radiation is
     #    purely co-rotating, which the scalar envelope holds whole and the vector path
@@ -243,7 +243,7 @@ def main():
     check("refusal: tilt with transcribed maps, by name (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
 
     if FAILED:
-        print("TWO-POLARIZATION CHECKS: FAIL")
+        print("two-polarization checks: FAIL")
         sys.exit(1)
     print("two-polarization checks: PASS")
 

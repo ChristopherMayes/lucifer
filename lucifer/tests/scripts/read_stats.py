@@ -15,7 +15,7 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st.ele_name                  # (nz,) element name per record, gathered through ix_ele
     st.run["p0c"]                # what the run produced; st.params["global"]["ran_seed"] is what the user set
 
-THE FILE DESCRIBES ITSELF (manual sec:stats), so this reader hard-codes almost nothing.
+The file describes itself (manual sec:stats), so this reader hard-codes almost nothing.
 Every dataset carries @unit, @long_name, @description and @axes, and every name in @axes
 resolves to a coords/ dataset, so this class only exposes them: there are no unit
 conversions here, no reshapes and no table of names, which is why a file that grows a
@@ -29,7 +29,7 @@ bool. The file keeps one source of truth for each.
 Units are DOCUMENTATION. The values are already SI and eV, so nothing here scales by
 @unit, and neither should a caller.
 
-THE VERSION IS REFUSED BY NAME. This is internal development, so the format moves
+The version is refused by name. This is internal development, so the format moves
 without compatibility machinery: a file this reader does not know is an error rather
 than a guess.
 """
@@ -177,7 +177,7 @@ class Stats:
 
     @property
     def z_slice(self):
-        """(ns,) Bmad z of each slice AT THE REFERENCE beta [m].
+        """(ns,) Bmad z of each slice at the reference beta [m].
 
         The one member of the three that needs a reference: a particle's own offset is
         its own beta times ct_slice, which is why the slice-to-bunch conversion stores

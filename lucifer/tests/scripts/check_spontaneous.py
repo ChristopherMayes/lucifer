@@ -90,7 +90,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 # sigma^2-differencing measurement is dominated by the cross-covariance sampling term
 # (beamlet-common kicks against 2048-particle sample variances, ~50% noise). Starting
 # from (near-)zero spread measures the kicks directly. Measured and learned, not
-# guessed -- see FINDINGS 7.27's instrument notes.
+# guessed: a dark segment with real shot noise isolates the spontaneous term.
 def cold(nml):
     return nml.replace("sig_pz = 8.804506566858e-05", "sig_pz = 1e-12")
 
@@ -235,7 +235,7 @@ def main():
           r_meas / r_pred, 0.5, 2.0,
           note=f"(measured {r_meas:.2f}x vs predicted {r_pred:.2f}x)")
 
-    # 5. DAMPING ON: both FEL modes honor bmad_com%radiation_damping_on.
+    # 5. Damping on: both FEL modes honor bmad_com%radiation_damping_on.
     #    Averaged: the full analytic rate (its native debit is ~0). Unaveraged: the
     #    COMPOSITE prediction -- the explicit term integrates the ramp envelope
     #    (INT g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps), and the grid-captured
@@ -250,7 +250,7 @@ def main():
           abs(loss(wd, "sp_uv_d") / (composite * analytic) - 1), 0.0, 2e-2,
           note=f"(composite = {composite:.4f} of analytic)")
 
-    # 6. FLUCTUATIONS ON: the Genesis/Saldin variance 1.015e-27 ku^3 aw^2 F(aw) g0^4
+    # 6. Fluctuations on: the Genesis/Saldin variance 1.015e-27 ku^3 aw^2 F(aw) g0^4
     #    per meter (Genesis reaches it with uniform*sqrt(3) draws, ours are Gaussian).
     #    Cold beam (see cold()). The FEL modes must sit on the analytic form, and Bmad's
     #    own runge_kutta + fluctuations is the independent cross-reference -- measured
@@ -284,7 +284,7 @@ def main():
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 0.0, 1e-3)
 
     if FAILED:
-        print("SPONTANEOUS CHECKS: FAIL")
+        print("spontaneous checks: FAIL")
         sys.exit(1)
     print("spontaneous checks: PASS")
 

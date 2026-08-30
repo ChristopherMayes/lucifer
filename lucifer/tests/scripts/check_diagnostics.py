@@ -106,7 +106,7 @@ WKT_NONE = """WKT: pipe, l = 0"""
 def h5_identical(fa, fb):
     """Whether two HDF5 files hold the same data, meta/ excluded.
 
-    meta/ IS EXCLUDED, deliberately. Provenance moved from attributes to datasets for
+    meta/ is excluded, deliberately. Provenance moved from attributes to datasets for
     HDF5's 64 kB attribute cap (manual sec:meta), and input_echo carries out_root while
     timestamp carries the clock, so any two runs differ there by construction. Nothing in
     meta/ is physics. Before the move the exclusion existed only by the accident of being
@@ -157,7 +157,7 @@ def main():
 
     run(exe, wd, "dg", NML.format(lat="dg_wrap.bmad", root="dg", extra=""))
 
-    # 0. THE ACCEPTANCE TEST IS THE STANDARD'S OWN VALIDATOR, which knows no program:
+    # 0. The acceptance test is the standard's own validator, which knows no program:
     # a bmad-stats file conforms when it reports zero MUST failures, and everything it
     # checks is checked from the spec alone. The named checks below hold what it cannot
     # see: the physics identities and the declarations only this writer knows it owes.
@@ -172,7 +172,7 @@ def main():
     with read_stats(wd / "dg.stats.h5") as st:
         nslice = int(st.run["n_slice"])
 
-        # 0a. THE FILE DESCRIBES ITSELF: a walk of every dataset, checking that it says
+        # 0a. The file describes itself: a walk of every dataset, checking that it says
         # what it is and what its dimensions run over. This is what makes a generic
         # reader possible, so it is checked generically rather than name by name.
         bad = []
@@ -186,7 +186,7 @@ def main():
               note=f"[{len(st.units_table())} datasets, {len(st.kind)} groups" +
                    (f"; first problem {bad[0]}]" if bad else "]"))
 
-        # 0a2. THE ACCEPTANCE TEST IS A GENERIC LOAD: label every dimension of every
+        # 0a2. The acceptance test is a generic load: label every dimension of every
         # dataset from @axes alone. It fails if a name does not resolve to a coordinate,
         # if a dimension has no name, if a length disagrees with its coordinate, or if
         # one dataset names an axis twice, which is what would force a reader to guess
@@ -209,7 +209,7 @@ def main():
               note=f"[{len(st.axis_names)} axes: {', '.join(st.axis_names)}" +
                    (f"; first problem {bad[0]}]" if bad else "]"))
 
-        # 0a3. THE RECORD NUMBER IS THE AXIS, and s is a variable on it. s must be
+        # 0a3. The record number is the axis, and s is a variable on it. s must be
         # non-decreasing, and where it repeats the two records must sit in DIFFERENT
         # elements, which is what a zero-length element applying a wake kick does: it
         # records at the plane the element before it ended on. Two records at one plane
@@ -222,7 +222,7 @@ def main():
         check("stats: every repeated s straddles an element boundary", len(unexplained), 0.5,
               note=f"[{len(dup)} repeats in {len(st.s)} records]")
 
-        # 0a4. PROVENANCE IS DATA, NOT AN ATTRIBUTE. HDF5 caps one attribute at 64 kB
+        # 0a4. Provenance is data, not an attribute. HDF5 caps one attribute at 64 kB
         # (measured: 65495 bytes is the largest that writes), and the echoed namelist is
         # already 12 kB with a real lattice text at 37 kB, so meta/ as attributes was at
         # half the cap with a warning for a failure path: the provenance would have gone
@@ -245,7 +245,7 @@ def main():
         check("stats: meta/ holds its texts as datasets", n_meta_attrs, 0.5,
               note=f"[{len(meta)} datasets, input_echo {len(meta['input_echo'])} bytes]")
 
-        # 0a5. AND IT DOES NOT OVERSTATE ITSELF. dg tracks a WRAPPER lattice, so the
+        # 0a5. And it does not overstate itself. dg tracks a wrapper lattice, so the
         # parser opened two files and lattice_source holds only the outer one. Recording
         # the count is what keeps that honest, and this run is the case that proves it:
         # a reader of lattice_source alone would think it had the lattice.
@@ -254,14 +254,14 @@ def main():
               note=f"[{meta['n_lattice_files']} files, source "
                    f"{len(meta['lattice_source'])} bytes]")
 
-        # 0a6. A STATS FILE TRAVELS. Nothing identifies a person or a machine unless the
+        # 0a6. A stats file travels. Nothing identifies a person or a machine unless the
         # run asked for it, and a path is a basename.
         leaks = [k for k in ("user", "cwd") if k in meta]
         leaks += ["lattice_file has a directory"] if "/" in meta["lattice_file"] else []
         check("stats: the default file carries no machine-local values", len(leaks), 0.5,
               note=f"[{', '.join(leaks) if leaks else 'clean'}]")
 
-        # 0a7. THE SLICE COORDINATES ARE EXACT, AND ONE OF THEM IS NOT. The grid is
+        # 0a7. The slice coordinates are exact, and one of them is not. The grid is
         # uniform in TIME: the migration invariant carries each particle's own beta, and
         # z = -beta*c*(t-t_ref), so at a grid point the beta CANCELS and the arrival-time
         # separation is ct_slice/c with no beta anywhere. t_slice must therefore be
@@ -280,7 +280,7 @@ def main():
         check("stats: the slice axis is the index", abs(len(st.slice) - nslice), 0.5,
               note=f"[{nslice} slices, positions ct_slice, t_slice, z_slice on it]")
 
-        # 0a8. THE ENVELOPE DATA ARE THE PARTICLES'. rel_max/rel_min are order
+        # 0a8. The envelope data are the particles'. rel_max/rel_min are order
         # statistics relative to the stored centroid, and the dump at the UND end holds
         # the SAME particles the record saw, so the position entries must match to the
         # bit: the file stores x verbatim, and IEEE subtraction of the same centroid is
@@ -325,7 +325,7 @@ def main():
         check("envelope: the t entry is the z entry through -dz/(beta0 c), exactly (abs)",
               worst_t, 1e-30)
 
-        # 0b. THE JOIN. at_element_end selects the element-end rows, and every record
+        # 0b. The join. at_element_end selects the element-end rows, and every record
         # sits inside the element its ix_ele names. An off-by-one in either would break
         # every layout plot and no physics check would see it.
         n_end = int(st.at_end.sum())
@@ -543,7 +543,7 @@ def main():
     check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes)",
           0.0 if same else 1.0, 0.5)
 
-    # 5a. ZERO-LENGTH WAKE ELEMENTS, BOTH POLARITIES. This is the lattice the repeated-s
+    # 5a. Zero-length wake elements, both polarities. This is the lattice the repeated-s
     # check was written for, and until it existed that check had only ever seen zero
     # repeats, which is to say it was untested. WKF can kick, so it is tracked and its
     # record lands on the plane UND ended at, repeating coords/s. The two WKT pipes
@@ -588,7 +588,7 @@ def main():
           0.0 if refused else 1.0, 0.5)
 
     if FAILED:
-        print("DIAGNOSTIC CHECKS: FAIL")
+        print("diagnostic checks: FAIL")
         sys.exit(1)
     print("diagnostic checks: PASS")
 

@@ -1,7 +1,7 @@
 !+
 ! Module fel_h5_mod
 !
-! Annotated HDF5 writes for the statistics file (manual sec:stats). ONE RULE: no array
+! Annotated HDF5 writes for the statistics file (manual sec:stats). One rule: no array
 ! reaches the file without saying what it is. Every routine here writes a dataset and
 ! four string attributes with it:
 !
@@ -10,13 +10,13 @@
 !   @description  One sentence, for a reader who has never seen the file.
 !   @axes         The coords/ datasets this dataset's dimensions run over, in h5py
 !                 order, comma separated: 'record,slice' means (n_record, n_slice)
-!                 with coords/record down and coords/slice across. EVERY name in it
+!                 with coords/record down and coords/slice across. Every name in it
 !                 resolves to a coords/ dataset, including the trailing label axes of a
 !                 vector or a matrix, so a reader never guesses a dimension from its
 !                 length. 'none' marks a scalar and nothing else: a coordinate names the
 !                 axis it defines.
 !
-! UNITS ARE DOCUMENTATION, NEVER LOAD-BEARING. The file's numbers are already SI and
+! Units are documentation, never load-bearing. The file's numbers are already SI and
 ! eV, so a reader must not scale by @unit. That is the opposite of openPMD's unitSI,
 ! which is a factor to apply, and the two conventions must not be mixed in one file.
 !
@@ -101,9 +101,9 @@ character(200) ax
 
 !
 
-! NEVER a zero-length string. HDF5's Fortran wrapper for a string attribute writes its
+! Never a zero-length string. HDF5's Fortran wrapper for a string attribute writes its
 ! terminator into the caller's buffer, so a zero-length one walks off the end and
-! corrupts the CALLER's stack: it silently overwrote two loop counts in fel_stats_write
+! corrupts the caller's stack: it silently overwrote two loop counts in fel_stats_write
 ! before this was found. An axis or a scalar therefore says 'none' rather than nothing.
 
 ax = axes
@@ -127,7 +127,7 @@ end subroutine annotate
 ! Subroutine fel_h5_real_rank<n> (id, name, unit, label, descrip, axes, val, error)
 !
 ! Routine to write a real dataset with its four documentation attributes. Overloaded for
-! ranks 0 through 4 by the interface fel_h5_real. Rank 0 writes a TRUE HDF5 scalar, so a
+! ranks 0 through 4 by the interface fel_h5_real. Rank 0 writes a true HDF5 scalar, so a
 ! scalar's shape and its @axes = 'none' say the same thing.
 !
 ! Input:
@@ -327,7 +327,7 @@ end subroutine fel_h5_int_rank2
 !
 ! int8 with @unit = '1' IS the format's boolean: HDF5 has no boolean type, and a flag
 ! stored as a float would be a lie about what it is. Each one also carries
-! @dtype_hint = 'bool', stamped here so the convention is a thing the DATASET says
+! @dtype_hint = 'bool', stamped here so the convention is a thing the dataset says
 ! rather than a rule a reader has to find in the root attributes and pattern-match on.
 !
 ! The file type is H5T_STD_I8LE and the memory type is the native integer, so HDF5
@@ -354,7 +354,7 @@ logical error, val
 character(*) name, label, descrip
 type (c_ptr) f_ptr
 
-! A true scalar flag, from a LOGICAL: the rank-0 case exists for input switches, which
+! A true scalar flag, from a logical: the rank-0 case exists for input switches, which
 ! are logicals in the structs, where the array cases take 0/1 integer buffers.
 
 call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
@@ -551,9 +551,9 @@ end subroutine fel_h5_str
 !+
 ! Subroutine fel_h5_attr_int (obj_id, attrib, val, error)
 !
-! Routine to attach a TRUE SCALAR integer attribute to an open object.
+! Routine to attach a true scalar integer attribute to an open object.
 !
-! SHAPE EXPRESSES ARITY. One value is a scalar, a list is an array. HDF5's high-level
+! Shape expresses arity. One value is a scalar, a list is an array. HDF5's high-level
 ! Fortran layer cannot write a scalar attribute at all: H5LTset_attribute_int_f takes a
 ! count and an array, so it makes shape (1,) whatever the caller means, and Bmad's
 ! hdf5_write_attribute_int_rank0 wraps exactly that call. A reader then has to unwrap
@@ -632,7 +632,7 @@ end subroutine fel_h5_dset_attr_int
 !+
 ! Subroutine fel_h5_dset_attr_strs (id, name, attrib, val, error)
 !
-! Routine to attach a string-ARRAY attribute to a dataset reached by name from its
+! Routine to attach a string-array attribute to a dataset reached by name from its
 ! parent group. Shape expresses arity: a list is an array, length one included, which
 ! Bmad's hdf5_write_attribute_string_rank1 writes and the dataset-open is the part it
 ! cannot do for us.
@@ -664,15 +664,15 @@ end subroutine fel_h5_dset_attr_strs
 !+
 ! Subroutine fel_h5_text (id, name, label, descrip, val, error)
 !
-! Routine to write one string of ANY length as a scalar string dataset.
+! Routine to write one string of any length as a scalar string dataset.
 !
 ! A dataset, not an attribute, and that is the whole point: HDF5 caps a single attribute
 ! at 64 kB (measured here: the largest that writes is 65495 bytes), while a scalar string
 ! dataset took 3 MB without complaint. An echoed namelist or a lattice file passes that
 ! cap on a lattice of no unusual size, and the failure is silent unless someone checks
-! the error, so provenance belongs in a dataset (FINDINGS 7.31).
+! the error, so provenance belongs in a dataset.
 !
-! Where fel_h5_str writes a FIXED-width array for label axes, this writes exactly one
+! Where fel_h5_str writes a fixed-width array for label axes, this writes exactly one
 ! string at exactly its own length. An empty value becomes '(unrecorded)': a zero-length
 ! HDF5 string type is invalid, and the value would be indistinguishable from a recorded
 ! blank in any case.

@@ -2,8 +2,7 @@
 
 Lucifer (*lux ferre*, light-bringer) is an FEL tracker whose physics is transcribed
 from Genesis 1.3 Version 4 (GPL permits transcription), embedded in Bmad's lattice
-machinery by the seam of the design brief's
-section 4.1, and validated against Genesis over its `benchmark/Benchmark1-SASE`
+machinery by the seam, and validated against Genesis over its `benchmark/Benchmark1-SASE`
 configuration from bitwise-identical starting states.
 
 **The physics reference is the manual, [`doc/fel-physics.tex`](doc/fel-physics.tex)**
@@ -12,14 +11,7 @@ Genesis provenance, and which check pins it at what measured level. This README 
 the measured numbers, the validation methodology, and how to run everything. Where it
 touches physics it cites the manual's sections (`sec:core`, `sec:slippage`, ...).
 
-Citations of the form "brief §x.y" and "FINDINGS.md n.m" refer to the port's two
-working documents: the design brief (the deliverable sequence and its decisions) and
-the transcription-findings log (the numbered defects and lessons found while
-validating against Genesis). Both are development records maintained with the
-project, outside this repository. The citations stay because they are the audit
-trail behind the measured numbers below.
-
-No harmonics beyond the coupling formula. Everything else the brief's section 10 sequences through step 10 is in, including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the brief's 7.5 assertions enforced by name. Also see the FEL element section. Per-particle weights are carried from day one (brief section 5): the
+No harmonics beyond the coupling formula. Everything else in the deliverable sequence through step 10 is in, including the FEL element proper (deliverable 9): undulator segments are real Bmad wiggler elements with `tracking_method = custom`, their FEL parameters derived from lattice attributes, with the sanity assertions enforced by name. Also see the FEL element section. Per-particle weights are carried from day one: the
 packed arrays store one, every reduction uses it, and the split-weight check below tests
 the nonuniform case that no Genesis comparison can reach. The FEL step is OpenMP-parallel
 over slices (deliverable 5), with thread-count independence (bit-identical results at
@@ -40,13 +32,13 @@ shot-noise section.
 | `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis's, independent RNGs |
 | `lucifer/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
-| `lucifer/code/fel_import_mod.f90` | The distribution import (brief 10 step 10): a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer. Also see the distribution-import section |
+| `lucifer/code/fel_import_mod.f90` | The distribution import: a bunch_struct resampled into FEL slices by Genesis's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis-distribution-file writer. Also see the distribution-import section |
 | `lucifer/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
 | `lucifer/tests/scripts/check_import.py` | Import checks: exact current profile vs Genesis on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `lucifer/code/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `lucifer/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
 | `lucifer/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
-| `lucifer/code/fel_unaveraged_mod.f90` | The unaveraged verification mode (brief 6.6, manual `sec:unaveraged`): full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
+| `lucifer/code/fel_unaveraged_mod.f90` | The unaveraged verification mode: full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
 | `lucifer/tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
 | `lucifer/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
 | `lucifer/tests/run_fel_benchmark.sh` | The whole validation, one command |
@@ -58,7 +50,7 @@ shot-noise section.
 | `lucifer/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis deck: one undulator segment, importing the same dumps |
 | `lucifer/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis decks: the time-dependent pair, 32 slices with shot noise |
 | `lucifer/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
-| `lucifer/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement (brief 8.3): one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding the element attribute) |
+| `lucifer/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement: one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding the element attribute) |
 
 ## Running
 
@@ -88,7 +80,7 @@ element's `ds_step` (Bmad's standard step attribute, which is Genesis's `delz` l
 the lattice like every other parameter, and the bookkeeper's `num_steps =
 round(l/ds_step)` is exactly Genesis's unroll), in Genesis's exact order: transverse half step, RK4 advance of (theta, gamma) with
 the field gathered once per step, transverse half step, then source deposition and the
-`exp(K2 dz)` field solve. Bmad tracking is never used inside (the brief's rule:
+`exp(K2 dz)` field solve. Bmad tracking is never used inside (the rule:
 `symp_lie_bmad` resolves the wiggle motion the period-averaged map assumes away).
 
 Everywhere else (the seam) the packed slice converts to `coord_struct`s by plain
@@ -104,8 +96,8 @@ the particle-specific lag carried by Bmad's z:
 theta_j = phi0 - ks*tau_j,    tau_j = -z_j/beta_j = c*(t_j - t_ref)
 ```
 
-This is the reference-offset formulation the design brief's section 8 identifies as the
-FP32-safe one, and it removes the brief's 6.4 hazard outright: z does not wrap, so slice
+This is the reference-offset formulation identified as the
+FP32-safe one, and it removes the wrap hazard outright: z does not wrap, so slice
 migration has no theta-wrap-plus-index update to get wrong. The longitudinal RK4 still
 runs in Genesis's (theta, gamma) chart as per-step working variables. theta <-> z is an
 affine map, under which RK4 is exactly invariant, so the verbatim transcription survives.
@@ -146,13 +138,13 @@ slice rotating out at the head of the time window is discarded and re-enters zer
 the tail. Drifts autophase `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths onto the last
 interlude element before each undulator (`Lattice::calcSlippage`), and the end-of-lattice
 fixup is **unguarded in Genesis** (`+1` even with no trailing drift at all), which
-costs one final rotation if transcribed with a guard Genesis does not have (FINDINGS.md
-7.1, found at 0.84 of the final field). Everything reading the record in time order
+costs one final rotation if transcribed with a guard Genesis does not have (found at
+0.84 of the final field). Everything reading the record in time order
 (the per-slice diagnostics, the final field dump) unrotates through `fel_field_index`,
 as Genesis does at `writeFieldHDF5.cpp:86` and `Diagnostic.cpp:852`. Beam slices never
 rotate.
 
-## The FEL element (brief 7.5): parameters live on the lattice
+## The FEL element: parameters live on the lattice
 
 (Physics: manual `sec:element`.)
 
@@ -169,7 +161,7 @@ the element attributes:
   1 ulp, measured below.
 - Helicity from `field_calc` (`helical_model` / `planar_model`), never from the stored
   `k1x`/`k1y` wiggler attributes, whose helical sign convention disagrees with Bmad's
-  own tracking locals (brief 7.5, and nothing here cross-uses them).
+  own tracking locals.
 - Genesis's natural-focusing split from the helicity defaults (`kx = ky = 0.5*k_u^2`
   helical, `0`/`k_u^2` planar, LatticeParser.cpp:328-333). Bmad's `kx` roll-off
   attribute is not yet mapped onto that split and must be zero.
@@ -178,18 +170,18 @@ Outside the driver's own FEL walk the element is just a periodic wiggler, tracke
 Bmad's standard kernel through two hooks wired before `bmad_parser`:
 `track1_custom_ptr` and `make_mat6_custom_ptr` both delegate to `track_a_wiggler`, so
 the reference time acquires the resonant undulation delay from Bmad's own code
-(brief 7.5) and the transfer-matrix bookkeeping works. Both hooks are load-bearing:
+and the transfer-matrix bookkeeping works. Both hooks are load-bearing:
 `mat6_calc_method` resolves to custom alongside the tracking method, and Bmad calls
 through a null `make_mat6_custom_ptr` (a jump to address zero) if a program sets only
 the tracking hook.
 
 The 7.5 assertions are enforced at the element's first touch (the reference pass
-inside `bmad_parser`, through those hooks) and refuse BY NAME: a missing `b_max`
+inside `bmad_parser`, through those hooks) and refuse by name: a missing `b_max`
 (Bmad's own kernel would silently give `osc_amplitude = 0`: no field, no resonance, no
 error), a missing `l_period` (same silence), and a fieldmap `field_calc` (which
 segfaults the parse-time reference tracking if allowed through). Enforcing them any
 later is provably too late. The missing-`b_max` lattice otherwise dies downstream on
-an unrelated generation message. The assertions live in ONE routine
+an unrelated generation message. The assertions live in one routine
 (`fel_assert_wiggler_sane`). A second inline copy was tried and removed because
 redundant assertions mask the removal of either copy under mutation testing. All three
 refusals are permanent harness checks.
@@ -202,7 +194,7 @@ reading it from input.
 
 **The FEL tracking mode is a per-element lattice attribute** (`fel_tracking`,
 registered by the driver, class-settable as `wiggler::*[fel_tracking] = ...`), so
-averaged and unaveraged segments mix freely in one line. Unset/0, THE DEFAULT, is
+averaged and unaveraged segments mix freely in one line. Unset/0, the default, is
 averaged with the transverse maps of Bmad's own `bmad_standard` periodic-wiggler
 kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like
 end kicks, chromatic via `p0/p`). `1` is the unaveraged verification mode. `-1` is
@@ -235,7 +227,7 @@ tiers). Measured, on the numbers this tree was developed against:
 | Tier | What runs | Largest relative difference |
 |---|---|---|
 | `tier1` | One undulator segment: the FEL core alone | **1.8e-6** (the impedance-constant floor, previously 2.8e-11 with Genesis's constants transcribed) |
-| `tier1_unavg` | The same segment and dumps, tracked by the UNAVERAGED mode against Genesis's averaged run | **6.9e-2**: a priced model difference (sin² ramps vs hard edges, no averaging, integrator structure), dominated by the final-field phase. The power curve agrees at 6.1e-3 and per-particle gamma at 3.7e-6, and theta shows a CONSTANT ~6.6 rad ramp-phase offset with only 2.8e-3 rms about it |
+| `tier1_unavg` | The same segment and dumps, tracked by the unaveraged mode against Genesis's averaged run | **6.9e-2**: a priced model difference (sin² ramps vs hard edges, no averaging, integrator structure), dominated by the final-field phase. The power curve agrees at 6.1e-3 and per-particle gamma at 3.7e-6, and theta shows a constant ~6.6 rad ramp-phase offset with only 2.8e-3 rms about it |
 | `tier2_genesis` | Full 6-FODO line, interludes via the transcribed Genesis model | **1.8e-5** (constants floor through full gain, previously 5.9e-8) |
 | `tier2_bmad` | Full line, interludes via the Bmad seam | **5.0e-2** (power curve 1.3e-2): a measured model difference, see below |
 | `weight_split` | tier1 rerun with every particle split into coincident w/3 + 2w/3 copies, against the unsplit run | **3.6e-13** (Fortran vs Fortran, constants-independent) |
@@ -256,7 +248,7 @@ tier rather than check it, run from a kept work directory:
 and bunching curves, plots the checked elementwise relative power difference along the
 line, and the per-slice exit power, e.g. `plot_fel_compare.py tdsase.diag.txt
 AramisTDSASE.out.h5`. Add `--fld <tier>-final.wf.h5 <GenesisRoot>-final.fld.h5` for a
-second figure overlaying the FINAL FIELD (on-axis amplitude and unwrapped-phase
+second figure overlaying the final field (on-axis amplitude and unwrapped-phase
 lineouts, plus the transverse map of the complex difference). That panel shows
 what a phase-dominated tier number is made of: for `tier1_unavg`, an amplitude overlay
 indistinguishable by eye, a −0.03 rad on-axis phase offset, and the 6.9e-2 difference
@@ -302,13 +294,13 @@ a chaotic separatrix tail (see below).
 The final per-particle theta difference is printed with max, rms and median but does not
 check the comparison. theta is a bucket phase: at saturation neighboring trajectories
 separate exponentially, so the worst-particle difference measures Lyapunov amplification,
-not implementation quality (the brief's 9.1 warning about chaotic growth, met in
+not implementation quality (the warning about chaotic growth, met in
 practice: `tier2_genesis` has median 6.4e-14 rad against max 2.0e-5). Its collective
 effect is checked, through the bunching curve and the final field.
 
 ### The harness bites
 
-Verified by mutation, the FINDINGS.md 4.1 discipline. Dropping the factor 2 on the source
+Verified by mutation. Dropping the factor 2 on the source
 term fails tier1 at 3.5e-1. Dropping the conjugation in the field gather fails at 2.8e-2.
 Using one particle's weight for every deposition, invisible to every Genesis-based
 tier, fails the split-weight check at 2.4e-1. One sensitivity was knowingly traded away
@@ -324,7 +316,7 @@ rotation fails td1 at 1.0e9. Dropping the drift autophasing fails td2_genesis at
 1.9e8. The fourth sensitivity was demonstrated live rather than by mutation: guarding the
 end-of-lattice autophasing the way the mid-lattice case is guarded (one wavelength short
 on the final step) failed td1 at 0.84 of the final field during development, which is
-how the unguarded `+1` in Genesis (FINDINGS.md 7.1) was found. The elementwise per-slice
+how the unguarded `+1` in Genesis was found. The elementwise per-slice
 power comparison is what makes these loud: a one-slice misalignment puts finite power
 against near-vacuum slices, so the failure signature is orders of magnitude, not percent.
 
@@ -337,12 +329,12 @@ unrelated downstream message instead of by name, which the check's grep rejects.
 
 The thread-independence check bites too: reintroducing a shared source accumulator across
 slices (the exact state of the code before deliverable 5) puts the 1-thread and 8-thread
-runs apart by 7.0 relative in power, while the mutated 1-thread run is IDENTICAL to the
+runs apart by 7.0 relative in power, while the mutated 1-thread run is identical to the
 pristine one. That is the defining property of this bug class: invisible to every
 single-threaded check, including all seven Genesis tiers, and caught only by comparing
 across thread counts.
 
-## Parallelism (brief 4.3): OpenMP over slices, bit-identical by construction
+## Parallelism: OpenMP over slices, bit-identical by construction
 
 Slices are independent within an integration step: the only cross-slice operations are
 slippage (an index rotation, applied serially between steps) and the per-beam `phi0`
@@ -414,12 +406,12 @@ agree at the documented seam level (4.0e-2) before any timing is quoted:
 | `lucifer` (OpenMP) | 123.6 s | 19.4 s (12 threads) | 6.4x |
 
 The tracker is 1.2x faster serial and 1.85x faster at 12 workers. The parallel gap is
-the design brief's section 4.3 bet showing up in a measurement: Genesis's 12-rank run
+the shared-memory bet showing up in a measurement: Genesis's 12-rank run
 spent 68 s of system time on the per-step MPI slippage ring exchange and diagnostics
 gather, where this code's slippage is an index rotation in shared memory and costs
 nothing to communicate.
 
-## Shot noise under weights (brief 6.2): the loader's noise is physical, and checked
+## Shot noise under weights: the loader's noise is physical, and checked
 
 (Physics: manual `sec:loading`.)
 
@@ -427,22 +419,22 @@ A slice of current I represents `N_lambda = I*slice_spacing/(e*c)` real electron
 physical shot noise means `<|b(h)|^2> = 1/N_lambda` per harmonic. The built-in loader
 imposes it Fawley style, transcribed from Genesis's `ShotNoise::applyShotNoise` and
 generalized to per-particle weights in one substitution: the per-beamlet electron count
-in the amplitude is the beamlet's REAL charge over e, not Genesis's slice-uniform
+in the amplitude is the beamlet's real charge over e, not Genesis's slice-uniform
 `ne/mpart` (identical for uniform weights). The algebra then gives `1/N_lambda` for any
-cross-beamlet weight distribution with no correction factors (FINDINGS.md 7.6). Weights
+cross-beamlet weight distribution with no correction factors. Weights
 must stay uniform within a beamlet. The quiet cancellation is per beamlet. Genesis's
 silent `nbl < 1` clamp is kept but counted and warned.
 
-The N_eff discipline (brief 6.2's trap): the loader reports per-slice `N_lambda` and
+The N_eff discipline: the loader reports per-slice `N_lambda` and
 `N_eff = (sum w)^2/sum w^2`, and refuses to impose noise on a slice whose pre-noise
 quiet floor `max_h |b(h)|^2` is not far below the target: swept over every harmonic
 the beamlet structure can resolve (`1..nbins-1`), not just the imposed ones, because an
 unquiet weight pattern can park its floor on a harmonic the imposition never touches
-(FINDINGS.md 7.7, found by this guard's own mutation test).
+(found by this guard's own mutation test).
 
 Two permanent checks in the harness:
 
-- `check_shot_noise.py` (self-referenced, FINDINGS 6.9): many-seed loading-only runs,
+- `check_shot_noise.py` (self-referenced): many-seed loading-only runs,
   `<|b(h)|^2>*N_lambda` against 1 within 5/sqrt(n) for harmonics 1-3, uniform AND
   0.25x/1.75x alternating beamlet weights. Measured 1.03 in both modes.
 - `check_sase_startup.py` (cross-code): dark start, one segment, each code generating
@@ -459,7 +451,7 @@ their deterministic complement: Genesis generates the noisy beam, writes it, and
 codes track the identical realization dark through the full line, so startup-from-noise
 is also compared elementwise like any other tier.
 
-## Distribution import (brief 10 step 10): a bunch_struct, resampled Genesis's way
+## Distribution import: a bunch_struct, resampled Genesis's way
 
 (Physics: manual `sec:import`.)
 
@@ -480,7 +472,7 @@ the slice current comes from the same window -- Genesis's `count*dQ*c/dslen`,
 generalized to the weight sum `c*sum(w)/dslen`, identical for uniform weights and the
 only weighted generalization made. Candidates are brought to `npart/nbins` beamlet
 seeds by random deletion or by Genesis's phase-space interpolation (normalize 5D to
-unit rms. Nearest ORIGINAL neighbor under a metric whose per-coordinate weights are
+unit rms. Nearest original neighbor under a metric whose per-coordinate weights are
 fresh random draws. Child at midpoint plus uniform[-1,1] times the difference). Theta
 is refilled over one beamlet spacing, mirrored into nbins bins, and the deliverable-6
 Fawley loader imposes shot noise with `ne = round(I*lambda*sample/(e*c))`, shared
@@ -493,7 +485,7 @@ For the same reason there is no namelist `gamma0` anywhere in the driver anymore
 reference energy derives from the lattice's `e_tot`, after the first external user fed
 a hand-rounded gamma0 against a round lattice energy and the run died mid-tracking on
 the seam's backstop p0c check (two specifications of one truth was the defect,
-FINDINGS.md 7.19). Facts pinned by reading: the `align*` parameters are parsed but
+one specification of one truth). Facts pinned by reading: the `align*` parameters are parsed but
 never used in v4, and the `shotnoise` flag is read but never consulted (the import
 applies noise unconditionally, skipping only zero-current slices) -- both kept as
 Genesis has them, neither transcribed as functional. one4one is out of scope: weights
@@ -504,7 +496,7 @@ Validation (`scripts/check_import.py`, in the harness) splits along the RNG boun
 
 | Check | Kind | Measured |
 |---|---|---|
-| per-slice current profile vs Genesis importing the SAME file | exact | **8.2e-13** of peak (24 slices) |
+| per-slice current profile vs Genesis importing the same file | exact | **8.2e-13** of peak (24 slices) |
 | the generated bunch carries the specified emittance | exact | ex, ey within 3e-5 of spec |
 | split-weight invariance (coincident w/3 + 2w/3 copies) | exact | moments 1.8e-15, currents 7.4e-14 |
 | openPMD round trip (write_opmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
@@ -516,15 +508,15 @@ Mutations bite, each on the check built for it: normalizing the current by the s
 spacing instead of `dslen` fails the exact current check at 6.5e-1. Skipping the shot
 noise fails the startup check at ln ratio -57 (a dead-quiet start). Collapsing the
 beamlet mirroring fails the startup check at ln ratio +4.7. One planned mutation --
-refilling theta over 2pi instead of 2pi/nbins, turned out to be an EQUIVALENT
-MUTANT: under the beamlet mirroring, a uniform seed over the full turn is uniform
+refilling theta over 2pi instead of 2pi/nbins, turned out to be an equivalent
+mutant: under the beamlet mirroring, a uniform seed over the full turn is uniform
 modulo one beamlet spacing, the quiet cancellation is untouched, and the checks
-correctly pass it (FINDINGS.md 7.16). It is a convention, not a defect class. The
+correctly pass it. It is a convention, not a defect class. The
 load-bearing neighbor (the mirroring itself) is what gets mutation-tested. (A fourth
 mutation, the match transform's slope/momentum order, retired with the match
 transform itself, see below.)
 
-Recorded improvement path: with per-particle weights the resampling is OPTIONAL -- a
+Recorded improvement path: with per-particle weights the resampling is optional -- a
 direct weighted import (every bunch particle a macroparticle in its slice, no deletion,
 no interpolation) has no Genesis counterpart outside one4one and is likely the better
 default once validated. Genesis's O(n^2) randomly-reweighted nearest-neighbor
@@ -532,7 +524,7 @@ interpolation is the first thing worth replacing. `examples/import/` is the
 self-contained demonstration: a beam_init bunch, matched by the import, tracked dark
 through the full line.
 
-## Slice migration under weights (brief 6.4)
+## Slice migration under weights
 
 (Physics: manual `sec:migration`.)
 
@@ -545,17 +537,17 @@ across the move to rounding. No wrap protocol exists to get wrong (the 4.2 decis
 paying off a third time). `fel_migrate_slices` is the weighted generalization of
 `Sorting::localSort`: same criterion (`atar = floor(theta/slen)`), same swap-with-last
 removal, same rescan semantics. The MPI `globalSort` has no counterpart here by design
-(brief 4.3). Particles leaving the window ends are dropped WITH THEIR CHARGE COUNTED and
+Particles leaving the window ends are dropped with their charge counted and
 reported per event. Genesis discards them silently at the world edges
-(`Sorting.cpp:194-195`). Migration is OFF BY DEFAULT (`migrate = T` enables): the
+(`Sorting.cpp:194-195`). Migration is off by default (`migrate = T` enables): the
 Genesis-comparison tiers run against Genesis without one4one, which never migrates, so
 enabling it inside a transcription-level comparison would be a model difference. The
 pass runs serially at a per-element stride between the parallel regions, so the
 thread-independence check is untouched. Per-slice `current` and `n_eff` are appended to
-the diag columns. N_eff drifts once particles migrate (brief 6.4) and is monitored,
+the diag columns. N_eff drifts once particles migrate and is monitored,
 not assumed.
 
-Four permanent checks (`check_migration.py`, self-referenced per FINDINGS 6.9): charge
+Four permanent checks (`check_migration.py`, self-referenced): charge
 conservation under heavy migration (a 60-m_ec² energy-spread beam, 74k moves, in-window
 charge plus reported drops equals initial charge at every record, measured 1.5e-14),
 exact phase continuity (the whole-beam weighted phasor obeys
@@ -565,20 +557,20 @@ postcondition), and no-op bit identity (a frozen-phase run with migration enable
 reports zero moves and reproduces the disabled run byte for byte).
 
 Mutations bite, each caught by the instrument built for it: charge left behind on the
-move fails conservation at 8.9e-1. Leaving z unadjusted on the move SURVIVES conservation and
+move fails conservation at 8.9e-1. Leaving z unadjusted on the move survives conservation and
 continuity, because the mover cascade evaporates through accounted window-end drops, a
 balance sheet that balances while the beam disappears. It is caught by window residency (17
 survivors outside). Removing the high-side bounds check dies on the constructed
 off-the-end mover with a bounds trap, never touching memory beyond the arrays
-(FINDINGS.md 7.8).
 
-## Wakes and space charge (brief 10 step 8): Genesis's granularity, checked
+
+## Wakes and space charge: Genesis's granularity, checked
 
 (Physics: manual `sec:wakes`, `sec:spacecharge`.)
 
 Inside undulators and Genesis-model interludes, the collective terms are transcribed at
 Genesis's granularity (`fel_collective_mod`): wakes as a per-slice energy-loss rate --
-the three single-particle kernels (resistive wall via the NUMERICAL impedance of Bane &
+the three single-particle kernels (resistive wall via the numerical impedance of Bane &
 Stupakov SLAC-PUB-10707, with AC conductivity and round/flat geometry. The undulator gap
 wake, convolved with dI/ds, and surface roughness via the complex-q contour) superposed and
 causally convolved with the window's current profile, applied between the longitudinal
@@ -591,7 +583,7 @@ change the currents. Every recompute appends a z-stamped eloss block to
 `<out_root>.wake.txt`, making "the wake followed the currents" a parseable fact.
 
 Two decisions recorded here as much as in the code: the numerical impedance is a clean,
-SEPARABLE routine (`fel_resistive_wall_wake`) because that computation is a future port
+separable routine (`fel_resistive_wall_wake`) because that computation is a future port
 target into Bmad proper as a wake source, and the space-charge solver sits behind an
 interface a Bmad-slice implementation can later fill. Bmad's slice method is suspected
 the better model long-term, Genesis's is transcribed now for consistency, and the
@@ -612,7 +604,7 @@ energy channel, and every record's `d<gamma>` must equal `eloss*dz/m_electron` e
 spread invariant under the uniform
 kicks (4.9e-13, after the diagnostics moved to a two-pass variance, since the one-pass form
 hid sigma-scale cancellation noise for five deliverables because nothing ever moved the
-mean, FINDINGS.md 7.9), and under heavy migration the eloss blocks must multiply and
+mean), and under heavy migration the eloss blocks must multiply and
 change (49 blocks measured).
 
 Mutations bite, each on its named check: reversing the convolution's causality (wake
@@ -620,12 +612,12 @@ collected from trailing charge) fails tdwk at 7.0e-3 against its 8.7e-7 pristine
 flipping the sign of `ez` fails tdsc at 9.1e-1. Removing the migration-stride recompute
 leaves one eloss block and fails the stale-wake structural check.
 
-## Bmad element wakes across the whole bunch (brief 10 step 11)
+## Bmad element wakes across the whole bunch
 
 (Physics and conventions: manual `sec:seamwake`.)
 
 Elements carrying Bmad `sr_wake` definitions (pseudomodes and the tabular `z_long`,
-binning plus FFT) act across the WHOLE time window. For wake elements only, the seam
+binning plus FFT) act across the whole time window. For wake elements only, the seam
 concatenates all slices into one bunch in global window coordinates,
 
 ```
@@ -642,13 +634,13 @@ the checks corrected it. Interlude elements pass through Bmad's own `track1_bunc
 `sr_wake` get one whole-window kick at the step nearest mid-element via
 `track1_sr_wake` directly -- a pure kick, no transport, with z rescaled by
 `beta_new/beta_old` to hold theta (the same convention as `wake_on`'s energy kick).
-Bmad's wake machinery is used AS IS: the seam supplies global z and charges, Bmad
+Bmad's wake machinery is used as is: the seam supplies global z and charges, Bmad
 supplies the physics (`ix_z(1)` is the bunch head at largest `vec(5)`,
 `wake_mod.f90`). Refused by name: lr (multi-bunch) wakes. A pseudomode `z_max` or a
 `z_long` table extent `z0` shorter than the window (Bmad would kill the bunch
 mid-run). A Bmad drift cannot carry a wake at all (use a pipe, and the driver now
-stops on ANY `bmad_parser` error rather than running a partial lattice, found when an
-example's drift wakes silently never attached). Wakes are resolved through LORDS
+stops on any `bmad_parser` error rather than running a partial lattice, found when an
+example's drift wakes silently never attached). Wakes are resolved through lords
 (`pointer_to_wake_ele`): a wake on a superimposed or split element lives on the lord
 and `ele%wake` is null on its slaves. Checking `ele%wake` directly was the first
 shipped version's hole, found by a user's lattice whose lord wakes fell through to the
@@ -656,14 +648,14 @@ per-slice path (the zero-charge INFO spam returning was the symptom). Zero-lengt
 elements are kept in the walk for the same reason (a wake on a marker-like element is
 a standard Bmad idiom). Zero-length elements without wakes are skipped as before.
 
-Checks (`scripts/check_seam_wake.py`, self-referenced per FINDINGS 6.9, every wake
+Checks (`scripts/check_seam_wake.py`, self-referenced, every wake
 measurement an A-B difference against a bit-identical no-wake run on a one-step
 wiggler so the FEL evolution cancels exactly):
 
 | Check | Measured |
 |---|---|
 | constant-pseudomode closed form (W = amp, self = W(0)/2), per-slice means | **6.2e-10** |
-| causality: kick ahead of ALL charge (must be exactly zero) | **0.0** bitwise |
+| causality: kick ahead of all charge (must be exactly zero) | **0.0** bitwise |
 | d8 direction cross-check: `wake_on` marks the same affected mask | agrees, 0 ahead |
 | z_long vs first-principles particle convolution of the same table | **3.4e-8** |
 | resolved-beam z_long vs `wake_on`, same kernel, per-slice bound derived from Genesis's half-slice head deficit | 0.55 of bound |
@@ -673,9 +665,9 @@ wiggler so the FEL evolution cancels exactly):
 
 The kernel bridge: `write_wake_kernels` exports the deliverable-8 Bane-Stupakov
 kernels (eV/(m electron), s = 0 rows carrying the Bane self-slice half factor), and a
-`z_long` table built from them (sign-flipped, since the d8 kernels are stored as SIGNED
+`z_long` table built from them (sign-flipped, since the d8 kernels are stored as signed
 energy loss and Bmad's table is positive-decelerating; unhalved at s = 0, causal side
-z < 0, zero-padded past the window) gives the SAME physical wake through two
+z < 0, zero-padded past the window) gives the same physical wake through two
 independent implementations. Measured on the full 96-slice SASE line with a 0.5 mm
 copper chamber on every element (`examples/bmad_wake/`): exit mean energy drop
 -2.324 (Bmad z_long, once per element) vs -2.308 m_e c^2 (`wake_on`, per step), the
@@ -689,7 +681,7 @@ Mutations bite: flipping the head/tail direction fails the closed form at 22 and
 causality at 2.8e-4. Dropping the slice offset (all slices coincide) fails both,
 unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
 
-## The unaveraged verification mode (brief 6.6, step 13): fc measured, not assumed
+## The unaveraged verification mode: fc measured, not assumed
 
 (Physics, conventions, and provenance: manual `sec:unaveraged`. MINERVA (Freund and
 van der Slot) is the production existence proof and a statistical ~1e-3-class
@@ -697,7 +689,7 @@ reference only, never a bit check.)
 
 `fel_tracking = 1` is a per-element lattice attribute, so unaveraged segments mix
 with averaged ones in a single line. It integrates the particles through the undulator's
-REAL field: the full Newton-Lorentz quiver, RK4 at `fel_steps_per_period` (default
+real field: the full Newton-Lorentz quiver, RK4 at `fel_steps_per_period` (default
 20, MINERVA's envelope), with the radiation field as a Strang-split kick and a source
 built from the actual quiver current. Nothing from the averaged coupling path appears
 in it (the harness greps `fel_und_coupling|faw` out of the module), so the averaged
@@ -735,7 +727,7 @@ non-symplecticity is priced at gamma exact / emittance ≤ 3.3e-6 over the longe
 benchmark segment (266 periods, 5320 steps), with the ballistic check standing watch
 should production-length unaveraged runs ever appear.
 
-The JJ Bessel factor and its h=3 counterpart EMERGE from the raw dynamics at 6e-4,
+The JJ Bessel factor and its h=3 counterpart emerge from the raw dynamics at 6e-4,
 the first independent check on `fel_und_coupling`'s closed forms, and on the
 harmonic-load rule (the beamlet quiet start cancels every harmonic below `nbins`, so
 `nbins = 8` is quiet at h=3 and no quadrature load is needed for this measurement).
@@ -744,10 +736,10 @@ harmonic-agnostic.
 
 Mutations bite, each on its named check: flipping the E·v kick sign fails the ledger
 at 2.0 (energy created) and the gain comparison at 0.69, while the magnitude-blind
-fc checks PASS it, which is why the ledger is check zero. A hard-edge entry
+fc checks pass it, which is why the ledger is check zero. A hard-edge entry
 (`fel_ramp_periods = -1`, the explicit sentinel) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
 probe beam. Note the exit momentum re-absorbs the quiver at integer-period lengths,
-so the ORBIT, not the exit mean px, is the reliable instrument, FINDINGS.md 7.24).
+so the orbit, not the exit mean px, is the reliable instrument).
 skipping the exit handoff flag is refused by name at the first seam element.
 
 ## The saturation demo: one practical SASE case, three trackers, one clock
@@ -762,7 +754,7 @@ rerun. The script is a thin clock-and-check runner. Does this work for a practic
 case? The question is answered on Genesis's
 own Benchmark1-SASE configuration run to saturation: the full 57 m 6-FODO Aramis line,
 dark start, growth from shot noise alone, 96 slices × 2048 particles, all three
-trackers fed IDENTICAL initial dumps and each given the machine's full performance-core
+trackers fed identical initial dumps and each given the machine's full performance-core
 count. Wall times come from one external clock. The exit answers must agree at the
 documented levels before any timing or report is produced. The run ends with a
 multi-page PDF summary (`tests/scripts/report_fel_saturation.py`), regenerated from the
@@ -786,7 +778,7 @@ price is invisible here because saturation self-limits the power. It is also 1.2
 faster than Genesis at equal cores, each code computing its own in-run diagnostics,
 and ours are the full 6x6/4x4 moment sets of the stats file where Genesis's are
 scalar columns (the diag/stats fusion in the diagnostics section is where that speed
-came from). Spontaneous radiation is OFF in the demo on both sides, matching Genesis's
+came from). Spontaneous radiation is off in the demo on both sides, matching Genesis's
 `&sponrad` default. Turning `radiation_damping`/`radiation_fluctuations` on costs the
 beam ~1.3e-4 of its energy over the line (~0.5 rho of accumulated detuning -- the size
 that moves hard-X-ray saturation, and the reason the switches exist).
@@ -796,8 +788,8 @@ paying its documented ~32x cost. It reproduces the startup (coherent shot-noise
 radiation matches both codes to ~8%), the gain curve shape, and the saturation
 location (56.2 vs 56.8 m), and rides ~2%/m above the KMR codes through the
 exponential regime, while its beam gives up ~14x more energy. The energy difference is
-understood and measured (FINDINGS.md 7.27): both models emit spontaneous shot-noise
-radiation of the same magnitude, but the averaged/KMR model does not DEBIT the beam
+understood and measured: both models emit spontaneous shot-noise
+radiation of the same magnitude, but the averaged/KMR model does not debit the beam
 for it (its step adds 2S to the field and kicks with E, so the 4|S|^2 part of the
 field energy is created, measured factor 134 on a dark segment), while the unaveraged
 mode conserves energy by construction and therefore pays. The unaveraged mode's
@@ -813,7 +805,7 @@ growth), and "slipped out forward" is bookkept, not asserted: the unaveraged led
 banks the energy of every slice the slippage zero-fill discards (U_escaped) and the
 deposit's own |src|^2 (U_spont, the one term the kick/deposit duality does not charge
 to the beam -- physically the substep's spontaneous emission), so the time-dependent
-books close EXACTLY: E_beam + U_window + U_escaped - U_spont conserved to 2.9e-3 of
+books close exactly: E_beam + U_window + U_escaped - U_spont conserved to 2.9e-3 of
 turnover over the whole demo (8.0e-6 on the harness configuration, where it is a
 standing check at 1e-3. The demo's 6.6e-8 J = 7.9e-9 held + 5.9e-8 escaped - 1.1e-9
 spontaneous credit). The figure's dotted curve is that closure drawn on the budget
@@ -828,7 +820,7 @@ radiation) is the named future check. Until then the demo prices the difference 
 
 Two more unaveraged end effects were found and dispatched on the way to this figure:
 the ramps' slippage deficit (3.3 rad of optical phase per end, compensated exactly by
-the built-in handoff phase jump, FINDINGS.md 7.26, and tier1_unavg's theta median fell
+the built-in handoff phase jump, and tier1_unavg's theta median fell
 from 6.6 rad to 6.4e-2) and their reduced coupling length (~2% ln per segment at the
 default 2-period ramps, real field physics, priced and left visible).
 
@@ -864,21 +856,21 @@ The production statistics live in `<out_root>.stats.h5`: a `bmad-stats` 1.0 file
 the `fel` extension (manual sec:stats), the planned reset from the development format
 `lucifer-stats` 2.x. The layout is deliberately not FEL-specific, and the file says
 what it holds. Every dataset carries `@unit`, `@long_name`, `@description` and
-`@axes`, and EVERY NAME IN `@axes` RESOLVES TO A `coords/` DATASET, trailing label axes
+`@axes`, and every name in `@axes` resolves to a `coords/` dataset, trailing label axes
 included, so a reader needs no table of names and never infers a dimension from its
 length: `scripts/read_stats.py` is the one reader everything in the tree uses, and it
 hard-codes nothing. The acceptance test is `scripts/validate_bmad_stats.py`, the
 format's own conformance checker, program-blind and run by the harness, which must
-report zero failures. Units are FIXED Bmad units (m, rad, eV, s, C, J, W) and the
-attributes are DOCUMENTATION, never load-bearing, which is the opposite of openPMD's
+report zero failures. Units are fixed Bmad units (m, rad, eV, s, C, J, W) and the
+attributes are documentation, never load-bearing, which is the opposite of openPMD's
 `unitSI` and deliberately not mixed with it in one file. The version is refused by name
 rather than negotiated.
 
 | group | what |
 |---|---|
-| `coords/` | every axis once: `record` (THE record axis) with `s`, `ix_ele` (`@indexes='ele'`) and `at_element_end` (`@selects='element_end'`) as variables on it, `element_end` and `s_element_end`, the `slice` axis with `ct_slice`, `t_slice` and `z_slice` on it, the `ele` axis, and the label axes `bmad`, `bmad_col`, `bmad_t`, `wavefront`, `wavefront_col`, `plane`, `mode` |
-| `params/` | the INPUT tree: one subgroup per honored input struct (`global`, `beam_init`, `bmad_com`, `space_charge_com`, `wake`, `sc`, `wavefront_init`, ...), each with `@struct`, every honored component resolved after defaults |
-| `run/` | what the run PRODUCED: `p0c`, the species, `slice_spacing`, the axis lengths as bookkeeping cross-checks |
+| `coords/` | every axis once: `record` (the record axis) with `s`, `ix_ele` (`@indexes='ele'`) and `at_element_end` (`@selects='element_end'`) as variables on it, `element_end` and `s_element_end`, the `slice` axis with `ct_slice`, `t_slice` and `z_slice` on it, the `ele` axis, and the label axes `bmad`, `bmad_col`, `bmad_t`, `wavefront`, `wavefront_col`, `plane`, `mode` |
+| `params/` | the input tree: one subgroup per honored input struct (`global`, `beam_init`, `bmad_com`, `space_charge_com`, `wake`, `sc`, `wavefront_init`, ...), each with `@struct`, every honored component resolved after defaults |
+| `run/` | what the run produced: `p0c`, the species, `slice_spacing`, the axis lengths as bookkeeping cross-checks |
 | `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), the envelope extremes `rel_max`/`rel_min` over `bmad_t`, plus derived `current` and `energy` in eV |
 | `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end axis, the nine twiss quantities in `twiss/` over the `plane` axis and in `modes/` over the `mode` axis |
 | `field/total/`, `field/x/`, `field/y/`, `field/harm<h>/` | one wavelength's total and each component, all with the same dataset names |
@@ -898,9 +890,9 @@ matrix's two sides (`bmad`, `bmad_col`) so that selecting one entry needs no rul
 the projected twiss planes (`plane`) from the normal modes (`mode`), because an
 eigen-emittance is not a projected emittance and one axis carrying both invites an
 average across them. **The slice axis exists**, and its
-coordinates are exact: the slice NUMBER is the axis, with `ct_slice` and `t_slice` on it
+coordinates are exact: the slice number is the axis, with `ct_slice` and `t_slice` on it
 free of any beta and `z_slice` marked as Bmad's z at the reference beta. The slice grid is
-uniform in TIME, not in z, which is what makes slippage an exact integer shift of the
+uniform in time, not in z, which is what makes slippage an exact integer shift of the
 field record. All three carry `@head_direction`, publishing the migration invariant that
 the high slice index is the window head, without which no per-slice profile can be
 trusted, let alone overlaid on another code's. **No dataset's meaning depends on what
@@ -911,7 +903,7 @@ cannot double-count. **Not computed is NaN**, not a zero that reads as an answer
 theta moments away from element ends, an empty slice's moments, the twiss of a degenerate
 slice.
 
-The per-record beam datasets are SUFFICIENT statistics, so
+The per-record beam datasets are sufficient statistics, so
 `scripts/bunch_params_from_stats.py` reconstructs a bunch_params dict from any
 (record, slice), and the harness holds that reconstruction against the twiss the
 tracker stored from Bmad's own `calc_bunch_params`. The field side stores
@@ -934,13 +926,13 @@ dump openPMD files at named elements (Bmad locator syntax, unknown names
 refused). `keep_escaped_field` banks every slice slippage transmits out of the window
 (`-escaped.fld.h5`, with per-slice wavefront_params and z_transmit, the one place that
 keeps Genesis field conventions since those two records have no home in the wavefront
-extension) and reconstructs the FULL PULSE at the exit plane (`-pulse.fld.h5`) by free-space propagation at
+extension) and reconstructs the full pulse at the exit plane (`-pulse.fld.h5`) by free-space propagation at
 finalize, because transmitted light is fixed information and never re-interacts, so
 whole-pulse statistics use the ABCD map on the banked moment matrices and never
 propagate numerically.
 
 `meta/` says which lattice and which input, and deliberately not more. Everything in it
-is a DATASET rather than an attribute, because HDF5 caps one attribute at 64 kB (the
+is a dataset rather than an attribute, because HDF5 caps one attribute at 64 kB (the
 largest that writes here is 65495 bytes) while the echoed namelist is 12 kB and a real
 lattice text 37 kB, and the failure path was a warning: provenance whose failure mode is
 silent absence must not sit on a resource limit. `meta/lattice_source` is the TOP-LEVEL
@@ -948,7 +940,7 @@ lattice file only, and says so, because Bmad's `call, file =` pulls in more and 
 wrapper lattice here recorded a call statement while the lattice it called was absent.
 `n_lattice_files` reports how many files the parser opened, so one means the text is the
 whole story. Reproduction rests on the `lattice/` table and the input echo, not on this
-group. And nothing here identifies a PERSON by default: the timestamp and the Bmad
+group. And nothing here identifies a person by default: the timestamp and the Bmad
 version identify the run, `lattice_file` is a base name, and the user and working
 directory go in only under `global%record_environment`. Note that `input_echo` echoes
 file names as the user typed them, so relative paths are the user's half of that.
@@ -965,16 +957,16 @@ Measured (check_diagnostics.py, in the harness -- cross-identities, not referenc
 | unknown dump element | refused by name | (refusal, no level) |
 
 diag.txt is untouched (the Genesis-comparison instrument): every benchmark tier
-reproduces bit for bit, including through the diag/stats FUSION: the per-record
+reproduces bit for bit, including through the diag/stats fusion: the per-record
 stats loop also evaluates the diag instrument (the identical fel_field_diag and
 fel_slice_diag calls per slice, so each slice's arithmetic is unchanged), and the
-diag writer only prints. That retired the formerly SERIAL per-record diag sweeps
+diag writer only prints. That retired the formerly serial per-record diag sweeps
 (all 96 field planes and 96 particle slices, every record), which were worth more
 than the whole stats machinery costs: measured on the saturation demo's averaged run
 (96 slices x 2048 particles, 255^2 grid, 12 threads), the pre-stats baseline was
-36.5 s and the run WITH full statistics is ~32 s. The diagnostics deliverable made
+36.5 s and the run with full statistics is ~32 s. The diagnostics deliverable made
 the tracker 12% faster, net. Per-slice element-end twiss is evaluated through Bmad's
-own calc_emittances_and_twiss_from_sigma_matrix FED FROM the already-computed
+own calc_emittances_and_twiss_from_sigma_matrix fed from the already-computed
 per-record moments (an element end always coincides with its last record), not by
 re-summing particles.
 
@@ -986,7 +978,7 @@ moments, by the pooled-covariance identity
 
 with each slice moved from its local z chart to the global window chart. That move is
 not a plain offset: `fel_concat_slices` places a particle at
-z_global = z_local + beta*(is-1)*spacing with the particle's OWN beta, so within a
+z_global = z_local + beta*(is-1)*spacing with the particle's own beta, so within a
 slice z depends on pz. Linearizing beta about the slice's mean pz makes the move an
 exact shear of (z, pz), and the pool applies it as S -> J S J^T with the single
 off-diagonal J(5,6) = (is-1)*spacing*dbeta/dpz. This replaced a concatenation of every
@@ -1004,7 +996,7 @@ parameters that are ratios of near-cancelling small terms, so their relative agr
 says more about their conditioning than about either computation. The same caution
 applies to whole beams: on a degenerate one (a window resampled far shorter than its
 bunch, where the transverse moments nearly vanish) the z cross terms agree only to
-4e-6 relative while agreeing to 1e-29 ABSOLUTE -- physically the same number. That is
+4e-6 relative while agreeing to 1e-29 absolute -- physically the same number. That is
 why the check measures on a physical configuration, and why it compares the whole
 matrix rather than chasing the relative error of an individual near-zero entry.
 The `element_end/` group is SELF-SUFFICIENT: beam moments and Twiss (whole window and
@@ -1012,7 +1004,7 @@ per slice) plus the radiation power, energy, on-axis intensity and bunching per 
 That is what makes `comb_ds_save < 0` usable rather than a trap. Bmad's comb semantics
 are kept verbatim ("< 0 => no comb calculated"), so that mode writes no per-record
 rows at all, and the element-end row is then the only record of the run, which is why
-it carries the field as well as the beam. With records present those field values ARE
+it carries the field as well as the beam. With records present those field values are
 the record's own (copied, so the datasets agree exactly). With no records they are
 evaluated at the element end by the same routines, angle moments not needed. Measured
 on the 96-slice SASE example: the two paths agree bit-for-bit.
@@ -1096,7 +1088,7 @@ checks, in the same commit. Nothing else printed to the terminal is.
 
 ## Two polarizations: vector radiation, tilt honored, the crossed undulator
 
-The radiation carries (Ex, Ey) when any FEL element is TILTED (`UNDY: UNDX,
+The radiation carries (Ex, Ey) when any FEL element is tilted (`UNDY: UNDX,
 tilt = pi/2` is a y-planar undulator, standard Bmad, no new attribute), or when the seed
 is y-polarized (`seed_polarization = 'y'`). Otherwise Ey is never allocated and the
 single-component path runs untouched (every tier bit-for-bit, the compatibility
@@ -1128,9 +1120,9 @@ draws its planes sequentially, so the generated beam itself is never swap-symmet
 The elliptical follow-on (cartesian_map-derived coupling, APPLE-II, the Ming-Xie
 ladder, B0's em_field_calc unification) builds on this foundation.
 
-## Harmonic fields and the openPMD wavefront (brief deliverable 2 + the field set)
+## Harmonic fields and the openPMD wavefront
 
-The walk carries an ordered SET of radiation fields, Genesis's `vector<Field*>`
+The walk carries an ordered set of radiation fields, Genesis's `vector<Field*>`
 shape, with the fundamental always entry 1. A harmonic field h (namelist
 `harmonics = 1, 3, ...`) lives at wavelength lambda_1/h and enters the physics in
 exactly three places: its coupling fc(h) (the Bessel factor, zero for every
@@ -1140,15 +1132,15 @@ factor appears. Genesis's per-field ks factors are its internal unit conversion,
 absorbed once. Harmonic fields start dark and grow from the beam's bunching
 (nonlinear harmonic generation: `examples/harmonics/`, P3 climbing nine decades to
 5.1 kW under a 200 MW fundamental in 4 m), or import. A single-entry set is the
-pre-harmonic walk BIT FOR BIT (the two-polarization overlay discipline again).
+pre-harmonic walk bit for bit (the two-polarization overlay discipline again).
 Harmonics with two live polarizations, and with an unaveraged element, are refused
 by name, so unvalidated combinations refuse rather than guess.
 
-Dumps speak ONE format, openPMD, in both directions. A field dump is an openPMD
-EXT_Wavefront file (`.wf.h5`), both polarizations as complex components of ONE mesh
+Dumps speak one format, openPMD, in both directions. A field dump is an openPMD
+EXT_Wavefront file (`.wf.h5`), both polarizations as complex components of one mesh
 record (h5py reads them as complex128 natively), one file per harmonic with
-photonEnergy identifying it, and a harmonic's file carrying `-h<h>`. The STANDARD
-DOCUMENT is authoritative: the harness verifies every required attribute against its
+photonEnergy identifying it, and a harmonic's file carrying `-h<h>`. The standard
+document is authoritative: the harness verifies every required attribute against its
 text independently of the writer. A file that is not openPMD is refused by name on
 import, with the conversion command in the message, and
 `lucifer/tests/scripts/convert_genesis.py` converts either kind of file in either
@@ -1185,10 +1177,10 @@ particles carry different weights comes back uniform. Per-particle weights are t
 port's day-one difference from Genesis, so that format cannot hold this code's state,
 and the dump is openPMD (`.beam.h5`): Bmad's own `hdf5_write_beam`, where openPMD's
 macro-charge IS the per-particle weight. Converting such a beam to a Genesis `.par.h5`
-is REFUSED BY NAME by the converter, with the slice, the weight spread and the total
+is refused by name by the converter, with the slice, the weight spread and the total
 charge in the message.
 
-THE SLICE PARTITION IS `particlePatches`, the standard's own partition of a species
+The slice partition is `particlePatches`, the standard's own partition of a species
 record: one patch per slice, in window order, and an empty slice is a patch of no
 particles. So the patch count IS the window, and the file needs no attributes of this
 code's invention to describe it. What openPMD has no place for comes from the deck
@@ -1198,7 +1190,7 @@ defaulted, since a wrong wavelength rescales every phase in the run. `one4one` n
 storage at all: the flag asserts that every macroparticle carries one electron, which is
 what the weights say.
 
-THE REFERENCE PHASE is folded into the file's time coordinate. The chart splits a
+The reference phase is folded into the file's time coordinate. The chart splits a
 particle's ponderomotive phase into a per-beam reference and a per-particle lag,
 `theta_j = phi0 + ks z_j / beta_j`, and no dump format has anywhere to put `phi0`, so
 every reader restarts it at zero. A dump therefore writes the lag the whole phase
@@ -1227,29 +1219,29 @@ momenta and a time where this code keeps `px`, `py` and a lag, so those pass thr
 comes back exact, so the levels above are bounds on what the chart could cost rather
 than expected values.
 
-## Phasing between segments (brief proposal 2026-08-20): measured, then built
+## Phasing between segments: measured, then built
 
 Between undulator segments the default is Genesis's behavior, verified by
 measurement before anything was written: scanning an inter-segment gap by fractions
 of 2 gamma^2 lambda (25.8 mm per turn at the benchmark) leaves the bunching phase
-entering the next segment FLAT on Genesis and on this code alike, since segments are
+entering the next segment flat on Genesis and on this code alike, since segments are
 autophased, and the fractional drift slip never reaches the coupling. The
 deliberate off-phase knob is the wiggler's own `z_offset` (standard Bmad
 misalignment, anchored at the nominal position): a displacement delta shifts the
 entry phase by exactly -2 pi delta/(2 gamma^2 lambda), and the same scan run as
-Genesis's own PHASESHIFTER element (which needs FINITE length to register, since a
+Genesis's own PHASESHIFTER element (which needs finite length to register, since a
 zero-length one silently does nothing) reproduces our curve at 1.9e-8, and the
-exit POWER against phi at 9.3e-9, so the phase reaches the physics identically, not
+exit power against phi at 9.3e-9, so the phase reaches the physics identically, not
 just the bookkeeping (both codes tracking the same Genesis-written initial dumps,
 on independently loaded beams the same comparison sits at 1.4e-4, which measures
 the two loaders, not the phasing). No new element, no new attribute.
 
 With `bmad_com[absolute_time_tracking] = T` in the lattice (honored per element
-through Bmad's own resolver), phasing follows the REAL spacings instead -- the
+through Bmad's own resolver), phasing follows the real spacings instead -- the
 recirculating-linac discipline: a wrong-length break visibly detunes the next
 segment, and the absolute-mode gap scan reproduces the relative-mode z_offset scan
 point by point. Chicanes work in both modes: the beam detours the closed bump via
-the seam while the radiation drifts the CHORD between undulator faces (from
+the seam while the radiation drifts the chord between undulator faces (from
 ele%floor, derived never entered). The arc-minus-chord delay becomes whole-slice
 window rotations plus, in absolute mode, its carrier phase. examples/chicane/
 flips a second segment between 1.32x gain and 0.94x absorption on 0.43 urad of
@@ -1299,14 +1291,14 @@ zero, so a future change that starts debiting the beam cannot pass unnoticed.
 The **unaveraged mode conserves energy by construction**, so its beam pays, but only
 for the radiation the grid can hold. An SVEA grid represents angles to the FFT Nyquist
 θ_max = λ/2dx, and the evidence that the captured 3.3% really is acceptance-limited
-undulator radiation is its SCALING: varying only the acceptance (ngrid 127/255/511 at
+undulator radiation is its scaling: varying only the acceptance (ngrid 127/255/511 at
 fixed box, θ_max = 1.6/3.2/6.4e-5 rad) moves the captured loss 0.84% -> 3.28% -> 11.4%,
 a measured 13.7x against a predicted 10.5x across a 16x range in captured solid angle.
 The absolute normalization sits ~3x below a dipole-limit estimate of the angular
 distribution, which is that estimate's own accuracy at a_w ~ 1 -- so the test checks
 the shape tightly and the magnitude loosely, which is the honest split.
 
-RESOLVED: both FEL modes now honor Bmad's GLOBAL switches
+Resolved: both FEL modes now honor Bmad's global switches
 `bmad_com%radiation_damping_on` / `%radiation_fluctuations_on` (set directly in
 `&fel_params`, which exposes `bmad_com` the way Tao's `&tao_params` does. Interludes
 always honored them through track1). Measured, same instrument:
@@ -1320,12 +1312,12 @@ always honored them through track1). Measured, same instrument:
 | 1 vs 8 threads with fluctuations on | byte-identical | (serial per-beamlet draws in fixed slice order) |
 | unaveraged TD ledger with radiation on: E_beam + U + U_esc − U_spont + E_rad | 4.6e-5 of turnover | 1e-3 |
 
-Fluctuation kicks are ONE DRAW PER BEAMLET, exactly as Genesis: independent
+Fluctuation kicks are one draw per beamlet, exactly as Genesis: independent
 per-particle kicks would break the quiet start's per-beamlet harmonic cancellation
 (and fluctuations + slice migration is refused by name for the same reason). Genesis
 reaches the same variance with uniform x sqrt(3) draws. Ours are Gaussian. The
 physical limit. With the switches off (the default) every tier and check is unchanged
-bit for bit. FINDINGS.md 7.27 has the full trail, including the measurement that first
+bit for bit. The full trail includes the measurement that first
 exposed the gap (a dark segment where the averaged model's field gained 134x what its
 beam paid) and the measurement-design lesson (cold beam for fluctuation growth: with a
 real energy spread the sigma^2 differencing drowns in cross-covariance sampling
@@ -1336,7 +1328,7 @@ noise).
 A real 42 m case (131 slices) at 2048 particles/slice ran at parity with Genesis4
 (96 vs 94 s, 12 threads vs 12 MPI ranks, same machine back-to-back). At 8192/slice it
 did not (164 vs 99 s). The per-element time stamps and an in-wiggler profile put the
-gap in ONE place: the FEL step's particle path (the RK4 + gather), whose cost
+gap in one place: the FEL step's particle path (the RK4 + gather), whose cost
 quadrupled with the particles while the per-slice field FFTs (~68 s) stayed constant.
 
 `tests/lucifer_advance_bench.f90` (built as `lucifer_advance_bench`) times the path serially
@@ -1346,14 +1338,14 @@ ns/particle-step**, the RK4+ODE alone 87.5, the four sin/cos pairs the ODE evalu
 13.7 ns. The gap is codegen and libm rather than physics (macOS gfortran has no vectorized
 libm and emits scalar calls).
 
-Adopted, as ONE NAMED VALUE CHANGE (each pays nothing alone, together full
+Adopted, as one named value change (each pays nothing alone, together full
 fel_advance drops to ~108-125 ns and the real case 164 -> 143 s):
 
 - per-file `-O3` on `fel_track_mod` (CMakeLists `set_source_files_properties`), and
 - the paired-sincos shim (`code/fel_sincos.c`): one libm call for the (sin, cos)
   pair at the ODE's three call sites.
 
-The change is 1-ulp-level: gfortran's sin/cos INTRINSICS differ from libm's sincos
+The change is 1-ulp-level: gfortran's sin/cos intrinsics differ from libm's sincos
 by one ulp on ~2e-6 of arguments (measured: 73 mismatches in a 44M-point sweep of
 the theta domain. The C-side test of __sincos against libm sin/cos was clean, so
 the divergence is gfortran's intrinsic lowering), and -O3 re-contracts floating
@@ -1377,7 +1369,7 @@ initialized (a deterministic 2x bunching shift, present even at one thread), whi
 block-local declaration gets Fortran's own default initialization.
 
 Also measured and worth knowing: the production (-O2) and debug (-O0) trees were
-NEVER bit-identical to each other (FP contraction). The bit-for-bit keystone is a
+never bit-identical to each other (FP contraction). The bit-for-bit keystone is a
 WITHIN-tree contract, and the harness runs the debug tree. And the remaining gap to
 Genesis on the 8192 case (143 vs 99 s) now sits in the per-slice field FFTs and the
 wake-path interludes, with the clang-twin numbers bounding what further particle-path
@@ -1398,20 +1390,20 @@ Measured (check_coherent.py, the harness's coherent-source section): at M = 128/
 plain deposit fakes ln P by +0.42 on a curve that truly absorbs, the coherent source
 stays at 0.048 -- a 64x particle reduction at the model's own bias (1.9e-2 at large
 M). Guarded by name: per-slice Gaussianity vs sampling significance (weighted by charge),
-and refusals for unaveraged/harmonics/two-polarization and for DARK STARTS -- measured
+and refusals for unaveraged/harmonics/two-polarization and for dark starts -- measured
 ~175x startup deficit: spontaneous spatially-incoherent emission dominates SASE
 startup and the coherent model drops it, so seeded runs only. Also priced once:
 SIMPLEX's coarse stepping (12 periods/step) costs 2.6e-3 in |ln P| here (taper and
 harmonics untested at coarse steps).
 
-## The coarse-step measurement (brief 8.3)
+## The coarse-step measurement
 
 (Summarized in manual `sec:numerics`.)
 
 SIMPLEX's reference case integrates twelve undulator periods per step with the slice
 spacing matched so slippage is one slice per step -- an order of magnitude fewer steps
 than one-step-per-period. Whether that economy transfers to this integrator is the
-brief's 8.3 question, measured by `run_delz_sweep.sh`: Genesis generates ONE
+question, measured by `run_delz_sweep.sh`: Genesis generates one
 time-dependent initial state (32 slices of spacing `12*lambda0`, shot noise on), and the
 tracker runs the full line from that same dump at `ds_step` of 1, 2, 3, 6 and 12 periods
 (two-line wrapper lattices overriding the element attribute), so
@@ -1450,10 +1442,10 @@ is defensible when only saturation power matters.
   time on by default), with `nslice = round(slen/(sample*lambda0))` (`GenTime.cpp:70`).
 - The end-of-lattice autophasing is unguarded: the last step always gets
   `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths of slippage, `+1` even with no trailing
-  drift (`Lattice.cpp:191-193`, FINDINGS.md 7.1).
+  drift (`Lattice.cpp:191-193`).
 - The field record's rotation never appears in Genesis's outputs: `writeFieldHDF5` and
   `DiagField::calc` both unrotate on the fly, so `.out.h5` per-slice arrays and `.fld.h5`
-  dumps are in time-window order, aligned with beam-slice indexing (FINDINGS.md 7.3).
+  dumps are in time-window order, aligned with beam-slice indexing.
 - A helical undulator defaults to `kx = ky = 0.5` (LatticeParser.cpp:329), scaled by
   `ku^2` in the unroll.
 - The `&importbeam` / `&importfield` namelists take full filenames and make the
