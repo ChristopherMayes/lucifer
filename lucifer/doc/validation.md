@@ -2,7 +2,7 @@
 
 Lucifer's physics is transcribed from Genesis 1.3 Version 4 and validated against it from bitwise-identical starting states. This document is the measured record: the rule every commit obeys, the tier table and its recorded digits, the check sections that run on every validation pass, and the subsystem-by-subsystem story of what each measurement pins.
 
-The physics itself is the manual, [`fel-physics.tex`](fel-physics.tex): every equation the code integrates, each subsystem's Genesis provenance, and which check pins it. This document carries the numbers. Where a section here touches physics it cites the manual's labels (`sec:core`, `sec:slippage`, and so on).
+The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equation the code integrates, each subsystem's Genesis provenance, and which check pins it. This document carries the numbers, and links to the manual section where a section here touches physics.
 
 ## The keystone rule
 
@@ -25,9 +25,19 @@ Debug and production binaries are never bit-comparable to each other. Compare li
 
 Almost nothing here is checked against a stored expected-output file. A reference file records what the code did once. An identity records what must be true of any correct implementation, and it keeps its teeth when the code is rewritten underneath it. So the checks are conservation laws, closed forms, independent routes to the same number, invariance under a change that must not matter (thread count, weight splitting, a no-op), and refusals by name.
 
-Two consequences worth stating. A check that has never failed on a real defect is untested, so several here carry their own mutation record: what was broken deliberately, and how loudly the check noticed. And a measurement without a stated tolerance is not a check, so every number below is paired with the level it is held at.
+A check that has never failed on a real defect is untested, so several here carry their own mutation record: what was broken deliberately, and how loudly the check noticed. And a measurement without a stated tolerance is not a check, so every number below is paired with the level it is held at.
 
 ## Validation, from one command
+
+The harness runs Genesis six times (full line and single segment, steady state and time
+dependent, plus the collective tiers), converts each chain's initial dumps to openPMD,
+which is the only format the tracker reads, runs the Bmad tracker for every tier and
+check, and prints the largest relative difference of each check. It fails loudly if the
+genesis4 binary is missing, and likewise without an openPMD-beamphysics checkout
+(`--beamphysics <path>`, a sibling of bmad-ecosystem by default), which is what performs
+the conversion. There is no comparison without either, so there is nothing to skip to. Genesis must be built with FFTW, since the
+benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver,
+and Genesis's default ADI solver is out of scope).
 
 Both codes start from the same Genesis `&write` dumps, so the initial state is bitwise
 identical and no loader is reproduced. Genesis records diagnostics once at the start and
@@ -147,7 +157,7 @@ across thread counts.
 
 ## Shot noise under weights: the loader's noise is physical, and checked
 
-(Physics: manual `sec:loading`.)
+(Physics: manual [](fel-physics.md#sec-loading).)
 
 A slice of current I represents `N_lambda = I*slice_spacing/(e*c)` real electrons, and
 physical shot noise means `<|b(h)|^2> = 1/N_lambda` per harmonic. The built-in loader
@@ -187,7 +197,7 @@ is also compared elementwise like any other tier.
 
 ## Distribution import: a bunch_struct, resampled Genesis's way
 
-(Physics: manual `sec:import`.)
+(Physics: manual [](fel-physics.md#sec-import).)
 
 The `importdistribution` equivalent: an arbitrary bunch (arbitrary times, arbitrary
 weights) resampled into the evenly spaced, equal-population slices the FEL step
@@ -260,7 +270,7 @@ through the full line.
 
 ## Slice migration under weights
 
-(Physics: manual `sec:migration`.)
+(Physics: manual [](fel-physics.md#sec-migration).)
 
 Genesis permits migration only under one4one, because with uniform weighting the charge
 a mover carries cannot be expressed. Per-particle weights dissolve the problem, and this
@@ -300,7 +310,7 @@ off-the-end mover with a bounds trap, never touching memory beyond the arrays
 
 ## Wakes and space charge: Genesis's granularity, checked
 
-(Physics: manual `sec:wakes`, `sec:spacecharge`.)
+(Physics: manual [](fel-physics.md#sec-wakes), [](fel-physics.md#sec-spacecharge).)
 
 Inside undulators and Genesis-model interludes, the collective terms are transcribed at
 Genesis's granularity (`fel_collective_mod`): wakes as a per-slice energy-loss rate --
@@ -348,7 +358,7 @@ leaves one eloss block and fails the stale-wake structural check.
 
 ## Bmad element wakes across the whole bunch
 
-(Physics and conventions: manual `sec:seamwake`.)
+(Physics and conventions: manual [](fel-physics.md#sec-seamwake).)
 
 Elements carrying Bmad `sr_wake` definitions (pseudomodes and the tabular `z_long`,
 binning plus FFT) act across the whole time window. For wake elements only, the seam
@@ -417,7 +427,7 @@ unwiring the charge fails the closed form at exactly 1.0 (kicks vanish).
 
 ## The unaveraged mode: fc measured, not assumed
 
-(Physics, conventions, and provenance: manual `sec:unaveraged`. MINERVA (Freund and
+(Physics, conventions, and provenance: manual [](fel-physics.md#sec-unaveraged). MINERVA (Freund and
 van der Slot) is the production existence proof and a statistical ~1e-3-class
 reference only, never a bit check.)
 
@@ -809,7 +819,7 @@ per-particle inner threading), BIT-FOR-BIT at any thread count against the seria
 baseline (checked at 1 and 8 threads on tier2 and td2). Two boundaries, both
 deliberate: radiation fluctuations keep the serial loop (they draw from the one
 shared RNG stream inside track1, whose order must stay fixed), and wake-carrying
-elements were always whole-window concatenations (manual `sec:seamwake`), so lattices whose
+elements were always whole-window concatenations (manual [](fel-physics.md#sec-seamwake)), so lattices whose
 interludes all carry wakes see no change. One hard-won implementation note: the
 scratch bunch is BLOCK-LOCAL inside the loop body, not an OMP `private` variable --
 gfortran left a `private` copy of the allocatable-component derived type improperly
@@ -825,7 +835,7 @@ codegen work could still buy (~68 ns vs our ~125 per particle-step).
 
 ## The coarse-step measurement
 
-(Summarized in manual `sec:numerics`.)
+(Summarized in manual [](fel-physics.md#sec-numerics).)
 
 SIMPLEX's reference case integrates twelve undulator periods per step with the slice
 spacing matched so slippage is one slice per step -- an order of magnitude fewer steps

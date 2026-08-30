@@ -2,7 +2,7 @@
 
 The normative reference for every namelist parameter Lucifer honors: its default, its meaning, and what refuses it. The program reads three namelist groups from one input file, each setting Bmad or program structures directly, which is Tao's `&tao_params` pattern. Defaults live in the struct declarations, so this document and the code agree by construction.
 
-How to build and run is [`user-guide.md`](user-guide.md). What the outputs hold is [`reading-output.md`](reading-output.md). The measured levels are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.tex`](fel-physics.tex).
+How to build and run is [`user-guide.md`](user-guide.md). What the outputs hold is [`reading-output.md`](reading-output.md). The measured levels are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.md`](fel-physics.md).
 
 Every resolved input is also written into the stats file's `params/` group, one subgroup per structure, so a finished run states its own configuration with every default made explicit.
 

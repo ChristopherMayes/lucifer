@@ -142,7 +142,7 @@ if (write_diag) then
         '               current               n_eff'
 endif
 
-! The unaveraged energy ledger (fel-physics.tex sec:unaveraged). One row per record
+! The unaveraged energy ledger (fel-physics.md sec-unaveraged). One row per record
 ! step inside FEL segments: total weighted beam energy, total window field energy,
 ! and the kick-side energy change of the step. The ledger check holds
 ! d(E_beam + U_field) to its measured floor.

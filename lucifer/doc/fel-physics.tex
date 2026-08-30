@@ -781,8 +781,8 @@ check. Like the averaged path it is parallel over slices with
 bit-identical results at any thread count (per-slice private state, fixed-order
 energy reduction. The harness runs a 1-thread/8-thread byte comparison). Nothing
 from the averaged coupling path may
-appear in it (a harness grep enforces this): its agreement with
-Eq.~\ref{eq:fc} is the point, not the input.
+appear in it (a harness grep enforces this). The mode measures its agreement with
+Eq.~\ref{eq:fc}, and does *not* take it as an input.
 
 \emph{The step.} Per substep $\delta$ ($\lambda_u/20$ by default, against MINERVA's
 envelope of 10--30 per period), a Strang split: half magnetic push, radiation kick and source
@@ -1235,7 +1235,7 @@ The format's own conformance checker, \code{tests/scripts/validate\_bmad\_stats.
 is program-blind (numpy and h5py only), runs on every diagnostics check and is
 required to report zero failures. What it enforces is the specification's rules, which
 \code{doc/BMAD-STATS-SPEC.md} states and this manual does not restate. Two of its
-checks are worth naming here because they guard physics rather than layout. The join:
+checks are named here because they guard physics rather than layout. The join:
 \code{at\_element\_end} must select exactly the element ends, and every record must sit
 inside the element \code{ix\_ele} names, since a silent off-by-one there would break
 every layout plot while no physics check noticed. And the record axis: \code{s}

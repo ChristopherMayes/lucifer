@@ -1,7 +1,7 @@
 !+
 ! Module fel_unaveraged_mod
 !
-! The unaveraged mode (fel-physics.tex sec:unaveraged):
+! The unaveraged mode (fel-physics.md sec-unaveraged):
 ! particles integrated through the undulator's real field (the full Newton-Lorentz
 ! quiver, no period averaging) with the radiation field as a co-evolving kick. There
 ! is no resonance approximation. What the cost per step buys is physics the averaged
@@ -12,7 +12,7 @@
 ! here instead of assumed inputs. MINERVA (Freund and van der Slot) is the production
 ! existence proof for this physics. This mode differs by keeping the grid field and
 ! the Lorentz force where MINERVA evaluates modal fields. The cost is priced in
-! fel-physics.tex and measured in examples/saturation_demo.
+! fel-physics.md and measured in examples/saturation_demo.
 !
 ! DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 ! path. Those are what this mode measures, and their appearance here would make the
@@ -365,7 +365,7 @@ call fel_field_kernel_init (ngrid, dgrid, ks, dsub)
 phi0_rate_avg = fel_phi0_rate(ks, und%ku, p0_mc)
 
 ! The unaveraged source scale: the averaged scl_w with the coupling factor REMOVED
-! and the 1/2 period-average projection undone (fel-physics.tex sec:unaveraged).
+! and the 1/2 period-average projection undone (fel-physics.md sec-unaveraged).
 
 scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_spacing)
 

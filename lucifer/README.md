@@ -12,9 +12,15 @@ FEL segments are real Bmad wiggler elements with `tracking_method = custom`, so 
 | [`doc/input-reference.md`](doc/input-reference.md) | What does this namelist parameter do, and what refuses it? |
 | [`doc/reading-output.md`](doc/reading-output.md) | I have an output file. What is in it and how do I read it? |
 | [`doc/validation.md`](doc/validation.md) | What is checked, how, and at what measured level? |
-| [`doc/fel-physics.tex`](doc/fel-physics.tex) | What does it compute, and why is that right? (`make` in `doc/` builds the PDF) |
+| [`doc/fel-physics.md`](doc/fel-physics.md) | What does it compute, and why is that right? |
 | [`doc/BMAD-STATS-SPEC.md`](doc/BMAD-STATS-SPEC.md) | The statistics file format, normatively, with [`doc/BMAD-STATS-EXT-FEL.md`](doc/BMAD-STATS-EXT-FEL.md) |
 | [`examples/`](examples) | Runnable cases, each a directory of real input files with its own README |
+| [`doc/changelog.md`](doc/changelog.md) | What changed on this branch, newest first |
+
+The documents render as one site. With `mystmd` available, `myst build --html` in
+`doc/` produces it, and `myst start` serves it locally. `doc/fel-physics.tex` is the
+manual's original LaTeX, kept for comparison against the Markdown that replaced it and
+still building a PDF through `make` in `doc/`.
 
 ## The three tracking methods
 
@@ -28,12 +34,9 @@ Chosen per element with the `fel_tracking` lattice attribute, and they mix freel
 
 ## Building and running
 
-From the `bmad-ecosystem` root, in the `bmad-build` conda environment:
-
-```
-BUILD_PRODUCTION=N ./util/conda_compile      # debug, into debug/bin/lucifer
-./util/conda_compile                         # production, into production/bin/lucifer
-```
+Lucifer builds as part of Bmad's normal distribution build, and the binary lands in
+`production/bin/lucifer` (or `debug/bin/lucifer` for a debug build) alongside every
+other Bmad program.
 
 A run is one input file naming a lattice:
 

@@ -150,7 +150,7 @@ def cover(pdf, d, checks):
         ("", 10, 0),
         ("The measured levels and methodology live in lucifer/doc/validation.md", 10, 0),
         ("(sections: The saturation demo, Diagnostic output) and the physics manual", 10, 0),
-        ("(lucifer/doc/fel-physics.tex, sec:unaveraged, sec:stats).", 10, 0),
+        ("(lucifer/doc/fel-physics.md, sec-unaveraged, sec:stats).", 10, 0),
     ]
     y = 0.94
     for text, size, kind in lines:

@@ -71,7 +71,7 @@ rather than negotiated.
 | `lattice/` | one row per element on the `ele` axis, for layout plots |
 | `meta/` | which lattice and which input, as datasets. Not the lattice, and not a person |
 
-Six rules earn their keep. **The record number is the axis**: `s` rides along as a
+**The record number is the axis**: `s` rides along as a
 variable, because `s` repeats wherever two records land on one plane, which is what a
 zero-length element applying a wake kick does, and a selection on a repeating index
 answers silently wrong. It is `s`, Bmad's name for position along the lattice, and `z` is

@@ -274,7 +274,7 @@ make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "wake%on = T
   wake%lrough = 100e-6"
 
 # Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
-# uses a fieldmap field_calc (deliverable 9, brief 7.5), or that carries Bmad wakes on
+# uses a fieldmap field_calc, or that carries Bmad wakes on
 # any element (the slice-at-a-time seam cannot apply them meaningfully), must be
 # Refused by name -- the failure message names the offending attribute and element -- not passed
 # through to fail downstream with an unrelated message (missing b_max) or a segfault in
@@ -489,7 +489,7 @@ fi
 section_time collective
 echo
 
-# Unaveraged-mode checks (deliverable 13, fel-physics.tex sec:unaveraged): the energy
+# Unaveraged-mode checks (deliverable 13, fel-physics.md sec-unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
 # comparison against the averaged mode. The fc/faw leak grep is part of the check: the

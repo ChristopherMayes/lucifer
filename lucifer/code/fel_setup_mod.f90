@@ -564,13 +564,13 @@ call check_wake_window ()
 if (err_flag) return
 run%any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
 
-! The collective terms are not wired into the unaveraged step (fel-physics.tex
+! The collective terms are not wired into the unaveraged step (fel-physics.md
 ! sec:unaveraged), and a mixed line would apply them in some segments and silently
 ! drop them in others. Refuse by name.
 
 if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
   call out_io (s_error$, r_name, 'WAKES/SPACE CHARGE ARE NOT WIRED INTO THE UNAVERAGED MODE', &
-                                 '(SEE fel-physics.tex sec:unaveraged).', &
+                                 '(SEE fel-physics.md sec-unaveraged).', &
                                  'POSSIBLE SOLUTION: TURN THEM OFF.')
   err_flag = .true.;  return
 endif

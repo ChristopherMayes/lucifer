@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks for the unaveraged mode (fel-physics.tex sec:unaveraged). Self-referenced by design where the point is self-consistency (the
+Checks for the unaveraged mode (fel-physics.md sec-unaveraged). Self-referenced by design where the point is self-consistency (the
 energy ledger, ballistic conservation) and closed-form where the point is measuring
 the averaged mode's inputs (the coupling factor fc).
 

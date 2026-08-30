@@ -6,7 +6,7 @@
 ! fel_beam_mod. Runs steady state (one slice) or time dependent (many slices with
 ! slippage).
 ! The physics is transcribed from Genesis 1.3 Version 4, which GPL permits. Physics,
-! Genesis provenance (routine by routine), and validation: lucifer/doc/fel-physics.tex
+! Genesis provenance (routine by routine), and validation: lucifer/doc/fel-physics.md
 ! (sec:core, sec:transverse, sec:field, sec:slippage).
 !
 ! The step composition (transverse half step, longitudinal advance, transverse half
@@ -77,7 +77,7 @@ implicit none
 ! One undulator segment, constant parameters along it: one contiguous run of aw > 0 steps
 ! in Genesis's unrolled lattice, divided into nstep equal steps of dz = l/nstep with
 ! nstep = round(l/delz_target). kx, ky carry Genesis's unroll scaling by ku^2
-! (fel-physics.tex sec:element).
+! (fel-physics.md sec-element).
 !-
 
 type fel_und_struct
@@ -419,7 +419,7 @@ end subroutine fel_mat6_as_wiggler
 !
 ! Routine to map beam slice is (1-based) to its field slice in the rotated record:
 ! ifld = 1 + mod(is-1 + first, nslice), the Fortran form of Genesis's
-! (is + field->first) % field.size() (fel-physics.tex sec:slippage). The same mapping
+! (is + field->first) % field.size() (fel-physics.md sec-slippage). The same mapping
 ! restores time order when reading the record out: field slice
 ! fel_field_index(slip, is, nslice) is the field at time window position is.
 !-
@@ -443,7 +443,7 @@ end function fel_field_index
 ! Subroutine fel_apply_slippage (slip, wf, slippage, bank, harm)
 !
 ! Routine to account the slippage of one step and rotate the field record when it
-! crosses a slice boundary. Transcribed from Control::applySlippage (fel-physics.tex
+! crosses a slice boundary. Transcribed from Control::applySlippage (fel-physics.md
 ! sec:slippage) reduced to one shared-memory node. The MPI ring exchange between
 ! adjacent ranks is the identity when the ring has one member. This node is
 ! simultaneously rank 0 and rank size-1, so the non-periodic zero fill always applies
@@ -869,7 +869,7 @@ end subroutine fel_track_und_step
 ! way Genesis does it, as one integration step: transverse half step, the longitudinal
 ! advance with the path-length term sampled at mid element and Genesis's drift
 ! reference xku = ks*0.5/gamma0/gamma0 (division order kept for bit identity,
-! fel-physics.tex sec:interlude), the wake's gamma decrement, transverse half step,
+! fel-physics.md sec-interlude), the wake's gamma decrement, transverse half step,
 ! field diffraction with zero source.
 ! Slippage is NOT applied here. The caller schedules it after the step, as with
 ! fel_track_und_step.
@@ -923,7 +923,7 @@ gamma0 = fel_gamma0(beam)                         ! Genesis's gammaref.
 p0_mc = fel_p0_mc(beam)
 xks = twopi / wf%wavelength
 xku = xks * 0.5_rp / gamma0 / gamma0
-qquad = qf * gamma0                               ! fel-physics.tex sec:interlude.
+qquad = qf * gamma0                               ! fel-physics.md sec-interlude.
 q_hat = qquad / p0_mc
 phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, p0_mc)
 nslice = size(wf%Ex, 3)
@@ -1100,7 +1100,7 @@ end subroutine fel_track_interlude_genesis
 !   quad:   foc^2 = q_hat/gz_hat with q_hat = q/p0_mc;  x' = a1 x + a2 px/gz_hat;
 !           px' = a3 x gz_hat + a1 px
 !
-! The effective strengths (fel-physics.tex sec:natfocus): qnat_{x,y} = k_{x,y}*aw^2/
+! The effective strengths (fel-physics.md sec-natfocus): qnat_{x,y} = k_{x,y}*aw^2/
 ! (gamma0*betpar0), betpar0 = sqrt(1 - (1+aw^2)/gamma0^2), with Genesis's reference gamma.
 !
 ! Input:
@@ -1345,7 +1345,7 @@ end subroutine fel_apply_focus
 ! space-charge ez held fixed through the stages. The harmonic phases h*theta are live
 ! per stage (fel_ode_multi). ez per particle is
 ! fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
-! ez = getEField(ip) + eloss (fel-physics.tex sec:eom, sec:spacecharge). is is this
+! ez = getEField(ip) + eloss (fel-physics.md sec-eom, sec:spacecharge). is is this
 ! slice's beam index.
 !
 ! (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
@@ -1530,7 +1530,7 @@ end subroutine fel_advance
 ! Subroutine fel_runge_kutta (delz, xks, xku, btpar, rpart, ez, gamma, theta)
 !
 ! The RK4 stage bookkeeping of BeamSolver::RungeKutta, VERBATIM -- the in-place stage
-! algebra is kept exactly for bit identity, do not "clean up" (fel-physics.tex sec:eom).
+! algebra is kept exactly for bit identity, do not "clean up" (fel-physics.md sec-eom).
 ! ez is held fixed through the stages, as Genesis holds it.
 !
 ! Input:
@@ -1615,7 +1615,7 @@ end subroutine fel_runge_kutta
 !+
 ! Subroutine fel_ode (tgam, tthet, xks, xku, btpar, rpart, ez, k2gg, k2pp)
 !
-! The longitudinal equations of motion, BeamSolver::ODE (fel-physics.tex sec:eom),
+! The longitudinal equations of motion, BeamSolver::ODE (fel-physics.md sec-eom),
 ! fundamental only. ez is the per-particle space-charge term in m_e c^2 per meter
 ! (short-range harmonics plus the long-range loss), zero when space charge is off.
 ! In that case the arithmetic is bit-identical to the pre-collective code because
@@ -2008,7 +2008,7 @@ end subroutine fel_coherent_prep
 ! FieldSolverFFT::advance and FFT, unfiltered path.
 !
 ! The source scale, weighted, in V/m (derivation from Genesis's internal-unit form:
-! fel-physics.tex sec:field):
+! fel-physics.md sec-field):
 !
 !   scl_w = fc * Z0 * sqrt(2) * c * delz / (4 * dgrid^2 * slice_spacing);  per particle scl_w*w_j
 !
@@ -2333,7 +2333,7 @@ end function fel_kernel_index
 !
 ! Pure free-space diffraction of field slice ifld over the step dz: FFT, multiply
 ! the cached exp(K2 dz), inverse FFT, normalize. No source, no coupling factor, no
-! undulator knowledge: this is the field half the unaveraged mode (fel-physics.tex
+! undulator knowledge: this is the field half the unaveraged mode (fel-physics.md
 ! sec:unaveraged) shares with the averaged solver. The caller deposits its own source.
 ! The kernel cache must have been initialized serially (fel_field_kernel_init) for
 ! this grid, wavelength and step. A mismatch errors, exactly as fel_field_step.
@@ -2404,7 +2404,7 @@ end subroutine fel_field_diffract
 ! on-axis intensity = |E(center)|^2/(2*Z0) [W/m^2]. Accumulation order: y outer, x inner.
 !
 ! ifld is the raw record index. To report the field at time window position is, pass
-! fel_field_index(slip, is, nslice), the unrotation of fel-physics.tex sec:slippage.
+! fel_field_index(slip, is, nslice), the unrotation of fel-physics.md sec-slippage.
 !
 ! Input:
 !   wf    -- wavefront_struct: The field.

@@ -1,0 +1,20 @@
+version: 1
+project:
+  id: lucifer-doc
+  title: Lucifer
+  description: The Bmad FEL tracker, transcribed from Genesis 1.3 Version 4 and validated against it.
+  toc:
+    - file: user-guide.md
+    - file: input-reference.md
+    - file: reading-output.md
+    - file: fel-physics.md
+    - file: validation.md
+    - title: The statistics file format
+      children:
+        - file: BMAD-STATS-SPEC.md
+        - file: BMAD-STATS-EXT-FEL.md
+    - file: changelog.md
+site:
+  template: book-theme
+  options:
+    logo_text: Lucifer

@@ -4,7 +4,7 @@ Self-contained runs of the FEL tracker: one command each, no Genesis, no dump fi
 (one exception: `saturation_demo/`, the three-way comparison, needs the genesis4 binary). For
 the validation benchmark against Genesis see `lucifer/tests/`. That is where the physics
 is proven. The physics itself (equations, conventions, provenance) is the
-manual, `lucifer/doc/fel-physics.tex`.
+manual, `lucifer/doc/fel-physics.md`.
 
 One directory per example, each holding a `run.nml`. Shared pieces live at this level:
 `aramis.bmad` (the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator
@@ -152,7 +152,7 @@ writes `unaveraged.ledger.txt`: beam energy (relative to the reference) and wind
 energy per record, whose sum is conserved (manual `eq:ledger`, checked at 1e-4 of the
 turnover under the harness's strong-exchange probe). One segment sits in the lethargy
 regime. The seed diffracts and the exponential growth is only beginning at the exit, so
-the point of the plot is the overlay, not the gain.
+the plot shows the overlay rather than the gain.
 
 ## sase_wake
 

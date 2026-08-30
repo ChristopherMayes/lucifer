@@ -4,7 +4,7 @@
 ! FEL tracker validated against Genesis 1.3 Version 4.
 !
 ! The documentation is in lucifer/doc/:
-!   fel-physics.tex      The physics: every equation the code integrates, each piece's
+!   fel-physics.md      The physics: every equation the code integrates, each piece's
 !                        Genesis provenance, and which check pins it.
 !   input-reference.md   Every namelist parameter: default, meaning, and what refuses it.
 !                        The normative reference. This header is a summary only.

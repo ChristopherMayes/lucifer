@@ -1,17 +1,16 @@
 # User guide: building, describing a run, and running it
 
-Everything needed to get from a checkout to a tracked FEL run. The parameter-by-parameter reference is [`input-reference.md`](input-reference.md); what the output files hold and how to read them is [`reading-output.md`](reading-output.md); the measured levels and how to reproduce them are [`validation.md`](validation.md); the physics is the manual, [`fel-physics.tex`](fel-physics.tex).
+Everything needed to get from a checkout to a tracked FEL run. The parameter-by-parameter reference is [`input-reference.md`](input-reference.md). What the output files hold and how to read them is [`reading-output.md`](reading-output.md). The measured levels and how to reproduce them are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.md`](fel-physics.md).
 
 ## Building
 
-From the `bmad-ecosystem` root, in the `bmad-build` conda environment:
+Lucifer builds as part of Bmad's normal distribution build. No step here is specific to
+it: the binary lands in `production/bin/lucifer`, or `debug/bin/lucifer` for a debug
+build, alongside every other Bmad program.
 
-```
-BUILD_PRODUCTION=N ./util/conda_compile      # debug, into debug/bin/lucifer
-./util/conda_compile                         # production, into production/bin/lucifer
-```
-
-The harness runs its Python in the `bmad-fel-validate` environment (numpy, h5py, pytest), created from `lucifer/wavefront/tests/environment.yml`. Use only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours. `util/dist_prefs` is rewritten by every build with a local conda path, so `git checkout -- util/dist_prefs` before staging and never commit it.
+Running the validation harness needs one thing beyond the binary, a Python environment
+with numpy, h5py and pytest, described by `lucifer/wavefront/tests/environment.yml`. The
+exact commands the harness runs are in [`validation.md`](validation.md).
 
 ## The three tracking methods
 
@@ -27,27 +26,27 @@ Lattices name these with one-line variables rather than raw numbers, so `fel_una
 
 ## Running
 
+A run is one input file, which names the lattice:
+
 ```
-cd <bmad-ecosystem>
-BUILD_PRODUCTION=N ./util/conda_compile                      # builds lucifer
-./lucifer/tests/run_fel_benchmark.sh [--genesis <path to genesis4>]
+lucifer run.nml
 ```
 
-The harness runs Genesis six times (full line and single segment, steady state and time
-dependent, plus the collective tiers), converts each chain's initial dumps to openPMD,
-which is the only format the tracker reads, runs the Bmad tracker for every tier and
-check, and prints the largest relative difference of each check. It fails loudly if the
-genesis4 binary is missing, and likewise without an openPMD-beamphysics checkout
-(`--beamphysics <path>`, a sibling of bmad-ecosystem by default), which is what performs
-the conversion. There is no comparison without either, so there is nothing to skip to. Genesis must be built with FFTW, since the
-benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver,
-and Genesis's default ADI solver is out of scope).
+The examples are the fastest way in. Each is a directory of real input files with a
+runner that needs nothing else:
+
+```
+cd lucifer/examples/saturation_demo && ./run.sh
+```
+
+The validation harness is a separate thing, described with its commands in
+[`validation.md`](validation.md).
 
 ## Files
 
 | Path | Contents |
 |---|---|
-| `lucifer/doc/fel-physics.tex` | **The physics manual**: equations, conventions, Genesis provenance and validation pointers, one section per subsystem |
+| `lucifer/doc/fel-physics.md` | **The physics manual**: equations, conventions, Genesis provenance and validation pointers, one section per subsystem |
 | `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis interlude model |
 | `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
@@ -77,7 +76,7 @@ and Genesis's default ADI solver is out of scope).
 
 ## Architecture
 
-(Physics: manual `sec:core`, `sec:chart`, `sec:field`, `sec:slippage`.)
+(Physics: manual [](fel-physics.md#sec-core), [](fel-physics.md#sec-chart), [](fel-physics.md#sec-field), [](fel-physics.md#sec-slippage).)
 
 Inside FEL elements (wigglers with `tracking_method = custom`, described in the FEL
 element section), `fel_track_und_step` advances the coupled system in steps of the
@@ -151,7 +150,7 @@ rotate.
 
 ## The FEL element: parameters live on the lattice
 
-(Physics: manual `sec:element`.)
+(Physics: manual [](fel-physics.md#sec-element).)
 
 An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying
 `tracking_method = custom`, Bmad's own semantics for "the program supplies the

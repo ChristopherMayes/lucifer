@@ -45,7 +45,7 @@
 ! Why packed arrays at all: the FEL step advances every particle every internal step, and
 ! coord_struct is ~224 bytes against the ~56 needed. coord_struct appears only at element
 ! boundaries. The arrays are allocated to a capacity that may exceed the fill count n.
-! Slice migration can then move particles without per-step reallocation (fel-physics.tex
+! Slice migration can then move particles without per-step reallocation (fel-physics.md
 ! sec:migration).
 !-
 
@@ -99,7 +99,7 @@ type fel_beam_struct
   real(rp) :: s0 = 0               ! Start of the time window [m].
   integer :: nbins = 0             ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
-  logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.tex
+  logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.md
                                    !   sec:unaveraged): False = stored px excludes the
                                    !   undulator quiver (the averaged chart, and the only
                                    !   convention any averaged/seam code accepts). True =
@@ -248,7 +248,7 @@ end function
 ! (the unaveraged tracker left its region without restoring the averaged convention).
 ! Every averaged-physics or seam entry point calls this: a hard-edge handoff injects
 ! spurious transverse momentum of order K/gamma -- comparable to the beam divergence --
-! and presents downstream as unexplained emittance growth (fel-physics.tex
+! and presents downstream as unexplained emittance growth (fel-physics.md
 ! sec:unaveraged).
 !
 ! Input:
@@ -555,7 +555,7 @@ end subroutine fel_slice_reallocate
 ! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights. Each
 ! beamlet's amplitude draws on its REAL electron count, the beamlet's charge over e
 ! (Genesis's slice-uniform ne/mpart for uniform weights). This makes <|b(h)|^2> =
-! 1/N_lambda exact for any cross-beamlet weight distribution (fel-physics.tex
+! 1/N_lambda exact for any cross-beamlet weight distribution (fel-physics.md
 ! sec:noise). Weights must be uniform WITHIN a beamlet (the quiet cancellation is per
 ! beamlet). The first particle's weight speaks for its beamlet. Genesis's silent
 ! nbl < 1 clamp is kept but counted into n_clamp for the caller to report. Kicks
@@ -941,7 +941,7 @@ end subroutine fel_split_slices
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
 ! slice window: the weighted generalization of Genesis's one4one-only Sorting::localSort
-! (fel-physics.tex sec:migration). This port can offer it for ANY beam because each
+! (fel-physics.md sec-migration). This port can offer it for ANY beam because each
 ! particle carries its own charge -- weights and migration are the same feature.
 !
 ! The criterion is Genesis's, in this code's chart: the derived phase
@@ -1079,7 +1079,7 @@ end subroutine fel_migrate_slices
 !
 ! where ku_like is the undulator wavenumber inside an undulator, or Genesis's drift
 ! surrogate ks/(2*gamma0^2) in field-free regions, supplied by the caller
-! (fel-physics.tex sec:chart), and beta0 is the reference beta from p0_mc. Combined with the
+! (fel-physics.md sec-chart), and beta0 is the reference beta from p0_mc. Combined with the
 ! per-particle theta_j = phi0 - ks*tau_j this reproduces Genesis's
 ! dtheta/ds = ks*(1 - 1/beta_z) + ku_like exactly, because
 ! -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
@@ -1117,7 +1117,7 @@ end function fel_phi0_rate
 !
 ! Routine to compute the per-slice beam diagnostics, weighted. Genesis's DiagBeam::calc
 ! definitions with 1/N generalized to w_j/sum(w) (two-pass variances by REQUIREMENT:
-! fel-physics.tex sec:numerics). Uniform weights reproduce Genesis exactly up to the
+! fel-physics.md sec-numerics). Uniform weights reproduce Genesis exactly up to the
 ! regrouped arithmetic. Positions and sizes are of x, y directly. mean_px, mean_py are
 ! in Bmad's normalization P/p0 (multiply by fel_p0_mc for Genesis's gamma*beta). Adds
 ! N_eff and the derived current.
@@ -1174,7 +1174,7 @@ g1 = g1/wsum
 x1 = x1/wsum
 y1 = y1/wsum
 
-! Second pass for the variances (fel-physics.tex sec:numerics): the one-pass <v^2> - <v>^2 form loses
+! Second pass for the variances (fel-physics.md sec-numerics): the one-pass <v^2> - <v>^2 form loses
 ! sigma to cancellation once the mean is large against the spread. For gamma ~ 1e4
 ! with sigma ~ 1e-3 the one-pass noise is of order sigma itself, seen as spurious
 ! sigma_gamma jitter under uniform wake kicks before this was rewritten.

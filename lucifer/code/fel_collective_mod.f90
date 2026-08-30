@@ -4,7 +4,7 @@
 ! In-undulator collective effects for the FEL tracker: wakefields applied as a
 ! per-slice energy-loss rate, and longitudinal space charge entering the pendulum
 ! equation as a per-particle ez. Physics, Genesis provenance, and validation:
-! lucifer/doc/fel-physics.tex (sec:wakes, sec:spacecharge, sec:seamwake).
+! lucifer/doc/fel-physics.md (sec:wakes, sec:spacecharge, sec:seamwake).
 !
 ! Placement in the step: the wake's gamma decrement lands BETWEEN the longitudinal
 ! advance and the second transverse half step. ez is computed per slice before the RK
@@ -109,7 +109,7 @@ contains
 !
 ! The single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV per meter per
 ! electron (negative = loss), from the NUMERICAL impedance of Bane & Stupakov
-! SLAC-PUB-10707 (fel-physics.tex sec:wakes), transcribed from
+! SLAC-PUB-10707 (fel-physics.md sec-wakes), transcribed from
 ! Wake::singleWakeResistive with Genesis's exact numerics: k in [0, 100/s0] on 1000
 ! intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3), flat x-integral on [0,15] with 20000
 ! points, trapezoid half weights at every endpoint. Kept separable: this routine is
@@ -222,7 +222,7 @@ end subroutine fel_resistive_wall_wake
 !
 ! Build the single-particle kernels over the window at wavelength resolution
 ! (Wake::init): material shortcuts, the three kernels, the self-loading half weight on
-! the s = 0 bin (fel-physics.tex sec:wakes).
+! the s = 0 bin (fel-physics.md sec-wakes).
 !
 ! Input:
 !   wake       -- fel_wake_struct: The wake description (radius, materials, roughness).
@@ -302,7 +302,7 @@ if (wake%hrough > 0) then
 endif
 
 ! Self-loading theorem: the s = 0 bin of every kernel carries half weight. Genesis
-! halves all three (the geometric one is zero there anyway). fel-physics.tex sec:wakes.
+! halves all three (the geometric one is zero there anyway). fel-physics.md sec-wakes.
 
 wake%wakeres(1) = wake%wakeres(1) * 0.5_rp
 wake%wakegeo(1) = wake%wakegeo(1) * 0.5_rp
@@ -385,7 +385,7 @@ allocate (cur(0:nslice), current(0:wake%ns-1), dcurrent(0:wake%ns-1))
 do ic = 1, nslice
   cur(ic-1) = c_light * sum(beam%slice(ic)%weight(1:beam%slice(ic)%n)) / beam%slice_spacing
 enddo
-cur(nslice) = 0            ! Zero pad past the head (fel-physics.tex sec:wakes).
+cur(nslice) = 0            ! Zero pad past the head (fel-physics.md sec-wakes).
 
 do is = 0, wake%ns - 1
   s = wake%ds * is
@@ -512,7 +512,7 @@ end subroutine fel_wake_apply_slice
 !
 ! EFieldSolver::longRange, one node: the per-slice long-range space-charge field from
 ! the whole-window weighted current and rms-size profiles, in Genesis's longESC units
-! (eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.tex
+! (eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.md
 ! sec:spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 !
 ! Input:
