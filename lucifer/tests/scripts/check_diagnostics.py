@@ -35,6 +35,9 @@ from nml import to_groups
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
 from read_stats import read_stats, same_data  # noqa: E402
+from beamio import read_slices  # noqa: E402
+
+import validate_bmad_stats  # noqa: E402  The standard's own conformance checker.
 
 FAILED = False
 
@@ -154,8 +157,20 @@ def main():
 
     run(exe, wd, "dg", NML.format(lat="dg_wrap.bmad", root="dg", extra=""))
 
+    # 0. THE ACCEPTANCE TEST IS THE STANDARD'S OWN VALIDATOR, which knows no program:
+    # a bmad-stats file conforms when it reports zero MUST failures, and everything it
+    # checks is checked from the spec alone. The named checks below hold what it cannot
+    # see: the physics identities and the declarations only this writer knows it owes.
+    rep = validate_bmad_stats.validate(wd / "dg.stats.h5")
+    for level, where, msg in rep.rows:
+        if level == "MUST":
+            print(f"    {level} {where}: {msg}")
+    check("bmad-stats: the generic validator reports zero MUST failures", rep.n_must, 0.5,
+          note=f"[{sum(1 for r in rep.rows if r[0] != 'INFO')} findings in "
+               f"{len(rep.rows)} rows]")
+
     with read_stats(wd / "dg.stats.h5") as st:
-        nslice = int(st.params["n_slice"])
+        nslice = int(st.run["n_slice"])
 
         # 0a. THE FILE DESCRIBES ITSELF: a walk of every dataset, checking that it says
         # what it is and what its dimensions run over. This is what makes a generic
@@ -254,7 +269,7 @@ def main():
         # 3.9e-9). z_slice is the one that needs a reference, so it is only equal to
         # beta0*ct_slice to the rounding of two ways of forming beta0.
         c_light = 299792458.0
-        p0c = float(st.params["p0c"])
+        p0c = float(st.run["p0c"])
         beta0 = p0c / np.sqrt(p0c**2 + M_ELECTRON**2)
         ct = st.ct_slice
         check("stats: t_slice is -ct_slice/c exactly (abs)",
@@ -265,12 +280,57 @@ def main():
         check("stats: the slice axis is the index", abs(len(st.slice) - nslice), 0.5,
               note=f"[{nslice} slices, positions ct_slice, t_slice, z_slice on it]")
 
+        # 0a8. THE ENVELOPE DATA ARE THE PARTICLES'. rel_max/rel_min are order
+        # statistics relative to the stored centroid, and the dump at the UND end holds
+        # the SAME particles the record saw, so the position entries must match to the
+        # bit: the file stores x verbatim, and IEEE subtraction of the same centroid is
+        # deterministic. The momentum entries cross the dump's unit round trip
+        # (px*p0c on write, /p0c on read), so they get an ulp-scale tolerance.
+        irec = int(np.flatnonzero(st.at_end)[0])
+        rel_hi = st["beam/slice/rel_max"][irec]
+        rel_lo = st["beam/slice/rel_min"][irec]
+        cen_r = st["beam/slice/centroid"][irec]
+        dump_sl = read_slices(wd / "dg-at1-UND.beam.h5", wavelength=1e-10)
+        p0_mc_l = float(st.run["p0c"]) / M_ELECTRON
+        worst_pos, worst_mom = 0.0, 0.0
+        for isl, sd in enumerate(dump_sl):
+            if sd["n"] == 0:
+                continue
+            for j, arr in ((0, sd["x"]), (2, sd["y"])):
+                worst_pos = max(worst_pos,
+                                abs(np.max(arr - cen_r[isl, j]) - rel_hi[isl, j]),
+                                abs(np.min(arr - cen_r[isl, j]) - rel_lo[isl, j]))
+            for j, arr in ((1, sd["px"] / p0_mc_l), (3, sd["py"] / p0_mc_l),
+                           (5, sd["pz"])):
+                sc = max(abs(rel_hi[isl, j]), abs(rel_lo[isl, j]), 1e-30)
+                worst_mom = max(worst_mom,
+                                abs(np.max(arr - cen_r[isl, j]) - rel_hi[isl, j]) / sc,
+                                abs(np.min(arr - cen_r[isl, j]) - rel_lo[isl, j]) / sc)
+        check("envelope: position extremes vs the dump's particles, exactly (abs)",
+              worst_pos, 1e-30, note=f"[{len(dump_sl)} slices, stored centroid]")
+        check("envelope: momentum extremes across the dump's unit round trip",
+              worst_mom, 1e-12)
+
+        # And the time entry is the z entry through the exact map t - <t> =
+        # -(z - <z>)/(beta0 c): the largest time offset is the smallest z one.
+        beta0_l = p0_mc_l / np.sqrt(p0_mc_l**2 + 1)
+        c_l = 299792458.0
+        rmx = st["beam/slice/rel_max"]
+        rmn = st["beam/slice/rel_min"]
+        fin = np.isfinite(rmx[..., 6])
+        worst_t = float(np.max(np.abs(rmx[..., 6][fin] +
+                                      rmn[..., 4][fin] / (beta0_l * c_l))))
+        worst_t = max(worst_t, float(np.max(np.abs(rmn[..., 6][fin] +
+                                                   rmx[..., 4][fin] / (beta0_l * c_l)))))
+        check("envelope: the t entry is the z entry through -dz/(beta0 c), exactly (abs)",
+              worst_t, 1e-30)
+
         # 0b. THE JOIN. at_element_end selects the element-end rows, and every record
         # sits inside the element its ix_ele names. An off-by-one in either would break
         # every layout plot and no physics check would see it.
         n_end = int(st.at_end.sum())
         check("stats: at_element_end selects exactly the element ends",
-              abs(n_end - int(st.params["n_element_end"])), 0.5,
+              abs(n_end - int(st.run["n_element_end"])), 0.5,
               note=f"[{n_end} of {len(st.s)} records]")
         check("stats: element-end arrays are aligned with the mask",
               abs(st["beam/bunch/centroid"].shape[0] - n_end), 0.5)
@@ -310,8 +370,8 @@ def main():
         # beta*(is-1)*spacing plus the pz shear that map carries because beta is the
         # particle's own. Measured against the particle sum when this landed: 4.0e-12 on
         # this config, 5.0e-11 on the 96-slice SASE example.
-        spacing = float(st.params["slice_spacing"])
-        p0_mc = float(st.params["p0c"]) / M_ELECTRON
+        spacing = float(st.run["slice_spacing"])
+        p0_mc = float(st.run["p0c"]) / M_ELECTRON
         worst_pool = 0.0
         worst_nobg = 0.0
         for ie in range(st["beam/bunch/sigma"].shape[0]):

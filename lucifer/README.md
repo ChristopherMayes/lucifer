@@ -860,21 +860,26 @@ lab notebook, off by default because a stats file travels.
 
 ## The stats file describes itself
 
-The production statistics live in `<out_root>.stats.h5` (manual sec:stats), and the
-file says what it holds. Every dataset carries `@unit`, `@long_name`, `@description` and
+The production statistics live in `<out_root>.stats.h5`: a `bmad-stats` 1.0 file with
+the `fel` extension (manual sec:stats), the planned reset from the development format
+`lucifer-stats` 2.x. The layout is deliberately not FEL-specific, and the file says
+what it holds. Every dataset carries `@unit`, `@long_name`, `@description` and
 `@axes`, and EVERY NAME IN `@axes` RESOLVES TO A `coords/` DATASET, trailing label axes
 included, so a reader needs no table of names and never infers a dimension from its
 length: `scripts/read_stats.py` is the one reader everything in the tree uses, and it
-hard-codes nothing. Units are FIXED Bmad units (m, rad, eV, s, C, J, W) and the
+hard-codes nothing. The acceptance test is `scripts/validate_bmad_stats.py`, the
+format's own conformance checker, program-blind and run by the harness, which must
+report zero failures. Units are FIXED Bmad units (m, rad, eV, s, C, J, W) and the
 attributes are DOCUMENTATION, never load-bearing, which is the opposite of openPMD's
 `unitSI` and deliberately not mixed with it in one file. The version is refused by name
-rather than negotiated, and it resets to 1.0 at the first external release.
+rather than negotiated.
 
 | group | what |
 |---|---|
-| `coords/` | every axis once: `record` (THE record axis) with `s`, `ix_ele` and `at_element_end` as variables on it, `element_end` and `s_element_end`, the `slice` axis with `ct_slice`, `t_slice` and `z_slice` on it, the `ele` axis, and the label axes `bmad`, `bmad_col`, `wavefront`, `wavefront_col`, `plane`, `mode` |
-| `params/` | every scalar as data, as a true HDF5 scalar: the window (`lambda0`, `window_sample`, `slice_spacing`, `nbins`), `p0c`, the charge, the seed, the grid, the counts |
-| `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), plus `current` and `energy` in eV |
+| `coords/` | every axis once: `record` (THE record axis) with `s`, `ix_ele` (`@indexes='ele'`) and `at_element_end` (`@selects='element_end'`) as variables on it, `element_end` and `s_element_end`, the `slice` axis with `ct_slice`, `t_slice` and `z_slice` on it, the `ele` axis, and the label axes `bmad`, `bmad_col`, `bmad_t`, `wavefront`, `wavefront_col`, `plane`, `mode` |
+| `params/` | the INPUT tree: one subgroup per honored input struct (`global`, `beam_init`, `bmad_com`, `space_charge_com`, `wake`, `sc`, `wavefront_init`, ...), each with `@struct`, every honored component resolved after defaults |
+| `run/` | what the run PRODUCED: `p0c`, the species, `slice_spacing`, the axis lengths as bookkeeping cross-checks |
+| `beam/slice/` | per-record sufficient statistics, `bunch_params_struct` names, `sigma` at natural rank (nz, ns, 6, 6), the envelope extremes `rel_max`/`rel_min` over `bmad_t`, plus derived `current` and `energy` in eV |
 | `beam/slice_twiss/`, `beam/bunch/` | Bmad's own `calc_bunch_params`, per slice and whole window, on the element-end axis, the nine twiss quantities in `twiss/` over the `plane` axis and in `modes/` over the `mode` axis |
 | `field/total/`, `field/x/`, `field/y/`, `field/harm<h>/` | one wavelength's total and each component, all with the same dataset names |
 | `lattice/` | one row per element on the `ele` axis, for layout plots |

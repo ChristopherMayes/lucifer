@@ -63,9 +63,11 @@ def load(fn):
     or not a y component exists, so no branch changes what a name means."""
     st = read_stats(fn)
     q = {
-        "s": st.s, "p0c": float(st.params["p0c"]),
+        "s": st.s, "p0c": float(st.run["p0c"]),
         "centroid": st["beam/slice/centroid"],        # (nrec, nslice, 6)
         "sigma": st["beam/slice/sigma"],              # (nrec, nslice, 6, 6)
+        "rel_max": st["beam/slice/rel_max"],          # (nrec, nslice, 7), envelope data
+        "rel_min": st["beam/slice/rel_min"],
         "bunching": st["beam/slice/bunching"],
         "energy_ev": st["beam/slice/energy"],         # eV, stated not derived
         "sigma_energy": st["beam/slice/sigma_energy"],
@@ -188,6 +190,13 @@ def main():
 
     # Transverse rms sizes: beam from the 6x6, FIELD from the wavefront 4x4 --
     # gain guiding is the field-size curve bending toward the beam-size curve.
+    # The envelope band, centroid + rel over the window: the extremes are order
+    # statistics the file stores, not a sigma multiple.
+    with np.errstate(all="ignore"):
+        env_hi = 1e6 * np.nanmax(q["centroid"][:, :, 0] + q["rel_max"][:, :, 0], axis=1)
+        env_lo = 1e6 * np.nanmin(q["centroid"][:, :, 0] + q["rel_min"][:, :, 0], axis=1)
+    axd["bsize"].fill_between(s, env_lo, env_hi, color=BLUE, alpha=0.12, lw=0,
+                              label="x envelope", zorder=0)
     panel_series(axd["bsize"], s, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 0, 0])), BLUE, label=r"$\sigma_x$")
     panel_series(axd["bsize"], s, 1e6 * np.sqrt(np.maximum(0, sig[:, :, 2, 2])), ORANGE, label=r"$\sigma_y$")
     axd["bsize"].set_ylabel(r"rms beam size ($\mu$m)")

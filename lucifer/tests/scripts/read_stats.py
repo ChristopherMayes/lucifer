@@ -13,7 +13,7 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st.coord("plane")            # ('x', 'y', 'z'), the projected planes
     st.dim_coords("beam/slice/sigma")   # the coordinate of each dimension, in order
     st.ele_name                  # (nz,) element name per record, gathered through ix_ele
-    st.units["beam/slice/t"]     # 's'
+    st.run["p0c"]                # what the run produced; st.params["global"]["ran_seed"] is what the user set
 
 THE FILE DESCRIBES ITSELF (manual sec:stats), so this reader hard-codes almost nothing.
 Every dataset carries @unit, @long_name, @description and @axes, and every name in @axes
@@ -42,7 +42,8 @@ import h5py
 import numpy as np
 
 # The format versions this reader understands. No older ones: see the module docstring.
-KNOWN_VERSIONS = ("2.3",)
+# 1.0 is bmad-stats with the fel extension, the planned reset from lucifer-stats 2.x.
+KNOWN_VERSIONS = ("1.0",)
 
 
 class Stats:
@@ -55,8 +56,8 @@ class Stats:
 
         self.file_format = _text(self._h5.attrs.get("file_format", b"?"))
         self.version = _text(self._h5.attrs.get("file_format_version", b"?"))
-        if self.file_format != "lucifer-stats":
-            raise ValueError(f"{self.path.name} is not a Lucifer stats file "
+        if self.file_format != "bmad-stats":
+            raise ValueError(f"{self.path.name} is not a bmad-stats file "
                              f"(@file_format = {self.file_format!r})")
         if self.version not in KNOWN_VERSIONS:
             raise ValueError(f"{self.path.name} is stats format {self.version}, and this "
@@ -91,10 +92,14 @@ class Stats:
         self.axis_names = tuple(k for k in self._h5["coords"]
                                 if self.axes.get(f"coords/{k}") == (k,))
 
+        # run/ holds what the run produced, params/ what the user set: one subgroup
+        # per honored input struct, so params is a dict of dicts.
+        self.run = _scalars(self._h5["run"]) if "run" in self._h5 else {}
         self.params = {}
-        for key, dset in self._h5["params"].items():
-            val = np.atleast_1d(dset[()])[0]
-            self.params[key] = _text(val) if isinstance(val, bytes) else val
+        if "params" in self._h5:
+            for key, grp in self._h5["params"].items():
+                if isinstance(grp, h5py.Group):
+                    self.params[key] = _scalars(grp)
 
     # ------------------------------------------------------------------
 
@@ -264,6 +269,21 @@ def _text(val):
     return str(val).strip()
 
 
+def _scalars(group):
+    """A group's datasets as a dict, scalars unwrapped, strings decoded."""
+    out = {}
+    for key, dset in group.items():
+        if not isinstance(dset, h5py.Dataset):
+            continue
+        val = dset[()]
+        if getattr(val, "shape", None) == () or np.isscalar(val):
+            val = np.atleast_1d(val)[0]
+            out[key] = _text(val) if isinstance(val, bytes) else val
+        else:
+            out[key] = np.asarray(val)
+    return out
+
+
 def _list(val):
     """A list-valued string attribute as a tuple of str, empty for an absent one.
 
@@ -301,14 +321,16 @@ if __name__ == "__main__":
     st = read_stats(sys.argv[1])
     print(f"{st.path.name}: {st.file_format} {st.version}")
     print(f"  {len(st.s)} records, {st.at_end.sum()} element ends, "
-          f"{st.params['n_slice']} slices, components {st.components}, "
+          f"{st.run['n_slice']} slices, components {st.components}, "
           f"harmonics {st.harmonics}")
-    print(f"  window: lambda0 {st.params['lambda0']:.4e} m, sample "
-          f"{st.params['window_sample']}, spacing {st.params['slice_spacing']:.4e} m, "
+    wi = st.params.get("wavefront_init", {})
+    print(f"  window: lambda0 {wi.get('lambda0', float('nan')):.4e} m, sample "
+          f"{wi.get('window_sample', 0)}, spacing {st.run['slice_spacing']:.4e} m, "
           f"head at {st.head_direction}")
     print(f"  axes: {', '.join(f'{a}[{len(st.coord(a))}]' for a in st.axis_names)}")
     m = st.meta
     print(f"  lattice: {m['lattice_file']}, {m['n_lattice_files']} file(s) parsed, "
           f"source {len(m['lattice_source'])} bytes")
+    print(f"  inputs: {', '.join(sorted(st.params))}")
     for name, unit, label, axes, descrip in st.units_table():
         print(f"  {name:44s} [{unit:12s}] ({','.join(axes) or 'none'})  {descrip[:60]}")

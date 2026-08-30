@@ -117,7 +117,7 @@ def bunch_params_at(stats, record, islice):
             stats["beam/slice/sigma"][record, islice],
             float(stats["beam/slice/charge_live"][record, islice]),
             int(stats["beam/slice/n_particle_live"][record, islice]),
-            float(stats.params["p0c"]))
+            float(stats.run["p0c"]))
     finally:
         if close:
             stats.close()

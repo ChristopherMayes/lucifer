@@ -95,6 +95,11 @@ type fel_stats_struct
   real(rp), allocatable :: bunching(:,:)          ! (nslice, nrec) |b| at the fundamental
   real(rp), allocatable :: bunching_phase(:,:)    ! (nslice, nrec) [rad]
   integer, allocatable :: n_particle_live(:,:)    ! (nslice, nrec)
+  ! Per-coordinate extremes RELATIVE TO THE CENTROID, bunch_params_struct's rel_max and
+  ! rel_min: six phase-space entries plus time. Order statistics, which no moment can
+  ! reconstruct, kept for envelope plots. NaN for an empty slice.
+  real(rp), allocatable :: b_rel_max(:,:,:)       ! (7, nslice, nrec)
+  real(rp), allocatable :: b_rel_min(:,:,:)       ! (7, nslice, nrec)
   ! Field side, wavefront_params_struct names. With ONE live polarization these are
   ! the whole story. With two, they carry the X component, the f2_* arrays carry Y
   ! (written as a field/y/ group), and the power/energy/on_axis datasets are written
@@ -127,21 +132,14 @@ end type
 !+
 ! Structure fel_stats_params_struct
 !
-! The run parameters the stats file states as DATA, so nothing downstream scrapes them
-! out of the echoed namelist. Filled by the caller (fel_io_mod, which sees the whole
-! run) and written into params/ verbatim.
+! The few run scalars the stats writer itself needs, filled by the caller (fel_io_mod,
+! which sees the whole run) and written into run/. The INPUT tree params/ is written by
+! fel_io_mod directly, one subgroup per honored struct, since only it sees the run.
 !-
 
 type fel_stats_params_struct
-  real(rp) :: lambda0 = 0          ! Fundamental radiation wavelength [m].
   real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m] (window_sample * lambda0).
-  real(rp) :: bunch_charge = 0     ! Total live charge [C].
-  real(rp) :: grid_half_width = 0  ! Transverse grid half width [m].
-  real(rp) :: beta0 = 1            ! Reference beta, for the slice time axis.
-  integer :: window_sample = 0     ! Slice spacing in wavelengths (Genesis's sample).
-  integer :: nbins = 0             ! Beamlet size.
-  integer :: grid_n_pts = 0        ! Transverse grid points per side.
-  integer :: ran_seed = 0          ! The run's random seed.
+  real(rp) :: beta0 = 1            ! Reference beta, for the slice z variable.
   character(20) :: species = ''    ! Particle species name.
 end type
 
@@ -172,9 +170,15 @@ character(*), parameter :: fel_stats_wf_unit$ = 'm,rad,m,rad'
 character(3), parameter :: fel_stats_bmad_u$(6) = [character(3):: 'm', '1', 'm', '1', 'm', '1']
 character(3), parameter :: fel_stats_wf_u$(4) = [character(3):: 'm', 'rad', 'm', 'rad']
 ! Every value @kind takes, enumerated on the root so a reader that sorts groups by kind
-! does not have to discover the vocabulary by inspection.
-character(*), parameter :: fel_stats_kinds$ = 'axis,scalar,beam,per_slice,projected,' // &
-        'twiss,modes,field,component,derived,harmonic,table,provenance'
+! does not have to discover the vocabulary by inspection. An ARRAY: shape expresses
+! arity, and this holds a list.
+character(10), parameter :: fel_stats_kinds$(14) = [character(10):: 'axis', 'input', &
+        'run', 'beam', 'per_slice', 'projected', 'twiss', 'modes', 'field', &
+        'component', 'derived', 'harmonic', 'table', 'provenance']
+! The label axis of the per-slice extremes: the six phase-space names plus time, since
+! bunch_params_struct's rel_max and rel_min are seven-vectors.
+character(2), parameter :: fel_stats_bmad_t$(7) = [character(2):: 'x', 'px', 'y', 'py', 'z', 'pz', 't']
+character(3), parameter :: fel_stats_bmad_t_u$(7) = [character(3):: 'm', '1', 'm', '1', 'm', '1', 's']
 character(9), parameter :: fel_stats_twiss$(9) = [character(9):: &
         'beta', 'alpha', 'gamma', 'emit', 'norm_emit', 'sigma', 'sigma_p', 'eta', 'etap']
 ! The unit of each twiss quantity above, in the same order, for the file's @unit
@@ -227,6 +231,7 @@ allocate (stats%b_centroid(6, nslice, nrec), stats%b_sigma(36, nslice, nrec))
 allocate (stats%charge_live(nslice, nrec), stats%t(nslice, nrec), stats%sigma_t(nslice, nrec))
 allocate (stats%bunching(nslice, nrec), stats%bunching_phase(nslice, nrec))
 allocate (stats%n_particle_live(nslice, nrec))
+allocate (stats%b_rel_max(7, nslice, nrec), stats%b_rel_min(7, nslice, nrec))
 allocate (stats%f_centroid(4, nslice, nrec), stats%f_sigma(16, nslice, nrec))
 allocate (stats%f_energy(nslice, nrec), stats%f_power(nslice, nrec), stats%f_on_axis(nslice, nrec))
 allocate (stats%f_emit_x(nslice, nrec), stats%f_emit_y(nslice, nrec))
@@ -296,7 +301,7 @@ real(rp) z_now
 integer ix_ele
 logical with_angles, err_flag
 
-real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), beta0, ks
+real(rp) w, wsum, mean(6), cen(6), sig(6,6), v(6), vmin(6), vmax(6), beta0, ks
 integer ir, is, ip, i, j, nslice
 logical err, any_err
 character(*), parameter :: r_name = 'fel_stats_record'
@@ -324,7 +329,7 @@ any_err = .false.
 ! identical serial code, so diag.txt is bit-for-bit what it always was. What changed
 ! is that the formerly SERIAL per-record diag sweeps now ride this parallel loop.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, ip, i, j, io, pms, err) &
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, err) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
@@ -343,8 +348,10 @@ do is = 1, nslice
   if (wsum > 0) mean = mean / wsum
 
   sig = 0
+  vmin = huge(1.0_rp);  vmax = -huge(1.0_rp)
   do ip = 1, sl%n
     v = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)] - mean
+    vmin = min(vmin, v);  vmax = max(vmax, v)
     w = sl%weight(ip)
     do j = 1, 6
       do i = 1, j
@@ -372,6 +379,20 @@ do is = 1, nslice
 
   stats%bunching(is, ir) = bdiag_arr(is)%bunching
   stats%bunching_phase(is, ir) = bdiag_arr(is)%bunching_phase
+
+  ! The per-coordinate extremes, relative to the centroid just computed: order
+  ! statistics that ride the sweep for free. The time entry maps through
+  ! t - <t> = -(z - <z>)/(beta0 c), so the LARGEST time offset is the SMALLEST z one.
+
+  if (sl%n > 0) then
+    stats%b_rel_max(1:6, is, ir) = vmax
+    stats%b_rel_min(1:6, is, ir) = vmin
+    stats%b_rel_max(7, is, ir) = -vmin(5) / (beta0 * c_light)
+    stats%b_rel_min(7, is, ir) = -vmax(5) / (beta0 * c_light)
+  else
+    stats%b_rel_max(:, is, ir) = ieee_value(1.0_rp, ieee_quiet_nan)
+    stats%b_rel_min(:, is, ir) = ieee_value(1.0_rp, ieee_quiet_nan)
+  endif
 
   ! The field slice this beam slice couples to, unrotated exactly as the dumps are.
 
@@ -753,9 +774,9 @@ end subroutine fel_stats_exit_light
 !+
 ! Subroutine fel_stats_write (stats, prm, file_name, err_flag)
 !
-! Routine to write the stats file: coords/, params/, beam/ and field/ (module header).
-! meta/, lattice/ and coords/ele are appended afterwards by fel_io_mod, which can see
-! the run.
+! Routine to write the stats file: the identity, coords/, run/, beam/ and field/.
+! params/ (the input tree), meta/, lattice/ and coords/ele are appended afterwards by
+! fel_io_mod, which can see the run.
 !
 ! Every dataset goes through fel_h5_mod, so every dataset carries @unit, @long_name,
 ! @description and @axes, and EVERY NAME IN @axes RESOLVES TO A coords/ DATASET,
@@ -784,7 +805,9 @@ real(rp), allocatable :: cur(:,:), energy(:,:), sig_energy(:,:)
 logical, allocatable :: mask(:)
 logical err_flag, err
 character(*) file_name
+logical merr
 character(12) hname
+character(24) writer_str
 character(*), parameter :: r_name = 'fel_stats_write'
 
 !
@@ -797,10 +820,20 @@ ns = stats%nslice
 
 call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
 
-call hdf5_write_attribute_string (f_id, 'file_format', 'lucifer-stats', err)
-call hdf5_write_attribute_string (f_id, 'file_format_version', '2.3', err)
+! The identity (bmad-stats R1 to R5): the FORMAT is bmad-stats with the fel extension,
+! the planned reset from lucifer-stats 2.x, and the writer is this program, whose only
+! version is the Bmad it was built against.
+
+call hdf5_write_attribute_string (f_id, 'file_format', 'bmad-stats', err)
+call hdf5_write_attribute_string (f_id, 'file_format_version', '1.0', err)
+write (writer_str, '(a, i0)') 'lucifer bmad-', bmad_inc_version$
+call hdf5_write_attribute_string (f_id, 'writer', trim(writer_str), err)
+call hdf5_write_attribute_string_rank1 (f_id, 'extensions', [character(3):: 'fel'], merr)
+err = err .or. merr
+call hdf5_write_attribute_string (f_id, 'fel_version', '1.0', err)
 call hdf5_write_attribute_string (f_id, 'phase_space', 'bmad', err)
-call hdf5_write_attribute_string (f_id, 'kinds', fel_stats_kinds$, err)
+call hdf5_write_attribute_string_rank1 (f_id, 'kinds', fel_stats_kinds$, merr)
+err = err .or. merr
 call hdf5_write_attribute_string (f_id, 'units_note', &
         'Fixed Bmad units: m, rad, eV, s, C, J, W. Every dataset carries @unit as ' // &
         'DOCUMENTATION: the values are already SI and eV, so a reader must not scale ' // &
@@ -902,6 +935,13 @@ call fel_h5_str (g_id, 'bmad_unit', 'unit', &
 call fel_h5_str (g_id, 'wavefront_unit', 'unit', &
       'The unit of each wavefront coordinate. See coords/bmad_unit.', &
       'wavefront', fel_stats_wf_u$, err)
+call fel_h5_str (g_id, 'bmad_t', 'phase space + t', &
+      'The six phase-space names plus t: the label axis of the per-slice extremes ' // &
+      'rel_max and rel_min, which are seven-vectors in bunch_params_struct.', &
+      'bmad_t', fel_stats_bmad_t$, err)
+call fel_h5_str (g_id, 'bmad_t_unit', 'unit', &
+      'The unit of each bmad_t entry. See coords/bmad_unit.', 'bmad_t', &
+      fel_stats_bmad_t_u$, err)
 call fel_h5_str (g_id, 'plane', 'plane', &
       'The three PROJECTED twiss planes, bunch_params_struct''s x, y and z.', 'plane', &
       fel_stats_planes$, err)
@@ -923,6 +963,15 @@ call H5LTset_attribute_string_f (g_id, 'element_end', 'plot_against', 's_element
 err = err .or. (h5_err < 0)
 call H5LTset_attribute_string_f (g_id, 'slice', 'plot_against', 't_slice', h5_err)
 err = err .or. (h5_err < 0)
+
+! The join key and the mask say MACHINE-READABLY what their descriptions say in prose
+! (bmad-stats R18, R19): ix_ele's values index the ele axis, and at_element_end selects
+! the element_end axis's entries, in order.
+
+call H5LTset_attribute_string_f (g_id, 'ix_ele', 'indexes', 'ele', h5_err)
+err = err .or. (h5_err < 0)
+call H5LTset_attribute_string_f (g_id, 'at_element_end', 'selects', 'element_end', h5_err)
+err = err .or. (h5_err < 0)
 if (err) return
 
 ! The head convention, which no per-slice plot can be drawn without: the migration
@@ -941,36 +990,21 @@ call H5Gclose_f (g_id, h5_err)
 if (err) return
 
 ! ------------------------------------------------------------------
-! params/: every scalar as data, and as a true HDF5 scalar.
+! run/: the scalars the RUN produced, apart from params/, which holds what the user
+! set and is written by fel_io_mod (one subgroup per honored input struct). The three
+! counts restate axis lengths on purpose: n_element_end comes from the ACCUMULATOR's
+! counter, so the harness checking it against the mask tests the walk's bookkeeping,
+! which coords/element_end, packed from that mask, cannot.
 
-call H5Gcreate_f (f_id, 'params', g_id, h5_err)
-call group_note (f_id, 'params', 'scalar', 'Run parameters, one scalar each.', err)
-call fel_h5_real (g_id, 'lambda0', 'm', 'lambda0', &
-      'Fundamental radiation wavelength.', '', prm%lambda0, err)
-call fel_h5_int (g_id, 'window_sample', '1', 'sample', &
-      'Slice spacing in wavelengths (Genesis''s sample), and so the number of ' // &
-      'undulator periods of slippage per slice. An integer, which is what lets the ' // &
-      'field record rotate by one index with no interpolation.', '', prm%window_sample, err)
+call H5Gcreate_f (f_id, 'run', g_id, h5_err)
+call group_note (f_id, 'run', 'run', 'What the run produced, one scalar each.', err)
+call fel_h5_real (g_id, 'p0c', 'eV', 'p0c', 'Reference momentum times c.', '', stats%p0c, err)
+call fel_h5_str (g_id, 'species', 'species', 'Particle species.', '', [prm%species], err)
 call fel_h5_real (g_id, 'slice_spacing', 'm', 'slice spacing', &
       'Slice spacing, window_sample * lambda0. A LIGHT-TRAVEL distance, c times the ' // &
       'slice time separation: the grid is exactly uniform in t and ct, which is what ' // &
       'makes slippage a whole-slice shift. In Bmad z the separation is beta*this, per ' // &
       'particle. See coords/ct_slice.', '', prm%slice_spacing, err)
-call fel_h5_int (g_id, 'nbins', '1', 'beamlet size', &
-      'Beamlet size of the quiet loading.', '', prm%nbins, err)
-call fel_h5_real (g_id, 'p0c', 'eV', 'p0c', 'Reference momentum times c.', '', stats%p0c, err)
-call fel_h5_real (g_id, 'bunch_charge', 'C', 'charge', &
-      'Total live charge of the window.', '', prm%bunch_charge, err)
-call fel_h5_int (g_id, 'ran_seed', '1', 'seed', 'Random seed of the run.', '', prm%ran_seed, err)
-call fel_h5_int (g_id, 'grid_n_pts', '1', 'grid points', &
-      'Transverse grid points per side.', '', prm%grid_n_pts, err)
-call fel_h5_real (g_id, 'grid_half_width', 'm', 'grid half width', &
-      'Transverse grid half width.', '', prm%grid_half_width, err)
-! The three counts restate axis lengths, which is redundant on purpose. n_element_end
-! comes from the ACCUMULATOR's own counter rather than from the mask, so the harness
-! checking one against the other tests the walk's bookkeeping. coords/element_end is
-! packed from that mask, so no check on it could see the same disagreement.
-
 call fel_h5_int (g_id, 'n_record', '1', 'records', &
       'Records taken, the length of the record axis.', '', ir, err)
 call fel_h5_int (g_id, 'n_element_end', '1', 'element ends', &
@@ -978,7 +1012,6 @@ call fel_h5_int (g_id, 'n_element_end', '1', 'element ends', &
       'counter, and equal to the count of coords/at_element_end.', '', ie, err)
 call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
       'Slices in the time window, the length of the slice axis.', '', ns, err)
-call fel_h5_str (g_id, 'species', 'species', 'Particle species.', '', [prm%species], err)
 call H5Gclose_f (g_id, h5_err)
 if (err) return
 
@@ -1024,13 +1057,32 @@ call fel_h5_real (g_id, 'bunching', '1', 'bunching', &
 call fel_h5_real (g_id, 'bunching_phase', 'rad', 'bunching phase', &
       'Bunching phase arg(b), carrying the run''s reference phase.', &
       'record,slice', stats%bunching_phase(:,1:ir), err)
+call fel_h5_real (g_id, 'rel_max', 'm,1,m,1,m,1,s', 'max - centroid', &
+      'Per-coordinate maximum over the slice RELATIVE TO THE CENTROID, ' // &
+      'bunch_params_struct''s rel_max: order statistics no moment can reconstruct. ' // &
+      'The envelope is centroid + rel_max. NaN for an empty slice.', &
+      'record,slice,bmad_t', stats%b_rel_max(:,:,1:ir), err)
+call unit_axis_note (g_id, 'rel_max', 'bmad_t', 1, err)
+call fel_h5_real (g_id, 'rel_min', 'm,1,m,1,m,1,s', 'min - centroid', &
+      'Per-coordinate minimum over the slice relative to the centroid. See rel_max.', &
+      'record,slice,bmad_t', stats%b_rel_min(:,:,1:ir), err)
+call unit_axis_note (g_id, 'rel_min', 'bmad_t', 1, err)
+
+! The conveniences every consumer would otherwise re-derive, marked as the pure
+! functions they are (bmad-stats R38). Ambient scalars (slice_spacing, p0c) are not
+! named: the formula is in each description.
+
 call fel_h5_real (g_id, 'current', 'A', 'current', &
       'Slice current, c * charge_live / slice_spacing.', 'record,slice', cur, err)
+call fel_h5_dset_attr_strs (g_id, 'current', 'derived_from', [character(11):: 'charge_live'], err)
 call fel_h5_real (g_id, 'energy', 'eV', 'energy', &
       'Mean total energy of the slice, Bmad''s convention (energy is eV, never gamma).', &
       'record,slice', energy, err)
+call fel_h5_dset_attr_strs (g_id, 'energy', 'derived_from', [character(8):: 'centroid'], err)
 call fel_h5_real (g_id, 'sigma_energy', 'eV', 'sigma_E', &
       'Rms energy spread of the slice.', 'record,slice', sig_energy, err)
+call fel_h5_dset_attr_strs (g_id, 'sigma_energy', 'derived_from', &
+      [character(8):: 'sigma', 'centroid'], err)
 call H5Gclose_f (g_id, h5_err)
 if (err) return
 
@@ -1052,7 +1104,9 @@ if (err) return
 
 call H5Gcreate_f (b_id, 'bunch', g_id, h5_err)
 call group_note (b_id, 'bunch', 'projected', &
-      'Bmad''s evaluated bunch_params for the whole window, at element ends.', err)
+      'Bmad''s evaluated bunch_params for the whole window, at element ends. Pooled ' // &
+      'from beam/slice''s moments by the covariance identity, so it is derived.', err)
+call string_note (g_id, 'derived_from', [character(5):: 'slice'], err)
 call write_bp_bunch (g_id, stats%e_bunch(:, 1:ie), err)
 call H5Gclose_f (g_id, h5_err)
 call H5Gclose_f (b_id, h5_err)
@@ -1281,6 +1335,8 @@ call fel_h5_real (id, 'emit_x', 'm rad', 'emit_x', &
 call fel_h5_real (id, 'emit_y', 'm rad', 'emit_y', &
       'sqrt(det sigma_y-plane) = M^2 lambda / 4 pi. NaN without angle moments.', &
       'record,slice', ey, err)
+call fel_h5_dset_attr_strs (id, 'emit_x', 'derived_from', [character(5):: 'sigma'], err)
+call fel_h5_dset_attr_strs (id, 'emit_y', 'derived_from', [character(5):: 'sigma'], err)
 call fel_h5_flag (id, 'angle_moments_valid', 'angles valid', &
       'One where the theta moments were computed (they cost three FFTs, so element ' // &
       'ends only).', 'record,slice', valid, err)
@@ -1353,7 +1409,8 @@ character(*) gname, axis
 nr = size(rows, 2)
 call H5Gcreate_f (id, gname, t_id, h5e)
 call group_note (id, gname, gname, 'The nine twiss quantities over the ' // axis // &
-      ' axis, for the whole window.', err)
+      ' axis, for the whole window. Pure functions of the sibling moments.', err)
+call string_note (t_id, 'derived_from', [character(8):: 'centroid', 'sigma'], err)
 
 allocate (tw(3, nr))
 do jp = 1, 9
@@ -1434,7 +1491,8 @@ character(*) gname, axis
 nsl = size(rows, 2);  nr = size(rows, 3)
 call H5Gcreate_f (id, gname, t_id, h5e)
 call group_note (id, gname, gname, 'The nine twiss quantities over the ' // axis // &
-      ' axis, per slice.', err)
+      ' axis, per slice. Pure functions of the sibling moments.', err)
+call string_note (t_id, 'derived_from', [character(8):: 'centroid', 'sigma'], err)
 
 allocate (tw(3, nsl, nr))
 do jp = 1, 9

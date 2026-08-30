@@ -61,6 +61,7 @@ interface fel_h5_int
 end interface
 
 interface fel_h5_flag
+  module procedure fel_h5_flag_rank0
   module procedure fel_h5_flag_rank1
   module procedure fel_h5_flag_rank2
 end interface
@@ -344,6 +345,39 @@ end subroutine fel_h5_int_rank2
 !   error    -- logical: Accumulates True on any failure.
 !-
 
+subroutine fel_h5_flag_rank0 (id, name, label, descrip, val, error)
+
+integer(hid_t) id, s_id, d_id
+integer h5_err
+integer, target :: buf
+logical error, val
+character(*) name, label, descrip
+type (c_ptr) f_ptr
+
+! A true scalar flag, from a LOGICAL: the rank-0 case exists for input switches, which
+! are logicals in the structs, where the array cases take 0/1 integer buffers.
+
+call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)
+call H5Dcreate_f (id, name, H5T_STD_I8LE, s_id, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  call H5Sclose_f (s_id, h5_err)
+  return
+endif
+buf = merge(1, 0, val)
+f_ptr = c_loc(buf)
+call H5Dwrite_f (d_id, H5T_NATIVE_INTEGER, f_ptr, h5_err)
+error = error .or. (h5_err < 0)
+call H5Dclose_f (d_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+
+call annotate (id, name, '1', label, descrip, '', error)
+call hint_bool (id, name, error)
+
+end subroutine fel_h5_flag_rank0
+
+!------------------------------------------------------------------------------
+
 subroutine fel_h5_flag_rank1 (id, name, label, descrip, axes, val, error)
 
 integer(hid_t) id
@@ -591,6 +625,38 @@ call fel_h5_attr_int (d_id, attrib, val, error)
 call H5Dclose_f (d_id, h5_err)
 
 end subroutine fel_h5_dset_attr_int
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_h5_dset_attr_strs (id, name, attrib, val, error)
+!
+! Routine to attach a string-ARRAY attribute to a dataset reached by name from its
+! parent group. Shape expresses arity: a list is an array, length one included, which
+! Bmad's hdf5_write_attribute_string_rank1 writes and the dataset-open is the part it
+! cannot do for us.
+!-
+
+subroutine fel_h5_dset_attr_strs (id, name, attrib, val, error)
+
+integer(hid_t) id, d_id
+integer h5_err
+logical error, merr
+character(*) name, attrib, val(:)
+
+!
+
+call H5Dopen_f (id, name, d_id, h5_err)
+if (h5_err < 0) then
+  error = .true.
+  return
+endif
+call hdf5_write_attribute_string_rank1 (d_id, attrib, val, merr)
+error = error .or. merr
+call H5Dclose_f (d_id, h5_err)
+
+end subroutine fel_h5_dset_attr_strs
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

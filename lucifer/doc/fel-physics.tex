@@ -1127,7 +1127,12 @@ confirms the walk's floor-derived delay against the trace at that scale.
 
 \section{Diagnostic output}\label{sec:stats}
 
-\emph{The stats file} \code{<out\_root>.stats.h5} DESCRIBES ITSELF. Every dataset
+\emph{The stats file} \code{<out\_root>.stats.h5} DESCRIBES ITSELF. Its format is
+\code{bmad-stats} 1.0 with the \code{fel} extension: the layout is deliberately not
+FEL-specific, so the root states \code{@file\_format}, \code{@file\_format\_version},
+\code{@writer}, \code{@extensions} and \code{@kinds} (the group vocabulary, an array),
+and a reader refuses an unknown version by name. This is the planned reset from the
+development format \code{lucifer-stats} 2.x. Every dataset
 carries four attributes: \code{@unit}, \code{@long\_name} (three words, for an axis
 label), \code{@description} (a sentence) and \code{@axes}. Units are fixed Bmad units
 (m, rad, eV, s, C, J, W) and they are DOCUMENTATION: the values are already SI and eV,
@@ -1157,9 +1162,11 @@ the position along the lattice while \code{z} is the phase-space coordinate, and
 file uses \code{z} for that in \code{coords/bmad} and for the longitudinal twiss plane in
 \code{coords/plane}. \code{ix\_ele} is a variable there
 too, whose values index the \code{ele} axis, which makes it the join key onto
-\code{lattice/}. \code{at\_element\_end} marks which records are element ends and
-selects the \code{element\_end} axis, whose own coordinates are \code{element\_end} (the
-element index) and \code{s\_element\_end} (the position). The slice axis is \code{slice}, the
+\code{lattice/}, and it SAYS so: \code{@indexes = 'ele'}. \code{at\_element\_end} marks
+which records are element ends and selects the \code{element\_end} axis
+(\code{@selects = 'element\_end'}), whose own coordinates are \code{element\_end} (the
+element index) and \code{s\_element\_end} (the position). A join key and a mask are
+machine-readable relationships, not prose. The slice axis is \code{slice}, the
 slice NUMBER, with three positions as variables on it: \code{ct\_slice} and
 \code{t\_slice}, which are exact and free of $\beta$, and \code{z\_slice}, which is
 Bmad's $z$ at the reference $\beta$ and says so (Eq.~\ref{eq:tslice} and
@@ -1170,20 +1177,35 @@ it on one of a set would invite the reader to assume the set agrees. Both also c
 viewer should put on the axis in place of the index, which only the writer knows. Last
 are the label axes: \code{bmad} and \code{bmad\_col} naming the six phase space
 coordinates, \code{wavefront} and \code{wavefront\_col} the four field moments,
-\code{plane} the three PROJECTED twiss planes and \code{mode} the three NORMAL modes. A
+\code{plane} the three PROJECTED twiss planes, \code{mode} the three NORMAL modes,
+and \code{bmad\_t} the six phase-space names plus $t$, the label axis of the per-slice
+extremes. A
 square matrix's two sides are named APART so that selecting one entry needs no rule, and
 the planes and the modes are named apart because they are two decompositions of one beam:
 an eigen-emittance is not a projected emittance, and one axis carrying both invites an
 average across them.
 
-\code{params/} holds every scalar as data, as a true HDF5 scalar, the window
-(\code{lambda0}, \code{window\_sample}, \code{slice\_spacing}, \code{nbins}) included,
-so nothing downstream parses the echoed namelist. \code{beam/slice/} holds the
+\code{params/} is the INPUT TREE: one subgroup per input structure the program
+honors, each carrying \code{@struct} naming the Fortran type and holding the RESOLVED
+value of every honored component as a true HDF5 scalar, so nothing downstream parses
+the echoed namelist, no reader needs a defaults table, and two runs diff by their
+inputs. (\code{out\_root} alone is left out: it is the run's own name, and as data it
+would make two otherwise identical runs compare different.) List-valued inputs are
+array attributes on their subgroup. What the run PRODUCED, apart from what the user
+set, is \code{run/}: \code{p0c}, the species, \code{slice\_spacing} and the axis
+lengths, kept as bookkeeping cross-checks. \code{beam/slice/} holds the
 per-record SUFFICIENT statistics, named exactly as \code{bunch\_params\_struct}
 components: \code{centroid} (nrec, nslice, 6), \code{sigma} (nrec, nslice, 6, 6) at its
 natural rank, \code{charge\_live}, \code{n\_particle\_live}, \code{t}, \code{sigma\_t},
-computed two-pass (the \S\ref{sec:numerics} variance lesson), plus \code{current} and
-\code{energy} in eV, which every consumer would otherwise re-derive.
+computed two-pass (the \S\ref{sec:numerics} variance lesson), the per-coordinate
+extremes \code{rel\_max} and \code{rel\_min} over the \code{bmad\_t} axis (RELATIVE to
+the centroid, Bmad's own convention, so the envelope a plot wants is centroid plus
+rel: order statistics no moment can reconstruct, accumulated in the same sweep), plus
+\code{current} and \code{energy} in eV, which every consumer would otherwise
+re-derive. Everything that is a pure function of other datasets says so with
+\code{@derived\_from}, so a re-deriver knows what is independent information: the
+moments, extremes, weights and bunching are the primary layer, and the twiss, the
+conveniences and the whole-window row (pooled from the slice moments) are derived.
 \code{beam/slice\_twiss/} and \code{beam/bunch/} hold the fully evaluated struct from
 Bmad's own \code{calc\_bunch\_params}, per slice and for the whole window, on the
 element-end axis, with the nine twiss quantities in a \code{twiss/} subgroup over the
@@ -1285,7 +1307,10 @@ pooled pulse $\sigma_{xx}$ by both routes at $3.4\times10^{-3}$; the
 all three files dataset-identical at 1 vs 8 threads (NaN counting as NaN, which is what
 a not-computed entry means); unknown dump elements refused by name.
 
-Twelve structural checks hold the self-description itself. A walk of every dataset for its
+The acceptance test is the format's own conformance checker,
+\code{tests/scripts/validate\_bmad\_stats.py}: program-blind, numpy and h5py only, run
+by the harness on every diagnostics check and required to report ZERO failures against
+the rules it can see. The structural checks below hold what it cannot. A walk of every dataset for its
 four attributes and of every group for its two. Then THE ACCEPTANCE TEST, which is a
 generic load: label every dimension of every dataset from \code{@axes} alone, failing if
 a name does not resolve to a coordinate, if a dimension has no name, if a length
@@ -1301,9 +1326,14 @@ provenance: no attribute anywhere near HDF5's 64 kB cap, every text in \code{met
 dataset, \code{n\_lattice\_files} reporting the wrapper lattice's second file, and no
 machine-local value in a default run. Then three on the slice coordinates:
 \code{t\_slice} exactly $-\code{ct\_slice}/c$, \code{z\_slice} equal to
-$\beta_0\code{ct\_slice}$, and the axis being the index. And one on the zero-length wake
-lattice, where \code{s} really does repeat, so the repeated-\code{s} check meets its
-target rather than a run with no duplicates in it. \code{diag.txt} is untouched: every benchmark tier
+$\beta_0\code{ct\_slice}$, and the axis being the index. Then the envelope: the
+position extremes equal numpy extremes over a \code{dump\_beam\_at} file's particles at
+the same plane EXACTLY (same particles, and IEEE subtraction of the stored centroid is
+deterministic), the momentum entries match across the dump's unit round trip at
+$3\times10^{-16}$, and the $t$ entry is the $z$ entry through $-\Delta z/(\beta_0 c)$
+exactly. And one on the zero-length wake lattice, where \code{s} really does repeat, so
+the repeated-\code{s} check meets its target rather than a run with no duplicates in
+it. \code{diag.txt} is untouched: every benchmark tier
 reproduces bit for bit.
 \end{validation}
 
