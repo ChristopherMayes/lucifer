@@ -223,7 +223,7 @@ WINEOF
 
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
 # Every deck reads the converted openPMD dumps and writes openPMD, the only format the
-# tracker speaks. The three input groups (manual sec:program): extra &fel_params content
+# tracker speaks. The three input groups (doc/user-guide.md): extra &fel_params content
 # (wake/sc) as argument 6, extra &fel_beam_init content (check knobs) as argument 7.
 # nbins is the beamlet size the Genesis decks load with, which no dump format carries.
 
@@ -276,7 +276,7 @@ make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "wake%on = T
 # Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
 # uses a fieldmap field_calc (deliverable 9, brief 7.5), or that carries Bmad wakes on
 # any element (the slice-at-a-time seam cannot apply them meaningfully), must be
-# REFUSED BY NAME -- the failure message names the offending attribute and element -- not passed
+# Refused by name -- the failure message names the offending attribute and element -- not passed
 # through to fail downstream with an unrelated message (missing b_max) or a segfault in
 # the parse-time reference tracking (fieldmap). Each check mutates one attribute of the
 # real single-segment lattice and requires both a nonzero exit and the by-name message.
@@ -286,16 +286,16 @@ grep -v "b_max" aramis_1seg.bmad                                   > refusal_bma
 sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > refusal_lperiod.bmad
 sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > refusal_fieldmap.bmad
 
-GATES_OK=1
+CHECKS_OK=1
 run_assert_refusal () {   # <name> <by-name message fragment>
   make_nml refusal_$1.nml refusal_$1.bmad refusal_$1 bmad Aramis
   if "$EXE" refusal_$1.nml > fel-refusal_$1.log 2>&1; then
     echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
-    GATES_OK=0
+    CHECKS_OK=0
   elif ! grep -q "$2" fel-refusal_$1.log; then
     echo "FAIL: refusal_$1 refused, but not by name; log tail:" >&2
     tail -5 fel-refusal_$1.log >&2
-    GATES_OK=0
+    CHECKS_OK=0
   else
     echo "  refusal_$1: refused by name ($(grep "$2" fel-refusal_$1.log | head -1 | cut -c1-60)...)"
   fi
@@ -320,7 +320,7 @@ run_assert_refusal lperiod  "ZERO L_PERIOD"
 run_assert_refusal fieldmap "FIELD_CALC MUST BE PLANAR_MODEL"
 run_assert_refusal lrwake   "LR (MULTI-BUNCH) WAKES ARE NOT SUPPORTED"
 run_assert_refusal zmax     "Z_MAX CAN HANDLE"
-if [ "$GATES_OK" -ne 1 ]; then
+if [ "$CHECKS_OK" -ne 1 ]; then
   echo "FAIL: FEL-element assertion checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi
@@ -361,7 +361,7 @@ done
 section_time tiers-all-eleven
 
 # Thread-count independence: the time-dependent single-segment configuration rerun with
-# eight threads must reproduce the one-thread run BIT FOR BIT -- each slice's arithmetic
+# eight threads must reproduce the one-thread run bit for bit -- each slice's arithmetic
 # is independent of which thread runs it, so any difference at all is a race. The diag
 # file is compared byte for byte. The dumps dataset by dataset, exactly (HDF5 object
 # headers carry timestamps, so whole-file cmp would false-alarm).

@@ -1,6 +1,6 @@
 # The coherent source: converged results at a fraction of the particles
 
-The use case (manual sec:coherent-source): runs whose beams are transversely
+The use case (manual: the coherent-source section): runs whose beams are transversely
 Gaussian (idealized machines, parameter scans, seeded amplifier studies) can
 trade the per-particle source deposit for Tanaka's coherent retrieval
 (`global%source_model = "coherent"`, PRAB 27, 030703 (2024)) and converge at one
@@ -24,8 +24,7 @@ this case, with nothing anywhere reporting a problem. The last row is the same
 particle count giving the converged answer. (Per-slice cost dominates real
 time-dependent runs, where the same particle reduction pays proportionally.)
 
-The guardrails are part of the feature (all refusals by name, manual
-sec:coherent-source). A per-slice Gaussianity test is sized against its own
+The guardrails are part of the feature (all refusals by name, the manual's coherent-source section). A per-slice Gaussianity test is sized against its own
 sampling significance. A genuinely structured profile refuses. An offset,
 mismatched or tilted Gaussian beam passes -- the source centers and tilts with
 the beam's phasor-weighted moments. Harmonics, two polarizations and the

@@ -2,7 +2,7 @@
 
 The check scripts assemble their run configurations as flat key = value blocks
 (many of them templated). lucifer's input is the three groups
-&fel_params / &fel_beam_init / &fel_wavefront_init (manual sec:program); this
+&fel_params / &fel_beam_init / &fel_wavefront_init (doc/user-guide.md); this
 router rewrites a flat block into them, one key at a time, with the same
 old-name -> new-home mapping the program's own retired-group refusal prints.
 The configurations themselves are untouched -- same keys, same values.

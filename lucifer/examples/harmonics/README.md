@@ -27,7 +27,7 @@ live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name,
 identifying the harmonic.
 
 A helical undulator would give exactly nothing here: its coupling fc(h) vanishes
-for every harmonic (manual sec:field-set), which is why this example is planar.
+for every harmonic (manual: the harmonic-radiation section), which is why this example is planar.
 Validated against Genesis4 running the same configuration (fundamental 5.3e-8,
 harmonic growth 1.3e-4) and against the exact Bessel deposit sum (3.3e-16) by the
 harness's harmonic check section. Runs in ~2 min.

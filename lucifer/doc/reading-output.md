@@ -47,7 +47,7 @@ Units in these files are documentation, never a factor to apply. The values are 
 ## The stats file describes itself
 
 The production statistics live in `<out_root>.stats.h5`: a `bmad-stats` 1.0 file with
-the `fel` extension (manual sec:stats), the planned reset from the development format
+the `fel` extension (manual: the diagnostic-output section), the planned reset from the development format
 `lucifer-stats` 2.x. The layout is deliberately not FEL-specific, and the file says
 what it holds. Every dataset carries `@unit`, `@long_name`, `@description` and
 `@axes`, and every name in `@axes` resolves to a `coords/` dataset, trailing label axes
@@ -83,7 +83,12 @@ label axes included, and things that must not be confused are named apart: a squ
 matrix's two sides (`bmad`, `bmad_col`) so that selecting one entry needs no rule, and
 the projected twiss planes (`plane`) from the normal modes (`mode`), because an
 eigen-emittance is not a projected emittance and one axis carrying both invites an
-average across them. **The slice axis exists**, and its
+average across them. The nine twiss quantities sit on those axes rather than in six
+groups per set for two reasons. A group named `z` cannot sit beside a `z` coordinate,
+which xarray and netCDF both refuse, and one array per quantity is 18 datasets where
+six groups per set were 108. They are subgroups (`twiss/`, `modes/`) because one of the
+nine is named `sigma`, as `bunch_params_struct` names it, and the covariance matrix
+beside them is `sigma` too. **The slice axis exists**, and its
 coordinates are exact: the slice number is the axis, with `ct_slice` and `t_slice` on it
 free of any beta and `z_slice` marked as Bmad's z at the reference beta. The slice grid is
 uniform in time, not in z, which is what makes slippage an exact integer shift of the
@@ -127,9 +132,12 @@ propagate numerically.
 
 `meta/` says which lattice and which input, and deliberately not more. Everything in it
 is a dataset rather than an attribute, because HDF5 caps one attribute at 64 kB (the
-largest that writes here is 65495 bytes) while the echoed namelist is 12 kB and a real
-lattice text 37 kB, and the failure path was a warning: provenance whose failure mode is
-silent absence must not sit on a resource limit. `meta/lattice_source` is the TOP-LEVEL
+largest that writes here is 65495 bytes, where a scalar string dataset took 3 MB) while
+the echoed namelist is 12 kB and a real lattice text 37 kB, and the failure path was a
+warning: provenance whose failure mode is silent absence must not sit on a resource
+limit. The cost is that `meta/` no longer sits outside dataset-level identity
+comparisons for free, since `input_echo` carries `out_root`, so the harness excludes it
+by name instead. `meta/lattice_source` is the top-level
 lattice file only, and says so, because Bmad's `call, file =` pulls in more and every
 wrapper lattice here recorded a call statement while the lattice it called was absent.
 `n_lattice_files` reports how many files the parser opened, so one means the text is the
@@ -164,18 +172,15 @@ own calc_emittances_and_twiss_from_sigma_matrix fed from the already-computed
 per-record moments (an element end always coincides with its last record), not by
 re-summing particles.
 
-The WHOLE-WINDOW element-end row is assembled the same way, from the per-slice
-moments, by the pooled-covariance identity
-
-    m = Sum_s w_s m_s / Sum_s w_s
-    S = Sum_s w_s [S_s + (m_s - m)(m_s - m)^T] / Sum_s w_s
-
-with each slice moved from its local z chart to the global window chart. That move is
-not a plain offset: `fel_concat_slices` places a particle at
-z_global = z_local + beta*(is-1)*spacing with the particle's own beta, so within a
-slice z depends on pz. Linearizing beta about the slice's mean pz makes the move an
-exact shear of (z, pz), and the pool applies it as S -> J S J^T with the single
-off-diagonal J(5,6) = (is-1)*spacing*dbeta/dpz. This replaced a concatenation of every
+The whole-window element-end row is assembled the same way, from the per-slice
+moments, by the pooled-covariance identity, with each slice first moved from its local
+z chart to the global window chart. That move is not a plain offset, since
+`fel_concat_slices` places a particle at z_global = z_local + beta*(is-1)*spacing with
+the particle's own beta, so within a slice z depends on pz. The identity, the shear
+that carries the chart change, and why the between-group term makes the pool exact
+rather than an average of covariances are in the manual's whole-window-row section.
+What matters for reading the file is that the row is a pool of the slice moments and
+never a re-sum of particles. This replaced a concatenation of every
 particle in the window into one bunch plus Bmad's full 6D moments and Twiss on it, at
 every element end -- 110 million particle visits on a 131-slice x 8192 case, all on
 one thread. Measured against that particle sum when it landed: 4.0e-12 worst relative

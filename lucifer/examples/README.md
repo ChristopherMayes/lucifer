@@ -42,9 +42,9 @@ import path). The current is derived, never input: a Gaussian profile from
 `lucifer.f90` documents every parameter and the honored-fields table. The undulator segments in the lattices
 are real Bmad wiggler elements with `tracking_method = custom`, and their FEL parameters
 live on the lattice. The attribute-to-parameter map and the parse-time refusals are the
-manual's `sec:element`. There are no per-undulator namelist parameters.
+manual's the FEL-element section. There are no per-undulator namelist parameters.
 
-`<example>.stats.h5` is the production statistics file (manual sec:stats): fixed Bmad
+`<example>.stats.h5` is the production statistics file (manual: the diagnostic-output section): fixed Bmad
 units, per-record per-slice arrays with beam datasets named as `bunch_params_struct`
 components (plus `bunching`), `wavefront_params` for the field, and the evaluated
 `calc_bunch_params` at element ends. The plot is ten panels against z: radiation power
@@ -87,7 +87,7 @@ saturation peak).
 A bunch described by Bmad's `beam_init_struct` (the native equivalent of Genesis's
 `&beam`), generated, resampled into FEL slices by the transcribed Genesis
 `importdistribution` method (`fel_import_mod`), and tracked dark through the full
-line: SASE from an imported bunch (the resampling method is the manual's `sec:import`).
+line: SASE from an imported bunch (the resampling method is the manual's the distribution-import section).
 The bunch is a Gaussian test bunch sized to the FEL
 window's economics (sigma_z = 1.2 nm, 30 fC, 3 kA peak). It is labeled a test bunch for
 a reason: physical bunches are micrometers and need thousands of slices. The time
@@ -121,8 +121,7 @@ power panel is the slippage cascade itself.
 ## bmad_wake
 
 The same chamber-wake physics as `sase_wake`, delivered through Bmad's own wake
-machinery instead of the transcribed Genesis model (conventions: manual
-`sec:seamwake`): `ztable.wake` is the Bane-Stupakov resistive-wall kernel for a 0.5 mm
+machinery instead of the transcribed Genesis model (conventions: the manual's Bmad-element-wakes section): `ztable.wake` is the Bane-Stupakov resistive-wall kernel for a 0.5 mm
 copper chamber (exported by `write_wake_kernels`, sign-flipped to Bmad's
 positive-decelerating convention, self-slice unhalved, causal side z < 0, padded past
 the window), attached as an `sr_wake` `z_long` table to every element of the line. The
@@ -137,7 +136,7 @@ in `wake_lattice.bmad`'s header.
 
 ## unaveraged
 
-The FEL with no period averaging (manual `sec:unaveraged`): one seeded steady-state
+The FEL with no period averaging (manual: the unaveraged-mode section): one seeded steady-state
 segment (`seg1.bmad`, 266 periods of the benchmark undulator, carrying
 `fel_tracking = 1` as its own lattice attribute). The particles ride the real helical
 field, quiver and all, at 20 integration substeps per period, with sin² entry/exit ramps

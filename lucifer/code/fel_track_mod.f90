@@ -191,7 +191,7 @@ type fel_field_struct
   type (fel_bank_struct) :: bank
 end type
 
-! Cached kernels for fel_field_step, mirroring FieldSolverFFT::init: ONE ENTRY PER
+! Cached kernels for fel_field_step, mirroring FieldSolverFFT::init: one entry per
 ! WAVELENGTH (per harmonic), each rebuilt when its grid or step changes. All module
 ! state, built SERIALLY by fel_field_kernel_init before any parallel slice loop and
 ! read-only ever after. fel_field_step never rebuilds: it looks its entry up
@@ -223,14 +223,14 @@ integer, parameter :: fel_transcribed$ = -1   ! Transcribed-Genesis transverse m
                                               !   (validation-internal, Genesis tiers).
 integer, parameter :: fel_averaged$ = 0       ! Averaged, bmad_standard kernel maps
                                               !   (the unset default).
-integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged verification mode.
+integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged mode.
 
 type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
 ! One libm call for the (sin, cos) pair (lucifer/code/fel_sincos.c). NOT bit-identical
 ! to gfortran's own sin/cos intrinsics: they differ from libm by one ulp on ~2e-6 of
 ! arguments (73 mismatches in a 44M-point sweep of the theta domain). Adopting
-! this was therefore a NAMED VALUE CHANGE -- every benchmark tier re-measured and
+! this was therefore a named value change -- every benchmark tier re-measured and
 ! re-recorded (doc/validation.md, "The particle-path cost").
 
 !+
@@ -781,7 +781,7 @@ beam%phi0 = phi0_new
 ! sums from the just-advanced particles (slice-parallel, each slice its own data),
 ! then the ONE global kappa (Tanaka Eq 26: the integrals run over the whole window,
 ! so this is the cross-slice serial point), then the guard. A slice whose transverse
-! charge profile is measurably non-Gaussian is refused BY NAME with its number: the
+! charge profile is measurably non-Gaussian is refused by name with its number: the
 ! Gaussian model would bias the gain there. Thresholds are set by the distorted-beam
 ! checks.
 

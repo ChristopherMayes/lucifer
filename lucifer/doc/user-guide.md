@@ -61,7 +61,7 @@ and Genesis's default ADI solver is out of scope).
 | `lucifer/code/fel_collective_mod.f90` | Wakes and space charge at Genesis's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `lucifer/tests/genesis4/collective/` | Genesis decks: the collective tiers, importing the shared TD dumps |
 | `lucifer/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
-| `lucifer/code/fel_unaveraged_mod.f90` | The unaveraged verification mode: full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
+| `lucifer/code/fel_unaveraged_mod.f90` | The unaveraged mode: full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; no fc/faw anywhere (grep-checked) |
 | `lucifer/tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison |
 | `lucifer/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
 | `lucifer/tests/run_fel_benchmark.sh` | The whole validation, one command |
@@ -202,7 +202,7 @@ registered by the driver, class-settable as `wiggler::*[fel_tracking] = ...`), s
 averaged and unaveraged segments mix freely in one line. Unset/0, the default, is
 averaged with the transverse maps of Bmad's own `bmad_standard` periodic-wiggler
 kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like
-end kicks, chromatic via `p0/p`). `1` is the unaveraged verification mode. `-1` is
+end kicks, chromatic via `p0/p`). `1` is the unaveraged mode, a production method whose cost buys the full quiver dynamics (see the manual's unaveraged-mode section). `-1` is
 averaged with the transcribed-Genesis focusing (matrix from `aw`, `kx`, `ky`,
 chromatic via `gammaz`), and it is VALIDATION-INTERNAL: the Genesis tiers require
 transcription-level transport and select it via the `*_val.bmad` wrapper lattices. No
@@ -221,7 +221,7 @@ line with the last two cells' undulators a second element definition with `b_max
 lower: bit-identical to the untapered run until the taper starts, 12.7x its exit
 power after (see `examples/README.md`).
 
-## Program structure (manual sec:program)
+## Program structure
 
 The tracker is laid out the way Tao is laid out: the input structs in `fel_struct`
 (defaults in the declarations), the namelist layer quarantined in `fel_input_mod`

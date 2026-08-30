@@ -25,7 +25,7 @@ The second segment amplifies or absorbs on a half-wavelength of geometry -- the
 re-phasing knob a real machine turns by trimming its chicane. In the default
 relative mode the same two lattices produce identical output (the geometric
 fraction is autophased away, Genesis's chicane semantics). The deliberate
-off-phase knob there is the wiggler's own `z_offset` (manual sec:phasing).
+off-phase knob there is the wiggler's own `z_offset` (manual: the phasing section).
 
 Validated by the harness's phasing section: the re-anchor baseline flat, the
 z_offset knob on the analytic slope, the knob curve equal to Genesis's own

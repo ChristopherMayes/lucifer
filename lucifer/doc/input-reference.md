@@ -6,8 +6,7 @@ How to build and run is [`user-guide.md`](user-guide.md). What the outputs hold 
 
 Every resolved input is also written into the stats file's `params/` group, one subgroup per structure, so a finished run states its own configuration with every default made explicit.
 
-The program walks a Bmad lattice and applies the seam of the design (manual
-sec:element, sec:seam). FEL segments are real Bmad wiggler/undulator elements with
+The program walks a Bmad lattice and applies the seam of the design (manual: the FEL-element and seam sections). FEL segments are real Bmad wiggler/undulator elements with
 tracking_method = custom, their FEL parameters read from lattice attributes (aw from
 b_max/l_period, helicity from field_calc, step from ds_step, asserted by name at
 setup), stepped with the transcribed Genesis physics of fel_track_mod. Every other
@@ -18,7 +17,7 @@ wavefront_drift, with one advance of the reference phase phi0 per element.
 Time dependence follows from the starting state alone: a multi-slice window makes a
 time-dependent run (slippage active), a single slice the steady state, no separate
 switch (the same rule as Genesis). The slippage schedule is precomputed over the
-lattice, transcribing Lattice::calcSlippage (manual sec:slippage, including the
+lattice, transcribing Lattice::calcSlippage (manual: the slippage section, including the
 drift autophasing and its unguarded end-of-lattice fixup), and applied after each
 step's field solve, before its diagnostics -- Gencore's step order. The field record
 rotates rather than moves. Everything reading it in time order goes through
@@ -32,7 +31,7 @@ start and once after every integration step, one step per interlude element. Eac
 record is one row per slice, in time-window order.
 
 Input is a namelist file of three groups, laid out the way Tao lays out its init file
-(manual sec:program). The structs live in fel_struct, the parsing in fel_input_mod,
+(doc/user-guide.md). The structs live in fel_struct, the parsing in fel_input_mod,
 both library. &fel_params carries the run: the lattice, the global%... switches,
 Bmad's own bmad_com and space_charge_com set directly (Tao's &tao_params pattern),
 and the wake%/sc% collective descriptions. &fel_beam_init carries the beam:
@@ -74,8 +73,8 @@ fel_transcribed$/fel_averaged$/fel_unaveraged$ parameters (fel_track_mod):
 ```
     fel_tracking          ! unset/0 = averaged, the bmad_standard wiggler kernel's
                           !   transverse maps -- BMAD'S own kernel is the default.
-                          ! 1 = the unaveraged verification mode: full Newton-Lorentz
-                          !   quiver, no fc/faw (manual sec:unaveraged). The run
+                          ! 1 = the unaveraged mode: full Newton-Lorentz
+                          !   quiver, no fc/faw (manual: the unaveraged-mode section). The run
                           !   writes <out_root>.ledger.txt.
                           ! -1 = averaged with the transcribed-Genesis transverse
                           !   maps: VALIDATION-INTERNAL (the Genesis tiers require
@@ -102,7 +101,7 @@ The remaining global%... switches of &fel_params:
                                              !   wavefront_params and z_transmit per slice) and
                                              !   reconstruct the full pulse at the exit plane
                                              !   (<out_root>-pulse.fld.h5) by free-space
-                                             !   propagation at finalize. Manual sec:stats.
+                                             !   propagation at finalize. Manual: the diagnostic-output section.
     global%migrate = F                       ! Slice migration (see below).
     global%migrate_check = F                 ! Verify phase continuity at each migration.
     global%ran_seed = 12345                  ! The one RNG seed (generation, import, noise).
@@ -113,11 +112,11 @@ The remaining global%... switches of &fel_params:
                                              !   directory in stats.h5's meta/ group. OFF
                                              !   by default: a stats file is meant to
                                              !   travel, and those identify a person and a
-                                             !   machine. Manual sec:meta.
+                                             !   machine. Manual: the provenance section.
 ```
 
 global%migrate = T moves particles between slices when their ponderomotive phase leaves the
-slice window (fel_migrate_slices, manual sec:migration), called serially after every
+slice window (fel_migrate_slices, manual: the slice-migration section), called serially after every
 element. off by default, deliberately: the Genesis-comparison tiers run against
 Genesis WITHOUT one4one, which never migrates. Migration would be a physics-model
 difference inside a transcription-level comparison. Dropped charge is counted and
@@ -174,7 +173,7 @@ be worse than a custom one. The radiation starting condition is
                              !   one slice steady state). Override it for slippage
                              !   headroom. A window that clips the bunch warns.
     wavefront_init%window_sample = 1        ! Slice spacing / lambda0 (integer, &time sample).
-    wavefront_init%harmonics = 1, 3         ! The field set (manual sec:field-set).
+    wavefront_init%harmonics = 1, 3         ! The field set (manual: harmonic radiation).
 ```
 
 The beam-side generation knobs of &fel_beam_init:
@@ -189,14 +188,14 @@ The beam-side generation knobs of &fel_beam_init:
 ```
 
 Element wakes: elements carrying Bmad sr_wake definitions (pseudomodes or a
-tabular z_long) act across the WHOLE time window via slice concatenation (manual
-sec:seamwake: conventions, ds_wake, the mid-element wiggler kick, refusals).
+tabular z_long) act across the WHOLE time window via slice concatenation (manual: the
+Bmad-element-wakes section, for conventions, ds_wake, the mid-element wiggler kick, refusals).
 write_wake_kernels = "<file>" exports the transcribed wake kernels for building
 matching z_long tables (see the README's seam-wake section and examples/bmad_wake).
 
 Third way in: import a particle DISTRIBUTION, an arbitrary bunch resampled into
-slices by the transcribed Genesis importdistribution method (fel_import_mod, manual
-sec:import). The bunch comes from the SAME beam_init block (use_beam_init = T:
+slices by the transcribed Genesis importdistribution method (fel_import_mod, manual: the
+distribution-import section). The bunch comes from the SAME beam_init block (use_beam_init = T:
 init_beam_distribution generates it, honoring everything Bmad honors) or from an
 openPMD-beamphysics file (dist_file). Note: the honored-fields contract above
 applies to the quiet-start generator only. window_sample, ran_seed and the seed
@@ -221,14 +220,14 @@ noise. Knobs, named after &importdistribution's where one exists:
 ```
 
 The quiet start and the weighted Fawley shot noise (shotnoise = T), including
-the noise-level algebra and the N_eff refusal guard, are the manual's sec:loading.
+the noise-level algebra and the N_eff refusal guard, are the manual's loading section.
 The loader warns where Genesis silently clamps beamlets with fewer real electrons
 than macroparticles.
 
 interlude_model selects how the field-free elements are handled. "bmad" is the seam
 (track1_bunch, exact theta mapping, wavefront_drift). "genesis" uses the transcribed
 Genesis interlude step everywhere, which prices what the seam changes (the manual's
-sec:interlude and sec:seam). The slippage schedule is identical in both models.
+interlude and seam sections). The slippage schedule is identical in both models.
 
 split_weights = T replaces each imported particle by two copies at identical
 coordinates carrying 1/3 and 2/3 of its weight. Every collective observable must be
@@ -237,7 +236,7 @@ comparison can (Genesis dumps carry no weights).
 
 Outputs: <out_root>.diag.txt, ONLY with global%write_diag = T (one row per slice per
 record: z, slice, field and beam diagnostics). <out_root>.stats.h5 is the production
-statistics file (manual sec:stats): per-record per-slice beam moments named as
+statistics file (manual: the diagnostic-output section): per-record per-slice beam moments named as
 bunch_params_struct components, per-record per-slice wavefront_params, and the
 evaluated calc_bunch_params at element ends, in fixed Bmad units.
 The end state is dumped as openPMD, the one format this program speaks:

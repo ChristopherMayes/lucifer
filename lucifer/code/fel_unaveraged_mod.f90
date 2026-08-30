@@ -1,19 +1,22 @@
 !+
 ! Module fel_unaveraged_mod
 !
-! The unaveraged verification mode (fel-physics.tex sec:unaveraged):
-! particles integrated through the undulator's REAL field (the full Newton-Lorentz
-! quiver, no period averaging) with the radiation field as a co-evolving kick, so the
-! coupling factor fc, the harmonic content, and the entry/exit behavior of the averaged
-! mode become measured OUTPUTS instead of assumed inputs. MINERVA (Freund and van der
-! Slot) is the production existence proof for this physics.
-! This mode differs by keeping the GRID field and the Lorentz force where MINERVA
-! evaluates modal fields, and it is a verification mode: run on a handful of slices
-! where the ~100x cost against the averaged path is irrelevant.
+! The unaveraged mode (fel-physics.tex sec:unaveraged):
+! particles integrated through the undulator's real field (the full Newton-Lorentz
+! quiver, no period averaging) with the radiation field as a co-evolving kick. There
+! is no resonance approximation. What the cost per step buys is physics the averaged
+! map cannot reach: the full quiver dynamics, the energy accounting the beam actually
+! pays, polarization-agnostic coupling and arbitrary harmonic content. The mode is
+! also the referee for the averaged path, since the coupling factor fc, the harmonic
+! content and the entry/exit behavior of the averaged mode become measured outputs
+! here instead of assumed inputs. MINERVA (Freund and van der Slot) is the production
+! existence proof for this physics. This mode differs by keeping the grid field and
+! the Lorentz force where MINERVA evaluates modal fields. The cost is priced in
+! fel-physics.tex and measured in examples/saturation_demo.
 !
-! DELIBERATELY ABSENT from this path: fc, faw, and every other period-averaged
-! coupling quantity. Those are what this mode measures, and their appearance here
-! would make the check circular. The harness greps this file for them.
+! DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
+! path. Those are what this mode measures, and their appearance here would make the
+! check circular. The harness greps this file for them.
 !
 ! The step, per substep delta (Strang split, second order):
 !
@@ -51,12 +54,12 @@
 ! intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 !
 ! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables,
-! chosen ON MERIT, not because MINERVA uses it: for a verification mode the currency
-! is short-probe ACCURACY, and 4th order is what makes fc measurable at 6e-4 with 20
+! chosen on merit, not because MINERVA uses it: the currency here is short-probe
+! accuracy, and 4th order is what makes fc measurable at 6e-4 with 20
 ! steps/period (a 2nd-order symplectic scheme needs ~100 steps/period to match, and
 ! no explicit symplectic method exists for this non-separable Hamiltonian without
 ! paying implicit iterations). The structural cost is measured, not argued: gamma is
-! conserved EXACTLY by construction (B does no work: gamma changes only in the kick),
+! conserved exactly by construction (B does no work: gamma changes only in the kick),
 ! and over the longest benchmark segment (266 periods, 5320 steps) the dark-run
 ! emittance drifts by <= 3.3e-6, orders below every check. If production-length
 ! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
@@ -598,7 +601,7 @@ enddo
 end subroutine unavg_ramp_phase_jump
 
 ! One RK4 magnetic push of one particle over step h from segment position s0. All
-! per-particle state passes BY ARGUMENT: host-associated variables privatized by the
+! per-particle state passes by argument: host-associated variables privatized by the
 ! caller's OMP region are not redirected inside called procedures, so nothing mutable
 ! may be host-associated here (und/ustate/inv_beta0 are read-only shared). gamma is
 ! untouched: B does no work, exactly.

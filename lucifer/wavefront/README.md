@@ -16,7 +16,7 @@ that a later FEL tracker will carry, and the transport step it will use outside 
 |---|---|
 | `lucifer/code/wavefront_mod.f90` | `wavefront_struct`, derived quantities, `wavefront_drift`, the cached FFTW plan, and `wavefront_drift_reference` |
 | `lucifer/code/wavefront_hdf5_mod.f90` | `wavefront_read_genesis4`, `wavefront_write_genesis4` |
-| `lucifer/code/wavefront_openpmd_mod.f90` | openPMD EXT_Wavefront: `wavefront_write_openpmd`, `wavefront_read_openpmd`, `wavefront_file_is_openpmd` (manual sec:openpmd, validated by the FEL harness's harmonic section) |
+| `lucifer/code/wavefront_openpmd_mod.f90` | openPMD EXT_Wavefront: `wavefront_write_openpmd`, `wavefront_read_openpmd`, `wavefront_file_is_openpmd` (manual: the openPMD-wavefront section, validated by the FEL harness's harmonic section) |
 | `lucifer/wavefront/wavefront_drift_test.f90` | Test driver, both modes |
 | `lucifer/wavefront/tests/run_validation.sh` | The whole validation, one command |
 | `lucifer/wavefront/tests/validate_drift.py` | Python side: builds the test input, drifts it, compares |

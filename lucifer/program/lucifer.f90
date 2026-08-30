@@ -45,7 +45,7 @@ use fel_io_mod
 
 implicit none
 
-! The driver is read-parse-call (manual sec:program): the namelist layer fills the
+! The driver is read-parse-call (doc/user-guide.md): the namelist layer fills the
 ! input structs, the library builds and walks the run, and every library error
 ! RETURNS here. This is the one place that stops. The check instruments
 ! (split_weights, swap_beam_xy, gen_test_weights, imp_split_weights,

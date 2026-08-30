@@ -8,7 +8,7 @@ performance-core count. Every input is a real file in this directory:
 | file | what it is |
 |---|---|
 | `Aramis.lat` | the Genesis lattice (6 FODO cells, 12 undulator segments) |
-| `aramis.bmad` | the Bmad translation (real wigglers, manual sec:element) |
+| `aramis.bmad` | the Bmad translation (real wigglers, the manual's FEL-element section) |
 | `sat_unavg.bmad` | two-line wrapper selecting `fel_tracking = fel_unaveraged` |
 | `sat-prep.in` | Genesis deck that writes the shared initial dumps (no tracking) |
 | `sat-genesis.in` | the timed Genesis deck (same seed and ranks as the prep) |

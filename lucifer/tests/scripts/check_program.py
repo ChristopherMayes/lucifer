@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Program-structure checks (manual sec:program): the library contract, the comb, and
+Program-structure checks (doc/user-guide.md): the library contract, the comb, and
 the tracking window.
 
   1. Library: lucifer_smoke_test drives the tracker with NO namelist anywhere -- structs

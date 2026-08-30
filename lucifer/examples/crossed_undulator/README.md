@@ -5,7 +5,7 @@ rotated a quarter turn (`UNDY: UNDX, tilt = pi/2` -- tilt is the polarization sp
 standard Bmad) follows after a short gap. Microbunching is longitudinal and
 polarization-blind, so the y set radiates orthogonally polarized light seeded by the
 bunching the x set built, while the x field passes through gaining nothing (the
-harness holds that isolation at 1.6e-14, manual sec:field vector convention).
+harness holds that isolation at 1.6e-14, the manual's field-solver vector convention).
 
     ../../../../production/bin/lucifer run.nml
     python ../plot_fel.py crossed.stats.h5

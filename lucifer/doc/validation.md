@@ -663,7 +663,7 @@ beam paid) and the measurement-design lesson (cold beam for fluctuation growth: 
 real energy spread the sigma^2 differencing drowns in cross-covariance sampling
 noise).
 
-## The coherent source (SIMPLEX hybrid, manual sec:coherent-source)
+## The coherent source (SIMPLEX hybrid)
 
 `global%source_model = "coherent"` swaps the per-particle source deposit for Tanaka's
 coherent retrieval (PRAB 27, 030703 (2024), implemented from the paper): the spatially
@@ -683,6 +683,16 @@ and refusals for unaveraged/harmonics/two-polarization and for dark starts -- me
 startup and the coherent model drops it, so seeded runs only. Also priced once:
 SIMPLEX's coarse stepping (12 periods/step) costs 2.6e-3 in |ln P| here (taper and
 harmonics untested at coarse steps).
+
+## The program's own identities
+
+Three invariances of the driver, none of them physics, each one a way a rewrite could break the tracker silently.
+
+The library never stops. Every error returns through `err_flag` and the program decides, so `tests/lucifer_smoke_test.f90` drives the whole library with no namelist anywhere and reproduces a namelist run dataset-identically. `track_fel_line` is re-entrant, and twice in one process is bit-identical to two processes.
+
+A windowed run composes with the full one. `global%track_start`/`track_end` bound the walk, but the schedule (slippage, autophasing, break geometry, including the end-of-lattice fixup) is always built on the full lattice. So `[start, D]` followed by `[after D, end]` from its dumps reproduces the one-shot run to the dump format's own round-trip floor, measured **3e-13** and held at 1e-10, with the walk itself bit-for-bit and a windowed run's finals equal to the full run's mid-line dumps exactly.
+
+Refusal texts are a supported contract. stdout is otherwise for humans and carries no contract at all, which is why the suite reads files rather than scraping the screen. The one exception is deliberate: a refusal must be recognizable by name, so the suite matches the capitalized text of a refusal together with a nonzero exit status. Those texts therefore change only with their checks, in the same commit.
 
 ## Parallelism: OpenMP over slices, bit-identical by construction
 
@@ -799,7 +809,7 @@ per-particle inner threading), BIT-FOR-BIT at any thread count against the seria
 baseline (checked at 1 and 8 threads on tier2 and td2). Two boundaries, both
 deliberate: radiation fluctuations keep the serial loop (they draw from the one
 shared RNG stream inside track1, whose order must stay fixed), and wake-carrying
-elements were always whole-window concatenations (sec:seamwake), so lattices whose
+elements were always whole-window concatenations (manual `sec:seamwake`), so lattices whose
 interludes all carry wakes see no change. One hard-won implementation note: the
 scratch bunch is BLOCK-LOCAL inside the loop body, not an OMP `private` variable --
 gfortran left a `private` copy of the allocatable-component derived type improperly

@@ -484,7 +484,7 @@ end subroutine generate_initial_state
 ! Subroutine check_beam_init_contract ()
 !
 ! Routine to check the beam_init contract: the quiet-start generator honors the beam_init
-! fields in the header table and REFUSES BY NAME every other field that is set -- a
+! fields in the header table and refuses by name every other field that is set -- a
 ! standard structure that silently dropped fields would be worse than a custom one. (The
 ! import path is exempt: init_beam_distribution honors everything Bmad honors.)
 ! renorm_center/renorm_sigma, random_engine defaults and n_bunch = 0/1 are generation
@@ -642,7 +642,7 @@ call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
 
 ! The RNG-free instruments the exactness checks read (the analysis moments and the
 ! per-slice current profile) go to a FILE, not stdout: stdout is for humans and
-! nslice current lines are not (manual sec:program). Full precision, one row per slice.
+! nslice current lines are not (doc/user-guide.md). Full precision, one row per slice.
 ! Written here, at import time, because load_only stops before tracking.
 
 open (newunit = iu_i, file = trim(out_root) // '.import.txt', action = 'write')

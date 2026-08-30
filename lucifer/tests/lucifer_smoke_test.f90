@@ -1,10 +1,10 @@
 !+
 ! Program lucifer_smoke_test
 !
-! The library-contract check (manual sec:program): drive the FEL tracker WITHOUT the
+! The library-contract check (doc/user-guide.md): drive the FEL tracker WITHOUT the
 ! namelist layer. Fill the input structs in code, call the library, write the dumps.
 ! The harness compares its outputs dataset-identically against a namelist-driven run
-! of the same configuration, and runs it TWICE IN ONE PROCESS (both passes here) to
+! of the same configuration, and runs it twice in one process (both passes here) to
 ! prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 !
 !   lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>

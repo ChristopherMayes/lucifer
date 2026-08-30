@@ -210,7 +210,7 @@ do ie = run%i_start, run%i_end
   wake_src => null()
   if (bmad_com%sr_wakes_on) wake_src => pointer_to_wake_ele(ele)
 
-  ! A zero-length element whose wake CANNOT ACT is skipped like any other zero-length
+  ! A zero-length element whose wake cannot act is skipped like any other zero-length
   ! element. Bmad's scale_with_length defaults true and wake_mod scales the kick by l$,
   ! so at zero length it is identically zero: measured, such a run is the no-wake run
   ! exactly. This is not a user error and is not refused, since a wake assigned over an
@@ -582,7 +582,7 @@ endif
 
 ! One row per event, at full precision, to the migration file: the charge that left the
 ! window ends and where, plus the phase-continuity residual. A file, not stdout, because
-! this is data (manual sec:program).
+! this is data (doc/user-guide.md).
 
 if (nm > 0 .or. chd > 0) then
   write (iu_mig, '(es22.14, i12, 2es24.15e3)') z_now, nm, chd, dev
@@ -713,7 +713,7 @@ end subroutine write_ledger_row
 !                 Incoherent.cpp F(aw) fits (the Saldin closed form) -- drawn GAUSSIAN.
 !                 Genesis draws uniform scaled by sqrt(3) to reach this SAME variance.
 !                 The sqrt(3) normalizes the uniform draw and must not appear with a
-!                 Gaussian (the physical limit, a merit choice). ONE DRAW PER BEAMLET,
+!                 Gaussian (the physical limit, a merit choice). One draw per beamlet,
 !                 exactly as Genesis: independent per-particle kicks would break the
 !                 quiet start's per-beamlet harmonic cancellation. Draws happen
 !                 SERIALLY in fixed slice order from the one seeded stream, so results
@@ -805,8 +805,8 @@ end subroutine apply_radiation
 ! show signs of life. Element boundaries always print. Inside elements a wall-clock
 ! throttle (2 s) keeps fast runs quiet.
 !
-! The row is FOR A HUMAN (manual sec:program): SI-prefixed values so a column of them
-! lines up and the startup climb is readable, the element NAME LAST so every numeric
+! The row is FOR A HUMAN (doc/user-guide.md): SI-prefixed values so a column of them
+! lines up and the startup climb is readable, the element name last so every numeric
 ! column is fixed however long the name is, and no step field for the one-step elements
 ! that dominate a real lattice. The files carry full precision. Nothing parses this.
 !
@@ -847,7 +847,7 @@ else
         mod(int(elapsed) / 60, 60), ':', mod(int(elapsed), 60)
 endif
 
-! Header once, then the rows. s is the ARC LENGTH along the reference orbit (meters):
+! Header once, then the rows. s is the arc length along the reference orbit (meters):
 ! through a bending break it exceeds the chord the light takes, which is what
 ! light_corr accounts for.
 

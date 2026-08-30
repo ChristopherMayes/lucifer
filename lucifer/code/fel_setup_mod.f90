@@ -564,13 +564,13 @@ call check_wake_window ()
 if (err_flag) return
 run%any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
 
-! The unaveraged mode is a verification mode (fel-physics.tex sec:unaveraged): the
-! collective terms are not wired into its step, and a mixed line would apply them in
-! some segments and silently drop them in others. Refuse by name.
+! The collective terms are not wired into the unaveraged step (fel-physics.tex
+! sec:unaveraged), and a mixed line would apply them in some segments and silently
+! drop them in others. Refuse by name.
 
 if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
   call out_io (s_error$, r_name, 'WAKES/SPACE CHARGE ARE NOT WIRED INTO THE UNAVERAGED MODE', &
-                                 '(A VERIFICATION MODE; SEE fel-physics.tex sec:unaveraged).', &
+                                 '(SEE fel-physics.tex sec:unaveraged).', &
                                  'POSSIBLE SOLUTION: TURN THEM OFF.')
   err_flag = .true.;  return
 endif
@@ -583,7 +583,7 @@ endif
 ! floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at all
 ! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is:
 ! omitting that +1 leaves the field record one rotation short at the very end, found the
-! hard way against the single-segment time-dependent run. (Citations kept AT THE LINES:
+! hard way against the single-segment time-dependent run. (Citations kept at the lines:
 ! this quirk's exactness matters here, at the call site. Manual sec:slippage.)
 
 allocate (run%ele_slip(branch%n_ele_track))
@@ -759,7 +759,7 @@ end subroutine check_wake_window
 ! delay is charged as whole-wavelength window rotations (Genesis's chicane
 ! semantics: "always autophasing") on the break's last element, which also takes
 ! the light-path drift correction. Absolute mode adds the delay's carrier phase in
-! the walk. Only a CLOSED BUMP keeps the light on the next undulator's axis.
+! the walk. Only a closed bump keeps the light on the next undulator's axis.
 ! Anything else is refused by name, as is any geometry element under the
 ! genesis-model interludes (Genesis's drift/quad set cannot represent it).
 !-

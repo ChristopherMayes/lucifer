@@ -242,7 +242,7 @@ contains
 ! Routine to format a value for a human: an SI prefix chosen so the mantissa lands in
 ! [1, 1000), three decimals, and the whole thing right-justified to a fixed width so a
 ! column of them lines up (4.230 kW and 105.000 GW under each other). This is display
-! only -- stdout is for humans and the files carry full precision (manual sec:program).
+! only -- stdout is for humans and the files carry full precision (doc/user-guide.md).
 !
 ! Values outside the prefix range, and exact zero, fall back to es10.3 with the bare
 ! unit rather than inventing a prefix.
@@ -297,13 +297,13 @@ end function fel_si_str
 !+
 ! Function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
 !
-! THE COMB RULE, in one place: Bmad's bunch_track_struct%ds_save semantics, with one
+! The comb rule, in one place: Bmad's bunch_track_struct%ds_save semantics, with one
 ! deliberate difference (save_a_bunch_step's guards, and Tao's comb_ds_save note
 ! "< 0 => No comb calculated"):
 !   comb < 0: element ends only;
 !   comb = 0: a row at every record position;
 !   comb > 0: a row when z has advanced comb_ds_save past the last row.
-! AN ELEMENT END IS ALWAYS A ROW, whatever the comb. That is the difference, and it is
+! An element end is always a row, whatever the comb. That is the difference, and it is
 ! what lets the stats file carry ONE record axis with a boolean mask (coords/
 ! at_element_end) instead of a second axis and a duplicated copy of every element-end
 ! quantity. Bmad's comb < 0 drops the comb, and here that leaves the element ends,

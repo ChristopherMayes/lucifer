@@ -82,7 +82,7 @@ def run(exe, wd, nml_name, text):
 
 def read_migration_file(wd, root):
     """Per-event migration rows and the summary from <out_root>.migration.txt. Program
-    stdout is for humans and is deliberately not parsed (manual sec:program).
+    stdout is for humans and is deliberately not parsed (doc/user-guide.md).
     Returns (moved, worst_bunching_deviation, [(s, charge_dropped), ...])."""
     moved = 0
     bdev = 0.0

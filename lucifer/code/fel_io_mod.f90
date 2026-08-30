@@ -7,7 +7,7 @@
 !
 ! Every procedure takes the run state (fel_run_struct) explicitly, and nothing here
 ! stops: errors return through err_flag and the caller decides -- the library contract
-! (manual sec:program). All terminal output goes through out_io. The file-name echo
+! (doc/user-guide.md). All terminal output goes through out_io. The file-name echo
 ! lines are s_blank$ so scripts see bare names.
 !-
 
