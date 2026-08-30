@@ -6,7 +6,7 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st = read_stats("run.stats.h5")
 
     st.record                    # (nz,) the record axis, 0..nz-1
-    st.s                         # (nz,) path length, a VARIABLE on the record axis
+    st.s                         # (nz,) path length, a variable on the record axis
     st["beam/slice/current"]     # (nz, ns) A, as the file states it
     st.at_end                    # (nz,) bool, True where a record is an element end
     st["beam/bunch/twiss/beta"]  # (ne, 3) on the element-end axis, plane last
@@ -26,7 +26,7 @@ Two conveniences on top, both derived rather than stored, and both marked as suc
 `ele_name` gathers lattice/name through coords/ix_ele, and `at_end` is the mask as a
 bool. The file keeps one source of truth for each.
 
-Units are DOCUMENTATION. The values are already SI and eV, so nothing here scales by
+Units are documentation. The values are already SI and eV, so nothing here scales by
 @unit, and neither should a caller.
 
 The version is refused by name. This is internal development, so the format moves
@@ -86,7 +86,7 @@ class Stats:
 
         self._h5.visititems(note)
 
-        # An axis is a coords/ dataset that names ITSELF: coords/record has @axes =
+        # An axis is a coords/ dataset that names itself: coords/record has @axes =
         # 'record'. coords/z and coords/ix_ele name the record axis instead, which is
         # what makes them variables on it rather than axes of their own.
         self.axis_names = tuple(k for k in self._h5["coords"]
@@ -141,7 +141,7 @@ class Stats:
 
     @property
     def record(self):
-        """(nz,) the record axis. THE axis: coords/s repeats where two records land on
+        """(nz,) the record axis. The axis: coords/s repeats where two records land on
         one plane, so s indexes nothing."""
         return self["coords/record"]
 
@@ -157,14 +157,14 @@ class Stats:
 
     @property
     def slice(self):
-        """(ns,) the slice axis, 0..ns-1. THE axis, with three positions on it."""
+        """(ns,) the slice axis, 0..ns-1. The axis, with three positions on it."""
         return self["coords/slice"]
 
     @property
     def ct_slice(self):
         """(ns,) light-travel distance of each slice ahead of the reference [m].
 
-        EXACT and free of beta, and the coordinate slippage counts in: one slice is
+        exact and free of beta, and the coordinate slippage counts in: one slice is
         window_sample wavelengths of it. See t_slice and z_slice.
         """
         return self["coords/ct_slice"]
@@ -202,7 +202,7 @@ class Stats:
 
     @property
     def ele_name(self):
-        """(nz,) element name per record. DERIVED: lattice/name gathered through ix_ele,
+        """(nz,) element name per record. Derived: lattice/name gathered through ix_ele,
         which is why the file stores neither a name per record nor a second axis."""
         names = np.array([n.decode().strip() for n in self["lattice/name"]])
         return names[self.ix_ele]
@@ -287,7 +287,7 @@ def _scalars(group):
 def _list(val):
     """A list-valued string attribute as a tuple of str, empty for an absent one.
 
-    The file writes these as string ARRAYS, length one included, so that a
+    The file writes these as string arrays, length one included, so that a
     one-component file parses exactly like a two-component one: shape expresses arity.
     """
     arr = np.atleast_1d(val)
@@ -304,7 +304,7 @@ def same_data(a, b):
 
     The stats file carries NaN wherever a quantity was not computed: the theta moments
     away from element ends, an empty slice's moments, the twiss of a degenerate slice.
-    Two files with a NaN in the same place ARE identical, and plain equality would call
+    Two files with a NaN in the same place are identical, and plain equality would call
     every such pair different, so every identity check in the harness comes here.
     """
     a, b = np.asarray(a), np.asarray(b)

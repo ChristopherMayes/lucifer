@@ -12,7 +12,7 @@
 # slices) at the twelve undulator-segment exits, positions every run records regardless
 # of delz, against the finest run. A convergence order is fitted from successive step
 # halvings/triplings. This is a measurement, not a check: results are recorded in
-# lucifer/README.md.
+# lucifer/doc/validation.md.
 #
 #   ./run_delz_sweep.sh [--genesis <path>] [--exe <path>] [--python <path>] [--work-dir <path>]
 #

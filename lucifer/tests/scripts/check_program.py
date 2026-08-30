@@ -3,23 +3,23 @@
 Program-structure checks (manual sec:program): the library contract, the comb, and
 the tracking window.
 
-  1. LIBRARY: lucifer_smoke_test drives the tracker with NO namelist anywhere -- structs
+  1. Library: lucifer_smoke_test drives the tracker with NO namelist anywhere -- structs
      filled in code -- and runs twice in one process. Pass 1 must reproduce a
      namelist-driven run of the same configuration dataset-identically (the library
      IS the program), and pass 2 must reproduce pass 1 bit-for-bit (re-entrancy:
      twice in one process = two processes).
   2. Library errors return: lucifer_smoke_test on an unreadable lattice must print its
      proof-of-return line and exit with its own code 2 -- the library returned, the
-     PROGRAM decided (no exit inside the library).
+     program decided (no exit inside the library).
   3. Retired group: the flat &fel_track_params is refused by name, the error mapping
      each parameter found to its new group.
   4. The comb (global%comb_ds_save, Bmad's ds_save semantics verbatim): a comb > 0
-     run's per-record rows must be EXACTLY the every-record run's rows at the comb
+     run's per-record rows must be exactly the every-record run's rows at the comb
      positions (subset, dataset-equal), element ends always present; comb < 0 keeps
      NO per-record rows (element-end arrays and dumps remain); the precomputed nrec
      is exact in every mode (the arrays are sized once, never grown).
   5. The window (global%track_start/track_end, Tao's names): the schedule is built
-     on the FULL lattice, so a windowed run composes exactly -- run A = [start, D]
+     on the full lattice, so a windowed run composes exactly -- run A = [start, D]
      dumps its final state; run B = [after D, end] imports it; B's finals must be
      dataset-identical to the one-shot full run's finals, and A's finals to the full
      run's mid-line dumps at D.
@@ -219,11 +219,11 @@ def main():
     s0, sp, sn = stats_of(wd / "cb0.stats.h5"), stats_of(wd / "cbp.stats.h5"), \
                  stats_of(wd / "cbn.stats.h5")
 
-    # First, what the comparison below rests on. The record NUMBER is the axis and s is
+    # First, what the comparison below rests on. The record number is the axis and s is
     # a variable on it (manual sec:stats), so matching rows BY s is only legitimate while
     # s does not repeat, and it can: a zero-length element that applies a wake kick sits
     # at the plane the element before it ended on. Every repeat must therefore straddle
-    # an element boundary. A repeat INSIDE one element would be a defect in the walk, and
+    # an element boundary. A repeat inside one element would be a defect in the walk, and
     # every s-keyed comparison in this file would then silently pick the wrong row.
     ds = np.diff(s0["s"])
     dup = np.flatnonzero(ds == 0)
@@ -256,7 +256,7 @@ def main():
           note=f"[{len(sn['s'])} rows, all element ends]")
 
     # nrec exact: the arrays are sized by the same rule the walk replays -- full,
-    # never padded (h5 dataset lengths ARE nrec).
+    # never padded (h5 dataset lengths are nrec).
     ok = len(s0["s"]) == 31 and len(sn["s"]) == int(s0["at_end"].sum())
     check("nrec exact in every mode (sized once, never grown)", ok,
           note=f"[comb0 {len(s0['s'])} rows = 30 steps + initial, "

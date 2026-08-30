@@ -23,11 +23,11 @@ This manual states the physics and the numerical conventions of the Bmad FEL tra
 The code references these sections by label. The validation harness
 (\code{lucifer/tests/}) proves each statement against Genesis 1.3 Version 4, against
 closed forms, or against independent implementations, and the measured levels live in
-\code{lucifer/README.md}. Each section ends with a \emph{Provenance} note (the Genesis
+\code{lucifer/doc/validation.md}. Each section ends with a \emph{Provenance} note (the Genesis
 routine the physics was transcribed from, moved here from the source comments) and a
 \emph{Validation} note (which check pins it). The physics was transcribed from Genesis
 (GPL permits transcription), validated at transcription level, and then re-expressed in
-Bmad's units and conventions. The transcription-era agreement is banked in the README.
+Bmad's units and conventions. The transcription-era agreement is banked in \code{validation.md}.
 
 Throughout: $m_e c^2$ is Bmad's \code{m\_electron} (eV), $c$ is \code{c\_light},
 $Z_0 = \mu_0 c$ (\code{mu\_0\_vac*c\_light}), $e$ is \code{e\_charge}, and
@@ -1377,7 +1377,7 @@ the only instrument that catches shared-accumulator races (invisible to every
 single-threaded check).
 
 \begin{validation}
-The coarse-step table in the README, and the
+The coarse-step table in \code{validation.md}, and the
 thread check with its shared-accumulator mutation (7.0 relative between thread counts,
 bit-identical single-threaded).
 \end{validation}

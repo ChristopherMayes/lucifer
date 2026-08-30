@@ -10,13 +10,13 @@ the averaged mode's inputs (the coupling factor fc).
    independent transcriptions of one wave equation, and only their consistency makes
    this hold. Check: max |d(E+U)| over the cumulative field-energy turnover.
 
-2. BALLISTIC: a dark run's magnetic push does no work, EXACTLY (gamma only changes in
+2. Ballistic: a dark run's magnetic push does no work, exactly (gamma only changes in
    the radiation kick), and the emittance survives the RK4 push through the ramps.
    This also checks the handoff: with the sin^2 ramps the quiver vanishes at the
    segment ends, so the exit emittance equals the entry emittance; a hard-edge entry
    (fel_ramp_periods = -1, the explicit test sentinel) fails the orbit instrument loudly.
 
-3. fc MEASURED, both limits. Paired probes (12 and 20 periods, identical 2-period
+3. fc measured, both limits. Paired probes (12 and 20 periods, identical 2-period
    ramps): the difference of the two energy-modulation phasors
        F = (2/N) sum dgamma_j exp(+i theta0_j)
    isolates the flat region (ramps and their detuning cancel exactly), and
@@ -30,7 +30,7 @@ the averaged mode's inputs (the coupling factor fc).
    quiet at h = 3 because the beamlet quiet start cancels every harmonic below nbins
    (nbins = 8 here) -- the recorded reason a quadrature load is not needed for this.
 
-5. CONVERGENCE: fc at 10/20/30 steps per period, tabulated (MINERVA's envelope).
+5. Convergence: fc at 10/20/30 steps per period, tabulated (MINERVA's envelope).
 
 6. Gain curve: the benchmark single segment, seeded steady state, unaveraged vs
    averaged from the same generated start. The exit ln power ratio prices the
@@ -90,7 +90,7 @@ PROBE = """! flat keys; routed into the three groups by nml.to_groups
 """
 
 def probe_nml(wd, **kw):
-    """PROBE with the steady-state charge DERIVED (I = Q*c/spacing, spacing = lam) and
+    """probe with the steady-state charge derived (I = Q*c/spacing, spacing = lam) and
     the unaveraged mode selected by a wrapper lattice (attributes, not namelist)."""
     kw.setdefault("q", f"{3000 * float(kw['lam']) / 2.99792458e8:.12e}")
     kw["lat"] = unavg_wrapper(wd, kw["lat"], kw.pop("spp"), kw.pop("ramp"))
@@ -143,7 +143,7 @@ TDID = """! flat keys; routed into the three groups by nml.to_groups
 
 def unavg_wrapper(wd, base, spp, ramp):
     """A wrapper lattice selecting the unaveraged mode with per-run parameters --
-    the delz-sweep pattern: the mode and its knobs are LATTICE attributes."""
+    the delz-sweep pattern: the mode and its knobs are lattice attributes."""
     name = f"w_{base.replace('.bmad','')}_s{spp}_r{str(ramp).replace('-','m').replace('.','p')}.bmad"
     (wd / name).write_text(
         f"call, file = {base}\n"
@@ -174,7 +174,7 @@ def run(exe, wd, name, text, threads="4"):
 
 
 def run_expect_refusal(exe, wd, name, text, fragment):
-    """The run must FAIL, and by name."""
+    """The run must fail, and by name."""
     (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
@@ -182,7 +182,7 @@ def run_expect_refusal(exe, wd, name, text, fragment):
 
 
 SAND_WAKE_LAT = """call, file = unavg_sandwich.bmad
-UNDW: UNDB, sr_wake = {amp_scale = 1, scale_with_length = T,
+UNDW: undb, sr_wake = {amp_scale = 1, scale_with_length = T,
   longitudinal = {1e14, 0, 0, 0.25, none}}
 SEGW: line = (UNDA, P1, UNDW, P1, UNDA)
 use, SEGW
@@ -203,7 +203,7 @@ def read_par(path, lam):
 def phasor(root, wd, lam):
     """F = (2/N) sum dgamma * exp(+i theta0) between the initial and final dumps.
 
-    theta0 comes from the INITIAL dump, where the reference phase phi0 is still zero, so
+    theta0 comes from the initial dump, where the reference phase phi0 is still zero, so
     the phase here is the absolute one the tracker used."""
     p0 = read_par(wd / f"{root}-initial.beam.h5", lam)
     p1 = read_par(wd / f"{root}-final.beam.h5", lam)
@@ -329,7 +329,7 @@ def main():
           lnr, 0.2, note="(priced integrator-structure difference)")
 
     # 7. Mixed line (Stage A): averaged / unaveraged / averaged sandwich with pipe
-    # interludes. Completing at all exercises the convention-flag asserts at REAL
+    # interludes. Completing at all exercises the convention-flag asserts at real
     # internal boundaries. The ledger must be confined to and conserved over the
     # unaveraged segment. A wake on that segment must refuse by name, and the exit
     # power is priced against the all-averaged twin.
@@ -357,7 +357,7 @@ def main():
     check("sandwich: wake on the unaveraged segment refused by name (1 = yes)",
           0.0 if refused else 1.0, 0.5)
 
-    # 8. Thread invariance: the parallel slice loop must be INVISIBLE. A multi-slice
+    # 8. Thread invariance: the parallel slice loop must be invisible. A multi-slice
     # time-dependent unaveraged run (slippage active, so slices genuinely interleave
     # through the field) at 1 thread and at 8 threads must produce byte-identical
     # diagnostics AND ledger -- the same guarantee the averaged path carries
@@ -373,7 +373,7 @@ def main():
     # 9. The TIME-DEPENDENT ledger closure. The window is an open system -- slippage
     # transmits the head slice's light out of the simulation -- and the deposit's own
     # |dE_src|^2 is the one field-energy term the kick/deposit duality does not charge
-    # to the beam (physically: the substep's spontaneous emission). BOTH are banked as
+    # to the beam (physically: the substep's spontaneous emission). Both are banked as
     # ledger columns, so the closing quantity is exact:
     #     E_beam + U_window + U_escaped - U_spont = const.
     # Wakes would be a second, unbanked exit channel from the beam. They are refused in

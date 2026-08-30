@@ -4,30 +4,30 @@ Spontaneous emission: the FEL modes against Bmad's own radiation physics and aga
 the analytic undulator-radiation rate. Bmad-only -- Genesis is not involved, because
 the averaged mode's agreement with Genesis is already established by the tiers.
 
-ONE short helical wiggler (spont_probe.bmad, 40 periods, benchmark parameters) tracked
+one short helical wiggler (spont_probe.bmad, 40 periods, benchmark parameters) tracked
 four ways from the same beam:
 
   1. Bmad's own runge_kutta with radiation damping (spont_probe_rk.bmad: the same
      wiggler with tracking_method = runge_kutta, so the FEL walk hands it to
      track1_bunch -- no FEL model, no grid, no SVEA band). This is the independent
      implementation, and it must reproduce the analytic rate.
-  2. The same, radiation OFF: the integrator must lose exactly nothing.
-  3. The averaged FEL mode: loses essentially NOTHING, by design. The KMR/SVEA step
+  2. The same, radiation off: the integrator must lose exactly nothing.
+  3. The averaged FEL mode: loses essentially nothing, by design. The KMR/SVEA step
      adds 2S to the field while kicking particles with E, so the |S|^2 part of the
      field energy is created rather than taken from the beam. This is a documented
      model property, not a defect -- Genesis carries an optional &sponrad module to
      add the missing loss by hand, off by default. The check pins it as a known zero.
   4. The unaveraged FEL mode: it conserves energy by construction (the /u_s deposit
-     makes kick and source exact duals), so its beam DOES pay -- but only for the
+     makes kick and source exact duals), so its beam does pay -- but only for the
      radiation the grid can hold. An SVEA grid represents angles up to the FFT
      Nyquist, theta_max = lambda/(2 dx), so only a few percent of the emission is
-     captured, and THAT is what the beam is charged.
+     captured, and that is what the beam is charged.
 
 The analytic rate is the classical result dgamma/ds = (2/3) r_e gamma^2 ku^2 aw^2
 (aw rms, both polarizations) -- identical to the coefficient in Genesis's own
 Incoherent.cpp, 1.88e-15 * (ku gamma aw)^2.
 
-The physics check on (4) is the SCALING: vary only the grid's angular acceptance
+The physics check on (4) is the scaling: vary only the grid's angular acceptance
 (ngrid at fixed box) and the captured loss must track the acceptance the way undulator
 radiation does. The absolute normalization is compared against a dipole-limit estimate
 of the angular distribution, which is only good to a factor of a few at aw ~ 1 -- so
@@ -138,7 +138,7 @@ def sigma_gamma(wd, root):
 def dipole_fraction(u):
     """Fraction of a dipole-limit angular distribution (1+u^2)/(1+u)^4 inside u,
     u = gamma^2 theta^2 / (1 + aw^2). Closed form; exact for aw << 1, indicative
-    at aw ~ 1 (which is why only the SHAPE is checked tightly)."""
+    at aw ~ 1 (which is why only the shape is checked tightly)."""
     x = 1.0 + u
     return 1.5 * (2 / 3 - 1 / x + 1 / x**2 - (2 / 3) / x**3)
 
@@ -212,7 +212,7 @@ def main():
     check("averaged mode: beam debit / analytic (KMR does NOT charge the beam)",
           f_avg, 0.0, 2e-2, note="(model property; Genesis has &sponrad for it)")
 
-    # 4. The unaveraged mode: grid-acceptance-limited, and it must SCALE that way.
+    # 4. The unaveraged mode: grid-acceptance-limited, and it must scale that way.
     print("--- unaveraged mode, grid angular-acceptance scan (box fixed):")
     meas, pred = {}, {}
     for ngrid in (127, NGRID_REF, 511):
@@ -237,8 +237,8 @@ def main():
 
     # 5. Damping on: both FEL modes honor bmad_com%radiation_damping_on.
     #    Averaged: the full analytic rate (its native debit is ~0). Unaveraged: the
-    #    COMPOSITE prediction -- the explicit term integrates the ramp envelope
-    #    (INT g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps), and the grid-captured
+    #    composite prediction -- the explicit term integrates the ramp envelope
+    #    (int g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps), and the grid-captured
     #    self-field work measured in step (4) adds on top. Measured 0.9703 vs
     #    predicted 0.9705 at the defaults.
     print("--- bmad_com%radiation_damping_on, both FEL modes:")
@@ -276,7 +276,7 @@ def main():
           0.0 if same else 1.0, 0.0, 0.5)
 
     # 8. The ledger closes with the E_radiated column (radiation on, TD, unaveraged):
-    #    E_beam + U_window + U_escaped - U_spont + E_radiated = const, ACTUAL drawn sums.
+    #    E_beam + U_window + U_escaped - U_spont + E_radiated = const, actual drawn sums.
     led = np.loadtxt(wd / "sp_uv_f1.ledger.txt")
     etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
     turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])

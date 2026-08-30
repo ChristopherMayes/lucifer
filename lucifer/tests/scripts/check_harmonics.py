@@ -5,7 +5,7 @@ Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
   1. openPMD round trip: a run's field dump must carry every required attribute of
      the standard (verified against the spec text's names and values here,
      independently of the Fortran writer), its complex values must agree with the
-     converter's Genesis view of the same field, and the Fortran READER must
+     converter's Genesis view of the same field, and the Fortran reader must
      reproduce it exactly: re-importing the .wf.h5 and re-dumping must be
      dataset-identical to the file that was read. The Python Wavefront class reads
      the converted Genesis file through its own path and must agree on the field
@@ -14,16 +14,16 @@ Harmonic field-set and openPMD wavefront checks (manual sec:field-set):
      Fortran reader unchanged.
   2. Harmonic tier vs Genesis4: a planar steady-state segment (the benchmark's
      gamma, wavelength and rms aw -- planar so fc(3) is alive), both codes tracking
-     the SAME Genesis-written starting state with a dark third-harmonic field:
+     the same Genesis-written starting state with a dark third-harmonic field:
      fundamental and third-harmonic power curves compared per record.
   3. Deposit closed form: from the tier's bunched exit beam, a two-step dark restart
      radiates P_h proportional to (fc(h) |b_h|)^2 -- the ratio P3/P1 against the
      Bessel closed form with b_h measured directly from the dumped particles. No
-     gain, no diffraction to speak of: this pins the harmonic DEPOSIT normalization
+     gain, no diffraction to speak of: this pins the harmonic deposit normalization
      independently of Genesis.
   4. Thread identity: 1 vs 8 threads byte-identical on a time-dependent harmonic run
      (diag byte-equal, harmonic dumps dataset-equal).
-  5. REFUSALS, each by name: harmonics not anchored on the fundamental; harmonic
+  5. Refusals, each by name: harmonics not anchored on the fundamental; harmonic
      fields with an unaveraged element; harmonic fields with two live polarizations;
      an openPMD import declaring the frequency domain; a harmonic import whose
      photonEnergy matches no field of the run; a Genesis-format harmonic import,
@@ -431,9 +431,9 @@ def main():
     with h5py.File(wd / "dark.wf.h5", "r+") as h5:
         h5[fieldio.MESH_PATH + "/x"][...] = 0.0
 
-    # ONE step, dark start: the field at exit is EXACTLY twice the source deposit of
+    # one step, dark start: the field at exit is exactly twice the source deposit of
     # the post-advance particles (a zero field diffracts to zero before the add), and
-    # a one-step run's final particle dump is EXACTLY the state the deposit read. So
+    # a one-step run's final particle dump is exactly the state the deposit read. So
     # the exit powers are predictable from the dump by the deposit sum itself -- the
     # Bessel fc(h) and the harmonic phase h*theta, with no evolution approximation.
 

@@ -11,9 +11,9 @@ written, never against another code.
 2. The state round trip. The file stores absolute momenta and a time where the tracker
    keeps packed (px, py) and a lag, so those pass through P/p0 and -beta*c*dt on the way
    out and back, while x and y are untouched. The state is read out here through the
-   CONVERTER, in Genesis's chart, which is the only other view of the beam there is now:
+   converter, in Genesis's chart, which is the only other view of the beam there is now:
    theta and gamma instead of a time and a momentum. Every column comes back exact on this
-   configuration, so the levels are BOUNDS on what the chart could cost rather than
+   configuration, so the levels are bounds on what the chart could cost rather than
    expected values: which coordinate pays is fixed, whether it pays is configuration
    dependent.
 
@@ -34,7 +34,7 @@ written, never against another code.
    (sig_pz = 0.15) empties a slice; the restored beam must have the same per-slice counts,
    empty slice included, and the file must hold one patch per slice.
 
-6. REFUSALS, each by name: a beam file that is not openPMD (the message names the
+6. Refusals, each by name: a beam file that is not openPMD (the message names the
    converter), a file whose patch count disagrees with the window the deck states, and a
    file that carries no charge.
 

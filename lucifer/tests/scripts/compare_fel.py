@@ -9,7 +9,7 @@ floor is set by fundamental constants: the tracker uses Bmad's (Z0 = mu_0*c =
 376.7303...), Genesis carries a truncated impedance (376.73, 8.3e-7 relative), and that
 difference enters the coupling and compounds through gain. During deliverable-3
 development the tracker transcribed Genesis's constants and agreed at transcription
-level (tier1 2.8e-11, tier2_genesis 5.9e-8, recorded in the README); after that
+level (tier1 2.8e-11, tier2_genesis 5.9e-8, recorded in doc/validation.md); after that
 validation was banked the code moved to Bmad constants by decision, and the tiers now
 measure against the constants floor.
 
@@ -375,7 +375,7 @@ def main():
     print("The tier2_bmad number is a measured transport model difference, not an error:")
     print("Genesis samples the quad path-length term at mid-element, Bmad integrates it")
     print("exactly. tier2_genesis proves it: same code, Genesis's interlude model, and")
-    print("the difference collapses by six orders of magnitude. See the README.")
+    print("the difference collapses by six orders of magnitude. See doc/validation.md.")
     print()
     print("PASS" if all_ok else "FAIL")
     return 0 if all_ok else 1

@@ -26,7 +26,7 @@
 ! serial at the caller's barrier.
 !
 ! Constants are Bmad's. The Genesis-comparison floors this creates are tabulated in
-! the manual (sec:numerics) and the README.
+! the manual (sec:numerics) and doc/validation.md.
 !
 ! Deliberately absent: Genesis's transient wake option (&wake transient/ztrans), the
 ! incoherent-synchrotron module, harmonics beyond what the solver provides, MPI.

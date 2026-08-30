@@ -41,5 +41,5 @@ Not checkable by the generic validator, required of a conforming writer's own te
 
 ## 7. Open questions
 
-- **OF1.** `emit_x`/`emit_y` as two datasets against one `emit` over a two-entry axis. Kept as two on the grounds that a two-entry axis buys nothing; a standard may want the uniformity anyway.
+- **OF1.** `emit_x`/`emit_y` as two datasets against one `emit` over a two-entry axis. Kept as two on the grounds that a two-entry axis buys nothing. A standard may want the uniformity anyway.
 - **OF2.** Whether the companion field files (escaped, pulse) should eventually get an extension of their own rather than Genesis conventions, tabled with the escaped-field openPMD question.

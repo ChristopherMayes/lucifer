@@ -966,7 +966,7 @@ end subroutine fel_write_meta
 ! fel_stats_write, and the literal text stays in meta/input_echo.
 !
 ! Components the program refuses are not here: recording a knob that did nothing would
-! lie about the run (the quiet start's honored beam_init set is the driver header's
+! lie about the run (the quiet start's honored beam_init set is doc/input-reference.md's
 ! table). List-valued inputs (the dump locators, the harmonic set, the field files) are
 ! string or integer array attributes on their subgroup rather than datasets, since a
 ! dataset needs an axis and a list of inputs has none worth defining. A blank file-name

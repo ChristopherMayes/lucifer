@@ -3,17 +3,17 @@
 Coherent-source checks (manual sec:coherent-source; Tanaka PRAB 27, 030703 (2024),
 implemented from the paper -- the SIMPLEX hybrid: their source, our field).
 
-  1. KEYSTONE: source_model is defaulted -- the deposit path -- everywhere else in the
+  1. Keystone: source_model is defaulted -- the deposit path -- everywhere else in the
      harness, so the benchmark's own tiers hold the default-path contract. Here: a
      coherent run exists and runs clean on the reference configuration.
   2. Limit identity (the model's measured bias, not zero): coherent vs deposit at
-     LARGE M on the seeded 6 GeV segment -- the |ln P| curve difference is the
+     large M on the seeded 6 GeV segment -- the |ln P| curve difference is the
      coherent-Gaussian model's intrinsic error in the lethargy regime, measured
      2.0e-2, checked at 5e-2. The regime is deliberate: lethargy/absorption is the
      energy exchange where the low-M artifact bites hardest.
   3. The claim (variance reduction): at M = 128 the plain deposit fakes gain
      (measured ln +0.41 on a curve that truly absorbs -- the per-cell shot-noise
-     artifact of the survey's 5.1), while the coherent source at the SAME M stays
+     artifact of the survey's 5.1), while the coherent source at the same M stays
      within the model bias of the large-M reference (measured 0.05). Both measured
      here, both checked: the artifact must exceed 0.2, the coherent error stay
      under 0.1.
@@ -25,7 +25,7 @@ implemented from the paper -- the SIMPLEX hybrid: their source, our field).
      spatially-incoherent emission dominates SASE startup; the coherent model drops
      it by construction) -- the goal's fallback clause, executed. B(s) does carry
      the physical Fawley noise, but it is not the dominant seed at startup.
-  6. THREADS: a coherent run is bit-identical at 1 and 8 threads.
+  6. Threads: a coherent run is bit-identical at 1 and 8 threads.
 
 Run by the benchmark harness; exits nonzero on failure. Self-referenced (no Genesis).
 """
@@ -177,14 +177,14 @@ def main():
     # ------------------------------------------------------------------
     print("== the moments extension (offset + tilted admitted; double horn refused) ==")
 
-    # An offset, x-y-tilted Gaussian bunch written as openPMD and imported by BOTH
+    # An offset, x-y-tilted Gaussian bunch written as openPMD and imported by both
     # source models: the coherent run must track its own deposit twin. The import
-    # runs in the resampler's VALIDATED regime (a time-dependent window of many
+    # runs in the resampler's validated regime (a time-dependent window of many
     # slices, imp%nslice = 0 auto) -- the single-slice corner produces degenerate
     # transverse sampling (a separate finding, noted in the brief). nbins = 4 keeps
     # the guard's independent-sample estimate honest for the horn to trip on.
 
-    # A SHORT undulator (0.9 m) and sample = 20 keep the seed in the window: at
+    # A short undulator (0.9 m) and sample = 20 keep the seed in the window: at
     # sample = 1 the slippage (3 wavelengths per step here) flushes the seed out
     # within a few steps and the comparison degenerates into the dark-start case
     # (the deposit's inflated spontaneous emission vs the coherent model's none --
@@ -232,7 +232,7 @@ def main():
     # ------------------------------------------------------------------
     print("== dark start refused by name (the measured startup deficit) ==")
 
-    # MEASURED on this configuration: the coherent dark start came out ~175x low
+    # measured on this configuration: the coherent dark start came out ~175x low
     # (deposit 1311 W vs coherent 7.5 W at the same seeds) -- spontaneous,
     # spatially-incoherent emission dominates SASE startup and the coherent model
     # drops it by construction. The goal's fallback clause applies: refusal by name.

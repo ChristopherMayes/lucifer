@@ -5,7 +5,7 @@ exit total powers must agree at the documented levels. Averaged vs Genesis carri
 seam-transport difference (~4e-2 on the benchmark line; measured 4.9e-4 at saturation,
 where the power self-limits). The unaveraged mode additionally carries the shot-noise
 radiation channel it physically resolves and the averaged model does not track
-(README "The saturation demo"): +0.6 ln at the exit, measured
+(this directory's README, "The measured result"): +0.6 ln at the exit, measured
 n-particle- and steps-per-period-independent. The check holds |ln| <= 1.0 -- an
 order-of-magnitude disagreement still fails the demo.
 

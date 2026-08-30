@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Seam-wake checks (deliverable 11): Bmad element sr wakes applied across the WHOLE time
+Seam-wake checks (deliverable 11): Bmad element sr wakes applied across the whole time
 window, validated without Genesis (self-referenced and against the deliverable-8 wake
 model). Every wake measurement is an A-B difference between a run with
 the wake and a bit-identical run without it, on a single one-step wiggler, so the FEL
@@ -12,10 +12,10 @@ Checks:
             Bmad's W(dz) = amp*exp(damp*dz)*sin(2pi*phi + k*dz), self = W(0)/2) on a
             uniform cold beam gives Delta_pz(particle) = -(l*amp/p0c) * (Q_ahead +
             Q_self_particle/2). Verified per particle to roundoff. This also pins the
-            head/tail direction: charge "ahead" must be the HIGHER slice indices
+            head/tail direction: charge "ahead" must be the higher slice indices
             (z_global = z_local + beta*(islice-1)*spacing), or the ramp is mirrored.
   causality A short bunch at the window tail (low indices): the zero-charge probe
-            slices ahead of it must receive EXACTLY zero kick, and the d8 wake model
+            slices ahead of it must receive exactly zero kick, and the d8 wake model
             (wake_on) on the same beam must mark the same "affected" mask in its
             eloss profile -- two independent implementations agreeing on direction.
   zlong     Same-element cross-validation: the deliverable-8 resistive-wall kernel
@@ -104,7 +104,7 @@ def imp_nml(**kw):
 
 
 def gen_nml(**kw):
-    """NML_GEN with the flat-bunch charge DERIVED from the window: I = Q*c/extent."""
+    """NML_GEN with the flat-bunch charge derived from the window: I = Q*c/extent."""
     slen = float(kw["slen"])
     kw.setdefault("q", f"{3000 * slen / 2.99792458e8:.12e}")
     kw.setdefault("half", f"{slen / 2:.9e}")
@@ -178,11 +178,11 @@ def main():
     A, B = load_par(w, "wra"), load_par(w, "wrb")
     nsl = len(A)
     q = np.array([b["q"] for b in B])
-    # Closed form: Delta_pz = -(l*amp/p0c) * (sum of charge STRICTLY ahead + half of
+    # Closed form: Delta_pz = -(l*amp/p0c) * (sum of charge strictly ahead + half of
     # charge at identical z). "Ahead" = higher slice index (and, within a slice, larger
     # z -- for the quiet start all beamlet phases differ, so per-particle ordering
     # inside the slice matters at the sub-slice level of the constant wake: for a
-    # CONSTANT wake W is z-independent, so only the ahead-charge SUM matters and
+    # constant wake W is z-independent, so only the ahead-charge sum matters and
     # within-slice ordering contributes via each particle's own weight).
     f = L_ELE * AMP / P0C
     worst = 0.0
@@ -205,9 +205,9 @@ def main():
         print("FAIL: constant-wake closed form violated (head/tail direction or charge wiring)")
         ok = False
 
-    # ---------------- lord resolution: the same constant wake on a PIPE that a
-    # superimposed marker has SPLIT into super_slaves. The wake then lives on the
-    # LORD (ele%wake is null on every tracked slave, pointer_to_wake_ele resolves it,
+    # ---------------- lord resolution: the same constant wake on a pipe that a
+    # superimposed marker has split into super_slaves. The wake then lives on the
+    # lord (ele%wake is null on every tracked slave, pointer_to_wake_ele resolves it,
     # applying once at the slave containing the lord's midpoint). Checking ele%wake
     # directly was the deliverable-11 hole: lord wakes fell through to the per-slice
     # path. Closed form as in ramp, with the pipe's length in f.
@@ -236,7 +236,7 @@ def main():
         print("FAIL: a lord's wake was not applied exactly once across its slaves")
         ok = False
 
-    # ---------------- causality: spike at the tail, probes ahead get EXACTLY zero
+    # ---------------- causality: spike at the tail, probes ahead get exactly zero
     (w/"wc_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE,
                                       extra=""))
     (w/"wc_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE,
@@ -280,13 +280,13 @@ def main():
     kern = np.loadtxt(w/"kern.txt")
     s_k, w_res = kern[:, 0], kern[:, 1].copy()
     w_res[0] *= 2                                    # unhalve the Bane self-slice factor
-    # Causal table for Bmad: W(z) acts on particles BEHIND the source. Bmad's z_long
+    # Causal table for Bmad: W(z) acts on particles behind the source. Bmad's z_long
     # table is W(z_test - z_source). Trailing means z_test < z_source, so the causal
     # side is z < 0: w(-s) = kernel(s) in V/C/m (kernel is eV/(m e-)).
     dz_t = s_k[1] - s_k[0]
     npad = len(s_k) // 2 + 2                        # extend past the window with zeros
     s_ext = np.concatenate([s_k, s_k[-1] + dz_t * np.arange(1, npad + 1)])
-    # Sign: the d8 kernels are stored SIGNED as energy loss (wakeres < 0, applied as
+    # Sign: the d8 kernels are stored signed as energy loss (wakeres < 0, applied as
     # dgamma = eloss*dz/m). Bmad's z_long table is positive-decelerating (vec6 -= conv).
     w_ext = np.concatenate([-w_res / E_CHARGE, np.zeros(npad)])
     z_tab = np.concatenate([-s_ext[::-1], s_ext[1:]])
@@ -299,7 +299,7 @@ def main():
     run(exe, "wz_a.nml", "wza.log", w)
     A = load_par(w, "wza")
     B = load_par(w, "wcb")                            # the no-wake twin from causality
-    # First principles: per-particle convolution of the SAME table with the actual
+    # First principles: per-particle convolution of the same table with the actual
     # particle distribution (positions from theta: z_global = theta/ks + (islice-1)*spacing
     # -- theta = ks*z/beta and the table compares z differences at beta ~ 1e-8 accuracy).
     ks = 2 * math.pi / LAMBDA0
@@ -348,7 +348,7 @@ def main():
         print(f"  slice {i+1}: dgamma z_long {dg_bmad:+.4e}, wake_on {dg_d8[i]:+.4e} "
               f"(methodological difference, reported not checked)")
 
-    # On a RESOLVED beam (uniform current, structure much wider than a slice) the two
+    # On a resolved beam (uniform current, structure much wider than a slice) the two
     # methods must converge: check their per-slice dgamma agreement on interior slices.
     # Tolerance derivation: the remaining differences are the self-slice treatment
     # (halved W(0) on slice sums vs particle-level pairs, ~1/(2*nslice) of the kick),
@@ -367,7 +367,7 @@ def main():
         if len(parts) == 2 and not line.startswith("#"):
             eloss_u.append(float(parts[1]))
     eloss_u = np.array(eloss_u[:len(AU)])
-    # The dominant, DERIVED difference: Genesis's wake model (Collective.cpp,
+    # The dominant, derived difference: Genesis's wake model (Collective.cpp,
     # transcribed in d8) represents the beam as a linearly interpolated current with a
     # Zero pad past the head slice -- a trapezoidal density missing half a slice of
     # charge at the head -- while the particle-level z_long sees the full charge. On

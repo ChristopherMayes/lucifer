@@ -5,10 +5,10 @@ undulator segments, held by symmetries, closed forms and Genesis itself.
 
   1. Re-anchor baseline (relative mode, the default): scanning an inter-segment gap
      by fractions of 2 gamma^2 lambda leaves the bunching phase entering the next
-     segment FLAT -- the transcription of Genesis's drift autophasing (measured flat
+     segment flat -- the transcription of Genesis's drift autophasing (measured flat
      on Genesis itself the same way; the residual is a slow adiabatic trend).
-  2. THE Z_OFFSET KNOB: displacing the downstream wiggler by delta (standard Bmad
-     misalignment, anchor at the nominal position) shifts that phase by EXACTLY
+  2. The Z_OFFSET knob: displacing the downstream wiggler by delta (standard Bmad
+     misalignment, anchor at the nominal position) shifts that phase by exactly
      -2 pi delta / (2 gamma^2 lambda) -- the analytic drift slip rate, no fit.
   3. Cross-mode identity: in absolute mode (bmad_com[absolute_time_tracking] = T in
      the lattice, honored through Bmad's own resolver) the same phase arrives via the
@@ -17,12 +17,12 @@ undulator segments, held by symmetries, closed forms and Genesis itself.
   4. Phase-shifter parity vs Genesis4: Genesis scans PHASESHIFTER phi (which needs
      finite length to register -- a zero-length one silently does nothing); we scan
      z_offset with delta = phi * 2 gamma^2 lambda / (2 pi). Same physical scan; the
-     bunching-phase curves must agree point by point. This anchors the SIGN
+     bunching-phase curves must agree point by point. This anchors the sign
      convention ("delay goes backwards") against Genesis's own element.
-  5. CHICANE: a four-bend closed bump between segments (Bmad seam tracks the beam;
-     the radiation drifts the CHORD from ele%floor). Relative mode drops the
+  5. Chicane: a four-bend closed bump between segments (Bmad seam tracks the beam;
+     the radiation drifts the chord from ele%floor). Relative mode drops the
      geometric fraction (Genesis's "chicane is always autophasing"); absolute mode
-     ramps with the bend angle at the slope an INDEPENDENT geometric computation of
+     ramps with the bend angle at the slope an independent geometric computation of
      d(arc - chord)/d(angle) predicts -- itself cross-checked against the textbook
      small-angle path lengthening theta^2 (2 L_bend/3 + L_drift). The unaveraged
      ledger closes across a chicane sandwich.
@@ -31,7 +31,7 @@ undulator segments, held by symmetries, closed forms and Genesis itself.
      slice). A delay of a few wavelengths must bank exactly floor(delay/lambda) more
      escaped slices than the straight-line twin of the same arc length, and the run
      must be byte-identical at 1 and 8 threads.
-  7. REFUSALS by name: a non-closed-bump break; a bend under the genesis-model
+  7. Refusals by name: a non-closed-bump break; a bend under the genesis-model
      interludes; a z_offset exceeding its upstream break; a z_offset on the first
      element (no break to displace into).
 
@@ -66,7 +66,7 @@ TOL_CHIC_SLOPE = 2e-3    # measured 6.8e-4: absolute chicane ramp vs the geometr
                          #   (583 wavelengths of delay at the base angle).
 TOL_LEDGER = 1e-4        # measured 4.0e-6: unaveraged ledger closure across the chicane.
 TOL_CF = 1e-6            # measured 6.4e-8: the 2D trace vs the small-angle closed form.
-TOL_POWER = 1e-6         # measured 9.3e-9 from SHARED dumps: exit power vs phi, our knob
+TOL_POWER = 1e-6         # measured 9.3e-9 from shared dumps: exit power vs phi, our knob
                          #   vs Genesis's shifter (1.4e-4 on independently loaded beams --
                          #   that measures the loaders, so this tier shares the start).
 
@@ -146,7 +146,7 @@ UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
 DD: pipe, l = 0.025
 STR: pipe, l = 0.275               ! ARC-MATCHED to the bump (5*0.025 + 4*0.05 = 0.325
                                    ! total with the flanking DDs), so the two runs share
-                                   ! the autophase term and ONLY the geometric delay differs.
+                                   ! the autophase term and only the geometric delay differs.
 SEG: line = (UND, DD, STR, DD, UND)
 use, SEG
 {modeline}
@@ -212,7 +212,7 @@ fft_fieldsolver = true
 """
 
 GEN_PREP = """&setup
-rootname=PSP
+rootname=psp
 lattice=ps0.lat
 beamline=SEG
 lambda0=1e-10
@@ -283,11 +283,11 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
 /
 """
 
-GEN_LAT_PS = """UND: UNDULATOR = {{ lambdau=0.015000, nwig=30, aw=0.84853, helical=True}};
-D1: DRIFT = {{ l = 0.1425 }};
+GEN_LAT_PS = """UND: undulator = {{ lambdau=0.015000, nwig=30, aw=0.84853, helical=True}};
+D1: drift = {{ l = 0.1425 }};
 PS: PHASESHIFTER = {{ l = 0.015, phi = {phi} }};
-D2: DRIFT = {{ l = 0.1425 }};
-SEG: LINE={{UND,D1,PS,D2,UND}};
+D2: drift = {{ l = 0.1425 }};
+SEG: line={{UND,D1,PS,D2,UND}};
 """
 
 
@@ -341,7 +341,7 @@ def escaped_count(wd, tag):
 
 
 def chicane_delay(ang):
-    """arc - chord of the four-bend closed bump, EXACT 2D geometry, independently of
+    """arc - chord of the four-bend closed bump, exact 2D geometry, independently of
     the walk's floor arithmetic: bends of arc length lb and bend angle +a,-a,-a,+a
     with drifts ld between (and the outer DD pieces adding straight length only)."""
     lb, ld = 0.05, 0.025
@@ -416,7 +416,7 @@ def main():
     # ------------------------------------------------------------------
     print("== phase-shifter parity vs Genesis4 (SHARED initial dumps) ==")
 
-    # Both codes start from the SAME particles and field: Genesis writes the dumps
+    # Both codes start from the same particles and field: Genesis writes the dumps
     # once (the loaders are independently written, so comparing power on
     # independently generated beams would measure the loaders, not the phasing --
     # measured at 1.4e-4 that way, against a 2.2e-2 power swing).
@@ -472,7 +472,7 @@ def main():
           float(np.max(np.abs(wrap(d_knob2 - d_gen)))), TOL_PARITY,
           note="[delta = phi 2 gamma^2 lambda / 2pi]")
 
-    # The phase must reach the PHYSICS identically, not just the bookkeeping: exit
+    # The phase must reach the physics identically, not just the bookkeeping: exit
     # power against phi, code vs code, from the shared start.
 
     gp = np.array(gen_pw);  kp = np.array(knob_pw2)
@@ -527,7 +527,7 @@ def main():
     # The window rotations the geometric delay buys. Steady state never exercises
     # them (slippage is a no-op with one slice), so this runs time dependent with a
     # bend angle tuned for a few wavelengths of delay: the chicane must bank exactly
-    # floor(delay/lambda) MORE escaped slices than its straight-line twin of the same
+    # floor(delay/lambda) more escaped slices than its straight-line twin of the same
     # arc length, and the run must be thread-invariant.
 
     print("== time-dependent chicane: window rotations and threads ==")

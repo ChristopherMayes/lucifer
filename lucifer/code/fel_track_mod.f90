@@ -231,7 +231,7 @@ type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 ! to gfortran's own sin/cos intrinsics: they differ from libm by one ulp on ~2e-6 of
 ! arguments (73 mismatches in a 44M-point sweep of the theta domain). Adopting
 ! this was therefore a NAMED VALUE CHANGE -- every benchmark tier re-measured and
-! re-recorded (README, "The particle-path cost").
+! re-recorded (doc/validation.md, "The particle-path cost").
 
 !+
 ! Subroutine fel_sincos (theta, s, c)
@@ -882,7 +882,7 @@ end subroutine fel_track_und_step
 !
 ! This is the Genesis interlude model, transcribed. Running the full lattice with
 ! it isolates what the Bmad seam changes: the seam integrates the path-length term
-! exactly through the quad map where this samples it once. See the benchmark README.
+! exactly through the quad map where this samples it once. See doc/validation.md.
 ! The production configuration is the seam.
 !
 ! Input:

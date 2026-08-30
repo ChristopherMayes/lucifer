@@ -12,7 +12,7 @@ no conversions at all -- no text files, no reshapes, no unit juggling. Ten panel
   radiation power and window field energy (log and linear -- the log pair shows the
   exponential gain regime, the linear pair shows where the energy actually is);
   bunching |b|; beam energy change and rms spread (MeV -- Bmad's convention: energy is
-  eV, never gamma); rms BEAM sizes and rms FIELD sizes (the field sizes come from the
+  eV, never gamma); rms beam sizes and rms field sizes (the field sizes come from the
   wavefront_params sigma(4,4) -- watch gain guiding pull the light onto the beam);
   beam normalized emittances (projected, dispersion removed, the bunch_params
   convention) and the field "emittance" sqrt(det sigma_plane) = M^2 lambda/4pi at the
@@ -188,7 +188,7 @@ def main():
     axd["gamma"].set_ylabel("beam energy (MeV)")
     axd["gamma"].legend(**above)
 
-    # Transverse rms sizes: beam from the 6x6, FIELD from the wavefront 4x4 --
+    # Transverse rms sizes: beam from the 6x6, field from the wavefront 4x4 --
     # gain guiding is the field-size curve bending toward the beam-size curve.
     # The envelope band, centroid + rel over the window: the extremes are order
     # statistics the file stores, not a sigma multiple.

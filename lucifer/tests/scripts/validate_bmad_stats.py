@@ -9,7 +9,7 @@ which is the property being checked (spec R42). numpy and h5py only.
 Findings are reported at three levels. MUST failures mean the file does not conform.
 SHOULD findings are recommendations. INFO lines report what could not be checked
 generically, so silence is never mistaken for coverage: the validator can verify that
-a DECLARED join key resolves (R18), not that every join key is declared; it cannot see
+a declared join key resolves (R18), not that every join key is declared; it cannot see
 whether R26's strings are really the code's enums, whether R28's NaN means
 not-computed, or whether R34's input trees are complete. Those belong in the writing
 program's own harness.

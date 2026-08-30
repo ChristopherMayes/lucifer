@@ -60,7 +60,7 @@ implicit none
 ! carries its own values (EG an impedance of free space truncated to 376.73 where
 ! mu_0_vac*c_light is 376.7303...). During the original transcription validation this
 ! module transcribed them to get transcription-level agreement. That validation is banked
-! (lucifer/README.md). The code now uses Bmad's constants, and the ~8e-7 relative
+! (lucifer/doc/validation.md). The code now uses Bmad's constants, and the ~8e-7 relative
 ! difference against Genesis is the accepted comparison floor.
 
 !+

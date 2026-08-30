@@ -5,7 +5,7 @@ escaped-field bank, held by cross-identities rather than reference files --
 
   1. bunch_params reconstruction: bunch_params_from_stats.py applied to the per-record
      sufficient statistics must reproduce the calc_bunch_params values the tracker
-     stored at element ends (proves the per-record datasets ARE sufficient).
+     stored at element ends (proves the per-record datasets are sufficient).
   2. banked energy == the ledger's U_escaped column: same slices, independent
      bookkeeping paths (drain-time wavefront_params vs the zero-fill energy sum).
   3. analytic vs numerical propagation: each banked slice's rms size at the exit from
@@ -210,10 +210,10 @@ def main():
                    (f"; first problem {bad[0]}]" if bad else "]"))
 
         # 0a3. The record number is the axis, and s is a variable on it. s must be
-        # non-decreasing, and where it repeats the two records must sit in DIFFERENT
+        # non-decreasing, and where it repeats the two records must sit in different
         # elements, which is what a zero-length element applying a wake kick does: it
         # records at the plane the element before it ended on. Two records at one plane
-        # INSIDE one element would be a defect in the walk that this axis choice hides.
+        # inside one element would be a defect in the walk that this axis choice hides.
         # The zero-length wake lattice below is what makes this fire on real duplicates.
         ds = np.diff(st.s)
         dup = np.flatnonzero(ds == 0)
@@ -262,10 +262,10 @@ def main():
               note=f"[{', '.join(leaks) if leaks else 'clean'}]")
 
         # 0a7. The slice coordinates are exact, and one of them is not. The grid is
-        # uniform in TIME: the migration invariant carries each particle's own beta, and
-        # z = -beta*c*(t-t_ref), so at a grid point the beta CANCELS and the arrival-time
+        # uniform in time: the migration invariant carries each particle's own beta, and
+        # z = -beta*c*(t-t_ref), so at a grid point the beta cancels and the arrival-time
         # separation is ct_slice/c with no beta anywhere. t_slice must therefore be
-        # -ct_slice/c EXACTLY, which it was not until 2.3 (it carried a spurious beta0,
+        # -ct_slice/c exactly, which it was not until 2.3 (it carried a spurious beta0,
         # 3.9e-9). z_slice is the one that needs a reference, so it is only equal to
         # beta0*ct_slice to the rounding of two ways of forming beta0.
         c_light = 299792458.0
@@ -282,7 +282,7 @@ def main():
 
         # 0a8. The envelope data are the particles'. rel_max/rel_min are order
         # statistics relative to the stored centroid, and the dump at the UND end holds
-        # the SAME particles the record saw, so the position entries must match to the
+        # the same particles the record saw, so the position entries must match to the
         # bit: the file stores x verbatim, and IEEE subtraction of the same centroid is
         # deterministic. The momentum entries cross the dump's unit round trip
         # (px*p0c on write, /p0c on read), so they get an ulp-scale tolerance.
@@ -364,7 +364,7 @@ def main():
         # Measured 4.6e-8 (numpy eig vs mat_eigen). The projected planes agree exactly.
         check("stats: bunch_params reconstruction vs stored calc_bunch_params", worst, 1e-6)
 
-        # 1b. The whole-window row is ASSEMBLED from the per-slice moments by the
+        # 1b. The whole-window row is assembled from the per-slice moments by the
         # pooled-covariance identity rather than summed over particles. Re-implement the
         # identity here, independently, including the local-to-global z map: a shift of
         # beta*(is-1)*spacing plus the pz shear that map carries because beta is the
@@ -421,7 +421,7 @@ def main():
               0.0 if worst_nobg > 1e-3 else 1.0, 0.5,
               note=f"[dropping it moves the row by {worst_nobg:.2e}]")
 
-        # 1c. The moments the element-end twiss rests on are the RECORD's, not a second
+        # 1c. The moments the element-end twiss rests on are the record's, not a second
         # copy: beam/slice_twiss/centroid at an element end must be beam/slice/centroid
         # at the record the mask selects. Exactly, since one is written from the other.
         worst_ef = float(np.max(np.abs(st["beam/slice/centroid"][st.at_end] -
@@ -431,7 +431,7 @@ def main():
         check("stats: the element-end moments ARE the record's (abs)", worst_ef, 1e-30)
 
         # And the field's theta moments are computed where the file says they are:
-        # (nz, ns) per slice, at every element end that HAS field, plus the initial
+        # (nz, ns) per slice, at every element end that has field, plus the initial
         # record (the walk takes that one with angles so the starting state is
         # complete). An empty slice has no moments to compute and says so.
         valid = st["field/x/angle_moments_valid"].astype(bool)
@@ -521,7 +521,7 @@ def main():
     _, pooled_ana, _ = pool_wavefront(np.vstack([cen_l, cen_b]),
                                       np.vstack([sig_l.reshape(-1, 16), sig_b.reshape(-1, 16)]),
                                       np.concatenate([en_l, en_b]))
-    # Numerical pooling over the SAME banked slices from the pulse file:
+    # Numerical pooling over the same banked slices from the pulse file:
     cen_n = np.stack([np.array(cx_num)[::-1], np.zeros(nb), np.array(cy_num)[::-1], np.zeros(nb)], axis=1)
     sig_n = np.zeros((nb, 4, 4))
     sig_n[:, 0, 0] = sxx_num;  sig_n[:, 2, 2] = syy_num
@@ -534,7 +534,7 @@ def main():
 
     # 5. Thread invariance: every dataset of all three files identical at 1 vs 8
     #    threads. Dataset-level, not raw bytes: HDF5 object headers embed creation
-    #    times, so two files with bit-identical DATA differ as byte streams -- the
+    #    times, so two files with bit-identical data differ as byte streams -- the
     #    data is the invariance claim, the container metadata is not.
     run(exe, wd, "dg1", NML.format(lat="dg_wrap.bmad", root="dg1", extra=""), threads="1")
 
@@ -547,7 +547,7 @@ def main():
     # check was written for, and until it existed that check had only ever seen zero
     # repeats, which is to say it was untested. WKF can kick, so it is tracked and its
     # record lands on the plane UND ended at, repeating coords/s. The two WKT pipes
-    # cannot kick, so they are skipped and the file must be IDENTICAL to one whose
+    # cannot kick, so they are skipped and the file must be identical to one whose
     # zero-length pipes carry no wake at all.
     (wd / "zlw.bmad").write_text(ZL_WAKE.format(wkt=WKT_WAKE))
     (wd / "zlwn.bmad").write_text(ZL_WAKE.format(wkt=WKT_NONE))

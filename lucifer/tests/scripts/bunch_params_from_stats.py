@@ -2,8 +2,8 @@
 """
 Reconstruct a Bmad bunch_params_struct-shaped dict from any (record, slice) of the
 tracker's stats file <out_root>.stats.h5 -- the per-record beam datasets (centroid,
-sigma, charge_live, n_particle_live) are SUFFICIENT statistics, and this module is
-the proof by construction: at element ends its output must reproduce the TWISS the
+sigma, charge_live, n_particle_live) are sufficient statistics, and this module is
+the proof by construction: at element ends its output must reproduce the twiss the
 tracker stored from Bmad's own calc_bunch_params (the harness holds that). The moments
 themselves are stored once, per record, so there is nothing there to compare against.
 
@@ -11,7 +11,7 @@ The formulas are transcribed from Bmad's calc_emittances_and_twiss_from_sigma_ma
 (beam_utils.f90): projected x/y/z twiss with dispersion removed via sigma(i,6)
 columns, and the normal-mode a/b/c emittances as the imaginary parts of the
 eigenvalues of sigma.S (Wolski Eq. 32; numpy does the eigensystem). Full normal-mode
-BETA functions need Wolski's N matrix and are Bmad's job, not this script's --
+beta functions need Wolski's N matrix and are Bmad's job, not this script's --
 projected twiss plus normal-mode emittances is what the reconstruction covers.
 
 Fixed Bmad units throughout, matching the file. norm_emit uses
@@ -19,7 +19,7 @@ f_emit = p0c*(1 + <pz>)/m_e c^2 with the file's stored p0c.
 
 Also provides the wavefront-side pooling helper: pulse-level moments from per-slice
 wavefront_params (energy-weighted mean of slice sigmas plus the variance of slice
-centroids) -- pulse values are DERIVED, never stored; the file stays raw.
+centroids) -- pulse values are derived, never stored; the file stays raw.
 
 Usage as a module:
   from bunch_params_from_stats import bunch_params_at, pool_wavefront
@@ -96,7 +96,7 @@ def bunch_params_from_moments(centroid, sigma36, charge_live, n_live, p0c):
     ev = np.linalg.eigvals(sig[:dim, :dim] @ S[:dim, :dim])
     emits = np.sort(np.abs(ev.imag))[::-1]     # Pairs +-i emit; take distinct values.
     emits = emits[::2]                         # One per conjugate pair.
-    # NOTE: mode LABELS here are magnitude-descending. Bmad's mat_eigen identifies
+    # note: mode labels here are magnitude-descending. Bmad's mat_eigen identifies
     # modes by eigenvector structure, so a/b/c may be permuted relative to Bmad;
     # the harness compares the normal-mode emittances as a sorted set.
     for k, name in enumerate(("a", "b", "c")):

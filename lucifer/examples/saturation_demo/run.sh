@@ -13,7 +13,7 @@
 # check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
 # decks stay static. Measured results: the "The saturation demo" section of
-# lucifer/README.md.
+# lucifer/examples/saturation_demo/README.md.
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]
 #                  [--python <path>] [--work-dir <path>]

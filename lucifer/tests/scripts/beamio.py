@@ -13,7 +13,7 @@ current [A], and n. Empty slices come back with n = 0 and empty arrays.
 
 An openPMD dump adds pz, the Bmad energy deviation (p - p0)/p0, exactly as the file
 states it. gamma is the same quantity through gamma = sqrt((p0(1+pz)/mc)^2 + 1), which
-costs an ulp of gamma, and a check that DIFFERENCES energies between two runs pays that
+costs an ulp of gamma, and a check that differences energies between two runs pays that
 ulp against a difference many orders smaller: a wake kick of 3e-8 in pz read back
 through gamma agrees to 1.2e-8 rather than to rounding. Such a check should read pz. A
 Genesis dump states gamma alone and carries no reference momentum, so pz is not
@@ -25,7 +25,7 @@ the run rather than to the beam. theta scales with it, so a caller reading an op
 must say which wavelength its deck used. A Genesis file states its own and the argument is
 then a cross-check.
 
-theta is the ABSOLUTE ponderomotive phase on both paths. Neither format has a place for a
+theta is the absolute ponderomotive phase on both paths. Neither format has a place for a
 run's reference phase phi0 and every reader restarts it at zero, so each writer folds it
 into what it stores: Genesis stores theta itself, and an openPMD beam file stores the lag
 theta implies, time = -theta/(ks c). The two therefore mean the same thing here, and a
@@ -130,7 +130,7 @@ def _read_genesis(path, wavelength=None):
 
 
 def _read_openpmd(path, wavelength, spacing=None):
-    """The particlePatches ARE the slices: one per slice, in window order, empty ones as
+    """The particlePatches are the slices: one per slice, in window order, empty ones as
     zero-count patches. Nothing else in the file describes the window."""
     ks = 2 * np.pi / wavelength
     if spacing is None:
@@ -147,7 +147,7 @@ def _read_openpmd(path, wavelength, spacing=None):
 
         # Two shapes of the same beam. Bmad's writer states a reference momentum, so the
         # energy comes back as the deviation the tracker keeps. A file written against the
-        # LATTICE's reference states none, which is deliberate (the converter leaves the
+        # lattice's reference states none, which is deliberate (the converter leaves the
         # run's one reference to the lattice), and then only the total momentum is
         # available: gamma follows from it and pz has no reference to be measured against.
         pz = None

@@ -528,7 +528,7 @@ if (trim(beam_init%distribution_type(2)) /= '' .and. trim(beam_init%distribution
 
 if (bad /= '') then
   call out_io (s_error$, r_name, 'BEAM_INIT%' // trim(bad) // ' IS SET BUT NOT HONORED BY THE', &
-                                 'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN THE PROGRAM HEADER).', &
+                                 'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN doc/input-reference.md).', &
                                  'REFUSING RATHER THAN SILENTLY IGNORING IT.')
   err_flag = .true.;  return
 endif

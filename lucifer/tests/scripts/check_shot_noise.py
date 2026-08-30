@@ -70,7 +70,7 @@ def b2_samples(dump_file, harmonics):
 
     The dump is openPMD, so the weights are the ones the loader wrote. An earlier
     version read Genesis format, which carries one current per slice, and had to
-    RECONSTRUCT the alternating test pattern to weight the sum. Reading the weights
+    reconstruct the alternating test pattern to weight the sum. Reading the weights
     tests the loader instead of assuming it.
 
     |b(h)| is invariant under a constant shift of theta, which is what a dump's missing

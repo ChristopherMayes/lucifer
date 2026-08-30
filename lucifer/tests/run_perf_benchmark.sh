@@ -2,7 +2,7 @@
 #
 # Head-to-head performance benchmark: the Bmad FEL tracker (OpenMP) against Genesis 1.3
 # Version 4 (MPI), serial and at the machine's full performance-core count, on the same
-# physics. This reproduces the measurement in the README's "Head to head" section as one
+# physics. This reproduces the head-to-head measurement of doc/validation.md as one
 # command instead of a by-hand procedure.
 #
 # Methodology, each point deliberate:
@@ -16,7 +16,7 @@
 #     identical particles and field. Before any timing is quoted, the final total powers
 #     are required to agree at the documented seam level (the Bmad tracker runs its
 #     production configuration, interlude_model = "bmad", which differs from Genesis by
-#     the priced transport model difference of ~4e-2 -- see the README).
+#     the priced transport model difference of ~4e-2 -- see doc/validation.md).
 #   - Wall times come from one uniform external clock (/usr/bin/time -p), not from each
 #     code's self-report. Serial Genesis runs the plain binary (one rank, no launcher),
 #     and parallel Genesis runs mpirun -np <workers>. The Bmad tracker runs the same binary

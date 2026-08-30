@@ -148,7 +148,7 @@ def cover(pdf, d, checks):
         ("       radiation without debiting the beam; the unaveraged mode conserves and", 10, 0),
         ("       pays, at the analytically correct magnitude.", 10, 0),
         ("", 10, 0),
-        ("The measured levels, attributions and methodology live in lucifer/README.md", 10, 0),
+        ("The measured levels and methodology live in lucifer/doc/validation.md", 10, 0),
         ("(sections: The saturation demo, Diagnostic output) and the physics manual", 10, 0),
         ("(lucifer/doc/fel-physics.tex, sec:unaveraged, sec:stats).", 10, 0),
     ]
@@ -308,7 +308,7 @@ def energy_page(pdf, d, checks):
     a1.set_xlim(0, max(given.values()) * 1.55)
     a1.set_title("Energy accounting at the exit", loc="left", weight="bold")
 
-    # -- Panel 2: the unaveraged books CLOSING along z. ----------------------------
+    # -- Panel 2: the unaveraged books closing along z. ----------------------------
     zl = led[:, 1 - 1]
     given_z = -(led[:, 1] - led[0, 1])
     account_z = (led[:, 2] - led[0, 2]) + led[:, 4] - led[:, 5]

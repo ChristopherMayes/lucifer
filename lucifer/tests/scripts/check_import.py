@@ -9,7 +9,7 @@ bunch), writes it as a Genesis DISTRIBUTION file (t = -tau/c, so both codes bin 
 identical particle set identically), imports it through the transcribed resampler, and
 Genesis imports the same file through &importdistribution. Then:
 
-EXACT (RNG-free), tolerance at roundoff:
+exact (RNG-free), tolerance at roundoff:
   current   The per-slice current profile, ours vs Genesis's beam dump. Window
             membership and the weighted sum contain no random numbers.
   moments   The generated bunch carries the specified emittance (matched generation
@@ -21,7 +21,7 @@ EXACT (RNG-free), tolerance at roundoff:
   threads   The same seed at 1 and 8 threads gives byte-identical diag output (the
             import runs serially before tracking).
 
-STATISTICAL (the resampling and loading RNG):
+statistical (the resampling and loading RNG):
   twiss     Per-slice Twiss/emittance measured from the imported dump must recover
             the lattice Twiss and the beam_init emittance, central slices, ~percent.
   startup   Dark-start SASE power after one segment, ours vs Genesis's, each code
@@ -302,7 +302,7 @@ def main():
     # twiss (statistical): the imported dump's central slices recover the targets.
     # Statistics note: each slice has npart/nbins = 256 independent phase-space seeds,
     # so a single slice's Twiss carries ~1/sqrt(256) = 6% noise and a max over slices
-    # would check on order statistics. Check on the MEAN over central slices instead.
+    # would check on order statistics. Check on the mean over central slices instead.
     slices, cur = load_dump_slices(w/"impref-initial.beam.h5")
     central = [i for i in range(len(slices)) if cur[i] > 0.5*cur.max()]
     berr, aerr, eerr = [], [], []
@@ -367,10 +367,10 @@ def main():
         print("FAIL: startup power after import disagrees between the codes")
         ok = False
 
-    # ---- Cross-path equivalence (the beam_init interface deliverable): the SAME
+    # ---- Cross-path equivalence (the beam_init interface deliverable): the same
     # Gaussian description, quiet-loaded directly (analytic per-slice evaluation) and
     # imported (real particles resampled). The quiet-load must match the analytic
-    # Gaussian profile EXACTLY -- this is also the sqrt(2pi) mutation check on the
+    # Gaussian profile exactly -- this is also the sqrt(2pi) mutation check on the
     # driver's current derivation -- and the import must match it statistically.
     (w/"imp_xq.nml").write_text(to_groups(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
         sample=SAMPLE, nslice=NSLICE, extra='  load_only = T\n',

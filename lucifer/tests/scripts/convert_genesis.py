@@ -119,7 +119,7 @@ def write_openpmd_beam(path, groups, spacing):
     """One species record, one particlePatch per slice, in the Bmad reader's layout.
 
     spacing [m] is the slice spacing, needed because a ParticleGroup read from a Genesis
-    dump carries a GLOBAL z: slice i sits at (i-1)*spacing within the window. A patch
+    dump carries a global z: slice i sits at (i-1)*spacing within the window. A patch
     holds its slice's own coordinate, the same local z the tracker keeps, so the slice
     offset comes back off here.
     """
@@ -182,7 +182,7 @@ def write_openpmd_beam(path, groups, spacing):
 
         # No totalMomentum and no totalMomentumOffset. Without them Bmad's reader takes
         # the momentum from the three absolute components and references it to the
-        # LATTICE's p0c, which is the run's one reference. Writing a reference here would
+        # lattice's p0c, which is the run's one reference. Writing a reference here would
         # invent a second one, and a beam's mean momentum is not the lattice's: doing that
         # shifted gamma by 5.1e-4 in the first version of this converter.
 
@@ -232,7 +232,7 @@ def write_genesis_par(path, slices, wavelength, spacing, refposition=0.0,
 
     A beam whose weights differ within a slice is refused by name. This format stores one
     current per slice, so a read-back would return a uniform beam, and per-particle weights
-    are the whole reason the tracker's own format is openPMD. Weights differing BETWEEN
+    are the whole reason the tracker's own format is openPMD. Weights differing between
     slices are fine: that is what a current profile is.
     """
     for i, s in enumerate(slices, start=1):

@@ -13,17 +13,17 @@ set does the right thing. Held by symmetries and physics, not reference files:
   2. Crossed undulator (x-set then y-set): the x field only diffracts through the
      y set -- its polarization-resolved dump power must match the same line with the
      y set replaced by an equal drift (pure-diffraction reference) -- while the y
-     field GROWS from the x-set's microbunching (bunching is longitudinal and
+     field grows from the x-set's microbunching (bunching is longitudinal and
      polarization-blind: the crossed-polarized afterburner), far above its dark
      floor. Both FEL modes, and the two modes agree at a priced level.
-  3. LEDGER: the unaveraged TD closure holds on the crossed line (kick/deposit are
+  3. Ledger: the unaveraged TD closure holds on the crossed line (kick/deposit are
      exact duals per component).
   4. Thread identity: 1 vs 8 threads byte-identical on the crossed unaveraged run.
   5. Helical re-anchor: a helical run forced onto the two-polarization path (a
      y-polarized zero-power seed makes Ey live) reproduces the scalar-path run's
      diag -- measured level (the vector path evaluates the same physics through
      differently-ordered arithmetic).
-  6. REFUSALS: tilt on a helical element; tilt with the transcribed-Genesis maps.
+  6. Refusals: tilt on a helical element; tilt with the transcribed-Genesis maps.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -169,7 +169,7 @@ def main():
         sw = max(np.abs(dx_[-1, :, 8] / dy_[-1, :, 9] - 1).max(),
                  np.abs(dx_[-1, :, 9] / dy_[-1, :, 8] - 1).max())
         # Averaged: machine precision (both runs use the pol-projected coupling).
-        # Unaveraged: the x-run takes the SCALAR path (deposits only the wiggle-
+        # Unaveraged: the x-run takes the scalar path (deposits only the wiggle-
         # direction current, by convention) while the y-run takes the vector path,
         # which also carries the tiny betatron-current radiation -- a real model
         # refinement of the vector path, measured 4.1e-6 here, tolerated not hidden.
@@ -196,7 +196,7 @@ def main():
     lnr = abs(np.log(lnr_modes["averaged"][1] / lnr_modes["unaveraged"][1]))
     check("crossed: averaged vs unaveraged y-power, |ln ratio| (priced)", lnr, 0.5)
 
-    # 3. LEDGER on a TD crossed unaveraged run (slippage + escape live).
+    # 3. Ledger on a TD crossed unaveraged run (slippage + escape live).
     run(exe, wd, "p2t_uv", NML.format(lat="p2_c_uv.bmad", root="p2t_uv",
                                       extra="  keep_escaped_field = T\n"))
     led = np.loadtxt(wd / "p2t_uv.ledger.txt")
@@ -216,7 +216,7 @@ def main():
     #    TD run with physical shot noise (a quiet start's dark power is the numerical
     #    floor, meaningless to compare). The helical quiver's spontaneous radiation is
     #    purely co-rotating, which the scalar envelope holds whole and the vector path
-    #    splits into (Ex, Ey). The TOTAL power must agree. Ey is forced live by a
+    #    splits into (Ex, Ey). The total power must agree. Ey is forced live by a
     #    negligible y seed (1e-30 W).
     (wd / "p2_hel.bmad").write_text("call, file = spont_probe.bmad\n")
     run(exe, wd, "p2h_v0", NML.format(lat="p2_hel.bmad", root="p2h_v0",
@@ -230,7 +230,7 @@ def main():
     check("helical re-anchor: vector vs scalar path, shot-noise power", hel, TOL_HEL,
           note="(co-rotating radiation, two representations)")
 
-    # 6. REFUSALS.
+    # 6. Refusals.
     (wd / "p2_hel_tilt.bmad").write_text("call, file = spont_probe.bmad\nUNDS[tilt] = 0.3\n")
     ok1 = refuse(exe, wd, "p2f1", NML.format(lat="p2_hel_tilt.bmad", root="p2f1", extra=""),
                  "TILT ON A HELICAL FEL ELEMENT")
