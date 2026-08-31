@@ -5,7 +5,7 @@ short_title: Changelog
 
 # Lucifer changelog
 
-Development history of the FEL tracker on the `fel/wavefront` branch, newest first.
+Development history of the FEL tracker on the `lucifer-dev` branch, newest first.
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
