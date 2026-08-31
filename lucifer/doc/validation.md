@@ -459,13 +459,13 @@ Two bookkeeping identities ride with the seam wake. Energy bookkeeping, $d\langl
 ## The unaveraged mode: fc measured, not assumed
 
 (Physics, conventions, and provenance: manual [](fel-physics.md#sec-unaveraged). MINERVA (Freund and
-van der Slot) is the production existence proof and a statistical ~1e-3-class
-reference only, never a bit check.)
+van der Slot) is the published existence proof for this physics. Only its published
+work was used: nothing here is compared against a MINERVA run.)
 
 `fel_tracking = 1` is a per-element lattice attribute, so unaveraged segments mix
 with averaged ones in a single line. It integrates the particles through the undulator's
 real field: the full Newton-Lorentz quiver, RK4 at `fel_steps_per_period` (default
-20, MINERVA's envelope), with the radiation field as a Strang-split kick and a source
+20, floor 10 on the convergence measured below), with the radiation field as a Strang-split kick and a source
 built from the actual quiver current. Nothing from the averaged coupling path appears
 in it (the harness greps `fel_und_coupling|faw` out of the module), so the averaged
 mode's inputs become measurements. Entry/exit are sin² amplitude ramps

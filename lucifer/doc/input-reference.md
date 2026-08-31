@@ -269,7 +269,7 @@ The tracking method and the unaveraged parameters are per-element attributes rat
 **`fel_tracking`** unset or `0` is the averaged mode on Bmad's own `bmad_standard` wiggler kernel maps. `1` is the unaveraged mode, a full Newton-Lorentz quiver with no period averaging and no coupling factor anywhere in its inputs, and the run writes an energy ledger beside its other outputs. `-1` is averaged with the transcribed Genesis4 transverse maps, which is validation-internal: the comparison tiers require transcription-level transport and select it through wrapper lattices, so no production lattice writes it. The three mix freely in one line. See [](fel-physics.md#sec-unaveraged).
 
 (attr-fel-steps-per-period)=
-**`fel_steps_per_period`** defaults to 20 when unset. Below 10 is refused by name, which is MINERVA's floor.
+**`fel_steps_per_period`** defaults to 20 when unset. Below 10 is refused by name, the floor our own coupling-factor convergence supports: [](validation.md) tabulates it at 10, 20 and 30 steps per period.
 
 (attr-fel-ramp-periods)=
 **`fel_ramp_periods`** defaults to 2 when unset. A true hard edge is a test configuration, and it has an explicit sentinel of `-1`, so silence never means hard edge. A ramp pair longer than the segment is refused by name.

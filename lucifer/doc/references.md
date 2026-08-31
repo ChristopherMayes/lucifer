@@ -22,17 +22,19 @@ machinery, the beam I/O and the units and phase-space conventions are Bmad's.
 D. Sagan, *Bmad: A relativistic charged particle simulation library*, Nucl. Instr. and
 Meth. A **558** (2006) 356.
 
-**MINERVA**, H. P. Freund and P. J. M. van der Slot. The production existence proof for
-unaveraged FEL dynamics, and the source of the substeps-per-period envelope the
-unaveraged mode is sized against. Lucifer differs by keeping the grid field and the
-Lorentz force where MINERVA evaluates modal fields. See
-[](fel-physics.md#sec-unaveraged).
+**MINERVA**, H. P. Freund and P. J. M. van der Slot. The published existence proof that
+unaveraged FEL dynamics is practical for production, and the published source of the
+substeps-per-period envelope this mode's own convergence measurement is read against.
+Lucifer differs by keeping the grid field and the Lorentz force where MINERVA evaluates
+modal fields. Only the published work informed this port: MINERVA's source was not
+read, and no run of it was compared against. See [](fel-physics.md#sec-unaveraged).
 
 **SIMPLEX**, T. Tanaka. Its source is unlicensed and unread. The coherent source is
 implemented from the published paper alone, not from that code.
 
-**Puffin** and **openPMD-beamphysics** are read-only references in this project's
-working tree, used for conventions and for file conversion respectively.
+**openPMD-beamphysics** is a library this code calls: the harness converts the Genesis4
+reference dumps through it, and the wavefront round trip goes through its own openPMD
+I/O in both directions.
 
 ## Papers the code implements
 

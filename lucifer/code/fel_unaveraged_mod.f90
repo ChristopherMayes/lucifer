@@ -9,8 +9,8 @@
 ! pays, polarization-agnostic coupling and arbitrary harmonic content. The mode is
 ! also the referee for the averaged path, since the coupling factor fc, the harmonic
 ! content and the entry/exit behavior of the averaged mode become measured outputs
-! here instead of assumed inputs. MINERVA (Freund and van der Slot) is the production
-! existence proof for this physics. This mode differs by keeping the grid field and
+! here instead of assumed inputs. MINERVA (Freund and van der Slot) is the published
+! existence proof for this physics, and only its published work was used here. This mode differs by keeping the grid field and
 ! the Lorentz force where MINERVA evaluates modal fields. The cost is priced in
 ! fel-physics.md and measured in examples/saturation_demo.
 !
@@ -54,7 +54,7 @@
 ! intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 !
 ! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables,
-! chosen on merit, not because MINERVA uses it: the currency here is short-probe
+! chosen on merit: the currency here is short-probe
 ! accuracy, and 4th order is what makes fc measurable at 6e-4 with 20
 ! steps/period (a 2nd-order symplectic scheme needs ~100 steps/period to match, and
 ! no explicit symplectic method exists for this non-separable Hamiltonian without
@@ -104,7 +104,8 @@ contains
 ! Subroutine fel_unavg_setup (und, ustate, l, dz_record, steps_per_period, ramp_periods, err_flag)
 !
 ! Routine to size one segment's unaveraged state: substeps per record step from the
-! requested steps per period (MINERVA's envelope: 10 floor, 20-30 recommended), ramps
+! requested steps per period (10 is the floor our own fc convergence supports, 20 the
+! default), ramps
 ! from the requested periods. Refuses a ramp pair longer than the segment and a record
 ! step that does not hold an integer substep count.
 !
@@ -146,7 +147,7 @@ if (2 * ustate%l_ramp > l) then
 endif
 
 if (steps_per_period < 10) then
-  call out_io (s_error$, r_name, 'fel_steps_per_period BELOW MINERVA''S FLOOR OF 10: \i0\ ', &
+  call out_io (s_error$, r_name, 'fel_steps_per_period BELOW THE CONVERGENCE FLOOR OF 10: \i0\ ', &
                                  i_array = [steps_per_period])
   return
 endif

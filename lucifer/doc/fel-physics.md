@@ -766,7 +766,7 @@ This mode (`fel_unaveraged_mod`, selected per element by the lattice attribute
 `fel_tracking = 1`, [](#sec-element)) integrates the
 particles through the undulator's *real* field with the radiation as a
 co-evolving kick. There is no period averaging and no resonance approximation. It
-keeps the grid field and the Lorentz force where MINERVA (the production existence
+keeps the grid field and the Lorentz force where MINERVA (the published existence
 proof of this physics) uses modal fields. The cost is $\sim$30$\times$ per step,
 priced and not hidden. What it buys is physics the averaged map cannot reach: the
 full quiver dynamics, the energy accounting the beam actually pays, coupling that is
@@ -791,8 +791,9 @@ from the averaged coupling path may
 appear in it (a harness grep enforces this). The mode measures its agreement with
 Eq. [](#eq-fc), and does *not* take it as an input.
 
-*The step.* Per substep $\delta$ ($\lambda_u/20$ by default, against MINERVA's
-envelope of 10--30 per period), a Strang split: half magnetic push, radiation kick and source
+*The step.* Per substep $\delta$ ($\lambda_u/20$ by default, with a floor of 10 that
+this mode's own convergence measurement supports and the published 10 to 30 envelope
+corroborates), a Strang split: half magnetic push, radiation kick and source
 deposit at the midpoint, half magnetic push, then the shared pure diffraction
 (Eq. [](#eq-k2)) and the $+2\cdot$source convention of [](#sec-field). The
 magnetic push is classical RK4 on the exact $z$-ODEs in kinetic variables
@@ -933,13 +934,13 @@ cancels every harmonic below `beamlet_size` ([](#sec-quiet)). A quadrature load
 
 :::{admonition} Provenance
 :class: note
-Brief 6.6 (the mode's charter, the Strang split, the handoff hazard and its
-convention flag); MINERVA 2.0 (Freund and van der Slot), the production
-existence proof: the 10--30 steps/period envelope, the energy-ledger practice, the
-$\sin^2$ ramp treatment, kinematic phase everywhere. MINERVA's standing here is a
-statistical $\sim$$10^{-3}$-class reference only, never a bit check: truncated
-constants (emass to six digits, awfac), Runge-Kutta-Gill. No MINERVA code was
-transcribed, and MINERVA precedent decided nothing here on its own. The magnetic
+The Strang split, the handoff hazard and its convention flag are this port's own.
+MINERVA (Freund and van der Slot) is the published existence proof that unaveraged
+FEL simulation is practical, and the published practices this mode shares with it
+are the 10 to 30 steps per period envelope, the energy ledger, the $\sin^2$ ramp
+treatment and kinematic phase everywhere. Only the published work was used: MINERVA's
+source was not read, no MINERVA code was transcribed, and no run of it was compared
+against. MINERVA precedent decided nothing here on its own. The magnetic
 push is explicit RK4 on merit: fourth order is what makes $f_c$ measurable at
 $6\times10^{-4}$ with 20 steps/period (second-order symplectic needs $\sim$100 to
 match), and the non-symplecticity is priced by measurement: $\gamma$ exact,

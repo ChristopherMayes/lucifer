@@ -29,7 +29,7 @@ the averaged mode's inputs (the coupling factor fc).
    quiet at h = 3 because the beamlet quiet start cancels every harmonic below nbins
    (beamlet_size = 8 here) -- the recorded reason a quadrature load is not needed for this.
 
-5. Convergence: fc at 10/20/30 steps per period, tabulated (MINERVA's envelope).
+5. Convergence: fc at 10/20/30 steps per period, tabulated. This is what the floor of 10 rests on.
 
 6. Gain curve: the benchmark single segment, seeded steady state, unaveraged vs
    averaged from the same generated start. The exit ln power ratio prices the
@@ -303,7 +303,7 @@ def main():
         check(f"fc measured vs closed form, {pol} (h={h}): |ratio-1|  [{fm:.5f} vs {fx:.5f}]",
               abs(fm / fx - 1), 5e-3)
 
-    # 5. Convergence over MINERVA's envelope (planar pair at 10/20/30 steps/period).
+    # 5. Convergence at 10/20/30 steps/period (planar pair), which the floor rests on.
     print("--- step-size convergence (planar fc, steps/period):")
     fcs = {}
     for spp in (10, 30):

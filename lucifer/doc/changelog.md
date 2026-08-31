@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-31 Changed: The documentation cites published work rather than code this port
+  never used. MINERVA's papers informed the unaveraged mode, its source was not read, and
+  no run of it was compared against, so the claim that it served as a statistical
+  reference is gone along with a parenthetical naming one of its source variables. The
+  ten-substep floor rests on this tree's own coupling-factor convergence, measured at ten,
+  twenty and thirty steps per period, and both refusal texts say so. Puffin is removed: it
+  was named once and nothing here traces to it. openPMD-beamphysics is described as what
+  it is, a library this code calls.
+
 - 2026-08-31 Fixed: three datasets under `params/resample` were still written as `npart`,
   `nslice` and `slicewidth`. The rename had changed the Fortran accessors but not the
   strings naming the datasets, so a stats file read back in the old vocabulary. The

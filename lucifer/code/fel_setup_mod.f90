@@ -302,7 +302,7 @@ do je = 1, branch%n_ele_track
   fel_spp(je) = nint(rv)
   if (fel_spp(je) == 0) fel_spp(je) = 20
   if (fel_spp(je) < 10) then
-    call out_io (s_error$, r_name, 'FEL_STEPS_PER_PERIOD IS BELOW THE FLOOR OF 10 (MINERVA''S ENVELOPE),', &
+    call out_io (s_error$, r_name, 'FEL_STEPS_PER_PERIOD IS BELOW THE CONVERGENCE FLOOR OF 10,', &
                  'AT ELEMENT: ' // trim(w%name))
     err_flag = .true.;  return
   endif
