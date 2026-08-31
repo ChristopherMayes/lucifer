@@ -7,7 +7,7 @@
 ! slippage).
 ! The physics is transcribed from Genesis 1.3 Version 4, which GPL permits. Physics,
 ! Genesis provenance (routine by routine), and validation: lucifer/doc/fel-physics.md
-! (sec:core, sec:transverse, sec:field, sec:slippage).
+! (sec-core, sec-transverse, sec-field, sec-slippage).
 !
 ! The step composition (transverse half step, longitudinal advance, transverse half
 ! step, field step, slippage) is Beam::track plus Gencore's steps 4 and 5.
@@ -22,7 +22,7 @@
 ! behind the bunch. The caller owns the schedule (what slips when, including the drift
 ! autophasing of Lattice::calcSlippage). This module owns the mechanics. Anything
 ! reading the field record in time order (dumps, per-slice field diagnostics) must
-! unrotate through fel_field_index, exactly as Genesis's writers do (sec:slippage).
+! unrotate through fel_field_index, exactly as Genesis's writers do (sec-slippage).
 !
 ! Coordinates. The stored state is Bmad's (x, px/p0, y, py/p0, z, pz) plus weight (see
 ! fel_beam_mod). The longitudinal RK4 runs in Genesis's chart (theta, gamma) as
@@ -55,7 +55,7 @@
 ! differs from Genesis's truncated 376.73 by 8e-7 relative, the accepted floor of the
 ! Genesis comparison.
 !
-! Deliberately absent, per the deliverable: space charge, wakes, incoherent synchrotron
+! Deliberately absent from this module: space charge, wakes, incoherent synchrotron
 ! radiation, harmonics beyond the coupling formula, the source filter, orbit or field
 ! errors, one4one sorting and slice migration, and the periodic time-window boundary
 ! (Genesis's periodic option: the non-periodic zero fill is what is transcribed).
@@ -90,7 +90,7 @@ type fel_und_struct
   real(rp) :: cos_t = 1, sin_t = 0   !   e = (cos_t, sin_t). Cached for the maps.
   complex(rp) :: pol(2) = [(1.0_rp, 0.0_rp), (0.0_rp, 0.0_rp)]
                               ! Polarization 2-vector on the (Ex, Ey) pair (manual
-                              ! sec:field vector convention): planar (cos t, sin t),
+                              ! sec-field vector convention): planar (cos t, sin t),
                               ! helical (1, -i)/sqrt(2). The averaged kick reads
                               ! E_eff = conj(pol).E and the deposit writes pol*src.
                               ! This reproduces the scalar path exactly when only
@@ -444,7 +444,7 @@ end function fel_field_index
 !
 ! Routine to account the slippage of one step and rotate the field record when it
 ! crosses a slice boundary. Transcribed from Control::applySlippage (fel-physics.md
-! sec:slippage) reduced to one shared-memory node. The MPI ring exchange between
+! sec-slippage) reduced to one shared-memory node. The MPI ring exchange between
 ! adjacent ranks is the identity when the ring has one member. This node is
 ! simultaneously rank 0 and rank size-1, so the non-periodic zero fill always applies
 ! to the transmitted slice. What remains is Genesis's exact bookkeeping: accumulate in
@@ -502,7 +502,7 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   slip%accuslip = slip%accuslip - slip%sample * direction
 
   ! The transmitted slice: the last of the record in time order for forward slippage,
-  ! the first for backward, 0-based here as in Genesis (sec:slippage).
+  ! the first for backward, 0-based here as in Genesis (sec-slippage).
 
   last = mod(slip%first + nslice - 1, nslice)
   if (direction < 0) last = mod(last + 1, nslice)
@@ -1345,7 +1345,7 @@ end subroutine fel_apply_focus
 ! space-charge ez held fixed through the stages. The harmonic phases h*theta are live
 ! per stage (fel_ode_multi). ez per particle is
 ! fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
-! ez = getEField(ip) + eloss (fel-physics.md sec-eom, sec:spacecharge). is is this
+! ez = getEField(ip) + eloss (fel-physics.md sec-eom, sec-spacecharge). is is this
 ! slice's beam index.
 !
 ! (theta, gamma) are derived at entry from the stored (z, pz) and written back at exit
@@ -1445,7 +1445,7 @@ if (nf == 1) then
       cpart = cpart + wf%Ex(ix+1, iy+1, ifld) * (1-wx) * (1-wy)
 
       ! Two live polarizations: the element couples to E_eff = conj(pol).E (manual
-      ! sec:field). With one polarization pol = (1,0) and this branch never runs, so
+      ! sec-field). With one polarization pol = (1,0) and this branch never runs, so
       ! single-polarization arithmetic is untouched.
 
       if (allocated(wf%Ey)) then
@@ -1460,7 +1460,7 @@ if (nf == 1) then
       rpart = 0
     endif
 
-    ez_ip = ez(ip) + esc_loss     ! Short range plus the long-range loss (sec:spacecharge).
+    ez_ip = ez(ip) + esc_loss     ! Short range plus the long-range loss (sec-spacecharge).
     call fel_runge_kutta (delz, xks, xku, btpar, rpart, ez_ip, gamma, theta)
 
     ! Back to the stored chart: pz from gamma (the subtraction is exact once p_mc is
@@ -2334,7 +2334,7 @@ end function fel_kernel_index
 ! Pure free-space diffraction of field slice ifld over the step dz: FFT, multiply
 ! the cached exp(K2 dz), inverse FFT, normalize. No source, no coupling factor, no
 ! undulator knowledge: this is the field half the unaveraged mode (fel-physics.md
-! sec:unaveraged) shares with the averaged solver. The caller deposits its own source.
+! sec-unaveraged) shares with the averaged solver. The caller deposits its own source.
 ! The kernel cache must have been initialized serially (fel_field_kernel_init) for
 ! this grid, wavelength and step. A mismatch errors, exactly as fel_field_step.
 !

@@ -216,7 +216,7 @@ end function fel_unavg_envelope
 ! (aw rms; peak = rms*sqrt(2) planar, = rms helical). The curl retains the g' ramp
 ! terms. The transverse profiles are the near-axis models whose ponderomotive-average
 ! focusing reproduces the averaged mode's natural-focusing split exactly (planar
-! kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec:unaveraged.
+! kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec-unaveraged.
 !
 ! Input:
 !   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
@@ -444,7 +444,7 @@ do is = 1, nslice
         ! Two live polarizations: COMPONENT-WISE duals. The instantaneous kinetic
         ! momenta u_x, u_y are real numbers, each working against and depositing into
         ! its own field component. No polarization convention enters at all (manual
-        ! sec:field vector convention). The scalar branch below keeps the folded
+        ! sec-field vector convention). The scalar branch below keeps the folded
         ! ĵ-convention verbatim for single-polarization lines.
 
         ehat =        wf%Ex(ix,   iy,   ifld) * wx * wy
@@ -488,7 +488,7 @@ do is = 1, nslice
         ! per-substep energy exchange cancel identically (the diffraction between
         ! substeps is unitary), leaving only physical spontaneous emission in the
         ! ledger. The period-averaged limit shifts by beta_par ~ 5e-9 -- five orders
-        ! below the fc checks. A merit choice, not a transcription (sec:unaveraged).
+        ! below the fc checks. A merit choice, not a transcription (sec-unaveraged).
         cdep = cmplx(0.0_rp, 1.0_rp, rp) * exp(cmplx(0.0_rp, -(psi_mid - ks*tau(ip)), rp)) &
                * jhat * scl_u * sl%weight(ip) / u_s
         crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cdep

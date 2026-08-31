@@ -76,8 +76,8 @@ variable, because `s` repeats wherever two records land on one plane, which is w
 zero-length element applying a wake kick does, and a selection on a repeating index
 answers silently wrong. It is `s`, Bmad's name for position along the lattice, and `z` is
 left to mean the phase-space coordinate. **One record axis**: an element end is always
-a record, so `at_element_end` is a boolean mask where a duplicated copy of every
-element-end quantity used to be. That mask is information only the writer has, and no
+a record, so `at_element_end` is a boolean mask rather than a duplicated copy of every
+element-end quantity. That mask is information only the writer has, and no
 reader can recover afterwards which record was the end. **Every axis has a coordinate**,
 label axes included, and things that must not be confused are named apart: a square
 matrix's two sides (`bmad`, `bmad_col`) so that selecting one entry needs no rule, and
@@ -164,12 +164,12 @@ diag.txt is untouched (the Genesis4-comparison instrument): every benchmark tier
 reproduces bit for bit, including through the diag/stats fusion: the per-record
 stats loop also evaluates the diag instrument (the identical fel_field_diag and
 fel_slice_diag calls per slice, so each slice's arithmetic is unchanged), and the
-diag writer only prints. That retired the formerly serial per-record diag sweeps
+diag writer only prints. That removed the serial per-record diag sweeps
 (all 96 field planes and 96 particle slices, every record), which were worth more
 than the whole stats machinery costs: measured on the saturation demo's averaged run
 (96 slices x 2048 particles, 255^2 grid, 12 threads), the pre-stats baseline was
-36.5 s and the run with full statistics is ~32 s. The diagnostics deliverable made
-the tracker 12% faster, net. Per-slice element-end twiss is evaluated through Bmad's
+36.5 s and the run with full statistics is ~32 s. The diagnostics work made the tracker
+12% faster, net. Per-slice element-end twiss is evaluated through Bmad's
 own calc_emittances_and_twiss_from_sigma_matrix fed from the already-computed
 per-record moments (an element end always coincides with its last record), not by
 re-summing particles.

@@ -176,7 +176,7 @@ contains
 ! Subroutine generate_initial_state ()
 !
 ! Routine to generate the quiet-start beam from the beam_init description (manual
-! sec:loading): matched Gaussian transverse planes on the lattice Twiss, beamlets on a
+! sec-loading): matched Gaussian transverse planes on the lattice Twiss, beamlets on a
 ! uniform ponderomotive phase grid, the derived per-slice current, and optional Fawley
 ! shot noise.
 !-
@@ -243,7 +243,7 @@ if (seed_power > 0 .and. seed_waist_size <= 0) then
 endif
 
 ! The window and the per-slice current derive from the beam_init description (manual
-! sec:loading): one bulk bunch, evaluated analytically at the slice centers. The
+! sec-loading): one bulk bunch, evaluated analytically at the slice centers. The
 ! default window covers the described bunch (as the import derives its window from
 ! real particles). window_length overrides it for slippage headroom and warns when it
 ! clips the bunch. sig_z = 0 is the steady state (the whole charge in one slice

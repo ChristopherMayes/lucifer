@@ -877,8 +877,8 @@ mode-independent.
 
 *Spontaneous emission.* The classical rate is
 $d\gamma/ds = \tfrac23 r_e \gamma^2 k_u^2 a_w^2$ ($a_w$ rms, both polarizations). Bmad's
-own `radiation_damping` through the same wiggler reproduces it to $10^{-4}$, and
-it is the coefficient in Genesis4's `Incoherent.cpp`. The two FEL modes stand in
+own `radiation_damping` through the same wiggler reproduces it to $10^{-4}$, and it
+is the coefficient Genesis4 uses. The two FEL modes stand in
 very different relations to it. The averaged (KMR) mode *emits* the radiation but
 never debits the beam: its step adds $2S$ to the field while particles are kicked by
 $E$, so the $4|S|^2$ part of the field energy is created (measured on a dark segment:
@@ -901,8 +901,8 @@ lands on the analytic rate at $9\times10^{-4}$, and the unaveraged mode on the
 ramp+capture composite $(1 - \tfrac{5}{4}l_{\mathrm{ramp}}/L) + f_{\mathrm{cap}}$
 at $2\times10^{-6}$ (its grid-captured self-field work adds to the explicit term).
 Fluctuations apply the standard quantum-diffusion variance
-$1.015\times10^{-27} k_u^3 a_w^2 F(a_w)\gamma_0^4$ per meter (Genesis4's
-`Incoherent.cpp` fits of the Saldin form), one draw per
+$1.015\times10^{-27} k_u^3 a_w^2 F(a_w)\gamma_0^4$ per meter (Genesis4's fits of the
+Saldin form, see [](references.md)), one draw per
 beamlet exactly as Genesis4 (independent per-particle kicks would break the quiet
 start's per-beamlet cancellation), drawn serially in fixed slice order so thread
 count stays invisible. Genesis4 reaches the same variance with uniform$\times\sqrt3$
@@ -978,15 +978,14 @@ phase, the `phi0` advance and the slippage schedule are all defined against it.
 A harmonic field $h$ carries wavelength $\lambda_1/h$ and enters the physics in
 exactly three places: its coupling $f_c(h)$ (the Bessel factor of
 [](#sec-coupling), zero for every harmonic of a helical device), the harmonic
-ponderomotive phase $h\theta$ -- live per Runge--Kutta stage in the kick
-(`BeamSolver::ODE`'s $\sum_i r_i e^{-ih_i\theta}$) and scaling the deposit
-phase (`FieldSolver.cpp`'s $\theta_h = h\,\theta$) -- and its own diffraction
+ponderomotive phase $h\theta$ -- live per Runge--Kutta stage in the kick and scale
+the deposit phase -- and its own diffraction
 kernel and escape accounting at $\lambda_1/h$. In the V/m field
 convention no other factor appears: Genesis4's per-field $k_{s,h}$ factors in kick
 and deposit are exactly its per-field internal unit conversion, which this
 formulation absorbed once ([](#sec-units)). Every field shares the time window,
 so all slippage states advance in fundamental-wavelength units and the records
-rotate in lockstep (one `Control::sample`). Harmonic fields start dark and
+rotate in lockstep on one slippage sample. Harmonic fields start dark and
 grow from the bunching the beam carries, or import. A single-entry set is the
 pre-harmonic walk, bit for bit: the same overlay discipline as
 [](#sec-vector). The two are not yet validated together: harmonic fields
@@ -1002,6 +1001,14 @@ $P_3/P_1$ the exact deposit sum (Bessel $f_c$, $h\theta$, bilinear weights, from
 the dumped particles) reproduces at $3.3\times10^{-16}$. Thread byte-identity on a
 time-dependent harmonic run. Refusals by name. `examples/harmonics/` is the
 runnable instance.
+
+:::{admonition} Provenance
+:class: note
+The harmonic convention is Genesis4's: the harmonic ponderomotive phase enters the
+kick per Runge-Kutta stage (`BeamSolver::ODE`, its $\sum_i r_i e^{-ih_i\theta}$) and
+scales the deposit phase (`FieldSolver.cpp`, its $\theta_h = h\,\theta$), and every
+harmonic record rotates on the fundamental's slippage sample (`Control::sample`).
+:::
 
 (sec-openpmd)=
 ### The openPMD wavefront
@@ -1151,7 +1158,7 @@ the reader to assume the set agrees.
 `diag.txt` instrument, the identical `fel_field_diag` and
 `fel_slice_diag` calls per slice, so each slice's arithmetic is unchanged and
 the diag writer only prints. Every benchmark tier reproduces `diag.txt` bit for
-bit. That retired the formerly serial per-record diag sweeps, which cost more than the
+bit. That removed the serial per-record diag sweeps, which cost more than the
 whole statistics machinery does, and the measured saving is recorded in
 `doc/reading-output.md`.
 
@@ -1254,8 +1261,7 @@ contract. Genesis4 records user and cwd unconditionally. Parity is not a reason 
 *Two-pass variance.* All second moments subtract the mean before squaring: for
 $\gamma \sim 10^4$ with $\sigma \sim 10^{-3}$ the one-pass
 $\langle v^2\rangle - \langle v\rangle^2$ form loses the entire $\sigma$ to
-cancellation (hidden for five deliverables until a uniform wake kick first moved the
-mean).
+cancellation, which stayed hidden until a uniform wake kick first moved the mean.
 
 *Constants floors.* Comparisons against Genesis4 bottom out at the mismatch of
 its truncated constants, per term: $Z_0 = 376.73$ ($8.3\times10^{-7}$, the FEL core

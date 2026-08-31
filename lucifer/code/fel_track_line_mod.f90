@@ -449,7 +449,7 @@ do ie = run%i_start, run%i_end
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
     call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err)
-    if (absolute_time_tracking(ele)) then      ! Absolute-time phasing (sec:phasing).
+    if (absolute_time_tracking(ele)) then      ! Absolute-time phasing (sec-phasing).
       fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$)
     endif
     if (associated(wake_src)) then
@@ -629,7 +629,7 @@ end subroutine whole_beam_phasor
 !
 ! Routine to write one diag row per slice, slices in time-window order: beam slice is
 ! against field slice fel_field_index(slip, is, nslice), the unrotation of manual
-! sec:slippage. The values are the ones the stats loop just evaluated with the SAME
+! sec-slippage. The values are the ones the stats loop just evaluated with the SAME
 ! fel_field_diag and fel_slice_diag calls, slice-parallel (each slice's arithmetic
 ! identical to the old serial sweep, so this file is bit-for-bit what it always was).
 ! This routine only prints. take_stats_record must have run for this record first.

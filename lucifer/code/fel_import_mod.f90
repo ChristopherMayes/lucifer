@@ -6,13 +6,13 @@
 ! the FEL step wants, by Genesis 1.3 v4's own method, transcribed from SDDSBeam.cpp
 ! (the class name is historical: it reads plain HDF5).
 ! Method, Genesis provenance, and validation: lucifer/doc/fel-physics.md
-! (sec:import). The only weighted generalization: the slice current is c*sum(w)/dslen
+! (sec-import). The only weighted generalization: the slice current is c*sum(w)/dslen
 ! where Genesis counts particles (identical for uniform weights).
 !
 ! Longitudinal mapping: a bunch particle's window position is the port's own
 ! tau = -z/beta = c*(t - t_ref), min-shifted to zero exactly as Genesis min-shifts its
 ! file's s = -c*t, so both codes bin the identical particle set identically when the
-! distribution file is written with t = -tau/c (sec:import).
+! distribution file is written with t = -tau/c (sec-import).
 !
 ! Genesis's match/center transforms are NOT ported, by decision: they exist because
 ! Genesis lattices carry no optics, so an imported bunch must be rematched by hand. A
@@ -24,7 +24,7 @@
 ! deliberately: coincident split-weight copies leave every moment bit-identical, which
 ! the invariance check relies on.
 !
-! Genesis quirks found by reading and NOT transcribed as functional (sec:import): the
+! Genesis quirks found by reading and NOT transcribed as functional (sec-import): the
 ! align/align_start/align_end parameters are parsed but never used in v4. The
 ! shotnoise flag is read but never consulted: the import applies noise
 ! unconditionally, skipping only zero-current slices. Both behaviors are kept as
@@ -162,7 +162,7 @@ if (sum(wt) <= 0) then
   return
 endif
 
-smin = minval(s);  s = s - smin                    ! Genesis's min shift (sec:import).
+smin = minval(s);  s = s - smin                    ! Genesis's min shift (sec-import).
 ttotal = maxval(s)
 if (ttotal <= 0) then
   call out_io (s_error$, r_name, 'BUNCH HAS ZERO LENGTH; NOTHING TO SLICE.')
@@ -170,7 +170,7 @@ if (ttotal <= 0) then
 endif
 
 nslice = prm%nslice
-if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! Genesis's rule (sec:import).
+if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! Genesis's rule (sec-import).
 
 ! The bunch moments, in Genesis's analyse form (unweighted, strict window bounds:
 ! the two extreme particles are excluded, exactly as Genesis's eval defaults do).
@@ -304,7 +304,7 @@ real(rp) g1, x1, y1, px1, py1, g2, x2, y2, px2, py2, scl, rmin, r, tmp, uu
 real(rp) gam_p, beta_p
 integer nd, nd0, k, j, n1, n2, i1, i2
 
-! addParticles (sec:import): empty -> one filler at the reference energy.
+! addParticles (sec-import): empty -> one filler at the reference energy.
 ! Singleton -> mirror it. Then interpolate up to mpart.
 
 nd = ncand
@@ -375,7 +375,7 @@ if (nd < mpart) then
   cpy(1:nd) = cpy(1:nd)/py2 + py1
 endif
 
-! theta refilled completely new over one beamlet spacing (sec:import), then the
+! theta refilled completely new over one beamlet spacing (sec-import), then the
 ! beamlet mirroring: seed i lands at nbins consecutive indices.
 
 do k = 1, mpart

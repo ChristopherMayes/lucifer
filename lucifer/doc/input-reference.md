@@ -17,7 +17,7 @@ wavefront_drift, with one advance of the reference phase phi0 per element.
 Time dependence follows from the starting state alone: a multi-slice window makes a
 time-dependent run (slippage active), a single slice the steady state, no separate
 switch (the same rule as Genesis4). The slippage schedule is precomputed over the
-lattice, transcribing Lattice::calcSlippage (manual: the slippage section, including the
+lattice, transcribed from Genesis4 (manual: the slippage section, including the
 drift autophasing and its unguarded end-of-lattice fixup), and applied after each
 step's field solve, before its diagnostics -- Gencore's step order. The field record
 rotates rather than moves. Everything reading it in time order goes through
@@ -38,8 +38,8 @@ and the wake%/sc% collective descriptions. &fel_beam_init carries the beam:
 Bmad's beam_init%... description, the imp%... resampler, source/output files and the
 beam-side check knobs. &fel_wavefront_init carries the radiation: the
 wavefront_init%... starting condition (the beam_init analog: the field record IS
-the time window, so the window lives here) and field_file imports. The retired flat
-&fel_track_params group is refused by name, each parameter mapped to its new home.
+the time window, so the window lives here) and field_file imports. A flat &fel_track_params group is refused by name, with each parameter mapped to the
+group that now carries it.
 
 ```
   &fel_params

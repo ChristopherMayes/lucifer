@@ -9,6 +9,23 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-30 Added: The measured levels and the API reference are generated. The benchmark
+  writes a results file under `--results`, `tests/scripts/report_validation.py` turns the
+  debug and production results into `doc/generated/validation-measured.md`, and
+  `validation.md` includes it in place of a hand-maintained tier table.
+  `tests/scripts/report_api.py` reads the 217 `!+ ... !-` headers the source already
+  carries, the convention `util/getf` reads, into `doc/generated/api.md`. Both are
+  deterministic, so the keystone regenerates them and requires an empty diff: a moved
+  digit is now a failing command.
+
+- 2026-08-30 Changed: Development history leaves the user documentation. The user guide's
+  units paragraph stated the convention and the comparison floor instead of narrating how
+  the code got there, and "retired", "formerly" and "used to be" go with it. The mutation
+  records in `validation.md` stay: what was broken deliberately and how loudly a check
+  noticed is evidence about the check. Incidental Genesis4 source references leave the
+  user guide and the input reference, and the manual's move into its Provenance notes.
+  Every provenance citation is kept.
+
 - 2026-08-30 Added: `genesis4.md`, one page for everything about Genesis 1.3 Version 4
   (Genesis4). Shared physics, what each code has that the other does not, a settings
   translation table, the conventions that differ, and file exchange. It pins the Genesis4

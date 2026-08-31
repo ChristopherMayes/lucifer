@@ -37,6 +37,8 @@
 #   --python <path>     Python interpreter. Default: the bmad-fel-validate conda env.
 #   --work-dir <path>   Where to run. Default: a temporary directory (kept on failure).
 #   --beamphysics <p>   openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
+#   --results <path>    Write a machine-readable results file (tiers, check sections,
+#                       build flavor) for doc generation. Default: none written.
 #
 # Exit status is zero only if every tier passes its tolerance.
 
@@ -50,6 +52,7 @@ EXE=""
 PYTHON=""
 WORK_DIR=""
 BEAMPHYSICS=""
+RESULTS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -58,6 +61,7 @@ while [[ $# -gt 0 ]]; do
     --python)   PYTHON="$2";   shift 2 ;;
     --work-dir) WORK_DIR="$2"; shift 2 ;;
     --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
+    --results)  RESULTS="$2";  shift 2 ;;
     -h|--help)  sed -n '2,41p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -128,6 +132,19 @@ echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"
 echo
 
+# The results file is for doc generation, so it records what is reproducible: which
+# build flavor ran, which sections passed, and each tier's level. No timing, no path,
+# no host: those would make the generated documentation differ between runs.
+if [[ -n "$RESULTS" ]]; then
+  case "$EXE" in
+    */debug/bin/*)      BUILD_FLAVOR=debug ;;
+    */production/bin/*) BUILD_FLAVOR=production ;;
+    *)                  BUILD_FLAVOR=unknown ;;
+  esac
+  : > "$RESULTS"
+  echo "build|$BUILD_FLAVOR" >> "$RESULTS"
+fi
+
 # Inputs are grouped by consumer and configuration (genesis4/<config>/*.in with the
 # shared .lat files one level up, bmad/*.bmad). The run itself is flat in WORK_DIR, so
 # the decks' internal lattice= references need no paths.
@@ -147,6 +164,9 @@ BENCH_T_LAST=$SECONDS
 section_time () {   # <label>
   echo "  [time: $1 $((SECONDS - BENCH_T_LAST)) s]"
   BENCH_T_LAST=$SECONDS
+  # Reaching here means the section passed: every failure exits before it. The timing
+  # is machine dependent and deliberately not recorded.
+  if [[ -n "$RESULTS" ]]; then echo "section|$1|pass" >> "$RESULTS"; fi
 }
 
 # The Genesis reference runs form three independent chains -- [ss -> 1seg],
@@ -416,7 +436,7 @@ echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dat
 section_time thread-independence
 echo
 
-# Shot-noise checks (deliverable 6). The statistical check is self-referenced
+# Shot-noise checks. The statistical check is self-referenced
 # (no cross-code reference exists: Genesis cannot represent weighted noise). The SASE startup cross-check pits the
 # two codes' fully independent loaders and RNGs against each other at the level the
 # noise sets, the startup power.
@@ -437,9 +457,9 @@ fi
 section_time sase-startup
 echo
 
-# Seam-wake checks (deliverable 11): element sr wakes across the whole window --
+# Seam-wake checks: element sr wakes across the whole window --
 # closed-form pseudomode ramp, exact causality with the d8 direction cross-check, the
-# z_long kernel cross-validation against the deliverable-8 wake model (first-principles
+# z_long kernel cross-validation against the wake model (first-principles
 # tight, resolved-beam at the derived boundary bound), split-weight invariance and
 # thread determinism. Self-referenced. Needs no Genesis.
 
@@ -451,7 +471,7 @@ fi
 section_time seam-wake
 echo
 
-# Distribution-import checks (deliverable 10): the bunch_struct resampler transcribed
+# Distribution-import checks: the bunch_struct resampler transcribed
 # from Genesis's SDDSBeam.cpp -- exact where no RNG enters (the per-slice current
 # profile against Genesis importing the SAME distribution file, the match transform
 # hitting its Twiss targets, split-weight invariance, thread determinism), statistical
@@ -465,7 +485,7 @@ fi
 section_time import
 echo
 
-# Slice-migration checks (deliverable 7): conservation under heavy migration, exact
+# Slice-migration checks: conservation under heavy migration, exact
 # phase continuity of the moves, and no-op bit identity (self-referenced
 # -- Genesis migrates only under one4one).
 
@@ -477,7 +497,7 @@ fi
 section_time migration
 echo
 
-# Collective-effects self-referenced checks (deliverable 8): exact energy bookkeeping of
+# Collective-effects self-referenced checks: exact energy bookkeeping of
 # the wake's eloss on a cold dark beam, and the stale-wake structural check (the
 # convolution must follow the currents under migration).
 
@@ -489,7 +509,7 @@ fi
 section_time collective
 echo
 
-# Unaveraged-mode checks (deliverable 13, fel-physics.md sec-unaveraged): the energy
+# Unaveraged-mode checks (fel-physics.md sec-unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
 # comparison against the averaged mode. The fc/faw leak grep is part of the check: the
@@ -573,7 +593,9 @@ fi
 section_time diagnostics
 echo
 
-"$PYTHON" "$SCRIPT_DIR/scripts/compare_fel.py" "$WORK_DIR"
+COMPARE_ARGS=()
+if [[ -n "$RESULTS" ]]; then COMPARE_ARGS+=(--results "$RESULTS"); fi
+"$PYTHON" "$SCRIPT_DIR/scripts/compare_fel.py" "$WORK_DIR" "${COMPARE_ARGS[@]}"
 STATUS=$?
 section_time tier-comparison
 

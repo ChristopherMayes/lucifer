@@ -7,8 +7,8 @@ run_fel_benchmark.sh, which produces all the inputs; this script only reads and 
 Three tiers, each with its own tolerance sized to what it measures. The comparison
 floor is set by fundamental constants: the tracker uses Bmad's (Z0 = mu_0*c =
 376.7303...), Genesis carries a truncated impedance (376.73, 8.3e-7 relative), and that
-difference enters the coupling and compounds through gain. During deliverable-3
-development the tracker transcribed Genesis's constants and agreed at transcription
+difference enters the coupling and compounds through gain. Transcribing Genesis's own constants
+agreed at transcription
 level (tier1 2.8e-11, tier2_genesis 5.9e-8, recorded in doc/validation.md); after that
 validation was banked the code moved to Bmad constants by decision, and the tiers now
 measure against the constants floor.
@@ -290,6 +290,7 @@ def main():
     # (8.85e-12, 4.7e-4 relative, measured 2.4e-4). The wake tier measured 8.7e-7.
     p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
     p.add_argument("--tol-tdwk", type=float, default=1.0e-4)
+    p.add_argument("--results", help="Append tier levels here for doc generation")
     args = p.parse_args()
     w = args.workdir
 
@@ -308,7 +309,7 @@ def main():
          f"{w}/tier1-final.wf.h5", f"{w}/Aramis1seg-final.fld.h5",
          f"{w}/tier1-final.beam.h5", f"{w}/Aramis1seg-final.par.h5",
          args.tol_tier1, 1),
-        ("tier1_unavg: one segment, UNAVERAGED dynamics vs Genesis (priced model difference)",
+        ("tier1_unavg: one segment, unaveraged dynamics vs Genesis4 (priced model difference)",
          f"{w}/tier1u.diag.txt", f"{w}/Aramis1seg.out.h5",
          f"{w}/tier1u-final.wf.h5", f"{w}/Aramis1seg-final.fld.h5",
          f"{w}/tier1u-final.beam.h5", f"{w}/Aramis1seg-final.par.h5",
@@ -377,6 +378,15 @@ def main():
     print("exactly. tier2_genesis proves it: same code, Genesis's interlude model, and")
     print("the difference collapses by six orders of magnitude. See doc/validation.md.")
     print()
+    # The results file feeds doc generation. Levels are written at the same six
+    # significant figures the summary prints, so the generated table and the summary
+    # cannot disagree.
+    if args.results:
+        with open(args.results, "a") as fh:
+            for name, worst, ok in results:
+                key, _, desc = name.partition(":")
+                fh.write(f"tier|{key}|{worst:.6e}|{'pass' if ok else 'fail'}|{desc.strip()}\n")
+
     print("PASS" if all_ok else "FAIL")
     return 0 if all_ok else 1
 

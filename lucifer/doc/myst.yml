@@ -16,6 +16,7 @@ project:
         - file: BMAD-STATS-EXT-FEL.md
     - file: references.md
     - file: genesis4.md
+    - file: generated/api.md
     - file: changelog.md
 site:
   template: book-theme

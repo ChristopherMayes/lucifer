@@ -12,11 +12,26 @@ Every commit is validated before it lands, and the tiers land on their recorded 
 ```
 BUILD_PRODUCTION=N ./util/conda_compile      # debug
 ./util/conda_compile                         # production
-./lucifer/tests/run_fel_benchmark.sh                                  # ~9 min, needs genesis4
-./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer
+./lucifer/tests/run_fel_benchmark.sh --results /tmp/fel-debug.txt   # ~9 min, needs genesis4
+./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer --results /tmp/fel-prod.txt
 ./lucifer/wavefront/tests/run_validation.sh
 cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin
 ```
+
+Then regenerate the documentation that is generated, and require no diff:
+
+```
+python3 lucifer/tests/scripts/report_validation.py \
+        --debug /tmp/fel-debug.txt --production /tmp/fel-prod.txt \
+        --out lucifer/doc/generated/validation-measured.md
+python3 lucifer/tests/scripts/report_api.py \
+        --code lucifer/code --code lucifer/program --out lucifer/doc/generated/api.md
+git diff --exit-code lucifer/doc/generated/
+```
+
+The measured levels in this document are written by the harness that measured them, so
+a moved digit is a failing command rather than a discrepancy someone has to notice while
+reading.
 
 The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours.
 
@@ -25,7 +40,7 @@ Debug and production binaries are never bit-comparable to each other. Compare li
 (val-crossidentities-not-reference-files)=
 ## Cross-identities, not reference files
 
-Almost nothing here is checked against a stored expected-output file. A reference file records what the code did once. An identity records what must be true of any correct implementation, and it keeps its teeth when the code is rewritten underneath it. So the checks are conservation laws, closed forms, independent routes to the same number, invariance under a change that must not matter (thread count, weight splitting, a no-op), and refusals by name.
+Almost nothing here is checked against a stored expected-output file. A reference file records what the code did once. An identity records what must be true of any correct implementation, and it stays valid when the code is rewritten underneath it. So the checks are conservation laws, closed forms, independent routes to the same number, invariance under a change that must not matter (thread count, weight splitting, a no-op), and refusals by name.
 
 A check that has never failed on a real defect is untested, so several here carry their own mutation record: what was broken deliberately, and how loudly the check noticed. And a measurement without a stated tolerance is not a check, so every number below is paired with the level it is held at.
 
@@ -48,19 +63,24 @@ once per integration step, with each interlude element being a single step. The 
 records at the same z positions (per slice, in time-window order, for the time-dependent
 tiers). Measured, on the numbers this tree was developed against:
 
-| Tier | What runs | Largest relative difference |
-|---|---|---|
-| `tier1` | One undulator segment: the FEL core alone | **1.8e-6** (the impedance-constant floor, previously 2.8e-11 with Genesis4's constants transcribed) |
-| `tier1_unavg` | The same segment and dumps, tracked by the unaveraged mode against Genesis4's averaged run | **6.9e-2**: a priced model difference (sin² ramps vs hard edges, no averaging, integrator structure), dominated by the final-field phase. The power curve agrees at 6.1e-3 and per-particle gamma at 3.7e-6, and theta shows a constant ~6.6 rad ramp-phase offset with only 2.8e-3 rms about it |
-| `tier2_genesis` | Full 6-FODO line, interludes via the transcribed Genesis4 model | **1.8e-5** (constants floor through full gain, previously 5.9e-8) |
-| `tier2_bmad` | Full line, interludes via the Bmad seam | **5.0e-2** (power curve 1.3e-2): a measured model difference, see below |
-| `weight_split` | tier1 rerun with every particle split into coincident w/3 + 2w/3 copies, against the unsplit run | **3.6e-13** (Fortran vs Fortran, constants-independent) |
-| `td1` | One undulator segment, 32 slices: FEL core plus slippage (accumulation, threshold, rotation, zero fill, end-of-lattice autophasing) | **8.5e-7** (constants floor) |
-| `td2_genesis` | Full line time dependent, transcribed Genesis4 interludes: adds the drift autophasing schedule | **2.4e-6** (constants floor) |
-| `td2_bmad` | Full line time dependent through the Bmad seam | **4.1e-2**: the tier2_bmad transport model difference with slippage interleaved |
-| `tdsase` | Full line, pure SASE: dark start (`power = 0`), shot noise on, both codes tracking the identical noisy beam and identical zero field from shared dumps -- the deterministic startup-from-noise comparison the seeded tiers and the statistical startup check leave uncovered | **2.3e-6** (constants floor, exit total power agrees at 1.9e-6) |
-| `tdsc` | One segment TD, space charge on (short-range harmonics nz=2/nphi=1 plus long range) | **2.4e-4** (the epsilon_0-truncation floor of Genesis4's longRange, 8.85e-12) |
-| `tdwk` | One segment TD, all three wake kernels on (numerical-impedance resistive wall, gap, roughness) | **8.7e-7** (the impedance floor) |
+```{include} generated/validation-measured.md
+```
+
+What each level means, which the digits above cannot say on their own:
+
+| Tier | Attribution |
+|---|---|
+| `tier1` | The impedance-constant floor. With Genesis4's own constants transcribed it was 2.8e-11, which is what makes the floor an attribution rather than a guess |
+| `tier1_unavg` | A priced model difference (sin² ramps against hard edges, no averaging, integrator structure), dominated by the final-field phase. The power curve agrees at 6.1e-3 and per-particle gamma at 3.7e-6, and theta shows a constant ~6.6 rad ramp-phase offset with only 2.8e-3 rms about it |
+| `tier2_genesis` | The constants floor through full gain. With Genesis4's constants it was 5.9e-8 |
+| `tier2_bmad` | A measured transport model difference, located and priced below. The power curve is 1.3e-2 |
+| `weight_split` | Fortran against itself, so constants-independent |
+| `td1` | The constants floor |
+| `td2_genesis` | The constants floor |
+| `td2_bmad` | The tier2_bmad transport model difference with slippage interleaved |
+| `tdsase` | The constants floor. Exit total power agrees at 1.9e-6 |
+| `tdsc` | The epsilon_0-truncation floor of Genesis4's longRange, 8.85e-12 |
+| `tdwk` | The impedance floor |
 
 Particle ordering is preserved by both codes (no sorting happens without one4one), so the
 final dumps compare particle by particle, not just statistically, in every tier.
@@ -152,7 +172,7 @@ the `b_max` assertion is caught by the refusal check: the lattice still dies, bu
 unrelated downstream message instead of by name, which the check's grep rejects.
 
 The thread-independence check bites too: reintroducing a shared source accumulator across
-slices (the exact state of the code before deliverable 5) puts the 1-thread and 8-thread
+slices (the exact state of the code before the parallel step landed) puts the 1-thread and 8-thread
 runs apart by 7.0 relative in power, while the mutated 1-thread run is identical to the
 pristine one. That is the defining property of this bug class: invisible to every
 single-threaded check, including all seven Genesis4 tiers, and caught only by comparing
@@ -225,8 +245,8 @@ only weighted generalization made. Candidates are brought to `npart/nbins` beaml
 seeds by random deletion or by Genesis4's phase-space interpolation (normalize 5D to
 unit rms. Nearest original neighbor under a metric whose per-coordinate weights are
 fresh random draws. Child at midpoint plus uniform[-1,1] times the difference). Theta
-is refilled over one beamlet spacing, mirrored into nbins bins, and the deliverable-6
-Fawley loader imposes shot noise with `ne = round(I*lambda*sample/(e*c))`, shared
+is refilled over one beamlet spacing, mirrored into nbins bins, and the Fawley
+loader imposes shot noise with `ne = round(I*lambda*sample/(e*c))`, shared
 code (`fel_fawley_noise`), so the generator and the import stay one implementation.
 Genesis4's `match`/`center` transforms are NOT ported, by decision: they exist because
 Genesis4 lattices carry no optics, so an imported bunch must be rematched by hand. A
@@ -263,9 +283,7 @@ refilling theta over 2pi instead of 2pi/nbins, turned out to be an equivalent
 mutant: under the beamlet mirroring, a uniform seed over the full turn is uniform
 modulo one beamlet spacing, the quiet cancellation is untouched, and the checks
 correctly pass it. It is a convention, not a defect class. The
-load-bearing neighbor (the mirroring itself) is what gets mutation-tested. (A fourth
-mutation, the match transform's slope/momentum order, retired with the match
-transform itself, see below.)
+load-bearing neighbor (the mirroring itself) is what gets mutation-tested.
 
 Recorded improvement path: with per-particle weights the resampling is optional -- a
 direct weighted import (every bunch particle a macroparticle in its slice, no deletion,
@@ -353,10 +371,10 @@ tier's check is sized to the floor of the terms it enables:
 
 Self-referenced checks (`check_collective.py`): on a cold dark beam the wake is the only
 energy channel, and every record's `d<gamma>` must equal `eloss*dz/m_electron` exactly
-(measured 8.6e-11 against 4e-4 kicks, in gamma units at the time) with the energy
+(measured 8.6e-11 against 4e-4 kicks, in gamma units) with the energy
 spread invariant under the uniform
 kicks (4.9e-13, after the diagnostics moved to a two-pass variance, since the one-pass form
-hid sigma-scale cancellation noise for five deliverables because nothing ever moved the
+hid sigma-scale cancellation noise for a long time because nothing ever moved the
 mean), and under heavy migration the eloss blocks must multiply and
 change (49 blocks measured).
 
@@ -380,10 +398,10 @@ z_global = z_local + beta * (islice-1) * slice_spacing
 
 -- higher slice index is the window head (larger Bmad z). The formula is the slice-
 migration invariant run backward (a mover's z shifts by exactly -atar*beta*spacing),
-and the direction is triple-pinned: by that invariant, by the deliverable-8
+and the direction is triple-pinned: by that invariant, by the wake
 convolution (eloss collects `current(is+i)`, the wake trailing its source), and
-empirically by the causality check. The deliverable-11 goal guessed the opposite sign,
-the checks corrected it. Interlude elements pass through Bmad's own `track1_bunch`
+empirically by the causality check. The sign was guessed the other way when the seam wake was
+specified, and the checks corrected it. Interlude elements pass through Bmad's own `track1_bunch`
 (wake applied at `ds_wake`, Bmad's once-per-passage convention). FEL wigglers carrying
 `sr_wake` get one whole-window kick at the step nearest mid-element via
 `track1_sr_wake` directly -- a pure kick, no transport, with z rescaled by
@@ -417,7 +435,7 @@ wiggler so the FEL evolution cancels exactly):
 | thread determinism with wake elements | byte-identical |
 | lord resolution: a wake on a superimposition-split element applies exactly once | **1.8e-10** closed form |
 
-The kernel bridge: `write_wake_kernels` exports the deliverable-8 Bane-Stupakov
+The kernel bridge: `write_wake_kernels` exports the Bane-Stupakov
 kernels (eV/(m electron), s = 0 rows carrying the Bane self-slice half factor), and a
 `z_long` table built from them (sign-flipped, since the d8 kernels are stored as signed
 energy loss where Bmad's table is positive-decelerating, unhalved at s = 0, causal side
@@ -734,7 +752,7 @@ Slices are independent within an integration step: the only cross-slice operatio
 slippage (an index rotation, applied serially between steps) and the per-beam `phi0`
 advance (one scalar, computed before the loop). The slice loops of `fel_track_und_step`
 and `fel_track_interlude_genesis` are therefore plain `parallel do` regions, and the work
-of this deliverable was making the per-slice step safe to run concurrently:
+of the parallel step was making the per-slice step safe to run concurrently:
 
 - The FFTW plan cache in `wavefront_mod` is **threadprivate**: each thread owns its plans
   and its aligned work buffer (the change the cache's design note anticipated). Plan

@@ -4,7 +4,7 @@
 ! In-undulator collective effects for the FEL tracker: wakefields applied as a
 ! per-slice energy-loss rate, and longitudinal space charge entering the pendulum
 ! equation as a per-particle ez. Physics, Genesis provenance, and validation:
-! lucifer/doc/fel-physics.md (sec:wakes, sec:spacecharge, sec:seamwake).
+! lucifer/doc/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
 !
 ! Placement in the step: the wake's gamma decrement lands BETWEEN the longitudinal
 ! advance and the second transverse half step. ez is computed per slice before the RK
@@ -26,7 +26,7 @@
 ! serial at the caller's barrier.
 !
 ! Constants are Bmad's. The Genesis-comparison floors this creates are tabulated in
-! the manual (sec:numerics) and doc/validation.md.
+! the manual (sec-numerics) and doc/validation.md.
 !
 ! Deliberately absent: Genesis's transient wake option (&wake transient/ztrans), the
 ! incoherent-synchrotron module, harmonics beyond what the solver provides, MPI.
@@ -513,7 +513,7 @@ end subroutine fel_wake_apply_slice
 ! EFieldSolver::longRange, one node: the per-slice long-range space-charge field from
 ! the whole-window weighted current and rms-size profiles, in Genesis's longESC units
 ! (eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.md
-! sec:spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
+! sec-spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 !
 ! Input:
 !   ef       -- fel_efield_struct: Space-charge configuration.
@@ -547,7 +547,7 @@ allocate (fcur(nslice), fsize(nslice))
 
 ! Weighted current and transverse size per slice. Genesis's getSize is the PRODUCT of
 ! the rms sizes, sigma_x*sigma_y: an effective area scale, not a variance sum
-! (transcribed wrong once, caught by the SC tier at 1.7e-1, sec:spacecharge). Weighted
+! (transcribed wrong once, caught by the SC tier at 1.7e-1, sec-spacecharge). Weighted
 ! moments where Genesis counts particles: identical for uniform weights, correct
 ! otherwise. Zero-size guard as the original.
 

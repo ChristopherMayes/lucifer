@@ -49,12 +49,12 @@ The validation harness is a separate thing, described with its commands in
 | `lucifer/doc/fel-physics.md` | **The physics manual**: equations, conventions, Genesis4 provenance and validation pointers, one section per subsystem |
 | `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis4 interlude model |
-| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from `Lattice::calcSlippage`; generates its own quiet-start beam and seed field when no dumps are named |
+| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; generates its own quiet-start beam and seed field when no dumps are named |
 | `lucifer/examples/` | Self-contained single-command examples (no Genesis4, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
 | `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis4's, independent RNGs |
 | `lucifer/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
-| `lucifer/code/fel_import_mod.f90` | The distribution import: a bunch_struct resampled into FEL slices by Genesis4's importdistribution method, transcribed from SDDSBeam.cpp, plus the Genesis4-distribution-file writer. Also see the distribution import in [`validation.md`](validation.md) |
+| `lucifer/code/fel_import_mod.f90` | The distribution import: a bunch_struct resampled into FEL slices by Genesis4's importdistribution method, plus the Genesis4-distribution-file writer. Also see the distribution import in [`validation.md`](validation.md) |
 | `lucifer/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
 | `lucifer/tests/scripts/check_import.py` | Import checks: exact current profile vs Genesis4 on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `lucifer/code/fel_collective_mod.f90` | Wakes and space charge at Genesis4's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
@@ -120,33 +120,27 @@ rest.
 **Units and constants.** The field is in V/m throughout (the `wavefront_struct`
 convention) and all constants are Bmad's (`m_electron`, `mu_0_vac*c_light`). Expressed
 that way the formulas are simpler than Genesis4's internal-unit originals (power is
-`sum|E|^2*dA/(2*Z0)`, the coupling is `fc*conj(E)/(sqrt(2)*m_electron)`). During
-development the tracker instead transcribed Genesis4's internal units and constants
-(including its truncated impedance, 376.73 against the exact 376.7303...) and agreed at
-transcription level: tier1 2.8e-11, tier2_genesis 5.9e-8, measured at the 2026-08-01
-commit "Move the packed FEL beam to Bmad coordinates and carry per-particle weights".
-With that validation banked, the code moved to Bmad constants by decision. The 8.3e-7
-relative impedance difference is now the floor of every Genesis4 comparison, and the
-checks below are sized to it.
+`sum|E|^2*dA/(2*Z0)`, the coupling is `fc*conj(E)/(sqrt(2)*m_electron)`). Genesis4's
+impedance constant is truncated, 376.73 against the exact 376.7303..., so the two codes
+differ by 8.3e-7 relative before any physics runs. That difference is the floor of every
+Genesis4 comparison, and the checks are sized to it rather than to round-off.
 
 **Time dependence and slippage.** A multi-slice starting dump makes a time-dependent run,
 a single-slice dump the steady state. There is no separate switch, the same rule as
 Genesis4, whose imports carry the time window. Beam slice `is` couples to field slice
 `1 + mod(is-1+first, nslice)`: the field record is a circular buffer over the wavefront's
-slice index, rotated by slippage rather than moved (Genesis4's `Field::first`,
-`BeamSolver.cpp:66`, `FieldSolverFFT.cpp:54`). Slippage accumulates at
+slice index, rotated by slippage rather than moved, as Genesis4 does. Slippage accumulates at
 `dz*(1+aw^2)/(2*gamma0^2*lambda)` wavelengths per undulator step and rotates the record
-one slice whenever the accumulation exceeds `0.8*sample` (`Control::applySlippage`,
-reduced to one shared-memory node, where the MPI ring exchange is the identity). The
+one slice whenever the accumulation exceeds `0.8*sample`, reduced to one shared-memory
+node, where the MPI ring exchange is the identity. The
 slice rotating out at the head of the time window is discarded and re-enters zeroed at
 the tail. Drifts autophase `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths onto the last
-interlude element before each undulator (`Lattice::calcSlippage`), and the end-of-lattice
+interlude element before each undulator, and the end-of-lattice
 fixup is **unguarded in Genesis4** (`+1` even with no trailing drift at all), which
 costs one final rotation if transcribed with a guard Genesis4 does not have (found at
 0.84 of the final field). Everything reading the record in time order
 (the per-slice diagnostics, the final field dump) unrotates through `fel_field_index`,
-as Genesis4 does at `writeFieldHDF5.cpp:86` and `Diagnostic.cpp:852`. Beam slices never
-rotate.
+as Genesis4 does on the way out. Beam slices never rotate.
 
 ## The FEL element: parameters live on the lattice
 
@@ -167,7 +161,7 @@ the element attributes:
   `k1x`/`k1y` wiggler attributes, whose helical sign convention disagrees with Bmad's
   own tracking locals.
 - Genesis4's natural-focusing split from the helicity defaults (`kx = ky = 0.5*k_u^2`
-  helical, `0`/`k_u^2` planar, LatticeParser.cpp:328-333). Bmad's `kx` roll-off
+  helical, `0`/`k_u^2` planar). Bmad's `kx` roll-off
   attribute is not yet mapped onto that split and must be zero.
 
 Outside the driver's own FEL walk the element is just a periodic wiggler, tracked by
@@ -231,8 +225,8 @@ work in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod`
 `fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops --
 errors return and the driver decides, and `track_fel_line` is re-entrant (twice in
 one process is bit-identical to two processes. `tests/lucifer_smoke_test.f90` drives the
-library with no namelist anywhere). The retired flat `&fel_track_params` group is
-refused by name with each parameter's new home. `global%comb_ds_save` is the stats
+library with no namelist anywhere). A flat `&fel_track_params` group is refused by
+name, with each parameter's current home in the message. `global%comb_ds_save` is the stats
 comb (Bmad's `ds_save` semantics with one deliberate difference: an element end is
 always a record, whatever the comb, which is what lets the file carry one record axis
 and a mask instead of a second axis. Default 0 = every record).

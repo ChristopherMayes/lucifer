@@ -327,7 +327,7 @@ any_err = .false.
 ! This loop also evaluates the diag instrument (fel_slice_diag, fel_field_diag) for
 ! every slice: the diag writer then only prints. Each slice's arithmetic is the
 ! identical serial code, so diag.txt is bit-for-bit what it always was. What changed
-! is that the formerly serial per-record diag sweeps now ride this parallel loop.
+! is that the per-record diag sweeps, once serial, now ride this parallel loop.
 
 !$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, err) &
 !$OMP&   reduction(.or.: any_err)
@@ -337,7 +337,7 @@ do is = 1, nslice
   call fel_slice_diag (beam, sl, ks, bdiag_arr(is))
 
   ! Two-pass weighted moments: mean first, then centered second moments (manual
-  ! sec:numerics).
+  ! sec-numerics).
 
   wsum = 0;  mean = 0
   do ip = 1, sl%n

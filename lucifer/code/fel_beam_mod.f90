@@ -46,7 +46,7 @@
 ! coord_struct is ~224 bytes against the ~56 needed. coord_struct appears only at element
 ! boundaries. The arrays are allocated to a capacity that may exceed the fill count n.
 ! Slice migration can then move particles without per-step reallocation (fel-physics.md
-! sec:migration).
+! sec-migration).
 !-
 
 module fel_beam_mod
@@ -100,7 +100,7 @@ type fel_beam_struct
   integer :: nbins = 0             ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
   logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.md
-                                   !   sec:unaveraged): False = stored px excludes the
+                                   !   sec-unaveraged): False = stored px excludes the
                                    !   undulator quiver (the averaged chart, and the only
                                    !   convention any averaged/seam code accepts). True =
                                    !   the unaveraged tracker is mid-region and px is the
@@ -249,7 +249,7 @@ end function
 ! Every averaged-physics or seam entry point calls this: a hard-edge handoff injects
 ! spurious transverse momentum of order K/gamma -- comparable to the beam divergence --
 ! and presents downstream as unexplained emittance growth (fel-physics.md
-! sec:unaveraged).
+! sec-unaveraged).
 !
 ! Input:
 !   beam        -- fel_beam_struct: The beam whose chart flag is checked.
@@ -556,7 +556,7 @@ end subroutine fel_slice_reallocate
 ! beamlet's amplitude draws on its REAL electron count, the beamlet's charge over e
 ! (Genesis's slice-uniform ne/mpart for uniform weights). This makes <|b(h)|^2> =
 ! 1/N_lambda exact for any cross-beamlet weight distribution (fel-physics.md
-! sec:noise). Weights must be uniform WITHIN a beamlet (the quiet cancellation is per
+! sec-noise). Weights must be uniform WITHIN a beamlet (the quiet cancellation is per
 ! beamlet). The first particle's weight speaks for its beamlet. Genesis's silent
 ! nbl < 1 clamp is kept but counted into n_clamp for the caller to report. Kicks
 ! accumulate from the unperturbed phases, exactly as Genesis's work array does: two
@@ -961,7 +961,7 @@ end subroutine fel_split_slices
 ! window, so it stays). One appended to a LOWER slice waits for the next call, as in
 ! Genesis. Particles whose destination lies beyond the window are DROPPED WITH THEIR
 ! CHARGE COUNTED into charge_dropped. Genesis discards them silently at the world
-! edges (sec:migration). The accounting is this port's deviation, chosen so
+! edges (sec-migration). The accounting is this port's deviation, chosen so
 ! conservation is checkable.
 !
 ! Serial by design: called between the parallel regions at the caller's stride, so

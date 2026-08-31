@@ -565,7 +565,7 @@ if (err_flag) return
 run%any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
 
 ! The collective terms are not wired into the unaveraged step (fel-physics.md
-! sec:unaveraged), and a mixed line would apply them in some segments and silently
+! sec-unaveraged), and a mixed line would apply them in some segments and silently
 ! drop them in others. Refuse by name.
 
 if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
@@ -584,7 +584,7 @@ endif
 ! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is:
 ! omitting that +1 leaves the field record one rotation short at the very end, found the
 ! hard way against the single-segment time-dependent run. (Citations kept at the lines:
-! this quirk's exactness matters here, at the call site. Manual sec:slippage.)
+! this quirk's exactness matters here, at the call site. Manual sec-slippage.)
 
 allocate (run%ele_slip(branch%n_ele_track))
 allocate (run%fel_zoff(branch%n_ele_track), run%light_corr(branch%n_ele_track))
