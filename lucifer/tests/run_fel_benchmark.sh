@@ -576,6 +576,14 @@ fi
 section_time coherent-source
 
 echo
+echo "--- input-reference conformance (the stated defaults against the declarations) ---"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_input_reference.py"; then
+  echo "FAIL: the input reference disagrees with the struct declarations" >&2
+  exit 1
+fi
+section_time input-reference
+
+echo
 echo "--- program-structure checks (library contract, the comb, the window) ---------"
 SMOKE="${EXE%lucifer}lucifer_smoke_test"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$WORK_DIR/program" --exe "$EXE" --smoke "$SMOKE"; then

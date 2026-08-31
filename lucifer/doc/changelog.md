@@ -9,6 +9,18 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-31 Changed: The input reference reads as a reference. One section per namelist
+  group with a subsection per family, each opening with a table of parameter, default and
+  one-line meaning, and the long descriptions as anchored paragraphs below so another page
+  can link a single parameter. The comment-laden namelist fences are gone, each group
+  keeping one short uncommented example.
+
+- 2026-08-31 Added: `tests/scripts/check_input_reference.py` holds the page to the struct
+  declarations in both directions: every stated default must match the code, and every
+  component of the six fel-owned input structs must be named on the page. It found 23
+  parameters the reference had never documented, the whole of `wake%` and `sc%` among them,
+  and one name that does not exist. Wired into the harness as its own check section.
+
 - 2026-08-30 Added: The measured levels and the API reference are generated. The benchmark
   writes a results file under `--results`, `tests/scripts/report_validation.py` turns the
   debug and production results into `doc/generated/validation-measured.md`, and
