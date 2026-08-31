@@ -1,7 +1,7 @@
-# Fortran wavefront: representation, free-space propagation, Genesis4 HDF5
+# Fortran wavefront: representation, free-space propagation, Genesis 1.3 Version 4 (Genesis4) HDF5
 
 A `wavefront_struct` holding the complex transverse electric field of a radiation pulse, a
-free-space propagator built on FFTW, and Genesis 1.3 Version 4 HDF5 input and output. It
+free-space propagator built on FFTW, and Genesis4 HDF5 input and output. It
 mirrors the `Wavefront` class of
 [openPMD-beamphysics](https://github.com/ChristopherMayes/openPMD-beamphysics)
 (`beamphysics/wavefront/wavefront.py`) closely enough that the two can be compared field by
@@ -48,7 +48,7 @@ an independent implementation. Five cases run: an even grid, an odd grid, a non-
 grid, a long drift and a zero drift. The structure and the root scalar values of the Fortran
 output file are also compared against a file written by `Wavefront.write_genesis4`, because
 `from_genesis4` globs and sorts the slice groups and so cannot see an error in their names or
-in `slicecount`, while Genesis, which addresses them by index, would be broken by one.
+in `slicecount`, while Genesis4, which addresses them by index, would be broken by one.
 
 **Against an in-Fortran reference propagator.** `wavefront_drift_reference` builds its own
 kernel and performs a direct DFT rather than using FFTW. It exists because the Genesis4
@@ -109,7 +109,7 @@ intrinsic sums sequentially, with error growing as `N·eps`, which is 4.5e-12 he
 
 `Wavefront.write_genesis4` writes `refposition` as int64 whenever the default argument is
 used, because the default is the Python int `0` and `np.asarray([0])` infers an integer type.
-Pass a float and it writes float64. Genesis writes this field as a double with a unit
+Pass a float and it writes float64. Genesis4 writes this field as a double with a unit
 attribute of `"m"`, and reads it with `H5Dread` into `H5T_NATIVE_DOUBLE`, so the integer file
 is read correctly and nothing breaks. But a position in meters is being stored as an
 integer. This Fortran writer writes float64 deliberately. The harness reports the difference
@@ -131,7 +131,7 @@ as in `drift_wavefront_advanced`, is a different propagator.
 **The transverse boundary is periodic and unapodised**, because that is what a discrete
 Fourier transform imposes. Field reaching the edge of the grid wraps around and re-enters.
 Over a long drift the grid has to be large enough to contain the field. This is the same
-limitation Genesis has.
+limitation Genesis4 has.
 
 **The transform is single threaded on purpose.** `fftw_plan_with_nthreads` is not called: the
 parallelisation axis for a wavefront is the slice index, and threading a small 2D transform

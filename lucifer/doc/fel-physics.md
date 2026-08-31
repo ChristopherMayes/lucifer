@@ -8,19 +8,19 @@ short_title: Physics manual
 
 This manual states the physics and the numerical conventions of the Bmad FEL tracker.
 The code references these sections by label. The validation harness
-(`lucifer/tests/`) proves each statement against Genesis 1.3 Version 4, against
+(`lucifer/tests/`) proves each statement against Genesis 1.3 Version 4 (Genesis4), against
 closed forms, or against independent implementations, and the measured levels live in
-`lucifer/doc/validation.md`. Each section ends with a *Provenance* note (the Genesis
+`lucifer/doc/validation.md`. Each section ends with a *Provenance* note (the Genesis4
 routine the physics was transcribed from, moved here from the source comments) and a
-*Validation* note (which check pins it). The physics was transcribed from Genesis
+*Validation* note (which check pins it). The physics was transcribed from Genesis4
 (GPL permits transcription), validated at transcription level, and then re-expressed in
 Bmad's units and conventions. The transcription-era agreement is banked in `validation.md`.
 
 Throughout: $m_e c^2$ is Bmad's `m_electron` (eV), $c$ is `c_light`,
 $Z_0 = \mu_0 c$ (`mu_0_vac*c_light`), $e$ is `e_charge`, and
-$\varepsilon_0$ is `eps_0_vac`. Genesis carries its own truncated constants
+$\varepsilon_0$ is `eps_0_vac`. Genesis4 carries its own truncated constants
 (EG $Z_0 = 376.73$ against $376.7303\ldots$). The resulting $8.3\times10^{-7}$
-relative difference is the accepted floor of every Genesis comparison
+relative difference is the accepted floor of every Genesis4 comparison
 ([](#sec-numerics)).
 
 (sec-coords)=
@@ -49,7 +49,7 @@ $$
 $$ (eq-kinematics)
 
 
-The ponderomotive phase is *derived, never stored*. Genesis's per-particle
+The ponderomotive phase is *derived, never stored*. Genesis4's per-particle
 $\theta$ splits into a common reference advance (one scalar per beam, $\varphi_0$,
 advanced once per step) and the particle lag carried by Bmad's $z$:
 
@@ -71,7 +71,7 @@ $$
   \gamma_{0b}^2 = \hat P_0^2 + 1 .
 $$ (eq-phi0rate)
 
-Inside undulators $k_u^{\mathrm{like}} = k_u$. Over field-free interludes Genesis's
+Inside undulators $k_u^{\mathrm{like}} = k_u$. Over field-free interludes Genesis4's
 drift surrogate $k_u^{\mathrm{like}} = k_s/(2\gamma_0^2)$ is used
 ([](#sec-interlude)).
 
@@ -117,8 +117,8 @@ $\beta$, which is the one of the three that needs a reference at all
 The radiation field is stored in V/m (the `wavefront_struct` convention). There
 is no internal unit system. Beam energies in diagnostics are total energies
 $E = \gamma\, m_e c^2$ in eV, which is Bmad's convention. Here *energy never
-means* $\gamma$. Genesis's `energy` output *is* $\gamma$, and the comparison
-scripts convert. Genesis's internal field unit $u$ relates to the physical field by
+means* $\gamma$. Genesis4's `energy` output *is* $\gamma$, and the comparison
+scripts convert. Genesis4's internal field unit $u$ relates to the physical field by
 $u = E\,k_s/(\sqrt2\, m_e c^2)$, the identity under which every formula in this manual
 was converted from its internal-unit original. The converted forms are simpler
 ([](#sec-eom), [](#sec-field)).
@@ -126,17 +126,11 @@ was converted from its internal-unit original. The converted forms are simpler
 :::{admonition} Provenance
 :class: note
 The chart and window conventions are this port's own.
-Genesis stores $(\theta,\gamma)$ per particle with per-slice bounded $\theta$. The
-unit identity composes Genesis's dump scale (`writeFieldHDF5.cpp`) with
+Genesis4 stores $(\theta,\gamma)$ per particle with per-slice bounded $\theta$. The
+unit identity composes Genesis4's dump scale (`writeFieldHDF5.cpp`) with
 $E = \mathit{dfl}\,\sqrt{2 Z_0}/\mathit{dgrid}$.
 :::
-:::{admonition} Validation
-:class: tip
-The chart is exercised by every tier; the theta identity specifically by the
-bit-identity of the shot-noise-off loader against the deliverable-4 baseline, and
-Eq. [](#eq-zglobal) by the migration phase-continuity check ($6.9\times10^{-15}$) and
-the seam-wake causality check (exactly zero ahead of all charge).
-:::
+Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
 (sec-element)=
 ## The FEL element
@@ -152,12 +146,12 @@ $$
                       K/\sqrt2 & \text{planar (\texttt{planar\_model})}\end{cases}
 $$ (eq-awmap)
 
-Here $a_w$ is rms, Genesis's convention. In code $K = c\,\texttt{b\_max}/(k_u\,
+Here $a_w$ is rms, Genesis4's convention. In code $K = c\,\texttt{b\_max}/(k_u\,
 \texttt{m\_electron})$ with `b_max` in Tesla and `m_electron` in eV. The
 natural-focusing split follows the helicity defaults, scaled by $k_u^2$:
 helical $k_x = k_y = \tfrac12 k_u^2$. Planar $k_x = 0$, $k_y = k_u^2$. The integration
 step is the element's own `ds_step`/`num_steps`. The bookkeeper's
-$n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\texttt{ds\_step}))$ is exactly Genesis's
+$n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\texttt{ds\_step}))$ is exactly Genesis4's
 unroll.
 
 The FEL tracking mode and unaveraged parameters are likewise per-element lattice
@@ -169,7 +163,7 @@ parameters). `fel_tracking` selects the transport: unset/0
 (`fel_averaged`) is the averaged
 default with the
 `bmad_standard` kernel's transverse maps ([](#sec-undbmad)). 1 is the
-unaveraged mode ([](#sec-unaveraged)). $-1$ is the transcribed-Genesis maps,
+unaveraged mode ([](#sec-unaveraged)). $-1$ is the transcribed-Genesis4 maps,
 validation-internal. The other two are `fel_steps_per_period` (unset $\to$ 20,
 below 10 refused) and `fel_ramp_periods` (unset $\to$ 2). An attribute's unset
 value
@@ -187,24 +181,18 @@ Refused by name at parse time: missing `b_max` or `l_period`, a
 fieldmap `field_calc`, nonzero `kx` (unmapped roll-off), an unset
 `ds_step`, `tilt` on a helical element (a rotation of a circularly
 symmetric field, a no-op that reads as a mistake) and `tilt` with the
-transcribed-Genesis maps (Genesis has no tilt). Outside the FEL walk the element is a plain periodic wiggler: the
+transcribed-Genesis4 maps (Genesis4 has no tilt). Outside the FEL walk the element is a plain periodic wiggler: the
 `track1_custom` and `make_mat6_custom` hooks delegate to
 `track_a_wiggler`, so reference time and transfer matrices come from Bmad's own
 kernel.
 
 :::{admonition} Provenance
 :class: note
-Helicity defaults from Genesis's `LatticeParser` ($k_x{=}k_y{=}0.5$ helical,
+Helicity defaults from Genesis4's `LatticeParser` ($k_x{=}k_y{=}0.5$ helical,
 $0/1$ planar, scaled by $k_u^2$ in the unroll); the step rule from
 `Lattice::unrollLattice`.
 :::
-:::{admonition} Validation
-:class: tip
-The element-driven line reproduces the namelist-driven reference bit-identically at
-$z=0$, growing to $3.4\times10^{-12}$ (the 1-ulp $a_w$ attribute round trip); the
-assertion checks refuse each malformed lattice by name; mutations (rms factor, wrong
-helicity attribute) fail tier1 at $\sim$1.0 relative.
-:::
+Measured levels and how they are checked: [](validation.md#val-the-programs-own-identities).
 
 (sec-core)=
 ## The FEL core
@@ -275,7 +263,7 @@ $$ (eq-dgamma)
 with $e_z$ the space-charge term ([](#sec-spacecharge)) in units of $m_e c^2$ per
 meter, held fixed through the stages along with $r$, $\hat p_{x,y}$ and $f_{aw}$. The
 integrator (`fel_runge_kutta`) is the classical fourth-order Runge--Kutta in
-Genesis's incremental bookkeeping, kept verbatim so the audited transcription
+Genesis4's incremental bookkeeping, kept verbatim so the audited transcription
 survives.
 
 *Chart round trip.* $(\theta,\gamma)$ are derived at step entry from
@@ -294,12 +282,7 @@ grid weights from `Field::getLLGridpoint`. The V/m forms follow from the unit
 identity of [](#sec-units), under which the rest energy and $k_s$ cancel out of
 $r$.
 :::
-:::{admonition} Validation
-:class: tip
-tier1 (one segment, FEL core alone): $1.8\times10^{-6}$, the constants floor
-(transcription-era $2.8\times10^{-11}$ with Genesis's constants). Source-term and
-conjugation mutations fail tier1 at $3.5\times10^{-1}$ and $2.8\times10^{-2}$.
-:::
+Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
 (sec-transverse)=
 ## Transverse motion
@@ -336,14 +319,14 @@ $$ (eq-focusmap)
 
 with $\cosh/\sinh$ for $\hat q<0$ and the plain drift $x \mathrel{+}= p_x\,\delta z/
 (p_0\hat\gamma_z)$ for $\hat q = 0$. Chromaticity is through $\hat\gamma_z$
-(Genesis's $\gamma_z$ scaling).
+(Genesis4's $\gamma_z$ scaling).
 
 (sec-interlude)=
-### The Genesis interlude model
+### The Genesis4 interlude model
 
-Field-free elements (drifts, quadrupoles) tracked "Genesis's way" are one
+Field-free elements (drifts, quadrupoles) tracked "Genesis4's way" are one
 integration step of the full element length: transverse half (quad strength
-$\hat q = k_1\gamma_0\, m_ec/p_0$, Genesis's chromatic convention $k_1\gamma_0/
+$\hat q = k_1\gamma_0\, m_ec/p_0$, Genesis4's chromatic convention $k_1\gamma_0/
 \gamma_z$ against Bmad's $k_1 p_0/P$), then the $\theta$ advance with the path-length
 term sampled once at mid element,
 
@@ -367,7 +350,7 @@ per quadrupole, compounding to the documented tier2_bmad difference.
 The default transverse maps (`fel_tracking` unset, [](#sec-element)) are
 Bmad's own: the `bmad_standard` periodic-wiggler kernel, flattened to per-step
 granularity. The transcribed maps of [](#sec-natfocus) remain selectable as
-`fel_tracking = -1`, validation-internal. The Genesis comparisons require
+`fel_tracking = -1`, validation-internal. The Genesis4 comparisons require
 transcription-level transport. No production lattice writes it. The kernel, per
 particle: $k_1 = -\tfrac12 g_{\max}^2/
 (1+p_z)^2$ with $g_{\max} = K k_u\,m_ec/p_0$ ($K$ from Eq. [](#eq-awmap)), quadrupole
@@ -388,12 +371,7 @@ drift path with the division order kept. [](#sec-undbmad):
 `track_a_wiggler.f90` tracking locals (never the stored `k1x`/`k1y`
 attributes, whose helical sign disagrees).
 :::
-:::{admonition} Validation
-:class: tip
-tier2_genesis $1.8\times10^{-5}$ (transcribed interludes, constants floor);
-tier2_bmad $5.0\times10^{-2}$, the located and priced transport difference; the
-transverse-map pricing above.
-:::
+Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
 (sec-field)=
 ## The field solver
@@ -417,7 +395,7 @@ $$
   s_w = \frac{f_c(1)\, Z_0\, \sqrt2\, c\;\delta z}{4\,\mathit{dgrid}^2\,\Delta s} ,
 $$ (eq-source)
 
-the weighted V/m form in which the rest energy and $k_s$ have cancelled. Genesis's
+the weighted V/m form in which the rest energy and $k_s$ have cancelled. Genesis4's
 $\mathit{current}/n_{\mathrm{part}}$ is the uniform-weight special case of
 $c\,w_j/\Delta s$. Field diagnostics: power $= \sum_{\mathrm{cells}}|E|^2\,
 \mathit{dgrid}^2/(2Z_0)$, and on-axis intensity is $|E(0,0)|^2/(2Z_0)$. The window field
@@ -430,11 +408,7 @@ diagnostics per `DiagField::calc`. The internal-unit source scale
 $f_c\,\mathit{vacimp}\,I\,k_s\,\delta z/(4\,\mathit{eev}\,n\,\mathit{dgrid}^2)$
 converts to Eq. [](#eq-source) by [](#sec-units).
 :::
-:::{admonition} Validation
-:class: tip
-tier1/td1 at the constants floor; the split-weight check ($3.6\times10^{-13}$) pins the
-weighted deposition; the dropped-factor-2 mutation fails tier1 at $3.5\times10^{-1}$.
-:::
+Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
 (sec-slippage)=
 ## Time dependence and slippage
@@ -461,7 +435,7 @@ non-periodic fill). Backward slippage mirrors the direction. Interludes slip not
 per step. Instead their lengths $L_z$ accumulate and, when an undulator follows, the last
 interlude element receives $\lfloor L_z/(2\gamma_0^2\lambda_s)\rfloor + 1$ wavelengths
 of autophasing. The end-of-lattice fixup is *unguarded*: the final element always
-receives the same $+1$, even with no trailing interlude at all. That is a Genesis
+receives the same $+1$, even with no trailing interlude at all. That is a Genesis4
 quirk kept deliberately, since guarding it leaves the record one rotation short.
 
 :::{admonition} Provenance
@@ -471,12 +445,7 @@ is the identity); the schedule from `Lattice::calcSlippage`, including the
 unguarded fixup (found live: the guarded version failed td1 at 0.84 of the final
 field).
 :::
-:::{admonition} Validation
-:class: tip
-td1 $8.5\times10^{-7}$; slippage mutations (never-firing rotation, wrong zeroed slice,
-dropped autophasing) fail at $10^{10}$, $10^{9}$, $1.9\times10^{8}$ on the elementwise
-per-slice power comparison.
-:::
+Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
 (sec-loading)=
 ## Loading
@@ -533,7 +502,7 @@ $$ (eq-fawley)
 with $n_h = (n_{\mathrm{bins}}-1)/2$, $\phi_{bh}$ uniform in $[0,2\pi)$, and kicks
 accumulated from the unperturbed phases. This makes $\langle|b(h)|^2\rangle =
 1/N_\lambda$ exact for any cross-beamlet weight distribution, $N_\lambda$ the slice's
-real electron count. Genesis's silent $n_{bl}<1$ clamp is kept but counted and warned.
+real electron count. Genesis4's silent $n_{bl}<1$ clamp is kept but counted and warned.
 The $N_{\mathrm{eff}}$ guard refuses to impose noise when the pre-noise quiet floor
 $\max_h |b(h)|^2$, swept over *every* harmonic the beamlet structure resolves
 ($h = 1..n_{\mathrm{bins}}-1$), is not far below the target $1/N_\lambda$.
@@ -544,25 +513,13 @@ $\max_h |b(h)|^2$, swept over *every* harmonic the beamlet structure resolves
 w_b/e$ (identical for uniform weights). Shared code between the generator and the
 distribution import.
 :::
-:::{admonition} Validation
-:class: tip
-Statistical check $\langle|b|^2\rangle N_\lambda = 1.03\pm0.14$, uniform and
-$0.25\times/1.75\times$ beamlet weights; cross-loader SASE startup to 0.3%;
-mutations at 13--20$\times$ (macroparticle-count amplitudes) and 1.52
-(weights ignored). The guard's own mutation test exposed the $n_{\mathrm{bins}}/2$
-blind spot that fixed its sweep range. The description contract: the quiet-load
-current profile matches Eq. [](#eq-derivedcurrent) exactly ($9.9\times10^{-15}$ of
-peak; a dropped $\sqrt{2\pi}$ fails at $1.5$), the import of the same Gaussian
-description agrees at rms $4.9\times10^{-2}$ of peak (statistical, 50k particles,
-truncated-tail fit); a set-but-unhonored `beam_init` field refuses by name; a
-clipping `window_length` warns with numbers.
-:::
+Measured levels and how they are checked: [](validation.md#val-shot-noise-under-weights).
 
 (sec-import)=
 ## Distribution import
 
 An arbitrary `bunch_struct` (from `beam_init` generation or an
-openPMD-beamphysics file) resamples into slices by Genesis's method
+openPMD-beamphysics file) resamples into slices by Genesis4's method
 (`fel_import_mod`). Window positions are $\tau$ of Eq. [](#eq-kinematics),
 min-shifted to zero. Slice centers sit at $(i-1)\Delta s$, with
 $n_{\mathrm{slice}} = \mathrm{nint}(\tau_{\mathrm{total}}/\Delta s)$ when not given.
@@ -574,8 +531,8 @@ $$
   I_i = \frac{c\sum_{j\in\mathrm{window}} w_j}{d s_{\mathrm{len}}},
 $$ (eq-importcurrent)
 
-the weighted generalization of Genesis's count$\cdot dQ$. The candidate set reduces to
-$n_{\mathrm{part}}/n_{\mathrm{bins}}$ seeds by random deletion, or grows by Genesis's
+the weighted generalization of Genesis4's count$\cdot dQ$. The candidate set reduces to
+$n_{\mathrm{part}}/n_{\mathrm{bins}}$ seeds by random deletion, or grows by Genesis4's
 phase-space interpolation: normalize the five coordinates $(\gamma,x,y,\hat p_x,
 \hat p_y)$ to zero mean and unit rms, pick a random parent, find its nearest
 *original* neighbor under a metric whose per-coordinate weights are fresh random
@@ -584,9 +541,9 @@ difference per coordinate. $\theta$ is refilled uniformly over one beamlet spaci
 mirrored into $n_{\mathrm{bins}}$, and [](#sec-noise) imposes the noise with
 $n_e = \mathrm{nint}(I\lambda_s\,\texttt{sample}/(e c))$. The file's $p_x/p_y$ are
 *slopes*. The slope-to-momentum conversion $\hat p = x'\gamma$ happens at the
-copy into the candidate set. Genesis's `match`/`center` transforms are not
+copy into the candidate set. Genesis4's `match`/`center` transforms are not
 ported (a Bmad lattice carries its optics, and `init_beam_distribution`
-generates matched bunches), and Genesis's `align*` and `shotnoise` inputs
+generates matched bunches), and Genesis4's `align*` and `shotnoise` inputs
 are parsed but dead in v4. Neither is transcribed as functional. A zero-charge bunch
 is refused by name.
 
@@ -595,15 +552,7 @@ is refused by name.
 `SDDSBeam::init` (window, current, ordering), `removeParticles`,
 `addParticles`, `distance`; slice centers from `Time::getPosition`.
 :::
-:::{admonition} Validation
-:class: tip
-Per-slice current vs Genesis importing the same file: $8.2\times10^{-13}$ of peak
-(RNG-free, exact); openPMD round trip exact; slice optics recover the lattice Twiss at
-the 1% level; startup power vs Genesis's independent resampling at $\ln$ ratio
-$+0.02$; mutations (dslen/spacing, no noise, collapsed mirroring) caught at
-$6.5\times10^{-1}$, $\ln{-57}$, $\ln{+4.7}$; the "$\theta$ over $2\pi$" mutation is
-an equivalent mutant, correctly passed (uniformity mod the beamlet spacing under mirroring makes it indistinguishable).
-:::
+Measured levels and how they are checked: [](validation.md#val-distribution-import-a-bunchstruct).
 
 (sec-pardump)=
 ### Particle dumps
@@ -612,13 +561,13 @@ A run writes its beam as openPMD (`.beam.h5`) through Bmad's own
 `hdf5_write_beam`, and reads the same. There is no second format and no knob to
 select one: a `beam_file` that is not openPMD is refused by name, with the
 conversion command in the message, and
-`lucifer/tests/scripts/convert_genesis.py` converts a Genesis `.par.h5` of
+`lucifer/tests/scripts/convert_genesis.py` converts a Genesis4 `.par.h5` of
 [](#sec-units)'s conventions either way.
 
 The reason is charge. openPMD's macro-charge IS the per-particle weight $w_j$, so a
-weighted beam survives. Genesis `.par.h5` carries one current per slice,
+weighted beam survives. Genesis4 `.par.h5` carries one current per slice,
 Eq. [](#eq-importcurrent) read backwards, so a reader must divide it out uniformly, and
-per-particle weights are this port's day-one difference from Genesis. The converter
+per-particle weights are this port's day-one difference from Genesis4. The converter
 refuses to write a nonuniform-weight beam in that format rather than writing one that
 would silently read back uniform.
 
@@ -636,7 +585,7 @@ anywhere to put $\varphi_0$, so every reader restarts it at zero, and a dump tha
 the lag $z_j$ alone would come back with every $\theta_j$ short by $\varphi_0$: a
 different phase against the same dumped field, which is a change of state and not of
 bookkeeping. So a dump writes $\beta_j \theta_j / k_s$, making the file's time
-$-\theta_j/(k_s c)$ and a $\varphi_0 = 0$ reader exact. Genesis stores $\theta$ itself and
+$-\theta_j/(k_s c)$ and a $\varphi_0 = 0$ reader exact. Genesis4 stores $\theta$ itself and
 its reader does the same fold, so the two formats agree on what a dump means.
 
 The chart, not the file, is what could cost a digit: openPMD stores absolute momenta and
@@ -652,22 +601,13 @@ macro-charge as `weight`, `particlePatches` added for the window);
 `fel_slice_to_bunch` and `fel_bunch_to_slice` for the chart, the same
 pair the seam uses every step, with `fold_phi0` set for a dump alone.
 :::
-:::{admonition} Validation
-:class: tip
-openPMD file write/read/write dataset-identical; every coordinate exact through a
-restart, read out in Genesis's chart through the converter, $\theta$ included and
-absolute; split weights stored per particle and bit-identical on read; per-slice counts
-restored with an empty slice present, one patch per slice; four refusals by name;
-mutations (weight unwritten, the reference phase not folded, bunches placed in file
-order) each caught by their own check, the unfolded phase at $2.1\times10^{-2}$ on the
-windowed-composition check.
-:::
+Measured levels and how they are checked: [](validation.md#val-distribution-import-a-bunchstruct).
 
 (sec-migration)=
 ## Slice migration
 
 With per-particle weights, migration needs no one4one: a mover carries its own charge.
-The criterion is Genesis's in this chart: with the derived $\theta$ of
+The criterion is Genesis4's in this chart: with the derived $\theta$ of
 Eq. [](#eq-theta) and the slice window $[0, 2\pi\,\texttt{sample})$,
 $a_{\mathrm{tar}} = \lfloor\theta/(2\pi\,\texttt{sample})\rfloor$ is the relative
 destination (positive $\theta$ drift moves toward higher index, the head). A mover's
@@ -676,21 +616,15 @@ $-a_{\mathrm{tar}}\cdot2\pi\,\texttt{sample}$: for integer `sample` the phase ev
 deposition sees is continuous across the move to rounding, and
 Eq. [](#eq-zglobal) is invariant. Removal is swap-with-last with rescan. Particles
 whose destination lies beyond the window are dropped *with their charge counted*
-(Genesis discards silently). Off by default: the Genesis tiers compare against
-non-one4one Genesis, which never migrates.
+(Genesis4 discards silently). Off by default: the Genesis4 tiers compare against
+non-one4one Genesis4, which never migrates.
 
 :::{admonition} Provenance
 :class: note
 `Sorting::localSort` (criterion, swap-with-last, rescan semantics); the silent
 world-edge discard replaced by counted drops.
 :::
-:::{admonition} Validation
-:class: tip
-Conservation with drop accounting $1.5\times10^{-14}$ under 74k moves; exact phasor
-continuity $S_{\mathrm{before}} = S_{\mathrm{after}} + S_{\mathrm{dropped}}$ at
-$6.9\times10^{-15}$; window residency (the postcondition that catches accounted
-evaporation); no-op bit identity.
-:::
+Measured levels and how they are checked: [](validation.md#val-slice-migration-under-weights).
 
 (sec-collective)=
 ## Collective effects
@@ -717,13 +651,13 @@ $$
 \end{gathered}
 $$ (eq-bszk)
 
-with Genesis's exact numerics kept: $k \in [0, 100/s_0]$ on 1000 trapezoid intervals,
+with Genesis4's exact numerics kept: $k \in [0, 100/s_0]$ on 1000 trapezoid intervals,
 $s_0 = (2a^2/(Z_0\sigma_0))^{1/3}$, flat integral on $[0,15]$ with 20000 points. This
 routine is deliberately separable (a future Bmad-proper wake source, and
 [](#sec-seamwake) already feeds it to Bmad's machinery). *Geometric* (undulator gap, convolved with
 $dI/ds$): $w(s) = -\frac{Z_0 c\, e}{\pi^2 a\, L_{\mathrm{gap}}}\,2\sqrt{g/2}\,\sqrt{s}$
 ($\times0.956$ flat). *Roughness*: $w(s) = \frac{r_r}{\pi}\frac{4}{a^2}
-\frac{e}{4\pi\varepsilon_0}\,\mathrm{Re}\!\int e^{-iq\tau} K(q)\,dq$ over Genesis's
+\frac{e}{4\pi\varepsilon_0}\,\mathrm{Re}\!\int e^{-iq\tau} K(q)\,dq$ over Genesis4's
 four-segment complex-$q$ contour, $r_r = \pi^3 h^2 a/L_r^3$, $\tau = 2\pi s/L_r$. The
 $s{=}0$ bin of every kernel carries half weight (the self-loading theorem).
 
@@ -809,19 +743,7 @@ otherwise). Lr wakes are refused. `write_wake_kernels` exports the
 `BeamSolver.cpp`'s `ez = getEField + eloss`. [](#sec-seamwake): Bmad's
 `wake_mod.f90` used as-is; the concatenation is this port's.
 :::
-:::{admonition} Validation
-:class: tip
-tdwk $8.7\times10^{-7}$ (impedance floor); tdsc $2.4\times10^{-4}$ (Genesis's
-truncated $\varepsilon_0$); exact energy bookkeeping $d\langle E\rangle =
-\mathcal{E}\,\delta z$ at $4.4\times10^{-5}$ eV against 203 eV kicks;
-$\sigma_E$ invariance under uniform kicks $2.5\times10^{-7}$ eV. Seam wakes:
-constant-pseudomode closed form $6.2\times10^{-10}$; causality exactly zero ahead of
-all charge; `z_long` vs first-principles convolution $3.4\times10^{-8}$;
-same-kernel `z_long`-vs-`wake_on` on the full SASE line to 0.7%;
-lord-resolution closed form $1.8\times10^{-10}$. Mutations: anti-causal convolution
-$7\times10^{-3}$, $e_z$ sign $9.1\times10^{-1}$, stale wake structurally; seam
-direction/offset/charge at 22/11/1.0.
-:::
+Measured levels and how they are checked: [](validation.md#val-bmad-element-wakes-across).
 
 (sec-seam)=
 ## The seam
@@ -835,12 +757,7 @@ energy is the lattice's ($\gamma_0 = E_{\mathrm{tot}}/m_ec^2$ from the beginning
 element, and there is no namelist duplicate), and every FEL parameter lives on the
 lattice ([](#sec-element)), one specification of one truth.
 
-:::{admonition} Validation
-:class: tip
-tier2_bmad/td2_bmad price the seam transport difference ($5.0\times10^{-2}$ /
-$4.1\times10^{-2}$), with tier2_genesis proving the attribution by collapsing it six
-orders of magnitude under the model swap.
-:::
+Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
 (sec-unaveraged)=
 ## The unaveraged mode
@@ -917,7 +834,7 @@ $$ (eq-unavgkick)
 
 the averaged deposit of Eq. [](#eq-source) with the coupling removed and the actual
 quiver current in its place. The $1/u_s$ (where the averaged solver carries
-Genesis's $1/\gamma$) is a merit choice: kick and source are exact duals of one
+Genesis4's $1/\gamma$) is a merit choice: kick and source are exact duals of one
 wave equation, and using the same $u_s$ in both (same operands, same bilinear
 weights, unitary diffraction between substeps) makes the coherent energy exchange
 cancel in $E+U$ *identically*, leaving only physical spontaneous emission and
@@ -945,7 +862,7 @@ slippage, banked at each zero fill (the window is an open system, so light escap
 forward), and $U_{\mathrm{sp}}$ is the cumulative deposit energy
 $\sum|\Delta E_{\mathrm{src}}|^2$, the one field-energy term the kick/deposit
 duality does not charge to the beam (physically, the substep's spontaneous emission,
-as in Genesis and MINERVA). Both vanish in steady state. $E_{\mathrm{rad}}$ is the energy the beam radiated away
+as in Genesis4 and MINERVA). Both vanish in steady state. $E_{\mathrm{rad}}$ is the energy the beam radiated away
 under `bmad_com`'s radiation switches (actual drawn sums rather than expectations,
 and zero with the switches off, their default). Measured closure:
 $8\times10^{-6}$ of turnover on the time-dependent harness configuration (checked at
@@ -961,11 +878,11 @@ mode-independent.
 *Spontaneous emission.* The classical rate is
 $d\gamma/ds = \tfrac23 r_e \gamma^2 k_u^2 a_w^2$ ($a_w$ rms, both polarizations). Bmad's
 own `radiation_damping` through the same wiggler reproduces it to $10^{-4}$, and
-it is the coefficient in Genesis's `Incoherent.cpp`. The two FEL modes stand in
+it is the coefficient in Genesis4's `Incoherent.cpp`. The two FEL modes stand in
 very different relations to it. The averaged (KMR) mode *emits* the radiation but
 never debits the beam: its step adds $2S$ to the field while particles are kicked by
 $E$, so the $4|S|^2$ part of the field energy is created (measured on a dark segment:
-the field gains $134\times$ what the beam pays). Genesis's optional `&sponrad`
+the field gains $134\times$ what the beam pays). Genesis4's optional `&sponrad`
 module exists to add that loss by hand and is off by default. The unaveraged mode
 conserves energy by construction ([](#sec-unaveraged)'s $1/u_s$ deposit), so its
 beam pays for the fraction of the emission the grid can hold: angles up to the FFT
@@ -984,11 +901,11 @@ lands on the analytic rate at $9\times10^{-4}$, and the unaveraged mode on the
 ramp+capture composite $(1 - \tfrac{5}{4}l_{\mathrm{ramp}}/L) + f_{\mathrm{cap}}$
 at $2\times10^{-6}$ (its grid-captured self-field work adds to the explicit term).
 Fluctuations apply the standard quantum-diffusion variance
-$1.015\times10^{-27} k_u^3 a_w^2 F(a_w)\gamma_0^4$ per meter (Genesis's
+$1.015\times10^{-27} k_u^3 a_w^2 F(a_w)\gamma_0^4$ per meter (Genesis4's
 `Incoherent.cpp` fits of the Saldin form), one draw per
-beamlet exactly as Genesis (independent per-particle kicks would break the quiet
+beamlet exactly as Genesis4 (independent per-particle kicks would break the quiet
 start's per-beamlet cancellation), drawn serially in fixed slice order so thread
-count stays invisible. Genesis reaches the same variance with uniform$\times\sqrt3$
+count stays invisible. Genesis4 reaches the same variance with uniform$\times\sqrt3$
 draws where ours are Gaussian, the physical limit. Measured: both FEL modes sit on the
 analytic form at $\le 2\%$. Bmad's own `runge_kutta`+fluctuations through the
 same wiggler sits 11% below it, which is the two references' $F$-convention spread,
@@ -1029,31 +946,7 @@ match), and the non-symplecticity is priced by measurement: $\gamma$ exact,
 emittance drift $\le 3.3\times10^{-6}$ over the longest benchmark segment
 (266 periods, 5320 steps).
 :::
-:::{admonition} Validation
-:class: tip
-`check_unaveraged.py`, all self-referenced or closed-form: energy ledger
-$1.0\times10^{-5}$ of the field-energy turnover (check $10^{-4}$; degenerate with the
-$\gamma\leftrightarrow p_z$ round-trip floor once the deposit uses $1/u_s$, and it was
-$6.7\times10^{-4}$ under the $1/\gamma$ convention); ledger internal
-kick-vs-realized $1.0\times10^{-5}$; ballistic $\Delta\gamma$ exactly zero,
-emittance handoff $9.8\times10^{-11}$, orbit handoff $1.9\times10^{-9}$ m;
-$f_c$ measured vs closed form: planar $0.75051$ vs $0.75095$, helical $0.84803$ vs
-$0.84853$, $h{=}3$ planar $0.21287$ vs $0.21302$, all $\sim$$6\times10^{-4}$
-relative (checks $5\times10^{-3}$); step-size convergence $f_c(10/20/30$ per period$)
-= 0.750582/0.750505/0.750502$; full-segment gain curve vs the averaged default
-$|\ln$ ratio$| = 2.7\times10^{-3}$ at exit (priced). The benchmark's
-`tier1_unavg` compares this mode directly against Genesis from the same
-starting dumps: $6.9\times10^{-2}$ overall (a priced model difference dominated by
-the final-field phase; power $6.1\times10^{-3}$, per-particle $\gamma$
-$3.7\times10^{-6}$, and a constant $\sim$6.6 rad ramp-phase offset in $\theta$ with
-$2.8\times10^{-3}$ rms about it). Mutations: the
-$E\cdot v$ sign fails the ledger at $2.0$ and the gain comparison at $0.69$ (the
-magnitude-blind $f_c$ checks pass it, which is why the ledger is check zero); a hard-edge
-entry fails the orbit-handoff check at $3.2\times10^{-5}$ m ($19\sigma$; note the
-exit momentum re-absorbs the quiver at integer periods, so the orbit, not
-$\langle p_x\rangle$, is the reliable instrument); a skipped exit handoff is refused
-by name at the first seam element.
-:::
+Measured levels and how they are checked: [](validation.md#val-the-unaveraged-mode-fc).
 
 (sec-vector)=
 ### Two polarizations
@@ -1073,25 +966,13 @@ analytic potential evaluated in the rotated frame). The scalar helical envelope 
 the co-rotating combination $(\hat E_x - i\hat E_y)/\sqrt2$. Measured on dark
 shot-noise runs the two representations agree at $7\times10^{-15}$.
 
-:::{admonition} Validation
-:class: tip
-check_two_polarization.py: rotation identity (an all-y line fed the x/y-swapped
-beam reproduces the all-x line) at $4.5\times10^{-15}$ averaged, $4.1\times10^{-6}$
-unaveraged (the vector path also carries the betatron-current radiation the scalar
-convention omits: a real refinement, tolerated at $10^{-5}$ not hidden); crossed
-undulator: x-field gain isolation through the y set at $1.6\times10^{-14}$ (averaged)
-and $1.7\times10^{-6}$ (unaveraged) against a pure-diffraction reference, the
-y field lighting up from the carried-over bunching at $P_y/P_x \sim 10^{-2}$, the
-two modes agreeing at $0.25$ in $\ln$; the unaveraged TD ledger closes over both
-components at $10^{-4}$; thread byte-identity; helical re-anchor $7\times10^{-15}$;
-tilt on helical and tilt with the transcribed maps refused by name.
-:::
+Measured levels and how they are checked: [](validation.md#val-two-polarizations-vector-radiation).
 
 (sec-field-set)=
 ### The field set: harmonic radiation
 
 The walk carries an ordered set of radiation fields (`fel_field_struct`:
-harmonic number, wavefront, slippage state, escape bank, Genesis's
+harmonic number, wavefront, slippage state, escape bank, Genesis4's
 `vector<Field*>`), with the fundamental always entry 1: the ponderomotive
 phase, the `phi0` advance and the slippage schedule are all defined against it.
 A harmonic field $h$ carries wavelength $\lambda_1/h$ and enters the physics in
@@ -1101,7 +982,7 @@ ponderomotive phase $h\theta$ -- live per Runge--Kutta stage in the kick
 (`BeamSolver::ODE`'s $\sum_i r_i e^{-ih_i\theta}$) and scaling the deposit
 phase (`FieldSolver.cpp`'s $\theta_h = h\,\theta$) -- and its own diffraction
 kernel and escape accounting at $\lambda_1/h$. In the V/m field
-convention no other factor appears: Genesis's per-field $k_{s,h}$ factors in kick
+convention no other factor appears: Genesis4's per-field $k_{s,h}$ factors in kick
 and deposit are exactly its per-field internal unit conversion, which this
 formulation absorbed once ([](#sec-units)). Every field shares the time window,
 so all slippage states advance in fundamental-wavelength units and the records
@@ -1114,7 +995,7 @@ carries the fundamental envelope only), are refused by name.
 
 Validation (`check_harmonics.py`, ninth harness section): a planar
 steady-state segment at the benchmark's $\gamma$, $\lambda$ and rms $a_w$, both
-codes tracking the same Genesis-written start with a dark third-harmonic field --
+codes tracking the same Genesis4-written start with a dark third-harmonic field --
 fundamental power to $5.3\times10^{-8}$, harmonic growth to $1.3\times10^{-4}$ of
 its curve maximum. A one-step dark restart from a hard-bunched beam, whose exit
 $P_3/P_1$ the exact deposit sum (Bessel $f_c$, $h\theta$, bilinear weights, from
@@ -1131,7 +1012,7 @@ Radiation dumps speak one format, the openPMD `Wavefront` extension
 authoritative: the harness verifies the written attributes against its text
 independently of the writer. A `field_file` that is not openPMD is refused by
 name, with the conversion command in the message, and
-`lucifer/tests/scripts/convert_genesis.py` converts a Genesis 1.3 v4 field dump
+`lucifer/tests/scripts/convert_genesis.py` converts a Genesis4 field dump
 either way. Per-harmonic imports are matched to the field whose photon energy they
 carry, and a file matching none is refused by name.
 
@@ -1148,10 +1029,10 @@ file (each carried upstream into openPMD-beamphysics's own openPMD I/O):
 | harmonics | one file per harmonic (the record name is fixed by the extension) |
 
 Validation: every required attribute and `unitDimension` checked against the
-spec text in h5py. The converter's Genesis view of a dump agrees complex-value-wise at
+spec text in h5py. The converter's Genesis4 view of a dump agrees complex-value-wise at
 $1.5\times10^{-16}$. The Fortran reader's re-dump is dataset-identical to the file it
 read. The openPMD-beamphysics `Wavefront` class
-agrees on the field energy through its own Genesis path at $1.2\times10^{-12}$.
+agrees on the field energy through its own Genesis4 path at $1.2\times10^{-12}$.
 Its `from_openpmd` reads the harmonic file to the same complex values,
 `write_openpmd` round-trips exactly, and the Fortran reader takes what that
 writer produces and re-dumps it dataset-identical. All of it runs every harness
@@ -1165,11 +1046,11 @@ built (every claim below is a scan in `check_phasing.py`). In the relative
 mode (the default, `absolute_time_tracking` false) segments are
 autophased: scanning an inter-segment gap by fractions of $2\gamma^2\lambda$ (one
 full turn of drift slip, 25.8 mm at the benchmark) leaves the
-bunching phase entering the next segment flat, measured on Genesis and on this code
+bunching phase entering the next segment flat, measured on Genesis4 and on this code
 alike, both interlude models. The mechanism is the co-moving reference convention:
 `fel_phi0_rate` tracks the beam through a drift, and the window rotations are
 whole wavelengths, carrier-neutral. The fractional beam-vs-light slip
-$k_s L/(2\gamma^2)$ never reaches the coupling. (Genesis's `calcSlippage`
+$k_s L/(2\gamma^2)$ never reaches the coupling. (Genesis4's `calcSlippage`
 carries commented-out code that would have applied that fraction to $\theta$.
 The active code re-anchors, as the measurement shows.)
 
@@ -1179,15 +1060,15 @@ anchor is the element's nominal reference position, so a physical displacement
 $\delta$ adds the real, never-re-anchored entry phase
 $\Delta\phi = -2\pi\,\delta/(2\gamma^2\lambda)$, returned at exit (the downstream
 break is shorter by the same $\delta$, and downstream elements stay anchored). Measured
-against the analytic slope, and against Genesis's own
+against the analytic slope, and against Genesis4's own
 `PHASESHIFTER` element scanned over $\phi = 2\pi\,\delta/(2\gamma^2\lambda)$:
 the two bunching-phase curves agree at $1.9\times10^{-8}$ and the exit power against
-$\phi$ at $9.3\times10^{-9}$, both codes tracking the same Genesis-written initial
+$\phi$ at $9.3\times10^{-9}$, both codes tracking the same Genesis4-written initial
 dumps, so the phase reaches the physics identically, not just the bookkeeping. (On
 independently loaded beams the same power comparison sits at $1.4\times10^{-4}$,
-which measures the two loaders. Hence the shared start.) The sign is Genesis's
+which measures the two loaders. Hence the shared start.) The sign is Genesis4's
 "delay goes backwards", $\theta \to \theta - \phi$, applied persistently.
-Note: Genesis's phase shifter must have finite length to register at all. A
+Note: Genesis4's phase shifter must have finite length to register at all. A
 zero-length one silently does nothing.
 
 In the absolute mode (`bmad_com[absolute_time_tracking] = T` in the
@@ -1205,14 +1086,14 @@ beam while the radiation goes straight, so the light's path is the chord between
 the flanking undulator faces (computed from `ele%floor`, never entered by
 hand) while `vec(5)` is measured against the reference arc. The
 arc-minus-chord delay is charged as whole-wavelength window rotations on the
-break's last element (Genesis's chicane semantics: "always autophasing") plus,
+break's last element (Genesis4's chicane semantics: "always autophasing") plus,
 in absolute mode, its carrier phase. The light drift is shortened by the same
 delay. Relative mode drops the geometric fraction (measured flat under an angle
 scan). Absolute mode ramps at exactly the slope an independent 2D geometric
 computation of $d(\mathrm{arc}-\mathrm{chord})/d\alpha$ predicts. Only a closed
 bump keeps the light on the next undulator's axis: floor orientations and the
 chord direction are asserted, anything else refused by name, as are bends and
-patches under the genesis-model interludes (Genesis's drift/quad set cannot
+patches under the genesis-model interludes (Genesis4's drift/quad set cannot
 represent them) and a `z_offset` that exceeds its upstream break. The
 unaveraged energy ledger closes across a chicane sandwich. The window rotations the
 delay buys are checked time-dependently (steady state never exercises them): a
@@ -1302,7 +1183,7 @@ never re-interacts and evolves by free space alone. Each transmitted slice strea
 `<out_root>-escaped.fld.h5` at the zero fill (peak memory a handful of grid
 planes. One banked slice per `sample`$\cdot\lambda$ of slippage, inheriting the
 window's decimation) with its `wavefront_params` and transmission $z$. These two
-diagnostic files keep Genesis field conventions rather than openPMD, since the
+diagnostic files keep Genesis4 field conventions rather than openPMD, since the
 per-slice `wavefront_params` and transmission $z$ beside each plane have no home
 in the wavefront extension. They are diagnostics: nothing reads them back as state. At
 finalize each is propagated to the exit plane by the `exp(K2\,dz)` kernel and
@@ -1312,37 +1193,7 @@ numerically: free-space propagation is an ABCD map on `sigma(4,4)`, so
 $\sigma_x^2(z) = \sigma_x^2 + 2z\,\sigma_{x\theta} + z^2\sigma_\theta^2$ per
 banked slice, exact.
 
-:::{admonition} Validation
-:class: tip
-Cross-identities, not reference files (`check_diagnostics.py`): banked slice
-energies equal the ledger's $U_{\mathrm{esc}}$ column at $6.7\times10^{-16}$ (same
-slices, independent bookkeeping); the analytic moment map against the FFT-propagated
-pulse agrees at max $8.4\times10^{-3}$ over 267 banked slices (grid-edge wrap of the
-FFT route on divergent noise slices is the residual; checked at $2\times10^{-2}$);
-pooled pulse $\sigma_{xx}$ by both routes at $3.4\times10^{-3}$; the
-`bunch_params` reconstruction at $4.6\times10^{-8}$ (checked at $10^{-6}$, the
-numpy-vs-`mat_eigen` eigensystem difference, with the projected planes agreeing
-exactly); all three files dataset-identical at 1 vs 8 threads (NaN counting as NaN,
-which is what a not-computed entry means); unknown dump elements refused by name. The
-position extremes equal numpy extremes over a `dump_beam_at` file's particles at
-the same plane exactly (same particles, and IEEE subtraction of the stored centroid is
-deterministic), the momentum entries match across the dump's unit round trip at
-$3\times10^{-16}$, and the $t$ entry is the $z$ entry through $-\Delta z/(\beta_0 c)$
-exactly. `diag.txt` is untouched: every benchmark tier reproduces it bit for bit.
-
-The format's own conformance checker, `tests/scripts/validate_bmad_stats.py`,
-is program-blind (numpy and h5py only), runs on every diagnostics check and is
-required to report zero failures. What it enforces is the specification's rules, which
-`doc/BMAD-STATS-SPEC.md` states and this manual does not restate. Two of its
-checks are named here because they guard physics rather than layout. The join:
-`at_element_end` must select exactly the element ends, and every record must sit
-inside the element `ix_ele` names, since a silent off-by-one there would break
-every layout plot while no physics check noticed. And the record axis: `s`
-non-decreasing, with every repeated `s` straddling an element boundary, since one
-plane is reached twice at a boundary while a repeat inside an element would be a defect
-in the walk. The zero-length wake lattice is run for that check, where `s` really
-does repeat, so the check meets its target rather than a run with no duplicates in it.
-:::
+Measured levels and how they are checked: [](reading-output.md).
 
 (sec-pool)=
 ### The whole-window row
@@ -1365,15 +1216,7 @@ applies it as $S \to J S J^{\mathsf T}$ with the single off-diagonal
 $J_{56} = (i_s - 1)\Delta \, {\rm d}\beta/{\rm d}p_z$. The residual is second order
 in that expansion.
 
-:::{admonition} Validation
-:class: tip
-check_diagnostics reproduces [](#eq-pool) and its shear independently and holds
-the stored row to it, and confirms the between-group term is load-bearing (dropping it
-moves the row by order unity). Against the particle sum it replaced: worst relative
-4.0e-12 over every whole-window quantity on that configuration, 5.0e-11 over the
-96-slice SASE example's 48 element ends. It removed 110 million single-threaded
-particle visits from a 131-slice run (16.5% of its wall clock).
-:::
+Measured levels and how they are checked: [](reading-output.md).
 
 (sec-meta)=
 ### Provenance
@@ -1403,7 +1246,7 @@ Bmad version identify the run. The user name and working directory go in only un
 `global%record_environment`, and the lattice file is recorded as a base name.
 What a user types into the namelist is echoed as typed, so an absolute path in the input
 is still an absolute path in the file: relative paths are the user's half of that
-contract. Genesis records user and cwd unconditionally. Parity is not a reason to leak.
+contract. Genesis4 records user and cwd unconditionally. Parity is not a reason to leak.
 
 (sec-numerics)=
 ## Numerical practices
@@ -1414,7 +1257,7 @@ $\langle v^2\rangle - \langle v\rangle^2$ form loses the entire $\sigma$ to
 cancellation (hidden for five deliverables until a uniform wake kick first moved the
 mean).
 
-*Constants floors.* Comparisons against Genesis bottom out at the mismatch of
+*Constants floors.* Comparisons against Genesis4 bottom out at the mismatch of
 its truncated constants, per term: $Z_0 = 376.73$ ($8.3\times10^{-7}$, the FEL core
 and resistive/geometric wakes), $\varepsilon_0 = 8.85\times10^{-12}$ in the
 long-range space charge ($4.7\times10^{-4}$), $e = 1.6\times10^{-19}$ and
@@ -1446,12 +1289,7 @@ it, so results are bit-identical across thread counts. That is a checked propert
 the only instrument that catches shared-accumulator races (invisible to every
 single-threaded check).
 
-:::{admonition} Validation
-:class: tip
-The coarse-step table in `validation.md`, and the
-thread check with its shared-accumulator mutation (7.0 relative between thread counts,
-bit-identical single-threaded).
-:::
+Measured levels and how they are checked: [](validation.md).
 
 (sec-coherent-source)=
 ## The coherent source (SIMPLEX hybrid)

@@ -10,9 +10,9 @@ the equations beside them.
 
 ## The codes this one is measured against
 
-**Genesis 1.3 Version 4**, S. Reiche. The FEL physics of the averaged path is
+**Genesis 1.3 Version 4 (Genesis4)**, S. Reiche. The FEL physics of the averaged path is
 transcribed from it, routine by routine, and the benchmark tiers compare against it from
-shared dumps. Genesis is GPLv3, which is what permits the transcription, and the
+shared dumps. Genesis4 is GPLv3, which is what permits the transcription, and the
 per-routine citations in the source are kept for that reason. The original code is
 described in S. Reiche, *GENESIS 1.3: a fully 3D time-dependent FEL simulation code*,
 Nucl. Instr. and Meth. A **429** (1999) 243.
@@ -45,7 +45,7 @@ name. See [](fel-physics.md#sec-coherent-source).
 **Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, SLAC-PUB-10707. The numerical
 impedance with AC (Drude) conductivity and Leontovich surface impedance, round and flat
 geometry. Transcribed in `fel_collective_mod` (`fel_resistive_wall_wake`), with
-Genesis's exact numerics kept. See [](fel-physics.md#sec-wakes).
+Genesis4's exact numerics kept. See [](fel-physics.md#sec-wakes).
 
 **Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in
 FEL simulation codes, in the one-substitution weighted generalization that makes it
@@ -54,7 +54,7 @@ $\langle|b(h)|^2\rangle = 1/N_\lambda$ under uniform and nonuniform weights. See
 [](fel-physics.md#sec-noise).
 
 **Incoherent (quantum) diffusion.** The standard undulator quantum-diffusion variance in
-the Saldin form, as fitted in Genesis's `Incoherent.cpp`, with one draw per beamlet so
+the Saldin form, as fitted in Genesis4's `Incoherent.cpp`, with one draw per beamlet so
 the quiet start's cancellation survives. Applied only when Bmad's own
 `radiation_fluctuations` switch is on. See [](fel-physics.md#sec-eom).
 
@@ -76,7 +76,7 @@ in [](BMAD-STATS-EXT-FEL.md). The statistics file is deliberately not FEL-specif
 
 ## On the citations in the source
 
-Genesis and Bmad are both GPLv3. The per-routine transcription citations in the Fortran
+Genesis4 and Bmad are both GPLv3. The per-routine transcription citations in the Fortran
 (`Field::track`, `Beam::track`, `Lattice::calcSlippage`, `SDDSBeam.cpp` and the rest) are
 kept deliberately: they record provenance, they let a reader check a transcription
 against its original, and they are the license's own trail.

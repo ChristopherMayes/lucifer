@@ -4,8 +4,8 @@ short_title: Introduction
 ---
 
 Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its
-physics is transcribed from Genesis 1.3 Version 4, embedded in Bmad's lattice
-machinery, and validated against Genesis from bitwise-identical starting states.
+physics is transcribed from Genesis 1.3 Version 4 (Genesis4), embedded in Bmad's lattice
+machinery, and validated against Genesis4 from bitwise-identical starting states.
 
 An FEL segment is a real Bmad wiggler element with `tracking_method = custom`, so a
 Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and
@@ -20,9 +20,9 @@ one line.
 
 | `fel_tracking` | method | what it is for |
 |---|---|---|
-| unset or `0` | averaged | The default. The wiggle-averaged model on Bmad's own `bmad_standard` kernel maps. The production workhorse, and faster than Genesis at equal cores with richer in-run diagnostics. |
+| unset or `0` | averaged | The default. The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
 | `1` | unaveraged | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. A production method whose cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also the tree's referee, sharing no approximation with the averaged path. |
-| `-1` | transcribed Genesis | Genesis's transverse maps verbatim. Validation-internal: the comparison tiers select it through wrapper lattices, and no production lattice writes it. |
+| `-1` | transcribed Genesis4 | Genesis4's transverse maps verbatim. Validation-internal: the comparison tiers select it through wrapper lattices, and no production lattice writes it. |
 
 ## Where to start
 
@@ -40,22 +40,31 @@ one line.
 Runnable cases live in `lucifer/examples/`, each a directory of real input files with
 its own README and a runner.
 
-## What is in, and what is not
+## Features
 
-In: the FEL element, per-particle weights throughout, OpenMP over slices with
-bit-identical results at any thread count, physical shot noise under weights,
-distribution import, slice migration, Genesis's collective effects and Bmad element
-wakes across the whole bunch, the unaveraged mode, two polarizations, harmonic fields,
-openPMD dumps in both directions, phasing between segments, spontaneous emission
-honoring Bmad's global switches, and a self-describing statistics file.
+- **The FEL element.** An FEL segment is a Bmad wiggler, so its parameters are lattice attributes and one lattice serves tracking, optics and layout.
+- **Three tracking methods**, mixable per element in one line.
+- **Per-particle weights** throughout: physical shot noise, collective effects and diagnostics are all weight-correct.
+- **Time dependence** with an exact integer slippage shift, and slice migration when a particle's ponderomotive phase leaves its slice.
+- **Collective effects**: resistive-wall, geometric and roughness wakes, short-range and long-range space charge, and Bmad element wakes applied across the whole time window.
+- **Two polarizations** and harmonic field sets, with tilt honored on planar and helical undulators.
+- **Spontaneous emission** gated on Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
+- **Shared-memory parallelism** over slices, bit-identical at any thread count.
+- **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
+- **Distribution import**, resampling a `bunch_struct` into FEL slices.
+- **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
 
-Not in: simultaneous harmonic fields in the unaveraged mode, elliptical polarization
-beyond the tilt-honored planar and helical limits, MPI (deliberate, since the
-shared-memory design is measured faster at equal cores), one-to-one particle tracking,
-undulator field errors, and GPU support.
+## Known missing features
+
+- Simultaneous harmonic fields in the unaveraged mode.
+- Elliptical polarization beyond the tilt-honored planar and helical limits.
+- One-to-one particle tracking, and the particle sorting it implies.
+- Undulator field errors.
+- MPI. This one is a design decision rather than a gap: the shared-memory design is what this program is, and the case for adding MPI would have to be made on measurement.
+- GPU support.
 
 Validation runs on eleven comparison tiers and thirteen check sections, on both debug
 and production builds, before every commit. Nine of the eleven tiers are transcription
-checks that agree with Genesis at the floor set by its truncated impedance constants.
+checks that agree with Genesis4 at the floor set by its truncated impedance constants.
 The other two are priced model differences rather than defects. The levels, the
 attributions and the tier table are in [](validation.md).

@@ -1,17 +1,17 @@
 # The saturation demo: one practical SASE case, three trackers, one clock
 
-Genesis's own Benchmark1-SASE configuration run to saturation (the full 57 m 6-FODO
+The Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), run to saturation (the full 57 m 6-FODO
 Aramis line, dark start, growth from shot noise alone, 96 slices x 2048 particles),
 tracked three ways from identical initial dumps, each on the machine's full
 performance-core count. Every input is a real file in this directory:
 
 | file | what it is |
 |---|---|
-| `Aramis.lat` | the Genesis lattice (6 FODO cells, 12 undulator segments) |
+| `Aramis.lat` | the Genesis4 lattice (6 FODO cells, 12 undulator segments) |
 | `aramis.bmad` | the Bmad translation (real wigglers, the manual's FEL-element section) |
 | `sat_unavg.bmad` | two-line wrapper selecting `fel_tracking = fel_unaveraged` |
-| `sat-prep.in` | Genesis deck that writes the shared initial dumps (no tracking) |
-| `sat-genesis.in` | the timed Genesis deck (same seed and ranks as the prep) |
+| `sat-prep.in` | Genesis4 deck that writes the shared initial dumps (no tracking) |
+| `sat-genesis.in` | the timed Genesis4 deck (same seed and ranks as the prep) |
 | `sat-avg.nml` | Bmad averaged mode (the `bmad_standard` default) |
 | `sat-unavg.nml` | Bmad unaveraged mode (~32x cost). The point is the same answer from raw dynamics |
 | `check_agreement.py` | exit powers must agree at the documented levels before timings mean anything |
@@ -32,19 +32,19 @@ unaveraged ledger closing exactly along z.
 
 Measured (M3 Max, 12 performance cores, production builds both sides):
 
-| | wall | exit total power | vs Genesis |
+| | wall | exit total power | vs Genesis4 |
 |---|---|---|---|
-| Genesis 1.3 v4, 12 MPI ranks | 38.0 s | 3.381 GW (4.52 GW peak at 56.8 m) | the reference |
+| Genesis4, 12 MPI ranks | 38.0 s | 3.381 GW (4.52 GW peak at 56.8 m) | the reference |
 | Bmad averaged (`bmad_standard` default), 12 threads | 30.2 s | 3.380 GW | **rel 4.9e-4** |
 | Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1143.2 s | 6.25 GW | ln ratio +0.62 |
 
-The averaged mode tracks Genesis through eight decades of z and three of power to
+The averaged mode tracks Genesis4 through eight decades of z and three of power to
 **4.9e-4** at saturation. The ~4e-2 seam-transport difference the benchmark tiers
-price is invisible here because saturation self-limits the power. It is also 1.26x
-faster than Genesis at equal cores, each code computing its own in-run diagnostics,
-and ours are the full 6x6/4x4 moment sets of the stats file where Genesis's are
+price is invisible here because saturation self-limits the power. On this configuration and machine it also ran 1.26x
+faster than Genesis4 at equal cores, each code computing its own in-run diagnostics,
+and ours are the full 6x6/4x4 moment sets of the stats file where Genesis4's are
 scalar columns (the diagnostics record in `lucifer/doc/validation.md` is where that speed
-came from). Spontaneous radiation is off in the demo on both sides, matching Genesis's
+came from). Spontaneous radiation is off in the demo on both sides, matching Genesis4's
 `&sponrad` default. Turning `radiation_damping`/`radiation_fluctuations` on costs the
 beam ~1.3e-4 of its energy over the line (~0.5 rho of accumulated detuning -- the size
 that moves hard-X-ray saturation, and the reason the switches exist).
@@ -60,11 +60,11 @@ for it (its step adds 2S to the field and kicks with E, so the 4|S|^2 part of th
 field energy is created, measured factor 134 on a dark segment), while the unaveraged
 mode conserves energy by construction and therefore pays. The unaveraged mode's
 captured spontaneous loss agrees with the analytic rate (2/3)r_e gamma^2 ku^2 aw^2
-restricted to the grid's angular acceptance to 8%, the same formula Genesis's own
+restricted to the grid's angular acceptance to 8%, the same formula Genesis4's own
 optional &sponrad module uses. Neither model yet carries the ~90% of spontaneous
 power radiated outside the grid acceptance (the named follow-on). The energy panels
 are where all of this is visible (the budget panel:
-Genesis and the averaged mode both keep ~72% of the beam's energy in the window at
+Genesis4 and the averaged mode both keep ~72% of the beam's energy in the window at
 exit, the unaveraged mode keeps 10%. Its beam gave 6.6e-8 J against their 4.7e-9,
 the difference radiated and slipped out forward. Also the faster energy-spread
 growth), and "slipped out forward" is bookkept, not asserted: the unaveraged ledger

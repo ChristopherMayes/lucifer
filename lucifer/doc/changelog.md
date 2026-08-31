@@ -9,6 +9,25 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-30 Added: `genesis4.md`, one page for everything about Genesis 1.3 Version 4
+  (Genesis4). Shared physics, what each code has that the other does not, a settings
+  translation table, the conventions that differ, and file exchange. It pins the Genesis4
+  release it was checked against, so it is the only page to revisit when Genesis4 changes.
+  The "Facts about Genesis this work pinned down" section moved here from `validation.md`.
+
+- 2026-08-30 Changed: The documentation presents Lucifer as its own code. Genesis4 is named
+  in full at first mention on each page and `Genesis4` after, in place of five spellings.
+  The introduction replaces its "In:"/"Not in:" paragraphs with Features and Known missing
+  features. The claim of being faster than Genesis4 leaves the introduction, the user guide
+  and the README: it was one configuration on one machine, and it now appears only in the
+  two places that carry the measurement, each naming the machine.
+
+- 2026-08-30 Changed: The physics manual no longer carries measured levels. Its 17
+  Validation admonitions are removed and each section links to the measured record instead.
+  The 12 Provenance admonitions stay, since transcription provenance is not comparison.
+  Seven levels that lived only in the manual moved to `validation.md` and
+  `reading-output.md` with their stories.
+
 - 2026-08-30 Changed: The LaTeX manual is removed. `fel-physics.md` is the manual now, and
   `fel-physics.tex`, its `Makefile` and every reference to either are gone. The Markdown
   was kept beside the LaTeX for one commit so the two could be compared, and the

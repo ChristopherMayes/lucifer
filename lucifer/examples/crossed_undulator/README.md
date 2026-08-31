@@ -26,5 +26,5 @@ polarization panel (the last one, present only when a run carries two components
 The figure is banked as `fel-benchmark-plots/crossed-afterburner.png`.
 
 Outputs: `crossed-final-x.fld.h5` / `crossed-final-y.fld.h5` (one polarization per
-file, Genesis's format), and `crossed.stats.h5` with the field group carrying totals
+file, in the format of Genesis 1.3 Version 4 (Genesis4)), and `crossed.stats.h5` with the field group carrying totals
 plus the x component and a `field/y/` group. Runs in ~30 s.

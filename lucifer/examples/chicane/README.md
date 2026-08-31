@@ -24,11 +24,11 @@ delay. Measured (200 MW seed, two 0.99 m helical segments):
 The second segment amplifies or absorbs on a half-wavelength of geometry -- the
 re-phasing knob a real machine turns by trimming its chicane. In the default
 relative mode the same two lattices produce identical output (the geometric
-fraction is autophased away, Genesis's chicane semantics). The deliberate
+fraction is autophased away, the chicane semantics of Genesis 1.3 Version 4 (Genesis4)). The deliberate
 off-phase knob there is the wiggler's own `z_offset` (manual: the phasing section).
 
 Validated by the harness's phasing section: the re-anchor baseline flat, the
-z_offset knob on the analytic slope, the knob curve equal to Genesis's own
+z_offset knob on the analytic slope, the knob curve equal to Genesis4's own
 PHASESHIFTER scan at 6.0e-6, the absolute-mode chicane ramp on the independent
 geometric prediction at 6.8e-4, the unaveraged ledger closing across the chicane
 at 4.0e-6, and four refusals by name. Runs in ~1 min each.

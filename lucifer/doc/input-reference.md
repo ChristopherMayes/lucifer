@@ -9,24 +9,24 @@ Every resolved input is also written into the stats file's `params/` group, one 
 The program walks a Bmad lattice and applies the seam of the design (manual: the FEL-element and seam sections). FEL segments are real Bmad wiggler/undulator elements with
 tracking_method = custom, their FEL parameters read from lattice attributes (aw from
 b_max/l_period, helicity from field_calc, step from ds_step, asserted by name at
-setup), stepped with the transcribed Genesis physics of fel_track_mod. Every other
+setup), stepped with the transcribed Genesis 1.3 Version 4 (Genesis4) physics of fel_track_mod. Every other
 element tracks each slice's bunch with Bmad's track1_bunch (the packed arrays ARE
 Bmad coordinates, so conversion is a plain copy) and drifts the field by
 wavefront_drift, with one advance of the reference phase phi0 per element.
 
 Time dependence follows from the starting state alone: a multi-slice window makes a
 time-dependent run (slippage active), a single slice the steady state, no separate
-switch (the same rule as Genesis). The slippage schedule is precomputed over the
+switch (the same rule as Genesis4). The slippage schedule is precomputed over the
 lattice, transcribing Lattice::calcSlippage (manual: the slippage section, including the
 drift autophasing and its unguarded end-of-lattice fixup), and applied after each
 step's field solve, before its diagnostics -- Gencore's step order. The field record
 rotates rather than moves. Everything reading it in time order goes through
 fel_field_index.
 
-The starting state can be a pair of Genesis dumps (&write of beam and field), so
+The starting state can be a pair of Genesis4 dumps (&write of beam and field), so
 both codes track from bitwise-identical initial conditions. It can also be
-self-generated, or an imported distribution (below). Diagnostics matching Genesis's
-definitions are recorded at the same z positions Genesis records them: once at the
+self-generated, or an imported distribution (below). Diagnostics matching Genesis4's
+definitions are recorded at the same z positions Genesis4 records them: once at the
 start and once after every integration step, one step per interlude element. Each
 record is one row per slice, in time-window order.
 
@@ -76,8 +76,8 @@ fel_transcribed$/fel_averaged$/fel_unaveraged$ parameters (fel_track_mod):
                           ! 1 = the unaveraged mode: full Newton-Lorentz
                           !   quiver, no fc/faw (manual: the unaveraged-mode section). The run
                           !   writes <out_root>.ledger.txt.
-                          ! -1 = averaged with the transcribed-Genesis transverse
-                          !   maps: VALIDATION-INTERNAL (the Genesis tiers require
+                          ! -1 = averaged with the transcribed-Genesis4 transverse
+                          !   maps: VALIDATION-INTERNAL (the Genesis4 tiers require
                           !   transcription-level transport, so no production lattice
                           !   writes it). Differences priced in the README.
     fel_steps_per_period  ! Unaveraged substeps per period. unset/0 -> 20.
@@ -117,15 +117,15 @@ The remaining global%... switches of &fel_params:
 
 global%migrate = T moves particles between slices when their ponderomotive phase leaves the
 slice window (fel_migrate_slices, manual: the slice-migration section), called serially after every
-element. off by default, deliberately: the Genesis-comparison tiers run against
-Genesis WITHOUT one4one, which never migrates. Migration would be a physics-model
+element. off by default, deliberately: the Genesis4-comparison tiers run against
+Genesis4 WITHOUT one4one, which never migrates. Migration would be a physics-model
 difference inside a transcription-level comparison. Dropped charge is counted and
 reported. migrate_check = T also verifies exact phase continuity at every
 migration and reports the worst deviation.
 
 Alternatively, leave beam_file and field_file blank and the program generates its own
 starting condition (a quiet-start beam and a Gaussian seed field), making a
-self-contained single run with no Genesis anywhere (see lucifer/examples). The BEAM
+self-contained single run with no Genesis4 anywhere (see lucifer/examples). The BEAM
 is described by Bmad's standard beam_init_struct, the same block the import path
 uses: one bulk-bunch description, two generation methods. The import resamples
 real particles from it, the quiet-start loader evaluates it analytically per slice.
@@ -181,7 +181,7 @@ The beam-side generation knobs of &fel_beam_init:
 ```
     nbins = 8                ! Beamlet size of the quiet start (quiet below nbins).
     shotnoise = F            ! Impose physical shot noise (&time shotnoise).
-                             !   Time-dependent windows only, Genesis's dotime rule.
+                             !   Time-dependent windows only, Genesis4's dotime rule.
     gen_test_weights = F     ! Validation knob: alternate beamlet weights 0.25x/1.75x
                              !   (charge preserving, uniform within each beamlet) to
                              !   exercise the weighted-noise paths. Not physics input.
@@ -194,7 +194,7 @@ write_wake_kernels = "<file>" exports the transcribed wake kernels for building
 matching z_long tables (see the README's seam-wake section and examples/bmad_wake).
 
 Third way in: import a particle DISTRIBUTION, an arbitrary bunch resampled into
-slices by the transcribed Genesis importdistribution method (fel_import_mod, manual: the
+slices by the transcribed Genesis4 importdistribution method (fel_import_mod, manual: the
 distribution-import section). The bunch comes from the SAME beam_init block (use_beam_init = T:
 init_beam_distribution generates it, honoring everything Bmad honors) or from an
 openPMD-beamphysics file (dist_file). Note: the honored-fields contract above
@@ -203,16 +203,16 @@ field are shared with the generator: one seed governs generation, resampling and
 noise. Knobs, named after &importdistribution's where one exists:
 
 ```
-    imp%slicewidth = 0.01    ! Sampling window / bunch length (Genesis's slicewidth).
+    imp%slicewidth = 0.01    ! Sampling window / bunch length (Genesis4's slicewidth).
     imp%npart = 8192         ! Macroparticles per slice after resampling.
     imp%nbins = 4            ! Beamlet size (quiet-load bins) of the resample.
-    imp%nslice = 0           ! 0: round(bunch_length/spacing), Genesis's rule.
-                             ! (Genesis's match/center are NOT ported: a Bmad lattice
+    imp%nslice = 0           ! 0: round(bunch_length/spacing), Genesis4's rule.
+                             ! (Genesis4's match/center are NOT ported: a Bmad lattice
                              !   carries its Twiss and beam_init generates matched
                              !   bunches already. Also see fel_import_mod's header.)
     use_beam_init = F        ! Generate the bunch from the beam_init%... block.
     dist_file = ""           ! Or read an openPMD-beamphysics file.
-    write_dist_file = ""     ! Write the bunch as a Genesis &importdistribution
+    write_dist_file = ""     ! Write the bunch as a Genesis4 &importdistribution
                              !   input (t/p/x/xp/y/yp + charge, t = -tau/c), the
                              !   shared file of the cross-code checks.
     write_opmd_file = ""     ! Write the bunch as openPMD-beamphysics.
@@ -221,18 +221,18 @@ noise. Knobs, named after &importdistribution's where one exists:
 
 The quiet start and the weighted Fawley shot noise (shotnoise = T), including
 the noise-level algebra and the N_eff refusal guard, are the manual's loading section.
-The loader warns where Genesis silently clamps beamlets with fewer real electrons
+The loader warns where Genesis4 silently clamps beamlets with fewer real electrons
 than macroparticles.
 
 interlude_model selects how the field-free elements are handled. "bmad" is the seam
 (track1_bunch, exact theta mapping, wavefront_drift). "genesis" uses the transcribed
-Genesis interlude step everywhere, which prices what the seam changes (the manual's
+Genesis4 interlude step everywhere, which prices what the seam changes (the manual's
 interlude and seam sections). The slippage schedule is identical in both models.
 
 split_weights = T replaces each imported particle by two copies at identical
 coordinates carrying 1/3 and 2/3 of its weight. Every collective observable must be
-identical to the unsplit run. This checks the weighted paths, which no Genesis
-comparison can (Genesis dumps carry no weights).
+identical to the unsplit run. This checks the weighted paths, which no Genesis4
+comparison can (Genesis4 dumps carry no weights).
 
 Outputs: <out_root>.diag.txt, ONLY with global%write_diag = T (one row per slice per
 record: z, slice, field and beam diagnostics). <out_root>.stats.h5 is the production
@@ -241,5 +241,5 @@ bunch_params_struct components, per-record per-slice wavefront_params, and the
 evaluated calc_bunch_params at element ends, in fixed Bmad units.
 The end state is dumped as openPMD, the one format this program speaks:
 <out_root>-final.beam.h5 and -final.wf.h5 are openPMD, <out_root>-final.par.h5 and
--final.fld.h5 are Genesis format, for field-by-field comparison against Genesis. The
+-final.fld.h5 are Genesis4 format, for field-by-field comparison against Genesis4. The
 field dump is unrotated to time order first, as writeFieldHDF5 does.

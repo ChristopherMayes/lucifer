@@ -1,8 +1,8 @@
 # FEL examples
 
-Self-contained runs of the FEL tracker: one command each, no Genesis, no dump files
+Self-contained runs of the FEL tracker: one command each, no Genesis 1.3 Version 4 (Genesis4), no dump files
 (one exception: `saturation_demo/`, the three-way comparison, needs the genesis4 binary). For
-the validation benchmark against Genesis see `lucifer/tests/`. That is where the physics
+the validation benchmark against Genesis4 see `lucifer/tests/`. That is where the physics
 is proven. The physics itself (equations, conventions, provenance) is the
 manual, `lucifer/doc/fel-physics.md`.
 
@@ -24,13 +24,13 @@ python ../plot_fel.py <example>.stats.h5            # needs h5py + matplotlib; w
 | `taper/` | The same, with a two-stage undulator taper | ~1 min |
 | `sase/` | Pure SASE: 96 slices, dark start, shot noise | ~90 s |
 | `sase_wake/` | The SASE run plus resistive-wall/gap/roughness wakes | ~100 s |
-| `import/` | A beam_init bunch resampled into slices (Genesis's importdistribution method), tracked dark | ~1 min |
+| `import/` | A beam_init bunch resampled into slices (Genesis4's importdistribution method), tracked dark | ~1 min |
 | `bmad_wake/` | The SASE run with the chamber wake via Bmad's z_long machinery on every element | ~2 min |
 | `unaveraged/` | One seeded segment with no period averaging: the real quiver, the coupling as an outcome, plus its averaged twin for the overlay | ~1 min |
 | `crossed_undulator/` | The two-polarization afterburner: an x-planar set bunches, its quarter-turn twin radiates orthogonally from that bunching | ~30 s |
 | `harmonics/` | Harmonic lasing (the field set): a dark third harmonic grows from the fundamental's bunching on a planar segment, with openPMD wavefront output | ~2 min |
 | `chicane/` | A four-bend chicane between segments in absolute-time mode: half a wavelength of geometric delay flips the second segment between amplifying and absorbing | ~2 min |
-| `saturation_demo/` | The one exception to "no Genesis": the full 57 m SASE case to saturation, three trackers (Genesis4 MPI, Bmad averaged, Bmad unaveraged) from identical dumps, one clock (its own `run.sh`, every input a real file in the directory) | ~25 min |
+| `saturation_demo/` | The one exception to "no Genesis4": the full 57 m SASE case to saturation, three trackers (Genesis4 MPI, Bmad averaged, Bmad unaveraged) from identical dumps, one clock (its own `run.sh`, every input a real file in the directory) | ~25 min |
 
 With no dump files named in the namelist, the program generates its own starting state
 (quiet-start beam, and a Gaussian seed where `wavefront_init%seed_power > 0`). The beam is described
@@ -55,7 +55,7 @@ normalized emittances beside the field emittance sqrt(det) = M^2 lambda/4pi at e
 ends. Two more panels appear when the run calls for them: a polarization split when the
 run carries two live polarizations (field/y in the stats file), and per-harmonic power
 when it carries harmonic fields (field/harm<h>). Note: Energies are eV, never gamma.
-`<example>.diag.txt` remains the Genesis-comparison instrument
+`<example>.diag.txt` remains the Genesis4-comparison instrument
 (same columns as always) and is what the benchmark harness reads.
 
 The sections below cover the single-command examples. `crossed_undulator/`,
@@ -84,8 +84,8 @@ saturation peak).
 
 ## import
 
-A bunch described by Bmad's `beam_init_struct` (the native equivalent of Genesis's
-`&beam`), generated, resampled into FEL slices by the transcribed Genesis
+A bunch described by Bmad's `beam_init_struct` (the native equivalent of Genesis4's
+`&beam`), generated, resampled into FEL slices by the transcribed Genesis4
 `importdistribution` method (`fel_import_mod`), and tracked dark through the full
 line: SASE from an imported bunch (the resampling method is the manual's the distribution-import section).
 The bunch is a Gaussian test bunch sized to the FEL
@@ -94,9 +94,9 @@ a reason: physical bunches are micrometers and need thousands of slices. The tim
 window derives from the bunch itself, so the diag file's per-slice current is the
 Gaussian profile. The lattice is the whole optics specification. The reference energy
 comes from its `e_tot`, and `init_beam_distribution` generates the bunch matched to the
-Twiss in its beginning statement. Genesis's `match` transform is not ported, since a
+Twiss in its beginning statement. Genesis4's `match` transform is not ported, since a
 Bmad lattice already says what it would say. Set `write_dist_file` to hand the
-identical bunch to Genesis's `&importdistribution`, or `write_opmd_file` for
+identical bunch to Genesis4's `&importdistribution`, or `write_opmd_file` for
 openPMD-beamphysics. `dist_file` reads openPMD back in place of `use_beam_init`.
 
 ## sase
@@ -114,14 +114,14 @@ first segment, total power reaches 3.0 GW at z = 57 m with a per-slice spread of
 dark start, a tiny transport change re-rolls the effective noise realization.) The
 plot shows the physics directly. The total-power sawtooth is radiation slipping out of
 the head of the finite window at each drift while fresh vacuum enters at the tail (a
-real effect of any finite time window, identical in Genesis). Deep saturation of every
+real effect of any finite time window, identical in Genesis4). Deep saturation of every
 slice needs a window longer than the total slippage. The per-slice spaghetti in the
 power panel is the slippage cascade itself.
 
 ## bmad_wake
 
 The same chamber-wake physics as `sase_wake`, delivered through Bmad's own wake
-machinery instead of the transcribed Genesis model (conventions: the manual's Bmad-element-wakes section): `ztable.wake` is the Bane-Stupakov resistive-wall kernel for a 0.5 mm
+machinery instead of the transcribed Genesis4 model (conventions: the manual's Bmad-element-wakes section): `ztable.wake` is the Bane-Stupakov resistive-wall kernel for a 0.5 mm
 copper chamber (exported by `write_wake_kernels`, sign-flipped to Bmad's
 positive-decelerating convention, self-slice unhalved, causal side z < 0, padded past
 the window), attached as an `sr_wake` `z_long` table to every element of the line. The

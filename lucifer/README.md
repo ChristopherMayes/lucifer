@@ -1,6 +1,6 @@
-# Lucifer: an FEL tracker, validated against Genesis 1.3 Version 4
+# Lucifer: an FEL tracker, validated against Genesis 1.3 Version 4 (Genesis4)
 
-Lucifer (*lux ferre*, light-bringer) is a free-electron-laser tracker inside Bmad. Its physics is transcribed from Genesis 1.3 Version 4 (GPL permits transcription), embedded in Bmad's lattice machinery by the seam, and validated against Genesis over its `benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states.
+Lucifer (*lux ferre*, light-bringer) is a free-electron-laser tracker inside Bmad. Its physics is transcribed from Genesis4 (GPL permits transcription), embedded in Bmad's lattice machinery by the seam, and validated against Genesis4 over its `benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states.
 
 FEL segments are real Bmad wiggler elements with `tracking_method = custom`, so a Lucifer lattice is a Bmad lattice: quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's, and the FEL parameters are read from lattice attributes rather than a parallel namelist. Every other element tracks each slice's bunch with Bmad's own `track1_bunch`.
 
@@ -27,9 +27,9 @@ Chosen per element with the `fel_tracking` lattice attribute, and they mix freel
 
 | `fel_tracking` | method | what it is for |
 |---|---|---|
-| unset or `0` | averaged | The default. The wiggle-averaged model on Bmad's own kernel maps: the production workhorse, 1.26x faster than Genesis at equal cores with richer in-run diagnostics. |
+| unset or `0` | averaged | The default. The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
 | `1` | unaveraged | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also the tree's referee, sharing no approximation with the averaged path. |
-| `-1` | transcribed Genesis | Genesis's transverse maps verbatim. Validation-internal: the comparison tiers select it through wrapper lattices, and no production lattice writes it. |
+| `-1` | transcribed Genesis4 | Genesis4's transverse maps verbatim. Validation-internal: the comparison tiers select it through wrapper lattices, and no production lattice writes it. |
 
 ## Building and running
 
@@ -53,10 +53,10 @@ See [`doc/user-guide.md`](doc/user-guide.md) for the input file's three namelist
 
 ## Where it stands
 
-Validated against Genesis on eleven tiers plus thirteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
+Validated against Genesis4 on eleven tiers plus thirteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
-Nine of the eleven tiers are transcription checks and agree with Genesis at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis's averaged one. Every level, every attribution and the full tier table live in [`doc/validation.md`](doc/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
+Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`doc/validation.md`](doc/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 
-In: the FEL element, per-particle weights throughout, OpenMP over slices with bit-identical results at any thread count, physical shot noise under weights, distribution import, slice migration, Genesis's collective effects and Bmad element wakes across the whole bunch, the unaveraged mode, two polarizations, harmonic fields, openPMD dumps in both directions, phasing between segments, spontaneous emission honoring Bmad's global switches, and a self-describing statistics file.
+In: the FEL element, per-particle weights throughout, OpenMP over slices with bit-identical results at any thread count, physical shot noise under weights, distribution import, slice migration, Genesis4's collective effects and Bmad element wakes across the whole bunch, the unaveraged mode, two polarizations, harmonic fields, openPMD dumps in both directions, phasing between segments, spontaneous emission honoring Bmad's global switches, and a self-describing statistics file.
 
 Not in: simultaneous harmonic fields in the unaveraged mode, elliptical polarization beyond the tilt-honored planar and helical limits, MPI (deliberate: the shared-memory design is measured faster at equal cores), one-to-one particle tracking, undulator field errors, and GPU support.
