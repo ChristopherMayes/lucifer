@@ -16,8 +16,8 @@
 ! directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
 !
 !   &fel_params           lat_file, the global%... run switches, Bmad's own bmad_com and
-!                         space_charge_com, and the wake%/sc% collective descriptions.
-!   &fel_beam_init        Bmad's beam_init%... bunch description, the imp%... resampler,
+!                         space_charge_com, and the chamber_wake%/space_charge% collective descriptions.
+!   &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
 !                         source and output files, and the beam-side check knobs.
 !   &fel_wavefront_init   wavefront_init%... radiation starting condition (the field
 !                         record IS the time window, so the window lives here) and the
@@ -48,8 +48,8 @@ implicit none
 ! The driver is read-parse-call (doc/user-guide.md): the namelist layer fills the
 ! input structs, the library builds and walks the run, and every library error
 ! RETURNS here. This is the one place that stops. The check instruments
-! (split_weights, swap_beam_xy, gen_test_weights, imp_split_weights,
-! write_wake_kernels) ride along in the input structs and act inside init/setup.
+! (split_weights, swap_beam_xy, gen_test_weights, resample_split_weights,
+! chamber_wake%write_kernels) ride along in the input structs and act inside init/setup.
 
 type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k
@@ -88,15 +88,15 @@ call fel_write_header (run)
 ! fel_setup_schedule's fel_wake_init. Note: The s = 0 entries carry the Bane
 ! self-slice half factor.
 
-if (run%wake_init%write_kernels /= '' .and. run%coll%wake%on) then
-  open (newunit = iu_k, file = trim(run%wake_init%write_kernels), action = 'write')
+if (run%chamber_wake%write_kernels /= '' .and. run%coll%wake%on) then
+  open (newunit = iu_k, file = trim(run%chamber_wake%write_kernels), action = 'write')
   write (iu_k, '(a)') '# s [m]   wakeres   wakegeo   wakerou   [eV/(m electron)]; s=0 rows are HALVED (Bane self-slice)'
   do i_k = 1, run%coll%wake%ns
     write (iu_k, '(4es24.15e3)') run%coll%wake%ds * (i_k-1), run%coll%wake%wakeres(i_k), &
                                  run%coll%wake%wakegeo(i_k), run%coll%wake%wakerou(i_k)
   enddo
   close (iu_k)
-  call out_io (s_info$, r_name, 'Wrote wake kernels: ' // trim(run%wake_init%write_kernels))
+  call out_io (s_info$, r_name, 'Wrote wake kernels: ' // trim(run%chamber_wake%write_kernels))
 endif
 
 if (run%global%write_initial .or. run%global%load_only) then

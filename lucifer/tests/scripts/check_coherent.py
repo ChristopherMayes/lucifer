@@ -89,8 +89,8 @@ NML = """&fel_params
 
 COHERENT = '  global%source_model = "coherent"\n'
 
-SASE_B = """  nbins = 8
-  shotnoise = T
+SASE_B = """  beamlet_size = 8
+  shot_noise = T
   beam_init%distribution_type(3) = "GRID"
   beam_init%grid(3)%x_min = -1.6e-9
   beam_init%grid(3)%x_max = 1.6e-9
@@ -180,8 +180,8 @@ def main():
     # An offset, x-y-tilted Gaussian bunch written as openPMD and imported by both
     # source models: the coherent run must track its own deposit twin. The import
     # runs in the resampler's validated regime (a time-dependent window of many
-    # slices, imp%nslice = 0 auto) -- the single-slice corner produces degenerate
-    # transverse sampling (a separate finding, noted in the brief). nbins = 4 keeps
+    # slices, resample%n_slice = 0 auto) -- the single-slice corner produces degenerate
+    # transverse sampling (a separate finding, noted in the brief). beamlet_size = 4 keeps
     # the guard's independent-sample estimate honest for the horn to trip on.
 
     # A short undulator (0.9 m) and sample = 20 keep the seed in the window: at
@@ -191,12 +191,12 @@ def main():
     # measured as an apparent 5.9 |ln| disagreement before this was understood).
 
     (wd / "cohshort.bmad").write_text(LAT.replace("l = 3.96,", "l = 0.90,"))
-    IMP = ('  dist_file = "beam0.h5"\n  imp%npart = 2048\n  imp%nbins = 4\n'
-           '  imp%nslice = 0\n  imp%slicewidth = 0.05\n')
+    IMP = ('  dist_file = "beam0.h5"\n  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n'
+           '  resample%n_slice = 0\n  resample%slice_width = 0.05\n')
     WIN = '  wavefront_init%window_sample = 20\n'
     run(exe, wd, "seedbeam", 200000, False, pextra='  global%load_only = T\n', sig_z='4e-9',
-        bextra='  use_beam_init = T\n  write_opmd_file = "beam0.h5"\n'
-               '  imp%npart = 2048\n  imp%nbins = 4\n')
+        bextra='  use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'
+               '  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n')
     with h5py.File(wd / "beam0.h5", "r+") as f:
         # openPMD-beamphysics as Bmad writes it: /data/%T/particles/electron/...
         for it in f["data"]:

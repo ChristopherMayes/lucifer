@@ -97,7 +97,7 @@ type fel_beam_struct
   real(rp) :: wavelength = 0       ! Radiation wavelength [m]. From the deck: no dump carries it.
   real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. From the deck likewise.
   real(rp) :: s0 = 0               ! Start of the time window [m].
-  integer :: nbins = 0             ! Beamlet size at generation. Carried for dump round trips.
+  integer :: beamlet_size = 0      ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
   logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.md
                                    !   sec-unaveraged): False = stored px excludes the
@@ -317,7 +317,7 @@ end function fel_theta
 !------------------------------------------------------------------------------
 !+
 ! Subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing,
-!                                                                nbins, ele, err_flag)
+!                                                                beamlet_size, ele, err_flag)
 !
 ! Routine to read an openPMD-beamphysics particle file written by
 ! fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
@@ -340,20 +340,20 @@ end function fel_theta
 !   ele         -- ele_struct: Element to convert the coordinates against.
 !   wavelength  -- real(rp): Radiation wavelength [m], from the deck.
 !   spacing     -- real(rp): Slice spacing [m], from the deck.
-!   nbins       -- integer: Beamlet size, from the deck. A dump does not carry it.
+!   beamlet_size       -- integer: Beamlet size, from the deck. A dump does not carry it.
 !
 ! Output:
 !   beam        -- fel_beam_struct: Beam read from the file.
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, nbins, ele, err_flag)
+subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, beamlet_size, ele, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
-integer is, np, nb, n_slice, n_win, nbins
+integer is, np, nb, n_slice, n_win, beamlet_size
 real(rp) gamma0, q_file, wavelength, spacing
 logical err_flag, err
 character(*) file_name
@@ -376,7 +376,7 @@ beam%p0c = sqrt(gamma0**2 - 1) * m_electron
 beam%phi0 = 0
 beam%wavelength = wavelength
 beam%slice_spacing = spacing
-beam%nbins = nbins
+beam%beamlet_size = beamlet_size
 beam%s0 = 0
 
 call hdf5_read_beam (file_name, beam_b, err, ele)
@@ -549,7 +549,7 @@ end subroutine fel_slice_reallocate
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_fawley_noise (theta, weight, n, nbins, n_clamp)
+! Subroutine fel_fawley_noise (theta, weight, n, beamlet_size, n_clamp)
 !
 ! Routine to impose Fawley-style shot noise on a quiet-loaded slice, transcribed from
 ! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights. Each
@@ -567,8 +567,8 @@ end subroutine fel_slice_reallocate
 ! Input:
 !   theta(:)    -- real(rp): Quiet-loaded ponderomotive phases [rad], beamlet-contiguous.
 !   weight(:)   -- real(rp): Macroparticle charges [C], uniform within each beamlet.
-!   n           -- integer: Number of particles in the slice (a multiple of nbins).
-!   nbins       -- integer: Beamlet size.
+!   n           -- integer: Number of particles in the slice (a multiple of beamlet_size).
+!   beamlet_size       -- integer: Beamlet size.
 !   n_clamp     -- integer: Running count of nbl < 1 clamps, accumulated across calls.
 !
 ! Output:
@@ -576,10 +576,10 @@ end subroutine fel_slice_reallocate
 !   n_clamp     -- integer: Incremented once per clamped (harmonic, beamlet) draw.
 !-
 
-subroutine fel_fawley_noise (theta, weight, n, nbins, n_clamp)
+subroutine fel_fawley_noise (theta, weight, n, beamlet_size, n_clamp)
 
 real(rp) theta(:), weight(:)
-integer n, nbins, n_clamp
+integer n, beamlet_size, n_clamp
 
 real(rp), allocatable :: kick(:)
 real(rp) nbl, u, phi, an
@@ -587,15 +587,15 @@ integer nharm, mbase, ih, ib, im, ip
 
 !
 
-nharm = (nbins - 1) / 2
-mbase = n / nbins
+nharm = (beamlet_size - 1) / 2
+mbase = n / beamlet_size
 
 allocate (kick(n))
 kick = 0
 
 do ih = 0, nharm - 1
   do ib = 1, mbase
-    nbl = nbins * weight((ib-1)*nbins + 1) / e_charge
+    nbl = beamlet_size * weight((ib-1)*beamlet_size + 1) / e_charge
     if (nbl < 1) then
       nbl = 1
       n_clamp = n_clamp + 1
@@ -605,8 +605,8 @@ do ih = 0, nharm - 1
     call ran_uniform (u)
     an = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
     if (an > twopi) an = mod(an, twopi)
-    do im = 1, nbins
-      ip = (ib-1)*nbins + im
+    do im = 1, beamlet_size
+      ip = (ib-1)*beamlet_size + im
       kick(ip) = kick(ip) - an * sin(theta(ip) * (ih+1) + phi)
     enddo
   enddo

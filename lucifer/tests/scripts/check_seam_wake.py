@@ -19,7 +19,7 @@ Checks:
             (wake_on) on the same beam must mark the same "affected" mask in its
             eloss profile -- two independent implementations agreeing on direction.
   zlong     Same-element cross-validation: the deliverable-8 resistive-wall kernel
-            (exported by write_wake_kernels) fed to Bmad's z_long machinery as a
+            (exported by chamber_wake%write_kernels) fed to Bmad's z_long machinery as a
             causal table. Bmad's per-slice energy change must match a first-principles
             numpy convolution of the same table with the actual particle distribution
             (tight, method-identical), and the wake_on model's eloss (slice-density
@@ -89,7 +89,7 @@ NML_GEN = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_pz = 0
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  nbins = 8
+  beamlet_size = 8
   ran_seed = 777
   seed_power = 0
   grid_n_pts = 63
@@ -115,8 +115,8 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   out_root = "{root}"
   lambda0 = 1e-10
   window_sample = {sample}
-  imp%npart = 512
-  imp%nbins = 8
+  resample%n_particle_per_slice = 512
+  resample%beamlet_size = 8
   ran_seed = 777
   seed_power = 0
   grid_n_pts = 63
@@ -128,8 +128,8 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_z = 1.5e-10
   beam_init%sig_pz = 1e-6
   beam_init%bunch_charge = 3.0e-14
-  imp%nslice = 12
-  imp%slicewidth = 0.01
+  resample%n_slice = 12
+  resample%slice_width = 0.01
   write_diag = T
 {extra}&end
 """
@@ -275,7 +275,7 @@ def main():
     # Export the kernel from a wake_on run (any beam, kernels are beam-independent).
     (w/"wz_k.nml").write_text(imp_nml(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
         extra='  load_only = T\n  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n'
-              '  wake_relaxation = 8.1e-6\n  write_wake_kernels = "kern.txt"\n'))
+              '  wake_relaxation = 8.1e-6\n  chamber_wake%write_kernels = "kern.txt"\n'))
     run(exe, "wz_k.nml", "wzk.log", w)
     kern = np.loadtxt(w/"kern.txt")
     s_k, w_res = kern[:, 0], kern[:, 1].copy()
@@ -392,9 +392,9 @@ def main():
 
     # ---------------- split-weight invariance through the wake
     (w/"ws_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
-                                             extra="  imp_split_weights = T\n"))
+                                             extra="  resample_split_weights = T\n"))
     (w/"ws_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
-                                             extra="  imp_split_weights = T\n"))
+                                             extra="  resample_split_weights = T\n"))
     run(exe, "ws_a.nml", "wsa.log", w)
     run(exe, "ws_b.nml", "wsb.log", w)
     A2, B2 = load_par(w, "wsa"), load_par(w, "wsb")

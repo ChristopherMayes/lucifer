@@ -215,7 +215,7 @@ cat > perf.nml <<NML
 /
 &fel_beam_init
   beam_file = "AramisPerf-initial.beam.h5"
-  nbins = 8
+  beamlet_size = 8
 /
 &fel_wavefront_init
   field_file = "AramisPerf-initial.wf.h5"

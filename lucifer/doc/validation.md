@@ -257,7 +257,7 @@ reference energy derives from the lattice's `e_tot`, after the first external us
 a hand-rounded gamma0 against a round lattice energy and the run died mid-tracking on
 the seam's backstop p0c check (two specifications of one truth was the defect,
 one specification of one truth). Facts pinned by reading: the `align*` parameters are parsed but
-never used in v4, and the `shotnoise` flag is read but never consulted (the import
+never used in v4, and the `shot_noise` flag is read but never consulted (the import
 applies noise unconditionally, skipping only zero-current slices) -- both kept as
 Genesis4 has them, neither transcribed as functional. one4one is out of scope: weights
 supersede it.
@@ -270,7 +270,7 @@ Validation (`scripts/check_import.py`, in the harness) splits along the RNG boun
 | per-slice current profile vs Genesis4 importing the same file | exact | **8.2e-13** of peak (24 slices) |
 | the generated bunch carries the specified emittance | exact | ex, ey within 3e-5 of spec |
 | split-weight invariance (coincident w/3 + 2w/3 copies) | exact | moments 1.8e-15, currents 7.4e-14 |
-| openPMD round trip (write_opmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
+| openPMD round trip (write_openpmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
 | thread determinism (1 vs 8 threads, same seed) | exact | byte-identical diag |
 | slice Twiss/emittance recover the spec (mean, central slices) | statistical | beta 0.8%, alpha 1.0%, emit 1.4% |
 | dark-start startup power vs Genesis4, independent resampling RNGs | statistical | ln ratio +0.023 (check 0.30) |
@@ -435,7 +435,7 @@ wiggler so the FEL evolution cancels exactly):
 | thread determinism with wake elements | byte-identical |
 | lord resolution: a wake on a superimposition-split element applies exactly once | **1.8e-10** closed form |
 
-The kernel bridge: `write_wake_kernels` exports the Bane-Stupakov
+The kernel bridge: `chamber_wake%write_kernels` exports the Bane-Stupakov
 kernels (eV/(m electron), s = 0 rows carrying the Bane self-slice half factor), and a
 `z_long` table built from them (sign-flipped, since the d8 kernels are stored as signed
 energy loss where Bmad's table is positive-decelerating, unhalved at s = 0, causal side
@@ -504,7 +504,7 @@ should production-length unaveraged runs ever appear.
 
 The JJ Bessel factor and its h=3 counterpart emerge from the raw dynamics at 6e-4,
 the first independent check on `fel_und_coupling`'s closed forms, and on the
-harmonic-load rule (the beamlet quiet start cancels every harmonic below `nbins`, so
+harmonic-load rule (the beamlet quiet start cancels every harmonic below `beamlet_size`, so
 `nbins = 8` is quiet at h=3 and no quadrature load is needed for this measurement).
 The h-probe is just the same undulator with the field at `lambda1/h`: the mode is
 harmonic-agnostic.

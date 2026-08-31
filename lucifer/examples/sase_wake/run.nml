@@ -12,13 +12,13 @@
   lat_file = "../aramis.bmad"
   global%out_root = "sase_wake"
 
-  wake%on = T
-  wake%radius = 0.5e-3         ! Narrow chamber: the tuned, visible case.
-  wake%material = "CU"         ! Copper: conductivity + AC relaxation shortcuts.
-  wake%gap = 0.5e-3            ! Undulator gap wake...
-  wake%lgap = 0.015            ! ...one gap per period.
-  wake%hrough = 100e-9         ! 100 nm surface roughness...
-  wake%lrough = 100e-6         ! ...with 100 um correlation length.
+  chamber_wake%on = T
+  chamber_wake%radius = 0.5e-3         ! Narrow chamber: the tuned, visible case.
+  chamber_wake%material = "CU"         ! Copper: conductivity + AC relaxation shortcuts.
+  chamber_wake%gap = 0.5e-3            ! Undulator gap wake...
+  chamber_wake%lgap = 0.015            ! ...one gap per period.
+  chamber_wake%hrough = 100e-9         ! 100 nm surface roughness...
+  chamber_wake%lrough = 100e-6         ! ...with 100 um correlation length.
 /
 
 &fel_beam_init
@@ -32,7 +32,7 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  shotnoise = T
+  shot_noise = T
 /
 
 &fel_wavefront_init

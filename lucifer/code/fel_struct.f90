@@ -12,12 +12,12 @@
 !     lat_file = "line.bmad"
 !     global%out_root = "run1"
 !     bmad_com%radiation_damping_on = T
-!     wake%radius = 2.5e-3
-!     sc%nz = 2
+!     chamber_wake%radius = 2.5e-3
+!     space_charge%nz = 2
 !   /
 !   &fel_beam_init
 !     beam_init%n_particle = 8192
-!     shotnoise = T
+!     shot_noise = T
 !   /
 !   &fel_wavefront_init
 !     wavefront_init%lambda0 = 1e-10
@@ -117,15 +117,19 @@ type wavefront_init_struct
 end type
 
 !+
-! Struct fel_wake_init_struct
+! Struct fel_chamber_wake_init_struct
 !
-! The chamber-wake description (&fel_params wake%...), Genesis &wake names. A plain
+! The chamber-wake description (&fel_params chamber_wake%...), Genesis &wake names. A plain
 ! mirror of fel_wake_struct's configuration fields (that struct carries allocatable
 ! state, which a namelist object cannot). fel_setup copies these in.
 !-
 
-type fel_wake_init_struct
+type fel_chamber_wake_init_struct
   logical :: on = .false.
+  ! Which chamber-wake implementation runs. 'genesis' is the transcribed solver at
+  ! slice granularity, convolving the kernels with the weighted slice currents. The
+  ! field exists so a second implementation arrives as a value, not a rework.
+  character(16) :: model = 'genesis'
   real(rp) :: loss = 0             ! External loss [eV/m].
   real(rp) :: radius = 2.5e-3_rp   ! Chamber radius, or half gap if flat [m].
   real(rp) :: conductivity = 0     ! DC conductivity [1/(Ohm m)]. 0: no resistive wake.
@@ -140,8 +144,8 @@ type fel_wake_init_struct
   character(400) :: write_kernels = ''
 end type
 
-! (Space charge needs no init mirror: fel_efield_struct is already pure scalars and
-! reads directly in &fel_params as sc%... .)
+! (Space charge needs no init mirror: fel_space_charge_struct is already pure scalars and
+! reads directly in &fel_params as space_charge%... .)
 
 !+
 ! Struct fel_beam_init_param_struct
@@ -154,16 +158,16 @@ end type
 type fel_beam_init_param_struct
   character(400) :: beam_file = ''        ! Genesis .par.h5 dump (with field_file(1)).
   character(400) :: dist_file = ''        ! openPMD-beamphysics particle file to import.
-  character(400) :: write_dist_file = ''  ! Write the bunch as a Genesis DISTRIBUTION file.
-  character(400) :: write_opmd_file = ''  ! Write the bunch as openPMD-beamphysics.
+  character(400) :: write_genesis_dist = ''  ! Write the bunch as a Genesis4 distribution file.
+  character(400) :: write_openpmd_file = ''  ! Write the bunch as openPMD-beamphysics.
   logical :: use_beam_init = .false.      ! Generate the bunch from beam_init, then import.
-  integer :: nbins = 8                    ! Beamlet size of the quiet start.
-  logical :: shotnoise = .false.          ! Physical (Fawley) shot noise on the phases.
+  integer :: beamlet_size = 8             ! Beamlet size of the quiet start.
+  logical :: shot_noise = .false.         ! Physical (Fawley) shot noise on the phases.
   ! Check instruments (the validation harness's knobs, not physics inputs):
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.
   logical :: gen_test_weights = .false.   ! Alternate beamlet weights 0.25x/1.75x.
-  logical :: imp_split_weights = .false.  ! Split-weight copies BEFORE the import resample.
+  logical :: resample_split_weights = .false.  ! Split-weight copies BEFORE the resample.
 end type
 
 !+
@@ -180,10 +184,10 @@ type fel_run_struct
   ! The resolved inputs.
   type (fel_global_struct) :: global
   type (wavefront_init_struct) :: winit
-  type (fel_wake_init_struct) :: wake_init
-  type (fel_efield_struct) :: sc_init
+  type (fel_chamber_wake_init_struct) :: chamber_wake
+  type (fel_space_charge_struct) :: space_charge
   type (beam_init_struct) :: beam_init
-  type (fel_import_param_struct) :: imp
+  type (fel_resample_param_struct) :: resample
   type (fel_beam_init_param_struct) :: bparam
   character(400) :: lat_file = ''
   character(400) :: field_file(9) = ''

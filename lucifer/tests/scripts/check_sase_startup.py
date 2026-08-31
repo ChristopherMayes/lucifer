@@ -86,10 +86,10 @@ BMAD_NML = """! flat keys; routed into the three groups by nml.to_groups
   seed_power = 0
   grid_n_pts = 255
   grid_half_width = 2e-4
-  nbins = 8
+  beamlet_size = 8
   window_length = 9.6e-9
   window_sample = 3
-  shotnoise = T
+  shot_noise = T
   ran_seed = {seed}
   write_diag = T
 &end

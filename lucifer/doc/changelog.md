@@ -9,6 +9,28 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-31 Changed: The input names say what they are. `imp%` is `resample%`, with
+  `n_particle_per_slice` (which is what it always was), `n_slice`, `slice_width` and
+  `beamlet_size`. `wake%` is `chamber_wake%` and `sc%` is `space_charge%`, so neither
+  collides with Bmad's own element wakes or `space_charge_com`. Bare `nbins` is
+  `beamlet_size`, `shotnoise` is `shot_noise`, `write_opmd_file` is
+  `write_openpmd_file`, `write_dist_file` is `write_genesis_dist`, and
+  `imp_split_weights` is `resample_split_weights`. The stats file's `params/` subgroups
+  follow, so a file reads with the vocabulary its input was written in. Genesis4's own
+  names live in the translation table of `genesis4.md`.
+
+- 2026-08-31 Added: `chamber_wake%model` and `space_charge%model`, both `"genesis"`, both
+  refusing any other value by name. Each names the transcribed solver that runs at slice
+  granularity, so a second implementation can arrive as a value rather than a rework.
+
+- 2026-08-31 Fixed: `chamber_wake%write_kernels` works as written. The bare
+  `write_wake_kernels` and the unconditional assignment that silently overwrote the
+  struct path are both gone.
+
+- 2026-08-31 Removed: the 104-line mapping of retired flat-group parameters to their new
+  homes. The group name is still refused, since Fortran ignores an unknown namelist group
+  in silence and a stale deck must fail loudly.
+
 - 2026-08-31 Changed: The input reference reads as a reference. One section per namelist
   group with a subsection per family, each opening with a table of parameter, default and
   one-line meaning, and the long descriptions as anchored paragraphs below so another page

@@ -17,7 +17,7 @@
 !            migration invariant (higher slice index is the window head) that a
 !            per-slice plot cannot be drawn without.
 !   params/  Every scalar as data: the window (lambda0, window_sample, slice_spacing,
-!            nbins), p0c, the charge, the species, the seed, the grid, the counts.
+!            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
 !            Nothing a reader needs is left in the echoed namelist.
 !   beam/    slice/ holds the per-record sufficient statistics, named exactly as
 !            bunch_params_struct components, enough to construct one from any

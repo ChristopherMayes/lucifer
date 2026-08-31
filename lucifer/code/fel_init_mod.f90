@@ -49,13 +49,13 @@ type (lat_struct), pointer :: lat
 type (branch_struct), pointer :: branch
 type (fel_beam_struct), pointer :: fbeam
 type (beam_init_struct), pointer :: beam_init
-type (fel_import_param_struct) imp
-character(400) beam_file, dist_file, write_dist_file, write_opmd_file
+type (fel_resample_param_struct) resample
+character(400) beam_file, dist_file, write_genesis_dist, write_openpmd_file
 character(400) out_root
 character(400) field_file(9)
-logical use_beam_init, shotnoise, gen_test_weights, imp_split_weights
+logical use_beam_init, shot_noise, gen_test_weights, resample_split_weights
 logical split_weights, swap_beam_xy, err
-integer nbins, ran_seed, is, ih
+integer beamlet_size, ran_seed, is, ih
 real(rp) gamma0, lambda0, window_length, seed_power, seed_waist_size, grid_half_width
 integer n_win
 integer window_sample, grid_n_pts, npart_gen
@@ -69,17 +69,17 @@ lat => run%lat
 branch => lat%branch(0)
 fbeam => run%fbeam
 beam_init => run%beam_init
-imp = run%imp
+resample = run%resample
 gamma0 = run%gamma0
 beam_file = run%bparam%beam_file
 dist_file = run%bparam%dist_file
-write_dist_file = run%bparam%write_dist_file
-write_opmd_file = run%bparam%write_opmd_file
+write_genesis_dist = run%bparam%write_genesis_dist
+write_openpmd_file = run%bparam%write_openpmd_file
 use_beam_init = run%bparam%use_beam_init
-nbins = run%bparam%nbins
-shotnoise = run%bparam%shotnoise
+beamlet_size = run%bparam%beamlet_size
+shot_noise = run%bparam%shot_noise
 gen_test_weights = run%bparam%gen_test_weights
-imp_split_weights = run%bparam%imp_split_weights
+resample_split_weights = run%bparam%resample_split_weights
 split_weights = run%bparam%split_weights
 swap_beam_xy = run%bparam%swap_beam_xy
 ran_seed = run%global%ran_seed
@@ -143,7 +143,7 @@ if (beam_file /= '') then
   if (window_length > 0 .and. window_sample > 0) &
                               n_win = nint(window_length / (window_sample * lambda0))
   call fel_read_openpmd_beam (fbeam, beam_file, gamma0, n_win, lambda0, &
-                              window_sample * lambda0, nbins, branch%ele(0), err)
+                              window_sample * lambda0, beamlet_size, branch%ele(0), err)
   if (err) then
     err_flag = .true.;  return
   endif
@@ -205,7 +205,7 @@ endif
 call check_beam_init_contract ()
 
 npart_gen = beam_init%n_particle
-if (npart_gen < 1 .or. nbins < 1 .or. mod(npart_gen, nbins) /= 0) then
+if (npart_gen < 1 .or. beamlet_size < 1 .or. mod(npart_gen, beamlet_size) /= 0) then
   call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE (MACROPARTICLES PER SLICE HERE) MUST BE A', &
                                  'POSITIVE MULTIPLE OF NBINS.')
   err_flag = .true.;  return
@@ -290,12 +290,12 @@ else
   nslice_gen = max(1, nint(zlen_gen / spacing_gen))
 endif
 
-if (shotnoise .and. nslice_gen < 2) then
+if (shot_noise .and. nslice_gen < 2) then
   call out_io (s_error$, r_name, 'SHOTNOISE NEEDS A TIME-DEPENDENT WINDOW, THE SAME RULE AS GENESIS.')
   err_flag = .true.;  return
 endif
 
-mbase = npart_gen / nbins
+mbase = npart_gen / beamlet_size
 if (gen_test_weights .and. mod(mbase, 2) /= 0) then
   call out_io (s_error$, r_name, 'GEN_TEST_WEIGHTS NEEDS AN EVEN NUMBER OF BEAMLETS.')
   err_flag = .true.;  return
@@ -309,7 +309,7 @@ fbeam%phi0 = 0
 fbeam%wavelength = lambda0
 fbeam%slice_spacing = spacing_gen
 fbeam%s0 = 0
-fbeam%nbins = nbins
+fbeam%beamlet_size = beamlet_size
 fbeam%one4one = .false.
 
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
@@ -351,9 +351,9 @@ do is_g = 1, nslice_gen
   sl%n = npart_gen
   w_part = cur_gen(is_g) * fbeam%slice_spacing / (c_light * npart_gen)
 
-  ! Quiet start: mbase base samples, each replicated at nbins equally spaced
+  ! Quiet start: mbase base samples, each replicated at beamlet_size equally spaced
   ! ponderomotive phases (theta0 spread on a uniform grid within one beamlet spacing),
-  ! so bunching harmonics below nbins vanish to roundoff. Weights and coordinates
+  ! so bunching harmonics below beamlet_size vanish to roundoff. Weights and coordinates
   ! follow the Genesis chart's own map: z = beta*theta/ks with phi0 = 0,
   ! weight = I*slice_spacing/(c*npart). theta and beta are held in work arrays so noise
   ! can kick the phases before the z conversion.
@@ -373,11 +373,11 @@ do is_g = 1, nslice_gen
     beta = p_mc / gam
     pz = (p_mc - p0_mc) / p0_mc
 
-    theta0 = (ib - 0.5_rp) * twopi / (nbins * mbase)
+    theta0 = (ib - 0.5_rp) * twopi / (beamlet_size * mbase)
 
-    do im = 0, nbins - 1
+    do im = 0, beamlet_size - 1
       ip = ip + 1
-      theta_work(ip) = theta0 + im * twopi / nbins
+      theta_work(ip) = theta0 + im * twopi / beamlet_size
       beta_work(ip) = beta
       sl%x(ip) = x;   sl%px(ip) = xp
       sl%y(ip) = y;   sl%py(ip) = yp
@@ -394,8 +394,8 @@ do is_g = 1, nslice_gen
 
   if (gen_test_weights) then
     do ib = 1, mbase
-      sl%weight((ib-1)*nbins+1 : ib*nbins) = &
-              sl%weight((ib-1)*nbins+1 : ib*nbins) * (1 + 0.75_rp * (-1)**ib)
+      sl%weight((ib-1)*beamlet_size+1 : ib*beamlet_size) = &
+              sl%weight((ib-1)*beamlet_size+1 : ib*beamlet_size) * (1 + 0.75_rp * (-1)**ib)
     enddo
   endif
 
@@ -412,20 +412,20 @@ do is_g = 1, nslice_gen
   ! Zero-current slices (Gaussian tails, outside a flat extent) carry no noise:
   ! Genesis's own zero-current skip, shared with the import.
 
-  if (shotnoise .and. wsum > 0) then
+  if (shot_noise .and. wsum > 0) then
 
     ! The N_eff guard: measure the pre-noise quiet floor. A representation whose floor
     ! is not far below the target 1/N_lambda cannot carry physical noise: imposing on
     ! top would give a silently wrong startup level. The sweep covers EVERY harmonic the
-    ! beamlet structure can resolve (1..nbins-1), not just the imposed ones. An
+    ! beamlet structure can resolve (1..beamlet_size-1), not just the imposed ones. An
     ! unquiet weight pattern can park its floor on a harmonic the imposition never
     ! touches, and still corrupt the dynamics through the nonlinear phase evolution.
-    ! (An alternating within-beamlet pattern lands exactly on nbins/2, found by the
+    ! (An alternating within-beamlet pattern lands exactly on beamlet_size/2, found by the
     ! guard's own mutation test.)
 
     target_b2 = 1 / n_lambda
     floor_b2 = 0
-    do ih = 1, nbins - 1
+    do ih = 1, beamlet_size - 1
       br = 0; bi = 0
       do ip = 1, npart_gen
         br = br + sl%weight(ip) * cos(ih * theta_work(ip))
@@ -449,7 +449,7 @@ do is_g = 1, nslice_gen
     ! two paths stay one implementation. Draw order is unchanged from when this block
     ! lived inline here (two ran_uniform per harmonic per beamlet, Genesis's loops).
 
-    call fel_fawley_noise (theta_work(1:npart_gen), sl%weight(1:npart_gen), npart_gen, nbins, n_clamp)
+    call fel_fawley_noise (theta_work(1:npart_gen), sl%weight(1:npart_gen), npart_gen, beamlet_size, n_clamp)
   endif
 
   ! To the stored chart: z = beta*theta/ks with phi0 = 0, beta of the base sample.
@@ -461,7 +461,7 @@ enddo
 
 deallocate (theta_work, beta_work)
 
-if (shotnoise) then
+if (shot_noise) then
   call out_io (s_info$, r_name, 'Shot noise imposed on \i0\ slices.', &
                '  N_lambda per slice: \es10.3\ to \es10.3\ ', &
                '  N_eff per slice:    \es10.3\ to \es10.3\ ', &
@@ -605,7 +605,7 @@ bp => beam_b%bunch(1)
 ! The current profile (weighted sums) and the analysis moments (unweighted, over
 ! coincident copies) must then be bit-identical to the unsplit run.
 
-if (imp_split_weights) then
+if (resample_split_weights) then
   n0 = size(bp%particle)
   call reallocate_bunch (bp, 2*n0, save = .true.)
   do ip_g = 1, n0
@@ -615,30 +615,30 @@ if (imp_split_weights) then
   enddo
 endif
 
-if (write_dist_file /= '') then
-  call fel_write_genesis4_distribution (bp, write_dist_file, err_i)
+if (write_genesis_dist /= '') then
+  call fel_write_genesis4_distribution (bp, write_genesis_dist, err_i)
   if (err_i) then
     err_flag = .true.;  return
   endif
-  call out_io (s_info$, r_name, 'Wrote Genesis distribution file: ' // trim(write_dist_file))
+  call out_io (s_info$, r_name, 'Wrote Genesis distribution file: ' // trim(write_genesis_dist))
 endif
 
-if (write_opmd_file /= '') then
-  call hdf5_write_beam (write_opmd_file, beam_b%bunch(1:1), .false., err_i, lat)
+if (write_openpmd_file /= '') then
+  call hdf5_write_beam (write_openpmd_file, beam_b%bunch(1:1), .false., err_i, lat)
   if (err_i) then
     err_flag = .true.;  return
   endif
-  call out_io (s_info$, r_name, 'Wrote openPMD-beamphysics file: ' // trim(write_opmd_file))
+  call out_io (s_info$, r_name, 'Wrote openPMD-beamphysics file: ' // trim(write_openpmd_file))
 endif
 
-! imp%npart and imp%nbins come from the imp block directly: the resample's own knobs.
+! resample%n_particle_per_slice and resample%beamlet_size come from the resample block directly: the resample's own knobs.
 ! beam_init%n_particle is the BUNCH particle count on this path.
-call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, imp, fbeam, err_i, moments)
+call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, resample, fbeam, err_i, moments)
 if (err_i) then
   err_flag = .true.;  return
 endif
 call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
-             i_array = [size(fbeam%slice), imp%npart])
+             i_array = [size(fbeam%slice), resample%n_particle_per_slice])
 
 ! The RNG-free instruments the exactness checks read (the analysis moments and the
 ! per-slice current profile) go to a FILE, not stdout: stdout is for humans and
@@ -647,7 +647,7 @@ call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
 
 open (newunit = iu_i, file = trim(out_root) // '.import.txt', action = 'write')
 write (iu_i, '(a)') '# The distribution import, at full precision. Machine-readable; stdout is not.'
-write (iu_i, '(a, i0, a, i0)') '# nslice = ', size(fbeam%slice), '   npart_per_slice = ', imp%npart
+write (iu_i, '(a, i0, a, i0)') '# nslice = ', size(fbeam%slice), '   npart_per_slice = ', resample%n_particle_per_slice
 write (iu_i, '(a)') '# moments: gavg xavg pxavg yavg pyavg ex ey bx by ax ay'
 write (iu_i, '(a, 11es24.15e3)') 'moments', moments
 write (iu_i, '(a)') '#  slice            current [A]'

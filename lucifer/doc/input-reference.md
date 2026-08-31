@@ -4,8 +4,8 @@ The normative reference for every namelist parameter Lucifer honors: its default
 
 | Group | Carries |
 |---|---|
-| [`&fel_params`](#group-fel-params) | The run: the lattice, the `global%` switches, Bmad's `bmad_com` and `space_charge_com`, and the `wake%` and `sc%` collective descriptions |
-| [`&fel_beam_init`](#group-fel-beam-init) | The beam: Bmad's `beam_init%` description, the `imp%` resampler, source and output files, and the check instruments |
+| [`&fel_params`](#group-fel-params) | The run: the lattice, the `global%` switches, Bmad's `bmad_com` and `space_charge_com`, and the `chamber_wake%` and `space_charge%` collective descriptions |
+| [`&fel_beam_init`](#group-fel-beam-init) | The beam: Bmad's `beam_init%` description, the `resample%` resampler, source and output files, and the check instruments |
 | [`&fel_wavefront_init`](#group-fel-wavefront-init) | The radiation: the `wavefront_init%` starting condition and `field_file`. The field record is the time window, so the window lives here |
 
 Per-element settings are [lattice attributes](#lattice-attributes) rather than namelist parameters. How to build and run is [](user-guide.md). What the outputs hold is [](reading-output.md). The measured levels are [](validation.md). The physics is the manual, [](fel-physics.md). Every resolved input is written into the statistics file's `params/` group, so a finished run states its own configuration with every default explicit.
@@ -85,40 +85,48 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 
 Both are off by default, matching Genesis4's `&sponrad`. Fluctuations with `global%migrate = T` are refused by name: the quiet start cancels per beamlet, and migration scrambles the grouping. See [](fel-physics.md#sec-eom).
 
-### Chamber wakes: `wake%`
+### Chamber wakes: `chamber_wake%`
 
 Genesis4's `&wake` names. Bmad element wakes are a separate mechanism, described under [element wakes](#element-wakes) below.
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `wake%on` | `F` | Enable the chamber wake |
-| `wake%loss` | `0` | External loss [eV/m] |
-| `wake%radius` | `2.5e-3` | Chamber radius, or half gap if flat [m] |
-| `wake%conductivity` | `0` | DC conductivity [1/(Ohm m)]. Zero means no resistive wake |
-| `wake%relaxation` | `0` | AC relaxation distance c*tau [m] |
-| `wake%roundpipe` | `T` | Round chamber. `F` is flat, parallel plates |
-| `wake%material` | `""` | `"CU"` or `"AL"` shortcut for conductivity and relaxation |
-| `wake%gap` | `0` | Undulator gap [m]. Zero means no geometric wake |
-| `wake%lgap` | `1` | Period of the gaps [m] |
-| `wake%hrough` | `0` | Roughness amplitude [m]. Zero means no roughness wake |
-| `wake%lrough` | `1` | Roughness period [m] |
-| `write_wake_kernels` | `""` | Export the transcribed kernels to this file, for building `z_long` tables |
+| `chamber_wake%on` | `F` | Enable the chamber wake |
+| `chamber_wake%model` | `"genesis"` | Which implementation runs. `"genesis"` is the only accepted value |
+| `chamber_wake%loss` | `0` | External loss [eV/m] |
+| `chamber_wake%radius` | `2.5e-3` | Chamber radius, or half gap if flat [m] |
+| `chamber_wake%conductivity` | `0` | DC conductivity [1/(Ohm m)]. Zero means no resistive wake |
+| `chamber_wake%relaxation` | `0` | AC relaxation distance c*tau [m] |
+| `chamber_wake%roundpipe` | `T` | Round chamber. `F` is flat, parallel plates |
+| `chamber_wake%material` | `""` | `"CU"` or `"AL"` shortcut for conductivity and relaxation |
+| `chamber_wake%gap` | `0` | Undulator gap [m]. Zero means no geometric wake |
+| `chamber_wake%lgap` | `1` | Period of the gaps [m] |
+| `chamber_wake%hrough` | `0` | Roughness amplitude [m]. Zero means no roughness wake |
+| `chamber_wake%lrough` | `1` | Roughness period [m] |
+| `chamber_wake%write_kernels` | `""` | Export the transcribed kernels to this file, for building `z_long` tables |
 
 (param-write-wake-kernels)=
-**`write_wake_kernels`** is a bare name in this group rather than a `wake%` component, and it is the only name that works: it lands in `wake%write_kernels`, which the parser assigns unconditionally, so a value written as `wake%write_kernels` is overwritten. The export builds matching `z_long` tables, and `examples/bmad_wake` uses one.
+**`chamber_wake%write_kernels`** is a bare name in this group rather than a `chamber_wake%` component, and it is the only name that works: it lands in `chamber_wake%write_kernels`, which the parser assigns unconditionally, so a value written as `chamber_wake%write_kernels` is overwritten. The export builds matching `z_long` tables, and `examples/bmad_wake` uses one.
+
+(param-chamber-wake-model)=
+**`chamber_wake%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which convolves its kernels with the weighted slice currents and produces one energy loss per slice. Anything else is refused by name rather than treated as the transcribed solver by default. The field exists so that a second implementation can arrive as a value here rather than as a rework.
 
 The three kernels, their numerical impedance and the causal convolution are in [](fel-physics.md#sec-wakes).
 
-### Space charge: `sc%`
+### Space charge: `space_charge%`
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `sc%on` | `F` | Enable space charge |
-| `sc%rmax` | `0` | Radial grid extent scale [m]. Grows adaptively |
-| `sc%ngrid` | `100` | Radial grid points |
-| `sc%nz` | `0` | Longitudinal harmonics. Zero disables the short-range solve |
-| `sc%nphi` | `0` | Azimuthal modes, m over -nphi to nphi |
-| `sc%longrange` | `F` | The whole-window long-range term |
+| `space_charge%on` | `F` | Enable space charge |
+| `space_charge%model` | `"genesis"` | Which implementation runs. `"genesis"` is the only accepted value |
+| `space_charge%rmax` | `0` | Radial grid extent scale [m]. Grows adaptively |
+| `space_charge%ngrid` | `100` | Radial grid points |
+| `space_charge%nz` | `0` | Longitudinal harmonics. Zero disables the short-range solve |
+| `space_charge%nphi` | `0` | Azimuthal modes, m over -nphi to nphi |
+| `space_charge%longrange` | `F` | The whole-window long-range term |
+
+(param-space-charge-model)=
+**`space_charge%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which works per slice on a radial grid over azimuthal modes and longitudinal harmonics. Anything else is refused by name. Note that this family is Lucifer's own, and `space_charge_com` in the same group is Bmad's global structure, a separate thing.
 
 See [](fel-physics.md#sec-spacecharge).
 
@@ -146,8 +154,8 @@ There are three ways to obtain a beam: start from a dump, generate one from a de
 | `beam_file` | `""` | openPMD particle dump to start from. Blank generates a beam instead |
 | `dist_file` | `""` | openPMD-beamphysics file to import and resample |
 | `use_beam_init` | `F` | Import path: generate the bunch from the `beam_init%` block instead of a file |
-| `write_dist_file` | `""` | Write the bunch as a Genesis4 `&importdistribution` input |
-| `write_opmd_file` | `""` | Write the bunch as openPMD-beamphysics |
+| `write_genesis_dist` | `""` | Write the bunch as a Genesis4 `&importdistribution` input |
+| `write_openpmd_file` | `""` | Write the bunch as openPMD-beamphysics |
 
 (param-beam-beam-file)=
 **`beam_file`** reads openPMD only. A file that is not openPMD is refused by name, and the message carries the conversion command. `tests/scripts/convert_genesis.py` converts in both directions, and [](genesis4.md) describes the exchange.
@@ -158,7 +166,7 @@ Bmad's standard `beam_init_struct`, the same block both generation paths read. O
 
 | Parameter | Meaning |
 |---|---|
-| `beam_init%n_particle` | Macroparticles per slice, a positive multiple of `nbins`. The import path reads it as bunch particles |
+| `beam_init%n_particle` | Macroparticles per slice, a positive multiple of `beamlet_size`. The import path reads it as bunch particles |
 | `beam_init%a_norm_emit`, `beam_init%b_norm_emit` | Normalized emittances [m rad] |
 | `beam_init%sig_pz` | Fractional momentum spread dP/P0 |
 | `beam_init%bunch_charge` | Charge [C]. The current is derived from it, never input |
@@ -175,22 +183,22 @@ Every other `beam_init` field that is set is refused by name. A standard structu
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `nbins` | `8` | Beamlet size of the quiet start. The load is quiet below this |
-| `shotnoise` | `F` | Impose physical shot noise. Time-dependent windows only |
+| `beamlet_size` | `8` | Beamlet size of the quiet start. The load is quiet below this |
+| `shot_noise` | `F` | Impose physical shot noise. Time-dependent windows only |
 
-(param-beam-shotnoise)=
-**`shotnoise`** imposes the weighted Fawley loading. The noise-level algebra and the effective-count refusal guard are in [](fel-physics.md#sec-noise). The loader warns where Genesis4 silently clamps beamlets holding fewer real electrons than macroparticles.
+(param-beam-shot-noise)=
+**`shot_noise`** imposes the weighted Fawley loading. The noise-level algebra and the effective-count refusal guard are in [](fel-physics.md#sec-noise). The loader warns where Genesis4 silently clamps beamlets holding fewer real electrons than macroparticles.
 
-### The resampler: `imp%`
+### The resampler: `resample%`
 
 Named after Genesis4's `&importdistribution` where an equivalent exists. `window_sample`, `ran_seed` and the seed field are shared with the generator: one seed governs generation, resampling and noise.
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `imp%slicewidth` | `0.01` | Sampling window over bunch length |
-| `imp%npart` | `8192` | Macroparticles per slice after resampling |
-| `imp%nbins` | `4` | Beamlet size of the resample |
-| `imp%nslice` | `0` | Slice count. Zero derives it from the bunch length and the spacing |
+| `resample%slice_width` | `0.01` | Sampling window over bunch length |
+| `resample%n_particle_per_slice` | `8192` | Macroparticles per slice after resampling |
+| `resample%beamlet_size` | `4` | Beamlet size of the resample |
+| `resample%n_slice` | `0` | Slice count. Zero derives it from the bunch length and the spacing |
 
 Genesis4's `match` and `center` are not ported: a Bmad lattice carries its Twiss and `beam_init` generates matched bunches already. The method is in [](fel-physics.md#sec-import).
 
@@ -201,7 +209,7 @@ Not physics input. The validation harness sets these.
 | Parameter | Default | Meaning |
 |---|---|---|
 | `split_weights` | `F` | Replace each particle by coincident copies carrying 1/3 and 2/3 of its weight |
-| `imp_split_weights` | `F` | The same split, applied before the import |
+| `resample_split_weights` | `F` | The same split, applied before the import |
 | `gen_test_weights` | `F` | Alternate beamlet weights of 0.25x and 1.75x, charge preserving, to exercise the weighted-noise paths |
 | `swap_beam_xy` | `F` | Swap (x, px) with (y, py) after generation |
 

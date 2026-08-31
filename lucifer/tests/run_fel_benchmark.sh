@@ -260,7 +260,7 @@ ${6:+  $6}
 /
 &fel_beam_init
   beam_file = "$5-initial.beam.h5"
-  nbins = 8
+  beamlet_size = 8
 ${7:+  $7}
 /
 &fel_wavefront_init
@@ -280,18 +280,18 @@ make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis_val.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis_val.bmad      td2g   genesis AramisTD
 make_nml tdsase.nml aramis_val.bmad      tdsase genesis AramisTDSASE
-make_nml tdsc.nml   aramis_1seg_val.bmad tdsc   genesis AramisTD "sc%rmax = 250e-6
-  sc%nz = 2
-  sc%nphi = 1
-  sc%longrange = T"
-make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "wake%on = T
-  wake%radius = 2.5e-3
-  wake%conductivity = 5.813e7
-  wake%relaxation = 8.1e-6
-  wake%gap = 0.5e-3
-  wake%lgap = 0.015
-  wake%hrough = 100e-9
-  wake%lrough = 100e-6"
+make_nml tdsc.nml   aramis_1seg_val.bmad tdsc   genesis AramisTD "space_charge%rmax = 250e-6
+  space_charge%nz = 2
+  space_charge%nphi = 1
+  space_charge%longrange = T"
+make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "chamber_wake%on = T
+  chamber_wake%radius = 2.5e-3
+  chamber_wake%conductivity = 5.813e7
+  chamber_wake%relaxation = 8.1e-6
+  chamber_wake%gap = 0.5e-3
+  chamber_wake%lgap = 0.015
+  chamber_wake%hrough = 100e-9
+  chamber_wake%lrough = 100e-6"
 
 # Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
 # uses a fieldmap field_calc, or that carries Bmad wakes on

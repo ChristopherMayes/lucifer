@@ -11,8 +11,9 @@ the tracking window.
   2. Library errors return: lucifer_smoke_test on an unreadable lattice must print its
      proof-of-return line and exit with its own code 2 -- the library returned, the
      program decided (no exit inside the library).
-  3. Retired group: the flat &fel_track_params is refused by name, the error mapping
-     each parameter found to its new group.
+  3. Retired group: the flat &fel_track_params is refused by name. Fortran ignores an
+     unknown namelist group in silence, so without the refusal a stale deck would run
+     on defaults.
   4. The comb (global%comb_ds_save, Bmad's ds_save semantics verbatim): a comb > 0
      run's per-record rows must be exactly the every-record run's rows at the comb
      positions (subset, dataset-equal), element ends always present; comb < 0 keeps
@@ -201,10 +202,10 @@ def main():
     print("== the retired flat group ==")
     (wd / "old.nml").write_text(OLD_STYLE)
     r = run([str(exe), "old.nml"], wd)
-    ok = (r.returncode != 0 and "IS RETIRED" in r.stdout
-          and "lambda0 -> &fel_wavefront_init wavefront_init%lambda0" in r.stdout
-          and "wake_on -> &fel_params wake%on" in r.stdout)
-    check("&fel_track_params refused by name, each parameter mapped", ok)
+    ok = (r.returncode != 0 and "IS NOT AN INPUT GROUP" in r.stdout
+          and "&fel_params" in r.stdout and "&fel_beam_init" in r.stdout
+          and "&fel_wavefront_init" in r.stdout)
+    check("&fel_track_params refused by name, naming the three groups", ok)
 
     # ------------------------------------------------------------------
     print("== the comb (global%comb_ds_save) ==")

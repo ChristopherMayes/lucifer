@@ -151,7 +151,7 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   beam_file = "{beam}"
   field_file = "{field}"
   lambda0 = 1e-10
-  nbins = 8
+  beamlet_size = 8
   harmonics = 1, 3
   write_diag = T
 {extra}&end
@@ -169,14 +169,14 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_pz = 8.804506566858e-05
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  nbins = 8
+  beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
   grid_n_pts = 63
   grid_half_width = 2e-4
   window_length = 8e-10
   window_sample = 1
-  shotnoise = T
+  shot_noise = T
   ran_seed = 777
   harmonics = 1, 3
   write_diag = T
@@ -420,7 +420,7 @@ def main():
     buncher = buncher.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
     buncher = buncher.replace("  window_length = 8e-10\n", "")
     buncher = buncher.replace("  window_sample = 1\n", "")
-    buncher = buncher.replace("  shotnoise = T\n", "")
+    buncher = buncher.replace("  shot_noise = T\n", "")
     buncher = buncher.replace("beam_init%n_particle = 2048", "beam_init%n_particle = 8192")
     buncher = buncher.replace("bunch_charge = 8.0e-15", "bunch_charge = 1.000692285594e-15")
     buncher = buncher.replace("seed_power = 1e4", "seed_power = 1e9")

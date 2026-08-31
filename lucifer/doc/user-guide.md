@@ -219,7 +219,7 @@ power after (see `examples/README.md`).
 The tracker is laid out the way Tao is laid out: the input structs in `fel_struct`
 (defaults in the declarations), the namelist layer quarantined in `fel_input_mod`
 (three groups in one file -- `&fel_params` with `global%...`, `bmad_com`,
-`space_charge_com`, `wake%`, `sc%`. `&fel_beam_init` with `beam_init%...`, `imp%...`
+`space_charge_com`, `chamber_wake%`, `space_charge%`. `&fel_beam_init` with `beam_init%...`, `resample%...`
 and files. `&fel_wavefront_init` with `wavefront_init%...` and `field_file`), and the
 work in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` /
 `fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops --

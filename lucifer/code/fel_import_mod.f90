@@ -26,7 +26,7 @@
 !
 ! Genesis quirks found by reading and NOT transcribed as functional (sec-import): the
 ! align/align_start/align_end parameters are parsed but never used in v4. The
-! shotnoise flag is read but never consulted: the import applies noise
+! shot_noise flag is read but never consulted: the import applies noise
 ! unconditionally, skipping only zero-current slices. Both behaviors are kept as
 ! Genesis has them (noise always on for nonzero current). one4one is out of scope:
 ! per-particle weights supersede it.
@@ -43,16 +43,16 @@ use fel_beam_mod
 implicit none
 
 !+
-! Struct fel_import_param_struct
+! Struct fel_resample_param_struct
 !
 ! The &importdistribution knobs, named after Genesis's where one exists.
 !-
 
-type fel_import_param_struct
-  real(rp) :: slicewidth = 0.01_rp       ! Sampling window / bunch length (Genesis ds).
-  integer :: npart = 8192                ! Macroparticles per slice after resampling.
-  integer :: nbins = 4                   ! Beamlet size (quiet-load bins).
-  integer :: nslice = 0                  ! 0: round(bunch_length/slice_spacing), Genesis's rule.
+type fel_resample_param_struct
+  real(rp) :: slice_width = 0.01_rp      ! Sampling window / bunch length.
+  integer :: n_particle_per_slice = 8192 ! Macroparticles per slice after resampling.
+  integer :: beamlet_size = 4            ! Beamlet size of the quiet load.
+  integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
 end type
 
 private analyse_window
@@ -75,7 +75,7 @@ contains
 !   gamma0          -- real(rp): FEL reference gamma. Sets fbeam%p0c.
 !   lambda0         -- real(rp): Radiation wavelength [m].
 !   slice_spacing   -- real(rp): Longitudinal slice spacing, sample*lambda0 [m].
-!   prm             -- fel_import_param_struct: The &importdistribution knobs.
+!   prm             -- fel_resample_param_struct: The &importdistribution knobs.
 !
 ! Output:
 !   fbeam           -- fel_beam_struct: The resampled packed beam.
@@ -88,7 +88,7 @@ contains
 subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
 
 type (bunch_struct), target :: bunch
-type (fel_import_param_struct) prm
+type (fel_resample_param_struct) prm
 type (fel_beam_struct), target :: fbeam
 type (fel_slice_struct), pointer :: sl
 type (coord_struct), pointer :: cp
@@ -114,11 +114,11 @@ character(*), parameter :: r_name = 'fel_import_bunch'
 
 err_flag = .true.
 
-if (prm%npart < 1 .or. prm%nbins < 1 .or. mod(prm%npart, prm%nbins) /= 0) then
+if (prm%n_particle_per_slice < 1 .or. prm%beamlet_size < 1 .or. mod(prm%n_particle_per_slice, prm%beamlet_size) /= 0) then
   call out_io (s_error$, r_name, 'NPART MUST BE A POSITIVE MULTIPLE OF NBINS (Genesis''s rule).')
   return
 endif
-if (prm%slicewidth <= 0) then
+if (prm%slice_width <= 0) then
   call out_io (s_error$, r_name, 'SLICEWIDTH MUST BE POSITIVE.')
   return
 endif
@@ -169,7 +169,7 @@ if (ttotal <= 0) then
   return
 endif
 
-nslice = prm%nslice
+nslice = prm%n_slice
 if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! Genesis's rule (sec-import).
 
 ! The bunch moments, in Genesis's analyse form (unweighted, strict window bounds:
@@ -189,7 +189,7 @@ fbeam%phi0 = 0
 fbeam%wavelength = lambda0
 fbeam%slice_spacing = slice_spacing
 fbeam%s0 = 0
-fbeam%nbins = prm%nbins
+fbeam%beamlet_size = prm%beamlet_size
 fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice))
@@ -197,13 +197,13 @@ allocate (fbeam%slice(nslice))
 ! The slice loop (fel-physics.md sec-import). Slice centers at
 ! (islice-1)*slice_spacing. Candidates from the dslen window, strict inequalities.
 
-dslen = prm%slicewidth * ttotal
-mpart = prm%npart / prm%nbins
+dslen = prm%slice_width * ttotal
+mpart = prm%n_particle_per_slice / prm%beamlet_size
 ks_l = twopi / lambda0
 n_clamp = 0
 
-allocate (cg(prm%npart), cx(prm%npart), cy(prm%npart), cpx(prm%npart), cpy(prm%npart), &
-          theta(prm%npart), wk(prm%npart))
+allocate (cg(prm%n_particle_per_slice), cx(prm%n_particle_per_slice), cy(prm%n_particle_per_slice), cpx(prm%n_particle_per_slice), cpy(prm%n_particle_per_slice), &
+          theta(prm%n_particle_per_slice), wk(prm%n_particle_per_slice))
 
 do islice = 1, nslice
   sloc = (islice - 1) * slice_spacing
@@ -294,7 +294,7 @@ end subroutine gather_and_remove
 ! Subroutine fill_slice ()
 !
 ! Routine to bring the candidate set to mpart seeds (Genesis's addParticles when short),
-! refill theta, mirror into nbins beamlet copies, impose the shot noise, and store the
+! refill theta, mirror into beamlet_size beamlet copies, impose the shot noise, and store the
 ! slice.
 !-
 
@@ -376,19 +376,19 @@ if (nd < mpart) then
 endif
 
 ! theta refilled completely new over one beamlet spacing (sec-import), then the
-! beamlet mirroring: seed i lands at nbins consecutive indices.
+! beamlet mirroring: seed i lands at beamlet_size consecutive indices.
 
 do k = 1, mpart
   call ran_uniform (uu)
-  wk(k) = (twopi / prm%nbins) * uu
+  wk(k) = (twopi / prm%beamlet_size) * uu
 enddo
 do k = mpart, 1, -1
   i1 = k
-  i2 = prm%nbins * (k-1)
-  do j = 0, prm%nbins - 1
+  i2 = prm%beamlet_size * (k-1)
+  do j = 0, prm%beamlet_size - 1
     cg(i2+j+1) = cg(i1); cx(i2+j+1) = cx(i1); cy(i2+j+1) = cy(i1)
     cpx(i2+j+1) = cpx(i1); cpy(i2+j+1) = cpy(i1)
-    theta(i2+j+1) = wk(i1) + j * twopi / prm%nbins
+    theta(i2+j+1) = wk(i1) + j * twopi / prm%beamlet_size
   enddo
 enddo
 
@@ -396,19 +396,19 @@ enddo
 ! shared Fawley noise with ne = charge/e (skipped for empty slices, as Genesis's),
 ! then the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
 
-w_part = cur * slice_spacing / (c_light * prm%npart)
+w_part = cur * slice_spacing / (c_light * prm%n_particle_per_slice)
 ne = anint(cur * slice_spacing / (e_charge * c_light))
 
 sl => fbeam%slice(islice)
-call fel_slice_reallocate (sl, prm%npart)
-sl%n = prm%npart
-sl%weight(1:prm%npart) = w_part
+call fel_slice_reallocate (sl, prm%n_particle_per_slice)
+sl%n = prm%n_particle_per_slice
+sl%weight(1:prm%n_particle_per_slice) = w_part
 
 if (ne > 0) then
-  call fel_fawley_noise (theta(1:prm%npart), sl%weight(1:prm%npart), prm%npart, prm%nbins, n_clamp)
+  call fel_fawley_noise (theta(1:prm%n_particle_per_slice), sl%weight(1:prm%n_particle_per_slice), prm%n_particle_per_slice, prm%beamlet_size, n_clamp)
 endif
 
-do k = 1, prm%npart
+do k = 1, prm%n_particle_per_slice
   gam_p = cg(k)
   beta_p = sqrt(gam_p**2 - 1) / gam_p
   sl%x(k) = cx(k);  sl%px(k) = cpx(k) / p0_mc

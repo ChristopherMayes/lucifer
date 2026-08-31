@@ -112,7 +112,7 @@ LAT
 /
 &fel_beam_init
   beam_file = "AramisS12-initial.beam.h5"
-  nbins = 8
+  beamlet_size = 8
 /
 &fel_wavefront_init
   field_file = "AramisS12-initial.wf.h5"

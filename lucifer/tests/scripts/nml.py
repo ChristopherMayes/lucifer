@@ -11,7 +11,7 @@ The configurations themselves are untouched -- same keys, same values.
 from __future__ import annotations
 
 # Key roots that keep their name in &fel_params.
-PARAMS_LOOSE = {"lat_file", "write_wake_kernels"}
+PARAMS_LOOSE = {"lat_file", "chamber_wake%write_kernels"}
 # Key roots that become global%<key> in &fel_params.
 PARAMS_GLOBAL = {
     "out_root", "interlude_model", "write_diag", "write_initial",
@@ -24,13 +24,13 @@ PARAMS_RENAME = {
     "radiation_damping": "bmad_com%radiation_damping_on",
     "radiation_fluctuations": "bmad_com%radiation_fluctuations_on",
 }
-# wake_<x> -> wake%<x>, sc_<x> -> sc%<x> handled by prefix below.
+# wake_<x> -> chamber_wake%<x>, sc_<x> -> space_charge%<x> handled by prefix below.
 
 # &fel_beam_init keys, verbatim.
 BEAM = {
-    "beam_init", "imp", "beam_file", "dist_file", "write_dist_file", "write_opmd_file",
-    "use_beam_init", "nbins", "shotnoise", "split_weights", "swap_beam_xy",
-    "gen_test_weights", "imp_split_weights",
+    "beam_init", "resample", "beam_file", "dist_file", "write_genesis_dist", "write_openpmd_file",
+    "use_beam_init", "beamlet_size", "shot_noise", "split_weights", "swap_beam_xy",
+    "gen_test_weights", "resample_split_weights",
 }
 # Keys that become wavefront_init%<key> in &fel_wavefront_init.
 WAVEFRONT = {
@@ -41,7 +41,7 @@ WAVEFRONT_LOOSE = {"field_file"}
 
 # Keys already written in new-style form pass through to their group.
 NEWSTYLE = {"global": "params", "bmad_com": "params", "space_charge_com": "params",
-            "wake": "params", "sc": "params", "wavefront_init": "wavefront"}
+            "chamber_wake": "params", "space_charge": "params", "wavefront_init": "wavefront"}
 
 
 def to_groups(flat_text):
@@ -66,9 +66,9 @@ def to_groups(flat_text):
         elif root in PARAMS_RENAME:
             params.append(f"  {PARAMS_RENAME[root]} {rest}")
         elif root.startswith("wake_"):
-            params.append(f"  wake%{root[5:]}{subs} {rest}")
+            params.append(f"  chamber_wake%{root[5:]}{subs} {rest}")
         elif root.startswith("sc_"):
-            params.append(f"  sc%{root[3:]}{subs} {rest}")
+            params.append(f"  space_charge%{root[3:]}{subs} {rest}")
         elif root in BEAM:
             beam.append("  " + line)
         elif root in WAVEFRONT:

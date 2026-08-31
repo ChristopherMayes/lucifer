@@ -63,7 +63,7 @@ beam%p0c = sqrt(11357.82_rp**2 - 1) * m_electron
 beam%phi0 = 0
 beam%wavelength = 1e-10_rp
 beam%slice_spacing = 1e-10_rp
-beam%nbins = 8
+beam%beamlet_size = 8
 allocate (beam%slice(1))
 sl => beam%slice(1)
 call fel_slice_reallocate (sl, npart)

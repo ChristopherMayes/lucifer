@@ -233,7 +233,7 @@ Output:
 *Subroutine* `(beam, file_name, gamma0, n_slice, wavelength, spacing,`
 
 ```
-                                                               nbins, ele, err_flag)
+                                                               beamlet_size, ele, err_flag)
 
 Routine to read an openPMD-beamphysics particle file written by
 fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
@@ -258,7 +258,7 @@ Input:
   ele         -- ele_struct: Element to convert the coordinates against.
   wavelength  -- real(rp): Radiation wavelength [m], from the deck.
   spacing     -- real(rp): Slice spacing [m], from the deck.
-  nbins       -- integer: Beamlet size, from the deck. A dump does not carry it.
+  beamlet_size       -- integer: Beamlet size, from the deck. A dump does not carry it.
 
 Output:
   beam        -- fel_beam_struct: Beam read from the file.
@@ -318,7 +318,7 @@ Output:
 (api-fel-fawley-noise)=
 ### `fel_fawley_noise`
 
-*Subroutine* `(theta, weight, n, nbins, n_clamp)`
+*Subroutine* `(theta, weight, n, beamlet_size, n_clamp)`
 
 ```
 Routine to impose Fawley-style shot noise on a quiet-loaded slice, transcribed from
@@ -339,8 +339,8 @@ implementation.
 Input:
   theta(:)    -- real(rp): Quiet-loaded ponderomotive phases [rad], beamlet-contiguous.
   weight(:)   -- real(rp): Macroparticle charges [C], uniform within each beamlet.
-  n           -- integer: Number of particles in the slice (a multiple of nbins).
-  nbins       -- integer: Beamlet size.
+  n           -- integer: Number of particles in the slice (a multiple of beamlet_size).
+  beamlet_size       -- integer: Beamlet size.
   n_clamp     -- integer: Running count of nbl < 1 clamps, accumulated across calls.
 
 Output:
@@ -642,8 +642,8 @@ recomputed at the caller's migration stride when they can (the hoist's premise
 predates migration).
 ```
 
-(api-fel-efield-struct)=
-### `fel_efield_struct`
+(api-fel-space-charge-struct)=
+### `fel_space_charge_struct`
 
 *Struct*
 
@@ -802,7 +802,7 @@ sec-spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is
 
 ```
 Input:
-  ef       -- fel_efield_struct: Space-charge configuration.
+  ef       -- fel_space_charge_struct: Space-charge configuration.
   beam     -- fel_beam_struct: The beam.
   gamma0   -- real(rp): Reference Lorentz factor.
   aw       -- real(rp): Undulator parameter (parallel-velocity correction).
@@ -836,7 +836,7 @@ This is the interface a Bmad-slice space-charge implementation can later fill
 
 ```
 Input:
-  ef    -- fel_efield_struct: Space-charge configuration (grid, harmonics).
+  ef    -- fel_space_charge_struct: Space-charge configuration (grid, harmonics).
   beam  -- fel_beam_struct: The beam.
   sl    -- fel_slice_struct: One slice's packed particles.
   gz2   -- real(rp): Longitudinal gamma^2 (with the undulator correction).
@@ -1137,7 +1137,7 @@ the invariance check relies on.
 
 Genesis quirks found by reading and NOT transcribed as functional (sec-import): the
 align/align_start/align_end parameters are parsed but never used in v4. The
-shotnoise flag is read but never consulted: the import applies noise
+shot_noise flag is read but never consulted: the import applies noise
 unconditionally, skipping only zero-current slices. Both behaviors are kept as
 Genesis has them (noise always on for nonzero current). one4one is out of scope:
 per-particle weights supersede it.
@@ -1147,8 +1147,8 @@ everything the RNG touches is validated statistically. The current profile and t
 analyse/match/center moments are RNG-free and check exactly.
 ```
 
-(api-fel-import-param-struct)=
-### `fel_import_param_struct`
+(api-fel-resample-param-struct)=
+### `fel_resample_param_struct`
 
 *Struct*
 
@@ -1174,7 +1174,7 @@ Input:
   gamma0          -- real(rp): FEL reference gamma. Sets fbeam%p0c.
   lambda0         -- real(rp): Radiation wavelength [m].
   slice_spacing   -- real(rp): Longitudinal slice spacing, sample*lambda0 [m].
-  prm             -- fel_import_param_struct: The &importdistribution knobs.
+  prm             -- fel_resample_param_struct: The &importdistribution knobs.
 
 Output:
   fbeam           -- fel_beam_struct: The resampled packed beam.
@@ -1202,7 +1202,7 @@ last and shrink until mpart remain.
 
 ```
 Routine to bring the candidate set to mpart seeds (Genesis's addParticles when short),
-refill theta, mirror into nbins beamlet copies, impose the shot noise, and store the
+refill theta, mirror into beamlet_size beamlet copies, impose the shot noise, and store the
 slice.
 ```
 
@@ -1409,16 +1409,16 @@ generator and the distribution import (both make their own beam, neither brings 
 The namelist layer of the FEL tracker, quarantined the way Tao quarantines its
 tao_init_* files: three groups, all read from ONE input file, each filling the
 structs of fel_struct directly (Tao's &tao_params pattern: set global%out_root,
-bmad_com%radiation_damping_on, wake%radius, sc%nz, beam_init%n_particle,
+bmad_com%radiation_damping_on, chamber_wake%radius, space_charge%nz, beam_init%n_particle,
 wavefront_init%lambda0 by component). This module is itself library: an embedding
 program may reuse the parsing, or skip it and fill the structs in code.
 
   &fel_params          lat_file, global, bmad_com, space_charge_com, wake, sc,
-                       write_wake_kernels
-  &fel_beam_init       beam_init, imp, beam_file, dist_file, write_dist_file,
-                       write_opmd_file, use_beam_init, nbins, shotnoise,
+                       chamber_wake%write_kernels
+  &fel_beam_init       beam_init, imp, beam_file, dist_file, write_genesis_dist,
+                       write_openpmd_file, use_beam_init, beamlet_size, shot_noise,
                        split_weights, swap_beam_xy, gen_test_weights,
-                       imp_split_weights
+                       resample_split_weights
   &fel_wavefront_init  wavefront_init, field_file
 
 A group that is absent keeps its defaults. A group that is present must parse.
@@ -2163,7 +2163,7 @@ Five groups, and each answers one question.
            migration invariant (higher slice index is the window head) that a
            per-slice plot cannot be drawn without.
   params/  Every scalar as data: the window (lambda0, window_sample, slice_spacing,
-           nbins), p0c, the charge, the species, the seed, the grid, the counts.
+           beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
            Nothing a reader needs is left in the echoed namelist.
   beam/    slice/ holds the per-record sufficient statistics, named exactly as
            bunch_params_struct components, enough to construct one from any
@@ -2521,12 +2521,12 @@ input file sets them directly, Tao-style:
     lat_file = "line.bmad"
     global%out_root = "run1"
     bmad_com%radiation_damping_on = T
-    wake%radius = 2.5e-3
-    sc%nz = 2
+    chamber_wake%radius = 2.5e-3
+    space_charge%nz = 2
   /
   &fel_beam_init
     beam_init%n_particle = 8192
-    shotnoise = T
+    shot_noise = T
   /
   &fel_wavefront_init
     wavefront_init%lambda0 = 1e-10
@@ -2567,13 +2567,13 @@ window_sample set the slice count and spacing for the field AND the generated be
 override the seed.
 ```
 
-(api-fel-wake-init-struct)=
-### `fel_wake_init_struct`
+(api-fel-chamber-wake-init-struct)=
+### `fel_chamber_wake_init_struct`
 
 *Struct*
 
 ```
-The chamber-wake description (&fel_params wake%...), Genesis &wake names. A plain
+The chamber-wake description (&fel_params chamber_wake%...), Genesis &wake names. A plain
 mirror of fel_wake_struct's configuration fields (that struct carries allocatable
 state, which a namelist object cannot). fel_setup copies these in.
 ```
@@ -4030,8 +4030,8 @@ The program reads THREE namelist groups from one input file, each setting struct
 directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
 
   &fel_params           lat_file, the global%... run switches, Bmad's own bmad_com and
-                        space_charge_com, and the wake%/sc% collective descriptions.
-  &fel_beam_init        Bmad's beam_init%... bunch description, the imp%... resampler,
+                        space_charge_com, and the chamber_wake%/space_charge% collective descriptions.
+  &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
                         source and output files, and the beam-side check knobs.
   &fel_wavefront_init   wavefront_init%... radiation starting condition (the field
                         record IS the time window, so the window lives here) and the

@@ -27,7 +27,7 @@ the averaged mode's inputs (the coupling factor fc).
 4. h = 3: the same planar pair run with lambda0 = lambda1/3 measures the third-harmonic
    coupling against fc3 = aw*|J1(xi3)-J2(xi3)|, xi3 = (3/2) aw^2/(1+aw^2). The load is
    quiet at h = 3 because the beamlet quiet start cancels every harmonic below nbins
-   (nbins = 8 here) -- the recorded reason a quadrature load is not needed for this.
+   (beamlet_size = 8 here) -- the recorded reason a quadrature load is not needed for this.
 
 5. Convergence: fc at 10/20/30 steps per period, tabulated (MINERVA's envelope).
 
@@ -77,7 +77,7 @@ PROBE = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_pz = 8.804506566858e-07
   beam_init%a_norm_emit = 4e-9
   beam_init%b_norm_emit = 4e-9
-  nbins = 8
+  beamlet_size = 8
   seed_power = {power}
   seed_waist_size = {w0}
   grid_n_pts = 129
@@ -105,7 +105,7 @@ GAIN = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_pz = 8.804506566858e-05
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  nbins = 8
+  beamlet_size = 8
   seed_power = 5e3
   seed_waist_size = 30e-6
   grid_n_pts = 129
@@ -127,14 +127,14 @@ TDID = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_pz = 8.8045e-5
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  nbins = 8
+  beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
   grid_n_pts = 63
   grid_half_width = 2e-4
   window_length = 8e-10
   window_sample = 1
-  shotnoise = T
+  shot_noise = T
   ran_seed = 999
   write_diag = T
 &end

@@ -28,7 +28,7 @@ Lucifer is the reference writer. The escaped-field and pulse field files are com
 
 ## 4. Parameters
 
-- **F14.** `params/` gains the program's window and seed structs (for Lucifer: `lambda0`, `window_sample`, `nbins`, the grid, the seed knobs), under core R34.
+- **F14.** `params/` gains the program's window and seed structs (for Lucifer: `lambda0`, `window_sample`, `beamlet_size`, the grid, the seed knobs), under core R34.
 - **F15.** `run/` gains `slice_spacing` and `n_slice`. `slice_spacing`'s description MUST state that it is a light-travel distance, c times the slice time separation, with the z separation being beta times it, per particle. It is derived (`window_sample * lambda0`), which is why it is in `run/` and not `params/`.
 
 ## 5. Kinds and axes this extension adds

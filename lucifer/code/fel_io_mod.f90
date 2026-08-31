@@ -1091,10 +1091,10 @@ call H5Gclose_f (g_id, h5e)
 
 call sub_open ('beam_param', 'fel_beam_init_param_struct', &
       'The beam-side scalars of &fel_beam_init beside beam_init and imp.')
-call fel_h5_int (g_id, 'nbins', '1', 'beamlet size', &
-      'Beamlet size of the quiet start (quiet below nbins).', '', run%bparam%nbins, merr)
-call fel_h5_flag (g_id, 'shotnoise', 'shot noise', &
-      'Impose physical (Fawley) shot noise on the phases.', run%bparam%shotnoise, merr)
+call fel_h5_int (g_id, 'beamlet_size', '1', 'beamlet size', &
+      'Beamlet size of the quiet start (the load is quiet below it).', '', run%bparam%beamlet_size, merr)
+call fel_h5_flag (g_id, 'shot_noise', 'shot noise', &
+      'Impose physical (Fawley) shot noise on the phases.', run%bparam%shot_noise, merr)
 call fel_h5_flag (g_id, 'use_beam_init', 'use beam_init', &
       'Generate the bunch from beam_init, then import it.', run%bparam%use_beam_init, merr)
 call fel_h5_flag (g_id, 'split_weights', 'split weights', &
@@ -1106,28 +1106,28 @@ call fel_h5_flag (g_id, 'swap_beam_xy', 'swap xy', &
 call fel_h5_flag (g_id, 'gen_test_weights', 'test weights', &
       'Check instrument: alternate beamlet weights 0.25x/1.75x.', &
       run%bparam%gen_test_weights, merr)
-call fel_h5_flag (g_id, 'imp_split_weights', 'import split', &
+call fel_h5_flag (g_id, 'resample_split_weights', 'import split', &
       'Check instrument: split-weight copies before the import resample.', &
-      run%bparam%imp_split_weights, merr)
+      run%bparam%resample_split_weights, merr)
 call file_note ('beam_file', run%bparam%beam_file, 'Genesis .par.h5 dump to import.')
 call file_note ('dist_file', run%bparam%dist_file, 'openPMD-beamphysics particle file to import.')
-call file_note ('write_dist_file', run%bparam%write_dist_file, 'Write the bunch as a Genesis DISTRIBUTION file.')
-call file_note ('write_opmd_file', run%bparam%write_opmd_file, 'Write the bunch as openPMD-beamphysics.')
+call file_note ('write_genesis_dist', run%bparam%write_genesis_dist, 'Write the bunch as a Genesis DISTRIBUTION file.')
+call file_note ('write_openpmd_file', run%bparam%write_openpmd_file, 'Write the bunch as openPMD-beamphysics.')
 call H5Gclose_f (g_id, h5e)
 
 ! ------------------------------------------------------------ the import resampler.
 
-call sub_open ('imp', 'fel_import_param_struct', &
-      'The importdistribution resampler knobs (&fel_beam_init imp%).')
+call sub_open ('resample', 'fel_resample_param_struct', &
+      'The resampler knobs (&fel_beam_init resample%).')
 call fel_h5_real (g_id, 'slicewidth', '1', 'slice width', &
-      'Sampling window over bunch length (Genesis''s slicewidth).', '', run%imp%slicewidth, merr)
+      'Sampling window over bunch length (Genesis''s slicewidth).', '', run%resample%slice_width, merr)
 call fel_h5_int (g_id, 'npart', '1', 'particles', &
-      'Macroparticles per slice after resampling.', '', run%imp%npart, merr)
-call fel_h5_int (g_id, 'nbins', '1', 'beamlet size', &
-      'Beamlet size of the resample.', '', run%imp%nbins, merr)
+      'Macroparticles per slice after resampling.', '', run%resample%n_particle_per_slice, merr)
+call fel_h5_int (g_id, 'beamlet_size', '1', 'beamlet size', &
+      'Beamlet size of the resample.', '', run%resample%beamlet_size, merr)
 call fel_h5_int (g_id, 'nslice', '1', 'slices', &
       'Slice count. Zero means round(bunch length / spacing), Genesis''s rule.', '', &
-      run%imp%nslice, merr)
+      run%resample%n_slice, merr)
 call H5Gclose_f (g_id, h5e)
 
 ! ------------------------------------------------------------ the radiation start.
@@ -1172,49 +1172,53 @@ call H5Gclose_f (g_id, h5e)
 
 ! ------------------------------------------------------------ the chamber wake.
 
-call sub_open ('wake', 'fel_wake_init_struct', &
-      'The chamber-wake description (&fel_params wake%), Genesis &wake names.')
-call fel_h5_flag (g_id, 'on', 'wake on', 'Any chamber wake at all.', run%wake_init%on, merr)
-call fel_h5_real (g_id, 'loss', 'eV/m', 'loss', 'External loss.', '', run%wake_init%loss, merr)
+call sub_open ('chamber_wake', 'fel_chamber_wake_init_struct', &
+      'The chamber-wake description (&fel_params chamber_wake%).')
+call fel_h5_flag (g_id, 'on', 'wake on', 'Any chamber wake at all.', run%chamber_wake%on, merr)
+call fel_h5_str (g_id, 'model', 'wake model', &
+      'Which chamber-wake implementation ran.', '', [run%chamber_wake%model], merr)
+call fel_h5_real (g_id, 'loss', 'eV/m', 'loss', 'External loss.', '', run%chamber_wake%loss, merr)
 call fel_h5_real (g_id, 'radius', 'm', 'radius', &
-      'Chamber radius, or half gap if flat.', '', run%wake_init%radius, merr)
+      'Chamber radius, or half gap if flat.', '', run%chamber_wake%radius, merr)
 call fel_h5_real (g_id, 'conductivity', '1/(Ohm m)', 'conductivity', &
-      'DC conductivity. Zero means no resistive wake.', '', run%wake_init%conductivity, merr)
+      'DC conductivity. Zero means no resistive wake.', '', run%chamber_wake%conductivity, merr)
 call fel_h5_real (g_id, 'relaxation', 'm', 'relaxation', &
-      'AC relaxation distance c*tau.', '', run%wake_init%relaxation, merr)
+      'AC relaxation distance c*tau.', '', run%chamber_wake%relaxation, merr)
 call fel_h5_flag (g_id, 'roundpipe', 'round pipe', &
-      'Round chamber. False is flat, parallel plates.', run%wake_init%roundpipe, merr)
+      'Round chamber. False is flat, parallel plates.', run%chamber_wake%roundpipe, merr)
 call fel_h5_str (g_id, 'material', 'material', &
       'CU or AL shortcut for conductivity and relaxation. Blank when set directly.', &
-      '', [run%wake_init%material], merr)
+      '', [run%chamber_wake%material], merr)
 call fel_h5_real (g_id, 'gap', 'm', 'gap', &
-      'Undulator gap. Zero means no geometric wake.', '', run%wake_init%gap, merr)
+      'Undulator gap. Zero means no geometric wake.', '', run%chamber_wake%gap, merr)
 call fel_h5_real (g_id, 'lgap', 'm', 'gap period', 'Period of the gaps.', '', &
-      run%wake_init%lgap, merr)
+      run%chamber_wake%lgap, merr)
 call fel_h5_real (g_id, 'hrough', 'm', 'roughness', &
-      'Roughness amplitude. Zero means no roughness wake.', '', run%wake_init%hrough, merr)
+      'Roughness amplitude. Zero means no roughness wake.', '', run%chamber_wake%hrough, merr)
 call fel_h5_real (g_id, 'lrough', 'm', 'roughness period', 'Roughness period.', '', &
-      run%wake_init%lrough, merr)
-call file_note ('write_kernels', run%wake_init%write_kernels, &
+      run%chamber_wake%lrough, merr)
+call file_note ('write_kernels', run%chamber_wake%write_kernels, &
       'Check instrument: export the transcribed kernels.')
 call H5Gclose_f (g_id, h5e)
 
 ! ------------------------------------------------------------ space charge.
 
-call sub_open ('sc', 'fel_efield_struct', &
-      'The FEL space-charge description (&fel_params sc%).')
+call sub_open ('space_charge', 'fel_space_charge_struct', &
+      'The FEL space-charge description (&fel_params space_charge%).')
 call fel_h5_flag (g_id, 'on', 'space charge on', 'Any space charge at all.', &
-      run%sc_init%on, merr)
+      run%space_charge%on, merr)
+call fel_h5_str (g_id, 'model', 'space charge model', &
+      'Which space-charge implementation ran.', '', [run%space_charge%model], merr)
 call fel_h5_real (g_id, 'rmax', 'm', 'rmax', &
-      'Radial grid extent scale. Grows adaptively as Genesis''s.', '', run%sc_init%rmax, merr)
+      'Radial grid extent scale. Grows adaptively as Genesis''s.', '', run%space_charge%rmax, merr)
 call fel_h5_int (g_id, 'ngrid', '1', 'radial points', 'Radial grid points.', '', &
-      run%sc_init%ngrid, merr)
+      run%space_charge%ngrid, merr)
 call fel_h5_int (g_id, 'nz', '1', 'harmonics', &
-      'Longitudinal harmonics. Zero disables the short-range solve.', '', run%sc_init%nz, merr)
+      'Longitudinal harmonics. Zero disables the short-range solve.', '', run%space_charge%nz, merr)
 call fel_h5_int (g_id, 'nphi', '1', 'azimuthal modes', &
-      'Azimuthal modes m = -nphi..nphi.', '', run%sc_init%nphi, merr)
+      'Azimuthal modes m = -nphi..nphi.', '', run%space_charge%nphi, merr)
 call fel_h5_flag (g_id, 'longrange', 'long range', &
-      'The whole-window longESC term.', run%sc_init%longrange, merr)
+      'The whole-window longESC term.', run%space_charge%longrange, merr)
 call H5Gclose_f (g_id, h5e)
 
 ! ------------------------------------------------------------ bmad_com, whole.

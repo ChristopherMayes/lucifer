@@ -69,14 +69,14 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   out_root = "{root}"
   lambda0 = {lambda0}
   window_sample = {sample}
-  imp%npart = 2048
-  imp%nbins = 8
+  resample%n_particle_per_slice = 2048
+  resample%beamlet_size = 8
   ran_seed = {seed}
   seed_power = 0
   grid_n_pts = 255
   grid_half_width = 2e-4
-{source}  imp%nslice = {nslice}
-  imp%slicewidth = 0.01
+{source}  resample%n_slice = {nslice}
+  resample%slice_width = 0.01
   write_diag = T
 {extra}&end
 """
@@ -227,8 +227,8 @@ def main():
 
     # ---- The RNG-free runs: generate, write the shared file, import, dump, stop.
     write_nml(w/"imp_ref.nml", "impref", 1000,
-              extra='  write_dist_file = "impdist.h5"\n'
-                    '  write_opmd_file = "impopmd.h5"\n  load_only = T\n')
+              extra='  write_genesis_dist = "impdist.h5"\n'
+                    '  write_openpmd_file = "impopmd.h5"\n  load_only = T\n')
     run([args.exe, "imp_ref.nml"], w/"imp_ref.log", env=env1)
     mom_ref, cur_ref = read_import_file(w, "impref")
 
@@ -261,7 +261,7 @@ def main():
 
     # split: coincident copies leave the RNG-free outputs unchanged to roundoff.
     write_nml(w/"imp_split.nml", "impsplit", 1000,
-              extra="  imp_split_weights = T\n  load_only = T\n")
+              extra="  resample_split_weights = T\n  load_only = T\n")
     run([args.exe, "imp_split.nml"], w/"imp_split.log", env=env1)
     mom_s, cur_s = read_import_file(w, "impsplit")
     dm = np.abs(mom_s - mom_ref).max() / np.abs(mom_ref).max()
@@ -281,7 +281,7 @@ def main():
     mom_o, cur_o = read_import_file(w, "impopmd")
     dm = np.abs(mom_o - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_o - cur_ref).max() / max(cur_ref.max(), 1e-30)
-    print(f"openPMD round trip (write_opmd_file -> dist_file): moments {dm:.3e}, currents {dc:.3e}")
+    print(f"openPMD round trip (write_openpmd_file -> dist_file): moments {dm:.3e}, currents {dc:.3e}")
     if dm > 1e-10 or dc > 1e-10:
         print("FAIL: openPMD round trip does not reproduce the bunch")
         ok = False
@@ -300,7 +300,7 @@ def main():
         print("zero-charge refusal: refused by name")
 
     # twiss (statistical): the imported dump's central slices recover the targets.
-    # Statistics note: each slice has npart/nbins = 256 independent phase-space seeds,
+    # Statistics note: each slice has npart/beamlet_size = 256 independent phase-space seeds,
     # so a single slice's Twiss carries ~1/sqrt(256) = 6% noise and a max over slices
     # would check on order statistics. Check on the mean over central slices instead.
     slices, cur = load_dump_slices(w/"impref-initial.beam.h5")
@@ -344,7 +344,7 @@ def main():
         seed = 2000 + 17*k
         dist = f"impdist_s{k}.h5"
         write_nml(w/f"imp_s{k}.nml", f"imps{k}", seed,
-                  extra=f'  write_dist_file = "{dist}"\n')
+                  extra=f'  write_genesis_dist = "{dist}"\n')
         run([args.exe, f"imp_s{k}.nml"], w/f"imp_s{k}.log", env=env8)
         (w/f"imp_g{k}.in").write_text(GENESIS_TRACK_DECK.format(
             root=f"impg{k}", dist=dist, lambda0=LAMBDA0, gamma0=GAMMA0,
@@ -395,7 +395,7 @@ def main():
         ok = False
     # The import's profile (cur_ref, measured earlier from the same description):
     # its own slice centers, bunch center fitted (the import min-shifts positions, and
-    # imp%nslice truncates the +4 sigma tail, so the fit is over a clipped profile --
+    # resample%n_slice truncates the +4 sigma tail, so the fit is over a clipped profile --
     # rms over the live slices is the honest statistic. The mutations this check exists
     # to catch, a dropped sqrt(2pi) or dslen-for-spacing, sit at 0.65-1.5 of peak).
     si = np.arange(len(cur_ref)) * sp

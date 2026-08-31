@@ -476,23 +476,35 @@ harmonics = run%winit%harmonics
 nslice = run%nslice
 n_harm = run%n_harm
 two_pol = run%two_pol
-wake_on = run%wake_init%on
-wake_loss = run%wake_init%loss
-wake_radius = run%wake_init%radius
-wake_conductivity = run%wake_init%conductivity
-wake_relaxation = run%wake_init%relaxation
-wake_roundpipe = run%wake_init%roundpipe
-wake_material = run%wake_init%material
-wake_gap = run%wake_init%gap
-wake_lgap = run%wake_init%lgap
-wake_hrough = run%wake_init%hrough
-wake_lrough = run%wake_init%lrough
-sc_rmax = run%sc_init%rmax
-sc_ngrid = run%sc_init%ngrid
-sc_nz = run%sc_init%nz
-sc_nphi = run%sc_init%nphi
-sc_longrange = run%sc_init%longrange
+wake_on = run%chamber_wake%on
+wake_loss = run%chamber_wake%loss
+wake_radius = run%chamber_wake%radius
+wake_conductivity = run%chamber_wake%conductivity
+wake_relaxation = run%chamber_wake%relaxation
+wake_roundpipe = run%chamber_wake%roundpipe
+wake_material = run%chamber_wake%material
+wake_gap = run%chamber_wake%gap
+wake_lgap = run%chamber_wake%lgap
+wake_hrough = run%chamber_wake%hrough
+wake_lrough = run%chamber_wake%lrough
+sc_rmax = run%space_charge%rmax
+sc_ngrid = run%space_charge%ngrid
+sc_nz = run%space_charge%nz
+sc_nphi = run%space_charge%nphi
+sc_longrange = run%space_charge%longrange
 
+! Each collective family names its implementation. One value is accepted today, and an
+! unknown one is refused rather than silently treated as the transcribed solver.
+
+if (run%chamber_wake%model /= 'genesis') then
+  call out_io (s_error$, r_name, 'CHAMBER_WAKE%MODEL MUST BE "genesis", GOT: ' // trim(run%chamber_wake%model))
+  err_flag = .true.;  return
+endif
+
+if (run%space_charge%model /= 'genesis') then
+  call out_io (s_error$, r_name, 'SPACE_CHARGE%MODEL MUST BE "genesis", GOT: ' // trim(run%space_charge%model))
+  err_flag = .true.;  return
+endif
 
 coll%efield%on = (sc_nz >= 1 .or. sc_longrange)
 coll%efield%rmax = sc_rmax
@@ -533,17 +545,17 @@ if (wake_on) then
   ! convolution. NOTE the s = 0 entries carry the Bane self-slice half factor
   ! (fel_wake_init halves them). A plain W(z) table wants the unhalved value.
 
-  if (run%wake_init%write_kernels /= '') then
+  if (run%chamber_wake%write_kernels /= '') then
     block
       integer iu_k, i_k
-      open (newunit = iu_k, file = trim(run%wake_init%write_kernels), action = 'write')
+      open (newunit = iu_k, file = trim(run%chamber_wake%write_kernels), action = 'write')
       write (iu_k, '(a)') '# s [m]   wakeres   wakegeo   wakerou   [eV/(m electron)]; s=0 rows are HALVED (Bane self-slice)'
       do i_k = 1, coll%wake%ns
         write (iu_k, '(4es24.15e3)') coll%wake%ds * (i_k-1), coll%wake%wakeres(i_k), &
                                      coll%wake%wakegeo(i_k), coll%wake%wakerou(i_k)
       enddo
       close (iu_k)
-      call out_io (s_info$, r_name, 'Wrote wake kernels: ' // trim(run%wake_init%write_kernels))
+      call out_io (s_info$, r_name, 'Wrote wake kernels: ' // trim(run%chamber_wake%write_kernels))
     end block
   endif
 endif

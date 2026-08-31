@@ -759,7 +759,7 @@ if (bmad_com%radiation_fluctuations_on) then
   sig = sqrt(1.015e-27_rp * und%ku**3 * und%aw**2 * fform * gamma0_ref**4 * intg2)
 endif
 
-nb = max(1, fbeam%nbins)
+nb = max(1, fbeam%beamlet_size)
 if (.not. allocated(e_rad_slice)) allocate (e_rad_slice(nslice))
 e_rad_slice = 0
 

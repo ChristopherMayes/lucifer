@@ -60,11 +60,14 @@ parameter reference is [](input-reference.md).
 | `&setup rootname` | `global%out_root` | |
 | `&time sample` | `wavefront_init%window_sample` | Slice spacing in wavelengths, an integer in both |
 | `&time slen` | the number of slices in the starting state | Lucifer takes the window from the beam it is given rather than a length |
-| `&beam npart` | `beam_init%n_particle` | Per slice in both. Lucifer requires a positive multiple of `nbins` |
-| `&beam nbins` | `nbins` | Beamlet size of the quiet start. No dump format carries it, so it is named on both sides |
+| `&beam npart` | `beam_init%n_particle` | Per slice in both. Lucifer requires a positive multiple of `beamlet_size` |
+| `&beam nbins` | `beamlet_size` | Beamlet size of the quiet start. No dump format carries it, so it is named on both sides |
+| `&importdistribution npart` | `resample%n_particle_per_slice` | Per slice in both, and Lucifer's name says so |
+| `&importdistribution nbins` | `resample%beamlet_size` | Beamlet size of the resample |
+| `&importdistribution nslice` | `resample%n_slice` | Slice count. Zero derives it from the bunch length |
 | `&track zstop` | `global%track_end` | Lucifer's bound is an element locator, not a distance. `global%track_start` has no Genesis4 equivalent |
 | `&track fft_fieldsolver` | (always) | Lucifer transcribes the FFT solver only |
-| `&importdistribution slicewidth` | `imp%slicewidth` | Same meaning, sampling window over bunch length |
+| `&importdistribution slicewidth` | `resample%slice_width` | Same meaning, sampling window over bunch length |
 | `&importdistribution` (match, center) | not ported | A Bmad lattice matches the beam, so these are the lattice's job |
 | `&sponrad` | `bmad_com%radiation_damping_on`, `bmad_com%radiation_fluctuations_on` | Lucifer exposes Bmad's own switches directly, as Tao does, rather than an FEL-local flag. Both default off, matching Genesis4's `&sponrad` default |
 | `&write beam`, `&write field` | `beam_file`, `field_file` on the input side; openPMD dumps on the output side | See file exchange below |

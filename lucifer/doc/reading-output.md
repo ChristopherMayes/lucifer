@@ -236,7 +236,7 @@ record: one patch per slice, in window order, and an empty slice is a patch of n
 particles. So the patch count IS the window, and the file needs no attributes of this
 code's invention to describe it. What openPMD has no place for comes from the deck
 instead: the wavelength, the slice spacing (`lambda0` and `window_sample`) and the
-beamlet size (`nbins`). Reading a dump without `lambda0` is refused by name rather than
+beamlet size (`beamlet_size`). Reading a dump without `lambda0` is refused by name rather than
 defaulted, since a wrong wavelength rescales every phase in the run. `one4one` needs no
 storage at all: the flag asserts that every macroparticle carries one electron, which is
 what the weights say.

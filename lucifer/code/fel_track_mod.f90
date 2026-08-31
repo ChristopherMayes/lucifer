@@ -122,7 +122,7 @@ type fel_coherent_struct
   real(rp) :: g2sum = 0                  ! |g0|^2 + |g1|^2 (Eq 20 sums, charge-weighted).
   real(rp) :: b2 = 0                     ! |B|^2, same weighting (kappa's Eq 26 ratio).
   real(rp) :: kurt = 0                   ! max plane |excess kurtosis| (guard metric).
-  real(rp) :: m_ind = 1                  ! Independent transverse samples: N_eff/nbins
+  real(rp) :: m_ind = 1                  ! Independent transverse samples: N_eff/beamlet_size
                                          !   (beamlet copies share coordinates). The
                                          !   guard tests SIGNIFICANCE, not raw kurtosis
                                          !   (sample kurtosis spreads as sqrt(24/m_ind)).
@@ -1991,7 +1991,7 @@ enddo
 coh%g2sum = abs(g0)**2 + abs(g1)**2
 coh%b2 = abs(bsum)**2
 coh%kurt = max(abs(x4 - 3), abs(y4 - 3))        ! Excess kurtosis, worst plane.
-coh%m_ind = max(1.0_rp, wsum**2 / w2sum / max(1, beam%nbins))
+coh%m_ind = max(1.0_rp, wsum**2 / w2sum / max(1, beam%beamlet_size))
 coh%ok = .true.
 
 end subroutine fel_coherent_prep

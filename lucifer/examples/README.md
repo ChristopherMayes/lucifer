@@ -95,8 +95,8 @@ window derives from the bunch itself, so the diag file's per-slice current is th
 Gaussian profile. The lattice is the whole optics specification. The reference energy
 comes from its `e_tot`, and `init_beam_distribution` generates the bunch matched to the
 Twiss in its beginning statement. Genesis4's `match` transform is not ported, since a
-Bmad lattice already says what it would say. Set `write_dist_file` to hand the
-identical bunch to Genesis4's `&importdistribution`, or `write_opmd_file` for
+Bmad lattice already says what it would say. Set `write_genesis_dist` to hand the
+identical bunch to Genesis4's `&importdistribution`, or `write_openpmd_file` for
 openPMD-beamphysics. `dist_file` reads openPMD back in place of `use_beam_init`.
 
 ## sase
@@ -122,7 +122,7 @@ power panel is the slippage cascade itself.
 
 The same chamber-wake physics as `sase_wake`, delivered through Bmad's own wake
 machinery instead of the transcribed Genesis4 model (conventions: the manual's Bmad-element-wakes section): `ztable.wake` is the Bane-Stupakov resistive-wall kernel for a 0.5 mm
-copper chamber (exported by `write_wake_kernels`, sign-flipped to Bmad's
+copper chamber (exported by `chamber_wake%write_kernels`, sign-flipped to Bmad's
 positive-decelerating convention, self-slice unhalved, causal side z < 0, padded past
 the window), attached as an `sr_wake` `z_long` table to every element of the line. The
 undulators apply it once per element at mid-element across the whole 96-slice
@@ -131,7 +131,7 @@ pipes here: a Bmad drift cannot carry a wake.) Measured against the identical ke
 in the `wake_on` model: exit mean energy drop -2.324 vs -2.308 m_e c^2, interior
 per-slice profiles agreeing to 0.7% -- one physical wake, two independent
 implementations, two application granularities. Regenerate the table by running any
-wake_on configuration with `write_wake_kernels = "kern.txt"` and applying the recipe
+wake_on configuration with `chamber_wake%write_kernels = "kern.txt"` and applying the recipe
 in `wake_lattice.bmad`'s header.
 
 ## unaveraged

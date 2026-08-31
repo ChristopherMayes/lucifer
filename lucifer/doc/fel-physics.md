@@ -543,7 +543,7 @@ $n_e = \mathrm{nint}(I\lambda_s\,\texttt{sample}/(e c))$. The file's $p_x/p_y$ a
 *slopes*. The slope-to-momentum conversion $\hat p = x'\gamma$ happens at the
 copy into the candidate set. Genesis4's `match`/`center` transforms are not
 ported (a Bmad lattice carries its optics, and `init_beam_distribution`
-generates matched bunches), and Genesis4's `align*` and `shotnoise` inputs
+generates matched bunches), and Genesis4's `align*` and `shot_noise` inputs
 are parsed but dead in v4. Neither is transcribed as functional. A zero-charge bunch
 is refused by name.
 
@@ -575,7 +575,7 @@ The slice partition is `particlePatches`, the standard's own partition of a spec
 record: one patch per slice, in window order, an empty slice as a patch of no particles.
 The patch count is therefore the window, and the file states nothing else about it. What
 openPMD has no place for comes from the deck: `lambda0`, `window_sample` and
-`nbins`. Reading a dump with no `lambda0` is refused rather than defaulted,
+`beamlet_size`. Reading a dump with no `lambda0` is refused rather than defaulted,
 since a wrong wavelength rescales every phase in the run. `one4one` is not stored
 either: the flag asserts that every macroparticle carries one electron, which is what the
 weights say.
@@ -730,7 +730,7 @@ positive-decelerating, causal side $\delta z<0$ (the [](#sec-wakes) kernels are
 stored as signed loss, so flip the sign when bridging). Wakes on superimposed/split
 elements live on the *lord* and resolve through `pointer_to_wake_ele`.
 `sr%z_max` and the table extent must cover the window (refused by name
-otherwise). Lr wakes are refused. `write_wake_kernels` exports the
+otherwise). Lr wakes are refused. `chamber_wake%write_kernels` exports the
 [](#sec-wakes) kernels for building matching tables.
 
 :::{admonition} Provenance
@@ -928,7 +928,7 @@ $$ (eq-fcmeas)
 with $|\hat E_0| = \sqrt{4 Z_0 P/\pi w_0^2}$ the Gaussian seed's on-axis envelope.
 The harmonic probe is the same undulator with the field at $\lambda_1/h$ (the mode
 is harmonic-agnostic), and the load is quiet there because the beamlet start
-cancels every harmonic below `nbins` ([](#sec-quiet)). A quadrature load
+cancels every harmonic below `beamlet_size` ([](#sec-quiet)). A quadrature load
 (MINERVA's) is therefore not needed for this measurement.
 
 :::{admonition} Provenance

@@ -73,14 +73,14 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%sig_pz = 8.804506566858e-05
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  nbins = 8
+  beamlet_size = 8
   seed_power = 0
   seed_waist_size = 30e-6
   grid_n_pts = {ngrid}
   grid_half_width = 2e-4
   window_length = 2.4e-9
   window_sample = 1
-  shotnoise = T
+  shot_noise = T
   ran_seed = 4242
   write_diag = T
 {extra}&end

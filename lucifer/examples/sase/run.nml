@@ -39,7 +39,7 @@
   beam_init%sig_pz = 8.804506566858e-5     ! delta_gamma = 1.0 m_e c^2.
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
-  shotnoise = T
+  shot_noise = T
 /
 
 &fel_wavefront_init

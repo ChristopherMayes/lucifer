@@ -70,14 +70,18 @@ type fel_wake_struct
 end type
 
 !+
-! Struct fel_efield_struct
+! Struct fel_space_charge_struct
 !
 ! Space-charge configuration, Genesis &efield names. The solver itself is stateless per
 ! call (thread safe). This carries only the run facts.
 !-
 
-type fel_efield_struct
+type fel_space_charge_struct
   logical :: on = .false.          ! Any space charge at all (shortrange if nz*nphi*ngrid set).
+  ! Which space-charge implementation runs. 'genesis' is the transcribed solver, which
+  ! works per slice on a radial grid. Bmad's own space_charge_method = 'slice' is a
+  ! candidate second value, so this is a field rather than an assumption.
+  character(16) :: model = 'genesis'
   real(rp) :: rmax = 0             ! Radial grid extent scale [m]. Grows adaptively as Genesis's.
   integer :: ngrid = 100           ! Radial grid points.
   integer :: nz = 0                ! Longitudinal harmonics. 0 disables the short-range solve.
@@ -95,7 +99,7 @@ end type
 
 type fel_collective_struct
   type (fel_wake_struct) :: wake
-  type (fel_efield_struct) :: efield
+  type (fel_space_charge_struct) :: efield
   real(rp), allocatable :: long_esc(:)   ! Per-slice longESC [eV/m], refreshed per step.
 end type
 
@@ -516,7 +520,7 @@ end subroutine fel_wake_apply_slice
 ! sec-spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 !
 ! Input:
-!   ef       -- fel_efield_struct: Space-charge configuration.
+!   ef       -- fel_space_charge_struct: Space-charge configuration.
 !   beam     -- fel_beam_struct: The beam.
 !   gamma0   -- real(rp): Reference Lorentz factor.
 !   aw       -- real(rp): Undulator parameter (parallel-velocity correction).
@@ -527,7 +531,7 @@ end subroutine fel_wake_apply_slice
 
 subroutine fel_longrange_esc (ef, beam, gamma0, aw, long_esc)
 
-type (fel_efield_struct) ef
+type (fel_space_charge_struct) ef
 type (fel_beam_struct), target :: beam
 real(rp) gamma0, aw, long_esc(:)
 
@@ -615,7 +619,7 @@ end subroutine fel_longrange_esc
 ! (module header). Callers depend on (beam, slice, gz2, ks) -> ez only.
 !
 ! Input:
-!   ef    -- fel_efield_struct: Space-charge configuration (grid, harmonics).
+!   ef    -- fel_space_charge_struct: Space-charge configuration (grid, harmonics).
 !   beam  -- fel_beam_struct: The beam.
 !   sl    -- fel_slice_struct: One slice's packed particles.
 !   gz2   -- real(rp): Longitudinal gamma^2 (with the undulator correction).
@@ -627,7 +631,7 @@ end subroutine fel_longrange_esc
 
 subroutine fel_shortrange_ez (ef, beam, sl, gz2, ks, ez)
 
-type (fel_efield_struct) ef
+type (fel_space_charge_struct) ef
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 real(rp) gz2, ks, ez(:)
