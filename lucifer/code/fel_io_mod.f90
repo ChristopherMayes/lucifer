@@ -1119,13 +1119,13 @@ call H5Gclose_f (g_id, h5e)
 
 call sub_open ('resample', 'fel_resample_param_struct', &
       'The resampler knobs (&fel_beam_init resample%).')
-call fel_h5_real (g_id, 'slicewidth', '1', 'slice width', &
+call fel_h5_real (g_id, 'slice_width', '1', 'slice width', &
       'Sampling window over bunch length (Genesis''s slicewidth).', '', run%resample%slice_width, merr)
-call fel_h5_int (g_id, 'npart', '1', 'particles', &
+call fel_h5_int (g_id, 'n_particle_per_slice', '1', 'particles', &
       'Macroparticles per slice after resampling.', '', run%resample%n_particle_per_slice, merr)
 call fel_h5_int (g_id, 'beamlet_size', '1', 'beamlet size', &
       'Beamlet size of the resample.', '', run%resample%beamlet_size, merr)
-call fel_h5_int (g_id, 'nslice', '1', 'slices', &
+call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
       'Slice count. Zero means round(bunch length / spacing), Genesis''s rule.', '', &
       run%resample%n_slice, merr)
 call H5Gclose_f (g_id, h5e)

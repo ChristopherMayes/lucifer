@@ -9,6 +9,12 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-31 Fixed: three datasets under `params/resample` were still written as `npart`,
+  `nslice` and `slicewidth`. The rename had changed the Fortran accessors but not the
+  strings naming the datasets, so a stats file read back in the old vocabulary. The
+  conformance check gained a third assertion, mutation tested like the others: a dataset
+  written under `params/<family>` must name a component of that family's struct.
+
 - 2026-08-31 Changed: The input names say what they are. `imp%` is `resample%`, with
   `n_particle_per_slice` (which is what it always was), `n_slice`, `slice_width` and
   `beamlet_size`. `wake%` is `chamber_wake%` and `sc%` is `space_charge%`, so neither

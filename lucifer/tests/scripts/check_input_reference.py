@@ -140,6 +140,25 @@ def main():
         if fam in {p for _, p in STRUCTS.values()} and name not in known:
             failed.append(f"{name} is on the page but no struct declares it")
 
+    # (3) The stats file writes one dataset per honored input. A dataset written under
+    # a name no struct component has means the file and the namelist disagree, which is
+    # how a reader ends up guessing. Names only: which helper writes a component, and
+    # which are deliberately left out, is fel_io_mod's business.
+    io = (code / "fel_io_mod.f90").read_text()
+    marks = [(m.group(1), m.end()) for m in re.finditer(r"call sub_open \('([a-z_]+)'", io)]
+    spans = {n: (s, marks[i + 1][1] if i + 1 < len(marks) else len(io))
+             for i, (n, s) in enumerate(marks)}
+    for struct, (src, prefix) in STRUCTS.items():
+        sub = prefix.rstrip("%")
+        if not sub or sub not in spans:
+            continue
+        comps = set(parse_struct((code / src).read_text(), struct))
+        a, b = spans[sub]
+        for name in set(re.findall(r"fel_h5_\w+ \(g_id, '([a-z_0-9]+)'", io[a:b])):
+            if name not in comps:
+                failed.append(f"params/{sub}/{name} is written to the stats file, "
+                              f"but {struct} has no component of that name")
+
     for f in failed:
         print(f"  FAIL: {f}")
     print(f"  input reference: {checked} fel-owned parameters checked, "
