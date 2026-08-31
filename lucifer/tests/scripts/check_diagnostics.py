@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Diagnostic-output checks (manual sec:stats): the stats file, dump-at elements, and the
+Diagnostic-output checks (fel-physics.md sec-stats): the stats file, dump-at elements, and the
 escaped-field bank, held by cross-identities rather than reference files --
 
   1. bunch_params reconstruction: bunch_params_from_stats.py applied to the per-record
@@ -107,7 +107,7 @@ def h5_identical(fa, fb):
     """Whether two HDF5 files hold the same data, meta/ excluded.
 
     meta/ is excluded, deliberately. Provenance moved from attributes to datasets for
-    HDF5's 64 kB attribute cap (manual sec:meta), and input_echo carries out_root while
+    HDF5's 64 kB attribute cap (fel-physics.md sec-meta), and input_echo carries out_root while
     timestamp carries the clock, so any two runs differ there by construction. Nothing in
     meta/ is physics. Before the move the exclusion existed only by the accident of being
     attributes, which is not something a reader of this check could have reasoned about.

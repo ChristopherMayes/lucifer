@@ -399,7 +399,7 @@ do is_g = 1, nslice_gen
     enddo
   endif
 
-  ! Noise bookkeeping (manual sec:noise): real electrons N_lambda = charge/e, effective
+  ! Noise bookkeeping (fel-physics.md sec-noise): real electrons N_lambda = charge/e, effective
   ! macroparticle number N_eff = (sum w)^2/sum w^2, both per slice.
 
   wsum = sum(sl%weight(1:npart_gen))
@@ -541,7 +541,7 @@ end subroutine check_beam_init_contract
 !+
 ! Subroutine import_initial_state ()
 !
-! Routine to import a distribution (manual sec:import): a bunch_struct -- generated from
+! Routine to import a distribution (fel-physics.md sec-import): a bunch_struct -- generated from
 ! Bmad's beam_init_struct (the native equivalent of Genesis's &beam description) or read
 ! from an openPMD-beamphysics file -- is resampled into FEL slices by the transcribed
 ! Genesis importdistribution method (fel_import_mod, where the algorithm and its

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phasing checks (manual sec:phasing): how the beam-field phase behaves between
+Phasing checks (fel-physics.md sec-phasing): how the beam-field phase behaves between
 undulator segments, held by symmetries, closed forms and Genesis itself.
 
   1. Re-anchor baseline (relative mode, the default): scanning an inter-segment gap

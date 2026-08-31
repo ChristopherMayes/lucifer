@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Coherent-source checks (manual sec:coherent-source; Tanaka PRAB 27, 030703 (2024),
+Coherent-source checks (fel-physics.md sec-coherent-source; Tanaka PRAB 27, 030703 (2024),
 implemented from the paper -- the SIMPLEX hybrid: their source, our field).
 
   1. Keystone: source_model is defaulted -- the deposit path -- everywhere else in the

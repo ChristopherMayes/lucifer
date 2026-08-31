@@ -1,7 +1,7 @@
 !+
 ! Module fel_stats_mod
 !
-! The tracker's production statistics file <out_root>.stats.h5 (manual sec:stats).
+! The tracker's production statistics file <out_root>.stats.h5 (fel-physics.md sec-stats).
 !
 ! The file describes itself. Every dataset goes through fel_h5_mod and carries @unit,
 ! @description and @axes, the last naming the coords/ datasets its dimensions run over.
@@ -46,7 +46,7 @@
 ! reproduces the stored twiss.
 !
 ! Beam moments are computed two-pass (mean first, then centered second moments, the
-! manual sec:numerics variance rule: the one-pass form loses the entire sigma to
+! fel-physics.md sec-numerics variance rule: the one-pass form loses the entire sigma to
 ! cancellation), weighted by macroparticle charge, parallel over slices with
 ! fixed-order results (each slice's sums are its own).
 !

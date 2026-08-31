@@ -133,7 +133,7 @@ def run_nml(exe, wd, root, nml_text):
 
 def h5_identical(fa, fb):
     # meta/ is excluded, deliberately. Provenance is datasets rather than attributes,
-    # for HDF5's 64 kB attribute cap (manual sec:meta), and meta/timestamp differs
+    # for HDF5's 64 kB attribute cap (fel-physics.md sec-meta), and meta/timestamp differs
     # between any two runs by construction. Nothing in meta/ is physics. Before the
     # move, the exclusion existed only by the accident of being attributes.
     with h5py.File(fa) as a, h5py.File(fb) as b:
@@ -220,7 +220,7 @@ def main():
                  stats_of(wd / "cbn.stats.h5")
 
     # First, what the comparison below rests on. The record number is the axis and s is
-    # a variable on it (manual sec:stats), so matching rows BY s is only legitimate while
+    # a variable on it (fel-physics.md sec-stats), so matching rows BY s is only legitimate while
     # s does not repeat, and it can: a zero-length element that applies a wake kick sits
     # at the plane the element before it ended on. Every repeat must therefore straddle
     # an element boundary. A repeat inside one element would be a defect in the walk, and
@@ -246,7 +246,7 @@ def main():
 
     # comb < 0: the element ends, and nothing else. Bmad's comb semantics drop the comb
     # there; this tracker always keeps the element ends, because the stats file carries
-    # one record axis and marks the ends inside it (manual sec:stats). So a comb < 0 run
+    # one record axis and marks the ends inside it (fel-physics.md sec-stats). So a comb < 0 run
     # is a file whose every record is an element end, at the same positions the
     # every-record run put them.
     ok = bool(np.all(sn["at_end"])) and len(sn["s"]) == int(s0["at_end"].sum())

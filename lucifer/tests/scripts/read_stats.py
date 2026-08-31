@@ -15,7 +15,7 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st.ele_name                  # (nz,) element name per record, gathered through ix_ele
     st.run["p0c"]                # what the run produced; st.params["global"]["ran_seed"] is what the user set
 
-The file describes itself (manual sec:stats), so this reader hard-codes almost nothing.
+The file describes itself (fel-physics.md sec-stats), so this reader hard-codes almost nothing.
 Every dataset carries @unit, @long_name, @description and @axes, and every name in @axes
 resolves to a coords/ dataset, so this class only exposes them: there are no unit
 conversions here, no reshapes and no table of names, which is why a file that grows a

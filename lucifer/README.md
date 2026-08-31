@@ -18,9 +18,8 @@ FEL segments are real Bmad wiggler elements with `tracking_method = custom`, so 
 | [`doc/changelog.md`](doc/changelog.md) | What changed on this branch, newest first |
 
 The documents render as one site. With `mystmd` available, `myst build --html` in
-`doc/` produces it, and `myst start` serves it locally. `doc/fel-physics.tex` is the
-manual's original LaTeX, kept for comparison against the Markdown that replaced it and
-still building a PDF through `make` in `doc/`.
+`doc/` produces it and `myst start` serves it locally. Each page also reads on its own
+as Markdown.
 
 ## The three tracking methods
 

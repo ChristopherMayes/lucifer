@@ -54,7 +54,7 @@ implicit none
 type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
   character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
-  ! The FEL source model (manual sec:coherent-source). 'deposit' is the standard
+  ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
   ! per-particle scatter (the referee, bit-for-bit unchanged). 'coherent' is the
   ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the
   ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
@@ -81,7 +81,7 @@ type fel_global_struct
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
   logical :: keep_escaped_field = .false.    ! Keep the escaped-slice bank file.
-  logical :: migrate = .false.               ! Slice migration (manual sec:migration).
+  logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
   ! Provenance detail in stats.h5's meta/ group. OFF by default because a stats file is

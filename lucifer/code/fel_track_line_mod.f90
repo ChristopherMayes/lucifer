@@ -255,7 +255,7 @@ do ie = run%i_start, run%i_end
       endif
     endif
 
-    ! The off-phase knob (manual sec:phasing): a displaced element sees the extra
+    ! The off-phase knob (fel-physics.md sec-phasing): a displaced element sees the extra
     ! upstream-break phase at entry and gives it back at exit (the downstream break
     ! is shorter by the same delta), so the anchor stays nominal downstream. Sign:
     ! positive z_offset = a longer upstream break = MORE beam delay = theta backwards,
@@ -278,7 +278,7 @@ do ie = run%i_start, run%i_end
 
       ! Element sr wake, Bmad's once-per-passage convention mirrored: one kick at the
       ! step nearest mid-element, scaled to the full element length (scale_with_length
-      ! uses ele's l), applied across the WHOLE window (manual sec:seamwake). Direct
+      ! uses ele's l), applied across the WHOLE window (fel-physics.md sec-seamwake). Direct
       ! kick, no transport -- this walk owns transport inside wigglers.
 
       if (associated(wake_src) .and. istep == (und%nstep + 1)/2) then
@@ -326,7 +326,7 @@ do ie = run%i_start, run%i_end
 
       ! Wake-carrying interlude: ALL slices as one bunch in global window coordinates,
       ! through Bmad's own track1_bunch, which applies the sr wake at ds_wake with the
-      ! whole window visible head to tail (manual sec:seamwake). The per-slice path below
+      ! whole window visible head to tail (fel-physics.md sec-seamwake). The per-slice path below
       ! is untouched for everything else, keeping its numerics bit-identical.
 
       call fel_concat_slices (fbeam, ele, run%wake_bunch, run%wake_beta0, err)
@@ -409,7 +409,7 @@ do ie = run%i_start, run%i_end
     if (err) exit
   enddo
 
-  ! Absolute-time phasing (manual sec:phasing, bmad_com's global switch through
+  ! Absolute-time phasing (fel-physics.md sec-phasing, bmad_com's global switch through
   ! Bmad's own resolver): keep the real beam-vs-light carrier phase of this break,
   ! the drift slip plus any geometric (chicane) delay, where the relative mode
   ! re-anchors. Whole turns wrap. No floors needed on a phase.
@@ -501,7 +501,7 @@ contains
 ! Subroutine apply_bmad_wake_kick (wake_ele)
 !
 ! Routine to apply one whole-window application of an element's Bmad sr wake, as a
-! pure kick (manual sec:seamwake): concatenate the slices into global window
+! pure kick (fel-physics.md sec-seamwake): concatenate the slices into global window
 ! coordinates, let Bmad's own machinery order and kick (track1_sr_wake: pseudomode
 ! accumulation head to tail, z_long binned FFT), split back holding theta
 ! (Genesis's convention for wake energy loss, the same z rescale fel_wake_apply_slice
@@ -658,7 +658,7 @@ end subroutine write_diag_rows
 ! Routine to write one energy-ledger row (unaveraged mode): beam energy RELATIVE to
 ! the reference, sum(w*(gamma-gamma0))*me [C*eV = J] (relative so the per-record
 ! change is not differenced off a large baseline at its own summation-rounding floor,
-! manual sec:numerics), total window field energy sum(P_is)*slice_spacing/c [J],
+! fel-physics.md sec-numerics), total window field energy sum(P_is)*slice_spacing/c [J],
 ! and the kick-side change dE_step returned by fel_unavg_step. The last columns are the
 ! cumulative energy transmitted out of the window by slippage (banked at the zero fill
 ! in fel_apply_slippage), the cumulative spontaneous deposit energy sum|dE_src|^2 (the

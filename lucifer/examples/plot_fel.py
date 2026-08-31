@@ -5,7 +5,7 @@ Plot the standard diagnostics of a lucifer run from its stats file.
     python plot_fel.py run.stats.h5              # writes run.png
     python plot_fel.py run.stats.h5 -o gain.png --show
 
-The stats file (manual sec:stats) describes itself: every dataset carries its unit and
+The stats file (fel-physics.md sec-stats) describes itself: every dataset carries its unit and
 the axes it runs over, so this script reads named datasets through read_stats and does
 no conversions at all -- no text files, no reshapes, no unit juggling. Ten panels against s:
 
@@ -58,7 +58,7 @@ def load(fn):
     """Everything the panels need, straight out of the file through read_stats.
 
     There are no conversions and no reshapes here: the file states its own shapes and
-    units (manual sec:stats), so this is a gather of named datasets. field/total is the
+    units (fel-physics.md sec-stats), so this is a gather of named datasets. field/total is the
     sum over polarizations of the fundamental and field/x is the x component, whether
     or not a y component exists, so no branch changes what a name means."""
     st = read_stats(fn)

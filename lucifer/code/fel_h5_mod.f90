@@ -1,7 +1,7 @@
 !+
 ! Module fel_h5_mod
 !
-! Annotated HDF5 writes for the statistics file (manual sec:stats). One rule: no array
+! Annotated HDF5 writes for the statistics file (fel-physics.md sec-stats). One rule: no array
 ! reaches the file without saying what it is. Every routine here writes a dataset and
 ! four string attributes with it:
 !

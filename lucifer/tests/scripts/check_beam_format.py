@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks for the particle dump format (manual sec:import). The tracker writes and reads
+Checks for the particle dump format (fel-physics.md sec-import). The tracker writes and reads
 openPMD and nothing else, so every claim here is a round trip against the beam that was
 written, never against another code.
 

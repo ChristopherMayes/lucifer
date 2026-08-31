@@ -112,7 +112,7 @@ endif
 track1_custom_ptr => fel_ele_as_wiggler
 make_mat6_custom_ptr => fel_mat6_as_wiggler
 
-! The FEL mode and unaveraged parameters live on the LATTICE (manual sec:element),
+! The FEL mode and unaveraged parameters live on the LATTICE (fel-physics.md sec-element),
 ! registered program-side so no lattice declares them. The same slot index serves
 ! wigglers and undulators.
 
@@ -150,7 +150,7 @@ if (err_flag) return
 is_fel => run%is_fel
 fel_mode => run%fel_mode
 
-! The field set (manual sec:field-set). Validate the harmonics request, then allocate
+! The field set (fel-physics.md sec-field-set). Validate the harmonics request, then allocate
 ! the set and point the fundamental aliases at entry 1 BEFORE any field construction:
 ! every construction path below builds the fundamental through wf.
 
@@ -186,7 +186,7 @@ if (n_harm > 1 .and. run%two_pol) then
   err_flag = .true.;  return
 endif
 
-! The source model (manual sec:coherent-source): validated, then stamped onto every
+! The source model (fel-physics.md sec-coherent-source): validated, then stamped onto every
 ! FEL element. v1 scope refusals, each by name: the coherent source carries the
 ! FUNDAMENTAL of one polarization, and it cannot live inside the unaveraged referee
 ! (variance reduction inside the explicit-everything mode). Even harmonics are invalid
@@ -342,7 +342,7 @@ do je = 1, branch%n_ele_track
   ! aw (rms, Genesis's convention) from the peak field:
   ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy.
   ! Helical aw = K, planar aw = K/sqrt(2). Focusing split: Genesis's defaults by
-  ! helicity, scaled by ku^2 as Genesis's unroll does (manual sec:element).
+  ! helicity, scaled by ku^2 as Genesis's unroll does (fel-physics.md sec-element).
 
   kk = c_light * w%value(b_max$) / (kw * m_electron)
 
@@ -605,7 +605,7 @@ do ie = 1, branch%n_ele_track
       ele_slip(prev_ie) = ele_slip(prev_ie) + floor(Lz / (2 * gamma0_ref**2 * wf%wavelength)) + 1
     endif
 
-    ! The off-phase knob (manual sec:phasing): the wiggler's own z_offset, standard
+    ! The off-phase knob (fel-physics.md sec-phasing): the wiggler's own z_offset, standard
     ! Bmad misalignment (girder-composed _tot form). Anchored at the NOMINAL position:
     ! the entry phase shifts by the displaced upstream break, the exit unshifts for the
     ! displaced downstream one, so everything downstream stays anchored. The knob must
@@ -707,7 +707,7 @@ end subroutine resolve_window_ele
 ! Subroutine check_wake_window ()
 !
 ! Routine to check the Bmad element wakes against the time window. Element sr wakes act
-! across the WHOLE window (manual sec:seamwake): all slices concatenate into one bunch
+! across the WHOLE window (fel-physics.md sec-seamwake): all slices concatenate into one bunch
 ! in global window coordinates and Bmad's wake machinery applies unmodified. What is
 ! checked here, by name: lr (multi-bunch) wakes are not supported. A pseudomode wake
 ! whose z_max is shorter than the window would have Bmad kill the bunch mid-run. A
@@ -752,7 +752,7 @@ end subroutine check_wake_window
 !+
 ! Subroutine setup_break_geometry ()
 !
-! Routine to set up chicane breaks (manual sec:phasing): a break whose elements bend the
+! Routine to set up chicane breaks (fel-physics.md sec-phasing): a break whose elements bend the
 ! reference (sbends, patches) detours the BEAM while the RADIATION goes straight. The
 ! light's path is the CHORD between the flanking undulator faces, from ele%floor,
 ! never the reference arc that vec(5) is measured against. The arc-minus-chord
@@ -848,7 +848,7 @@ end subroutine close_geometry_break
 !+
 ! Subroutine setup_diagnostics ()
 !
-! Routine to set up the diagnostics (manual sec:stats): resolve the dump-at lists through
+! Routine to set up the diagnostics (fel-physics.md sec-stats): resolve the dump-at lists through
 ! Bmad's own lat_ele_locator (class::name syntax for free) and precompute the EXACT
 ! record and element-end counts by replaying the walk's skip rule, so the stats arrays
 ! are sized once, never grown. An entry matching nothing is refused by name.

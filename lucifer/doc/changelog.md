@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `fel/wavefront` branch, newest fir
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-30 Changed: The LaTeX manual is removed. `fel-physics.md` is the manual now, and
+  `fel-physics.tex`, its `Makefile` and every reference to either are gone. The Markdown
+  was kept beside the LaTeX for one commit so the two could be compared, and the
+  comparison is done.
+
+- 2026-08-30 Added: An introduction page and a references page. `index.md` is the site's
+  front page: what Lucifer is, the three tracking methods, where to start for each kind of
+  question, and what is in and out. `references.md` collects what the code implements and
+  where each thing came from, every entry naming both the source and the routine that
+  carries it. The manual keeps its citations in place beside the equations.
+
 - 2026-08-30 Changed: The unaveraged mode is documented as a peer of the averaged one, not
   as a probe. The manual section retitles from "The unaveraged verification mode" and its
   opening states what the cost per step buys: the full quiver dynamics, the energy

@@ -84,7 +84,7 @@ if (err) stop 1
 call fel_write_header (run)
 
 ! Check instrument: export the transcribed single-particle wake kernels for
-! cross-validation against Genesis (manual sec:wakes). The kernels are built by
+! cross-validation against Genesis (fel-physics.md sec-wakes). The kernels are built by
 ! fel_setup_schedule's fel_wake_init. Note: The s = 0 entries carry the Bane
 ! self-slice half factor.
 
@@ -118,7 +118,7 @@ if (err) stop 1
 
 ! Final dumps. The field records are unrotated to time order first (position is of
 ! the time window holds record slice 1 + mod(is-1+first, nslice)), which is what
-! Genesis's field writer does on the fly (manual sec:slippage).
+! Genesis's field writer does on the fly (fel-physics.md sec-slippage).
 
 call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err)
 if (err) stop 1

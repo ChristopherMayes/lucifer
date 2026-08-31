@@ -106,7 +106,7 @@ end type
 !+
 ! Struct fel_coherent_struct
 !
-! One slice's coherent-source summary (manual sec:coherent-source), computed from the
+! One slice's coherent-source summary (fel-physics.md sec-coherent-source), computed from the
 ! just-advanced particles each step: the source phasor S (exactly the sum the deposit
 ! would scatter: SUM crsource = S is the normalization contract), the charge-weighted
 ! centroid and 2x2 second moments (widths + tilt: the centering and tilt are this
@@ -206,11 +206,11 @@ type fel_kernel_struct
   real(rp) :: dgrid = 0, ks = 0, dz = 0
 end type
 
-! Named values of the fel_tracking lattice attribute (manual sec:element), in Bmad's
+! Named values of the fel_tracking lattice attribute (fel-physics.md sec-element), in Bmad's
 ! named-integer convention. Lattices use the same names via one-line variable
 ! definitions (e.g. "fel_unaveraged = 1" before the element that sets it).
 
-! The source model (manual sec:coherent-source): the standard per-particle deposit
+! The source model (fel-physics.md sec-coherent-source): the standard per-particle deposit
 ! (the referee) or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27,
 ! 030703 (2024); arXiv:2310.20197). In the coherent source the spatially incoherent
 ! artifact is dropped. The slice bunch factor keeps the physical shot noise. The
@@ -777,7 +777,7 @@ enddo
 
 beam%phi0 = phi0_new
 
-! The coherent source (manual sec:coherent-source): per-slice phasor, moments and LG
+! The coherent source (fel-physics.md sec-coherent-source): per-slice phasor, moments and LG
 ! sums from the just-advanced particles (slice-parallel, each slice its own data),
 ! then the ONE global kappa (Tanaka Eq 26: the integrals run over the whole window,
 ! so this is the cross-slice serial point), then the guard. A slice whose transverse
@@ -828,7 +828,7 @@ if (und%source_model == fel_source_coherent$) then
   if (g2_tot > 0) kappa = sqrt(b2_tot / (4 * pi * g2_tot))
 endif
 
-! Field solve, harmonic loop outermost (each pass is self-contained, manual sec:field-set). The
+! Field solve, harmonic loop outermost (each pass is self-contained, fel-physics.md sec-field-set). The
 ! deposit reads the just-advanced particles, so every field sees the same beam state.
 
 do io = 1, size(ff)
@@ -1147,7 +1147,7 @@ end subroutine fel_transverse_track
 !+
 ! Subroutine fel_transverse_track_bmad (und, beam, sl, delz, leading)
 !
-! The priced transport alternative (manual sec:element): the transverse maps of Bmad's own
+! The priced transport alternative (fel-physics.md sec-element): the transverse maps of Bmad's own
 ! periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened. Quadrupole bodies go
 ! via quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
 ! half-octupole edge kicks, using the TRACKING-LOCAL k1 values (7.5: never the stored
@@ -1889,7 +1889,7 @@ end subroutine fel_grid_weights_pre
 !+
 ! Subroutine fel_coherent_prep (und, beam, sl, xks1, coh)
 !
-! One slice's coherent-source summary (manual sec:coherent-source; Tanaka PRAB 27,
+! One slice's coherent-source summary (fel-physics.md sec-coherent-source; Tanaka PRAB 27,
 ! 030703 (2024), implemented from the paper). Computed: the source phasor S, EXACTLY as
 ! the deposit would (same theta, same part factors, post-advance particles: the
 ! normalization contract is SUM crsource = S), the charge-weighted centroid and
@@ -2043,7 +2043,7 @@ type (wavefront_struct), target :: wf
 integer ifld, harm
 real(rp) delz, xks1
 logical err_flag
-type (fel_coherent_struct), optional :: coh    ! Coherent source (manual sec:coherent-source):
+type (fel_coherent_struct), optional :: coh    ! Coherent source (fel-physics.md sec-coherent-source):
 real(rp), optional :: kappa                    !   present together when und%source_model says so.
 
 real(rp) xks, dgrid, scl_w, part, theta, beta, wx, wy, gam, p_mc, p0_mc, s_t, c_t
@@ -2081,7 +2081,7 @@ scl_w = scl_w / (4 * dgrid * dgrid * beam%slice_spacing)
 
 if (scl_w /= 0 .and. und%source_model == fel_source_coherent$) then
 
-  ! The coherent-Gaussian source (manual sec:coherent-source): the slice's whole
+  ! The coherent-Gaussian source (fel-physics.md sec-coherent-source): the slice's whole
   ! phasor S, deposited as one analytic Gaussian at the phasor's charge centroid
   ! with covariance kappa^2 * (second-moment matrix). S carries the PHYSICAL shot
   ! noise through B(s), which the Fawley loading pins to <|B|^2> N_lambda = 1. The
@@ -2147,7 +2147,7 @@ contains
 !+
 ! Subroutine coherent_gaussian_source ()
 !
-! Routine to deposit the coherent-Gaussian source (manual sec:coherent-source):
+! Routine to deposit the coherent-Gaussian source (fel-physics.md sec-coherent-source):
 ! the slice's bunching phasor as a Gaussian of the phasor-weighted second moments
 ! scaled by kappa, normalized so the deposited sum equals the particle deposit's.
 !-
