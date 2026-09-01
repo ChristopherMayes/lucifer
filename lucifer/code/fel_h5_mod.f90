@@ -325,7 +325,7 @@ end subroutine fel_h5_int_rank2
 ! Routine to write a one-byte flag dataset from an ordinary integer buffer of zeros
 ! and ones. Overloaded for ranks 1 and 2 by the interface fel_h5_flag.
 !
-! int8 with @unit = '1' IS the format's boolean: HDF5 has no boolean type, and a flag
+! int8 with @unit = '1' is the format's boolean: HDF5 has no boolean type, and a flag
 ! stored as a float would be a lie about what it is. Each one also carries
 ! @dtype_hint = 'bool', stamped here so the convention is a thing the dataset says
 ! rather than a rule a reader has to find in the root attributes and pattern-match on.
@@ -523,7 +523,7 @@ enddo
 call H5Tcopy_f (H5T_NATIVE_CHARACTER, t_id, h5_err)
 call H5Tset_size_f (t_id, int(fel_h5_str_len$, size_t), h5_err)
 if (n == 1 .and. axes == '') then
-  call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)      ! One string with no axis IS a scalar.
+  call H5Screate_f (H5S_SCALAR_F, s_id, h5_err)      ! One string with no axis is a scalar.
 else
   call H5Screate_simple_f (1, hdims, s_id, h5_err)
 endif

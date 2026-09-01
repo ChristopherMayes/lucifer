@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cross-code validation of the shot-noise level (deliverable 6): a dark start (no seed
+Cross-code validation of the shot-noise level: a dark start (no seed
 field), one undulator segment, each code generating its own noisy beam -- Genesis with
 its loader and RNG, lucifer with its weighted Fawley loader -- so the two noise
 implementations are fully independent. SASE startup power is proportional to the

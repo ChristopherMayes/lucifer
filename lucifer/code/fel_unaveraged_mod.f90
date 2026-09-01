@@ -37,11 +37,11 @@
 !      comparable), and the polarization-basis current
 !        j = u_x (planar),  (u_x - i u_y)/sqrt(2) (helical).
 !      The source is the same SVEA deposit as the averaged solver with the coupling
-!      REMOVED and the actual quiver current in its place:
+!      Removed and the actual quiver current in its place:
 !        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
 !      followed by the shared pure diffraction (fel_field_diffract) and the +2*src
 !      convention. The /u_s (where the averaged solver has Genesis's /gamma) makes the
-!      kick/deposit pair EXACT energy duals per substep (same operands, same bilinear
+!      kick/deposit pair exact energy duals per substep (same operands, same bilinear
 !      weights, unitary diffraction between), so the ledger closes to the physical
 !      spontaneous-emission term and rounding, by construction. Period-averaging the
 !      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
@@ -89,7 +89,7 @@ implicit none
 type fel_unavg_struct
   real(rp) :: s = 0                ! Distance into the segment [m].
   real(rp) :: l = 0                ! Segment length [m].
-  real(rp) :: l_ramp = 0           ! sin^2 ramp length at EACH end [m].
+  real(rp) :: l_ramp = 0           ! sin^2 ramp length at each end [m].
   integer :: nsub = 1              ! Substeps per record step.
   real(rp) :: dsub = 0             ! Substep length [m].
   logical :: active = .false.      ! Between entry and exit handoff.
@@ -166,9 +166,9 @@ end subroutine fel_unavg_setup
 ! Function fel_unavg_envelope (ustate, s, gp) result (g)
 !
 ! The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
-! flat 1, sin^2 down over the last l_ramp. Amplitude AND slope are continuous (the
+! flat 1, sin^2 down over the last l_ramp. Amplitude and slope are continuous (the
 ! slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
-! the hard-edge MUTATION configuration. The handoff check exists to catch it.
+! the hard-edge mutation configuration. The handoff check exists to catch it.
 !
 ! Input:
 !   ustate -- fel_unavg_struct: Ramp geometry.
@@ -365,12 +365,12 @@ call fel_field_kernel_init (ngrid, dgrid, ks, dsub)
 
 phi0_rate_avg = fel_phi0_rate(ks, und%ku, p0_mc)
 
-! The unaveraged source scale: the averaged scl_w with the coupling factor REMOVED
+! The unaveraged source scale: the averaged scl_w with the coupling factor removed
 ! and the 1/2 period-average projection undone (fel-physics.md sec-unaveraged).
 
 scl_u = (mu_0_vac * c_light) * c_light * dsub / (2 * dgrid * dgrid * beam%slice_spacing)
 
-! Entry handoff: the ramp makes a = 0 here, so the stored (averaged-convention) px IS
+! Entry handoff: the ramp makes a = 0 here, so the stored (averaged-convention) px is
 ! the kinetic momentum. The flag records that px now carries the quiver.
 
 if (first) then
@@ -442,7 +442,7 @@ do is = 1, nslice
       call fel_grid_weights (wf, xx(ip), yy(ip), ix, iy, wx, wy, on_grid)
       if (on_grid .and. two_pol) then
 
-        ! Two live polarizations: COMPONENT-WISE duals. The instantaneous kinetic
+        ! Two live polarizations: Component-wise duals. The instantaneous kinetic
         ! momenta u_x, u_y are real numbers, each working against and depositing into
         ! its own field component. No polarization convention enters at all (manual
         ! sec-field vector convention). The scalar branch below keeps the folded
@@ -485,7 +485,7 @@ do is = 1, nslice
         gam(ip) = gam(ip) + dgam
 
         ! /u_s, not Genesis's averaged /gamma: the source and the E.v force are exact
-        ! duals of one wave equation, and using the SAME u_s the kick used makes the
+        ! duals of one wave equation, and using the same u_s the kick used makes the
         ! per-substep energy exchange cancel identically (the diffraction between
         ! substeps is unitary), leaving only physical spontaneous emission in the
         ! ledger. The period-averaged limit shifts by beta_par ~ 5e-9 -- five orders
@@ -508,11 +508,11 @@ do is = 1, nslice
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
     if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
 
-    ! The deposit's own energy |dE|^2 = 4|src|^2: the ONE term of the field-energy
+    ! The deposit's own energy |dE|^2 = 4|src|^2: the one term of the field-energy
     ! increment the kick/deposit duality does not charge to the beam (the beam pays the
     ! cross term 2 Re<E, dE> exactly, manual eq:ledger). Physically this is the
     ! spontaneous emission of the substep. Numerically it is banked here so the
-    ! time-dependent ledger closes EXACTLY: E_beam + U_window + U_escaped - U_spont.
+    ! time-dependent ledger closes exactly: E_beam + U_window + U_escaped - U_spont.
 
     dU_sp_slice(is) = dU_sp_slice(is) + 4 * sum(real(crsource, rp)**2 + aimag(crsource)**2) &
                         * dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
@@ -567,7 +567,7 @@ contains
 ! at the handoffs where the envelope is exactly zero and nothing couples. The
 ! element's contract is L meters of full-strength undulator. The entry/exit ramps
 ! are a numerical device (an adiabatic switch-on), and an electron under a ramped
-! quiver <u_perp^2> = g^2 aw^2 lags the wave LESS than the contracted hard-edge
+! quiver <u_perp^2> = g^2 aw^2 lags the wave less than the contracted hard-edge
 ! element would have it, by dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds, which
 ! is ks*dtau ~ 2.6 rad of optical phase per end at the benchmark parameters
 ! (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp per end). Uncompensated, every
@@ -575,9 +575,9 @@ contains
 ! phase rotated by that much. The first segment is immune (nothing is bunched
 ! yet), and that is exactly how it was caught: per-segment ln-power deviations vs
 ! the averaged mode of {0.0000, +0.08, +0.005, +0.02, +0.01, +0.13}. The jump must
-! be discrete AND at the ends: compensating continuously inside the ramp detunes
+! be discrete and at the ends: compensating continuously inside the ramp detunes
 ! the live interaction where the coupling is already substantial (measured -0.9%
-! gain on the FIRST segment, doubling with ramp length). In hardware terms this is
+! gain on the first segment, doubling with ramp length). In hardware terms this is
 ! the phase shifter that makes a tapered-end segment equivalent to its ideal
 ! hard-edged length. In the stored chart z = -beta*tau, so tau += dtau is
 ! z -= aw^2 INT(1-g^2) / (2 p^2), per particle with its own momentum.

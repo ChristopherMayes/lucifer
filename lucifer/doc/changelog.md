@@ -9,6 +9,13 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-31 Changed: the last of the prose-style debt in the Fortran. 203 single-word
+  stress capitals in comments are lowercased per prose 1.4, and the 12 remaining
+  `deliverable N` citations are gone, so nothing in the tree cites a document outside the
+  repository. Untouched by design: `out_io` message text, which 6.3 sanctions as capitals
+  and which refusal checks match; `!$OMP` directives, which are not prose; Bmad attribute
+  registration strings; acronyms and units; and `SUM` where it transliterates a sum.
+
 - 2026-08-31 Fixed: no machine-local paths in the harness. The genesis4 binary, the Python
   interpreter and the openPMD-beamphysics checkout were defaulted to paths under one
   developer's home directory, in nine files. Each now resolves through an explicit flag,

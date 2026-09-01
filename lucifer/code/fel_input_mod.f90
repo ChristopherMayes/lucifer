@@ -2,7 +2,7 @@
 ! Module fel_input_mod
 !
 ! The namelist layer of the FEL tracker, quarantined the way Tao quarantines its
-! tao_init_* files: three groups, all read from ONE input file, each filling the
+! tao_init_* files: three groups, all read from one input file, each filling the
 ! structs of fel_struct directly (Tao's &tao_params pattern: set global%out_root,
 ! bmad_com%radiation_damping_on, chamber_wake%radius, space_charge%nz, beam_init%n_particle,
 ! wavefront_init%lambda0 by component). This module is itself library: an embedding
@@ -17,7 +17,7 @@
 !   &fel_wavefront_init  wavefront_init, field_file
 !
 ! A group that is absent keeps its defaults. A group that is present must parse.
-! The retired flat &fel_track_params group is refused BY NAME: the error lists each
+! The retired flat &fel_track_params group is refused by name: the error lists each
 ! parameter found in it and the group it moved to.
 !-
 
@@ -177,7 +177,7 @@ end subroutine fel_read_input
 !+
 ! Subroutine fel_write_resolved_input (run, iu)
 !
-! Write run's RESOLVED inputs (every default made explicit) as the three
+! Write run's resolved inputs (every default made explicit) as the three
 ! namelist groups, to an open unit. The stats file's Meta/ provenance echo
 ! (Genesis parity: its Meta group embeds the entire input file). An embedding
 ! program may also use it to persist a configuration built in code.
@@ -290,7 +290,7 @@ end function group_present
 !+
 ! Function has_retired_group (param_file) result (found)
 !
-! Refuse the retired flat &fel_track_params group BY NAME: list every parameter set
+! Refuse the retired flat &fel_track_params group by name: list every parameter set
 ! in it together with the group and name it moved to, so migration is a mechanical
 ! edit of the input file.
 !

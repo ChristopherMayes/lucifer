@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Self-referenced checks for the collective terms (deliverable 8; the Genesis-comparison
+Self-referenced checks for the collective terms (the Genesis-comparison
 tiers live in compare_fel.py).
 
 1. Energy bookkeeping. A dark, quiet, cold beam (no seed, no shot noise, negligible

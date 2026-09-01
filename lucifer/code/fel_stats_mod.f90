@@ -39,7 +39,7 @@
 ! (scripts), never stored: the file stays raw.
 !
 ! There is one record axis. Element ends are always recorded whatever the comb (fel_comb_take),
-! so an element end IS a record and the element-end arrays need no axis of their own:
+! so an element end is a record and the element-end arrays need no axis of their own:
 ! at_element_end selects them. scripts/read_stats.py is the reader everything uses, and
 ! scripts/bunch_params_from_stats.py reconstructs a bunch_params dict from any (record,
 ! slice) of the sufficient statistics. The harness checks that at element ends it
@@ -491,7 +491,7 @@ if (stats%iend >= stats%nend) then
   return
 endif
 
-! The invariant this row rests on: the record at this z exists, and IS this element
+! The invariant this row rests on: the record at this z exists, and is this element
 ! end. fel_comb_take takes a row at every element end whatever the comb, so a walk
 ! that reordered its stats call against its element-end call would land here.
 
@@ -1086,7 +1086,7 @@ call fel_h5_dset_attr_strs (g_id, 'sigma_energy', 'derived_from', &
 call H5Gclose_f (g_id, h5_err)
 if (err) return
 
-! beam/slice_twiss/ and beam/bunch/: the evaluated bunch_params, on the element-END
+! beam/slice_twiss/ and beam/bunch/: the evaluated bunch_params, on the element-end
 ! axis. The twiss planes are an axis, not six groups: a group named z cannot sit beside
 ! a z coordinate, which xarray and netCDF both refuse, and one array per quantity is 18
 ! datasets where six groups per set were 108. Two axes, though, not one: twiss/ over the

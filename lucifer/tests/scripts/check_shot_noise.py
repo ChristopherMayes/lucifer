@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Statistical check for the weighted shot-noise loader (deliverable 6: a
+Statistical check for the weighted shot-noise loader (a
 feature Genesis cannot represent is tested against its own statistics, not a reference).
 
 Physics under test: after quiet loading plus Fawley-style noise, each slice's bunching

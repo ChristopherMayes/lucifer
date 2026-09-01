@@ -47,7 +47,7 @@ implicit none
 ! Struct fel_global_struct
 !
 ! The run-level switches and names, exposed in &fel_params as global%... (the
-! tao_global_struct analog). Everything here is about ONE run of the tracker. The
+! tao_global_struct analog). Everything here is about one run of the tracker. The
 ! physics description lives in the lattice, beam_init and wavefront_init.
 !-
 
@@ -63,7 +63,7 @@ type fel_global_struct
   ! The tracking window, Tao's names (tao_beam_init carries track_start/track_end) and
   ! Genesis's zstop parity: element locators (lat_ele_locator syntax). Blank = the whole
   ! line. The schedule (slippage, autophasing, break geometry) is always built on the
-  ! FULL lattice, so a windowed run composes exactly with the full run: [1,k] then
+  ! Full lattice, so a windowed run composes exactly with the full run: [1,k] then
   ! [k+1,end] from its dumps reproduces [1,end] bit for bit.
   character(60) :: track_start = '', track_end = ''
   ! The comb (Bmad's bunch_track_struct%ds_save name and semantics, Tao's
@@ -84,7 +84,7 @@ type fel_global_struct
   logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
-  ! Provenance detail in stats.h5's meta/ group. OFF by default because a stats file is
+  ! Provenance detail in stats.h5's meta/ group. Off by default because a stats file is
   ! meant to travel: attached to a paper, mailed to a collaborator, posted beside a
   ! figure. On, meta/ also records the user name and the working directory, which is
   ! useful in a lab notebook and a leak outside one. Genesis records them always. Parity
@@ -96,8 +96,8 @@ end type
 ! Struct wavefront_init_struct
 !
 ! The radiation starting condition, the beam_init_struct analog (&fel_wavefront_init).
-! The field record IS the time window, so the window lives here: window_length and
-! window_sample set the slice count and spacing for the field AND the generated beam
+! The field record is the time window, so the window lives here: window_length and
+! window_sample set the slice count and spacing for the field and the generated beam
 ! (one window, one definition). harmonics requests the field set. field_file imports
 ! override the seed.
 !-
@@ -167,7 +167,7 @@ type fel_beam_init_param_struct
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.
   logical :: gen_test_weights = .false.   ! Alternate beamlet weights 0.25x/1.75x.
-  logical :: resample_split_weights = .false.  ! Split-weight copies BEFORE the resample.
+  logical :: resample_split_weights = .false.  ! Split-weight copies before the resample.
 end type
 
 !+
@@ -308,12 +308,12 @@ end function fel_si_str
 !   comb = 0: a row at every record position;
 !   comb > 0: a row when z has advanced comb_ds_save past the last row.
 ! An element end is always a row, whatever the comb. That is the difference, and it is
-! what lets the stats file carry ONE record axis with a boolean mask (coords/
+! what lets the stats file carry one record axis with a boolean mask (coords/
 ! at_element_end) instead of a second axis and a duplicated copy of every element-end
 ! quantity. Bmad's comb < 0 drops the comb, and here that leaves the element ends,
 ! which are the positions the evaluated bunch_params live on.
 ! z_last updates when the row is taken. The walk consults this rule live and the
-! setup's nrec precompute REPLAYS it with the same z arithmetic, so the stats
+! setup's nrec precompute replays it with the same z arithmetic, so the stats
 ! arrays are exact-sized in every mode.
 !
 ! Input:

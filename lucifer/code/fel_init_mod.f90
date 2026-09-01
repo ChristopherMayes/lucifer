@@ -93,7 +93,7 @@ grid_half_width = run%winit%grid_half_width
 seed_power = run%winit%seed_power
 seed_waist_size = run%winit%seed_waist_size
 
-! ONE reference energy, and the lattice is it: gamma0 = e_tot/m_e c^2 from the lattice
+! One reference energy, and the lattice is it: gamma0 = e_tot/m_e c^2 from the lattice
 ! header, never a namelist input. There used to be a namelist gamma0 for Genesis-deck
 ! symmetry. The first external user fed it a hand-rounded value against a round lattice
 ! e_tot, and the two disagreed at 1.4e-9. The run died mid-tracking on the seam's
@@ -220,7 +220,7 @@ if (beam_init%bunch_charge <= 0) then
   err_flag = .true.;  return
 endif
 
-! The Twiss is the LATTICE's (one specification of one truth, as with e_tot and the
+! The Twiss is the lattice's (one specification of one truth, as with e_tot and the
 ! import path's init_beam_distribution): read the beginning element, refuse by name
 ! when a lattice carries none.
 
@@ -315,7 +315,7 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 
-! The derived per-slice current: flat Q*c/extent inside the GRID extent. Gaussian
+! The derived per-slice current: flat Q*c/extent inside the grid extent. Gaussian
 ! profile at the slice centers, bunch centered in the window. Steady state = the
 ! whole charge in the one slice window, I = Q*c/spacing.
 
@@ -416,7 +416,7 @@ do is_g = 1, nslice_gen
 
     ! The N_eff guard: measure the pre-noise quiet floor. A representation whose floor
     ! is not far below the target 1/N_lambda cannot carry physical noise: imposing on
-    ! top would give a silently wrong startup level. The sweep covers EVERY harmonic the
+    ! top would give a silently wrong startup level. The sweep covers every harmonic the
     ! beamlet structure can resolve (1..beamlet_size-1), not just the imposed ones. An
     ! unquiet weight pattern can park its floor on a harmonic the imposition never
     ! touches, and still corrupt the dynamics through the nonlinear phase evolution.
@@ -572,7 +572,7 @@ if (window_sample < 1) then
 endif
 
 ! One seed governs the whole import: the bunch generation, the resampler's draws and
-! the shot noise. Seeding AFTER generation was the first mutation this path caught in
+! the shot noise. Seeding after generation was the first mutation this path caught in
 ! development: every run then imports a different bunch. The split-weight and
 ! thread-determinism checks both fail on what looks like resampler noise.
 
@@ -632,7 +632,7 @@ if (write_openpmd_file /= '') then
 endif
 
 ! resample%n_particle_per_slice and resample%beamlet_size come from the resample block directly: the resample's own knobs.
-! beam_init%n_particle is the BUNCH particle count on this path.
+! beam_init%n_particle is the bunch particle count on this path.
 call fel_import_bunch (bp, gamma0, lambda0, window_sample * lambda0, resample, fbeam, err_i, moments)
 if (err_i) then
   err_flag = .true.;  return
@@ -641,7 +641,7 @@ call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
              i_array = [size(fbeam%slice), resample%n_particle_per_slice])
 
 ! The RNG-free instruments the exactness checks read (the analysis moments and the
-! per-slice current profile) go to a FILE, not stdout: stdout is for humans and
+! per-slice current profile) go to a file, not stdout: stdout is for humans and
 ! nslice current lines are not (doc/user-guide.md). Full precision, one row per slice.
 ! Written here, at import time, because load_only stops before tracking.
 

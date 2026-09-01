@@ -19,8 +19,8 @@
 ! Bmad lattice carries its Twiss, and init_beam_distribution generates bunches matched
 ! to the lattice element already. The transform would be a second way to say what
 ! the lattice says. (An openPMD bunch that genuinely needs rematching is a Bmad
-! tracking problem upstream of the FEL, not an import option.) The bunch moments ARE
-! still measured, as an UNWEIGHTED analysis in Genesis's analyse form. Unweighted
+! tracking problem upstream of the FEL, not an import option.) The bunch moments are
+! still measured, as an unweighted analysis in Genesis's analyse form. Unweighted
 ! deliberately: coincident split-weight copies leave every moment bit-identical, which
 ! the invariance check relies on.
 !
@@ -97,7 +97,7 @@ real(rp) gamma0, lambda0, slice_spacing
 real(rp), optional :: moments_out(11)
 
 ! The whole-bunch working set, in Genesis's variables: s (window position), gamma,
-! x, y and the SLOPES xp, yp. Weight rides along for the current sums.
+! x, y and the slopes xp, yp. Weight rides along for the current sums.
 real(rp), allocatable :: s(:), gam(:), x(:), y(:), xp(:), yp(:), wt(:)
 ! The per-slice candidate set, in Genesis's internal Particle coordinates
 ! (px = xp*gamma after the slope conversion).
@@ -232,7 +232,7 @@ do islice = 1, nslice
   cur = cur * c_light / dslen                       ! c*sum(w)/dslen
 
   if (ncand > mpart) then
-    ! Second pass, transcribing removeParticles faithfully: gather ALL candidates,
+    ! Second pass, transcribing removeParticles faithfully: gather all candidates,
     ! then repeatedly overwrite a random index with the last and shrink.
     call gather_and_remove ()
   endif
@@ -427,7 +427,7 @@ end subroutine fel_import_bunch
 !+
 ! Subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
 !
-! Routine to compute Genesis's analyse moments (fel-physics.md sec-import): UNWEIGHTED
+! Routine to compute Genesis's analyse moments (fel-physics.md sec-import): Unweighted
 ! means, variances and Twiss over the particles with s0 < s < s1, on the slopes.
 ! Emittance ex = sqrt(|var_x*var_px - cov^2|)*gavg (a normalized emittance through the
 ! mean energy), bx = var_x*gavg/ex, ax = -cov*gavg/ex. Unweighted deliberately. See
@@ -504,7 +504,7 @@ end subroutine analyse_window
 !+
 ! Subroutine fel_write_genesis4_distribution (bunch, file_name, err_flag)
 !
-! Routine to write a bunch_struct as a Genesis 1.3 v4 DISTRIBUTION file (the
+! Routine to write a bunch_struct as a Genesis 1.3 v4 distribution file (the
 ! &importdistribution input, not a dump): flat datasets t [s], p [gamma*beta], x, y [m],
 ! xp, yp [slopes], plus the total charge. t = -tau/c with tau = -z/beta, so Genesis's
 ! s = -c*t reproduces this port's window position exactly and both codes bin the

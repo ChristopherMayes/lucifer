@@ -12,7 +12,7 @@
 !   reading-output.md    What the output files hold and how to read them.
 !   validation.md        The keystone rule, the tier table, and the measured levels.
 !
-! The program reads THREE namelist groups from one input file, each setting structs
+! The program reads three namelist groups from one input file, each setting structs
 ! directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
 !
 !   &fel_params           lat_file, the global%... run switches, Bmad's own bmad_com and
@@ -20,7 +20,7 @@
 !   &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
 !                         source and output files, and the beam-side check knobs.
 !   &fel_wavefront_init   wavefront_init%... radiation starting condition (the field
-!                         record IS the time window, so the window lives here) and the
+!                         record is the time window, so the window lives here) and the
 !                         field_file imports.
 !
 ! Three ways in, all through the same input file: a pair of Genesis dumps (both codes
@@ -47,7 +47,7 @@ implicit none
 
 ! The driver is read-parse-call (doc/user-guide.md): the namelist layer fills the
 ! input structs, the library builds and walks the run, and every library error
-! RETURNS here. This is the one place that stops. The check instruments
+! Returns here. This is the one place that stops. The check instruments
 ! (split_weights, swap_beam_xy, gen_test_weights, resample_split_weights,
 ! chamber_wake%write_kernels) ride along in the input structs and act inside init/setup.
 

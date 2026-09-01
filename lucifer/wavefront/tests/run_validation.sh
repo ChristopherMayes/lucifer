@@ -13,7 +13,7 @@
 #    program reads it, drifts it and writes it back. The same input is drifted in Python with
 #    drift_wavefront and the two results compared, field arrays and file metadata alike. This
 #    exercises the whole path -- HDF5 read, propagation, HDF5 write -- against an
-#    independent implementation, and it is the comparison the deliverable is defined by.
+#    independent implementation, and it is the comparison this suite is defined by.
 #    Several grid sizes and drift distances are run, including an odd number of transverse
 #    points, a rectangular grid and a negative drift.
 #

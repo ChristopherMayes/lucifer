@@ -3,7 +3,7 @@
 !
 ! openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
 ! Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
-! THE STANDARD DOCUMENT IS AUTHORITATIVE for this format. This module and the
+! The standard document is authoritative for this format. This module and the
 ! harness's h5py reader validate against its text independently.
 !
 ! Layout decisions (see the physics manual, fel-physics.md sec-field-set):
@@ -13,7 +13,7 @@
 !                            iterationEncoding "groupBased", iterationFormat "/data/%T/"
 !   /data/1/                 one iteration per file; time = 0, dt = 0, timeUnitSI = 1
 !   /data/1/meshes/electricField
-!                            the one mesh record. Attributes ON THE MESH RECORD (the
+!                            the one mesh record. Attributes on the mesh record (the
 !                            extension's heading. Its body says "series", and the
 !                            contradiction is resolved here in the record's favor:
 !                            photonEnergy is a property of one field):
@@ -26,8 +26,8 @@
 !   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively.
 !                            Component attributes: unitSI 1 and position [0,0,0], the
 !                            sample's offset within its cell in units of gridSpacing.
-!   .../electricField/y      present only when the wavefront carries Ey. BOTH transverse
-!                            polarizations live in ONE file as components, the
+!   .../electricField/y      present only when the wavefront carries Ey. Both transverse
+!                            polarizations live in one file as components, the
 !                            improvement over the Genesis format's one-per-file. The z
 !                            component is never written: a paraxial code has none, and
 !                            an absent component is ordinary openPMD.
@@ -35,10 +35,10 @@
 ! The dataset is stored exactly as the Fortran (nx, ny, nslice) array, which the HDF5
 ! Fortran API records as a C-order (nslice, ny, nx) dataspace: zero-copy, and
 ! numpy-natural for per-slice access. axisLabels declare that stored order. The slice
-! axis is the one LABELED z (third in the logical x,y,z reading). Slices are
-! simultaneous, so they are a MESH axis, never the openPMD iteration.
+! axis is the one labeled z (third in the logical x,y,z reading). Slices are
+! simultaneous, so they are a mesh axis, never the openPMD iteration.
 !
-! Reading implements exactly what writing produces and refuses the rest BY NAME:
+! Reading implements exactly what writing produces and refuses the rest by name:
 ! temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
 ! (z,y,x), and any missing required attribute.
 !-
@@ -236,7 +236,7 @@ end subroutine wavefront_write_openpmd
 ! Subroutine wavefront_read_openpmd (wf, file_name, err_flag, photon_energy)
 !
 ! Routine to read an openPMD EXT_Wavefront file written to the module header's layout.
-! Everything this reader cannot represent is refused BY NAME: a frequency-domain or
+! Everything this reader cannot represent is refused by name: a frequency-domain or
 ! k-space field, an axis order other than (z,y,x), a missing required attribute.
 !
 ! photon_energy is returned so the caller can match the file to the field set entry

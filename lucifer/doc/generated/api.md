@@ -273,11 +273,11 @@ Output:
 ```
 Routine to write a packed beam as an openPMD-beamphysics particle file, one bunch per
 slice through Bmad's own hdf5_write_beam. Unlike a Genesis dump this carries the
-PER-PARTICLE weight, as openPMD's macro-charge, so a weighted beam survives the round
+Per-particle weight, as openPMD's macro-charge, so a weighted beam survives the round
 trip.
 
 One slice per openPMD particlePatch, in window order, so an empty slice is a
-zero-count patch rather than a gap. The patch count IS the window, and nothing else
+zero-count patch rather than a gap. The patch count is the window, and nothing else
 about the window is written: the wavelength, spacing and beamlet size belong to the
 deck, and one4one follows from the weights.
 
@@ -326,7 +326,7 @@ Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights. Eac
 beamlet's amplitude draws on its REAL electron count, the beamlet's charge over e
 (Genesis's slice-uniform ne/mpart for uniform weights). This makes <|b(h)|^2> =
 1/N_lambda exact for any cross-beamlet weight distribution (fel-physics.md
-sec-noise). Weights must be uniform WITHIN a beamlet (the quiet cancellation is per
+sec-noise). Weights must be uniform within a beamlet (the quiet cancellation is per
 beamlet). The first particle's weight speaks for its beamlet. Genesis's silent
 nbl < 1 clamp is kept but counted into n_clamp for the caller to report. Kicks
 accumulate from the unperturbed phases, exactly as Genesis's work array does: two
@@ -359,7 +359,7 @@ stored coordinates are coord_struct's. The element's p0c must match the beam's
 normalization. A mismatch is refused, not rescaled, since nothing on this path
 changes the reference momentum.
 
-fold_phi0 IS FOR A DUMP AND NOTHING ELSE. The chart splits a particle's ponderomotive
+fold_phi0 is for A dump and nothing else. The chart splits a particle's ponderomotive
 phase into a per-beam reference and a per-particle lag,
 
   theta_j = phi0 + ks * z_j / beta_j,
@@ -418,15 +418,15 @@ Output:
 *Subroutine* `(beam, ele, bunch, beta0, err_flag)`
 
 ```
-Routine to concatenate all slices into ONE bunch_struct in GLOBAL window coordinates,
+Routine to concatenate all slices into one bunch_struct in global window coordinates,
 so Bmad's whole-bunch machinery (the sr wake) sees the beam head to tail:
 
   z_global = z_local + beta * (islice-1) * slice_spacing
 
-Higher slice index is the window HEAD (larger Bmad z). The direction and the formula
+Higher slice index is the window head (larger Bmad z). The direction and the formula
 are not new conventions. fel_migrate_slices documents "positive theta drift moves
 toward higher slice index, the head", and shifts a mover's z by exactly
--atar*beta*slice_spacing (which makes z_global the migration INVARIANT).
+-atar*beta*slice_spacing (which makes z_global the migration invariant).
 fel_wake_update's convolution collects current(is+i) from higher indices, the wake
 trailing its source. (An earlier specification guessed the opposite sign. The
 causality check and these two authorities pinned it.)
@@ -465,7 +465,7 @@ theta = phi0 + ks*z/beta is untouched by an energy kick. This is Genesis's conve
 for wake energy loss (fel_wake_apply_slice does the same), used when the caller applied
 a pure kick with no transport (the in-wiggler wake). A track1_bunch passage uses
 hold_theta = false: there the element transported vec(5) in Bmad's own chart and the
-restored z IS the tracked z.
+restored z is the tracked z.
 ```
 
 ```
@@ -489,7 +489,7 @@ Output:
 ```
 Routine to move particles between slices when their ponderomotive phase leaves the
 slice window: the weighted generalization of Genesis's one4one-only Sorting::localSort
-(fel-physics.md sec-migration). This port can offer it for ANY beam because each
+(fel-physics.md sec-migration). This port can offer it for any beam because each
 particle carries its own charge -- weights and migration are the same feature.
 
 The criterion is Genesis's, in this code's chart: the derived phase
@@ -504,11 +504,11 @@ unwrapped-z coordinate choice (module header) paying off. sample is asserted int
 for that reason.
 
 Removal is Genesis's swap-with-last, and the while-loop re-examines the swapped-in
-particle exactly as localSort does. A particle appended to a HIGHER slice is
+particle exactly as localSort does. A particle appended to a higher slice is
 re-examined when the scan reaches that slice (its adjusted theta then lies inside the
-window, so it stays). One appended to a LOWER slice waits for the next call, as in
-Genesis. Particles whose destination lies beyond the window are DROPPED WITH THEIR
-CHARGE COUNTED into charge_dropped. Genesis discards them silently at the world
+window, so it stays). One appended to a lower slice waits for the next call, as in
+Genesis. Particles whose destination lies beyond the window are dropped with their
+Charge counted into charge_dropped. Genesis discards them silently at the world
 edges (sec-migration). The accounting is this port's deviation, chosen so
 conservation is checkable.
 
@@ -572,7 +572,7 @@ Output:
 
 ```
 Routine to compute the per-slice beam diagnostics, weighted. Genesis's DiagBeam::calc
-definitions with 1/N generalized to w_j/sum(w) (two-pass variances by REQUIREMENT:
+definitions with 1/N generalized to w_j/sum(w) (two-pass variances by requirement:
 fel-physics.md sec-numerics). Uniform weights reproduce Genesis exactly up to the
 regrouped arithmetic. Positions and sizes are of x, y directly. mean_px, mean_py are
 in Bmad's normalization P/p0 (multiply by fel_p0_mc for Genesis's gamma*beta). Adds
@@ -603,14 +603,14 @@ per-slice energy-loss rate, and longitudinal space charge entering the pendulum
 equation as a per-particle ez. Physics, Genesis provenance, and validation:
 lucifer/doc/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
 
-Placement in the step: the wake's gamma decrement lands BETWEEN the longitudinal
+Placement in the step: the wake's gamma decrement lands between the longitudinal
 advance and the second transverse half step. ez is computed per slice before the RK
 loop and held fixed through the stages, entering dgamma/dz as -ez. Both act in every
 element, interludes included -- the chamber does not end where the undulator does.
 
-fel_resistive_wall_wake is kept a clean, separable routine BY DECISION: it is a
+fel_resistive_wall_wake is kept a clean, separable routine by decision: it is a
 future port target into Bmad proper as a wake source, and nothing in it knows about
-the FEL. Space charge is transcribed FOR CONSISTENCY with Genesis (directly
+the FEL. Space charge is transcribed for consistency with Genesis (directly
 testable), behind this module's interface BY DECISION: Bmad's slice space-charge
 method is suspected the better model long-term, and a Bmad-slice implementation of
 fel_shortrange_ez / fel_longrange_esc is an explicit future task.
@@ -670,7 +670,7 @@ constructed = everything off = every existing check bit-identical.
 
 ```
 The single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV per meter per
-electron (negative = loss), from the NUMERICAL impedance of Bane & Stupakov
+electron (negative = loss), from the numerical impedance of Bane & Stupakov
 SLAC-PUB-10707 (fel-physics.md sec-wakes), transcribed from
 Wake::singleWakeResistive with Genesis's exact numerics: k in [0, 100/s0] on 1000
 intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3), flat x-integral on [0,15] with 20000
@@ -725,7 +725,7 @@ Output:
 The convolution of Collective::update, one shared-memory node: interpolate the
 per-slice currents to wavelength resolution (zero-padded past the head), convert to
 electrons per bin and the derivative for the geometric term, then for each slice sum
-causally from the evaluation point TOWARD THE HEAD (a trailing slice collects the
+causally from the evaluation point toward the head (a trailing slice collects the
 wakes of the charge ahead of it), averaging over the sample steps within the slice.
 Serial by design: the caller holds the barrier. Call once when currents cannot change
 (Genesis's hoisting), and at the migration stride when they can.
@@ -796,7 +796,7 @@ Output:
 ```
 EFieldSolver::longRange, one node: the per-slice long-range space-charge field from
 the whole-window weighted current and rms-size profiles, in Genesis's longESC units
-(eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.md
+(eV/m). The caller converts at use exactly as Genesis does (fel-physics.md
 sec-spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 ```
 
@@ -958,7 +958,7 @@ Input and output as fel_h5_real, with val integer.
 Routine to write a one-byte flag dataset from an ordinary integer buffer of zeros
 and ones. Overloaded for ranks 1 and 2 by the interface fel_h5_flag.
 
-int8 with @unit = '1' IS the format's boolean: HDF5 has no boolean type, and a flag
+int8 with @unit = '1' is the format's boolean: HDF5 has no boolean type, and a flag
 stored as a float would be a lie about what it is. Each one also carries
 @dtype_hint = 'bool', stamped here so the convention is a thing the dataset says
 rather than a rule a reader has to find in the root attributes and pattern-match on.
@@ -1130,8 +1130,8 @@ Genesis lattices carry no optics, so an imported bunch must be rematched by hand
 Bmad lattice carries its Twiss, and init_beam_distribution generates bunches matched
 to the lattice element already. The transform would be a second way to say what
 the lattice says. (An openPMD bunch that genuinely needs rematching is a Bmad
-tracking problem upstream of the FEL, not an import option.) The bunch moments ARE
-still measured, as an UNWEIGHTED analysis in Genesis's analyse form. Unweighted
+tracking problem upstream of the FEL, not an import option.) The bunch moments are
+still measured, as an unweighted analysis in Genesis's analyse form. Unweighted
 deliberately: coincident split-weight copies leave every moment bit-identical, which
 the invariance check relies on.
 
@@ -1212,7 +1212,7 @@ slice.
 *Subroutine* `(s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)`
 
 ```
-Routine to compute Genesis's analyse moments (fel-physics.md sec-import): UNWEIGHTED
+Routine to compute Genesis's analyse moments (fel-physics.md sec-import): Unweighted
 means, variances and Twiss over the particles with s0 < s < s1, on the slopes.
 Emittance ex = sqrt(|var_x*var_px - cov^2|)*gavg (a normalized emittance through the
 mean energy), bx = var_x*gavg/ex, ax = -cov*gavg/ex. Unweighted deliberately. See
@@ -1244,7 +1244,7 @@ Output:
 *Subroutine* `(bunch, file_name, err_flag)`
 
 ```
-Routine to write a bunch_struct as a Genesis 1.3 v4 DISTRIBUTION file (the
+Routine to write a bunch_struct as a Genesis 1.3 v4 distribution file (the
 &importdistribution input, not a dump): flat datasets t [s], p [gamma*beta], x, y [m],
 xp, yp [slopes], plus the total charge. t = -tau/c with tau = -z/beta, so Genesis's
 s = -c*t reproduces this port's window position exactly and both codes bin the
@@ -1407,7 +1407,7 @@ generator and the distribution import (both make their own beam, neither brings 
 
 ```
 The namelist layer of the FEL tracker, quarantined the way Tao quarantines its
-tao_init_* files: three groups, all read from ONE input file, each filling the
+tao_init_* files: three groups, all read from one input file, each filling the
 structs of fel_struct directly (Tao's &tao_params pattern: set global%out_root,
 bmad_com%radiation_damping_on, chamber_wake%radius, space_charge%nz, beam_init%n_particle,
 wavefront_init%lambda0 by component). This module is itself library: an embedding
@@ -1422,7 +1422,7 @@ program may reuse the parsing, or skip it and fill the structs in code.
   &fel_wavefront_init  wavefront_init, field_file
 
 A group that is absent keeps its defaults. A group that is present must parse.
-The retired flat &fel_track_params group is refused BY NAME: the error lists each
+The retired flat &fel_track_params group is refused by name: the error lists each
 parameter found in it and the group it moved to.
 ```
 
@@ -1453,7 +1453,7 @@ Output:
 *Subroutine* `(run, iu)`
 
 ```
-Write run's RESOLVED inputs (every default made explicit) as the three
+Write run's resolved inputs (every default made explicit) as the three
 namelist groups, to an open unit. The stats file's Meta/ provenance echo
 (Genesis parity: its Meta group embeds the entire input file). An embedding
 program may also use it to persist a configuration built in code.
@@ -1495,7 +1495,7 @@ Output:
 *Function* `(param_file) result (found)`
 
 ```
-Refuse the retired flat &fel_track_params group BY NAME: list every parameter set
+Refuse the retired flat &fel_track_params group by name: list every parameter set
 in it together with the group and name it moved to, so migration is a mechanical
 edit of the input file.
 ```
@@ -2054,7 +2054,7 @@ tracking locals. Nothing here cross-uses them.
 *Subroutine* `(run, err_flag)`
 
 ```
-Routine to build everything that needs BOTH the lattice and the built starting state:
+Routine to build everything that needs both the lattice and the built starting state:
 the collective configuration and wake kernels, the wake-window and unaveraged-collective
 refusals, the slippage/autophasing schedule, the geometry breaks (chicanes), and the
 diagnostics setup (dump locators and the exact record/element-end counts). Errors
@@ -2090,12 +2090,12 @@ refused by name when it matches nothing or more than one element.
 
 ```
 Routine to check the Bmad element wakes against the time window. Element sr wakes act
-across the WHOLE window (fel-physics.md sec-seamwake): all slices concatenate into one bunch
+across the whole window (fel-physics.md sec-seamwake): all slices concatenate into one bunch
 in global window coordinates and Bmad's wake machinery applies unmodified. What is
 checked here, by name: lr (multi-bunch) wakes are not supported. A pseudomode wake
 whose z_max is shorter than the window would have Bmad kill the bunch mid-run. A
 z_long table narrower than the window would overflow its binning grid the same way.
-Runs AFTER the beam is built (the window length is the subject). setup_fel_elements
+Runs after the beam is built (the window length is the subject). setup_fel_elements
 runs before it (two_pol must precede the field).
 ```
 
@@ -2106,8 +2106,8 @@ runs before it (two_pol must precede the field).
 
 ```
 Routine to set up chicane breaks (fel-physics.md sec-phasing): a break whose elements bend the
-reference (sbends, patches) detours the BEAM while the RADIATION goes straight. The
-light's path is the CHORD between the flanking undulator faces, from ele%floor,
+reference (sbends, patches) detours the beam while the radiation goes straight. The
+light's path is the chord between the flanking undulator faces, from ele%floor,
 never the reference arc that vec(5) is measured against. The arc-minus-chord
 delay is charged as whole-wavelength window rotations (Genesis's chicane
 semantics: "always autophasing") on the break's last element, which also takes
@@ -2134,7 +2134,7 @@ rotations and the light-path correction (see setup_break_geometry's header).
 
 ```
 Routine to set up the diagnostics (fel-physics.md sec-stats): resolve the dump-at lists through
-Bmad's own lat_ele_locator (class::name syntax for free) and precompute the EXACT
+Bmad's own lat_ele_locator (class::name syntax for free) and precompute the exact
 record and element-end counts by replaying the walk's skip rule, so the stats arrays
 are sized once, never grown. An entry matching nothing is refused by name.
 ```
@@ -2185,7 +2185,7 @@ says where (the twiss_valid pattern). Pulse-level values are pooled downstream
 (scripts), never stored: the file stays raw.
 
 There is one record axis. Element ends are always recorded whatever the comb (fel_comb_take),
-so an element end IS a record and the element-end arrays need no axis of their own:
+so an element end is a record and the element-end arrays need no axis of their own:
 at_element_end selects them. scripts/read_stats.py is the reader everything uses, and
 scripts/bunch_params_from_stats.py reconstructs a bunch_params dict from any (record,
 slice) of the sufficient statistics. The harness checks that at element ends it
@@ -2550,7 +2550,7 @@ everywhere.
 
 ```
 The run-level switches and names, exposed in &fel_params as global%... (the
-tao_global_struct analog). Everything here is about ONE run of the tracker. The
+tao_global_struct analog). Everything here is about one run of the tracker. The
 physics description lives in the lattice, beam_init and wavefront_init.
 ```
 
@@ -2561,8 +2561,8 @@ physics description lives in the lattice, beam_init and wavefront_init.
 
 ```
 The radiation starting condition, the beam_init_struct analog (&fel_wavefront_init).
-The field record IS the time window, so the window lives here: window_length and
-window_sample set the slice count and spacing for the field AND the generated beam
+The field record is the time window, so the window lives here: window_length and
+window_sample set the slice count and spacing for the field and the generated beam
 (one window, one definition). harmonics requests the field set. field_file imports
 override the seed.
 ```
@@ -2640,12 +2640,12 @@ deliberate difference (save_a_bunch_step's guards, and Tao's comb_ds_save note
   comb = 0: a row at every record position;
   comb > 0: a row when z has advanced comb_ds_save past the last row.
 An element end is always a row, whatever the comb. That is the difference, and it is
-what lets the stats file carry ONE record axis with a boolean mask (coords/
+what lets the stats file carry one record axis with a boolean mask (coords/
 at_element_end) instead of a second axis and a duplicated copy of every element-end
 quantity. Bmad's comb < 0 drops the comb, and here that leaves the element ends,
 which are the positions the evaluated bunch_params live on.
 z_last updates when the row is taken. The walk consults this rule live and the
-setup's nrec precompute REPLAYS it with the same z arithmetic, so the stats
+setup's nrec precompute replays it with the same z arithmetic, so the stats
 arrays are exact-sized in every mode.
 ```
 
@@ -2725,7 +2725,7 @@ Bmad's own chart.
 
 ```
 Routine to run slice migration at the per-element stride, serial, between the
-parallel regions (the thread check stays untouched). Called AFTER z_now is advanced,
+parallel regions (the thread check stays untouched). Called after z_now is advanced,
 so per-event drop reports carry the z of the diagnostic record they precede -- the
 conservation timeline reconstructs exactly from the log. With migrate_check, the
 whole-beam weighted phasor S = sum(w e^{i theta}) must satisfy
@@ -2755,7 +2755,7 @@ migrate_check verifies.
 ```
 Routine to write one diag row per slice, slices in time-window order: beam slice is
 against field slice fel_field_index(slip, is, nslice), the unrotation of manual
-sec-slippage. The values are the ones the stats loop just evaluated with the SAME
+sec-slippage. The values are the ones the stats loop just evaluated with the same
 fel_field_diag and fel_slice_diag calls, slice-parallel (each slice's arithmetic
 identical to the old serial sweep, so this file is bit-for-bit what it always was).
 This routine only prints. take_stats_record must have run for this record first.
@@ -2767,7 +2767,7 @@ This routine only prints. take_stats_record must have run for this record first.
 *Subroutine* `()`
 
 ```
-Routine to write one energy-ledger row (unaveraged mode): beam energy RELATIVE to
+Routine to write one energy-ledger row (unaveraged mode): beam energy relative to
 the reference, sum(w*(gamma-gamma0))*me [C*eV = J] (relative so the per-record
 change is not differenced off a large baseline at its own summation-rounding floor,
 fel-physics.md sec-numerics), total window field energy sum(P_is)*slice_spacing/c [J],
@@ -2776,8 +2776,8 @@ cumulative energy transmitted out of the window by slippage (banked at the zero 
 in fel_apply_slippage), the cumulative spontaneous deposit energy sum|dE_src|^2 (the
 one field-energy term the kick/deposit duality does not charge to the beam), and the
 cumulative energy the beam radiated away under bmad_com's radiation switches (the
-ACTUAL drawn sums, not expectations, so closure stays exact, and zero with the
-switches off). In a time-dependent run the window is an open system, and the EXACTLY
+Actual drawn sums, not expectations, so closure stays exact, and zero with the
+switches off). In a time-dependent run the window is an open system, and the exactly
 closing quantity is E_beam + U_field + U_escaped - U_spont + E_radiated. Wakes would
 be a second, unbanked exit channel. This ledger only exists where they are refused.
 ```
@@ -2788,7 +2788,7 @@ be a second, unbanked exit channel. This ledger only exists where they are refus
 *Subroutine* `()`
 
 ```
-Routine to apply spontaneous radiation inside FEL elements, honoring Bmad's GLOBAL
+Routine to apply spontaneous radiation inside FEL elements, honoring Bmad's global
 switches bmad_com%radiation_damping_on / %radiation_fluctuations_on, the same
 switches every Bmad tracking path honors. Interludes get theirs through track1. This
 covers the custom-tracked FEL step, whose radiation reaction cannot emerge from its
@@ -2799,13 +2799,13 @@ Newton-Lorentz equations of motion. Per record:
                 the unaveraged ramps radiate by their actual strength; averaged g = 1)
   fluctuations: the standard undulator quantum-diffusion form -- variance
                 1.015e-27 * ku^3 aw^2 F(aw) gamma0^4 per meter with Genesis's
-                Incoherent.cpp F(aw) fits (the Saldin closed form) -- drawn GAUSSIAN.
-                Genesis draws uniform scaled by sqrt(3) to reach this SAME variance.
+                Incoherent.cpp F(aw) fits (the Saldin closed form) -- drawn gaussian.
+                Genesis draws uniform scaled by sqrt(3) to reach this same variance.
                 The sqrt(3) normalizes the uniform draw and must not appear with a
                 Gaussian (the physical limit, a merit choice). One draw per beamlet,
                 exactly as Genesis: independent per-particle kicks would break the
                 quiet start's per-beamlet harmonic cancellation. Draws happen
-                SERIALLY in fixed slice order from the one seeded stream, so results
+                Serially in fixed slice order from the one seeded stream, so results
                 are independent of thread count. Only the application parallelizes.
 
 The actual drawn energy accumulates into e_rad_cum (the ledger's E_radiated column):
@@ -2826,7 +2826,7 @@ and beam are doing, so the slow modes (the unaveraged mode runs ~30x the average
 show signs of life. Element boundaries always print. Inside elements a wall-clock
 throttle (2 s) keeps fast runs quiet.
 
-The row is FOR A HUMAN (doc/user-guide.md): SI-prefixed values so a column of them
+The row is for A human (doc/user-guide.md): SI-prefixed values so a column of them
 lines up and the startup climb is readable, the element name last so every numeric
 column is fixed however long the name is, and no step field for the one-step elements
 that dominate a real lattice. The files carry full precision. Nothing parses this.
@@ -2854,7 +2854,7 @@ on error.
 *Function* `(wake_ele) result (acts)`
 
 ```
-Routine to say whether an element's LONG-RANGE wake can act. A long-range wake has no
+Routine to say whether an element's long-range wake can act. A long-range wake has no
 scale_with_length, so unlike a short-range one it is not silenced by a zero length,
 which is what makes it the exception to the zero-length skip above.
 ```
@@ -3011,7 +3011,7 @@ rotation of the call, ~1 inside undulators, ~10 over an interlude.
 ```
 One radiation field of the walk's field set: the harmonic number, the wavefront
 record, and that field's own slippage state and escape bank. The walk carries an
-ordered set of these (Genesis's vector<Field*>), with the FUNDAMENTAL always
+ordered set of these (Genesis's vector<Field*>), with the fundamental always
 entry 1. The ponderomotive phase, the phi0 advance and the slippage schedule are
 all defined against the fundamental. A harmonic field couples through fc(h) and the
 phase h*theta and diffracts at its own wavelength. A single-entry set is the
@@ -3066,7 +3066,7 @@ Output:
 
 ```
 The brief's 7.5 assertions, enforced at the first touch of the element: the
-reference time/energy pass INSIDE bmad_parser, through the hooks above. Enforcing
+reference time/energy pass inside bmad_parser, through the hooks above. Enforcing
 them any later is too late. A missing b_max parses cleanly and only fails downstream
 with an unrelated message. A fieldmap field_calc segfaults track_a_wiggler during
 the parse itself. Refusal is by name so a lattice author knows which attribute to fix.
@@ -3350,10 +3350,10 @@ Output:
 The priced transport alternative (fel-physics.md sec-element): the transverse maps of Bmad's own
 periodic-wiggler kernel (track_a_wiggler.f90:90-186), flattened. Quadrupole bodies go
 via quad_mat2_calc with the per-particle 1/rel_p^2 chromatic scaling and the
-half-octupole edge kicks, using the TRACKING-LOCAL k1 values (7.5: never the stored
+half-octupole edge kicks, using the tracking-local k1 values (7.5: never the stored
 k1x/k1y attributes, whose helical sign disagrees). The z bookkeeping of the kernel
 (path-length dz terms, low-energy correction, the end-of-element undulation factor)
-is deliberately ABSENT: the ponderomotive phase evolution, including the aw^2 and
+is deliberately absent: the ponderomotive phase evolution, including the aw^2 and
 px^2+py^2 path terms, lives in fel_advance's RK. Applying it here too would
 double-count.
 
@@ -3442,7 +3442,7 @@ BeamSolver::advance. Gather the field at (x, y) by bilinear interpolation from f
 slice ifld (the rotated-record index, fel_field_index). Form
 rpart = (fc(h)/ks)*faw*conj(E_h) per field of the set ff (the fundamental is entry 1,
 and a single-entry set takes the pre-harmonic scalar path verbatim). Integrate
-(theta, gamma) by the verbatim RK4 with the rpart set, px, py, faw AND the
+(theta, gamma) by the verbatim RK4 with the rpart set, px, py, faw and the
 space-charge ez held fixed through the stages. The harmonic phases h*theta are live
 per stage (fel_ode_multi). ez per particle is
 fel_shortrange_ez(ip) - long_esc(is)/m_electron, exactly Genesis's
@@ -3475,7 +3475,7 @@ Output:
 *Subroutine* `(delz, xks, xku, btpar, rpart, ez, gamma, theta)`
 
 ```
-The RK4 stage bookkeeping of BeamSolver::RungeKutta, VERBATIM -- the in-place stage
+The RK4 stage bookkeeping of BeamSolver::RungeKutta, verbatim -- the in-place stage
 algebra is kept exactly for bit identity, do not "clean up" (fel-physics.md sec-eom).
 ez is held fixed through the stages, as Genesis holds it.
 ```
@@ -3557,9 +3557,9 @@ Output:
 
 ```
 The longitudinal equations of motion over a field set, BeamSolver::ODE verbatim:
-ctmp sums rpart(i) * exp(-i * rharm(i) * theta) over the fields at the CURRENT stage
+ctmp sums rpart(i) * exp(-i * rharm(i) * theta) over the fields at the current stage
 theta: the couplings held fixed through the stages, the harmonic phases live
-(BeamSolver.cpp:150). xks is the FUNDAMENTAL wavenumber (the theta equation is the
+(BeamSolver.cpp:150). xks is the fundamental wavenumber (the theta equation is the
 fundamental's, and harmonics enter the slope only through ctmp).
 ```
 
@@ -3583,7 +3583,7 @@ Output:
 
 ```
 Routine to map a particle position to its lower-left grid cell corner and bilinear
-weights. Transcribed from Field::getLLGridpoint. wx is the weight of the LOWER x point.
+weights. Transcribed from Field::getLLGridpoint. wx is the weight of the lower x point.
 A particle outside |x|,|y| < gridmax neither feels the field nor radiates into it.
 ```
 
@@ -3604,7 +3604,7 @@ Output:
 *Subroutine* `(gridmax, dx, dy, x, y, ix, iy, wx, wy, on_grid)`
 
 ```
-fel_grid_weights with the grid bounds PRECOMPUTED by the caller (the particle
+fel_grid_weights with the grid bounds precomputed by the caller (the particle
 loops call this per particle: wavefront_shape and gridmax are loop-invariant).
 The arithmetic is character-identical to fel_grid_weights -- bit-for-bit --
 and the caller passes gridmax = (ngrid - 1) * wf%dx / 2 exactly as computed there.
@@ -3629,7 +3629,7 @@ Output:
 
 ```
 One slice's coherent-source summary (fel-physics.md sec-coherent-source; Tanaka PRAB 27,
-030703 (2024), implemented from the paper). Computed: the source phasor S, EXACTLY as
+030703 (2024), implemented from the paper). Computed: the source phasor S, exactly as
 the deposit would (same theta, same part factors, post-advance particles: the
 normalization contract is SUM crsource = S), the charge-weighted centroid and
 central second moments (this port's extension for offset/mismatched/tilted beams),
@@ -3848,11 +3848,11 @@ The step, per substep delta (Strang split, second order):
      comparable), and the polarization-basis current
        j = u_x (planar),  (u_x - i u_y)/sqrt(2) (helical).
      The source is the same SVEA deposit as the averaged solver with the coupling
-     REMOVED and the actual quiver current in its place:
+     Removed and the actual quiver current in its place:
        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
      followed by the shared pure diffraction (fel_field_diffract) and the +2*src
      convention. The /u_s (where the averaged solver has Genesis's /gamma) makes the
-     kick/deposit pair EXACT energy duals per substep (same operands, same bilinear
+     kick/deposit pair exact energy duals per substep (same operands, same bilinear
      weights, unitary diffraction between), so the ledger closes to the physical
      spontaneous-emission term and rounding, by construction. Period-averaging the
      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
@@ -3927,9 +3927,9 @@ Output:
 
 ```
 The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
-flat 1, sin^2 down over the last l_ramp. Amplitude AND slope are continuous (the
+flat 1, sin^2 down over the last l_ramp. Amplitude and slope are continuous (the
 slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
-the hard-edge MUTATION configuration. The handoff check exists to catch it.
+the hard-edge mutation configuration. The handoff check exists to catch it.
 ```
 
 ```
@@ -4027,7 +4027,7 @@ The documentation is in lucifer/doc/:
   reading-output.md    What the output files hold and how to read them.
   validation.md        The keystone rule, the tier table, and the measured levels.
 
-The program reads THREE namelist groups from one input file, each setting structs
+The program reads three namelist groups from one input file, each setting structs
 directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
 
   &fel_params           lat_file, the global%... run switches, Bmad's own bmad_com and
@@ -4035,7 +4035,7 @@ directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
   &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
                         source and output files, and the beam-side check knobs.
   &fel_wavefront_init   wavefront_init%... radiation starting condition (the field
-                        record IS the time window, so the window lives here) and the
+                        record is the time window, so the window lives here) and the
                         field_file imports.
 
 Three ways in, all through the same input file: a pair of Genesis dumps (both codes
@@ -4101,13 +4101,13 @@ that along with the rest of the Python class's __post_init__ validation.
 *Struct*
 
 ```
-Summary statistics of ONE FIELD SLICE, the field analog of Bmad's bunch_params_struct
+Summary statistics of one field slice, the field analog of Bmad's bunch_params_struct
 and named to match it: centroid and sigma are the intensity-weighted first and second
 Wigner moments over the transverse phase space (x, theta_x, y, theta_y), so sizes come
 out as sqrt(sigma(1,1)) in both structs and free-space propagation is the ABCD map on
 sigma (sigma_x^2(z) is quadratic in z, which is how banked slices are folded into
 pulse statistics without numerical propagation). emit = sqrt(det of a plane's 2x2 block) is
-the field-quality analog (= M^2 lambda/4pi). Pulse-level values are POOLED from slice
+the field-quality analog (= M^2 lambda/4pi). Pulse-level values are pooled from slice
 instances downstream (energy-weighted mean of sigmas plus variance of centroids),
 never stored. Fixed Bmad units.
 
@@ -4590,7 +4590,7 @@ that only fftw_execute is reentrant. The planner is globally serialised even tho
 every thread builds into its own threadprivate cache.
 
 That same rule is why wavefront_fft2_plan_threads exists: a thread that plans lazily on
-its first transform does so while other threads are already EXECUTING transforms, and
+its first transform does so while other threads are already executing transforms, and
 planner activity concurrent with execution sits outside FFTW's thread-safety promise --
 observed as run-to-run ulp-level differences in the planes of the last-planning threads.
 Callers about to run transforms in a parallel loop must warm every thread's cache first.
@@ -4613,7 +4613,7 @@ Output:
 *Subroutine* `(nx, ny, err_flag)`
 
 ```
-Routine to fill EVERY OpenMP thread's plan cache for an nx by ny transform, so that no
+Routine to fill every OpenMP thread's plan cache for an nx by ny transform, so that no
 planner runs concurrently with transform execution afterwards (see wavefront_fft2_plan's
 note: only fftw_execute is reentrant). Call serially, before any parallel loop that
 executes transforms of this size. A no-op when every thread already holds this size.
@@ -4633,8 +4633,8 @@ Output:
 *Subroutine* `()`
 
 ```
-Routine to destroy the cached FFTW plans and free the work buffer OF THE CALLING
-THREAD. The cache is threadprivate, so a serial call after parallel work leaves the
+Routine to destroy the cached FFTW plans and free the work buffer of the calling
+Thread. The cache is threadprivate, so a serial call after parallel work leaves the
 worker threads' caches allocated until program end. Freeing those would need a call
 from inside a parallel region. Not needed for correctness. Useful for making a
 single-threaded leak check clean.
@@ -4679,7 +4679,7 @@ Output:
 ```
 openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
 Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
-THE STANDARD DOCUMENT IS AUTHORITATIVE for this format. This module and the
+The standard document is authoritative for this format. This module and the
 harness's h5py reader validate against its text independently.
 
 Layout decisions (see the physics manual, fel-physics.md sec-field-set):
@@ -4689,7 +4689,7 @@ Layout decisions (see the physics manual, fel-physics.md sec-field-set):
                            iterationEncoding "groupBased", iterationFormat "/data/%T/"
   /data/1/                 one iteration per file; time = 0, dt = 0, timeUnitSI = 1
   /data/1/meshes/electricField
-                           the one mesh record. Attributes ON THE MESH RECORD (the
+                           the one mesh record. Attributes on the mesh record (the
                            extension's heading. Its body says "series", and the
                            contradiction is resolved here in the record's favor:
                            photonEnergy is a property of one field):
@@ -4702,8 +4702,8 @@ Layout decisions (see the physics manual, fel-physics.md sec-field-set):
   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively.
                            Component attributes: unitSI 1 and position [0,0,0], the
                            sample's offset within its cell in units of gridSpacing.
-  .../electricField/y      present only when the wavefront carries Ey. BOTH transverse
-                           polarizations live in ONE file as components, the
+  .../electricField/y      present only when the wavefront carries Ey. Both transverse
+                           polarizations live in one file as components, the
                            improvement over the Genesis format's one-per-file. The z
                            component is never written: a paraxial code has none, and
                            an absent component is ordinary openPMD.
@@ -4711,10 +4711,10 @@ Layout decisions (see the physics manual, fel-physics.md sec-field-set):
 The dataset is stored exactly as the Fortran (nx, ny, nslice) array, which the HDF5
 Fortran API records as a C-order (nslice, ny, nx) dataspace: zero-copy, and
 numpy-natural for per-slice access. axisLabels declare that stored order. The slice
-axis is the one LABELED z (third in the logical x,y,z reading). Slices are
-simultaneous, so they are a MESH axis, never the openPMD iteration.
+axis is the one labeled z (third in the logical x,y,z reading). Slices are
+simultaneous, so they are a mesh axis, never the openPMD iteration.
 
-Reading implements exactly what writing produces and refuses the rest BY NAME:
+Reading implements exactly what writing produces and refuses the rest by name:
 temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
 (z,y,x), and any missing required attribute.
 ```
@@ -4784,7 +4784,7 @@ group instead. Caught by the validation's file comparison against the Python wri
 
 ```
 Routine to read an openPMD EXT_Wavefront file written to the module header's layout.
-Everything this reader cannot represent is refused BY NAME: a frequency-domain or
+Everything this reader cannot represent is refused by name: a frequency-domain or
 k-space field, an axis order other than (z,y,x), a missing required attribute.
 
 photon_energy is returned so the caller can match the file to the field set entry

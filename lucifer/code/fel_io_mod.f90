@@ -1530,7 +1530,7 @@ character(*), parameter :: r_name = 'fel_write_lattice'
 
 !
 
-! The table is indexed BY ix_ele, element 0 (Bmad's beginning element) included, so
+! The table is indexed by ix_ele, element 0 (Bmad's beginning element) included, so
 ! coords/ix_ele indexes it with no offset arithmetic anywhere: lattice/name(ix_ele) is
 ! the record's element. The first record of a run sits at element 0.
 

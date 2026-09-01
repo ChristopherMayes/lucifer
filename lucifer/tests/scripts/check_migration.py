@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks for slice migration under weights (deliverable 7, self-referenced:
+Checks for slice migration under weights (self-referenced:
 6.9: Genesis migrates only under one4one, so weighted migration has no reference).
 
 Three checks:

@@ -5,7 +5,7 @@
 ! slice at fixed state and decompose the per-particle-step cost into
 ! the full path, the RK4+ODE alone (no gather, fixed rpart), and the bare sin/cos
 ! pair. Each optimization lever then gets a number, not a guess. Serial on purpose:
-! this measures the per-particle CONSTANT. Parallel scaling is the perf harness's job.
+! this measures the per-particle constant. Parallel scaling is the perf harness's job.
 !
 !   lucifer_advance_bench [npart] [nstep]      (defaults 8192, 400)
 !

@@ -6,14 +6,14 @@
 ! equation as a per-particle ez. Physics, Genesis provenance, and validation:
 ! lucifer/doc/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
 !
-! Placement in the step: the wake's gamma decrement lands BETWEEN the longitudinal
+! Placement in the step: the wake's gamma decrement lands between the longitudinal
 ! advance and the second transverse half step. ez is computed per slice before the RK
 ! loop and held fixed through the stages, entering dgamma/dz as -ez. Both act in every
 ! element, interludes included -- the chamber does not end where the undulator does.
 !
-! fel_resistive_wall_wake is kept a clean, separable routine BY DECISION: it is a
+! fel_resistive_wall_wake is kept a clean, separable routine by decision: it is a
 ! future port target into Bmad proper as a wake source, and nothing in it knows about
-! the FEL. Space charge is transcribed FOR CONSISTENCY with Genesis (directly
+! the FEL. Space charge is transcribed for consistency with Genesis (directly
 ! testable), behind this module's interface BY DECISION: Bmad's slice space-charge
 ! method is suspected the better model long-term, and a Bmad-slice implementation of
 ! fel_shortrange_ez / fel_longrange_esc is an explicit future task.
@@ -112,7 +112,7 @@ contains
 ! Subroutine fel_resistive_wall_wake (radius, conductivity, relaxation, roundpipe, ns, ds, wake)
 !
 ! The single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV per meter per
-! electron (negative = loss), from the NUMERICAL impedance of Bane & Stupakov
+! electron (negative = loss), from the numerical impedance of Bane & Stupakov
 ! SLAC-PUB-10707 (fel-physics.md sec-wakes), transcribed from
 ! Wake::singleWakeResistive with Genesis's exact numerics: k in [0, 100/s0] on 1000
 ! intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3), flat x-integral on [0,15] with 20000
@@ -353,7 +353,7 @@ end subroutine fel_wake_init
 ! The convolution of Collective::update, one shared-memory node: interpolate the
 ! per-slice currents to wavelength resolution (zero-padded past the head), convert to
 ! electrons per bin and the derivative for the geometric term, then for each slice sum
-! causally from the evaluation point TOWARD THE HEAD (a trailing slice collects the
+! causally from the evaluation point toward the head (a trailing slice collects the
 ! wakes of the charge ahead of it), averaging over the sample steps within the slice.
 ! Serial by design: the caller holds the barrier. Call once when currents cannot change
 ! (Genesis's hoisting), and at the migration stride when they can.
@@ -516,7 +516,7 @@ end subroutine fel_wake_apply_slice
 !
 ! EFieldSolver::longRange, one node: the per-slice long-range space-charge field from
 ! the whole-window weighted current and rms-size profiles, in Genesis's longESC units
-! (eV/m). The CALLER converts at use exactly as Genesis does (fel-physics.md
+! (eV/m). The caller converts at use exactly as Genesis does (fel-physics.md
 ! sec-spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 !
 ! Input:
@@ -549,7 +549,7 @@ if (.not. (ef%on .and. ef%longrange)) return
 gamma = gamma0 / sqrt(1 + aw**2)
 allocate (fcur(nslice), fsize(nslice))
 
-! Weighted current and transverse size per slice. Genesis's getSize is the PRODUCT of
+! Weighted current and transverse size per slice. Genesis's getSize is the product of
 ! the rms sizes, sigma_x*sigma_y: an effective area scale, not a variance sum
 ! (transcribed wrong once, caught by the SC tier at 1.7e-1, sec-spacecharge). Weighted
 ! moments where Genesis counts particles: identical for uniform weights, correct

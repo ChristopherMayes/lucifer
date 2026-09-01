@@ -93,13 +93,13 @@ end type
 !+
 ! Struct wavefront_params_struct
 !
-! Summary statistics of ONE FIELD SLICE, the field analog of Bmad's bunch_params_struct
+! Summary statistics of one field slice, the field analog of Bmad's bunch_params_struct
 ! and named to match it: centroid and sigma are the intensity-weighted first and second
 ! Wigner moments over the transverse phase space (x, theta_x, y, theta_y), so sizes come
 ! out as sqrt(sigma(1,1)) in both structs and free-space propagation is the ABCD map on
 ! sigma (sigma_x^2(z) is quadratic in z, which is how banked slices are folded into
 ! pulse statistics without numerical propagation). emit = sqrt(det of a plane's 2x2 block) is
-! the field-quality analog (= M^2 lambda/4pi). Pulse-level values are POOLED from slice
+! the field-quality analog (= M^2 lambda/4pi). Pulse-level values are pooled from slice
 ! instances downstream (energy-weighted mean of sigmas plus variance of centroids),
 ! never stored. Fixed Bmad units.
 !
@@ -119,7 +119,7 @@ type wavefront_params_struct
   logical :: angle_moments_valid = .false.
 end type
 
-! Cached FFTW plan state for wavefront_fft2, private to the module, ONE CACHE PER THREAD.
+! Cached FFTW plan state for wavefront_fft2, private to the module, one cache per thread.
 !
 ! Following bmad/space_charge/fft_interface_mod.f90: plans are created once per transverse
 ! grid size and reused. Two differences from that routine. First, the work buffer here is
@@ -133,7 +133,7 @@ end type
 !
 ! On the critical section inside wavefront_fft2: it guards FFTW's rule that plan creation
 ! is not reentrant, and nothing else. The FFTW planner is globally serialised no matter
-! how many per-thread buffers exist. Plan EXECUTION is thread safe by FFTW's own
+! how many per-thread buffers exist. Plan execution is thread safe by FFTW's own
 ! guarantee, and each execution here touches only the calling thread's buffer.
 
 ! The transform itself is deliberately single threaded. The parallelisation axis for a
@@ -766,7 +766,7 @@ kernel = wavefront_drift_kernel(wf, z_drift)
 ! Apply slice by slice. Both polarisation components see the same kernel: the paraxial
 ! operator does not couple Ex and Ey in free space.
 !
-! PARALLEL OVER SLICES, the same shape as the FEL field solve (fel_field_step): every
+! Parallel over slices, the same shape as the FEL field solve (fel_field_step): every
 ! slice touches only its own plane, the kernel is read-only, and the FFTW plan cache is
 ! threadprivate, so the arithmetic per slice is independent of which thread runs it and
 ! of how many there are. It matters: a time-dependent line spends one of these calls
@@ -1136,7 +1136,7 @@ end subroutine wavefront_fft2
 ! every thread builds into its own threadprivate cache.
 !
 ! That same rule is why wavefront_fft2_plan_threads exists: a thread that plans lazily on
-! its first transform does so while other threads are already EXECUTING transforms, and
+! its first transform does so while other threads are already executing transforms, and
 ! planner activity concurrent with execution sits outside FFTW's thread-safety promise --
 ! observed as run-to-run ulp-level differences in the planes of the last-planning threads.
 ! Callers about to run transforms in a parallel loop must warm every thread's cache first.
@@ -1186,8 +1186,8 @@ if (nx /= wf_cache_nx .or. ny /= wf_cache_ny) then
     ! dimension first, and in a Fortran (nx, ny) array that is ny. Getting this backwards is
     ! invisible on a square grid, which is why wavefront_drift_reference exists.
     !
-    ! FFTW_ESTIMATE, not FFTW_MEASURE, and deliberately: MEASURE picks the algorithm by
-    ! TIMING candidate transforms, so two runs of the same binary can pick differently and
+    ! FFTW_ESTIMATE, not FFTW_MEASURE, and deliberately: Measure picks the algorithm by
+    ! Timing candidate transforms, so two runs of the same binary can pick differently and
     ! every transform thereafter differs at the ulp level -- observed as rare whole-run
     ! flips of the field diagnostics under the harness's byte-identity checks. ESTIMATE's
     ! choice is a pure function of the problem, so results are reproducible run to run,
@@ -1214,7 +1214,7 @@ end subroutine wavefront_fft2_plan
 !+
 ! Subroutine wavefront_fft2_plan_threads (nx, ny, err_flag)
 !
-! Routine to fill EVERY OpenMP thread's plan cache for an nx by ny transform, so that no
+! Routine to fill every OpenMP thread's plan cache for an nx by ny transform, so that no
 ! planner runs concurrently with transform execution afterwards (see wavefront_fft2_plan's
 ! note: only fftw_execute is reentrant). Call serially, before any parallel loop that
 ! executes transforms of this size. A no-op when every thread already holds this size.
@@ -1258,8 +1258,8 @@ end subroutine wavefront_fft2_plan_threads
 !+
 ! Subroutine wavefront_fft_free ()
 !
-! Routine to destroy the cached FFTW plans and free the work buffer OF THE CALLING
-! THREAD. The cache is threadprivate, so a serial call after parallel work leaves the
+! Routine to destroy the cached FFTW plans and free the work buffer of the calling
+! Thread. The cache is threadprivate, so a serial call after parallel work leaves the
 ! worker threads' caches allocated until program end. Freeing those would need a call
 ! from inside a parallel region. Not needed for correctness. Useful for making a
 ! single-threaded leak check clean.
@@ -1332,7 +1332,7 @@ pms = wavefront_params_struct()
 nx = size(plane, 1);  ny = size(plane, 2)
 ks = twopi / wavelength
 
-! Intensity moments, one pass, SEPARABLE: the inner loop only accumulates row and
+! Intensity moments, one pass, separable: the inner loop only accumulates row and
 ! column intensity sums (the vectorizable part). The 1-D moments follow. Coordinates
 ! are grid-centered, matching the solver. This runs per slice per record, so its cost
 ! is the stats file's overhead. Keep it lean.

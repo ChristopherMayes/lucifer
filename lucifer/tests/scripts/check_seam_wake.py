@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Seam-wake checks (deliverable 11): Bmad element sr wakes applied across the whole time
-window, validated without Genesis (self-referenced and against the deliverable-8 wake
+Seam-wake checks: Bmad element sr wakes applied across the whole time
+window, validated without Genesis (self-referenced and against the transcribed wake
 model). Every wake measurement is an A-B difference between a run with
 the wake and a bit-identical run without it, on a single one-step wiggler, so the FEL
 evolution cancels exactly and what remains IS the kick.
@@ -18,7 +18,7 @@ Checks:
             slices ahead of it must receive exactly zero kick, and the d8 wake model
             (wake_on) on the same beam must mark the same "affected" mask in its
             eloss profile -- two independent implementations agreeing on direction.
-  zlong     Same-element cross-validation: the deliverable-8 resistive-wall kernel
+  zlong     Same-element cross-validation: the transcribed resistive-wall kernel
             (exported by chamber_wake%write_kernels) fed to Bmad's z_long machinery as a
             causal table. Bmad's per-slice energy change must match a first-principles
             numpy convolution of the same table with the actual particle distribution
@@ -209,7 +209,7 @@ def main():
     # superimposed marker has split into super_slaves. The wake then lives on the
     # lord (ele%wake is null on every tracked slave, pointer_to_wake_ele resolves it,
     # applying once at the slave containing the lord's midpoint). Checking ele%wake
-    # directly was the deliverable-11 hole: lord wakes fell through to the per-slice
+    # directly was the hole this check closed: lord wakes fell through to the per-slice
     # path. Closed form as in ramp, with the pipe's length in f.
     L_PIPE = 0.1
     (w/"wl_lordw.bmad").write_text(
@@ -268,7 +268,7 @@ def main():
     behind_active = np.abs(eloss[:top_charged+1]).max()
     print(f"d8 direction cross-check: wake_on eloss ahead of charge {ahead_active:.3e}, at/behind {behind_active:.3e}")
     if not (behind_active > 0 and ahead_active < 1e-12 * behind_active):
-        print("FAIL: deliverable-8 wake model does not mark the same affected mask")
+        print("FAIL: the transcribed wake model does not mark the same affected mask")
         ok = False
 
     # ---------------- z_long cross-validation with the d8 resistive-wall kernel

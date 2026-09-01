@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Distribution-import checks (deliverable 10): the bunch_struct -> FEL slices resampler,
+Distribution-import checks: the bunch_struct -> FEL slices resampler,
 transcribed from Genesis's SDDSBeam.cpp, validated along the RNG boundary.
 
 The driver generates a bunch from Bmad's beam_init_struct (a nm-scale Gaussian test
@@ -367,7 +367,7 @@ def main():
         print("FAIL: startup power after import disagrees between the codes")
         ok = False
 
-    # ---- Cross-path equivalence (the beam_init interface deliverable): the same
+    # ---- Cross-path equivalence through the beam_init interface: the same
     # Gaussian description, quiet-loaded directly (analytic per-slice evaluation) and
     # imported (real particles resampled). The quiet-load must match the analytic
     # Gaussian profile exactly -- this is also the sqrt(2pi) mutation check on the
