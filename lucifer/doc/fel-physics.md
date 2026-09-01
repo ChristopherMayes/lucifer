@@ -613,11 +613,21 @@ $a_{\mathrm{tar}} = \lfloor\theta/(2\pi\,\texttt{sample})\rfloor$ is the relativ
 destination (positive $\theta$ drift moves toward higher index, the head). A mover's
 $z$ shifts by exactly $-a_{\mathrm{tar}}\,\beta\,\Delta s$, changing $\theta$ by
 $-a_{\mathrm{tar}}\cdot2\pi\,\texttt{sample}$: for integer `sample` the phase every
-deposition sees is continuous across the move to rounding, and
+deposition sees is continuous across the move to rounding, at every harmonic $h$ too
+since $h\cdot2\pi\,\texttt{sample}$ stays a multiple of $2\pi$, and
 Eq. [](#eq-zglobal) is invariant. Removal is swap-with-last with rescan. Particles
 whose destination lies beyond the window are dropped *with their charge counted*
 (Genesis4 discards silently). Off by default: the Genesis4 tiers compare against
 non-one4one Genesis4, which never migrates.
+
+`sample > 1` is the intended case, not a tolerated one. In a sampled window the slices
+are the only represented longitudinal positions, so the slice spacing is the only move
+the discretization can express, and a particle drifting within the $2\pi\,\texttt{sample}$
+window has nowhere finer to go. The sub-window position is invisible to the per-slice
+current until the threshold, and that error is below the slice spacing, the window's own
+resolution. Genesis4's `localSort` uses the same sample-scaled window. What migration
+does require is *integer* `sample`, since the phase continuity above holds only then,
+and a non-integer value is refused by name at the first migration pass.
 
 :::{admonition} Provenance
 :class: note

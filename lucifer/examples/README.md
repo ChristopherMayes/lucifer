@@ -76,7 +76,7 @@ One row per feature declared in [the introduction](../doc/index.md).
 | Two polarizations, tilt honored | [`crossed_undulator/`](crossed_undulator/) |
 | Harmonic field sets | [`harmonics/`](harmonics/) |
 | Spontaneous emission on Bmad's switches | [`spontaneous/`](spontaneous/) |
-| Post-saturation taper | [`taper/`](taper/) |
+| Undulator tapering | [`taper/`](taper/) |
 | Phasing between segments | [`chicane/`](chicane/) |
 | Shared-memory parallelism, bit-identical at any thread count | Demonstrated inline, below |
 | openPMD dumps in both directions | [`steady_state/`](steady_state/) writes mid-run, [`import/`](import/) round-trips a bunch through a file, [`saturation_demo/`](saturation_demo/) reads Genesis4's |
