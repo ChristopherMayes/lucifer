@@ -34,7 +34,20 @@ lucifer lucifer.in
 
 The name is an argument and any name works. `lucifer.in` is the convention the
 examples follow, so that a directory reads the same way twice, and it is not a default
-the program looks for.
+the program looks for. Running `lucifer` with no argument prints that much and the
+version it was built from.
+
+The file vocabulary of a run, in four extensions:
+
+| Extension | Written by | What it is |
+|---|---|---|
+| `.in` | you | The input deck: `&fel_params`, `&fel_beam_init` and `&fel_wavefront_init`, naming one lattice |
+| `.bmad` | you | A Bmad lattice, named by the deck's `lat_file`. Variants call a shared one and override it |
+| `.h5` | the run | HDF5, openPMD throughout: the statistics file, and the beam and field dumps |
+| `.txt` | the run | The named streams, one per subject: diag, ledger, import, migration, wake |
+
+What each written file holds is the output section below, and what to do with it is
+[`reading-output.md`](reading-output.md).
 
 The examples are the fastest way in. Each is a directory of real input files, a README
 with the numbers measured on it, and nothing else to fetch:
@@ -272,7 +285,7 @@ completion block listing what was written.
 
 ```
 ================================================================================
- Lucifer -- FEL tracking in Bmad
+ Lucifer -- FEL tracking in Bmad, Bmad version 20260810-0
 --------------------------------------------------------------------------------
  Lattice     aramis.bmad
              49 elements, 57.000 m, 12 FEL segments

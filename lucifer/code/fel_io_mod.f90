@@ -19,6 +19,9 @@ use wavefront_openpmd_mod
 ! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read in
 ! fel_write_meta, which is the only place this module reaches into the parser.
 use bmad_parser_struct, only: bp_com
+! For bmad_version_date, the distribution's own version. Tao reports the same string,
+! and Lucifer ships inside the same distribution, so there is no second version to keep.
+use bmad_version_mod, only: bmad_version_date
 !$ use omp_lib
 
 implicit none
@@ -157,7 +160,7 @@ n_omp = 1
 !$ n_omp = omp_get_max_threads()
 
 call out_io (s_blank$, r_name, rule)
-call out_io (s_blank$, r_name, ' Lucifer -- FEL tracking in Bmad')
+call out_io (s_blank$, r_name, ' Lucifer -- FEL tracking in Bmad, Bmad version ' // bmad_version_date)
 call out_io (s_blank$, r_name, &
       '--------------------------------------------------------------------------------')
 
@@ -929,8 +932,12 @@ stamp = date_s(1:4) // '-' // date_s(5:6) // '-' // date_s(7:8) // 'T' // &
         time_s(1:2) // ':' // time_s(3:4) // ':' // time_s(5:6)
 call fel_h5_text (g_id, 'timestamp', 'timestamp', &
       'Local time the run finished, ISO 8601 without a zone.', stamp, merr)
-call fel_h5_int (g_id, 'bmad_inc_version', '1', 'Bmad version', &
+call fel_h5_int (g_id, 'bmad_inc_version', '1', 'Bmad lattice-format version', &
       'The bmad_inc_version$ the run was built against.', '', bmad_inc_version$, merr)
+call fel_h5_text (g_id, 'bmad_version', 'Bmad distribution version', &
+      'The Bmad distribution version the run was built from, the string Tao reports. ' // &
+      'The date-like form is Bmad''s own, and bmad_inc_version above is a different ' // &
+      'number: the lattice-format version.', bmad_version_date, merr)
 
 ! The environment, only when asked for: these identify a person and a machine, and they
 ! are of no use to a reader elsewhere.

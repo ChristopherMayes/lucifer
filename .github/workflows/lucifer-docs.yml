@@ -1,0 +1,106 @@
+# The part of Lucifer's validation that needs no Fortran build.
+#
+# The keystone runs eleven comparison tiers and nineteen check sections against a
+# genesis4 binary, which needs the whole distribution built and a reference build of
+# another code. None of that fits here yet, for the reason recorded at the bottom of this
+# file. What does fit is everything that only reads files: the documentation builds, the
+# input reference agrees with the Fortran declarations, the examples agree with the
+# feature list, and the generated example pages are current.
+#
+# Scoped to the lucifer-dev branch on purpose. The distribution's own ci.yml owns every
+# other branch, and this workflow has nothing to say about them.
+
+name: Lucifer - Docs & Conformance
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [lucifer-dev]
+  pull_request:
+    branches: [lucifer-dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-and-conformance:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # pip rather than conda-forge here, which is the opposite of the rule for a
+      # workstation. A runner is thrown away after the job, so there is no shared
+      # environment for an install to escape into.
+      - name: Install mystmd
+        run: npm install -g mystmd
+
+      # The three conformance checks are standard library only, so nothing else is
+      # installed. If one of them ever needs numpy, it stops belonging in this job.
+      - name: Input-reference conformance
+        run: python lucifer/tests/scripts/check_input_reference.py
+
+      - name: Examples conformance
+        run: python lucifer/tests/scripts/check_examples.py
+
+      # A deck edited without regenerating its page would leave the documentation
+      # quoting text that no longer runs. Regenerating here and requiring no diff is the
+      # same guarantee the keystone gives, and it costs no build. The Markdown only: the
+      # figures beside it are rewritten byte for byte by a plotting-library upgrade, and
+      # diffing them would fail on a version bump rather than on a stale page.
+      - name: Example pages are current
+        run: |
+          python lucifer/tests/scripts/report_examples.py \
+            --examples lucifer/examples \
+            --out lucifer/doc/generated/examples
+          git diff --exit-code -- 'lucifer/doc/generated/examples/*.md'
+
+      - name: Build the documentation
+        working-directory: lucifer/doc
+        run: myst build --html
+
+      - name: Scripts parse
+        run: |
+          for f in lucifer/tests/*.sh lucifer/examples/*.sh lucifer/examples/*/*.sh \
+                   lucifer/wavefront/tests/*.sh; do
+            [ -e "$f" ] || continue
+            bash -n "$f" || exit 1
+          done
+          python - <<'PY'
+          import ast, pathlib, sys
+          bad = 0
+          for f in sorted(pathlib.Path("lucifer").rglob("*.py")):
+              try:
+                  ast.parse(f.read_text())
+              except SyntaxError as e:
+                  print(f"{f}: {e}")
+                  bad = 1
+          sys.exit(bad)
+          PY
+
+  # The full keystone is not here yet, and one thing blocks it: the conda-forge genesis4
+  # release carries eev = 510999.06, which is 2.14e-7 above CODATA 2022, so ten of the
+  # eleven tier digits read differently against it than against the recorded reference.
+  # A run that passes every check on the wrong digits is worse than no run. When a
+  # release carries the fix, this becomes a second job that builds the distribution,
+  # installs genesis4, and runs:
+  #
+  #   ./lucifer/tests/run_fel_benchmark.sh
+  #   ./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer
+  #   ./lucifer/wavefront/tests/run_validation.sh
+  #   cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin

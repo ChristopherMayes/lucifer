@@ -602,6 +602,24 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_input_reference.py"; then
 fi
 section_time input-reference
 
+# The examples are the feature list's evidence, so the two must agree. The generated
+# pages quote the decks verbatim, and regenerating them here is what keeps a page from
+# drifting: a deck edited without a regeneration leaves a diff the keystone refuses.
+
+echo
+echo "--- examples conformance (the feature matrix, the directories, the pages) -----"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/report_examples.py" \
+       --examples "$BMAD_ROOT/lucifer/examples" \
+       --out "$BMAD_ROOT/lucifer/doc/generated/examples" > /dev/null; then
+  echo "FAIL: the example pages could not be generated" >&2
+  exit 1
+fi
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_examples.py"; then
+  echo "FAIL: the examples, the feature matrix and the generated pages disagree" >&2
+  exit 1
+fi
+section_time examples
+
 echo
 echo "--- program-structure checks (library contract, the comb, the window) ---------"
 SMOKE="${EXE%lucifer}lucifer_smoke_test"

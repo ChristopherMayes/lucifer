@@ -57,10 +57,18 @@ See [`doc/user-guide.md`](doc/user-guide.md) for the input file's three namelist
 
 ## Where it stands
 
-Validated against Genesis4 on eleven tiers plus eighteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
+Validated against Genesis4 on eleven tiers plus nineteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
 Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`doc/validation.md`](doc/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 
-In: the FEL element, per-particle weights throughout, OpenMP over slices with bit-identical results at any thread count, physical shot noise under weights, distribution import, slice migration, Genesis4's collective effects and Bmad element wakes across the whole bunch, the unaveraged mode, two polarizations, harmonic fields, openPMD dumps in both directions, phasing between segments, spontaneous emission honoring Bmad's global switches, and a self-describing statistics file.
+What the program does, and what it does not do yet, are the two lists in
+[`doc/index.md`](doc/index.md). They are kept in one place because the examples are
+checked against them: every declared feature names the example that shows it, and the
+harness refuses a feature that has lost its example.
 
-Not in: simultaneous harmonic fields in the unaveraged mode, elliptical polarization beyond the tilt-honored planar and helical limits, MPI (deliberate: the shared-memory design is measured faster at equal cores), one-to-one particle tracking, undulator field errors, and GPU support.
+## License
+
+Lucifer is part of the Bmad distribution and is distributed on the distribution's terms.
+Its physics is transcribed from Genesis 1.3 Version 4, which is licensed under the GNU
+General Public License version 3, and every transcribed routine carries a citation to
+the Genesis4 file and lines it came from. Those citations are kept deliberately.

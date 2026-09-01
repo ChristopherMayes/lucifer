@@ -1,7 +1,7 @@
 ! Harmonic-lasing example lattice: one planar undulator segment at the benchmark
 ! energy and rms aw (planar, so the odd-harmonic couplings fc(h) are alive -- a
-! helical device couples only the fundamental). Resonant at 1 Angstrom; the third
-! harmonic radiates at 1/3 Angstrom. Production defaults: Bmad's own kernel maps
+! helical device couples only the fundamental). Resonant at 1 Angstrom, and the
+! third harmonic radiates at 1/3 Angstrom. Production defaults: Bmad's own kernel maps
 ! (fel_tracking unset), ds_step = 3 periods.
 
 no_digested

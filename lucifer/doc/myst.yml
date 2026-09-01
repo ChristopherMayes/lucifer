@@ -16,6 +16,25 @@ project:
         - file: BMAD-STATS-EXT-FEL.md
     - file: references.md
     - file: genesis4.md
+    - title: Examples
+      children:
+        - file: generated/examples/examples.md
+        - file: generated/examples/steady_state.md
+        - file: generated/examples/taper.md
+        - file: generated/examples/sase.md
+        - file: generated/examples/sase_wake.md
+        - file: generated/examples/bmad_wake.md
+        - file: generated/examples/space_charge.md
+        - file: generated/examples/migration.md
+        - file: generated/examples/spontaneous.md
+        - file: generated/examples/unaveraged.md
+        - file: generated/examples/mixed_line.md
+        - file: generated/examples/import.md
+        - file: generated/examples/crossed_undulator.md
+        - file: generated/examples/harmonics.md
+        - file: generated/examples/chicane.md
+        - file: generated/examples/coherent_source.md
+        - file: generated/examples/saturation_demo.md
     - file: generated/api.md
     - file: changelog.md
 site:

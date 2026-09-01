@@ -20,8 +20,8 @@ Measured by this example (200 MW seed, 3.96 m planar, rms aw = 0.84853):
 | 3.01 | 1.905e8 | 1.7e2 |
 | 3.96 (exit) | 1.847e8 | 5.1e3 |
 
-`plot_fel.py`'s harmonic panel shows both curves on one log scale (banked as
-`fel-benchmark-plots/harmonic-lasing.png`). The harmonic's full wavefront_params
+`plot_fel.py`'s harmonic panel shows both curves on one log scale, and that figure is
+this example's page in the documentation. The harmonic's full wavefront_params
 live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name,
 `harmonics-final-h3.wf.h5`, an openPMD EXT_Wavefront file with the photon energy
 identifying the harmonic.

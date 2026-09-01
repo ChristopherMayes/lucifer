@@ -33,13 +33,15 @@ one line.
 | read an output file you were handed | [](reading-output.md) |
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what level | [](validation.md) |
+| run something and see a figure | [](generated/examples/examples.md) |
 | write or read the statistics format | [](BMAD-STATS-SPEC.md) |
 | see what changed | [](changelog.md) |
 | find a paper this code implements | [](references.md) |
 
 Runnable cases live in `lucifer/examples/`, each a directory of real input files with
-its own README and the numbers measured on it. Its index carries a table of which
-example shows which feature.
+its own README and the numbers measured on it. Every one of them has a page here, with
+its figure and its input files: [](generated/examples/examples.md) carries the table of
+which example shows which feature.
 
 ## Features
 
@@ -66,7 +68,7 @@ example shows which feature.
 - MPI. This one is a design decision rather than a gap: the shared-memory design is what this program is, and the case for adding MPI would have to be made on measurement.
 - GPU support.
 
-Validation runs on eleven comparison tiers and eighteen check sections, on both debug
+Validation runs on eleven comparison tiers and nineteen check sections, on both debug
 and production builds, before every commit. Nine of the eleven tiers are transcription
 checks that agree with Genesis4 at the floor set by its truncated impedance constants.
 The other two are priced model differences rather than defects. The levels, the

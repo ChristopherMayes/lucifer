@@ -142,9 +142,12 @@ lattice file only, and says so, because Bmad's `call, file =` pulls in more and 
 wrapper lattice here recorded a call statement while the lattice it called was absent.
 `n_lattice_files` reports how many files the parser opened, so one means the text is the
 whole story. Reproduction rests on the `lattice/` table and the input echo, not on this
-group. And nothing here identifies a person by default: the timestamp and the Bmad
-version identify the run, `lattice_file` is a base name, and the user and working
-directory go in only under `global%record_environment`. Note that `input_echo` echoes
+group. Two versions sit there and they are different numbers: `bmad_version` is the
+distribution's own date-like version, the string Tao reports, and `bmad_inc_version` is
+the lattice-format version the run was built against. And nothing here identifies a
+person by default: the timestamp and the Bmad version identify the run, `lattice_file`
+is a base name, and the user and working directory go in only under
+`global%record_environment`. Note that `input_echo` echoes
 file names as the user typed them, so relative paths are the user's half of that.
 
 Measured (check_diagnostics.py, in the harness -- cross-identities, not references):
@@ -200,7 +203,7 @@ bunch, where the transverse moments nearly vanish) the z cross terms agree only 
 4e-6 relative while agreeing to 1e-29 absolute -- physically the same number. That is
 why the check measures on a physical configuration, and why it compares the whole
 matrix rather than chasing the relative error of an individual near-zero entry.
-The `element_end/` group is SELF-SUFFICIENT: beam moments and Twiss (whole window and
+The `element_end/` group is self-sufficient: beam moments and Twiss (whole window and
 per slice) plus the radiation power, energy, on-axis intensity and bunching per slice.
 That is what makes `comb_ds_save < 0` usable rather than a trap. Bmad's comb semantics
 are kept verbatim ("< 0 => no comb calculated"), so that mode writes no per-record

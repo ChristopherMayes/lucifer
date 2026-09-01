@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""
+Generate doc/generated/examples/ from the example directories themselves.
+
+Each page carries the example's own README prose, the figure the runner saved, and every
+input file it runs on, fenced verbatim from the file on disk. The embedded text is read
+rather than transcribed, so a deck shown in the documentation cannot drift from the deck
+that runs: editing the deck and regenerating is the only way to change the page.
+
+The output is deterministic. Nothing time dependent, machine dependent or path dependent
+is written, because the keystone regenerates these files and requires the diff to be
+empty. Figures are referenced, never read: PNG bytes vary with the plotting library, so
+run_examples.sh owns them and check_examples.py asserts only that each one exists.
+
+Usage:
+
+  report_examples.py --examples <dir> --out <dir>
+
+Every relative link in a README is rewritten for the page's new depth, and any link form
+this script does not recognize is an error rather than a guess. A silent rewrite that
+produced a dead link would be worse than no page.
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+# Input files worth showing on a page, in the order they appear. A run's own deck first,
+# then the reference code's decks, then the lattices.
+DECK_GLOBS = ("lucifer.in", "lucifer[-_]*.in", "sat-*.in")
+LATTICE_GLOBS = ("*.bmad", "*.lat")
+
+# An embedded file is meant to be read on a page. Anything larger is data, not input,
+# and belongs in the repository only (examples/bmad_wake/ztable.wake is the case).
+MAX_EMBED_BYTES = 4000
+
+# run_examples.sh does not run these, so their pages carry no figure. saturation_demo
+# needs the genesis4 binary and its own clock, and it has run.sh and a report of its own.
+NO_FIGURE = ("saturation_demo",)
+
+# The index page's own name. The site serves a page under its file stem, so this cannot
+# be index.md: that collides with the site's own index and is served as /index-1.
+INDEX_PAGE = "examples.md"
+
+LANG = {".in": "fortran", ".bmad": "fortran", ".lat": "text"}
+
+LINK = re.compile(r"\]\(([^)]+)\)")
+
+
+def rewrite_links(text, names, where):
+    """Retarget a README's relative links for a page in doc/generated/examples/."""
+    def sub(m):
+        t = m.group(1)
+        if t.startswith(("http://", "https://", "#")):
+            return m.group(0)
+        # A doc page, from a per-directory README (../../doc/x.md) or the index (../doc/x.md).
+        d = re.fullmatch(r"\.\./(?:\.\./)?doc/([A-Za-z0-9._-]+\.md)", t)
+        if d:
+            return f"](../../{d.group(1)})"
+        # A sibling example, which the index names as a directory.
+        s = re.fullmatch(r"([A-Za-z0-9_]+)/", t)
+        if s and s.group(1) in names:
+            return f"]({s.group(1)}.md)"
+        raise SystemExit(f"{where}: unrecognized link target {t!r}. Teach "
+                         "report_examples.py this form rather than letting it guess.")
+    return LINK.sub(sub, text)
+
+
+def split_title(text, where):
+    """Return (title line, body) for a README whose first heading is its title."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("# "):
+            return line[2:].strip(), "\n".join(lines[i + 1:]).lstrip("\n")
+    raise SystemExit(f"{where}: no '# ' title line")
+
+
+def gather(d):
+    """The input files of one example, deduplicated, in a fixed order."""
+    out = []
+    for globs in (DECK_GLOBS, LATTICE_GLOBS):
+        found = []
+        for g in globs:
+            found += [p for p in d.glob(g) if p.is_file()]
+        for p in sorted(set(found), key=lambda p: (p.name != "lucifer.in", p.name)):
+            if p not in out:
+                out.append(p)
+    return out
+
+
+def embed(page, path, label=None):
+    size = path.stat().st_size
+    if size > MAX_EMBED_BYTES:
+        raise SystemExit(f"{path}: {size} bytes is too large to embed on a page. Add it "
+                         "to the exclusions or shorten it.")
+    page.append(f"### `{label or path.name}`")
+    page.append("")
+    page.append("```" + LANG.get(path.suffix, "text"))
+    page.append(path.read_text().rstrip("\n"))
+    page.append("```")
+    page.append("")
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--examples", required=True, help="The examples directory")
+    p.add_argument("--out", required=True, help="Directory to write the pages into")
+    args = p.parse_args()
+
+    ex = Path(args.examples)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+
+    dirs = sorted(d for d in ex.iterdir() if d.is_dir() and (d / "README.md").is_file())
+    names = {d.name for d in dirs}
+    if not dirs:
+        raise SystemExit(f"{ex}: no example directory carries a README.md")
+
+    written = []
+
+    # The index page, from the examples index, plus the lattice every example shares.
+    idx = ex / "README.md"
+    title, body = split_title(idx.read_text(), idx)
+    page = [f"<!-- Generated by {Path(__file__).name} from {idx.name}. Do not edit. -->",
+            "", f"# {title}", "", rewrite_links(body, names, idx).rstrip("\n"), "",
+            "## The shared lattice", "",
+            "Most examples call this line. The ones that need a different lattice carry "
+            "their own, shown on their own page.", ""]
+    embed(page, ex / "aramis.bmad")
+    (out / INDEX_PAGE).write_text("\n".join(page).rstrip("\n") + "\n")
+    written.append((INDEX_PAGE[:-3], 1))
+
+    for d in dirs:
+        readme = d / "README.md"
+        title, body = split_title(readme.read_text(), readme)
+        files = gather(d)
+        if not files:
+            raise SystemExit(f"{d}: no input file to embed")
+
+        page = [f"<!-- Generated by {Path(__file__).name} from examples/{d.name}/. "
+                "Do not edit. -->", "", f"# {title}", ""]
+        # The figure the runner saved, referenced beside the page it belongs to.
+        if d.name not in NO_FIGURE:
+            page += [f"![{d.name}]({d.name}.png)", ""]
+        page += [rewrite_links(body, names, readme).rstrip("\n"), ""]
+        page += ["## The input files", "",
+                 f"Every file below is read from `lucifer/examples/{d.name}/`, which is "
+                 "where the commands above are run.", ""]
+        for f in files:
+            embed(page, f)
+        (out / f"{d.name}.md").write_text("\n".join(page).rstrip("\n") + "\n")
+        written.append((d.name, len(files)))
+
+    print(f"wrote {len(written)} pages to {out}")
+    for name, n in written:
+        print(f"  {name:20s} {n} file(s) embedded")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -123,6 +123,10 @@ def main():
     p.add_argument("stats", help="lucifer .stats.h5 file")
     p.add_argument("-o", "--output", help="Output image (default: <stats stem>.png)")
     p.add_argument("--show", action="store_true", help="Also open a window")
+    p.add_argument("--dpi", type=int, default=160,
+                   help="Output resolution. The committed documentation figures use a "
+                        "lower value than the default, since they are read on a page "
+                        "rather than zoomed into (default: 160)")
     args = p.parse_args()
 
     if args.stats.endswith(".diag.txt"):
@@ -264,7 +268,7 @@ def main():
     fig.suptitle(title, x=0.02, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
 
-    fig.savefig(out, dpi=160)
+    fig.savefig(out, dpi=args.dpi)
     print(f"wrote {out}")
     if args.show:
         matplotlib.use("TkAgg", force=False)

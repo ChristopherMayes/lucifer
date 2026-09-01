@@ -10,6 +10,7 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. From the `bmad-ecosystem` root:
 
 ```
+export GENESIS4=<path to a genesis4 built from master>   # see below: not optional
 BUILD_PRODUCTION=N ./util/conda_compile      # debug
 ./util/conda_compile                         # production
 ./lucifer/tests/run_fel_benchmark.sh --results /tmp/fel-debug.txt   # ~9 min, needs genesis4
@@ -26,16 +27,25 @@ python3 lucifer/tests/scripts/report_validation.py \
         --out lucifer/doc/generated/validation-measured.md
 python3 lucifer/tests/scripts/report_api.py \
         --code lucifer/code --code lucifer/program --out lucifer/doc/generated/api.md
-git diff --exit-code lucifer/doc/generated/
+python3 lucifer/tests/scripts/report_examples.py \
+        --examples lucifer/examples --out lucifer/doc/generated/examples
+git diff --exit-code -- 'lucifer/doc/generated/*.md' 'lucifer/doc/generated/examples/*.md'
 ```
 
 The measured levels in this document are written by the harness that measured them, so
 a moved digit is a failing command rather than a discrepancy someone has to notice while
-reading.
+reading. The benchmark regenerates the example pages itself, in its `examples` section,
+so the command above is the same work made explicit.
+
+The diff names the Markdown. The figures in `doc/generated/examples/` are committed
+beside the pages and deliberately excluded: a plotting-library upgrade rewrites every
+one of them byte for byte without changing any physics, and a check that fails on that
+is a check that gets switched off. `examples/run_examples.sh` writes them, and the
+examples check asserts that each page's figure exists rather than what it contains.
 
 The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `lucifer/wavefront/tests/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one.
 
-The levels here were measured against a Genesis4 built from master, which carries the CODATA electron rest energy. Releases up to v4.6.14 do not, and comparing against one of those loosens the transcription tiers by several percent of their own value while still passing every tolerance ([](genesis4.md) states the constant and the size). The harness prints which of the two the reference carries, and the regeneration check refuses to absorb the difference: a reference change shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours.
+The levels here were measured against a Genesis4 built from master, which carries the CODATA electron rest energy. Releases up to v4.6.14 do not, and comparing against one of those loosens the transcription tiers by several percent of their own value while still passing every tolerance ([](genesis4.md) states the constant and the size). Ten of the eleven tiers move, and only `weight_split`, which compares Fortran against Fortran, holds, which is what identifies the cause. `$GENESIS4` is therefore not optional until a release carries the fix. The harness prints which of the two the reference carries, and the regeneration check refuses to absorb the difference: a reference change shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours.
 
 Debug and production binaries are never bit-comparable to each other. Compare like builds only.
 

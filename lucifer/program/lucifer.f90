@@ -42,6 +42,8 @@ use fel_setup_mod
 use fel_init_mod
 use fel_track_line_mod
 use fel_io_mod
+use bmad_version_mod, only: bmad_version_date
+use, intrinsic :: iso_fortran_env, only: output_unit
 
 implicit none
 
@@ -59,9 +61,26 @@ character(*), parameter :: r_name = 'lucifer'
 
 !
 
+! The one argument is the input file. Its name is the caller's choice, and lucifer.in is
+! the convention the examples follow rather than a name looked for here.
+
 n_arg = command_argument_count()
 if (n_arg /= 1) then
-  print '(a)', 'Usage: lucifer <param_file>'
+  call out_io (s_blank$, r_name, [ &
+        'Usage:                                                                      ', &
+        '  lucifer <input_file>                                                      ', &
+        '                                                                            ', &
+        'One input file names the lattice and holds the three namelist groups:       ', &
+        '&fel_params, &fel_beam_init and &fel_wavefront_init. Any file name works.   ', &
+        'The examples name theirs lucifer.in by convention, which is a convention    ', &
+        'rather than a default looked for here. lucifer/doc/ documents every         ', &
+        'parameter, every output file and the lattice attributes.                    '])
+  ! Separate from the block above because a character array constructor needs every
+  ! element the same length, and the version string's length is not this file's to know.
+  call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
+  ! Flushed before the stop, or the runtime's own STOP line reaches the terminal first
+  ! and the usage text appears to follow the exit.
+  flush (output_unit)
   stop 1
 endif
 call get_command_argument (1, param_file)
