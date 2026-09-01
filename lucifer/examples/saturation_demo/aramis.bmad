@@ -2,7 +2,7 @@
 ! demo's own copy of ../aramis.bmad, because run.sh copies its inputs into a work
 ! directory and a relative call would not follow.
 !
-! The undulator segments are Bmad wiggler elements with tracking_method = custom, so
+! The undulator segments are Bmad wiggler elements with tracking_method = fel_averaged, so
 ! their FEL parameters derive from the element attributes: aw from b_max and l_period,
 ! helicity from field_calc. Everything else is tracked by Bmad.
 !
@@ -31,7 +31,7 @@ beginning[alpha_b] = 1.40348
 ! encodes aw = 0.84853 as an expression in Bmad's own constants.
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = custom, ds_step = 0.045
+     tracking_method = fel_averaged, ds_step = 0.045
 D1: drift, l = 0.44
 D2: drift, l = 0.24
 QF: quadrupole, l = 0.08, k1 = 2.0

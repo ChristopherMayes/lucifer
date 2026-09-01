@@ -9,7 +9,7 @@ Two commands, Bmad only:
 The tracking method is an element attribute, so a line whose segments are tracked
 differently is a line of elements that differ. `mixed.bmad` calls `../aramis.bmad`
 for its parameters, defines `UNDU` as the same undulator carrying
-`fel_tracking = fel_unaveraged`, and puts one `UNDU` in the third FODO cell. Eleven
+`tracking_method = fel_unaveraged`, and puts one `UNDU` in the third FODO cell. Eleven
 segments run the averaged default and the fifth runs unaveraged, integrating the real
 helical field with no period averaging (the manual's [unaveraged-mode section](../../doc/fel-physics.md)).
 

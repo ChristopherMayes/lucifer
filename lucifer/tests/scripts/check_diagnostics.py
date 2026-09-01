@@ -69,8 +69,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 """
 
 WRAP = """call, file = aramis_1seg.bmad
-fel_unaveraged = 1
-wiggler::*[FEL_TRACKING] = fel_unaveraged
+wiggler::*[TRACKING_METHOD] = fel_unaveraged
 """
 
 # Zero-length wake elements, both polarities, for check 7. A zero-length element carrying
@@ -92,7 +91,7 @@ WKF: pipe, l = 0, sr_wake = {{amp_scale = 1, scale_with_length = F,
   longitudinal = {{1e12, 0, 0, 0.25, none}}}}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 SEG: line = (WKT, UND, WKF, WKT)
 use, SEG
 """

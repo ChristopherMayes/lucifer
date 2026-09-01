@@ -54,9 +54,7 @@ beginning[beta_a] = 15
 beginning[beta_b] = 15
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
-fel_transcribed = -1
-wiggler::*[FEL_TRACKING] = fel_transcribed
+      tracking_method = fel_averaged, ds_step = 0.015
 SEG: line = (UND)
 use, SEG
 """
@@ -69,11 +67,9 @@ beginning[beta_a] = 15
 beginning[beta_b] = 15
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 UND2: UND
 D: pipe, l = 0.30
-fel_transcribed = -1
-wiggler::*[FEL_TRACKING] = fel_transcribed
 SEG: line = (UND, D, UND2)
 use, SEG
 """
@@ -83,6 +79,7 @@ NML_TWIN = """&fel_params
   lat_file = "smoke.bmad"
   global%out_root = "{root}"
   global%interlude_model = "genesis"
+  global%transport_model = "genesis"
   global%write_diag = T
   global%ran_seed = 777
 {extra}/

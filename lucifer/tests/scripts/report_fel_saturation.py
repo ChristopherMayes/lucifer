@@ -121,7 +121,7 @@ def cover(pdf, d, checks):
         (f"    Genesis 1.3 v4, 12 MPI ranks              {t['genesis']:8.1f} s", 10, 2),
         (f"    Bmad averaged (bmad_standard default)     {t['avg']:8.1f} s   "
          f"({t['genesis']/t['avg']:.2f}x faster than Genesis)", 10, 2),
-        (f"    Bmad unaveraged (fel_tracking selection)  {t['unavg']:8.1f} s   "
+        (f"    Bmad unaveraged (tracking_method)         {t['unavg']:8.1f} s   "
          f"({t['unavg']/t['avg']:.0f}x the averaged mode)", 10, 2),
         ("    Each code computes its own in-run diagnostics; the Bmad runs write the", 10, 0),
         ("    full moment-matrix stats file while Genesis writes scalar columns.", 10, 0),

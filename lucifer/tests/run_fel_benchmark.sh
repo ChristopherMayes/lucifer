@@ -264,6 +264,10 @@ WINEOF
 # Every deck reads the converted openPMD dumps and writes openPMD, the only format the
 # tracker speaks. The three input groups (doc/user-guide.md): extra &fel_params content
 # (wake/sc) as argument 6, extra &fel_beam_init content (check knobs) as argument 7.
+# transport_model = genesis on every tier this builds: a transcription comparison needs
+# Genesis4's own transverse maps, so what is left over is transcription fidelity rather
+# than a transport model difference. It is a no-op for the unaveraged tier, which
+# integrates the field and has no map to choose.
 # nbins is the beamlet size the Genesis decks load with, which no dump format carries.
 
 make_nml () {
@@ -274,6 +278,7 @@ make_nml () {
   lat_file = "$2"
   global%out_root = "$3"
   global%interlude_model = "$4"
+  global%transport_model = "genesis"
   global%write_diag = T
 ${6:+  $6}
 /
@@ -290,20 +295,20 @@ ${7:+  $7}
 NML
 }
 
-make_nml tier1.nml  aramis_1seg_val.bmad tier1  bmad    Aramis
-make_nml tier2.nml  aramis_val.bmad      tier2  bmad    Aramis
-make_nml tier2g.nml aramis_val.bmad      tier2g genesis Aramis
-make_nml tier1s.nml aramis_1seg_val.bmad tier1s bmad    Aramis "" "split_weights = T"
+make_nml tier1.nml  aramis_1seg.bmad tier1  bmad    Aramis
+make_nml tier2.nml  aramis.bmad      tier2  bmad    Aramis
+make_nml tier2g.nml aramis.bmad      tier2g genesis Aramis
+make_nml tier1s.nml aramis_1seg.bmad tier1s bmad    Aramis "" "split_weights = T"
 make_nml tier1u.nml aramis_1seg_unavg.bmad tier1u bmad Aramis
-make_nml td1.nml    aramis_1seg_val.bmad td1    bmad    AramisTD
-make_nml td2.nml    aramis_val.bmad      td2    bmad    AramisTD
-make_nml td2g.nml   aramis_val.bmad      td2g   genesis AramisTD
-make_nml tdsase.nml aramis_val.bmad      tdsase genesis AramisTDSASE
-make_nml tdsc.nml   aramis_1seg_val.bmad tdsc   genesis AramisTD "space_charge%rmax = 250e-6
+make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
+make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
+make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
+make_nml tdsase.nml aramis.bmad      tdsase genesis AramisTDSASE
+make_nml tdsc.nml   aramis_1seg.bmad tdsc   genesis AramisTD "space_charge%rmax = 250e-6
   space_charge%nz = 2
   space_charge%nphi = 1
   space_charge%longrange = T"
-make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "chamber_wake%on = T
+make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = T
   chamber_wake%radius = 2.5e-3
   chamber_wake%conductivity = 5.813e7
   chamber_wake%relaxation = 8.1e-6
@@ -319,6 +324,11 @@ make_nml tdwk.nml   aramis_1seg_val.bmad tdwk   genesis AramisTD "chamber_wake%o
 # through to fail downstream with an unrelated message (missing b_max) or a segfault in
 # the parse-time reference tracking (fieldmap). Each check mutates one attribute of the
 # real single-segment lattice and requires both a nonzero exit and the by-name message.
+#
+# The fieldmap case is refused by Bmad rather than by this program: an FEL method is not
+# valid on a wiggler whose field is a map, so the lattice does not parse. That is one step
+# earlier than the program's own assertion, and the assertion stays as the second line of
+# defense for a lattice built through the API rather than parsed.
 
 echo "--- FEL-element assertion checks (refusal by name) -----------------------------"
 grep -v "b_max" aramis_1seg.bmad                                   > refusal_bmax.bmad
@@ -356,9 +366,28 @@ LAT
 
 run_assert_refusal bmax     "ZERO B_MAX"
 run_assert_refusal lperiod  "ZERO L_PERIOD"
-run_assert_refusal fieldmap "FIELD_CALC MUST BE PLANAR_MODEL"
+run_assert_refusal fieldmap "NOT A VALID TRACKING_METHOD"
 run_assert_refusal lrwake   "LR (MULTI-BUNCH) WAKES ARE NOT SUPPORTED"
 run_assert_refusal zmax     "Z_MAX CAN HANDLE"
+
+# tracking_method = custom on a wiggler means some other program's tracking, so this
+# program must not claim the element. With the only wiggler tracked that way there is no
+# FEL segment left, which is refused by name: the alternative, silently tracking it as an
+# FEL element, is what the named methods exist to prevent.
+
+sed 's/tracking_method = fel_averaged/tracking_method = custom/' aramis_1seg.bmad > custom_seam.bmad
+make_nml custom_seam.nml custom_seam.bmad custom_seam bmad Aramis
+if "$EXE" custom_seam.nml > fel-custom_seam.log 2>&1; then
+  echo "FAIL: a custom-tracked wiggler was claimed as an FEL segment" >&2
+  CHECKS_OK=0
+elif ! grep -q "NO FEL ELEMENT" fel-custom_seam.log; then
+  echo "FAIL: custom-tracked wiggler refused, but not by name; log tail:" >&2
+  tail -5 fel-custom_seam.log >&2
+  CHECKS_OK=0
+else
+  echo "  custom_seam: a custom-tracked wiggler is not an FEL segment, refused by name"
+fi
+
 if [ "$CHECKS_OK" -ne 1 ]; then
   echo "FAIL: FEL-element assertion checks; outputs kept in: $WORK_DIR" >&2
   exit 1

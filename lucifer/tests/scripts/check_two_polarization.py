@@ -70,7 +70,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-UV = "fel_unaveraged = 1\nwiggler::*[FEL_TRACKING] = fel_unaveraged\n"
+UV = "wiggler::*[TRACKING_METHOD] = fel_unaveraged\n"
 
 
 def ss(nml):
@@ -234,11 +234,11 @@ def main():
     (wd / "p2_hel_tilt.bmad").write_text("call, file = spont_probe.bmad\nUNDS[tilt] = 0.3\n")
     ok1 = refuse(exe, wd, "p2f1", NML.format(lat="p2_hel_tilt.bmad", root="p2f1", extra=""),
                  "TILT ON A HELICAL FEL ELEMENT")
+    # The transcribed maps are a run switch now, so the refusal is asked for in the deck.
     (wd / "p2_tr_tilt.bmad").write_text(
-        "call, file = crossed_probe.bmad\nfel_transcribed = -1\n"
-        "wiggler::*[FEL_TRACKING] = fel_transcribed\nuse, CROSSED\n")
-    ok2 = refuse(exe, wd, "p2f2", NML.format(lat="p2_tr_tilt.bmad", root="p2f2", extra=""),
-                 "KNOW NO TILT")
+        "call, file = crossed_probe.bmad\nuse, CROSSED\n")
+    ok2 = refuse(exe, wd, "p2f2", NML.format(lat="p2_tr_tilt.bmad", root="p2f2",
+                 extra='  transport_model = "genesis"\n'), "KNOW NO TILT")
     check("refusal: tilt on helical, by name (1 = yes)", 0.0 if ok1 else 1.0, 0.5)
     check("refusal: tilt with transcribed maps, by name (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
 

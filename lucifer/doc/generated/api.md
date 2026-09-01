@@ -2039,7 +2039,7 @@ Output:
 ```
 Routine to recognize FEL segments and derive their FEL parameters from lattice
 attributes (Bmad's kx roll-off attribute is not yet mapped and must be zero). An FEL
-segment is a wiggler/undulator element with tracking_method = custom: Bmad's own
+segment is a wiggler/undulator tracked by an FEL method: Bmad's own
 semantics for program-supplied tracking, which this driver is. The wiggler sanity
 assertions are enforced: a wiggler with zero b_max or l_period would silently get
 factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
@@ -3038,7 +3038,7 @@ fel_sincos.c). See the named-value-change note above.
 
 ```
 track1_custom hook: outside a driver's own FEL walk, an FEL element (a wiggler with
-tracking_method = custom) is just a periodic wiggler. Delegate to Bmad's standard
+tracked by an FEL method) is just a periodic wiggler. Delegate to Bmad's standard
 kernel. The reference time/energy pass inside bmad_parser and any seam-side track1
 resolve through this, so the element carries the resonant undulation delay
 from Bmad's own code. Kept at module scope deliberately: gfortran implements pointers
@@ -3090,7 +3090,7 @@ Output:
 
 ```
 make_mat6_custom hook, the transfer-matrix companion of fel_ele_as_wiggler: an FEL
-element's mat6_calc_method resolves to custom (auto follows tracking_method = custom),
+element's mat6_calc_method resolves to custom (auto follows an FEL tracking method),
 and Bmad's bookkeeping calls through make_mat6_custom_ptr unconditionally. A
 program that leaves the pointer null segfaults at a jump to address zero. Delegate to the
 standard periodic-wiggler kernel with matrix propagation, filling ele%mat6, ele%vec0

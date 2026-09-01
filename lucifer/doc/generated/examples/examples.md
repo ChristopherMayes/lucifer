@@ -71,7 +71,7 @@ One row per feature declared in [the introduction](../../index.md).
 | Feature | Shown by |
 |---|---|
 | The FEL element: parameters as lattice attributes | [`steady_state/`](steady_state.md), and [`taper/`](taper.md) for a heterogeneous line |
-| Three tracking methods, mixable per element in one line | [`mixed_line/`](mixed_line.md), [`unaveraged/`](unaveraged.md) |
+| Two tracking methods, Bmad's own named methods, mixable per element in one line | [`mixed_line/`](mixed_line.md), [`unaveraged/`](unaveraged.md) |
 | Per-particle weights throughout | [`sase/`](sase.md) for weighted shot noise, [`migration/`](migration.md) for weighted migration |
 | Time dependence with an exact integer slippage shift | [`sase/`](sase.md) |
 | Slice migration | [`migration/`](migration.md) |
@@ -141,7 +141,7 @@ Most examples call this line. The ones that need a different lattice carry their
 ! Bmad translation of Genesis4's benchmark/Benchmark1-SASE/Aramis.lat, shared by the
 ! examples in this directory.
 !
-! The undulator segments are Bmad wiggler elements with tracking_method = custom, so
+! The undulator segments are Bmad wiggler elements tracked by the FEL_Averaged method, so
 ! their FEL parameters derive from the element attributes: aw from b_max and l_period,
 ! helicity from field_calc. Everything else is tracked by Bmad.
 !
@@ -170,7 +170,7 @@ beginning[alpha_b] = 1.40348
 ! encodes aw = 0.84853 as an expression in Bmad's own constants.
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = custom, ds_step = 0.045
+     tracking_method = fel_averaged, ds_step = 0.045
 D1: drift, l = 0.44
 D2: drift, l = 0.24
 QF: quadrupole, l = 0.08, k1 = 2.0

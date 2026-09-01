@@ -206,10 +206,6 @@ type fel_kernel_struct
   real(rp) :: dgrid = 0, ks = 0, dz = 0
 end type
 
-! Named values of the fel_tracking lattice attribute (fel-physics.md sec-element), in Bmad's
-! named-integer convention. Lattices use the same names via one-line variable
-! definitions (e.g. "fel_unaveraged = 1" before the element that sets it).
-
 ! The source model (fel-physics.md sec-coherent-source): the standard per-particle deposit
 ! (the referee) or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27,
 ! 030703 (2024); arXiv:2310.20197). In the coherent source the spatially incoherent
@@ -219,11 +215,9 @@ end type
 integer, parameter :: fel_source_deposit$ = 0
 integer, parameter :: fel_source_coherent$ = 1
 
-integer, parameter :: fel_transcribed$ = -1   ! Transcribed-Genesis transverse maps
-                                              !   (validation-internal, Genesis tiers).
-integer, parameter :: fel_averaged$ = 0       ! Averaged, bmad_standard kernel maps
-                                              !   (the unset default).
-integer, parameter :: fel_unaveraged$ = 1     ! The unaveraged mode.
+! The FEL mode of an element is its tracking_method, and Bmad names the two values:
+! fel_averaged$ and fel_unaveraged$ (bmad_struct.f90). There is no separate mode enum
+! here, so a lattice, the parser, show ele and this code all say the same thing.
 
 type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
@@ -257,7 +251,7 @@ contains
 ! Subroutine fel_ele_as_wiggler (orbit, ele, param, err_flag, finished, track)
 !
 ! track1_custom hook: outside a driver's own FEL walk, an FEL element (a wiggler with
-! tracking_method = custom) is just a periodic wiggler. Delegate to Bmad's standard
+! tracked by an FEL method) is just a periodic wiggler. Delegate to Bmad's standard
 ! kernel. The reference time/energy pass inside bmad_parser and any seam-side track1
 ! resolve through this, so the element carries the resonant undulation delay
 ! from Bmad's own code. Kept at module scope deliberately: gfortran implements pointers
@@ -375,7 +369,7 @@ end subroutine fel_assert_wiggler_sane
 ! Subroutine fel_mat6_as_wiggler (ele, param, start_orb, end_orb, err_flag)
 !
 ! make_mat6_custom hook, the transfer-matrix companion of fel_ele_as_wiggler: an FEL
-! element's mat6_calc_method resolves to custom (auto follows tracking_method = custom),
+! element's mat6_calc_method resolves to custom (auto follows an FEL tracking method),
 ! and Bmad's bookkeeping calls through make_mat6_custom_ptr unconditionally. A
 ! program that leaves the pointer null segfaults at a jump to address zero. Delegate to the
 ! standard periodic-wiggler kernel with matrix propagation, filling ele%mat6, ele%vec0

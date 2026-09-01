@@ -95,8 +95,7 @@ def cold(nml):
     return nml.replace("sig_pz = 8.804506566858e-05", "sig_pz = 1e-12")
 
 WRAP = """call, file = spont_probe.bmad
-fel_unaveraged = 1
-wiggler::*[FEL_TRACKING] = fel_unaveraged
+wiggler::*[TRACKING_METHOD] = fel_unaveraged
 """
 
 

@@ -15,7 +15,7 @@ beginning[alpha_b] = 1.40348
 ! Stage 1: aw = 0.84853 rms helical, the Benchmark1-SASE undulator.
 UND1: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.045
+      tracking_method = fel_averaged, ds_step = 0.045
 
 ! Stage 2: the same device with b_max, and so aw, 0.4% lower.
 UND2: UND1, b_max = 0.99600 * 0.84853 * (twopi / 0.015) * m_electron / c_light

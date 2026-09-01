@@ -115,7 +115,7 @@ values are pooled downstream. The file stays raw.
 `lattice/` is what a layout plot needs and what the file did without for too long: one
 row per tracked element with element 0 included, on the `ele` axis that `coords/ix_ele`
 indexes so a join is a gather, carrying `name`, `key`, `s_start`, `s_end`, `l`, `ds_step`, `is_fel`,
-`fel_tracking`, `b_max`, `aw` as the physics used it, `l_period`, `ku`, `helical`,
+`tracking_method`, `b_max`, `aw` as the physics used it, `l_period`, `ku`, `helical`,
 `k1`, `tilt` and `z_offset`. Genesis4 writes per-step arrays. A table plus the existing
 join says the same thing without a second copy of the record axis, and says what
 Genesis4 cannot: signed quad strengths with a length, wake-carrying pipes, and the

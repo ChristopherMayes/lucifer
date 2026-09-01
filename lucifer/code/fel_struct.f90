@@ -54,6 +54,11 @@ implicit none
 type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
   character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
+  ! Transverse transport inside averaged FEL elements: 'bmad' is Bmad's own periodic-wiggler
+  ! kernel, the production model, and 'genesis' is Genesis4's maps verbatim. The second is
+  ! validation-internal: the comparison tiers need transcription-level transport, so it is a
+  ! run switch rather than a tracking method, and no production run sets it.
+  character(16) :: transport_model = 'bmad'
   ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
   ! per-particle scatter (the referee, bit-for-bit unchanged). 'coherent' is the
   ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the

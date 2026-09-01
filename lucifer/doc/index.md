@@ -7,22 +7,25 @@ Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. I
 physics is transcribed from Genesis 1.3 Version 4 (Genesis4), embedded in Bmad's lattice
 machinery, and validated against Genesis4 from bitwise-identical starting states.
 
-An FEL segment is a real Bmad wiggler element with `tracking_method = custom`, so a
+An FEL segment is a real Bmad wiggler element tracked by a Bmad tracking method, so a
 Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and
 apertures are Bmad's own, the FEL parameters are lattice attributes rather than a
 parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's
 `track1_bunch`. A run is one input file naming a lattice.
 
-## Three tracking methods
+## Two tracking methods
 
-Selected per element by the `fel_tracking` lattice attribute, and they mix freely in
-one line.
+Bmad's own named methods, set on the element as any tracking method is, and they mix
+freely in one line.
 
-| `fel_tracking` | method | what it is for |
-|---|---|---|
-| unset or `0` | averaged | The default. The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
-| `1` | unaveraged | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. A production method whose cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also the tree's referee, sharing no approximation with the averaged path. |
-| `-1` | transcribed Genesis4 | Genesis4's transverse maps verbatim. Validation-internal: the comparison tiers select it through wrapper lattices, and no production lattice writes it. |
+| `tracking_method` | what it is for |
+|---|---|
+| `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
+| `fel_unaveraged` | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. A production method whose cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also the tree's referee, sharing no approximation with the averaged path. |
+
+The averaged method's transverse maps have a third option behind them, the transcribed
+Genesis4 maps, which the comparison tiers select through [](input-reference.md)'s
+`global%transport_model`. It is validation-internal and no production run sets it.
 
 ## Where to start
 
@@ -46,7 +49,7 @@ which example shows which feature.
 ## Features
 
 - **The FEL element.** An FEL segment is a Bmad wiggler, so its parameters are lattice attributes and one lattice serves tracking, optics and layout.
-- **Three tracking methods**, mixable per element in one line.
+- **Two tracking methods**, Bmad's own named methods, mixable per element in one line.
 - **Per-particle weights** throughout: physical shot noise, collective effects and diagnostics are all weight-correct.
 - **Time dependence** with an exact integer slippage shift, and slice migration when a particle's ponderomotive phase leaves its slice.
 - **Collective effects**: resistive-wall, geometric and roughness wakes, short-range and long-range space charge, and Bmad element wakes applied across the whole time window.

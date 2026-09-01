@@ -12,7 +12,7 @@ real helical field, quiver and all, at 20 integration substeps per period with s
 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path
 knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
 
-The mode is `seg1.bmad`'s own attribute, `fel_tracking = 1`, and the substep count and
+The mode is `seg1.bmad`'s own tracking method, `fel_unaveraged`, and the substep count and
 ramp length are element attributes too, `fel_steps_per_period` and `fel_ramp_periods`.
 `lucifer_averaged.in` runs the identical configuration through the averaged default by
 calling the same lattice and overriding that one attribute.

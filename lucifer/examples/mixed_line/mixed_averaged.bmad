@@ -3,6 +3,4 @@
 
 call, file = mixed.bmad
 
-fel_averaged = 0
-
-UNDU[FEL_TRACKING] = fel_averaged
+UNDU[TRACKING_METHOD] = fel_averaged

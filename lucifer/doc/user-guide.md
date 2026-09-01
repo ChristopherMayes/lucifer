@@ -12,17 +12,16 @@ Running the validation harness needs one thing beyond the binary, a Python envir
 with numpy, h5py and pytest, described by `lucifer/wavefront/tests/environment.yml`. The
 exact commands the harness runs are in [`validation.md`](validation.md).
 
-## The three tracking methods
+## The two tracking methods
 
-Selected per element by the `fel_tracking` lattice attribute, and they mix freely in one line.
+Bmad's own named methods, set on the element as any tracking method is, and they mix freely in one line.
 
-| `fel_tracking` | method | what it is for |
-|---|---|---|
-| unset or `0` | averaged | The default. The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
-| `1` | unaveraged | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also the tree's referee, since it shares no approximation with the averaged path. |
-| `-1` | transcribed Genesis4 | Genesis4's own transverse maps, verbatim. Validation-internal: the Genesis4 comparison tiers select it through wrapper lattices, and no production lattice writes it. |
+| `tracking_method` | what it is for |
+|---|---|
+| `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
+| `fel_unaveraged` | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also the tree's referee, since it shares no approximation with the averaged path. |
 
-Lattices name these with one-line variables rather than raw numbers, so `fel_unaveraged = 1` then `wiggler::*[FEL_TRACKING] = fel_unaveraged`.
+A lattice writes them as it writes any method, `tracking_method = fel_unaveraged`, and class-settable as `wiggler::*[TRACKING_METHOD] = fel_unaveraged`. The averaged method's maps have one more option behind them, `global%transport_model`, described in [`input-reference.md`](input-reference.md).
 
 ## Running
 
@@ -73,7 +72,7 @@ The validation harness is a separate thing, described with its commands in
 | `lucifer/doc/fel-physics.md` | **The physics manual**: equations, conventions, Genesis4 provenance and validation pointers, one section per subsystem |
 | `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis4 interlude model |
-| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; generates its own quiet-start beam and seed field when no dumps are named |
+| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements tracked by an FEL method (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; generates its own quiet-start beam and seed field when no dumps are named |
 | `lucifer/examples/` | Self-contained single-command examples, one directory per feature, each with its own README and measured numbers. Its index says which example shows which feature |
 | `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis4's, independent RNGs |
@@ -96,13 +95,13 @@ The validation harness is a separate thing, described with its commands in
 | `lucifer/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis4 deck: one undulator segment, importing the same dumps |
 | `lucifer/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis4 decks: the time-dependent pair, 32 slices with shot noise |
 | `lucifer/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
-| `lucifer/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement: one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding the element attribute) |
+| `lucifer/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement: one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding that attribute) |
 
 ## Architecture
 
 (Physics: manual [](fel-physics.md#sec-core), [](fel-physics.md#sec-chart), [](fel-physics.md#sec-field), [](fel-physics.md#sec-slippage).)
 
-Inside FEL elements (wigglers with `tracking_method = custom`, described in the FEL
+Inside FEL elements (wigglers tracked by an FEL method, described in the FEL
 element section), `fel_track_und_step` advances the coupled system in steps of the
 element's `ds_step` (Bmad's standard step attribute, which is Genesis4's `delz` living on
 the lattice like every other parameter, and the bookkeeper's `num_steps =
@@ -171,10 +170,12 @@ as Genesis4 does on the way out. Beam slices never rotate.
 (Physics: manual [](fel-physics.md#sec-element).)
 
 An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying
-`tracking_method = custom`, Bmad's own semantics for "the program supplies the
-tracking", which this driver does. Recognition is by key and tracking method, never by
-name. There are no per-undulator namelist parameters. The FEL parameters derive from
-the element attributes:
+`tracking_method = fel_averaged` or `fel_unaveraged`, Bmad's own names for the two FEL
+methods, which this driver supplies through the same hook Bmad uses for `custom`.
+Recognition is by key and tracking method, never by name, and a wiggler carrying
+`tracking_method = custom` is some other program's element: this driver leaves it to the
+seam. There are no per-undulator namelist parameters. The FEL parameters derive from the
+element attributes:
 
 - `aw` (rms, Genesis4's convention) from the peak field: `K = c*b_max/(k_u*m_e c^2)`,
   exactly and independent of the reference energy. Helical `aw = K`, planar
@@ -214,16 +215,19 @@ reproduces the last namelist-driven build's run to a max relative difference of
 `aw` difference from deriving `aw` through the `b_max` attribute round trip rather than
 reading it from input.
 
-**The FEL tracking mode is a per-element lattice attribute** (`fel_tracking`,
-registered by the driver, class-settable as `wiggler::*[fel_tracking] = ...`), so
-averaged and unaveraged segments mix freely in one line. Unset/0, the default, is
-averaged with the transverse maps of Bmad's own `bmad_standard` periodic-wiggler
-kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like
-end kicks, chromatic via `p0/p`). `1` is the unaveraged mode, a production method whose cost buys the full quiver dynamics (see the manual's unaveraged-mode section). `-1` is
-averaged with the transcribed-Genesis4 focusing (matrix from `aw`, `kx`, `ky`,
-chromatic via `gammaz`), and it is validation-internal: the Genesis4 tiers require
-transcription-level transport and select it via the `*_val.bmad` wrapper lattices. No
-production lattice writes it. The two averaged models are priced, measured over the
+**The FEL mode is the element's tracking method**, class-settable as
+`wiggler::*[TRACKING_METHOD] = fel_unaveraged`, so averaged and unaveraged segments mix
+freely in one line. `fel_averaged` uses the transverse maps of Bmad's own
+`bmad_standard` periodic-wiggler kernel, flattened per `ds_step` (`track_a_wiggler`'s
+matrix with the octupole-like end kicks, chromatic via `p0/p`). `fel_unaveraged` is a
+production method whose cost buys the full quiver dynamics (see the manual's
+unaveraged-mode section).
+
+Behind the averaged method there is one more choice, and it is a run switch rather than a
+method: `global%transport_model = "genesis"` replaces those maps with the
+transcribed-Genesis4 focusing (matrix from `aw`, `kx`, `ky`, chromatic via `gammaz`). It
+is validation-internal, since the Genesis4 tiers need transcription-level transport, and
+no production run sets it. The two averaged models are priced, measured over the
 full time-dependent line (32 slices, 90 records): power differs by 5.0e-5 max (exit
 total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching
 phase 1.3e-2 rad max, for +3.8% runtime. That is period-averaged Genesis4 focusing

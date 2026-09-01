@@ -66,7 +66,7 @@ One row per feature declared in [the introduction](../doc/index.md).
 | Feature | Shown by |
 |---|---|
 | The FEL element: parameters as lattice attributes | [`steady_state/`](steady_state/), and [`taper/`](taper/) for a heterogeneous line |
-| Three tracking methods, mixable per element in one line | [`mixed_line/`](mixed_line/), [`unaveraged/`](unaveraged/) |
+| Two tracking methods, Bmad's own named methods, mixable per element in one line | [`mixed_line/`](mixed_line/), [`unaveraged/`](unaveraged/) |
 | Per-particle weights throughout | [`sase/`](sase/) for weighted shot noise, [`migration/`](migration/) for weighted migration |
 | Time dependence with an exact integer slippage shift | [`sase/`](sase/) |
 | Slice migration | [`migration/`](migration/) |

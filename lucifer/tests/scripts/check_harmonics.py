@@ -131,16 +131,11 @@ beginning[beta_b] = 15
 
 UNDP: wiggler, l = {length}, l_period = 0.015, field_calc = planar_model, &
       b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.045
+      tracking_method = fel_averaged, ds_step = 0.045
 
 SEGP: line = (UNDP)
 
 use, SEGP
-"""
-
-WRAPPER = """call, file = {base}
-fel_transcribed = -1
-wiggler::*[FEL_TRACKING] = fel_transcribed
 """
 
 # lambda0 and nbins are the deck's now: an openPMD beam file carries the slice partition
@@ -149,6 +144,7 @@ wiggler::*[FEL_TRACKING] = fel_transcribed
 NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  transport_model = "genesis"
   beam_file = "{beam}"
   field_file = "{field}"
   lambda0 = 1e-10
@@ -161,6 +157,7 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  transport_model = "genesis"
   lambda0 = 1e-10
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 8.0e-15
@@ -256,11 +253,8 @@ def main():
 
     (wd / "planar.lat").write_text(GENESIS_LAT)
     (wd / "planar.bmad").write_text(BMAD_LAT.format(length="3.96"))
-    (wd / "planar_val.bmad").write_text(WRAPPER.format(base="planar.bmad"))
     (wd / "short.bmad").write_text(BMAD_LAT.format(length="0.045"))
-    (wd / "short_val.bmad").write_text(WRAPPER.format(base="short.bmad"))
     (wd / "mid.bmad").write_text(BMAD_LAT.format(length="1.98"))
-    (wd / "mid_val.bmad").write_text(WRAPPER.format(base="mid.bmad"))
 
     # ------------------------------------------------------------------
     # 2 first (its dumps feed 1 and 3): the harmonic tier vs Genesis.
@@ -279,7 +273,7 @@ def main():
                      ("H3-initial.fld.h5", "H3-initial.wf.h5")):
         convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
 
-    run(exe, wd, "h3bmad", NML_IMPORT.format(lat="planar_val.bmad", root="h3bmad",
+    run(exe, wd, "h3bmad", NML_IMPORT.format(lat="planar.bmad", root="h3bmad",
         beam="H3-initial.beam.h5", field="H3-initial.wf.h5", extra=""))
 
     with h5py.File(wd / "H3.out.h5") as h5:
@@ -307,7 +301,7 @@ def main():
     # 1. openPMD round trip, on the tier's Bmad run re-dumped in both formats.
 
     print("== openPMD EXT_Wavefront round trip ==")
-    run(exe, wd, "h3both", NML_IMPORT.format(lat="planar_val.bmad", root="h3both",
+    run(exe, wd, "h3both", NML_IMPORT.format(lat="planar.bmad", root="h3both",
         beam="H3-initial.beam.h5", field="H3-initial.wf.h5", extra=""))
 
     # The Genesis view of each dump, through the converter: the second reading of the same
@@ -354,7 +348,7 @@ def main():
     # Fortran read-back: import the .wf.h5, write_initial + load_only re-dumps it. The
     # field datasets must be identical to the file that was read.
 
-    run(exe, wd, "h3rt", NML_IMPORT.format(lat="planar_val.bmad", root="h3rt",
+    run(exe, wd, "h3rt", NML_IMPORT.format(lat="planar.bmad", root="h3rt",
         beam="h3both-final.beam.h5", field="h3both-final.wf.h5",
         extra="  write_initial = T\n  load_only = T\n"))
     check("Fortran openPMD read-back, re-dump dataset-identical",
@@ -399,7 +393,7 @@ def main():
     for src, dst in (("h3both-final.wf.h5", "pyw-final.wf.h5"),
                      ("h3both-final-h3.wf.h5", "pyw-final-h3.wf.h5")):
         Wavefront.from_openpmd(wd / src).write_openpmd(wd / dst)
-    run(exe, wd, "pywrt", NML_IMPORT.format(lat="planar_val.bmad", root="pywrt",
+    run(exe, wd, "pywrt", NML_IMPORT.format(lat="planar.bmad", root="pywrt",
         beam="h3both-final.beam.h5", field="pyw-final.wf.h5",
         extra="  write_initial = T\n  load_only = T\n"))
     u_py = fieldio.read_field(wd / "pywrt-initial.wf.h5")["u"]
@@ -415,7 +409,7 @@ def main():
     # A hard-seeded Bmad-only buncher: 1 GW over ~2 m drives the pendulum nonlinear,
     # so b3 is real (the tier's 4 m from 5 kW leaves b1 ~ 1e-3 and b3 in the noise).
 
-    buncher = NML_TD.format(lat="mid_val.bmad", root="h3bunch", extra="")
+    buncher = NML_TD.format(lat="mid.bmad", root="h3bunch", extra="")
     buncher = buncher.replace('  beam_init%distribution_type(3) = "GRID"\n', "")
     buncher = buncher.replace("  beam_init%grid(3)%x_min = -4e-10\n", "")
     buncher = buncher.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
@@ -438,7 +432,7 @@ def main():
     # the exit powers are predictable from the dump by the deposit sum itself -- the
     # Bessel fc(h) and the harmonic phase h*theta, with no evolution approximation.
 
-    run(exe, wd, "h3dep", NML_IMPORT.format(lat="short_val.bmad", root="h3dep",
+    run(exe, wd, "h3dep", NML_IMPORT.format(lat="short.bmad", root="h3dep",
         beam="h3bunch-final.beam.h5", field="dark.wf.h5", extra=""))
 
     sl = beamio.read_slices(wd / "h3dep-final.beam.h5", 1e-10, 1e-10)[0]
@@ -478,8 +472,8 @@ def main():
     # 4. Thread identity on a TD harmonic run.
 
     print("== thread identity (TD, harmonics 1+3) ==")
-    run(exe, wd, "h3t1", NML_TD.format(lat="planar_val.bmad", root="h3t1", extra=""), threads="1")
-    run(exe, wd, "h3t8", NML_TD.format(lat="planar_val.bmad", root="h3t8", extra=""), threads="8")
+    run(exe, wd, "h3t1", NML_TD.format(lat="planar.bmad", root="h3t1", extra=""), threads="1")
+    run(exe, wd, "h3t8", NML_TD.format(lat="planar.bmad", root="h3t8", extra=""), threads="8")
     same = (wd / "h3t1.diag.txt").read_bytes() == (wd / "h3t8.diag.txt").read_bytes()
     same = same and fields_identical(wd / "h3t1-final-h3.wf.h5", wd / "h3t8-final-h3.wf.h5")
     check("1 vs 8 threads byte/dataset-identical", 0.0 if same else 1.0, 0.5)
@@ -488,7 +482,7 @@ def main():
     # 5. Refusals, each by name.
 
     print("== refusals ==")
-    base = NML_TD.format(lat="planar_val.bmad", root="rf", extra="{extra}")
+    base = NML_TD.format(lat="planar.bmad", root="rf", extra="{extra}")
 
     ok = refuse(exe, wd, "rf_anchor",
                 base.replace("harmonics = 1, 3", "harmonics = 3").format(extra=""),
@@ -496,8 +490,8 @@ def main():
     print(f"--- refusal harmonics without the fundamental: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
-    (wd / "planar_uv.bmad").write_text("call, file = planar.bmad\nfel_unaveraged = 1\n"
-                                       "wiggler::*[FEL_TRACKING] = fel_unaveraged\n")
+    (wd / "planar_uv.bmad").write_text("call, file = planar.bmad\n"
+                                       "wiggler::*[TRACKING_METHOD] = fel_unaveraged\n")
     ok = refuse(exe, wd, "rf_unavg",
                 NML_TD.format(lat="planar_uv.bmad", root="rf_unavg", extra=""),
                 "UNAVERAGED")
@@ -505,7 +499,7 @@ def main():
     FAILED = FAILED or not ok
 
     ok = refuse(exe, wd, "rf_pol",
-                NML_TD.format(lat="planar_val.bmad", root="rf_pol",
+                NML_TD.format(lat="planar.bmad", root="rf_pol",
                               extra="  seed_polarization = 'y'\n"),
                 "TWO LIVE POLARIZATIONS")
     print(f"--- refusal harmonics + two polarizations: {'ok' if ok else '** FAIL **'}")
@@ -516,13 +510,13 @@ def main():
         m = h5["data/1/meshes/electricField"]
         del m.attrs["temporalDomain"]
         m.attrs["temporalDomain"] = np.bytes_("frequency")
-    ok = refuse(exe, wd, "rf_freq", NML_IMPORT.format(lat="planar_val.bmad", root="rf_freq",
+    ok = refuse(exe, wd, "rf_freq", NML_IMPORT.format(lat="planar.bmad", root="rf_freq",
                 beam="h3both-final.beam.h5", field="freq.wf.h5", extra=""),
                 "ONLY THE time DOMAIN")
     print(f"--- refusal frequency-domain openPMD import: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
-    nomatch = NML_IMPORT.format(lat="planar_val.bmad", root="rf_match",
+    nomatch = NML_IMPORT.format(lat="planar.bmad", root="rf_match",
                                 beam="h3both-final.beam.h5", field="H3-initial.wf.h5", extra="")
     nomatch = nomatch.replace("harmonics = 1, 3", "harmonics = 1, 5")
     nomatch = nomatch.replace('field_file = "H3-initial.wf.h5"',
@@ -531,7 +525,7 @@ def main():
     print(f"--- refusal harmonic import matching no field: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
-    genharm = NML_IMPORT.format(lat="planar_val.bmad", root="rf_genh",
+    genharm = NML_IMPORT.format(lat="planar.bmad", root="rf_genh",
                                 beam="h3both-final.beam.h5", field="H3-initial.wf.h5", extra="")
     genharm = genharm.replace('field_file = "H3-initial.wf.h5"',
                               'field_file = "H3-initial.wf.h5", "h3both-final-h3.fld.h5"')

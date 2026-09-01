@@ -80,7 +80,7 @@ beginning[beta_b] = 15
 {absline}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 UND2: UND, z_offset = {zoff}
 D: pipe, l = {gap}
 SEG: line = (UND, D, UND2)
@@ -97,7 +97,7 @@ beginning[beta_b] = 15
 {absline}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 ANG = {ang}
 B1: sbend, l = 0.05, g =  ANG / 0.05
 B2: sbend, l = 0.05, g = -ANG / 0.05
@@ -111,14 +111,14 @@ use, SEG
 CHIC_MID = "B1, DD, B2, DD, B3, DD, B4"
 OPEN_MID = "B1, DD, B2, DD, B3"          # Three bends: NOT a closed bump.
 
-TRANSCRIBED = "fel_transcribed = -1\nwiggler::*[FEL_TRACKING] = fel_transcribed"
-UNAVG = "fel_unaveraged = 1\nwiggler::*[FEL_TRACKING] = fel_unaveraged"
+UNAVG = "wiggler::*[TRACKING_METHOD] = fel_unaveraged"
 
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
   lambda0 = 1e-10
   interlude_model = '{imodel}'
+  transport_model = '{transport}'
   beam_init%n_particle = 8192
   beam_init%bunch_charge = 1.000692285594e-15
   beam_init%sig_z = 0
@@ -143,7 +143,7 @@ beginning[beta_b] = 15
 {absline}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 DD: pipe, l = 0.025
 STR: pipe, l = 0.275               ! ARC-MATCHED to the bump (5*0.025 + 4*0.05 = 0.325
                                    ! total with the flanking DDs), so the two runs share
@@ -158,6 +158,7 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   out_root = "{tag}"
   lambda0 = 1e-10
   interlude_model = 'bmad'
+  transport_model = '{transport}'
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 1.6e-14
   beam_init%distribution_type(3) = "GRID"
@@ -280,6 +281,7 @@ NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lambda0 = 1e-10
   beamlet_size = 8
   interlude_model = '{imodel}'
+  transport_model = '{transport}'
   write_diag = T
 /
 """
@@ -304,9 +306,10 @@ def wrap(dp):
     return (np.asarray(dp) + np.pi) % (2 * np.pi) - np.pi
 
 
-def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"):
+def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4",
+        transport="bmad"):
     (wd / f"{tag}.bmad").write_text(lat_text)
-    nml = (nml_t or NML).format(tag=tag, imodel=imodel)
+    nml = (nml_t or NML).format(tag=tag, imodel=imodel, transport=transport)
     if extra:
         nml = nml.replace("/\n", extra + "/\n")
     (wd / f"{tag}.nml").write_text(to_groups(nml))
@@ -317,9 +320,10 @@ def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"
         sys.exit(1)
 
 
-def refuse(exe, wd, tag, lat_text, fragment, imodel="bmad"):
+def refuse(exe, wd, tag, lat_text, fragment, imodel="bmad", transport="bmad"):
     (wd / f"{tag}.bmad").write_text(lat_text)
-    (wd / f"{tag}.nml").write_text(to_groups(NML.format(tag=tag, imodel=imodel)))
+    (wd / f"{tag}.nml").write_text(to_groups(NML.format(tag=tag, imodel=imodel,
+                                                       transport=transport)))
     r = subprocess.run([str(exe), f"{tag}.nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in (r.stdout + r.stderr)
@@ -392,11 +396,11 @@ def main():
     for k in range(NSCAN):
         f = k / 8
         jobs.append(lambda k=k, f=f: run(exe, wd, f"pb{k}", LAT2SEG.format(absline="",
-            zoff="0", gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis"))
+            zoff="0", gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=""), imodel="genesis", transport="genesis"))
         jobs.append(lambda k=k, f=f: run(exe, wd, f"pk{k}", LAT2SEG.format(absline="",
-            zoff=f"{f * TWO_G2L:.12e}", gap="0.30", modeline=TRANSCRIBED), imodel="genesis"))
+            zoff=f"{f * TWO_G2L:.12e}", gap="0.30", modeline=""), imodel="genesis", transport="genesis"))
         jobs.append(lambda k=k, f=f: run(exe, wd, f"px{k}", LAT2SEG.format(absline=ABS,
-            zoff="0", gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=TRANSCRIBED), imodel="genesis"))
+            zoff="0", gap=f"{0.30 + f * TWO_G2L:.12e}", modeline=""), imodel="genesis", transport="genesis"))
     pool.run_all(jobs, threads_per_job=4)
     base_bp = [bphase(wd, f"pb{k}", 0.76) for k in range(NSCAN)]
     knob_bp = [bphase(wd, f"pk{k}", 0.76) for k in range(NSCAN)]
@@ -449,8 +453,8 @@ def main():
     jobs = []
     for k in range(NSCAN):
         jobs.append(lambda k=k: run(exe, wd, f"pi{k}", LAT2SEG.format(absline="",
-            zoff=f"{k / 8 * TWO_G2L:.12e}", gap="0.30", modeline=TRANSCRIBED),
-            imodel="genesis", nml_t=NML_IMP))
+            zoff=f"{k / 8 * TWO_G2L:.12e}", gap="0.30", modeline=""),
+            imodel="genesis", transport="genesis", nml_t=NML_IMP))
         jobs.append(lambda k=k: gen_ps(k))
     pool.run_all(jobs, threads_per_job=4)
 
@@ -490,9 +494,9 @@ def main():
     for k in range(NSCAN):
         a = a0 + k * da
         jobs.append(lambda k=k, a=a: run(exe, wd, f"cr{k}", LATCHIC.format(absline="",
-            ang=f"{a:.12e}", mid=CHIC_MID, modeline=TRANSCRIBED)))
+            ang=f"{a:.12e}", mid=CHIC_MID, modeline=""), transport="genesis"))
         jobs.append(lambda k=k, a=a: run(exe, wd, f"ca{k}", LATCHIC.format(absline=ABS,
-            ang=f"{a:.12e}", mid=CHIC_MID, modeline=TRANSCRIBED)))
+            ang=f"{a:.12e}", mid=CHIC_MID, modeline=""), transport="genesis"))
     jobs.append(lambda: run(exe, wd, "cled", LATCHIC.format(absline="", ang=f"{a0:.12e}",
         mid=CHIC_MID, modeline=UNAVG)))
     pool.run_all(jobs, threads_per_job=4)
@@ -541,17 +545,17 @@ def main():
     # confirmation of the walk's floor geometry against the trace at this scale).
 
     a_td = float(np.sqrt(3.5 * LAM / (2 * 0.05 / 3 + 0.025)))
-    jobs = [lambda: run(exe, wd, "tds", LATSTRAIGHT.format(absline="", modeline=TRANSCRIBED),
-                        nml_t=NML_TD),
+    jobs = [lambda: run(exe, wd, "tds", LATSTRAIGHT.format(absline="", modeline=""),
+                        nml_t=NML_TD, transport="genesis"),
             lambda: run(exe, wd, "tdc", LATCHIC.format(absline="", ang=f"{a_td:.12e}",
-                        mid=CHIC_MID, modeline=TRANSCRIBED), nml_t=NML_TD),
+                        mid=CHIC_MID, modeline=""), nml_t=NML_TD, transport="genesis"),
             lambda: run(exe, wd, "tdc8", LATCHIC.format(absline="", ang=f"{a_td:.12e}",
-                        mid=CHIC_MID, modeline=TRANSCRIBED), nml_t=NML_TD, threads="8")]
+                        mid=CHIC_MID, modeline=""), nml_t=NML_TD, transport="genesis", threads="8")]
     for target in (3.5, 6.5, 10.5):
         a = float(np.sqrt(target * LAM / (2 * 0.05 / 3 + 0.025)))
         jobs.append(lambda a=a, tag=f"tdc{int(target)}": run(exe, wd, tag,
             LATCHIC.format(absline="", ang=f"{a:.12e}", mid=CHIC_MID,
-                           modeline=TRANSCRIBED), nml_t=NML_TD))
+                           modeline=""), nml_t=NML_TD, transport="genesis"))
     pool.run_all(jobs, threads_per_job=4)
 
     n_str = escaped_count(wd, "tds")
@@ -575,17 +579,19 @@ def main():
 
     # ------------------------------------------------------------------
     print("== refusals ==")
-    first = LAT2SEG.format(absline="", zoff="0", gap="0.30", modeline=TRANSCRIBED)
+    first = LAT2SEG.format(absline="", zoff="0", gap="0.30", modeline="")
     first = first.replace("SEG: line = (UND, D, UND2)", "SEG: line = (UND2, D, UND)")
     first = first.replace("UND2: UND, z_offset = 0", "UND2: UND, z_offset = 0.01")
     oks = pool.run_all([
         lambda: refuse(exe, wd, "rf_open", LATCHIC.format(absline="", ang="1e-3",
-                       mid=OPEN_MID, modeline=TRANSCRIBED), "NOT A CLOSED BUMP"),
+                       mid=OPEN_MID, modeline=""), "NOT A CLOSED BUMP",
+                       transport="genesis"),
         lambda: refuse(exe, wd, "rf_genb", LATCHIC.format(absline="", ang="1e-3",
-                       mid=CHIC_MID, modeline=TRANSCRIBED),
-                       "GENESIS-MODEL INTERLUDE", imodel="genesis"),
+                       mid=CHIC_MID, modeline=""),
+                       "GENESIS-MODEL INTERLUDE", imodel="genesis", transport="genesis"),
         lambda: refuse(exe, wd, "rf_zbig", LAT2SEG.format(absline="", zoff="0.35",
-                       gap="0.30", modeline=TRANSCRIBED), "EXCEEDS ITS UPSTREAM BREAK"),
+                       gap="0.30", modeline=""), "EXCEEDS ITS UPSTREAM BREAK",
+                       transport="genesis"),
         lambda: refuse(exe, wd, "rf_zfirst", first, "NO UPSTREAM BREAK"),
     ], threads_per_job=4)
     for name, ok in zip(("non-closed-bump break", "bend under genesis-model interludes",

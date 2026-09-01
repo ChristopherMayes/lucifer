@@ -236,7 +236,10 @@ do ie = run%i_start, run%i_end
     ! each step's field solve. Any end-of-lattice fixup lands on the last step.
 
     und = und_of(ie)
-    und%bmad_transport = (fel_mode(ie) == fel_averaged$)   ! The default: bmad_standard's kernel.
+    ! Transverse transport in an averaged element: Bmad's own kernel by default, and
+    ! Genesis4's maps under transport_model = 'genesis', which only the comparison tiers
+    ! set. The unaveraged mode integrates the field and has no map to choose.
+    und%bmad_transport = (run%global%transport_model == 'bmad')
     und_slip_step = (1 + und%aw**2) / (2 * gamma0_ref**2 * wf%wavelength)
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep

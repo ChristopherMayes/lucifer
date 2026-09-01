@@ -104,8 +104,11 @@ for dir in */; do
     rc=$?
     dt=$((SECONDS - t0))
     line="$(grep -m1 '^ Exit' "$dir/$log" 2>/dev/null | sed 's/^ *Exit *//')"
-    if [[ $rc -ne 0 ]]; then
-      line="$(grep -m1 'ERROR' "$dir/$log" 2>/dev/null | head -c 90)"
+    # A completed run always prints its exit line, so its absence is a failure even when
+    # the status says otherwise. A stale binary rejecting a lattice it does not understand
+    # looked like success here until this check existed.
+    if [[ $rc -ne 0 || -z "$line" ]]; then
+      line="$(grep -m1 -E 'ERROR|FATAL' "$dir/$log" 2>/dev/null | head -c 90)"
       FAILED=1
     fi
     printf '%-20s %-26s %6s %6s  %s\n' "$dir" "$deck" "$rc" "$dt" "$line"

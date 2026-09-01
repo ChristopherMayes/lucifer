@@ -135,8 +135,8 @@ Measured levels and how they are checked: [](validation.md#val-validation-from-o
 (sec-element)=
 ## The FEL element
 
-An FEL segment is a Bmad `wiggler`/`undulator` with
-`tracking_method = custom`, recognized by key and method, never by name. Its FEL
+An FEL segment is a Bmad `wiggler`/`undulator` whose `tracking_method` is one of Bmad's
+two FEL methods, recognized by key and method, never by name. Its FEL
 parameters derive from lattice attributes:
 
 $$
@@ -154,18 +154,17 @@ step is the element's own `ds_step`/`num_steps`. The bookkeeper's
 $n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\texttt{ds\_step}))$ is exactly Genesis4's
 unroll.
 
-The FEL tracking mode and unaveraged parameters are likewise per-element lattice
-attributes (registered program-side, class-settable as
-`wiggler::*[attr] = ...`), so averaged and unaveraged segments mix freely in one
-line. Lattices use named values via one-line variable definitions
-(`fel_unaveraged = 1`, matching the code's `fel_unaveraged$`-style
-parameters). `fel_tracking` selects the transport: unset/0
-(`fel_averaged`) is the averaged
-default with the
-`bmad_standard` kernel's transverse maps ([](#sec-undbmad)). 1 is the
-unaveraged mode ([](#sec-unaveraged)). $-1$ is the transcribed-Genesis4 maps,
-validation-internal. The other two are `fel_steps_per_period` (unset $\to$ 20,
-below 10 refused) and `fel_ramp_periods` (unset $\to$ 2). An attribute's unset
+The mode is the element's own tracking method, `fel_averaged` or `fel_unaveraged`,
+class-settable as `wiggler::*[TRACKING_METHOD] = ...`, so averaged and unaveraged
+segments mix freely in one line. `fel_averaged` is the averaged model on the
+`bmad_standard` kernel's transverse maps ([](#sec-undbmad)) and `fel_unaveraged` is
+[](#sec-unaveraged). Bmad names both, so a lattice, the parser and `show ele` say the
+same thing and a misspelling is refused rather than read as an integer. The transcribed
+maps are still selectable, as the run switch `global%transport_model = "genesis"`, since
+they are chosen for a whole comparison rather than per element. The unaveraged mode's own
+two parameters remain per-element attributes registered program-side:
+`fel_steps_per_period` (unset $\to$ 20, below 10 refused) and `fel_ramp_periods`
+(unset $\to$ 2). An attribute's unset
 value
 is 0 and a silent hard edge would reintroduce the $K/\gamma$ handoff hazard, so a
 true hard edge (the test configuration) must be asked for by name with the
@@ -347,10 +346,10 @@ per quadrupole, compounding to the documented tier2_bmad difference.
 (sec-undbmad)=
 ### The Bmad-kernel default
 
-The default transverse maps (`fel_tracking` unset, [](#sec-element)) are
+The default transverse maps (`transport_model = "bmad"`, [](#sec-element)) are
 Bmad's own: the `bmad_standard` periodic-wiggler kernel, flattened to per-step
 granularity. The transcribed maps of [](#sec-natfocus) remain selectable as
-`fel_tracking = -1`, validation-internal. The Genesis4 comparisons require
+`transport_model = "genesis"`, validation-internal. The Genesis4 comparisons require
 transcription-level transport. No production lattice writes it. The kernel, per
 particle: $k_1 = -\tfrac12 g_{\max}^2/
 (1+p_z)^2$ with $g_{\max} = K k_u\,m_ec/p_0$ ($K$ from Eq. [](#eq-awmap)), quadrupole
@@ -772,8 +771,8 @@ Measured levels and how they are checked: [](validation.md#val-validation-from-o
 (sec-unaveraged)=
 ## The unaveraged mode
 
-This mode (`fel_unaveraged_mod`, selected per element by the lattice attribute
-`fel_tracking = 1`, [](#sec-element)) integrates the
+This mode (`fel_unaveraged_mod`, selected per element by
+`tracking_method = fel_unaveraged`, [](#sec-element)) integrates the
 particles through the undulator's *real* field with the radiation as a
 co-evolving kick. There is no period averaging and no resonance approximation. It
 keeps the grid field and the Lorentz force where MINERVA (the published existence

@@ -1027,6 +1027,10 @@ call sub_open ('global', 'fel_global_struct', 'The run switches (&fel_params glo
 call fel_h5_str (g_id, 'interlude_model', 'interludes', &
       'Interlude transport: bmad (the seam) or genesis (transcribed).', '', &
       [run%global%interlude_model], merr)
+call fel_h5_str (g_id, 'transport_model', 'undulator transport', &
+      'Transverse transport inside averaged FEL elements: bmad (Bmad''s own kernel) or ' // &
+      'genesis (transcribed, validation-internal).', '', &
+      [run%global%transport_model], merr)
 call fel_h5_str (g_id, 'source_model', 'source', &
       'The FEL source model: deposit or coherent.', '', [run%global%source_model], merr)
 call fel_h5_text (g_id, 'track_start', 'track start', &
@@ -1526,10 +1530,10 @@ type (fel_run_struct), target :: run
 type (branch_struct), pointer :: branch
 type (ele_struct), pointer :: ele
 character(*) stats_file
-character(fel_h5_str_len$), allocatable :: names(:), keys(:)   ! 0:n_ele_track
+character(fel_h5_str_len$), allocatable :: names(:), keys(:), tmethod(:)   ! 0:n_ele_track
 real(rp), allocatable :: s1(:), s2(:), len_(:), dstep(:), b_max(:), aw(:), l_per(:)
 real(rp), allocatable :: ku(:), k1(:), tilt(:), z_off(:)
-integer, allocatable :: is_fel(:), helical(:), mode(:)
+integer, allocatable :: is_fel(:), helical(:)
 integer(hid_t) f_id, g_id
 integer h5e, ie, ne
 logical merr
@@ -1544,14 +1548,15 @@ character(*), parameter :: r_name = 'fel_write_lattice'
 branch => run%lat%branch(0)
 ne = branch%n_ele_track
 
-allocate (names(0:ne), keys(0:ne), s1(0:ne), s2(0:ne), len_(0:ne), dstep(0:ne))
+allocate (names(0:ne), keys(0:ne), tmethod(0:ne), s1(0:ne), s2(0:ne), len_(0:ne), dstep(0:ne))
 allocate (b_max(0:ne), aw(0:ne), l_per(0:ne), ku(0:ne), k1(0:ne), tilt(0:ne), z_off(0:ne))
-allocate (is_fel(0:ne), helical(0:ne), mode(0:ne))
+allocate (is_fel(0:ne), helical(0:ne))
 
 do ie = 0, ne
   ele => branch%ele(ie)
   names(ie) = ele%name
   keys(ie) = key_name(ele%key)
+  tmethod(ie) = tracking_method_name(ele%tracking_method)
   s1(ie) = ele%s_start
   s2(ie) = ele%s
   len_(ie) = ele%value(l$)
@@ -1563,12 +1568,11 @@ do ie = 0, ne
   z_off(ie) = ele%value(z_offset_tot$)
   is_fel(ie) = 0
   if (ie > 0) is_fel(ie) = merge(1, 0, run%is_fel(ie))
-  aw(ie) = 0;  ku(ie) = 0;  helical(ie) = 0;  mode(ie) = 0
+  aw(ie) = 0;  ku(ie) = 0;  helical(ie) = 0
   if (is_fel(ie) == 1) then
     aw(ie) = run%und_of(ie)%aw
     ku(ie) = run%und_of(ie)%ku
     helical(ie) = merge(1, 0, run%und_of(ie)%helical)
-    mode(ie) = run%fel_mode(ie)
   endif
 enddo
 
@@ -1601,10 +1605,10 @@ call fel_h5_real (g_id, 'ds_step', 'm', 'ds_step', &
       'ele', dstep, merr)
 call fel_h5_flag (g_id, 'is_fel', 'is FEL', &
       'One where the element is an FEL segment the FEL step tracked.', 'ele', is_fel, merr)
-call fel_h5_int (g_id, 'fel_tracking', '1', 'tracking mode', &
-      'Tracking mode of an FEL segment: -1 transcribed Genesis maps, 0 averaged ' // &
-      '(the default, Bmad''s own kernel), 1 unaveraged. Zero off an FEL segment.', &
-      'ele', mode, merr)
+call fel_h5_str (g_id, 'tracking_method', 'tracking method', &
+      'How the element was tracked, as Bmad names it. FEL_Averaged and FEL_Unaveraged ' // &
+      'are the FEL segments, and every other element carries the method Bmad used.', &
+      'ele', tmethod, merr)
 call fel_h5_real (g_id, 'b_max', 'T', 'b_max', 'Peak undulator field, zero elsewhere.', &
       'ele', b_max, merr)
 call fel_h5_real (g_id, 'aw', '1', 'aw', &

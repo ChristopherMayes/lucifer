@@ -95,7 +95,7 @@ beginning[alpha_b] = 0
 
 UNDX: wiggler, l = 0.60, l_period = 0.015, field_calc = planar_model, &
       b_max = 0.84853 * sqrt(2) * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 
 UNDY: UNDX, tilt = pi / 2
 

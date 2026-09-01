@@ -21,7 +21,7 @@ real helical field, quiver and all, at 20 integration substeps per period with s
 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path
 knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
 
-The mode is `seg1.bmad`'s own attribute, `fel_tracking = 1`, and the substep count and
+The mode is `seg1.bmad`'s own tracking method, `fel_unaveraged`, and the substep count and
 ramp length are element attributes too, `fel_steps_per_period` and `fel_ramp_periods`.
 `lucifer_averaged.in` runs the identical configuration through the averaged default by
 calling the same lattice and overriding that one attribute.
@@ -108,8 +108,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
 ```fortran
 ! One undulator segment of the benchmark line, ../aramis.bmad's UND and nothing else:
 ! 3.99 m and 266 periods of helical undulator, aw = 0.85 rms, resonant at 1 Angstrom at
-! 5.8 GeV. fel_tracking = 1 selects the unaveraged mode as this element's own attribute,
-! and the averaged twin overrides it back to the default.
+! 5.8 GeV. The element's tracking_method is fel_unaveraged, which is what selects the
+! mode, and the averaged twin sets the method back to fel_averaged.
 
 no_digested
 parameter[geometry] = open
@@ -121,11 +121,9 @@ beginning[alpha_a] = -0.703306
 beginning[beta_b] = 17.3899
 beginning[alpha_b] = 1.40348
 
-fel_unaveraged = 1   ! Named value for the fel_tracking attribute.
-
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = custom, ds_step = 0.045, fel_tracking = fel_unaveraged
+     tracking_method = fel_unaveraged, ds_step = 0.045
 
 SEG1: line = (UND)
 
@@ -135,9 +133,8 @@ use, SEG1
 ### `seg1_averaged.bmad`
 
 ```fortran
-! The all-averaged twin of seg1.bmad: the element's fel_tracking overridden back to
-! the default (0: averaged, the bmad_standard kernel's transverse maps).
+! The averaged twin of seg1.bmad: the same element tracked by fel_averaged, which is
+! the wiggle-averaged model on Bmad's own periodic-wiggler maps.
 call, file = seg1.bmad
-fel_averaged = 0     ! Named value: the bmad_standard kernel default.
-UND[FEL_TRACKING] = fel_averaged
+UND[TRACKING_METHOD] = fel_averaged
 ```

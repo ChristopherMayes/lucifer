@@ -3,5 +3,4 @@
 ! priced model-difference tier (ramps + no averaging + integrator structure), the
 ! unaveraged counterpart of tier2_bmad's priced seam. See aramis_1seg.bmad.
 call, file = aramis_1seg.bmad
-fel_unaveraged = 1   ! Named value for the fel_tracking attribute (lucifer.f90).
-wiggler::*[FEL_TRACKING] = fel_unaveraged
+wiggler::*[TRACKING_METHOD] = fel_unaveraged

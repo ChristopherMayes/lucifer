@@ -5,5 +5,4 @@
 ! are field physics of adiabatic ends rather than something hidden.
 
 call, file = aramis.bmad
-fel_unaveraged = 1
-wiggler::*[FEL_TRACKING] = fel_unaveraged
+wiggler::*[TRACKING_METHOD] = fel_unaveraged

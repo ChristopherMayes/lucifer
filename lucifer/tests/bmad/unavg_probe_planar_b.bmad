@@ -14,7 +14,7 @@ beginning[alpha_b] = 1.40348
 
 UNDP: wiggler, l = 0.30, l_period = 0.015, field_calc = planar_model, &
       b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 
 SEG1: line = (UNDP)
 

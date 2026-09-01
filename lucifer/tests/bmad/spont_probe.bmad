@@ -19,7 +19,7 @@ beginning[alpha_b] = 1.40348
 
 UNDS: wiggler, l = 0.60, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
+      tracking_method = fel_averaged, ds_step = 0.015
 
 SEG: line = (UNDS)
 

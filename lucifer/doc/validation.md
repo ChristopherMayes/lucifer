@@ -474,7 +474,7 @@ Two bookkeeping identities ride with the seam wake. Energy bookkeeping, $d\langl
 van der Slot) is the published existence proof for this physics. Only its published
 work was used: nothing here is compared against a MINERVA run.)
 
-`fel_tracking = 1` is a per-element lattice attribute, so unaveraged segments mix
+`tracking_method = fel_unaveraged` is per element, so unaveraged segments mix
 with averaged ones in a single line. It integrates the particles through the undulator's
 real field: the full Newton-Lorentz quiver, RK4 at `fel_steps_per_period` (default
 20, floor 10 on the convergence measured below), with the radiation field as a Strang-split kick and a source
@@ -899,7 +899,7 @@ than one-step-per-period. Whether that economy transfers to this integrator is t
 question, measured by `run_delz_sweep.sh`: Genesis4 generates one
 time-dependent initial state (32 slices of spacing `12*lambda0`, shot noise on), and the
 tracker runs the full line from that same dump at `ds_step` of 1, 2, 3, 6 and 12 periods
-(two-line wrapper lattices overriding the element attribute), so
+(two-line wrapper lattices overriding `ds_step`), so
 every run shares one shot-noise realization and the differences are pure integration
 error. Total power at the twelve undulator-segment exits, against the one-period run:
 

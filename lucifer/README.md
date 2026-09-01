@@ -2,7 +2,7 @@
 
 Lucifer (*lux ferre*, light-bringer) is a free-electron-laser tracker inside Bmad. Its physics is transcribed from Genesis4 (GPL permits transcription), embedded in Bmad's lattice machinery by the seam, and validated against Genesis4 over its `benchmark/Benchmark1-SASE` configuration from bitwise-identical starting states.
 
-FEL segments are real Bmad wiggler elements with `tracking_method = custom`, so a Lucifer lattice is a Bmad lattice: quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's, and the FEL parameters are read from lattice attributes rather than a parallel namelist. Every other element tracks each slice's bunch with Bmad's own `track1_bunch`.
+FEL segments are real Bmad wiggler elements tracked by a Bmad FEL method, so a Lucifer lattice is a Bmad lattice: quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's, and the FEL parameters are read from lattice attributes rather than a parallel namelist. Every other element tracks each slice's bunch with Bmad's own `track1_bunch`.
 
 ## Documentation
 
@@ -21,15 +21,16 @@ The documents render as one site. With `mystmd` available, `myst build --html` i
 `doc/` produces it and `myst start` serves it locally. Each page also reads on its own
 as Markdown.
 
-## The three tracking methods
+## The two tracking methods
 
-Chosen per element with the `fel_tracking` lattice attribute, and they mix freely in one line.
+Bmad's own named methods, set on the element as any tracking method is, and they mix freely in one line.
 
-| `fel_tracking` | method | what it is for |
-|---|---|---|
-| unset or `0` | averaged | The default. The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
-| `1` | unaveraged | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also the tree's referee, sharing no approximation with the averaged path. |
-| `-1` | transcribed Genesis4 | Genesis4's transverse maps verbatim. Validation-internal: the comparison tiers select it through wrapper lattices, and no production lattice writes it. |
+| `tracking_method` | what it is for |
+|---|---|
+| `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
+| `fel_unaveraged` | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also the tree's referee, sharing no approximation with the averaged path. |
+
+The averaged method's transverse maps have one more option behind them, the transcribed Genesis4 maps, selected for a whole run by `global%transport_model`. It is validation-internal and no production run sets it.
 
 ## Building and running
 

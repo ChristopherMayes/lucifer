@@ -1,8 +1,8 @@
-! Mixed-mode sandwich (Stage A check): averaged / UNAVERAGED / averaged segments with
-! pipe interludes. UNDB carries fel_tracking = 1 on the element itself -- the mode is
-! a lattice attribute -- so the averaged<->unaveraged handoffs happen at REAL internal
-! boundaries mid-line, which the single-segment configurations never exercise. The
-! all-averaged twin is a two-line wrapper overriding UNDB[fel_tracking] = 0.
+! Mixed-mode sandwich: averaged, unaveraged and averaged segments with pipe interludes.
+! UNDB is tracked by fel_unaveraged and its neighbors by fel_averaged, so the handoffs
+! between the two happen at real internal boundaries mid-line, which the single-segment
+! configurations never exercise. The all-averaged twin is a two-line wrapper setting
+! UNDB[TRACKING_METHOD] = fel_averaged.
 
 no_digested
 parameter[geometry] = open
@@ -14,12 +14,10 @@ beginning[alpha_a] = -0.703306
 beginning[beta_b] = 17.3899
 beginning[alpha_b] = 1.40348
 
-fel_unaveraged = 1   ! Named value for the fel_tracking attribute (lucifer.f90).
-
 UNDA: wiggler, l = 0.6, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = custom, ds_step = 0.015
-UNDB: UNDA, fel_tracking = fel_unaveraged
+      tracking_method = fel_averaged, ds_step = 0.015
+UNDB: UNDA, tracking_method = fel_unaveraged
 P1: pipe, l = 0.21
 
 SEG: line = (UNDA, P1, UNDB, P1, UNDA)

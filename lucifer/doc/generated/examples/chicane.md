@@ -133,7 +133,7 @@ bmad_com[absolute_time_tracking] = T
 
 UND: wiggler, l = 0.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = custom, ds_step = 0.015
+     tracking_method = fel_averaged, ds_step = 0.015
 
 B1: sbend, l = 0.05, g =  ANG / 0.05
 B2: sbend, l = 0.05, g = -ANG / 0.05

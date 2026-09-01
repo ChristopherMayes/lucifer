@@ -16,7 +16,7 @@ performance-core count. Every input is a real file in this directory:
 |---|---|
 | `Aramis.lat` | the Genesis4 lattice (6 FODO cells, 12 undulator segments) |
 | `aramis.bmad` | the Bmad translation (real wigglers, the manual's FEL-element section) |
-| `sat_unavg.bmad` | two-line wrapper selecting `fel_tracking = fel_unaveraged` |
+| `sat_unavg.bmad` | two-line wrapper selecting `tracking_method = fel_unaveraged` |
 | `sat-prep.in` | Genesis4 deck that writes the shared initial dumps (no tracking) |
 | `sat-genesis.in` | the timed Genesis4 deck (same seed and ranks as the prep) |
 | `lucifer-avg.in` | Bmad averaged mode (the `bmad_standard` default) |
@@ -43,7 +43,7 @@ Measured (M3 Max, 12 performance cores, production builds both sides):
 |---|---|---|---|
 | Genesis4, 12 MPI ranks | 38.0 s | 3.381 GW (4.52 GW peak at 56.8 m) | the reference |
 | Bmad averaged (`bmad_standard` default), 12 threads | 30.2 s | 3.380 GW | **rel 4.9e-4** |
-| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1143.2 s | 6.25 GW | ln ratio +0.62 |
+| Bmad unaveraged (`tracking_method = fel_unaveraged`), 12 threads | 1143.2 s | 6.25 GW | ln ratio +0.62 |
 
 The averaged mode tracks Genesis4 through eight decades of z and three of power to
 **4.9e-4** at saturation. The ~4e-2 seam-transport difference the benchmark tiers
@@ -253,7 +253,7 @@ ARAMIS: LINE={6*FODO};
 ! demo's own copy of ../aramis.bmad, because run.sh copies its inputs into a work
 ! directory and a relative call would not follow.
 !
-! The undulator segments are Bmad wiggler elements with tracking_method = custom, so
+! The undulator segments are Bmad wiggler elements with tracking_method = fel_averaged, so
 ! their FEL parameters derive from the element attributes: aw from b_max and l_period,
 ! helicity from field_calc. Everything else is tracked by Bmad.
 !
@@ -282,7 +282,7 @@ beginning[alpha_b] = 1.40348
 ! encodes aw = 0.84853 as an expression in Bmad's own constants.
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = custom, ds_step = 0.045
+     tracking_method = fel_averaged, ds_step = 0.045
 D1: drift, l = 0.44
 D2: drift, l = 0.24
 QF: quadrupole, l = 0.08, k1 = 2.0
@@ -304,6 +304,5 @@ use, ARAMIS
 ! are field physics of adiabatic ends rather than something hidden.
 
 call, file = aramis.bmad
-fel_unaveraged = 1
-wiggler::*[FEL_TRACKING] = fel_unaveraged
+wiggler::*[TRACKING_METHOD] = fel_unaveraged
 ```

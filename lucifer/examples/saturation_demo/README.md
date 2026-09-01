@@ -9,7 +9,7 @@ performance-core count. Every input is a real file in this directory:
 |---|---|
 | `Aramis.lat` | the Genesis4 lattice (6 FODO cells, 12 undulator segments) |
 | `aramis.bmad` | the Bmad translation (real wigglers, the manual's FEL-element section) |
-| `sat_unavg.bmad` | two-line wrapper selecting `fel_tracking = fel_unaveraged` |
+| `sat_unavg.bmad` | two-line wrapper selecting `tracking_method = fel_unaveraged` |
 | `sat-prep.in` | Genesis4 deck that writes the shared initial dumps (no tracking) |
 | `sat-genesis.in` | the timed Genesis4 deck (same seed and ranks as the prep) |
 | `lucifer-avg.in` | Bmad averaged mode (the `bmad_standard` default) |
@@ -36,7 +36,7 @@ Measured (M3 Max, 12 performance cores, production builds both sides):
 |---|---|---|---|
 | Genesis4, 12 MPI ranks | 38.0 s | 3.381 GW (4.52 GW peak at 56.8 m) | the reference |
 | Bmad averaged (`bmad_standard` default), 12 threads | 30.2 s | 3.380 GW | **rel 4.9e-4** |
-| Bmad unaveraged (`fel_tracking = fel_unaveraged`), 12 threads | 1143.2 s | 6.25 GW | ln ratio +0.62 |
+| Bmad unaveraged (`tracking_method = fel_unaveraged`), 12 threads | 1143.2 s | 6.25 GW | ln ratio +0.62 |
 
 The averaged mode tracks Genesis4 through eight decades of z and three of power to
 **4.9e-4** at saturation. The ~4e-2 seam-transport difference the benchmark tiers

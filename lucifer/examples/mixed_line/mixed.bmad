@@ -4,9 +4,7 @@
 
 call, file = ../aramis.bmad
 
-fel_unaveraged = 1   ! Named value for fel_tracking (doc/input-reference.md).
-
-UNDU: UND, fel_tracking = fel_unaveraged
+UNDU: UND, tracking_method = fel_unaveraged
 
 CELL:  line = (UND,  D1, QF, D2, UND, D1, QD, D2)
 CELLU: line = (UNDU, D1, QF, D2, UND, D1, QD, D2)

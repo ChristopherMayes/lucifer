@@ -86,6 +86,12 @@ if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
   err_flag = .true.;  return
 endif
 
+if (run%global%transport_model /= 'bmad' .and. run%global%transport_model /= 'genesis') then
+  call out_io (s_error$, r_name, 'TRANSPORT_MODEL MUST BE "bmad" OR "genesis", GOT: ' // &
+               trim(run%global%transport_model))
+  err_flag = .true.;  return
+endif
+
 ! (bmad_com%radiation_damping_on / %radiation_fluctuations_on come straight from the
 ! &fel_params namelist: Bmad's own switches, exposed directly as Tao exposes them.)
 
@@ -99,12 +105,13 @@ endif
 ! benchmark methodology, where the reference code's dumps are converted at the harness
 ! boundary), or a self-generated steady-state condition when both file names are blank.
 !
-! FEL elements carry tracking_method = custom, and Bmad's bookkeeping (the reference
-! time/energy pass inside bmad_parser, any track1 at the seam) resolves custom tracking
-! through track1_custom_ptr. Point it at the standard periodic-wiggler kernel, so the
-! element behaves as the plain Bmad wiggler it is everywhere except inside this
-! driver's own FEL walk. In particular the reference time acquires the resonant
-! undulation delay from Bmad's own code, not from anything written here.
+! FEL elements carry tracking_method = fel_averaged or fel_unaveraged, and Bmad
+! dispatches both through track1_custom_ptr as it dispatches custom (the reference
+! time/energy pass inside bmad_parser, any track1 at the seam). Point it at the standard
+! periodic-wiggler kernel, so the element behaves as the plain Bmad wiggler it is
+! everywhere except inside this driver's own FEL walk. In particular the reference time
+! acquires the resonant undulation delay from Bmad's own code, not from anything written
+! here.
 
 ! Both hooks are needed: mat6_calc_method resolves to custom too (auto follows the
 ! tracking method), and make_mat6 calls through a null make_mat6_custom_ptr otherwise.
@@ -112,14 +119,13 @@ endif
 track1_custom_ptr => fel_ele_as_wiggler
 make_mat6_custom_ptr => fel_mat6_as_wiggler
 
-! The FEL mode and unaveraged parameters live on the lattice (fel-physics.md sec-element),
+! The unaveraged mode's two numbers live on the lattice (fel-physics.md sec-element),
 ! registered program-side so no lattice declares them. The same slot index serves
-! wigglers and undulators.
+! wigglers and undulators. The mode itself is not here: it is the element's
+! tracking_method, which Bmad names.
 
 if (.not. fel_attributes_registered) then
-  call set_custom_attribute_name ('WIGGLER::FEL_TRACKING', err, 1)
-  if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_TRACKING', err, 1)
-  if (.not. err) call set_custom_attribute_name ('WIGGLER::FEL_STEPS_PER_PERIOD', err, 2)
+  call set_custom_attribute_name ('WIGGLER::FEL_STEPS_PER_PERIOD', err, 2)
   if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_STEPS_PER_PERIOD', err, 2)
   if (.not. err) call set_custom_attribute_name ('WIGGLER::FEL_RAMP_PERIODS', err, 3)
   if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_RAMP_PERIODS', err, 3)
@@ -133,7 +139,14 @@ endif
 ! err_flag matters: bmad_parser reports attribute errors (e.g. a wake on an element
 ! type that cannot carry one) and returns. Without the check the run continues on a
 ! partial lattice, found when an example's drift wakes silently never attached.
+!
+! exit_on_error is cleared first, because a fatal parse error otherwise reaches
+! err_exit, which bombs for a traceback and then stops. That stop carries status zero,
+! so a refused lattice looked like a successful run to anything reading exit codes. With
+! the flag cleared, bmad_parser returns and the library contract holds: nothing here
+! stops, the caller decides.
 
+global_com%exit_on_error = .false.
 call bmad_parser (lat_file, lat, err_flag = err)
 if (err) then
   call out_io (s_error$, r_name, 'LATTICE PARSE ERRORS (ABOVE); REFUSING TO RUN ON A PARTIAL LATTICE.')
@@ -249,7 +262,7 @@ contains
 !
 ! Routine to recognize FEL segments and derive their FEL parameters from lattice
 ! attributes (Bmad's kx roll-off attribute is not yet mapped and must be zero). An FEL
-! segment is a wiggler/undulator element with tracking_method = custom: Bmad's own
+! segment is a wiggler/undulator tracked by an FEL method: Bmad's own
 ! semantics for program-supplied tracking, which this driver is. The wiggler sanity
 ! assertions are enforced: a wiggler with zero b_max or l_period would silently get
 ! factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
@@ -272,28 +285,18 @@ fel_mode => run%fel_mode;  fel_spp => run%fel_spp;  fel_ramp => run%fel_ramp
 is_fel = .false.
 fel_mode = 0;  fel_spp = 0;  fel_ramp = 0
 
+! The mode is the element's tracking_method, which Bmad names: FEL_Averaged or
+! FEL_Unaveraged. A wiggler tracked any other way is not this program's element, and
+! that includes tracking_method = custom, which means some other program's tracking and
+! is left to the seam.
+
 do je = 1, branch%n_ele_track
   w => branch%ele(je)
   if (.not. (w%key == wiggler$ .or. w%key == undulator$)) cycle
-  if (w%tracking_method /= custom$) cycle
-
-  ! The FEL mode and unaveraged parameters, from the element's own attributes.
-  ! fel_tracking: unset/0 = averaged with the bmad_standard kernel's transverse maps
-  ! (Bmad's own kernel is the default). 1 = unaveraged. -1 = averaged with the
-  ! transcribed-Genesis maps (validation-internal: the Genesis tiers require
-  ! transcription-level transport, and no production lattice writes it).
-
-  rv = value_of_attribute(w, 'FEL_TRACKING', err_a)
-  if (err_a) then
-    err_flag = .true.;  return
-  endif
-  fel_mode(je) = nint(rv)
-  if (abs(rv - fel_mode(je)) > 1e-9_rp .or. fel_mode(je) < fel_transcribed$ .or. &
-      fel_mode(je) > fel_unaveraged$) then
-    call out_io (s_error$, r_name, 'FEL_TRACKING MUST BE -1 (TRANSCRIBED MAPS, VALIDATION-INTERNAL),', &
-                 '0/UNSET (AVERAGED, BMAD_STANDARD KERNEL MAPS) OR 1 (UNAVERAGED), AT ELEMENT: ' // trim(w%name))
-    err_flag = .true.;  return
-  endif
+  select case (w%tracking_method)
+  case (fel_averaged$, fel_unaveraged$);  fel_mode(je) = w%tracking_method
+  case default;                           cycle
+  end select
 
   rv = value_of_attribute(w, 'FEL_STEPS_PER_PERIOD', err_a)
   if (err_a) then
@@ -369,9 +372,9 @@ do je = 1, branch%n_ele_track
                    'SYMMETRIC FIELD -- A NO-OP THAT READS AS A MISTAKE: ' // trim(w%name))
       err_flag = .true.;  return
     endif
-    if (fel_mode(je) == fel_transcribed$) then
-      call out_io (s_error$, r_name, 'THE TRANSCRIBED-GENESIS MAPS (FEL_TRACKING = -1) KNOW NO TILT', &
-                   '(GENESIS HAS NONE); USE THE DEFAULT MAPS ON: ' // trim(w%name))
+    if (run%global%transport_model == 'genesis' .and. fel_mode(je) == fel_averaged$) then
+      call out_io (s_error$, r_name, 'THE TRANSCRIBED-GENESIS MAPS KNOW NO TILT, SINCE GENESIS4 HAS', &
+                   'NONE. SET TRANSPORT_MODEL = "bmad" TO TILT: ' // trim(w%name))
       err_flag = .true.;  return
     endif
   endif
@@ -394,7 +397,10 @@ if (seed_polarization /= 'x' .and. seed_polarization /= 'y') then
 endif
 
 if (.not. any(is_fel) .and. .not. reference_run) then
-  call out_io (s_error$, r_name, 'THE LATTICE HAS NO FEL ELEMENTS (WIGGLER/UNDULATOR WITH TRACKING_METHOD = CUSTOM).', &
+  call out_io (s_error$, r_name, &
+               'THE LATTICE HAS NO FEL ELEMENT: NO WIGGLER OR UNDULATOR CARRIES', &
+               'TRACKING_METHOD = FEL_AVERAGED OR FEL_UNAVERAGED. NOTE THAT CUSTOM IS NOT', &
+               'ONE OF THEM: IT MEANS ANOTHER PROGRAM''S TRACKING AND IS LEFT TO THE SEAM.', &
                'POSSIBLE SOLUTION: SET REFERENCE_RUN = T FOR A DELIBERATE NO-FEL RUN (BMAD TRACKS EVERYTHING).')
   err_flag = .true.;  return
 endif
