@@ -9,6 +9,24 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-08-31 Fixed: no machine-local paths in the harness. The genesis4 binary, the Python
+  interpreter and the openPMD-beamphysics checkout were defaulted to paths under one
+  developer's home directory, in nine files. Each now resolves through an explicit flag,
+  then an environment variable (`$GENESIS4`, `$LUCIFER_PYTHON`, `$OPENPMD_BEAMPHYSICS`),
+  then a portable search, and refuses by name saying how to fix it. `convert_genesis.py`
+  lost its home-directory default and states its import contract: installed, or a checkout
+  named explicitly.
+
+- 2026-08-31 Added: `tests/scripts/genesis_constants.py` reports which electron rest energy
+  a genesis4 binary carries, and the harness prints it beside the binary's path. Genesis
+  releases to v4.6.14 use a value 2.14e-7 above CODATA; master carries the CODATA value,
+  which is also Bmad's `m_electron`. Comparing against a release loosens the transcription
+  tiers by several percent of their own value while still passing every tolerance, so the
+  reference is now identified rather than assumed.
+
+- 2026-08-31 Fixed: two check scripts ran genesis4 with a stripped environment, which a
+  conda-provided MPI build cannot initialize in. They inherit the environment now.
+
 - 2026-08-31 Changed: The documentation cites published work rather than code this port
   never used. MINERVA's papers informed the unaveraged mode, its source was not read, and
   no run of it was compared against, so the claim that it served as a statistical

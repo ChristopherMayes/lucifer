@@ -33,7 +33,9 @@ The measured levels in this document are written by the harness that measured th
 a moved digit is a failing command rather than a discrepancy someone has to notice while
 reading.
 
-The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours.
+The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `lucifer/wavefront/tests/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one.
+
+The levels here were measured against a Genesis4 built from master, which carries the CODATA electron rest energy. Releases up to v4.6.14 do not, and comparing against one of those loosens the transcription tiers by several percent of their own value while still passing every tolerance ([](genesis4.md) states the constant and the size). The harness prints which of the two the reference carries, and the regeneration check refuses to absorb the difference: a reference change shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours.
 
 Debug and production binaries are never bit-comparable to each other. Compare like builds only.
 

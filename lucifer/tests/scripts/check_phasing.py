@@ -40,6 +40,7 @@ Run by the benchmark harness; exits nonzero on failure. Needs genesis4 for secti
 
 from __future__ import annotations
 
+import os
 import argparse
 import pathlib
 import subprocess
@@ -371,8 +372,9 @@ def main():
     ap.add_argument("workdir")
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--pyrepo", default=convert_genesis.DEFAULT_PYREPO,
-                    help="openPMD-beamphysics checkout, for the dump conversion")
+    ap.add_argument("--pyrepo",
+                    help="openPMD-beamphysics checkout, for the dump conversion. "
+                         "Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -424,7 +426,7 @@ def main():
     (wd / "ps0.lat").write_text(GEN_LAT_PS.format(phi="0"))
     (wd / "psp.in").write_text(GEN_PREP)
     r = subprocess.run([args.genesis, "psp.in"], cwd=wd, capture_output=True, text=True,
-                       env={"PATH": "/usr/bin:/bin", "FI_PROVIDER": "tcp"})
+                       env=dict(os.environ, FI_PROVIDER="tcp"))
     if r.returncode != 0:
         print(f"FAIL: genesis prep run:\n{r.stdout[-800:]}")
         sys.exit(1)
@@ -439,7 +441,7 @@ def main():
         (wd / f"ps{k}.lat").write_text(GEN_LAT_PS.format(phi=f"{2 * np.pi * k / 8:.12e}"))
         (wd / f"ps{k}.in").write_text(GEN_IMPORT.format(root=f"PS{k}", lat=f"ps{k}.lat"))
         r = subprocess.run([args.genesis, f"ps{k}.in"], cwd=wd, capture_output=True, text=True,
-                           env={"PATH": "/usr/bin:/bin", "FI_PROVIDER": "tcp"})
+                           env=dict(os.environ, FI_PROVIDER="tcp"))
         if r.returncode != 0:
             print(f"FAIL: genesis ps{k}:\n{r.stdout[-800:]}")
             sys.exit(1)

@@ -23,7 +23,16 @@ set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-GENESIS="$HOME/Code/GitHub/Genesis-1.3-Version4/build-metal/genesis4"
+# genesis4 comes from conda-forge, in this project's own environment. PATH is not
+# searched first on purpose: an unrelated environment on PATH would supply a different
+# build, and the comparison levels are tied to the build that produced them.
+GENESIS="${GENESIS4:-}"
+if [[ -z "$GENESIS" ]]; then
+  for candidate in "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/genesis4" \
+                   "$(command -v genesis4 2>/dev/null)"; do
+    if [[ -x "$candidate" ]]; then GENESIS="$candidate"; break; fi
+  done
+fi
 EXE=""
 PYTHON=""
 WORK_DIR=""
@@ -55,8 +64,9 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
 fi
 
 if [[ -z "$PYTHON" ]]; then
-  for candidate in "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/python3" \
-                   "$HOME/Code/miniforge3/envs/bmad-fel-validate/bin/python3"; do
+  for candidate in "${LUCIFER_PYTHON:-}" \
+                   "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/python3" \
+                   "$(command -v python3 2>/dev/null)"; do
     if [[ -x "$candidate" ]]; then PYTHON="$candidate"; break; fi
   done
 fi

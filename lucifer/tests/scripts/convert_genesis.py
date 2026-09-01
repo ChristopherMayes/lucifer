@@ -30,6 +30,7 @@ commands cover both. Exit 0 only on success.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import sys
 
@@ -63,15 +64,36 @@ def is_particles(path):
 # Genesis particles in
 
 
+def _beamphysics(pyrepo=None):
+    """Make openPMD-beamphysics importable, and say plainly when it is not.
+
+    Installed is the normal case and needs nothing. A checkout is the other case, since
+    the wavefront I/O this uses is not in a release yet, and it is named explicitly:
+    --pyrepo, or $OPENPMD_BEAMPHYSICS. There is no default path, because a path that
+    works on one machine is a silent failure on every other one.
+    """
+    import importlib
+    repo = pyrepo or os.environ.get("OPENPMD_BEAMPHYSICS")
+    if repo:
+        repo = str(pathlib.Path(repo).expanduser())
+        if repo not in sys.path:
+            sys.path.insert(0, repo)
+    try:
+        return importlib.import_module("beamphysics")
+    except ImportError as exc:
+        raise SystemExit(
+            "openPMD-beamphysics is not importable: " + str(exc) + "\n"
+            "Install it, or name a checkout with --pyrepo <path> or "
+            "$OPENPMD_BEAMPHYSICS.")
+
+
 def read_genesis_par(path, pyrepo=None):
     """Per-slice ParticleGroups from a Genesis .par.h5, empty slices as None.
 
     The physics conversion is openPMD-beamphysics's: theta and gamma to a time and a
     momentum, the slice current to per-particle weights.
     """
-    if pyrepo:
-        sys.path.insert(0, str(pyrepo))
-    from beamphysics import ParticleGroup
+    ParticleGroup = _beamphysics(pyrepo).ParticleGroup
 
     with h5py.File(path) as h5:
         nslice = int(h5["slicecount"][0])
@@ -274,8 +296,7 @@ def write_genesis_par(path, slices, wavelength, spacing, refposition=0.0,
 
 
 def convert_field(src, dst, pyrepo=None):
-    if pyrepo:
-        sys.path.insert(0, str(pyrepo))
+    _beamphysics(pyrepo)
     from beamphysics.wavefront import Wavefront
 
     if is_openpmd(src):
@@ -286,10 +307,7 @@ def convert_field(src, dst, pyrepo=None):
 
 # ----------------------------------------------------------------------------------
 
-DEFAULT_PYREPO = str(pathlib.Path.home() / "Code/GitHub/bmad-fel/openPMD-beamphysics")
-
-
-def to_openpmd(src, dst, pyrepo=DEFAULT_PYREPO):
+def to_openpmd(src, dst, pyrepo=None):
     """Convert one Genesis file, particles or field, to openPMD. The importable form of
     the to-openpmd command, for the check scripts that run Genesis themselves."""
     src, dst = pathlib.Path(src), pathlib.Path(dst)
@@ -308,7 +326,7 @@ def main():
     p.add_argument("dst", nargs="?")
     p.add_argument("--wavelength", type=float, default=0.0)
     p.add_argument("--sample", type=int, default=1)
-    p.add_argument("--pyrepo", default=DEFAULT_PYREPO)
+    p.add_argument("--pyrepo", help="openPMD-beamphysics checkout. Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     a = p.parse_args()
     src = pathlib.Path(a.src)
 

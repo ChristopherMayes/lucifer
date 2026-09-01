@@ -131,6 +131,13 @@ true of the release named at the top of this page.
   (`writeFieldHDF5.cpp:70`), with `vacimp = 376.73` truncated and `eev = 510998.95069`
   (identical to Bmad's `m_electron`). Equivalently `u = E*ks/(sqrt(2)*eev)` with E in
   V/m, the relation used to derive this tracker's physical-unit formulas.
+- Releases up to v4.6.14 use `eev = 510999.06` for the electron rest energy, which is
+  2.14e-7 above the CODATA 2022 value. Genesis master carries 510998.95069, which is also
+  Bmad's `m_electron`, so a comparison against master has no electron-mass discrepancy at
+  all while one against a release has this one. The field unit is linear in `eev`, so the
+  difference reaches the field-normalization integrals as 4.28e-7 and loosens the
+  transcription tiers by several percent of their own value without failing any of them.
+  The levels recorded in [](validation.md) belong to a build that carries the CODATA value.
 - The quad transport is chromatic through per-particle `gammaz` with `foc^2 =
   k1*gamma0/gammaz`. Bmad's equivalent scaling is `k1*p0/p`. The two differ by ~4e-9
   relative at this energy (1 - beta0), far below the path-length-term difference.

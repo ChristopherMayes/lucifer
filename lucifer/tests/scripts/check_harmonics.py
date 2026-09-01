@@ -36,6 +36,7 @@ beamphysics/wavefront/openpmd.py (--pyrepo) for the openPMD checks of section 1.
 
 from __future__ import annotations
 
+import os
 import argparse
 import pathlib
 import re
@@ -246,8 +247,8 @@ def main():
     ap.add_argument("workdir")
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--pyrepo", default=str(pathlib.Path.home()
-                    / "Code/GitHub/bmad-fel/openPMD-beamphysics"))
+    ap.add_argument("--pyrepo", help="openPMD-beamphysics checkout. "
+                    "Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -267,7 +268,7 @@ def main():
     print("== harmonic tier vs Genesis4 (planar SS, harm 1 + dark harm 3) ==")
     (wd / "H3.in").write_text(GENESIS_DECK)
     r = subprocess.run([args.genesis, "H3.in"], cwd=wd, capture_output=True, text=True,
-                       env={"PATH": "/usr/bin:/bin", "FI_PROVIDER": "tcp"})
+                       env=dict(os.environ, FI_PROVIDER="tcp"))
     if r.returncode != 0:
         print(f"FAIL: genesis exited {r.returncode}:\n{r.stdout[-2000:]}\n{r.stderr[-500:]}")
         sys.exit(1)

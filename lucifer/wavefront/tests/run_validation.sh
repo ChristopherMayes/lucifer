@@ -91,7 +91,7 @@ fi
 # Locate openPMD-beamphysics.
 
 if [[ -z "$BEAMPHYSICS" ]]; then
-  for candidate in "$BMAD_ROOT/../openPMD-beamphysics" "$HOME/Code/GitHub/openPMD-beamphysics"; do
+  for candidate in "${OPENPMD_BEAMPHYSICS:-}" "$BMAD_ROOT/../openPMD-beamphysics"; do
     if [[ -d "$candidate/beamphysics/wavefront" ]]; then
       BEAMPHYSICS="$(cd "$candidate" && pwd)"
       break
@@ -108,8 +108,9 @@ fi
 # Locate Python.
 
 if [[ -z "$PYTHON" ]]; then
-  for candidate in "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/python3" \
-                   "$HOME/Code/miniforge3/envs/bmad-fel-validate/bin/python3"; do
+  for candidate in "${LUCIFER_PYTHON:-}" \
+                   "$(conda info --base 2>/dev/null)/envs/bmad-fel-validate/bin/python3" \
+                   "$(command -v python3 2>/dev/null)"; do
     if [[ -x "$candidate" ]]; then PYTHON="$candidate"; break; fi
   done
 fi
