@@ -2,8 +2,8 @@
 
 Two commands, Bmad only:
 
-    ../../../../production/bin/lucifer run.nml
-    ../../../../production/bin/lucifer run_detuned.nml
+    ../../../production/bin/lucifer lucifer.in
+    ../../../production/bin/lucifer lucifer_detuned.in
 
 Two undulator segments with a four-bend closed-bump chicane in the break, in
 absolute time tracking mode (`bmad_com[absolute_time_tracking] = T` in the
@@ -31,4 +31,4 @@ Validated by the harness's phasing section: the re-anchor baseline flat, the
 z_offset knob on the analytic slope, the knob curve equal to Genesis4's own
 PHASESHIFTER scan at 6.0e-6, the absolute-mode chicane ramp on the independent
 geometric prediction at 6.8e-4, the unaveraged ledger closing across the chicane
-at 4.0e-6, and four refusals by name. Runs in ~1 min each.
+at 4.0e-6, and four refusals by name. Runs in ~1 s each.

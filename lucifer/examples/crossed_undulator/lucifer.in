@@ -1,0 +1,23 @@
+&fel_params
+  lat_file = "run_lattice.bmad"
+  global%out_root = "crossed"
+  global%ran_seed = 4242
+/
+
+&fel_beam_init
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 1e6
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_half_width = 2e-4
+/

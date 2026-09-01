@@ -1,0 +1,24 @@
+&fel_params
+  lat_file = "../aramis.bmad"
+  global%out_root = "steady_state"
+  global%dump_beam_at = "UND##3"
+  global%dump_field_at = "UND##3"
+/
+
+&fel_beam_init
+  beam_init%n_particle = 8192
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%seed_power = 5e3
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+/

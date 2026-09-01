@@ -1,18 +1,10 @@
-! Chicane re-phasing, one command (see the README; run both nml files):
-!
-!   lucifer run.nml
-!
-! Absolute-time phasing: the bend angle sets the light's re-injection phase onto the
-! bunched beam. This lattice: chicane.bmad.
-
 &fel_params
-  lat_file = "chicane.bmad"
-  global%out_root = "chicane"
+  lat_file = "harmonics.bmad"
+  global%out_root = "harmonics"
   global%ran_seed = 12345
 /
 
 &fel_beam_init
-
   beam_init%n_particle = 8192
   beam_init%bunch_charge = 1.000692285594e-15
   beam_init%sig_z = 0
@@ -22,8 +14,8 @@
 /
 
 &fel_wavefront_init
-
   wavefront_init%lambda0 = 1e-10
+  wavefront_init%harmonics = 1, 3
 
   wavefront_init%seed_power = 2e8
   wavefront_init%seed_waist_size = 30e-6

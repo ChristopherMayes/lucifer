@@ -38,7 +38,8 @@ one line.
 | find a paper this code implements | [](references.md) |
 
 Runnable cases live in `lucifer/examples/`, each a directory of real input files with
-its own README and a runner.
+its own README and the numbers measured on it. Its index carries a table of which
+example shows which feature.
 
 ## Features
 
@@ -48,6 +49,8 @@ its own README and a runner.
 - **Time dependence** with an exact integer slippage shift, and slice migration when a particle's ponderomotive phase leaves its slice.
 - **Collective effects**: resistive-wall, geometric and roughness wakes, short-range and long-range space charge, and Bmad element wakes applied across the whole time window.
 - **Two polarizations** and harmonic field sets, with tilt honored on planar and helical undulators.
+- **Undulator tapering**, as a line whose segments are different elements rather than a per-segment input.
+- **Phasing between segments**, following the real geometry in absolute time tracking and autophased in the default relative mode.
 - **Spontaneous emission** gated on Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
 - **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
@@ -63,7 +66,7 @@ its own README and a runner.
 - MPI. This one is a design decision rather than a gap: the shared-memory design is what this program is, and the case for adding MPI would have to be made on measurement.
 - GPU support.
 
-Validation runs on eleven comparison tiers and thirteen check sections, on both debug
+Validation runs on eleven comparison tiers and eighteen check sections, on both debug
 and production builds, before every commit. Nine of the eleven tiers are transcription
 checks that agree with Genesis4 at the floor set by its truncated impedance constants.
 The other two are priced model differences rather than defects. The levels, the

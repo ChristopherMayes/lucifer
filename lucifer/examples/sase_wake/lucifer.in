@@ -1,0 +1,35 @@
+&fel_params
+  lat_file = "../aramis.bmad"
+  global%out_root = "sase_wake"
+
+  chamber_wake%on = T
+  chamber_wake%radius = 0.5e-3
+  chamber_wake%material = "CU"
+  chamber_wake%gap = 0.5e-3
+  chamber_wake%lgap = 0.015
+  chamber_wake%hrough = 100e-9
+  chamber_wake%lrough = 100e-6
+/
+
+&fel_beam_init
+  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 2.881993782512e-13
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -1.44e-8
+  beam_init%grid(3)%x_max =  1.44e-8
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  shot_noise = T
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+
+  wavefront_init%window_length = 2.88e-8
+  wavefront_init%window_sample = 3
+/

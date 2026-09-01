@@ -29,11 +29,22 @@ Lattices name these with one-line variables rather than raw numbers, so `fel_una
 A run is one input file, which names the lattice:
 
 ```
-lucifer run.nml
+lucifer lucifer.in
 ```
 
-The examples are the fastest way in. Each is a directory of real input files with a
-runner that needs nothing else:
+The name is an argument and any name works. `lucifer.in` is the convention the
+examples follow, so that a directory reads the same way twice, and it is not a default
+the program looks for.
+
+The examples are the fastest way in. Each is a directory of real input files, a README
+with the numbers measured on it, and nothing else to fetch:
+
+```
+cd lucifer/examples/steady_state && lucifer lucifer.in
+```
+
+The one that needs Genesis4, and the only one with a runner, is the three-way
+saturation comparison:
 
 ```
 cd lucifer/examples/saturation_demo && ./run.sh
@@ -50,7 +61,7 @@ The validation harness is a separate thing, described with its commands in
 | `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis4 interlude model |
 | `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements with `tracking_method = custom` (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; generates its own quiet-start beam and seed field when no dumps are named |
-| `lucifer/examples/` | Self-contained single-command examples (no Genesis4, no dump files): a seeded steady-state run and a pure-SASE time-dependent run of the benchmark line, with plotting script and README |
+| `lucifer/examples/` | Self-contained single-command examples, one directory per feature, each with its own README and measured numbers. Its index says which example shows which feature |
 | `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
 | `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis4's, independent RNGs |
 | `lucifer/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
@@ -197,7 +208,7 @@ averaged with the transverse maps of Bmad's own `bmad_standard` periodic-wiggler
 kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like
 end kicks, chromatic via `p0/p`). `1` is the unaveraged mode, a production method whose cost buys the full quiver dynamics (see the manual's unaveraged-mode section). `-1` is
 averaged with the transcribed-Genesis4 focusing (matrix from `aw`, `kx`, `ky`,
-chromatic via `gammaz`), and it is VALIDATION-INTERNAL: the Genesis4 tiers require
+chromatic via `gammaz`), and it is validation-internal: the Genesis4 tiers require
 transcription-level transport and select it via the `*_val.bmad` wrapper lattices. No
 production lattice writes it. The two averaged models are priced, measured over the
 full time-dependent line (32 slices, 90 records): power differs by 5.0e-5 max (exit

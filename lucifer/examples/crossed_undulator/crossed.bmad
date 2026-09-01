@@ -1,4 +1,4 @@
-! Two-polarization probes (check_two_polarization.py). A SYMMETRIC configuration --
+! Two-polarization probes (check_two_polarization.py). A symmetric configuration --
 ! round beam Twiss, no quads -- so the rotation-identity check (an all-y line must
 ! reproduce the all-x line under the x<->y swap) is not broken by the lattice.
 !

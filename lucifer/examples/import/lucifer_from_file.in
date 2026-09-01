@@ -1,0 +1,24 @@
+&fel_params
+  lat_file = "../aramis.bmad"
+  global%out_root = "from_file"
+  global%ran_seed = 12345
+/
+
+&fel_beam_init
+  resample%n_particle_per_slice = 2048
+  resample%beamlet_size = 8
+
+  dist_file = "import_bunch.h5"
+
+  resample%slice_width = 0.01
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%window_sample = 3
+
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+/

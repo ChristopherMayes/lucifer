@@ -1,0 +1,15 @@
+! The benchmark line with one segment tracked unaveraged and the other eleven averaged.
+! The tracking method is an element attribute, so a mixed line is a line of elements
+! that differ, exactly as the tapered line is (fel-physics.md sec-element).
+
+call, file = ../aramis.bmad
+
+fel_unaveraged = 1   ! Named value for fel_tracking (doc/input-reference.md).
+
+UNDU: UND, fel_tracking = fel_unaveraged
+
+CELL:  line = (UND,  D1, QF, D2, UND, D1, QD, D2)
+CELLU: line = (UNDU, D1, QF, D2, UND, D1, QD, D2)
+MIXED: line = (2*CELL, CELLU, 3*CELL)
+
+use, MIXED

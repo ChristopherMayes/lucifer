@@ -2,7 +2,7 @@
 
 One command, Bmad only:
 
-    ../../../../production/bin/lucifer run.nml
+    ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py harmonics.stats.h5
 
 A strongly seeded steady-state run on a planar segment carrying two radiation
@@ -30,4 +30,4 @@ A helical undulator would give exactly nothing here: its coupling fc(h) vanishes
 for every harmonic (manual: the harmonic-radiation section), which is why this example is planar.
 Validated against Genesis 1.3 Version 4 (Genesis4) running the same configuration (fundamental 5.3e-8,
 harmonic growth 1.3e-4) and against the exact Bessel deposit sum (3.3e-16) by the
-harness's harmonic check section. Runs in ~2 min.
+harness's harmonic check section. Runs in ~1 s.

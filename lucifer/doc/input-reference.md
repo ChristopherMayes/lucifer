@@ -33,7 +33,7 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 | `global%track_start` | `""` | Element locator bounding the walk below. Blank is the whole line |
 | `global%track_end` | `""` | Element locator bounding the walk above. Blank is the whole line |
 | `global%ran_seed` | `12345` | The one random seed, governing generation, resampling and noise |
-| `global%reference_run` | `F` | No FEL interaction: Bmad tracks every element |
+| `global%reference_run` | `F` | Permit a lattice with no FEL element, so Bmad tracks every element |
 | `global%load_only` | `F` | Build the initial state, dump it, exit without tracking |
 | `global%migrate` | `F` | Move particles between slices when their ponderomotive phase leaves the slice |
 | `global%migrate_check` | `F` | Verify phase continuity at every migration and report the worst deviation |

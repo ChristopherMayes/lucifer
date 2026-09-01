@@ -1,5 +1,12 @@
 # The coherent source: converged results at a fraction of the particles
 
+Three commands, Bmad only:
+
+    ../../../production/bin/lucifer lucifer.in
+    ../../../production/bin/lucifer lucifer_low_m.in
+    ../../../production/bin/lucifer lucifer_reference.in
+    python ../plot_fel.py coherent.stats.h5
+
 The use case (manual: the coherent-source section): runs whose beams are transversely
 Gaussian (idealized machines, parameter scans, seeded amplifier studies) can
 trade the per-particle source deposit for Tanaka's coherent retrieval
@@ -14,9 +21,9 @@ decades of gain, ../steady_state's configuration):
 
 | run | source, particles/slice | exit power | vs reference | wall (12 threads) |
 |---|---|---|---|---|
-| `run_reference.nml` | deposit, 8192 | 7.62e+08 W | -- | 4.3 s |
-| `run_low_m.nml` | deposit, 512 | 5.82e+09 W | 7.6x high (ln +2.03) | 2.0 s |
-| `run.nml` | coherent, 512 | 7.46e+08 W | ln 0.021 | 2.2 s |
+| `lucifer_reference.in` | deposit, 8192 | 7.62e+08 W | -- | 4.3 s |
+| `lucifer_low_m.in` | deposit, 512 | 5.82e+09 W | 7.6x high (ln +2.03) | 2.0 s |
+| `lucifer.in` | coherent, 512 | 7.46e+08 W | ln 0.021 | 2.2 s |
 
 The middle row is the trap this feature exists to remove: cutting particles
 without the coherent source silently multiplies the predicted power by 7.6 on

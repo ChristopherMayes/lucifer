@@ -1,5 +1,5 @@
-! Chicane-between-segments example line (manual sec:phasing): two undulator segments
-! with a four-bend closed-bump chicane in the break. ABSOLUTE TIME TRACKING is on, so
+! Chicane-between-segments example line (the manual's phasing section): two undulator segments
+! with a four-bend closed-bump chicane in the break. Absolute time tracking is on, so
 ! the inter-segment phase follows the real geometry: the beam detours the bump while
 ! the radiation drifts the chord, and the arc-minus-chord delay -- thousands of
 ! wavelengths -- re-injects the light onto the bunched beam at whatever carrier phase

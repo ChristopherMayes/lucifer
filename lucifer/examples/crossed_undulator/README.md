@@ -7,7 +7,7 @@ polarization-blind, so the y set radiates orthogonally polarized light seeded by
 bunching the x set built, while the x field passes through gaining nothing (the
 harness holds that isolation at 1.6e-14, the manual's field-solver vector convention).
 
-    ../../../../production/bin/lucifer run.nml
+    ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py crossed.stats.h5
 
 Measured by this example (1 MW x seed, 0.6 m x-set, 0.2 m gap, 0.6 m y-set):
@@ -27,4 +27,4 @@ The figure is banked as `fel-benchmark-plots/crossed-afterburner.png`.
 
 Outputs: `crossed-final-x.fld.h5` / `crossed-final-y.fld.h5` (one polarization per
 file, in the format of Genesis 1.3 Version 4 (Genesis4)), and `crossed.stats.h5` with the field group carrying totals
-plus the x component and a `field/y/` group. Runs in ~30 s.
+plus the x component and a `field/y/` group. Runs in ~1 s.

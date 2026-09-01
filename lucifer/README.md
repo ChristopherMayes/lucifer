@@ -40,20 +40,24 @@ other Bmad program.
 A run is one input file naming a lattice:
 
 ```
-lucifer run.nml
+lucifer lucifer.in
 ```
 
-The examples are the fastest way in. Each is a directory of real inputs with a runner:
+`lucifer.in` is the name the examples use by convention. It is an argument rather than
+a default, and any name works.
+
+The examples are the fastest way in. Each is a directory of real inputs with its own
+README and the numbers measured on it:
 
 ```
-cd examples/saturation_demo && ./run.sh
+cd examples/steady_state && lucifer lucifer.in
 ```
 
 See [`doc/user-guide.md`](doc/user-guide.md) for the input file's three namelist groups, the lattice attributes, and what each output file is.
 
 ## Where it stands
 
-Validated against Genesis4 on eleven tiers plus thirteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
+Validated against Genesis4 on eleven tiers plus eighteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
 Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`doc/validation.md`](doc/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 

@@ -1,0 +1,31 @@
+&fel_params
+  lat_file = "../aramis.bmad"
+  global%out_root = "import"
+  global%ran_seed = 12345
+/
+
+&fel_beam_init
+  resample%n_particle_per_slice = 2048
+  resample%beamlet_size = 8
+
+  use_beam_init = T
+  write_openpmd_file = "import_bunch.h5"
+  beam_init%n_particle = 50000
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beam_init%sig_z = 1.2e-9
+  beam_init%sig_pz = 8.8045e-5
+  beam_init%bunch_charge = 3.01e-14
+
+  resample%slice_width = 0.01
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+
+  wavefront_init%window_sample = 3
+
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+/

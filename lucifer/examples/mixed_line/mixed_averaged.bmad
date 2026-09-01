@@ -1,0 +1,8 @@
+! The all-averaged twin of mixed.bmad: the one unaveraged segment overridden back to
+! the default, so the two runs differ in that segment's method and nothing else.
+
+call, file = mixed.bmad
+
+fel_averaged = 0
+
+UNDU[FEL_TRACKING] = fel_averaged
