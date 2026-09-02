@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-02 Added: `tests/scripts/sincos_audit.c` records why `code/fel_sincos.c` still calls libm.
+  Replacing that call with a Cody-Waite reduction and the fdlibm kernel polynomials, which is what a
+  hand-written double-precision sincos looks like, lands 6 ulp from libm on 34% of arguments where
+  the shim it would replace was admitted at one ulp on 2e-6 of them. It also degrades with the
+  argument, 10 ulp at 1e5 and 2681 at 1e8, and the argument carries the common phase accumulating
+  along the line, so a longer line moves toward that with nothing to detect it. Measured gain 3.2%
+  of an averaged run at 2048 particles per slice. Refused, and the audit is committed so the next
+  reader starts from the number. FINDINGS 7.38.
+
 - 2026-09-02 Changed: the unaveraged mode's undulator field no longer evaluates transcendentals per
   particle. `fel_unavg_bfield` took a position `s` and computed the ramp envelope, its slope,
   `cos(ku s)` and `sin(ku s)` from it, once per particle per RK4 stage, when all four depend only on

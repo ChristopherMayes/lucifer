@@ -168,7 +168,19 @@ An inline (sin, cos) pair with no libm call, Cody-Waite reduction and the fdlibm
 
 The averaged rows bound the libm call from below at 3.2% of a run at 2048 particles per slice, against the 8.5% the sampler attributes to sin and cos: the polynomial is cheaper than the call and not free. The unaveraged row was the finding. That mode never reaches this file, and its own transcendentals were the undulator field's and the ramp envelope's intrinsics, which the hoist above removed instead.
 
-Neither probe is a candidate implementation. `fel_sincos.c` was chosen for bit-identity with gfortran's own lowering, and [](validation.md#val-the-particlepath-cost-measured) records the one ulp audit that admitted it. Any replacement moves recorded digits and needs its own audit and its own re-recording.
+Neither probe is a candidate implementation, and the second one is refused on its own audit rather than on judgement. `tests/scripts/sincos_audit.c` sweeps it against libm:
+
+| range | worst error | arguments differing |
+|---|---|---|
+| the measured range, $[-159.8, 19.0]$ | 6 ulp | 34% |
+| $\lvert \theta \rvert < 10^4$ | 6 ulp | 34% |
+| $\lvert \theta \rvert < 10^5$ | 10 ulp | 34% |
+| $\lvert \theta \rvert < 10^6$ | 24 ulp | 34% |
+| $\lvert \theta \rvert < 10^8$ | 2681 ulp | 34% |
+
+The shim it would replace was admitted at one ulp on $2 \times 10^{-6}$ of arguments, 73 mismatches in a 44M-point sweep ([](validation.md#val-the-particlepath-cost-measured)). This candidate is six ulp on a third of them, which is five orders of magnitude more arguments and six times the error, so it cannot be recorded as a 1-ulp change. The error is the two-term reduction rather than the kernels, and a reduction accurate enough to reach one ulp costs arithmetic that eats a 3.2% gain. The range is also not a constant: $\theta$ carries the common phase accumulating along the line, so a longer line moves toward the degradation with nothing to detect it.
+
+The version of this that could pay is a vectorized pair inside a loop that vectorizes, where one reduction amortizes over a whole vector. The averaged path has no such loop, for the reasons in the audit section below. FINDINGS 7.38 records the refusal.
 
 (perf-the-vectorization-audit)=
 ## The vectorization audit
