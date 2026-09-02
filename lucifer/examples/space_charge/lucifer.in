@@ -1,8 +1,8 @@
 &fel_params
-  lat_file = "../aramis.bmad"
+  lat_file = "sc_line.bmad"
   global%out_root = "space_charge"
 
-  space_charge%on = T
+  bmad_com%csr_and_space_charge_on = T
   space_charge%rmax = 250e-6
   space_charge%nz = 2
   space_charge%nphi = 1

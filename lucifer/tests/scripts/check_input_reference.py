@@ -31,7 +31,9 @@ STRUCTS = {
     "fel_chamber_wake_init_struct": ("fel_struct.f90",         "chamber_wake%"),
     "fel_beam_init_param_struct":  ("fel_struct.f90",          ""),
     "fel_resample_param_struct":   ("fel_import_mod.f90",      "resample%"),
-    "fel_space_charge_struct":     ("fel_collective_mod.f90",  "space_charge%"),
+    # The input type, deliberately not the working one: the working copy carries the
+    # per-element gate, which no deck can set and the page must not document.
+    "fel_space_charge_input_struct": ("fel_collective_mod.f90", "space_charge%"),
 }
 
 DECL = re.compile(r"""^\s*(?:type\s*\([^)]*\)|character\([^)]*\)|real\(rp\)|integer|logical)

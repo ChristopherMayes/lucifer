@@ -1,0 +1,28 @@
+&fel_params
+  lat_file = "sc_line.bmad"
+  global%out_root = "gate_off"
+
+  bmad_com%csr_and_space_charge_on = F
+  space_charge%rmax = 250e-6
+  space_charge%nz = 2
+  space_charge%nphi = 1
+  space_charge%longrange = T
+/
+
+&fel_beam_init
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 1.003345e-13
+  beam_init%sig_z = 4e-9
+  beam_init%sig_pz = 0
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_half_width = 2e-4
+  wavefront_init%window_length = 2.4e-8
+  wavefront_init%window_sample = 3
+/

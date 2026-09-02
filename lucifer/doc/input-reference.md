@@ -119,9 +119,13 @@ The three kernels, their numerical impedance and the causal convolution are in [
 
 ### Space charge: `space_charge%`
 
+Whether space charge acts is not in this group. It is the element's own
+`space_charge_method`, described with the other [lattice attributes](#lattice-attributes),
+and this group holds only the solver's numbers. A run with no element asking for it never
+reaches them.
+
 | Parameter | Default | Meaning |
 |---|---|---|
-| `space_charge%on` | `F` | Enable space charge |
 | `space_charge%model` | `"genesis"` | Which implementation runs. `"genesis"` is the only accepted value |
 | `space_charge%rmax` | `0` | Radial grid extent scale [m]. Grows adaptively |
 | `space_charge%ngrid` | `100` | Radial grid points |
@@ -131,6 +135,10 @@ The three kernels, their numerical impedance and the causal convolution are in [
 
 (param-space-charge-model)=
 **`space_charge%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which works per slice on a radial grid over azimuthal modes and longitudinal harmonics. Anything else is refused by name. Note that this family is Lucifer's own, and `space_charge_com` in the same group is Bmad's global structure, a separate thing.
+
+The default is expected to stay `"genesis"` when Bmad's own slice solver becomes the second value, and the reason is the physics rather than the order they arrived in. The transcribed solver carries two terms that matter inside an undulator and that Bmad's slice model does not have: the space charge of the microbunching itself, solved per longitudinal harmonic of the ponderomotive phase, and the longitudinal Lorentz factor, which at aw = 0.85 rms is worth a factor of 1.7 in the field's own scaling. What Bmad's model adds that this one lacks, a transverse defocusing kick, falls as the inverse cube of gamma and is an injector term rather than an undulator-line one. The transcribed path is also the measured one, at the level [](validation.md) records for the space-charge tier. A second value earns the default by measurement, not by being newer.
+
+If neither term is configured, `nz = 0` with `longrange = F`, an element asking for `slice` is refused by name: the solve would cost its full price and return an exact zero, and which of the two terms was meant is worth asking.
 
 See [](fel-physics.md#sec-spacecharge).
 
@@ -269,6 +277,15 @@ An FEL segment is a wiggler or undulator whose `tracking_method` is one of Bmad'
 | `fel_unaveraged` | Direct integration through the undulator field, with no period averaging |
 
 Both are Bmad's own named methods rather than anything this program registers, so `show ele` prints them, a written lattice keeps them, and the parser refuses a misspelling. They are class-settable as any attribute is, `wiggler::*[TRACKING_METHOD] = fel_unaveraged`, and they mix freely in one line. A wiggler tracked any other way is not an FEL segment: `tracking_method = custom` means some other program's tracking and this program leaves it to the seam.
+
+Space charge is per element too, through Bmad's own `space_charge_method` attribute rather than anything this program registers:
+
+| `space_charge_method` | Meaning |
+|---|---|
+| `off` | The default. No space charge in this element |
+| `slice` | The slice-binned longitudinal solve, with the FEL slices as the bins |
+
+`fft_3d` and `cathode_fft_3d` are refused by name on an FEL element, since their solvers want a three-dimensional grid this walk does not build. Bmad's master switch applies as it does everywhere else: `bmad_com%csr_and_space_charge_on` must also be true, and when elements ask for `slice` while it is false the run says so and tracks without space charge. `space_charge_com%n_bin` is ignored, because the slices are the bins. Inside the Bmad seam the same attribute drives Bmad's own machinery, so one lattice reads the same way in every Bmad program.
 
 The unaveraged mode's two numbers are per-element attributes, registered by this program and usable on any wiggler or undulator:
 

@@ -227,6 +227,13 @@ do ie = run%i_start, run%i_end
 
   if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
 
+  ! Space charge is this element's own attribute, resolved at setup into run%sc_here
+  ! (with Bmad's master switch folded in). The solvers read coll%efield%active and zero their
+  ! outputs when it is false, so an element that does not ask for space charge tracks the
+  ! space-charge-free path bit for bit.
+
+  coll%efield%active = run%sc_here(ie)
+
   if (is_fel(ie)) then
 
     ! FEL segment: Genesis's unroll in the element's own step, using Bmad's standard

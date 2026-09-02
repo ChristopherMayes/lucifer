@@ -456,9 +456,9 @@ real(rp) sc_rmax, wake_loss, wake_radius, wake_conductivity, wake_relaxation
 real(rp) wake_gap, wake_lgap, wake_hrough, wake_lrough
 logical wake_roundpipe
 character(8) wake_material
-integer sc_ngrid, sc_nz, sc_nphi
+integer sc_ngrid, sc_nz, sc_nphi, n_sc, n_ask
 real(rp) gamma0_ref, phase_rate, Lz
-integer nslice, n_harm, ie, ih, prev_ie, nrec_stats, nend_stats
+integer nslice, n_harm, ie, ih, je, prev_ie, nrec_stats, nend_stats
 integer harmonics(9)
 character(*), parameter :: r_name = 'fel_setup_schedule'
 
@@ -512,16 +512,76 @@ if (run%space_charge%model /= 'genesis') then
   err_flag = .true.;  return
 endif
 
-coll%efield%on = (sc_nz >= 1 .or. sc_longrange)
+! The solver's numbers are run-level. Whether it runs in a given element is that
+! element's own space_charge_method, resolved into run%sc_here below: nothing here is a
+! gate, so a stats file cannot record a configuration the run did not use.
+
 coll%efield%rmax = sc_rmax
 coll%efield%ngrid = sc_ngrid
 coll%efield%nz = sc_nz
 coll%efield%nphi = sc_nphi
 coll%efield%longrange = sc_longrange
+coll%efield%model = run%space_charge%model
+coll%efield%active = .false.    ! Set per element by the walk, from run%sc_here.
 
-if (coll%efield%on .and. interlude_model == 'bmad') then
-  call out_io (s_info$, r_name, 'Note: space charge acts inside undulators and genesis-model', &
-               'interludes only; the Bmad seam''s own space charge is a named follow-on.')
+if (sc_nz < 1 .and. .not. sc_longrange .and. bmad_com%csr_and_space_charge_on) then
+  ! Neither term is configured, so slice would compute an exact zero at full cost. That
+  ! is a deck saying two things at once, and the useful answer is which one it meant.
+  ! Only when the master switch is on: with it off, a lattice that carries slice for its
+  ! own reasons is being run without space charge deliberately, and demanding solver
+  ! numbers for a solver that will not run would be hostile.
+  do je = 1, branch%n_ele_track
+    if (branch%ele(je)%space_charge_method /= slice$) cycle
+    call out_io (s_error$, r_name, &
+                 'SPACE_CHARGE_METHOD = SLICE IS SET ON ELEMENT ' // trim(branch%ele(je)%name) // ',', &
+                 'BUT NEITHER SPACE-CHARGE TERM IS CONFIGURED: SET SPACE_CHARGE%NZ >= 1 FOR THE', &
+                 'SHORT-RANGE HARMONICS, SPACE_CHARGE%LONGRANGE = T FOR THE LONG-RANGE TERM, OR BOTH.')
+    err_flag = .true.;  return
+  enddo
+endif
+
+! Per element: the attribute says whether, Bmad's master switch says whether at all, and
+! an FEL element refuses the methods whose solvers need a field this walk does not have.
+
+allocate (run%sc_here(branch%n_ele_track))
+run%sc_here = .false.
+n_sc = 0
+
+do je = 1, branch%n_ele_track
+  select case (branch%ele(je)%space_charge_method)
+  case (off$)
+    cycle
+  case (slice$)
+    run%sc_here(je) = bmad_com%csr_and_space_charge_on
+    if (run%sc_here(je)) n_sc = n_sc + 1
+  case default
+    if (run%is_fel(je)) then
+      call out_io (s_error$, r_name, 'SPACE_CHARGE_METHOD ON AN FEL ELEMENT MUST BE OFF OR SLICE.', &
+                   'THE SLICE-BINNED SOLVE IS THE ONE THIS WALK HAS, SINCE THE FEL SLICES ARE ITS', &
+                   'BINS. GOT ' // trim(space_charge_method_name(branch%ele(je)%space_charge_method)) // &
+                   ' ON: ' // trim(branch%ele(je)%name))
+      err_flag = .true.;  return
+    endif
+  end select
+enddo
+
+! Loud rather than refusing: the master switch exists to disable space charge across a
+! lattice without editing it, so the combination is legitimate and only silence is not.
+
+if (.not. bmad_com%csr_and_space_charge_on) then
+  n_ask = count(branch%ele(1:branch%n_ele_track)%space_charge_method == slice$)
+  if (n_ask > 0) then
+    call out_io (s_info$, r_name, &
+                 'Note: \i0\ element(s) set space_charge_method = slice, but ' // &
+                 'bmad_com%csr_and_space_charge_on', 'is false, so no space charge runs ' // &
+                 'anywhere. That combination is how a lattice runs without it.', &
+                 i_array = [n_ask])
+  endif
+endif
+
+if (n_sc > 0 .and. interlude_model == 'bmad') then
+  call out_io (s_info$, r_name, 'Note: inside the Bmad seam, space charge is Bmad''s own, from the', &
+               'same element attribute. This solver acts in FEL elements and genesis-model interludes.')
 endif
 
 coll%wake%on = wake_on

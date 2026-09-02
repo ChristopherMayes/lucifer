@@ -190,7 +190,7 @@ type fel_run_struct
   type (fel_global_struct) :: global
   type (wavefront_init_struct) :: winit
   type (fel_chamber_wake_init_struct) :: chamber_wake
-  type (fel_space_charge_struct) :: space_charge
+  type (fel_space_charge_input_struct) :: space_charge
   type (beam_init_struct) :: beam_init
   type (fel_resample_param_struct) :: resample
   type (fel_beam_init_param_struct) :: bparam
@@ -211,6 +211,9 @@ type fel_run_struct
   real(rp), allocatable :: fel_zoff(:)     ! The z_offset off-phase knob per element [m].
   real(rp), allocatable :: light_corr(:)   ! Chord-vs-arc correction on a break's last element [m].
   logical, allocatable :: is_fel(:)
+  ! Space charge, per element: ele%space_charge_method = slice, and Bmad's master switch
+  ! bmad_com%csr_and_space_charge_on, resolved once at setup so the walk reads a fact.
+  logical, allocatable :: sc_here(:)
   logical, allocatable :: dump_beam_here(:), dump_field_here(:)
   integer :: i_start = 1, i_end = 0        ! The resolved tracking window [elements].
   ! Run facts.

@@ -304,10 +304,20 @@ make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
 make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
 make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
 make_nml tdsase.nml aramis.bmad      tdsase genesis AramisTDSASE
-make_nml tdsc.nml   aramis_1seg.bmad tdsc   genesis AramisTD "space_charge%rmax = 250e-6
+# The space-charge tier says where space charge acts on the element, as any Bmad program
+# does, and turns on Bmad's master switch in the deck. The solver's numbers stay in
+# space_charge%.
+
+cat > aramis_1seg_sc.bmad <<'LAT'
+call, file = aramis_1seg.bmad
+wiggler::*[SPACE_CHARGE_METHOD] = slice
+LAT
+
+make_nml tdsc.nml   aramis_1seg_sc.bmad tdsc   genesis AramisTD "space_charge%rmax = 250e-6
   space_charge%nz = 2
   space_charge%nphi = 1
-  space_charge%longrange = T"
+  space_charge%longrange = T
+  bmad_com%csr_and_space_charge_on = T"
 make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = T
   chamber_wake%radius = 2.5e-3
   chamber_wake%conductivity = 5.813e7
@@ -336,8 +346,8 @@ sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > refusal_lpe
 sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > refusal_fieldmap.bmad
 
 CHECKS_OK=1
-run_assert_refusal () {   # <name> <by-name message fragment>
-  make_nml refusal_$1.nml refusal_$1.bmad refusal_$1 bmad Aramis
+run_assert_refusal () {   # <name> <by-name message fragment> [extra &fel_params lines]
+  make_nml refusal_$1.nml refusal_$1.bmad refusal_$1 bmad Aramis "${3:-}"
   if "$EXE" refusal_$1.nml > fel-refusal_$1.log 2>&1; then
     echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
     CHECKS_OK=0
@@ -364,11 +374,23 @@ SEGW: line = (UND, PW)
 use, SEGW
 LAT
 
+# Space charge asked for with neither term configured: the solve would cost its full
+# price and return an exact zero, so which term was meant is worth asking. The other
+# space-charge refusal, a three-dimensional method on an FEL element, is covered by the
+# collective checks.
+
+cat > refusal_scnone.bmad <<'LAT'
+call, file = aramis_1seg.bmad
+wiggler::*[SPACE_CHARGE_METHOD] = slice
+LAT
+
 run_assert_refusal bmax     "ZERO B_MAX"
 run_assert_refusal lperiod  "ZERO L_PERIOD"
 run_assert_refusal fieldmap "NOT A VALID TRACKING_METHOD"
 run_assert_refusal lrwake   "LR (MULTI-BUNCH) WAKES ARE NOT SUPPORTED"
 run_assert_refusal zmax     "Z_MAX CAN HANDLE"
+run_assert_refusal scnone   "NEITHER SPACE-CHARGE TERM IS CONFIGURED" \
+                            "bmad_com%csr_and_space_charge_on = T"
 
 # tracking_method = custom on a wiggler means some other program's tracking, so this
 # program must not claim the element. With the only wiggler tracked that way there is no

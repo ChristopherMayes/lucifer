@@ -5,12 +5,20 @@ Three commands, Bmad only:
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_off.in
     ../../../production/bin/lucifer lucifer_short_range.in
+    ../../../production/bin/lucifer lucifer_gate_off.in
     python ../plot_fel.py space_charge.stats.h5
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice
 radial-harmonic solves plus a whole-window long-range term
 (the manual's [space-charge section](../../doc/fel-physics.md)). The two terms answer different
 questions, so this example measures them separately.
+
+Which elements it acts in is the elements' own business. `sc_line.bmad` calls the shared
+lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD]
+= slice`, and the decks turn on Bmad's master switch,
+`bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so
+`space_charge_com%n_bin` has nothing to say here and is ignored. `space_charge%` in the
+deck holds the solver's numbers and nothing about whether it runs.
 
 `lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a
 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the
@@ -57,8 +65,15 @@ to act on, by matching the `../steady_state` deck parameter for parameter and ad
 That is +0.75% in exit power, past saturation, from the short-range term acting on a
 beam the FEL has bunched.
 
-`space_charge%on` is set in both decks and does not by itself enable anything: the
-solver runs when `nz >= 1` or `longrange = T`. That inconsistency is recorded as a
-defect rather than worked around here.
+Two configurations refuse rather than surprise. `slice` with neither term configured,
+`nz = 0` and `longrange = F`, is refused by name: the solve would cost its full price and
+return an exact zero. And `fft_3d` on an FEL element is refused, since that solver wants a
+three-dimensional grid this walk does not build.
+
+The master switch off while the elements still ask for `slice` is not refused, because
+that is how a lattice is run without space charge without editing it.
+`lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch
+false. The run says so by name and tracks the space-charge-free path, measured as exactly
+the control run's zero.
 
 Runs in ~7 s each.

@@ -719,9 +719,22 @@ $$ (eq-longrange)
 
 where the size scale is the *product* $\sigma_x\sigma_y$ (an effective area, not
 a variance sum: transcribed wrong once, caught at $1.7\times10^{-1}$). The
-per-particle ODE term is $e_z^{\mathrm{short}}(j) - E_i/(m_ec^2)$. Space charge is
-transcribed for consistency. A Bmad-slice implementation behind the same interface is
-an explicit future task.
+per-particle ODE term is $e_z^{\mathrm{short}}(j) - E_i/(m_ec^2)$.
+
+*Where it acts.* Each element's own `space_charge_method` decides, and Bmad's
+`csr_and_space_charge_on` gates the lattice as a whole, exactly as in any Bmad program.
+An FEL element set to `slice` gets the two terms above, with the FEL slices as the bins,
+so `space_charge_com%n_bin` is not consulted. A genesis-model interlude set to `slice`
+gets them through the transcribed interlude step. A Bmad-seam interlude reads the same
+attribute and gets Bmad's own machinery, which is a different model: Gaussian-slab
+longitudinal kicks plus a transverse defocusing term, binned on its own `n_bin`. Nothing
+in an FEL element is Bmad's, and nothing in the seam is this solver's.
+
+A Bmad-slice implementation of the terms above, selected by `space_charge%model`, remains
+a named follow-on. The default stays the transcribed solver on the physics: it carries the
+microbunching harmonics ($l \ge 1$ above) and the $\gamma_z$ of Eq. [](#eq-scsource)'s
+operator scale, which Bmad's slice model has no counterpart for, while what that model
+adds is a transverse kick falling as $\gamma^{-3}$.
 
 (sec-seamwake)=
 ### Bmad element wakes across the window

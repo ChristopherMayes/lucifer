@@ -14,12 +14,20 @@ Three commands, Bmad only:
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_off.in
     ../../../production/bin/lucifer lucifer_short_range.in
+    ../../../production/bin/lucifer lucifer_gate_off.in
     python ../plot_fel.py space_charge.stats.h5
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice
 radial-harmonic solves plus a whole-window long-range term
 (the manual's [space-charge section](../../fel-physics.md)). The two terms answer different
 questions, so this example measures them separately.
+
+Which elements it acts in is the elements' own business. `sc_line.bmad` calls the shared
+lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD]
+= slice`, and the decks turn on Bmad's master switch,
+`bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so
+`space_charge_com%n_bin` has nothing to say here and is ignored. `space_charge%` in the
+deck holds the solver's numbers and nothing about whether it runs.
 
 `lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a
 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the
@@ -66,9 +74,16 @@ to act on, by matching the `../steady_state` deck parameter for parameter and ad
 That is +0.75% in exit power, past saturation, from the short-range term acting on a
 beam the FEL has bunched.
 
-`space_charge%on` is set in both decks and does not by itself enable anything: the
-solver runs when `nz >= 1` or `longrange = T`. That inconsistency is recorded as a
-defect rather than worked around here.
+Two configurations refuse rather than surprise. `slice` with neither term configured,
+`nz = 0` and `longrange = F`, is refused by name: the solve would cost its full price and
+return an exact zero. And `fft_3d` on an FEL element is refused, since that solver wants a
+three-dimensional grid this walk does not build.
+
+The master switch off while the elements still ask for `slice` is not refused, because
+that is how a lattice is run without space charge without editing it.
+`lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch
+false. The run says so by name and tracks the space-charge-free path, measured as exactly
+the control run's zero.
 
 Runs in ~7 s each.
 
@@ -80,10 +95,43 @@ The deck, its variants, and any lattice they name, as they are on disk.
 
 ```fortran
 &fel_params
-  lat_file = "../aramis.bmad"
+  lat_file = "sc_line.bmad"
   global%out_root = "space_charge"
 
-  space_charge%on = T
+  bmad_com%csr_and_space_charge_on = T
+  space_charge%rmax = 250e-6
+  space_charge%nz = 2
+  space_charge%nphi = 1
+  space_charge%longrange = T
+/
+
+&fel_beam_init
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 1.003345e-13
+  beam_init%sig_z = 4e-9
+  beam_init%sig_pz = 0
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_half_width = 2e-4
+  wavefront_init%window_length = 2.4e-8
+  wavefront_init%window_sample = 3
+/
+```
+
+### `lucifer_gate_off.in`
+
+```fortran
+&fel_params
+  lat_file = "sc_line.bmad"
+  global%out_root = "gate_off"
+
+  bmad_com%csr_and_space_charge_on = F
   space_charge%rmax = 250e-6
   space_charge%nz = 2
   space_charge%nphi = 1
@@ -140,9 +188,9 @@ The deck, its variants, and any lattice they name, as they are on disk.
 
 ```fortran
 &fel_params
-  lat_file = "../aramis.bmad"
+  lat_file = "sc_line.bmad"
   global%out_root = "short_range"
-  space_charge%on = T
+  bmad_com%csr_and_space_charge_on = T
   space_charge%rmax = 250e-6
   space_charge%nz = 4
   space_charge%nphi = 1
@@ -164,4 +212,16 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%grid_n_pts = 255
   wavefront_init%grid_half_width = 2e-4
 /
+```
+
+### `sc_line.bmad`
+
+```fortran
+! The benchmark line with space charge asked for on its undulators. The method is Bmad's
+! own space_charge_method attribute, so the same lattice means the same thing in any Bmad
+! program, and the FEL slices are the bins the solve uses.
+
+call, file = ../aramis.bmad
+
+wiggler::*[SPACE_CHARGE_METHOD] = slice
 ```

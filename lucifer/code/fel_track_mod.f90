@@ -922,7 +922,7 @@ q_hat = qquad / p0_mc
 phi0_new = beam%phi0 + length * fel_phi0_rate(xks, xku, p0_mc)
 nslice = size(wf%Ex, 3)
 
-sc_active = coll%efield%on .and. (coll%efield%nz >= 1 .or. coll%efield%longrange)
+sc_active = coll%efield%active .and. (coll%efield%nz >= 1 .or. coll%efield%longrange)
 if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(size(beam%slice)))
 call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
 

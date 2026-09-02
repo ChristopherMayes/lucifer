@@ -54,7 +54,7 @@ type (fel_run_struct), target :: run
 type (fel_global_struct) global
 type (wavefront_init_struct) wavefront_init
 type (fel_chamber_wake_init_struct) chamber_wake
-type (fel_space_charge_struct) space_charge
+type (fel_space_charge_input_struct) space_charge
 type (beam_init_struct) beam_init
 type (fel_resample_param_struct) resample
 character(400) lat_file, beam_file, dist_file, write_genesis_dist, write_openpmd_file
@@ -199,7 +199,7 @@ integer iu
 type (fel_global_struct) global
 type (wavefront_init_struct) wavefront_init
 type (fel_chamber_wake_init_struct) chamber_wake
-type (fel_space_charge_struct) space_charge
+type (fel_space_charge_input_struct) space_charge
 type (beam_init_struct) beam_init
 type (fel_resample_param_struct) resample
 character(400) lat_file, beam_file, dist_file, write_genesis_dist, write_openpmd_file

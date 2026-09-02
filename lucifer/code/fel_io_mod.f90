@@ -185,7 +185,7 @@ write (line, '(5a, i0, 2a)') ' Radiation   lambda0 = ', trim(adjustl(fel_si_str(
 call out_io (s_blank$, r_name, trim(line))
 
 write (line, '(a, l1, a, l1, a, l1)') ' Switches    sr wakes ', run%coll%wake%on, &
-      ', space charge ', run%coll%efield%on, ', radiation damping ', bmad_com%radiation_damping_on
+      ', space charge ', any(run%sc_here), ', radiation damping ', bmad_com%radiation_damping_on
 call out_io (s_blank$, r_name, trim(line))
 
 write (line, '(3a, i0)') ' Output      out_root "', trim(run%global%out_root), '", threads ', n_omp
@@ -1214,10 +1214,9 @@ call H5Gclose_f (g_id, h5e)
 
 ! ------------------------------------------------------------ space charge.
 
-call sub_open ('space_charge', 'fel_space_charge_struct', &
-      'The FEL space-charge description (&fel_params space_charge%).')
-call fel_h5_flag (g_id, 'on', 'space charge on', 'Any space charge at all.', &
-      run%space_charge%on, merr)
+call sub_open ('space_charge', 'fel_space_charge_input_struct', &
+      'The FEL space-charge solver''s numbers (&fel_params space_charge%). Whether it ' // &
+      'ran in a given element is that element''s space_charge_method, in lattice/.')
 call fel_h5_str (g_id, 'model', 'space charge model', &
       'Which space-charge implementation ran.', '', [run%space_charge%model], merr)
 call fel_h5_real (g_id, 'rmax', 'm', 'rmax', &
@@ -1530,7 +1529,7 @@ type (fel_run_struct), target :: run
 type (branch_struct), pointer :: branch
 type (ele_struct), pointer :: ele
 character(*) stats_file
-character(fel_h5_str_len$), allocatable :: names(:), keys(:), tmethod(:)   ! 0:n_ele_track
+character(fel_h5_str_len$), allocatable :: names(:), keys(:), tmethod(:), scmethod(:)   ! 0:n_ele_track
 real(rp), allocatable :: s1(:), s2(:), len_(:), dstep(:), b_max(:), aw(:), l_per(:)
 real(rp), allocatable :: ku(:), k1(:), tilt(:), z_off(:)
 integer, allocatable :: is_fel(:), helical(:)
@@ -1548,7 +1547,7 @@ character(*), parameter :: r_name = 'fel_write_lattice'
 branch => run%lat%branch(0)
 ne = branch%n_ele_track
 
-allocate (names(0:ne), keys(0:ne), tmethod(0:ne), s1(0:ne), s2(0:ne), len_(0:ne), dstep(0:ne))
+allocate (names(0:ne), keys(0:ne), tmethod(0:ne), scmethod(0:ne), s1(0:ne), s2(0:ne), len_(0:ne), dstep(0:ne))
 allocate (b_max(0:ne), aw(0:ne), l_per(0:ne), ku(0:ne), k1(0:ne), tilt(0:ne), z_off(0:ne))
 allocate (is_fel(0:ne), helical(0:ne))
 
@@ -1557,6 +1556,7 @@ do ie = 0, ne
   names(ie) = ele%name
   keys(ie) = key_name(ele%key)
   tmethod(ie) = tracking_method_name(ele%tracking_method)
+  scmethod(ie) = space_charge_method_name(ele%space_charge_method)
   s1(ie) = ele%s_start
   s2(ie) = ele%s
   len_(ie) = ele%value(l$)
@@ -1609,6 +1609,10 @@ call fel_h5_str (g_id, 'tracking_method', 'tracking method', &
       'How the element was tracked, as Bmad names it. FEL_Averaged and FEL_Unaveraged ' // &
       'are the FEL segments, and every other element carries the method Bmad used.', &
       'ele', tmethod, merr)
+call fel_h5_str (g_id, 'space_charge_method', 'space charge method', &
+      'The element''s own space_charge_method, as Bmad names it, which is what decided ' // &
+      'whether space charge acted here. Off unless the element asked for it, and ' // &
+      'Bmad''s csr_and_space_charge_on had to be true as well.', 'ele', scmethod, merr)
 call fel_h5_real (g_id, 'b_max', 'T', 'b_max', 'Peak undulator field, zero elsewhere.', &
       'ele', b_max, merr)
 call fel_h5_real (g_id, 'aw', '1', 'aw', &

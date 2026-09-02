@@ -76,17 +76,35 @@ end type
 ! call (thread safe). This carries only the run facts.
 !-
 
-type fel_space_charge_struct
-  logical :: on = .false.          ! Any space charge at all (shortrange if nz*nphi*ngrid set).
+! The space-charge solver's numbers, as an input group. There is deliberately no gate
+! here: whether space charge runs is the element's own space_charge_method, so an input
+! struct cannot claim one thing while the run does another (FINDINGS 7.34).
+
+type fel_space_charge_input_struct
   ! Which space-charge implementation runs. 'genesis' is the transcribed solver, which
-  ! works per slice on a radial grid. Bmad's own space_charge_method = 'slice' is a
-  ! candidate second value, so this is a field rather than an assumption.
+  ! works per slice on a radial grid, and it is the default on merit: it carries the
+  ! microbunching harmonics and the longitudinal-gamma correction that Bmad's own slice
+  ! model does not, and its path is the one the comparison tier measures. Bmad's method
+  ! is a candidate second value, so this is a field rather than an assumption.
   character(16) :: model = 'genesis'
   real(rp) :: rmax = 0             ! Radial grid extent scale [m]. Grows adaptively as Genesis's.
   integer :: ngrid = 100           ! Radial grid points.
   integer :: nz = 0                ! Longitudinal harmonics. 0 disables the short-range solve.
   integer :: nphi = 0              ! Azimuthal modes m = -nphi..nphi.
   logical :: longrange = .false.   ! The whole-window longESC term.
+end type
+
+! The working copy the solvers read. Same numbers plus the gate, which the walk sets from
+! the element it is standing in and no input can reach.
+
+type fel_space_charge_struct
+  logical :: active = .false.      ! This element's space_charge_method asked for it.
+  character(16) :: model = 'genesis'
+  real(rp) :: rmax = 0
+  integer :: ngrid = 100
+  integer :: nz = 0
+  integer :: nphi = 0
+  logical :: longrange = .false.
 end type
 
 !+
@@ -544,7 +562,7 @@ integer nslice, i, j, ip
 
 nslice = size(beam%slice)
 long_esc(1:nslice) = 0
-if (.not. (ef%on .and. ef%longrange)) return
+if (.not. (ef%active .and. ef%longrange)) return
 
 gamma = gamma0 / sqrt(1 + aw**2)
 allocate (fcur(nslice), fsize(nslice))
@@ -646,7 +664,7 @@ integer np, ngrid, m, l, i, ip
 
 np = sl%n
 ez(1:np) = 0
-if (.not. ef%on .or. ef%nz < 1 .or. np < 1) return
+if (.not. ef%active .or. ef%nz < 1 .or. np < 1) return
 
 ngrid = ef%ngrid
 
