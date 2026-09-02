@@ -100,6 +100,12 @@ type fel_global_struct
   ! compounding rate is measured). A check instrument, not a production mode.
   character(16) :: fp32_check = 'off'
   logical :: fp32_mutate = .false.     ! The instrument's self-test: coarsen the residual.
+  ! The device backend (fel_device_mod): 'off', or 'metal' for the Apple Silicon
+  ! backend on a build that carries it. Alone it runs the averaged FEL step resident
+  ! on the device; combined with fp32_check the device takes the lockstep twin's role
+  ! and the FP64 run is untouched. Everything the backend does not cover is refused
+  ! by name at setup or first use, never quietly run on the CPU instead.
+  character(16) :: device = 'off'
 end type
 
 !+
@@ -207,6 +213,7 @@ type fel_run_struct
   type (fel_field_struct), allocatable :: ffield(:)
   type (fel_collective_struct) :: coll
   type (fel_fp32_struct) :: fp32
+  type (fel_device_struct) :: dev
   type (fel_stats_struct) :: stats
   type (fel_unavg_struct) :: ustate
   ! The schedule (fel_setup): per tracked element.

@@ -275,6 +275,20 @@ do ie = run%i_start, run%i_end
 
     if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 - phase_rate * fel_zoff(ie)
 
+    ! The device's residency (fel_device_mod): with the backend armed and no
+    ! instrument in the way, the beam and the field upload here and stay resident
+    ! through the element. Element wakes are the one refusal only this walk can
+    ! make, since only it resolves them through the lords.
+
+    if (run%dev%on .and. .not. run%fp32%on .and. fel_mode(ie) /= fel_unaveraged$) then
+      if (associated(wake_src)) then
+        call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // &
+                     '" DOES NOT COVER ELEMENT WAKES. AT ELEMENT: ' // trim(ele%name))
+        err_flag = .true.;  return
+      endif
+      call fel_device_element_begin (run%dev, fbeam, wf)
+    endif
+
     do istep = 1, und%nstep
       if (fel_mode(ie) == fel_unaveraged$) then
         call fel_tic (fel_t_unavg$)
@@ -283,7 +297,7 @@ do ie = run%i_start, run%i_end
         call fel_toc (fel_t_unavg$)
         u_spont_cum = u_spont_cum + dU_step
       else
-        call fel_track_und_step (und, fbeam, ffield, coll, err, run%fp32)
+        call fel_track_und_step (und, fbeam, ffield, coll, err, run%fp32, run%dev)
       endif
       if (err) then
         err_flag = .true.;  return
@@ -311,6 +325,12 @@ do ie = run%i_start, run%i_end
       if (istep == und%nstep) call do_migrate ()
       if (err_flag) return
       if (fel_comb_take(comb, z_now, run%z_last_rec, istep == und%nstep)) then
+
+        ! The comb's positions are where the resident state comes back to the host:
+        ! the stats, the diag rows and everything downstream read the refreshed FP64
+        ! arrays. Between rows the host state is stale by design. No-op off-device.
+
+        call fel_device_readback (run%dev, fbeam, wf)
         call take_stats_record (istep == und%nstep)
         if (err_flag) return
         if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
@@ -318,6 +338,7 @@ do ie = run%i_start, run%i_end
       endif
       if (istep /= und%nstep) call progress_line (.false., istep, und%nstep)
     enddo
+    call fel_device_element_end (run%dev, fbeam, wf)   ! The residency boundary: z re-forms in FP64.
     if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
     call end_of_element ()              ! Fills the element-end row before this element's
     if (err_flag) return                !   last progress row reads it.
@@ -503,6 +524,7 @@ if (write_diag) close (iu_diag)
 if (any_unavg) close (iu_ledger)
 if (run%coll%wake%on) close (iu_wake)
 call fel_fp32_close (run%fp32)
+call fel_device_close_run (run%dev)
 
 if (migrate) then
   write (iu_mig, '(a)') '#'
@@ -1006,7 +1028,17 @@ real(rp) slippage
 integer ihh
 logical err_b
 
-!
+! While the field is resident the rotation runs against the device record: the ring
+! bookkeeping is fel_apply_slippage's, the transmitted slice's energy comes back and
+! its device slice is zeroed, and nothing else moves. Harmonics and the escape bank
+! are refused with the device, so the fundamental's record is the whole set here.
+
+if (run%dev%resident) then
+  call fel_tic (fel_t_slippage$)
+  call fel_device_apply_slippage (run%dev, ffield(1)%slip, ffield(1)%wf, slippage)
+  call fel_toc (fel_t_slippage$)
+  return
+endif
 
 call fel_tic (fel_t_slippage$)
 if (keep_escaped_field) then

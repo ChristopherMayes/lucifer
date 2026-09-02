@@ -236,3 +236,17 @@ The deposit's `on_grid` guard cannot become a mask. `fel_grid_weights` leaves `i
 Thread scaling at production slice counts is 9.16x on 12 cores and the nameable serial cost is 0.6% of the walk, so there is little left to win by removing serial work.
 
 The single-precision question is measured rather than argued. `global%fp32_check` steps an FP32 twin of the averaged advance beside the FP64 path and records the divergence per quantity, with the reformulations FP32 forces (offset energy, residual phase, difference-form detuning) and a runtime guard on the one failure that is silent, a residual too coarse for the per-step increment. The measured levels and the guard's own first catch are in [](validation.md#val-fp32-lockstep), and the field solve has its own twin there: FP32 deposit, single-precision transform pair, rounded propagator, with an end-to-end freerun number for the complete single-precision run (1.0e-3 on exit power over a gain segment, and 2.7e-1 in deep saturation where phase decorrelation dominates). An FP32 six-vector is 24 bytes per particle against 48, which is the bandwidth argument for a device path. Whether an FP32 CPU mode ever ships is a decision against those recorded levels, not taken here.
+
+(perf-device)=
+## The device, measured against the CPU
+
+The Metal backend ([](validation.md#val-device)) run against the CPU path on the same decks, one 9 m Aramis segment of 89 steps at `ngrid` 256, `comb_ds_save = -1` so both sides pay stats at the element end only. Walk seconds, best of three, M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps; the difference from its wall clock is the host side of each step, dominated by the dispatch floor.
+
+| case | CPU, 12 threads | device wall | device busy | ratio |
+|---|---|---|---|---|
+| steady state, 1 x 8192 particles | 0.360 s | 0.049 s | 0.015 s | 7.3x |
+| SASE window, 24 x 4096, slippage live | 0.873 s | 0.107 s | 0.048 s | 8.2x |
+| SASE window, 96 x 8192 | 3.92 s | 0.316 s | 0.196 s | 12.4x |
+| dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.037 s | 0.009 s | 0.9x |
+
+The pattern is the reference backends' own: the device pays a fixed cost per step to be told what to do, measured here at (0.037 - 0.009)/89 = 0.31 ms per step of host-side floor on the tiny deck, and the win grows with the work per step. Below the floor the CPU is the right processor, and the last row says so rather than hiding it. The readback schedule is the other knob: these rows read back at the element end only, and `comb_ds_save = 0` (a stats row every step) pays a beam-and-field download per step, which is the same trade the reference manual prices as `output_step`. Kernel tuning beyond residency and the one-command-buffer step is deliberately not attempted here: this landing is judged on correctness and these honest timings.

@@ -593,6 +593,21 @@ fi
 section_time fp32-lockstep
 echo
 
+# Device backend checks: the Metal backend judged by the lockstep instrument with
+# the device in the twin's role, inside its recorded ceilings; the exact-wrap
+# assertion on the fixed-point phase; read-only on the FP64 physics; the perturbed
+# kernel constant moves a recorded level so the check can fail; the freerun twin
+# and the resident production run land in the same end-to-end band; and everything
+# the backend does not cover is refused by name.
+
+echo "--- Device backend checks -------------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: device backend checks; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+section_time device
+echo
+
 # Unaveraged-mode checks (fel-physics.md sec-unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve

@@ -754,6 +754,62 @@ call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, ru
                      fel_p0_mc(fbeam) / fel_gamma0(fbeam) * fbeam%slice_spacing, trim(out_root), err_flag)
 if (err_flag) return
 
+! The device backend. Everything its kernels do not cover is refused here by name --
+! an unsupported configuration stops the run and never quietly takes the CPU path.
+! Element wakes are refused at the element (only the walk sees them), and the grid
+! refusal, naming the nearest supported size, comes back from the backend itself.
+
+if (run%global%device /= '' .and. run%global%device /= 'off') then
+  if (run%any_unavg) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE UNAVERAGED MODE.')
+    err_flag = .true.;  return
+  endif
+  if (run%n_harm > 1) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER HARMONIC FIELD SETS.')
+    err_flag = .true.;  return
+  endif
+  if (run%two_pol) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER TWO-POLARIZATION FIELDS.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%source_model == 'coherent') then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE COHERENT SOURCE MODEL.')
+    err_flag = .true.;  return
+  endif
+  if (run%chamber_wake%on) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER WAKES.')
+    err_flag = .true.;  return
+  endif
+  if (any(run%sc_here)) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SPACE CHARGE.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%migrate) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SLICE MIGRATION.')
+    err_flag = .true.;  return
+  endif
+  if (bmad_com%radiation_damping_on .or. bmad_com%radiation_fluctuations_on) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SPONTANEOUS RADIATION.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%keep_escaped_field) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE ESCAPED-FIELD BANK.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%transport_model /= 'bmad') then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" CARRIES THE BMAD TRANSVERSE MAPS ONLY;', &
+                                   'TRANSPORT_MODEL = "' // trim(run%global%transport_model) // '" IS VALIDATION-INTERNAL.')
+    err_flag = .true.;  return
+  endif
+  block
+    integer ngrid_dev(3)
+    ngrid_dev = wavefront_shape(run%ffield(1)%wf)
+    call fel_device_setup (run%dev, run%global%device, fbeam, ngrid_dev(1), &
+                           run%ffield(1)%slip%sample, run%fp32%iu, err_flag)
+  end block
+  if (err_flag) return
+endif
+
 !------------------------------------------------------------------------------
 contains
 

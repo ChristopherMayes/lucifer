@@ -62,7 +62,9 @@ integer, parameter :: fel_t_stats$ = 14          ! The stats record, the diag an
 integer, parameter :: fel_t_ele_end$ = 15        ! The element-end bunch parameters.
 integer, parameter :: fel_t_dumps$ = 16          ! Mid-run beam and field dumps.
 
-integer, parameter :: fel_t_n$ = 16
+integer, parameter :: fel_t_device$ = 17         ! The resident device step, whole.
+
+integer, parameter :: fel_t_n$ = 17
 
 character(20), parameter :: fel_phase_name(0:fel_t_n$) = [character(20) :: &
       'walk total', &
@@ -70,7 +72,7 @@ character(20), parameter :: fel_phase_name(0:fel_t_n$) = [character(20) :: &
       'field solve', 'unaveraged step', &
       'slippage', 'radiation', 'migration', 'wake', &
       'seam interlude', 'field drift', 'genesis interlude', &
-      'stats and diag', 'element end', 'dumps']
+      'stats and diag', 'element end', 'dumps', 'device step']
 
 integer(8), private :: t_open(0:fel_t_n$) = 0
 integer(8), private :: t_acc(0:fel_t_n$) = 0

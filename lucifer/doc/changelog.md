@@ -9,6 +9,30 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-02 Added: the Metal device backend. `global%device = "metal"` runs the averaged FEL step
+  on an Apple Silicon GPU: the beam and the field upload at each FEL element's entry and stay
+  resident through it, every integration step is one command buffer (transverse maps, the RK4 push,
+  the deposit and the FFT field solve, all FP32), and the state returns at the stats comb's
+  positions and the element end. The seam is one C interface behind `iso_c_binding` with one
+  Objective-C++ file behind it and a refusing stub on every other platform, shaped as the GPUEngine
+  design of this project's own prior Genesis 1.3 v4 backends (branch `gpu/metal-engine`, 4919b01,
+  unmerged upstream); the transform transcribes that backend and the physics kernels transcribe
+  `fel_fp32_mod`'s priced reformulations. One divergence, stated at the citation: the longitudinal
+  state is a 64-bit fixed-point phase in ticks of two pi over 2^32 off a static FP64 per-slice
+  reference, so bucket wraps are exact integer arithmetic and are asserted exactly on the device at
+  every setup. Acceptance is the lockstep instrument with the device in the twin's role: with
+  `fp32_check` set the FP64 run is untouched and the device's rows land in the same stream, inside
+  ceilings at three times the recorded CPU-twin levels (measured: theta 6.8e-6 rad, source 1.5e-5,
+  guard 6.8e6 ticks), with `fp32_mutate` perturbing a kernel constant so a wrong shader moves a
+  recorded level (710x on theta). End to end the freerun twin and the resident production run land
+  at the same 5.1e-4 on exit power against the CPU. Everything the kernels do not cover is refused
+  by name: harmonics, two polarizations, the coherent source, wakes, space charge, radiation,
+  migration, the unaveraged mode, the escaped-field bank, and any grid that is not a power of two
+  from 64 to 1024 (the message names the nearest size). Measured on an M3 Max against 12 CPU cores:
+  7.3x steady, 8.2x to 12.4x time-dependent, with the 0.31 ms per-step dispatch floor stated and the
+  deck below it left to the CPU. The harness gains a device section of thirty-six assertions, and
+  every tier digit holds with the knob off.
+
 - 2026-09-02 Added: the FP32 field solve joins the lockstep instrument, and the end-to-end single-
   precision run has its number. The field twin scatters the deposit into an FP32 source grid,
   transforms it with FFTW's single-precision interface (FFTW_ESTIMATE, the determinism decision the

@@ -66,6 +66,7 @@ module fel_track_mod
 use fel_beam_mod
 use fel_collective_mod
 use fel_fp32_mod
+use fel_device_mod
 use wavefront_mod
 use fel_timer_mod
 
@@ -555,6 +556,64 @@ end subroutine fel_apply_slippage
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_device_apply_slippage (dev, slip, wf, slippage)
+!
+! Routine to account one step's slippage while the field is resident on the device:
+! fel_apply_slippage's exact bookkeeping with the two data motions the rotation needs
+! done against the resident record through fel_device_mod -- the transmitted slice's
+! energy read back (one slice, the reference backends' own slippage traffic) and its
+! device slice zeroed. The host FP64 record stays stale, as between any two
+! readbacks. The escape bank is absent: keep_escaped_field is refused with the
+! device, and so is every harmonic beyond the fundamental.
+!
+! Input:
+!   dev         -- fel_device_struct: The resident device state.
+!   slip        -- fel_slip_struct: Slippage state of the fundamental's record.
+!   wf          -- wavefront_struct: The field record (geometry only; data stays put).
+!   slippage    -- real(rp): Slippage of this step [radiation wavelengths].
+!
+! Output:
+!   dev, slip   -- Updated state; the device record rotated.
+!-
+
+subroutine fel_device_apply_slippage (dev, slip, wf, slippage)
+
+type (fel_device_struct) dev
+type (fel_slip_struct) slip
+type (wavefront_struct) wf
+real(rp) slippage, t_slice
+integer nslice, last, direction
+
+!
+
+t_slice = (slip%sample * wf%wavelength / c_light)
+
+if (.not. slip%timerun) return
+
+slip%accuslip = slip%accuslip + slippage
+nslice = size(wf%Ex, 3)
+
+do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
+  direction = 1
+  if (slip%accuslip < 0) direction = -1
+  slip%accuslip = slip%accuslip - slip%sample * direction
+
+  last = mod(slip%first + nslice - 1, nslice)
+  if (direction < 0) last = mod(last + 1, nslice)
+
+  slip%u_escaped = slip%u_escaped + fel_device_slice_energy(dev, last+1, wf%dx) * t_slice
+  call fel_device_zero_slice (dev, last+1)
+
+  slip%first = last
+  if (direction < 0) slip%first = mod(last + 1, nslice)
+enddo
+
+end subroutine fel_device_apply_slippage
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_und_coupling (und, h) result (fc)
 !
 ! The coupling factor fc(h), transcribed from Undulator::fc. Helical couples the
@@ -699,20 +758,23 @@ end function faw2
 !   err_flag    -- logical: Set True on error.
 !-
 
-subroutine fel_track_und_step (und, beam, ff, coll, err_flag, fp32)
+subroutine fel_track_und_step (und, beam, ff, coll, err_flag, fp32, dev)
 
 type (fel_und_struct) und
 type (fel_beam_struct), target :: beam
 type (fel_field_struct), target :: ff(:)
 type (fel_collective_struct) coll
 type (fel_fp32_struct), optional :: fp32
+type (fel_device_struct), optional :: dev
 logical err_flag
 
-real(rp) ks, phi0_new, kappa, b2_tot, g2_tot
+type (fel_device_par_struct) dpar
+real(rp) ks, phi0_new, phi0_old, kappa, b2_tot, g2_tot
 real(rp) fp_rtmp, fp_gridmax
+real(rp), allocatable :: dev_s0(:,:,:)
 type (fel_coherent_struct), allocatable :: coh(:)
-integer is, io, nslice, nslice_f, ngrid_arr(3)
-logical any_err, err, fp_on
+integer is, io, ikk, nslice, nslice_f, ngrid_arr(3)
+logical any_err, err, fp_on, dev_on, dev_twin, dev_prod
 character(*), parameter :: r_name = 'fel_track_und_step'
 
 !
@@ -757,10 +819,39 @@ call fel_toc (fel_t_sc_profile$)
 
 ! The FP32 lockstep instrument (fel_fp32_mod). Its twin mirrors the fundamental-only,
 ! collective-free advance, so any configuration outside that is refused by name at
-! first use rather than measured wrongly in silence.
+! first use rather than measured wrongly in silence. With the device armed the
+! instrument's twin role passes to the device (fel_device_mod), under the same
+! refusals; without the instrument the device is the run itself, and this routine
+! reduces to the serial prep plus one resident step.
 
 fp_on = .false.
 if (present(fp32)) fp_on = fp32%on
+dev_on = .false.
+if (present(dev)) dev_on = dev%on
+dev_twin = dev_on .and. fp_on
+dev_prod = dev_on .and. .not. fp_on
+
+if (dev_on) then
+  call fill_device_par (dpar)
+  if (fp_on) dpar%mutate = merge(1, 0, fp32%mutate)
+endif
+
+! The production device step: the beam and the field are resident (the walk uploaded
+! them at element entry), so the whole step is one command buffer -- transverse maps,
+! the push in the offset-energy tick-phase chart, deposit and the FP32 field solve --
+! and nothing returns to the host here. The setup refusals hold everything this step
+! does not cover (collectives, harmonics, the second polarization, radiation).
+
+if (dev_prod) then
+  ikk = fel_kernel_index(size(ff(1)%wf%Ex, 1), ff(1)%wf%dx, ks, und%dz)
+  call fel_tic (fel_t_device$)
+  call fel_device_step_run (dev, dpar, fel_kernels(ikk)%exp_k2, beam%phi0, phi0_new, ks, err)
+  call fel_toc (fel_t_device$)
+  if (err) return
+  beam%phi0 = phi0_new
+  err_flag = .false.
+  return
+endif
 if (fp_on .and. .not. fp32%checked) then
   if (size(ff) > 1) then
     call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER HARMONIC FIELD SETS.')
@@ -789,6 +880,7 @@ if (fp_on) then
   ngrid_arr = wavefront_shape(ff(1)%wf)
   fp_gridmax = (ngrid_arr(1) - 1) * ff(1)%wf%dx / 2
 endif
+if (dev_twin) allocate (dev_s0(6, dev%npart, size(beam%slice)))
 
 ! Per-slice sequence in Genesis's order (Beam::track): transverse half, longitudinal
 ! advance (ez inside the RK), the wake's gamma decrement, transverse half. All four are
@@ -798,12 +890,29 @@ endif
 call fel_tic (fel_t_particles$)
 !$OMP parallel do
 do is = 1, size(beam%slice)
+  if (dev_twin) then
+
+    ! The shared state the device twin advances from, taken before the leading half
+    ! step: the device runs the whole step, transverse maps included, where the CPU
+    ! twin below copies later and takes the transverse state from FP64.
+
+    block
+      integer nn
+      nn = beam%slice(is)%n
+      dev_s0(1, 1:nn, is) = beam%slice(is)%x(1:nn)
+      dev_s0(2, 1:nn, is) = beam%slice(is)%px(1:nn)
+      dev_s0(3, 1:nn, is) = beam%slice(is)%y(1:nn)
+      dev_s0(4, 1:nn, is) = beam%slice(is)%py(1:nn)
+      dev_s0(5, 1:nn, is) = beam%slice(is)%z(1:nn)
+      dev_s0(6, 1:nn, is) = beam%slice(is)%pz(1:nn)
+    end block
+  endif
   if (und%bmad_transport) then
     call fel_transverse_track_bmad (und, beam, beam%slice(is), und%dz/2, .true.)
   else
     call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
   endif
-  if (fp_on) then
+  if (fp_on .and. .not. dev_twin) then
 
     ! The shared state the twin advances from, copied at fel_advance's own sequence
     ! point. Block-local like the seam's scratch bunch, one copy per slice per step.
@@ -838,7 +947,21 @@ call fel_toc (fel_t_particles$)
 ! The instrument's step epilogue (rows, stream, guard) now runs after the field twin,
 ! at the end of this routine, so the field rows of this step join the same line.
 
+phi0_old = beam%phi0
 beam%phi0 = phi0_new
+
+! The device twin's uploads and step encode sit before the production solve: the
+! lockstep field image must round from the pre-solve FP64 record, and the encoded
+! step then overlaps the CPU's own solve. The rows read back after both finish.
+
+if (dev_twin) then
+  ikk = fel_kernel_index(size(ff(1)%wf%Ex, 1), ff(1)%wf%dx, ks, und%dz)
+  call fel_tic (fel_t_device$)
+  call fel_device_twin_begin (dev, fp32, beam, ff(1)%wf, dev_s0, dpar, &
+                              fel_kernels(ikk)%exp_k2, phi0_old, phi0_new, ks, err)
+  call fel_toc (fel_t_device$)
+  if (err) return
+endif
 
 ! The coherent source (fel-physics.md sec-coherent-source): per-slice phasor, moments and LG
 ! sums from the just-advanced particles (slice-parallel, each slice its own data),
@@ -925,27 +1048,93 @@ call fel_toc (fel_t_solve$)
 ! The FP32 field twin, serial after the production solve: one FP32 image of each
 ! slice's deposit-transform-propagate step against the FP64 record that now carries it
 ! (fel_fp32_mod). scl_w and the kernel come from the same authorities the production
-! step used.
+! step used. With the device in the twin's role its own step, encoded before the
+! solve, is read back here instead and fills every row of the same stream.
 
 if (fp_on) then
-  block
-    real(rp) fp_scl
-    integer ikk, ifl
-    fp_scl = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
-    fp_scl = fp_scl / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
-    ikk = fel_kernel_index(ngrid_arr(1), ff(1)%wf%dx, twopi / ff(1)%wf%wavelength, und%dz)
-    do is = 1, size(beam%slice)
-      ifl = fel_field_index(ff(1)%slip, is, size(ff(1)%wf%Ex, 3))
-      call fel_fp32_field_twin (fp32, is, beam%slice(is), beam, ff(1)%wf%Ex(:,:,ifl), &
-            fel_kernels(ikk)%exp_k2, fp_scl, ff(1)%wf%dx, fp_gridmax, und%kx, und%ky, &
-            und%ax, und%ay, und%cos_t, und%sin_t, ks)
-    enddo
-  end block
+  if (dev_twin) then
+    call fel_tic (fel_t_device$)
+    call fel_device_twin_rows (dev, fp32, beam, ff(1)%wf, ff(1)%slip%first, dpar, &
+                               phi0_old, phi0_new, ks)
+    call fel_toc (fel_t_device$)
+  else
+    block
+      real(rp) fp_scl
+      integer ikk2, ifl
+      fp_scl = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
+      fp_scl = fp_scl / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
+      ikk2 = fel_kernel_index(ngrid_arr(1), ff(1)%wf%dx, twopi / ff(1)%wf%wavelength, und%dz)
+      do is = 1, size(beam%slice)
+        ifl = fel_field_index(ff(1)%slip, is, size(ff(1)%wf%Ex, 3))
+        call fel_fp32_field_twin (fp32, is, beam%slice(is), beam, ff(1)%wf%Ex(:,:,ifl), &
+              fel_kernels(ikk2)%exp_k2, fp_scl, ff(1)%wf%dx, fp_gridmax, und%kx, und%ky, &
+              und%ax, und%ay, und%cos_t, und%sin_t, ks)
+      enddo
+    end block
+  endif
   call fel_fp32_step_close (fp32, err)
   if (err) return
 endif
 
 err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine fill_device_par (par)
+!
+! Routine to fill one step's device constants from the same authorities the FP64
+! step reads: the undulator segment, the beam's references, the fundamental's grid,
+! and fel_field_step's own source scale. The Bmad transverse map's k1 locals are
+! fel_transverse_track_bmad's forms.
+!-
+
+subroutine fill_device_par (par)
+
+type (fel_device_par_struct) par
+real(rp) g_max, p0_mc_l
+integer ngrid_l(3)
+
+!
+
+p0_mc_l = fel_p0_mc(beam)
+par%dz = und%dz
+par%ks = ks
+par%ku = und%ku
+par%aw = und%aw
+par%qres = 2 * und%ku / ks
+par%e0 = p0_mc_l**2 / fel_gamma0(beam)
+par%gam0 = fel_gamma0(beam)
+par%p0_mc = p0_mc_l
+par%rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
+par%kx = und%kx;  par%ky = und%ky
+par%ax = und%ax;  par%ay = und%ay
+par%cos_t = und%cos_t;  par%sin_t = und%sin_t
+
+if (und%helical) then
+  g_max = und%aw * und%ku / p0_mc_l
+  par%k1x = -0.5_rp * g_max**2
+  par%k1y = par%k1x
+else
+  g_max = und%aw * sqrt(2.0_rp) * und%ku / p0_mc_l
+  par%k1x = 0
+  par%k1y = -0.5_rp * g_max**2
+endif
+
+ngrid_l = wavefront_shape(ff(1)%wf)
+par%gridmax = (ngrid_l(1) - 1) * ff(1)%wf%dx / 2
+par%dgrid = ff(1)%wf%dx
+
+par%scl_w = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
+par%scl_w = par%scl_w / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
+
+par%first = ff(1)%slip%first
+par%helical = merge(1, 0, und%helical)
+par%mutate = 0
+par%pad = 0
+
+end subroutine fill_device_par
 
 end subroutine fel_track_und_step
 

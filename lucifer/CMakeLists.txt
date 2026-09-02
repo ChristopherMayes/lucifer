@@ -31,3 +31,31 @@ set (EXE_SPECS
 )
 
 include($ENV{ACC_BUILD_SYSTEM}/Master.cmake)
+
+# The device seam (device/lucifer_device.h): exactly one implementation file joins
+# the library, chosen here and nowhere else. Darwin compiles the Metal backend
+# (Objective-C++, so its own language and the two frameworks) and every other
+# platform compiles a stub that refuses by name, so the same tree builds everywhere
+# and a deck asking for a device on a stub build gets an error, not a fallback.
+# device/ is deliberately outside SRC_DIRS: Master.cmake globs whole directories,
+# and these two files must never both compile.
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  enable_language(OBJCXX)
+  set (CMAKE_OBJCXX_STANDARD 17)
+  set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+  find_library (METAL_LIBRARY Metal REQUIRED)
+  find_library (FOUNDATION_LIBRARY Foundation REQUIRED)
+  target_sources (lucifer PRIVATE device/lucifer_metal.mm)
+  set_source_files_properties (device/lucifer_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  target_link_libraries (lucifer ${METAL_LIBRARY} ${FOUNDATION_LIBRARY})
+  if (TARGET lucifer-shared)
+    target_sources (lucifer-shared PRIVATE device/lucifer_metal.mm)
+    target_link_libraries (lucifer-shared ${METAL_LIBRARY} ${FOUNDATION_LIBRARY})
+  endif ()
+else ()
+  target_sources (lucifer PRIVATE device/lucifer_device_stub.c)
+  if (TARGET lucifer-shared)
+    target_sources (lucifer-shared PRIVATE device/lucifer_device_stub.c)
+  endif ()
+endif ()

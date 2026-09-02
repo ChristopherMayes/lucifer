@@ -937,6 +937,37 @@ The gain-regime figure sits at the order of the published backends' end-to-end S
 
 The instrument is read-only on the physics by construction and by check: nothing outside it reads the FP32 state, and the instrumented run's FP64 outputs are byte-identical to the uninstrumented run's. Configurations the twin does not cover (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode) are refused by name rather than half-measured.
 
+(val-device)=
+## The Metal backend, judged by the instrument
+
+`global%device = "metal"` runs the averaged FEL step on an Apple Silicon GPU ([](input-reference.md#param-global-device)). The seam is one C interface (`device/lucifer_device.h`) behind `iso_c_binding`, one Objective-C++ file behind that, and a stub that refuses by name on every other platform; no Metal type or call appears anywhere else, so a second backend is a new implementation of the same interface plus one CMake branch. The design is this project's own prior work, the Genesis 1.3 v4 backends on branch `gpu/metal-engine` (commit 4919b01, unmerged upstream): the transform kernels, the one-command-buffer step and the buffer-sync rule transcribe `MetalEngine.mm` from that branch, while the physics kernels transcribe Lucifer's own `fel_fp32_mod` twin and the Bmad transverse map, so the arithmetic the device runs is the arithmetic the lockstep instrument already priced.
+
+One deliberate divergence from the reference backend, stated where the citation is: the longitudinal state is not an absolute FP32 theta but a 64-bit fixed-point phase, in ticks of $2\pi/2^{32}$ off a static FP64 per-slice reference. The low 32 bits are the phase modulo one radiation period at a uniform 1.5e-9 rad, the high bits count whole periods, and a bucket crossing is exact integer arithmetic -- the migration operation a later landing needs. The uniform quantum is what lets the reference stay static for a whole element where the FP32 residual of [](#val-fp32-lockstep) needed a moving one. Bucket wraps are modular arithmetic and are asserted exactly, on the device's own arithmetic at every setup: a bucket shift and its return must be bit-exact and the extracted phase must never see the shift, a statement no tolerance is allowed to soften.
+
+The backend is judged by the lockstep machinery with the device in the twin's role: `device = "metal"` with `fp32_check = "lockstep"` leaves the FP64 run untouched (diag byte-identical, on against off) and the device advances every step from the shared pre-step state, whole -- its own transverse maps, push, deposit and field solve -- with the rows in the same `.fp32.txt` stream. The ceilings are three times the recorded CPU-twin levels above, absorbing that Metal's precise-math sincos is not libm and its fused ops round differently; the transverse rows get their own recorded levels, since the CPU twin refreshed those from FP64 and the device runs its own FP32 maps. A jump against the refreshed reference is a kernel bug by definition. Measured levels, worst over the run (M3 Max, both builds agree; the check cases of `check_device.py`, grid 64):
+
+| case | x..py (relative) | pz (relative) | theta [rad] | phasor | source | field | guard [tick] |
+|---|---|---|---|---|---|---|---|
+| steady state, 1024 particles | 2.7e-7 | 1.4e-7 | 6.6e-6 | 7.3e-8 | 1.5e-5 | 1.5e-5 | 8.8e6 |
+| SASE window, 8 slices x 1024, slippage live | 2.8e-7 | 1.4e-7 | 6.8e-6 | 1.0e-7 | 6.4e-6 | 6.4e-6 | 6.8e6 |
+
+The guard column is the median per-step phase increment in ticks of the fixed-point quantum; its floor plays the same silent-z role as the residual guard above. The mutation hook reaches the kernels themselves: `fp32_mutate` perturbs the detuning resonance inside the shader by one part in $2^{12}$ and coarsens the uploaded phase, and the theta and source levels move by 710x and 52x, so the ceilings are demonstrated to catch a wrong kernel constant, not just a wrong upload.
+
+End to end the two roles corroborate each other. The freerun twin (state resident and compounding, single-slice window) lands at 5.1e-4 on exit power; the production run (`fp32_check` off, the device is the run, beam and field resident through each element with readbacks only at the stats comb's positions) lands at 5.1e-4 against the CPU run's diag rows on the same deck -- the freerun-measured order, and the same number twice by different routes. Wall times against the CPU are in [](performance.md#perf-device), with the dispatch floor stated.
+
+| check (harness section `device`) | level |
+|---|---|
+| device lockstep steady and TD levels within the recorded ceilings | x..py 1e-6, pz 1.3e-6, theta 1.5e-4, phasor 2.2e-5, source 2.2e-4, field 2.2e-4 |
+| phase-increment guard healthy | >= 1e6 ticks (measured 6.8e6 to 8.8e6) |
+| bucket wraps exact on device arithmetic | asserted bit-exact, never a tolerance |
+| FP64 untouched: diag byte-identical, device twin on vs off, steady and TD | exact |
+| the perturbed kernel constant moves the recorded levels | theta >= 10x, source >= 5x (measured 710x, 52x) |
+| device freerun compounds past lockstep on the phasor | measured 14x |
+| freerun and production exit power vs CPU, steady and TD | <= 1.6e-3 (measured 5.1e-4, 5.1e-4, 1.5e-5) |
+| wakes, migration, radiation, harmonics, the unaveraged mode, an unknown backend, an unsupported grid | each refused by name |
+
+One property is inherited from the reference backends and documented rather than fought: the deposit accumulates with device atomic adds whose ordering is not fixed, so two runs of the same step differ in the source's last bit or two. No device output is therefore asserted byte-identical against another device run; the read-only proofs compare FP64 outputs only, and the ceilings absorb the flutter. Everything the kernels do not cover is refused by name at setup or first use, and a build without the backend (any platform but Darwin) refuses the knob itself with the stub's own message.
+
 (val-the-coarsestep-measurement)=
 ## The coarse-step measurement
 
