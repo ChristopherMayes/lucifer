@@ -242,6 +242,16 @@ call out_io (s_blank$, r_name, trim(line))
 
 call fel_timer_write (r_name)
 
+! The FP32 lockstep instrument's worst case, when it ran. The full per-step record
+! and the summary block are in the .fp32.txt file listed below.
+
+if (run%fp32%on) then
+  write (line, '(a, 3(a, es9.2), a, es9.2)') ' FP32        worst', &
+        ' pz ', run%fp32%worst(5), ', theta ', run%fp32%worst(6), &
+        ', phasor ', run%fp32%worst(7), ', guard ulp ', run%fp32%ulp_min
+  call out_io (s_blank$, r_name, trim(line))
+endif
+
 ! The file list is by existence, not by replaying which switches were on: a candidate
 ! name that is there gets listed with its size, and the naming rules stay in the one
 ! place that owns them (the writers).
@@ -259,6 +269,7 @@ call note_file (trim(run%global%out_root) // '.stats.h5')
 call note_file (trim(run%global%out_root) // '.diag.txt')
 call note_file (trim(run%global%out_root) // '.ledger.txt')
 call note_file (trim(run%global%out_root) // '.import.txt')
+call note_file (trim(run%global%out_root) // '.fp32.txt')
 call note_file (trim(run%global%out_root) // '.migration.txt')
 
 call out_io (s_blank$, r_name, &

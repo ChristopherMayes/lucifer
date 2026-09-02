@@ -743,6 +743,17 @@ endif
 call setup_diagnostics ()
 if (err_flag) return
 
+! The FP32 lockstep instrument. Its twin mirrors the averaged advance, so a lattice
+! with unaveraged segments is refused by name rather than half-instrumented.
+
+if (run%global%fp32_check /= '' .and. run%global%fp32_check /= 'off' .and. run%any_unavg) then
+  call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER THE UNAVERAGED MODE.')
+  err_flag = .true.;  return
+endif
+call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, run%nslice, &
+                     fel_p0_mc(fbeam) / fel_gamma0(fbeam) * fbeam%slice_spacing, trim(out_root), err_flag)
+if (err_flag) return
+
 !------------------------------------------------------------------------------
 contains
 

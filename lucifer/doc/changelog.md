@@ -9,6 +9,21 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-02 Added: the FP32 lockstep instrument. `global%fp32_check = "lockstep"` steps a single-
+  precision twin of the averaged FEL advance beside the FP64 path from a shared state and records
+  per-quantity divergence to `<out_root>.fp32.txt` ("freerun" carries the FP32 state so the
+  compounding rate is measured too). The twin carries the reformulations FP32 forces: energy as an
+  offset (the FP32 quantum of absolute gamma exceeds the per-step change), phase as a residual off
+  an FP64 per-slice reference with the base rotator evaluated once per slice, and the ODE detuning
+  as a difference of like small quantities (the FP64 form's square-root argument rounds to exactly 1
+  in FP32). A runtime guard refuses a run whose residual cannot resolve the per-step increment, the
+  silent failure mode, and it fired on the instrument's own first run: a static reference let the
+  beam's secular z drift grow the residual until step 514 of 1068, so the reference now follows the
+  slice mean. Measured on the way to saturation, FP32 costs about 4e-7 on the energy chart, 5e-5 rad
+  on the phase and under 1e-5 on the source phasor per step. The FP64 path is untouched: the
+  instrumented run's outputs are byte-identical to the uninstrumented run's, and every tier digit
+  holds. Harness section `fp32-lockstep` records the levels and proves the check can fail.
+  doc/validation.md carries the tables.
 - 2026-09-02 Changed: the unaveraged push runs stage-major. Each RK4 stage is one loop over the
   slice's particles into per-particle stage arrays, with the combination a last loop, instead of
   four stages walked inside each particle through a call tree. Per particle the arithmetic is the

@@ -579,6 +579,20 @@ fi
 section_time collective
 echo
 
+# FP32 lockstep checks: the single-precision particle path's divergence from the
+# FP64 reference lands inside its recorded ceilings, the instrument is read-only on
+# the FP64 physics (diag byte-identical on vs off), its mutation hook moves the
+# recorded level so the check can fail, freerun measures the compounding rate, and
+# configurations the twin does not cover are refused by name.
+
+echo "--- FP32 lockstep checks --------------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_fp32.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: FP32 lockstep checks; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+section_time fp32-lockstep
+echo
+
 # Unaveraged-mode checks (fel-physics.md sec-unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve

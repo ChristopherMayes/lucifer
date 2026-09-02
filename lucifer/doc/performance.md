@@ -234,3 +234,5 @@ The deposit's `on_grid` guard cannot become a mask. `fel_grid_weights` leaves `i
 `fel_advance`'s loops call `fel_sincos` and `fel_runge_kutta` per particle, so `!$omp simd` cannot apply to them until the sincos itself is vectorizable.
 
 Thread scaling at production slice counts is 9.16x on 12 cores and the nameable serial cost is 0.6% of the walk, so there is little left to win by removing serial work.
+
+The single-precision question is measured rather than argued. `global%fp32_check` steps an FP32 twin of the averaged advance beside the FP64 path and records the divergence per quantity, with the reformulations FP32 forces (offset energy, residual phase, difference-form detuning) and a runtime guard on the one failure that is silent, a residual too coarse for the per-step increment. The measured levels and the guard's own first catch are in [](validation.md#val-fp32-lockstep). An FP32 six-vector is 24 bytes per particle against 48, which is the bandwidth argument for a device path; whether an FP32 CPU mode ever ships is a decision against those recorded levels, not taken here.

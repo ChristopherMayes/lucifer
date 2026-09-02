@@ -65,6 +65,7 @@ module fel_track_mod
 
 use fel_beam_mod
 use fel_collective_mod
+use fel_fp32_mod
 use wavefront_mod
 use fel_timer_mod
 
@@ -698,18 +699,20 @@ end function faw2
 !   err_flag    -- logical: Set True on error.
 !-
 
-subroutine fel_track_und_step (und, beam, ff, coll, err_flag)
+subroutine fel_track_und_step (und, beam, ff, coll, err_flag, fp32)
 
 type (fel_und_struct) und
 type (fel_beam_struct), target :: beam
 type (fel_field_struct), target :: ff(:)
 type (fel_collective_struct) coll
+type (fel_fp32_struct), optional :: fp32
 logical err_flag
 
 real(rp) ks, phi0_new, kappa, b2_tot, g2_tot
+real(rp) fp_rtmp, fp_gridmax
 type (fel_coherent_struct), allocatable :: coh(:)
 integer is, io, nslice, nslice_f, ngrid_arr(3)
-logical any_err, err
+logical any_err, err, fp_on
 character(*), parameter :: r_name = 'fel_track_und_step'
 
 !
@@ -752,6 +755,41 @@ if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(nslice))
 call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_esc)
 call fel_toc (fel_t_sc_profile$)
 
+! The FP32 lockstep instrument (fel_fp32_mod). Its twin mirrors the fundamental-only,
+! collective-free advance, so any configuration outside that is refused by name at
+! first use rather than measured wrongly in silence.
+
+fp_on = .false.
+if (present(fp32)) fp_on = fp32%on
+if (fp_on .and. .not. fp32%checked) then
+  if (size(ff) > 1) then
+    call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER HARMONIC FIELD SETS.')
+    return
+  endif
+  if (allocated(ff(1)%wf%Ey)) then
+    call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER TWO-POLARIZATION FIELDS.')
+    return
+  endif
+  if (und%source_model == fel_source_coherent$) then
+    call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER THE COHERENT SOURCE MODEL.')
+    return
+  endif
+  if (coll%wake%on) then
+    call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER WAKES.')
+    return
+  endif
+  if (coll%efield%active) then
+    call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER SPACE CHARGE.')
+    return
+  endif
+  fp32%checked = .true.
+endif
+if (fp_on) then
+  fp_rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
+  ngrid_arr = wavefront_shape(ff(1)%wf)
+  fp_gridmax = (ngrid_arr(1) - 1) * ff(1)%wf%dx / 2
+endif
+
 ! Per-slice sequence in Genesis's order (Beam::track): transverse half, longitudinal
 ! advance (ez inside the RK), the wake's gamma decrement, transverse half. All four are
 ! per-slice pure, so folding them into one loop is arithmetic-identical to Genesis's
@@ -765,7 +803,28 @@ do is = 1, size(beam%slice)
   else
     call fel_transverse_track (und, beam, beam%slice(is), und%dz/2)
   endif
-  call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is)
+  if (fp_on) then
+
+    ! The shared state the twin advances from, copied at fel_advance's own sequence
+    ! point. Block-local like the seam's scratch bunch, one copy per slice per step.
+
+    block
+      real(rp), allocatable :: cx(:), cy(:), cpx(:), cpy(:), cz(:), cpz(:)
+      integer nn
+      nn = beam%slice(is)%n
+      cx = beam%slice(is)%x(1:nn);    cy = beam%slice(is)%y(1:nn)
+      cpx = beam%slice(is)%px(1:nn);  cpy = beam%slice(is)%py(1:nn)
+      cz = beam%slice(is)%z(1:nn);    cpz = beam%slice(is)%pz(1:nn)
+      call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is)
+      call fel_fp32_twin_slice (fp32, is, cx, cy, cpx, cpy, cz, cpz, beam%slice(is), beam, &
+            ff(1)%wf%Ex(:, :, fel_field_index(ff(1)%slip, is, size(ff(1)%wf%Ex, 3))), &
+            ff(1)%wf%dx, ff(1)%wf%dy, fp_gridmax, und%aw, und%ku, und%kx, und%ky, &
+            und%ax, und%ay, und%cos_t, und%sin_t, fp_rtmp, und%dz, ks, und%ku, &
+            beam%phi0, phi0_new)
+    end block
+  else
+    call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is)
+  endif
   call fel_wake_apply_slice (coll%wake, beam, is, und%dz)
   if (und%bmad_transport) then
     call fel_transverse_track_bmad (und, beam, beam%slice(is), und%dz/2, .false.)
@@ -775,6 +834,13 @@ do is = 1, size(beam%slice)
 enddo
 !$OMP end parallel do
 call fel_toc (fel_t_particles$)
+
+! The instrument's serial epilogue: reduce the step's rows, write, run the guard.
+
+if (fp_on) then
+  call fel_fp32_step_close (fp32, err)
+  if (err) return
+endif
 
 beam%phi0 = phi0_new
 

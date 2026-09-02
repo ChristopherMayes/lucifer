@@ -38,6 +38,8 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 | `global%load_only` | `F` | Build the initial state, dump it, exit without tracking |
 | `global%migrate` | `F` | Move particles between slices when their ponderomotive phase leaves the slice |
 | `global%migrate_check` | `F` | Verify phase continuity at every migration and report the worst deviation |
+| `global%fp32_check` | `"off"` | Step a single-precision twin beside the FP64 path and record its divergence: `"lockstep"` or `"freerun"` |
+| `global%fp32_mutate` | `F` | The instrument's self-test: coarsen the FP32 residual so the recorded level must move |
 
 (param-global-interlude-model)=
 **`global%interlude_model`** selects how the field-free elements are handled. `"bmad"` is the seam: Bmad's own `track1_bunch`, an exact theta mapping, and `wavefront_drift` for the field. `"genesis"` uses the transcribed interlude step everywhere, which prices what the seam changes. The slippage schedule is identical in both models. The physics is in the manual's interlude and seam sections.
@@ -50,6 +52,9 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 
 (param-global-track-start)=
 **`global%track_start`** and **`global%track_end`** bound the walk, using Bmad's element-locator syntax. The schedule (slippage, autophasing, break geometry) is always built on the full lattice, so a windowed run composes exactly with the full one: the first span followed by the second, started from the first's dumps, reproduces the one-shot run. The measured level is in [](validation.md#val-the-programs-own-identities).
+
+(param-global-fp32-check)=
+**`global%fp32_check`** arms the FP32 lockstep instrument, a check rather than a production mode: an FP32 twin of the averaged FEL advance steps beside the FP64 path from a shared state, and the per-quantity divergence goes to `<out_root>.fp32.txt` with the worst case in the footer. `"lockstep"` rebuilds the FP32 state from FP64 every step, so a wrong formula shows as a jump; `"freerun"` carries the FP32 longitudinal state across steps, so the compounding rate is measured. The twin covers the fundamental-only, collective-free averaged advance and refuses anything else by name (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode). A run whose FP32 residual cannot resolve the per-step phase increment is refused by the runtime guard rather than reported as a clean number. The FP64 physics is untouched: the instrumented run's outputs are byte-identical to the uninstrumented run's. The measured levels are in [](validation.md#val-fp32-lockstep). `fp32_mutate` coarsens the FP32 residual by eight mantissa bits so the harness can prove the check fails when the path is wrong.
 
 (param-global-migrate)=
 **`global%migrate`** is off by default, and the reason is the comparison rather than the physics: the tiers that compare against Genesis 1.3 Version 4 (Genesis4) run against a code that never migrates, so migration inside a transcription-level comparison would be a model difference. Dropped charge is counted and reported per event. With `migrate_check = T` the run also verifies exact phase continuity at every migration. See [](fel-physics.md#sec-migration).

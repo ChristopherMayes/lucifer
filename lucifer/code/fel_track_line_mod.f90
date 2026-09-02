@@ -283,7 +283,7 @@ do ie = run%i_start, run%i_end
         call fel_toc (fel_t_unavg$)
         u_spont_cum = u_spont_cum + dU_step
       else
-        call fel_track_und_step (und, fbeam, ffield, coll, err)
+        call fel_track_und_step (und, fbeam, ffield, coll, err, run%fp32)
       endif
       if (err) then
         err_flag = .true.;  return
@@ -502,6 +502,7 @@ enddo
 if (write_diag) close (iu_diag)
 if (any_unavg) close (iu_ledger)
 if (run%coll%wake%on) close (iu_wake)
+call fel_fp32_close (run%fp32)
 
 if (migrate) then
   write (iu_mig, '(a)') '#'

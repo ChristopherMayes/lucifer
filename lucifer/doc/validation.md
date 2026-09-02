@@ -895,6 +895,36 @@ Genesis4 on the 8192 case (143 vs 99 s) now sits in the per-slice field FFTs and
 wake-path interludes, with the clang-twin numbers bounding what further particle-path
 codegen work could still buy (~68 ns vs our ~125 per particle-step).
 
+(val-fp32-lockstep)=
+## The FP32 particle path, priced by lockstep
+
+Apple GPUs have no FP64, so a single-precision form of the averaged FEL advance exists as a measured object before any kernel: an FP32 twin steps beside the FP64 path from a shared state at `fel_advance`'s own sequence point, and `global%fp32_check` records the per-quantity divergence (`fel_fp32_mod`, [](input-reference.md#param-global-fp32-check)). The twin carries the three reformulations FP32 forces, each documented in the module header with the quantum that forces it: energy as an offset from the reference (the FP32 quantum of absolute gamma is 1.35e-3 against a per-step change of 3.0e-4), phase as a residual with the base rotator evaluated in FP64 once per slice, and the detuning as a difference of like small quantities (the FP64 ODE's square-root argument is 1 minus ~1.3e-8, which is exactly 1 in FP32 and erases the phase equation).
+
+The longitudinal residual needs a moving reference, and the instrument's own guard found that. The split is $z = z_{ref} + dz$ with the reference one FP64 number per slice; on the instrument's first run the reference was static, the beam's common $z$ drift accumulated into the residual, and at step 514 of 1068 the guard refused the run at 28 ulps against its floor of 32. A secular term in the residual is silent death by quantization, so the reference now follows the slice's FP64 mean each step, one host number per slice, and in freerun mode the persistent residuals rebase across the move with `fel_fp32_renorm`, the same operation migration needs (round trip measured at 1 ulp).
+
+Measured levels, worst over the run per quantity (M3 Max, production build; debug agrees):
+
+| case | pz (relative) | theta [rad] | phasor (of full charge) | guard [ulp] |
+|---|---|---|---|---|
+| steady state, 2048 particles, 57 m through saturation | 4.2e-7 | 4.7e-5 | 7.2e-6 | 1.9e3 |
+| SASE, 96 slices x 2048, full line through saturation | 4.1e-7 | 5.7e-5 | 2.8e-6 | 8.2e2 |
+| freerun (compounding), steady state | 1.6e0 | 2.9e1 | 8.5e-2 | 2.3e3 |
+
+The lockstep rows are the per-step cost of FP32: about 4e-7 on the energy chart, 5e-5 rad on the phase, under 1e-5 on the source term, flat across a run because the state refreshes each step. The freerun row is trajectory decorrelation through saturation, where the dynamics amplify any perturbation; per-particle trajectories are not the observable, and the phasor's 8.5e-2 worst case is the number a production FP32 decision would weigh. The transverse rows measure representation only (~6e-8, FP32 epsilon), since the transverse maps stay FP64.
+
+| check (harness section `fp32-lockstep`) | level |
+|---|---|
+| lockstep steady and TD levels within the recorded ceilings | pz 2e-6, theta 3e-4, phasor 3e-5 |
+| residual guard healthy | >= 256 ulp (measured 5.7e3 to 6.8e3 on the check cases) |
+| bucket renormalization round trip | <= 1.5 ulp (measured 1.0) |
+| FP64 untouched: diag byte-identical, instrument on vs off | exact |
+| the mutation moves the theta level | >= 10x (measured 12.5x) |
+| freerun compounds past lockstep on the phasor | measured 13x |
+| instrument stream at 1 vs 8 threads | byte-identical |
+| wake with the instrument on | refused by name |
+
+The instrument is read-only on the physics by construction and by check: nothing outside it reads the FP32 state, and the instrumented run's FP64 outputs are byte-identical to the uninstrumented run's. Configurations the twin does not cover (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode) are refused by name rather than half-measured.
+
 (val-the-coarsestep-measurement)=
 ## The coarse-step measurement
 

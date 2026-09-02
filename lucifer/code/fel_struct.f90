@@ -95,6 +95,11 @@ type fel_global_struct
   ! useful in a lab notebook and a leak outside one. Genesis records them always. Parity
   ! is not a reason to leak.
   logical :: record_environment = .false.
+  ! The FP32 lockstep instrument (fel_fp32_mod): 'off', 'lockstep' (the FP32 twin
+  ! rebuilt from FP64 every step) or 'freerun' (its longitudinal state carries, so the
+  ! compounding rate is measured). A check instrument, not a production mode.
+  character(16) :: fp32_check = 'off'
+  logical :: fp32_mutate = .false.     ! The instrument's self-test: coarsen the residual.
 end type
 
 !+
@@ -201,6 +206,7 @@ type fel_run_struct
   type (fel_beam_struct) :: fbeam
   type (fel_field_struct), allocatable :: ffield(:)
   type (fel_collective_struct) :: coll
+  type (fel_fp32_struct) :: fp32
   type (fel_stats_struct) :: stats
   type (fel_unavg_struct) :: ustate
   ! The schedule (fel_setup): per tracked element.
