@@ -902,24 +902,36 @@ Apple GPUs have no FP64, so a single-precision form of the averaged FEL advance 
 
 The longitudinal residual needs a moving reference, and the instrument's own guard found that. The split is $z = z_{ref} + dz$ with the reference one FP64 number per slice; on the instrument's first run the reference was static, the beam's common $z$ drift accumulated into the residual, and at step 514 of 1068 the guard refused the run at 28 ulps against its floor of 32. A secular term in the residual is silent death by quantization, so the reference now follows the slice's FP64 mean each step, one host number per slice, and in freerun mode the persistent residuals rebase across the move with `fel_fp32_renorm`, the same operation migration needs (round trip measured at 1 ulp).
 
+The field solve has its own twin: the deposit scattered into an FP32 source grid, FFTW's single-precision transform pair, and the propagator rounded from the FP64 kernel, applied to the twin's own field record each step. Two rows join the stream, the source grid and the post-solve field, both against the FP64 post-solve field's norm. In freerun the FP32 field carries across steps, fed by the twin's own deposit and read by its own gather, so the twin is a complete single-precision run beside the FP64 one, longitudinal and field state alike (the transverse maps stay FP64 and enter rounded). A freerun window is one slice by refusal: the twin keeps no slippage rotation of its own.
+
 Measured levels, worst over the run per quantity (M3 Max, production build; debug agrees):
 
-| case | pz (relative) | theta [rad] | phasor (of full charge) | guard [ulp] |
-|---|---|---|---|---|
-| steady state, 2048 particles, 57 m through saturation | 4.2e-7 | 4.7e-5 | 7.2e-6 | 1.9e3 |
-| SASE, 96 slices x 2048, full line through saturation | 4.1e-7 | 5.7e-5 | 2.8e-6 | 8.2e2 |
-| freerun (compounding), steady state | 1.6e0 | 2.9e1 | 8.5e-2 | 2.3e3 |
+| case | pz (relative) | theta [rad] | phasor (of full charge) | source | field | guard [ulp] |
+|---|---|---|---|---|---|---|
+| steady state, 2048 particles, 57 m through saturation | 4.2e-7 | 4.7e-5 | 7.2e-6 | 7.2e-5 | 7.2e-5 | 1.9e3 |
+| SASE, 96 slices x 2048, full line through saturation | 4.1e-7 | 5.7e-5 | 2.8e-6 | 4.1e-5 | 4.1e-5 | 8.2e2 |
+| freerun (compounding), steady state | 1.8e0 | 3.3e1 | 2.1e-1 | 4.0e-2 | 1.3e0 | 2.2e3 |
 
-The lockstep rows are the per-step cost of FP32: about 4e-7 on the energy chart, 5e-5 rad on the phase, under 1e-5 on the source term, flat across a run because the state refreshes each step. The freerun row is trajectory decorrelation through saturation, where the dynamics amplify any perturbation; per-particle trajectories are not the observable, and the phasor's 8.5e-2 worst case is the number a production FP32 decision would weigh. The transverse rows measure representation only (~6e-8, FP32 epsilon), since the transverse maps stay FP64.
+The lockstep rows are the per-step cost of FP32: about 4e-7 on the energy chart, 5e-5 rad on the phase, under 1e-5 on the source term and under 1e-4 on the field step, flat across a run because the state refreshes each step. The source and field rows agree to three digits, so the deposit's FP32 phase noise dominates the step and the single-precision transform contributes beneath it, consistent with published transform-only figures of 2.2e-7 to 4.0e-7. The transverse rows measure representation only (~6e-8, FP32 epsilon), since the transverse maps stay FP64.
+
+The end-to-end number, the one a device port is judged against:
+
+| case | exit power (relative) | exit bunching (absolute) |
+|---|---|---|
+| freerun, one 3.99 m segment, exponential gain | 1.0e-3 | 2.9e-8 |
+| freerun, 57 m steady state, deep saturation | 2.7e-1 | 3.6e-2 |
+
+The gain-regime figure sits at the order of the published backends' end-to-end SASE comparison (6.7e-4). The deep-saturation figure is a different animal and reads as one: past saturation the power oscillates with the synchrotron rotation, an FP32 trajectory ends at a visibly different phase of that oscillation, and a 27% instantaneous power difference at one z is what phase decorrelation looks like there, with the bunching magnitude off by 3.6e-2 on 0.185. A device port validated per step by this instrument's lockstep rows is not exposed to that compounding; a device run trusted end to end through deep saturation is, in FP32, and now the number is on record rather than discovered later.
 
 | check (harness section `fp32-lockstep`) | level |
 |---|---|
-| lockstep steady and TD levels within the recorded ceilings | pz 2e-6, theta 3e-4, phasor 3e-5 |
+| lockstep steady and TD levels within the recorded ceilings | pz 2e-6, theta 3e-4, phasor 3e-5, source 1e-4, field 1e-4 |
 | residual guard healthy | >= 256 ulp (measured 5.7e3 to 6.8e3 on the check cases) |
 | bucket renormalization round trip | <= 1.5 ulp (measured 1.0) |
 | FP64 untouched: diag byte-identical, instrument on vs off | exact |
-| the mutation moves the theta level | >= 10x (measured 12.5x) |
-| freerun compounds past lockstep on the phasor | measured 13x |
+| the mutation moves the theta level and the source row | >= 10x and >= 5x (measured 12.5x, 29x) |
+| freerun compounds past lockstep on the phasor | measured 14x |
+| freerun end-to-end power divergence on the gain segment | <= 1e-2 (measured 6.2e-4) |
 | instrument stream at 1 vs 8 threads | byte-identical |
 | wake with the instrument on | refused by name |
 

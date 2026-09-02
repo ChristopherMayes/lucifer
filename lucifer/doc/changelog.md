@@ -9,6 +9,20 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-02 Added: the FP32 field solve joins the lockstep instrument, and the end-to-end single-
+  precision run has its number. The field twin scatters the deposit into an FP32 source grid,
+  transforms it with FFTW's single-precision interface (FFTW_ESTIMATE, the determinism decision the
+  FP64 solver already records), multiplies the propagator rounded from the FP64 kernel, and two rows
+  join `.fp32.txt`: the source grid and the post-solve field, both against the FP64 field's norm.
+  Measured through saturation the field step costs under 1e-4, with the deposit's phase noise
+  dominating and the transform beneath it. In freerun the FP32 field carries across steps, fed and
+  read by the twin itself, so the end-to-end divergence of the exit observables is recorded: 1.0e-3
+  on power over a gain segment (the published backends' comparable figure is 6.7e-4) and 2.7e-1 in
+  deep saturation, where an FP32 trajectory ends at a different phase of the synchrotron oscillation
+  and the number says so. Freerun covers a single-slice window and refuses more, since the twin
+  keeps no slippage rotation. The harness section grows to twenty-one assertions including field-row
+  falsifiability, and every tier digit holds.
+
 - 2026-09-02 Added: the FP32 lockstep instrument. `global%fp32_check = "lockstep"` steps a single-
   precision twin of the averaged FEL advance beside the FP64 path from a shared state and records
   per-quantity divergence to `<out_root>.fp32.txt` ("freerun" carries the FP32 state so the

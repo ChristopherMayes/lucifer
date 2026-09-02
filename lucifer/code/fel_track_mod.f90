@@ -835,12 +835,8 @@ enddo
 !$OMP end parallel do
 call fel_toc (fel_t_particles$)
 
-! The instrument's serial epilogue: reduce the step's rows, write, run the guard.
-
-if (fp_on) then
-  call fel_fp32_step_close (fp32, err)
-  if (err) return
-endif
+! The instrument's step epilogue (rows, stream, guard) now runs after the field twin,
+! at the end of this routine, so the field rows of this step join the same line.
 
 beam%phi0 = phi0_new
 
@@ -925,6 +921,29 @@ do io = 1, size(ff)
   if (any_err) return
 enddo
 call fel_toc (fel_t_solve$)
+
+! The FP32 field twin, serial after the production solve: one FP32 image of each
+! slice's deposit-transform-propagate step against the FP64 record that now carries it
+! (fel_fp32_mod). scl_w and the kernel come from the same authorities the production
+! step used.
+
+if (fp_on) then
+  block
+    real(rp) fp_scl
+    integer ikk, ifl
+    fp_scl = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
+    fp_scl = fp_scl / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
+    ikk = fel_kernel_index(ngrid_arr(1), ff(1)%wf%dx, twopi / ff(1)%wf%wavelength, und%dz)
+    do is = 1, size(beam%slice)
+      ifl = fel_field_index(ff(1)%slip, is, size(ff(1)%wf%Ex, 3))
+      call fel_fp32_field_twin (fp32, is, beam%slice(is), beam, ff(1)%wf%Ex(:,:,ifl), &
+            fel_kernels(ikk)%exp_k2, fp_scl, ff(1)%wf%dx, fp_gridmax, und%kx, und%ky, &
+            und%ax, und%ay, und%cos_t, und%sin_t, ks)
+    enddo
+  end block
+  call fel_fp32_step_close (fp32, err)
+  if (err) return
+endif
 
 err_flag = .false.
 
