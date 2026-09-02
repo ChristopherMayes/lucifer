@@ -12,6 +12,7 @@ FEL segments are real Bmad wiggler elements tracked by a Bmad FEL method, so a L
 | [`doc/input-reference.md`](doc/input-reference.md) | What does this namelist parameter do, and what refuses it? |
 | [`doc/reading-output.md`](doc/reading-output.md) | I have an output file. What is in it and how do I read it? |
 | [`doc/validation.md`](doc/validation.md) | What is checked, how, and at what measured level? |
+| [`doc/performance.md`](doc/performance.md) | Where does a run spend its time, on what machine? |
 | [`doc/fel-physics.md`](doc/fel-physics.md) | What does it compute, and why is that right? |
 | [`doc/BMAD-STATS-SPEC.md`](doc/BMAD-STATS-SPEC.md) | The statistics file format, normatively, with [`doc/BMAD-STATS-EXT-FEL.md`](doc/BMAD-STATS-EXT-FEL.md) |
 | [`examples/`](examples) | Runnable cases, each a directory of real input files with its own README |

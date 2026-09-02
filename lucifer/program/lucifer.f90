@@ -11,6 +11,7 @@
 !   user-guide.md        Building, describing a run, running it, the output inventory.
 !   reading-output.md    What the output files hold and how to read them.
 !   validation.md        The keystone rule, the tier table, and the measured levels.
+!   performance.md       Where a run spends its time, measured, with the machine named.
 !
 ! The program reads three namelist groups from one input file, each setting structs
 ! directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
@@ -42,6 +43,7 @@ use fel_setup_mod
 use fel_init_mod
 use fel_track_line_mod
 use fel_io_mod
+use fel_timer_mod
 use bmad_version_mod, only: bmad_version_date
 use, intrinsic :: iso_fortran_env, only: output_unit
 
@@ -63,6 +65,11 @@ character(*), parameter :: r_name = 'lucifer'
 
 ! The one argument is the input file. Its name is the caller's choice, and lucifer.in is
 ! the convention the examples follow rather than a name looked for here.
+
+! The run clock starts before anything is read, so the footer's run total covers the
+! whole process and the work outside the walk reads off as the difference.
+
+call fel_timer_reset()
 
 n_arg = command_argument_count()
 if (n_arg /= 1) then

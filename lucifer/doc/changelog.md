@@ -9,6 +9,21 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-01 Added: every run's footer prints where its time went. `code/fel_timer_mod.f90`
+  accumulates wall clock per phase at region boundaries, always on, and the phases partition the
+  walk so the fractions sum to it and the remainder is a row named `unaccounted` (measured, 0.02%).
+  `tests/run_perf_benchmark.sh --phases` runs the profile at two slice counts and sweeps the thread
+  count, needing neither genesis4 nor MPI. `tests/scripts/vec_audit.sh` reports what the vectorizer
+  did to the hot files, taking its compile command from the production build's own makefile.
+  `doc/performance.md` carries the measured tables, attributed to the machine and the build that
+  produced them. No physics changed and no recorded digit moved.
+
+- 2026-09-01 Changed: `doc/validation.md` no longer names the slippage rotation as part of the
+  serial cost that caps thread scaling. Measured, slippage is 0.4% of the walk at 96 slices and 0.1%
+  at 504, and the per-slice diagnostics reduction it named beside slippage runs slice-parallel. Its
+  claim that the 32-slice curve is the floor of the scaling holds: at 96 slices in a production
+  build, 8 threads give 6.76x against the recorded 3.97x, and 12 threads give 9.16x.
+
 - 2026-08-31 Changed: the last of the prose-style debt in the Fortran. 203 single-word
   stress capitals in comments are lowercased per prose 1.4, and the 12 remaining
   `deliverable N` citations are gone, so nothing in the tree cites a document outside the

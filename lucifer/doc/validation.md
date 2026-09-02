@@ -797,13 +797,17 @@ build):
 | 4 | 46.4 s | 2.79 | 70% |
 | 8 | 32.6 s | 3.97 | 50% |
 
-It saturates near 4x at 8 threads. The serial fraction per step is real: the per-slice
-diagnostics reduction (32 grids of 255^2 every record) and the slippage rotation run
-serially between the parallel regions, two parallel regions are spawned per integration
+It saturates near 4x at 8 threads. Two parallel regions are spawned per integration
 step, and on this machine 8 threads includes efficiency cores. With 32 slices there is
 also little schedule slack: 4 slices per thread at 8 threads. Production-size runs
 (hundreds to thousands of slices) have more parallel work per serial byte, so this is
-the floor of the scaling, not its ceiling.
+the floor of the scaling rather than its ceiling.
+
+[](performance.md#perf-thread-scaling) measures the same curve at 96 slices in a
+production build and gets 6.76x at 8 threads and 9.16x at 12, which holds that claim. It
+also prices what the serial fraction is made of. The slippage rotation is 0.4% of the
+walk, the per-slice diagnostics reduction runs slice-parallel, and every phase this file
+can name totals 0.6%, so the rest is the cost of entering a parallel region.
 
 ### Head to head against Genesis4 at 12 workers
 
@@ -843,6 +847,9 @@ A real 42 m case (131 slices) at 2048 particles/slice ran at parity with Genesis
 did not (164 vs 99 s). The per-element time stamps and an in-wiggler profile put the
 gap in one place: the FEL step's particle path (the RK4 + gather), whose cost
 quadrupled with the particles while the per-slice field FFTs (~68 s) stayed constant.
+[](performance.md#perf-the-particles-against-the-grid) measures that crossover as a
+table, and [](performance.md#perf-the-phase-profile) is the standing phase profile every
+run's own footer now prints.
 
 `tests/lucifer_advance_bench.f90` (built as `lucifer_advance_bench`) times the path serially
 at fixed state -- measured (min-of-5, this machine): full fel_advance **152

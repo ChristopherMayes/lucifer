@@ -10,6 +10,7 @@ project:
     - file: reading-output.md
     - file: fel-physics.md
     - file: validation.md
+    - file: performance.md
     - title: The statistics file format
       children:
         - file: BMAD-STATS-SPEC.md

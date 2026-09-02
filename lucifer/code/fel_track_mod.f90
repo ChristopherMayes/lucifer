@@ -66,6 +66,7 @@ module fel_track_mod
 use fel_beam_mod
 use fel_collective_mod
 use wavefront_mod
+use fel_timer_mod
 
 use, intrinsic :: iso_c_binding, only: c_double
 
@@ -739,19 +740,24 @@ phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 ! Each slice's arithmetic is independent of which thread runs it, so results are
 ! bit-identical across thread counts -- the check the benchmark harness holds.
 
+call fel_tic (fel_t_und_prep$)
 do io = 1, size(ff)
   ngrid_arr = wavefront_shape(ff(io)%wf)
   call fel_field_kernel_init (ngrid_arr(1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz)
 enddo
+call fel_toc (fel_t_und_prep$)
 
+call fel_tic (fel_t_sc_profile$)
 if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(nslice))
 call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_esc)
+call fel_toc (fel_t_sc_profile$)
 
 ! Per-slice sequence in Genesis's order (Beam::track): transverse half, longitudinal
 ! advance (ez inside the RK), the wake's gamma decrement, transverse half. All four are
 ! per-slice pure, so folding them into one loop is arithmetic-identical to Genesis's
 ! four sweeps.
 
+call fel_tic (fel_t_particles$)
 !$OMP parallel do
 do is = 1, size(beam%slice)
   if (und%bmad_transport) then
@@ -768,6 +774,7 @@ do is = 1, size(beam%slice)
   endif
 enddo
 !$OMP end parallel do
+call fel_toc (fel_t_particles$)
 
 beam%phi0 = phi0_new
 
@@ -780,6 +787,7 @@ beam%phi0 = phi0_new
 ! checks.
 
 if (und%source_model == fel_source_coherent$) then
+  call fel_tic (fel_t_source$)
   allocate (coh(size(beam%slice)))
   !$OMP parallel do
   do is = 1, size(beam%slice)
@@ -820,11 +828,13 @@ if (und%source_model == fel_source_coherent$) then
   enddo
   kappa = 1
   if (g2_tot > 0) kappa = sqrt(b2_tot / (4 * pi * g2_tot))
+  call fel_toc (fel_t_source$)
 endif
 
 ! Field solve, harmonic loop outermost (each pass is self-contained, fel-physics.md sec-field-set). The
 ! deposit reads the just-advanced particles, so every field sees the same beam state.
 
+call fel_tic (fel_t_solve$)
 do io = 1, size(ff)
   nslice_f = size(ff(io)%wf%Ex, 3)
   any_err = .false.
@@ -848,6 +858,7 @@ do io = 1, size(ff)
   endif
   if (any_err) return
 enddo
+call fel_toc (fel_t_solve$)
 
 err_flag = .false.
 

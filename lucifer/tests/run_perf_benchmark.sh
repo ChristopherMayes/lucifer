@@ -24,9 +24,22 @@
 #   - Use production builds. A debug lucifer is accepted with a loud warning,
 #     and its numbers are not comparable.
 #
+# The --phases mode answers a different question: where this code's own time goes. It
+# needs no genesis4 and no MPI, since it compares the code against itself. Two runs at production-like parameters give the
+# per-phase table the tracker's footer prints, and a thread sweep over the same
+# configuration gives the scaling curve and the serial fraction Amdahl's law implies.
+# The phases partition the walk in the tracker itself (code/fel_timer_mod.f90), so the
+# table needs no instrument here beyond reading the footer.
+#
+# What --phases cannot see: the phases that interleave per slice inside one parallel
+# region, which are the deposit against its FFT and the field gather against the RK4.
+# Those come from a sampling profiler, and doc/performance.md records that split.
+#
 # Usage:
 #   ./run_perf_benchmark.sh [--workers N] [--genesis <path>] [--exe <path>]
 #                           [--mpirun <path>] [--python <path>] [--work-dir <path>]
+#   ./run_perf_benchmark.sh --phases [--workers N] [--exe <path>] [--python <path>]
+#                           [--work-dir <path>] [--big-slices N] [--npart N]
 #
 # Defaults: workers = the machine's performance-core count (hw.perflevel0.physicalcpu on
 # macOS, nproc on Linux). Binaries and python found as in run_fel_benchmark.sh, except
@@ -52,16 +65,22 @@ PYTHON=""
 WORK_DIR=""
 WORKERS=""
 MPIRUN=""
+PHASES=0
+BIG_SLICES=504
+NPART=2048
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --genesis)  GENESIS="$2";  shift 2 ;;
-    --exe)      EXE="$2";      shift 2 ;;
-    --python)   PYTHON="$2";   shift 2 ;;
-    --work-dir) WORK_DIR="$2"; shift 2 ;;
-    --workers)  WORKERS="$2";  shift 2 ;;
-    --mpirun)   MPIRUN="$2";   shift 2 ;;
-    -h|--help)  sed -n '2,35p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --genesis)     GENESIS="$2";    shift 2 ;;
+    --exe)         EXE="$2";        shift 2 ;;
+    --python)      PYTHON="$2";     shift 2 ;;
+    --work-dir)    WORK_DIR="$2";   shift 2 ;;
+    --workers)     WORKERS="$2";    shift 2 ;;
+    --mpirun)      MPIRUN="$2";     shift 2 ;;
+    --phases)      PHASES=1;        shift 1 ;;
+    --big-slices)  BIG_SLICES="$2"; shift 2 ;;
+    --npart)       NPART="$2";      shift 2 ;;
+    -h|--help)  sed -n '2,46p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -77,7 +96,7 @@ if [[ -z "$WORKERS" || "$WORKERS" -lt 2 ]]; then
   exit 1
 fi
 
-if [[ ! -x "$GENESIS" ]]; then
+if [[ $PHASES -eq 0 && ! -x "$GENESIS" ]]; then
   echo "Error: genesis4 binary not found at: $GENESIS (use --genesis)." >&2
   exit 1
 fi
@@ -86,6 +105,9 @@ fi
 # MPICH-linked genesis4 with "unsupported PMI version PMIx", and vice versa). On macOS
 # the binary's LC_RPATH names the MPI installation it loads from. Prefer the mpiexec
 # that lives beside it, and fall back to PATH only if that turns up nothing.
+if [[ $PHASES -eq 1 ]]; then
+  MPIRUN="not needed in the phases mode"
+fi
 if [[ -z "$MPIRUN" && "$(uname)" == "Darwin" ]]; then
   while read -r rpath; do
     if [[ -x "$rpath/../bin/mpiexec" ]]; then MPIRUN="$rpath/../bin/mpiexec"; break; fi
@@ -94,7 +116,7 @@ fi
 if [[ -z "$MPIRUN" ]]; then
   MPIRUN="$(command -v mpiexec || command -v mpirun)"
 fi
-if [[ -z "$MPIRUN" || ! -x "$MPIRUN" ]]; then
+if [[ $PHASES -eq 0 && ( -z "$MPIRUN" || ! -x "$MPIRUN" ) ]]; then
   echo "Error: no MPI launcher found; the parallel Genesis run needs one (use --mpirun)." >&2
   exit 1
 fi
@@ -130,6 +152,183 @@ mkdir -p "$WORK_DIR"
 
 NSLICE=$((4 * WORKERS))
 SLEN="$(awk -v n="$NSLICE" 'BEGIN { printf "%.6e", n * 3 * 1e-10 }')"
+
+# ------------------------------------------------------------------------------------
+# The phases mode: where this code's own time goes, from the footer table the tracker
+# prints, plus a thread sweep for the serial fraction. Genesis is not involved, so the
+# starting state is the tracker's own shot-noise quiet start rather than an imported
+# dump: nothing here compares two codes, so nothing here needs identical particles.
+
+if [[ $PHASES -eq 1 ]]; then
+  echo "=============================================================================="
+  echo "FEL phase profile: where the walk spends its time"
+  echo "=============================================================================="
+  echo "  lucifer:     $EXE"
+  echo "  workers:     $WORKERS (performance cores)"
+  echo "  particles:   $NPART per slice"
+  echo "  workdir:     $WORK_DIR"
+  if [[ $DEBUG_EXE_WARNING -eq 1 ]]; then
+    echo
+    echo "  WARNING: using a DEBUG lucifer. Its phase shares are not the production"
+    echo "  build's: the per-file -O3 on fel_track_mod is a production-only setting,"
+    echo "  so the particle path is charged more here than it costs in production."
+  fi
+  echo
+
+  cp "$SCRIPT_DIR/bmad/aramis.bmad" "$WORK_DIR/"
+  cd "$WORK_DIR" || exit 1
+
+  # One deck per slice count, the SASE example's configuration with the window resized.
+  # A time window of nslice slices at sample = 3 is nslice * 3 * lambda0 long, which is
+  # the same arithmetic the head-to-head above does for Genesis.
+  #
+  # The bunch charge does not scale with the window, so a longer window is a lower
+  # current and a different gain. That is deliberate and it does not matter here: the
+  # work per step is the same whatever the charge, which the measurement confirms (the
+  # phase shares agree to 0.1% across a factor of 5.25 in slice count). Read the two
+  # columns as the same work at two sizes rather than as the same physics.
+
+  phase_deck () {   # <file> <nslice> <out_root>
+    local slen sigz
+    slen="$(awk -v n="$2" 'BEGIN { printf "%.6e", n * 3 * 1e-10 }')"
+    sigz="$(awk -v n="$2" 'BEGIN { printf "%.6e", n * 3 * 1e-10 / 2 }')"
+    cat > "$1" <<DECK
+&fel_params
+  lat_file = "aramis.bmad"
+  global%out_root = "$3"
+/
+&fel_beam_init
+  beam_init%n_particle = $NPART
+  beam_init%bunch_charge = 2.881993782512e-13
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -$sigz
+  beam_init%grid(3)%x_max =  $sigz
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  shot_noise = T
+/
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_half_width = 2e-4
+  wavefront_init%window_length = $slen
+  wavefront_init%window_sample = 3
+/
+DECK
+  }
+
+  # phase_run <label> <nslice> <threads>: one run, its footer table parsed out.
+  phase_run () {
+    local label="$1" ns="$2" nt="$3" root log
+    root="phase_${ns}_${nt}"
+    log="$root.log"
+    phase_deck "$root.in" "$ns" "$root"
+    echo "--- $label: $ns slices, $nt thread(s) ---"
+    if ! env OMP_NUM_THREADS="$nt" "$EXE" "$root.in" > "$log" 2>&1; then
+      echo "FAILED; log tail:" >&2
+      tail -20 "$log" >&2
+      exit 1
+    fi
+    if ! grep -q '^ Timing' "$log"; then
+      echo "FAILED: the run printed no Timing block. An old binary, or a phase left open." >&2
+      exit 1
+    fi
+  }
+
+  phase_run "profile" "$((8 * WORKERS))" "$WORKERS"
+  phase_run "profile" "$BIG_SLICES" "$WORKERS"
+
+  # The thread sweep runs the smaller configuration, whose 1-thread run is affordable.
+  # Powers of two up to the worker count, then the worker count itself.
+
+  SWEEP=""
+  n=1
+  while [[ $n -lt $WORKERS ]]; do SWEEP="$SWEEP $n"; n=$((n * 2)); done
+  SWEEP="$SWEEP $WORKERS"
+  for nt in $SWEEP; do
+    [[ "$nt" == "$WORKERS" && -f "phase_$((8 * WORKERS))_$WORKERS.log" ]] && continue
+    phase_run "sweep" "$((8 * WORKERS))" "$nt"
+  done
+  echo
+
+  "$PYTHON" - "$WORK_DIR" "$((8 * WORKERS))" "$BIG_SLICES" "$WORKERS" "$NPART" <<'EOF'
+import re, sys, glob, os
+
+work, small, big, workers, npart = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+
+# The footer's own table, read back rather than re-derived: name, regions, seconds,
+# share of the walk. The name field can hold spaces, so the numbers anchor the parse.
+ROW = re.compile(r'^\s{2,}(?P<name>\S.*?)\s+(?P<reg>\d+)?\s+(?P<sec>\d+\.\d+)(?:\s+(?P<frac>[-\d.]+)%)?\s*$')
+
+def read_phases(path):
+    rows, inblock = [], False
+    for line in open(path):
+        if line.startswith(' Timing'):
+            inblock = True
+            continue
+        if not inblock:
+            continue
+        if line.startswith(' Wrote') or line.startswith('====') or not line.strip():
+            break
+        m = ROW.match(line.rstrip())
+        if m:
+            rows.append((m.group('name'), int(m.group('reg')) if m.group('reg') else None,
+                         float(m.group('sec')), float(m.group('frac')) if m.group('frac') else None))
+    return rows
+
+def table(ns, nt, title):
+    path = os.path.join(work, f'phase_{ns}_{nt}.log')
+    rows = read_phases(path)
+    if not rows:
+        print(f'  {title}: no Timing block in {path}')
+        return
+    print(f'  {title}')
+    print(f"    {'phase':22s} {'regions':>10s} {'seconds':>10s} {'of walk':>9s}")
+    for name, reg, sec, frac in rows:
+        r = '' if reg is None else str(reg)
+        f = '' if frac is None else f'{frac:.1f}%'
+        print(f'    {name:22s} {r:>10s} {sec:>10.3f} {f:>9s}')
+    print()
+
+print('==============================================================================')
+print(f'Phase profile ({npart} particles per slice, full 6-FODO line, {workers} threads)')
+print('==============================================================================')
+table(small, workers, f'{small} slices')
+table(big,   workers, f'{big} slices')
+
+# The scaling curve, from the walk row of each sweep run, and the serial fraction
+# Amdahl's law implies from the best speedup: S = 1/(f + (1-f)/n) inverts to
+# f = (n/S - 1)/(n - 1). It is a bound on this configuration, not a constant of the
+# code: a serial region that shrinks with slice count reads differently at another size.
+
+walks = {}
+for path in sorted(glob.glob(os.path.join(work, f'phase_{small}_*.log'))):
+    nt = int(re.search(r'_(\d+)\.log$', path).group(1))
+    for name, reg, sec, frac in read_phases(path):
+        if name == 'walk':
+            walks[nt] = sec
+
+if len(walks) > 1:
+    base = walks[min(walks)]
+    print('==============================================================================')
+    print(f'Thread scaling ({small} slices x {npart} particles, full line)')
+    print('==============================================================================')
+    print(f"    {'threads':>8s} {'walk [s]':>10s} {'speedup':>9s} {'efficiency':>11s} {'implied serial':>15s}")
+    for nt in sorted(walks):
+        sp = base / walks[nt]
+        ser = ''
+        if nt > 1:
+            f = (nt / sp - 1) / (nt - 1)
+            ser = f'{100 * f:.1f}%'
+        print(f'    {nt:>8d} {walks[nt]:>10.1f} {sp:>8.2f}x {100 * sp / nt:>10.0f}% {ser:>15s}')
+    print()
+EOF
+  status=$?
+  echo "Outputs kept in: $WORK_DIR"
+  exit $status
+fi
 
 echo "=============================================================================="
 echo "FEL performance benchmark: Bmad tracker (OpenMP) vs Genesis4 (MPI)"

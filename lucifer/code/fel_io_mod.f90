@@ -15,6 +15,7 @@ module fel_io_mod
 
 use fel_struct
 use fel_input_mod
+use fel_timer_mod
 use wavefront_openpmd_mod
 ! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read in
 ! fel_write_meta, which is the only place this module reaches into the parser.
@@ -234,6 +235,12 @@ call fel_stats_exit_light (stats, pow, ene, bun)
 write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
       ', pulse energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', <|b|> ', bun
 call out_io (s_blank$, r_name, trim(line))
+
+! Where the time went, one row per phase the run entered. The phases partition the
+! walk, so the unaccounted row is the walk's own overhead and nothing is counted twice.
+! doc/performance.md reads a table like this one.
+
+call fel_timer_write (r_name)
 
 ! The file list is by existence, not by replaying which switches were on: a candidate
 ! name that is there gets listed with its size, and the naming rules stay in the one

@@ -36,6 +36,7 @@ Genesis4 maps, which the comparison tiers select through [](input-reference.md)'
 | read an output file you were handed | [](reading-output.md) |
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what level | [](validation.md) |
+| know where a run spends its time | [](performance.md) |
 | run something and see a figure | [](generated/examples/examples.md) |
 | write or read the statistics format | [](BMAD-STATS-SPEC.md) |
 | see what changed | [](changelog.md) |

@@ -16,6 +16,7 @@ module fel_track_line_mod
 
 use fel_struct
 use fel_io_mod
+use fel_timer_mod
 use beam_mod
 use wake_mod
 
@@ -83,6 +84,7 @@ character(*), parameter :: r_name = 'track_fel_line'
 !
 
 err_flag = .false.
+call fel_tic (fel_t_walk$)
 lat => run%lat
 branch => lat%branch(0)
 fbeam => run%fbeam
@@ -275,8 +277,10 @@ do ie = run%i_start, run%i_end
 
     do istep = 1, und%nstep
       if (fel_mode(ie) == fel_unaveraged$) then
+        call fel_tic (fel_t_unavg$)
         call fel_unavg_step (und, run%ustate, fbeam, wf, slip, und%dz, istep == 1, &
                              istep == und%nstep, dE_step, dU_step, err)
+        call fel_toc (fel_t_unavg$)
         u_spont_cum = u_spont_cum + dU_step
       else
         call fel_track_und_step (und, fbeam, ffield, coll, err)
@@ -332,6 +336,7 @@ do ie = run%i_start, run%i_end
     ! call, so parallelizing here as well would nest. The FEL step's parallelism over
     ! slices lives in fel_track_mod.
 
+    call fel_tic (fel_t_seam$)
     if (associated(wake_src)) then
 
       ! Wake-carrying interlude: All slices as one bunch in global window coordinates,
@@ -408,16 +413,19 @@ do ie = run%i_start, run%i_end
         endif
       endif
     endif
+    call fel_toc (fel_t_seam$)
 
     fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &
                     fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
 
+    call fel_tic (fel_t_drift$)
     do ih = 1, n_harm      ! Each field diffracts at its own wavelength. Through a
                          ! geometry break the light goes the chord, not the arc, and
                          ! the correction lands on the break's last element.
     call wavefront_drift (ffield(ih)%wf, ele%value(l$) - light_corr(ie), err)
     if (err) exit
   enddo
+  call fel_toc (fel_t_drift$)
 
   ! Absolute-time phasing (fel-physics.md sec-phasing, bmad_com's global switch through
   ! Bmad's own resolver): keep the real beam-vs-light carrier phase of this break,
@@ -434,7 +442,9 @@ do ie = run%i_start, run%i_end
     ! through seam interludes too, as one kick of the element's length (Genesis applies
     ! it every step, and an interlude is one step).
 
+    call fel_tic (fel_t_wake$)
     call fel_wake_apply (coll%wake, fbeam, ele%value(l$))
+    call fel_toc (fel_t_wake$)
 
     z_now = z_now + ele%value(l$)
     call apply_slippage_banked (ele_slip(ie))
@@ -458,7 +468,9 @@ do ie = run%i_start, run%i_end
 
     qf = 0
     if (ele%key == quadrupole$) qf = ele%value(k1$)
+    call fel_tic (fel_t_gen_int$)
     call fel_track_interlude_genesis (qf, ele%value(l$), fbeam, ffield, coll, err)
+    call fel_toc (fel_t_gen_int$)
     if (absolute_time_tracking(ele)) then      ! Absolute-time phasing (sec-phasing).
       fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$)
     endif
@@ -502,6 +514,8 @@ if (migrate) then
                i_array = [n_moved_tot], r_array = [charge_dropped_tot])
 endif
 
+call fel_toc (fel_t_walk$)
+
 
 !------------------------------------------------------------------------------
 contains
@@ -528,6 +542,7 @@ logical err_w
 
 !
 
+call fel_tic (fel_t_wake$)
 call fel_concat_slices (fbeam, wake_ele, run%wake_bunch, run%wake_beta0, err_w)
 if (err_w) then
   err_flag = .true.;  return
@@ -538,6 +553,7 @@ call fel_split_slices (run%wake_bunch, wake_ele, fbeam, run%wake_beta0, .true., 
 if (err_w) then
   err_flag = .true.;  return
 endif
+call fel_toc (fel_t_wake$)
 end subroutine apply_bmad_wake_kick
 
 !------------------------------------------------------------------------------
@@ -562,6 +578,7 @@ real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum, dev
 integer nm
 
 if (.not. migrate) return
+call fel_tic (fel_t_migration$)
 
 if (migrate_check) call whole_beam_phasor (sb_re, sb_im, wsum)
 
@@ -597,6 +614,7 @@ endif
 if (nm > 0 .or. chd > 0) then
   write (iu_mig, '(es22.14, i12, 2es24.15e3)') z_now, nm, chd, dev
 endif
+call fel_toc (fel_t_migration$)
 
 end subroutine do_migrate
 
@@ -650,6 +668,7 @@ subroutine write_diag_rows ()
 integer is
 
 if (.not. write_diag) return
+call fel_tic (fel_t_stats$)
 
 do is = 1, nslice
   write (iu_diag, '(es24.16, i8, 10es24.16)') z_now, is, fpow_arr(is), fonax_arr(is), &
@@ -657,6 +676,7 @@ do is = 1, nslice
         bdiag_arr(is)%sigma_energy, bdiag_arr(is)%sigma_x, bdiag_arr(is)%sigma_y, &
         bdiag_arr(is)%current, bdiag_arr(is)%n_eff
 enddo
+call fel_toc (fel_t_stats$)
 
 end subroutine write_diag_rows
 
@@ -689,6 +709,7 @@ integer is, ip
 ! (same call, same unrotation, same summation order over slices: bit-identical).
 ! take_stats_record must have run for this record first.
 
+call fel_tic (fel_t_stats$)
 e_beam = 0
 u_field = 0
 g0_l = fel_gamma0(fbeam)
@@ -701,6 +722,7 @@ do is = 1, nslice
 enddo
 
 write (iu_ledger, '(7es24.16)') z_now, e_beam, u_field, dE_step, slip%u_escaped, u_spont_cum, e_rad_cum
+call fel_toc (fel_t_stats$)
 
 end subroutine write_ledger_row
 
@@ -743,6 +765,7 @@ integer isl, ipr, ibl, nb, nbl_max
 !
 
 if (.not. (bmad_com%radiation_damping_on .or. bmad_com%radiation_fluctuations_on)) return
+call fel_tic (fel_t_radiation$)
 
 ! The envelope integral over this record: the substep-grid midpoint sum for the
 ! unaveraged mode (matching its own integration grid), dz exactly for the averaged.
@@ -802,6 +825,7 @@ enddo
 !$OMP end parallel do
 
 e_rad_cum = e_rad_cum + sum(e_rad_slice)
+call fel_toc (fel_t_radiation$)
 
 end subroutine apply_radiation
 
@@ -888,7 +912,9 @@ subroutine take_stats_record (with_angles)
 
 logical with_angles, serr
 
+call fel_tic (fel_t_stats$)
 call fel_stats_record (stats, fbeam, ffield, z_now, ie, with_angles, bdiag_arr, fpow_arr, fonax_arr, serr)
+call fel_toc (fel_t_stats$)
 if (serr) then
   err_flag = .true.;  return
 endif
@@ -936,10 +962,13 @@ character(500) fname
 
 !
 
+call fel_tic (fel_t_ele_end$)
 call fel_stats_element_end (stats, fbeam, z_now, eerr)
+call fel_toc (fel_t_ele_end$)
 if (eerr) then
   err_flag = .true.;  return
 endif
+if (dump_beam_here(ie) .or. dump_field_here(ie)) call fel_tic (fel_t_dumps$)
 if (dump_beam_here(ie)) then
   write (fname, '(2a, i0, 2a)') trim(out_root), '-at', ie, '-', trim(ele%name)
   call fel_dump_beam (run, ele, trim(fname), eerr)
@@ -955,6 +984,7 @@ if (dump_field_here(ie)) then
     err_flag = .true.;  return
   endif
 endif
+if (dump_beam_here(ie) .or. dump_field_here(ie)) call fel_toc (fel_t_dumps$)
 
 end subroutine end_of_element
 
@@ -977,6 +1007,7 @@ logical err_b
 
 !
 
+call fel_tic (fel_t_slippage$)
 if (keep_escaped_field) then
   do ihh = 1, n_harm
     call fel_apply_slippage (ffield(ihh)%slip, ffield(ihh)%wf, slippage, ffield(ihh)%bank, &
@@ -991,6 +1022,7 @@ else
     call fel_apply_slippage (ffield(ihh)%slip, ffield(ihh)%wf, slippage, harm = ffield(ihh)%harm)
   enddo
 endif
+call fel_toc (fel_t_slippage$)
 
 end subroutine apply_slippage_banked
 
