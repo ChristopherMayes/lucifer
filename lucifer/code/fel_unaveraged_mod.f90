@@ -323,6 +323,7 @@ real(rp) dz_record, dE_beam, dU_spont
 logical first, last, err_flag
 
 real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:), dU_sp_slice(:)
+real(rp), allocatable :: kst(:,:,:)
 complex(rp), allocatable :: crsource(:,:), crsource_y(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
@@ -398,7 +399,7 @@ any_err = .false.
 ! bit-identical across thread counts, and the harness checks that.
 
 !$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, crsource_y, s_sub, isub, ip, &
-!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, ehat_y, wphasor, dgam, cdep, cph, err, fq) &
+!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, ehat_y, wphasor, dgam, cdep, cph, err, fq, kst) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
@@ -407,6 +408,7 @@ do is = 1, nslice
   allocate (crsource(ngrid, ngrid))
   if (two_pol) allocate (crsource_y(ngrid, ngrid))
   allocate (ux(sl%n), uy(sl%n), xx(sl%n), yy(sl%n), tau(sl%n), gam(sl%n))
+  allocate (kst(5, sl%n, 4))     ! The push's RK stage arrays, one allocation per slice.
   do ip = 1, sl%n
     p_mc = p0_mc * (1 + sl%pz(ip))
     gam(ip) = sqrt(p_mc**2 + 1)
@@ -426,9 +428,7 @@ do is = 1, nslice
     if (two_pol) crsource_y = 0
 
     call unavg_field_quartet (s_sub, dsub/2, fq)
-    do ip = 1, sl%n
-      call unavg_push (dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip), fq)
-    enddo
+    call unavg_push_all (dsub/2, sl%n, xx, yy, ux, uy, tau, gam, fq, kst)
 
     ! Radiation kick + deposit at the substep midpoint, phi0 advanced to it.
 
@@ -505,9 +505,7 @@ do is = 1, nslice
     enddo
 
     call unavg_field_quartet (s_sub + dsub/2, dsub/2, fq)
-    do ip = 1, sl%n
-      call unavg_push (dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip), fq)
-    enddo
+    call unavg_push_all (dsub/2, sl%n, xx, yy, ux, uy, tau, gam, fq, kst)
 
     call fel_field_diffract (wf, ifld, dsub, err)
     any_err = any_err .or. err
@@ -544,7 +542,7 @@ do is = 1, nslice
     sl%z(ip) = -beta * tau(ip)
   enddo
 
-  deallocate (ux, uy, xx, yy, tau, gam, crsource)
+  deallocate (ux, uy, xx, yy, tau, gam, crsource, kst)
   if (two_pol) deallocate (crsource_y)
 enddo
 !$OMP end parallel do
@@ -610,7 +608,7 @@ end subroutine unavg_ramp_phase_jump
 ! The s-dependent field factors at the four RK stage positions of a push over h from
 ! s0: the envelope and its slope, and the undulator phase's cosine and sine. None of
 ! them depends on the particle, so one call here replaces four per particle. The stage
-! positions are the expressions unavg_push evaluated inline before the hoist, in the
+! positions are the expressions the push evaluated inline before the hoist, in the
 ! same order, so every value is the same bits it was. Stages two and three share a
 ! position and the third is a copy of the second, which says so.
 
@@ -636,30 +634,57 @@ enddo
 
 end subroutine unavg_field_quartet
 
-! One RK4 magnetic push of one particle over step h from segment position s0. All
-! per-particle state passes by argument: host-associated variables privatized by the
-! caller's OMP region are not redirected inside called procedures, so nothing mutable
-! may be host-associated here (und/ustate/inv_beta0 are read-only shared). gamma is
-! untouched: B does no work, exactly.
+! One RK4 magnetic push of a whole slice over step h, stages outermost: each RK stage
+! is one loop over the particles into its stage array, and the combination is a last
+! loop. Per particle this is the same operations on the same values in the same order
+! as the particle-outermost form it replaces (nothing couples particles inside a push,
+! and the stage field factors are per stage already), so the results are byte-identical
+! and the identity checks hold it there. Stages outermost is also the shape a GPU
+! kernel transcribes: array work per stage, no call tree per particle.
+!
+! All per-particle state passes by argument: host-associated variables privatized by
+! the caller's OMP region are not redirected inside called procedures, so nothing
+! mutable may be host-associated here (und/ustate/inv_beta0 are read-only shared).
+! gamma is untouched: B does no work, exactly. kst is caller scratch, sized (5, n, 4),
+! so the allocation is paid once per slice rather than once per push.
 
-subroutine unavg_push (h, x1, y1, u1, v1, t1, gamma, fq)
+subroutine unavg_push_all (h, n, xx, yy, ux, uy, tau, gam, fq, kst)
 
-real(rp) h, x1, y1, u1, v1, t1, gamma
-real(rp) fq(4,4)
-real(rp) y0(5), k1(5), k2(5), k3(5), k4(5)
+integer n, ip
+real(rp) h, xx(n), yy(n), ux(n), uy(n), tau(n), gam(n)
+real(rp) fq(4,4), kst(5,n,4)
+real(rp) yt(5)
 
-y0 = [x1, y1, u1, v1, t1]
-call unavg_ode (y0,                fq(:,1),   gamma, k1)
-call unavg_ode (y0 + (h/2) * k1,   fq(:,2),   gamma, k2)
-call unavg_ode (y0 + (h/2) * k2,   fq(:,3),   gamma, k3)
-call unavg_ode (y0 + h * k3,       fq(:,4),   gamma, k4)
-y0 = y0 + (h/6) * (k1 + 2*k2 + 2*k3 + k4)
+do ip = 1, n
+  call unavg_ode ([xx(ip), yy(ip), ux(ip), uy(ip), tau(ip)], fq(:,1), gam(ip), kst(:,ip,1))
+enddo
 
-x1 = y0(1);  y1 = y0(2)
-u1 = y0(3);  v1 = y0(4)
-t1 = y0(5)
+do ip = 1, n
+  yt = [xx(ip), yy(ip), ux(ip), uy(ip), tau(ip)] + (h/2) * kst(:,ip,1)
+  call unavg_ode (yt, fq(:,2), gam(ip), kst(:,ip,2))
+enddo
 
-end subroutine unavg_push
+do ip = 1, n
+  yt = [xx(ip), yy(ip), ux(ip), uy(ip), tau(ip)] + (h/2) * kst(:,ip,2)
+  call unavg_ode (yt, fq(:,3), gam(ip), kst(:,ip,3))
+enddo
+
+do ip = 1, n
+  yt = [xx(ip), yy(ip), ux(ip), uy(ip), tau(ip)] + h * kst(:,ip,3)
+  call unavg_ode (yt, fq(:,4), gam(ip), kst(:,ip,4))
+enddo
+
+! The combination, elementwise exactly as the per-particle form wrote it.
+
+do ip = 1, n
+  xx(ip)  = xx(ip)  + (h/6) * (kst(1,ip,1) + 2*kst(1,ip,2) + 2*kst(1,ip,3) + kst(1,ip,4))
+  yy(ip)  = yy(ip)  + (h/6) * (kst(2,ip,1) + 2*kst(2,ip,2) + 2*kst(2,ip,3) + kst(2,ip,4))
+  ux(ip)  = ux(ip)  + (h/6) * (kst(3,ip,1) + 2*kst(3,ip,2) + 2*kst(3,ip,3) + kst(3,ip,4))
+  uy(ip)  = uy(ip)  + (h/6) * (kst(4,ip,1) + 2*kst(4,ip,2) + 2*kst(4,ip,3) + kst(4,ip,4))
+  tau(ip) = tau(ip) + (h/6) * (kst(5,ip,1) + 2*kst(5,ip,2) + 2*kst(5,ip,3) + kst(5,ip,4))
+enddo
+
+end subroutine unavg_push_all
 
 ! The exact z-ODEs of ballistic motion in the magnetostatic field:
 !   dx/ds = u_x/u_s, du_x/ds = b_y - u_y b_z/u_s, du_y/ds = -b_x + u_x b_z/u_s,

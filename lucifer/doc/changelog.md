@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-02 Changed: the unaveraged push runs stage-major. Each RK4 stage is one loop over the
+  slice's particles into per-particle stage arrays, with the combination a last loop, instead of
+  four stages walked inside each particle through a call tree. Per particle the arithmetic is the
+  same operations in the same order, so every result is byte-identical, and the unaveraged step is
+  7.9% faster at 2048 particles per slice and 17.9% at 16384. Inlining the field into the stage loop
+  was tried for vectorization and refused: the fused arithmetic differs from the called form in the
+  last bits, and bit-identity is the contract. The stage loops therefore still carry a call and
+  still do not vectorize, which doc/performance.md records with the reason.
+
 - 2026-09-02 Added: `tests/scripts/sincos_audit.c` records why `code/fel_sincos.c` still calls libm.
   Replacing that call with a Cody-Waite reduction and the fdlibm kernel polynomials, which is what a
   hand-written double-precision sincos looks like, lands 6 ulp from libm on 34% of arguments where

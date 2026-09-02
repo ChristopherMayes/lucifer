@@ -153,7 +153,16 @@ Same machine and build, one thread, median of five runs at 2048 particles and th
 
 The gain grows with the particle count because what it removes is per-particle and what remains at fixed count is the per-substep FFT.
 
-What is left is the next lever, and it is now the majority of the mode: the substep RK4 and the undulator field arithmetic together are 63% of the samples, all of it inside a `do ip` loop that calls `unavg_push` per particle. The loop cannot vectorize while the integrator is a procedure call per particle. A stage-major interchange, one loop over particles inside each RK stage instead of four stages inside each particle, keeps every particle's arithmetic exactly as it is and would let the vectorizer see straight-line array work.
+The next lever after the hoist was the loop order, and it landed. The substep RK4 and the undulator field arithmetic were 63% of the mode's samples, four RK stages inside each particle of a `do ip` loop. The push now runs stage-major: per stage, one loop over the slice's particles into per-particle stage arrays, then one loop for the RK4 combination. Per particle the operations, values and order are unchanged, so the results are byte-identical, checked the same way as the hoist.
+
+| configuration | before | after | change |
+|---|---|---|---|
+| 2048 particles per slice | 4.577 s | 4.217 s | -7.9% |
+| 16384 particles per slice | 16.073 s | 13.189 s | -17.9% |
+
+The win is locality and call overhead, and deliberately not vectorization. The stage loops still refuse to vectorize because each iteration calls `unavg_ode`, and inlining the field into the stage loop was tried and refused on the identity check: the compiler fuses the inlined arithmetic differently than it fused the called form, the results differ in the last bits, and a moved bit is a moved digit somewhere downstream. So the call stays, and the vectorizer's verdict stands recorded rather than fought. What vectorization of this loop now needs is a reduction-free arithmetic core whose bits are the contract rather than an accident of fusion, which is the FP32 lockstep work's territory, where the reference is measured divergence rather than identity.
+
+After the interchange the mode's samples split 37.5% substep RK4, 21.4% FFT, 18.8% undulator field arithmetic, 18.7% the deposit's own transcendentals, 2.2% deposit weights.
 
 (perf-the-sincos-ceiling)=
 ## The sincos ceiling
