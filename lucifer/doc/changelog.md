@@ -9,6 +9,21 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-02 Changed: the unaveraged mode's undulator field no longer evaluates transcendentals per
+  particle. `fel_unavg_bfield` took a position `s` and computed the ramp envelope, its slope,
+  `cos(ku s)` and `sin(ku s)` from it, once per particle per RK4 stage, when all four depend only on
+  the substep position and are therefore the same for every particle in the loop. They now arrive as
+  arguments built once per push by `unavg_field_quartet`, and the routine no longer takes `s`. The
+  unaveraged step is 14.8% faster at 2048 particles per slice and 27.6% at 16384, libm samples fall
+  from 6936 to 1221, and every result is bit-identical: the stage positions are the expressions
+  `unavg_push` evaluated inline, in the same order, so every value is the same bits it was. FINDINGS
+  7.37.
+
+- 2026-09-02 Fixed: `doc/performance.md` labelled a profile category "libm sin and cos" where it had
+  summed every libm transcendental, `exp` and `cexp` and the shared reduction helper included. `sin`
+  and `cos` proper were 13.9% of the unaveraged mode rather than the 53.6% the table implied. The
+  category is now named for what it sums and the sub-split is stated.
+
 - 2026-09-01 Added: every run's footer prints where its time went. `code/fel_timer_mod.f90`
   accumulates wall clock per phase at region boundaries, always on, and the phases partition the
   walk so the fractions sum to it and the remainder is a row named `unaccounted` (measured, 0.02%).

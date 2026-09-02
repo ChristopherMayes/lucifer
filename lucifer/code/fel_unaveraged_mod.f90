@@ -219,28 +219,31 @@ end function fel_unavg_envelope
 ! focusing reproduces the averaged mode's natural-focusing split exactly (planar
 ! kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec-unaveraged.
 !
+! The four quantities that depend on s and not on the particle arrive as arguments:
+! the envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK
+! stage shares them, so the caller evaluates them once per stage rather than once per
+! particle per stage (FINDINGS 7.37). Taking them as arguments rather than computing
+! them here is what makes that structural: this routine can no longer be the place a
+! per-particle transcendental hides.
+!
 ! Input:
 !   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
-!   ustate     -- fel_unavg_struct: Ramp geometry.
-!   x, y, s    -- real(rp): Position [m].
+!   x, y       -- real(rp): Transverse position [m].
+!   g, gp      -- real(rp): The ramp envelope and its slope at this s (fel_unavg_envelope).
+!   c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
 !
 ! Output:
 !   bx, by, bz -- real(rp): The analytic undulator field B = curl(a), with the
 !                   envelope's g' terms so the ramps stay divergence-free [T].
 !-
 
-subroutine fel_unavg_bfield (und, ustate, x, y, s, bx, by, bz)
+subroutine fel_unavg_bfield (und, x, y, g, gp, c_u, s_u, bx, by, bz)
 
 type (fel_und_struct) und
-type (fel_unavg_struct) ustate
-real(rp) x, y, s, bx, by, bz
-real(rp) a0, g, gp, c_u, s_u, fperp, xl, yl, bt
+real(rp) x, y, g, gp, c_u, s_u, bx, by, bz
+real(rp) a0, fperp, xl, yl, bt
 
 !
-
-g = fel_unavg_envelope(ustate, s, gp)
-c_u = cos(und%ku * s)
-s_u = sin(und%ku * s)
 
 ! A tilted planar element: evaluate the untilted potential in the wiggle frame
 ! (coordinates rotated in), rotate b back out. sin_t = 0 skips both rotations.
@@ -323,6 +326,7 @@ real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:)
 complex(rp), allocatable :: crsource(:,:), crsource_y(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
+real(rp) fq(4,4)     ! The stage field factors, rebuilt per push. Private per thread.
 complex(rp) ehat, jhat, wphasor, cdep, ehat_y, cph
 logical two_pol
 integer is, ip, isub, nslice, ifld, ix, iy, ngrid_arr(3), ngrid
@@ -394,7 +398,7 @@ any_err = .false.
 ! bit-identical across thread counts, and the harness checks that.
 
 !$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, crsource_y, s_sub, isub, ip, &
-!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, ehat_y, wphasor, dgam, cdep, cph, err) &
+!$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, ehat_y, wphasor, dgam, cdep, cph, err, fq) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
@@ -421,8 +425,9 @@ do is = 1, nslice
     crsource = 0
     if (two_pol) crsource_y = 0
 
+    call unavg_field_quartet (s_sub, dsub/2, fq)
     do ip = 1, sl%n
-      call unavg_push (s_sub, dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip))
+      call unavg_push (dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip), fq)
     enddo
 
     ! Radiation kick + deposit at the substep midpoint, phi0 advanced to it.
@@ -499,8 +504,9 @@ do is = 1, nslice
       endif
     enddo
 
+    call unavg_field_quartet (s_sub + dsub/2, dsub/2, fq)
     do ip = 1, sl%n
-      call unavg_push (s_sub + dsub/2, dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip))
+      call unavg_push (dsub/2, xx(ip), yy(ip), ux(ip), uy(ip), tau(ip), gam(ip), fq)
     enddo
 
     call fel_field_diffract (wf, ifld, dsub, err)
@@ -601,22 +607,52 @@ enddo
 
 end subroutine unavg_ramp_phase_jump
 
+! The s-dependent field factors at the four RK stage positions of a push over h from
+! s0: the envelope and its slope, and the undulator phase's cosine and sine. None of
+! them depends on the particle, so one call here replaces four per particle. The stage
+! positions are the expressions unavg_push evaluated inline before the hoist, in the
+! same order, so every value is the same bits it was. Stages two and three share a
+! position and the third is a copy of the second, which says so.
+
+subroutine unavg_field_quartet (s0, h, fq)
+
+real(rp) s0, h, fq(4,4)
+real(rp) s_st(4), g, gp
+integer j
+
+s_st = [s0, s0 + h/2, s0 + h/2, s0 + h]
+
+do j = 1, 4
+  if (j == 3) then
+    fq(:,3) = fq(:,2)
+    cycle
+  endif
+  g = fel_unavg_envelope(ustate, s_st(j), gp)
+  fq(1,j) = g
+  fq(2,j) = gp
+  fq(3,j) = cos(und%ku * s_st(j))
+  fq(4,j) = sin(und%ku * s_st(j))
+enddo
+
+end subroutine unavg_field_quartet
+
 ! One RK4 magnetic push of one particle over step h from segment position s0. All
 ! per-particle state passes by argument: host-associated variables privatized by the
 ! caller's OMP region are not redirected inside called procedures, so nothing mutable
 ! may be host-associated here (und/ustate/inv_beta0 are read-only shared). gamma is
 ! untouched: B does no work, exactly.
 
-subroutine unavg_push (s0, h, x1, y1, u1, v1, t1, gamma)
+subroutine unavg_push (h, x1, y1, u1, v1, t1, gamma, fq)
 
-real(rp) s0, h, x1, y1, u1, v1, t1, gamma
+real(rp) h, x1, y1, u1, v1, t1, gamma
+real(rp) fq(4,4)
 real(rp) y0(5), k1(5), k2(5), k3(5), k4(5)
 
 y0 = [x1, y1, u1, v1, t1]
-call unavg_ode (y0,                s0,         gamma, k1)
-call unavg_ode (y0 + (h/2) * k1,   s0 + h/2,   gamma, k2)
-call unavg_ode (y0 + (h/2) * k2,   s0 + h/2,   gamma, k3)
-call unavg_ode (y0 + h * k3,       s0 + h,     gamma, k4)
+call unavg_ode (y0,                fq(:,1),   gamma, k1)
+call unavg_ode (y0 + (h/2) * k1,   fq(:,2),   gamma, k2)
+call unavg_ode (y0 + (h/2) * k2,   fq(:,3),   gamma, k3)
+call unavg_ode (y0 + h * k3,       fq(:,4),   gamma, k4)
 y0 = y0 + (h/6) * (k1 + 2*k2 + 2*k3 + k4)
 
 x1 = y0(1);  y1 = y0(2)
@@ -629,12 +665,12 @@ end subroutine unavg_push
 !   dx/ds = u_x/u_s, du_x/ds = b_y - u_y b_z/u_s, du_y/ds = -b_x + u_x b_z/u_s,
 !   dtau/ds = gamma/u_s - 1/beta0.
 
-subroutine unavg_ode (y, s0, gamma, dyds)
+subroutine unavg_ode (y, fq, gamma, dyds)
 
-real(rp) y(5), s0, gamma, dyds(5)
+real(rp) y(5), fq(4), gamma, dyds(5)
 real(rp) bx, by, bz, us_l
 
-call fel_unavg_bfield (und, ustate, y(1), y(2), s0, bx, by, bz)
+call fel_unavg_bfield (und, y(1), y(2), fq(1), fq(2), fq(3), fq(4), bx, by, bz)
 us_l = sqrt(gamma**2 - 1 - y(3)**2 - y(4)**2)
 
 dyds(1) = y(3) / us_l

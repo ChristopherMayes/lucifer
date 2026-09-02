@@ -122,19 +122,38 @@ An earlier estimate put the field solve near 10% of a run, and at these paramete
 (perf-the-sampling-split-unaveraged)=
 ## The sampling split, unaveraged mode
 
-One slice, 16384 particles, `ngrid` 129, serial (the mode's parallelism is over slices and there is one), 13302 samples. The phase table gives the unaveraged step 99.7% of the walk, so this is the mode.
+One slice, 16384 particles, `ngrid` 129, serial (the mode's parallelism is over slices and there is one). The phase table gives the unaveraged step 99.7% of the walk, so this is the mode. Both columns are 20 s of samples at 1 ms, and the totals differ because the hoisted run finishes sooner inside that window.
 
-| | share |
-|---|---|
-| libm sin and cos | 53.6% |
-| substep RK4 (`unavg_push`, `unavg_ode`) | 17.6% |
-| FFT transform and `fel_field_diffract` | 13.0% |
-| undulator field (`fel_unavg_bfield`) | 8.9% |
-| ramp envelope (`fel_unavg_envelope`) | 4.8% |
-| deposit | 1.2% |
-| everything else | 0.7% |
+| | before the hoist | after |
+|---|---|---|
+| libm transcendentals | 52.1% | 15.3% |
+| substep RK4 (`unavg_push`, `unavg_ode`) | 17.6% | 35.3% |
+| undulator field, this code's own arithmetic | 8.9% | 27.7% |
+| FFT transform and `fel_field_diffract` | 13.0% | 17.8% |
+| ramp envelope (`fel_unavg_envelope`) | 4.8% | 0.0% |
+| deposit, this code's own arithmetic | 1.2% | 1.9% |
+| everything else | 2.4% | 1.8% |
+| total samples | 13302 | 7964 |
 
-Over half of this mode is libm sin and cos, and none of it goes through `fel_sincos`. `fel_unavg_bfield` calls `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics. The argument depends only on the substep position, which is the same for every particle in the loop, so the values are recomputed once per particle per RK stage when three per substep would do. `fel_unavg_envelope` is invariant the same way. FINDINGS 7.37 records this.
+Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics and `fel_unavg_envelope` called two more, all four per particle per RK stage, when the argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all: the s-independence is structural rather than a comment. FINDINGS 7.37 records the defect.
+
+The share row hides how much moved, because the denominator moved too. In absolute samples libm fell from 6936 to 1221, which is 82% of the transcendental work gone, and the step's wall clock fell by the amounts in the next table.
+
+Read the before column's label carefully, since the P1 table got it wrong. It said "libm sin and cos" where it measured every libm transcendental the run entered, `exp` and `cexp` and the shared reduction helper included, and only 13.9% of the run was `sin` and `cos` proper. The label was wrong and the number was right for what it summed. The hoist recovers most of it either way, because the envelope's own trig was per-particle for the same reason.
+
+(perf-the-hoist-measured)=
+## The hoist, measured
+
+Same machine and build, one thread, median of five runs at 2048 particles and three at 16384. The change is bit-identical by construction and checked as such: the diag and ledger files of the unaveraged example are byte-identical before and after at 1 and 8 threads.
+
+| configuration | before | after | change |
+|---|---|---|---|
+| 2048 particles per slice | 5.293 s | 4.507 s | -14.8% |
+| 16384 particles per slice | 21.842 s | 15.806 s | -27.6% |
+
+The gain grows with the particle count because what it removes is per-particle and what remains at fixed count is the per-substep FFT.
+
+What is left is the next lever, and it is now the majority of the mode: the substep RK4 and the undulator field arithmetic together are 63% of the samples, all of it inside a `do ip` loop that calls `unavg_push` per particle. The loop cannot vectorize while the integrator is a procedure call per particle. A stage-major interchange, one loop over particles inside each RK stage instead of four stages inside each particle, keeps every particle's arithmetic exactly as it is and would let the vectorizer see straight-line array work.
 
 (perf-the-sincos-ceiling)=
 ## The sincos ceiling
@@ -147,7 +166,7 @@ An inline (sin, cos) pair with no libm call, Cody-Waite reduction and the fdlibm
 | 96 slices, 8192 particles, 12 threads | 41.375 s | 38.197 s | -7.7% |
 | unaveraged, 16384 particles, serial | 21.937 s | 21.848 s | -0.4% |
 
-The averaged rows bound the libm call from below at 3.2% of a run at 2048 particles per slice, against the 8.5% the sampler attributes to sin and cos: the polynomial is cheaper than the call and not free. The unaveraged row is the finding, since that mode never reaches this file.
+The averaged rows bound the libm call from below at 3.2% of a run at 2048 particles per slice, against the 8.5% the sampler attributes to sin and cos: the polynomial is cheaper than the call and not free. The unaveraged row was the finding. That mode never reaches this file, and its own transcendentals were the undulator field's and the ramp envelope's intrinsics, which the hoist above removed instead.
 
 Neither probe is a candidate implementation. `fel_sincos.c` was chosen for bit-identity with gfortran's own lowering, and [](validation.md#val-the-particlepath-cost-measured) records the one ulp audit that admitted it. Any replacement moves recorded digits and needs its own audit and its own re-recording.
 
@@ -183,8 +202,14 @@ Ordered by measured share, for the averaged mode at 2048 particles per slice and
 
 The FFT is 61% and it is in FFTW, not in this code. What this code controls is how many transforms it asks for: two per slice per field per step, at the grid the deck sets. `ngrid` is a deck parameter and $255^2$ is 65025 points against 2048 particles, so a convergence study on `ngrid` is worth more here than any change to the deposit.
 
-The libm transcendentals are 8.5% of the averaged mode and 53.6% of the unaveraged, and the unaveraged share is a hoist rather than a vectorization (FINDINGS 7.37). Bmad's `cexp` in the transverse map is a further 5.9%, and a quadrupole map has a real closed form.
+The libm transcendentals are 8.5% of the averaged mode. They were half the unaveraged mode and the hoist took 82% of that, so what remains there is the RK4 itself. Bmad's `cexp` in the transverse map is a further 5.9% of the averaged mode, and a quadrupole map has a real closed form.
 
-The per-particle loops do not vectorize, and the blocker is uniform: an un-inlined call with a branch in it. Removing the branch is a prerequisite for `!$omp simd` on any of them, and the deposit's `on_grid` guard is the smallest case.
+The per-particle loops do not vectorize, and the blocker is uniform: an un-inlined call with a branch in it. Three of the five in the table above resist for reasons worth stating rather than fixing.
+
+The deposit's `on_grid` guard cannot become a mask. `fel_grid_weights` leaves `ix` and `iy` unassigned when it reports off-grid, so a masked body would index `crsource` with an undefined subscript. Making that safe means clamping the indices, which is no longer the same program.
+
+`fel_apply_focus` is called only by `fel_transverse_track`, which runs only under `transport_model = "genesis"`. That default is `bmad`, no example sets it, and only the comparison tiers select it, so restructuring that loop speeds up a validation-internal path. `faw`, on the production path, carries one branch on `und%sin_t` which is a property of the element and already loop-invariant.
+
+`fel_advance`'s loops call `fel_sincos` and `fel_runge_kutta` per particle, so `!$omp simd` cannot apply to them until the sincos itself is vectorizable.
 
 Thread scaling at production slice counts is 9.16x on 12 cores and the nameable serial cost is 0.6% of the walk, so there is little left to win by removing serial work.
