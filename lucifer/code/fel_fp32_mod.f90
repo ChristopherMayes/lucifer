@@ -276,6 +276,181 @@ end subroutine fel_fp32_renorm
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function fel_fp32_faw (x, y, kx, ky, ax, ay, cos_t, sin_t) result (value)
+!
+! The FP64 comparison side's transverse roll-off, faw of fel_track_mod on loose
+! scalars rather than on an fel_und_struct, which the instrument and the device seam
+! do not carry. Shared by both of the instrument's roles: the CPU twin compares
+! against it and the device twin does the same, and one transcription of the
+! expression is the point.
+!
+! Input:
+!   x, y            -- real(rp): Transverse position [m].
+!   kx, ky          -- real(rp): Natural-focusing roll-off [1/m^2].
+!   ax, ay          -- real(rp): Undulator field offset [m].
+!   cos_t, sin_t    -- real(rp): Wiggle-plane tilt.
+!
+! Output:
+!   value           -- real(rp): aw(x,y)/aw, the rolled-off factor.
+!-
+
+function fel_fp32_faw (x, y, kx, ky, ax, ay, cos_t, sin_t) result (value)
+
+real(rp) x, y, kx, ky, ax, ay, cos_t, sin_t
+real(rp) value, ddx, ddy, ddt
+
+!
+
+ddx = x - ax
+ddy = y - ay
+if (sin_t /= 0) then
+  ddt = cos_t * ddx + sin_t * ddy
+  ddy = -sin_t * ddx + cos_t * ddy
+  ddx = ddt
+endif
+value = 1 + 0.5_rp * (kx * ddx*ddx + ky * ddy*ddy)
+
+end function fel_fp32_faw
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_deposit64 (src, x, y, theta, wgt, scl_w, gridmax, dgrid, &
+!                                   kx2, ky2, ax, ay, cos_t, sin_t)
+!
+! One particle's FP64 source deposit, fel_field_step's own expressions:
+! part = sqrt(faw2) * scl_w * wgt with faw2 = 1 + kx*dx^2 + ky*dy^2 (no half, which
+! is Genesis's own roll-off transcribed), cpart = (sin theta + i cos theta) * part,
+! bilinear scatter onto the lower-left cell and its three neighbours.
+!
+! This is the reference the FP32 source row is measured against, and both roles of the
+! instrument need it: the CPU field twin and the device twin. It lives here, once,
+! because it is a transcription of a convention -- a second copy would have to be
+! found and changed the day fel_field_step's deposit changes.
+!
+! Input:
+!   src(:,:)        -- complex(rp): The accumulating source grid.
+!   x, y            -- real(rp): Transverse position [m].
+!   theta           -- real(rp): Ponderomotive phase [rad].
+!   wgt             -- real(rp): Charge weight over gamma [C].
+!   scl_w           -- real(rp): The deposit scale of fel_field_step.
+!   gridmax, dgrid  -- real(rp): Grid half width and spacing [m].
+!   kx2, ky2        -- real(rp): faw2's roll-off coefficients [1/m^2].
+!   ax, ay          -- real(rp): Undulator field offset [m].
+!   cos_t, sin_t    -- real(rp): Wiggle-plane tilt.
+!
+! Output:
+!   src(:,:)        -- complex(rp): This particle's contribution added.
+!-
+
+subroutine fel_fp32_deposit64 (src, x, y, theta, wgt, scl_w, gridmax, dgrid, &
+                               kx2, ky2, ax, ay, cos_t, sin_t)
+
+complex(rp) src(:,:)
+real(rp) x, y, theta, wgt, scl_w, gridmax, dgrid, kx2, ky2, ax, ay, cos_t, sin_t
+real(rp) f2, ppart, wwx, wwy, sth, cth, ddx, ddy, ddt
+complex(rp) cpart
+integer jx, jy
+
+!
+
+if (.not. (x > -gridmax .and. x < gridmax .and. y > -gridmax .and. y < gridmax)) return
+wwx = (x + gridmax) / dgrid
+wwy = (y + gridmax) / dgrid
+jx = int(floor(wwx));  jy = int(floor(wwy))
+wwx = 1 + real(jx, rp) - wwx
+wwy = 1 + real(jy, rp) - wwy
+jx = jx + 1;  jy = jy + 1
+ddx = x - ax;  ddy = y - ay
+if (sin_t /= 0) then
+  ddt = cos_t * ddx + sin_t * ddy
+  ddy = -sin_t * ddx + cos_t * ddy
+  ddx = ddt
+endif
+f2 = 1 + kx2 * ddx*ddx + ky2 * ddy*ddy
+ppart = sqrt(f2) * scl_w * wgt
+sth = sin(theta);  cth = cos(theta)
+cpart = cmplx(sth, cth, rp) * ppart
+src(jx,   jy)   = src(jx,   jy)   + (wwx * wwy) * cpart
+src(jx+1, jy)   = src(jx+1, jy)   + ((1-wwx) * wwy) * cpart
+src(jx,   jy+1) = src(jx,   jy+1) + (wwx * (1-wwy)) * cpart
+src(jx+1, jy+1) = src(jx+1, jy+1) + ((1-wwx) * (1-wwy)) * cpart
+
+end subroutine fel_fp32_deposit64
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_median (v, nn, med)
+!
+! The median of the first nn entries, scratch reordered in place. Heapsort:
+! O(n log n), no recursion, no degenerate case. This runs per slice per step in both
+! of the instrument's roles, so it must be cheap and it must terminate on any input
+! (a quickselect written here first did not, and hung a run). The sift is inlined
+! twice because a contained procedure cannot hold one of its own.
+!
+! Input:
+!   v(:)  -- real(rp): The values. Reordered in place.
+!   nn    -- integer: How many of them count.
+!
+! Output:
+!   v(:)  -- real(rp): Reordered.
+!   med   -- real(rp): The median.
+!-
+
+subroutine fel_fp32_median (v, nn, med)
+
+real(rp) v(:), med, tmp
+integer nn, i, iend, root, child
+
+!
+
+if (nn < 1) then
+  med = 0
+  return
+endif
+
+do i = nn/2, 1, -1
+  root = i
+  do while (2*root <= nn)
+    child = 2*root
+    if (child < nn) then
+      if (v(child+1) > v(child)) child = child + 1
+    endif
+    if (v(root) >= v(child)) exit
+    tmp = v(root);  v(root) = v(child);  v(child) = tmp
+    root = child
+  enddo
+enddo
+
+do iend = nn, 2, -1
+  tmp = v(1);  v(1) = v(iend);  v(iend) = tmp
+  root = 1
+  do while (2*root <= iend - 1)
+    child = 2*root
+    if (child < iend - 1) then
+      if (v(child+1) > v(child)) child = child + 1
+    endif
+    if (v(root) >= v(child)) exit
+    tmp = v(root);  v(root) = v(child);  v(child) = tmp
+    root = child
+  enddo
+enddo
+
+if (mod(nn, 2) == 1) then
+  med = v((nn+1)/2)
+else
+  med = 0.5_rp * (v(nn/2) + v(nn/2+1))
+endif
+
+end subroutine fel_fp32_median
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_fp32_twin_slice (fp32, is, x0, y0, px0, py0, z0, pz0, sl, beam, &
 !                                    exfld, dx, dy, gridmax, aw, ku, kx, ky, ax, ay, &
 !                                    cos_t, sin_t, rtmp, delz, xks, xku, phi0, phi0_new)
@@ -436,7 +611,7 @@ do ip = 1, n
   p_mc64 = p0_mc * (1 + sl%pz(ip))
   beta64 = p_mc64 / sqrt(p_mc64**2 + 1)
   theta64 = (phi0_new - phi0) + xks * sl%z(ip) / beta64 - xks * t%z_ref   ! delta convention.
-  aw64loc = faw64 (sl%x(ip), sl%y(ip))
+  aw64loc = fel_fp32_faw (sl%x(ip), sl%y(ip), kx, ky, ax, ay, cos_t, sin_t)
   e_ip = cmplx(cos(phi_ref + theta64), -sin(phi_ref + theta64), rp)
   p64sum = p64sum + sl%weight(ip) * aw64loc * e_ip
   wsum = wsum + sl%weight(ip) * aw64loc
@@ -477,7 +652,7 @@ fp32%bmag32(is) = abs(cmplx(p32sum, kind=rp)) / sc(7)
 ! The guard statistic: the median per-step phase-residual increment in ulps of the
 ! residual's own magnitude. The silent failure is this number reaching zero.
 
-call median_inplace (incr, n, ulp_med)
+call fel_fp32_median (incr, n, ulp_med)
 fp32%ulp_slice(is) = ulp_med / max(real(spacing(maxval(abs(ks32 * t%dzr(1:n)))), rp), tiny(1.0_rp))
 
 !------------------------------------------------------------------------------
@@ -496,20 +671,6 @@ if (st32 /= 0) then
 endif
 value = 1 + 0.5_sp * (kx32 * ddx*ddx + ky32 * ddy*ddy)
 end function faw32
-
-! The FP64 faw, for the comparison side (same expressions as fel_track_mod's).
-
-function faw64 (xx, yy) result (value)
-real(rp) xx, yy, value, ddx, ddy, ddt
-ddx = xx - ax
-ddy = yy - ay
-if (sin_t /= 0) then
-  ddt = cos_t * ddx + sin_t * ddy
-  ddy = -sin_t * ddx + cos_t * ddy
-  ddx = ddt
-endif
-value = 1 + 0.5_rp * (kx * ddx*ddx + ky * ddy*ddy)
-end function faw64
 
 ! The FP32 gather: fel_grid_weights_pre's expressions in sp, the four corner values
 ! converted to FP32 before the blend, as a resident FP32 field would hold them.
@@ -596,50 +757,6 @@ s = sin(a)
 c = cos(a)
 end subroutine sincos32
 
-! The median of the first nn entries, scratch reordered in place. Heapsort: O(n log n),
-! no recursion, no degenerate case. This runs per slice per step, so it must be cheap
-! and it must terminate on any input. The sift is inlined twice because an internal
-! procedure cannot contain one of its own.
-
-subroutine median_inplace (v, nn, med)
-real(rp) v(:), med, tmp
-integer nn, i, iend, root, child
-
-do i = nn/2, 1, -1
-  root = i
-  do while (2*root <= nn)
-    child = 2*root
-    if (child < nn) then
-      if (v(child+1) > v(child)) child = child + 1
-    endif
-    if (v(root) >= v(child)) exit
-    tmp = v(root);  v(root) = v(child);  v(child) = tmp
-    root = child
-  enddo
-enddo
-
-do iend = nn, 2, -1
-  tmp = v(1);  v(1) = v(iend);  v(iend) = tmp
-  root = 1
-  do while (2*root <= iend - 1)
-    child = 2*root
-    if (child < iend - 1) then
-      if (v(child+1) > v(child)) child = child + 1
-    endif
-    if (v(root) >= v(child)) exit
-    tmp = v(root);  v(root) = v(child);  v(child) = tmp
-    root = child
-  enddo
-enddo
-
-if (mod(nn, 2) == 1) then
-  med = v((nn+1)/2)
-else
-  med = 0.5_rp * (v(nn/2) + v(nn/2+1))
-endif
-
-end subroutine median_inplace
-
 end subroutine fel_fp32_twin_slice
 
 !------------------------------------------------------------------------------
@@ -682,7 +799,6 @@ real(rp) scl_w, dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks
 complex(rp), allocatable :: s64(:,:)
 complex(sp), allocatable :: s32(:,:)
 complex(sp) cbase
-complex(rp) cpart
 real(rp) p0_mc, p_mc, gam, beta, theta, phi_dep, enorm
 real(rp) w_s, w_f
 real(sp) x_s, y_s, pz_s, gam_s, del_s
@@ -721,7 +837,8 @@ do ip = 1, n
   gam = sqrt(p_mc**2 + 1)
   beta = p_mc / gam
   theta = beam%phi0 + xks * sl%z(ip) / beta
-  call dep64 (sl%x(ip), sl%y(ip), theta, sl%weight(ip) / gam)
+  call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), theta, sl%weight(ip) / gam, &
+                           scl_w, gridmax, dx, kx2, ky2, ax, ay, cos_t, sin_t)
 
   ! The FP32 side. Lockstep prices the field arithmetic from the same shared state, so
   ! it rounds the FP64 particle; freerun feeds the field from the twin's own run, so it
@@ -774,32 +891,6 @@ fp32%pow32(is) = sum(real(real(fp32%e32(:,:,is), rp))**2 + real(aimag(fp32%e32(:
 
 !------------------------------------------------------------------------------
 contains
-
-subroutine dep64 (xx, yy, th, wg)
-real(rp) xx, yy, th, wg, f2, ppart, wwx, wwy, sth, cth, ddx, ddy, ddt
-integer jx, jy
-if (.not. (xx > -gridmax .and. xx < gridmax .and. yy > -gridmax .and. yy < gridmax)) return
-wwx = (xx + gridmax) / dx
-wwy = (yy + gridmax) / dx
-jx = int(floor(wwx));  jy = int(floor(wwy))
-wwx = 1 + real(jx, rp) - wwx
-wwy = 1 + real(jy, rp) - wwy
-jx = jx + 1;  jy = jy + 1
-ddx = xx - ax;  ddy = yy - ay
-if (sin_t /= 0) then
-  ddt = cos_t * ddx + sin_t * ddy
-  ddy = -sin_t * ddx + cos_t * ddy
-  ddx = ddt
-endif
-f2 = 1 + kx2 * ddx*ddx + ky2 * ddy*ddy
-ppart = sqrt(f2) * scl_w * wg
-sth = sin(th);  cth = cos(th)
-cpart = cmplx(sth, cth, rp) * ppart
-s64(jx,   jy)   = s64(jx,   jy)   + (wwx * wwy) * cpart
-s64(jx+1, jy)   = s64(jx+1, jy)   + ((1-wwx) * wwy) * cpart
-s64(jx,   jy+1) = s64(jx,   jy+1) + (wwx * (1-wwy)) * cpart
-s64(jx+1, jy+1) = s64(jx+1, jy+1) + ((1-wwx) * (1-wwy)) * cpart
-end subroutine dep64
 
 subroutine dep32 (xx, yy, del, wg)
 real(sp) xx, yy, del, wg, ppart, wwx, wwy, ddx, ddy, ddt, ss_l, cc_l

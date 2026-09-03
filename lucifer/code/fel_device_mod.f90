@@ -5,10 +5,13 @@
 ! lucifer_device.h, behind which one backend file sits per build (the Metal backend
 ! where the toolchain can carry it, a refusing stub in every other build, including a
 ! macOS one whose Objective-C++ compiler is a GNU one). Everything device-shaped
-! crosses here: the chart
-! conversions, the residency bookkeeping, the lockstep instrument's device role, and
-! the refusals. No Metal type or call appears outside device/lucifer_metal.mm, and no
-! luc_dev call appears outside this module.
+! crosses here: the chart conversions, the residency bookkeeping, the lockstep
+! instrument's device role, and the refusals. No Metal type or call appears outside
+! device/lucifer_metal.mm, and no luc_dev call appears outside this module. The FP64
+! comparison quantities the instrument's rows are measured against (the roll-off, the
+! source deposit, the median) are fel_fp32_mod's own module procedures, called from
+! here rather than repeated: they are transcriptions of fel_field_step's conventions,
+! and a second copy is a second thing to find the day a convention changes.
 !
 ! The device chart. Transverse coordinates and the energy offset are FP32; the
 ! longitudinal state is a 64-bit fixed-point phase in ticks of 2 pi / 2^32, held off a
@@ -840,8 +843,9 @@ do is = 1, size(beam%slice)
     ! The source phasor, both sides in FP64 from their own states, the twin's
     ! full-charge normalization.
 
-    awloc_d = faw_dev(x, y)
-    awloc_c = faw_dev(sl%x(ip), sl%y(ip))
+    awloc_d = fel_fp32_faw (x, y, par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
+    awloc_c = fel_fp32_faw (sl%x(ip), sl%y(ip), par%kx, par%ky, par%ax, par%ay, &
+                            par%cos_t, par%sin_t)
     e_ip = cmplx(cos(phi_ref + delta), -sin(phi_ref + delta), rp)
     p32sum = p32sum + sl%weight(ip) * awloc_d * e_ip
     e_ip = cmplx(cos(phi_ref + theta_rel), -sin(phi_ref + theta_rel), rp)
@@ -863,7 +867,7 @@ do is = 1, size(beam%slice)
   fp32%bmag64(is) = abs(p64sum) / sc(7)
   fp32%bmag32(is) = abs(p32sum) / sc(7)
 
-  call fel_device_median (incr, n, tick_med)
+  call fel_fp32_median (incr, n, tick_med)
   fp32%ulp_slice(is) = tick_med
 
   ! The field rows: the device's own source grid and post-solve field against a
@@ -879,7 +883,9 @@ do is = 1, size(beam%slice)
     p_mc = p0_mc * (1 + sl%pz(ip))
     gam = sqrt(p_mc**2 + 1)
     beta = p_mc / gam
-    call dep64_dev (sl%x(ip), sl%y(ip), beam%phi0 + ks * sl%z(ip) / beta, sl%weight(ip) / gam)
+    call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), beam%phi0 + ks * sl%z(ip) / beta, &
+                             sl%weight(ip) / gam, par%scl_w, par%gridmax, par%dgrid, &
+                             par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
   enddo
 
   enorm = sqrt(sum(real(wf%Ex(:,:,ifld), rp)**2 + aimag(wf%Ex(:,:,ifld))**2)) + 1e-30_rp
@@ -898,114 +904,7 @@ do is = 1, size(beam%slice)
   fp32%pow32(is) = sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
 enddo
 
-!------------------------------------------------------------------------------
-contains
-
-! The first-order roll-off, faw of fel_track_mod on the par constants.
-
-function faw_dev (xx, yy) result (value)
-real(rp) xx, yy, value, ddx, ddy, ddt
-ddx = xx - par%ax
-ddy = yy - par%ay
-if (par%sin_t /= 0) then
-  ddt = par%cos_t * ddx + par%sin_t * ddy
-  ddy = -par%sin_t * ddx + par%cos_t * ddy
-  ddx = ddt
-endif
-value = 1 + 0.5_rp * (par%kx * ddx*ddx + par%ky * ddy*ddy)
-end function faw_dev
-
-! The FP64 comparison deposit, fel_fp32_field_twin's dep64 on the par constants:
-! part = sqrt(faw2) * scl_w * w / gamma, cpart = (sin theta + i cos theta) * part,
-! bilinear scatter. faw2 carries no half, Genesis's own roll-off.
-
-subroutine dep64_dev (xx, yy, th, wg)
-real(rp) xx, yy, th, wg, f2, ppart, wwx, wwy, sth, cth, ddx, ddy, ddt
-complex(rp) cpart
-integer jx, jy
-if (.not. (xx > -par%gridmax .and. xx < par%gridmax .and. &
-           yy > -par%gridmax .and. yy < par%gridmax)) return
-wwx = (xx + par%gridmax) / par%dgrid
-wwy = (yy + par%gridmax) / par%dgrid
-jx = int(floor(wwx));  jy = int(floor(wwy))
-wwx = 1 + real(jx, rp) - wwx
-wwy = 1 + real(jy, rp) - wwy
-jx = jx + 1;  jy = jy + 1
-ddx = xx - par%ax;  ddy = yy - par%ay
-if (par%sin_t /= 0) then
-  ddt = par%cos_t * ddx + par%sin_t * ddy
-  ddy = -par%sin_t * ddx + par%cos_t * ddy
-  ddx = ddt
-endif
-f2 = 1 + par%kx * ddx*ddx + par%ky * ddy*ddy
-ppart = sqrt(f2) * par%scl_w * wg
-sth = sin(th);  cth = cos(th)
-cpart = cmplx(sth, cth, rp) * ppart
-s64(jx,   jy)   = s64(jx,   jy)   + (wwx * wwy) * cpart
-s64(jx+1, jy)   = s64(jx+1, jy)   + ((1-wwx) * wwy) * cpart
-s64(jx,   jy+1) = s64(jx,   jy+1) + (wwx * (1-wwy)) * cpart
-s64(jx+1, jy+1) = s64(jx+1, jy+1) + ((1-wwx) * (1-wwy)) * cpart
-end subroutine dep64_dev
-
 end subroutine fel_device_twin_rows
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine fel_device_median (v, nn, med)
-!
-! The median of the first nn entries, scratch reordered in place: the heapsort of
-! fel_fp32_twin_slice's median_inplace, repeated here because that one is internal
-! to its host routine. O(n log n), no recursion, terminates on any input.
-!-
-
-subroutine fel_device_median (v, nn, med)
-
-real(rp) v(:), med, tmp
-integer nn, i, iend, root, child
-
-!
-
-if (nn < 1) then
-  med = 0
-  return
-endif
-
-do i = nn/2, 1, -1
-  root = i
-  do while (2*root <= nn)
-    child = 2*root
-    if (child < nn) then
-      if (v(child+1) > v(child)) child = child + 1
-    endif
-    if (v(root) >= v(child)) exit
-    tmp = v(root);  v(root) = v(child);  v(child) = tmp
-    root = child
-  enddo
-enddo
-
-do iend = nn, 2, -1
-  tmp = v(1);  v(1) = v(iend);  v(iend) = tmp
-  root = 1
-  do while (2*root <= iend - 1)
-    child = 2*root
-    if (child < iend - 1) then
-      if (v(child+1) > v(child)) child = child + 1
-    endif
-    if (v(root) >= v(child)) exit
-    tmp = v(root);  v(root) = v(child);  v(child) = tmp
-    root = child
-  enddo
-enddo
-
-if (mod(nn, 2) == 1) then
-  med = v((nn+1)/2)
-else
-  med = 0.5_rp * (v(nn/2) + v(nn/2+1))
-endif
-
-end subroutine fel_device_median
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
