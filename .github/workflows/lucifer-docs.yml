@@ -70,9 +70,22 @@ jobs:
             --out lucifer/doc/generated/examples
           git diff --exit-code -- 'lucifer/doc/generated/examples/*.md'
 
+      # BASE_URL is what makes the built site work at a project-page address. Pages
+      # serves this repository under /<name>, so without it every asset and link
+      # resolves against the domain root and the pages load blank. The name is read
+      # from the repository rather than written out, so a rename or another fork needs
+      # no edit here.
       - name: Build the documentation
         working-directory: lucifer/doc
+        env:
+          BASE_URL: /${{ github.event.repository.name }}
         run: myst build --html
+
+      - name: Package the site for Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: lucifer/doc/_build/html
 
       - name: Scripts parse
         run: |
@@ -92,6 +105,34 @@ jobs:
                   bad = 1
           sys.exit(bad)
           PY
+
+  # Publishing the site the job above already built. This serves the fork's own Pages
+  # site, which is the only place Lucifer's documentation is readable without building
+  # it: the rest of Bmad ships LaTeX. The permissions live on this job rather than the
+  # workflow, so the conformance steps keep read-only access to the repository.
+  #
+  # A pull request builds the documentation and stops there. A proposed change must not
+  # replace what the branch is serving, and the build alone is what tells the author
+  # whether their page compiles.
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: docs-and-conformance
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    # Deploys are not cancelled when one supersedes another, so a half-finished
+    # deployment cannot be left behind by a quick second push.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
 
   # The full keystone is not here yet, and the reason changed on 2026-09-03. What used to
   # block it was the reference: the conda-forge genesis4 release carried eev = 510999.06,
