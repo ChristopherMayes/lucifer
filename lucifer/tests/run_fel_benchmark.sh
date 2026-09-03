@@ -40,6 +40,18 @@
 #   --results <path>    Write a machine-readable results file (tiers, check sections,
 #                       build flavor) for doc generation. Default: none written.
 #
+# Two of these may run at once, which is how the keystone runs them: one pass per
+# build, each with its own --work-dir. They share only a source tree they read.
+#
+# The Genesis reference dumps are cached, since they are a pure function of the
+# reference binary and the decks that make them. The cache sits under
+# $LUCIFER_GENESIS_CACHE, or ~/.cache/lucifer/genesis-refs, keyed by the binary's
+# bytes, every deck genesis reads and the pinned reference version. Each run prints
+# whether it hit or missed. Deleting the cache is always safe and costs one cold run.
+#
+# Every section runs on every invocation. There is no quicker mode, on purpose: a
+# cheap run that checks less is what this harness exists to prevent.
+#
 # Exit status is zero only if every tier passes its tolerance.
 
 set -o pipefail
@@ -218,19 +230,68 @@ run_genesis () {   # <deck> ...: the decks of one chain, in order
     fi
   done
 }
-run_genesis Aramis-ss Aramis-1seg &
-GEN_PID_SS=$!
-run_genesis Aramis-td Aramis-td-1seg Aramis-td-sc Aramis-td-wake &
-GEN_PID_TD=$!
-run_genesis Aramis-td-sase &
-GEN_PID_SASE=$!
-GEN_OK=1
-wait $GEN_PID_SS   || GEN_OK=0
-wait $GEN_PID_TD   || GEN_OK=0
-wait $GEN_PID_SASE || GEN_OK=0
-if [[ $GEN_OK -ne 1 ]]; then
-  echo "FAIL: a Genesis reference chain failed (see above)" >&2
-  exit 1
+
+# The references are a pure function of the reference binary and the decks that make
+# them, and they cost 131 s on both passes of every run, so they are cached. The key
+# names all three things that can change the answer: the binary's own bytes, every
+# deck genesis reads, and the version the harness pins, which is what a set generated
+# by some other reference would fail. The cache holds whatever the chains wrote, found
+# by diffing the directory rather than by a list of names that could fall behind the
+# decks. It lives outside the repository, is safe to delete at any time, and the run
+# says which way it went, because a cache that silently serves stale physics is worse
+# than no cache. A reader requires the .complete marker rather than the directory,
+# since the two build passes may run at once: the set is staged under a private name
+# with its marker written last and moved into place whole, so a half-filled directory
+# is never mistaken for a reference set.
+GEN_CACHE_ROOT="${LUCIFER_GENESIS_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/genesis-refs}"
+if command -v shasum >/dev/null 2>&1; then SHA="shasum -a 256"; else SHA="sha256sum"; fi
+GEN_KEY="$( { echo "genesis $GENESIS_VERSION"
+              $SHA "$GENESIS"
+              ls -1 *.lat *.in | sort | while read -r f; do $SHA "$f"; done
+            } | $SHA | cut -c1-16 )"
+GEN_CACHE="$GEN_CACHE_ROOT/$GEN_KEY"
+
+if [[ -f "$GEN_CACHE/.complete" ]]; then
+  cp -p "$GEN_CACHE"/* . 2>/dev/null
+  echo "  reference cache HIT  $GEN_KEY  ($GEN_CACHE_ROOT)"
+else
+  echo "  reference cache MISS $GEN_KEY, generating"
+  ls -1 > .gen_before
+  run_genesis Aramis-ss Aramis-1seg &
+  GEN_PID_SS=$!
+  run_genesis Aramis-td Aramis-td-1seg Aramis-td-sc Aramis-td-wake &
+  GEN_PID_TD=$!
+  run_genesis Aramis-td-sase &
+  GEN_PID_SASE=$!
+  GEN_OK=1
+  wait $GEN_PID_SS   || GEN_OK=0
+  wait $GEN_PID_TD   || GEN_OK=0
+  wait $GEN_PID_SASE || GEN_OK=0
+  if [[ $GEN_OK -ne 1 ]]; then
+    echo "FAIL: a Genesis reference chain failed (see above)" >&2
+    exit 1
+  fi
+  # Populate a private directory and move it into place, because the two build
+  # passes may run concurrently: a reader tests for the directory, so it must not
+  # exist until it is complete, or a concurrent pass copies half a reference set and
+  # compares against it. The rename is atomic within one filesystem, and a loser of
+  # the race simply finds the winner's set already there.
+  GEN_STAGE="$GEN_CACHE.stage.$$"
+  mkdir -p "$GEN_STAGE"
+  ls -1 | grep -v '^\.gen_before$' | comm -13 .gen_before - | while read -r f; do
+    [[ -f "$f" ]] && cp -p "$f" "$GEN_STAGE"/
+  done
+  rm -f .gen_before
+  touch "$GEN_STAGE/.complete"
+  if [[ -f "$GEN_CACHE/.complete" ]]; then
+    rm -rf "$GEN_STAGE"
+    echo "  reference cache filled by a concurrent run, discarded ours"
+  elif mv "$GEN_STAGE" "$GEN_CACHE" 2>/dev/null; then
+    echo "  reference cache saved $GEN_KEY"
+  else
+    rm -rf "$GEN_STAGE"
+    echo "  reference cache could not be written, continuing without it"
+  fi
 fi
 for log in genesis-Aramis-ss genesis-Aramis-td genesis-Aramis-td-sase; do
   tail -3 $log.log

@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-03 Changed: the everyday keystone runs in 7.7 minutes rather than 25, with nothing behind
+  a flag and every section still running in every run. Three measured changes, in order of what they
+  bought. The Genesis references are cached: they are a pure function of the reference binary and the
+  decks that make them, so they sit under a content-hash key naming both and the pinned version
+  besides, and each run reports hit or miss. A set is staged privately and moved into place with its
+  completion marker written last, since the two build passes now run at once and a reader must never
+  find a half-filled directory. Everything independent runs concurrently, which is the two benchmark
+  passes in separate work directories plus the regression suite, the wavefront validation and the
+  examples: they share only a source tree they read, with nothing persisting FFTW wisdom or writing
+  outside its own directory. And the spontaneous section's acceptance scan moved an octave down to
+  ngrid (63, 127, 255), keeping 255 as the reference point so its fraction check is untouched and the
+  shape test still spans the same 16x solid-angle range; that section goes from 114 s to 77 s on the
+  debug tree, and the scaling test is better centred than before (measured against predicted 1.07,
+  where the old bracket's top point sat at 1.31 because the dipole model it compares to is furthest
+  from valid there). The per-job thread count and the job pool's width moved together, from eight
+  threads two wide to four threads four wide, which is the same subscription with more overlap. Every
+  tier digit is unchanged on both builds, and the deliberately single-threaded job in that section
+  was left alone on purpose: it also feeds the energy-ledger closure, whose recorded level is a grid
+  quantity, so a cheaper deck there would move a measured number rather than only the clock.
+
 - 2026-09-03 Changed: the reference is the Genesis4 4.6.15 release, and six of the eleven tiers are
   re-recorded. 4.6.15 is the first release carrying the CODATA electron rest energy, which is what
   the retired `$GENESIS4` variable existed to pin, so the reference is now `genesis4` from

@@ -109,7 +109,7 @@ def check(name, value, lo, hi, note=""):
         FAILED = True
 
 
-def run(exe, wd, name, text, threads="8"):
+def run(exe, wd, name, text, threads="4"):
     (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
@@ -170,6 +170,11 @@ def main():
 
     # Every run of this section is independent of the others (distinct roots, all
     # analysis afterwards), so the pool runs them all. The checks read in order.
+    #
+    # Four threads a job rather than eight, which is the pool width's other half: at
+    # eight this machine's sixteen CPUs give two workers, and thirteen jobs then run
+    # two at a time. Neither number is physics -- thread-count independence is itself
+    # one of the checks below -- so the pair is chosen to fill the machine and overlap.
     jobs = [
         lambda: run(exe, wd, "sp_rk", NML.format(lat="spont_probe_rk.bmad", root="sp_rk",
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n  reference_run = T\n")),
@@ -181,6 +186,11 @@ def main():
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
         lambda: run(exe, wd, "sp_uv_d", NML.format(lat="sp_uv.bmad", root="sp_uv_d",
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
+        # sp_uv_f1 runs single threaded on purpose, which makes it the longest job in
+        # the section at about 32 s. Shrinking its grid would pay for itself, and it is
+        # deliberately not done: besides the thread-identity comparison it feeds the
+        # energy-ledger closure, whose recorded level is a grid quantity, so a cheaper
+        # deck here moves a measured number rather than only the clock.
         lambda: run(exe, wd, "sp_uv_f1", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f1",
                     ngrid=NGRID_REF,
                     extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="1"),
@@ -188,7 +198,7 @@ def main():
                     ngrid=NGRID_REF,
                     extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8"),
     ]
-    for ngrid in (127, NGRID_REF, 511):
+    for ngrid in (63, 127, NGRID_REF):
         jobs.append(lambda ngrid=ngrid: run(exe, wd, f"sp_uv{ngrid}",
                     NML.format(lat="sp_uv.bmad", root=f"sp_uv{ngrid}", ngrid=ngrid, extra="")))
     for root, lat, extra in (("sp_avg_f", "spont_probe.bmad", "  radiation_fluctuations = T\n"),
@@ -197,7 +207,7 @@ def main():
                               "  radiation_fluctuations = T\n  reference_run = T\n")):
         jobs.append(lambda root=root, lat=lat, extra=extra: run(exe, wd, root,
                     cold(NML.format(lat=lat, root=root, ngrid=NGRID_REF, extra=extra))))
-    pool.run_all(jobs, threads_per_job=8)
+    pool.run_all(jobs, threads_per_job=4)
 
     l_rk, l_rk0 = loss(wd, "sp_rk"), loss(wd, "sp_rk0")
     check("Bmad runge_kutta + radiation vs analytic, |ratio - 1|",
@@ -214,7 +224,7 @@ def main():
     # 4. The unaveraged mode: grid-acceptance-limited, and it must scale that way.
     print("--- unaveraged mode, grid angular-acceptance scan (box fixed):")
     meas, pred = {}, {}
-    for ngrid in (127, NGRID_REF, 511):
+    for ngrid in (63, 127, NGRID_REF):
         root = f"sp_uv{ngrid}"
         theta, u = acceptance(ngrid)
         meas[ngrid] = loss(wd, root)
@@ -228,8 +238,8 @@ def main():
           meas[NGRID_REF] / analytic, 1e-2, 8e-2,
           note="(only what the SVEA grid can hold)")
     # The shape test: a 16x range in captured solid angle.
-    r_meas = meas[511] / meas[127]
-    r_pred = pred[511] / pred[127]
+    r_meas = meas[NGRID_REF] / meas[63]
+    r_pred = pred[NGRID_REF] / pred[63]
     check("unaveraged: acceptance SCALING, measured/predicted ratio over 16x solid angle",
           r_meas / r_pred, 0.5, 2.0,
           note=f"(measured {r_meas:.2f}x vs predicted {r_pred:.2f}x)")
