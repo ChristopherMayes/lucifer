@@ -1,9 +1,11 @@
 /* The device seam: the C interface fel_device_mod talks to through iso_c_binding.
  *
- * One implementation file sits behind this header per build: lucifer_metal.mm on
- * Darwin, lucifer_device_stub.c everywhere else. No device type or call appears
- * outside that one file, so a second backend is a new implementation of these
- * functions plus one CMake branch. The shape follows GPUEngine.h of this project's
+ * One implementation file sits behind this header per build: lucifer_metal.mm where
+ * the toolchain can carry it (macOS with a Clang-family Objective-C++ compiler, since
+ * the backend is ARC-managed Objective-C++ against the Metal framework) and
+ * lucifer_device_stub.c everywhere else, which refuses by name. No device type or
+ * call appears outside that one file, so a second backend is a new implementation of
+ * these functions plus one CMake branch. The shape follows GPUEngine.h of this project's
  * own prior work, the Genesis 1.3 v4 backends on branch gpu/metal-engine (commit
  * 4919b01, unmerged upstream): residency for the whole element, refusal by name,
  * and single precision arranged for rather than accepted.

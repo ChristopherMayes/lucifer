@@ -69,6 +69,19 @@ implicit none
 
 integer, parameter :: fel_fp32_nq$ = 9   ! x, px, y, py, pz, theta, phasor, source, field.
 
+! The field twin transforms with FFTW's single-precision interface, and not every
+! toolchain carries it: the conda environment does, and the off-site distribution
+! builds FFTW from source in double precision only. The build detects the library and
+! defines LUCIFER_HAVE_FFTW3F when it is there (lucifer/CMakeLists.txt). Without it the
+! instrument refuses at setup rather than transforming in another precision, which
+! would measure something other than what it reports.
+
+#ifdef LUCIFER_HAVE_FFTW3F
+logical, parameter :: fel_fp32_have_fftw3f$ = .true.
+#else
+logical, parameter :: fel_fp32_have_fftw3f$ = .false.
+#endif
+
 character(8), parameter :: fel_fp32_qname(fel_fp32_nq$) = &
       [character(8) :: 'x', 'px', 'y', 'py', 'pz', 'theta', 'phasor', 'source', 'field']
 
@@ -168,6 +181,17 @@ case default
   err_flag = .true.
   return
 end select
+
+! The field twin's transform is FFTW's own single-precision interface, so a build
+! without that library cannot run the instrument in either role and says so here.
+
+if (.not. fel_fp32_have_fftw3f$) then
+  call out_io (s_error$, r_name, 'FP32_CHECK NEEDS THE SINGLE-PRECISION FFTW (libfftw3f), AND THIS BUILD', &
+        'DOES NOT CARRY IT. THE FIELD TWIN TRANSFORMS WITH FFTW''S OWN fftwf INTERFACE,', &
+        'AND ANOTHER PRECISION WOULD MEASURE SOMETHING OTHER THAN WHAT IT REPORTS.')
+  err_flag = .true.
+  return
+endif
 
 ! Freerun now carries the FP32 field, and the field twin keeps one record per beam
 ! slice with no slippage bookkeeping of its own, so a multi-slice freerun would hold
@@ -850,6 +874,11 @@ end subroutine fp32_kernel_cache
 ! timing and is nondeterministic at the ulp level, the same decision wavefront_mod
 ! records). Serial by design: the caller's epilogue runs slices one at a time, so one
 ! plan pair and one aligned buffer suffice.
+!
+! A build without the single-precision library compiles the body out, since a call to
+! fftwf_execute_dft would fail to link at all. Setup refuses such a build by name
+! (fel_fp32_have_fftw3f$), so this routine is unreachable there, and the message says
+! so rather than pretending to a fallback.
 !-
 
 subroutine fft32_solve (e, k32, ng)
@@ -858,6 +887,8 @@ use, intrinsic :: iso_c_binding
 
 complex(sp) e(:,:), k32(:,:)
 integer ng
+
+#ifdef LUCIFER_HAVE_FFTW3F
 
 include 'fftw3.f03'
 
@@ -886,6 +917,21 @@ call fftwf_execute_dft (plan_f, buf, buf)
 buf = buf * k32
 call fftwf_execute_dft (plan_b, buf, buf)
 e = buf / real(ng * ng, sp)
+
+#else
+
+character(*), parameter :: r_name = 'fft32_solve'
+
+! The stop stays, for the reason fel_assert_wiggler_sane records: err_exit's traceback
+! bomb does not trap on arm64 and its bare stop exits zero, so a refusal that must be
+! seen has to stop with a nonzero status itself.
+
+call out_io (s_fatal$, r_name, 'THE FP32 FIELD TWIN NEEDS THE SINGLE-PRECISION FFTW (libfftw3f),', &
+      'WHICH THIS BUILD DOES NOT CARRY. SETUP REFUSES SUCH A RUN, SO REACHING HERE', &
+      'IS A BUG. PLEASE REPORT THIS!')
+stop 1
+
+#endif
 
 end subroutine fft32_solve
 

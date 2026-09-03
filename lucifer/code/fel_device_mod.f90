@@ -2,8 +2,10 @@
 ! Module fel_device_mod
 !
 ! The Fortran side of the device seam: the only unit that calls the C interface of
-! lucifer_device.h, behind which one backend file sits per build (the Metal backend on
-! Darwin, a refusing stub elsewhere). Everything device-shaped crosses here: the chart
+! lucifer_device.h, behind which one backend file sits per build (the Metal backend
+! where the toolchain can carry it, a refusing stub in every other build, including a
+! macOS one whose Objective-C++ compiler is a GNU one). Everything device-shaped
+! crosses here: the chart
 ! conversions, the residency bookkeeping, the lockstep instrument's device role, and
 ! the refusals. No Metal type or call appears outside device/lucifer_metal.mm, and no
 ! luc_dev call appears outside this module.

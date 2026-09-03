@@ -1,8 +1,11 @@
-/* The device seam with no backend behind it: every platform without one builds
- * this file, so the same tree compiles everywhere and a deck asking for a device
- * is refused by name rather than failing at link time or, worse, quietly taking
- * the CPU path. Only luc_dev_available can legitimately be called on a stub
- * build; everything else exists to satisfy the linker and would be a caller bug.
+/* The device seam with no backend behind it: every build that cannot carry one
+ * compiles this file, so the same tree compiles everywhere and a deck asking for a
+ * device is refused by name rather than failing at link time or, worse, quietly
+ * taking the CPU path. That is not only the non-Darwin platforms: the Metal backend
+ * is ARC-managed Objective-C++, so a macOS build whose Objective-C++ compiler is a
+ * GNU one lands here too, which is what the CMake decision reports at configure
+ * time. Only luc_dev_available can legitimately be called on a stub build;
+ * everything else exists to satisfy the linker and would be a caller bug.
  */
 
 #include "lucifer_device.h"
@@ -20,7 +23,9 @@ int luc_dev_available (char *name, int name_len, char *reason, int reason_len)
 {
   put_str (name, name_len, "none");
   put_str (reason, reason_len,
-           "this build carries no device backend (the Metal backend builds on Darwin only)");
+           "this build carries no device backend (the Metal backend needs macOS and a "
+           "Clang-family Objective-C++ compiler; the configure output names which "
+           "backend was built)");
   return 0;
 }
 

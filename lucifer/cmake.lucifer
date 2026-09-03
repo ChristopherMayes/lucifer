@@ -11,6 +11,6 @@ set (LINK_LIBS
   lucifer
   bmad
   sim_utils
-  fftw3f
+  ${LUCIFER_FFTW3F_LIBS}
   ${ACC_BMAD_LINK_LIBS}
 )

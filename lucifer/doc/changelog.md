@@ -9,6 +9,18 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-03 Fixed: two build-time capabilities are detected rather than assumed, so builds whose
+  toolchains lack them compile and refuse by name instead of failing to build. The single-precision
+  FFTW the FP32 field twin transforms with is present in the conda environment and absent from the
+  off-site distribution, whose FFTW is built from source in double precision only, where an
+  unconditional `-lfftw3f` does not link; the build now looks for the library and `fp32_check`
+  refuses by name without it, since transforming in another precision would measure something other
+  than what it reports. The Metal backend is ARC-managed Objective-C++, so it needs a Clang-family
+  Objective-C++ compiler and not merely macOS: a build that hands `OBJCXX` to a GNU compiler
+  rejected `-fobjc-arc` outright, and such a build now takes the refusing stub like any other.
+  Configure output names both outcomes. A capability-free build was measured to produce
+  byte-identical physics, and every tier digit holds.
+
 - 2026-09-02 Added: the Metal device backend. `global%device = "metal"` runs the averaged FEL step
   on an Apple Silicon GPU: the beam and the field upload at each FEL element's entry and stay
   resident through it, every integration step is one command buffer (transverse maps, the RK4 push,
