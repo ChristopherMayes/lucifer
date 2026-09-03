@@ -19,7 +19,7 @@ Bmad's own named methods, set on the element as any tracking method is, and they
 | `tracking_method` | what it is for |
 |---|---|
 | `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
-| `fel_unaveraged` | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also the tree's referee, since it shares no approximation with the averaged path. |
+| `fel_unaveraged` | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also an independent check on the averaged method, since the two share no approximation. |
 
 A lattice writes them as it writes any method, `tracking_method = fel_unaveraged`, and class-settable as `wiggler::*[TRACKING_METHOD] = fel_unaveraged`. The averaged method's maps have one more option behind them, `global%transport_model`, described in [`input-reference.md`](input-reference.md).
 

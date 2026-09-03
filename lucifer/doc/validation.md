@@ -748,7 +748,7 @@ runs overestimate gain, is dropped from the source. The coherent part deposits a
 analytic Gaussian carrying the slice's exact source phasor, centered and tilted by
 phasor-weighted moments (this port's extension) with Tanaka's kappa width fit. The
 field, gather, and every diagnostic are untouched. `"deposit"` stays the default and
-the referee.
+the reference the coherent model is measured against.
 
 Measured (check_coherent.py, the harness's coherent-source section): at M = 128/slice the
 plain deposit fakes ln P by +0.42 on a curve that truly absorbs, the coherent source

@@ -815,7 +815,7 @@ priced and not hidden. What it buys is physics the averaged map cannot reach: th
 full quiver dynamics, the energy accounting the beam actually pays, coupling that is
 polarization-agnostic, and arbitrary harmonic content.
 
-The mode is also the tree's referee. Every input of the averaged map (the coupling
+The mode is also an independent check on the averaged path. Every input of the averaged map (the coupling
 $f_c(h)$, the roll-off $f_{aw}$, the entry/exit behavior) is an output of the
 underlying unaveraged dynamics, so here those inputs become measurements. The two
 paths share no approximation. Because the kick/deposit pair resolves each particle's full quiver
