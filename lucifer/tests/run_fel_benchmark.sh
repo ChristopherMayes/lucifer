@@ -137,15 +137,31 @@ echo "FEL steady-state benchmark"
 echo "=============================================================================="
 echo "  lucifer: $EXE"
 echo "  genesis4:    $GENESIS"
-# Which electron rest energy the reference was compiled with. Releases to v4.6.14 carry
-# the pre-CODATA value, which loosens the transcription levels without failing anything,
-# so it is named here rather than discovered later.
+# Which reference this is. The recorded levels belong to one version of it, and another
+# moves them while every check still passes, so this is a refusal rather than a note:
+# 4.6.15 both carries the CODATA electron rest energy and seeds its noise per global
+# slice index, and digits recorded against anything earlier do not compare. The version
+# comes from the binary's own banner, which it prints before complaining about the
+# missing input file, so a binary named by --genesis identifies itself the same way a
+# packaged one does.
+GENESIS_VERSION_WANTED=4.6.15
+GENESIS_VERSION="$("$GENESIS" 2>&1 | sed -n 's/.*Version \([0-9][0-9.]*\).*/\1/p' | head -1)"
+echo "               version $GENESIS_VERSION"
+if [[ "$GENESIS_VERSION" != "$GENESIS_VERSION_WANTED" ]]; then
+  echo "Error: the recorded levels belong to genesis4 $GENESIS_VERSION_WANTED, and this reference reports" >&2
+  echo "       ${GENESIS_VERSION:-no version at all}: $GENESIS" >&2
+  echo "       Install the reference with:" >&2
+  echo "         conda install -n bmad-fel-validate -c conda-forge \\" >&2
+  echo "                 'genesis4=$GENESIS_VERSION_WANTED=mpi_openmpi*'" >&2
+  exit 1
+fi
+
+# Which electron rest energy it was compiled with. Releases to v4.6.14 carried the
+# pre-CODATA value, which loosened the transcription levels without failing anything.
+# The version check above already excludes those, so this line is a statement of what
+# the reference carries rather than a warning about what it might.
 GENESIS_EEV="$("$PYTHON" "$SCRIPT_DIR/scripts/genesis_constants.py" "$GENESIS" 2>/dev/null)"
 echo "               $GENESIS_EEV"
-if [[ "$GENESIS_EEV" != codata* ]]; then
-  echo "               NOTE: the recorded levels belong to a codata build. Set \$GENESIS4"
-  echo "               to one built from Genesis master until a release carries the fix."
-fi
 echo "  python:      $PYTHON"
 echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"

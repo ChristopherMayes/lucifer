@@ -846,6 +846,589 @@ Output:
   ez(:) -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
 ```
 
+## `fel_device_mod.f90`
+
+(api-fel-device-mod)=
+### `fel_device_mod`
+
+*Module*
+
+```
+The Fortran side of the device seam: the only unit that calls the C interface of
+lucifer_device.h, behind which one backend file sits per build (the Metal backend
+where the toolchain can carry it, a refusing stub in every other build, including a
+macOS one whose Objective-C++ compiler is a GNU one). Everything device-shaped
+crosses here: the chart conversions, the residency bookkeeping, the lockstep
+instrument's device role, and the refusals. No Metal type or call appears outside
+device/lucifer_metal.mm, and no luc_dev call appears outside this module. The FP64
+comparison quantities the instrument's rows are measured against (the roll-off, the
+source deposit, the median) are fel_fp32_mod's own module procedures, called from
+here rather than repeated: they are transcriptions of fel_field_step's conventions,
+and a second copy is a second thing to find the day a convention changes.
+
+The device chart. Transverse coordinates and the energy offset are FP32; the
+longitudinal state is a 64-bit fixed-point phase in ticks of 2 pi / 2^32, held off a
+static FP64 per-slice reference z_ref. The conversions are exact FP64 both ways:
+
+  up:    goff = gamma - gamma0,  uphase = nint((ks z / beta - ks z_ref) * ticks)
+  down:  gamma = gamma0 + goff, pz = (sqrt(gamma^2-1) - p0_mc)/p0_mc,
+         z = beta (z_ref + delta / ks) with delta = uphase / ticks
+
+(the down form is fel_advance's own exit chart z = -beta (phi0 - theta)/ks with
+theta = phi0 + ks z_ref + delta, so the boundary is the CPU chart evaluated in
+FP64). Bucket wraps in the accumulator are exact integer arithmetic -- the migration
+operation a later landing needs -- and fel_device_setup asserts that exactly on the
+device itself, not to a tolerance. The kernel-side reformulations (energy offset,
+detuning difference, base rotator times small angle) mirror fel_fp32_mod, whose
+lockstep levels price them; the fixed-point phase replaces the FP32 residual dzr,
+whose ulp floor forced that module's moving reference (FINDINGS 7.39): with a
+uniform 1.5e-9 rad quantum the reference can stay static for a whole element.
+
+Two roles. With fp32_check off the device is the run inside averaged FEL elements:
+beam and field upload at element entry, stay resident through the element, and come
+back at the comb's stats positions and the element end (fel_track_line_mod owns that
+schedule). With fp32_check = 'lockstep' or 'freerun' the device takes the CPU twin's
+role in the instrument: the FP64 path runs untouched, the device advances the same
+step from the shared state, and the rows, guard, stream and ceilings are
+fel_fp32_mod's own machinery with the device's arithmetic under test. The guard
+column is then the median per-step phase increment in ticks of the fixed-point
+quantum rather than in FP32 ulps; the same floor applies.
+
+The device deposit accumulates with atomic adds whose ordering is not fixed, so two
+runs of the same step differ in the source's last bit or two. Both reference
+backends behave the same way (manual/GPU.md, gpu/metal-engine 4919b01), so no device
+output is asserted byte-identical; the ceilings absorb it.
+```
+
+(api-fel-device-par-struct)=
+### `fel_device_par_struct`
+
+*Struct*
+
+```
+One step's constants for luc_dev_step, mirroring luc_dev_step_par of
+lucifer_device.h field for field (all doubles, then the 32-bit ints). Editing
+either mirror alone skews the layout silently; keep them together.
+```
+
+(api-fel-device-struct)=
+### `fel_device_struct`
+
+*Struct*
+
+```
+The device run state: the knob's answer, the residency flag the walk consults, the
+static per-slice references, the kernel-upload key (fp32_kernel_cache's key), and
+the staging arrays the transfers reuse. su0 holds the previous step's phase
+accumulators for the instrument's guard statistic.
+```
+
+(api-fel-device-setup)=
+### `fel_device_setup`
+
+*Subroutine* `(dev, device_req, beam, ngrid, sample, fp32_iu, err_flag)`
+
+```
+Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
+asks for the one backend this tree knows; a build without it (the stub) refuses with
+the stub's own reason, and any other name is refused by name. Allocates the resident
+buffers for this run shape (the grid refusal, naming the nearest supported size,
+comes back from the backend), runs the exact-wrap assertion on the device, and
+writes the device header lines into the instrument's stream when one is open.
+```
+
+```
+Input:
+  device_req -- character(*): global%device.
+  beam       -- fel_beam_struct: The beam (slice fills size the rectangular array).
+  ngrid      -- integer: Transverse grid points per side.
+  sample     -- real(rp): Slice spacing in radiation wavelengths (integer by check).
+  fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
+
+Output:
+  dev        -- fel_device_struct: Armed (or left dark).
+  err_flag   -- logical: Set True on any refusal. False otherwise.
+```
+
+(api-fel-device-element-begin)=
+### `fel_device_element_begin`
+
+*Subroutine* `(dev, beam, wf)`
+
+```
+Routine to make the beam and the field resident at an FEL element's entry: the
+static per-slice reference is set to the slice's FP64 mean z, every slice converts
+through the module header's chart, and every field record slice rounds to FP32.
+From here to fel_device_element_end the device state is the run inside the element;
+the host arrays are stale until a readback refreshes them.
+```
+
+```
+Input:
+  beam -- fel_beam_struct: The beam.
+  wf   -- wavefront_struct: The fundamental's field record (ring order preserved).
+
+Output:
+  dev  -- fel_device_struct: Resident.
+```
+
+(api-fel-device-stage-slice)=
+### `fel_device_stage_slice`
+
+*Subroutine* `(dev, beam, is, z_ref)`
+
+```
+Routine to fill the staging arrays with one slice's device image: the exact FP64
+chart conversions of the module header, rounded once into the device
+representation, padded to the rectangular width with zero-weight entries.
+```
+
+(api-fel-device-step-run)=
+### `fel_device_step_run`
+
+*Subroutine* `(dev, par, exp_k2, phi0, phi0_new, ks, err_flag)`
+
+```
+Routine to encode one resident integration step: the keyed propagator upload, the
+per-slice phase rotators (the push reads e^{-i(phi0 + ks z_ref)}, the deposit its
+phi0_new counterpart), the exact tick count of the common phase advance, and one
+command buffer holding the whole step. Nothing is waited on here; the next host
+touch of a buffer drains it.
+```
+
+```
+Input:
+  par       -- fel_device_par_struct: The step's constants, filled by the caller.
+  exp_k2    -- complex(rp): The FP64 propagator this step (rounded on upload).
+  phi0      -- real(rp): The common phase at step entry.
+  phi0_new  -- real(rp): The common phase at step exit.
+  ks        -- real(rp): The fundamental radiation wavenumber [1/m].
+
+Output:
+  dev       -- fel_device_struct: One more step encoded.
+  err_flag  -- logical: Set True if the backend refuses. False otherwise.
+```
+
+(api-fel-device-readback)=
+### `fel_device_readback`
+
+*Subroutine* `(dev, beam, wf)`
+
+```
+Routine to refresh the host FP64 state from the resident device state: the beam
+through the module header's exact down-chart, the field record slice for slice in
+ring order. The comb's stats positions and the element end call this; between them
+the host arrays are stale by design ("stats read back at the comb's positions
+only"). A readback observes and never steers: the device state is untouched.
+
+Parallel over slices, and the measurement that made it so is in
+doc/performance.md's device section: at the finest comb the serial conversion loops
+were half the cost of every stats row, ~4.3 ms a record on the 96 x 8192 case. The
+conversions are elementwise with no accumulation and each iteration writes only its
+own slice's arrays or its own field plane, so any thread order computes the same
+bits. Two structural points hold that. The device drains once, serially, before the
+parallel regions, after which every transfer is a pure disjoint copy from the
+shared-storage buffers (lucifer_device.h's post-drain contract). And the staging is
+block-local per slice rather than the module-level scratch, which is sized for one
+slice at a time and is not thread-safe by design.
+```
+
+(api-fel-device-element-end)=
+### `fel_device_element_end`
+
+*Subroutine* `(dev, beam, wf)`
+
+```
+Routine to end residency at the element's exit: the final readback, after which the
+host FP64 state is the run again (rounded through the device representation, the
+residency boundary the design brief names) and the walk's interludes proceed on the
+CPU. The next FEL element re-uploads.
+```
+
+(api-fel-device-slice-energy)=
+### `fel_device_slice_energy`
+
+*Function* `(dev, ifld, dx) result (energy)`
+
+```
+Routine to read one resident field slice's energy-like sum, sum|E|^2 * dx^2/(2 Z0)
+in FP64 over the FP32 record: the escape accounting the device-resident slippage
+needs (fel_device_apply_slippage in fel_track_mod owns the bookkeeping; this module
+owns the seam crossing). ifld is the 1-based record index.
+```
+
+(api-fel-device-zero-slice)=
+### `fel_device_zero_slice`
+
+*Subroutine* `(dev, ifld)`
+
+```
+Routine to zero one resident field slice, the non-periodic fill of the slippage
+rotation. ifld is the 1-based record index.
+```
+
+(api-fel-device-twin-begin)=
+### `fel_device_twin_begin`
+
+*Subroutine* `(dev, fp32, beam, wf, s0, par, exp_k2,`
+
+```
+                                     phi0, phi0_new, ks, err_flag)
+
+Routine to put the device in the twin's role for one step, part one: uploads and
+the step encode, called after the FP64 particle advance and BEFORE the production
+field solve (the lockstep field image must round from the pre-solve record). In
+lockstep the shared state is the caller's pre-step snapshot s0 and the reference
+moves to the slice mean; in freerun the resident state carries and only the first
+step uploads. The encoded step then runs concurrently with the production solve.
+```
+
+```
+Input:
+  s0(:,:,:) -- real(rp): Pre-step FP64 state, (6, npart, nslice) as x, px, y, py,
+                 z, pz, snapshotted before the leading transverse half step.
+```
+
+(api-fel-device-twin-rows)=
+### `fel_device_twin_rows`
+
+*Subroutine* `(dev, fp32, beam, wf, first, par, phi0_new, ks)`
+
+```
+Routine to put the device in the twin's role, part two: after the production solve,
+read the device state back and fill fel_fp32_mod's rows against the FP64 path.
+Rows 1 to 4 carry the device's FP32 transverse maps (the CPU twin refreshed those
+from FP64, so its recorded levels there were pure rounding; the device's are
+arithmetic and get their own recorded levels). Rows 5 to 7 follow
+fel_fp32_twin_slice's conventions with the phase compared in the tick chart's FP64
+image; rows 8 and 9 follow fel_fp32_field_twin's, against a fresh FP64 deposit of
+the shared post-step state. The guard statistic is the median per-step phase
+increment in ticks (uniform quantum, so no spacing division). The device's own
+phase accumulators are kept as the next step's guard baseline, which is what makes
+the freerun guard cost no extra sync.
+```
+
+(api-fel-device-close-run)=
+### `fel_device_close_run`
+
+*Subroutine* `(dev)`
+
+```
+Routine to report what the device did and release it: the step count and the
+device-busy seconds from the backend's own command-buffer timestamps, the honest
+pair a wall clock is judged against (the dispatch floor is their difference).
+```
+
+## `fel_fp32_mod.f90`
+
+(api-fel-fp32-mod)=
+### `fel_fp32_mod`
+
+*Module*
+
+```
+The single-precision particle path and the lockstep instrument that prices it
+(doc/performance.md, doc/validation.md). Apple GPUs have no FP64, so before any
+kernel is written a single-precision form of the averaged FEL advance must exist
+with its divergence from the FP64 path a measured number. Nothing outside the
+instrument reads the FP32 state, and the FP64 path is untouched: this module is a
+measuring device, not a production mode.
+
+The FP32 state is the packed six-vector (x, px, y, py, dzr, pz), 24 bytes per
+particle. dzr is the longitudinal residual of the split z = z_ref + dzr, with z_ref
+one FP64 number per slice. Storing Bmad's z absolutely in FP32 fails silently (the
+per-step increment rounds to zero and bunching never forms), so the residual form is
+load-bearing and the runtime guard below watches it. The reference must also move:
+the beam's common z drift is secular, a static reference lets the residual grow until
+its ulp swallows the physics, and the guard caught exactly that on this instrument's
+first run (step 514 of the steady-state example, 28 ulps against the floor of 32).
+z_ref therefore refreshes to the slice's FP64 mean each step, one host number per
+slice, and in freerun mode the persistent residuals rebase across the reference move
+by fel_fp32_renorm, which is the migration operation doing double duty.
+
+Reformulations, each forced by an FP32 quantum and each below FP64 notice:
+
+  energy   The working variable is goff = gamma - gamma0. The conversion is
+           goff = pz * p0_mc^2/gamma0, exact to O(1/gamma^2) ~ 4e-9, below FP32
+           resolution. Absolute FP32 gamma has a quantum of 1.35e-3 at these
+           energies against a per-step change of 3.0e-4, and sqrt(gamma^2 - 1)
+           loses the 1 entirely (the quantum of gamma^2 is about 15).
+  phase    The working variable is delta = theta - phi0, formed as ks * dzr
+           (the 1/beta corrections are ~4e-9 of theta, below FP32 resolution and
+           part of what the instrument measures). The phase factor is
+           e^{-i theta} = e^{-i phi0} * e^{-i delta}: the base rotator is one FP64
+           evaluation per slice, the per-particle sincos is FP32 on the small
+           angle. This is the angle-addition form a device kernel would use.
+  detuning The FP64 ODE forms sqrt(1 - btper0/gamma^2), which is 1 minus ~1.3e-8:
+           in FP32 that is exactly 1 and the phase equation loses the energy
+           dependence completely. The FP32 ODE forms the detuning as the
+           difference 0.5*ks*(qres - q) with q = btper0/gamma^2 and
+           qres = 2*ku/ks, so the resonant cancellation happens between two
+           small like quantities. The remaining floor is btper0's own FP32
+           representation, and the recorded levels carry it.
+
+The instrument runs both precisions from a shared state at fel_advance's own
+sequence point: the FP64 slice is copied before its
+advance, the twin advances the FP32 image of that copy, and the comparison reads
+both results before anything else touches the slice. In lockstep mode the FP32
+state is rebuilt from FP64 every step, so a wrong formula shows as a jump rather
+than as growth. In freerun mode dzr, pz and the FP32 field record persist across
+steps, the deposit feeds the twin's own field and the gather reads it, so the twin is
+a complete single-precision run beside the FP64 one; the transverse coordinates are
+refreshed from FP64 in both modes, since the transverse maps stay FP64 and enter
+rounded. A freerun window is one slice by refusal: the twin keeps no slippage
+rotation of its own, and slippage moves light between slices. The source phasor sum(w * awloc * e^{-i theta}) is compared at the
+same point; the production deposit runs one FP64 transverse half-step later, which
+is precision-neutral between the sides.
+
+Everything here is serial-safe inside the caller's parallel slice loop: the twin
+touches only its slice's state and its slice's row of the divergence arrays, so the
+instrument's own output is identical at any thread count.
+```
+
+(api-fel-fp32-slice-struct)=
+### `fel_fp32_slice_struct`
+
+*Struct*
+
+```
+One slice's packed FP32 particle set: the six-vector plus the working longitudinal
+chart the twin evolves. Allocated to the slice's fill count at first use.
+```
+
+(api-fel-fp32-struct)=
+### `fel_fp32_struct`
+
+*Struct*
+
+```
+The instrument's run state: mode, the per-slice FP32 sets, the per-step divergence
+table the parallel loop fills and the serial epilogue reduces, and the guard and
+worst-case accumulators the footer and the check read.
+```
+
+(api-fel-fp32-setup)=
+### `fel_fp32_setup`
+
+*Subroutine* `(fp32, mode, mutate, nslice, out_root, err_flag)`
+
+```
+Routine to arm the instrument from the input knob: '' or 'off' leaves it dark,
+'lockstep' rebuilds the FP32 state from FP64 every step, 'freerun' lets the
+longitudinal state carry across steps. Opens the .fp32.txt stream.
+```
+
+```
+Input:
+  mode     -- character(*): global%fp32_check.
+  mutate   -- logical: global%fp32_mutate, the check's own failure hook.
+  nslice   -- integer: Slice count.
+  out_root -- character(*): Output root for the stream file.
+
+Output:
+  fp32     -- fel_fp32_struct: Armed (or left dark).
+  err_flag -- logical: Set True on an unrecognized mode. False otherwise.
+```
+
+(api-fel-fp32-renorm)=
+### `fel_fp32_renorm`
+
+*Subroutine* `(dzr, shift)`
+
+```
+Routine to re-reference FP32 residuals across a bucket boundary: the migration
+operation in the split representation. The shift is FP64 (it is the slice bucket,
+exactly beta * slice_spacing) and rounds once into the residual's own precision.
+```
+
+```
+Input:
+  dzr(:) -- real(sp): Residuals off the old reference.
+  shift  -- real(rp): The bucket shift [m], signed.
+
+Output:
+  dzr(:) -- real(sp): Residuals off the new reference.
+```
+
+(api-fel-fp32-faw)=
+### `fel_fp32_faw`
+
+*Function* `(x, y, kx, ky, ax, ay, cos_t, sin_t) result (value)`
+
+```
+The FP64 comparison side's transverse roll-off, faw of fel_track_mod on loose
+scalars rather than on an fel_und_struct, which the instrument and the device seam
+do not carry. Shared by both of the instrument's roles: the CPU twin compares
+against it and the device twin does the same, and one transcription of the
+expression is the point.
+```
+
+```
+Input:
+  x, y            -- real(rp): Transverse position [m].
+  kx, ky          -- real(rp): Natural-focusing roll-off [1/m^2].
+  ax, ay          -- real(rp): Undulator field offset [m].
+  cos_t, sin_t    -- real(rp): Wiggle-plane tilt.
+
+Output:
+  value           -- real(rp): aw(x,y)/aw, the rolled-off factor.
+```
+
+(api-fel-fp32-deposit64)=
+### `fel_fp32_deposit64`
+
+*Subroutine* `(src, x, y, theta, wgt, scl_w, gridmax, dgrid, &`
+
+```
+                                  kx2, ky2, ax, ay, cos_t, sin_t)
+
+One particle's FP64 source deposit, fel_field_step's own expressions:
+part = sqrt(faw2) * scl_w * wgt with faw2 = 1 + kx*dx^2 + ky*dy^2 (no half, which
+is Genesis's own roll-off transcribed), cpart = (sin theta + i cos theta) * part,
+bilinear scatter onto the lower-left cell and its three neighbours.
+
+This is the reference the FP32 source row is measured against, and both roles of the
+instrument need it: the CPU field twin and the device twin. It lives here, once,
+because it is a transcription of a convention -- a second copy would have to be
+found and changed the day fel_field_step's deposit changes.
+```
+
+```
+Input:
+  src(:,:)        -- complex(rp): The accumulating source grid.
+  x, y            -- real(rp): Transverse position [m].
+  theta           -- real(rp): Ponderomotive phase [rad].
+  wgt             -- real(rp): Charge weight over gamma [C].
+  scl_w           -- real(rp): The deposit scale of fel_field_step.
+  gridmax, dgrid  -- real(rp): Grid half width and spacing [m].
+  kx2, ky2        -- real(rp): faw2's roll-off coefficients [1/m^2].
+  ax, ay          -- real(rp): Undulator field offset [m].
+  cos_t, sin_t    -- real(rp): Wiggle-plane tilt.
+
+Output:
+  src(:,:)        -- complex(rp): This particle's contribution added.
+```
+
+(api-fel-fp32-median)=
+### `fel_fp32_median`
+
+*Subroutine* `(v, nn, med)`
+
+```
+The median of the first nn entries, scratch reordered in place. Heapsort:
+O(n log n), no recursion, no degenerate case. This runs per slice per step in both
+of the instrument's roles, so it must be cheap and it must terminate on any input
+(a quickselect written here first did not, and hung a run). The sift is inlined
+twice because a contained procedure cannot hold one of its own.
+```
+
+```
+Input:
+  v(:)  -- real(rp): The values. Reordered in place.
+  nn    -- integer: How many of them count.
+
+Output:
+  v(:)  -- real(rp): Reordered.
+  med   -- real(rp): The median.
+```
+
+(api-fel-fp32-twin-slice)=
+### `fel_fp32_twin_slice`
+
+*Subroutine* `(fp32, is, x0, y0, px0, py0, z0, pz0, sl, beam, &`
+
+```
+                                   exfld, dx, dy, gridmax, aw, ku, kx, ky, ax, ay, &
+                                   cos_t, sin_t, rtmp, delz, xks, xku, phi0, phi0_new)
+
+Routine to advance one slice's FP32 twin from the shared pre-advance state and fill
+this slice's divergence row. The x0.. arrays are the FP64 state exactly as
+fel_advance received it, sl is the slice after the FP64 advance, and the twin
+mirrors fel_advance's arithmetic under the module header's reformulations:
+fundamental field only, no collective terms (the setup refusals hold that).
+
+Runs inside the caller's parallel loop: everything written is indexed by is.
+```
+
+(api-fel-fp32-field-twin)=
+### `fel_fp32_field_twin`
+
+*Subroutine* `(fp32, is, sl, beam, exfld_post, exp_k2, scl_w, &`
+
+```
+                                   dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks)
+
+Routine to run one slice's FP32 field step and fill the source and field rows. Serial,
+from the caller's epilogue after the production solve loop: the FP64 record already
+carries this step's solve, and the twin recomputes the same step in FP32 from its own
+field record (rounded pre-solve in lockstep, carried in freerun).
+
+The source comparison uses the shared post-step FP64 particle state on both sides
+(the FP32 side through rounded values), so the rows price the field arithmetic alone:
+the deposit's weights, phases and FP32 accumulation, the single-precision transform
+pair, and the rounded propagator. The freerun deposit instead uses the twin's own
+longitudinal state, since there the FP32 field must be fed by the FP32 run. The
+deposit expressions mirror fel_field_step exactly: part = sqrt(faw2)*scl_w*w/gamma
+with faw2 = 1 + kx*dx^2 + ky*dy^2 (no half: Genesis's own roll-off, transcribed),
+cpart = (sin theta + i cos theta) * part = i e^{-i theta} * part, bilinear scatter,
+transform, kernel multiply, inverse transform, 1/N, plus 2*source in real space.
+
+Both rows are normalized by the post-solve FP64 field's norm: the source alone can
+sit at noise level on a dark start, and the post-solve field bounds it from below.
+```
+
+(api-fp32-kernel-cache)=
+### `fp32_kernel_cache`
+
+*Subroutine* `(fp32, exp_k2, ng)`
+
+```
+Routine to hold the FP32 image of the FP64 propagator, rebuilt only when the FP64
+kernel it rounds from changes (keyed by the values themselves: the caller's kernel
+cache already resolves grid, wavelength and step).
+```
+
+(api-fft32-solve)=
+### `fft32_solve`
+
+*Subroutine* `(e, k32, ng)`
+
+```
+Routine to apply one field-solve step in single precision: forward transform,
+propagator multiply, inverse transform, 1/N. FFTW's single-precision interface,
+plans cached per grid size with FFTW_ESTIMATE (FFTW_MEASURE picks its algorithm by
+timing and is nondeterministic at the ulp level, the same decision wavefront_mod
+records). Serial by design: the caller's epilogue runs slices one at a time, so one
+plan pair and one aligned buffer suffice.
+
+A build without the single-precision library compiles the body out, since a call to
+fftwf_execute_dft would fail to link at all. Setup refuses such a build by name
+(fel_fp32_have_fftw3f$), so this routine is unreachable there, and the message says
+so rather than pretending to a fallback.
+```
+
+(api-fel-fp32-step-close)=
+### `fel_fp32_step_close`
+
+*Subroutine* `(fp32, err_flag)`
+
+```
+Routine to reduce the step's per-slice divergences, write the row, and run the
+guard. Serial, after the caller's parallel loop. The guard refuses when the median
+per-step residual increment falls below 32 ulps of the residual: below that the
+FP32 representation is absorbing the physics, which is the silent failure the
+design brief records.
+```
+
+(api-fel-fp32-close)=
+### `fel_fp32_close`
+
+*Subroutine* `(fp32)`
+
+```
+Routine to write the run summary block and close the stream.
+```
+
 ## `fel_h5_mod.f90`
 
 (api-fel-h5-mod)=
@@ -2661,6 +3244,139 @@ Output:
   take         -- logical: True when a stats row is due.
 ```
 
+## `fel_timer_mod.f90`
+
+(api-fel-timer-mod)=
+### `fel_timer_mod`
+
+*Module*
+
+```
+Where a run spends its time, accumulated per phase and printed in the footer. The
+phases partition the walk: every timed region belongs to exactly one of them, so the
+fractions sum to the walk and the leftover is named unaccounted rather than hidden.
+
+Two rules make the instrument honest.
+
+The timers sit at region boundaries, never inside a parallel loop. A clock call inside
+the slice loop would measure the loop it perturbs, and the phases that interleave per
+slice (the deposit against its FFT, the field gather against the RK4) are read from a
+sampling profiler instead. doc/performance.md records that split beside this one.
+
+The timers are always on. Each phase costs two system_clock calls per region against
+milliseconds of work inside it, and the measured cost of the whole instrument is below
+the run-to-run spread of the run it measures. An instrument behind a switch is an
+instrument nobody runs.
+
+State is module level, like the FFT plan cache and the field-solve kernel cache. The
+phases accumulate from fel_timer_reset, so a driver walking the lattice twice sees the
+total of both walks, and the numbers never enter the physics. That is what keeps the
+re-entrancy contract intact, and lucifer_smoke_test holds it: two walks in one process
+must agree bit for bit with two processes, which they do because nothing here is read
+by anything but the report.
+
+An embedding program that never calls fel_timer_reset gets no table and no error. The
+clock rate is then zero, fel_timer_write returns at once, and the timers cost their two
+clock calls and nothing else. An error return can leave a phase open, which also costs
+nothing: a failed run prints no footer.
+```
+
+(api-fel-timer-reset)=
+### `fel_timer_reset`
+
+*Subroutine* `()`
+
+```
+Routine to zero every phase and start the run clock. Called once by the driver before
+it reads its input, so the run total covers everything the process does and the work
+outside the walk reads off as the difference.
+```
+
+(api-fel-tic)=
+### `fel_tic`
+
+*Subroutine* `(iphase)`
+
+```
+Routine to open a phase. Must be called outside every parallel region, and must be
+closed by fel_toc on the paths that reach the footer.
+```
+
+```
+Input:
+  iphase -- integer: One of the fel_t_...$ phase indices.
+```
+
+(api-fel-toc)=
+### `fel_toc`
+
+*Subroutine* `(iphase)`
+
+```
+Routine to close a phase, adding its elapsed clock to the phase total and counting
+the region.
+```
+
+```
+Input:
+  iphase -- integer: The phase fel_tic opened.
+```
+
+(api-fel-timer-seconds)=
+### `fel_timer_seconds`
+
+*Function* `(iphase) result (secs)`
+
+```
+Routine to give one phase's accumulated seconds. fel_t_walk$ gives the walk.
+```
+
+```
+Input:
+  iphase -- integer: One of the fel_t_...$ phase indices.
+
+Output:
+  secs   -- real(rp): Seconds accumulated in that phase.
+```
+
+(api-fel-timer-write)=
+### `fel_timer_write`
+
+*Subroutine* `(r_name)`
+
+```
+Routine to print the phase table: every phase this run entered, its region count, its
+seconds and its share of the walk, then the unaccounted remainder, the walk and the
+run. Phases the run never entered are left out, so an averaged run says nothing about
+the unaveraged step.
+
+The unaccounted row is the point of the table. The phases partition the walk by
+construction, so what is left is the walk's own overhead: the element loop, the
+comb tests, the wake and space-charge resolution per element, and the instrument
+itself. A large remainder is a phase somebody forgot to name.
+
+One row is derived rather than measured, and its label carries an = to say so: the
+FEL step is the sum of the phases inside it, which is the share of the run the
+undulator segments own. It is left out of the leaf sum, so the leaf rows still add to
+the walk minus the remainder.
+```
+
+```
+Input:
+  r_name -- character(*): The caller's name, for out_io.
+```
+
+(api-write-phase-row)=
+### `write_phase_row`
+
+*Subroutine* `(iphase)`
+
+```
+Routine to print one measured phase, or nothing when the run never entered it. An
+averaged run says nothing about the unaveraged step this way, and a run without
+wakes says nothing about wakes.
+```
+
 ## `fel_track_line_mod.f90`
 
 (api-fel-track-line-mod)=
@@ -3155,6 +3871,32 @@ Output:
   slip, wf    -- Updated state and rotated record.
 ```
 
+(api-fel-device-apply-slippage)=
+### `fel_device_apply_slippage`
+
+*Subroutine* `(dev, slip, wf, slippage)`
+
+```
+Routine to account one step's slippage while the field is resident on the device:
+fel_apply_slippage's exact bookkeeping with the two data motions the rotation needs
+done against the resident record through fel_device_mod -- the transmitted slice's
+energy read back (one slice, the reference backends' own slippage traffic) and its
+device slice zeroed. The host FP64 record stays stale, as between any two
+readbacks. The escape bank is absent: keep_escaped_field is refused with the
+device, and so is every harmonic beyond the fundamental.
+```
+
+```
+Input:
+  dev         -- fel_device_struct: The resident device state.
+  slip        -- fel_slip_struct: Slippage state of the fundamental's record.
+  wf          -- wavefront_struct: The field record (geometry only; data stays put).
+  slippage    -- real(rp): Slippage of this step [radiation wavelengths].
+
+Output:
+  dev, slip   -- Updated state; the device record rotated.
+```
+
 (api-fel-und-coupling)=
 ### `fel_und_coupling`
 
@@ -3242,6 +3984,18 @@ Input:
 Output:
   beam, ff    -- Advanced one step.
   err_flag    -- logical: Set True on error.
+```
+
+(api-fill-device-par)=
+### `fill_device_par`
+
+*Subroutine* `(par)`
+
+```
+Routine to fill one step's device constants from the same authorities the FP64
+step reads: the undulator segment, the beam's references, the fundamental's grid,
+and fel_field_step's own source scale. The Bmad transverse map's k1 locals are
+fel_transverse_track_bmad's forms.
 ```
 
 (api-fel-track-interlude-genesis)=
@@ -3959,13 +4713,21 @@ segment, from the analytic vector potential with the ramp envelope g(s):
 terms. The transverse profiles are the near-axis models whose ponderomotive-average
 focusing reproduces the averaged mode's natural-focusing split exactly (planar
 kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec-unaveraged.
+
+The four quantities that depend on s and not on the particle arrive as arguments:
+the envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK
+stage shares them, so the caller evaluates them once per stage rather than once per
+particle per stage (FINDINGS 7.37). Taking them as arguments rather than computing
+them here is what makes that structural: this routine can no longer be the place a
+per-particle transcendental hides.
 ```
 
 ```
 Input:
   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
-  ustate     -- fel_unavg_struct: Ramp geometry.
-  x, y, s    -- real(rp): Position [m].
+  x, y       -- real(rp): Transverse position [m].
+  g, gp      -- real(rp): The ramp envelope and its slope at this s (fel_unavg_envelope).
+  c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
 
 Output:
   bx, by, bz -- real(rp): The analytic undulator field B = curl(a), with the
@@ -4026,6 +4788,7 @@ The documentation is in lucifer/doc/:
   user-guide.md        Building, describing a run, running it, the output inventory.
   reading-output.md    What the output files hold and how to read them.
   validation.md        The keystone rule, the tier table, and the measured levels.
+  performance.md       Where a run spends its time, measured, with the machine named.
 
 The program reads three namelist groups from one input file, each setting structs
 directly (Tao's &tao_params pattern). Defaults live in the struct declarations.

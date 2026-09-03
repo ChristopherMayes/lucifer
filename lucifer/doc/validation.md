@@ -10,7 +10,6 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. From the `bmad-ecosystem` root:
 
 ```
-export GENESIS4=<path to a genesis4 built from master>   # see below: not optional
 BUILD_PRODUCTION=N ./util/conda_compile      # debug
 ./util/conda_compile                         # production
 ./lucifer/tests/run_fel_benchmark.sh --results /tmp/fel-debug.txt   # ~9 min, needs genesis4
@@ -19,7 +18,7 @@ BUILD_PRODUCTION=N ./util/conda_compile      # debug
 cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin
 ```
 
-Then regenerate the documentation that is generated, and require no diff:
+Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module (FINDINGS 7.43), so treat these four commands as one step.
 
 ```
 python3 lucifer/tests/scripts/report_validation.py \
@@ -43,9 +42,9 @@ one of them byte for byte without changing any physics, and a check that fails o
 is a check that gets switched off. `examples/run_examples.sh` writes them, and the
 examples check asserts that each page's figure exists rather than what it contains.
 
-The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `lucifer/wavefront/tests/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one.
+The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `lucifer/wavefront/tests/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one, which the version check then has to accept: it refuses whatever does not report the recorded version, however it was named.
 
-The levels here were measured against a Genesis4 built from master, which carries the CODATA electron rest energy. Releases up to v4.6.14 do not, and comparing against one of those loosens the transcription tiers by several percent of their own value while still passing every tolerance ([](genesis4.md) states the constant and the size). Ten of the eleven tiers move, and only `weight_split`, which compares Fortran against Fortran, holds, which is what identifies the cause. `$GENESIS4` is therefore not optional until a release carries the fix. The harness prints which of the two the reference carries, and the regeneration check refuses to absorb the difference: a reference change shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours.
+The levels here were measured against the Genesis4 4.6.15 release, and the harness refuses a reference reporting any other version by name rather than running against it. That matters because the failure it prevents is silent: a different reference moves the recorded digits while every tolerance still passes. Two properties of 4.6.15 are load-bearing. It carries the CODATA electron rest energy, which is also Bmad's `m_electron`, where releases to v4.6.14 carried a value 2.14e-7 above it and loosened the transcription tiers by several percent of their own value ([](genesis4.md) states the constant and the size). And it seeds each stochastic stream from the global slice index, which this project contributed upstream, so noise realizations differ from every earlier release. The digits below were re-recorded on that migration, and which of them moved is stated in the changelog with the reason. The regeneration check refuses to absorb a reference change either way: it shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours, and the same class of mistake is why the reference's own variant is chosen to match the HDF5 its environment already runs.
 
 Debug and production binaries are never bit-comparable to each other. Compare like builds only.
 
@@ -981,7 +980,12 @@ time-dependent initial state (32 slices of spacing `12*lambda0`, shot noise on),
 tracker runs the full line from that same dump at `ds_step` of 1, 2, 3, 6 and 12 periods
 (two-line wrapper lattices overriding `ds_step`), so
 every run shares one shot-noise realization and the differences are pure integration
-error. Total power at the twelve undulator-segment exits, against the one-period run:
+error. That sharing is what the measurement rests on, and it holds whichever realization
+the reference produces, so the numbers below stand as measured against the reference of
+their day (a Genesis4 predating the 4.6.15 seeding change). A rerun on the current
+reference draws a different realization and would move them in their own right, which is
+a property of the comparison rather than of the integrator. Total power at the twelve
+undulator-segment exits, against the one-period run:
 
 | `ds_step` | max over exits | at saturation |
 |---|---|---|

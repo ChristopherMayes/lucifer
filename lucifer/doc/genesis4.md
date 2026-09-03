@@ -8,9 +8,10 @@ the benchmark tiers compare against it. This page is for a user who knows one co
 wants the other: what physics the two share, what each has that the other does not, how
 a setting translates, and how a file moves between them.
 
-**Checked against Genesis4 release v4.6.14.** This page is the only one that tracks
-Genesis4, so it is the only one to revisit when Genesis4 changes. Everything else in
-this documentation describes Lucifer on its own terms.
+**Checked against Genesis4 release v4.6.15**, which is also the reference the comparison
+tiers run against. This page is the only one that tracks Genesis4, so it is the only one
+to revisit when Genesis4 changes. Everything else in this documentation describes Lucifer
+on its own terms.
 
 ## Shared physics
 
@@ -132,12 +133,23 @@ true of the release named at the top of this page.
   (identical to Bmad's `m_electron`). Equivalently `u = E*ks/(sqrt(2)*eev)` with E in
   V/m, the relation used to derive this tracker's physical-unit formulas.
 - Releases up to v4.6.14 use `eev = 510999.06` for the electron rest energy, which is
-  2.14e-7 above the CODATA 2022 value. Genesis master carries 510998.95069, which is also
-  Bmad's `m_electron`, so a comparison against master has no electron-mass discrepancy at
-  all while one against a release has this one. The field unit is linear in `eev`, so the
-  difference reaches the field-normalization integrals as 4.28e-7 and loosens the
-  transcription tiers by several percent of their own value without failing any of them.
-  The levels recorded in [](validation.md) belong to a build that carries the CODATA value.
+  2.14e-7 above the CODATA 2022 value. From v4.6.15 the value is 510998.95069, which is
+  also Bmad's `m_electron`, so a comparison against the current release has no
+  electron-mass discrepancy at all while one against an older release has this one. The
+  field unit is linear in `eev`, so the difference reaches the field-normalization
+  integrals as 4.28e-7 and loosens the transcription tiers by several percent of their own
+  value without failing any of them. The levels recorded in [](validation.md) belong to a
+  reference that carries the CODATA value.
+- From v4.6.15 every stochastic stream is a pure function of the user seed, the global
+  slice index and a per-stream identifier, mixed with the splitmix64 finaliser, so a
+  slice's noise no longer depends on which MPI rank owns it. This project contributed
+  that change. Two consequences for a comparison. A result is now reproducible across
+  rank counts, where before a fixed seed gave different physics at different core counts
+  and per-slice bunching could differ by 90 per cent. And the realizations themselves
+  differ from every earlier release, because `ShotNoise` is re-keyed per slice instead of
+  drawn continuously and `RandomU::set`, which had an empty body, now re-keys as the
+  surrounding code always intended. Any level recorded against an earlier release is a
+  comparison against a different noise realization, not a tighter or looser one.
 - The quad transport is chromatic through per-particle `gammaz` with `foc^2 =
   k1*gamma0/gammaz`. Bmad's equivalent scaling is `k1*p0/p`. The two differ by ~4e-9
   relative at this energy (1 - beta0), far below the path-length-term difference.

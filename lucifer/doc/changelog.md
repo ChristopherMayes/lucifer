@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-03 Changed: the reference is the Genesis4 4.6.15 release, and six of the eleven tiers are
+  re-recorded. 4.6.15 is the first release carrying the CODATA electron rest energy, which is what
+  the retired `$GENESIS4` variable existed to pin, so the reference is now `genesis4` from
+  conda-forge in `bmad-fel-validate` and no export is needed. It also carries this project's
+  rank-independent seeding, and that moves noise realizations: `ShotNoise` is re-keyed from the
+  global slice index rather than drawn continuously per rank, `Incoherent` holds one generator per
+  slice, and `RandomU::set`, which had an empty body, now re-keys as the surrounding code always
+  intended. The digits move exactly where that reaches, which is the attribution: the four
+  steady-state tiers (`shotnoise = 0`) and `weight_split` (Fortran against Fortran) are
+  bit-identical, and the six loading from a shot-noise deck moved. td1 8.467690e-07 ->
+  8.362073e-07, td2_genesis 2.398226e-06 -> 2.376734e-06, td2_bmad 4.127587e-02 -> 3.442186e-02,
+  tdsase 2.292496e-06 -> 2.349627e-06, tdsc 2.440477e-04 -> 2.868371e-04, tdwk 8.708129e-07 ->
+  8.917019e-07, all on the debug tree, with tier1 1.825899e-06, tier1_unavg 6.934613e-02,
+  tier2_genesis 1.771890e-05, tier2_bmad 5.001254e-02 and weight_split 3.532394e-13 unchanged. The
+  production tree lands at the same digits except where the build reaches: tier1_unavg
+  6.934017e-02, td2_genesis 2.376736e-06, tdsase 2.349843e-06, weight_split 3.536001e-13. Every
+  tolerance is unchanged and every level stayed in its own order, between 0.83 and 1.18 of itself.
+  The harness now refuses a reference reporting any other version, printing what it found and
+  wanted, since the old failure mode was a silent re-baseline.
+
 - 2026-09-03 Changed: the device readback runs parallel over slices. At the finest stats comb
   (`comb_ds_save = 0`) every row paid ~4.3 ms of serial FP32-to-FP64 conversion on the 96 x 8192
   case, half the row's cost. The conversions are elementwise per slice, so the loops now run under

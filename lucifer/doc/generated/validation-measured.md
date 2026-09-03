@@ -9,12 +9,12 @@ physics moves, and the keystone regenerates this file and requires no diff.
 | `tier1_unavg` | one segment, unaveraged dynamics vs Genesis4 (priced model difference) | 6.934613e-02 | 6.934017e-02 |
 | `tier2_genesis` | full line, transcribed interludes | 1.771890e-05 | same |
 | `tier2_bmad` | full line, Bmad seam interludes | 5.001254e-02 | same |
-| `td1` | FEL core + slippage, one undulator segment | 8.467690e-07 | same |
-| `td2_genesis` | full line time dependent, transcribed interludes | 2.398226e-06 | 2.397983e-06 |
-| `td2_bmad` | full line time dependent, Bmad seam interludes | 4.127587e-02 | same |
-| `tdsase` | full line, pure SASE (dark start, growth from shot noise alone) | 2.292496e-06 | same |
-| `tdsc` | one segment TD, space charge on (short range + long range) | 2.440477e-04 | same |
-| `tdwk` | one segment TD, all wake kernels on | 8.708129e-07 | 8.708128e-07 |
+| `td1` | FEL core + slippage, one undulator segment | 8.362073e-07 | same |
+| `td2_genesis` | full line time dependent, transcribed interludes | 2.376734e-06 | 2.376736e-06 |
+| `td2_bmad` | full line time dependent, Bmad seam interludes | 3.442186e-02 | same |
+| `tdsase` | full line, pure SASE (dark start, growth from shot noise alone) | 2.349627e-06 | 2.349843e-06 |
+| `tdsc` | one segment TD, space charge on (short range + long range) | 2.868371e-04 | same |
+| `tdwk` | one segment TD, all wake kernels on | 8.917019e-07 | same |
 | `weight_split` | nonuniform weights must be invisible | 3.532394e-13 | 3.536001e-13 |
 
 Production levels read "same" where the two builds agree to every printed digit.
@@ -23,7 +23,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 22 in all.
+Every section below ran and passed on both builds, 25 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -37,6 +37,8 @@ A section that fails stops the run, so an entry here means it passed.
 - `import`
 - `migration`
 - `collective`
+- `fp32-lockstep`
+- `device`
 - `unaveraged`
 - `spontaneous`
 - `two-polarization`
@@ -45,6 +47,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `phasing`
 - `coherent-source`
 - `input-reference`
+- `examples`
 - `program-structure`
 - `diagnostics`
 - `tier-comparison`

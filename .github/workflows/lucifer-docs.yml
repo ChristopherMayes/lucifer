@@ -93,12 +93,17 @@ jobs:
           sys.exit(bad)
           PY
 
-  # The full keystone is not here yet, and one thing blocks it: the conda-forge genesis4
-  # release carries eev = 510999.06, which is 2.14e-7 above CODATA 2022, so ten of the
-  # eleven tier digits read differently against it than against the recorded reference.
-  # A run that passes every check on the wrong digits is worse than no run. When a
-  # release carries the fix, this becomes a second job that builds the distribution,
-  # installs genesis4, and runs:
+  # The full keystone is not here yet, and the reason changed on 2026-09-03. What used to
+  # block it was the reference: the conda-forge genesis4 release carried eev = 510999.06,
+  # 2.14e-7 above CODATA 2022, so ten of the eleven tier digits read differently against
+  # it than against the recorded reference, and a run that passes every check on the wrong
+  # digits is worse than no run. Release 4.6.15 carries the CODATA value and is now the
+  # recorded reference, so that objection is gone and the harness refuses any other
+  # version by name. What stands in the way now is cost and coverage: the two benchmark
+  # passes take about nine minutes each, and the device section needs a Metal device that
+  # no runner here has, so it would have to be skipped by name rather than silently. Those
+  # are decisions rather than obstacles, and the shape when they are taken is a second job
+  # that builds the distribution, installs genesis4 and runs:
   #
   #   ./lucifer/tests/run_fel_benchmark.sh
   #   ./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer

@@ -30,11 +30,14 @@ dependencies:
   - pytest
   # The reference code the FEL benchmark compares against. It lives here so the
   # comparison runs against a named build rather than whatever is on PATH: the
-  # recorded levels belong to the build that produced them.
+  # recorded levels belong to the build that produced them, and the harness refuses a
+  # reference reporting any other version.
   #
-  # Releases to v4.6.14 predate the CODATA electron rest energy that Genesis master
-  # carries, and the recorded levels belong to a build that has it. Until a release
-  # includes it, point $GENESIS4 at a build from master: the harness prints which
-  # constant the reference carries, and the keystone's regeneration check fails on the
-  # difference rather than absorbing it.
-  - genesis4=4.6.14=mpi_openmpi*
+  # 4.6.15 is the first release carrying both things the levels need: the CODATA
+  # electron rest energy, which is also Bmad's m_electron, and noise seeded from the
+  # global slice index. Releases to 4.6.14 have neither, and the local build from
+  # Genesis master that the retired $GENESIS4 variable used to name is no longer
+  # needed. Take the variant built against the hdf5 this environment already runs,
+  # since the other one downgrades hdf5 across a major version and h5py then has to
+  # move with it.
+  - genesis4=4.6.15=mpi_openmpi*
