@@ -65,10 +65,11 @@ an element with reference wavenumber $k_u^{\mathrm{like}}$ is computed
 cancellation-free (`fel_phi0_rate`):
 
 $$
-  \frac{d\varphi_0}{ds} = k_u^{\mathrm{like}} + k_s\Bigl(1 - \frac{1}{\beta_0}\Bigr),
-  \qquad
-  1 - \frac{1}{\beta_0} = \frac{-1}{\beta_0\,\gamma_{0b}^2\,(1+\beta_0)},\quad
-  \gamma_{0b}^2 = \hat P_0^2 + 1 .
+  \begin{aligned}
+    \frac{d\varphi_0}{ds} &= k_u^{\mathrm{like}} + k_s\Bigl(1 - \frac{1}{\beta_0}\Bigr),\\[4pt]
+    1 - \frac{1}{\beta_0} &= \frac{-1}{\beta_0\,\gamma_{0b}^2\,(1+\beta_0)},
+      \qquad \gamma_{0b}^2 = \hat P_0^2 + 1 .
+  \end{aligned}
 $$ (eq-phi0rate)
 
 Inside undulators $k_u^{\mathrm{like}} = k_u$. Over field-free interludes Genesis4's
@@ -141,10 +142,14 @@ parameters derive from lattice attributes:
 
 $$
   K = \frac{c\,B_{\max}}{k_u\, m_e c^2/e c} = \frac{c\,B_{\max}}{k_u}\frac{e}{m_e c},
-  \qquad
-  a_w = \begin{cases} K & \text{helical (\texttt{field\_calc = helical\_model})}\\
-                      K/\sqrt2 & \text{planar (\texttt{planar\_model})}\end{cases}
 $$ (eq-awmap)
+
+$$
+  a_w = \begin{cases}
+    K          & \text{helical (\texttt{field\_calc = helical\_model})},\\[2pt]
+    K/\sqrt2   & \text{planar (\texttt{planar\_model})}.
+  \end{cases}
+$$
 
 Here $a_w$ is rms, Genesis4's convention. In code $K = c\,\texttt{b\_max}/(k_u\,
 \texttt{m\_electron})$ with `b_max` in Tesla and `m_electron` in eV. The
@@ -215,18 +220,22 @@ The coupling factor at harmonic $h$ (`fel_und_coupling`):
 
 $$
   f_c(h) = \begin{cases}
-    a_w & \text{helical, } h=1; \quad 0 \text{ otherwise},\\[2pt]
-    a_w\,(-1)^{(h-1)/2}\Bigl[J_{\frac{h-1}{2}}(\xi) - J_{\frac{h+1}{2}}(\xi)\Bigr],
-    \;\; \xi = \frac{h}{2}\frac{a_w^2}{1+a_w^2} & \text{planar, odd } h;\quad 0 \text{ even.}
+    a_w
+      & \text{helical, } h = 1; \quad 0 \text{ otherwise},\\[4pt]
+    a_w\,(-1)^{(h-1)/2}\Bigl[J_{\frac{h-1}{2}}(\xi) - J_{\frac{h+1}{2}}(\xi)\Bigr]
+      & \text{planar, odd } h; \quad 0 \text{ even},
   \end{cases}
 $$ (eq-fc)
 
-Only $h=1$ is used (harmonics beyond the coupling formula are out of scope). The
-transverse roll-off of the undulator field about its offset $(a_x, a_y)$:
+with $\xi = (h/2)\,a_w^2/(1+a_w^2)$. Only $h=1$ is used (harmonics beyond the
+coupling formula are out of scope). The transverse roll-off of the undulator field
+about its offset $(a_x, a_y)$:
 
 $$
-  f_{aw}(x,y) = 1 + \tfrac12\!\left[k_x (x-a_x)^2 + k_y (y-a_y)^2\right], \qquad
-  f_{aw}^2(x,y) = 1 + k_x (x-a_x)^2 + k_y (y-a_y)^2 ,
+  \begin{aligned}
+    f_{aw}(x,y)   &= 1 + \tfrac12\!\left[k_x (x-a_x)^2 + k_y (y-a_y)^2\right],\\[2pt]
+    f_{aw}^2(x,y) &= 1 + k_x (x-a_x)^2 + k_y (y-a_y)^2 ,
+  \end{aligned}
 $$ (eq-faw)
 
 the first-order form in the particle gather, the squared form in the deposition.
@@ -465,9 +474,12 @@ fields would be worse than a custom one. The Twiss is always the lattice's
 input:
 
 $$
-  I(s_i) = \frac{Q c}{\sqrt{2\pi}\,\sigma_z}\, e^{-s_i^2/2\sigma_z^2}
-  \;\;\text{(Gaussian)}, \qquad
-  I = \frac{Q c}{x_{\max}-x_{\min}} \;\;\text{(GRID: Bmad's uniform, flat)},
+  \begin{aligned}
+    I(s_i) &= \frac{Q c}{\sqrt{2\pi}\,\sigma_z}\, e^{-s_i^2/2\sigma_z^2}
+      && \text{(Gaussian)},\\[4pt]
+    I &= \frac{Q c}{x_{\max}-x_{\min}}
+      && \text{(GRID: Bmad's uniform, flat)},
+  \end{aligned}
 $$ (eq-derivedcurrent)
 
 evaluated at the slice centers with the bunch centered in the window. $\sigma_z = 0$
@@ -491,11 +503,12 @@ weighted generalization: the per-beamlet amplitude draws on the beamlet's *real*
 electron count, its charge over $e$,
 
 $$
-  \theta_{bj} \mathrel{-}= \sum_{h=0}^{n_h-1} a_{bh}\,
-     \sin\!\bigl((h{+}1)\theta_{bj} + \phi_{bh}\bigr),
-  \qquad
-  a_{bh} = \frac{2}{h+1}\sqrt{\frac{-\ln u_{bh}}{n_{bl}}},
-  \quad n_{bl} = \frac{n_{\mathrm{bins}}\, w_b}{e},
+  \begin{aligned}
+    \theta_{bj} &\mathrel{-}= \sum_{h=0}^{n_h-1} a_{bh}\,
+       \sin\!\bigl((h{+}1)\theta_{bj} + \phi_{bh}\bigr),\\[4pt]
+    a_{bh} &= \frac{2}{h+1}\sqrt{\frac{-\ln u_{bh}}{n_{bl}}},
+      \qquad n_{bl} = \frac{n_{\mathrm{bins}}\, w_b}{e},
+  \end{aligned}
 $$ (eq-fawley)
 
 with $n_h = (n_{\mathrm{bins}}-1)/2$, $\phi_{bh}$ uniform in $[0,2\pi)$, and kicks
@@ -653,7 +666,7 @@ $$
 \begin{gathered}
   \sigma(k) = \frac{\sigma_0}{1 - i k c\tau}, \qquad
   \zeta(k) = (1-i)\sqrt{\frac{k}{2\sigma(k) Z_0}}, \notag\\[2pt]
-  Z_{\mathrm{round}}(k) = \frac{Z_0/(2\pi a)}{1/\zeta - i k a/2}, \qquad
+  Z_{\mathrm{round}}(k) = \frac{Z_0/(2\pi a)}{1/\zeta - i k a/2},\\[2pt]
   Z_{\mathrm{flat}}(k) = \int_0^{X}\!
      \frac{Z_0/(2\pi a)\; dx}{\cosh x\,[\cosh x/\zeta - i k a\,\mathrm{sinhc}\,x]},\\[2pt]
   w(s) = -e\,\frac{2c}{\pi}\int_0^{k_{\max}} \mathrm{Re}\,Z(k)\cos(k s)\, dk,
@@ -678,9 +691,13 @@ causally *toward the head* (a trailing slice collects the wake of the charge
 ahead), averaged over the `sample` sub-steps:
 
 $$
-  \mathcal{E}_i = \frac{1}{\texttt{sample}}\sum_{j=0}^{\texttt{sample}-1}
-    \sum_{k\ge0} \Bigl[N_{i,j+k}\,\bigl(w_{\mathrm{res}}+w_{\mathrm{rou}}\bigr)_k
-     + N'_{i,j+k}\, w_{\mathrm{geo},k}\Bigr] + \mathcal{E}_{\mathrm{ext}} .
+  \begin{aligned}
+    \mathcal{E}_i = \frac{1}{\texttt{sample}}
+      \sum_{j=0}^{\texttt{sample}-1} \sum_{k\ge0} \Bigl[
+        &N_{i,j+k}\,\bigl(w_{\mathrm{res}}+w_{\mathrm{rou}}\bigr)_k \\
+        &+ N'_{i,j+k}\, w_{\mathrm{geo},k} \Bigr]
+      + \mathcal{E}_{\mathrm{ext}} .
+  \end{aligned}
 $$ (eq-eloss)
 
 The kick is uniform within a slice: every particle loses $\Delta\gamma =
@@ -714,8 +731,12 @@ $$
   E_i = \frac{\Delta s}{2\pi c\,\varepsilon_0}\sum_{j\ne i}
     \mathrm{sgn}(i-j)\,
     \Bigl[1 - \frac{|d_{ij}|}{\sqrt{d_{ij}^2 + \sigma_{x,j}\sigma_{y,j}}}\Bigr]
-    \frac{I_j}{\sigma_{x,j}\sigma_{y,j}}, \qquad d_{ij} = (j-i)\,\Delta s\,\gamma_z,
+    \frac{I_j}{\sigma_{x,j}\sigma_{y,j}},
 $$ (eq-longrange)
+
+$$
+  d_{ij} = (j-i)\,\Delta s\,\gamma_z,
+$$
 
 where the size scale is the *product* $\sigma_x\sigma_y$ (an effective area, not
 a variance sum: transcribed wrong once, caught at $1.7\times10^{-1}$). The
@@ -870,10 +891,13 @@ $O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
 `<out_root>.ledger.txt`): conservation of
 
 $$
-  E_{\mathrm{beam}} + U + U_{\mathrm{esc}} - U_{\mathrm{sp}} + E_{\mathrm{rad}}, \qquad
+  E_{\mathrm{beam}} + U + U_{\mathrm{esc}} - U_{\mathrm{sp}} + E_{\mathrm{rad}},
+$$ (eq-ledger)
+
+$$
   E_{\mathrm{beam}} = \sum_j w_j\,(\gamma_j - \gamma_0)\, m_e, \qquad
   U = \sum_{\mathrm{slices}} P\,\Delta s/c,
-$$ (eq-ledger)
+$$
 
 with $E_{\mathrm{beam}}$ stored *relative* to the reference so per-record
 changes are not differenced off a large baseline at its own summation-rounding floor
@@ -944,9 +968,12 @@ and their detuning cancel exactly), and
 $$
   f_c^{\mathrm{meas}} =
   \frac{|F_B - F_A|\;\beta_0\gamma_0\sqrt2\, m_e}{|\hat E_0|\,\Delta L\,
-        \mathrm{sinc}(\delta_h \Delta L/2)},\qquad
-  \delta_h = h k_u - k_{s,h}\frac{1+a_w^2}{2\gamma_0^2},
+        \mathrm{sinc}(\delta_h \Delta L/2)},
 $$ (eq-fcmeas)
+
+$$
+  \delta_h = h k_u - k_{s,h}\frac{1+a_w^2}{2\gamma_0^2},
+$$
 
 with $|\hat E_0| = \sqrt{4 Z_0 P/\pi w_0^2}$ the Gaussian seed's on-axis envelope.
 The harmonic probe is the same undulator with the field at $\lambda_1/h$ (the mode

@@ -42,3 +42,4 @@ site:
   template: book-theme
   options:
     logo_text: Lucifer
+    style: ./static/custom.css

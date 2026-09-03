@@ -1,0 +1,17 @@
+/* Documentation styling that the book theme does not carry.
+ *
+ * Display math is the only case so far. The theme caps the body measure near eighty
+ * characters, which is the readable line length and worth keeping, and it sets no
+ * overflow behaviour on a math block, so an equation wider than the column used to
+ * spill across the page furniture. A block that cannot fit now scrolls inside itself.
+ * The equations that were merely long were broken into lines instead, since that is a
+ * property of the mathematics rather than of the page: this rule is the floor under
+ * whatever arrives next, not the fix for a formula that should have been split.
+ */
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Room for the scrollbar, so it does not sit on the bottom row of the equation. */
+  padding-bottom: 0.35rem;
+}
