@@ -546,6 +546,17 @@ end subroutine fel_device_step_run
 ! ring order. The comb's stats positions and the element end call this; between them
 ! the host arrays are stale by design ("stats read back at the comb's positions
 ! only"). A readback observes and never steers: the device state is untouched.
+!
+! Parallel over slices, and the measurement that made it so is in
+! doc/performance.md's device section: at the finest comb the serial conversion loops
+! were half the cost of every stats row, ~4.3 ms a record on the 96 x 8192 case. The
+! conversions are elementwise with no accumulation and each iteration writes only its
+! own slice's arrays or its own field plane, so any thread order computes the same
+! bits. Two structural points hold that. The device drains once, serially, before the
+! parallel regions, after which every transfer is a pure disjoint copy from the
+! shared-storage buffers (lucifer_device.h's post-drain contract). And the staging is
+! block-local per slice rather than the module-level scratch, which is sized for one
+! slice at a time and is not thread-safe by design.
 !-
 
 subroutine fel_device_readback (dev, beam, wf)
@@ -553,8 +564,8 @@ subroutine fel_device_readback (dev, beam, wf)
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
 type (wavefront_struct) wf
-integer is, ip, n
-real(rp) p0_mc, gamma0, ks, gam, p_mc, beta, delta
+real(rp) p0_mc, gamma0, ks
+integer is
 
 !
 
@@ -564,28 +575,48 @@ p0_mc = fel_p0_mc(beam)
 gamma0 = fel_gamma0(beam)
 ks = twopi / beam%wavelength
 
-do is = 1, size(beam%slice)
-  n = beam%slice(is)%n
-  call luc_dev_download_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
-                               dev%sg, dev%su)
-  do ip = 1, n
-    beam%slice(is)%x(ip) = real(dev%sx(ip), rp)
-    beam%slice(is)%px(ip) = real(dev%spx(ip), rp)
-    beam%slice(is)%y(ip) = real(dev%sy(ip), rp)
-    beam%slice(is)%py(ip) = real(dev%spy(ip), rp)
-    gam = gamma0 + real(dev%sg(ip), rp)
-    p_mc = sqrt(gam**2 - 1)
-    beam%slice(is)%pz(ip) = (p_mc - p0_mc) / p0_mc
-    beta = p_mc / gam
-    delta = real(dev%su(ip), rp) * fel_dev_rad_per_tick$
-    beam%slice(is)%z(ip) = beta * (dev%z_ref(is) + delta / ks)
-  enddo
-enddo
+! The one serial drain: everything encoded completes here, and the downloads inside
+! the parallel loops below never touch the backend's encoder state.
 
-do is = 1, size(wf%Ex, 3)
-  call luc_dev_download_field_slice (is-1, dev%se)
-  wf%Ex(:,:,is) = cmplx(dev%se, kind = wf_rp)
+call luc_dev_sync ()
+
+!$OMP parallel do
+do is = 1, size(beam%slice)
+  block
+    real(c_float), allocatable :: bx(:), bpx(:), by(:), bpy(:), bg(:)
+    integer(c_int64_t), allocatable :: bu(:)
+    real(rp) gam, p_mc, beta, delta
+    integer ip, n
+    allocate (bx(dev%npart), bpx(dev%npart), by(dev%npart), bpy(dev%npart), bg(dev%npart))
+    allocate (bu(dev%npart))
+    n = beam%slice(is)%n
+    call luc_dev_download_slice (is-1, dev%npart, bx, bpx, by, bpy, bg, bu)
+    do ip = 1, n
+      beam%slice(is)%x(ip) = real(bx(ip), rp)
+      beam%slice(is)%px(ip) = real(bpx(ip), rp)
+      beam%slice(is)%y(ip) = real(by(ip), rp)
+      beam%slice(is)%py(ip) = real(bpy(ip), rp)
+      gam = gamma0 + real(bg(ip), rp)
+      p_mc = sqrt(gam**2 - 1)
+      beam%slice(is)%pz(ip) = (p_mc - p0_mc) / p0_mc
+      beta = p_mc / gam
+      delta = real(bu(ip), rp) * fel_dev_rad_per_tick$
+      beam%slice(is)%z(ip) = beta * (dev%z_ref(is) + delta / ks)
+    enddo
+  end block
 enddo
+!$OMP end parallel do
+
+!$OMP parallel do
+do is = 1, size(wf%Ex, 3)
+  block
+    complex(c_float_complex), allocatable :: be(:,:)
+    allocate (be(size(wf%Ex, 1), size(wf%Ex, 2)))
+    call luc_dev_download_field_slice (is-1, be)
+    wf%Ex(:,:,is) = cmplx(be, kind = wf_rp)
+  end block
+enddo
+!$OMP end parallel do
 
 end subroutine fel_device_readback
 

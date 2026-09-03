@@ -536,6 +536,11 @@ struct Impl {
         }
         return enc;
     }
+    // Not thread-safe in general: encoder() and a draining sync() both touch enc.
+    // What the header's concurrency contract rests on is the narrow case: after one
+    // serial drain with nothing encoded since, enc is nil, concurrent transfer calls
+    // all take the early return below, and their memcpys of disjoint regions of the
+    // shared-storage buffers race nothing.
     void sync (){
         if (enc == nil) return;
         [enc endEncoding];

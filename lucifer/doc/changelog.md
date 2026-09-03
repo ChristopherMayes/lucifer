@@ -9,6 +9,18 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-03 Changed: the device readback runs parallel over slices. At the finest stats comb
+  (`comb_ds_save = 0`) every row paid ~4.3 ms of serial FP32-to-FP64 conversion on the 96 x 8192
+  case, half the row's cost. The conversions are elementwise per slice, so the loops now run under
+  OMP with block-local staging, after one serial drain of the device: the seam's transfers are then
+  pure disjoint copies, a contract `lucifer_device.h` now states. Measured: the fine-comb walk goes
+  from 1.231 s to 0.897 s, and the readback share from 0.409 s to 0.181 s. The share did not return
+  to noise, and the thread scan says why: it plateaus by four threads at the memory-bandwidth floor
+  of the bytes themselves, ~70 MB of transfers per record. That finding is recorded in
+  `doc/performance.md` as the input to the separate device-side moments decision, which is the only
+  route under the plateau and is not taken here. Bit-identical by construction (no accumulation,
+  per-slice writes), and every tier digit holds.
+
 - 2026-09-03 Fixed: two build-time capabilities are detected rather than assumed, so builds whose
   toolchains lack them compile and refuse by name instead of failing to build. The single-precision
   FFTW the FP32 field twin transforms with is present in the conda environment and absent from the

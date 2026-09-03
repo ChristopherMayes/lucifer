@@ -74,7 +74,15 @@ void luc_dev_close (void);
 
 /* Whole-slice transfers between the caller's staging arrays and the resident
  * buffers. The upload carries the weights; they are constant while resident
- * (migration is refused), so downloads do not return them. */
+ * (migration is refused), so downloads do not return them.
+ *
+ * Concurrency contract: every transfer drains the device before touching a
+ * buffer, and that drain is not thread-safe, so concurrent transfers are
+ * illegal in general. After one serial luc_dev_sync with no further encoding,
+ * however, a transfer is a pure copy of a caller-chosen region of the
+ * shared-storage buffers, and transfers of DISJOINT regions (distinct slice
+ * indices) may then run from concurrent threads. The parallel readback is
+ * built on exactly that: one drain, then one download per slice per thread. */
 void luc_dev_upload_slice (int is, int n, const float *x, const float *px,
                            const float *y, const float *py, const float *goff,
                            const int64_t *uphase, const float *w);
