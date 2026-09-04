@@ -515,8 +515,8 @@ def figures(results, out):
     for ng in GRIDS:
         r = fl[f"floor_g{ng}_n1024"]
         z = [d["z"] for d in r["dumps"]]
-        ax[0, 0].semilogy(z, [d[f"out_{cut}"] for d in r["dumps"]], "o-", label=f"{r['dx']*1e6:.2f} um")
-        ax[0, 1].semilogy(z, [d[f"in_{cut}"] for d in r["dumps"]], "o-", label=f"{r['dx']*1e6:.2f} um")
+        ax[0, 0].semilogy(z, [d[f"out_{cut}"] for d in r["dumps"]], "o-", label=f"{r['dx']*1e6:.2f} µm")
+        ax[0, 1].semilogy(z, [d[f"in_{cut}"] for d in r["dumps"]], "o-", label=f"{r['dx']*1e6:.2f} µm")
     for npart in NPARTS:
         r = fl[f"floor_g256_n{npart}"]
         z = [d["z"] for d in r["dumps"]]
@@ -525,16 +525,19 @@ def figures(results, out):
     zz = np.linspace(0, 57, 50)
     for a in (ax[0, 1], ax[1, 1]):
         a.semilogy(zz, np.minimum(th["P_eff"] / 9 * np.exp(zz * FILL / th["Lg"]), th["P_sat_xie"]), "k--", lw=1,
-                   label="P_eff exp(z/Lg)/9, capped at P_sat (Xie)")
-    ax[0, 0].set_title("power outside 3 urad, 1024 particles, cell size varied")
-    ax[0, 1].set_title("power inside 3 urad, 1024 particles, cell size varied")
-    ax[1, 0].set_title("power outside 3 urad, 1.57 um cells, particle count varied")
-    ax[1, 1].set_title("power inside 3 urad, 1.57 um cells, particle count varied")
+                   label=r"$P_\mathrm{eff}\,e^{z/L_g}/9$, capped at $P_\mathrm{sat}$ (Xie)")
+    ax[0, 0].set_title("1024 particles per slice, cell size varied")
+    ax[0, 1].set_title("1024 particles per slice, cell size varied")
+    ax[1, 0].set_title("1.57 µm cells, particle count varied")
+    ax[1, 1].set_title("1.57 µm cells, particle count varied")
     for a in ax.flat:
         a.legend(fontsize=8)
-        a.set_ylabel("power per slice [W]")
+    for a in ax[:, 0]:
+        a.set_ylabel("power per slice outside 3 µrad (W)")
+    for a in ax[:, 1]:
+        a.set_ylabel("power per slice inside 3 µrad (W)")
     for a in ax[1]:
-        a.set_xlabel("z [m]")
+        a.set_xlabel("z (m)")
     fig.tight_layout()
     fig.savefig(out / "power-outside-and-inside-the-mode.png", dpi=150)
     plt.close(fig)
@@ -546,18 +549,18 @@ def figures(results, out):
         ax[0].loglog(np.array(dxs) * 1e6, [fl[f"floor_g{ng}_n{npart}"]["dumps"][0][f"out_{cut}"] for ng in GRIDS],
                      mk, label=f"{npart} particles")
     ref = fl["floor_g256_n1024"]["dumps"][0][f"out_{cut}"]
-    ax[0].loglog(np.array(dxs) * 1e6, ref * (cell_size(256) / np.array(dxs)) ** 2, "k--", lw=1, label="1/dx^2")
-    ax[0].loglog(np.array(dxs) * 1e6, ref * (cell_size(256) / np.array(dxs)), "k:", lw=1, label="1/dx")
-    ax[0].set_xlabel("cell size [um]")
-    ax[0].set_ylabel("power outside 3 urad at z = 3.99 m [W]")
+    ax[0].loglog(np.array(dxs) * 1e6, ref * (cell_size(256) / np.array(dxs)) ** 2, "k--", lw=1, label=r"$1/dx^2$")
+    ax[0].loglog(np.array(dxs) * 1e6, ref * (cell_size(256) / np.array(dxs)), "k:", lw=1, label=r"$1/dx$")
+    ax[0].set_xlabel("cell size (µm)")
+    ax[0].set_ylabel("power per slice outside 3 µrad at z = 3.99 m (W)")
     ax[0].legend(fontsize=8)
     for ng, mk in zip(GRIDS, "osd^"):
         ax[1].loglog(NPARTS, [fl[f"floor_g{ng}_n{n}"]["dumps"][2][f"in_{cut}"] for n in NPARTS], mk + "-",
-                     label=f"{cell_size(ng)*1e6:.2f} um, inside")
+                     label=f"{cell_size(ng)*1e6:.2f} µm, inside")
         ax[1].loglog(NPARTS, [fl[f"floor_g{ng}_n{n}"]["dumps"][2][f"out_{cut}"] for n in NPARTS], mk + "--",
-                     label=f"{cell_size(ng)*1e6:.2f} um, outside")
+                     label=f"{cell_size(ng)*1e6:.2f} µm, outside")
     ax[1].set_xlabel("particles per slice")
-    ax[1].set_ylabel("power at z = 18.2 m [W]")
+    ax[1].set_ylabel("power per slice at z = 18.2 m (W)")
     ax[1].legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(out / "wide-angle-vs-cell-size-and-particle-count.png", dpi=150)
@@ -572,15 +575,17 @@ def figures(results, out):
         lab = f"{r['npart']} particles, beamlet {r['beamlet']}, {r['beamlets']} beamlets"
         ax[0, col].semilogy(z, [d[f"in_{cut}"] for d in r["dumps"]], "o-", label=lab)
         ax[1, col].semilogy(z, [d[f"out_{cut}"] for d in r["dumps"]], "o-", label=lab)
-    ax[0, 0].set_title("inside 3 urad: 4096 particles, beamlet size varied")
-    ax[0, 1].set_title("inside 3 urad: 512 beamlets, particle count varied")
-    ax[1, 0].set_title("outside 3 urad: 4096 particles, beamlet size varied")
-    ax[1, 1].set_title("outside 3 urad: 512 beamlets, particle count varied")
+    ax[0, 0].set_title("4096 particles per slice, beamlet size varied")
+    ax[0, 1].set_title("512 beamlets, particle count varied")
+    ax[1, 0].set_title("4096 particles per slice, beamlet size varied")
+    ax[1, 1].set_title("512 beamlets, particle count varied")
     for a in ax.flat:
         a.legend(fontsize=8)
-        a.set_ylabel("power per slice [W]")
+    for a in ax[0]:
+        a.set_ylabel("power per slice inside 3 µrad (W)")
     for a in ax[1]:
-        a.set_xlabel("z [m]")
+        a.set_ylabel("power per slice outside 3 µrad (W)")
+        a.set_xlabel("z (m)")
     fig.tight_layout()
     fig.savefig(out / "beamlets-vs-particles.png", dpi=150)
     plt.close(fig)
@@ -592,16 +597,17 @@ def figures(results, out):
         for ng in (128, 256):
             for npart in (1024, 65536):
                 r = ln[f"{tag}_g{ng}_n{npart}"]
-                a.semilogy(r["z"], r["P"], "-", label=f"{r['dx']*1e6:.2f} um, {npart} particles")
+                a.semilogy(r["z"], r["P"], "-", label=f"{r['dx']*1e6:.2f} µm, {npart} particles")
         if tag == "doubled":
-            a.axhline(th["P_sat_xie"], color="k", lw=0.8, ls="--", label="P_sat, Xie")
-            a.axhline(th["P_sat_ssy"], color="k", lw=0.8, ls=":", label="P_sat, SSY")
+            a.axhline(th["P_sat_xie"], color="k", lw=0.8, ls="--", label=r"$P_\mathrm{sat}$, Xie")
+            a.axhline(th["P_sat_ssy"], color="k", lw=0.8, ls=":", label=r"$P_\mathrm{sat}$, Saldin, Schneidmiller and Yurkov")
             a.axvline(th["L_sat_ssy"], color="gray", lw=0.8)
-        a.set_xlabel("z [m]")
+        a.set_xlabel("z (m)")
         a.legend(fontsize=8)
-    ax[0].set_ylabel("power [W]")
-    ax[0].set_title("the examples' 96-slice window, window power")
-    ax[1].set_title("the line twice, long window, power per interior slice")
+    ax[0].set_ylabel("window power (W)")
+    ax[1].set_ylabel("power per interior slice (W)")
+    ax[0].set_title("96 slices at three wavelengths, the line")
+    ax[1].set_title("600 slices at twelve wavelengths, the line twice")
     fig.tight_layout()
     fig.savefig(out / "line-and-doubled.png", dpi=150)
     plt.close(fig)
@@ -613,8 +619,8 @@ def figures(results, out):
         ax.semilogy(prof, lw=1, label=f"undulator {k} end")
     ax.axvspan(INTERIOR.start, INTERIOR.stop, color="gray", alpha=0.15, label="interior")
     ax.set_xlabel("slice index, tail to head")
-    ax.set_ylabel("power per slice [W]")
-    ax.set_title("per-slice power along the window, 1.57 um cells, 4096 particles")
+    ax.set_ylabel("power per slice (W)")
+    ax.set_title("1.57 µm cells, 4096 particles per slice")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(out / "window-profile.png", dpi=150)
