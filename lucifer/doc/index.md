@@ -25,7 +25,7 @@ parallel namelist, and every non-FEL element tracks each slice's bunch through B
 - **Phasing between segments**, following the real geometry in absolute time tracking and autophased in the default relative mode.
 - **Spontaneous emission** gated on Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
-- **A GPU backend** for the averaged method on Apple Silicon (`global%device = "metal"`): the beam and the field stay resident on the device through each FEL element, measured between 7x and 12x against twelve CPU cores and judged per step against the FP64 path ([](validation.md#val-device)). Configurations its kernels do not cover are refused, never run quietly on the CPU instead.
+- **A GPU backend** for the averaged method on Apple Silicon (`global%device = "metal"`): the beam and the field stay resident on the device through each FEL element, measured between 7x and 12x against twelve CPU cores and judged per step against the FP64 path ([](validation.md#val-device)), harmonic field sets and both polarizations included. Configurations its kernels do not cover are refused, never run quietly on the CPU instead.
 - **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
 - **Distribution import**, resampling a `bunch_struct` into FEL slices.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
@@ -70,7 +70,7 @@ which example shows which feature.
 - Elliptical polarization beyond the tilt-honored planar and helical limits.
 - One-to-one particle tracking, and the particle sorting it implies.
 - Undulator field errors.
-- On the GPU: harmonics, two polarizations, collective effects, migration and the unaveraged mode, each refused. A CUDA backend, which the device interface is shaped for.
+- On the GPU: collective effects, migration and the unaveraged mode, each refused. A CUDA backend, which the device interface is shaped for.
 - MPI. This one is a design decision rather than a gap: the shared-memory design is what this program is, and the case for adding MPI would have to be made on measurement.
 
 Validation runs on eleven comparison tiers and twenty-five check sections, on both

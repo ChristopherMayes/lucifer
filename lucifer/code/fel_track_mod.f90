@@ -65,6 +65,7 @@ module fel_track_mod
 
 use fel_beam_mod
 use fel_collective_mod
+use fel_field_mod
 use fel_fp32_mod
 use fel_device_mod
 use wavefront_mod
@@ -136,63 +137,10 @@ type fel_coherent_struct
   logical :: ok = .false.                ! Enough charge and spread to fit.
 end type
 
-!+
-! Struct fel_slip_struct
-!
-! The slippage state of one field record: Genesis's Field::first and Field::accuslip,
-! plus the two run facts they are meaningless without. One per wavefront. The default is
-! the steady state: timerun false makes fel_apply_slippage a no-op (as Genesis's)
-! and first = 0 makes fel_field_index the identity.
-!-
+! The field set's types (fel_slip_struct, fel_bank_struct, fel_field_struct) live in
+! fel_field_mod, which this module uses and re-exports: the device seam takes the set
+! whole, and a type it can see is what lets it.
 
-type fel_slip_struct
-  logical :: timerun = .false.  ! Time-dependent run? False: slippage is a no-op.
-  integer :: first = 0          ! Rotation offset of the field record, 0-based (Field::first).
-  real(rp) :: accuslip = 0      ! Accumulated slippage [radiation wavelengths] (Field::accuslip).
-  real(rp) :: sample = 1        ! Slice spacing / radiation wavelength (Control::sample).
-  real(rp) :: u_escaped = 0     ! Energy [J] transmitted out of the window by slippage
-                                ! (summed over every zero-filled slice). The TD energy
-                                ! ledger's escape column, so E_beam + U_window + U_escaped
-                                ! closes in a wake-free run.
-end type
-
-!+
-! Struct fel_bank_struct
-!
-! Scratch carrier for the field slices one fel_apply_slippage call transmits out of the
-! window: the caller passes it when it wants the light itself, not just its banked
-! energy (keep_escaped_field). Reset and refilled per call. The caller drains it
-! immediately (streams to file), so peak memory is a handful of grid planes -- one per
-! rotation of the call, ~1 inside undulators, ~10 over an interlude.
-!-
-
-type fel_bank_struct
-  complex(wf_rp), allocatable :: plane(:,:,:)  ! Transmitted planes, in transmission order.
-  complex(wf_rp), allocatable :: plane_y(:,:,:)  ! Ey planes, allocated when Ey is live.
-  integer :: n = 0                             ! How many this call transmitted.
-end type
-
-!+
-! Struct fel_field_struct
-!
-! One radiation field of the walk's field set: the harmonic number, the wavefront
-! record, and that field's own slippage state and escape bank. The walk carries an
-! ordered set of these (Genesis's vector<Field*>), with the fundamental always
-! entry 1. The ponderomotive phase, the phi0 advance and the slippage schedule are
-! all defined against the fundamental. A harmonic field couples through fc(h) and the
-! phase h*theta and diffracts at its own wavelength. A single-entry set is the
-! pre-harmonic walk, bit for bit. wf%wavelength = fundamental wavelength / harm. Every
-! field shares the time window, so the slippage state advances in fundamental-wavelength
-! units for all of them (Genesis's one Control::sample) and the records rotate in
-! lockstep.
-!-
-
-type fel_field_struct
-  integer :: harm = 1               ! Harmonic number h (Field::harm).
-  type (wavefront_struct) :: wf
-  type (fel_slip_struct) :: slip
-  type (fel_bank_struct) :: bank
-end type
 
 ! Cached kernels for fel_field_step, mirroring FieldSolverFFT::init: one entry per
 ! Wavelength (per harmonic), each rebuilt when its grid or step changes. All module
@@ -576,13 +524,13 @@ end subroutine fel_apply_slippage
 !   dev, slip   -- Updated state; the device record rotated.
 !-
 
-subroutine fel_device_apply_slippage (dev, slip, wf, slippage)
+subroutine fel_device_apply_slippage (dev, im, slip, wf, slippage)
 
 type (fel_device_struct) dev
 type (fel_slip_struct) slip
 type (wavefront_struct) wf
 real(rp) slippage, t_slice
-integer nslice, last, direction
+integer im, nslice, last, direction
 
 !
 
@@ -601,8 +549,8 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   last = mod(slip%first + nslice - 1, nslice)
   if (direction < 0) last = mod(last + 1, nslice)
 
-  slip%u_escaped = slip%u_escaped + fel_device_slice_energy(dev, last+1, wf%dx) * t_slice
-  call fel_device_zero_slice (dev, last+1)
+  slip%u_escaped = slip%u_escaped + fel_device_slice_energy(dev, im, last+1, wf%dx) * t_slice
+  call fel_device_zero_slice (dev, im, last+1)
 
   slip%first = last
   if (direction < 0) slip%first = mod(last + 1, nslice)
@@ -773,7 +721,7 @@ real(rp) ks, phi0_new, phi0_old, kappa, b2_tot, g2_tot
 real(rp) fp_rtmp, fp_gridmax
 real(rp), allocatable :: dev_s0(:,:,:)
 type (fel_coherent_struct), allocatable :: coh(:)
-integer is, io, ikk, nslice, nslice_f, ngrid_arr(3)
+integer is, io, nslice, nslice_f, ngrid_arr(3)
 logical any_err, err, fp_on, dev_on, dev_twin, dev_prod
 character(*), parameter :: r_name = 'fel_track_und_step'
 
@@ -836,28 +784,33 @@ if (dev_on) then
   if (fp_on) dpar%mutate = merge(1, 0, fp32%mutate)
 endif
 
-! The production device step: the beam and the field are resident (the walk uploaded
-! them at element entry), so the whole step is one command buffer -- transverse maps,
-! the push in the offset-energy tick-phase chart, deposit and the FP32 field solve --
-! and nothing returns to the host here. The setup refusals hold everything this step
-! does not cover (collectives, harmonics, the second polarization, radiation).
+! The production device step: the beam and the field set are resident (the walk
+! uploaded them at element entry), so the whole step is one command buffer --
+! transverse maps, the push in the offset-energy tick-phase chart gathering every
+! member, the deposit into every member and the FP32 field solve of every plane -- and
+! nothing returns to the host here. The setup refusals hold everything this step does
+! not cover (collectives, radiation, migration, the coherent source).
 
 if (dev_prod) then
-  ikk = fel_kernel_index(size(ff(1)%wf%Ex, 1), ff(1)%wf%dx, ks, und%dz)
+  call set_device_kernels ()
   call fel_tic (fel_t_device$)
-  call fel_device_step_run (dev, dpar, fel_kernels(ikk)%exp_k2, beam%phi0, phi0_new, ks, err)
+  call fel_device_step_run (dev, dpar, beam%phi0, phi0_new, ks, err)
   call fel_toc (fel_t_device$)
   if (err) return
   beam%phi0 = phi0_new
   err_flag = .false.
   return
 endif
+
+! The CPU twin covers the fundamental of one polarization and the device twin covers
+! the whole set, so the two refusals below stand only when the CPU holds the twin's role.
+
 if (fp_on .and. .not. fp32%checked) then
-  if (size(ff) > 1) then
+  if (size(ff) > 1 .and. .not. dev_twin) then
     call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER HARMONIC FIELD SETS.')
     return
   endif
-  if (allocated(ff(1)%wf%Ey)) then
+  if (allocated(ff(1)%wf%Ey) .and. .not. dev_twin) then
     call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER TWO-POLARIZATION FIELDS.')
     return
   endif
@@ -955,10 +908,9 @@ beam%phi0 = phi0_new
 ! step then overlaps the CPU's own solve. The rows read back after both finish.
 
 if (dev_twin) then
-  ikk = fel_kernel_index(size(ff(1)%wf%Ex, 1), ff(1)%wf%dx, ks, und%dz)
+  call set_device_kernels ()
   call fel_tic (fel_t_device$)
-  call fel_device_twin_begin (dev, fp32, beam, ff(1)%wf, dev_s0, dpar, &
-                              fel_kernels(ikk)%exp_k2, phi0_old, phi0_new, ks, err)
+  call fel_device_twin_begin (dev, fp32, beam, ff, dev_s0, dpar, phi0_old, phi0_new, ks, err)
   call fel_toc (fel_t_device$)
   if (err) return
 endif
@@ -1054,8 +1006,7 @@ call fel_toc (fel_t_solve$)
 if (fp_on) then
   if (dev_twin) then
     call fel_tic (fel_t_device$)
-    call fel_device_twin_rows (dev, fp32, beam, ff(1)%wf, ff(1)%slip%first, dpar, &
-                               phi0_old, phi0_new, ks)
+    call fel_device_twin_rows (dev, fp32, beam, ff, dpar, phi0_old, phi0_new, ks)
     call fel_toc (fel_t_device$)
   else
     block
@@ -1085,16 +1036,17 @@ contains
 ! Subroutine fill_device_par (par)
 !
 ! Routine to fill one step's device constants from the same authorities the FP64
-! step reads: the undulator segment, the beam's references, the fundamental's grid,
-! and fel_field_step's own source scale. The Bmad transverse map's k1 locals are
-! fel_transverse_track_bmad's forms.
+! step reads: the undulator segment, the beam's references, the set's one grid, and
+! per member fel_advance's coupling fc(h)/(sqrt(2) m_e) and fel_field_step's own
+! source scale at that harmonic, plus the element's polarization pair. The Bmad
+! transverse map's k1 locals are fel_transverse_track_bmad's forms.
 !-
 
 subroutine fill_device_par (par)
 
 type (fel_device_par_struct) par
 real(rp) g_max, p0_mc_l
-integer ngrid_l(3)
+integer ngrid_l(3), io
 
 !
 
@@ -1107,7 +1059,6 @@ par%qres = 2 * und%ku / ks
 par%e0 = p0_mc_l**2 / fel_gamma0(beam)
 par%gam0 = fel_gamma0(beam)
 par%p0_mc = p0_mc_l
-par%rtmp = fel_und_coupling(und, 1) / (sqrt(2.0_rp) * m_electron)
 par%kx = und%kx;  par%ky = und%ky
 par%ax = und%ax;  par%ay = und%ay
 par%cos_t = und%cos_t;  par%sin_t = und%sin_t
@@ -1126,15 +1077,47 @@ ngrid_l = wavefront_shape(ff(1)%wf)
 par%gridmax = (ngrid_l(1) - 1) * ff(1)%wf%dx / 2
 par%dgrid = ff(1)%wf%dx
 
-par%scl_w = fel_und_coupling(und, 1) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
-par%scl_w = par%scl_w / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
+par%harm = 0
+par%rtmp = 0
+par%scl_w = 0
+do io = 1, size(ff)
+  par%harm(io) = ff(io)%harm
+  par%rtmp(io) = fel_und_coupling(und, ff(io)%harm) / (sqrt(2.0_rp) * m_electron)
+  par%scl_w(io) = fel_und_coupling(und, ff(io)%harm) * (mu_0_vac * c_light) * sqrt(2.0_rp) * c_light * und%dz
+  par%scl_w(io) = par%scl_w(io) / (4 * ff(1)%wf%dx * ff(1)%wf%dx * beam%slice_spacing)
+enddo
+par%pol_re = real(und%pol, rp)
+par%pol_im = aimag(und%pol)
 
 par%first = ff(1)%slip%first
 par%helical = merge(1, 0, und%helical)
 par%mutate = 0
+par%nfield = size(ff)
+par%npol = merge(2, 1, allocated(ff(1)%wf%Ey))
 par%pad = 0
 
 end subroutine fill_device_par
+
+!+
+! Subroutine set_device_kernels ()
+!
+! Routine to hand the device every member's propagator for this step, each at its own
+! wavelength from the same cache fel_field_step reads. fel_device_set_kernel keys the
+! upload, so an unchanged kernel costs nothing.
+!-
+
+subroutine set_device_kernels ()
+
+integer io, ik
+
+!
+
+do io = 1, size(ff)
+  ik = fel_kernel_index(size(ff(io)%wf%Ex, 1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz)
+  call fel_device_set_kernel (dev, io, fel_kernels(ik)%exp_k2)
+enddo
+
+end subroutine set_device_kernels
 
 end subroutine fel_track_und_step
 

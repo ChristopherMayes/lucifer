@@ -898,6 +898,15 @@ The device deposit accumulates with atomic adds whose ordering is not fixed, so 
 runs of the same step differ in the source's last bit or two. Both reference
 backends behave the same way (manual/GPU.md, gpu/metal-engine 4919b01), so no device
 output is asserted byte-identical; the ceilings absorb it.
+
+The field set. The resident field is every member of the run's set (the fundamental
+and its harmonics, one grid) with one or two planes each (Ex, or the (Ex, Ey) pair
+when two polarizations are live). The routines here take the set as ff(:), the
+fel_field_struct of each member in set order, and the step's constants carry each member's
+harmonic, coupling and deposit scale plus the element's polarization pair
+(fel_device_par_struct). Every member rides the one fixed-point phase, at h times
+it, and every plane slips together, as on the CPU. One member and one plane is the
+single-field path it was before the set.
 ```
 
 (api-fel-device-par-struct)=
@@ -975,23 +984,26 @@ Output:
 (api-fel-device-setup)=
 ### `fel_device_setup`
 
-*Subroutine* `(dev, device_req, beam, ngrid, sample, fp32_iu, err_flag)`
+*Subroutine* `(dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, err_flag)`
 
 ```
 Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
 asks for the one backend this tree knows; a build without it (the stub) refuses with
-the stub's own reason, and any other value is refused, with the error listing what this tree knows. Allocates the resident
-buffers for this run shape (the grid refusal, naming the nearest supported size,
-comes back from the backend), runs the exact-wrap assertion on the device, and
-writes the device header lines into the instrument's stream when one is open.
+the stub's own reason, and any other value is refused, with the error listing what
+this tree knows. Allocates the resident buffers for this run shape (the grid
+refusal, naming the nearest supported size, comes back from the backend), runs the
+exact-wrap assertion on the device, and writes the device header lines into the
+instrument's stream when one is open.
 ```
 
 ```
 Input:
   device_req -- character(*): global%device.
   beam       -- fel_beam_struct: The beam (slice fills size the rectangular array).
-  ngrid      -- integer: Transverse grid points per side.
+  ngrid      -- integer: Transverse grid points per side, one grid for the set.
   sample     -- real(rp): Slice spacing in radiation wavelengths (integer by check).
+  harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the member count.
+  npol       -- integer: Planes per member, 1 or 2.
   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
 
 Output:
@@ -1005,20 +1017,48 @@ Output:
 *Subroutine* `(dev, beam, wf)`
 
 ```
-Routine to make the beam and the field resident at an FEL element's entry: the
+Routine to make the beam and the field set resident at an FEL element's entry: the
 static per-slice reference is set to the slice's FP64 mean z, every slice converts
-through the module header's chart, and every field record slice rounds to FP32.
-From here to fel_device_element_end the device state is the run inside the element;
-the host arrays are stale until a readback refreshes them.
+through the module header's chart, and every plane of every member rounds to FP32
+in ring order. From here to fel_device_element_end the device state is the run
+inside the element; the host arrays are stale until a readback refreshes them.
 ```
 
 ```
 Input:
-  beam -- fel_beam_struct: The beam.
-  wf   -- wavefront_struct: The fundamental's field record (ring order preserved).
+  beam  -- fel_beam_struct: The beam.
+  ff(:) -- fel_field_struct: The field set, in set order.
 
 Output:
-  dev  -- fel_device_struct: Resident.
+  dev   -- fel_device_struct: Resident.
+```
+
+(api-fel-device-upload-fields)=
+### `fel_device_upload_fields`
+
+*Subroutine* `(dev, ff)`
+
+```
+Routine to round every plane of every member of the set to FP32 and upload it in
+ring order: plane 1 is Ex and plane 2 is Ey, present only when the run carries two
+polarizations, in which case every member carries both.
+```
+
+(api-fel-device-set-kernel)=
+### `fel_device_set_kernel`
+
+*Subroutine* `(dev, im, exp_k2)`
+
+```
+Routine to upload member im's propagator exp(K2 dz), rounded from the FP64 kernel
+and keyed on the values themselves (fp32_kernel_cache's own key, per member), so
+an unchanged kernel costs no transfer. Each member diffracts at its own wavelength.
+```
+
+```
+Input:
+  im     -- integer: The member, 1-based in set order.
+  exp_k2 -- complex(rp): The member's FP64 propagator this step.
 ```
 
 (api-fel-device-stage-slice)=
@@ -1035,20 +1075,20 @@ representation, padded to the rectangular width with zero-weight entries.
 (api-fel-device-step-run)=
 ### `fel_device_step_run`
 
-*Subroutine* `(dev, par, exp_k2, phi0, phi0_new, ks, err_flag)`
+*Subroutine* `(dev, par, phi0, phi0_new, ks, err_flag)`
 
 ```
-Routine to encode one resident integration step: the keyed propagator upload, the
-per-slice phase rotators (the push reads e^{-i(phi0 + ks z_ref)}, the deposit its
-phi0_new counterpart), the exact tick count of the common phase advance, and one
-command buffer holding the whole step. Nothing is waited on here; the next host
-touch of a buffer drains it.
+Routine to encode one resident integration step: the per-slice phase rotators of
+every member (the push reads e^{-i h (phi0 + ks z_ref)}, the deposit its phi0_new
+counterpart), the exact tick count of the common phase advance, and one command
+buffer holding the whole step. The propagators are the caller's, uploaded through
+fel_device_set_kernel before this. Nothing is waited on here; the next host touch
+of a buffer drains it.
 ```
 
 ```
 Input:
   par       -- fel_device_par_struct: The step's constants, filled by the caller.
-  exp_k2    -- complex(rp): The FP64 propagator this step (rounded on upload).
   phi0      -- real(rp): The common phase at step entry.
   phi0_new  -- real(rp): The common phase at step exit.
   ks        -- real(rp): The fundamental radiation wavenumber [1/m].
@@ -1097,43 +1137,44 @@ CPU. The next FEL element re-uploads.
 (api-fel-device-slice-energy)=
 ### `fel_device_slice_energy`
 
-*Function* `(dev, ifld, dx) result (energy)`
+*Function* `(dev, im, ifld, dx) result (energy)`
 
 ```
 Routine to read one resident field slice's energy-like sum, sum|E|^2 * dx^2/(2 Z0)
-in FP64 over the FP32 record: the escape accounting the device-resident slippage
-needs (fel_device_apply_slippage in fel_track_mod owns the bookkeeping; this module
-owns the seam crossing). ifld is the 1-based record index.
+in FP64 over the FP32 record, both planes when two are live: the escape accounting
+the device-resident slippage needs (fel_device_apply_slippage in fel_track_mod owns
+the bookkeeping; this module owns the seam crossing). im is the member and ifld the
+1-based record index.
 ```
 
 (api-fel-device-zero-slice)=
 ### `fel_device_zero_slice`
 
-*Subroutine* `(dev, ifld)`
+*Subroutine* `(dev, im, ifld)`
 
 ```
-Routine to zero one resident field slice, the non-periodic fill of the slippage
-rotation. ifld is the 1-based record index.
+Routine to zero one resident field slice of member im, every plane, the
+non-periodic fill of the slippage rotation. ifld is the 1-based record index.
 ```
 
 (api-fel-device-twin-begin)=
 ### `fel_device_twin_begin`
 
-*Subroutine* `(dev, fp32, beam, wf, s0, par, exp_k2,`
+*Subroutine* `(dev, fp32, beam, wf, s0, par, phi0, phi0_new, ks, err_flag)`
 
 ```
-                                     phi0, phi0_new, ks, err_flag)
-
 Routine to put the device in the twin's role for one step, part one: uploads and
 the step encode, called after the FP64 particle advance and BEFORE the production
 field solve (the lockstep field image must round from the pre-solve record). In
 lockstep the shared state is the caller's pre-step snapshot s0 and the reference
 moves to the slice mean; in freerun the resident state carries and only the first
 step uploads. The encoded step then runs concurrently with the production solve.
+The propagators are the caller's, set through fel_device_set_kernel before this.
 ```
 
 ```
 Input:
+  ff(:)     -- fel_field_struct: The field set, in set order.
   s0(:,:,:) -- real(rp): Pre-step FP64 state, (6, npart, nslice) as x, px, y, py,
                  z, pz, snapshotted before the leading transverse half step.
 ```
@@ -1141,7 +1182,7 @@ Input:
 (api-fel-device-twin-rows)=
 ### `fel_device_twin_rows`
 
-*Subroutine* `(dev, fp32, beam, wf, first, par, phi0_new, ks)`
+*Subroutine* `(dev, fp32, beam, ff, par, phi0, phi0_new, ks)`
 
 ```
 Routine to put the device in the twin's role, part two: after the production solve,
@@ -1155,17 +1196,102 @@ the shared post-step state. The guard statistic is the median per-step phase
 increment in ticks (uniform quantum, so no spacing division). The device's own
 phase accumulators are kept as the next step's guard baseline, which is what makes
 the freerun guard cost no extra sync.
+
+The field set: the phasor, source and field rows are each the worst over the set's
+members, so the stream keeps its ten columns and its recorded ceilings, and every
+member's own worst is kept in dev%worst_h for the footer's attribution. A member's
+phasor and deposit are compared at h times the fundamental phase, fel_field_step's
+harm*theta, through fel_fp32_deposit64 unchanged (h*theta is its theta, the
+member's scale its scl_w). Every member's source and field rows are normalized by
+the fundamental's post-solve field norm over its planes, the run's power scale. A
+harmonic's own norm cannot serve: on a quiet start the CPU cancels the harmonic
+bunching to FP64 roundoff while the device's FP32 phase leaves it at ~1e-7 of the
+charge, and a dark member's row divided by its own roundoff-level field measured
+that noise against nothing (the first attempt read 6 to 8 on a deposit whose
+end-to-end power agreed at 1e-3). The harmonic's fidelity lives in its phasor row,
+which needs no field normalization, and in the end-to-end harmonic power against
+the CPU that check_device.py holds. With one member this is the normalization the
+single-field rows always had.
+```
+
+```
+Input:
+  ff(:) -- fel_field_struct: The field set, in set order, post-solve. The ring
+             offset is ff(1)%slip%first, one for the set.
 ```
 
 (api-fel-device-close-run)=
 ### `fel_device_close_run`
 
-*Subroutine* `(dev)`
+*Subroutine* `(dev, fp32)`
 
 ```
 Routine to report what the device did and release it: the step count and the
 device-busy seconds from the backend's own command-buffer timestamps, the honest
-pair a wall clock is judged against (the dispatch floor is their difference).
+pair a wall clock is judged against (the dispatch floor is their difference). When
+the device held the twin's role over a set of more than one member, its per-member
+worst levels go into the instrument's footer first, since the ten-column stream
+carries only the worst over members. The caller closes that stream afterwards.
+```
+
+## `fel_field_mod.f90`
+
+(api-fel-field-mod)=
+### `fel_field_mod`
+
+*Module*
+
+```
+The field set's types: one radiation field of the walk's set with its own slippage
+state and escape bank. They sit in a module of their own so that both the tracker
+(fel_track_mod) and the device seam (fel_device_mod) can take the set as an array
+of fel_field_struct, since passing a component section such as ffield(:)%wf, a
+wavefront with allocatable arrays inside, makes the compiler pack a temporary and
+deep-free it on return. fel_track_mod re-exports these types, so its users see them
+as before.
+```
+
+(api-fel-slip-struct)=
+### `fel_slip_struct`
+
+*Struct*
+
+```
+The slippage state of one field record: Genesis's Field::first and Field::accuslip,
+plus the two run facts they are meaningless without. One per wavefront. The default is
+the steady state: timerun false makes fel_apply_slippage a no-op (as Genesis's)
+and first = 0 makes fel_field_index the identity.
+```
+
+(api-fel-bank-struct)=
+### `fel_bank_struct`
+
+*Struct*
+
+```
+Scratch carrier for the field slices one fel_apply_slippage call transmits out of the
+window: the caller passes it when it wants the light itself, not just its banked
+energy (keep_escaped_field). Reset and refilled per call. The caller drains it
+immediately (streams to file), so peak memory is a handful of grid planes -- one per
+rotation of the call, ~1 inside undulators, ~10 over an interlude.
+```
+
+(api-fel-field-struct)=
+### `fel_field_struct`
+
+*Struct*
+
+```
+One radiation field of the walk's field set: the harmonic number, the wavefront
+record, and that field's own slippage state and escape bank. The walk carries an
+ordered set of these (Genesis's vector<Field*>), with the fundamental always
+entry 1. The ponderomotive phase, the phi0 advance and the slippage schedule are
+all defined against the fundamental. A harmonic field couples through fc(h) and the
+phase h*theta and diffracts at its own wavelength. A single-entry set is the
+pre-harmonic walk, bit for bit. wf%wavelength = fundamental wavelength / harm. Every
+field shares the time window, so the slippage state advances in fundamental-wavelength
+units for all of them (Genesis's one Control::sample) and the records rotate in
+lockstep.
 ```
 
 ## `fel_fp32_mod.f90`
@@ -3743,49 +3869,6 @@ Laguerre-Gauss order-0/1 sums feeding the global kappa fit, and the Gaussianity
 guard metric (excess kurtosis, worst plane).
 ```
 
-(api-fel-slip-struct)=
-### `fel_slip_struct`
-
-*Struct*
-
-```
-The slippage state of one field record: Genesis's Field::first and Field::accuslip,
-plus the two run facts they are meaningless without. One per wavefront. The default is
-the steady state: timerun false makes fel_apply_slippage a no-op (as Genesis's)
-and first = 0 makes fel_field_index the identity.
-```
-
-(api-fel-bank-struct)=
-### `fel_bank_struct`
-
-*Struct*
-
-```
-Scratch carrier for the field slices one fel_apply_slippage call transmits out of the
-window: the caller passes it when it wants the light itself, not just its banked
-energy (keep_escaped_field). Reset and refilled per call. The caller drains it
-immediately (streams to file), so peak memory is a handful of grid planes -- one per
-rotation of the call, ~1 inside undulators, ~10 over an interlude.
-```
-
-(api-fel-field-struct)=
-### `fel_field_struct`
-
-*Struct*
-
-```
-One radiation field of the walk's field set: the harmonic number, the wavefront
-record, and that field's own slippage state and escape bank. The walk carries an
-ordered set of these (Genesis's vector<Field*>), with the fundamental always
-entry 1. The ponderomotive phase, the phi0 advance and the slippage schedule are
-all defined against the fundamental. A harmonic field couples through fc(h) and the
-phase h*theta and diffracts at its own wavelength. A single-entry set is the
-pre-harmonic walk, bit for bit. wf%wavelength = fundamental wavelength / harm. Every
-field shares the time window, so the slippage state advances in fundamental-wavelength
-units for all of them (Genesis's one Control::sample) and the records rotate in
-lockstep.
-```
-
 (api-fel-sincos)=
 ### `fel_sincos`
 
@@ -4042,9 +4125,21 @@ Output:
 
 ```
 Routine to fill one step's device constants from the same authorities the FP64
-step reads: the undulator segment, the beam's references, the fundamental's grid,
-and fel_field_step's own source scale. The Bmad transverse map's k1 locals are
-fel_transverse_track_bmad's forms.
+step reads: the undulator segment, the beam's references, the set's one grid, and
+per member fel_advance's coupling fc(h)/(sqrt(2) m_e) and fel_field_step's own
+source scale at that harmonic, plus the element's polarization pair. The Bmad
+transverse map's k1 locals are fel_transverse_track_bmad's forms.
+```
+
+(api-set-device-kernels)=
+### `set_device_kernels`
+
+*Subroutine* `()`
+
+```
+Routine to hand the device every member's propagator for this step, each at its own
+wavelength from the same cache fel_field_step reads. fel_device_set_kernel keys the
+upload, so an unchanged kernel costs nothing.
 ```
 
 (api-fel-track-interlude-genesis)=

@@ -79,7 +79,7 @@ One row per feature declared in [the introduction](../doc/index.md).
 | Undulator tapering | [`taper/`](taper/) |
 | Phasing between segments | [`chicane/`](chicane/) |
 | Shared-memory parallelism, bit-identical at any thread count | Demonstrated inline, below |
-| A GPU backend for the averaged method | [`steady_state/`](steady_state/) and [`sase/`](sase/) run on it with `global%device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
+| A GPU backend for the averaged method | [`steady_state/`](steady_state/), [`sase/`](sase/), [`harmonics/`](harmonics/) and [`crossed_undulator/`](crossed_undulator/) run on it with `global%device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
 | openPMD dumps in both directions | [`steady_state/`](steady_state/) writes mid-run, [`import/`](import/) round-trips a bunch through a file, [`saturation_demo/`](saturation_demo/) reads Genesis4's |
 | A self-describing statistics file | Every example writes one |
 | Distribution import | [`import/`](import/) |

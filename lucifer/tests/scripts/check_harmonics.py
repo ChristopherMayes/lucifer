@@ -224,6 +224,37 @@ def fields_identical(fa, fb):
                for c in ua["components"])
 
 
+def bessel_p3_over_p1(beamfile, darkfile, aw=0.84853, lambda_u=0.015, lambda0=1e-10):
+    """The one-step dark deposit's P3/P1 predicted from the dumped particles alone: the
+    bilinear scatter of (sin h*theta + i cos h*theta) sqrt(faw2)/gamma over the dark
+    field's grid, weighted by |fc(h)|^2 from the Bessel closed form. Common factors
+    (weights, delz, spacing, mu0 c) cancel in the ratio. Shared with check_device.py,
+    which holds the device's deposit to the same identity."""
+    sl = beamio.read_slices(beamfile, lambda0, lambda0)[0]
+    theta, gam, xp, yp = sl["theta"], sl["gamma"], sl["x"], sl["y"]
+    dark = fieldio.read_field(darkfile)
+    ng, dgrid = dark["u"].shape[1], dark["dx"]
+    ku = 2 * np.pi / lambda_u
+    ky = ku * ku                      # Planar natural-focusing split: kx = 0, ky = ku^2.
+    gmax = (ng - 1) * dgrid / 2
+
+    def predicted_power(h):
+        crs = np.zeros((ng, ng), dtype=complex)
+        part = np.sqrt(1 + ky * yp * yp) / gam
+        cpart = (np.sin(h * theta) + 1j * np.cos(h * theta)) * part
+        wx = (xp + gmax) / dgrid
+        wy = (yp + gmax) / dgrid
+        ix = np.floor(wx).astype(int); iy = np.floor(wy).astype(int)
+        fx = 1 + ix - wx; fy = 1 + iy - wy
+        on = (np.abs(xp) < gmax) & (np.abs(yp) < gmax)
+        for dx_i, dy_i, wgt in ((0, 0, fx * fy), (1, 0, (1 - fx) * fy),
+                                (0, 1, fx * (1 - fy)), (1, 1, (1 - fx) * (1 - fy))):
+            np.add.at(crs, (ix[on] + dx_i, iy[on] + dy_i), (wgt * cpart)[on])
+        return abs(fc_planar(aw, h)) ** 2 * float((abs(crs) ** 2).sum())
+
+    return predicted_power(3) / predicted_power(1)
+
+
 def dfl_to_vperm(fname, dx_expected=None):
     """A Genesis field dump's slice 1 as complex V/m, plus its grid spacing."""
     with h5py.File(fname) as h5:
@@ -435,35 +466,10 @@ def main():
     run(exe, wd, "h3dep", NML_IMPORT.format(lat="short.bmad", root="h3dep",
         beam="h3bunch-final.beam.h5", field="dark.wf.h5", extra=""))
 
-    sl = beamio.read_slices(wd / "h3dep-final.beam.h5", 1e-10, 1e-10)[0]
-    theta, gam, xp, yp = sl["theta"], sl["gamma"], sl["x"], sl["y"]
-    dark = fieldio.read_field(wd / "dark.wf.h5")
-    ng, dgrid = dark["u"].shape[1], dark["dx"]
-
-    aw = 0.84853
-    ku = 2 * np.pi / 0.015
-    ky = ku * ku                      # Planar natural-focusing split: kx = 0, ky = ku^2.
-    gmax = (ng - 1) * dgrid / 2
-
-    def predicted_power(h):
-        crs = np.zeros((ng, ng), dtype=complex)
-        part = np.sqrt(1 + ky * yp * yp) / gam
-        cpart = (np.sin(h * theta) + 1j * np.cos(h * theta)) * part
-        wx = (xp + gmax) / dgrid
-        wy = (yp + gmax) / dgrid
-        ix = np.floor(wx).astype(int); iy = np.floor(wy).astype(int)
-        fx = 1 + ix - wx; fy = 1 + iy - wy
-        on = (np.abs(xp) < gmax) & (np.abs(yp) < gmax)
-        for dx_i, dy_i, wgt in ((0, 0, fx * fy), (1, 0, (1 - fx) * fy),
-                                (0, 1, fx * (1 - fy)), (1, 1, (1 - fx) * (1 - fy))):
-            np.add.at(crs, (ix[on] + dx_i, iy[on] + dy_i), (wgt * cpart)[on])
-        # Common factors (weights, delz, spacing, mu0 c) cancel in the ratio. Keep fc.
-        return abs(fc_planar(aw, h)) ** 2 * float((abs(crs) ** 2).sum())
-
+    expect = bessel_p3_over_p1(wd / "h3dep-final.beam.h5", wd / "dark.wf.h5")
     with read_stats(wd / "h3dep.stats.h5") as st:
         p1 = float(st["field/total/power"][-1, 0])
         p3 = float(st["field/harm3/total/power"][-1, 0])
-    expect = predicted_power(3) / predicted_power(1)
     d = abs(p3 / p1 / expect - 1)
     check("one-step deposit P3/P1 vs the Bessel fc + h*theta sum", d, TOL_DEPOSIT,
           note=f"[P3/P1 {p3/p1:.4e}]")

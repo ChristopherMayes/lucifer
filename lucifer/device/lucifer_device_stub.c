@@ -29,9 +29,10 @@ int luc_dev_available (char *name, int name_len, char *reason, int reason_len)
   return 0;
 }
 
-int luc_dev_init (int nslice, int npart, int ngrid, char *reason, int reason_len)
+int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
+                  char *reason, int reason_len)
 {
-  (void) nslice; (void) npart; (void) ngrid;
+  (void) nslice; (void) npart; (void) ngrid; (void) nfield; (void) npol;
   put_str (reason, reason_len, "no device backend in this build");
   return 1;
 }
@@ -53,11 +54,17 @@ void luc_dev_download_slice (int is, int n, float *x, float *px, float *y,
   (void) goff; (void) uphase;
 }
 
-void luc_dev_upload_field_slice (int ifld, const float *e) { (void) ifld; (void) e; }
-void luc_dev_download_field_slice (int ifld, float *e) { (void) ifld; (void) e; }
-void luc_dev_zero_field_slice (int ifld) { (void) ifld; }
-void luc_dev_download_source_slice (int ifld, float *s) { (void) ifld; (void) s; }
-void luc_dev_set_kernel (const float *expk) { (void) expk; }
+void luc_dev_upload_field_slice (int im, int ip, int is, const float *e)
+{
+  (void) im; (void) ip; (void) is; (void) e;
+}
+void luc_dev_download_field_slice (int im, int ip, int is, float *e)
+{
+  (void) im; (void) ip; (void) is; (void) e;
+}
+void luc_dev_zero_field_slice (int im, int ip, int is) { (void) im; (void) ip; (void) is; }
+void luc_dev_download_source_slice (int im, int is, float *s) { (void) im; (void) is; (void) s; }
+void luc_dev_set_kernel (int im, const float *expk) { (void) im; (void) expk; }
 void luc_dev_set_slice_phases (const float *base, const float *base_dep)
 {
   (void) base; (void) base_dep;

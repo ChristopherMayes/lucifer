@@ -249,7 +249,15 @@ The Metal backend ([](validation.md#val-device)) run against the CPU path on the
 | SASE window, 96 x 8192 | 3.92 s | 0.316 s | 0.196 s | 12.4x |
 | dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.037 s | 0.009 s | 0.9x |
 
-The pattern is the reference backends' own: the device pays a fixed cost per step to be told what to do, measured here at (0.037 - 0.009)/89 = 0.31 ms per step of host-side floor on the tiny deck, and the win grows with the work per step. Below the floor the CPU is the right processor, and the last row says so rather than hiding it. Kernel tuning beyond residency and the one-command-buffer step is deliberately not attempted here: this landing is judged on correctness and these honest timings.
+The field set, on the planar segment of the harmonics check (3.96 m, 88 steps) with the same 96 x 8192 window at `ngrid` 256 and `comb_ds_save = -1`, since a helical segment couples only the fundamental and the set has nothing to carry there:
+
+| case | CPU, 12 threads | device wall | device busy | ratio |
+|---|---|---|---|---|
+| fundamental only | 3.344 s | 0.269 s | 0.185 s | 12.4x |
+| harmonics 1, 3 | 5.249 s | 0.503 s | 0.365 s | 10.4x |
+| two polarizations (tilt 0.3) | 4.502 s | 0.418 s | 0.296 s | 10.8x |
+
+A second member costs the device 87% more wall clock and the CPU 57% more. A second plane costs the device 55% more and the CPU 35% more. The device pays the extra planes' transforms in full and the gather and deposit loops over members per particle, where the CPU's field solve is already the smaller share, so the ratio narrows by a fifth and no more. Production build, min of two runs, walk time.
 
 The readback schedule is the other knob: the rows above read back at the element end only, and `comb_ds_save = 0` (a stats row every step) pays a beam-and-field readback per step, the same trade the reference manual prices as `output_step`. Measured at that finest comb on the 96 x 8192 case, with the readback's conversion loops first serial and then parallel over slices:
 

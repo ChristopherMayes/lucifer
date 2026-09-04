@@ -759,18 +759,13 @@ if (err_flag) return
 ! an unsupported configuration stops the run and never quietly takes the CPU path.
 ! Element wakes are refused at the element (only the walk sees them), and the grid
 ! refusal, naming the nearest supported size, comes back from the backend itself.
+! The field set is covered whole: every harmonic member and both polarization planes
+! ride the device, and their combination is refused above for the CPU and the device
+! alike.
 
 if (run%global%device /= '' .and. run%global%device /= 'off') then
   if (run%any_unavg) then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE UNAVERAGED MODE.')
-    err_flag = .true.;  return
-  endif
-  if (run%n_harm > 1) then
-    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER HARMONIC FIELD SETS.')
-    err_flag = .true.;  return
-  endif
-  if (run%two_pol) then
-    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER TWO-POLARIZATION FIELDS.')
     err_flag = .true.;  return
   endif
   if (run%global%source_model == 'coherent') then
@@ -806,7 +801,8 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
     integer ngrid_dev(3)
     ngrid_dev = wavefront_shape(run%ffield(1)%wf)
     call fel_device_setup (run%dev, run%global%device, fbeam, ngrid_dev(1), &
-                           run%ffield(1)%slip%sample, run%fp32%iu, err_flag)
+                           run%ffield(1)%slip%sample, run%ffield(1:run%n_harm)%harm, &
+                           merge(2, 1, run%two_pol), run%fp32%iu, err_flag)
   end block
   if (err_flag) return
 endif

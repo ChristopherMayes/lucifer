@@ -687,8 +687,11 @@ echo
 # the device in the twin's role, inside its recorded ceilings; the exact-wrap
 # assertion on the fixed-point phase; read-only on the FP64 physics; the perturbed
 # kernel constant moves a recorded level so the check can fail; the freerun twin
-# and the resident production run land in the same end-to-end band; and everything
-# the backend does not cover is refused.
+# and the resident production run land in the same end-to-end band. The field set
+# (harmonic members, two polarization planes) is judged the same ways plus the Bessel
+# deposit identity and one time-dependent Genesis reference imported by CPU and
+# device alike, which is why this section takes the reference binary and the
+# conversion checkout. Everything the backend does not cover is refused.
 #
 # This is the one section that can skip, and it keys on the answer lucifer itself
 # gives rather than on the platform. A build compiled against the refusing stub has
@@ -712,7 +715,8 @@ case "$DEVICE_BACKEND" in
     ;;
   *)
     echo "--- backend: $DEVICE_BACKEND"
-    if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+    if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$WORK_DIR" \
+           --latdir "$SCRIPT_DIR/bmad" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS"; then
       echo "FAIL: device backend checks; outputs kept in: $WORK_DIR" >&2
       exit 1
     fi

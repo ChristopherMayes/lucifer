@@ -45,11 +45,21 @@
 ! runs of the same step differ in the source's last bit or two. Both reference
 ! backends behave the same way (manual/GPU.md, gpu/metal-engine 4919b01), so no device
 ! output is asserted byte-identical; the ceilings absorb it.
+!
+! The field set. The resident field is every member of the run's set (the fundamental
+! and its harmonics, one grid) with one or two planes each (Ex, or the (Ex, Ey) pair
+! when two polarizations are live). The routines here take the set as ff(:), the
+! fel_field_struct of each member in set order, and the step's constants carry each member's
+! harmonic, coupling and deposit scale plus the element's polarization pair
+! (fel_device_par_struct). Every member rides the one fixed-point phase, at h times
+! it, and every plane slips together, as on the CPU. One member and one plane is the
+! single-field path it was before the set.
 !-
 
 module fel_device_mod
 
 use fel_beam_mod
+use fel_field_mod
 use fel_fp32_mod
 use wavefront_mod
 
@@ -65,6 +75,11 @@ implicit none
 real(rp), parameter :: fel_dev_ticks_per_rad$ = 4294967296.0_rp / twopi
 real(rp), parameter :: fel_dev_rad_per_tick$ = twopi / 4294967296.0_rp
 
+! The field set's size bound, LUC_DEV_MAX_FIELD in lucifer_device.h and the
+! harmonics(9) list's length. The two mirrors move together.
+
+integer, parameter :: fel_dev_max_field$ = 9
+
 !+
 ! Struct fel_device_par_struct
 !
@@ -74,10 +89,14 @@ real(rp), parameter :: fel_dev_rad_per_tick$ = twopi / 4294967296.0_rp
 !-
 
 type, bind(c) :: fel_device_par_struct
-  real(c_double) :: dz, ks, ku, aw, qres, e0, gam0, p0_mc, rtmp
+  real(c_double) :: dz, ks, ku, aw, qres, e0, gam0, p0_mc
   real(c_double) :: kx, ky, ax, ay, cos_t, sin_t
-  real(c_double) :: k1x, k1y, gridmax, dgrid, scl_w
-  integer(c_int) :: first, helical, mutate, pad
+  real(c_double) :: k1x, k1y, gridmax, dgrid
+  real(c_double) :: harm(fel_dev_max_field$)    ! Per member: the harmonic number as a factor.
+  real(c_double) :: rtmp(fel_dev_max_field$)    ! Per member: fc(h) / (sqrt(2) m_e).
+  real(c_double) :: scl_w(fel_dev_max_field$)   ! Per member: fel_field_step's scl_w at h.
+  real(c_double) :: pol_re(2), pol_im(2)        ! The element's polarization pair.
+  integer(c_int) :: first, helical, mutate, nfield, npol, pad
 end type
 
 !+
@@ -99,14 +118,20 @@ type fel_device_struct
   logical :: resident = .false.         ! Production role: beam and field live on the device.
   logical :: twin_live = .false.        ! Instrument role: the freerun twin state carries.
   integer :: nslice = 0, npart = 0, ngrid = 0
+  integer :: nfield = 1, npol = 1       ! The set: members, and planes per member.
+  integer, allocatable :: harm(:)       ! Each member's harmonic number.
   real(rp), allocatable :: z_ref(:)     ! Static FP64 longitudinal reference per slice [m].
-  real(rp) :: k_key(4) = -1             ! Propagator upload key.
+  real(rp), allocatable :: k_key(:,:)   ! Propagator upload key, (4, nfield).
   character(64) :: name = ''            ! The device, for the log line.
   logical :: wrap_exact = .false.       ! The exact-wrap assertion's verdict.
   integer :: nstep = 0                  ! Device steps encoded this run.
+  ! The instrument's per-member record: run-level worst phasor, source and field
+  ! divergence of each member, the footer's attribution when the set has more than
+  ! one member (the ten-column stream itself carries the worst over members).
+  real(rp), allocatable :: worst_h(:,:) ! (3, nfield).
   ! Staging, sized once: per-slice particle arrays padded to npart with zero-weight
   ! entries (the device wants a rectangular array; padding radiates nothing and is
-  ! never read back), one field plane, and the per-slice phase rotators.
+  ! never read back), one field plane, and the per-slice phase rotators per member.
   real(c_float), allocatable :: sx(:), spx(:), sy(:), spy(:), sg(:), sw(:)
   integer(c_int64_t), allocatable :: su(:)
   integer(c_int64_t), allocatable :: su0(:,:)
@@ -125,10 +150,10 @@ interface
     integer(c_int) ok
   end function
 
-  function luc_dev_init (nslice, npart, ngrid, reason, reason_len) &
+  function luc_dev_init (nslice, npart, ngrid, nfield, npol, reason, reason_len) &
                          bind(c, name = 'luc_dev_init') result (ierr)
     import c_char, c_int
-    integer(c_int), value :: nslice, npart, ngrid, reason_len
+    integer(c_int), value :: nslice, npart, ngrid, nfield, npol, reason_len
     character(kind=c_char) :: reason(*)
     integer(c_int) ierr
   end function
@@ -152,31 +177,32 @@ interface
     integer(c_int64_t) :: uphase(*)
   end subroutine
 
-  subroutine luc_dev_upload_field_slice (ifld, e) bind(c, name = 'luc_dev_upload_field_slice')
+  subroutine luc_dev_upload_field_slice (im, ip, is, e) bind(c, name = 'luc_dev_upload_field_slice')
     import c_int, c_float_complex
-    integer(c_int), value :: ifld
+    integer(c_int), value :: im, ip, is
     complex(c_float_complex) :: e(*)
   end subroutine
 
-  subroutine luc_dev_download_field_slice (ifld, e) bind(c, name = 'luc_dev_download_field_slice')
+  subroutine luc_dev_download_field_slice (im, ip, is, e) bind(c, name = 'luc_dev_download_field_slice')
     import c_int, c_float_complex
-    integer(c_int), value :: ifld
+    integer(c_int), value :: im, ip, is
     complex(c_float_complex) :: e(*)
   end subroutine
 
-  subroutine luc_dev_zero_field_slice (ifld) bind(c, name = 'luc_dev_zero_field_slice')
+  subroutine luc_dev_zero_field_slice (im, ip, is) bind(c, name = 'luc_dev_zero_field_slice')
     import c_int
-    integer(c_int), value :: ifld
+    integer(c_int), value :: im, ip, is
   end subroutine
 
-  subroutine luc_dev_download_source_slice (ifld, s) bind(c, name = 'luc_dev_download_source_slice')
+  subroutine luc_dev_download_source_slice (im, is, s) bind(c, name = 'luc_dev_download_source_slice')
     import c_int, c_float_complex
-    integer(c_int), value :: ifld
+    integer(c_int), value :: im, is
     complex(c_float_complex) :: s(*)
   end subroutine
 
-  subroutine luc_dev_set_kernel (expk) bind(c, name = 'luc_dev_set_kernel')
-    import c_float_complex
+  subroutine luc_dev_set_kernel (im, expk) bind(c, name = 'luc_dev_set_kernel')
+    import c_int, c_float_complex
+    integer(c_int), value :: im
     complex(c_float_complex) :: expk(*)
   end subroutine
 
@@ -308,20 +334,23 @@ end subroutine from_c
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, fp32_iu, err_flag)
+! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, err_flag)
 !
 ! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
 ! asks for the one backend this tree knows; a build without it (the stub) refuses with
-! the stub's own reason, and any other value is refused, with the error listing what this tree knows. Allocates the resident
-! buffers for this run shape (the grid refusal, naming the nearest supported size,
-! comes back from the backend), runs the exact-wrap assertion on the device, and
-! writes the device header lines into the instrument's stream when one is open.
+! the stub's own reason, and any other value is refused, with the error listing what
+! this tree knows. Allocates the resident buffers for this run shape (the grid
+! refusal, naming the nearest supported size, comes back from the backend), runs the
+! exact-wrap assertion on the device, and writes the device header lines into the
+! instrument's stream when one is open.
 !
 ! Input:
 !   device_req -- character(*): global%device.
 !   beam       -- fel_beam_struct: The beam (slice fills size the rectangular array).
-!   ngrid      -- integer: Transverse grid points per side.
+!   ngrid      -- integer: Transverse grid points per side, one grid for the set.
 !   sample     -- real(rp): Slice spacing in radiation wavelengths (integer by check).
+!   harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the member count.
+!   npol       -- integer: Planes per member, 1 or 2.
 !   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
 !
 ! Output:
@@ -329,12 +358,13 @@ end subroutine from_c
 !   err_flag   -- logical: Set True on any refusal. False otherwise.
 !-
 
-subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, fp32_iu, err_flag)
+subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, err_flag)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
 character(*) device_req
-integer ngrid, fp32_iu
+integer ngrid, fp32_iu, npol
+integer harm(:)
 real(rp) sample
 logical err_flag
 
@@ -383,7 +413,11 @@ if (np == 0) then
   return
 endif
 
-ierr = luc_dev_init(size(beam%slice), np, ngrid, c_reason, 256)
+dev%nfield = size(harm)
+dev%npol = npol
+dev%harm = harm
+
+ierr = luc_dev_init(size(beam%slice), np, ngrid, dev%nfield, npol, c_reason, 256)
 if (ierr /= 0) then
   call from_c (c_reason, reason)
   call out_io (s_error$, r_name, 'DEVICE = "metal" REFUSED: ' // trim(reason) // '.')
@@ -417,14 +451,20 @@ dev%wrap_exact = .true.
 
 allocate (dev%z_ref(dev%nslice))
 dev%z_ref = 0
+allocate (dev%k_key(4, dev%nfield))
+dev%k_key = -1
+allocate (dev%worst_h(3, dev%nfield))
+dev%worst_h = 0
 allocate (dev%sx(np), dev%spx(np), dev%sy(np), dev%spy(np), dev%sg(np), dev%sw(np))
 allocate (dev%su(np), dev%su0(np, dev%nslice))
-allocate (dev%se(ngrid, ngrid), dev%sbase(dev%nslice), dev%sbdep(dev%nslice))
+allocate (dev%se(ngrid, ngrid))
+allocate (dev%sbase(dev%nfield * dev%nslice), dev%sbdep(dev%nfield * dev%nslice))
 dev%su0 = 0
 
 dev%on = .true.
-call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident.', &
-             i_array = [int(luc_dev_bytes() / 2**20)])
+call out_io (s_info$, r_name, 'Device: ' // trim(dev%name) // ', \i0\ MB resident, ' // &
+             '\i0\ field member(s) of \i0\ plane(s).', &
+             i_array = [int(luc_dev_bytes() / 2**20), dev%nfield, npol])
 
 if (fp32_iu /= 0) then
   write (fp32_iu, '(a)') '# device = ' // trim(dev%name) // ' (the device holds the twin''s role;'
@@ -440,25 +480,25 @@ end subroutine fel_device_setup
 !+
 ! Subroutine fel_device_element_begin (dev, beam, wf)
 !
-! Routine to make the beam and the field resident at an FEL element's entry: the
+! Routine to make the beam and the field set resident at an FEL element's entry: the
 ! static per-slice reference is set to the slice's FP64 mean z, every slice converts
-! through the module header's chart, and every field record slice rounds to FP32.
-! From here to fel_device_element_end the device state is the run inside the element;
-! the host arrays are stale until a readback refreshes them.
+! through the module header's chart, and every plane of every member rounds to FP32
+! in ring order. From here to fel_device_element_end the device state is the run
+! inside the element; the host arrays are stale until a readback refreshes them.
 !
 ! Input:
-!   beam -- fel_beam_struct: The beam.
-!   wf   -- wavefront_struct: The fundamental's field record (ring order preserved).
+!   beam  -- fel_beam_struct: The beam.
+!   ff(:) -- fel_field_struct: The field set, in set order.
 !
 ! Output:
-!   dev  -- fel_device_struct: Resident.
+!   dev   -- fel_device_struct: Resident.
 !-
 
-subroutine fel_device_element_begin (dev, beam, wf)
+subroutine fel_device_element_begin (dev, beam, ff)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
-type (wavefront_struct) wf
+type (fel_field_struct) ff(:)
 integer is
 
 !
@@ -471,13 +511,79 @@ do is = 1, size(beam%slice)
   call luc_dev_upload_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
                              dev%sg, dev%su, dev%sw)
 enddo
-do is = 1, size(wf%Ex, 3)
-  dev%se = cmplx(wf%Ex(:,:,is), kind = c_float_complex)
-  call luc_dev_upload_field_slice (is-1, dev%se)
-enddo
+call fel_device_upload_fields (dev, ff)
 dev%resident = .true.
 
 end subroutine fel_device_element_begin
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_upload_fields (dev, ff)
+!
+! Routine to round every plane of every member of the set to FP32 and upload it in
+! ring order: plane 1 is Ex and plane 2 is Ey, present only when the run carries two
+! polarizations, in which case every member carries both.
+!-
+
+subroutine fel_device_upload_fields (dev, ff)
+
+type (fel_device_struct) dev
+type (fel_field_struct) ff(:)
+integer im, ip, is
+
+!
+
+do im = 1, dev%nfield
+  do ip = 1, dev%npol
+    do is = 1, size(ff(im)%wf%Ex, 3)
+      if (ip == 1) then
+        dev%se = cmplx(ff(im)%wf%Ex(:,:,is), kind = c_float_complex)
+      else
+        dev%se = cmplx(ff(im)%wf%Ey(:,:,is), kind = c_float_complex)
+      endif
+      call luc_dev_upload_field_slice (im-1, ip-1, is-1, dev%se)
+    enddo
+  enddo
+enddo
+
+end subroutine fel_device_upload_fields
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_set_kernel (dev, im, exp_k2)
+!
+! Routine to upload member im's propagator exp(K2 dz), rounded from the FP64 kernel
+! and keyed on the values themselves (fp32_kernel_cache's own key, per member), so
+! an unchanged kernel costs no transfer. Each member diffracts at its own wavelength.
+!
+! Input:
+!   im     -- integer: The member, 1-based in set order.
+!   exp_k2 -- complex(rp): The member's FP64 propagator this step.
+!-
+
+subroutine fel_device_set_kernel (dev, im, exp_k2)
+
+type (fel_device_struct) dev
+integer im
+complex(rp) exp_k2(:,:)
+real(rp) key(4)
+integer ng
+
+!
+
+ng = size(exp_k2, 1)
+key = [real(ng, rp), real(exp_k2(1,1), rp), aimag(exp_k2(1,1)), aimag(exp_k2(ng/2+1, ng/2+1))]
+if (any(dev%k_key(:, im) /= key)) then
+  dev%se = cmplx(exp_k2, kind = c_float_complex)
+  call luc_dev_set_kernel (im-1, dev%se)
+  dev%k_key(:, im) = key
+endif
+
+end subroutine fel_device_set_kernel
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -529,17 +635,17 @@ end subroutine fel_device_stage_slice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_step_run (dev, par, exp_k2, phi0, phi0_new, ks, err_flag)
+! Subroutine fel_device_step_run (dev, par, phi0, phi0_new, ks, err_flag)
 !
-! Routine to encode one resident integration step: the keyed propagator upload, the
-! per-slice phase rotators (the push reads e^{-i(phi0 + ks z_ref)}, the deposit its
-! phi0_new counterpart), the exact tick count of the common phase advance, and one
-! command buffer holding the whole step. Nothing is waited on here; the next host
-! touch of a buffer drains it.
+! Routine to encode one resident integration step: the per-slice phase rotators of
+! every member (the push reads e^{-i h (phi0 + ks z_ref)}, the deposit its phi0_new
+! counterpart), the exact tick count of the common phase advance, and one command
+! buffer holding the whole step. The propagators are the caller's, uploaded through
+! fel_device_set_kernel before this. Nothing is waited on here; the next host touch
+! of a buffer drains it.
 !
 ! Input:
 !   par       -- fel_device_par_struct: The step's constants, filled by the caller.
-!   exp_k2    -- complex(rp): The FP64 propagator this step (rounded on upload).
 !   phi0      -- real(rp): The common phase at step entry.
 !   phi0_new  -- real(rp): The common phase at step exit.
 !   ks        -- real(rp): The fundamental radiation wavenumber [1/m].
@@ -549,16 +655,15 @@ end subroutine fel_device_stage_slice
 !   err_flag  -- logical: Set True if the backend refuses. False otherwise.
 !-
 
-subroutine fel_device_step_run (dev, par, exp_k2, phi0, phi0_new, ks, err_flag)
+subroutine fel_device_step_run (dev, par, phi0, phi0_new, ks, err_flag)
 
 type (fel_device_struct) dev
 type (fel_device_par_struct) par
-complex(rp) exp_k2(:,:)
 real(rp) phi0, phi0_new, ks
 logical err_flag
 
-real(rp) key(4), phi_ref
-integer is, ng, ierr
+real(rp) phi_ref, h
+integer is, im, ierr, k
 integer(c_int64_t) cret
 character(kind=c_char) c_reason(256)
 character(256) reason
@@ -567,27 +672,21 @@ character(*), parameter :: r_name = 'fel_device_step_run'
 !
 
 err_flag = .false.
-ng = size(exp_k2, 1)
 
-! The propagator, rounded from the FP64 kernel and keyed on the values themselves,
-! fp32_kernel_cache's own key.
+! The per-slice rotators per member, FP64 once per slice per step: the push works
+! against the entry phase, the deposit against the exit phase, exactly the two epochs
+! fel_fp32_twin_slice and fel_fp32_field_twin use, each at h times the fundamental's
+! phase (fel_field_step's harm*theta). Member-major, the seam's order.
 
-key = [real(ng, rp), real(exp_k2(1,1), rp), aimag(exp_k2(1,1)), aimag(exp_k2(ng/2+1, ng/2+1))]
-if (any(dev%k_key /= key)) then
-  dev%se = cmplx(exp_k2, kind = c_float_complex)
-  call luc_dev_set_kernel (dev%se)
-  dev%k_key = key
-endif
-
-! The per-slice rotators, FP64 once per slice per step: the push works against the
-! entry phase, the deposit against the exit phase, exactly the two epochs
-! fel_fp32_twin_slice and fel_fp32_field_twin use.
-
-do is = 1, dev%nslice
-  phi_ref = phi0 + ks * dev%z_ref(is)
-  dev%sbase(is) = cmplx(cmplx(cos(phi_ref), -sin(phi_ref), rp), kind = c_float_complex)
-  phi_ref = phi0_new + ks * dev%z_ref(is)
-  dev%sbdep(is) = cmplx(cmplx(cos(phi_ref), -sin(phi_ref), rp), kind = c_float_complex)
+do im = 1, dev%nfield
+  h = par%harm(im)
+  do is = 1, dev%nslice
+    k = (im - 1) * dev%nslice + is
+    phi_ref = h * (phi0 + ks * dev%z_ref(is))
+    dev%sbase(k) = cmplx(cmplx(cos(phi_ref), -sin(phi_ref), rp), kind = c_float_complex)
+    phi_ref = h * (phi0_new + ks * dev%z_ref(is))
+    dev%sbdep(k) = cmplx(cmplx(cos(phi_ref), -sin(phi_ref), rp), kind = c_float_complex)
+  enddo
 enddo
 call luc_dev_set_slice_phases (dev%sbase, dev%sbdep)
 
@@ -627,13 +726,13 @@ end subroutine fel_device_step_run
 ! slice at a time and is not thread-safe by design.
 !-
 
-subroutine fel_device_readback (dev, beam, wf)
+subroutine fel_device_readback (dev, beam, ff)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
-type (wavefront_struct) wf
+type (fel_field_struct) ff(:)
 real(rp) p0_mc, gamma0, ks
-integer is
+integer is, im, ip
 
 !
 
@@ -675,16 +774,24 @@ do is = 1, size(beam%slice)
 enddo
 !$OMP end parallel do
 
-!$OMP parallel do
-do is = 1, size(wf%Ex, 3)
-  block
-    complex(c_float_complex), allocatable :: be(:,:)
-    allocate (be(size(wf%Ex, 1), size(wf%Ex, 2)))
-    call luc_dev_download_field_slice (is-1, be)
-    wf%Ex(:,:,is) = cmplx(be, kind = wf_rp)
-  end block
+do im = 1, dev%nfield
+  do ip = 1, dev%npol
+    !$OMP parallel do
+    do is = 1, size(ff(im)%wf%Ex, 3)
+      block
+        complex(c_float_complex), allocatable :: be(:,:)
+        allocate (be(size(ff(im)%wf%Ex, 1), size(ff(im)%wf%Ex, 2)))
+        call luc_dev_download_field_slice (im-1, ip-1, is-1, be)
+        if (ip == 1) then
+          ff(im)%wf%Ex(:,:,is) = cmplx(be, kind = wf_rp)
+        else
+          ff(im)%wf%Ey(:,:,is) = cmplx(be, kind = wf_rp)
+        endif
+      end block
+    enddo
+    !$OMP end parallel do
+  enddo
 enddo
-!$OMP end parallel do
 
 end subroutine fel_device_readback
 
@@ -700,16 +807,16 @@ end subroutine fel_device_readback
 ! CPU. The next FEL element re-uploads.
 !-
 
-subroutine fel_device_element_end (dev, beam, wf)
+subroutine fel_device_element_end (dev, beam, ff)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
-type (wavefront_struct) wf
+type (fel_field_struct) ff(:)
 
 !
 
 if (.not. dev%resident) return
-call fel_device_readback (dev, beam, wf)
+call fel_device_readback (dev, beam, ff)
 dev%resident = .false.
 
 end subroutine fel_device_element_end
@@ -718,25 +825,29 @@ end subroutine fel_device_element_end
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Function fel_device_slice_energy (dev, ifld, dx) result (energy)
+! Function fel_device_slice_energy (dev, im, ifld, dx) result (energy)
 !
 ! Routine to read one resident field slice's energy-like sum, sum|E|^2 * dx^2/(2 Z0)
-! in FP64 over the FP32 record: the escape accounting the device-resident slippage
-! needs (fel_device_apply_slippage in fel_track_mod owns the bookkeeping; this module
-! owns the seam crossing). ifld is the 1-based record index.
+! in FP64 over the FP32 record, both planes when two are live: the escape accounting
+! the device-resident slippage needs (fel_device_apply_slippage in fel_track_mod owns
+! the bookkeeping; this module owns the seam crossing). im is the member and ifld the
+! 1-based record index.
 !-
 
-function fel_device_slice_energy (dev, ifld, dx) result (energy)
+function fel_device_slice_energy (dev, im, ifld, dx) result (energy)
 
 type (fel_device_struct) dev
-integer ifld
+integer im, ifld, ip
 real(rp) dx, energy
 
 !
 
-call luc_dev_download_field_slice (ifld-1, dev%se)
-energy = sum(real(real(dev%se, sp), rp)**2 + real(aimag(dev%se), rp)**2) &
-         * dx**2 / (2 * (mu_0_vac * c_light))
+energy = 0
+do ip = 1, dev%npol
+  call luc_dev_download_field_slice (im-1, ip-1, ifld-1, dev%se)
+  energy = energy + sum(real(real(dev%se, sp), rp)**2 + real(aimag(dev%se), rp)**2)
+enddo
+energy = energy * dx**2 / (2 * (mu_0_vac * c_light))
 
 end function fel_device_slice_energy
 
@@ -744,20 +855,22 @@ end function fel_device_slice_energy
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_zero_slice (dev, ifld)
+! Subroutine fel_device_zero_slice (dev, im, ifld)
 !
-! Routine to zero one resident field slice, the non-periodic fill of the slippage
-! rotation. ifld is the 1-based record index.
+! Routine to zero one resident field slice of member im, every plane, the
+! non-periodic fill of the slippage rotation. ifld is the 1-based record index.
 !-
 
-subroutine fel_device_zero_slice (dev, ifld)
+subroutine fel_device_zero_slice (dev, im, ifld)
 
 type (fel_device_struct) dev
-integer ifld
+integer im, ifld, ip
 
 !
 
-call luc_dev_zero_field_slice (ifld-1)
+do ip = 1, dev%npol
+  call luc_dev_zero_field_slice (im-1, ip-1, ifld-1)
+enddo
 
 end subroutine fel_device_zero_slice
 
@@ -765,8 +878,7 @@ end subroutine fel_device_zero_slice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_twin_begin (dev, fp32, beam, wf, s0, par, exp_k2,
-!                                      phi0, phi0_new, ks, err_flag)
+! Subroutine fel_device_twin_begin (dev, fp32, beam, wf, s0, par, phi0, phi0_new, ks, err_flag)
 !
 ! Routine to put the device in the twin's role for one step, part one: uploads and
 ! the step encode, called after the FP64 particle advance and BEFORE the production
@@ -774,21 +886,21 @@ end subroutine fel_device_zero_slice
 ! lockstep the shared state is the caller's pre-step snapshot s0 and the reference
 ! moves to the slice mean; in freerun the resident state carries and only the first
 ! step uploads. The encoded step then runs concurrently with the production solve.
+! The propagators are the caller's, set through fel_device_set_kernel before this.
 !
 ! Input:
+!   ff(:)     -- fel_field_struct: The field set, in set order.
 !   s0(:,:,:) -- real(rp): Pre-step FP64 state, (6, npart, nslice) as x, px, y, py,
 !                  z, pz, snapshotted before the leading transverse half step.
 !-
 
-subroutine fel_device_twin_begin (dev, fp32, beam, wf, s0, par, exp_k2, &
-                                  phi0, phi0_new, ks, err_flag)
+subroutine fel_device_twin_begin (dev, fp32, beam, ff, s0, par, phi0, phi0_new, ks, err_flag)
 
 type (fel_device_struct) dev
 type (fel_fp32_struct) fp32
 type (fel_beam_struct) beam
-type (wavefront_struct) wf
+type (fel_field_struct) ff(:)
 type (fel_device_par_struct) par
-complex(rp) exp_k2(:,:)
 real(rp) s0(:,:,:), phi0, phi0_new, ks
 logical err_flag
 
@@ -839,16 +951,14 @@ if (upload) then
                                dev%sg, dev%su, dev%sw)
   enddo
 
-  ! The field image, rounded from the pre-solve FP64 record in ring order.
+  ! The field images, every plane of every member, rounded from the pre-solve FP64
+  ! records in ring order.
 
-  do is = 1, size(wf%Ex, 3)
-    dev%se = cmplx(wf%Ex(:,:,is), kind = c_float_complex)
-    call luc_dev_upload_field_slice (is-1, dev%se)
-  enddo
+  call fel_device_upload_fields (dev, ff)
   dev%twin_live = .true.
 endif
 
-call fel_device_step_run (dev, par, exp_k2, phi0, phi0_new, ks, err_flag)
+call fel_device_step_run (dev, par, phi0, phi0_new, ks, err_flag)
 
 end subroutine fel_device_twin_begin
 
@@ -856,7 +966,7 @@ end subroutine fel_device_twin_begin
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_twin_rows (dev, fp32, beam, wf, first, par, phi0_new, ks)
+! Subroutine fel_device_twin_rows (dev, fp32, beam, ff, par, phi0, phi0_new, ks)
 !
 ! Routine to put the device in the twin's role, part two: after the production solve,
 ! read the device state back and fill fel_fp32_mod's rows against the FP64 path.
@@ -869,42 +979,62 @@ end subroutine fel_device_twin_begin
 ! increment in ticks (uniform quantum, so no spacing division). The device's own
 ! phase accumulators are kept as the next step's guard baseline, which is what makes
 ! the freerun guard cost no extra sync.
+!
+! The field set: the phasor, source and field rows are each the worst over the set's
+! members, so the stream keeps its ten columns and its recorded ceilings, and every
+! member's own worst is kept in dev%worst_h for the footer's attribution. A member's
+! phasor and deposit are compared at h times the fundamental phase, fel_field_step's
+! harm*theta, through fel_fp32_deposit64 unchanged (h*theta is its theta, the
+! member's scale its scl_w). Every member's source and field rows are normalized by
+! the fundamental's post-solve field norm over its planes, the run's power scale. A
+! harmonic's own norm cannot serve: on a quiet start the CPU cancels the harmonic
+! bunching to FP64 roundoff while the device's FP32 phase leaves it at ~1e-7 of the
+! charge, and a dark member's row divided by its own roundoff-level field measured
+! that noise against nothing (the first attempt read 6 to 8 on a deposit whose
+! end-to-end power agreed at 1e-3). The harmonic's fidelity lives in its phasor row,
+! which needs no field normalization, and in the end-to-end harmonic power against
+! the CPU that check_device.py holds. With one member this is the normalization the
+! single-field rows always had.
+!
+! Input:
+!   ff(:) -- fel_field_struct: The field set, in set order, post-solve. The ring
+!              offset is ff(1)%slip%first, one for the set.
 !-
 
-subroutine fel_device_twin_rows (dev, fp32, beam, wf, first, par, phi0, phi0_new, ks)
+subroutine fel_device_twin_rows (dev, fp32, beam, ff, par, phi0, phi0_new, ks)
 
 type (fel_device_struct) dev
 type (fel_fp32_struct), target :: fp32
 type (fel_beam_struct), target :: beam
-type (wavefront_struct) wf
+type (fel_field_struct) ff(:)
 type (fel_device_par_struct) par
 real(rp) phi0, phi0_new, ks
 integer first
 
 type (fel_slice_struct), pointer :: sl
-complex(rp), allocatable :: s64(:,:)
+complex(rp), allocatable :: s64(:,:), e64(:,:)
 complex(sp), allocatable :: sdev(:,:), edev(:,:)
-complex(rp) p32sum, p64sum, e_ip
+complex(rp) p32sum(dev%nfield), p64sum(dev%nfield), e_ip
 real(rp), allocatable :: incr(:)
-real(rp) p0_mc, gamma0, gam, p_mc, beta, pzd, delta, theta_rel, phi_ref
-real(rp) x, y, awloc_d, awloc_c, wsum, enorm, w_s, w_f, tick_med
-real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$)
+real(rp) p0_mc, gamma0, gam, p_mc, beta, pzd, delta, theta_rel, phi_ref, h, th_h
+real(rp) x, y, awloc_d, awloc_c, wsum, enorm, w_s, w_f, tick_med, pw64, pw32, v
+real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$), d7, d8, d9
 integer(c_int64_t) cret
-integer is, ip, n, ng, ifld, ix, iy
+integer is, ip, n, ng, ifld, ix, iy, im, ipl
 
 !
 
 p0_mc = fel_p0_mc(beam)
 gamma0 = fel_gamma0(beam)
-ng = size(wf%Ex, 1)
+ng = size(ff(1)%wf%Ex, 1)
+first = ff(1)%slip%first
 cret = nint((phi0_new - phi0) * fel_dev_ticks_per_rad$, c_int64_t)
-allocate (s64(ng, ng), sdev(ng, ng), edev(ng, ng), incr(dev%npart))
+allocate (s64(ng, ng), e64(ng, ng), sdev(ng, ng), edev(ng, ng), incr(dev%npart))
 
 do is = 1, size(beam%slice)
   sl => beam%slice(is)
   n = sl%n
-  ifld = 1 + mod(is - 1 + first, size(wf%Ex, 3))   ! fel_field_index's mapping.
-  phi_ref = phi0_new + ks * dev%z_ref(is)
+  ifld = 1 + mod(is - 1 + first, size(ff(1)%wf%Ex, 3))   ! fel_field_index's mapping.
 
   call luc_dev_download_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
                                dev%sg, dev%su)
@@ -939,16 +1069,20 @@ do is = 1, size(beam%slice)
     theta_rel = ks * sl%z(ip) / beta - ks * dev%z_ref(is)
     dstat(6) = max(dstat(6), abs(delta - theta_rel))
 
-    ! The source phasor, both sides in FP64 from their own states, the twin's
-    ! full-charge normalization.
+    ! The source phasor of every member, both sides in FP64 from their own states at
+    ! that member's phase h*theta, the twin's full-charge normalization.
 
     awloc_d = fel_fp32_faw (x, y, par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
     awloc_c = fel_fp32_faw (sl%x(ip), sl%y(ip), par%kx, par%ky, par%ax, par%ay, &
                             par%cos_t, par%sin_t)
-    e_ip = cmplx(cos(phi_ref + delta), -sin(phi_ref + delta), rp)
-    p32sum = p32sum + sl%weight(ip) * awloc_d * e_ip
-    e_ip = cmplx(cos(phi_ref + theta_rel), -sin(phi_ref + theta_rel), rp)
-    p64sum = p64sum + sl%weight(ip) * awloc_c * e_ip
+    do im = 1, dev%nfield
+      h = par%harm(im)
+      phi_ref = h * (phi0_new + ks * dev%z_ref(is))
+      e_ip = cmplx(cos(phi_ref + h * delta), -sin(phi_ref + h * delta), rp)
+      p32sum(im) = p32sum(im) + sl%weight(ip) * awloc_d * e_ip
+      e_ip = cmplx(cos(phi_ref + h * theta_rel), -sin(phi_ref + h * theta_rel), rp)
+      p64sum(im) = p64sum(im) + sl%weight(ip) * awloc_c * e_ip
+    enddo
     wsum = wsum + sl%weight(ip) * awloc_c
   enddo
   dev%su0(1:dev%npart, is) = dev%su(1:dev%npart)
@@ -962,45 +1096,92 @@ do is = 1, size(beam%slice)
   sc(7) = wsum + 1e-30_rp
 
   fp32%div_slice(1:6, is) = dstat(1:6) / sc(1:6)
-  fp32%div_slice(7, is) = abs(p32sum - p64sum) / sc(7)
-  fp32%bmag64(is) = abs(p64sum) / sc(7)
-  fp32%bmag32(is) = abs(p32sum) / sc(7)
+  d7 = 0
+  do im = 1, dev%nfield
+    v = abs(p32sum(im) - p64sum(im)) / sc(7)
+    d7 = max(d7, v)
+    dev%worst_h(1, im) = max(dev%worst_h(1, im), v)
+  enddo
+  fp32%div_slice(7, is) = d7
+  fp32%bmag64(is) = abs(p64sum(1)) / sc(7)
+  fp32%bmag32(is) = abs(p32sum(1)) / sc(7)
 
   call fel_fp32_median (incr, n, tick_med)
   fp32%ulp_slice(is) = tick_med
 
-  ! The field rows: the device's own source grid and post-solve field against a
-  ! fresh FP64 deposit of the shared post-step state and the post-solve record,
-  ! fel_fp32_field_twin's conventions (normalized by the post-solve field norm,
-  ! the source counted times 2 as the field sees it).
+  ! The field rows per member: the device's own source grid and post-solve planes
+  ! against a fresh FP64 deposit of the shared post-step state at h*theta and the
+  ! post-solve records, fel_fp32_field_twin's conventions (the source counted times 2
+  ! as the field sees it), every member normalized by the fundamental's post-solve
+  ! field norm over its planes. The end-to-end power sums are the fundamental's.
 
-  call luc_dev_download_source_slice (ifld-1, sdev)
-  call luc_dev_download_field_slice (ifld-1, edev)
-
-  s64 = 0
-  do ip = 1, n
-    p_mc = p0_mc * (1 + sl%pz(ip))
-    gam = sqrt(p_mc**2 + 1)
-    beta = p_mc / gam
-    call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), beam%phi0 + ks * sl%z(ip) / beta, &
-                             sl%weight(ip) / gam, par%scl_w, par%gridmax, par%dgrid, &
-                             par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
+  enorm = 0
+  do ipl = 1, dev%npol
+    if (ipl == 1) then
+      e64 = ff(1)%wf%Ex(:,:,ifld)
+    else
+      e64 = ff(1)%wf%Ey(:,:,ifld)
+    endif
+    enorm = enorm + sum(real(e64, rp)**2 + aimag(e64)**2)
   enddo
+  enorm = sqrt(enorm) + 1e-30_rp
 
-  enorm = sqrt(sum(real(wf%Ex(:,:,ifld), rp)**2 + aimag(wf%Ex(:,:,ifld))**2)) + 1e-30_rp
-  w_s = 0
-  w_f = 0
-  do iy = 1, ng
-    do ix = 1, ng
-      w_s = w_s + abs(cmplx(sdev(ix,iy), kind=rp) - s64(ix,iy))**2
-      w_f = w_f + abs(cmplx(edev(ix,iy), kind=rp) - wf%Ex(ix,iy,ifld))**2
+  d8 = 0
+  d9 = 0
+  pw64 = 0
+  pw32 = 0
+  do im = 1, dev%nfield
+    h = par%harm(im)
+    call luc_dev_download_source_slice (im-1, ifld-1, sdev)
+
+    s64 = 0
+    do ip = 1, n
+      p_mc = p0_mc * (1 + sl%pz(ip))
+      gam = sqrt(p_mc**2 + 1)
+      beta = p_mc / gam
+      th_h = h * (beam%phi0 + ks * sl%z(ip) / beta)
+      call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), th_h, sl%weight(ip) / gam, &
+                               par%scl_w(im), par%gridmax, par%dgrid, &
+                               par%kx, par%ky, par%ax, par%ay, par%cos_t, par%sin_t)
     enddo
-  enddo
-  fp32%div_slice(8, is) = sqrt(w_s) * 2 / enorm
-  fp32%div_slice(9, is) = sqrt(w_f) / enorm
 
-  fp32%pow64(is) = sum(real(wf%Ex(:,:,ifld), rp)**2 + aimag(wf%Ex(:,:,ifld))**2)
-  fp32%pow32(is) = sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
+    w_s = 0
+    do iy = 1, ng
+      do ix = 1, ng
+        w_s = w_s + abs(cmplx(sdev(ix,iy), kind=rp) - s64(ix,iy))**2
+      enddo
+    enddo
+
+    w_f = 0
+    do ipl = 1, dev%npol
+      call luc_dev_download_field_slice (im-1, ipl-1, ifld-1, edev)
+      if (ipl == 1) then
+        e64 = ff(im)%wf%Ex(:,:,ifld)
+      else
+        e64 = ff(im)%wf%Ey(:,:,ifld)
+      endif
+      do iy = 1, ng
+        do ix = 1, ng
+          w_f = w_f + abs(cmplx(edev(ix,iy), kind=rp) - e64(ix,iy))**2
+        enddo
+      enddo
+      if (im == 1) then
+        pw64 = pw64 + sum(real(e64, rp)**2 + aimag(e64)**2)
+        pw32 = pw32 + sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
+      endif
+    enddo
+
+    v = sqrt(w_s) * 2 / enorm
+    d8 = max(d8, v)
+    dev%worst_h(2, im) = max(dev%worst_h(2, im), v)
+    v = sqrt(w_f) / enorm
+    d9 = max(d9, v)
+    dev%worst_h(3, im) = max(dev%worst_h(3, im), v)
+  enddo
+  fp32%div_slice(8, is) = d8
+  fp32%div_slice(9, is) = d9
+  fp32%pow64(is) = pw64
+  fp32%pow32(is) = pw32
 enddo
 
 end subroutine fel_device_twin_rows
@@ -1009,27 +1190,40 @@ end subroutine fel_device_twin_rows
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_close_run (dev)
+! Subroutine fel_device_close_run (dev, fp32)
 !
 ! Routine to report what the device did and release it: the step count and the
 ! device-busy seconds from the backend's own command-buffer timestamps, the honest
-! pair a wall clock is judged against (the dispatch floor is their difference).
+! pair a wall clock is judged against (the dispatch floor is their difference). When
+! the device held the twin's role over a set of more than one member, its per-member
+! worst levels go into the instrument's footer first, since the ten-column stream
+! carries only the worst over members. The caller closes that stream afterwards.
 !-
 
-subroutine fel_device_close_run (dev)
+subroutine fel_device_close_run (dev, fp32)
 
 type (fel_device_struct) dev
+type (fel_fp32_struct) fp32
+integer im
 character(*), parameter :: r_name = 'fel_device_close_run'
 
 !
 
 if (.not. dev%on) return
 call luc_dev_sync ()
+
+if (fp32%on .and. fp32%iu /= 0 .and. dev%nfield > 1) then
+  write (fp32%iu, '(a)') '# per member, the device twin''s worst over the run:'
+  do im = 1, dev%nfield
+    write (fp32%iu, '(a, i0, a, es13.4)') 'worst_phasor_h', dev%harm(im), ' ', dev%worst_h(1, im)
+    write (fp32%iu, '(a, i0, a, es13.4)') 'worst_source_h', dev%harm(im), ' ', dev%worst_h(2, im)
+    write (fp32%iu, '(a, i0, a, es13.4)') 'worst_field_h', dev%harm(im), ' ', dev%worst_h(3, im)
+  enddo
+endif
+
 call out_io (s_info$, r_name, 'Device: \i0\ steps encoded, device busy \f10.3\ s.', &
              i_array = [dev%nstep], r_array = [real(luc_dev_seconds(), rp)])
 call luc_dev_close ()
-dev%on = .false.
-dev%resident = .false.
 
 end subroutine fel_device_close_run
 

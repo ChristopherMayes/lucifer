@@ -23,16 +23,33 @@ and everything the backend does not cover is refused.
    production path corroborate each other.
 5. Time dependence. An 8-slice shot-noise window with slippage rotating the resident
    record holds the same ceilings, read-only proof and production band.
-6. Refused. Wakes, migration, spontaneous radiation, harmonic field sets,
-   the unaveraged mode, an unsupported grid (the message names the nearest supported
-   size) and an unknown backend name each stop the run.
+6. Refused. Wakes, migration, spontaneous radiation, harmonics together with two live
+   polarizations, the unaveraged mode, an unsupported grid (the message names the
+   nearest supported size) and an unknown backend name each stop the run.
+7. The field set. Harmonic members ride the device (planar segment, harmonics 1 and 3)
+   and so do two polarization planes (the crossed undulator of check_two_polarization),
+   each judged the same four ways: the lockstep rows inside the recorded ceilings with
+   the per-member footer lines the set adds, the read-only proof, the mutation moving
+   the levels, and the production run against the CPU on the fundamental and on the
+   harmonic or the second plane. The harmonic's own identity check is the one-step
+   dark deposit's P3/P1 against the Bessel closed form from the dumped particles
+   (check_harmonics' identity, its helper shared), which the device holds in FP32. A
+   time-dependent Genesis run with shot noise and a third-harmonic field is imported
+   on both the CPU and the device at grid 64, the same particles and the same field,
+   so both are judged against one reference. One measurement is recorded rather than
+   asserted: a quiet-start dark harmonic whose true bunching sits at ~1e-8 of the
+   charge (the planar steady-state tier deck) radiates the device's FP32 phase floor
+   instead, ~1e-7 of the charge in the phasor row, and its P3 lands two decades above
+   the CPU's. The device resolves harmonic bunching down to that floor and not below,
+   which the phasor row states per member. The harmonic checks here sit above it.
 
 No device output is asserted byte-identical against another device run: the deposit
 accumulates with atomic adds whose ordering is not fixed, so two runs differ in the
 source's last bit or two, the reference backends' own documented behavior. The
 ceilings absorb it; the read-only proof compares FP64 outputs only.
 
-Usage: check_device.py --exe <lucifer> --workdir <dir>
+Usage: check_device.py --exe <lucifer> --workdir <dir> --latdir <tests/bmad>
+                       --genesis <genesis4> --pyrepo <openPMD-beamphysics>
 The workdir must hold aramis_1seg.bmad and aramis_1seg_unavg.bmad. Exit 0 only if
 all pass.
 """
@@ -40,11 +57,21 @@ all pass.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
+import shutil
 import subprocess
 import sys
 
+import h5py
+import numpy as np
+
+import check_harmonics as ch
+import check_two_polarization as tp
+import convert_genesis
+import fieldio
 from nml import to_groups
+from read_stats import read_stats
 
 FAILED = False
 
@@ -103,6 +130,55 @@ GUARD_FLOOR = 1e6
 
 E2E_CEIL = 1.6e-3
 
+# The field set's own levels, each at three times its first measurement (debug build,
+# this machine, the check's own first run). The harmonic phasor row is the device's
+# harmonic bunching floor, measured 6.6e-8 steady and 2.0e-7 time dependent, three
+# times the fundamental's phase error as h = 3 predicts. The harmonic's source and
+# field rows are normalized by the fundamental's field and measured 3.5e-9 steady and
+# 2.7e-6 time dependent, the latter on a shot-noise window where the third harmonic is
+# a quarter of the fundamental's power. The harmonic end-to-end band is the
+# third-harmonic power against the CPU on a strongly bunched beam (measured 6.0e-4, the
+# fundamental's phase error tripled and squared into a power), and the Bessel identity
+# is the one-step P3/P1 in FP32 (measured 4.4e-6 against 2.7e-14 on the CPU). The
+# isolation level is |ln(Px/P_drift)| through the y set on the device (measured 4.3e-6;
+# the CPU's is 1.6e-15, so this is the FP32 price of "the y set only diffracts Ex").
+# The second plane's own band is wider than the fundamental's because Py is a
+# hundredth of Px on this line and its relative error carries that ratio (measured
+# 4.3e-3). Against the one Genesis reference the device lands at 1.5e-5 on P1 and
+# 2.3e-5 on P3 where the CPU lands at 8.4e-7 and 1.1e-6, both inside these bands.
+
+CEIL_H = {"phasor_h3": 6e-7, "source_h3": 8e-6, "field_h3": 8e-6}
+H_E2E_CEIL = 1.8e-3
+BESSEL_CEIL = 1.3e-5
+ISO_CEIL = 1.3e-5
+PY_E2E_CEIL = 1.3e-2
+PYPX_FLOOR = 5e-3           # check_two_polarization's afterburner floor.
+
+# The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
+# segment is helical and couples only the fundamental, at the device's grid.
+PLANAR_LAT = ch.BMAD_LAT
+
+HARM_BASE = """! flat keys; routed into the three groups by nml.to_groups
+  lat_file = "{lat}"
+  out_root = "{root}"
+  lambda0 = 1e-10
+  beam_init%n_particle = 8192
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 1e9
+  seed_waist_size = 30e-6
+  grid_n_pts = 64
+  grid_half_width = 2e-4
+  ran_seed = 777
+  harmonics = 1, 3
+  write_diag = T
+{extra}&end
+"""
+
 
 def ok(label, value, check, good):
     global FAILED
@@ -150,8 +226,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
     ap.add_argument("--workdir", required=True)
+    ap.add_argument("--latdir", required=True, help="tests/bmad, for crossed_probe.bmad")
+    ap.add_argument("--genesis", required=True)
+    ap.add_argument("--pyrepo", help="openPMD-beamphysics checkout for the dump conversion")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
+    exe = pathlib.Path(args.exe).resolve()
 
     # 1. Steady lockstep: the device in the twin's role, the recorded ceilings, the
     # exact-wrap verdict from the device's own arithmetic.
@@ -224,7 +304,6 @@ def main():
         ("dev_rm.in", DEV + '  global%migrate = T\n', "DOES NOT COVER SLICE MIGRATION"),
         ("dev_rr.in", DEV + '  bmad_com%radiation_damping_on = T\n',
          "DOES NOT COVER SPONTANEOUS RADIATION"),
-        ("dev_rh.in", DEV + '  harmonics(2) = 3\n', "DOES NOT COVER HARMONIC FIELD SETS"),
         ("dev_rn.in", '  global%device = "cuda"\n', "UNRECOGNIZED DEVICE"),
     ]
     for name, extra, msg in refusals:
@@ -245,8 +324,238 @@ def main():
     refused = r.returncode != 0 and "DOES NOT COVER THE UNAVERAGED MODE" in r.stdout
     ok("refused: the unaveraged mode", refused, "True", refused)
 
+    field_set(args, wd, exe)
+
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0
+
+
+def field_set(args, wd, exe):
+    """The field set on the device: harmonic members, then two polarization planes."""
+    (wd / "dev_planar.bmad").write_text(PLANAR_LAT.format(length="3.96"))
+    (wd / "dev_planar_mid.bmad").write_text(PLANAR_LAT.format(length="1.98"))
+    (wd / "dev_planar_short.bmad").write_text(PLANAR_LAT.format(length="0.045"))
+
+    # 7a. Harmonics on a strongly bunched beam: check_harmonics' buncher (1 GW over
+    # 1.98 m drives the pendulum nonlinear, so b3 is real and far above the device's
+    # floor). Lockstep rows and the per-member footer, read-only, mutation, freerun,
+    # and the production run against the CPU on P1 and P3.
+    print("== the field set: harmonics 1 and 3 on the device ==")
+    hb = HARM_BASE.replace('lat_file = "{lat}"', 'lat_file = "dev_planar_mid.bmad"')
+    run(args.exe, wd, "devh_ss.in", hb.format(root="devhss", extra=DEV + '  global%fp32_check = "lockstep"\n'))
+    s = summary(wd, "devhss")
+    for q in CEIL:
+        ok(f"harmonic lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+    for q in CEIL_H:
+        ok(f"harmonic lockstep worst_{q} (per-member footer)", f"{s.get(q, float('nan')):.3e}",
+           f"<= {CEIL_H[q]:.1e}", q in s and s[q] <= CEIL_H[q])
+    ok("harmonic footer carries the fundamental too", "phasor_h1" in s, "True", "phasor_h1" in s)
+    run(args.exe, wd, "devh_off.in", hb.format(root="devhoff", extra=""))
+    same = (wd / "devhss.diag.txt").read_bytes() == (wd / "devhoff.diag.txt").read_bytes()
+    ok("harmonic FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    run(args.exe, wd, "devh_mut.in", hb.format(root="devhmut",
+        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+    m = summary(wd, "devhmut")
+    ok("harmonic mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
+       ">= 10x", m["theta"] >= 10 * s["theta"])
+    ok("harmonic mutation moves worst_source_h3", f"{m['source_h3']:.3e} vs {s['source_h3']:.3e}",
+       ">= 5x", m["source_h3"] >= 5 * s["source_h3"])
+    run(args.exe, wd, "devh_fr.in", hb.format(root="devhfr", extra=DEV + '  global%fp32_check = "freerun"\n'))
+    f = summary(wd, "devhfr")
+    ok("harmonic freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
+       "> 1x", f["phasor"] > s["phasor"])
+    run(args.exe, wd, "devh_pr.in", hb.format(root="devhpr", extra=DEV))
+    c1, c3 = harm_powers(wd, "devhoff")
+    d1, d3 = harm_powers(wd, "devhpr")
+    ok("harmonic production P1 vs CPU (bunched beam)", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",
+       abs(d1 - c1) / c1 <= E2E_CEIL)
+    ok("harmonic production P3 vs CPU (bunched beam)", f"{abs(d3-c3)/c3:.3e}", f"<= {H_E2E_CEIL:.1e}",
+       abs(d3 - c3) / c3 <= H_E2E_CEIL)
+
+    # 7b. The Bessel identity in FP32: a one-step dark restart from the CPU buncher's
+    # exit beam, P3/P1 against the closed form from the dumped particles.
+    shutil.copy(wd / "devhoff-final.wf.h5", wd / "devh_dark.wf.h5")
+    with h5py.File(wd / "devh_dark.wf.h5", "r+") as h5:
+        h5[fieldio.MESH_PATH + "/x"][...] = 0.0
+    dep = ch.NML_IMPORT.format(lat="dev_planar_short.bmad", root="devhdep", beam="devhoff-final.beam.h5",
+                               field="devh_dark.wf.h5", extra='  transport_model = "bmad"\n' + DEV)
+    (wd / "devh_dep.in").write_text(to_groups(dep))
+    r = subprocess.run([str(exe), "devh_dep.in"], cwd=wd, capture_output=True, text=True,
+                       env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    if r.returncode != 0:
+        print(f"FAIL: devh_dep.in exited {r.returncode}:\n{r.stdout[-3000:]}")
+        sys.exit(1)
+    expect = ch.bessel_p3_over_p1(wd / "devhdep-final.beam.h5", wd / "devh_dark.wf.h5")
+    p1, p3 = harm_powers(wd, "devhdep")
+    dv = abs(p3 / p1 / expect - 1)
+    ok("device one-step deposit P3/P1 vs the Bessel closed form", f"{dv:.3e}", f"<= {BESSEL_CEIL:.1e}",
+       dv <= BESSEL_CEIL)
+
+    # 7c. Time dependence with the set: the harmonics check's TD deck (8 slices, shot
+    # noise, dark third harmonic) at the device's grid, slippage rotating every plane.
+    # Shot noise puts b3 at ~1/sqrt(N), far above the floor, so P3 is a real comparison.
+    td = ch.NML_TD.replace("grid_n_pts = 63", "grid_n_pts = 64").replace('transport_model = "genesis"',
+                                                                            'transport_model = "bmad"')
+    run(args.exe, wd, "devh_td.in", td.format(lat="dev_planar.bmad", root="devhtd",
+        extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
+    t = summary(wd, "devhtd")
+    for q in CEIL:
+        ok(f"harmonic lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q])
+    for q in CEIL_H:
+        ok(f"harmonic lockstep TD worst_{q}", f"{t.get(q, float('nan')):.3e}", f"<= {CEIL_H[q]:.1e}",
+           q in t and t[q] <= CEIL_H[q])
+    run(args.exe, wd, "devh_tdoff.in", td.format(lat="dev_planar.bmad", root="devhtdoff", extra=""), threads="8")
+    same = (wd / "devhtd.diag.txt").read_bytes() == (wd / "devhtdoff.diag.txt").read_bytes()
+    ok("harmonic TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    run(args.exe, wd, "devh_tdpr.in", td.format(lat="dev_planar.bmad", root="devhtdpr", extra=DEV), threads="8")
+    c1, c3 = harm_powers(wd, "devhtdoff", window=True)
+    d1, d3 = harm_powers(wd, "devhtdpr", window=True)
+    ok("harmonic production TD window P1 vs CPU", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",
+       abs(d1 - c1) / c1 <= E2E_CEIL)
+    ok("harmonic production TD window P3 vs CPU (shot-noise b3)", f"{abs(d3-c3)/c3:.3e}",
+       f"<= {H_E2E_CEIL:.1e}", abs(d3 - c3) / c3 <= H_E2E_CEIL)
+
+    # 7d. One Genesis reference for both: check_harmonics' planar deck made time
+    # dependent (8 slices, shot noise on, so the third harmonic's bunching is real on
+    # every side) at the device's grid, its starting state imported by the CPU and the
+    # device alike. The CPU's level is the anchor the device's is read against.
+    genesis_harmonics(args, wd, exe)
+
+    # 7e. The quiet-start floor, recorded: the planar SS tier deck at grid 64, dark
+    # third harmonic, no shot noise. The fundamental holds its band. The harmonic's
+    # true bunching is ~1e-8 of the charge, below the device's FP32 phase floor, so
+    # its P3 is the floor radiating and is printed for the record, not asserted.
+    qs = ch.NML_TD.replace("grid_n_pts = 63", "grid_n_pts = 64").replace('transport_model = "genesis"',
+                                                                            'transport_model = "bmad"')
+    qs = tp.ss(qs).replace("beam_init%bunch_charge = 8.0e-15", "beam_init%bunch_charge = 1.000692285594e-15")
+    qs = qs.replace("seed_power = 1e4", "seed_power = 5e3")
+    run(args.exe, wd, "devh_qs.in", qs.format(lat="dev_planar.bmad", root="devhqs", extra=""))
+    run(args.exe, wd, "devh_qsdev.in", qs.format(lat="dev_planar.bmad", root="devhqsdev", extra=DEV))
+    c1, c3 = harm_powers(wd, "devhqs")
+    d1, d3 = harm_powers(wd, "devhqsdev")
+    ok("quiet-start dark harmonic: fundamental P1 vs CPU", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",
+       abs(d1 - c1) / c1 <= E2E_CEIL)
+    print(f"--- quiet-start dark harmonic: device P3 / CPU P3 = {d3/c3:.3e} "
+          f"(CPU {c3:.3e} W, device {d3:.3e} W): the FP32 floor radiating, recorded")
+
+    # 7f. Two polarizations: the crossed undulator of check_two_polarization, SS and
+    # TD, on its own deck at the device's grid.
+    print("== the field set: two polarization planes on the device ==")
+    (wd / "crossed_probe.bmad").write_bytes((pathlib.Path(args.latdir) / "crossed_probe.bmad").read_bytes())
+    (wd / "devp_c.bmad").write_text("call, file = crossed_probe.bmad\nuse, CROSSED\n")
+    (wd / "devp_xd.bmad").write_text("call, file = crossed_probe.bmad\nDEQ: pipe, l = 0.60\n"
+                                     "XDRIFT: line = (UNDX, D1, DEQ)\nuse, XDRIFT\n")
+    pn = tp.ss(tp.NML).replace("grid_n_pts = 63", "grid_n_pts = 64")
+    run(args.exe, wd, "devp_ss.in", pn.format(lat="devp_c.bmad", root="devpss",
+        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+    s = summary(wd, "devpss")
+    for q in CEIL:
+        ok(f"two-plane lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+    run(args.exe, wd, "devp_off.in", pn.format(lat="devp_c.bmad", root="devpoff", extra=""))
+    same = (wd / "devpss.diag.txt").read_bytes() == (wd / "devpoff.diag.txt").read_bytes()
+    ok("two-plane FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    run(args.exe, wd, "devp_mut.in", pn.format(lat="devp_c.bmad", root="devpmut",
+        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+    m = summary(wd, "devpmut")
+    ok("two-plane mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
+       ">= 10x", m["theta"] >= 10 * s["theta"])
+    ok("two-plane mutation moves worst_source", f"{m['source']:.3e} vs {s['source']:.3e}",
+       ">= 5x", m["source"] >= 5 * s["source"])
+    run(args.exe, wd, "devp_pr.in", pn.format(lat="devp_c.bmad", root="devppr", extra=DEV))
+    run(args.exe, wd, "devp_dr.in", pn.format(lat="devp_xd.bmad", root="devpdr", extra=DEV))
+    px_c = tp.dump_power(wd, "devpoff-final.wf.h5", "x")
+    py_c = tp.dump_power(wd, "devpoff-final.wf.h5", "y")
+    px_d = tp.dump_power(wd, "devppr-final.wf.h5", "x")
+    py_d = tp.dump_power(wd, "devppr-final.wf.h5", "y")
+    p_drift = tp.dump_power(wd, "devpdr-final.wf.h5", "x")
+    ok("crossed production Px vs CPU", f"{abs(px_d-px_c)/px_c:.3e}", f"<= {E2E_CEIL:.1e}",
+       abs(px_d - px_c) / px_c <= E2E_CEIL)
+    ok("crossed production Py vs CPU", f"{abs(py_d-py_c)/py_c:.3e}", f"<= {PY_E2E_CEIL:.1e}",
+       abs(py_d - py_c) / py_c <= PY_E2E_CEIL)
+    iso = abs(np.log(px_d / p_drift))
+    ok("crossed device: x-field isolation through the y set, |ln(Px/P_drift)|", f"{iso:.3e}",
+       f"<= {ISO_CEIL:.1e}", iso <= ISO_CEIL)
+    ok("crossed device: afterburner floor, Py/Px", f"{py_d/px_d:.3e}", f">= {PYPX_FLOOR:.0e}",
+       py_d / px_d >= PYPX_FLOOR)
+    tdn = tp.NML.replace("grid_n_pts = 63", "grid_n_pts = 64")
+    run(args.exe, wd, "devp_td.in", tdn.format(lat="devp_c.bmad", root="devptd",
+        extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
+    t = summary(wd, "devptd")
+    for q in CEIL:
+        ok(f"two-plane lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q])
+    run(args.exe, wd, "devp_tdoff.in", tdn.format(lat="devp_c.bmad", root="devptdoff", extra=""), threads="8")
+    same = (wd / "devptd.diag.txt").read_bytes() == (wd / "devptdoff.diag.txt").read_bytes()
+    ok("two-plane TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    run(args.exe, wd, "devp_tdpr.in", tdn.format(lat="devp_c.bmad", root="devptdpr", extra=DEV), threads="8")
+    for comp, band in (("x", E2E_CEIL), ("y", E2E_CEIL)):
+        pc = tp.dump_power(wd, "devptdoff-final.wf.h5", comp)
+        pd = tp.dump_power(wd, "devptdpr-final.wf.h5", comp)
+        ok(f"crossed TD production P{comp} vs CPU (slippage live)", f"{abs(pd-pc)/pc:.3e}",
+           f"<= {band:.1e}", abs(pd - pc) / pc <= band)
+
+    # 7g. The combination is refused for the device as for the CPU.
+    r = run(args.exe, wd, "devp_rh.in", pn.format(lat="devp_c.bmad", root="devprh",
+            extra=DEV + '  harmonics = 1, 3\n'), expect_fail=True)
+    refused = r.returncode != 0 and "TWO LIVE POLARIZATIONS" in r.stdout
+    ok("refused: harmonics together with two live polarizations", refused, "True", refused)
+
+
+def harm_powers(wd, root, window=False):
+    """Exit power of the fundamental and the third harmonic from the stats file, the
+    window's sum when time dependent."""
+    with read_stats(wd / f"{root}.stats.h5") as st:
+        p1 = st["field/total/power"][-1]
+        p3 = st["field/harm3/total/power"][-1]
+    if window:
+        return float(np.sum(p1)), float(np.sum(p3))
+    return float(p1[0]), float(p3[0])
+
+
+def genesis_harmonics(args, wd, exe):
+    """check_harmonics' planar deck made time dependent, with shot noise, at grid 64: one
+    Genesis reference, its starting state imported by the CPU and the device."""
+    (wd / "devg_planar.lat").write_text(ch.GENESIS_LAT)
+    deck = ch.GENESIS_DECK.replace("ngrid=255", "ngrid=64").replace("shotnoise=0\n", "shotnoise=true\n")
+    deck = deck.replace("lattice=planar.lat", "lattice=devg_planar.lat").replace("rootname=H3", "rootname=DEVG")
+    deck = deck.replace("&field\npower=5e3", "&time\nslen=8e-10\nsample=1\n&end\n\n&field\npower=5e3")
+    deck = deck.replace("H3-initial", "DEVG-initial").replace("H3-final", "DEVG-final")
+    (wd / "DEVG.in").write_text(deck)
+    r = subprocess.run([args.genesis, "DEVG.in"], cwd=wd, capture_output=True, text=True,
+                       env=dict(os.environ, FI_PROVIDER="tcp"))
+    if r.returncode != 0:
+        print(f"FAIL: genesis exited {r.returncode}:\n{r.stdout[-2000:]}\n{r.stderr[-500:]}")
+        sys.exit(1)
+    for src, dst in (("DEVG-initial.par.h5", "DEVG-initial.beam.h5"),
+                     ("DEVG-initial.fld.h5", "DEVG-initial.wf.h5")):
+        convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
+    imp = ch.NML_IMPORT.replace('transport_model = "genesis"', 'transport_model = "bmad"')
+    curves = {}
+    for tag, extra in (("cpu", ""), ("dev", DEV)):
+        name = f"devg_{tag}"
+        (wd / (name + ".nml")).write_text(to_groups(imp.format(lat="dev_planar.bmad", root=name,
+            beam="DEVG-initial.beam.h5", field="DEVG-initial.wf.h5", extra=extra)))
+        r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+                           env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
+        if r.returncode != 0:
+            print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}")
+            sys.exit(1)
+        with read_stats(wd / f"{name}.stats.h5") as st:
+            curves[tag] = (st["field/total/power"][:].sum(axis=1), st["field/harm3/total/power"][:].sum(axis=1))
+    with h5py.File(wd / "DEVG.out.h5") as h5:
+        p1g = h5["Field/power"][:].sum(axis=1)
+        p3g = h5["Field3/power"][:].sum(axis=1)
+
+    def level(p1b, p3b):
+        n = min(len(p1g), len(p1b))
+        lo = n // 8
+        return (float(np.max(np.abs(p1b[:n] - p1g[:n])) / np.max(p1g[:n])),
+                float(np.max(np.abs(p3b[lo:n] - p3g[lo:n])) / np.max(p3g[:n])))
+
+    c1, c3 = level(*curves["cpu"])
+    d1, d3 = level(*curves["dev"])
+    print(f"--- Genesis TD harmonic reference at grid 64: CPU P1 {c1:.3e} P3 {c3:.3e} (the anchor)")
+    ok("device vs Genesis, TD planar with shot noise, P1", f"{d1:.3e}", f"<= {E2E_CEIL:.1e}", d1 <= E2E_CEIL)
+    ok("device vs Genesis, TD planar with shot noise, P3", f"{d3:.3e}", f"<= {H_E2E_CEIL:.1e}", d3 <= H_E2E_CEIL)
 
 
 if __name__ == "__main__":

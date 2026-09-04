@@ -31,30 +31,47 @@
 extern "C" {
 #endif
 
+/* The field set's size bound, wavefront_init%harmonics(9)'s. Mirrored by
+ * fel_dev_max_field$ in fel_device_mod.f90. */
+#define LUC_DEV_MAX_FIELD 9
+
 /* One integration step's constants. Mirrored field for field by
  * fel_device_par_struct in fel_device_mod.f90: editing one side alone skews the
  * struct layout silently, the hazard MetalEngine.mm records for its own shader
  * structs. All doubles first, then 32-bit ints, so both mirrors agree on layout
  * without padding surprises. cret_ticks travels separately (luc_dev_step's own
- * argument) to keep this struct free of 64-bit members. */
+ * argument) to keep this struct free of 64-bit members.
+ *
+ * The field set: nfield members, each a harmonic of the fundamental with its own
+ * coupling fc(h) and deposit scale, and npol planes per member (Ex alone, or the
+ * (Ex, Ey) pair when the run carries two live polarizations). The push gathers
+ * every member at h*theta and the deposit writes every member's source with
+ * exp(-i h theta). pol is the element's polarization 2-vector, read as conj(pol).E
+ * in the gather and written as pol*src at the field add, fel_advance's and
+ * fel_field_step's own conventions. With one member and one plane, every kernel
+ * reduces to the single-field arithmetic it had before the set. */
 typedef struct {
   double dz;             /* full step length [m] */
-  double ks, ku;         /* radiation and undulator wavenumbers [1/m] */
+  double ks, ku;         /* fundamental radiation and undulator wavenumbers [1/m] */
   double aw;             /* rms undulator parameter */
   double qres;           /* 2 ku / ks, the detuning difference's resonance */
   double e0;             /* p0_mc^2 / gamma0: pz <-> goff conversion */
   double gam0;           /* reference gamma */
   double p0_mc;          /* reference momentum / m_e c */
-  double rtmp;           /* energy-exchange coupling fc / (sqrt(2) m_e) */
   double kx, ky;         /* natural-focusing roll-off [1/m^2] */
   double ax, ay;         /* undulator field offset [m] */
   double cos_t, sin_t;   /* wiggle-plane tilt */
   double k1x, k1y;       /* Bmad transverse map k1 locals (pre 1/rel_p^2) */
-  double gridmax, dgrid; /* grid half width and spacing [m] */
-  double scl_w;          /* deposit scale, fel_field_step's scl_w */
-  int32_t first;         /* field ring offset, Genesis's Field::first */
+  double gridmax, dgrid; /* grid half width and spacing [m], one grid for the set */
+  double harm[LUC_DEV_MAX_FIELD];   /* per member: the harmonic number, as a real factor */
+  double rtmp[LUC_DEV_MAX_FIELD];   /* per member: energy-exchange coupling fc(h) / (sqrt(2) m_e) */
+  double scl_w[LUC_DEV_MAX_FIELD];  /* per member: deposit scale, fel_field_step's scl_w at h */
+  double pol_re[2], pol_im[2];      /* the element's polarization pair on (Ex, Ey) */
+  int32_t first;         /* field ring offset, Genesis's Field::first, one for the set */
   int32_t helical;       /* octupole kick shape (1 = both planes) */
   int32_t mutate;        /* falsifiability hook: perturb the kernel's detuning */
+  int32_t nfield;        /* members in use, 1 to LUC_DEV_MAX_FIELD */
+  int32_t npol;          /* planes per member, 1 or 2 */
   int32_t pad;
 } luc_dev_step_par;
 
@@ -63,12 +80,14 @@ typedef struct {
  * missing. Safe to call on any machine; allocates nothing. */
 int luc_dev_available (char *name, int name_len, char *reason, int reason_len);
 
-/* Allocate the resident buffers and compile the kernels for this run shape.
- * Refuses (nonzero return, reason filled): no device, a grid the
- * transform does not handle (powers of two 64 to 1024, the message names the
- * nearest supported size), or a failed allocation with the wanted and free
- * bytes as the device reports them. */
-int luc_dev_init (int nslice, int npart, int ngrid, char *reason, int reason_len);
+/* Allocate the resident buffers and compile the kernels for this run shape: nslice
+ * slices of npart particles, and a field set of nfield members with npol planes
+ * each on one ngrid grid. Refuses (nonzero return, reason filled): no device, a grid
+ * the transform does not handle (powers of two 64 to 1024, the message names the
+ * nearest supported size), a set outside 1..LUC_DEV_MAX_FIELD members or 1..2
+ * planes, or a failed allocation with the wanted bytes as the device reports them. */
+int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
+                  char *reason, int reason_len);
 
 void luc_dev_close (void);
 
@@ -89,28 +108,33 @@ void luc_dev_upload_slice (int is, int n, const float *x, const float *px,
 void luc_dev_download_slice (int is, int n, float *x, float *px, float *y,
                              float *py, float *goff, int64_t *uphase);
 
-/* Field-slice transfers, 2*ngrid*ngrid floats interleaved re/im, plus the zero
- * fill slippage needs and the source-grid readback the instrument's rows read. */
-void luc_dev_upload_field_slice (int ifld, const float *e);
-void luc_dev_download_field_slice (int ifld, float *e);
-void luc_dev_zero_field_slice (int ifld);
-void luc_dev_download_source_slice (int ifld, float *s);
+/* Field-plane transfers, 2*ngrid*ngrid floats interleaved re/im, addressed by
+ * member im (0-based in the set), plane ip (0 = Ex, 1 = Ey) and record slice is,
+ * plus the zero fill slippage needs and the source-grid readback the instrument's
+ * rows read. The source is per member, not per plane: the polarization factors
+ * apply at the field add, as in fel_field_step. */
+void luc_dev_upload_field_slice (int im, int ip, int is, const float *e);
+void luc_dev_download_field_slice (int im, int ip, int is, float *e);
+void luc_dev_zero_field_slice (int im, int ip, int is);
+void luc_dev_download_source_slice (int im, int is, float *s);
 
-/* The step propagator exp(K2 dz), 2*ngrid*ngrid floats, FFT order. The caller
- * keys rebuilds (fel_device_mod mirrors fp32_kernel_cache's key). */
-void luc_dev_set_kernel (const float *expk);
+/* The step propagator exp(K2 dz) of member im, 2*ngrid*ngrid floats, FFT order:
+ * each member diffracts at its own wavelength. The caller keys rebuilds
+ * (fel_device_mod mirrors fp32_kernel_cache's key, per member). */
+void luc_dev_set_kernel (int im, const float *expk);
 
-/* Per-slice phase rotators e^{-i(phi0 + ks z_ref)}, 2*nslice floats each: the
- * push works against the step's entry phase (base) and the deposit against its
- * exit phase (base_dep, read as i times the rotator), the two epochs
- * fel_fp32_mod's twin uses. Uploaded per step: phi0 advances, and in lockstep
- * z_ref moves. */
+/* Per-slice phase rotators e^{-i h (phi0 + ks z_ref)} per member, member-major
+ * (index im*nslice + is), 2*nfield*nslice floats each: the push works against the
+ * step's entry phase (base) and the deposit against its exit phase (base_dep, read
+ * as i times the rotator), the two epochs fel_fp32_mod's twin uses. Uploaded per
+ * step: phi0 advances, and in lockstep z_ref moves. */
 void luc_dev_set_slice_phases (const float *base, const float *base_dep);
 
 /* Encode one integration step: transverse half step, longitudinal push in the
- * (goff, phase-tick) chart, transverse half step, source deposit, four-pass FFT
- * field solve. One command buffer for the whole step; nothing is waited on here.
- * cret_ticks is this step's phi0 advance in ticks, subtracted exactly. */
+ * (goff, phase-tick) chart gathering every member, transverse half step, source
+ * deposit into every member, four-pass FFT field solve of every plane with its
+ * member's propagator. One command buffer for the whole step; nothing is waited
+ * on here. cret_ticks is this step's phi0 advance in ticks, subtracted exactly. */
 int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
                   char *reason, int reason_len);
 

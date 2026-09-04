@@ -9,6 +9,40 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-04 Added: harmonic field sets and two polarizations run on the device. The resident
+  field is now the run's whole set, every harmonic member and both polarization planes, stored
+  member-major with one propagator per member. The step's constants carry each member's harmonic
+  number, coupling fc(h) and deposit scale plus the element's polarization pair. The push gathers
+  every member at h*theta into every RK stage, fel_ode_multi's structure in the FP32 reformulation,
+  the deposit writes every member's source at exp(-i h theta), and the transform runs over every
+  plane with its member's propagator, the polarization factors applied at the field add as
+  fel_field_step writes them. Every member rides the one fixed-point phase at h times it and every
+  plane slips together. With one member and one plane every kernel is the single-field arithmetic
+  it was, and the eleven tier digits are byte-identical on both builds. Harmonics together with
+  two polarizations stays refused, for the device as for the CPU. The field-set types moved to
+  fel_field_mod so the device seam can take the set as ff(:): passing ffield(:)%wf, a component
+  section of a pointer array whose elements hold allocatable arrays, made the compiler pack a
+  temporary and deep-free it on return, a heap abort with no Fortran message (FINDINGS 7.46).
+  The device twin judges every member: phasor, source and field rows are the worst over members,
+  the footer adds each member's own worst, and every member's source and field rows are
+  normalized by the fundamental's field, since a quiet-start harmonic's own norm is FP64 roundoff
+  on the CPU (FINDINGS 7.47). Measured on the debug build: harmonic lockstep phasor_h3 6.6e-8
+  steady and 2.0e-7 time dependent, three times the fundamental's phase error as h = 3 predicts;
+  production P3 against the CPU 6.0e-4 on a strongly bunched beam and 3.4e-6 on a shot-noise
+  window. The one-step Bessel identity P3/P1 is 4.4e-6 in FP32 against 2.7e-14 on the CPU.
+  Against one time-dependent Genesis reference with shot noise at grid 64, imported by CPU and
+  device alike, the device lands at 1.5e-5 on P1 and 2.3e-5 on P3 where the CPU lands at 8.4e-7
+  and 1.1e-6. The crossed undulator on the device: Px 1.4e-4 and Py 4.3e-3 against the CPU steady,
+  4.1e-6 both with slippage live, x-field isolation through the y set 4.3e-6, Py/Px 8.8e-3 above
+  the 5e-3 floor. One limitation is recorded rather than hidden: the device resolves harmonic
+  bunching to about 2e-7 of the charge, and a quiet-start dark harmonic whose true bunching is
+  1e-8 radiates that floor instead, 137 times the CPU's P3 on the planar steady-state tier deck
+  while P1 holds its band. On the production build, the 96 x 8192 SASE window at ngrid 256 on the
+  planar segment runs 12.4x faster than twelve CPU cores with the fundamental alone, 10.4x with
+  harmonics 1 and 3, and 10.8x with two polarizations. examples/harmonics and
+  examples/crossed_undulator run on the device at grid 256, agreeing with the CPU at 4.7e-4 on P3
+  and 9.5e-4 on Py.
+
 - 2026-09-03 Added: the checks run on a second platform, in CI. `lucifer-keystone.yml` builds the
   debug tree on Ubuntu against a conda environment and runs the benchmark harness and the wavefront
   validation there, on demand and on a weekly schedule. The job takes 37.5 minutes on a
