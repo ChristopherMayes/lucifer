@@ -536,7 +536,7 @@ def figures(results, out):
     for a in ax[1]:
         a.set_xlabel("z [m]")
     fig.tight_layout()
-    fig.savefig(out / "floor-and-gain.png", dpi=150)
+    fig.savefig(out / "power-outside-and-inside-the-mode.png", dpi=150)
     plt.close(fig)
 
     # 2. The floor against the cell size, the gain against the load, at the first dump.
@@ -560,7 +560,7 @@ def figures(results, out):
     ax[1].set_ylabel("power at z = 18.2 m [W]")
     ax[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(out / "floor-vs-cell-gain-vs-load.png", dpi=150)
+    fig.savefig(out / "wide-angle-vs-cell-size-and-particle-count.png", dpi=150)
     plt.close(fig)
 
     # 3. Beamlets against particles.
@@ -606,7 +606,7 @@ def figures(results, out):
     fig.savefig(out / "line-and-doubled.png", dpi=150)
     plt.close(fig)
 
-    # 5. The window profile: per-slice power against the slice index at four undulator ends.
+    # 5. The window profile: per-slice power against the slice index at five undulator ends.
     r = fl["floor_g256_n4096"]
     fig, ax = plt.subplots(figsize=(8, 4))
     for k, prof in r["profile"].items():
@@ -614,7 +614,7 @@ def figures(results, out):
     ax.axvspan(INTERIOR.start, INTERIOR.stop, color="gray", alpha=0.15, label="interior")
     ax.set_xlabel("slice index, tail to head")
     ax.set_ylabel("power per slice [W]")
-    ax.set_title("1.57 um cells, 4096 particles: the tail lags by the cooperation length, the head piles up")
+    ax.set_title("per-slice power along the window, 1.57 um cells, 4096 particles")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(out / "window-profile.png", dpi=150)

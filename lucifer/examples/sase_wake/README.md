@@ -22,9 +22,9 @@ least because the wake is causal and the head has little charge ahead of it. The
 energy drops 8.29 m_e c^2, about 4.24 MeV, over the 57 m line, and the per-slice drop
 runs from 0.25 to 13.56 m_e c^2 across the window. That is clearly visible in the
 energy panel against the 1 m_e c^2 initial spread. The SASE still reaches 2.94 GW,
-against 3.02 GW for the same run with no wake. Both powers are at this deck's grid and
-particle count, and a dark start's power depends on both
-([startup noise](../../doc/startup-noise.md)).
+against 3.02 GW for the same run with no wake. Both powers are those of this input's grid
+and particle count. The power of an unseeded run depends on both
+([SASE convergence](../../doc/startup-noise.md)).
 
 The same resistive-wall kernel applied through Bmad's own wake machinery instead of
 the transcribed model is `../bmad_wake`, which carries both runs and their agreement.
