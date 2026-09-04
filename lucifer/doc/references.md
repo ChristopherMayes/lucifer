@@ -15,12 +15,12 @@ transcribed from it, routine by routine, and the benchmark tiers compare against
 shared dumps. Genesis4 is GPLv3, which is what permits the transcription, and the
 per-routine citations in the source are kept for that reason. The original code is
 described in S. Reiche, *GENESIS 1.3: a fully 3D time-dependent FEL simulation code*,
-Nucl. Instr. and Meth. A **429** (1999) 243.
+[Nucl. Instr. and Meth. A **429** (1999) 243](https://doi.org/10.1016/S0168-9002(99)00114-X).
 
 **Bmad**, D. Sagan. The lattice, the tracking of every non-FEL element, the wake
 machinery, the beam I/O and the units and phase-space conventions are Bmad's.
-D. Sagan, *Bmad: A relativistic charged particle simulation library*, Nucl. Instr. and
-Meth. A **558** (2006) 356.
+D. Sagan, *Bmad: A relativistic charged particle simulation library*, [Nucl. Instr. and
+Meth. A **558** (2006) 356](https://doi.org/10.1016/j.nima.2005.11.001).
 
 **MINERVA**, H. P. Freund and P. J. M. van der Slot. The published existence proof that
 unaveraged FEL dynamics is practical for production, and the published source of the
@@ -38,19 +38,22 @@ I/O in both directions.
 
 ## Papers the code implements
 
-**Coherent source.** T. Tanaka, Phys. Rev. Accel. Beams **27**, 030703 (2024),
-arXiv:2310.20197. The slice bunch factor splits into coherent and spatially incoherent
+(ref-tanaka)=
+**Coherent source.** T. Tanaka, [Phys. Rev. Accel. Beams **27**, 030703 (2024)](https://doi.org/10.1103/PhysRevAccelBeams.27.030703),
+[arXiv:2310.20197](https://arxiv.org/abs/2310.20197). The slice bunch factor splits into coherent and spatially incoherent
 parts, and the incoherent part's radiation diffracts away. Implemented from the paper in
-`fel_track_mod` (`global%source_model = 'coherent'`), with its guardrails refusing by
-name. See [](fel-physics.md#sec-coherent-source).
+`fel_track_mod` (`global%source_model = 'coherent'`), which refuses the configurations
+the model does not cover. See [](fel-physics.md#sec-coherent-source).
 
-**Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, SLAC-PUB-10707. The numerical
+(ref-bane-stupakov)=
+**Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, [SLAC-PUB-10707](https://www.slac.stanford.edu/pubs/slacpubs/10500/slac-pub-10707.pdf). The numerical
 impedance with AC (Drude) conductivity and Leontovich surface impedance, round and flat
 geometry. Transcribed in `fel_collective_mod` (`fel_resistive_wall_wake`), with
 Genesis4's exact numerics kept. See [](fel-physics.md#sec-wakes).
 
+(ref-fawley)=
 **Shot-noise loading.** W. M. Fawley's algorithm for loading shot-noise microbunching in
-FEL simulation codes, in the one-substitution weighted generalization that makes it
+FEL simulation codes, [Phys. Rev. ST Accel. Beams **5**, 070701 (2002)](https://doi.org/10.1103/PhysRevSTAB.5.070701), in the one-substitution weighted generalization that makes it
 correct for per-particle weights. `fel_fawley_noise`, checked statistically against
 $\langle|b(h)|^2\rangle = 1/N_\lambda$ under uniform and nonuniform weights. See
 [](fel-physics.md#sec-noise).
@@ -60,9 +63,12 @@ the Saldin form, as fitted in Genesis4's `Incoherent.cpp`, with one draw per bea
 the quiet start's cancellation survives. Applied only when Bmad's own
 `radiation_fluctuations` switch is on. See [](fel-physics.md#sec-eom).
 
-**SASE startup and gain estimates.** Ming Xie's fitting formula for the 3D power gain length (Nucl. Instrum. Methods A **445**, 59 (2000)), and E. L. Saldin, E. A. Schneidmiller and M. V. Yurkov's effective shot-noise power, saturation length and efficiency, and the incoherent undulator power of a beam in its central cone (New J. Phys. **12**, 035010 (2010), eqs. 1, 5 and 18). Computed from the deck's parameters by `tests/scripts/startup_noise.py` and placed beside the measurements in [](startup-noise.md).
+(ref-sase-theory)=
+**SASE startup and gain estimates.** Ming Xie's fitting formula for the 3D power gain length, [Nucl. Instrum. Methods A **445**, 59 (2000)](https://doi.org/10.1016/S0168-9002(00)00114-5), and E. L. Saldin, E. A. Schneidmiller and M. V. Yurkov's effective shot-noise power, saturation length and efficiency, and the incoherent undulator power of a beam in its central cone, [New J. Phys. **12**, 035010 (2010)](https://doi.org/10.1088/1367-2630/12/3/035010), [arXiv:0912.4161](https://arxiv.org/abs/0912.4161), eqs. 1, 5 and 18. Computed from the input's parameters by the script of [](startup-noise.md) and placed beside the measurements there.
 
-**Normal-mode emittances.** A. Wolski's approach to general coupled linear optics
+(ref-wolski)=
+**Normal-mode emittances.** A. Wolski's approach to general coupled linear optics,
+[Phys. Rev. ST Accel. Beams **9**, 024001 (2006)](https://doi.org/10.1103/PhysRevSTAB.9.024001),
 supplies the eigen-emittances stored beside the projected Twiss planes. Bmad's
 `calc_bunch_params` evaluates them, and
 `tests/scripts/bunch_params_from_stats.py` re-derives them independently as a check. See
