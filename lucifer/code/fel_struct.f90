@@ -60,7 +60,7 @@ type fel_global_struct
   ! run switch rather than a tracking method, and no production run sets it.
   character(16) :: transport_model = 'bmad'
   ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
-  ! per-particle scatter (the referee, bit-for-bit unchanged). 'coherent' is the
+  ! per-particle scatter (bit-for-bit unchanged). 'coherent' is the
   ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the
   ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
   ! physical shot noise, and the transverse shape is a guarded Gaussian.

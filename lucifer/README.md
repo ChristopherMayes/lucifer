@@ -29,7 +29,7 @@ Bmad's own named methods, set on the element as any tracking method is, and they
 | `tracking_method` | what it is for |
 |---|---|
 | `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
-| `fel_unaveraged` | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also the tree's referee, sharing no approximation with the averaged path. |
+| `fel_unaveraged` | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also an independent check on the averaged path, since the two share no approximation. |
 
 The averaged method's transverse maps have one more option behind them, the transcribed Genesis4 maps, selected for a whole run by `global%transport_model`. It is validation-internal and no production run sets it.
 

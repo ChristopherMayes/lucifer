@@ -210,7 +210,7 @@ type fel_kernel_struct
 end type
 
 ! The source model (fel-physics.md sec-coherent-source): the standard per-particle deposit
-! (the referee) or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27,
+! or the SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27,
 ! 030703 (2024); arXiv:2310.20197). In the coherent source the spatially incoherent
 ! artifact is dropped. The slice bunch factor keeps the physical shot noise. The
 ! transverse shape is a guarded Gaussian from phasor sums and charge moments.

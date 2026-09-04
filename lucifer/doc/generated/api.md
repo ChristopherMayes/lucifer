@@ -4621,7 +4621,7 @@ quiver, no period averaging) with the radiation field as a co-evolving kick. The
 is no resonance approximation. What the cost per step buys is physics the averaged
 map cannot reach: the full quiver dynamics, the energy accounting the beam actually
 pays, polarization-agnostic coupling and arbitrary harmonic content. The mode is
-also the referee for the averaged path, since the coupling factor fc, the harmonic
+also an independent check on the averaged path, since the coupling factor fc, the harmonic
 content and the entry/exit behavior of the averaged mode become measured outputs
 here instead of assumed inputs. MINERVA (Freund and van der Slot) is the published
 existence proof for this physics, and only its published work was used here. This mode differs by keeping the grid field and

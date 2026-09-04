@@ -201,8 +201,9 @@ endif
 
 ! The source model (fel-physics.md sec-coherent-source): validated, then stamped onto every
 ! FEL element. v1 scope refusals: the coherent source carries the
-! Fundamental of one polarization, and it cannot live inside the unaveraged referee
-! (variance reduction inside the explicit-everything mode). Even harmonics are invalid
+! Fundamental of one polarization, and it cannot live inside the unaveraged mode,
+! which is the independent check (variance reduction inside the explicit-everything
+! mode). Even harmonics are invalid
 ! in the method itself -- F(z,0) = 0 -- and odd ones are a named follow-on.
 
 select case (run%global%source_model)
@@ -210,7 +211,7 @@ case ('deposit')
 case ('coherent')
   if (any(fel_mode == fel_unaveraged$ .and. is_fel)) then
     call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH AN UNAVERAGED ELEMENT: THE', &
-                                   'UNAVERAGED MODE IS THE EXPLICIT REFEREE; VARIANCE REDUCTION INSIDE IT IS REFUSED.')
+                                   'UNAVERAGED MODE RESOLVES EVERYTHING EXPLICITLY, SO VARIANCE REDUCTION IS REFUSED.')
     err_flag = .true.;  return
   endif
   if (n_harm > 1) then

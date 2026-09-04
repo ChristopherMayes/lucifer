@@ -323,7 +323,7 @@ and it is written at the merge.
   as a probe. The manual section retitles from "The unaveraged verification mode" and its
   opening states what the cost per step buys: the full quiver dynamics, the energy
   accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic
-  content. Its role as the referee for the averaged path is still there, as a second
+  content. Its role as an independent check on the averaged path is still there, as a second
   paragraph rather than as the mode's name. The physics of the section is unchanged, and
   "verification mode" is swept from all eleven places it survived.
 
