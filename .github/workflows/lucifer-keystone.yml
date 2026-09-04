@@ -8,28 +8,32 @@
 # happened to work. The debug build is what reaches that class, since -fbounds-check
 # turns such a read into a failure rather than a wrong number.
 #
-# What this varies and what it does not, so the coverage is not overstated. It varies
-# the operating system, the C library, the allocator and every dependency build, and it
-# runs the tiers and the check sections, which nothing outside this laptop has ever run.
-# It does not vary the compiler project: the build is conda-forge gfortran here as it is
-# there. The distribution's own ci.yml covers the system compiler on every push, which is
-# how an unconditional -lfftw3f was caught, and it builds without running a single tier.
+# The build is against conda, and the first reason is the users: Bmad ships on
+# conda-forge, so a conda build is the configuration most people will run, and a check is
+# worth more against what is delivered than against a configuration only the off-site
+# distribution assembles. It is also what the recording machine uses, through
+# util/conda_compile, so the CI build and the recorded levels come from one arrangement.
+#
+# Two mechanical properties come with that choice. LAPACK comes from the environment
+# rather than being built from source, and building it from source in a static debug
+# configuration fails in its own archive step, a path the distribution's CI never takes
+# because it builds shared. And the tracker and the reference then read one HDF5: lucifer
+# resolves conda's through the rpath of the environment it was built in, and genesis4
+# resolves its own, where a shared build reached through LD_LIBRARY_PATH would offer the
+# reference a library it was not linked against. The recording machine keeps those two
+# environments apart for exactly that reason.
+#
+# What this varies and what it does not, so the coverage is not overstated. It varies the
+# operating system, the C library, the allocator and every dependency build, and it runs
+# the tiers and the check sections, which nothing outside this laptop has ever run. It
+# does not vary the compiler project, which is conda-forge gfortran on both sides. The
+# distribution's own ci.yml builds with the system compiler on every push, which is how an
+# unconditional -lfftw3f was caught, and it runs no tier.
 #
 # It does NOT compare digits. A different FFTW and HDF5 give different last digits by
 # construction, so the eleven recorded tier levels stay a property of the machine that
 # recorded them and the tolerances are what gets asserted here. A reader who believes
 # this job guards the recorded digits will eventually trust it to.
-#
-# The build is against conda, which is the arrangement the recording machine uses and
-# util/conda_compile automates there. Two properties earn it over the apt and
-# bmad-external-packages route ci.yml takes. LAPACK comes from the environment rather
-# than being built from source, and building it from source in a static debug
-# configuration fails in its own archive step, a path the distribution's CI never takes
-# because it builds shared. And the tracker and the reference then read one HDF5:
-# lucifer resolves conda's through the rpath of the environment it was built in, and
-# genesis4 resolves its own, where a shared build reached through LD_LIBRARY_PATH would
-# offer the reference a library it was not linked against. The recording machine keeps
-# those two environments apart for exactly that reason.
 #
 # What is deliberately not here, so the difference from the local keystone is on the
 # record: the production build and the two-build digit comparison, the examples, and
