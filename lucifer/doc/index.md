@@ -16,7 +16,7 @@ parallel namelist, and every non-FEL element tracks each slice's bunch through B
 ## Features
 
 - **The FEL element.** An FEL segment is a Bmad wiggler, so its parameters are lattice attributes and one lattice serves tracking, optics and layout.
-- **Two tracking methods**, averaged and unaveraged, set per element like any Bmad tracking method and mixing freely in one line. The [next section](#the-two-tracking-methods) says what each is for.
+- **Two tracking methods**, averaged and unaveraged, set per element like any Bmad tracking method and mixing freely in one line. The [next section](#intro-two-methods) says what each is for.
 - **Per-particle weights** throughout: physical shot noise, collective effects and diagnostics are all weight-correct.
 - **Time dependence** with an exact integer slippage shift, and slice migration when a particle's ponderomotive phase leaves its slice.
 - **Collective effects**: resistive-wall, geometric and roughness wakes, short-range and long-range space charge, and Bmad element wakes applied across the whole time window.
@@ -30,6 +30,7 @@ parallel namelist, and every non-FEL element tracks each slice's bunch through B
 - **Distribution import**, resampling a `bunch_struct` into FEL slices.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
 
+(intro-two-methods)=
 ## The two tracking methods
 
 Bmad's own named methods, set on the element as any tracking method is.

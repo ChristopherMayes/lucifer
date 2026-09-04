@@ -54,6 +54,7 @@ use fel_fp32_mod
 use wavefront_mod
 
 use, intrinsic :: iso_c_binding
+use, intrinsic :: ieee_exceptions, only: ieee_usual, ieee_get_flag, ieee_set_flag
 
 implicit none
 
@@ -216,7 +217,92 @@ interface
 
 end interface
 
+! A generic name, kept inside the module: every caller of it is here, and the seam's
+! strings are the only reason it exists.
+
+private from_c
+
 contains
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_query (usable, device, reason)
+!
+! Routine to report what device backend this build carries, without arming anything.
+! luc_dev_available is the one call a stub build answers, and it allocates nothing, so
+! this is safe and free in every build. It is what the usage banner reports and what a
+! caller reads to decide whether device = "metal" is worth asking for at all.
+!
+! Two things can make a backend unusable, and they are different: a build compiled
+! against the stub carries none at all, and a build carrying the Metal backend can
+! still run on a machine with no Metal device or no unified memory. The reason
+! distinguishes them. Neither is a platform test: a caller that keys on the platform
+! rather than on this answer will skip the device on a machine that has one.
+!
+! The floating-point exception flags are saved and restored across the call. Metal's
+! own device enumeration raises overflow on this machine, and a program whose last act
+! is this query would then report a signalling overflow at exit, attributing the
+! framework's arithmetic to the run's own. A query answers a question and leaves no
+! trace.
+!
+! Output:
+!   usable -- logical: True if device = "metal" would be accepted here.
+!   device -- character(*): The device's own name, or 'none' when there is no backend.
+!   reason -- character(*): Why it is unusable. Blank when usable is True.
+!-
+
+subroutine fel_device_query (usable, device, reason)
+
+logical usable
+character(*) device, reason
+character(kind=c_char) c_name(64), c_reason(256)
+logical flag_was(size(ieee_usual))
+
+!
+
+call ieee_get_flag (ieee_usual, flag_was)
+usable = (luc_dev_available(c_name, 64, c_reason, 256) /= 0)
+call ieee_set_flag (ieee_usual, flag_was)
+
+call from_c (c_name, device)
+call from_c (c_reason, reason)
+if (usable) reason = ''
+
+end subroutine fel_device_query
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine from_c (c_str, f_str)
+!
+! Routine to copy a null-terminated C string into a Fortran one, truncating at the
+! Fortran length. Every reason and name the seam returns arrives this way.
+!
+! Input:
+!   c_str -- character(kind=c_char)(*): The C string.
+!
+! Output:
+!   f_str -- character(*): The Fortran string, blank padded.
+!-
+
+subroutine from_c (c_str, f_str)
+
+character(kind=c_char) c_str(*)
+character(*) f_str
+integer i
+
+!
+
+f_str = ''
+do i = 1, len(f_str)
+  if (c_str(i) == c_null_char) exit
+  f_str(i:i) = c_str(i)
+enddo
+
+end subroutine from_c
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -252,11 +338,12 @@ integer ngrid, fp32_iu
 real(rp) sample
 logical err_flag
 
-character(kind=c_char) c_name(64), c_reason(256)
+character(kind=c_char) c_reason(256)
 character(256) reason
 character(64) name
 integer is, np, ierr
 integer(c_int64_t) bucket
+logical usable
 character(*), parameter :: r_name = 'fel_device_setup'
 
 !
@@ -274,13 +361,12 @@ case default
   return
 end select
 
-if (luc_dev_available(c_name, 64, c_reason, 256) == 0) then
-  call from_c (c_reason, reason)
+call fel_device_query (usable, name, reason)
+if (.not. usable) then
   call out_io (s_error$, r_name, 'DEVICE = "metal" REFUSED: ' // trim(reason) // '.')
   err_flag = .true.
   return
 endif
-call from_c (c_name, name)
 dev%name = name
 
 ! The rectangular particle array: padded to the largest fill, so uneven slice fills
@@ -345,20 +431,6 @@ if (fp32_iu /= 0) then
   write (fp32_iu, '(a)') '#   guard_ulp is the median per-step phase increment in ticks of 2 pi / 2^32)'
   write (fp32_iu, '(a, l1)') '# device_wrap_exact ', dev%wrap_exact
 endif
-
-!------------------------------------------------------------------------------
-contains
-
-subroutine from_c (c_str, f_str)
-character(kind=c_char) c_str(*)
-character(*) f_str
-integer i
-f_str = ''
-do i = 1, len(f_str)
-  if (c_str(i) == c_null_char) exit
-  f_str(i:i) = c_str(i)
-enddo
-end subroutine from_c
 
 end subroutine fel_device_setup
 
@@ -522,11 +594,7 @@ call luc_dev_set_slice_phases (dev%sbase, dev%sbdep)
 cret = nint((phi0_new - phi0) * fel_dev_ticks_per_rad$, c_int64_t)
 ierr = luc_dev_step (par, cret, c_reason, 256)
 if (ierr /= 0) then
-  reason = ''
-  do is = 1, 256
-    if (c_reason(is) == c_null_char) exit
-    reason(is:is) = c_reason(is)
-  enddo
+  call from_c (c_reason, reason)
   call out_io (s_error$, r_name, 'DEVICE STEP REFUSED: ' // trim(reason) // '.')
   err_flag = .true.
   return

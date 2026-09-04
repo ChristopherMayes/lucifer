@@ -18,8 +18,13 @@ Usage:
 The results files are written by run_fel_benchmark.sh --results, one record per line:
 
   build|<flavor>
-  section|<name>|<outcome>
+  section|<name>|<outcome>[|<reason>]
   tier|<key>|<level>|<outcome>|<description>
+
+A results file whose sections did not all run is refused. The device section skips on a
+build with no usable backend, which is what a Linux CI runner is, and the table written
+from such a file would name one section fewer while claiming to list them all. The
+generated table therefore comes from a full local run on both builds.
 """
 
 import argparse
@@ -46,6 +51,12 @@ def read_results(path):
             raise SystemExit(f"{path}: unknown record kind {kind!r}")
     if out["build"] is None:
         raise SystemExit(f"{path}: no build record")
+    skipped = [n for n, outcome in out["sections"] if outcome != "pass"]
+    if skipped:
+        raise SystemExit(
+            f"{path}: this run skipped {', '.join(skipped)}, so it records fewer sections "
+            "than a full\n  run and the table would undercount them. Write the table from a "
+            "full run on both builds.")
     return out
 
 

@@ -1,10 +1,10 @@
 # The part of Lucifer's validation that needs no Fortran build.
 #
-# The keystone runs eleven comparison tiers and nineteen check sections against a
-# genesis4 binary, which needs the whole distribution built and a reference build of
-# another code. None of that fits here yet, for the reason recorded at the bottom of this
-# file. What does fit is everything that only reads files: the documentation builds, the
-# input reference agrees with the Fortran declarations, the examples agree with the
+# The keystone runs eleven comparison tiers and twenty-five check sections against a
+# genesis4 binary, which needs the whole distribution built and the reference installed.
+# That is lucifer-keystone.yml, which costs a build and runs on demand. What fits here is
+# everything that only reads files, so it runs on every push: the documentation builds,
+# the input reference agrees with the Fortran declarations, the examples agree with the
 # feature list, and the generated example pages are current.
 #
 # Scoped to the lucifer-dev branch on purpose. The distribution's own ci.yml owns every
@@ -134,19 +134,7 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
 
-  # The full keystone is not here yet, and the reason changed on 2026-09-03. What used to
-  # block it was the reference: the conda-forge genesis4 release carried eev = 510999.06,
-  # 2.14e-7 above CODATA 2022, so ten of the eleven tier digits read differently against
-  # it than against the recorded reference, and a run that passes every check on the wrong
-  # digits is worse than no run. Release 4.6.15 carries the CODATA value and is now the
-  # recorded reference, so that objection is gone and the harness refuses any other
-  # version by name. What stands in the way now is cost and coverage: the two benchmark
-  # passes take about nine minutes each, and the device section needs a Metal device that
-  # no runner here has, so it would have to be skipped by name rather than silently. Those
-  # are decisions rather than obstacles, and the shape when they are taken is a second job
-  # that builds the distribution, installs genesis4 and runs:
-  #
-  #   ./lucifer/tests/run_fel_benchmark.sh
-  #   ./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer
-  #   ./lucifer/wavefront/tests/run_validation.sh
-  #   cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin
+  # The tiers and the check sections are in lucifer-keystone.yml, which builds the debug
+  # tree and runs the benchmark harness on a Linux toolchain. It is separate from this
+  # workflow because it costs a distribution build where these steps cost none, so the
+  # two have different triggers: this one runs on every push, and that one on demand.

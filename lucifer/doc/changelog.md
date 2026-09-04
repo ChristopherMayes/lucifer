@@ -9,6 +9,30 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-03 Added: the checks run on a second platform, in CI. `lucifer-keystone.yml` builds the
+  debug tree on Ubuntu against a conda environment and runs the benchmark harness and the wavefront
+  validation there, on demand and on a weekly schedule. The job takes 37.5 minutes on a
+  four-core runner, of which the harness is 30 and the build 6.4, against the local keystone's 7.7
+  minutes on sixteen cores with its references cached. The defect class it reaches is one platform
+  hiding what another shows, and this project has paid for an instance: five wake cases failed on
+  Linux because a steady-state run read past the end of a one-element vector, and the macOS
+  allocator had been answering with a number that happened to work. The debug build is the point,
+  since `-fbounds-check` turns that read into a failure rather than a wrong number. The run asserts
+  the tolerances and not the digits, because a different FFTW and HDF5 give different last digits by
+  construction. It varies the operating system, the C library, the allocator and every dependency
+  build, and not the compiler project, which is conda-forge gfortran on both sides. Two changes
+  made it possible. `lucifer` run with no arguments now names
+  the device backend the build carries, either the device it found or the reason there is none, and
+  the harness reads that line to decide whether the device section can run, so the skip keys on the
+  build and the machine rather than on the platform and a machine that has a backend cannot skip.
+  And `report_validation.py` refuses a results file whose sections did not all run, since the table
+  it writes lists every section that ran and a file recording the skip is one short. The reference
+  pin is what unblocked the rest: `genesis4` 4.6.15 is on conda-forge for linux-64, so a runner
+  installs the same reference the levels were recorded against. The first green run is the
+  demonstration of what the job does and does not hold: all eleven tiers passed their tolerances,
+  four of them on digits identical to the recorded ones and seven moved in their last places, and
+  the device section skipped by name on a build whose banner reported no backend.
+
 - 2026-09-03 Changed: the everyday keystone runs in 7.7 minutes rather than 25, with nothing behind
   a flag and every section still running in every run. Three measured changes, in order of what they
   bought. The Genesis references are cached: they are a pure function of the reference binary and the

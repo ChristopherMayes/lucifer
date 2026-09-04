@@ -1,0 +1,255 @@
+# Lucifer's own checks, on Linux.
+#
+# Every level Lucifer records was measured on one machine, an Apple M3 Max running
+# macOS. This job runs the same checks on Linux, which is the only way a defect that
+# one platform hides and another shows ever gets found. The project has paid for one
+# already: five wake cases failed on Linux because a steady-state run read past the end
+# of a one-element vector, and the macOS allocator had been answering with a number that
+# happened to work. The debug build is what reaches that class, since -fbounds-check
+# turns such a read into a failure rather than a wrong number.
+#
+# What this varies and what it does not, so the coverage is not overstated. It varies
+# the operating system, the C library, the allocator and every dependency build, and it
+# runs the tiers and the check sections, which nothing outside this laptop has ever run.
+# It does not vary the compiler project: the build is conda-forge gfortran here as it is
+# there. The distribution's own ci.yml covers the system compiler on every push, which is
+# how an unconditional -lfftw3f was caught, and it builds without running a single tier.
+#
+# It does NOT compare digits. A different FFTW and HDF5 give different last digits by
+# construction, so the eleven recorded tier levels stay a property of the machine that
+# recorded them and the tolerances are what gets asserted here. A reader who believes
+# this job guards the recorded digits will eventually trust it to.
+#
+# The build is against conda, which is the arrangement the recording machine uses and
+# util/conda_compile automates there. Two properties earn it over the apt and
+# bmad-external-packages route ci.yml takes. LAPACK comes from the environment rather
+# than being built from source, and building it from source in a static debug
+# configuration fails in its own archive step, a path the distribution's CI never takes
+# because it builds shared. And the tracker and the reference then read one HDF5:
+# lucifer resolves conda's through the rpath of the environment it was built in, and
+# genesis4 resolves its own, where a shared build reached through LD_LIBRARY_PATH would
+# offer the reference a library it was not linked against. The recording machine keeps
+# those two environments apart for exactly that reason.
+#
+# What is deliberately not here, so the difference from the local keystone is on the
+# record: the production build and the two-build digit comparison, the examples, and
+# Bmad's own regression suite, which ci.yml already runs. The device section cannot run
+# on a runner with no Metal device and skips by name, which is the one section allowed
+# to.
+#
+# Both triggers below read this file from the repository's DEFAULT branch rather than
+# from the ref they name, which is GitHub's rule for `workflow_dispatch` and `schedule`
+# alike. On a fork whose default branch is `main`, that makes them inert while this file
+# lives only on `lucifer-dev`: `gh workflow run --ref lucifer-dev` answers 404, and the
+# cron never fires. They are declared anyway, because they are the cadence this job is
+# meant to have and they start working the moment the file reaches a default branch,
+# whether by a merge or by making `lucifer-dev` the default. The job itself was proved on
+# a probe branch carrying a temporary `push` trigger, which is the one trigger that reads
+# the pushed ref. Anyone who needs a run before then can do the same.
+#
+# Weekly, off the hour. The branch gets per-push build coverage from ci.yml already, and
+# the wall clock recorded on the job below is what an argument for running this more
+# often has to answer. A path filter would be no substitute: the defects this reaches
+# come from the platform, not from which file moved.
+
+name: Lucifer - Keystone (Linux)
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  keystone:
+    runs-on: ubuntu-latest
+    # Measured on this runner, from the run that proved this file: 37.5 minutes end to
+    # end, of which the harness is 30, the build 6.4 and the two environments 1.1. The
+    # harness costs four times its local 7.7 minutes because a runner has four cores
+    # against the recording machine's sixteen and its Genesis references are always cold,
+    # and its longest sections are spontaneous at 642 s and the eleven tiers at 320 s.
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Two packages the build needs on Linux and not on macOS. The distribution's own
+      # conda-build.yml appends the same two, and the file is the distribution's, so the
+      # append happens here in the runner rather than in the tree.
+      - name: Include the Linux-only build requirements
+        shell: bash
+        run: |
+          echo '  - libacl' >> .github/bmad-build-env.yaml
+          echo '  - libgomp' >> .github/bmad-build-env.yaml
+
+      - name: Install the build environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          use-mamba: true
+          activate-environment: bmad-build
+          channels: conda-forge
+          environment-file: .github/bmad-build-env.yaml
+          python-version: "3.12"
+          conda-remove-defaults: true
+
+      # The preferences are the ones util/conda_compile writes on the recording machine,
+      # less two macOS-only lines: that script restores util/dist_prefs from origin/main,
+      # which a shallow checkout of one branch does not have, and it passes a linker flag
+      # the GNU linker rejects. HDF5_ROOT pins the library to this environment, the same
+      # reason conda_compile sets it: CMake's FindHDF5 otherwise prefers whichever h5fc
+      # is first on PATH, and a mismatch across a major version can compile and link.
+      #
+      # OpenMP is on because the harness reruns a time-dependent tier at eight threads
+      # and requires it to reproduce one thread bit for bit. MPI is off, since Lucifer is
+      # shared memory and the reference runs single process. The test executables are off,
+      # which drops regression_tests from the build list and nothing else: this job does
+      # not run that suite, ci.yml does, and building it is minutes a runner spends on
+      # binaries no step here executes.
+      #
+      # The `set +e` is load-bearing, and finding out why cost three rounds.
+      # util/dist_source_me is an environment script in Bourne style whose last statement
+      # is a test that is false on a perfectly good run, so it returns non-zero and ends
+      # any shell that has errexit set. The distribution's own install_bmad.sh runs it
+      # from a script with no -e for that reason. Here errexit arrives on its own:
+      # setup-miniconda appends `set -eo pipefail` into conda.sh, so every shell that
+      # initializes conda has it, whether the step asked for it or not, and a login shell
+      # picks the same thing up through the profile. The death is silent because
+      # ACC_CONDA_BUILD=Y makes dist_source_me write its log to a file rather than the
+      # terminal, so the step failed in one second with no output at all.
+      #
+      # The build command's status is therefore checked explicitly, and the three
+      # binaries the later steps need are listed after it, so a build that half worked
+      # cannot pass.
+      - name: Build the debug tree
+        shell: bash -o pipefail {0}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          set +e
+          conda activate bmad-build
+          export HDF5_ROOT="$CONDA_PREFIX"
+          cat <<PREFS >> util/dist_prefs
+          export DIST_F90_REQUEST="gfortran"
+          export ACC_PLOT_PACKAGE="pgplot"
+          export ACC_PLOT_DISPLAY_TYPE="X"
+          export ACC_ENABLE_OPENMP="Y"
+          export ACC_ENABLE_MPI="N"
+          export ACC_FORCE_BUILTIN_MPI="N"
+          export ACC_ENABLE_GFORTRAN_OPTIMIZATION="N"
+          export ACC_ENABLE_SHARED="Y"
+          export ACC_ENABLE_SHARED_ONLY="N"
+          export ACC_ENABLE_FPIC="Y"
+          export ACC_ENABLE_PROFILING="N"
+          export ACC_SET_GMAKE_JOBS="$(nproc)"
+          export ACC_CONDA_BUILD="Y"
+          export ACC_CONDA_BUILD_TESTS="N"
+          export ACC_CONDA_PATH="$CONDA_PREFIX"
+          export ACC_USE_MACPORTS="N"
+          PREFS
+          cp "$CONDA_PREFIX/share/gnuconfig/config."* .
+          source ./util/dist_source_me
+          ./util/dist_build_debug
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "util/dist_build_debug exited $status"
+            exit "$status"
+          fi
+          ls -l debug/bin/lucifer debug/bin/lucifer_smoke_test debug/bin/wavefront_drift_test
+
+      # Which backend this build carries, from lucifer's own banner. This is the line the
+      # harness reads to decide whether the device section can run, so having it in the
+      # log makes the skip below checkable rather than asserted.
+      - name: Name the device backend
+        shell: bash
+        run: ./debug/bin/lucifer || true
+
+      # One environment for the reference and the Python side, from the repository's own
+      # file, which pins genesis4 4.6.15. The pin is the whole reason this job is
+      # possible: releases to 4.6.14 carry a pre-CODATA electron rest energy and seed
+      # their noise per MPI rank, and the harness refuses any other version by name. It
+      # is separate from the build environment for the reason the recording machine keeps
+      # them separate, and the harness finds it by name.
+      - name: Install the reference and the Python side
+        shell: bash -o pipefail {0}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          set -e
+          conda env create -f lucifer/wavefront/tests/environment.yml
+          # The reference's own banner, so a wrong version is visible here rather than
+          # only in the harness's refusal. genesis4 exits non-zero when it is given no
+          # input file, which is not a failure of this step.
+          conda run -n bmad-fel-validate genesis4 2>&1 | head -3 || true
+
+      # The tracker reads openPMD only, so the Genesis reference dumps are converted at
+      # the boundary before any tier runs, and the field half of that conversion calls
+      # Wavefront.from_openpmd and write_openpmd. Those two live on this branch and not
+      # in the released package, so the branch is what gets cloned rather than a pip
+      # install. Upstreaming them retires this step.
+      - name: Clone openPMD-beamphysics at the pinned branch
+        shell: bash
+        run: |
+          git clone --branch openpmd-wavefront-rw --depth 1 \
+              https://github.com/ChristopherMayes/openPMD-beamphysics.git \
+              "$RUNNER_TEMP/openPMD-beamphysics"
+          # The conversion's recorded levels belong to one commit, so a moved branch tip
+          # is refused by name here rather than converting differently and passing.
+          want=cffc34b96bbe1cbd9fae0733a73733d599611142
+          got=$(git -C "$RUNNER_TEMP/openPMD-beamphysics" rev-parse HEAD)
+          echo "openPMD-beamphysics at $got"
+          if [ "$got" != "$want" ]; then
+            echo "the pinned commit is $want, and the branch tip is $got"
+            exit 1
+          fi
+
+      # The harness prints the reference version and the electron rest energy it carries,
+      # every section's name and wall time, and every tier's level against its tolerance.
+      # Its exit status is zero only if every tier passed. Run from the validate
+      # environment, which is how the recording machine runs it.
+      - name: Benchmark harness, debug build
+        shell: bash -o pipefail {0}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          conda activate bmad-fel-validate
+          set -e
+          ./lucifer/tests/run_fel_benchmark.sh \
+              --exe "$PWD/debug/bin/lucifer" \
+              --beamphysics "$RUNNER_TEMP/openPMD-beamphysics" \
+              --results "$RUNNER_TEMP/fel-debug.txt" \
+              --work-dir "$RUNNER_TEMP/wd-dbg"
+
+      - name: Wavefront validation
+        shell: bash -o pipefail {0}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          conda activate bmad-fel-validate
+          set -e
+          ./lucifer/wavefront/tests/run_validation.sh \
+              --beamphysics "$RUNNER_TEMP/openPMD-beamphysics" \
+              --work-dir "$RUNNER_TEMP/wd-wf"
+
+      # The results file records what ran, what skipped and why, and each tier's level.
+      # It is not what writes the generated table: report_validation.py refuses a file
+      # carrying a skip, because that table names every section that ran and this run is
+      # one short. The table stays the product of a full local run on both builds.
+      - name: Summarize
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/fel-debug.txt" ]; then
+            {
+              echo '## Lucifer keystone, Linux debug build'
+              echo
+              echo 'Levels are this platform'"'"'s own. The recorded digits belong to the'
+              echo 'machine that recorded them, and this job asserts the tolerances.'
+              echo
+              echo '```'
+              cat "$RUNNER_TEMP/fel-debug.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

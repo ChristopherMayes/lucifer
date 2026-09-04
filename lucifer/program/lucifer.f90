@@ -44,6 +44,7 @@ use fel_init_mod
 use fel_track_line_mod
 use fel_io_mod
 use fel_timer_mod
+use fel_device_mod, only: fel_device_query
 use bmad_version_mod, only: bmad_version_date
 use, intrinsic :: iso_fortran_env, only: output_unit
 
@@ -57,8 +58,10 @@ implicit none
 
 type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k
-logical err
+logical err, dev_usable
 character(400) param_file
+character(256) dev_reason
+character(64) dev_name
 character(*), parameter :: r_name = 'lucifer'
 
 !
@@ -85,6 +88,16 @@ if (n_arg /= 1) then
   ! Separate from the block above because a character array constructor needs every
   ! element the same length, and the version string's length is not this file's to know.
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
+  ! What global%device can be set to in this build, which otherwise takes a run to
+  ! discover: the backend is a build-time and machine-time property, and the reason a
+  ! build has none names the toolchain requirement rather than the platform. A test
+  ! harness reads this line to decide whether the device checks can run at all.
+  call fel_device_query (dev_usable, dev_name, dev_reason)
+  if (dev_usable) then
+    call out_io (s_blank$, r_name, 'Device backend: metal, on ' // trim(dev_name))
+  else
+    call out_io (s_blank$, r_name, 'Device backend: none. ' // trim(dev_reason))
+  endif
   ! Flushed before the stop, or the runtime's own STOP line reaches the terminal first
   ! and the usage text appears to follow the exit.
   flush (output_unit)

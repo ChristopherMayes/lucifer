@@ -923,6 +923,55 @@ the staging arrays the transfers reuse. su0 holds the previous step's phase
 accumulators for the instrument's guard statistic.
 ```
 
+(api-fel-device-query)=
+### `fel_device_query`
+
+*Subroutine* `(usable, device, reason)`
+
+```
+Routine to report what device backend this build carries, without arming anything.
+luc_dev_available is the one call a stub build answers, and it allocates nothing, so
+this is safe and free in every build. It is what the usage banner reports and what a
+caller reads to decide whether device = "metal" is worth asking for at all.
+
+Two things can make a backend unusable, and they are different: a build compiled
+against the stub carries none at all, and a build carrying the Metal backend can
+still run on a machine with no Metal device or no unified memory. The reason
+distinguishes them. Neither is a platform test: a caller that keys on the platform
+rather than on this answer will skip the device on a machine that has one.
+
+The floating-point exception flags are saved and restored across the call. Metal's
+own device enumeration raises overflow on this machine, and a program whose last act
+is this query would then report a signalling overflow at exit, attributing the
+framework's arithmetic to the run's own. A query answers a question and leaves no
+trace.
+```
+
+```
+Output:
+  usable -- logical: True if device = "metal" would be accepted here.
+  device -- character(*): The device's own name, or 'none' when there is no backend.
+  reason -- character(*): Why it is unusable. Blank when usable is True.
+```
+
+(api-from-c)=
+### `from_c`
+
+*Subroutine* `(c_str, f_str)`
+
+```
+Routine to copy a null-terminated C string into a Fortran one, truncating at the
+Fortran length. Every reason and name the seam returns arrives this way.
+```
+
+```
+Input:
+  c_str -- character(kind=c_char)(*): The C string.
+
+Output:
+  f_str -- character(*): The Fortran string, blank padded.
+```
+
 (api-fel-device-setup)=
 ### `fel_device_setup`
 

@@ -65,6 +65,15 @@ The levels here were measured against the Genesis4 4.6.15 release, and the harne
 
 Debug and production binaries are never bit-comparable to each other. Compare like builds only.
 
+(val-second-toolchain)=
+### The same checks on a second toolchain
+
+Every level in this document was measured on one machine, an M3 Max running macOS with the conda-forge gfortran. A second toolchain finds a class of defect the first one hides, and this project has paid for an instance: five wake cases failed on Linux because a steady-state run read past the end of a one-element vector, and the macOS allocator had been answering with a number that happened to work. `.github/workflows/lucifer-keystone.yml` builds the debug tree under Ubuntu with its system gfortran and runs the benchmark harness and the wavefront validation there. The debug build is the point, since `-fbounds-check` is what turns that read into a failure rather than a wrong number.
+
+That run asserts the tolerances and not the digits. A different FFTW and HDF5 give different last digits by construction, so the levels recorded here stay a property of the machine that recorded them. Its first green run is the demonstration: all eleven tiers passed, four of them on digits identical to the ones above and seven moved in their last places. It takes 37.5 minutes on a four-core runner, of which the harness is 30, so it runs on demand and weekly rather than per push, and the distribution's `ci.yml` covers the build on every push.
+
+The device section is the one section allowed to skip, and it skips there by name: a Linux build carries the refusing stub, so it has no backend to judge. The skip keys on what `lucifer` answers when run with no arguments, which names the backend the build carries and the machine under it, so a machine that has a usable backend cannot skip. A results file recording that skip cannot write the generated table, which `report_validation.py` refuses by name: that table lists every section that ran, and a run one section short would undercount them.
+
 (val-crossidentities-not-reference-files)=
 ## Cross-identities, not reference files
 

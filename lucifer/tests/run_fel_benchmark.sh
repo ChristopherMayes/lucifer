@@ -50,7 +50,11 @@
 # whether it hit or missed. Deleting the cache is always safe and costs one cold run.
 #
 # Every section runs on every invocation. There is no quicker mode, on purpose: a
-# cheap run that checks less is what this harness exists to prevent.
+# cheap run that checks less is what this harness exists to prevent. The device
+# section is the one section that can skip, and only where the build carries no
+# usable device backend, which it establishes from lucifer's own banner rather than
+# from the platform. A results file recording that skip cannot write the generated
+# table, which report_validation.py refuses.
 #
 # Exit status is zero only if every tier passes its tolerance.
 
@@ -214,6 +218,15 @@ section_time () {   # <label>
   # Reaching here means the section passed: every failure exits before it. The timing
   # is machine dependent and deliberately not recorded.
   if [[ -n "$RESULTS" ]]; then echo "section|$1|pass" >> "$RESULTS"; fi
+}
+
+# One section can skip, and the outcome is recorded with its reason so a results file
+# says which run it came from. report_validation.py refuses to write the generated
+# table from a file carrying a skip, since that table names every section that ran.
+section_skip () {   # <label> <reason>
+  echo "  [time: $1 $((SECONDS - BENCH_T_LAST)) s, skipped: $2]"
+  BENCH_T_LAST=$SECONDS
+  if [[ -n "$RESULTS" ]]; then echo "section|$1|skip|$2" >> "$RESULTS"; fi
 }
 
 # The Genesis reference runs form three independent chains -- [ss -> 1seg],
@@ -676,13 +689,36 @@ echo
 # kernel constant moves a recorded level so the check can fail; the freerun twin
 # and the resident production run land in the same end-to-end band; and everything
 # the backend does not cover is refused by name.
+#
+# This is the one section that can skip, and it keys on the answer lucifer itself
+# gives rather than on the platform. A build compiled against the refusing stub has
+# no backend at all, and a build carrying the Metal backend still needs a Metal
+# device with unified memory under it, so the question is not one a uname can
+# answer. A machine that has a backend and skips anyway is the failure this
+# arrangement exists to prevent, which is why an unreadable banner fails the run
+# instead of skipping: a skip has to be justified by a stated reason.
 
 echo "--- Device backend checks -------------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: device backend checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time device
+DEVICE_BACKEND="$("$EXE" 2>&1 | sed -n 's/^Device backend: //p' | head -1)"
+case "$DEVICE_BACKEND" in
+  none*)
+    echo "SKIP: ${DEVICE_BACKEND#none. }"
+    section_skip device "no usable device backend in this build"
+    ;;
+  '')
+    echo "FAIL: $EXE named no device backend, so a skip here could not be justified." >&2
+    echo "      The banner it prints without arguments is what this reads." >&2
+    exit 1
+    ;;
+  *)
+    echo "--- backend: $DEVICE_BACKEND"
+    if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+      echo "FAIL: device backend checks; outputs kept in: $WORK_DIR" >&2
+      exit 1
+    fi
+    section_time device
+    ;;
+esac
 echo
 
 # Unaveraged-mode checks (fel-physics.md sec-unaveraged): the energy
