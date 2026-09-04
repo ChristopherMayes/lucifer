@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-05 Added: doc/startup-noise.md, the SASE startup measured against the transverse cell
+  size and the macroparticle load, with tests/scripts/startup_noise.py producing every number and
+  figure on demand. A dark start's field power has two parts. The power inside the mode, taken from
+  the far field of dumps at five undulator ends inside 3 urad, is the same for cells of 6.35 to
+  0.78 um and loads of 1024 to 65536 particles per slice within the SASE fluctuation, 1.8e9 to
+  3.9e9 W per interior slice at z = 37 m, saturating at 28 to 33 m beside Saldin, Schneidmiller and
+  Yurkov's 30.5 m, and at the end of the first segment it equals the beam's physical spontaneous
+  power inside that cone, 1.3e5 W per slice. The power outside the mode is the point beamlets'
+  own emission: load-independent at first and between 1/dx and 1/dx^2 in the cell size, then
+  growing with the bunching as one over the beamlet count and independent of the particle count
+  at a fixed beamlet count. At 1.57 um cells and 1024 particles it is 4.2e9 W per slice at the
+  exit against 8e8 W inside the mode. The examples' 96-slice window is 1.9 cooperation lengths
+  long and its power is that emission at every load measured, 7.3 GW at 1024 particles and
+  0.17 GW at 65536 at 1.57 um, so the SASE examples' recorded powers are numbers of that kind
+  and their ratios stand. Genesis4 4.6.15 on the SASE tier deck reports 2.26e7, 1.17e8 and
+  8.16e8 W at 151, 255 and 511 points, and Lucifer from its dumps lands on it at 1.9e-6 at each.
+  The page states what the codes model, what converged, and how to choose the grid, the window
+  and the load. The index gains a row, validation.md's SASE tier paragraph a sentence, and the
+  sase, migration and sase_wake examples one sentence each. No setting or recorded number moved.
+
 - 2026-09-04 Added: slice migration runs with the device. The pass is fel_migrate_slices
   unchanged, serial on the host at an FEL element's last step, and it touches no field, so no
   kernel is involved: with the beam resident at that step the pass reads the beam and the field

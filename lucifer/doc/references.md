@@ -60,6 +60,8 @@ the Saldin form, as fitted in Genesis4's `Incoherent.cpp`, with one draw per bea
 the quiet start's cancellation survives. Applied only when Bmad's own
 `radiation_fluctuations` switch is on. See [](fel-physics.md#sec-eom).
 
+**SASE startup and gain estimates.** Ming Xie's fitting formula for the 3D power gain length (Nucl. Instrum. Methods A **445**, 59 (2000)), and E. L. Saldin, E. A. Schneidmiller and M. V. Yurkov's effective shot-noise power, saturation length and efficiency, and the incoherent undulator power of a beam in its central cone (New J. Phys. **12**, 035010 (2010), eqs. 1, 5 and 18). Computed from the deck's parameters by `tests/scripts/startup_noise.py` and placed beside the measurements in [](startup-noise.md).
+
 **Normal-mode emittances.** A. Wolski's approach to general coupled linear optics
 supplies the eigen-emittances stored beside the projected Twiss planes. Bmad's
 `calc_bunch_params` evaluates them, and

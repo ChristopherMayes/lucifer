@@ -38,6 +38,10 @@ Measured on this input:
 | exit power, `migrate = T` | 3.13 GW, exit bunching 0.051 |
 | exit power, `migrate = F` | 1.81 GW, exit bunching 0.035 |
 
+The exit powers are at this deck's grid and particle count, and a dark start's power
+depends on both ([startup noise](../../startup-noise.md)). The ratio between the
+two rows is the measurement here.
+
 `migration.migration.txt` carries one row per event with the s position, the count,
 the charge dropped and the phasor deviation, and the totals at the end. The rows are
 what a plot of migration would be drawn from.

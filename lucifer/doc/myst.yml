@@ -11,6 +11,7 @@ project:
     - file: fel-physics.md
     - file: validation.md
     - file: performance.md
+    - file: startup-noise.md
     - title: The statistics file format
       children:
         - file: BMAD-STATS-SPEC.md

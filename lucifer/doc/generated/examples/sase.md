@@ -29,7 +29,9 @@ The beam is a flat coasting bunch said in Bmad's own vocabulary:
 Measured on this input (`ran_seed` at its 12345 default): startup power settles near
 4 MW per slice after the first segment, the total reaches 3.0 GW at z = 57 m with a
 per-slice spread of 0.91, which is the SASE fluctuation, and the induced energy
-spread grows from 0.99 to 1.14 m_e c^2.
+spread grows from 0.99 to 1.14 m_e c^2. These powers are at this deck's grid and
+particle count, and a dark start's power depends on both
+([startup noise](../../startup-noise.md)).
 
 Two features of the plot are physics rather than artifacts. The total-power sawtooth
 is radiation slipping out of the head of a finite time window at each drift while

@@ -257,6 +257,9 @@ These two checks are statistical by necessity (independent RNGs). The `tdsase` t
 their deterministic complement: Genesis4 generates the noisy beam, writes it, and both
 codes track the identical realization dark through the full line, so startup-from-noise
 is also compared elementwise like any other tier.
+Both codes discretize the transverse plane and the load identically, and the tiers pin
+one grid and one particle count, so a dependence of the SASE power on either is
+invisible to them. It is measured in [](startup-noise.md).
 
 The loader's own current profile reproduces the derived-current identity exactly, **9.9e-15** of peak, and a dropped $\sqrt{2\pi}$ fails that at 1.5. Importing the same Gaussian description agrees with it at rms **4.9e-2** of peak, which is a statistical comparison over 50k particles against a truncated-tail fit rather than an identity.
 
