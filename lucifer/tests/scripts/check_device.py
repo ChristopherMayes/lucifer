@@ -2,7 +2,7 @@
 """Device backend checks (doc/validation.md): the Metal backend's divergence from the
 FP64 path is a recorded number judged by the lockstep instrument with the device in
 the twin's role, the instrument cannot touch the FP64 physics, the check can fail,
-and everything the backend does not cover is refused by name.
+and everything the backend does not cover is refused.
 
 1. Lockstep levels. A steady one-segment run with device = "metal" and fp32_check =
    "lockstep" must land its worst per-quantity divergence inside the recorded device
@@ -23,7 +23,7 @@ and everything the backend does not cover is refused by name.
    production path corroborate each other.
 5. Time dependence. An 8-slice shot-noise window with slippage rotating the resident
    record holds the same ceilings, read-only proof and production band.
-6. Refused by name. Wakes, migration, spontaneous radiation, harmonic field sets,
+6. Refused. Wakes, migration, spontaneous radiation, harmonic field sets,
    the unaveraged mode, an unsupported grid (the message names the nearest supported
    size) and an unknown backend name each stop the run.
 
@@ -216,7 +216,7 @@ def main():
     ok("device production TD window power vs CPU", f"{rel:.3e}",
        f"<= {E2E_CEIL:.1e}", rel <= E2E_CEIL)
 
-    # 6. Refused by name, never a quiet CPU fallback.
+    # 6. Refused, never a quiet CPU fallback.
     refusals = [
         ("dev_rw.in", DEV + '  wake_on = T\n  wake_radius = 2.5e-3\n'
                             '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n',
@@ -231,19 +231,19 @@ def main():
         r = run(args.exe, wd, name, BASE.format(root=name.removesuffix(".in"), extra=extra),
                 expect_fail=True)
         refused = r.returncode != 0 and msg in r.stdout
-        ok(f"refused by name: {msg.lower()}", refused, "True", refused)
+        ok(f"refused: {msg.lower()}", refused, "True", refused)
 
     r = run(args.exe, wd, "dev_rg.in",
             BASE.format(root="dev_rg", extra=DEV).replace("grid_n_pts = 64", "grid_n_pts = 65"),
             expect_fail=True)
     refused = r.returncode != 0 and "nearest supported size is 64" in r.stdout
-    ok("refused by name: unsupported grid, nearest size named", refused, "True", refused)
+    ok("refused: unsupported grid, nearest size named", refused, "True", refused)
 
     r = run(args.exe, wd, "dev_ru.in",
             BASE.format(root="dev_ru", extra=DEV).replace("aramis_1seg.bmad", "aramis_1seg_unavg.bmad"),
             expect_fail=True)
     refused = r.returncode != 0 and "DOES NOT COVER THE UNAVERAGED MODE" in r.stdout
-    ok("refused by name: the unaveraged mode", refused, "True", refused)
+    ok("refused: the unaveraged mode", refused, "True", refused)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0

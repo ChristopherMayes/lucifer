@@ -23,7 +23,7 @@ Harmonic field-set and openPMD wavefront checks (fel-physics.md sec-field-set):
      independently of Genesis.
   4. Thread identity: 1 vs 8 threads byte-identical on a time-dependent harmonic run
      (diag byte-equal, harmonic dumps dataset-equal).
-  5. Refusals, each by name: harmonics not anchored on the fundamental; harmonic
+  5. Refusals: harmonics not anchored on the fundamental; harmonic
      fields with an unaveraged element; harmonic fields with two live polarizations;
      an openPMD import declaring the frequency domain; a harmonic import whose
      photonEnergy matches no field of the run; a Genesis-format harmonic import,
@@ -479,7 +479,7 @@ def main():
     check("1 vs 8 threads byte/dataset-identical", 0.0 if same else 1.0, 0.5)
 
     # ------------------------------------------------------------------
-    # 5. Refusals, each by name.
+    # 5. Refusals.
 
     print("== refusals ==")
     base = NML_TD.format(lat="planar.bmad", root="rf", extra="{extra}")

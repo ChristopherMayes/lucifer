@@ -29,7 +29,7 @@
 ! from beam_init, or an imported particle distribution. Time dependence follows from the
 ! starting state alone: a multi-slice window makes a time-dependent run, a single slice
 ! the steady state, no separate switch. The retired flat &fel_track_params group is
-! refused by name, each parameter mapped to its new home.
+! refused, each parameter mapped to its new home.
 !
 ! Usage:
 !   lucifer <input_file>

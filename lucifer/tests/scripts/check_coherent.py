@@ -19,12 +19,13 @@ implemented from the paper -- the SIMPLEX hybrid: their source, our field).
      under 0.1.
   4. Moments extension: an offset + tilted (but Gaussian) beam, imported via an
      openPMD file this check writes, runs coherent and tracks its own deposit twin
-     (same tolerance as 2); a DOUBLE-HORN beam is refused by name by the
+     (same tolerance as 2); a DOUBLE-HORN beam is refused by the
      significance guard (excess kurtosis against sqrt(24/m_ind)).
-  5. Dark start refused by name: measured ~175x startup deficit (spontaneous,
+  5. Dark start refused: measured ~175x startup deficit (spontaneous,
      spatially-incoherent emission dominates SASE startup; the coherent model drops
-     it by construction) -- the goal's fallback clause, executed. B(s) does carry
-     the physical Fawley noise, but it is not the dominant seed at startup.
+     it by construction), so the model refuses a dark start rather than reporting a
+     startup it cannot represent. B(s) does carry the physical Fawley noise, but it
+     is not the dominant seed at startup.
   6. Threads: a coherent run is bit-identical at 1 and 8 threads.
 
 Run by the benchmark harness; exits nonzero on failure. Self-referenced (no Genesis).
@@ -225,19 +226,20 @@ def main():
             break
     ok = run(exe, wd, "mhorn", 2048, True, sig_z='4e-9', bextra=IMP, wextra=WIN, lat="cohshort.bmad",
              expect_fail="GAUSSIAN ENOUGH")
-    print(f"--- double-horn beam refused by name (GAUSSIAN ENOUGH): {'ok' if ok else '** FAIL **'}")
+    print(f"--- double-horn beam refused (GAUSSIAN ENOUGH): {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
     # ------------------------------------------------------------------
-    print("== dark start refused by name (the measured startup deficit) ==")
+    print("== dark start refused (the measured startup deficit) ==")
 
     # measured on this configuration: the coherent dark start came out ~175x low
     # (deposit 1311 W vs coherent 7.5 W at the same seeds) -- spontaneous,
     # spatially-incoherent emission dominates SASE startup and the coherent model
-    # drops it by construction. The goal's fallback clause applies: refusal by name.
+    # drops it by construction, so a dark start is refused rather than reported as a
+    # startup this model cannot represent.
 
     ok = run(exe, wd, "sdark", 2048, True, sase=True, expect_fail="DARK START")
-    print(f"--- coherent + dark start refused by name: {'ok' if ok else '** FAIL **'}")
+    print(f"--- coherent + dark start refused: {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok
 
     # ------------------------------------------------------------------

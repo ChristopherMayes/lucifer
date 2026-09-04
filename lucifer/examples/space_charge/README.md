@@ -66,14 +66,14 @@ That is +0.75% in exit power, past saturation, from the short-range term acting 
 beam the FEL has bunched.
 
 Two configurations refuse rather than surprise. `slice` with neither term configured,
-`nz = 0` and `longrange = F`, is refused by name: the solve would cost its full price and
+`nz = 0` and `longrange = F`, is refused: the solve would cost its full price and
 return an exact zero. And `fft_3d` on an FEL element is refused, since that solver wants a
 three-dimensional grid this walk does not build.
 
 The master switch off while the elements still ask for `slice` is not refused, because
 that is how a lattice is run without space charge without editing it.
 `lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch
-false. The run says so by name and tracks the space-charge-free path, measured as exactly
+false. The run says so and tracks the space-charge-free path, measured as exactly
 the control run's zero.
 
 Runs in ~7 s each.

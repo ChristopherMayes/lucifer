@@ -32,7 +32,7 @@ Terminology note. "Coordinate" is used here in netCDF's coordinate-variable sens
 ## 3. File identity
 
 - **R1.** The root group MUST carry `@file_format = 'bmad-stats'`.
-- **R2.** The root MUST carry `@file_format_version = 'MAJOR.MINOR'`. A reader SHOULD refuse a version it does not know, by name, rather than guess.
+- **R2.** The root MUST carry `@file_format_version = 'MAJOR.MINOR'`. A reader SHOULD refuse a version it does not know rather than guess, and say which version it found.
 - **R3.** The root MUST carry `@writer`, the program name and version (`'lucifer 1.0'`).
 - **R4.** A file using extensions MUST list them in `@extensions`, a string array. A file using none MUST omit the attribute: absence means none, because a zero-length string array cannot pass safely through HDF5's Fortran layer (see R11).
 - **R5.** The root MUST carry `@kinds`, a string array enumerating every `@kind` value the file uses, so a reader that sorts groups never discovers the vocabulary by inspection.

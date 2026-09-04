@@ -172,7 +172,7 @@ def run(exe, wd, name, text, threads="4"):
 
 
 def run_expect_refusal(exe, wd, name, text, fragment):
-    """The run must fail, and by name."""
+    """The run must fail, with its own message."""
     (wd / (name + ".nml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
@@ -329,7 +329,7 @@ def main():
     # 7. Mixed line (Stage A): averaged / unaveraged / averaged sandwich with pipe
     # interludes. Completing at all exercises the convention-flag asserts at real
     # internal boundaries. The ledger must be confined to and conserved over the
-    # unaveraged segment. A wake on that segment must refuse by name, and the exit
+    # unaveraged segment. A wake on that segment must refuse, and the exit
     # power is priced against the all-averaged twin.
     (wd / "sandwich_avg.bmad").write_text(
         "call, file = unavg_sandwich.bmad\n"
@@ -352,7 +352,7 @@ def main():
     refused = run_expect_refusal(exe, wd, "uv_sandw",
         GAIN.format(root="uv_sandw", lat="sandwich_wake.bmad"),
         "ELEMENT SR WAKES ARE NOT SUPPORTED IN THE UNAVERAGED MODE")
-    check("sandwich: wake on the unaveraged segment refused by name (1 = yes)",
+    check("sandwich: wake on the unaveraged segment refused (1 = yes)",
           0.0 if refused else 1.0, 0.5)
 
     # 8. Thread invariance: the parallel slice loop must be invisible. A multi-slice

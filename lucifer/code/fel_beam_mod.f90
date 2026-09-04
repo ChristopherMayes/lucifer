@@ -244,7 +244,7 @@ end function
 !+
 ! Subroutine fel_assert_averaged_chart (beam, where_str, err_flag)
 !
-! Routine to refuse by name when the beam's stored px still carries the undulator quiver
+! Routine to refuse when the beam's stored px still carries the undulator quiver
 ! (the unaveraged tracker left its region without restoring the averaged convention).
 ! Every averaged-physics or seam entry point calls this: a hard-edge handoff injects
 ! spurious transverse momentum of order K/gamma -- comparable to the beam divergence --
@@ -325,7 +325,7 @@ end function fel_theta
 !
 ! n_slice is the window the deck asked for, and the file must agree: a dump carries one
 ! patch per slice, so a different patch count means the deck and the file describe
-! different runs, and that is refused by name. Pass -1 when the deck states no window,
+! different runs, and that is refused. Pass -1 when the deck states no window,
 ! which is the usual case for a restart, and the file's patch count defines it. A bunch
 ! that is not a sliced window belongs on the import path (dist_file), which resamples it
 ! instead of assuming a slicing it does not carry.

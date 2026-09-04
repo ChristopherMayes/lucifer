@@ -29,7 +29,7 @@ bool. The file keeps one source of truth for each.
 Units are documentation. The values are already SI and eV, so nothing here scales by
 @unit, and neither should a caller.
 
-The version is refused by name. This is internal development, so the format moves
+The version is refused. This is internal development, so the format moves
 without compatibility machinery: a file this reader does not know is an error rather
 than a guess.
 """

@@ -104,7 +104,7 @@ type fel_global_struct
   ! backend on a build that carries it. Alone it runs the averaged FEL step resident
   ! on the device; combined with fp32_check the device takes the lockstep twin's role
   ! and the FP64 run is untouched. Everything the backend does not cover is refused
-  ! by name at setup or first use, never quietly run on the CPU instead.
+  ! at setup or first use, never quietly run on the CPU instead.
   character(16) :: device = 'off'
 end type
 

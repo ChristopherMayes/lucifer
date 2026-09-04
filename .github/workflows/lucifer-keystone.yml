@@ -38,7 +38,7 @@
 # What is deliberately not here, so the difference from the local keystone is on the
 # record: the production build and the two-build digit comparison, the examples, and
 # Bmad's own regression suite, which ci.yml already runs. The device section cannot run
-# on a runner with no Metal device and skips by name, which is the one section allowed
+# on a runner with no Metal device and skips with its reason recorded, the one section allowed
 # to.
 #
 # Both triggers below read this file from the repository's DEFAULT branch rather than
@@ -176,7 +176,7 @@ jobs:
       # One environment for the reference and the Python side, from the repository's own
       # file, which pins genesis4 4.6.15. The pin is the whole reason this job is
       # possible: releases to 4.6.14 carry a pre-CODATA electron rest energy and seed
-      # their noise per MPI rank, and the harness refuses any other version by name. It
+      # their noise per MPI rank, and the harness refuses any other version, printing what it found and wanted. It
       # is separate from the build environment for the reason the recording machine keeps
       # them separate, and the harness finds it by name.
       - name: Install the reference and the Python side
@@ -202,7 +202,7 @@ jobs:
               https://github.com/ChristopherMayes/openPMD-beamphysics.git \
               "$RUNNER_TEMP/openPMD-beamphysics"
           # The conversion's recorded levels belong to one commit, so a moved branch tip
-          # is refused by name here rather than converting differently and passing.
+          # is refused here rather than converting differently and passing.
           want=cffc34b96bbe1cbd9fae0733a73733d599611142
           got=$(git -C "$RUNNER_TEMP/openPMD-beamphysics" rev-parse HEAD)
           echo "openPMD-beamphysics at $got"

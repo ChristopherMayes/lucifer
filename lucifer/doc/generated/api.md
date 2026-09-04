@@ -189,7 +189,7 @@ Output:
 *Subroutine* `(beam, where_str, err_flag)`
 
 ```
-Routine to refuse by name when the beam's stored px still carries the undulator quiver
+Routine to refuse when the beam's stored px still carries the undulator quiver
 (the unaveraged tracker left its region without restoring the averaged convention).
 Every averaged-physics or seam entry point calls this: a hard-edge handoff injects
 spurious transverse momentum of order K/gamma -- comparable to the beam divergence --
@@ -241,7 +241,7 @@ routine: one particlePatch per slice, in window order, empty patches included.
 
 n_slice is the window the deck asked for, and the file must agree: a dump carries one
 patch per slice, so a different patch count means the deck and the file describe
-different runs, and that is refused by name. Pass -1 when the deck states no window,
+different runs, and that is refused. Pass -1 when the deck states no window,
 which is the usual case for a restart, and the file's patch count defines it. A bunch
 that is not a sliced window belongs on the import path (dist_file), which resamples it
 instead of assuming a slicing it does not carry.
@@ -980,7 +980,7 @@ Output:
 ```
 Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
 asks for the one backend this tree knows; a build without it (the stub) refuses with
-the stub's own reason, and any other name is refused by name. Allocates the resident
+the stub's own reason, and any other value is refused, with the error listing what this tree knows. Allocates the resident
 buffers for this run shape (the grid refusal, naming the nearest supported size,
 comes back from the backend), runs the exact-wrap assertion on the device, and
 writes the device header lines into the instrument's stream when one is open.
@@ -1451,7 +1451,7 @@ records). Serial by design: the caller's epilogue runs slices one at a time, so 
 plan pair and one aligned buffer suffice.
 
 A build without the single-precision library compiles the body out, since a call to
-fftwf_execute_dft would fail to link at all. Setup refuses such a build by name
+fftwf_execute_dft would fail to link at all. Setup refuses such a build
 (fel_fp32_have_fftw3f$), so this routine is unreachable there, and the message says
 so rather than pretending to a fallback.
 ```
@@ -1951,7 +1951,7 @@ shot noise.
 
 ```
 Routine to check the beam_init contract: the quiet-start generator honors the beam_init
-fields in the header table and refuses by name every other field that is set -- a
+fields in the header table and refuses every other field that is set -- a
 standard structure that silently dropped fields would be worse than a custom one. (The
 import path is exempt: init_beam_distribution honors everything Bmad honors.)
 renorm_center/renorm_sigma, random_engine defaults and n_bunch = 0/1 are generation
@@ -2054,7 +2054,7 @@ program may reuse the parsing, or skip it and fill the structs in code.
   &fel_wavefront_init  wavefront_init, field_file
 
 A group that is absent keeps its defaults. A group that is present must parse.
-The retired flat &fel_track_params group is refused by name: the error lists each
+The retired flat &fel_track_params group is refused: the error lists each
 parameter found in it and the group it moved to.
 ```
 
@@ -2127,7 +2127,7 @@ Output:
 *Function* `(param_file) result (found)`
 
 ```
-Refuse the retired flat &fel_track_params group by name: list every parameter set
+Refuse the retired flat &fel_track_params group: list every parameter set
 in it together with the group and name it moved to, so migration is a mechanical
 edit of the input file.
 ```
@@ -2256,7 +2256,7 @@ so the footer never claims a file the run did not write.
 ```
 Routine to read an openPMD wavefront into field-set entry ihh (the fundamental
 import path). The photon energy must be the fundamental's: a file carrying a
-harmonic in field_file(1) is refused by name.
+harmonic in field_file(1) is refused.
 ```
 
 ```
@@ -2277,7 +2277,7 @@ Output:
 
 ```
 Routine to import a harmonic field: match the file's photon energy to the field-set
-entry carrying that harmonic (no match is refused by name), require the fundamental's
+entry carrying that harmonic (no match is refused), require the fundamental's
 grid and window, and keep the walk's wavelength convention (fundamental / h).
 ```
 
@@ -2675,7 +2675,7 @@ segment is a wiggler/undulator tracked by an FEL method: Bmad's own
 semantics for program-supplied tracking, which this driver is. The wiggler sanity
 assertions are enforced: a wiggler with zero b_max or l_period would silently get
 factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
-gets osc_amplitude without focusing. Both are refused by name. The stored k1x/k1y
+gets osc_amplitude without focusing. Both are refused. The stored k1x/k1y
 wiggler attributes are deliberately NOT read: their helical sign disagrees with the
 tracking locals. Nothing here cross-uses them.
 ```
@@ -2712,7 +2712,7 @@ Output:
 
 ```
 Routine to resolve one tracking-window locator to a single tracked-element index,
-refused by name when it matches nothing or more than one element.
+refused when it matches nothing or more than one element.
 ```
 
 (api-check-wake-window)=
@@ -2724,7 +2724,7 @@ refused by name when it matches nothing or more than one element.
 Routine to check the Bmad element wakes against the time window. Element sr wakes act
 across the whole window (fel-physics.md sec-seamwake): all slices concatenate into one bunch
 in global window coordinates and Bmad's wake machinery applies unmodified. What is
-checked here, by name: lr (multi-bunch) wakes are not supported. A pseudomode wake
+checked here: lr (multi-bunch) wakes are not supported. A pseudomode wake
 whose z_max is shorter than the window would have Bmad kill the bunch mid-run. A
 z_long table narrower than the window would overflow its binning grid the same way.
 Runs after the beam is built (the window length is the subject). setup_fel_elements
@@ -2745,7 +2745,7 @@ delay is charged as whole-wavelength window rotations (Genesis's chicane
 semantics: "always autophasing") on the break's last element, which also takes
 the light-path drift correction. Absolute mode adds the delay's carrier phase in
 the walk. Only a closed bump keeps the light on the next undulator's axis.
-Anything else is refused by name, as is any geometry element under the
+Anything else is refused, as is any geometry element under the
 genesis-model interludes (Genesis's drift/quad set cannot represent it).
 ```
 
@@ -2768,7 +2768,7 @@ rotations and the light-path correction (see setup_break_geometry's header).
 Routine to set up the diagnostics (fel-physics.md sec-stats): resolve the dump-at lists through
 Bmad's own lat_ele_locator (class::name syntax for free) and precompute the exact
 record and element-end counts by replaying the walk's skip rule, so the stats arrays
-are sized once, never grown. An entry matching nothing is refused by name.
+are sized once, never grown. An entry matching nothing is refused.
 ```
 
 ## `fel_stats_mod.f90`
@@ -3834,9 +3834,9 @@ The brief's 7.5 assertions, enforced at the first touch of the element: the
 reference time/energy pass inside bmad_parser, through the hooks above. Enforcing
 them any later is too late. A missing b_max parses cleanly and only fails downstream
 with an unrelated message. A fieldmap field_calc segfaults track_a_wiggler during
-the parse itself. Refusal is by name so a lattice author knows which attribute to fix.
+the parse itself. The refusal names the attribute so a lattice author knows what to fix.
 (The reference pass runs before lat_sanity_check, so these fire first. Bmad's own
-sanity check would also refuse a missing l_period by name if this were removed.)
+sanity check would also refuse a missing l_period if this were removed.)
 ```
 
 ```
@@ -4855,7 +4855,7 @@ then track from bitwise-identical initial conditions), a self-generated quiet st
 from beam_init, or an imported particle distribution. Time dependence follows from the
 starting state alone: a multi-slice window makes a time-dependent run, a single slice
 the steady state, no separate switch. The retired flat &fel_track_params group is
-refused by name, each parameter mapped to its new home.
+refused, each parameter mapped to its new home.
 
 Usage:
   lucifer <input_file>
@@ -5526,7 +5526,7 @@ numpy-natural for per-slice access. axisLabels declare that stored order. The sl
 axis is the one labeled z (third in the logical x,y,z reading). Slices are
 simultaneous, so they are a mesh axis, never the openPMD iteration.
 
-Reading implements exactly what writing produces and refuses the rest by name:
+Reading implements exactly what writing produces and refuses the rest:
 temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
 (z,y,x), and any missing required attribute.
 ```
@@ -5596,7 +5596,7 @@ group instead. Caught by the validation's file comparison against the Python wri
 
 ```
 Routine to read an openPMD EXT_Wavefront file written to the module header's layout.
-Everything this reader cannot represent is refused by name: a frequency-domain or
+Everything this reader cannot represent is refused: a frequency-domain or
 k-space field, an axis order other than (z,y,x), a missing required attribute.
 
 photon_energy is returned so the caller can match the file to the field set entry

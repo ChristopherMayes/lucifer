@@ -10,7 +10,7 @@ The normative reference for every namelist parameter Lucifer honors: its default
 
 Per-element settings are [lattice attributes](#lattice-attributes) rather than namelist parameters. How to build and run is [](user-guide.md). What the outputs hold is [](reading-output.md). The measured levels are [](validation.md). The physics is the manual, [](fel-physics.md). Every resolved input is written into the statistics file's `params/` group, so a finished run states its own configuration with every default explicit.
 
-A flat `&fel_track_params` group is refused by name, with each parameter mapped to the group that now carries it.
+A flat `&fel_track_params` group is refused, with each parameter mapped to the group that now carries it.
 
 (group-fel-params)=
 ## &fel_params
@@ -49,16 +49,16 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 **`global%transport_model`** selects the transverse maps inside an averaged FEL element. `"bmad"`, the default and the production model, is Bmad's own periodic-wiggler kernel with its end-field treatment and chromaticity through `p0/p`. `"genesis"` is Genesis4's maps verbatim, with the focusing matrix built from `aw`, `kx`, `ky` and chromaticity through `gammaz`. The second is validation-internal: a transcription comparison needs transcription-level transport, so the comparison tiers set it and no production run does. The two are priced against each other in the manual's element section, and the unaveraged mode integrates the field rather than applying a map, so the switch does not reach it.
 
 (param-global-source-model)=
-**`global%source_model`** is `"deposit"`, the standard per-particle scatter, or `"coherent"`, the coherent-Gaussian retrieval in which the spatially incoherent part of the source is dropped, the slice bunch factor keeps the physical shot noise, and the transverse shape is a guarded Gaussian. A profile that is measurably not Gaussian is refused by name. See [](fel-physics.md#sec-coherent-source).
+**`global%source_model`** is `"deposit"`, the standard per-particle scatter, or `"coherent"`, the coherent-Gaussian retrieval in which the spatially incoherent part of the source is dropped, the slice bunch factor keeps the physical shot noise, and the transverse shape is a guarded Gaussian. A profile that is measurably not Gaussian is refused. See [](fel-physics.md#sec-coherent-source).
 
 (param-global-track-start)=
 **`global%track_start`** and **`global%track_end`** bound the walk, using Bmad's element-locator syntax. The schedule (slippage, autophasing, break geometry) is always built on the full lattice, so a windowed run composes exactly with the full one: the first span followed by the second, started from the first's dumps, reproduces the one-shot run. The measured level is in [](validation.md#val-the-programs-own-identities).
 
 (param-global-fp32-check)=
-**`global%fp32_check`** arms the FP32 lockstep instrument, a check rather than a production mode: an FP32 twin of the averaged FEL advance steps beside the FP64 path from a shared state, and the per-quantity divergence goes to `<out_root>.fp32.txt` with the worst case in the footer. `"lockstep"` rebuilds the FP32 state from FP64 every step, so a wrong formula shows as a jump. `"freerun"` carries the FP32 longitudinal state and the FP32 field across steps, a complete single-precision run beside the FP64 one, so the compounding rate and the end-to-end observable divergence are measured; it covers a single-slice window and refuses more, since the twin keeps no slippage rotation of its own. The twin covers the fundamental-only, collective-free averaged advance and refuses anything else by name (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode). A run whose FP32 residual cannot resolve the per-step phase increment is refused by the runtime guard rather than reported as a clean number. The FP64 physics is untouched: the instrumented run's outputs are byte-identical to the uninstrumented run's. The measured levels are in [](validation.md#val-fp32-lockstep). `fp32_mutate` coarsens the FP32 residual by eight mantissa bits so the harness can prove the check fails when the path is wrong. The instrument needs the single-precision FFTW (`libfftw3f`), since the field twin's transform is FFTW's own `fftwf` interface; a build without that library refuses `fp32_check` by name rather than transforming in another precision, and the build reports which way it went at configure time.
+**`global%fp32_check`** arms the FP32 lockstep instrument, a check rather than a production mode: an FP32 twin of the averaged FEL advance steps beside the FP64 path from a shared state, and the per-quantity divergence goes to `<out_root>.fp32.txt` with the worst case in the footer. `"lockstep"` rebuilds the FP32 state from FP64 every step, so a wrong formula shows as a jump. `"freerun"` carries the FP32 longitudinal state and the FP32 field across steps, a complete single-precision run beside the FP64 one, so the compounding rate and the end-to-end observable divergence are measured; it covers a single-slice window and refuses more, since the twin keeps no slippage rotation of its own. The twin covers the fundamental-only, collective-free averaged advance and refuses anything else (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode). A run whose FP32 residual cannot resolve the per-step phase increment is refused by the runtime guard rather than reported as a clean number. The FP64 physics is untouched: the instrumented run's outputs are byte-identical to the uninstrumented run's. The measured levels are in [](validation.md#val-fp32-lockstep). `fp32_mutate` coarsens the FP32 residual by eight mantissa bits so the harness can prove the check fails when the path is wrong. The instrument needs the single-precision FFTW (`libfftw3f`), since the field twin's transform is FFTW's own `fftwf` interface; a build without that library refuses `fp32_check` rather than transforming in another precision, and the build reports which way it went at configure time.
 
 (param-global-device)=
-**`global%device`** selects a device backend for the averaged FEL step. `"metal"` runs it on an Apple Silicon GPU in single precision: the beam and the field upload at each FEL element's entry and stay resident through the element, every integration step is one command buffer (transverse maps, the longitudinal push in a fixed-point phase chart, the source deposit and the FFT field solve), and the state returns to the host at the stats comb's positions and the element end. Between those positions the host arrays are stale by design, so `comb_ds_save` is also the readback knob. Combined with `fp32_check` the device instead takes the lockstep twin's role: the FP64 run is untouched and the device's per-step divergence goes to the same `.fp32.txt` stream, which is how the backend is judged ([](validation.md#val-device)). Everything the kernels do not cover is refused by name at setup or first use (harmonics, two polarizations, the coherent source, wakes, space charge, spontaneous radiation, migration, the unaveraged mode, the escaped-field bank, a transverse grid that is not a power of two from 64 to 1024), and a build without the backend refuses the knob itself: an unsupported configuration stops the run and never quietly takes the CPU path. The backend is built where the toolchain can carry it, which is macOS with a Clang-family Objective-C++ compiler rather than macOS alone, since it is ARC-managed Objective-C++ against the Metal framework. Every other build takes the refusing stub and says so at configure time. Running `lucifer` with no arguments names what the build in hand carries, either the device it found or the reason there is none, so the question needs no run and no deck to answer.
+**`global%device`** selects a device backend for the averaged FEL step. `"metal"` runs it on an Apple Silicon GPU in single precision: the beam and the field upload at each FEL element's entry and stay resident through the element, every integration step is one command buffer (transverse maps, the longitudinal push in a fixed-point phase chart, the source deposit and the FFT field solve), and the state returns to the host at the stats comb's positions and the element end. Between those positions the host arrays are stale by design, so `comb_ds_save` is also the readback knob. Combined with `fp32_check` the device instead takes the lockstep twin's role: the FP64 run is untouched and the device's per-step divergence goes to the same `.fp32.txt` stream, which is how the backend is judged ([](validation.md#val-device)). Everything the kernels do not cover is refused at setup or first use (harmonics, two polarizations, the coherent source, wakes, space charge, spontaneous radiation, migration, the unaveraged mode, the escaped-field bank, a transverse grid that is not a power of two from 64 to 1024), and a build without the backend refuses the knob itself: an unsupported configuration stops the run and never quietly takes the CPU path. The backend is built where the toolchain can carry it, which is macOS with a Clang-family Objective-C++ compiler rather than macOS alone, since it is ARC-managed Objective-C++ against the Metal framework. Every other build takes the refusing stub and says so at configure time. Running `lucifer` with no arguments names what the build in hand carries, either the device it found or the reason there is none, so the question needs no run and no deck to answer.
 
 (param-global-migrate)=
 **`global%migrate`** is off by default, and the reason is the comparison rather than the physics: the tiers that compare against Genesis 1.3 Version 4 (Genesis4) run against a code that never migrates, so migration inside a transcription-level comparison would be a model difference. Dropped charge is counted and reported per event. With `migrate_check = T` the run also verifies exact phase continuity at every migration. See [](fel-physics.md#sec-migration).
@@ -76,7 +76,7 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 | `global%record_environment` | `F` | Also record the user name and working directory in the statistics file |
 
 (param-global-dump-beam-at)=
-**`global%dump_beam_at`** and **`global%dump_field_at`** name elements through Bmad's own locator, so `class::name` syntax works. An entry matching no element is refused by name. Dumps are openPMD, and the field dump is unrotated into time order first.
+**`global%dump_beam_at`** and **`global%dump_field_at`** name elements through Bmad's own locator, so `class::name` syntax works. An entry matching no element is refused. Dumps are openPMD, and the field dump is unrotated into time order first.
 
 (param-global-keep-escaped-field)=
 **`global%keep_escaped_field`** banks each field slice that slippage transmits beyond the window, with its `wavefront_params` and transmission position, and at finalize propagates each to the exit plane to write the whole pulse. Field that has left the window never re-interacts, so it is fixed information. See [](fel-physics.md#sec-stats).
@@ -96,7 +96,7 @@ A flat `&fel_track_params` group is refused by name, with each parameter mapped 
 | `bmad_com%radiation_damping_on` | Spontaneous energy loss in the FEL step and through Bmad's elements |
 | `bmad_com%radiation_fluctuations_on` | Quantum diffusion, one draw per beamlet |
 
-Both are off by default, matching Genesis4's `&sponrad`. Fluctuations with `global%migrate = T` are refused by name: the quiet start cancels per beamlet, and migration scrambles the grouping. See [](fel-physics.md#sec-eom).
+Both are off by default, matching Genesis4's `&sponrad`. Fluctuations with `global%migrate = T` are refused: the quiet start cancels per beamlet, and migration scrambles the grouping. See [](fel-physics.md#sec-eom).
 
 ### Chamber wakes: `chamber_wake%`
 
@@ -122,7 +122,7 @@ Genesis4's `&wake` names. Bmad element wakes are a separate mechanism, described
 **`chamber_wake%write_kernels`** is a bare name in this group rather than a `chamber_wake%` component, and it is the only name that works: it lands in `chamber_wake%write_kernels`, which the parser assigns unconditionally, so a value written as `chamber_wake%write_kernels` is overwritten. The export builds matching `z_long` tables, and `examples/bmad_wake` uses one.
 
 (param-chamber-wake-model)=
-**`chamber_wake%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which convolves its kernels with the weighted slice currents and produces one energy loss per slice. Anything else is refused by name rather than treated as the transcribed solver by default. The field exists so that a second implementation can arrive as a value here rather than as a rework.
+**`chamber_wake%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which convolves its kernels with the weighted slice currents and produces one energy loss per slice. Anything else is refused rather than treated as the transcribed solver by default. The field exists so that a second implementation can arrive as a value here rather than as a rework.
 
 The three kernels, their numerical impedance and the causal convolution are in [](fel-physics.md#sec-wakes).
 
@@ -143,18 +143,18 @@ reaches them.
 | `space_charge%longrange` | `F` | The whole-window long-range term |
 
 (param-space-charge-model)=
-**`space_charge%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which works per slice on a radial grid over azimuthal modes and longitudinal harmonics. Anything else is refused by name. Note that this family is Lucifer's own, and `space_charge_com` in the same group is Bmad's global structure, a separate thing.
+**`space_charge%model`** names the implementation, and `"genesis"` is the only value accepted today: the transcribed solver, which works per slice on a radial grid over azimuthal modes and longitudinal harmonics. Anything else is refused. Note that this family is Lucifer's own, and `space_charge_com` in the same group is Bmad's global structure, a separate thing.
 
 The default is expected to stay `"genesis"` when Bmad's own slice solver becomes the second value, and the reason is the physics rather than the order they arrived in. The transcribed solver carries two terms that matter inside an undulator and that Bmad's slice model does not have: the space charge of the microbunching itself, solved per longitudinal harmonic of the ponderomotive phase, and the longitudinal Lorentz factor, which at aw = 0.85 rms is worth a factor of 1.7 in the field's own scaling. What Bmad's model adds that this one lacks, a transverse defocusing kick, falls as the inverse cube of gamma and is an injector term rather than an undulator-line one. The transcribed path is also the measured one, at the level [](validation.md) records for the space-charge tier. A second value earns the default by measurement, not by being newer.
 
-If neither term is configured, `nz = 0` with `longrange = F`, an element asking for `slice` is refused by name: the solve would cost its full price and return an exact zero, and which of the two terms was meant is worth asking.
+If neither term is configured, `nz = 0` with `longrange = F`, an element asking for `slice` is refused: the solve would cost its full price and return an exact zero, and which of the two terms was meant is worth asking.
 
 See [](fel-physics.md#sec-spacecharge).
 
 (element-wakes)=
 ### Element wakes
 
-Elements carrying Bmad `sr_wake` definitions, either pseudomodes or a tabular `z_long`, act across the whole time window through slice concatenation. The conventions, the step size, the mid-element wiggler kick and the refusals are in [](fel-physics.md#sec-seamwake). Wakes and space charge are both refused by name in the unaveraged mode, which does not wire them into its step.
+Elements carrying Bmad `sr_wake` definitions, either pseudomodes or a tabular `z_long`, act across the whole time window through slice concatenation. The conventions, the step size, the mid-element wiggler kick and the refusals are in [](fel-physics.md#sec-seamwake). Wakes and space charge are both refused in the unaveraged mode, which does not wire them into its step.
 
 (group-fel-beam-init)=
 ## &fel_beam_init
@@ -179,7 +179,7 @@ There are three ways to obtain a beam: start from a dump, generate one from a de
 | `write_openpmd_file` | `""` | Write the bunch as openPMD-beamphysics |
 
 (param-beam-beam-file)=
-**`beam_file`** reads openPMD only. A file that is not openPMD is refused by name, and the message carries the conversion command. `tests/scripts/convert_genesis.py` converts in both directions, and [](genesis4.md) describes the exchange.
+**`beam_file`** reads openPMD only. A file that is not openPMD is refused, and the message carries the conversion command. `tests/scripts/convert_genesis.py` converts in both directions, and [](genesis4.md) describes the exchange.
 
 ### The bunch description: `beam_init%`
 
@@ -195,10 +195,10 @@ Bmad's standard `beam_init_struct`, the same block both generation paths read. O
 | `beam_init%distribution_type(3)` | `"RAN_GAUSS"` for a Gaussian current profile, `"GRID"` for Bmad's uniform one |
 
 (param-beam-init-contract)=
-Every other `beam_init` field that is set is refused by name. A standard structure that silently dropped fields would be worse than a custom one, so the honored set above is the contract, and `check_beam_init_contract` enforces it. Note that this contract covers the quiet-start generator: the import path honors everything Bmad honors, since `init_beam_distribution` generates the bunch.
+Every other `beam_init` field that is set is refused. A standard structure that silently dropped fields would be worse than a custom one, so the honored set above is the contract, and `check_beam_init_contract` enforces it. Note that this contract covers the quiet-start generator: the import path honors everything Bmad honors, since `init_beam_distribution` generates the bunch.
 
 (param-beam-sig-z)=
-**`beam_init%sig_z`** with `"RAN_GAUSS"` gives a Gaussian current profile evaluated at the slice centers, with the bunch centered in the window. A zero length is the steady state, one slice holding the whole charge, and it is refused by name for a time-dependent window. With `"GRID"` the profile is flat over the z extent of `grid(3)`. `beam_init%a_emit` and `b_emit` are refused: normalized emittances only, which is Bmad's preferred form. `sig_e` is deprecated Bmad-wide and does not exist here.
+**`beam_init%sig_z`** with `"RAN_GAUSS"` gives a Gaussian current profile evaluated at the slice centers, with the bunch centered in the window. A zero length is the steady state, one slice holding the whole charge, and it is refused for a time-dependent window. With `"GRID"` the profile is flat over the z extent of `grid(3)`. `beam_init%a_emit` and `b_emit` are refused: normalized emittances only, which is Bmad's preferred form. `sig_e` is deprecated Bmad-wide and does not exist here.
 
 ### The quiet start
 
@@ -273,7 +273,7 @@ Not physics input. The validation harness sets these.
 **`wavefront_init%window_length`** derives from the bunch when zero, four sigma either side of a Gaussian or the grid extent when flat, and one slice in the steady state. Override it for slippage headroom. A window that clips the bunch warns.
 
 (param-wavefront-harmonics)=
-**`wavefront_init%harmonics`** is a gap-free increasing list whose first entry must be `1`: the fundamental anchors the optical phase, the reference advance and the slippage schedule, and the harmonics ride on it. Anything else is refused by name. Nothing is ever summed across harmonics. See [](fel-physics.md#sec-field-set).
+**`wavefront_init%harmonics`** is a gap-free increasing list whose first entry must be `1`: the fundamental anchors the optical phase, the reference advance and the slippage schedule, and the harmonics ride on it. Anything else is refused. Nothing is ever summed across harmonics. See [](fel-physics.md#sec-field-set).
 
 (lattice-attributes)=
 ## Lattice attributes
@@ -294,7 +294,7 @@ Space charge is per element too, through Bmad's own `space_charge_method` attrib
 | `off` | The default. No space charge in this element |
 | `slice` | The slice-binned longitudinal solve, with the FEL slices as the bins |
 
-`fft_3d` and `cathode_fft_3d` are refused by name on an FEL element, since their solvers want a three-dimensional grid this walk does not build. Bmad's master switch applies as it does everywhere else: `bmad_com%csr_and_space_charge_on` must also be true, and when elements ask for `slice` while it is false the run says so and tracks without space charge. `space_charge_com%n_bin` is ignored, because the slices are the bins. Inside the Bmad seam the same attribute drives Bmad's own machinery, so one lattice reads the same way in every Bmad program.
+`fft_3d` and `cathode_fft_3d` are refused on an FEL element, since their solvers want a three-dimensional grid this walk does not build. Bmad's master switch applies as it does everywhere else: `bmad_com%csr_and_space_charge_on` must also be true, and when elements ask for `slice` while it is false the run says so and tracks without space charge. `space_charge_com%n_bin` is ignored, because the slices are the bins. Inside the Bmad seam the same attribute drives Bmad's own machinery, so one lattice reads the same way in every Bmad program.
 
 The unaveraged mode's two numbers are per-element attributes, registered by this program and usable on any wiggler or undulator:
 
@@ -307,12 +307,12 @@ The unaveraged mode's two numbers are per-element attributes, registered by this
 **`fel_unaveraged`** is a full Newton-Lorentz quiver with no period averaging and no coupling factor anywhere in its inputs, and the run writes an energy ledger beside its other outputs. **`fel_averaged`** is the wiggle-averaged model, whose transverse maps are chosen by [](#param-global-transport-model). See [](fel-physics.md#sec-unaveraged).
 
 (attr-fel-steps-per-period)=
-**`fel_steps_per_period`** defaults to 20 when unset. Below 10 is refused by name, the floor our own coupling-factor convergence supports: [](validation.md) tabulates it at 10, 20 and 30 steps per period.
+**`fel_steps_per_period`** defaults to 20 when unset. Below 10 is refused, the floor our own coupling-factor convergence supports: [](validation.md) tabulates it at 10, 20 and 30 steps per period.
 
 (attr-fel-ramp-periods)=
-**`fel_ramp_periods`** defaults to 2 when unset. A true hard edge is a test configuration, and it has an explicit sentinel of `-1`, so silence never means hard edge. A ramp pair longer than the segment is refused by name.
+**`fel_ramp_periods`** defaults to 2 when unset. A true hard edge is a test configuration, and it has an explicit sentinel of `-1`, so silence never means hard edge. A ramp pair longer than the segment is refused.
 
-The FEL parameters themselves come from the element: `aw` from `b_max` and `l_period`, the helicity from `field_calc`, and the step from `ds_step`. Each is asserted by name at setup. See [](fel-physics.md#sec-element).
+The FEL parameters themselves come from the element: `aw` from `b_max` and `l_period`, the helicity from `field_calc`, and the step from `ds_step`. Each is asserted at setup. See [](fel-physics.md#sec-element).
 
 ## Outputs
 

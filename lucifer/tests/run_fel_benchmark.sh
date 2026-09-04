@@ -29,7 +29,7 @@
 #   4. An openPMD-beamphysics checkout carrying beamphysics/wavefront/openpmd.py, at
 #      ../openPMD-beamphysics by default. It converts the Genesis reference dumps at the
 #      boundary, and the harmonics section round-trips the wavefront files through that
-#      class in both directions. Both refuse by name if the checkout is missing.
+#      class in both directions. Both refuse if the checkout is missing.
 #
 # Options:
 #   --genesis <path>    genesis4 binary. Default: $GENESIS4, else genesis4 on PATH.
@@ -420,7 +420,7 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = 
 # Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
 # uses a fieldmap field_calc, or that carries Bmad wakes on
 # any element (the slice-at-a-time seam cannot apply them meaningfully), must be
-# Refused by name -- the failure message names the offending attribute and element -- not passed
+# Refused -- the failure message names the offending attribute and element -- not passed
 # through to fail downstream with an unrelated message (missing b_max) or a segfault in
 # the parse-time reference tracking (fieldmap). Each check mutates one attribute of the
 # real single-segment lattice and requires both a nonzero exit and the by-name message.
@@ -430,7 +430,7 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = 
 # earlier than the program's own assertion, and the assertion stays as the second line of
 # defense for a lattice built through the API rather than parsed.
 
-echo "--- FEL-element assertion checks (refusal by name) -----------------------------"
+echo "--- FEL-element assertion checks (refusal messages) ----------------------------"
 grep -v "b_max" aramis_1seg.bmad                                   > refusal_bmax.bmad
 sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > refusal_lperiod.bmad
 sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > refusal_fieldmap.bmad
@@ -442,11 +442,11 @@ run_assert_refusal () {   # <name> <by-name message fragment> [extra &fel_params
     echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
     CHECKS_OK=0
   elif ! grep -q "$2" fel-refusal_$1.log; then
-    echo "FAIL: refusal_$1 refused, but not by name; log tail:" >&2
+    echo "FAIL: refusal_$1 refused, but not with the expected message; log tail:" >&2
     tail -5 fel-refusal_$1.log >&2
     CHECKS_OK=0
   else
-    echo "  refusal_$1: refused by name ($(grep "$2" fel-refusal_$1.log | head -1 | cut -c1-60)...)"
+    echo "  refusal_$1: refused ($(grep "$2" fel-refusal_$1.log | head -1 | cut -c1-60)...)"
   fi
 }
 cat > refusal_lrwake.bmad <<'LAT'
@@ -484,7 +484,7 @@ run_assert_refusal scnone   "NEITHER SPACE-CHARGE TERM IS CONFIGURED" \
 
 # tracking_method = custom on a wiggler means some other program's tracking, so this
 # program must not claim the element. With the only wiggler tracked that way there is no
-# FEL segment left, which is refused by name: the alternative, silently tracking it as an
+# FEL segment left, which is refused: the alternative, silently tracking it as an
 # FEL element, is what the named methods exist to prevent.
 
 sed 's/tracking_method = fel_averaged/tracking_method = custom/' aramis_1seg.bmad > custom_seam.bmad
@@ -493,11 +493,11 @@ if "$EXE" custom_seam.nml > fel-custom_seam.log 2>&1; then
   echo "FAIL: a custom-tracked wiggler was claimed as an FEL segment" >&2
   CHECKS_OK=0
 elif ! grep -q "NO FEL ELEMENT" fel-custom_seam.log; then
-  echo "FAIL: custom-tracked wiggler refused, but not by name; log tail:" >&2
+  echo "FAIL: custom-tracked wiggler refused, but not with the expected message; log tail:" >&2
   tail -5 fel-custom_seam.log >&2
   CHECKS_OK=0
 else
-  echo "  custom_seam: a custom-tracked wiggler is not an FEL segment, refused by name"
+  echo "  custom_seam: a custom-tracked wiggler is not an FEL segment, refused"
 fi
 
 if [ "$CHECKS_OK" -ne 1 ]; then
@@ -673,7 +673,7 @@ echo
 # FP64 reference lands inside its recorded ceilings, the instrument is read-only on
 # the FP64 physics (diag byte-identical on vs off), its mutation hook moves the
 # recorded level so the check can fail, freerun measures the compounding rate, and
-# configurations the twin does not cover are refused by name.
+# configurations the twin does not cover are refused.
 
 echo "--- FP32 lockstep checks --------------------------------------------------------"
 if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_fp32.py" --exe "$EXE" --workdir "$WORK_DIR"; then
@@ -688,7 +688,7 @@ echo
 # assertion on the fixed-point phase; read-only on the FP64 physics; the perturbed
 # kernel constant moves a recorded level so the check can fail; the freerun twin
 # and the resident production run land in the same end-to-end band; and everything
-# the backend does not cover is refused by name.
+# the backend does not cover is refused.
 #
 # This is the one section that can skip, and it keys on the answer lucifer itself
 # gives rather than on the platform. A build compiled against the refusing stub has

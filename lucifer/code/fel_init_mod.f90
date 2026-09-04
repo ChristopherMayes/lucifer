@@ -221,7 +221,7 @@ if (beam_init%bunch_charge <= 0) then
 endif
 
 ! The Twiss is the lattice's (one specification of one truth, as with e_tot and the
-! import path's init_beam_distribution): read the beginning element, refuse by name
+! import path's init_beam_distribution): read the beginning element, refuse
 ! when a lattice carries none.
 
 tw_beta_x = branch%ele(0)%a%beta;  tw_alpha_x = branch%ele(0)%a%alpha
@@ -247,7 +247,7 @@ endif
 ! default window covers the described bunch (as the import derives its window from
 ! real particles). window_length overrides it for slippage headroom and warns when it
 ! clips the bunch. sig_z = 0 is the steady state (the whole charge in one slice
-! window) and is refused by name for time-dependent windows.
+! window) and is refused for time-dependent windows.
 
 flat_z = .false.
 select case (trim(beam_init%distribution_type(3)))
@@ -484,7 +484,7 @@ end subroutine generate_initial_state
 ! Subroutine check_beam_init_contract ()
 !
 ! Routine to check the beam_init contract: the quiet-start generator honors the beam_init
-! fields in the header table and refuses by name every other field that is set -- a
+! fields in the header table and refuses every other field that is set -- a
 ! standard structure that silently dropped fields would be worse than a custom one. (The
 ! import path is exempt: init_beam_distribution honors everything Bmad honors.)
 ! renorm_center/renorm_sigma, random_engine defaults and n_bunch = 0/1 are generation

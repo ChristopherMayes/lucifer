@@ -99,7 +99,7 @@ particles out to a Genesis4 `.par.h5`, is implemented here because no upstream
 implementation exists. That is what Genesis4's `&importbeam` reads, so it is how
 Genesis4 restarts from a state Lucifer produced.
 
-A file that is not openPMD is refused by name, with the conversion command in the
+A file that is not openPMD is refused, with the conversion command in the
 message.
 
 ## Facts about Genesis4 this work pinned down

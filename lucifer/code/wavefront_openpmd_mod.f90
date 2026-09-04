@@ -38,7 +38,7 @@
 ! axis is the one labeled z (third in the logical x,y,z reading). Slices are
 ! simultaneous, so they are a mesh axis, never the openPMD iteration.
 !
-! Reading implements exactly what writing produces and refuses the rest by name:
+! Reading implements exactly what writing produces and refuses the rest:
 ! temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
 ! (z,y,x), and any missing required attribute.
 !-
@@ -236,7 +236,7 @@ end subroutine wavefront_write_openpmd
 ! Subroutine wavefront_read_openpmd (wf, file_name, err_flag, photon_energy)
 !
 ! Routine to read an openPMD EXT_Wavefront file written to the module header's layout.
-! Everything this reader cannot represent is refused by name: a frequency-domain or
+! Everything this reader cannot represent is refused: a frequency-domain or
 ! k-space field, an axis order other than (z,y,x), a missing required attribute.
 !
 ! photon_energy is returned so the caller can match the file to the field set entry

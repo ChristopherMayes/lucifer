@@ -61,7 +61,7 @@ examples check asserts that each page's figure exists rather than what it contai
 
 The regression suite reports 52 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `lucifer/wavefront/tests/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one, which the version check then has to accept: it refuses whatever does not report the recorded version, however it was named.
 
-The levels here were measured against the Genesis4 4.6.15 release, and the harness refuses a reference reporting any other version by name rather than running against it. That matters because the failure it prevents is silent: a different reference moves the recorded digits while every tolerance still passes. Two properties of 4.6.15 are load-bearing. It carries the CODATA electron rest energy, which is also Bmad's `m_electron`, where releases to v4.6.14 carried a value 2.14e-7 above it and loosened the transcription tiers by several percent of their own value ([](genesis4.md) states the constant and the size). And it seeds each stochastic stream from the global slice index, which this project contributed upstream, so noise realizations differ from every earlier release. The digits below were re-recorded on that migration, and which of them moved is stated in the changelog with the reason. The regeneration check refuses to absorb a reference change either way: it shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours, and the same class of mistake is why the reference's own variant is chosen to match the HDF5 its environment already runs.
+The levels here were measured against the Genesis4 4.6.15 release, and the harness refuses a reference reporting any other version rather than running against it, printing the one it found and the one it wants. That matters because the failure it prevents is silent: a different reference moves the recorded digits while every tolerance still passes. Two properties of 4.6.15 are load-bearing. It carries the CODATA electron rest energy, which is also Bmad's `m_electron`, where releases to v4.6.14 carried a value 2.14e-7 above it and loosened the transcription tiers by several percent of their own value ([](genesis4.md) states the constant and the size). And it seeds each stochastic stream from the global slice index, which this project contributed upstream, so noise realizations differ from every earlier release. The digits below were re-recorded on that migration, and which of them moved is stated in the changelog with the reason. The regeneration check refuses to absorb a reference change either way: it shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created: an unrelated `devel` environment on PATH once caused an HDF5 mismatch that cost hours, and the same class of mistake is why the reference's own variant is chosen to match the HDF5 its environment already runs.
 
 Debug and production binaries are never bit-comparable to each other. Compare like builds only.
 
@@ -74,12 +74,12 @@ That build is a conda build, for the same reason the recording machine uses one:
 
 That run asserts the tolerances and not the digits. A different FFTW and HDF5 give different last digits by construction, so the levels recorded here stay a property of the machine that recorded them. Its first green run is the demonstration: all eleven tiers passed, four of them on digits identical to the ones above and seven moved in their last places. It takes 37.5 minutes on a four-core runner, of which the harness is 30, so it runs on demand and weekly rather than per push, and the distribution's `ci.yml` covers the build on every push.
 
-The device section is the one section allowed to skip, and it skips there by name: a Linux build carries the refusing stub, so it has no backend to judge. The skip keys on what `lucifer` answers when run with no arguments, which names the backend the build carries and the machine under it, so a machine that has a usable backend cannot skip. A results file recording that skip cannot write the generated table, which `report_validation.py` refuses by name: that table lists every section that ran, and a run one section short would undercount them.
+The device section is the one section allowed to skip, and it skips there with its reason printed and recorded: a Linux build carries the refusing stub, so it has no backend to judge. The skip keys on what `lucifer` answers when run with no arguments, which names the backend the build carries and the machine under it, so a machine that has a usable backend cannot skip. A results file recording that skip cannot write the generated table, which `report_validation.py` refuses: that table lists every section that ran, and a run one section short would undercount them.
 
 (val-crossidentities-not-reference-files)=
 ## Cross-identities, not reference files
 
-Almost nothing here is checked against a stored expected-output file. A reference file records what the code did once. An identity records what must be true of any correct implementation, and it stays valid when the code is rewritten underneath it. So the checks are conservation laws, closed forms, independent routes to the same number, invariance under a change that must not matter (thread count, weight splitting, a no-op), and refusals by name.
+Almost nothing here is checked against a stored expected-output file. A reference file records what the code did once. An identity records what must be true of any correct implementation, and it stays valid when the code is rewritten underneath it. So the checks are conservation laws, closed forms, independent routes to the same number, invariance under a change that must not matter (thread count, weight splitting, a no-op), and refusals that state what they reject.
 
 A check that has never failed on a real defect is untested, so several here carry their own mutation record: what was broken deliberately, and how loudly the check noticed. And a measurement without a stated tolerance is not a check, so every number below is paired with the level it is held at.
 
@@ -208,7 +208,7 @@ the helical aw (the rms-convention error, exactly the mistake a translator would
 kills the gain outright and fails tier1 at 1.0 relative. Deriving helicity from the
 wrong attribute (element key instead of `field_calc`) fails identically. Removing
 the `b_max` assertion is caught by the refusal check: the lattice still dies, but on an
-unrelated downstream message instead of by name, which the check's grep rejects.
+unrelated downstream message instead of the assertion's own, which the check's grep rejects.
 
 The thread-independence check bites too: reintroducing a shared source accumulator across
 slices (the exact state of the code before the parallel step landed) puts the 1-thread and 8-thread
@@ -447,7 +447,7 @@ specified, and the checks corrected it. Interlude elements pass through Bmad's o
 `beta_new/beta_old` to hold theta (the same convention as `wake_on`'s energy kick).
 Bmad's wake machinery is used as is: the seam supplies global z and charges, Bmad
 supplies the physics (`ix_z(1)` is the bunch head at largest `vec(5)`,
-`wake_mod.f90`). Refused by name: lr (multi-bunch) wakes. A pseudomode `z_max` or a
+`wake_mod.f90`). Refused: lr (multi-bunch) wakes. A pseudomode `z_max` or a
 `z_long` table extent `z0` shorter than the window (Bmad would kill the bunch
 mid-run). A Bmad drift cannot carry a wake at all (use a pipe, and the driver now
 stops on any `bmad_parser` error rather than running a partial lattice, found when an
@@ -516,7 +516,7 @@ check exercises them (ledger conserved on the middle segment at 3.3e-4 of turnov
 mixed-vs-averaged exit price 2.9e-2 ln, a wake on the unaveraged segment refused by
 name). Parallel over slices with the averaged path's guarantees (results are
 bit-identical across thread counts. The harness checks it). Wakes/space
-charge/element wakes are refused by name. Each run writes `<out_root>.ledger.txt`.
+charge/element wakes are refused. Each run writes `<out_root>.ledger.txt`.
 
 Measured (`check_unaveraged.py`, in the harness, self-referenced or closed-form):
 
@@ -554,7 +554,7 @@ fc checks pass it, which is why the ledger is check zero. A hard-edge entry
 (`fel_ramp_periods = -1`, the explicit sentinel) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
 probe beam. Note the exit momentum re-absorbs the quiver at integer-period lengths,
 so the orbit, not the exit mean px, is the reliable instrument).
-skipping the exit handoff flag is refused by name at the first seam element.
+skipping the exit handoff flag is refused at the first seam element.
 
 (val-two-polarizations-vector-radiation)=
 ## Two polarizations: vector radiation, tilt honored, the crossed undulator
@@ -584,7 +584,7 @@ reference files):
 | unaveraged TD ledger over both components | 9.6e-5 | 1e-3 |
 | 1 vs 8 threads, crossed TD | byte-identical | (exactness, no level) |
 | helical re-anchor (vector vs scalar path, shot-noise power) | **7.2e-15** | 1e-12 |
-| tilt on helical / tilt with transcribed maps | refused by name | (refusal, no level) |
+| tilt on helical / tilt with transcribed maps | refused | (refusal, no level) |
 
 The rotation identity uses the driver's `swap_beam_xy` check instrument (the RNG
 draws its planes sequentially, so the generated beam itself is never swap-symmetric).
@@ -607,15 +607,15 @@ absorbed once. Harmonic fields start dark and grow from the beam's bunching
 (nonlinear harmonic generation: `examples/harmonics/`, P3 climbing nine decades to
 5.1 kW under a 200 MW fundamental in 4 m), or import. A single-entry set is the
 pre-harmonic walk bit for bit (the two-polarization overlay discipline again).
-Harmonics with two live polarizations, and with an unaveraged element, are refused
-by name, so unvalidated combinations refuse rather than guess.
+Harmonics with two live polarizations, and with an unaveraged element, are refused,
+so unvalidated combinations refuse rather than guess.
 
 Dumps speak one format, openPMD, in both directions. A field dump is an openPMD
 EXT_Wavefront file (`.wf.h5`), both polarizations as complex components of one mesh
 record (h5py reads them as complex128 natively), one file per harmonic with
 photonEnergy identifying it, and a harmonic's file carrying `-h<h>`. The standard
 document is authoritative: the harness verifies every required attribute against its
-text independently of the writer. A file that is not openPMD is refused by name on
+text independently of the writer. A file that is not openPMD is refused on
 import, with the conversion command in the message, and
 `lucifer/tests/scripts/convert_genesis.py` converts either kind of file in either
 direction. The Python side of the round trip is openPMD-beamphysics's own
@@ -641,7 +641,7 @@ Measured (check_harmonics.py, the harness's harmonics section):
 | Python openPMD read + round trip | 1.4e-16 / exact |
 | Fortran reads the Python writer's file | dataset-identical |
 | 1 vs 8 threads (TD harmonic run) | byte-identical |
-| six refusals (anchor, unavg, two-pol, frequency domain, no-match, format) | by name |
+| six refusals (anchor, unavg, two-pol, frequency domain, no-match, format) | message matched |
 
 (val-phasing-between-segments-measured)=
 ## Phasing between segments: measured, then built
@@ -687,7 +687,7 @@ Measured (check_phasing.py, the harness's phasing section):
 | unaveraged ledger closure across the chicane | 4.0e-6 |
 | TD chicane: extra banked slices == floor(delay/lambda) at 3.5, 6.5, 10.5 lambda | exact |
 | TD chicane 1 vs 8 threads | byte-identical |
-| four refusals (open bump, genesis-model bend, oversize z_offset, first-element z_offset) | by name |
+| four refusals (open bump, genesis-model bend, oversize z_offset, first-element z_offset) | message matched |
 
 (val-spontaneous-emission-the-two)=
 ## Spontaneous emission: the two FEL modes against Bmad's own radiation
@@ -740,7 +740,7 @@ always honored them through track1). Measured, same instrument:
 
 Fluctuation kicks are one draw per beamlet, exactly as Genesis4: independent
 per-particle kicks would break the quiet start's per-beamlet harmonic cancellation
-(and fluctuations + slice migration is refused by name for the same reason). Genesis4
+(and fluctuations + slice migration is refused for the same reason). Genesis4
 reaches the same variance with uniform x sqrt(3) draws. Ours are Gaussian. The
 physical limit. With the switches off (the default) every tier and check is unchanged
 bit for bit. The full trail includes the measurement that first
@@ -764,7 +764,7 @@ the reference the coherent model is measured against.
 Measured (check_coherent.py, the harness's coherent-source section): at M = 128/slice the
 plain deposit fakes ln P by +0.42 on a curve that truly absorbs, the coherent source
 stays at 0.048 -- a 64x particle reduction at the model's own bias (1.9e-2 at large
-M). Guarded by name: per-slice Gaussianity vs sampling significance (weighted by charge),
+M). Guarded: per-slice Gaussianity vs sampling significance (weighted by charge),
 and refusals for unaveraged/harmonics/two-polarization and for dark starts -- measured
 ~175x startup deficit: spontaneous spatially-incoherent emission dominates SASE
 startup and the coherent model drops it, so seeded runs only. Also priced once:
@@ -780,9 +780,9 @@ The library never stops. Every error returns through `err_flag` and the program 
 
 A windowed run composes with the full one. `global%track_start`/`track_end` bound the walk, but the schedule (slippage, autophasing, break geometry, including the end-of-lattice fixup) is always built on the full lattice. So `[start, D]` followed by `[after D, end]` from its dumps reproduces the one-shot run to the dump format's own round-trip floor, measured **3e-13** and held at 1e-10, with the walk itself bit-for-bit and a windowed run's finals equal to the full run's mid-line dumps exactly.
 
-Refusal texts are a supported contract. stdout is otherwise for humans and carries no contract at all, which is why the suite reads files rather than scraping the screen. The one exception is deliberate: a refusal must be recognizable by name, so the suite matches the capitalized text of a refusal together with a nonzero exit status. Those texts therefore change only with their checks, in the same commit.
+Refusal texts are a supported contract. stdout is otherwise for humans and carries no contract at all, which is why the suite reads files rather than scraping the screen. The one exception is deliberate: a refusal must be recognizable from its message, so the suite matches the capitalized text of a refusal together with a nonzero exit status. Those texts therefore change only with their checks, in the same commit.
 
-A fourth: an element-driven line reproduces the namelist-driven reference bit-identically at $z=0$, growing only to **3.4e-12** over the line, which is the one-ulp round trip of the $a_w$ lattice attribute. The FEL element's assertion checks refuse each malformed lattice by name.
+A fourth: an element-driven line reproduces the namelist-driven reference bit-identically at $z=0$, growing only to **3.4e-12** over the line, which is the one-ulp round trip of the $a_w$ lattice attribute. The FEL element's assertion checks refuse each malformed lattice, naming the attribute at fault.
 
 (val-parallelism-openmp-over-slices)=
 ## Parallelism: OpenMP over slices, bit-identical by construction
@@ -929,7 +929,7 @@ Apple GPUs have no FP64, so a single-precision form of the averaged FEL advance 
 
 The longitudinal residual needs a moving reference, and the instrument's own guard found that. The split is $z = z_{ref} + dz$ with the reference one FP64 number per slice; on the instrument's first run the reference was static, the beam's common $z$ drift accumulated into the residual, and at step 514 of 1068 the guard refused the run at 28 ulps against its floor of 32. A secular term in the residual is silent death by quantization, so the reference now follows the slice's FP64 mean each step, one host number per slice, and in freerun mode the persistent residuals rebase across the move with `fel_fp32_renorm`, the same operation migration needs (round trip measured at 1 ulp).
 
-The field solve has its own twin: the deposit scattered into an FP32 source grid, FFTW's single-precision transform pair, and the propagator rounded from the FP64 kernel, applied to the twin's own field record each step. Two rows join the stream, the source grid and the post-solve field, both against the FP64 post-solve field's norm. In freerun the FP32 field carries across steps, fed by the twin's own deposit and read by its own gather, so the twin is a complete single-precision run beside the FP64 one, longitudinal and field state alike (the transverse maps stay FP64 and enter rounded). A freerun window is one slice by refusal: the twin keeps no slippage rotation of its own. That transform is FFTW's own single-precision interface, and the build detects it rather than assuming it: the conda toolchain carries `libfftw3f` and the off-site distribution's from-source FFTW is double precision only, so a build without the library refuses `fp32_check` by name instead of transforming in a precision other than the one it reports.
+The field solve has its own twin: the deposit scattered into an FP32 source grid, FFTW's single-precision transform pair, and the propagator rounded from the FP64 kernel, applied to the twin's own field record each step. Two rows join the stream, the source grid and the post-solve field, both against the FP64 post-solve field's norm. In freerun the FP32 field carries across steps, fed by the twin's own deposit and read by its own gather, so the twin is a complete single-precision run beside the FP64 one, longitudinal and field state alike (the transverse maps stay FP64 and enter rounded). A freerun window is one slice by refusal: the twin keeps no slippage rotation of its own. That transform is FFTW's own single-precision interface, and the build detects it rather than assuming it: the conda toolchain carries `libfftw3f` and the off-site distribution's from-source FFTW is double precision only, so a build without the library refuses `fp32_check` instead of transforming in a precision other than the one it reports.
 
 Measured levels, worst over the run per quantity (M3 Max, production build; debug agrees):
 
@@ -960,14 +960,14 @@ The gain-regime figure sits at the order of the published backends' end-to-end S
 | freerun compounds past lockstep on the phasor | measured 14x |
 | freerun end-to-end power divergence on the gain segment | <= 1e-2 (measured 6.2e-4) |
 | instrument stream at 1 vs 8 threads | byte-identical |
-| wake with the instrument on | refused by name |
+| wake with the instrument on | refused |
 
-The instrument is read-only on the physics by construction and by check: nothing outside it reads the FP32 state, and the instrumented run's FP64 outputs are byte-identical to the uninstrumented run's. Configurations the twin does not cover (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode) are refused by name rather than half-measured.
+The instrument is read-only on the physics by construction and by check: nothing outside it reads the FP32 state, and the instrumented run's FP64 outputs are byte-identical to the uninstrumented run's. Configurations the twin does not cover (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode) are refused rather than half-measured.
 
 (val-device)=
 ## The Metal backend, judged by the instrument
 
-`global%device = "metal"` runs the averaged FEL step on an Apple Silicon GPU ([](input-reference.md#param-global-device)). The seam is one C interface (`device/lucifer_device.h`) behind `iso_c_binding`, one Objective-C++ file behind that, and a stub that refuses by name on every other platform; no Metal type or call appears anywhere else, so a second backend is a new implementation of the same interface plus one CMake branch. The design is this project's own prior work, the Genesis 1.3 v4 backends on branch `gpu/metal-engine` (commit 4919b01, unmerged upstream): the transform kernels, the one-command-buffer step and the buffer-sync rule transcribe `MetalEngine.mm` from that branch, while the physics kernels transcribe Lucifer's own `fel_fp32_mod` twin and the Bmad transverse map, so the arithmetic the device runs is the arithmetic the lockstep instrument already priced.
+`global%device = "metal"` runs the averaged FEL step on an Apple Silicon GPU ([](input-reference.md#param-global-device)). The seam is one C interface (`device/lucifer_device.h`) behind `iso_c_binding`, one Objective-C++ file behind that, and a stub that refuses on every other platform, naming the toolchain it would need; no Metal type or call appears anywhere else, so a second backend is a new implementation of the same interface plus one CMake branch. The design is this project's own prior work, the Genesis 1.3 v4 backends on branch `gpu/metal-engine` (commit 4919b01, unmerged upstream): the transform kernels, the one-command-buffer step and the buffer-sync rule transcribe `MetalEngine.mm` from that branch, while the physics kernels transcribe Lucifer's own `fel_fp32_mod` twin and the Bmad transverse map, so the arithmetic the device runs is the arithmetic the lockstep instrument already priced.
 
 One deliberate divergence from the reference backend, stated where the citation is: the longitudinal state is not an absolute FP32 theta but a 64-bit fixed-point phase, in ticks of $2\pi/2^{32}$ off a static FP64 per-slice reference. The low 32 bits are the phase modulo one radiation period at a uniform 1.5e-9 rad, the high bits count whole periods, and a bucket crossing is exact integer arithmetic -- the migration operation a later landing needs. The uniform quantum is what lets the reference stay static for a whole element where the FP32 residual of [](#val-fp32-lockstep) needed a moving one. Bucket wraps are modular arithmetic and are asserted exactly, on the device's own arithmetic at every setup: a bucket shift and its return must be bit-exact and the extracted phase must never see the shift, a statement no tolerance is allowed to soften.
 
@@ -991,9 +991,9 @@ End to end the two roles corroborate each other. The freerun twin (state residen
 | the perturbed kernel constant moves the recorded levels | theta >= 10x, source >= 5x (measured 710x, 52x) |
 | device freerun compounds past lockstep on the phasor | measured 14x |
 | freerun and production exit power vs CPU, steady and TD | <= 1.6e-3 (measured 5.1e-4, 5.1e-4, 1.5e-5) |
-| wakes, migration, radiation, harmonics, the unaveraged mode, an unknown backend, an unsupported grid | each refused by name |
+| wakes, migration, radiation, harmonics, the unaveraged mode, an unknown backend, an unsupported grid | each refused |
 
-One property is inherited from the reference backends and documented rather than fought: the deposit accumulates with device atomic adds whose ordering is not fixed, so two runs of the same step differ in the source's last bit or two. No device output is therefore asserted byte-identical against another device run; the read-only proofs compare FP64 outputs only, and the ceilings absorb the flutter. Everything the kernels do not cover is refused by name at setup or first use, and a build without the backend refuses the knob itself with the stub's own message. Which build that is comes from detection rather than from the platform: the backend needs macOS and a Clang-family Objective-C++ compiler, since it is ARC-managed Objective-C++ against the Metal framework, and a macOS build whose Objective-C++ compiler is a GNU one takes the stub like any other. The configure output names the backend it built, and a capability-free build was measured to produce byte-identical physics to a full one.
+One property is inherited from the reference backends and documented rather than fought: the deposit accumulates with device atomic adds whose ordering is not fixed, so two runs of the same step differ in the source's last bit or two. No device output is therefore asserted byte-identical against another device run; the read-only proofs compare FP64 outputs only, and the ceilings absorb the flutter. Everything the kernels do not cover is refused at setup or first use, and a build without the backend refuses the knob itself with the stub's own message. Which build that is comes from detection rather than from the platform: the backend needs macOS and a Clang-family Objective-C++ compiler, since it is ARC-managed Objective-C++ against the Metal framework, and a macOS build whose Objective-C++ compiler is a GNU one takes the stub like any other. The configure output names the backend it built, and a capability-free build was measured to produce byte-identical physics to a full one.
 
 (val-the-coarsestep-measurement)=
 ## The coarse-step measurement

@@ -967,7 +967,7 @@ end subroutine fp32_kernel_cache
 ! plan pair and one aligned buffer suffice.
 !
 ! A build without the single-precision library compiles the body out, since a call to
-! fftwf_execute_dft would fail to link at all. Setup refuses such a build by name
+! fftwf_execute_dft would fail to link at all. Setup refuses such a build
 ! (fel_fp32_have_fftw3f$), so this routine is unreachable there, and the message says
 ! so rather than pretending to a fallback.
 !-

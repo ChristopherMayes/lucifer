@@ -83,7 +83,7 @@ turnover over the whole demo (8.0e-6 on the harness configuration, where it is a
 standing check at 1e-3. The demo's 6.6e-8 J = 7.9e-9 held + 5.9e-8 escaped - 1.1e-9
 spontaneous credit). The figure's dotted curve is that closure drawn on the budget
 panel. Wakes would be a second, unbanked exit channel from the beam -- and the ledger
-exists only in the unaveraged mode, where wakes and space charge are refused by name. Measured independent of
+exists only in the unaveraged mode, where wakes and space charge are refused. Measured independent of
 particle count (1024/2048/4096) and steps-per-period (20/40): physics, not statistics
 or resolution. A dark segment with real shot noise isolates it: same in-window noise
 power in both models, 20x the beam-side energy cost in the unaveraged one. The absolute

@@ -89,7 +89,7 @@ the comment at their declaration.
 Separately, the reader checks each slice dataset's extent against `gridpoints` before reading
 it, because `hdf5_read_dataset_real` goes through `H5LTread_dataset`, which takes no buffer
 size and writes however much the file claims. A file whose `gridpoints` disagrees with its
-slice datasets is refused by name instead of overrunning the buffer, which on a forgiving
+slice datasets is refused instead of overrunning the buffer, which on a forgiving
 allocator would read as working.
 
 ### Two differences from Python that are not defects

@@ -3,11 +3,11 @@
  * One implementation file sits behind this header per build: lucifer_metal.mm where
  * the toolchain can carry it (macOS with a Clang-family Objective-C++ compiler, since
  * the backend is ARC-managed Objective-C++ against the Metal framework) and
- * lucifer_device_stub.c everywhere else, which refuses by name. No device type or
+ * lucifer_device_stub.c everywhere else, which refuses and says why. No device type or
  * call appears outside that one file, so a second backend is a new implementation of
  * these functions plus one CMake branch. The shape follows GPUEngine.h of this project's
  * own prior work, the Genesis 1.3 v4 backends on branch gpu/metal-engine (commit
- * 4919b01, unmerged upstream): residency for the whole element, refusal by name,
+ * 4919b01, unmerged upstream): residency for the whole element, refusal with a stated reason,
  * and single precision arranged for rather than accepted.
  *
  * Units and charts are the caller's business. Everything crossing this seam is
@@ -64,7 +64,7 @@ typedef struct {
 int luc_dev_available (char *name, int name_len, char *reason, int reason_len);
 
 /* Allocate the resident buffers and compile the kernels for this run shape.
- * Refuses by name (nonzero return, reason filled): no device, a grid the
+ * Refuses (nonzero return, reason filled): no device, a grid the
  * transform does not handle (powers of two 64 to 1024, the message names the
  * nearest supported size), or a failed allocation with the wanted and free
  * bytes as the device reports them. */

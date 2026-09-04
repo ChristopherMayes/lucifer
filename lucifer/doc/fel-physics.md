@@ -172,7 +172,7 @@ two parameters remain per-element attributes registered program-side:
 (unset $\to$ 2). An attribute's unset
 value
 is 0 and a silent hard edge would reintroduce the $K/\gamma$ handoff hazard, so a
-true hard edge (the test configuration) must be asked for by name with the
+true hard edge (the test configuration) must be asked for explicitly with the
 sentinel $-1$. Silence never means hard edge. The ramps carry two priced end
 effects ([](#sec-unaveraged)): their slippage deficit is compensated exactly by
 the mode's built-in end-of-segment phase jump, and their reduced coupling length
@@ -181,7 +181,7 @@ periods. That is real field physics of adiabatic ends, scaling with the ramp len
 deliberately left visible. `tilt` is honored on planar elements as the polarization specification
 ([](#sec-vector)): the wiggle plane, the focusing, the coupling roll-off and the
 unaveraged field all rotate with it, and the radiation grows a second component.
-Refused by name at parse time: missing `b_max` or `l_period`, a
+Refused at parse time: missing `b_max` or `l_period`, a
 fieldmap `field_calc`, nonzero `kx` (unmapped roll-off), an unset
 `ds_step`, `tilt` on a helical element (a rotation of a circularly
 symmetric field, a no-op that reads as a mistake) and `tilt` with the
@@ -484,7 +484,7 @@ $$ (eq-derivedcurrent)
 
 evaluated at the slice centers with the bunch centered in the window. $\sigma_z = 0$
 is the steady state (the whole charge in one slice window, $I = Qc/\Delta s$)
-and is refused by name for time-dependent windows. The default window covers the
+and is refused for time-dependent windows. The default window covers the
 described bunch ($\pm4\sigma_z$ Gaussian, the grid extent flat), exactly as the
 import derives its window from real particles. `window_length` overrides it
 for slippage headroom and warns with numbers when it clips the bunch.
@@ -557,7 +557,7 @@ copy into the candidate set. Genesis4's `match`/`center` transforms are not
 ported (a Bmad lattice carries its optics, and `init_beam_distribution`
 generates matched bunches), and Genesis4's `align*` and `shot_noise` inputs
 are parsed but dead in v4. Neither is transcribed as functional. A zero-charge bunch
-is refused by name.
+is refused.
 
 :::{admonition} Provenance
 :class: note
@@ -571,7 +571,7 @@ Measured levels and how they are checked: [](validation.md#val-distribution-impo
 
 A run writes its beam as openPMD (`.beam.h5`) through Bmad's own
 `hdf5_write_beam`, and reads the same. There is no second format and no knob to
-select one: a `beam_file` that is not openPMD is refused by name, with the
+select one: a `beam_file` that is not openPMD is refused, with the
 conversion command in the message, and
 `lucifer/tests/scripts/convert_genesis.py` converts a Genesis4 `.par.h5` of
 [](#sec-units)'s conventions either way.
@@ -639,7 +639,7 @@ window has nowhere finer to go. The sub-window position is invisible to the per-
 current until the threshold, and that error is below the slice spacing, the window's own
 resolution. Genesis4's `localSort` uses the same sample-scaled window. What migration
 does require is *integer* `sample`, since the phase continuity above holds only then,
-and a non-integer value is refused by name at the first migration pass.
+and a non-integer value is refused at the first migration pass.
 
 :::{admonition} Provenance
 :class: note
@@ -772,7 +772,7 @@ bunch head at largest $z$. The pseudomode wake is $W(\delta z) = A\,e^{\Gamma\de
 positive-decelerating, causal side $\delta z<0$ (the [](#sec-wakes) kernels are
 stored as signed loss, so flip the sign when bridging). Wakes on superimposed/split
 elements live on the *lord* and resolve through `pointer_to_wake_ele`.
-`sr%z_max` and the table extent must cover the window (refused by name
+`sr%z_max` and the table extent must cover the window (refused
 otherwise). Lr wakes are refused. `chamber_wake%write_kernels` exports the
 [](#sec-wakes) kernels for building matching tables.
 
@@ -1040,7 +1040,7 @@ grow from the bunching the beam carries, or import. A single-entry set is the
 pre-harmonic walk, bit for bit: the same overlay discipline as
 [](#sec-vector). The two are not yet validated together: harmonic fields
 with two live polarizations, and with an unaveraged element (the unaveraged mode
-carries the fundamental envelope only), are refused by name.
+carries the fundamental envelope only), are refused.
 
 Validation (`check_harmonics.py`, ninth harness section): a planar
 steady-state segment at the benchmark's $\gamma$, $\lambda$ and rms $a_w$, both
@@ -1049,7 +1049,7 @@ fundamental power to $5.3\times10^{-8}$, harmonic growth to $1.3\times10^{-4}$ o
 its curve maximum. A one-step dark restart from a hard-bunched beam, whose exit
 $P_3/P_1$ the exact deposit sum (Bessel $f_c$, $h\theta$, bilinear weights, from
 the dumped particles) reproduces at $3.3\times10^{-16}$. Thread byte-identity on a
-time-dependent harmonic run. Refusals by name. `examples/harmonics/` is the
+time-dependent harmonic run. Refusals matched on their messages. `examples/harmonics/` is the
 runnable instance.
 
 :::{admonition} Provenance
@@ -1071,7 +1071,7 @@ independently of the writer. A `field_file` that is not openPMD is refused by
 name, with the conversion command in the message, and
 `lucifer/tests/scripts/convert_genesis.py` converts a Genesis4 field dump
 either way. Per-harmonic imports are matched to the field whose photon energy they
-carry, and a file matching none is refused by name.
+carry, and a file matching none is refused.
 
 The mapping, one decision per row where the extension's text under-determines the
 file (each carried upstream into openPMD-beamphysics's own openPMD I/O):
@@ -1081,7 +1081,7 @@ file (each carried upstream into openPMD-beamphysics's own openPMD I/O):
 | one mesh record `electricField` | complex compound $\{r,i\}$ components `x`, `y` (V/m), both polarizations in one file. `z` never written (paraxial) |
 | required attributes | on the mesh record (the extension's heading. Its body says "series", resolved for the record: `photonEnergy` is per field) |
 | `photonEnergy` | $h_{\rm Planck} c/\lambda$ in joules, identifies the harmonic |
-| `temporalDomain`, `spatialDomain` | `time` (field in V/m) and `r` only. The rest refused by name |
+| `temporalDomain`, `spatialDomain` | `time` (field in V/m) and `r` only. The rest refused |
 | slice axis | a mesh axis, since slices are simultaneous and the iteration is not time: stored order $(z,y,x)$, declared by `axisLabels`, zero-copy for Fortran and numpy alike. One iteration per file |
 | harmonics | one file per harmonic (the record name is fixed by the extension) |
 
@@ -1149,7 +1149,7 @@ delay. Relative mode drops the geometric fraction (measured flat under an angle
 scan). Absolute mode ramps at exactly the slope an independent 2D geometric
 computation of $d(\mathrm{arc}-\mathrm{chord})/d\alpha$ predicts. Only a closed
 bump keeps the light on the next undulator's axis: floor orientations and the
-chord direction are asserted, anything else refused by name, as are bends and
+chord direction are asserted, anything else refused, as are bends and
 patches under the genesis-model interludes (Genesis4's drift/quad set cannot
 represent them) and a `z_offset` that exceeds its upstream break. The
 unaveraged energy ledger closes across a chicane sandwich. The window rotations the
@@ -1232,7 +1232,7 @@ is live or two, so no dataset's meaning depends on what else the file holds.
 
 *Dumps at elements.* `dump_beam_at` / `dump_field_at` name
 elements through Bmad's own locator (`class::name` syntax for free). An entry
-matching nothing is refused by name. openPMD, like every other dump.
+matching nothing is refused. openPMD, like every other dump.
 
 *The escaped-field bank* (`keep_escaped_field`). Field that slippage has
 transmitted beyond the window is fixed information: slippage is one-directional, so it
@@ -1369,7 +1369,7 @@ Measured on the seeded 6\,GeV lethargy configuration (the regime where the artif
 bites hardest): the plain deposit at $M=128$ per slice fakes $\ln P$ by $+0.42$
 where the $M=8192$ reference absorbs. The coherent source at the same $M=128$ stays
 within $0.05$, a demonstrated $64\times$ particle reduction at the model's own bias,
-which is $1.9\times10^{-2}$ in $|\ln P|$ at large $M$. Guards, all by name: a
+which is $1.9\times10^{-2}$ in $|\ln P|$ at large $M$. Guards, each with its own message: a
 per-slice excess-kurtosis test against its sampling significance
 ($\sqrt{24/m_\mathrm{ind}}$), charge-weighted so sparse edge slices are exempt. Refusals
 for the unaveraged mode, harmonics (even harmonics are invalid in the method itself),

@@ -4,8 +4,7 @@ Examples conformance: the feature list, the matrix and the directories must agre
 
 doc/index.md declares what the program does and examples/README.md says which example
 shows each declared feature. Neither statement is checkable on its own, and a feature
-that quietly loses its example reads exactly like one that never had it. Six assertions,
-each reported by name:
+that quietly loses its example reads exactly like one that never had it. Six assertions:
 
   1. Every Features bullet is represented by a matrix row. The row's name carries the
      bullet's own bold lead phrase, so the two files use one vocabulary.

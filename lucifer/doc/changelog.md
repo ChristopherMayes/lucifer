@@ -31,7 +31,7 @@ and it is written at the merge.
   installs the same reference the levels were recorded against. The first green run is the
   demonstration of what the job does and does not hold: all eleven tiers passed their tolerances,
   four of them on digits identical to the recorded ones and seven moved in their last places, and
-  the device section skipped by name on a build whose banner reported no backend.
+  the device section skipped with its reason recorded, on a build whose banner reported no backend.
 
 - 2026-09-03 Changed: the everyday keystone runs in 7.7 minutes rather than 25, with nothing behind
   a flag and every section still running in every run. Three measured changes, in order of what they
@@ -86,11 +86,11 @@ and it is written at the merge.
   per-slice writes), and every tier digit holds.
 
 - 2026-09-03 Fixed: two build-time capabilities are detected rather than assumed, so builds whose
-  toolchains lack them compile and refuse by name instead of failing to build. The single-precision
+  toolchains lack them compile and refuse the knob instead of failing to build. The single-precision
   FFTW the FP32 field twin transforms with is present in the conda environment and absent from the
   off-site distribution, whose FFTW is built from source in double precision only, where an
   unconditional `-lfftw3f` does not link; the build now looks for the library and `fp32_check`
-  refuses by name without it, since transforming in another precision would measure something other
+  refuses without it, since transforming in another precision would measure something other
   than what it reports. The Metal backend is ARC-managed Objective-C++, so it needs a Clang-family
   Objective-C++ compiler and not merely macOS: a build that hands `OBJCXX` to a GNU compiler
   rejected `-fobjc-arc` outright, and such a build now takes the refusing stub like any other.
@@ -113,8 +113,8 @@ and it is written at the merge.
   ceilings at three times the recorded CPU-twin levels (measured: theta 6.8e-6 rad, source 1.5e-5,
   guard 6.8e6 ticks), with `fp32_mutate` perturbing a kernel constant so a wrong shader moves a
   recorded level (710x on theta). End to end the freerun twin and the resident production run land
-  at the same 5.1e-4 on exit power against the CPU. Everything the kernels do not cover is refused
-  by name: harmonics, two polarizations, the coherent source, wakes, space charge, radiation,
+  at the same 5.1e-4 on exit power against the CPU. Everything the kernels do not cover is refused:
+  harmonics, two polarizations, the coherent source, wakes, space charge, radiation,
   migration, the unaveraged mode, the escaped-field bank, and any grid that is not a power of two
   from 64 to 1024 (the message names the nearest size). Measured on an M3 Max against 12 CPU cores:
   7.3x steady, 8.2x to 12.4x time-dependent, with the 0.31 ms per-step dispatch floor stated and the
@@ -209,7 +209,7 @@ and it is written at the merge.
   interpreter and the openPMD-beamphysics checkout were defaulted to paths under one
   developer's home directory, in nine files. Each now resolves through an explicit flag,
   then an environment variable (`$GENESIS4`, `$LUCIFER_PYTHON`, `$OPENPMD_BEAMPHYSICS`),
-  then a portable search, and refuses by name saying how to fix it. `convert_genesis.py`
+  then a portable search, and the refusal says how to fix it. `convert_genesis.py`
   lost its home-directory default and states its import contract: installed, or a checkout
   named explicitly.
 
@@ -249,7 +249,7 @@ and it is written at the merge.
   names live in the translation table of `genesis4.md`.
 
 - 2026-08-31 Added: `chamber_wake%model` and `space_charge%model`, both `"genesis"`, both
-  refusing any other value by name. Each names the transcribed solver that runs at slice
+  refusing any other value. Each names the transcribed solver that runs at slice
   granularity, so a second implementation can arrive as a value rather than a rework.
 
 - 2026-08-31 Fixed: `chamber_wake%write_kernels` works as written. The bare
@@ -359,12 +359,12 @@ and it is written at the merge.
 - 2026-08-30 Changed: `program/lucifer.f90`'s input documentation went from 234 lines to
   36: a group summary and a pointer to `doc/input-reference.md`, which is now normative.
   The refusal text that named the honored-fields table retargets in the same commit,
-  since a refusal must be recognizable by name and this one told the user where to look.
+  since a refusal must be recognizable from its message and this one told the user where to look.
 
 - 2026-08-30 Added: The format specifications join the tree as
   `lucifer/doc/BMAD-STATS-SPEC.md` and `lucifer/doc/BMAD-STATS-EXT-FEL.md`. The tree
   already shipped files claiming `@file_format = 'bmad-stats'`, a reader refusing other
-  versions by name, and a validator citing rule numbers, so the definition of those bytes
+  versions, and a validator citing rule numbers, so the definition of those bytes
   belongs beside them rather than in a working document a repository reader cannot see.
   The manual's stats section names the specification as the normative home, and the
   validator's docstring cites it by its path in the tree.
@@ -534,7 +534,7 @@ and it is written at the merge.
   HDF5 scalars rather than shape-(1,) arrays. `t_slice` carries `@head_direction` too,
   and a `sigma` matrix carries `@unit_of_axis` and `@unit_power` beside the human unit
   string, which no reader could parse. The version is a development marker and is refused
-  by name, with no compatibility machinery for older files. It resets to 1.0 at the first
+  outright, with no compatibility machinery for older files. It resets to 1.0 at the first
   external release.
 
 - 2026-08-26 Changed: The six twiss planes of `beam/slice_twiss/` and `beam/bunch/` are
@@ -609,7 +609,7 @@ and it is written at the merge.
 - 2026-08-25 Changed: Lucifer reads and writes openPMD and nothing else. A particle dump
   is `<out_root>-final.beam.h5` and a field dump `<out_root>-final.wf.h5`, and the format
   knobs `beam_formats` and `wavefront_formats` are gone with no alias. A file that is not
-  openPMD is refused by name on import, with the conversion command in the message.
+  openPMD is refused on import, with the conversion command in the message.
   `lucifer/tests/scripts/convert_genesis.py` converts particles and fields between the
   Genesis format and openPMD in either direction, and the validation harness converts the
   Genesis reference dumps once per chain at its boundary, so both codes still start from
@@ -655,7 +655,7 @@ and it is written at the merge.
 - 2026-08-25 Changed: A Lucifer run's particle dumps are openPMD by default
   (`<out_root>-final.beam.h5`), so a beam with per-particle weights now survives a dump
   and a restart. Genesis `.par.h5` holds one current per slice, and writing a
-  nonuniform-weight beam to it is refused by name rather than silently returning a
+  nonuniform-weight beam to it is refused rather than silently returning a
   uniform beam on read. Both dump kinds now take a LIST of formats instead of an enum,
   `beam_formats` and `wavefront_formats`, so a third code costs a token rather than
   another combination. `wavefront_format = 'both'` is retired with no alias, and
@@ -663,7 +663,7 @@ and it is written at the merge.
 
 - 2026-08-24 Changed: Running Lucifer's validation harness now needs an
   openPMD-beamphysics checkout carrying `beamphysics/wavefront/openpmd.py`
-  (`../openPMD-beamphysics` by default), and the harmonics section refuses by name
+  (`../openPMD-beamphysics` by default), and the harmonics section refuses
   without it. The Python side of the wavefront round trip was a patch carried in
   `lucifer/openpmd/`. It has landed upstream, so the patch is removed and the checks
   exercise `Wavefront.from_openpmd` and `write_openpmd` directly. The Fortran reader

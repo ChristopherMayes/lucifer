@@ -15,7 +15,7 @@ escaped-field bank, held by cross-identities rather than reference files --
      directly computed moments of the concatenated pulse file.
   5. thread invariance: every dataset of stats.h5, escaped and pulse files identical
      at 1 vs 8 threads (dataset-level: HDF5 headers embed creation times).
-  6. refusal: a dump_beam_at entry matching no element is refused by name.
+  6. refusal: a dump_beam_at entry matching no element is refused.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -577,13 +577,13 @@ def main():
     check("provenance: global%record_environment restores user and cwd",
           abs(len(got) - 2), 0.5, note=f"[{', '.join(got) if got else 'neither'}]")
 
-    # 6. Refusal: dump list entry matching nothing, refused by name.
+    # 6. Refusal: dump list entry matching nothing.
     (wd / "dg_bad.nml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_bad",
                                              extra='  dump_beam_at(2) = "NO_SUCH_ELEMENT"\n')))
     r = subprocess.run([str(exe), "dg_bad.nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = r.returncode != 0 and "NO_SUCH_ELEMENT" in (r.stdout + r.stderr)
-    check("refusal: unknown dump_beam_at element refused by name (1 = yes)",
+    check("refusal: unknown dump_beam_at element refused (1 = yes)",
           0.0 if refused else 1.0, 0.5)
 
     if FAILED:

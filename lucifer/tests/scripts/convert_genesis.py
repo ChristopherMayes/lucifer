@@ -252,7 +252,7 @@ def write_genesis_par(path, slices, wavelength, spacing, refposition=0.0,
     shape beamio.read_slices returns. one4one defaults to what the weights say: the flag
     asserts that every macroparticle carries one electron.
 
-    A beam whose weights differ within a slice is refused by name. This format stores one
+    A beam whose weights differ within a slice is refused. This format stores one
     current per slice, so a read-back would return a uniform beam, and per-particle weights
     are the whole reason the tracker's own format is openPMD. Weights differing between
     slices are fine: that is what a current profile is.

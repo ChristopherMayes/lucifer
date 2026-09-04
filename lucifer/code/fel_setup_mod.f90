@@ -200,7 +200,7 @@ if (n_harm > 1 .and. run%two_pol) then
 endif
 
 ! The source model (fel-physics.md sec-coherent-source): validated, then stamped onto every
-! FEL element. v1 scope refusals, each by name: the coherent source carries the
+! FEL element. v1 scope refusals: the coherent source carries the
 ! Fundamental of one polarization, and it cannot live inside the unaveraged referee
 ! (variance reduction inside the explicit-everything mode). Even harmonics are invalid
 ! in the method itself -- F(z,0) = 0 -- and odd ones are a named follow-on.
@@ -229,7 +229,7 @@ case ('coherent')
     ! Spontaneous, spatially-incoherent emission dominates SASE startup and is
     ! exactly what the coherent model drops. The slice bunch factor's physical noise
     ! (Fawley, <|B|^2> N_lambda = 1) is present but is not the dominant seed.
-    ! Refused by name. Seeded runs are fully supported.
+    ! Refused. Seeded runs are fully supported.
 
     call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH A DARK START IS REFUSED: THE', &
                  'COHERENT SOURCE DROPS THE SPATIALLY-INCOHERENT SPONTANEOUS EMISSION THAT', &
@@ -266,7 +266,7 @@ contains
 ! semantics for program-supplied tracking, which this driver is. The wiggler sanity
 ! assertions are enforced: a wiggler with zero b_max or l_period would silently get
 ! factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
-! gets osc_amplitude without focusing. Both are refused by name. The stored k1x/k1y
+! gets osc_amplitude without focusing. Both are refused. The stored k1x/k1y
 ! wiggler attributes are deliberately NOT read: their helical sign disagrees with the
 ! tracking locals. Nothing here cross-uses them.
 !-
@@ -313,7 +313,7 @@ do je = 1, branch%n_ele_track
   ! fel_ramp_periods: an attribute's unset value is 0, and a silent hard edge would
   ! reintroduce the K/gamma handoff hazard by omission. Thus unset/0 means the default
   ! of 2 periods, and a true hard edge (the mutation/test configuration) must be asked
-  ! for by name with the explicit sentinel -1.
+  ! for explicitly with the sentinel -1.
 
   rv = value_of_attribute(w, 'FEL_RAMP_PERIODS', err_a)
   if (err_a) then
@@ -513,8 +513,8 @@ if (run%space_charge%model /= 'genesis') then
 endif
 
 ! The solver's numbers are run-level. Whether it runs in a given element is that
-! element's own space_charge_method, resolved into run%sc_here below: nothing here is a
-! gate, so a stats file cannot record a configuration the run did not use.
+! element's own space_charge_method, resolved into run%sc_here below: nothing here
+! decides, so a stats file cannot record a configuration the run did not use.
 
 coll%efield%rmax = sc_rmax
 coll%efield%ngrid = sc_ngrid
@@ -644,7 +644,7 @@ run%any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
 
 ! The collective terms are not wired into the unaveraged step (fel-physics.md
 ! sec-unaveraged), and a mixed line would apply them in some segments and silently
-! drop them in others. Refuse by name.
+! drop them in others. Refuse.
 
 if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
   call out_io (s_error$, r_name, 'WAKES/SPACE CHARGE ARE NOT WIRED INTO THE UNAVERAGED MODE', &
@@ -744,7 +744,7 @@ call setup_diagnostics ()
 if (err_flag) return
 
 ! The FP32 lockstep instrument. Its twin mirrors the averaged advance, so a lattice
-! with unaveraged segments is refused by name rather than half-instrumented.
+! with unaveraged segments is refused rather than half-instrumented.
 
 if (run%global%fp32_check /= '' .and. run%global%fp32_check /= 'off' .and. run%any_unavg) then
   call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER THE UNAVERAGED MODE.')
@@ -754,7 +754,7 @@ call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, ru
                      fel_p0_mc(fbeam) / fel_gamma0(fbeam) * fbeam%slice_spacing, trim(out_root), err_flag)
 if (err_flag) return
 
-! The device backend. Everything its kernels do not cover is refused here by name --
+! The device backend. Everything its kernels do not cover is refused here --
 ! an unsupported configuration stops the run and never quietly takes the CPU path.
 ! Element wakes are refused at the element (only the walk sees them), and the grid
 ! refusal, naming the nearest supported size, comes back from the backend itself.
@@ -818,7 +818,7 @@ contains
 ! Subroutine resolve_window_ele (locator, which, ix)
 !
 ! Routine to resolve one tracking-window locator to a single tracked-element index,
-! refused by name when it matches nothing or more than one element.
+! refused when it matches nothing or more than one element.
 !-
 
 subroutine resolve_window_ele (locator, which, ix)
@@ -854,7 +854,7 @@ end subroutine resolve_window_ele
 ! Routine to check the Bmad element wakes against the time window. Element sr wakes act
 ! across the whole window (fel-physics.md sec-seamwake): all slices concatenate into one bunch
 ! in global window coordinates and Bmad's wake machinery applies unmodified. What is
-! checked here, by name: lr (multi-bunch) wakes are not supported. A pseudomode wake
+! checked here: lr (multi-bunch) wakes are not supported. A pseudomode wake
 ! whose z_max is shorter than the window would have Bmad kill the bunch mid-run. A
 ! z_long table narrower than the window would overflow its binning grid the same way.
 ! Runs after the beam is built (the window length is the subject). setup_fel_elements
@@ -905,7 +905,7 @@ end subroutine check_wake_window
 ! semantics: "always autophasing") on the break's last element, which also takes
 ! the light-path drift correction. Absolute mode adds the delay's carrier phase in
 ! the walk. Only a closed bump keeps the light on the next undulator's axis.
-! Anything else is refused by name, as is any geometry element under the
+! Anything else is refused, as is any geometry element under the
 ! genesis-model interludes (Genesis's drift/quad set cannot represent it).
 !-
 
@@ -996,7 +996,7 @@ end subroutine close_geometry_break
 ! Routine to set up the diagnostics (fel-physics.md sec-stats): resolve the dump-at lists through
 ! Bmad's own lat_ele_locator (class::name syntax for free) and precompute the exact
 ! record and element-end counts by replaying the walk's skip rule, so the stats arrays
-! are sized once, never grown. An entry matching nothing is refused by name.
+! are sized once, never grown. An entry matching nothing is refused.
 !-
 
 subroutine setup_diagnostics ()

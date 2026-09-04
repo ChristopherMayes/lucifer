@@ -57,7 +57,7 @@ hard-codes nothing. The acceptance test is `scripts/validate_bmad_stats.py`, the
 format's own conformance checker, program-blind and run by the harness, which must
 report zero failures. Units are fixed Bmad units (m, rad, eV, s, C, J, W) and the
 attributes are documentation, never load-bearing, which is the opposite of openPMD's
-`unitSI` and deliberately not mixed with it in one file. The version is refused by name
+`unitSI` and deliberately not mixed with it in one file. The version is refused
 rather than negotiated.
 
 | group | what |
@@ -161,7 +161,7 @@ Measured (check_diagnostics.py, in the harness -- cross-identities, not referenc
 | stats/escaped/pulse dataset-identical, 1 vs 8 threads | exact | (exactness, no level) |
 | position extremes vs numpy over a dump_beam_at file's particles | exact | (exactness, no level) |
 | momentum extremes across the dump's unit round trip | 3e-16 | (round-trip floor) |
-| unknown dump element | refused by name | (refusal, no level) |
+| unknown dump element | refused | (refusal, no level) |
 
 diag.txt is untouched (the Genesis4-comparison instrument): every benchmark tier
 reproduces bit for bit, including through the diag/stats fusion: the per-record
@@ -231,7 +231,7 @@ particles carry different weights comes back uniform. Per-particle weights are t
 port's day-one difference from Genesis4, so that format cannot hold this code's state,
 and the dump is openPMD (`.beam.h5`): Bmad's own `hdf5_write_beam`, where openPMD's
 macro-charge IS the per-particle weight. Converting such a beam to a Genesis4 `.par.h5`
-is refused by name by the converter, with the slice, the weight spread and the total
+is refused by the converter, with the slice, the weight spread and the total
 charge in the message.
 
 The slice partition is `particlePatches`, the standard's own partition of a species
@@ -239,7 +239,7 @@ record: one patch per slice, in window order, and an empty slice is a patch of n
 particles. So the patch count IS the window, and the file needs no attributes of this
 code's invention to describe it. What openPMD has no place for comes from the deck
 instead: the wavelength, the slice spacing (`lambda0` and `window_sample`) and the
-beamlet size (`beamlet_size`). Reading a dump without `lambda0` is refused by name rather than
+beamlet size (`beamlet_size`). Reading a dump without `lambda0` is refused rather than
 defaulted, since a wrong wavelength rescales every phase in the run. `one4one` needs no
 storage at all: the flag asserts that every macroparticle carries one electron, which is
 what the weights say.
@@ -265,7 +265,7 @@ Measured (check_beam_format.py, the harness's beam-format section):
 | split weights stored per particle, and bit-identical on read | exact |
 | per-slice counts restored with an empty slice in the window | identical |
 | one patch per slice, empty ones included | identical |
-| four refusals (nonuniform weights to Genesis4, not openPMD, patch count, no charge) | by name |
+| four refusals (nonuniform weights to Genesis4, not openPMD, patch count, no charge) | message matched |
 
 The chart, not the file, is what could cost a digit here: openPMD stores absolute
 momenta and a time where this code keeps `px`, `py` and a lag, so those pass through

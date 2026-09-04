@@ -31,7 +31,7 @@ undulator segments, held by symmetries, closed forms and Genesis itself.
      slice). A delay of a few wavelengths must bank exactly floor(delay/lambda) more
      escaped slices than the straight-line twin of the same arc length, and the run
      must be byte-identical at 1 and 8 threads.
-  7. Refusals by name: a non-closed-bump break; a bend under the genesis-model
+  7. Refusals: a non-closed-bump break; a bend under the genesis-model
      interludes; a z_offset exceeding its upstream break; a z_offset on the first
      element (no break to displace into).
 

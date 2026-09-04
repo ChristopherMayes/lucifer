@@ -17,7 +17,7 @@
 !   &fel_wavefront_init  wavefront_init, field_file
 !
 ! A group that is absent keeps its defaults. A group that is present must parse.
-! The retired flat &fel_track_params group is refused by name: the error lists each
+! The retired flat &fel_track_params group is refused: the error lists each
 ! parameter found in it and the group it moved to.
 !-
 
@@ -102,7 +102,7 @@ swap_beam_xy = run%bparam%swap_beam_xy
 gen_test_weights = run%bparam%gen_test_weights
 resample_split_weights = run%bparam%resample_split_weights
 
-! The retired group is refused by name before anything is read.
+! The retired group is refused before anything is read.
 
 if (has_retired_group(param_file)) return
 
@@ -290,7 +290,7 @@ end function group_present
 !+
 ! Function has_retired_group (param_file) result (found)
 !
-! Refuse the retired flat &fel_track_params group by name: list every parameter set
+! Refuse the retired flat &fel_track_params group: list every parameter set
 ! in it together with the group and name it moved to, so migration is a mechanical
 ! edit of the input file.
 !

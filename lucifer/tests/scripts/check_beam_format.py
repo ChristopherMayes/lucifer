@@ -26,7 +26,7 @@ written, never against another code.
 4. Weights survive, which the Genesis format cannot do. The split-weight instrument makes
    every particle two coincident copies of w/3 and 2w/3, so the file's weight record is a
    real dataset of two distinct values. It must come back bit-identical. Converting that
-   beam to a Genesis .par.h5 must be refused by name, since that format carries one
+   beam to a Genesis .par.h5 must be refused, since that format carries one
    current per slice and a read-back would silently return a uniform beam.
 
 5. An empty slice survives. Every slice is a particlePatch, in window order, and an empty
@@ -34,7 +34,7 @@ written, never against another code.
    (sig_pz = 0.15) empties a slice; the restored beam must have the same per-slice counts,
    empty slice included, and the file must hold one patch per slice.
 
-6. Refusals, each by name: a beam file that is not openPMD (the message names the
+6. Refusals: a beam file that is not openPMD (the message names the
    converter), a file whose patch count disagrees with the window the deck states, and a
    file that carries no charge.
 

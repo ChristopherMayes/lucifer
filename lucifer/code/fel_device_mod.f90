@@ -312,7 +312,7 @@ end subroutine from_c
 !
 ! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
 ! asks for the one backend this tree knows; a build without it (the stub) refuses with
-! the stub's own reason, and any other name is refused by name. Allocates the resident
+! the stub's own reason, and any other value is refused, with the error listing what this tree knows. Allocates the resident
 ! buffers for this run shape (the grid refusal, naming the nearest supported size,
 ! comes back from the backend), runs the exact-wrap assertion on the device, and
 ! writes the device header lines into the instrument's stream when one is open.

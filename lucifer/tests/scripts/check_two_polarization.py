@@ -239,8 +239,8 @@ def main():
         "call, file = crossed_probe.bmad\nuse, CROSSED\n")
     ok2 = refuse(exe, wd, "p2f2", NML.format(lat="p2_tr_tilt.bmad", root="p2f2",
                  extra='  transport_model = "genesis"\n'), "KNOW NO TILT")
-    check("refusal: tilt on helical, by name (1 = yes)", 0.0 if ok1 else 1.0, 0.5)
-    check("refusal: tilt with transcribed maps, by name (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
+    check("refusal: tilt on helical (1 = yes)", 0.0 if ok1 else 1.0, 0.5)
+    check("refusal: tilt with transcribed maps (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
 
     if FAILED:
         print("two-polarization checks: FAIL")

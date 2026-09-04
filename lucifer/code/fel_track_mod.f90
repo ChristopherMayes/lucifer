@@ -301,9 +301,9 @@ end subroutine fel_ele_as_wiggler
 ! reference time/energy pass inside bmad_parser, through the hooks above. Enforcing
 ! them any later is too late. A missing b_max parses cleanly and only fails downstream
 ! with an unrelated message. A fieldmap field_calc segfaults track_a_wiggler during
-! the parse itself. Refusal is by name so a lattice author knows which attribute to fix.
+! the parse itself. The refusal names the attribute so a lattice author knows what to fix.
 ! (The reference pass runs before lat_sanity_check, so these fire first. Bmad's own
-! sanity check would also refuse a missing l_period by name if this were removed.)
+! sanity check would also refuse a missing l_period if this were removed.)
 !
 ! Input:
 !   ele -- ele_struct: The FEL wiggler/undulator element to validate.
@@ -508,7 +508,7 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   ! slice. Its energy leaves the simulation here. Bank it first, so the time-dependent
   ! energy ledger can close: the slice's power (same convention as fel_field_diag) times
   ! its light-time slice_spacing/c. Wakes would be a second, unbanked exit channel from
-  ! the beam. The unaveraged mode, whose ledger this feeds, refuses them by name.
+  ! the beam. The unaveraged mode, whose ledger this feeds, refuses them.
 
   slip%u_escaped = slip%u_escaped + sum(real(wf%Ex(:,:,last+1), rp)**2 + aimag(wf%Ex(:,:,last+1))**2) &
                      * wf%dx**2 / (2 * (mu_0_vac * c_light)) * t_slice
@@ -818,7 +818,7 @@ call fel_longrange_esc (coll%efield, beam, fel_gamma0(beam), und%aw, coll%long_e
 call fel_toc (fel_t_sc_profile$)
 
 ! The FP32 lockstep instrument (fel_fp32_mod). Its twin mirrors the fundamental-only,
-! collective-free advance, so any configuration outside that is refused by name at
+! collective-free advance, so any configuration outside that is refused at
 ! first use rather than measured wrongly in silence. With the device armed the
 ! instrument's twin role passes to the device (fel_device_mod), under the same
 ! refusals; without the instrument the device is the run itself, and this routine
@@ -967,7 +967,7 @@ endif
 ! sums from the just-advanced particles (slice-parallel, each slice its own data),
 ! then the one global kappa (Tanaka Eq 26: the integrals run over the whole window,
 ! so this is the cross-slice serial point), then the guard. A slice whose transverse
-! charge profile is measurably non-Gaussian is refused by name with its number: the
+! charge profile is measurably non-Gaussian is refused with its number: the
 ! Gaussian model would bias the gain there. Thresholds are set by the distorted-beam
 ! checks.
 

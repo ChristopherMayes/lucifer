@@ -199,7 +199,7 @@ through a null `make_mat6_custom_ptr` (a jump to address zero) if a program sets
 the tracking hook.
 
 The 7.5 assertions are enforced at the element's first touch (the reference pass
-inside `bmad_parser`, through those hooks) and refuse by name: a missing `b_max`
+inside `bmad_parser`, through those hooks) and refuse: a missing `b_max`
 (Bmad's own kernel would silently give `osc_amplitude = 0`: no field, no resonance, no
 error), a missing `l_period` (same silence), and a fieldmap `field_calc` (which
 segfaults the parse-time reference tracking if allowed through). Enforcing them any

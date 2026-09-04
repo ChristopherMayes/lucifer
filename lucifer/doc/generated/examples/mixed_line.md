@@ -54,7 +54,7 @@ carries none, and the refusal itself is checked by the harness.
 
 The harness runs the same configuration as its sandwich check, where the mixed line must
 agree with the all-averaged line at the exit, the energy ledger rows must appear only
-inside the unaveraged segment, and a wake on that segment must be refused by name
+inside the unaveraged segment, and a wake on that segment must be refused
 ([validation](../../validation.md)). This directory is the runnable version of that
 check.
 

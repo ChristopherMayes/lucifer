@@ -18,7 +18,7 @@ the FP64 physics, and the check can fail.
    device port will be judged against.
 5. Time dependence. An 8-slice shot-noise window holds the same ceilings, and the
    instrument's stream is byte-identical at 1 and 8 threads (per-slice work only).
-6. Refused by name. The twin mirrors the fundamental-only collective-free advance, so
+6. Refused. The twin mirrors the fundamental-only collective-free advance, so
    a wake run with the instrument on must refuse, not measure wrongly in silence.
 
 Usage: check_fp32.py --exe <lucifer> --workdir <dir>
@@ -170,13 +170,13 @@ def main():
     same = t8 == (wd / "fp32td.fp32.txt").read_bytes()
     ok("instrument stream byte-identical, 1 vs 8 threads", same, "True", same)
 
-    # 6. Refused by name outside the twin's coverage.
+    # 6. Refused outside the twin's coverage.
     r = run(args.exe, wd, "fp32_ref.in", BASE.format(root="fp32ref",
         extra='  global%fp32_check = "lockstep"\n  wake_on = T\n  wake_radius = 2.5e-3\n'
               '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n'),
         expect_fail=True)
     refused = r.returncode != 0 and "FP32_CHECK DOES NOT COVER WAKES" in r.stdout
-    ok("wake with the instrument refused by name", refused, "True", refused)
+    ok("wake with the instrument refused", refused, "True", refused)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0

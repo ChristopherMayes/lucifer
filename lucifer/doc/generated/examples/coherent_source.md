@@ -40,7 +40,7 @@ this case, with nothing anywhere reporting a problem. The last row is the same
 particle count giving the converged answer. (Per-slice cost dominates real
 time-dependent runs, where the same particle reduction pays proportionally.)
 
-The guardrails are part of the feature (all refusals by name, the manual's coherent-source section). A per-slice Gaussianity test is sized against its own
+The guardrails are part of the feature (all refusals, the manual's coherent-source section). A per-slice Gaussianity test is sized against its own
 sampling significance. A genuinely structured profile refuses. An offset,
 mismatched or tilted Gaussian beam passes -- the source centers and tilts with
 the beam's phasor-weighted moments. Harmonics, two polarizations and the

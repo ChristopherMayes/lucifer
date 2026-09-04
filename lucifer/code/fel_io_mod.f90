@@ -316,7 +316,7 @@ end subroutine fel_write_footer
 !
 ! Routine to read an openPMD wavefront into field-set entry ihh (the fundamental
 ! import path). The photon energy must be the fundamental's: a file carrying a
-! harmonic in field_file(1) is refused by name.
+! harmonic in field_file(1) is refused.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state.
@@ -368,7 +368,7 @@ end subroutine fel_read_openpmd_into_field
 ! Subroutine fel_import_harmonic_field (run, fname, err_flag)
 !
 ! Routine to import a harmonic field: match the file's photon energy to the field-set
-! entry carrying that harmonic (no match is refused by name), require the fundamental's
+! entry carrying that harmonic (no match is refused), require the fundamental's
 ! grid and window, and keep the walk's wavelength convention (fundamental / h).
 !
 ! Input:

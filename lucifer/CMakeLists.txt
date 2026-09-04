@@ -29,7 +29,7 @@ set_source_files_properties(code/fel_track_mod.f90 PROPERTIES COMPILE_OPTIONS "-
 # unconditional -lfftw3f fails to link. Detected here rather than assumed, and this
 # runs before Master.cmake, so the search path is composed the way that file composes
 # its own link directories. Without the library nothing links against it and
-# fp32_check refuses by name; every other path is untouched.
+# fp32_check refuses it; every other path is untouched.
 
 find_library (LUCIFER_FFTW3F_LIBRARY NAMES fftw3f
   PATHS
@@ -50,7 +50,7 @@ if (LUCIFER_FFTW3F_LIBRARY)
   message (STATUS "Single-precision FFTW found, so fp32_check is available")
 else ()
   set (LUCIFER_FFTW3F_LIBS)
-  message (STATUS "No single-precision FFTW (libfftw3f), so fp32_check refuses by name")
+  message (STATUS "No single-precision FFTW (libfftw3f), so fp32_check is refused")
 endif ()
 
 # The device seam (device/lucifer_device.h). The Metal backend is ARC-managed
@@ -102,5 +102,5 @@ else ()
   if (TARGET lucifer-shared)
     target_sources (lucifer-shared PRIVATE device/lucifer_device_stub.c)
   endif ()
-  message (STATUS "Device backend: none, so global%device refuses by name")
+  message (STATUS "Device backend: none, so global%device is refused")
 endif ()
