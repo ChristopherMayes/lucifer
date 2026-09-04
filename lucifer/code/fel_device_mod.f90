@@ -161,6 +161,11 @@ interface
   subroutine luc_dev_close () bind(c, name = 'luc_dev_close')
   end subroutine
 
+  subroutine luc_dev_resize_particles (npart) bind(c, name = 'luc_dev_resize_particles')
+    import c_int
+    integer(c_int), value :: npart
+  end subroutine
+
   subroutine luc_dev_upload_slice (is, n, x, px, y, py, goff, uphase, w) &
                                    bind(c, name = 'luc_dev_upload_slice')
     import c_int, c_float, c_int64_t
@@ -503,6 +508,7 @@ integer is
 
 !
 
+call fel_device_ensure_capacity (dev, beam)
 do is = 1, size(beam%slice)
   dev%z_ref(is) = 0
   if (beam%slice(is)%n > 0) dev%z_ref(is) = &
@@ -706,7 +712,7 @@ end subroutine fel_device_step_run
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_readback (dev, beam, wf)
+! Subroutine fel_device_readback (dev, beam, ff)
 !
 ! Routine to refresh the host FP64 state from the resident device state: the beam
 ! through the module header's exact down-chart, the field record slice for slice in
@@ -799,7 +805,70 @@ end subroutine fel_device_readback
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_element_end (dev, beam, wf)
+! Subroutine fel_device_release (dev)
+!
+! Routine to end residency without a readback, for the caller that has just read the
+! state back itself and is about to change the host arrays: slice migration at an
+! element's last step. After a readback the host is authoritative, and a second
+! readback would overwrite whatever the caller does next with the device's older
+! state. The comb readback and fel_device_element_end that follow become no-ops.
+!-
+
+subroutine fel_device_release (dev)
+
+type (fel_device_struct) dev
+
+!
+
+dev%resident = .false.
+
+end subroutine fel_device_release
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_ensure_capacity (dev, beam)
+!
+! Routine to grow the resident particle rectangle when a slice has outgrown it. The
+! rectangle is sized at setup to the largest fill, and slice migration moves particles
+! between slices on the host, so a later element can arrive with a fill the device has
+! no room for. The seam reallocates the seven particle buffers, growth only and without
+! recompiling anything, and the staging arrays follow. The guard baseline su0 is
+! re-staged by the upload that always follows, so it is simply resized.
+!-
+
+subroutine fel_device_ensure_capacity (dev, beam)
+
+type (fel_device_struct) dev
+type (fel_beam_struct) beam
+integer is, np
+character(*), parameter :: r_name = 'fel_device_ensure_capacity'
+
+!
+
+np = 0
+do is = 1, size(beam%slice)
+  np = max(np, beam%slice(is)%n)
+enddo
+if (np <= dev%npart) return
+
+call luc_dev_resize_particles (np)
+call out_io (s_info$, r_name, 'Device: particle capacity grown from \i0\ to \i0\ per slice.', &
+             i_array = [dev%npart, np])
+dev%npart = np
+deallocate (dev%sx, dev%spx, dev%sy, dev%spy, dev%sg, dev%sw, dev%su, dev%su0)
+allocate (dev%sx(np), dev%spx(np), dev%sy(np), dev%spy(np), dev%sg(np), dev%sw(np))
+allocate (dev%su(np), dev%su0(np, dev%nslice))
+dev%su0 = 0
+
+end subroutine fel_device_ensure_capacity
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_element_end (dev, beam, ff)
 !
 ! Routine to end residency at the element's exit: the final readback, after which the
 ! host FP64 state is the run again (rounded through the device representation, the
@@ -918,6 +987,7 @@ nslice = size(beam%slice)
 upload = .not. fp32%freerun .or. .not. dev%twin_live
 
 if (upload) then
+  call fel_device_ensure_capacity (dev, beam)
   do is = 1, nslice
     n = beam%slice(is)%n
     dev%z_ref(is) = 0

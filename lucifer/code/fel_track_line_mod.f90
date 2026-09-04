@@ -603,6 +603,18 @@ integer nm
 if (.not. migrate) return
 call fel_tic (fel_t_migration$)
 
+! With the beam resident this is an element's last step, and the migration re-slices
+! the host arrays: they must be current first, and no readback may follow it. So the
+! whole state comes back here, the field with it, and residency ends without the
+! second readback fel_device_element_end would have made. Everything after this point
+! in the element sees the host as authoritative, and the next element re-uploads. At
+! interlude ends nothing is resident and this is a no-op.
+
+if (run%dev%resident) then
+  call fel_device_readback (run%dev, fbeam, ffield)
+  call fel_device_release (run%dev)
+endif
+
 if (migrate_check) call whole_beam_phasor (sb_re, sb_im, wsum)
 
 call fel_migrate_slices (fbeam, ks, nm, chd, d_re, d_im, err)

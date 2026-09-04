@@ -761,7 +761,9 @@ if (err_flag) return
 ! refusal, naming the nearest supported size, comes back from the backend itself.
 ! The field set is covered whole: every harmonic member and both polarization planes
 ! ride the device, and their combination is refused above for the CPU and the device
-! alike.
+! alike. Slice migration is covered without a kernel: it runs on the host at an
+! element's last step after the walk reads the beam back (do_migrate), and the next
+! element re-uploads into a rectangle grown to the new largest fill.
 
 if (run%global%device /= '' .and. run%global%device /= 'off') then
   if (run%any_unavg) then
@@ -778,10 +780,6 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
   endif
   if (any(run%sc_here)) then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SPACE CHARGE.')
-    err_flag = .true.;  return
-  endif
-  if (run%global%migrate) then
-    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SLICE MIGRATION.')
     err_flag = .true.;  return
   endif
   if (bmad_com%radiation_damping_on .or. bmad_com%radiation_fluctuations_on) then

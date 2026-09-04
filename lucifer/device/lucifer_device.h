@@ -91,6 +91,15 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
 
 void luc_dev_close (void);
 
+/* Grow the particle buffers to npart per slice, keeping the grid, the field set and
+ * the compiled kernels: the kernels take npart at dispatch, so no recompile. Growth
+ * only, since a smaller rectangle is never needed and shrinking would free buffers a
+ * later element could ask for again. The buffers' contents are not preserved, and the
+ * caller re-uploads every slice afterwards, which is what an element entry does. This
+ * is what slice migration needs: fel_migrate_slices grows a slice's arrays on the
+ * host, and the resident rectangle was sized at setup to the largest fill then. */
+void luc_dev_resize_particles (int npart);
+
 /* Whole-slice transfers between the caller's staging arrays and the resident
  * buffers. The upload carries the weights; they are constant while resident
  * (migration is refused), so downloads do not return them.

@@ -1101,7 +1101,7 @@ Output:
 (api-fel-device-readback)=
 ### `fel_device_readback`
 
-*Subroutine* `(dev, beam, wf)`
+*Subroutine* `(dev, beam, ff)`
 
 ```
 Routine to refresh the host FP64 state from the resident device state: the beam
@@ -1122,10 +1122,37 @@ block-local per slice rather than the module-level scratch, which is sized for o
 slice at a time and is not thread-safe by design.
 ```
 
+(api-fel-device-release)=
+### `fel_device_release`
+
+*Subroutine* `(dev)`
+
+```
+Routine to end residency without a readback, for the caller that has just read the
+state back itself and is about to change the host arrays: slice migration at an
+element's last step. After a readback the host is authoritative, and a second
+readback would overwrite whatever the caller does next with the device's older
+state. The comb readback and fel_device_element_end that follow become no-ops.
+```
+
+(api-fel-device-ensure-capacity)=
+### `fel_device_ensure_capacity`
+
+*Subroutine* `(dev, beam)`
+
+```
+Routine to grow the resident particle rectangle when a slice has outgrown it. The
+rectangle is sized at setup to the largest fill, and slice migration moves particles
+between slices on the host, so a later element can arrive with a fill the device has
+no room for. The seam reallocates the seven particle buffers, growth only and without
+recompiling anything, and the staging arrays follow. The guard baseline su0 is
+re-staged by the upload that always follows, so it is simply resized.
+```
+
 (api-fel-device-element-end)=
 ### `fel_device_element_end`
 
-*Subroutine* `(dev, beam, wf)`
+*Subroutine* `(dev, beam, ff)`
 
 ```
 Routine to end residency at the element's exit: the final readback, after which the

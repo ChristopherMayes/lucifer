@@ -38,6 +38,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
 }
 
 void luc_dev_close (void) {}
+void luc_dev_resize_particles (int npart) { (void) npart; }
 
 void luc_dev_upload_slice (int is, int n, const float *x, const float *px,
                            const float *y, const float *py, const float *goff,

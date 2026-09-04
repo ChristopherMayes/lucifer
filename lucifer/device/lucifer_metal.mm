@@ -858,6 +858,27 @@ void luc_dev_close (void)
     gImpl = nullptr;
 }
 
+void luc_dev_resize_particles (int npart)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || npart <= p->npart) return;
+    @autoreleasepool {
+        p->sync();
+        const size_t np_old = (size_t) p->nslice * p->npart;
+        const size_t np = (size_t) p->nslice * npart;
+        // Seven particle buffers, six of 4 bytes and the phase accumulator of 8.
+        p->bytes += (int64_t) ((np - np_old) * (6 * 4 + 8));
+        p->bX = [p->dev newBufferWithLength:np * 4 options:kShared];
+        p->bPX = [p->dev newBufferWithLength:np * 4 options:kShared];
+        p->bY = [p->dev newBufferWithLength:np * 4 options:kShared];
+        p->bPY = [p->dev newBufferWithLength:np * 4 options:kShared];
+        p->bG = [p->dev newBufferWithLength:np * 4 options:kShared];
+        p->bU = [p->dev newBufferWithLength:np * 8 options:kShared];
+        p->bW = [p->dev newBufferWithLength:np * 4 options:kShared];
+        p->npart = npart;
+    }
+}
+
 void luc_dev_upload_slice (int is, int n, const float *x, const float *px,
                            const float *y, const float *py, const float *goff,
                            const int64_t *uphase, const float *w)

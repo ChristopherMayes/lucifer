@@ -9,6 +9,33 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-04 Added: slice migration runs with the device. The pass is fel_migrate_slices
+  unchanged, serial on the host at an FEL element's last step, and it touches no field, so no
+  kernel is involved: with the beam resident at that step the pass reads the beam and the field
+  set back first and then releases residency through a new fel_device_release, since the host is
+  now authoritative and the field came back with it. The comb readback and the element end that
+  follow find nothing resident, so the readback moves rather than doubles, and the next element
+  uploads the re-sliced beam. The device's particle buffers are a rectangle sized at setup to the
+  largest fill, and migration grows fills, so the seam gains luc_dev_resize_particles: growth
+  only, no shader recompile since the kernels take the count at dispatch, called from the element
+  entry and the twin's staging when the largest fill exceeds the capacity, and reported in the
+  run's output. The device's refusal of migration leaves fel_setup_mod. Fluctuations with
+  migration stays refused, the CPU's own rule. Measured on the debug build with check_migration's
+  decks at grid 64: the heavy-migration run bites past 73,000 moves on the device with charge
+  conservation at 1.6e-14, phase continuity at 5.2e-15 and every survivor inside its window, its
+  exit power 4.0e-4 from the CPU's, and the capacity grows under it. The lockstep instrument on
+  the migrating deck, the twin re-staging every step across the changed fills, holds x..py at
+  2.9e-7, theta at 7.4e-6, the phasor at 2.0e-7 and source and field at 7.9e-6, with the FP64
+  diag byte-identical, twin on against off. The no-op is self-referenced, since the deposit's
+  atomics rule out byte identity on the device: zero moves, and the final beam 1.7e-14 slice
+  spacings from the migrate = F device run. One instrument property surfaced and is recorded in
+  validation.md: on a quiet-start deck without shot noise every slippage feeds the tail slice a
+  field at FP64 roundoff, and the source and field rows, normalized by the slice's own field,
+  read 0.4 there on a deposit whose end-to-end power agreed at 4e-4, so the check's deck carries
+  a seed and shot noise. examples/migration runs on the device at grid 256, agreeing with the CPU
+  at 2.8e-4 on exit power, 148,654 moves against 148,652 with the dropped charge identical, the
+  capacity grown from 1024 to 1215 per slice along the line.
+
 - 2026-09-04 Added: harmonic field sets and two polarizations run on the device. The resident
   field is now the run's whole set, every harmonic member and both polarization planes, stored
   member-major with one propagator per member. The step's constants carry each member's harmonic

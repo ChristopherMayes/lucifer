@@ -833,7 +833,14 @@ if (fp_on) then
   ngrid_arr = wavefront_shape(ff(1)%wf)
   fp_gridmax = (ngrid_arr(1) - 1) * ff(1)%wf%dx / 2
 endif
-if (dev_twin) allocate (dev_s0(6, dev%npart, size(beam%slice)))
+if (dev_twin) then
+
+  ! Sized to the slices as they are now, not to the device's rectangle: migration at
+  ! the previous element's end can have left a slice fuller than the rectangle, which
+  ! fel_device_twin_begin grows only when it stages this snapshot.
+
+  allocate (dev_s0(6, maxval(beam%slice(:)%n), size(beam%slice)))
+endif
 
 ! Per-slice sequence in Genesis's order (Beam::track): transverse half, longitudinal
 ! advance (ez inside the RK), the wake's gamma decrement, transverse half. All four are

@@ -23,7 +23,7 @@ and everything the backend does not cover is refused.
    production path corroborate each other.
 5. Time dependence. An 8-slice shot-noise window with slippage rotating the resident
    record holds the same ceilings, read-only proof and production band.
-6. Refused. Wakes, migration, spontaneous radiation, harmonics together with two live
+6. Refused. Wakes, spontaneous radiation, harmonics together with two live
    polarizations, the unaveraged mode, an unsupported grid (the message names the
    nearest supported size) and an unknown backend name each stop the run.
 7. The field set. Harmonic members ride the device (planar segment, harmonics 1 and 3)
@@ -42,6 +42,17 @@ and everything the backend does not cover is refused.
    instead, ~1e-7 of the charge in the phasor row, and its P3 lands two decades above
    the CPU's. The device resolves harmonic bunching down to that floor and not below,
    which the phasor row states per member. The harmonic checks here sit above it.
+8. Slice migration, from check_migration's own decks at the device's grid. Migration
+   needs no kernel: at an element's last step the walk reads the beam back and releases
+   residency before re-slicing, so conservation and phase continuity hold on the device
+   exactly as on the CPU, and the check proves the order is right. The production run
+   lands in a band against the CPU on the heavy-migration window. The no-op check cannot
+   be byte identity on the device (the deposit's atomics), so it is self-referenced:
+   zero moves, and the migrate = T run within three times the flutter between two
+   migrate = F device runs. Lockstep on the migrating window holds the ceilings and the
+   read-only proof, the twin re-staging each step across the changed fills. A slice
+   outgrowing the setup rectangle exercises the seam's growth-only resize, which the
+   log records.
 
 No device output is asserted byte-identical against another device run: the deposit
 accumulates with atomic adds whose ordering is not fixed, so two runs differ in the
@@ -66,7 +77,9 @@ import sys
 import h5py
 import numpy as np
 
+import beamio
 import check_harmonics as ch
+import check_migration as cm
 import check_two_polarization as tp
 import convert_genesis
 import fieldio
@@ -153,6 +166,13 @@ BESSEL_CEIL = 1.3e-5
 ISO_CEIL = 1.3e-5
 PY_E2E_CEIL = 1.3e-2
 PYPX_FLOOR = 5e-3           # check_two_polarization's afterburner floor.
+
+# Migration: the heavy-migration window's exit power against the CPU, at three times
+# the first measurement, and the no-op flutter floor: two migrate = F device runs may
+# be bit-identical on a small dark deck, and a zero flutter tripled is zero, so the
+# floor is a level in slice spacings under which FP32 cannot express a difference.
+MIG_E2E_CEIL = 3e-3
+NOOP_FLOOR = 1e-12
 
 # The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
 # segment is helical and couples only the fundamental, at the device's grid.
@@ -301,7 +321,6 @@ def main():
         ("dev_rw.in", DEV + '  wake_on = T\n  wake_radius = 2.5e-3\n'
                             '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n',
          "DOES NOT COVER WAKES"),
-        ("dev_rm.in", DEV + '  global%migrate = T\n', "DOES NOT COVER SLICE MIGRATION"),
         ("dev_rr.in", DEV + '  bmad_com%radiation_damping_on = T\n',
          "DOES NOT COVER SPONTANEOUS RADIATION"),
         ("dev_rn.in", '  global%device = "cuda"\n', "UNRECOGNIZED DEVICE"),
@@ -493,11 +512,95 @@ def field_set(args, wd, exe):
         ok(f"crossed TD production P{comp} vs CPU (slippage live)", f"{abs(pd-pc)/pc:.3e}",
            f"<= {band:.1e}", abs(pd - pc) / pc <= band)
 
+    migration(args, wd, exe)
+
     # 7g. The combination is refused for the device as for the CPU.
     r = run(args.exe, wd, "devp_rh.in", pn.format(lat="devp_c.bmad", root="devprh",
             extra=DEV + '  harmonics = 1, 3\n'), expect_fail=True)
     refused = r.returncode != 0 and "TWO LIVE POLARIZATIONS" in r.stdout
     ok("refused: harmonics together with two live polarizations", refused, "True", refused)
+
+
+def migration(args, wd, exe):
+    """Slice migration with the device, on check_migration's decks at grid 64."""
+    print("== slice migration with the device ==")
+    base = cm.BASE.replace("grid_n_pts = 65", "grid_n_pts = 64").replace("&end\n", "{extra}&end\n")
+    # check_migration's heavy deck is a dark quiet start, which suits its accounting and
+    # not the instrument: a slice whose field sits at FP64 roundoff normalizes the source
+    # and field rows to nothing (the harmonic floor's lesson, doc/validation.md), and
+    # every slippage feeds the tail slice exactly such a field. A seed fills the window
+    # and shot noise fills each fresh tail slice, as the TD lockstep deck above does, and
+    # the 60 m_e c^2 energy spread migrates just as heavily.
+    heavy_base = base.replace("seed_power = 0\n",
+                              "seed_power = 1e4\n  seed_waist_size = 30e-6\n  shot_noise = T\n")
+    heavy = dict(lat="aramis.bmad", sig_pz="5.282703940115e-03", emit="4e-7", npart=1024,
+                 slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9")
+    frozen = dict(lat="aramis_1seg.bmad", sig_pz="8.804506566858e-08", emit="1e-13", npart=256,
+                  slen="1.2e-9", q="1.200830742713e-14", half="6e-10")
+
+    # 8a. Heavy migration on the device: conservation, phase continuity and window
+    # residency by check_migration's own readers, the production band against the CPU,
+    # and the capacity growth in the log.
+    run(args.exe, wd, "devm_c.in", heavy_base.format(root="devmc", mig="T", extra="", **heavy), threads="8")
+    r = run(args.exe, wd, "devm_d.in", heavy_base.format(root="devmd", mig="T", extra=DEV, **heavy), threads="8")
+    moved, bdev, drops = cm.read_migration_file(wd, "devmd")
+    z, q_win = cm.in_window_charge(wd / "devmd.diag.txt")
+    q0 = q_win[0]
+    worst = max(abs(q_win[i] + sum(q for zd, q in drops if zd <= zr + 1e-9) - q0) / q0
+                for i, zr in enumerate(z))
+    ok("migration on the device bites", f"{moved} moves, {sum(q for _, q in drops):.3e} C dropped",
+       "> 10000 moves and drops", moved > 10000 and sum(q for _, q in drops) > 0)
+    ok("migration conservation on the device, worst violation", f"{worst:.2e}", "< 1e-10", worst < 1e-10)
+    ok("migration phase continuity on the device, worst deviation", f"{bdev:.2e}", "< 1e-10", bdev < 1e-10)
+    slen = 2 * np.pi * 3
+    n_out = sum(int(np.sum((sl["theta"] < -1e-9) | (sl["theta"] >= slen + 1e-9)))
+                for sl in beamio.read_slices(wd / "devmd-final.beam.h5", 1e-10, 3e-10))
+    ok("migration window residency on the device", f"{n_out} outside", "0", n_out == 0)
+    nslice = 16
+    pc = diag_power(wd, "devmc", nslice)
+    pd = diag_power(wd, "devmd", nslice)
+    ok("heavy-migration window power, device vs CPU", f"{abs(pd-pc)/pc:.3e}", f"<= {MIG_E2E_CEIL:.1e}",
+       abs(pd - pc) / pc <= MIG_E2E_CEIL)
+    grown = "particle capacity grown" in r.stdout
+    ok("a migrated slice outgrew the rectangle and the seam grew it", grown, "True", grown)
+
+    # 8b. Lockstep across migration: the twin re-stages every step over the changed
+    # fills, inside the ceilings, and the FP64 path is untouched.
+    run(args.exe, wd, "devm_l.in", heavy_base.format(root="devml", mig="T",
+        extra=DEV + '  global%fp32_check = "lockstep"\n', **heavy), threads="8")
+    s = summary(wd, "devml")
+    for q in CEIL:
+        ok(f"migrating lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+    same = (wd / "devml.diag.txt").read_bytes() == (wd / "devmc.diag.txt").read_bytes()
+    ok("migrating FP64 diag byte-identical, device twin on vs off", same, "True", same)
+
+    # 8c. The no-op, self-referenced against the device's own flutter. The frozen deck
+    # is dark, so its power is FP32 noise and says nothing; the read-back beam does. With
+    # zero moves the migrate = T run differs from migrate = F only in where the readback
+    # happened, so the final beam dumps must agree to within the flutter two migrate = F
+    # device runs show between themselves, measured on z in units of the slice spacing.
+    run(args.exe, wd, "devm_f1.in", base.format(root="devmf1", mig="F", extra=DEV, **frozen), threads="8")
+    run(args.exe, wd, "devm_f2.in", base.format(root="devmf2", mig="F", extra=DEV, **frozen), threads="8")
+    run(args.exe, wd, "devm_t.in", base.format(root="devmt", mig="T", extra=DEV, **frozen), threads="8")
+    moved = cm.read_migration_file(wd, "devmt")[0]
+    z1 = beam_z(wd / "devmf1-final.beam.h5")
+    z2 = beam_z(wd / "devmf2-final.beam.h5")
+    zt = beam_z(wd / "devmt-final.beam.h5")
+    flutter = float(np.max(np.abs(z1 - z2))) / 3e-10
+    tol = max(3 * flutter, NOOP_FLOOR)
+    dev_t = float(np.max(np.abs(zt - z1))) / 3e-10
+    ok("migration no-op on the device: moves", moved, "0", moved == 0)
+    ok("migration no-op on the device: migrate T vs F final beam z [spacings]", f"{dev_t:.2e}",
+       f"<= {tol:.1e} (3 x flutter {flutter:.1e})", dev_t <= tol)
+
+
+def beam_z(path):
+    """Every particle's longitudinal position c*t [m] from an openPMD beam dump, in the
+    file's own order. Bmad's dumps hold z as a constant and the coordinate in time."""
+    with h5py.File(path) as h5:
+        rec = h5["data"][list(h5["data"].keys())[0]]["particles"]
+        name = list(rec.keys())[0]
+        return 2.99792458e8 * np.asarray(rec[name]["time"][...], dtype=float)
 
 
 def harm_powers(wd, root, window=False):
