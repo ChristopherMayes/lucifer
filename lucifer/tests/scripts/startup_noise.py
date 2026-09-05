@@ -27,6 +27,10 @@ The experiments, each a set of runs and one figure:
                 shot-noise power and saturation estimates, from the deck's parameters.
   f. genesis    Genesis4 on the harness's SASE tier deck at three grids with both of its
                 field solvers, and Lucifer started from each of its dumps.
+  g. filter     The source filter (fel-physics.md sec-source-filter) at grid 256 and two
+                loads, with its sigmoid's edge at the central cone and at the 3 urad cut,
+                against the same runs with the filter off. What the filter does to the
+                power inside the mode is what this measures.
 
 Lucifer runs on the device by default (global%device = "metal"), with one CPU run at the
 sweep's smallest grid as the cross-check. Genesis runs on the CPU. Every run is cached
@@ -51,6 +55,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 
 import h5py
 import numpy as np
@@ -87,6 +92,7 @@ EXAMPLE = (96, 3)         # the examples' own window
 INTERIOR = slice(80, 230)
 DUMP_ELES = ("UND##1", "UND##2", "UND##4", "UND##8", "UND##12")
 UND_END_RECORDS = {1: 0, 2: 4, 4: 12, 8: 28, 12: 44}   # record index of each undulator end
+SHARP_WIDTH = 0.05        # the source filter's sigmoid width where the edge is meant to be sharp
 
 DECK = """&fel_params
   lat_file = "{lat}"
@@ -189,13 +195,26 @@ def cell_size(ngrid):
     return 2 * HALF_WIDTH / (ngrid - 1)
 
 
-def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=()):
+def filter_xcut(ngrid, theta):
+    """The source filter's xcut that puts its sigmoid's edge at the angle theta.
+
+    The edge sits at half the grid's Nyquist frequency times xcut, and half Nyquist is
+    the angle lambda/(4 dx) (fel-physics.md sec-source-filter)."""
+    return theta / (LAMBDA0 / (4 * cell_size(ngrid)))
+
+
+def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0):
     nslice, sample = window
     slen = nslice * sample * LAMBDA0
     charge = CURRENT * slen / C_LIGHT
     extra = ""
     if device != "off":
         extra += f'  global%device = "{device}"\n'
+    if xcut is not None:
+        extra += ('  global%source_filter = T\n'
+                  f'  global%source_filter_xcut = {xcut:.9f}\n'
+                  f'  global%source_filter_ycut = {xcut:.9f}\n'
+                  f'  global%source_filter_width = {width:.9f}\n')
     if dumps:
         extra += "  global%dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
     return DECK.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
@@ -391,6 +410,71 @@ def exp_floor(rn, args, lat, results):
     results["floor"] = res
 
 
+def exp_filter(rn, args, lat, results):
+    """
+    The source filter against the split this page defines (fel-physics.md
+    sec-source-filter). The filter suppresses the source at wide transverse angles, and
+    what has never been measured is what that does to the power inside the mode, which is
+    the part that amplifies. Grid 256, the cell size the page's scaling law is written
+    at, and the two loads that bracket the examples. Two edge positions: the central cone
+    of one segment, which is where the physical emission stops, and the 3 urad cut this
+    page splits at, which is inside the cone and inside the coherent mode.
+    """
+    print("== g. the source filter against the mode power, grid 256 ==")
+    ng = 256
+    th = results["theory"]
+    edges = {"cone": th["theta_cone_one_segment"], "cut": 3e-6}
+    res = {"ngrid": ng, "dx": cell_size(ng), "edges": {}}
+    for name, theta in edges.items():
+        res["edges"][name] = {"theta": theta, "xcut": filter_xcut(ng, theta)}
+
+    # Genesis4's default width is 1 in the same normalized units as the edge, which is a
+    # very soft roll-off: the sigmoid is 1/(1 + exp(-1/w)) = 0.73 on axis, so it attenuates
+    # the coherent source as well as the wide angles. The sharp pair separates the filter's
+    # angular selectivity from that softness.
+    cases = [("off", None, 1.0)]
+    for k, v in res["edges"].items():
+        cases.append((k, v["xcut"], 1.0))
+        cases.append((k + "_sharp", v["xcut"], SHARP_WIDTH))
+    res["sharp_width"] = SHARP_WIDTH
+
+    for npart in (1024, 4096):
+        for name, xcut, width in cases:
+            # The unfiltered case is experiment a's own deck, so the runner skips it when
+            # that experiment has already run in this work directory.
+            root = f"floor_g{ng}_n{npart}" if name == "off" else f"filt_{name}_n{npart}"
+            t0 = time.time()
+            rn.run(root, deck_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES,
+                                   xcut=xcut, width=width))
+            wall = time.time() - t0
+            rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
+            z, P, b = element_end_power(rn.wd, root)
+            zs, Ps = saturation_point(z, interior(P))
+            res[f"n{npart}_{name}"] = {
+                "npart": npart, "filter": name, "xcut": xcut, "width": width, "dumps": rows,
+                "z": z.tolist(), "P": interior(P).tolist(), "b": interior(b).tolist(),
+                "z_sat": zs, "P_sat": Ps, "wall_s": wall,
+            }
+
+    # The three numbers the page needs, at the last dump and at z = 37 m.
+    for npart in (1024, 4096):
+        base = res[f"n{npart}_off"]
+        for name, _, _ in cases[1:]:
+            r = res[f"n{npart}_{name}"]
+            for tag, i in (("z37", 3), ("exit", 4)):
+                o0, o1 = base["dumps"][i]["out_3e-06"], r["dumps"][i]["out_3e-06"]
+                i0, i1 = base["dumps"][i]["in_3e-06"], r["dumps"][i]["in_3e-06"]
+                r[f"wide_factor_{tag}"] = o0 / o1 if o1 > 0 else float("inf")
+                r[f"mode_rel_{tag}"] = (i1 - i0) / i0
+            r["b_rel_z37"] = (r["b"][UND_END_RECORDS[8]] - base["b"][UND_END_RECORDS[8]]) \
+                / base["b"][UND_END_RECORDS[8]]
+            print(f"  {npart:5d} particles, edge at the {name}: wide-angle down "
+                  f"{r['wide_factor_exit']:.1f}x at the exit, mode power "
+                  f"{r['mode_rel_exit']:+.0%}, bunching at 37 m {r['b_rel_z37']:+.0%}, "
+                  f"saturation {r['z_sat']:.1f} m against {base['z_sat']:.1f} m")
+    results["filter"] = res
+
+
 def exp_beamlets(rn, args, lat, results):
     print("== b. beamlets against particles, grid 256 ==")
     res = {}
@@ -500,6 +584,38 @@ def rounded(obj, digits=5):
 
 # ---------------------------------------------------------------------------
 # Figures
+
+def filter_figure(results, out):
+    """The source filter against the split, one panel per load."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({"font.size": 9, "axes.grid": True, "grid.alpha": 0.3})
+    fi = results["filter"]
+    cases = [("off", "no filter", "k", "-"),
+             ("cone", "edge at the cone, width 1", "tab:orange", "-"),
+             ("cut", "edge at 3 urad, width 1", "tab:red", "-"),
+             ("cone_sharp", f"edge at the cone, width {fi['sharp_width']}", "tab:green", "--"),
+             ("cut_sharp", f"edge at 3 urad, width {fi['sharp_width']}", "tab:blue", "--")]
+    fig, ax = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+    for j, npart in enumerate((1024, 4096)):
+        for name, label, c, ls in cases:
+            r = fi[f"n{npart}_{name}"]
+            z = [d["z"] for d in r["dumps"]]
+            ax[j].semilogy(z, [d["in_3e-06"] for d in r["dumps"]], ls, color=c, marker="o",
+                           ms=3, label=label if j == 0 else None)
+            ax[j].semilogy(z, [d["out_3e-06"] for d in r["dumps"]], ls, color=c, marker="x",
+                           ms=4, alpha=0.45)
+        ax[j].set_title(f"{npart} macroparticles per slice")
+        ax[j].set_xlabel("z [m]")
+    ax[0].set_ylabel("power per slice [W]")
+    ax[0].legend(fontsize=7, loc="lower right")
+    fig.suptitle("Inside 3 urad (circles) and outside it (crosses), with and without the "
+                 "source filter", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(pathlib.Path(out) / "source-filter.png", dpi=130)
+    plt.close(fig)
+
 
 def figures(results, out):
     import matplotlib
@@ -640,7 +756,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="metal")
     ap.add_argument("--cpu-threads", default="12")
-    ap.add_argument("--only", default="a,b,c,d,e,f")
+    ap.add_argument("--only", default="a,b,c,d,e,f,g")
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
@@ -670,9 +786,13 @@ def main():
         exp_line(rn, args, lat, lat2, results)
     if "f" in want:
         exp_genesis(rn, args, results)
+    if "g" in want:
+        exp_filter(rn, args, lat, results)
     results_file.write_text(json.dumps(rounded(results), indent=1))
     if all(k in results for k in ("floor", "beamlets", "line")):
         figures(results, out)
+    if "filter" in results:
+        filter_figure(results, out)
     print(f"wrote {results_file}")
 
 

@@ -215,6 +215,7 @@ Genesis4 discretizes the transverse plane and the particle distribution in the s
 | 511 | 0.78 | 816 | 548 | $1.9\times10^{-6}$ |
 ```
 
+(sn-recommendations)=
 ## Recommendations
 
 **Distinguish the mode power from the total.** Write the field to file at the position of interest, take its two-dimensional Fourier transform, and compare the power within an angular radius of about four diffraction angles of the mode, $4\lambda/(2\pi\sigma_x)$, with the power outside it. A converged simulation has the outside part below about a tenth of the inside part at saturation. Without a field dump, repeat the simulation with twice the macroparticles at the same beamlet size. The mode power agrees within the SASE fluctuation, about 25 percent for a window of 150 interior slices, while wide-angle emission halves.
@@ -229,6 +230,43 @@ within a factor of 1.5 over cell sizes of 0.78 to 6.35 µm and beamlet counts of
 
 **Check the bunching factor.** In the converged simulations the interior bunching factor at saturation is 0.20 to 0.30. A markedly lower value with a high total power indicates that wide-angle emission is draining the beam.
 
-## Possible code improvements
+## The source filter, measured
 
-Four remedies are known, and none has been measured against the power inside the mode as defined on this page. Genesis4's `source_filter` applies a sigmoid in spatial frequency to the transformed source term, which is the angular filter at the cone when its edge is set there ([](references.md#ref-genesis4)). Tanaka's coherent retrieval keeps the lowest Laguerre-Gauss orders of the bunching and adds the physical spontaneous emission back analytically ([](references.md#ref-tanaka)). Litvinenko's clones separate the induced from the spontaneous radiation by pairing each macroparticle with one of opposite charge ([](references.md#ref-litvinenko)). A deposition kernel of fixed physical width, wider than one cell, is the real-space form of the form factor of Pausch and co-workers ([](references.md#ref-pausch)). For this code the filter is the natural first step, and it is now transcribed: `global%source_filter` applies Genesis4's sigmoid to the transformed source, off by default, agreeing with Genesis4's own filter at 2.2e-6 ([](validation.md#val-source-filter), [](fel-physics.md#sec-source-filter)). What it does to the power inside the mode as this page defines it has not been measured yet. Any of the four changes the field the two codes compute from the same distributions, so it would be a switch, off by default, and it would be measured against the power inside the mode rather than against Genesis4.
+Of the four remedies below, one is now in this code and measured against the split this page defines. `global%source_filter` multiplies the transformed source by a sigmoid in normalized transverse spatial frequency, transcribed from Genesis4's own filter and agreeing with it at 2.2e-6 ([](fel-physics.md#sec-source-filter), [](validation.md#val-source-filter)). Two things set it: where the sigmoid's edge sits, and how sharply it falls. Both matter, and the second one turns out to matter more.
+
+The measurement is the sweep of this page at 1.57 µm cells, with the filter's edge at the central cone of one segment, 7.1 µrad, and at the 3 µrad cut this page splits at. Genesis4's default width of 1 is in the same normalized units as the edge, which makes the sigmoid 0.73 on axis: at that width the filter attenuates the coherent source as much as the wide angles. The sharp rows use a width of 0.05.
+
+```{table} The source filter against the split, 1.57 µm cells, 300-slice window. The wide-angle column is the factor by which the power outside 3 µrad falls at the exit. The in-cone column is the power inside 3 µrad at the end of the first undulator, where the physical spontaneous emission within that angle is 0.13 MW. The mode column is the change in the power inside 3 µrad at the exit, against a SASE fluctuation of about 25 percent.
+:name: tab-sn-filter
+
+| particles | edge | width | wide-angle at exit | in-cone at z = 4 m (MW) | mode at exit | bunching at 37 m | saturation (m) |
+|---|---|---|---|---|---|---|---|
+| 1024 | none | | 1 | 0.133 | | | 28.2 |
+| 1024 | cone | 1 | 2.8x | 0.067 | -18% | -32% | 37.7 |
+| 1024 | 3 µrad | 1 | 5.5x | 0.062 | +4% | -35% | 37.7 |
+| 1024 | cone | 0.05 | 1.1x | 0.132 | +13% | +3% | 28.2 |
+| 1024 | 3 µrad | 0.05 | 3.6x | 0.129 | +49% | +7% | 32.9 |
+| 4096 | none | | 1 | 0.123 | | | 32.9 |
+| 4096 | cone | 1 | 3.1x | 0.063 | -8% | -57% | 37.7 |
+| 4096 | 3 µrad | 1 | 5.9x | 0.059 | -6% | -59% | 37.7 |
+| 4096 | cone | 0.05 | 1.1x | 0.122 | +2% | 0% | 32.9 |
+| 4096 | 3 µrad | 0.05 | 3.2x | 0.122 | +17% | +1% | 32.9 |
+```
+
+```{figure} generated/startup-noise/source-filter.png
+:name: fig-sn-filter
+
+Power per slice inside 3 µrad (circles) and outside it (crosses) against z, with the filter off and at four settings, for 1024 and 4096 macroparticles per slice at 1.57 µm cells.
+```
+
+At Genesis4's default width the filter halves the power inside the cone at the end of the first undulator, from 0.13 MW to 0.06 MW, where 0.13 MW is the physical spontaneous emission the beam radiates into that angle. It removes half the startup seed along with the artifact, and the gain arrives late: the bunching at 37 m falls by a third to a half and saturation moves from 28 to 33 m out to 37.7 m. The power at the exit is then no better a measure of the machine than it was before, since the run has not finished saturating.
+
+At a sharp edge on the 3 µrad cut the same filter removes 3.2 to 3.6 times the wide-angle power while the in-cone startup power is unchanged to 3 percent, the bunching at 37 m is unchanged to a few percent, and the saturation point moves by at most one FODO cell. The power inside the mode at the exit rises by 17 to 49 percent, inside the fluctuation of the process at 1024 particles and above it at 4096, which is the mode keeping power that used to diffract away. A sharp edge at the cone removes almost nothing, because most of the wide-angle power sits between the cut and the cone rather than beyond it.
+
+What the filter does not do is make the total power a converged quantity. Even at the sharp 3 µrad edge the wide-angle part is still 0.30 GW per slice at the exit against 0.56 GW inside the mode, so the criterion of [](#sn-recommendations) still applies and the split is still the measurement to take. The filter costs 14 percent of the wall clock at 4096 macroparticles, 31 s against 27 s, since the source gains a transform pair it did not need.
+
+Two cautions carry from this. The width is not a detail: Genesis4's default of 1 attenuates the source on axis by 27 percent in amplitude, and a filter meant to remove only the wide angles wants a width well below the edge it cuts at. And a filter alone does not restore what it removes. The half of the physical spontaneous emission the soft filter takes out is exactly what Tanaka's remedy adds back analytically ([](references.md#ref-tanaka)), and this measurement is the case for that add-back rather than against it.
+
+## The other remedies
+
+Three remain, and none has been measured against the power inside the mode. Tanaka's coherent retrieval keeps the lowest Laguerre-Gauss orders of the bunching and adds the physical spontaneous emission back analytically ([](references.md#ref-tanaka)); this code carries it as `global%source_model = "coherent"`, which refuses a dark start for the reason the measurement above illustrates. Litvinenko's clones separate the induced from the spontaneous radiation by pairing each macroparticle with one of opposite charge ([](references.md#ref-litvinenko)). A deposition kernel of fixed physical width, wider than one cell, is the real-space form of the form factor of Pausch and co-workers ([](references.md#ref-pausch)). Any of the three changes the field the two codes compute from the same distributions, so each would be a switch, off by default, and measured against the power inside the mode rather than against Genesis4.
