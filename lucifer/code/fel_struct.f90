@@ -65,6 +65,24 @@ type fel_global_struct
   ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
   ! physical shot noise, and the transverse shape is a guarded Gaussian.
   character(16) :: source_model = 'deposit'
+  ! The angular filter on the source term (fel-physics.md sec-source-filter), transcribed
+  ! from Genesis4's source_filter, which release 4.6.12 added with its FFT solver. Off by
+  ! default, and a run with it off is bit-for-bit the run without it. On, the transformed
+  ! source is multiplied by a sigmoid in normalized transverse spatial frequency before it
+  ! reaches the field, so the wide-angle emission of the point-like beamlets is suppressed
+  ! while the field itself propagates untouched (doc/startup-noise.md).
+  logical :: source_filter = .false.
+  ! The sigmoid's edge, in units of half the grid's Nyquist frequency, per plane. Genesis4
+  ! calls these xcut and ycut. 1 puts the edge at half Nyquist.
+  real(rp) :: source_filter_xcut = 1
+  real(rp) :: source_filter_ycut = 1
+  ! The sigmoid's width in the same units, Genesis4's sigmoid. Small is a sharp edge.
+  real(rp) :: source_filter_width = 1
+  ! The filter check's self-test, the fp32_mutate pattern: apply the sigmoid to the
+  ! propagated field instead of to the source. Both suppress wide angles, so a run still
+  ! completes and still looks reasonable, and only the comparison against Genesis4 says
+  ! which one the code did.
+  logical :: source_filter_mutate = .false.
   ! The tracking window, Tao's names (tao_beam_init carries track_start/track_end) and
   ! Genesis's zstop parity: element locators (lat_ele_locator syntax). Blank = the whole
   ! line. The schedule (slippage, autophasing, break geometry) is always built on the

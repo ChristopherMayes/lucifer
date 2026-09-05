@@ -31,6 +31,11 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 | `global%interlude_model` | `"bmad"` | How field-free elements are tracked: `"bmad"` (the seam) or `"genesis"` (transcribed) |
 | `global%transport_model` | `"bmad"` | Transverse transport inside averaged FEL elements: `"bmad"` (Bmad's own kernel) or `"genesis"` (transcribed, validation-internal) |
 | `global%source_model` | `"deposit"` | The FEL source: `"deposit"` per particle, or `"coherent"` for the coherent retrieval |
+| `global%source_filter` | `F` | Filter the source term at wide transverse angles ([](#param-global-source-filter)) |
+| `global%source_filter_xcut` | `1` | The filter's sigmoid edge in x, in units of half the grid's Nyquist frequency |
+| `global%source_filter_ycut` | `1` | The filter's sigmoid edge in y, same units |
+| `global%source_filter_width` | `1` | The filter's sigmoid width, same units. Small is a sharp edge |
+| `global%source_filter_mutate` | `F` | The filter check's self-test: filter the field instead of the source |
 | `global%track_start` | `""` | Element locator bounding the walk below. Blank is the whole line |
 | `global%track_end` | `""` | Element locator bounding the walk above. Blank is the whole line |
 | `global%ran_seed` | `12345` | The one random seed, governing generation, resampling and noise |
@@ -50,6 +55,9 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 
 (param-global-source-model)=
 **`global%source_model`** is `"deposit"`, the standard per-particle scatter, or `"coherent"`, the coherent-Gaussian retrieval in which the spatially incoherent part of the source is dropped, the slice bunch factor keeps the physical shot noise, and the transverse shape is a guarded Gaussian. A profile that is measurably not Gaussian is refused. See [](fel-physics.md#sec-coherent-source).
+
+(param-global-source-filter)=
+**`global%source_filter`** filters the source term at wide transverse angles. Each beamlet is a single transverse point on the deposition grid and the source has no angular dependence, so a beamlet radiates into every transverse wavenumber the grid carries, well outside the undulator's central cone. On, the transformed source is multiplied by a sigmoid in normalized spatial frequency before it is added to the field, and the field itself is never multiplied: a seed, an imported field and everything already radiated propagate exactly as they do with the filter off. `source_filter_xcut` and `source_filter_ycut` place the sigmoid's half-height per plane and `source_filter_width` sets how sharply it falls, all three in units of half the grid's Nyquist frequency, so the default of 1 puts the edge at an angle of `lambda0/(4*grid_half_width/(grid_n_pts-1))`. Genesis4 carries the same filter with the same three numbers, named `xcut`, `ycut` and `sigmoid`, and the transcription is checked against it ([](validation.md#val-source-filter)). Off by default, and a run with it off is bit-for-bit the run without it. The unaveraged mode and `source_model = "coherent"` are refused, since neither builds the transformed source the filter multiplies, and a non-positive cut or width is refused rather than quietly turning the filter off. What the filter is for, and what it does to the power a SASE run reports, is [](startup-noise.md). `source_filter_mutate` applies the sigmoid to the propagated field instead of to the source, which is how the harness proves the check can fail.
 
 (param-global-track-start)=
 **`global%track_start`** and **`global%track_end`** bound the walk, using Bmad's element-locator syntax. The schedule (slippage, autophasing, break geometry) is always built on the full lattice, so a windowed run composes exactly with the full one: the first span followed by the second, started from the first's dumps, reproduces the one-shot run. The measured level is in [](validation.md#val-the-programs-own-identities).

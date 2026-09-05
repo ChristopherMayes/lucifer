@@ -1061,6 +1061,29 @@ Input:
   exp_k2 -- complex(rp): The member's FP64 propagator this step.
 ```
 
+(api-fel-device-set-filter)=
+### `fel_device_set_filter`
+
+*Subroutine* `(dev, im, sigmoid)`
+
+```
+Routine to upload the source filter's sigmoid for one field member
+(fel-physics.md sec-source-filter). The table is real and the same for every member,
+since it is built on the grid's own normalized frequency axis and carries no
+wavelength, but it rides the propagator's per-member layout so that one device kernel
+serves both multiplies.
+```
+
+```
+Input:
+  dev      -- fel_device_struct: The resident device state.
+  im       -- integer: Field-set member, 1 based.
+  sigmoid  -- real(rp)(:,:): The sigmoid in FFT order, as fel_field_kernel_init built it.
+
+Output:
+  None directly: the device's filter table for this member is current.
+```
+
 (api-fel-device-stage-slice)=
 ### `fel_device_stage_slice`
 
@@ -3881,6 +3904,20 @@ nstep = round(l/delz_target). kx, ky carry Genesis's unroll scaling by ku^2
 (fel-physics.md sec-element).
 ```
 
+(api-fel-source-filter-struct)=
+### `fel_source_filter_struct`
+
+*Struct*
+
+```
+The angular filter on the source term, transcribed from Genesis4's source_filter
+(FieldSolverFFT.cpp:129-146 and 158-170, release 4.6.12). The source is transformed,
+multiplied by a sigmoid in normalized transverse spatial frequency, and only then added
+to the field. The field's own propagation is untouched, so this removes the emission a
+point-like beamlet radiates into the wide angles the grid carries without changing how
+the field that exists diffracts (doc/startup-noise.md).
+```
+
 (api-fel-coherent-struct)=
 ### `fel_coherent_struct`
 
@@ -4652,6 +4689,9 @@ Input:
   dgrid -- real(rp): Grid half-width [m].
   ks    -- real(rp): Radiation wavenumber [1/m].
   dz    -- real(rp): Step length [m].
+  filter -- fel_source_filter_struct, optional: The source-term angular filter. The entry
+              gains its sigmoid table when this is present and on. Absent or off, no
+              table is built and fel_field_step adds the source unfiltered.
 
 Output:
   None directly: the module kernel cache (fel_kernels) gains an entry, and the

@@ -276,10 +276,13 @@ else
   GEN_PID_TD=$!
   run_genesis Aramis-td-sase &
   GEN_PID_SASE=$!
+  run_genesis Aramis-td-sase-filter &
+  GEN_PID_FILT=$!
   GEN_OK=1
   wait $GEN_PID_SS   || GEN_OK=0
   wait $GEN_PID_TD   || GEN_OK=0
   wait $GEN_PID_SASE || GEN_OK=0
+  wait $GEN_PID_FILT || GEN_OK=0
   if [[ $GEN_OK -ne 1 ]]; then
     echo "FAIL: a Genesis reference chain failed (see above)" >&2
     exit 1
@@ -306,7 +309,7 @@ else
     echo "  reference cache could not be written, continuing without it"
   fi
 fi
-for log in genesis-Aramis-ss genesis-Aramis-td genesis-Aramis-td-sase; do
+for log in genesis-Aramis-ss genesis-Aramis-td genesis-Aramis-td-sase genesis-Aramis-td-sase-filter; do
   tail -3 $log.log
 done
 section_time genesis-references
@@ -319,7 +322,7 @@ echo
 # convert_genesis.py round-trip, and a converted read matches a direct read at 1.7e-15).
 
 echo "--- convert the reference dumps to openPMD (the tracker reads openPMD only) ---"
-for root in Aramis AramisTD AramisTDSASE; do
+for root in Aramis AramisTD AramisTDSASE AramisTDSASEF; do
   for pair in "$root-initial.par.h5 $root-initial.beam.h5" \
               "$root-initial.fld.h5 $root-initial.wf.h5"; do
     if ! "$PYTHON" "$SCRIPT_DIR/scripts/convert_genesis.py" to-openpmd $pair \
@@ -667,6 +670,18 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir 
   exit 1
 fi
 section_time collective
+echo
+
+# Source-filter checks: the transcribed angular filter on the source term run against
+# Genesis4's own, from the same particles and the same field, plus the two mutations that
+# leave a plausible power curve and only the reference can separate.
+
+echo "--- source-filter checks --------------------------------------------------------"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_source_filter.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: source-filter checks; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+section_time source-filter
 echo
 
 # FP32 lockstep checks: the single-precision particle path's divergence from the

@@ -22,6 +22,12 @@ noise the loader prints the per-slice electron count `N_lambda`, the effective
 count `N_eff`, and the quiet floor it verified, so the noise level is a reported
 number rather than an assumption.
 
+The exit power of a run like this one is set by the transverse cell size and the
+macroparticle count as much as by the physics, since each beamlet radiates into every
+angle the grid carries. The documentation's SASE convergence page measures that and says
+how to choose the grid, the window and the load. `global%source_filter = T` suppresses
+the wide-angle part and takes this deck from 3.0 GW to 0.73 GW.
+
 The beam is a flat coasting bunch said in Bmad's own vocabulary:
 `distribution_type(3) = "GRID"` over the window extent, with the current derived as
 `I = Q*c/extent`, so `bunch_charge` encodes 3 kA exactly.

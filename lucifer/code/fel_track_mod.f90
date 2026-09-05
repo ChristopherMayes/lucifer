@@ -84,6 +84,24 @@ implicit none
 ! (fel-physics.md sec-element).
 !-
 
+!+
+! Struct fel_source_filter_struct
+!
+! The angular filter on the source term, transcribed from Genesis4's source_filter
+! (FieldSolverFFT.cpp:129-146 and 158-170, release 4.6.12). The source is transformed,
+! multiplied by a sigmoid in normalized transverse spatial frequency, and only then added
+! to the field. The field's own propagation is untouched, so this removes the emission a
+! point-like beamlet radiates into the wide angles the grid carries without changing how
+! the field that exists diffracts (doc/startup-noise.md).
+!-
+
+type fel_source_filter_struct
+  logical :: on = .false.
+  real(rp) :: xcut = 1, ycut = 1   ! Sigmoid edge per plane, in half-Nyquist units.
+  real(rp) :: width = 1            ! Sigmoid width, same units. Genesis4's sigmoid.
+  logical :: mutate = .false.      ! The check's self-test: filter the field, not the source.
+end type
+
 type fel_und_struct
   real(rp) :: aw = 0          ! rms undulator parameter.
   real(rp) :: ku = 0          ! Undulator wavenumber twopi/lambdau [1/m].
@@ -105,6 +123,7 @@ type fel_und_struct
   integer :: nstep = 0        ! Number of integration steps over the segment.
   real(rp) :: dz = 0          ! Step length [m].
   integer :: source_model = 0 ! fel_source_deposit$ (default) or fel_source_coherent$.
+  type (fel_source_filter_struct) :: filter   ! The source-term angular filter, off by default.
 end type
 
 !+
@@ -153,6 +172,8 @@ end type
 type fel_kernel_struct
   complex(rp), allocatable :: k2(:,:)      ! -i (kx^2+ky^2)/(2 ks), FFT order.
   complex(rp), allocatable :: exp_k2(:,:)  ! exp(K2 * dz), the step propagator.
+  real(rp), allocatable :: sigmoid(:,:)    ! The source filter's sigmoid, FFT order. Built
+                                           !   only when a caller asks for it.
   integer :: ngrid = 0
   real(rp) :: dgrid = 0, ks = 0, dz = 0
 end type
@@ -756,7 +777,7 @@ phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 call fel_tic (fel_t_und_prep$)
 do io = 1, size(ff)
   ngrid_arr = wavefront_shape(ff(io)%wf)
-  call fel_field_kernel_init (ngrid_arr(1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz)
+  call fel_field_kernel_init (ngrid_arr(1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz, und%filter)
 enddo
 call fel_toc (fel_t_und_prep$)
 
@@ -1099,6 +1120,7 @@ par%pol_im = aimag(und%pol)
 par%first = ff(1)%slip%first
 par%helical = merge(1, 0, und%helical)
 par%mutate = 0
+par%source_filter = merge(1, 0, und%filter%on)
 par%nfield = size(ff)
 par%npol = merge(2, 1, allocated(ff(1)%wf%Ey))
 par%pad = 0
@@ -1122,6 +1144,7 @@ integer io, ik
 do io = 1, size(ff)
   ik = fel_kernel_index(size(ff(io)%wf%Ex, 1), ff(io)%wf%dx, twopi / ff(io)%wf%wavelength, und%dz)
   call fel_device_set_kernel (dev, io, fel_kernels(ik)%exp_k2)
+  if (und%filter%on) call fel_device_set_filter (dev, io, fel_kernels(ik)%sigmoid)
 enddo
 
 end subroutine set_device_kernels
@@ -2387,25 +2410,74 @@ elseif (scl_w /= 0) then
   enddo
 endif
 
-! Propagate and add: FFT, multiply the cached exp(K2 delz), inverse FFT, normalize,
-! plus 2*crsource in real space.
+! The source filter (fel-physics.md sec-source-filter) when the run asks for it: the source
+! gets a forward transform of its own, the sigmoid multiplies it there, and it is added to
+! the field in Fourier space before the one inverse transform. FieldSolverFFT::FFT carries
+! both branches for the same reason. Without the filter the transform pair is linear,
+! IFFT(FFT(crsource))/ngrid^2 is crsource again, and the source is added in real space for
+! one FFT less per field per step. The unfiltered branch is the arithmetic the tiers were
+! recorded against, kept whole so that no digit moves when the filter is off.
 
-call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
-wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2
-call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
+if (und%filter%on) then
 
-if (allocated(wf%Ey)) then
+  if (.not. allocated(fel_kernels(ik)%sigmoid)) then
+    call out_io (s_error$, r_name, 'SOURCE FILTER IS ON BUT ITS SIGMOID WAS NOT BUILT FOR ' // &
+                                   'THIS GRID AND STEP.', 'PLEASE REPORT THIS!')
+    return
+  endif
 
-  ! Two live polarizations: the element's source lands as pol * src on the pair
-  ! (the exact dual of the kick's conj(pol).E read), and Ey diffracts identically.
+  ! The mutation the check exists to catch (check_source_filter.py): the sigmoid on the
+  ! propagated field rather than on the source. It suppresses wide angles too, so the run
+  ! completes and the power curve stays plausible, and only Genesis4 says which was done.
 
-  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(1) * crsource
-  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
-  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2
-  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
-  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(2) * crsource
+  if (.not. und%filter%mutate) then
+    call wavefront_fft2 (crsource, wf_fft_forward$, err);  if (err) return
+    crsource = crsource * fel_kernels(ik)%sigmoid
+  else
+    call wavefront_fft2 (crsource, wf_fft_forward$, err);  if (err) return
+  endif
+
+  call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
+  if (und%filter%mutate) wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%sigmoid
+
+  if (allocated(wf%Ey)) then
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2 + 2 * und%pol(1) * crsource
+    call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
+    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
+    if (und%filter%mutate) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%sigmoid
+    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2 + 2 * und%pol(2) * crsource
+    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
+    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp)
+  else
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2 + 2 * crsource
+    call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
+  endif
+
 else
-  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
+
+  ! Propagate and add: FFT, multiply the cached exp(K2 delz), inverse FFT, normalize,
+  ! plus 2*crsource in real space.
+
+  call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
+  wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * fel_kernels(ik)%exp_k2
+  call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
+
+  if (allocated(wf%Ey)) then
+
+    ! Two live polarizations: the element's source lands as pol * src on the pair
+    ! (the exact dual of the kick's conj(pol).E read), and Ey diffracts identically.
+
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(1) * crsource
+    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
+    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * fel_kernels(ik)%exp_k2
+    call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
+    wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * und%pol(2) * crsource
+  else
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp) + 2 * crsource
+  endif
+
 endif
 
 err_flag = .false.
@@ -2486,21 +2558,25 @@ end subroutine fel_field_step
 !   dgrid -- real(rp): Grid half-width [m].
 !   ks    -- real(rp): Radiation wavenumber [1/m].
 !   dz    -- real(rp): Step length [m].
+!   filter -- fel_source_filter_struct, optional: The source-term angular filter. The entry
+!               gains its sigmoid table when this is present and on. Absent or off, no
+!               table is built and fel_field_step adds the source unfiltered.
 !
 ! Output:
 !   None directly: the module kernel cache (fel_kernels) gains an entry, and the
 !   FFTW plans are warmed serially (the parallel loops then only execute).
 !-
 
-subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz)
+subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz, filter)
 
 integer ngrid
 real(rp) dgrid, ks, dz
-real(rp) dk, shift, dx, dy
+type (fel_source_filter_struct), optional :: filter
+real(rp) dk, shift, dx, dy, xf, yf, r
 type (fel_kernel_struct), allocatable :: grow(:)
 type (fel_kernel_struct), pointer :: kn
 integer ix, iy, iix, iiy, ik
-logical err
+logical err, want_sigmoid
 
 !
 
@@ -2518,10 +2594,19 @@ call wavefront_fft2_plan_threads (ngrid, ngrid, err)
 
 if (.not. allocated(fel_kernels)) allocate (fel_kernels(0))
 
+want_sigmoid = .false.
+if (present(filter)) want_sigmoid = filter%on
+
 do ik = 1, size(fel_kernels)
   if (fel_kernels(ik)%ks /= ks) cycle
+
+  ! A hit must also carry the table this caller needs. An interlude reaches the same four
+  ! keys with no filter, so an entry it built first would otherwise leave the undulator
+  ! step's filter with no sigmoid. Rebuilding here is safe, being serial by contract.
+
   if (fel_kernels(ik)%ngrid == ngrid .and. fel_kernels(ik)%dgrid == dgrid .and. &
-      fel_kernels(ik)%dz == dz) return
+      fel_kernels(ik)%dz == dz .and. &
+      (allocated(fel_kernels(ik)%sigmoid) .or. .not. want_sigmoid)) return
   exit
 enddo
 
@@ -2550,6 +2635,29 @@ do iy = 0, ngrid-1
 enddo
 
 kn%exp_k2 = exp(kn%k2 * dz)
+
+! The source filter's sigmoid, in the same FFT order as K2 and on the same normalized
+! frequency axis: FieldSolverFFT.cpp:133-144, where x runs over (ix + shift)/ngrid/xcut so
+! that xcut = 1 puts the sigmoid's edge at half the Nyquist frequency. Genesis leaves the
+! exponent unguarded, which is safe at its own cuts and overflows for a cut small enough to
+! carry the grid's corner far outside the edge. The clamp holds the value it already has
+! there, since 1/(1 + exp(700)) is zero in double precision.
+
+if (allocated(kn%sigmoid)) deallocate (kn%sigmoid)
+
+if (want_sigmoid) then
+  allocate (kn%sigmoid(ngrid, ngrid))
+  do iy = 0, ngrid-1
+    yf = (iy + shift) / ngrid / filter%ycut
+    do ix = 0, ngrid-1
+      xf = (ix + shift) / ngrid / filter%xcut
+      iiy = mod(iy + (ngrid+1)/2, ngrid)
+      iix = mod(ix + (ngrid+1)/2, ngrid)
+      r = (sqrt(xf*xf + yf*yf) - 1) / filter%width
+      kn%sigmoid(iix+1, iiy+1) = 1 / (1 + exp(min(r, 700.0_rp)))
+    enddo
+  enddo
+endif
 
 kn%ngrid = ngrid
 kn%dgrid = dgrid

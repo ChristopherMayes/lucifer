@@ -1,0 +1,65 @@
+# The SASE reference run of Aramis-td-sase.in with Genesis4's source-term filter on, which
+# is what the port's own filter is transcribed against (fel-physics.md sec-source-filter).
+# Everything else is that deck: same window, same grid, same shot noise, same FFT solver,
+# which is the solver the filter lives in. The filter's own parameters are Genesis4's
+# defaults, xcut = ycut = sigmoid = 1, so the sigmoid's edge sits at half the grid's
+# Nyquist frequency.
+#
+# The chain writes its own initial dumps rather than borrowing the unfiltered chain's. Both
+# codes then start from the same particles and the same field by construction, which is the
+# contract every tier holds, and no assumption about seed reproducibility across two Genesis
+# runs is needed.
+
+&setup
+rootname=AramisTDSASEF
+lattice=Aramis.lat
+beamline=ARAMIS
+lambda0=1e-10
+gamma0=11357.82
+delz=0.045000
+shotnoise=1
+npart = 2048
+nbins = 8
+beam_global_stat = true
+field_global_stat = true
+&end
+
+&lattice
+zmatch=9.5
+&end
+
+&time
+slen = 9.6e-9
+sample = 3
+&end
+
+&field
+power=0
+dgrid=2.000000e-04
+ngrid=255
+&end
+
+&beam
+current=3000
+delgam=1.000000
+ex=4.000000e-07
+ey=4.000000e-07
+&end
+
+&write
+field = AramisTDSASEF-initial
+beam = AramisTDSASEF-initial
+&end
+
+&track
+fft_fieldsolver = true
+source_filter = true
+xcut = 1
+ycut = 1
+sigmoid = 1
+&end
+
+&write
+field = AramisTDSASEF-final
+beam = AramisTDSASEF-final
+&end

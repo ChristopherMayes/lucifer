@@ -70,6 +70,7 @@ typedef struct {
   int32_t first;         /* field ring offset, Genesis's Field::first, one for the set */
   int32_t helical;       /* octupole kick shape (1 = both planes) */
   int32_t mutate;        /* falsifiability hook: perturb the kernel's detuning */
+  int32_t source_filter; /* 1 = filter the source term before it reaches the field */
   int32_t nfield;        /* members in use, 1 to LUC_DEV_MAX_FIELD */
   int32_t npol;          /* planes per member, 1 or 2 */
   int32_t pad;
@@ -131,6 +132,11 @@ void luc_dev_download_source_slice (int im, int is, float *s);
  * each member diffracts at its own wavelength. The caller keys rebuilds
  * (fel_device_mod mirrors fp32_kernel_cache's key, per member). */
 void luc_dev_set_kernel (int im, const float *expk);
+
+/* The source filter's sigmoid for member 'im', ngrid*ngrid interleaved complex floats in
+ * the same FFT order as the propagator. Real-valued, carried as complex so the same
+ * multiply-then-transform kernel serves both. Only read when par->source_filter is 1. */
+void luc_dev_set_filter (int im, const float *sig);
 
 /* Per-slice phase rotators e^{-i h (phi0 + ks z_ref)} per member, member-major
  * (index im*nslice + is), 2*nfield*nslice floats each: the push works against the

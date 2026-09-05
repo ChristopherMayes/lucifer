@@ -931,6 +931,26 @@ Genesis4 on the 8192 case (143 vs 99 s) now sits in the per-slice field FFTs and
 wake-path interludes, with the clang-twin numbers bounding what further particle-path
 codegen work could still buy (~68 ns vs our ~125 per particle-step).
 
+(val-source-filter)=
+## The source filter, against Genesis4's own
+
+The angular filter on the source term ([](fel-physics.md#sec-source-filter)) is a transcription, so it is checked the way every transcribed path is: both codes run the same configuration from the same particles and the same field, and what is left over is transcription fidelity. Genesis4 4.6.15 carries the filter as `source_filter`, so the reference exists rather than having to be argued for. The chain is the pure-SASE deck with the filter on at Genesis4's own defaults, `xcut = ycut = sigmoid = 1`, which puts the sigmoid's half-height at half the grid's Nyquist frequency. The same deck with the filter off is the `tdsase` tier.
+
+| Run | Line | Window power at the end | Relative to Genesis4 | Worst over records |
+|---|---|---|---|---|
+| Filter on, `xcut = 1` | 12 undulators | 32.739 MW | 1.80e-06 | 2.18e-06 |
+| Filter off | 2 undulators | 43.927 MW | 1.26 | 1.28 |
+| Mutation: the sigmoid on the field instead of the source | 2 undulators | 4.722 MW | 0.757 | 1.28 |
+| Mutation: the sigmoid's edge at twice the cut | 2 undulators | 20.347 MW | 0.046 | 5.01e-02 |
+
+The filtered run lands at 2.18e-06, which is the `tdsase` tier's own level of 2.35e-06 against the same reference chain with the filter off. The filter is transcribed to the fidelity of the path it sits in.
+
+The three rows below it are why that number means something. The unfiltered run differs from the filtered reference by 1.28, so the filter is what moved the answer rather than the comparison being insensitive. Both mutations leave a run that completes and a power curve that stays plausible, since a sigmoid on the field suppresses wide angles too and an edge at twice the cut is the right shape in the wrong place. Only the reference separates them. Each of the three is wrong from its first step, so each stops at the second undulator: a full line to prove it would cost four times the section for no more evidence. Over the whole line the filter removes a factor of 3.6 of the exit power on this deck.
+
+`tests/scripts/check_source_filter.py`, section `source-filter`, tolerance 1e-4.
+
+On the device the filter takes a different route to the same quantity. The CPU multiplies the sigmoid onto the source inside the field's own transform pair, which it has to spare. The device's fused solve adds the source in real space in its last pass, so the source is filtered in place first by four passes of its own and the solve is left exactly as it was. The two are compared on a time-dependent 64-point deck, since Genesis4's reference chain is a 255-point grid and the Metal solver takes powers of two: the window power agrees at 1.3e-5, and the filter removes 2.3x of it. On the 256-point SASE example the same comparison is 1.7e-4 with 4.1x removed. The mutation hook is the CPU check's own and the device refuses it, since it carries no second solve to make wrong. `tests/scripts/check_device.py`, section `device`.
+
 (val-fp32-lockstep)=
 ## The FP32 particle path, priced by lockstep
 

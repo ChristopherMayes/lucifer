@@ -418,6 +418,64 @@ converts to Eq. [](#eq-source) by [](#sec-units).
 :::
 Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
+(sec-source-filter)=
+## The source filter
+
+Each beamlet is a single transverse point on the deposition grid, and Eq. [](#eq-source)
+has no angular dependence, so a beamlet radiates into every transverse wavenumber the grid
+carries up to its Nyquist wavenumber. A real undulator of $N_w$ periods emits at the
+resonant wavelength only within the central cone of half angle
+$\theta_{con} = \sqrt{1+K^2}/(\gamma\sqrt{N_w})$, and emission at larger angles is
+red-shifted out of the bandwidth. The difference is an artifact of the representation, and
+at grids and macroparticle counts in common use it is most of the power an unseeded run
+reports ([](startup-noise.md)).
+
+The source filter suppresses it. With `global%source_filter` on, the source of Eq.
+[](#eq-source) gets a forward transform of its own and is multiplied there by a sigmoid in
+normalized transverse spatial frequency,
+
+$$
+  \sigma(k_x, k_y) = \frac{1}{1 + \exp\!\big[(\rho_k - 1)/w\big]}, \qquad
+  \rho_k = \sqrt{\Big(\frac{k_x}{k_{\mathrm{Ny}}\, c_x}\Big)^2 +
+                  \Big(\frac{k_y}{k_{\mathrm{Ny}}\, c_y}\Big)^2} ,
+$$ (eq-sigmoid)
+
+in which $k_{\mathrm{Ny}} = \pi/\mathit{dgrid}$ is the grid's Nyquist wavenumber, $c_x$
+and $c_y$ are `source_filter_xcut` and `source_filter_ycut`, and $w$ is
+`source_filter_width`. The cuts and the width are in units of half the Nyquist frequency,
+so $c_x = c_y = 1$ puts the sigmoid's half-height at $k_{\mathrm{Ny}}/2$, which is an
+angle $\lambda/(4\,\mathit{dgrid})$. The filtered source is then added to the field in
+Fourier space, before the one inverse transform:
+
+$$
+  \tilde E \mapsto \tilde E\, e^{K_2\,\delta z} + 2\,\sigma\,\tilde s .
+$$ (eq-filtered-add)
+
+The field itself is never multiplied by $\sigma$. Only what the beam adds is filtered, so
+a seed, an imported field and everything already radiated propagate exactly as they do with
+the filter off. The switch is off by default, and a run with it off takes the arithmetic of
+Eq. [](#eq-k2) unchanged, which is why every recorded digit is unmoved.
+
+The unaveraged mode ([](#sec-unaveraged)) deposits from the resolved motion and builds no
+transformed source, and the coherent source ([](#sec-coherent-source)) has already replaced
+the per-particle deposit by an analytic Gaussian that carries no wide-angle content. Both
+combinations are refused rather than filtered. A non-positive cut or width is refused too:
+Genesis4 turns its own filter off there, and a run that asked for the filter and silently
+did not get it is worse than one that stops.
+
+:::{admonition} Provenance
+:class: note
+`FieldSolverFFT::init` (the sigmoid table, lines 129-146), `FieldSolverFFT::FFT` (the
+filtered branch, lines 74-100) and `FieldSolverFFT::initSourceFilter` (lines 158-170).
+Genesis4 added the filter in release 4.6.12 with its FFT solver, describing it in the
+changelog as suppressing strongly diffracting field components from a rough distribution of
+the source term. The exponent of Eq. [](#eq-sigmoid) is clamped at 700 here, which Genesis
+does not do: it is unreachable at Genesis4's own cuts and overflows for a cut small enough
+to carry the grid's corner far outside the edge, where $\sigma$ is already zero in double
+precision.
+:::
+Measured levels and how they are checked: [](validation.md#val-source-filter).
+
 (sec-slippage)=
 ## Time dependence and slippage
 

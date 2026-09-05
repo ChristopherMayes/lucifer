@@ -245,6 +245,43 @@ case default
   err_flag = .true.;  return
 end select
 
+! The source filter (fel-physics.md sec-source-filter), validated and stamped onto every
+! FEL element the same way. It multiplies the transformed source, which the unaveraged
+! mode does not build (it deposits from the resolved motion) and which the coherent source
+! has already replaced by an analytic Gaussian carrying no wide-angle content. Both are
+! refused rather than filtered. Genesis turns its own filter off for a non-positive cut or
+! width, since those are divisors and a width of zero has no sigmoid
+! (initSourceFilter, FieldSolverFFT.cpp:158-170). A run that asked for the filter and
+! silently did not get it is worse than one that stops, so this refuses instead.
+
+if (run%global%source_filter) then
+  if (any(fel_mode == fel_unaveraged$ .and. is_fel)) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER WITH AN UNAVERAGED ELEMENT: THE UNAVERAGED', &
+                                   'MODE DEPOSITS FROM THE RESOLVED MOTION AND BUILDS NO FILTERED SOURCE.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%source_model == 'coherent') then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER WITH SOURCE_MODEL = "coherent": THE COHERENT', &
+                                   'SOURCE IS ALREADY AN ANALYTIC GAUSSIAN AND CARRIES NO WIDE-ANGLE CONTENT.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%source_filter_xcut <= 0 .or. run%global%source_filter_ycut <= 0 .or. &
+      run%global%source_filter_width <= 0) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER_XCUT, SOURCE_FILTER_YCUT AND ' // &
+                                   'SOURCE_FILTER_WIDTH MUST ALL BE POSITIVE.', &
+                 'GOT: \3es12.3\ ', r_array = [run%global%source_filter_xcut, &
+                 run%global%source_filter_ycut, run%global%source_filter_width])
+    err_flag = .true.;  return
+  endif
+  where (is_fel)
+    und_of%filter%on = .true.
+    und_of%filter%xcut = run%global%source_filter_xcut
+    und_of%filter%ycut = run%global%source_filter_ycut
+    und_of%filter%width = run%global%source_filter_width
+    und_of%filter%mutate = run%global%source_filter_mutate
+  end where
+endif
+
 allocate (run%ffield(n_harm))
 ffield => run%ffield
 do ih = 1, n_harm
@@ -776,6 +813,11 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
   endif
   if (run%chamber_wake%on) then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER WAKES.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%source_filter_mutate) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // &
+                 '" DOES NOT COVER SOURCE_FILTER_MUTATE, WHICH IS THE CPU CHECK''S OWN HOOK.')
     err_flag = .true.;  return
   endif
   if (any(run%sc_here)) then

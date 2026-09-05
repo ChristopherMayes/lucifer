@@ -610,7 +610,7 @@ struct Impl {
     size_t nplanes () const { return (size_t) nfield * npol * nslice; }
 
     id<MTLBuffer> bX, bPX, bY, bPY, bG, bU, bW;
-    id<MTLBuffer> bField, bSrc, bExpK, bTw, bBase, bBaseDep;
+    id<MTLBuffer> bField, bSrc, bExpK, bSig, bTw, bBase, bBaseDep;
     id<MTLBuffer> bProbe, bPh;
 
     id<MTLComputePipelineState> pTrk, pPush, pZero, pDep, pRow, pRowM, pCol, pColA;
@@ -768,6 +768,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bField = alloc(p->nplanes() * nn * 8);
         p->bSrc = alloc((size_t) nfield * nslice * nn * 8);
         p->bExpK = alloc((size_t) nfield * nn * 8);
+        p->bSig = alloc((size_t) nfield * nn * 8);
         p->bTw = alloc((size_t) ngrid * 8);
         p->bBase = alloc((size_t) nfield * nslice * 8);
         p->bBaseDep = alloc((size_t) nfield * nslice * 8);
@@ -951,6 +952,14 @@ void luc_dev_set_kernel (int im, const float *expk)
     memcpy((float *) [p->bExpK contents] + (size_t) im * nn * 2, expk, nn * 8);
 }
 
+void luc_dev_set_filter (int im, const float *sig)
+{
+    Impl *p = gImpl;
+    p->sync();
+    const size_t nn = (size_t) p->ngrid * p->ngrid;
+    memcpy((float *) [p->bSig contents] + (size_t) im * nn * 2, sig, nn * 8);
+}
+
 void luc_dev_set_slice_phases (const float *base, const float *base_dep)
 {
     Impl *p = gImpl;
@@ -1112,6 +1121,50 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBytes:&D length:sizeof(D) atIndex:7];
         [e setBytes:&S length:sizeof(S) atIndex:8];
         [e dispatchThreads:grid threadsPerThreadgroup:tgp];
+
+        // The source filter (fel-physics.md sec-source-filter). The CPU adds the filtered
+        // source in Fourier space, inside the field's own transform pair, because it has one
+        // to spare. The fused solve here adds the source in real space in its last pass, so
+        // the source is filtered in place first and the solve is left exactly as it was:
+        // IFFT(FFT(src) * sigmoid)/N^2 is the same quantity, reached by four passes over the
+        // source buffer with the kernels the field already uses. The source has no
+        // polarization plane, so its planes are member-major over slices alone.
+        if (par->source_filter) {
+            const uint32_t srcPPM = (uint32_t) p->nslice;
+            const size_t nsrcplane = (size_t) par->nfield * (size_t) p->nslice;
+            const MTLSize sRowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), nsrcplane, 1);
+            const MTLSize sRowT = MTLSizeMake((size_t) (p->rowsPerTG * p->lanes), 1, 1);
+            const MTLSize sColTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nsrcplane, 1);
+            const MTLSize sColT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
+
+            [e setComputePipelineState:p->pRow];
+            [e setBuffer:p->bSrc offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&fwd length:4 atIndex:2];
+            [e dispatchThreadgroups:sRowTG threadsPerThreadgroup:sRowT];
+
+            [e setComputePipelineState:p->pCol];
+            [e setBuffer:p->bSrc offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&fwd length:4 atIndex:2];
+            [e setBytes:&one length:4 atIndex:3];
+            [e dispatchThreadgroups:sColTG threadsPerThreadgroup:sColT];
+
+            [e setComputePipelineState:p->pRowM];
+            [e setBuffer:p->bSrc offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&inv length:4 atIndex:2];
+            [e setBuffer:p->bSig offset:0 atIndex:3];
+            [e setBytes:&srcPPM length:4 atIndex:4];
+            [e dispatchThreadgroups:sRowTG threadsPerThreadgroup:sRowT];
+
+            [e setComputePipelineState:p->pCol];
+            [e setBuffer:p->bSrc offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&inv length:4 atIndex:2];
+            [e setBytes:&nrm length:4 atIndex:3];
+            [e dispatchThreadgroups:sColTG threadsPerThreadgroup:sColT];
+        }
 
         // The transform over every plane of the set: tg.y indexes the plane.
         const MTLSize rowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), nplane, 1);

@@ -17,7 +17,8 @@ PARAMS_GLOBAL = {
     "out_root", "interlude_model", "transport_model", "write_diag", "write_initial",
     "load_only", "keep_escaped_field", "dump_beam_at", "dump_field_at", "ran_seed",
     "migrate", "migrate_check", "reference_run", "comb_ds_save", "track_start", "track_end",
-    "source_model",
+    "source_model", "source_filter", "source_filter_xcut", "source_filter_ycut",
+    "source_filter_width", "source_filter_mutate",
 }
 # Retired scalars that became bmad_com switches.
 PARAMS_RENAME = {

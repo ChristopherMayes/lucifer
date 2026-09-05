@@ -172,6 +172,11 @@ PYPX_FLOOR = 5e-3           # check_two_polarization's afterburner floor.
 # be bit-identical on a small dark deck, and a zero flutter tripled is zero, so the
 # floor is a level in slice spacings under which FP32 cannot express a difference.
 MIG_E2E_CEIL = 3e-3
+
+# The source filter's device-against-CPU ceiling. The device filters the source by four
+# FP32 passes of its own where the CPU multiplies inside the field's FP64 transform pair,
+# so the two differ by more than the plain solve does. Measured 1.7e-4 end to end.
+SF_E2E_CEIL = 1.0e-3
 NOOP_FLOOR = 1e-12
 
 # The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
@@ -344,9 +349,49 @@ def main():
     ok("refused: the unaveraged mode", refused, "True", refused)
 
     field_set(args, wd, exe)
+    source_filter(args, wd, exe)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0
+
+
+def source_filter(args, wd, exe):
+    """
+    The source filter on the device (fel-physics.md sec-source-filter).
+
+    The CPU adds the filtered source inside the field's own transform pair. The device's
+    fused solve adds the source in real space in its last pass, so the source is filtered
+    in place first by four passes of its own and the solve is left untouched. The two
+    reach the same quantity by a different route, and this is what says so. The
+    transcription itself is checked against Genesis4 on the CPU
+    (check_source_filter.py), which the device cannot join: Genesis4's reference chain is
+    a 255-point grid and the Metal solver takes powers of two.
+
+    The mutation hook is the CPU check's own, so the device refuses it rather than
+    carrying a second wrong solve.
+    """
+    nslice = 8
+    base = BASE.format(root="{root}", extra=DEV + TD_EXTRA + "{filt}")
+    for root, filt, extra in (("dev_sf", "  source_filter = T\n", DEV),
+                              ("dev_sfoff", "", DEV),
+                              ("cpu_sf", "  source_filter = T\n", "")):
+        text = BASE.format(root=root, extra=extra + TD_EXTRA + filt)
+        run(args.exe, wd, f"{root}.in", text)
+
+    pd = diag_power(wd, "dev_sf", nslice)
+    pc = diag_power(wd, "cpu_sf", nslice)
+    pn = diag_power(wd, "dev_sfoff", nslice)
+    ok("source filter, device vs CPU window power", f"{abs(pd - pc) / pc:.3e}",
+       f"<= {SF_E2E_CEIL:.1e}", abs(pd - pc) / pc <= SF_E2E_CEIL)
+    ok("source filter on the device removes wide-angle power", f"{pn / pd:.2f}x", "> 1.5",
+       pn / pd > 1.5)
+
+    r = run(args.exe, wd, "dev_sfm.in",
+            BASE.format(root="dev_sfm", extra=DEV + TD_EXTRA +
+                        "  source_filter = T\n  source_filter_mutate = T\n"),
+            expect_fail=True)
+    refused = r.returncode != 0 and "DOES NOT COVER SOURCE_FILTER_MUTATE" in r.stdout
+    ok("refused: source_filter_mutate on the device", refused, "True", refused)
 
 
 def field_set(args, wd, exe):

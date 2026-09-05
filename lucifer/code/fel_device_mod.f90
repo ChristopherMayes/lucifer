@@ -96,7 +96,7 @@ type, bind(c) :: fel_device_par_struct
   real(c_double) :: rtmp(fel_dev_max_field$)    ! Per member: fc(h) / (sqrt(2) m_e).
   real(c_double) :: scl_w(fel_dev_max_field$)   ! Per member: fel_field_step's scl_w at h.
   real(c_double) :: pol_re(2), pol_im(2)        ! The element's polarization pair.
-  integer(c_int) :: first, helical, mutate, nfield, npol, pad
+  integer(c_int) :: first, helical, mutate, source_filter, nfield, npol, pad
 end type
 
 !+
@@ -209,6 +209,12 @@ interface
     import c_int, c_float_complex
     integer(c_int), value :: im
     complex(c_float_complex) :: expk(*)
+  end subroutine
+
+  subroutine luc_dev_set_filter (im, sig) bind(c, name = 'luc_dev_set_filter')
+    import c_int, c_float_complex
+    integer(c_int), value :: im
+    complex(c_float_complex) :: sig(*)
   end subroutine
 
   subroutine luc_dev_set_slice_phases (base, base_dep) bind(c, name = 'luc_dev_set_slice_phases')
@@ -590,6 +596,40 @@ if (any(dev%k_key(:, im) /= key)) then
 endif
 
 end subroutine fel_device_set_kernel
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_set_filter (dev, im, sigmoid)
+!
+! Routine to upload the source filter's sigmoid for one field member
+! (fel-physics.md sec-source-filter). The table is real and the same for every member,
+! since it is built on the grid's own normalized frequency axis and carries no
+! wavelength, but it rides the propagator's per-member layout so that one device kernel
+! serves both multiplies.
+!
+! Input:
+!   dev      -- fel_device_struct: The resident device state.
+!   im       -- integer: Field-set member, 1 based.
+!   sigmoid  -- real(rp)(:,:): The sigmoid in FFT order, as fel_field_kernel_init built it.
+!
+! Output:
+!   None directly: the device's filter table for this member is current.
+!-
+
+subroutine fel_device_set_filter (dev, im, sigmoid)
+
+type (fel_device_struct) dev
+integer im
+real(rp) sigmoid(:,:)
+
+!
+
+dev%se = cmplx(sigmoid, 0.0_rp, kind = c_float_complex)
+call luc_dev_set_filter (im-1, dev%se)
+
+end subroutine fel_device_set_filter
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

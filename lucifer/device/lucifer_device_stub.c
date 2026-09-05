@@ -66,6 +66,7 @@ void luc_dev_download_field_slice (int im, int ip, int is, float *e)
 void luc_dev_zero_field_slice (int im, int ip, int is) { (void) im; (void) ip; (void) is; }
 void luc_dev_download_source_slice (int im, int is, float *s) { (void) im; (void) is; (void) s; }
 void luc_dev_set_kernel (int im, const float *expk) { (void) im; (void) expk; }
+void luc_dev_set_filter (int im, const float *sig) { (void) im; (void) sig; }
 void luc_dev_set_slice_phases (const float *base, const float *base_dep)
 {
   (void) base; (void) base_dep;
