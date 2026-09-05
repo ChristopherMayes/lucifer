@@ -18,7 +18,7 @@ python3 startup_noise.py --exe <lucifer> --genesis <genesis4> --pyrepo <openPMD-
 
 ## The model
 
-The particle loader groups the macroparticles of a slice into beamlets of eight that share their transverse coordinates and energy and differ only in phase, with the phases spaced uniformly over one radiation period. This is the quiet start: a beamlet has no bunching at any harmonic until the loader imposes it. The loader then perturbs the phases so that the rms bunching of each slice at each harmonic equals the shot-noise value $1/\sqrt{N_\lambda}$ for the $N_\lambda$ electrons the slice represents, following Fawley's algorithm ([](references.md#ref-fawley), [](fel-physics.md#sec-noise)). For the parameters of [](#tab-sn-parameters) a slice of twelve wavelengths represents $7.5\times10^{4}$ electrons and the rms bunching is $3.7\times10^{-3}$.
+The particle loader groups the macroparticles of a slice into beamlets of eight that share their transverse coordinates and energy and differ only in phase, with the phases spaced uniformly over one radiation period. This is the quiet start: a beamlet has no bunching at any harmonic until the loader imposes it. The loader then perturbs the phases so that the rms bunching of each slice at each harmonic equals the shot-noise value $1/\sqrt{N_\lambda}$ for the $N_\lambda$ electrons the slice represents, following Fawley's algorithm ([](references.md#ref-fawley), [](fel-physics.md#sec-noise)). For the beam of [](#tab-sn-beam) a slice of twelve wavelengths represents $7.5\times10^{4}$ electrons and the rms bunching is $3.7\times10^{-3}$ ([](#tab-sn-derived)).
 
 Each beamlet occupies a single transverse point on the deposition grid. The paraxial field solver carries every transverse wavenumber up to the Nyquist wavenumber of the grid, and the source term has no angular dependence, so a point beamlet radiates its noise at the resonant wavelength into every angle the grid can represent. A real undulator of $N_w$ periods emits at the resonant wavelength only within the central cone of half angle $\theta_{con} = \sqrt{1+K^2}/(\gamma\sqrt{N_w})$. Emission at an angle $\theta$ is red-shifted by the relative amount $\gamma^2\theta^2/(1+K^2)$, so emission outside the cone is outside the bandwidth $1/N_w$ of the undulator and, at the angles a fine grid represents, far outside the bandwidth $\rho$ of the FEL. The model applies no such cutoff. Spontaneous emission enters the field in no other way. The switch `radiation_fluctuations` acts on the particle energies and never on the field.
 
@@ -26,32 +26,74 @@ Once the beam is bunched, each beamlet radiates coherently with its own bunching
 
 ## Method
 
-The beam and the undulator line are those of the Aramis benchmark distributed with Genesis4, which the examples in this documentation also use ([](#tab-sn-parameters)). The line is six FODO cells, each holding two helical undulator segments of 266 periods, two quadrupoles and four drifts, for twelve segments and 57 m in all.
+The beam and the undulator line are those of the Aramis benchmark distributed with Genesis4, which the examples in this documentation also use ([](#tab-sn-beam), [](#tab-sn-lattice)). The line is six FODO cells, each holding two helical undulator segments of 266 periods, two quadrupoles and four drifts, for twelve segments and 57 m in all. The simulation settings are those of [](#tab-sn-simulation), and the quantities derived from them that the page uses are in [](#tab-sn-derived).
 
-```{table} Beam, undulator and simulation parameters. The beam is matched to the periodic focusing of the cell.
-:name: tab-sn-parameters
+```{table} Electron beam parameters. The beam is matched to the periodic focusing of the cell.
+:name: tab-sn-beam
 
-| quantity | value |
-|---|---|
-| beam energy | 5.80 GeV ($\gamma$ = 11358) |
-| peak current | 3.0 kA, uniform along the window |
-| normalized emittance, both planes | 0.40 µm |
-| rms relative energy spread | $8.8\times10^{-5}$ ($\sigma_\gamma$ = 1.0) |
-| matched beta functions at the cell entrance | 8.54 m and 17.4 m |
-| rms beam size at the mean beta function | 21 µm |
-| undulator | helical, period 15.0 mm, rms parameter $a_w$ = 0.849 |
-| segment | 3.99 m, 266 periods, 12 segments |
-| FODO cell | segment, 0.44 m drift, 0.08 m quadrupole with $k_1 = \pm 2.0$ m$^{-2}$, 0.24 m drift, twice, 9.5 m in all |
-| radiation wavelength | 1.00 A |
-| integration step | 45 mm, three periods |
-| field grid | 200 µm half width, 64 to 512 points, cells of 6.35 to 0.78 µm |
-| macroparticles per slice | 1024 to 65536, in beamlets of 8 |
-| Pierce parameter $\rho$ | $5.1\times10^{-4}$ |
-| cooperation length $\lambda/(4\pi\rho)$ | 16 nm |
-| slippage over the line | 320 nm |
-| central cone of one segment | 7.1 µrad |
-| angle at which the resonant wavelength shifts by $\rho$ | 2.6 µrad |
-| diffraction angle of the mode $\lambda/(2\pi\sigma_x)$ | 0.74 µrad |
+| quantity | symbol | value | unit |
+|---|---|---|---|
+| beam energy | $E$ | 5.80 | GeV |
+| Lorentz factor | $\gamma$ | 11358 | |
+| peak current, uniform along the window | $I$ | 3.0 | kA |
+| normalized emittance, both planes | $\varepsilon_n$ | 0.40 | µm |
+| rms relative energy spread | $\sigma_\gamma/\gamma$ | $8.8\times10^{-5}$ | |
+| rms energy spread | $\sigma_\gamma$ | 1.0 | |
+| matched beta function, horizontal, at the cell entrance | $\beta_x$ | 8.54 | m |
+| matched beta function, vertical, at the cell entrance | $\beta_y$ | 17.4 | m |
+| rms beam size at the mean beta function | $\sigma_x$ | 21 | µm |
+```
+
+```{table} Undulator line. Each FODO cell holds two undulator segments with a drift, a quadrupole and a drift after each.
+:name: tab-sn-lattice
+
+| quantity | symbol | value | unit |
+|---|---|---|---|
+| undulator type | | helical | |
+| undulator period | $\lambda_u$ | 15.0 | mm |
+| rms undulator parameter | $a_w$ | 0.849 | |
+| segment length | | 3.99 | m |
+| periods per segment | $N_w$ | 266 | |
+| number of segments | | 12 | |
+| drift after each segment | | 0.44 | m |
+| quadrupole length | | 0.08 | m |
+| quadrupole strength, alternating in sign | $k_1$ | 2.0 | m$^{-2}$ |
+| drift after each quadrupole | | 0.24 | m |
+| cell length | | 9.5 | m |
+| line length | | 57 | m |
+| resonant wavelength | $\lambda$ | 1.00 | A |
+```
+
+```{table} Simulation settings.
+:name: tab-sn-simulation
+
+| quantity | value | unit |
+|---|---|---|
+| integration step | 45 | mm |
+| periods per step | 3 | |
+| field grid half width | 200 | µm |
+| field grid points per side | 64, 128, 256, 512 | |
+| cell size | 6.35, 3.15, 1.57, 0.78 | µm |
+| macroparticles per slice | 1024, 4096, 16384, 65536 | |
+| beamlet size | 8 | |
+| slice spacing, long window | 12 | wavelengths |
+| slices, long window | 300 | |
+| slices, doubled line | 600 | |
+```
+
+```{table} Derived quantities.
+:name: tab-sn-derived
+
+| quantity | symbol | value | unit |
+|---|---|---|---|
+| Pierce parameter | $\rho$ | $5.1\times10^{-4}$ | |
+| cooperation length | $\lambda/(4\pi\rho)$ | 16 | nm |
+| slippage over the line | | 320 | nm |
+| central cone of one segment | $\theta_{con}$ | 7.1 | µrad |
+| angle at which the resonant wavelength shifts by $\rho$ | | 2.6 | µrad |
+| diffraction angle of the mode | $\lambda/(2\pi\sigma_x)$ | 0.74 | µrad |
+| electrons per slice of twelve wavelengths | $N_\lambda$ | $7.5\times10^{4}$ | |
+| rms shot-noise bunching of such a slice | $1/\sqrt{N_\lambda}$ | $3.7\times10^{-3}$ | |
 ```
 
 The time window holds 300 slices at a spacing of twelve wavelengths, 360 nm in all. It is longer than the slippage accumulated over the line, so the interior of the window behaves as a long bunch. The sixty slices nearest the tail lag by the cooperation length, and the thirty slices nearest the head collect the field that slips forward out of the interior ([](#fig-sn-profile)). Every power quoted on this page is therefore the mean over slices 80 to 230 of the per-slice power.
@@ -66,7 +108,7 @@ The field is written to file at the ends of undulators 1, 2, 4, 8 and 12, at z o
 
 The simulations use the GPU backend, which computes in single precision. One simulation on the CPU in double precision, at 6.35 µm and 1024 particles, differs from the corresponding GPU simulation by $1.5\times10^{-3}$ in the interior power and by $1.9\times10^{-3}$ in the power within the cut, which is the level at which the two backends agree in general ([](validation.md#val-device)).
 
-The script computes the theoretical quantities from the parameters of [](#tab-sn-parameters). The one-dimensional gain length is 1.34 m and Ming Xie's three-dimensional power gain length is 1.79 m of undulator. The effective shot-noise power is 1.9 kW per slice, the number of electrons per coherence volume is $N_c = 1.5\times10^{6}$, the saturation length is 30.5 m, and the saturated power is 0.5 GW by the estimate of Saldin, Schneidmiller and Yurkov and 8.1 GW by Ming Xie's. A seeded steady-state simulation on the same line, with a 5 kW seed and 8192 macroparticles, has a power e-folding length of 2.25 m along the line, which is 1.9 m of undulator once the drift spaces are excluded, within 6 percent of the fit.
+The script computes the theoretical quantities from the parameters of [](#tab-sn-beam) and [](#tab-sn-lattice). The one-dimensional gain length is 1.34 m and Ming Xie's three-dimensional power gain length is 1.79 m of undulator. The effective shot-noise power is 1.9 kW per slice, the number of electrons per coherence volume is $N_c = 1.5\times10^{6}$, the saturation length is 30.5 m, and the saturated power is 0.5 GW by the estimate of Saldin, Schneidmiller and Yurkov and 8.1 GW by Ming Xie's. A seeded steady-state simulation on the same line, with a 5 kW seed and 8192 macroparticles, has a power e-folding length of 2.25 m along the line, which is 1.9 m of undulator once the drift spaces are excluded, within 6 percent of the fit.
 
 ## Emission outside the mode
 
@@ -168,7 +210,7 @@ Genesis4 discretizes the transverse plane and the particle distribution in the s
 
 **Estimate the wide-angle share in advance.** At saturation the ratio of the wide-angle emission to the mode power measured here is
 $$\frac{P_{wide}}{P_{mode}} \approx \frac{100}{N_b}\left(\frac{1.57\,\mathrm{µm}}{dx}\right)^2,$$
-within a factor of 1.5 over cell sizes of 0.78 to 6.35 µm and beamlet counts of 128 to 2048, where $N_b$ is the number of beamlets per slice and $dx$ the cell size. The prefactor is for the beam of [](#tab-sn-parameters) and scales with the bunching factor squared. Keeping the ratio below a tenth requires $N_b > 1000\,(1.57\,\mathrm{µm}/dx)^2$, which is 4096 macroparticles per slice at a beamlet size of 8 for 3.15 µm cells and 16384 for 1.57 µm cells.
+within a factor of 1.5 over cell sizes of 0.78 to 6.35 µm and beamlet counts of 128 to 2048, where $N_b$ is the number of beamlets per slice and $dx$ the cell size. The prefactor is for the beam of [](#tab-sn-beam) and scales with the bunching factor squared. Keeping the ratio below a tenth requires $N_b > 1000\,(1.57\,\mathrm{µm}/dx)^2$, which is 4096 macroparticles per slice at a beamlet size of 8 for 3.15 µm cells and 16384 for 1.57 µm cells.
 
 **Choose the cell size from the beam, not from the field.** Cells of about $\sigma_x/7$, 3 µm here, resolve the beam and the mode. Finer cells increase the wide-angle emission as $1/dx^2$ and leave the mode power unchanged.
 
