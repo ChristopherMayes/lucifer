@@ -8,23 +8,38 @@
 !
 ! Each segment is 165 periods, so the wiggler has a whole number of them. The beam is
 ! ten times the emittance and five times the size of the Aramis benchmark's, the
-! wavelength a hundred times longer, and z_R/L_g falls from 41 to about 16, which moves
-! the ratio of the mode angle to the rho angle from 1.13 to about 1.9.
+! wavelength a hundred times longer, and z_R/L_g falls from 32 to about 14, which moves
+! the ratio of the mode angle to the rho angle from 1.14 to about 1.9.
+!
+! The focusing. A helical undulator focuses both planes alike, and this one's natural
+! strength is 8.68e-3 m^-2, which alone would hold the beta function at 10.7 m. The
+! quadrupole strengths are 1.185 and -1.185 m^-2, chosen so the mean beta function over
+! the cell is 10.0 m in both planes, with beta between 6.74 and 13.91 m and a phase
+! advance of 66 degrees. The two halves of the cell differ only in which quadrupole they
+! carry, so the vertical beta function is the horizontal one shifted by half a cell, and
+! one strength sets both means.
 
 parameter[geometry] = open
 parameter[particle] = electron
 parameter[e_tot] = 8.0333e8
 
-beginning[beta_a] = 10.0
-beginning[beta_b] = 10.0
+! The matched periodic Twiss of the cell below, at the entrance of a segment. The file
+! stated beta = 10 m with alpha = 0 until 2026-09-06, which is not that solution: the
+! beam beat through the line at a mismatch of 2.3, its rms size swinging from 27 to
+! 256 um, and every measurement made on this probe before that date was made on the
+! beating beam (FINDINGS 7.56).
+beginning[beta_a]  = 7.02965
+beginning[alpha_a] = -0.467079
+beginning[beta_b]  = 13.39578
+beginning[alpha_b] = 0.768195
 
 UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = helical_model, &
      b_max = 0.35307, tracking_method = fel_averaged, mat6_calc_method = tracking
 
 D1: drift, l = 0.6
 D2: drift, l = 0.3
-QF: quadrupole, l = 0.1, k1 = 2.5
-QD: quadrupole, l = 0.1, k1 = -2.5
+QF: quadrupole, l = 0.1, k1 =  1.185
+QD: quadrupole, l = 0.1, k1 = -1.185
 
 FODO: line = (UND, D1, QF, D2, UND, D1, QD, D2)
 FLASHLINE: line = (6*FODO)

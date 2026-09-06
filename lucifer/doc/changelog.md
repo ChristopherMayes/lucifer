@@ -9,6 +9,25 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Fixed: tests/bmad/flash.bmad holds the beta function its header claims. The probe stated
+  beta = 10 m with zero alpha, which is not the matched periodic solution of its own cell, and at
+  quadrupole strengths of plus and minus 2.5 m^-2 the cell held a mean beta of 8.19 m rather than the
+  10 m the header named. The beam beat through the line at a mismatch of 2.3, its rms size swinging
+  from 27 to 256 um. The strengths are now plus and minus 1.185 m^-2, which hold a mean of 10.0 m in
+  both planes with beta between 6.74 and 13.91 m, and the beginning statement is that cell's matched
+  solution. A helical undulator focuses both planes alike and the cell's two halves differ only in
+  which quadrupole they carry, so one strength sets both means. The run confirms the match: the beam
+  returns to the stated Twiss at every cell end and its rms size holds 78 to 116 um. Nothing else in
+  the tree reads this lattice, so no recorded digit moves. doc/startup-noise.md re-records the second
+  machine on the matched beam. Its geometry barely moves, the mode angle going from 65.2 to 64.5 urad
+  and the ratio of the two angles from 1.87 to 1.86, while its dynamics move a great deal: the power
+  inside the mode at the exit goes from 1.23 to 1.88 GW, the bunching at 43 m from 0.062 to 0.127, and
+  the saturation point from 27.1 to 21.6 m. The filter's default holds as it did, removing 171 times
+  the wide-angle power rather than 165 and raising the mode power 19 percent rather than 6. The
+  four-machine tables take the new rows, the range of ratios the default is measured over becomes 1.14
+  to 1.86, and the coefficient of the angle rule is unchanged at 6.8 with its threshold at 46
+  (FINDINGS 7.57).
+
 - 2026-09-06 Changed: the branch takes Bmad main at 20260904-1, 158 commits since the last common
   point. The two FEL tracking methods, the wiggler-averaged and the unaveraged, and the openPMD
   wavefront work in the HDF5 layer merged without conflict, and the parser hook that gives an FEL
