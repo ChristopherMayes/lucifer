@@ -6,18 +6,19 @@
 /
 
 &fel_beam_init
-  resample%n_particle_per_slice = 2048
-  resample%beamlet_size = 8
+  load_mode = "sample"
+  quiet_start = T
+  beamlet_size = 8
+  shot_noise = T
 
-  dist_file = "import_bunch.h5"
+  beam_init%position_file = "import_bunch.h5"
+  beam_init%n_particle = 2048
 
   resample%slice_width = 0.01
 /
 
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
-
-
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 255
   wavefront_init%grid_half_width = 2e-4

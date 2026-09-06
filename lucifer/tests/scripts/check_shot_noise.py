@@ -15,6 +15,18 @@ b is a sum of many independent beamlet contributions, so |b|^2*N_lambda is Exp(1
 excellent approximation and the mean over n samples has sigma = 1/sqrt(n); the check is
 |m - 1| < 5/sqrt(n) per weight mode, plus a looser per-harmonic check (n/3 samples).
 
+Fawley's kick is linear in the noise amplitude only while a group holds many electrons,
+so every deck here keeps about 150 electrons per group, as the generator's has. At 18 the
+scaled mean sits at 0.88 and the higher harmonics far lower, in every mode alike, which is
+the algorithm's own limit (Genesis4 has the same one) and not a load defect.
+
+The same statistic then runs on the loads that do not draw their own beamlets
+(fel-physics.md sec-noise): load_mode = "keep" from a generated bunch, where the loader
+makes the beamlets; a bunch of copies made outside the loader and loaded without the quiet
+start, where the noise goes on the particles sharing their transverse coordinates; and the
+same copies with their coordinates jittered so none coincide, where it goes on the
+occupants of each deposit cell. The loader's message must name the grouping it used.
+
 Usage: check_shot_noise.py --exe <lucifer> --workdir <dir> [--seeds N] [--lat <bmad file>]
 Exit 0 only if every check passes.
 """
@@ -33,6 +45,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fieldio  # noqa: E402
 
 import beamio
+import bunchfile
 from nml import to_groups
 
 E_CHARGE = 1.602176634e-19
@@ -106,6 +119,101 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
         for k, h in enumerate((1, 2, 3)):
             samples[h].extend(vals[k::3])
     return samples
+
+
+KEEP_NML = """&fel_params
+  lat_file = "{lat}"
+  global%out_root = "{root}"
+  global%ran_seed = {seed}
+  global%load_only = T
+  slicing%n_wavelength = 3
+/
+&fel_beam_init
+  load_mode = "keep"
+  quiet_start = {quiet}
+  shot_noise = T
+  beamlet_size = 8
+{source}/
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 33
+  wavefront_init%grid_half_width = 2e-4
+/
+"""
+
+KEEP_BUNCH = """  beam_init%n_particle = 2048
+  beam_init%bunch_charge = 4.803322970853e-14
+  beam_init%sig_z = 1.2e-9
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+"""
+
+
+def run_keep(exe, lat, workdir, seeds, label, source, quiet, want):
+    """The statistic on a load the loader did not make the beamlets of, or made in keep mode."""
+    samples = {h: [] for h in (1, 2, 3)}
+    for seed in range(1, seeds + 1):
+        root = f"sn_{label}_{seed}"
+        (workdir / f"{root}.nml").write_text(KEEP_NML.format(lat=lat, root=root, seed=2000 + 7 * seed,
+                                                              quiet=quiet, source=source))
+        r = subprocess.run([str(exe), f"{root}.nml"], cwd=workdir, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
+            sys.exit(1)
+        if want not in r.stdout:
+            print(f"FAIL: {root} did not report the noise on {want!r}:\n{r.stdout[-2000:]}")
+            sys.exit(1)
+        vals = b2_samples(workdir / f"{root}-initial.beam.h5", (1, 2, 3))
+        for k, h in enumerate((1, 2, 3)):
+            samples[h].extend(vals[k::3])
+    return samples
+
+
+def judge(samples, label):
+    """The scaled mean against 1, over all harmonics and per harmonic."""
+    ok = True
+    allv = np.concatenate([samples[h] for h in (1, 2, 3)])
+    n = len(allv)
+    m = allv.mean()
+    bound = 5 / np.sqrt(n)
+    good = abs(m - 1) < bound
+    ok = ok and good
+    print(f"--- shot noise, {label}: <|b(h)|^2 * N_lambda> = {m:.4f} "
+          f"(target 1 +- {bound:.3f}, {n} samples)  {'ok' if good else 'FAIL'}")
+    for h in (1, 2, 3):
+        v = np.asarray(samples[h])
+        mh = v.mean()
+        bh = 5 / np.sqrt(len(v))
+        goodh = abs(mh - 1) < bh
+        ok = ok and goodh
+        print(f"      harmonic {h}: {mh:.4f} (+- {bh:.3f})  {'ok' if goodh else 'FAIL'}")
+    return ok
+
+
+def other_loads(exe, lat, workdir, seeds):
+    """Keep mode, then copies and cells made outside the loader from one written bunch."""
+    ok = True
+    src = KEEP_BUNCH + '  write_openpmd_file = "sn_bunch.h5"\n'
+    ok = judge(run_keep(exe, lat, workdir, seeds, "keep", src, "T", "the beamlets the loader made"),
+               "keep mode, beamlets of a generated bunch") and ok
+
+    b = bunchfile.read_bunch(workdir / "sn_bunch.h5")
+    bunchfile.write_bunch(workdir / "sn_bunch.h5", workdir / "sn_copies.h5",
+                          bunchfile.copies(b, 8, LAMBDA0, SPACING))
+    src = '  beam_init%position_file = "sn_copies.h5"\n'
+    ok = judge(run_keep(exe, lat, workdir, max(3, seeds // 3), "copies", src, "F",
+                        "particles sharing their transverse coordinates"),
+               "copies made outside the loader") and ok
+
+    bunchfile.write_bunch(workdir / "sn_bunch.h5", workdir / "sn_cells.h5",
+                          bunchfile.copies(b, 8, LAMBDA0, SPACING, jitter=1e-12))
+    src = '  beam_init%position_file = "sn_cells.h5"\n'
+    ok = judge(run_keep(exe, lat, workdir, max(3, seeds // 3), "cells", src, "F",
+                        "the occupants of each deposit cell"),
+               "the occupants of each deposit cell") and ok
+    return ok
 
 
 SPLIT_NML = """  lat_file = "{lat}"
@@ -189,23 +297,9 @@ def main():
 
     ok = True
     for test_weights, label in ((False, "uniform weights"), (True, "nonuniform weights (0.25x/1.75x)")):
-        samples = run_mode(exe, PARSED.lat, workdir, PARSED.seeds, test_weights)
-        allv = np.concatenate([samples[h] for h in (1, 2, 3)])
-        n = len(allv)
-        m = allv.mean()
-        bound = 5 / np.sqrt(n)
-        good = abs(m - 1) < bound
-        ok = ok and good
-        print(f"--- shot noise, {label}: <|b(h)|^2 * N_lambda> = {m:.4f} "
-              f"(target 1 +- {bound:.3f}, {n} samples)  {'ok' if good else 'FAIL'}")
-        for h in (1, 2, 3):
-            v = np.asarray(samples[h])
-            mh = v.mean()
-            bh = 5 / np.sqrt(len(v))
-            goodh = abs(mh - 1) < bh
-            ok = ok and goodh
-            print(f"      harmonic {h}: {mh:.4f} (+- {bh:.3f})  {'ok' if goodh else 'FAIL'}")
+        ok = judge(run_mode(exe, PARSED.lat, workdir, PARSED.seeds, test_weights), label) and ok
 
+    ok = other_loads(exe, PARSED.lat, workdir, PARSED.seeds) and ok
     ok = split_check(exe, PARSED.lat, workdir) and ok
 
     print("shot-noise statistical check:", "PASS" if ok else "FAIL")

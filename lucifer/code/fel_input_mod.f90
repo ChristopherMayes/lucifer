@@ -10,8 +10,8 @@
 !
 !   &fel_params          lat_file, global, bmad_com, space_charge_com, wake, sc,
 !                        chamber_wake%write_kernels
-!   &fel_beam_init       beam_init, imp, beam_file, dist_file, write_genesis_dist,
-!                        write_openpmd_file, use_beam_init, beamlet_size, shot_noise,
+!   &fel_beam_init       beam_init, resample, beam_file, write_genesis_dist,
+!                        write_openpmd_file, load_mode, quiet_start, beamlet_size, shot_noise,
 !                        split_weights, swap_beam_xy, gen_test_weights,
 !                        resample_split_weights
 !   &fel_wavefront_init  wavefront_init, field_file
@@ -58,9 +58,10 @@ type (fel_chamber_wake_init_struct) chamber_wake
 type (fel_space_charge_input_struct) space_charge
 type (beam_init_struct) beam_init
 type (fel_resample_param_struct) resample
-character(400) lat_file, beam_file, dist_file, write_genesis_dist, write_openpmd_file
+character(400) lat_file, beam_file, write_genesis_dist, write_openpmd_file
 character(400) field_file(9)
-logical use_beam_init, shot_noise
+logical quiet_start, shot_noise
+character(16) load_mode
 logical split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
 integer beamlet_size
 
@@ -72,8 +73,8 @@ character(600) iomsg_text
 character(*), parameter :: r_name = 'fel_read_input'
 
 namelist / fel_params / lat_file, global, slicing, bmad_com, space_charge_com, chamber_wake, space_charge
-namelist / fel_beam_init / beam_init, resample, beam_file, dist_file, write_genesis_dist, &
-                        write_openpmd_file, use_beam_init, beamlet_size, shot_noise, &
+namelist / fel_beam_init / beam_init, resample, beam_file, write_genesis_dist, &
+                        write_openpmd_file, load_mode, quiet_start, beamlet_size, shot_noise, &
                         split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
 namelist / fel_wavefront_init / wavefront_init, field_file
 
@@ -93,10 +94,10 @@ space_charge = run%space_charge
 beam_init = run%beam_init
 resample = run%resample
 beam_file = run%bparam%beam_file
-dist_file = run%bparam%dist_file
 write_genesis_dist = run%bparam%write_genesis_dist
 write_openpmd_file = run%bparam%write_openpmd_file
-use_beam_init = run%bparam%use_beam_init
+load_mode = run%bparam%load_mode
+quiet_start = run%bparam%quiet_start
 beamlet_size = run%bparam%beamlet_size
 shot_noise = run%bparam%shot_noise
 split_weights = run%bparam%split_weights
@@ -161,10 +162,10 @@ run%space_charge = space_charge
 run%beam_init = beam_init
 run%resample = resample
 run%bparam%beam_file = beam_file
-run%bparam%dist_file = dist_file
 run%bparam%write_genesis_dist = write_genesis_dist
 run%bparam%write_openpmd_file = write_openpmd_file
-run%bparam%use_beam_init = use_beam_init
+run%bparam%load_mode = load_mode
+run%bparam%quiet_start = quiet_start
 run%bparam%beamlet_size = beamlet_size
 run%bparam%shot_noise = shot_noise
 run%bparam%split_weights = split_weights
@@ -206,15 +207,16 @@ type (fel_chamber_wake_init_struct) chamber_wake
 type (fel_space_charge_input_struct) space_charge
 type (beam_init_struct) beam_init
 type (fel_resample_param_struct) resample
-character(400) lat_file, beam_file, dist_file, write_genesis_dist, write_openpmd_file
+character(400) lat_file, beam_file, write_genesis_dist, write_openpmd_file
 character(400) field_file(9)
-logical use_beam_init, shot_noise
+logical quiet_start, shot_noise
+character(16) load_mode
 logical split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
 integer beamlet_size
 
 namelist / fel_params / lat_file, global, slicing, bmad_com, space_charge_com, chamber_wake, space_charge
-namelist / fel_beam_init / beam_init, resample, beam_file, dist_file, write_genesis_dist, &
-                        write_openpmd_file, use_beam_init, beamlet_size, shot_noise, &
+namelist / fel_beam_init / beam_init, resample, beam_file, write_genesis_dist, &
+                        write_openpmd_file, load_mode, quiet_start, beamlet_size, shot_noise, &
                         split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
 namelist / fel_wavefront_init / wavefront_init, field_file
 
@@ -230,10 +232,10 @@ space_charge = run%space_charge
 beam_init = run%beam_init
 resample = run%resample
 beam_file = run%bparam%beam_file
-dist_file = run%bparam%dist_file
 write_genesis_dist = run%bparam%write_genesis_dist
 write_openpmd_file = run%bparam%write_openpmd_file
-use_beam_init = run%bparam%use_beam_init
+load_mode = run%bparam%load_mode
+quiet_start = run%bparam%quiet_start
 beamlet_size = run%bparam%beamlet_size
 shot_noise = run%bparam%shot_noise
 split_weights = run%bparam%split_weights
@@ -351,6 +353,22 @@ do
     found = .true.
     call out_io (s_error$, r_name, 'wavefront_init%window_length IS RETIRED.', &
       'POSSIBLE SOLUTION: SET slicing%window_length IN &fel_params.')
+    exit
+  endif
+
+  ! A bunch to slice is beam_init's, read or generated, and Bmad's own position_file
+  ! reads it. The flag that resampled a generated bunch is the resampler's own knob.
+
+  if (index(line, 'dist_file') /= 0 .and. index(line, 'resample%') == 0) then
+    found = .true.
+    call out_io (s_error$, r_name, 'dist_file IS RETIRED.', &
+      'POSSIBLE SOLUTION: SET beam_init%position_file. THE BUNCH IS THEN SLICED BY load_mode.')
+    exit
+  endif
+  if (index(line, 'use_beam_init') /= 0 .and. index(line, 'resample%') == 0) then
+    found = .true.
+    call out_io (s_error$, r_name, 'use_beam_init IS RETIRED.', &
+      'A GENERATED BUNCH TAKES THE ANALYTIC LOADER. TO RESAMPLE ONE FOR A CHECK, SET resample%use_beam_init.')
     exit
   endif
 enddo

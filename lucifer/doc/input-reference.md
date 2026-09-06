@@ -5,7 +5,7 @@ The normative reference for every namelist parameter Lucifer honors: its default
 | Group | Carries |
 |---|---|
 | [`&fel_params`](#group-fel-params) | The run: the lattice, the `global%` switches, Bmad's `bmad_com` and `space_charge_com`, and the `chamber_wake%` and `space_charge%` collective descriptions |
-| [`&fel_beam_init`](#group-fel-beam-init) | The beam: Bmad's `beam_init%` description, the `resample%` resampler, source and output files, and the check instruments |
+| [`&fel_beam_init`](#group-fel-beam-init) | The beam: Bmad's `beam_init%` description, the load mode and its two switches, the `resample%` resampler, files, and the check instruments |
 | [`&fel_wavefront_init`](#group-fel-wavefront-init) | The radiation: the `wavefront_init%` starting condition and `field_file`. The field record is the time window, so the window lives here |
 
 Per-element settings are [lattice attributes](#lattice-attributes) rather than namelist parameters. How to build and run is [](user-guide.md). What the outputs hold is [](reading-output.md). The measured levels are [](validation.md). The physics is the manual, [](fel-physics.md). Every resolved input is written into the statistics file's `params/` group, so a finished run states its own configuration with every default explicit.
@@ -174,33 +174,39 @@ Elements carrying Bmad `sr_wake` definitions, either pseudomodes or a tabular `z
 
 ```
 &fel_beam_init
-  beam_file = "Aramis-initial.beam.h5"
-  nbins = 8
+  beam_init%n_particle = 2048
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beam_init%sig_z = 1.2e-9
+  beam_init%sig_pz = 8.8e-5
+  beam_init%bunch_charge = 3.0e-14
+  shot_noise = T
 /
 ```
 
-There are three ways to obtain a beam: start from a dump, generate one from a description, or import and resample a distribution.
+One path loads the beam: a bunch from `beam_init%`, generated or read from a file, binned
+into the slices and loaded by `load_mode`, with `quiet_start` and `shot_noise` acting on
+every load ([](fel-physics.md#sec-loading)). `beam_file` starts from a dump instead.
 
 ### Files and sources
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `beam_file` | `""` | openPMD particle dump to start from. Blank generates a beam instead |
-| `dist_file` | `""` | openPMD-beamphysics file to import and resample |
-| `use_beam_init` | `F` | Import path: generate the bunch from the `beam_init%` block instead of a file |
+| `beam_file` | `""` | openPMD particle dump to start from, slices as they are. Blank loads a bunch instead |
 | `write_genesis_dist` | `""` | Write the bunch as a Genesis4 `&importdistribution` input |
 | `write_openpmd_file` | `""` | Write the bunch as openPMD-beamphysics |
 
 (param-beam-beam-file)=
-**`beam_file`** reads openPMD only. A file that is not openPMD is refused, and the message carries the conversion command. `tests/scripts/convert_genesis.py` converts in both directions, and [](genesis4.md) describes the exchange.
+**`beam_file`** reads openPMD only. A file that is not openPMD is refused, and the message carries the conversion command. `tests/scripts/convert_genesis.py` converts in both directions, and [](genesis4.md) describes the exchange. A dump named in `beam_init%position_file` is refused, since its slices would collapse onto one another when read as a bunch.
 
 ### The bunch description: `beam_init%`
 
-Bmad's standard `beam_init_struct`, the same block both generation paths read. One bulk-bunch description, two methods: the quiet-start loader evaluates it analytically per slice, and the import resamples real particles from it. The Twiss is always the lattice's.
+Bmad's standard `beam_init_struct`. With `position_file` blank the bunch is generated from the description, and in the sample mode the loader evaluates the description analytically per slice without making a bunch at all. The Twiss is always the lattice's.
 
 | Parameter | Meaning |
 |---|---|
-| `beam_init%n_particle` | Macroparticles per slice, a positive multiple of `beamlet_size`. The import path reads it as bunch particles |
+| `beam_init%position_file` | openPMD-beamphysics bunch to load. Read whole, then sliced by `load_mode` |
+| `beam_init%n_particle` | Sample mode: macroparticles per slice after the phase copies, a positive multiple of `beamlet_size`. Keep mode: the particles of the generated bunch |
 | `beam_init%a_norm_emit`, `beam_init%b_norm_emit` | Normalized emittances [m rad] |
 | `beam_init%sig_pz` | Fractional momentum spread dP/P0 |
 | `beam_init%bunch_charge` | Charge [C]. The current is derived from it, never input |
@@ -208,20 +214,25 @@ Bmad's standard `beam_init_struct`, the same block both generation paths read. O
 | `beam_init%distribution_type(3)` | `"RAN_GAUSS"` for a Gaussian current profile, `"GRID"` for Bmad's uniform one |
 
 (param-beam-init-contract)=
-Every other `beam_init` field that is set is refused. A standard structure that silently dropped fields would be worse than a custom one, so the honored set above is the contract, and `check_beam_init_contract` enforces it. Note that this contract covers the quiet-start generator: the import path honors everything Bmad honors, since `init_beam_distribution` generates the bunch.
+The analytic loader honors the fields above and refuses every other `beam_init` field that is set. A standard structure that silently dropped fields would be worse than a custom one, so the honored set is the contract, and `check_beam_init_contract` enforces it. A bunch that Bmad makes, in keep mode or from a file, honors everything `init_beam_distribution` honors.
 
 (param-beam-sig-z)=
 **`beam_init%sig_z`** with `"RAN_GAUSS"` gives a Gaussian current profile evaluated at the slice centers, with the bunch centered in the window. A zero length is the steady state, one slice holding the whole charge, and it is refused for a time-dependent window. With `"GRID"` the profile is flat over the z extent of `grid(3)`. `beam_init%a_emit` and `b_emit` are refused: normalized emittances only, which is Bmad's preferred form. `sig_e` is deprecated Bmad-wide and does not exist here.
 
-### The quiet start
+### The load
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `beamlet_size` | `8` | Beamlet size of the quiet start. The load is quiet below this |
-| `shot_noise` | `F` | Impose physical shot noise. Time-dependent windows only |
+| `load_mode` | `"sample"` | `"sample"`: the same count in every slice, weights from the slice charge. `"keep"`: every particle kept, counts following the charge |
+| `quiet_start` | `T` | Load beamlets of `beamlet_size` phase copies, quiet below that harmonic |
+| `beamlet_size` | `8` | Copies per beamlet, and the harmonics the noise resolves |
+| `shot_noise` | `F` | Impose the physical noise on the load's groups. Time-dependent windows only |
+
+(param-beam-load-mode)=
+**`load_mode`** is what becomes of the particles in a slice. In the sample mode a generated bunch takes the analytic loader and a file takes the resampler ([](fel-physics.md#sec-import)); `beam_init%n_particle` is the count per slice either way. In the keep mode each particle becomes a beamlet of copies at weight over `beamlet_size` sharing its coordinates, so every moment of the bunch is the load's, slice by slice, and the window is the bunch's extent unless `slicing%` states one. The method is in [](fel-physics.md#sec-loading).
 
 (param-beam-shot-noise)=
-**`shot_noise`** imposes the weighted Fawley loading. The noise-level algebra and the effective-count refusal guard are in [](fel-physics.md#sec-noise). The loader warns where Genesis4 silently clamps beamlets holding fewer real electrons than macroparticles.
+**`shot_noise`** imposes the weighted Fawley loading on the groups the load has: the beamlets when the loader made them, else particles sharing their transverse coordinates, else the occupants of a deposit cell, and the message says which. The loader measures the quiet floor first and refuses noise on a load above it with the value in the message, so noise is never counted twice. The algebra, the rule and the four switch combinations are in [](fel-physics.md#sec-noise). The loader warns where Genesis4 silently clamps groups holding fewer real electrons than macroparticles.
 
 ### The resampler: `resample%`
 
@@ -230,11 +241,12 @@ Named after Genesis4's `&importdistribution` where an equivalent exists. `slicin
 | Parameter | Default | Meaning |
 |---|---|---|
 | `resample%slice_width` | `0.01` | Sampling window over bunch length |
-| `resample%n_particle_per_slice` | `8192` | Macroparticles per slice after resampling |
-| `resample%beamlet_size` | `4` | Beamlet size of the resample |
 | `resample%n_slice` | `0` | Slice count. Zero derives it from the bunch length and the spacing |
+| `resample%use_beam_init` | `F` | Validation route: resample a bunch Bmad generated from `beam_init%` instead of taking the analytic loader |
+| `resample%n_particle_per_slice` | `8192` | Macroparticles per slice on the validation route |
+| `resample%beamlet_size` | `4` | Beamlet size on the validation route |
 
-Genesis4's `match` and `center` are not ported: a Bmad lattice carries its Twiss and `beam_init` generates matched bunches already. The method is in [](fel-physics.md#sec-import).
+On the user's path the counts are `beam_init%n_particle` and `beamlet_size`. Genesis4's `match` and `center` are not ported: a Bmad lattice carries its Twiss and `beam_init` generates matched bunches already. The method is in [](fel-physics.md#sec-import).
 
 ### Check instruments
 
@@ -243,7 +255,7 @@ Not physics input. The validation harness sets these.
 | Parameter | Default | Meaning |
 |---|---|---|
 | `split_weights` | `F` | Replace each particle by coincident copies carrying 1/3 and 2/3 of its weight |
-| `resample_split_weights` | `F` | The same split, applied before the import |
+| `resample_split_weights` | `F` | The same split, applied to the bunch before it is sliced |
 | `gen_test_weights` | `F` | Alternate beamlet weights of 0.25x and 1.75x, charge preserving, to exercise the weighted-noise paths |
 | `swap_beam_xy` | `F` | Swap (x, px) with (y, py) after generation |
 

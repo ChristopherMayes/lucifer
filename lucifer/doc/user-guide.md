@@ -72,14 +72,16 @@ The validation harness is a separate thing, described with its commands in
 | `lucifer/doc/fel-physics.md` | **The physics manual**: equations, conventions, Genesis4 provenance and validation pointers, one section per subsystem |
 | `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
 | `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis4 interlude model |
-| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements tracked by an FEL method (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; generates its own quiet-start beam and seed field when no dumps are named |
+| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements tracked by an FEL method (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; loads the beam from a `beam_init` bunch and generates the seed field when no dumps are named |
 | `lucifer/examples/` | Self-contained single-command examples, one directory per feature, each with its own README and measured numbers. Its index says which example shows which feature |
-| `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights |
+| `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights, in keep mode, and on copies and deposit cells grouped by the loader |
+| `lucifer/tests/scripts/check_load.py` | Load-path checks: keep mode exact against the bunch, split-weight invariance, the in-cone startup power of a Gaussian bunch, the refusals of noise on unquiet loads |
+| `lucifer/tests/scripts/bunchfile.py` | Reads and writes the openPMD-beamphysics bunch files `beam_init%position_file` reads, for the checks that build a bunch outside the loader |
 | `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis4's, independent RNGs |
 | `lucifer/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity |
-| `lucifer/code/fel_import_mod.f90` | The distribution import: a bunch_struct resampled into FEL slices by Genesis4's importdistribution method, plus the Genesis4-distribution-file writer. Also see the distribution import in [`validation.md`](validation.md) |
+| `lucifer/code/fel_import_mod.f90` | The resampler: a bunch_struct resampled into FEL slices by Genesis4's importdistribution method, the sample mode from a file, plus the Genesis4-distribution-file writer. Also see the resampler in [`validation.md`](validation.md) |
 | `lucifer/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, exact causality with the d8 direction cross-check, z_long kernel cross-validation, split-weight, thread determinism |
-| `lucifer/tests/scripts/check_import.py` | Import checks: exact current profile vs Genesis4 on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
+| `lucifer/tests/scripts/check_import.py` | Resampler checks: exact current profile vs Genesis4 on the same file, match exactness, split-weight invariance, openPMD round trip, thread determinism; statistical Twiss recovery and startup power |
 | `lucifer/code/fel_collective_mod.f90` | Wakes and space charge at Genesis4's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
 | `lucifer/tests/genesis4/collective/` | Genesis4 decks: the collective tiers, importing the shared TD dumps |
 | `lucifer/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping, sigma_energy invariance, stale-wake structure under migration |
@@ -277,7 +279,7 @@ precision:
 | `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis4 dump can. `lucifer/tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
 | `<out_root>.diag.txt` | The per-record Genesis4-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
-| `<out_root>.import.txt` | The distribution import's analysis moments and per-slice current profile. Written at import time, so it exists under `load_only = T` |
+| `<out_root>.import.txt` | The load record: the per-slice current profile, with the bunch's analysis moments from the resampler or the per-slice counts and first moments from the keep mode. Written at load time, so it exists under `load_only = T` |
 | `<out_root>.migration.txt` | Slice migration: one row per event (s, particles moved, charge dropped, phase-continuity residual) plus the run summary |
 
 This is Tao's division of labour. `show ele` is for people, `show value` and pytao are

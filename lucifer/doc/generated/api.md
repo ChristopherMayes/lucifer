@@ -243,8 +243,8 @@ n_slice is the window the deck asked for, and the file must agree: a dump carrie
 patch per slice, so a different patch count means the deck and the file describe
 different runs, and that is refused. Pass -1 when the deck states no window,
 which is the usual case for a restart, and the file's patch count defines it. A bunch
-that is not a sliced window belongs on the import path (dist_file), which resamples it
-instead of assuming a slicing it does not carry.
+that is not a sliced window belongs on the bunch path (beam_init%position_file), which
+slices it by load_mode instead of assuming a slicing it does not carry.
 
 one4one is not read either. The flag asserts that every macroparticle carries one
 electron, so the weights decide it.
@@ -346,6 +346,193 @@ Input:
 Output:
   theta(:)    -- real(rp): Phases with the noise kicks added.
   n_clamp     -- integer: Incremented once per clamped (harmonic, beamlet) draw.
+```
+
+(api-fel-group-noise)=
+### `fel_group_noise`
+
+*Subroutine* `(theta, weight, n, group, n_group, nharm, n_clamp)`
+
+```
+Routine to impose physical shot noise on a load whose groups are not contiguous
+beamlets (fel-physics.md sec-noise). The algorithm is fel_fawley_noise's: for each
+harmonic and each group, one amplitude drawn on the group's real electron count and one
+phase, and every member's phase shifted by it. What differs is only how the members are
+found. fel_fawley_noise stays as it is for the beamlets the loader makes, since its draw
+order is what every recorded level was measured against.
+```
+
+```
+Input:
+  theta(:)   -- real(rp): Ponderomotive phases.
+  weight(:)  -- real(rp): Macroparticle charges [C].
+  n          -- integer: Particle count.
+  group(:)   -- integer: Group index of each particle, 1..n_group.
+  n_group    -- integer: Group count.
+  nharm      -- integer: Harmonics imposed, 1..nharm.
+
+Output:
+  theta(:)   -- real(rp): Phases with the noise imposed.
+  n_clamp    -- integer: Incremented per group whose electron count was under one.
+```
+
+(api-beamlet-groups)=
+### `beamlet_groups`
+
+*Function* `(n, beamlet_size) result (group)`
+
+```
+Routine to label contiguous beamlets: particle ip belongs to group (ip-1)/beamlet_size + 1.
+```
+
+```
+Input:
+  n            -- integer: Particle count, a multiple of beamlet_size.
+  beamlet_size -- integer: Copies per beamlet.
+
+Output:
+  group(:)     -- integer, allocatable: Group index of each particle.
+```
+
+(api-fel-impose-noise)=
+### `fel_impose_noise`
+
+*Subroutine* `(sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts,`
+
+```
+                             islice, n_clamp, rule, floor_n_lambda, err_flag)
+
+Routine to impose physical shot noise on one slice's load, whatever made it
+(fel-physics.md sec-noise). Two things happen in order.
+
+The floor is measured first: max over h of |b(h)|^2 times N_lambda, the load's own
+bunching against the physical level, swept over every harmonic the beamlets are declared
+to resolve. A load whose floor is not far below one cannot carry imposed noise, since the
+two would add and the startup level would be silently wrong, so such a load is refused
+with the value in the message. The threshold is a hundredth of the target.
+
+Then the groups over which independent phasors are drawn are found, by the first rule
+that applies: the beamlets, when this loader made them (quiet_start); else particles
+sharing their transverse coordinates to the bit, which is what copies from any loader
+look like; else the occupants of a deposit cell of the field grid, the finest structure
+the source term can see. The beamlet case calls fel_fawley_noise unchanged, so every
+recorded level stands. The others call fel_group_noise, which draws in the same order
+through an index.
+```
+
+```
+Input:
+  sl              -- fel_slice_struct: The slice, for its coordinates and weights.
+  theta(:)        -- real(rp): The load's ponderomotive phases.
+  n               -- integer: Particle count.
+  quiet_start     -- logical: This loader made contiguous beamlets of beamlet_size.
+  beamlet_size    -- integer: Copies per beamlet; also sets the harmonics resolved.
+  grid_half_width -- real(rp): The field grid's half width [m], for the cell rule.
+  grid_n_pts      -- integer: The field grid's points per side, for the cell rule.
+  islice          -- integer: Slice index, for the message.
+
+Output:
+  theta(:)        -- real(rp): Phases with the noise imposed.
+  n_clamp         -- integer: Incremented per group whose electron count was under one.
+  rule            -- integer: Which grouping was used: 1 beamlets, 2 copies, 3 cells.
+  floor_n_lambda  -- real(rp): The measured floor times N_lambda, for the caller's report.
+  err_flag        -- logical: Set True if the load is too loud to carry noise.
+```
+
+(api-compress-groups)=
+### `compress_groups`
+
+*Subroutine* `(group, n, n_group)`
+
+```
+Routine to renumber sparse cell labels to 1..n_group.
+```
+
+(api-fel-report-noise)=
+### `fel_report_noise`
+
+*Subroutine* `(rule, floor_n_lambda, nslice)`
+
+```
+Routine to print, once per load, which grouping the shot noise was imposed on and the
+worst quiet floor measured before it. A user who did not make the beamlets has no other
+way to know what the noise was drawn on.
+```
+
+```
+Input:
+  rule           -- integer: 1 beamlets, 2 particles sharing coordinates, 3 deposit cells.
+  floor_n_lambda -- real(rp): The worst |b|^2 N_lambda before imposing.
+  nslice         -- integer: Slices the noise was imposed on.
+```
+
+(api-fel-quiet-floor)=
+### `fel_quiet_floor`
+
+*Function* `(theta, weight, n, hmax) result (floor_b2)`
+
+```
+Routine to measure how quiet a load is before noise is imposed on it: the largest
+|b(h)|^2 over h = 1..hmax, weighted, with b(h) = sum w e^{i h theta} / sum w. Times
+N_lambda this is the load's own bunching against the physical level of 1, and a load
+whose floor is not far below that cannot carry imposed noise, since the two would add
+(fel-physics.md sec-noise). The sweep runs over every harmonic the load is declared to
+resolve, not only the imposed ones: an unquiet pattern can park its floor on a harmonic
+the imposition never touches and still corrupt the dynamics.
+```
+
+```
+Input:
+  theta(:)  -- real(rp): Ponderomotive phases.
+  weight(:) -- real(rp): Macroparticle charges [C].
+  n         -- integer: Particle count.
+  hmax      -- integer: Highest harmonic swept.
+
+Output:
+  floor_b2  -- real(rp): max over h of |b(h)|^2. Zero for an empty or chargeless load.
+```
+
+(api-fel-transverse-groups)=
+### `fel_transverse_groups`
+
+*Subroutine* `(sl, group, n_group)`
+
+```
+Routine to group a slice's particles by their transverse coordinates, exactly: two
+particles are in one group when x, px, y, py and pz all agree to the bit, which is what
+copies made by a loader look like and what nothing else does. The groups are the
+independent transverse samples of the slice, and they are what shot noise is imposed
+on when the loader did not make the beamlets itself.
+```
+
+```
+Input:
+  sl        -- fel_slice_struct: The slice.
+
+Output:
+  group(:)  -- integer, allocatable: Group index of each particle, 1..n_group.
+  n_group   -- integer: Group count.
+```
+
+(api-fel-m-ind)=
+### `fel_m_ind`
+
+*Function* `(sl, group, n_group) result (m_ind)`
+
+```
+Routine to count a slice's independent transverse samples from its groups:
+(sum_g W_g)^2 / sum_g W_g^2, which is the group count for uniform groups and N_eff for
+singletons. Stored on the slice as m_ind for the coherent source's Gaussianity test.
+```
+
+```
+Input:
+  sl        -- fel_slice_struct: The slice.
+  group(:)  -- integer: Group index of each particle.
+  n_group   -- integer: Group count.
+
+Output:
+  m_ind     -- real(rp): The count. One for an empty slice.
 ```
 
 (api-fel-slice-to-bunch)=
@@ -2103,9 +2290,9 @@ Output:
 *Module*
 
 ```
-The starting state of a run: fel_init_beam (an openPMD dump, an imported distribution,
-or the generated quiet start) and fel_init_wavefront (an openPMD wavefront or the
-generated Gaussian seed, plus the harmonic entries).
+The starting state of a run: fel_init_beam (an openPMD dump of slices, or a beam_init
+bunch loaded by load_mode, sampled or kept) and fel_init_wavefront (an openPMD wavefront
+or the generated Gaussian seed, plus the harmonic entries).
 Library contract: errors return through err_flag, and nothing here stops. The print
 lines are unchanged from when this code lived in the driver.
 ```
@@ -2116,12 +2303,13 @@ lines are unchanged from when this code lived in the driver.
 *Subroutine* `(run, err_flag)`
 
 ```
-Routine to build the beam: read an openPMD particle dump (beam_file), import a
-distribution (dist_file or use_beam_init: the resample of fel_import_mod), or generate
-the quiet start from beam_init. Applies the beam-side check instruments
-(split_weights, swap_beam_xy) and sets run%nslice. One seed (global%ran_seed)
-governs generation, resampling and noise, exactly as before the split. Errors
-return through err_flag, and nothing here stops.
+Routine to build the beam: read an openPMD particle dump of slices (beam_file), or load
+a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
+described bunch takes the analytic generator and a file, beam_init%position_file,
+takes the resampler of fel_import_mod. In the keep mode every particle of the bunch
+stays as a beamlet of copies. Applies the beam-side check instruments (split_weights,
+swap_beam_xy) and sets run%nslice. One seed (global%ran_seed) governs generation,
+resampling and noise. Errors return through err_flag, and nothing here stops.
 ```
 
 ```
@@ -2140,10 +2328,10 @@ Output:
 *Subroutine* `()`
 
 ```
-Routine to generate the quiet-start beam from the beam_init description (manual
-sec-loading): matched Gaussian transverse planes on the lattice Twiss, beamlets on a
-uniform ponderomotive phase grid, the derived per-slice current, and optional Fawley
-shot noise.
+Routine to generate the beam from the beam_init description, the sample mode with no
+file (manual sec-loading): matched Gaussian transverse planes on the lattice Twiss, the
+derived per-slice current, beamlets on a uniform ponderomotive phase grid under the
+quiet start and independent particles without it, and the shot noise where asked.
 ```
 
 (api-check-beam-init-contract)=
@@ -2166,13 +2354,78 @@ details with no analytic counterpart and are accepted at their defaults only.
 *Subroutine* `()`
 
 ```
-Routine to import a distribution (fel-physics.md sec-import): a bunch_struct -- generated from
-Bmad's beam_init_struct (the native equivalent of Genesis's &beam description) or read
-from an openPMD-beamphysics file -- is resampled into FEL slices by the transcribed
-Genesis importdistribution method (fel_import_mod, where the algorithm and its
-provenance are documented). The seed field comes from the same generator as the
-built-in loader. The RNG-free outputs the exactness checks read (the analysis
-moments and the per-slice current profile) are printed at full precision.
+Routine for the sample mode from a bunch (fel-physics.md sec-import): a bunch_struct,
+read from the openPMD-beamphysics file beam_init%position_file or generated from
+beam_init on the validation route resample%use_beam_init, is resampled into FEL slices
+by the transcribed Genesis importdistribution method (fel_import_mod, where the
+algorithm and its provenance are documented). The RNG-free outputs the exactness checks
+read (the analysis moments and the per-slice current profile) are written at full
+precision.
+```
+
+(api-fel-bunch-from-beam-init)=
+### `fel_bunch_from_beam_init`
+
+*Subroutine* `(beam_b, err_i)`
+
+```
+Routine to make the one bunch every slicing path starts from. Bmad's init_beam_distribution
+reads beam_init%position_file when it is set, openPMD or its own ASCII, and generates from
+the beam_init description otherwise, so the two sources meet here and the loaders never
+ask which one they have.
+```
+
+(api-keep-initial-state)=
+### `keep_initial_state`
+
+*Subroutine* `()`
+
+```
+Routine for load_mode = "keep": every live particle of the bunch stays, binned by its
+arrival time into the slices, and the slice's charge is what fell into it. With the
+quiet start each particle becomes a beamlet of beamlet_size copies at weight/beamlet_size
+that share its five other coordinates, phases spread over 2 pi about its own, so the load
+is quiet at every harmonic below beamlet_size and the bunch's moments are the particles'.
+Without it each particle keeps its phase and its weight. No random number is drawn
+before the shot noise, so the same bunch loads the same way every time.
+
+The window follows the bunch, ceiling(extent / spacing) slices from the earliest
+particle, or slicing%n_slice or slicing%window_length where the deck states one, the
+bunch centered and the particles outside counted in a warning.
+```
+
+(api-keep-impose-on-slice)=
+### `keep_impose_on_slice`
+
+*Subroutine* `(sl, is_g, p0_mc, ks_l, nbins, n_clamp, rule_seen, floor_max)`
+
+```
+Routine to impose the shot noise on one kept slice. The phases come back out of the
+stored z chart, the noise is imposed on the groups the load has, and they go back in
+with the same beta per particle. The chart is z = beta theta / ks, so the round trip is
+exact to roundoff.
+```
+
+(api-split-bunch-weights)=
+### `split_bunch_weights`
+
+*Subroutine* `(bp)`
+
+```
+Check knob: every particle of the bunch becomes two coincident copies carrying a third
+and two thirds of its charge, before anything downstream sees it. Every weighted sum,
+and in keep mode every moment, must then be bit-identical to the unsplit run.
+```
+
+(api-write-load-record)=
+### `write_load_record`
+
+*Subroutine* `(nslice_k)`
+
+```
+The RNG-free instruments the exactness checks read: the per-slice current and the
+slice moments of what was loaded, at full precision, one row per slice, in the same
+file the sample path writes. Written at load time because load_only stops before tracking.
 ```
 
 (api-do-split-weights)=
@@ -2249,8 +2502,8 @@ program may reuse the parsing, or skip it and fill the structs in code.
 
   &fel_params          lat_file, global, bmad_com, space_charge_com, wake, sc,
                        chamber_wake%write_kernels
-  &fel_beam_init       beam_init, imp, beam_file, dist_file, write_genesis_dist,
-                       write_openpmd_file, use_beam_init, beamlet_size, shot_noise,
+  &fel_beam_init       beam_init, resample, beam_file, write_genesis_dist,
+                       write_openpmd_file, load_mode, quiet_start, beamlet_size, shot_noise,
                        split_weights, swap_beam_xy, gen_test_weights,
                        resample_split_weights
   &fel_wavefront_init  wavefront_init, field_file

@@ -53,6 +53,10 @@ type fel_resample_param_struct
   integer :: n_particle_per_slice = 8192 ! Macroparticles per slice after resampling.
   integer :: beamlet_size = 4            ! Beamlet size of the quiet load.
   integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
+  ! Validation-internal: resample a bunch Bmad generated from beam_init rather than one
+  ! read from a file, so the SDDSBeam transcription can be checked on a known bunch. A
+  ! generated bunch otherwise takes the analytic loader, which needs no resampling.
+  logical :: use_beam_init = .false.
 end type
 
 private analyse_window
@@ -85,10 +89,15 @@ contains
 !                       ax, ay), the deterministic quantities the exactness checks read.
 !-
 
-subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
+subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, quiet_start, shot_noise, &
+                             grid_half_width, grid_n_pts, fbeam, err_flag, moments_out)
 
 type (bunch_struct), target :: bunch
 type (fel_resample_param_struct) prm
+logical quiet_start, shot_noise
+real(rp) grid_half_width
+integer grid_n_pts, rule, rule_seen
+real(rp) floor_nl, floor_worst
 type (fel_beam_struct), target :: fbeam
 type (fel_slice_struct), pointer :: sl
 type (coord_struct), pointer :: cp
@@ -203,6 +212,8 @@ dslen = prm%slice_width * ttotal
 mpart = prm%n_particle_per_slice / prm%beamlet_size
 ks_l = twopi / lambda0
 n_clamp = 0
+rule_seen = 0
+floor_worst = 0
 
 allocate (cg(prm%n_particle_per_slice), cx(prm%n_particle_per_slice), cy(prm%n_particle_per_slice), cpx(prm%n_particle_per_slice), cpy(prm%n_particle_per_slice), &
           theta(prm%n_particle_per_slice), wk(prm%n_particle_per_slice))
@@ -241,6 +252,8 @@ do islice = 1, nslice
 
   call fill_slice ()
 enddo
+
+if (shot_noise) call fel_report_noise (rule_seen, floor_worst, nslice)
 
 if (n_clamp > 0) then
   call out_io (s_warn$, r_name, 'SOME BEAMLET NOISE DRAWS HAD FEWER THAN ONE REAL ELECTRON', &
@@ -378,7 +391,9 @@ if (nd < mpart) then
 endif
 
 ! theta refilled completely new over one beamlet spacing (sec-import), then the
-! beamlet mirroring: seed i lands at beamlet_size consecutive indices.
+! beamlet mirroring: seed i lands at beamlet_size consecutive indices. Without the quiet
+! start the copies keep their coordinates and every phase is its own uniform draw, which
+! is a load with macroparticle noise at every harmonic, as a real bunch's would be.
 
 do k = 1, mpart
   call ran_uniform (uu)
@@ -393,6 +408,12 @@ do k = mpart, 1, -1
     theta(i2+j+1) = wk(i1) + j * twopi / prm%beamlet_size
   enddo
 enddo
+if (.not. quiet_start) then
+  do k = 1, prm%n_particle_per_slice
+    call ran_uniform (uu)
+    theta(k) = twopi * uu
+  enddo
+endif
 
 ! Uniform per-slice weights from the window current (Genesis's dQ semantics), the
 ! shared Fawley noise with ne = charge/e (skipped for empty slices, as Genesis's),
@@ -406,9 +427,19 @@ call fel_slice_reallocate (sl, prm%n_particle_per_slice)
 sl%n = prm%n_particle_per_slice
 sl%weight(1:prm%n_particle_per_slice) = w_part
 
-if (ne > 0) then
-  call fel_fawley_noise (theta(1:prm%n_particle_per_slice), sl%weight(1:prm%n_particle_per_slice), prm%n_particle_per_slice, prm%beamlet_size, n_clamp)
+! Noise where the deck asks for it. Genesis's importdistribution applied it whether or not
+! its shotnoise flag said so, a quirk this port carried until the load's two switches
+! became explicit; a deck that wants the noise now says shot_noise = T.
+
+if (ne > 0 .and. shot_noise) then
+  call fel_impose_noise (sl, theta(1:prm%n_particle_per_slice), prm%n_particle_per_slice, quiet_start, &
+                         prm%beamlet_size, grid_half_width, grid_n_pts, islice, n_clamp, rule, floor_nl, err_flag)
+  if (err_flag) return
+  rule_seen = max(rule_seen, rule)
+  floor_worst = max(floor_worst, floor_nl)
 endif
+sl%m_ind = fel_m_ind (sl, beamlet_groups(prm%n_particle_per_slice, prm%beamlet_size), &
+                      prm%n_particle_per_slice / prm%beamlet_size)
 
 do k = 1, prm%n_particle_per_slice
   gam_p = cg(k)

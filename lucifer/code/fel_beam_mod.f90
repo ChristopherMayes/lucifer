@@ -79,6 +79,12 @@ type fel_slice_struct
   real(rp), allocatable :: pz(:)       ! (p - p0)/p0
   real(rp), allocatable :: weight(:)   ! Macroparticle charge [C]
   integer :: n = 0                     ! Fill count.
+  ! Independent transverse samples at load: (sum_g W_g)^2 / sum_g W_g^2 over the groups
+  ! of particles sharing their transverse coordinates, which is the beamlet count for
+  ! uniform beamlets and N_eff for a load with no copies. The coherent source sizes its
+  ! Gaussianity test by it. A load-time count: migration moves particles between slices
+  ! and does not update it, which that soft use tolerates.
+  real(rp) :: m_ind = 1
 end type
 
 !+
@@ -333,8 +339,8 @@ end function fel_theta
 ! patch per slice, so a different patch count means the deck and the file describe
 ! different runs, and that is refused. Pass -1 when the deck states no window,
 ! which is the usual case for a restart, and the file's patch count defines it. A bunch
-! that is not a sliced window belongs on the import path (dist_file), which resamples it
-! instead of assuming a slicing it does not carry.
+! that is not a sliced window belongs on the bunch path (beam_init%position_file), which
+! slices it by load_mode instead of assuming a slicing it does not carry.
 !
 ! one4one is not read either. The flag asserts that every macroparticle carries one
 ! electron, so the weights decide it.
@@ -353,13 +359,13 @@ end function fel_theta
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, beamlet_size, ele, err_flag)
+subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, ele, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
-integer is, np, nb, n_slice, n_win, beamlet_size
+integer is, np, nb, n_slice, n_win
 real(rp) gamma0, q_file, wavelength, spacing
 logical err_flag, err
 character(*) file_name
@@ -384,7 +390,7 @@ beam%wavelength = wavelength
 beam%slice_spacing = spacing
 beam%n_wavelength = fel_n_wavelength(spacing, wavelength, err)
 if (err) return
-beam%beamlet_size = beamlet_size
+beam%beamlet_size = 0        ! Not carried by any dump format; the slices count their own.
 beam%s0 = 0
 
 call hdf5_read_beam (file_name, beam_b, err, ele)
@@ -436,6 +442,20 @@ if (q_file <= 0) then
                'EVERY WEIGHT IS ZERO, SO THE BEAM WOULD TRACK AND RADIATE NOTHING.')
   return
 endif
+
+! No dump format says how the slices were loaded, so each slice counts its own
+! independent transverse samples from the coordinates it carries: copies made by a
+! loader share theirs to the bit, and nothing else does.
+
+block
+  integer, allocatable :: group(:)
+  integer n_group
+  do is = 1, n_win
+    sl => beam%slice(is)
+    call fel_transverse_groups (sl, group, n_group)
+    sl%m_ind = fel_m_ind (sl, group, n_group)
+  enddo
+end block
 
 err_flag = .false.
 
@@ -623,6 +643,472 @@ enddo
 theta(1:n) = theta(1:n) + kick(1:n)
 
 end subroutine fel_fawley_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, n_clamp)
+!
+! Routine to impose physical shot noise on a load whose groups are not contiguous
+! beamlets (fel-physics.md sec-noise). The algorithm is fel_fawley_noise's: for each
+! harmonic and each group, one amplitude drawn on the group's real electron count and one
+! phase, and every member's phase shifted by it. What differs is only how the members are
+! found. fel_fawley_noise stays as it is for the beamlets the loader makes, since its draw
+! order is what every recorded level was measured against.
+!
+! Input:
+!   theta(:)   -- real(rp): Ponderomotive phases.
+!   weight(:)  -- real(rp): Macroparticle charges [C].
+!   n          -- integer: Particle count.
+!   group(:)   -- integer: Group index of each particle, 1..n_group.
+!   n_group    -- integer: Group count.
+!   nharm      -- integer: Harmonics imposed, 1..nharm.
+!
+! Output:
+!   theta(:)   -- real(rp): Phases with the noise imposed.
+!   n_clamp    -- integer: Incremented per group whose electron count was under one.
+!-
+
+subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, n_clamp)
+
+real(rp) theta(:), weight(:)
+integer n, group(:), n_group, nharm, n_clamp
+
+real(rp), allocatable :: kick(:), wgroup(:), an(:), phi(:)
+real(rp) u, nbl
+integer ih, ig, ip
+
+!
+
+allocate (kick(n), wgroup(n_group), an(n_group), phi(n_group))
+kick = 0
+wgroup = 0
+do ip = 1, n
+  wgroup(group(ip)) = wgroup(group(ip)) + weight(ip)
+enddo
+
+! Draws first, in Genesis's order (harmonic outer, group inner, phase then amplitude),
+! then one pass over the particles per harmonic. Same draws as fel_fawley_noise for
+! contiguous beamlets, applied through an index instead of a stride.
+
+do ih = 0, nharm - 1
+  do ig = 1, n_group
+    nbl = wgroup(ig) / e_charge
+    if (nbl < 1) then
+      nbl = 1
+      n_clamp = n_clamp + 1
+    endif
+    call ran_uniform (u)
+    phi(ig) = twopi * u
+    call ran_uniform (u)
+    an(ig) = sqrt(-log(u) / nbl) * 2 / real(ih+1, rp)
+    if (an(ig) > twopi) an(ig) = mod(an(ig), twopi)
+  enddo
+  do ip = 1, n
+    kick(ip) = kick(ip) - an(group(ip)) * sin(theta(ip) * (ih+1) + phi(group(ip)))
+  enddo
+enddo
+
+theta(1:n) = theta(1:n) + kick(1:n)
+
+end subroutine fel_group_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function beamlet_groups (n, beamlet_size) result (group)
+!
+! Routine to label contiguous beamlets: particle ip belongs to group (ip-1)/beamlet_size + 1.
+!
+! Input:
+!   n            -- integer: Particle count, a multiple of beamlet_size.
+!   beamlet_size -- integer: Copies per beamlet.
+!
+! Output:
+!   group(:)     -- integer, allocatable: Group index of each particle.
+!-
+
+function beamlet_groups (n, beamlet_size) result (group)
+
+integer n, beamlet_size
+integer, allocatable :: group(:)
+integer ip
+
+!
+
+allocate (group(n))
+do ip = 1, n
+  group(ip) = (ip - 1) / max(1, beamlet_size) + 1
+enddo
+
+end function beamlet_groups
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_impose_noise (sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts,
+!                              islice, n_clamp, rule, floor_n_lambda, err_flag)
+!
+! Routine to impose physical shot noise on one slice's load, whatever made it
+! (fel-physics.md sec-noise). Two things happen in order.
+!
+! The floor is measured first: max over h of |b(h)|^2 times N_lambda, the load's own
+! bunching against the physical level, swept over every harmonic the beamlets are declared
+! to resolve. A load whose floor is not far below one cannot carry imposed noise, since the
+! two would add and the startup level would be silently wrong, so such a load is refused
+! with the value in the message. The threshold is a hundredth of the target.
+!
+! Then the groups over which independent phasors are drawn are found, by the first rule
+! that applies: the beamlets, when this loader made them (quiet_start); else particles
+! sharing their transverse coordinates to the bit, which is what copies from any loader
+! look like; else the occupants of a deposit cell of the field grid, the finest structure
+! the source term can see. The beamlet case calls fel_fawley_noise unchanged, so every
+! recorded level stands. The others call fel_group_noise, which draws in the same order
+! through an index.
+!
+! Input:
+!   sl              -- fel_slice_struct: The slice, for its coordinates and weights.
+!   theta(:)        -- real(rp): The load's ponderomotive phases.
+!   n               -- integer: Particle count.
+!   quiet_start     -- logical: This loader made contiguous beamlets of beamlet_size.
+!   beamlet_size    -- integer: Copies per beamlet; also sets the harmonics resolved.
+!   grid_half_width -- real(rp): The field grid's half width [m], for the cell rule.
+!   grid_n_pts      -- integer: The field grid's points per side, for the cell rule.
+!   islice          -- integer: Slice index, for the message.
+!
+! Output:
+!   theta(:)        -- real(rp): Phases with the noise imposed.
+!   n_clamp         -- integer: Incremented per group whose electron count was under one.
+!   rule            -- integer: Which grouping was used: 1 beamlets, 2 copies, 3 cells.
+!   floor_n_lambda  -- real(rp): The measured floor times N_lambda, for the caller's report.
+!   err_flag        -- logical: Set True if the load is too loud to carry noise.
+!-
+
+subroutine fel_impose_noise (sl, theta, n, quiet_start, beamlet_size, grid_half_width, grid_n_pts, &
+                             islice, n_clamp, rule, floor_n_lambda, err_flag)
+
+type (fel_slice_struct) sl
+real(rp) theta(:), grid_half_width, floor_n_lambda
+integer n, beamlet_size, grid_n_pts, islice, n_clamp, rule
+logical quiet_start, err_flag
+
+integer, allocatable :: group(:)
+real(rp) wsum, n_lambda, floor_b2, dx
+integer n_group, ip, ix, iy, nharm
+character(*), parameter :: r_name = 'fel_impose_noise'
+
+!
+
+err_flag = .true.
+rule = 0
+floor_n_lambda = 0
+wsum = sum(sl%weight(1:n))
+if (n < 1 .or. wsum <= 0) then
+  err_flag = .false.
+  return
+endif
+n_lambda = wsum / e_charge
+
+floor_b2 = fel_quiet_floor (theta, sl%weight, n, max(1, beamlet_size - 1))
+floor_n_lambda = floor_b2 * n_lambda
+if (floor_b2 > 0.01_rp / n_lambda) then
+  call out_io (s_error$, r_name, 'SLICE \i0\ : THE LOAD IS NOT QUIET ENOUGH TO CARRY SHOT NOISE:', &
+               'MAX_H |B(H)|^2 * N_LAMBDA = \es10.2\ AGAINST THE PHYSICAL LEVEL OF 1. IMPOSING', &
+               'NOISE ON IT WOULD COUNT THE NOISE TWICE.', &
+               'POSSIBLE SOLUTION: quiet_start = T LETS THE LOADER QUIETEN IT FIRST, OR shot_noise = F', &
+               'TAKES THE BEAM WITH THE NOISE IT ALREADY CARRIES.', &
+               i_array = [islice], r_array = [floor_n_lambda])
+  return
+endif
+
+nharm = max(1, (beamlet_size - 1) / 2)
+
+if (quiet_start .and. mod(n, max(1, beamlet_size)) == 0) then
+  rule = 1
+  call fel_fawley_noise (theta(1:n), sl%weight(1:n), n, beamlet_size, n_clamp)
+  err_flag = .false.
+  return
+endif
+
+call fel_transverse_groups (sl, group, n_group)
+if (n_group < n) then
+  rule = 2
+else
+
+  ! No copies anywhere: group by deposit cell. The source term is deposited per cell, so a
+  ! phasor per cell is the finest grain the field can distinguish.
+
+  rule = 3
+  dx = 2 * grid_half_width / max(1, grid_n_pts - 1)
+  do ip = 1, n
+    ix = max(0, min(grid_n_pts - 1, int((sl%x(ip) + grid_half_width) / dx)))
+    iy = max(0, min(grid_n_pts - 1, int((sl%y(ip) + grid_half_width) / dx)))
+    group(ip) = iy * grid_n_pts + ix + 1
+  enddo
+  call compress_groups (group, n, n_group)
+endif
+
+call fel_group_noise (theta, sl%weight, n, group, n_group, nharm, n_clamp)
+err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine compress_groups (group, n, n_group)
+!
+! Routine to renumber sparse cell labels to 1..n_group.
+!-
+
+subroutine compress_groups (group, n, n_group)
+
+integer group(:), n, n_group
+integer, allocatable :: seen(:)
+integer ip, hi
+
+hi = maxval(group(1:n))
+allocate (seen(hi))
+seen = 0
+n_group = 0
+do ip = 1, n
+  if (seen(group(ip)) == 0) then
+    n_group = n_group + 1
+    seen(group(ip)) = n_group
+  endif
+  group(ip) = seen(group(ip))
+enddo
+
+end subroutine compress_groups
+
+end subroutine fel_impose_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_report_noise (rule, floor_n_lambda, nslice)
+!
+! Routine to print, once per load, which grouping the shot noise was imposed on and the
+! worst quiet floor measured before it. A user who did not make the beamlets has no other
+! way to know what the noise was drawn on.
+!
+! Input:
+!   rule           -- integer: 1 beamlets, 2 particles sharing coordinates, 3 deposit cells.
+!   floor_n_lambda -- real(rp): The worst |b|^2 N_lambda before imposing.
+!   nslice         -- integer: Slices the noise was imposed on.
+!-
+
+subroutine fel_report_noise (rule, floor_n_lambda, nslice)
+
+integer rule, nslice
+real(rp) floor_n_lambda
+character(60) what
+character(*), parameter :: r_name = 'fel_report_noise'
+
+!
+
+select case (rule)
+case (1);     what = 'the beamlets the loader made'
+case (2);     what = 'particles sharing their transverse coordinates'
+case (3);     what = 'the occupants of each deposit cell'
+case default; what = 'no group (no slice carried charge)'
+end select
+call out_io (s_info$, r_name, 'Shot noise imposed on \i0\ slices, one phasor per group, the groups being ' // &
+             trim(what) // '.', '  worst quiet floor before imposing, |b|^2 * N_lambda: \es10.2\ ', &
+             i_array = [nslice], r_array = [floor_n_lambda])
+
+end subroutine fel_report_noise
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_quiet_floor (theta, weight, n, hmax) result (floor_b2)
+!
+! Routine to measure how quiet a load is before noise is imposed on it: the largest
+! |b(h)|^2 over h = 1..hmax, weighted, with b(h) = sum w e^{i h theta} / sum w. Times
+! N_lambda this is the load's own bunching against the physical level of 1, and a load
+! whose floor is not far below that cannot carry imposed noise, since the two would add
+! (fel-physics.md sec-noise). The sweep runs over every harmonic the load is declared to
+! resolve, not only the imposed ones: an unquiet pattern can park its floor on a harmonic
+! the imposition never touches and still corrupt the dynamics.
+!
+! Input:
+!   theta(:)  -- real(rp): Ponderomotive phases.
+!   weight(:) -- real(rp): Macroparticle charges [C].
+!   n         -- integer: Particle count.
+!   hmax      -- integer: Highest harmonic swept.
+!
+! Output:
+!   floor_b2  -- real(rp): max over h of |b(h)|^2. Zero for an empty or chargeless load.
+!-
+
+function fel_quiet_floor (theta, weight, n, hmax) result (floor_b2)
+
+real(rp) theta(:), weight(:), floor_b2
+integer n, hmax
+real(rp) br, bi, wsum
+integer ih, ip
+
+!
+
+floor_b2 = 0
+wsum = sum(weight(1:n))
+if (n < 1 .or. wsum <= 0) return
+
+do ih = 1, max(1, hmax)
+  br = 0;  bi = 0
+  do ip = 1, n
+    br = br + weight(ip) * cos(ih * theta(ip))
+    bi = bi + weight(ip) * sin(ih * theta(ip))
+  enddo
+  floor_b2 = max(floor_b2, (br**2 + bi**2) / wsum**2)
+enddo
+
+end function fel_quiet_floor
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_transverse_groups (sl, group, n_group)
+!
+! Routine to group a slice's particles by their transverse coordinates, exactly: two
+! particles are in one group when x, px, y, py and pz all agree to the bit, which is what
+! copies made by a loader look like and what nothing else does. The groups are the
+! independent transverse samples of the slice, and they are what shot noise is imposed
+! on when the loader did not make the beamlets itself.
+!
+! Input:
+!   sl        -- fel_slice_struct: The slice.
+!
+! Output:
+!   group(:)  -- integer, allocatable: Group index of each particle, 1..n_group.
+!   n_group   -- integer: Group count.
+!-
+
+subroutine fel_transverse_groups (sl, group, n_group)
+
+type (fel_slice_struct) sl
+integer, allocatable :: group(:)
+integer n_group
+
+integer, allocatable :: perm(:)
+integer i, j, k, n
+
+!
+
+n = sl%n
+if (allocated(group)) deallocate (group)
+allocate (group(n), perm(n))
+n_group = 0
+if (n < 1) return
+
+! Sort an index by the five coordinates, then a linear pass finds equal runs. The sort
+! is an insertion sort by blocks of a merge, written out here since sim_utils sorts one
+! real key and the key here is five. n log n on a slice's particles, once, at load.
+
+do i = 1, n
+  perm(i) = i
+enddo
+call sort_perm (1, n)
+
+k = perm(1)
+n_group = 1
+group(k) = 1
+do i = 2, n
+  j = perm(i)
+  if (.not. same_transverse(j, k)) then
+    n_group = n_group + 1
+    k = j
+  endif
+  group(j) = n_group
+enddo
+
+!------------------------------------------------------------------------------
+contains
+
+logical function same_transverse (a, b)
+integer a, b
+same_transverse = sl%x(a) == sl%x(b) .and. sl%px(a) == sl%px(b) .and. &
+                  sl%y(a) == sl%y(b) .and. sl%py(a) == sl%py(b) .and. sl%pz(a) == sl%pz(b)
+end function same_transverse
+
+logical function before (a, b)
+integer a, b
+if (sl%x(a) /= sl%x(b)) then;   before = sl%x(a) < sl%x(b);   return; endif
+if (sl%px(a) /= sl%px(b)) then; before = sl%px(a) < sl%px(b); return; endif
+if (sl%y(a) /= sl%y(b)) then;   before = sl%y(a) < sl%y(b);   return; endif
+if (sl%py(a) /= sl%py(b)) then; before = sl%py(a) < sl%py(b); return; endif
+before = sl%pz(a) < sl%pz(b)
+end function before
+
+recursive subroutine sort_perm (lo, hi)
+integer lo, hi, mid, a, b, c
+integer, allocatable :: tmp(:)
+if (hi - lo < 1) return
+mid = (lo + hi) / 2
+call sort_perm (lo, mid)
+call sort_perm (mid+1, hi)
+allocate (tmp(hi-lo+1))
+a = lo;  b = mid + 1;  c = 0
+do while (a <= mid .and. b <= hi)
+  c = c + 1
+  if (before(perm(b), perm(a))) then
+    tmp(c) = perm(b);  b = b + 1
+  else
+    tmp(c) = perm(a);  a = a + 1
+  endif
+enddo
+do while (a <= mid);  c = c + 1;  tmp(c) = perm(a);  a = a + 1;  enddo
+do while (b <= hi);   c = c + 1;  tmp(c) = perm(b);  b = b + 1;  enddo
+perm(lo:hi) = tmp(1:c)
+end subroutine sort_perm
+
+end subroutine fel_transverse_groups
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_m_ind (sl, group, n_group) result (m_ind)
+!
+! Routine to count a slice's independent transverse samples from its groups:
+! (sum_g W_g)^2 / sum_g W_g^2, which is the group count for uniform groups and N_eff for
+! singletons. Stored on the slice as m_ind for the coherent source's Gaussianity test.
+!
+! Input:
+!   sl        -- fel_slice_struct: The slice.
+!   group(:)  -- integer: Group index of each particle.
+!   n_group   -- integer: Group count.
+!
+! Output:
+!   m_ind     -- real(rp): The count. One for an empty slice.
+!-
+
+function fel_m_ind (sl, group, n_group) result (m_ind)
+
+type (fel_slice_struct) sl
+integer group(:), n_group
+real(rp) m_ind
+real(rp), allocatable :: wg(:)
+integer ip
+
+!
+
+m_ind = 1
+if (sl%n < 1 .or. n_group < 1) return
+allocate (wg(n_group))
+wg = 0
+do ip = 1, sl%n
+  wg(group(ip)) = wg(group(ip)) + sl%weight(ip)
+enddo
+if (sum(wg**2) > 0) m_ind = max(1.0_rp, sum(wg)**2 / sum(wg**2))
+
+end function fel_m_ind
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

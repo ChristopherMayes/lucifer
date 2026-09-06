@@ -27,7 +27,7 @@ parallel namelist, and every non-FEL element tracks each slice's bunch through B
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
 - **A GPU backend** for the averaged method on Apple Silicon (`global%device = "metal"`): the beam and the field stay resident on the device through each FEL element, measured between 7x and 12x against twelve CPU cores and judged per step against the FP64 path ([](validation.md#val-device)), harmonic field sets, both polarizations and slice migration included. Configurations its kernels do not cover are refused, never run quietly on the CPU instead.
 - **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
-- **Distribution import**, resampling a `bunch_struct` into FEL slices.
+- **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever load there is.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
 
 (intro-two-methods)=

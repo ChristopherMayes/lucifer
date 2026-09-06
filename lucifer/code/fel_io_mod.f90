@@ -174,9 +174,13 @@ call out_io (s_blank$, r_name, trim(line))
 if (run%nslice == 1) then
   write (line, '(a, i0, a, f0.2)') ' Beam        1 slice x ', run%fbeam%slice(1)%n, &
         ' particles, gamma0 = ', run%gamma0
-else
+elseif (all(run%fbeam%slice%n == run%fbeam%slice(1)%n)) then
   write (line, '(a, i0, a, i0, a, f0.2)') ' Beam        ', run%nslice, ' slices x ', &
         run%fbeam%slice(1)%n, ' particles per slice, gamma0 = ', run%gamma0
+else
+  write (line, '(a, i0, a, i0, a, i0, a, i0, a, f0.2)') ' Beam        ', run%nslice, ' slices, ', &
+        sum(run%fbeam%slice%n), ' particles, ', minval(run%fbeam%slice%n), ' to ', &
+        maxval(run%fbeam%slice%n), ' per slice, gamma0 = ', run%gamma0
 endif
 call out_io (s_blank$, r_name, trim(line))
 
@@ -1120,12 +1124,19 @@ call H5Gclose_f (g_id, h5e)
 
 call sub_open ('beam_param', 'fel_beam_init_param_struct', &
       'The beam-side scalars of &fel_beam_init beside beam_init and imp.')
+call fel_h5_str (g_id, 'load_mode', 'load mode', &
+      'How the bunch became slices: sample (equal beamlets per slice, weights from the ' // &
+      'slice charge) or keep (every real particle a beamlet of copies).', '', &
+      [run%bparam%load_mode], merr)
+call fel_h5_flag (g_id, 'quiet_start', 'quiet start', &
+      'The load made quiet: beamlets of copies with phases spread over 2 pi.', &
+      run%bparam%quiet_start, merr)
 call fel_h5_int (g_id, 'beamlet_size', '1', 'beamlet size', &
-      'Beamlet size of the quiet start (the load is quiet below it).', '', run%bparam%beamlet_size, merr)
+      'Copies per beamlet of the quiet start. A loading parameter only.', '', &
+      run%bparam%beamlet_size, merr)
 call fel_h5_flag (g_id, 'shot_noise', 'shot noise', &
-      'Impose physical (Fawley) shot noise on the phases.', run%bparam%shot_noise, merr)
-call fel_h5_flag (g_id, 'use_beam_init', 'use beam_init', &
-      'Generate the bunch from beam_init, then import it.', run%bparam%use_beam_init, merr)
+      'Impose physical shot noise on the load, by independent phasors per group.', &
+      run%bparam%shot_noise, merr)
 call fel_h5_flag (g_id, 'split_weights', 'split weights', &
       'Check instrument: coincident w/3 + 2w/3 copies after loading.', &
       run%bparam%split_weights, merr)
@@ -1138,8 +1149,7 @@ call fel_h5_flag (g_id, 'gen_test_weights', 'test weights', &
 call fel_h5_flag (g_id, 'resample_split_weights', 'import split', &
       'Check instrument: split-weight copies before the import resample.', &
       run%bparam%resample_split_weights, merr)
-call file_note ('beam_file', run%bparam%beam_file, 'Genesis .par.h5 dump to import.')
-call file_note ('dist_file', run%bparam%dist_file, 'openPMD-beamphysics particle file to import.')
+call file_note ('beam_file', run%bparam%beam_file, 'An FEL beam already in slices, loaded as it is.')
 call file_note ('write_genesis_dist', run%bparam%write_genesis_dist, 'Write the bunch as a Genesis DISTRIBUTION file.')
 call file_note ('write_openpmd_file', run%bparam%write_openpmd_file, 'Write the bunch as openPMD-beamphysics.')
 call H5Gclose_f (g_id, h5e)

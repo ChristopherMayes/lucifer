@@ -223,27 +223,34 @@ across thread counts.
 (Physics: manual [](fel-physics.md#sec-loading).)
 
 A slice of current I represents `N_lambda = I*slice_spacing/(e*c)` real electrons, and
-physical shot noise means `<|b(h)|^2> = 1/N_lambda` per harmonic. The built-in loader
+physical shot noise means `<|b(h)|^2> = 1/N_lambda` per harmonic. The loader
 imposes it Fawley style, transcribed from Genesis4's `ShotNoise::applyShotNoise` and
-generalized to per-particle weights in one substitution: the per-beamlet electron count
-in the amplitude is the beamlet's real charge over e, not Genesis4's slice-uniform
+generalized to per-particle weights in one substitution: the electron count in the
+amplitude is the group's real charge over e, where Genesis4 uses the slice-uniform
 `ne/mpart` (identical for uniform weights). The algebra then gives `1/N_lambda` for any
-cross-beamlet weight distribution with no correction factors. Weights
-must stay uniform within a beamlet. The quiet cancellation is per beamlet. Genesis4's
+distribution of weight across the groups with no correction factors. Weights
+must stay uniform within a group. The quiet cancellation is per beamlet. Genesis4's
 silent `nbl < 1` clamp is kept but counted and warned.
 
-The N_eff discipline: the loader reports per-slice `N_lambda` and
-`N_eff = (sum w)^2/sum w^2`, and refuses to impose noise on a slice whose pre-noise
-quiet floor `max_h |b(h)|^2` is not far below the target: swept over every harmonic
-the beamlet structure can resolve (`1..nbins-1`), not just the imposed ones, because an
-unquiet weight pattern can park its floor on a harmonic the imposition never touches
-(found by this guard's own mutation test).
+The groups are the beamlets when the loader made them, else the particles sharing their
+transverse coordinates exactly, else the occupants of each deposit cell, and the rule
+used is printed. Before imposing, the loader measures the quiet floor
+`max_h |b(h)|^2 N_lambda` over every harmonic the beamlet structure can resolve
+(`1..beamlet_size-1`), not just the imposed ones, because an unquiet weight pattern can
+park its floor on a harmonic the imposition never touches (found by this guard's own
+mutation test), and refuses noise above 0.01 with the value in the message.
 
 Two permanent checks in the harness:
 
 - `check_shot_noise.py` (self-referenced): many-seed loading-only runs,
   `<|b(h)|^2>*N_lambda` against 1 within 5/sqrt(n) for harmonics 1-3, uniform AND
-  0.25x/1.75x alternating beamlet weights. Measured 1.03 in both modes.
+  0.25x/1.75x alternating beamlet weights. Measured 1.03 in both modes. The same
+  statistic on the loads that do not draw their own beamlets: keep mode from a generated
+  bunch, a bunch of copies made outside the loader (noise on the copies), and the same
+  copies with jittered coordinates (noise on the deposit cells). Measured 0.98,
+  0.98 and 0.95. Every group holds about 150 electrons: at 18 the kick is no
+  longer linear in its amplitude and the scaled mean sits at 0.88 in every mode alike,
+  which is the algorithm's own limit and Genesis4's too.
 - `check_sase_startup.py` (cross-code): dark start, one segment, each code generating
   its own noisy beam (fully independent loaders and RNGs), and the mean SASE startup
   power must agree. Measured ln ratio -0.003 (0.3 percent) over 6 seeds x 32 slices.
@@ -263,18 +270,49 @@ invisible to them. It is measured in [](startup-noise.md).
 
 The loader's own current profile reproduces the derived-current identity exactly, **9.9e-15** of peak, and a dropped $\sqrt{2\pi}$ fails that at 1.5. Importing the same Gaussian description agrees with it at rms **4.9e-2** of peak, which is a statistical comparison over 50k particles against a truncated-tail fit rather than an identity.
 
+(val-the-load-path)=
+## The load path: a bunch, sliced, quietened if asked, with noise if asked
+
+(Physics: manual [](fel-physics.md#sec-loading).)
+
+One path loads the beam from a bunch that `beam_init` generated or read through
+`beam_init%position_file`. `load_mode = "keep"` keeps every particle as a beamlet of
+copies at weight over `beamlet_size`, and `load_mode = "sample"` loads the same count into
+every slice, by the analytic loader for a described bunch and by the resampler below for
+a file. `quiet_start` and `shot_noise` act on every load. `check_load.py`, in the
+harness, measures:
+
+| Check | Kind | Measured |
+|---|---|---|
+| keep mode: per-slice currents, counts and charge-weighted moments against the bunch file, recomputed with the same binning | exact | **1.5e-11** over 9 slices |
+| the dump the load writes carries the bunch's charge, eight copies per particle | exact | 2.1e-16 |
+| split weights (coincident w/3 + 2w/3 copies) against the unsplit keep load | exact | 3.5e-12 |
+| in-cone startup: a Gaussian bunch in sample mode, in-cone power summed over a window with slippage headroom, per 3 kA of summed current, against the flat window's interior mean of [](startup-noise.md) (0.133 MW) | statistical | **1.385e5 W**, relative 0.041 (check 0.35) |
+
+The field record collects the emission of every beam slice it slipped past, so for a bunch
+the per-slice power is not proportional to the local current and the comparable quantity
+is the sum over records, with 24 slices of headroom on each side so nothing escapes. The
+edge records carry 5e-8 of the peak.
+
+Refusals, each with the floor in the message: noise on the generator without the quiet
+start (floor 2.8e-1 against 0.01), and a bunch of copies whose phases were shifted singly
+(0.70). The unshifted copies load at 2.9e-28 with the noise on the particles sharing
+their coordinates, and a slice dump named in `beam_init%position_file` is refused since its
+slices would collapse onto one another.
+
 (val-distribution-import-a-bunchstruct)=
-## Distribution import: a bunch_struct, resampled into slices
+## The resampler: a bunch_struct, resampled into slices
 
 (Physics: manual [](fel-physics.md#sec-import).)
 
 The `importdistribution` equivalent: an arbitrary bunch (arbitrary times, arbitrary
 weights) resampled into the evenly spaced, equal-population slices the FEL step
 wants, by Genesis4's own method, transcribed from `SDDSBeam.cpp` (`fel_import_mod`, the
-class name is historical, it reads plain HDF5). The bunch comes in two ways: generated
-natively from Bmad's `beam_init_struct` via `init_beam_distribution` (a `&beam_init`
-namelist block, Bmad's equivalent of Genesis4's `&beam` description), or read from an
-openPMD-beamphysics file via `hdf5_read_beam`. The driver can write any bunch back out
+class name is historical, it reads plain HDF5). The bunch is Bmad's `beam_init_struct`
+made by `init_beam_distribution`: read from an openPMD-beamphysics file named in
+`beam_init%position_file`, or generated from the `&beam_init` description on the
+validation route `resample%use_beam_init`, since a generated bunch otherwise takes the
+analytic loader. The driver can write any bunch back out
 as a Genesis4 distribution file (`t/p/x/xp/y/yp` + charge, with `t = -tau/c` so
 Genesis4's `s = -c*t` reproduces this port's window position exactly) and as
 openPMD-beamphysics (`hdf5_write_beam`).
@@ -302,7 +340,9 @@ one specification of one truth). Facts pinned by reading: the `align*` parameter
 never used in v4, and the `shot_noise` flag is read but never consulted (the import
 applies noise unconditionally, skipping only zero-current slices) -- both kept as
 Genesis4 has them, neither transcribed as functional. one4one is out of scope: weights
-supersede it.
+supersede it. The port carried the unconditional noise until the load's two switches
+became explicit. `shot_noise` is now honored on this path as on every other, and a deck
+that wants the noise says so.
 
 Validation (`scripts/check_import.py`, in the harness) splits along the RNG boundary
 -- exact checks where no random number enters, statistical only where one does:
@@ -312,7 +352,7 @@ Validation (`scripts/check_import.py`, in the harness) splits along the RNG boun
 | per-slice current profile vs Genesis4 importing the same file | exact | **8.2e-13** of peak (24 slices) |
 | the generated bunch carries the specified emittance | exact | ex, ey within 3e-5 of spec |
 | split-weight invariance (coincident w/3 + 2w/3 copies) | exact | moments 1.8e-15, currents 7.4e-14 |
-| openPMD round trip (write_openpmd_file -> dist_file) | exact | moments 9.4e-19, currents 0 |
+| openPMD round trip (write_openpmd_file -> beam_init%position_file) | exact | moments 9.4e-19, currents 0 |
 | thread determinism (1 vs 8 threads, same seed) | exact | byte-identical diag |
 | slice Twiss/emittance recover the spec (mean, central slices) | statistical | beta 0.8%, alpha 1.0%, emit 1.4% |
 | dark-start startup power vs Genesis4, independent resampling RNGs | statistical | ln ratio +0.023 (check 0.30) |

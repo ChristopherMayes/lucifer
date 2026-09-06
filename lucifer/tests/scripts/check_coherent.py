@@ -191,11 +191,11 @@ def main():
     # measured as an apparent 5.9 |ln| disagreement before this was understood).
 
     (wd / "cohshort.bmad").write_text(LAT.replace("l = 3.96,", "l = 0.90,"))
-    IMP = ('  dist_file = "beam0.h5"\n  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n'
-           '  resample%n_slice = 0\n  resample%slice_width = 0.05\n')
+    IMP = ('  beam_init%position_file = "beam0.h5"\n  beam_init%n_particle = 2048\n  beamlet_size = 4\n'
+           '  shot_noise = T\n  resample%n_slice = 0\n  resample%slice_width = 0.05\n')
     WIN = '  slicing%n_wavelength = 20\n'
     run(exe, wd, "seedbeam", 200000, False, pextra='  global%load_only = T\n', sig_z='4e-9',
-        bextra='  use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'
+        bextra='  resample%use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'
                '  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n')
     with h5py.File(wd / "beam0.h5", "r+") as f:
         # openPMD-beamphysics as Bmad writes it: /data/%T/particles/electron/...

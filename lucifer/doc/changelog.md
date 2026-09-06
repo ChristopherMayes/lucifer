@@ -9,6 +9,29 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Changed: one path loads the beam. A bunch comes from `beam_init`, generated or
+  read through `beam_init%position_file`, and `load_mode` says what becomes of the particles in
+  a slice: `"sample"` loads `beam_init%n_particle` macroparticles into every slice with weights
+  from the slice's charge, and `"keep"` keeps every particle as a beamlet of `beamlet_size`
+  copies at weight over `beamlet_size`, so every charge-weighted moment of the bunch is the
+  load's, measured at 1.5e-11 over the slices. `dist_file` and `use_beam_init` are retired and
+  refused with the names that replaced them, `beam_init%position_file` and
+  `resample%use_beam_init`, the latter the resampler's validation route. Two switches act on
+  every load. `quiet_start`, default true, makes beamlets of copies with their phases spread
+  over 2 pi. `shot_noise` imposes Fawley's noise on whatever load there is, by one phasor per
+  group of macroparticles sharing their transverse coordinates: the beamlets when the loader
+  made them, else particles sharing their coordinates exactly, else the occupants of a deposit
+  cell, and the message says which. The loader measures the quiet floor first and refuses noise
+  above 0.01 in |b|^2 N_lambda with the value in the message, so a bunch that carries its own
+  noise is never given a second dose: the unquiet generator sits at 0.28 and a quiet bunch made
+  elsewhere at 3e-28. The resampler honors `shot_noise` where it applied the noise unconditionally
+  before, so its decks now say `shot_noise = T`. `beamlet_size` is a loading quantity: the coherent
+  source counts the slice's distinct transverse positions instead, so a dump loads without it. A
+  generated Gaussian bunch in sample mode radiates 1.385e5 W per 3 kA slice inside 3 urad at the
+  end of the first Aramis undulator, against the 1.33e5 W of the flat window's interior. The
+  `import` example moves to the path, the keystone's eleven tier digits hold since the tiers load
+  dumps, and check_load.py joins the harness.
+
 - 2026-09-05 Changed: the time window moved out of `wavefront_init` into `slicing`, a struct of
   its own in `&fel_params`, and the wavelengths per slice are carried as the integer they are.
   A wavefront is an optical object with a longitudinal spacing and no slices; the rule that the

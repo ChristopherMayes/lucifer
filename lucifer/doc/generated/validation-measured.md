@@ -23,7 +23,7 @@ columns are two independent records rather than a comparison.
 
 ## Check sections
 
-Every section below ran and passed on both builds, 26 in all.
+Every section below ran and passed on both builds, 27 in all.
 A section that fails stops the run, so an entry here means it passed.
 
 - `genesis-references`
@@ -32,6 +32,7 @@ A section that fails stops the run, so an entry here means it passed.
 - `tiers-all-eleven`
 - `thread-independence`
 - `shot-noise`
+- `load`
 - `sase-startup`
 - `seam-wake`
 - `import`

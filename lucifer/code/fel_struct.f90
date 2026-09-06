@@ -226,13 +226,25 @@ end type
 !-
 
 type fel_beam_init_param_struct
-  character(400) :: beam_file = ''        ! Genesis .par.h5 dump (with field_file(1)).
-  character(400) :: dist_file = ''        ! openPMD-beamphysics particle file to import.
+  character(400) :: beam_file = ''        ! An FEL beam already in slices (with field_file(1)).
   character(400) :: write_genesis_dist = ''  ! Write the bunch as a Genesis4 distribution file.
   character(400) :: write_openpmd_file = ''  ! Write the bunch as openPMD-beamphysics.
-  logical :: use_beam_init = .false.      ! Generate the bunch from beam_init, then import.
-  integer :: beamlet_size = 8             ! Beamlet size of the quiet start.
-  logical :: shot_noise = .false.         ! Physical (Fawley) shot noise on the phases.
+  ! How a bunch becomes slices (fel-physics.md sec-loading). The bunch is beam_init's,
+  ! generated or read through beam_init%position_file, and is binned by arrival time into
+  ! slicing's slices. "sample" draws the same number of beamlets in every slice from what
+  ! fell into it, weights from the slice charge, so the current follows the bunch: Genesis's
+  ! &beam with &profile and its importdistribution in one, with beam_init%n_particle the
+  ! count per slice after phase copies. "keep" keeps every real particle as a beamlet of
+  ! beamlet_size copies at weight/beamlet_size, counts following the charge, so a
+  ! start-to-end bunch's correlations survive whole.
+  character(16) :: load_mode = 'sample'
+  ! The two switches of the load. quiet_start makes it quiet: beamlets of copies with phases
+  ! spread over 2 pi about each particle's own, so the load has no bunching at any harmonic
+  ! below beamlet_size. shot_noise then imposes the physical level on whatever load there
+  ! is, by independent phasors per group. Off both, the beam is taken as it came.
+  logical :: quiet_start = .true.
+  integer :: beamlet_size = 8             ! Copies per beamlet. A loading parameter only.
+  logical :: shot_noise = .false.         ! Impose physical shot noise on the load.
   ! Check instruments (the validation harness's knobs, not physics inputs):
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.

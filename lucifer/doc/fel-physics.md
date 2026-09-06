@@ -557,20 +557,34 @@ Measured levels and how they are checked: [](validation.md#val-validation-from-o
 (sec-loading)=
 ## Loading
 
-(sec-quiet)=
-### Quiet start
+One path loads the beam. A bunch comes from Bmad's `beam_init` structure, generated from
+its description or read through `beam_init%position_file`, which reads openPMD-beamphysics.
+It is binned by arrival time into the slices of [](#sec-window), and `load_mode` says what
+becomes of the particles that fell into a slice. Two switches then act on every load:
+`quiet_start` makes it quiet ([](#sec-quiet)) and `shot_noise` imposes the physical noise
+on whatever load there is ([](#sec-noise)). `beam_file` keeps its one meaning, a dump of
+slices loaded as they are with `field_file`.
 
-*One description, two generation methods.* The beam is described by Bmad's
-standard `beam_init` structure in both generated paths. The import
-([](#sec-import)) resamples real particles from it. The quiet-start loader here
-evaluates it *analytically* per slice. The loader honors
-`n_particle` (per slice), `a_norm_emit`/`b_norm_emit`,
-`sig_pz` ($\delta\gamma = \beta_0 p_0 \,\texttt{sig\_pz}/mc$),
-`bunch_charge`, `sig_z` and `distribution_type(3)`, and refuses by
-Name every other field that is set. A standard structure that silently dropped
-fields would be worse than a custom one. The Twiss is always the lattice's
-([](#sec-element)'s one-truth rule), and the current is *derived*, never
-input:
+The arrival coordinate is $\tau$ of Eq. [](#eq-kinematics), shifted so the earliest
+particle sits at zero, and the slice spacing is $\Delta s = \texttt{n\_wavelength}\,
+\lambda_0$. Bmad's `init_beam_distribution` makes the bunch on both sources, so a file is
+read whole: the reader's own use of `beam_init%n_particle` as a cap on the particles read is
+suppressed, since here the count means something else.
+
+### The sample mode
+
+`load_mode = "sample"`, the default, loads the same number of macroparticles into every
+slice, `beam_init%n_particle` counted after the phase copies, with weights from the slice's
+charge, so the current follows the bunch. Genesis4's `&beam` with a `&profile` and its
+`importdistribution` are this one mode.
+
+*From the description.* With no file the loader evaluates `beam_init` analytically per
+slice and no bunch is ever made. It honors `n_particle` (per slice),
+`a_norm_emit`/`b_norm_emit`, `sig_pz` ($\delta\gamma = \beta_0 p_0 \,\texttt{sig\_pz}/mc$),
+`bunch_charge`, `sig_z` and `distribution_type(3)`, and refuses every other field that is
+set. A standard structure that silently dropped fields would be worse than a custom one.
+The Twiss is always the lattice's ([](#sec-element)'s one-truth rule), and the current is
+derived, never input:
 
 $$
   \begin{aligned}
@@ -581,61 +595,119 @@ $$
   \end{aligned}
 $$ (eq-derivedcurrent)
 
-evaluated at the slice centers with the bunch centered in the window. $\sigma_z = 0$
-is the steady state (the whole charge in one slice window, $I = Qc/\Delta s$)
-and is refused for time-dependent windows. The default window covers the
-described bunch ($\pm4\sigma_z$ Gaussian, the grid extent flat), exactly as the
-import derives its window from real particles. `slicing%window_length` overrides it
-for slippage headroom and warns with numbers when it clips the bunch.
+evaluated at the slice centers with the bunch centered in the window, or `slicing%current`
+where the deck states a flat current directly. $\sigma_z = 0$ is the steady state (the whole
+charge in one slice window, $I = Qc/\Delta s$) and is refused for time-dependent windows.
+The default window covers the described bunch ($\pm4\sigma_z$ Gaussian, the grid extent
+flat). `slicing%window_length` overrides it for slippage headroom and warns with numbers
+when it clips the bunch. Each slice draws $m = n_{\mathrm{part}}/b$ transverse samples
+matched to the lattice Twiss, $b$ the `beamlet_size`, and one energy each.
 
-Generated slices load $m = n_{\mathrm{part}}/n_{\mathrm{bins}}$ beamlets: each beamlet
-draws one 4D transverse sample and one energy sample, replicated at $n_{\mathrm{bins}}$
-phases $\theta = \theta_0 + j\,2\pi/n_{\mathrm{bins}}$, so every bunching harmonic
-below $n_{\mathrm{bins}}$ cancels to roundoff. Weights are uniform within a beamlet
-(the cancellation is per beamlet).
+*From a file.* With `beam_init%position_file` the bunch is resampled slice by slice by
+Genesis4's method, [](#sec-import), which draws the slice's macroparticles from the
+particles that fell into its sampling window and takes the current from the same window.
+
+### The keep mode
+
+`load_mode = "keep"` keeps every real particle. Each becomes a beamlet of $b$ copies at
+weight $w/b$ sharing its five other coordinates, or stays one particle at its whole weight
+without the quiet start, and the counts follow the charge: a slice holds as many
+macroparticles as the bunch put there. The window is
+$\lceil \tau_{\mathrm{total}}/\Delta s \rceil$ slices from the earliest particle, or
+`slicing%n_slice` or `slicing%window_length` where the deck states one, the bunch centered
+and the particles outside counted in a warning. No random number is drawn before the
+noise, so the same bunch loads the same way every time.
+
+The copies stand at $\theta_0 + 2\pi j/b$, $j = 0..b-1$, about the particle's own phase
+$\theta_0 = k_s (s - s_i) \bmod 2\pi$ inside its slice, and $z = \beta\theta/k_s$ is the
+stored chart's. The transverse momenta are exact, $P_x/(mc)$ over $p_0/(mc)$, where the
+resampler carries Genesis4's $\gamma x'$ instead as transcription fidelity. Every
+charge-weighted moment of the bunch is therefore the load's, slice by slice, which is
+what a bunch from an accelerator simulation is loaded for. The per-slice current and the
+five first moments go to `<out_root>.import.txt` at full precision, where the exactness
+checks read them ([](validation.md#val-the-load-path)).
+
+(sec-quiet)=
+### Quiet start
+
+`quiet_start = T`, the default, loads beamlets: one transverse sample, one energy, $b$
+phases $\theta = \theta_0 + j\,2\pi/b$, so every bunching harmonic below $b$ cancels to
+roundoff. Weights are uniform within a beamlet, since the cancellation is per beamlet. The
+averaged step sees $z$ only through $\theta$, periodic in $2\pi$, so a beamlet shifted whole
+stays quiet at every harmonic and particles shifted singly do not, which is what the floor
+of [](#sec-noise) measures.
+
+`quiet_start = F` loads no beamlets. The analytic generator draws every particle its own
+five coordinates and its own uniform phase. The resampler keeps the copies' coordinates and
+gives every phase its own draw. The keep mode keeps the particle's phase and its whole
+weight. Each is a load with macroparticle noise at every harmonic, as a real bunch's would
+be, and a user who quietened a bunch by other means loads it this way and lets
+`shot_noise` group it.
+
+The `beamlet_size` is a loading quantity. Its one use at run time, the coherent source's
+count of independent transverse samples ([](#sec-coherent-source)), is a count of the slice's
+distinct transverse positions, exact for copies, so a dump loads without it.
 
 (sec-noise)=
 ### Weighted shot noise
 
-Physical noise is imposed Fawley-style (`fel_fawley_noise`), the one-substitution
-weighted generalization: the per-beamlet amplitude draws on the beamlet's *real*
-electron count, its charge over $e$,
+`shot_noise = T` imposes Fawley's noise, generalized to weights, on whatever load there is.
+Every group of macroparticles that shares its transverse coordinates gets one phasor per
+harmonic, drawn on the group's real electron count, its charge over $e$:
 
 $$
   \begin{aligned}
-    \theta_{bj} &\mathrel{-}= \sum_{h=0}^{n_h-1} a_{bh}\,
-       \sin\!\bigl((h{+}1)\theta_{bj} + \phi_{bh}\bigr),\\[4pt]
-    a_{bh} &= \frac{2}{h+1}\sqrt{\frac{-\ln u_{bh}}{n_{bl}}},
-      \qquad n_{bl} = \frac{n_{\mathrm{bins}}\, w_b}{e},
+    \theta_{gj} &\mathrel{-}= \sum_{h=0}^{n_h-1} a_{gh}\,
+       \sin\!\bigl((h{+}1)\theta_{gj} + \phi_{gh}\bigr),\\[4pt]
+    a_{gh} &= \frac{2}{h+1}\sqrt{\frac{-\ln u_{gh}}{n_{g}}},
+      \qquad n_{g} = \frac{w_g}{e},
   \end{aligned}
 $$ (eq-fawley)
 
-with $n_h = (n_{\mathrm{bins}}-1)/2$, $\phi_{bh}$ uniform in $[0,2\pi)$, and kicks
-accumulated from the unperturbed phases. This makes $\langle|b(h)|^2\rangle =
-1/N_\lambda$ exact for any cross-beamlet weight distribution, $N_\lambda$ the slice's
-real electron count. Genesis4's silent $n_{bl}<1$ clamp is kept but counted and warned.
-The $N_{\mathrm{eff}}$ guard refuses to impose noise when the pre-noise quiet floor
-$\max_h |b(h)|^2$, swept over *every* harmonic the beamlet structure resolves
-($h = 1..n_{\mathrm{bins}}-1$), is not far below the target $1/N_\lambda$.
+with $n_h = (b-1)/2$, $\phi_{gh}$ uniform in $[0,2\pi)$, and kicks accumulated from the
+unperturbed phases. This makes $\langle|b(h)|^2\rangle = 1/N_\lambda$ exact for any
+distribution of weight across the groups, $N_\lambda$ the slice's real electron count, and
+it is what [](validation.md#val-shot-noise-under-weights) measures. Genesis4's silent
+$n_{g}<1$ clamp is kept but counted and warned.
+
+The groups are found by rule, and the rule used is printed once per load:
+
+1. the beamlets, when this loader made them;
+2. else the particles sharing their five transverse coordinates to the bit, which is what
+   copies made by another loader look like and what nothing else does;
+3. else the occupants of each deposit cell of the field grid, the finest structure the
+   source term can see.
+
+Before imposing, the loader measures the quiet floor, $\max_h |b(h)|^2 N_\lambda$ over
+$h = 1..b-1$, and refuses `shot_noise` on a slice above $0.01$ with the value in the
+message: a load that already carries its noise would count it twice. A generated load
+without the quiet start sits at $N_\lambda/N_{\mathrm{part}}$, far above the floor, and a
+bunch quietened outside the loader sits at roundoff and passes. The four combinations:
+
+| `quiet_start` | `shot_noise` | The load |
+|---|---|---|
+| T | T | Quiet beamlets with the physical noise: the SASE start |
+| T | F | Quiet beamlets and nothing else: a seeded run, or a coherent-source run |
+| F | T | The load's own groups with the physical noise: a bunch quietened elsewhere |
+| F | F | The bunch as it is, macroparticle noise included |
 
 :::{admonition} Provenance
 :class: note
-`ShotNoise::applyShotNoise`, generalized by $n_{bl} = n_e/m \to n_{\mathrm{bins}}
-w_b/e$ (identical for uniform weights). Shared code between the generator and the
-distribution import.
+`ShotNoise::applyShotNoise`, generalized by $n_{bl} = n_e/m \to w_g/e$ (identical for
+uniform weights). Shared code between the generator, the resampler and the keep mode
+(`fel_impose_noise`). Genesis4's `importdistribution` applied the noise whether or not its
+`shotnoise` flag said so, a quirk this port carried until the two switches became explicit.
 :::
 Measured levels and how they are checked: [](validation.md#val-shot-noise-under-weights).
 
 (sec-import)=
-## Distribution import
+## The resampler
 
-An arbitrary `bunch_struct` (from `beam_init` generation or an
-openPMD-beamphysics file) resamples into slices by Genesis4's method
-(`fel_import_mod`). Window positions are $\tau$ of Eq. [](#eq-kinematics),
-min-shifted to zero. Slice centers sit at $(i-1)\Delta s$, with
+The sample mode from a file resamples the bunch into slices by Genesis4's method
+(`fel_import_mod`). Slice centers sit at $(i-1)\Delta s$, with
 $n_{\mathrm{slice}} = \mathrm{nint}(\tau_{\mathrm{total}}/\Delta s)$ when not given.
 Per slice: every particle inside a sampling window $d s_{\mathrm{len}} =
-\texttt{slicewidth}\cdot\tau_{\mathrm{total}}$ centered on the slice (strict
+\texttt{slice\_width}\cdot\tau_{\mathrm{total}}$ centered on the slice (strict
 inequalities) is a candidate, and the slice current comes from the same window,
 
 $$
@@ -643,20 +715,25 @@ $$
 $$ (eq-importcurrent)
 
 the weighted generalization of Genesis4's count$\cdot dQ$. The candidate set reduces to
-$n_{\mathrm{part}}/n_{\mathrm{bins}}$ seeds by random deletion, or grows by Genesis4's
+$n_{\mathrm{part}}/b$ seeds by random deletion, or grows by Genesis4's
 phase-space interpolation: normalize the five coordinates $(\gamma,x,y,\hat p_x,
 \hat p_y)$ to zero mean and unit rms, pick a random parent, find its nearest
 *original* neighbor under a metric whose per-coordinate weights are fresh random
 draws, and place the child at the midpoint plus $\mathrm{uniform}[-1,1]$ times the
 difference per coordinate. $\theta$ is refilled uniformly over one beamlet spacing,
-mirrored into $n_{\mathrm{bins}}$, and [](#sec-noise) imposes the noise with
-$n_e = \mathrm{nint}(I\lambda_s\,\texttt{n\_wavelength}/(e c))$. The file's $p_x/p_y$ are
+mirrored into $b$ copies, and [](#sec-noise) imposes the noise with
+$n_e = \mathrm{nint}(I\lambda_0\,\texttt{n\_wavelength}/(e c))$. The file's $p_x/p_y$ are
 *slopes*. The slope-to-momentum conversion $\hat p = x'\gamma$ happens at the
 copy into the candidate set. Genesis4's `match`/`center` transforms are not
 ported (a Bmad lattice carries its optics, and `init_beam_distribution`
-generates matched bunches), and Genesis4's `align*` and `shot_noise` inputs
-are parsed but dead in v4. Neither is transcribed as functional. A zero-charge bunch
-is refused.
+generates matched bunches), and Genesis4's `align*` inputs are parsed but dead in v4 and
+not transcribed as functional. A zero-charge bunch is refused.
+
+The resampler's own counts, `resample%n_particle_per_slice` and `resample%beamlet_size`,
+serve its validation route, `resample%use_beam_init`, which resamples a bunch Bmad generated
+so the transcription can be checked on a known bunch against Genesis4 importing the same
+file. On the user's path the counts are `beam_init%n_particle` and `beamlet_size`, the same
+two numbers the generator reads.
 
 :::{admonition} Provenance
 :class: note

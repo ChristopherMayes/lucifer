@@ -57,7 +57,7 @@ times slower.
 | [`spontaneous/`](spontaneous.md) | Undulator radiation under Bmad's own damping and fluctuation switches | 5 s each |
 | [`unaveraged/`](unaveraged.md) | One segment with no period averaging, beside its averaged twin | 5 s |
 | [`mixed_line/`](mixed_line.md) | One unaveraged segment among eleven averaged ones, in one line | 7 s |
-| [`import/`](import.md) | A `beam_init` bunch resampled into slices and tracked dark, and the openPMD round trip | 10 s each |
+| [`import/`](import.md) | A `beam_init` bunch loaded in the keep mode and in the sample mode, tracked dark, and the openPMD round trip | 43 s and 9 s |
 | [`crossed_undulator/`](crossed_undulator.md) | Two polarizations: an x-planar set bunches, its quarter-turn twin radiates orthogonally | 1 s |
 | [`harmonics/`](harmonics.md) | Harmonic lasing: a dark third harmonic grows from the fundamental's bunching | 1 s |
 | [`chicane/`](chicane.md) | A four-bend chicane between segments in absolute time: half a wavelength of geometry flips gain to absorption | 1 s each |
@@ -87,7 +87,7 @@ One row per feature declared in [the introduction](../../index.md).
 | A GPU backend for the averaged method | [`steady_state/`](steady_state.md), [`sase/`](sase.md), [`harmonics/`](harmonics.md), [`crossed_undulator/`](crossed_undulator.md) and [`migration/`](migration.md) run on it with `global%device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
 | openPMD dumps in both directions | [`steady_state/`](steady_state.md) writes mid-run, [`import/`](import.md) round-trips a bunch through a file, [`saturation_demo/`](saturation_demo.md) reads Genesis4's |
 | A self-describing statistics file | Every example writes one |
-| Distribution import | [`import/`](import.md) |
+| One load path | [`import/`](import.md) |
 | A coherent source model | [`coherent_source/`](coherent_source.md) |
 
 Thread independence is a few commands rather than a directory. The threads divide the

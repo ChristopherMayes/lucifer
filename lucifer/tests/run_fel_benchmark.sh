@@ -378,7 +378,6 @@ ${6:+  $6}
 /
 &fel_beam_init
   beam_file = "$5-initial.beam.h5"
-  beamlet_size = 8
 ${7:+  $7}
 /
 &fel_wavefront_init
@@ -610,6 +609,19 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_shot_noise.py" --exe "$EXE" --workdir 
   exit 1
 fi
 section_time shot-noise
+echo
+
+# The load path. Keep mode must hand every bunch moment through unchanged, the split
+# weights must be invisible, a generated Gaussian bunch in sample mode must radiate the
+# physical spontaneous power inside the cone, and the two loads that would count the
+# noise twice must be refused.
+
+echo "--- the load path (keep exactness, split invariance, in-cone startup, refusals) ----"
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_load.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+  echo "FAIL: load path; outputs kept in: $WORK_DIR" >&2
+  exit 1
+fi
+section_time load
 echo
 
 echo "--- SASE startup cross-check against Genesis's loader -------------------------"

@@ -29,8 +29,8 @@ PARAMS_RENAME = {
 
 # &fel_beam_init keys, verbatim.
 BEAM = {
-    "beam_init", "resample", "beam_file", "dist_file", "write_genesis_dist", "write_openpmd_file",
-    "use_beam_init", "beamlet_size", "shot_noise", "split_weights", "swap_beam_xy",
+    "beam_init", "resample", "beam_file", "write_genesis_dist", "write_openpmd_file",
+    "load_mode", "quiet_start", "beamlet_size", "shot_noise", "split_weights", "swap_beam_xy",
     "gen_test_weights", "resample_split_weights",
 }
 # Keys that become wavefront_init%<key> in &fel_wavefront_init.

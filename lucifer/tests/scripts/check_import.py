@@ -71,6 +71,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   n_wavelength = {sample}
   resample%n_particle_per_slice = 2048
   resample%beamlet_size = 8
+  shot_noise = T
   ran_seed = {seed}
   seed_power = 0
   grid_n_pts = 255
@@ -153,7 +154,7 @@ def run(cmd, log, env=None):
         sys.exit(1)
 
 
-BEAM_INIT_SOURCE = """  use_beam_init = T
+BEAM_INIT_SOURCE = """  resample%use_beam_init = T
   beam_init%n_particle = 50000
   beam_init%a_norm_emit = {emit}
   beam_init%b_norm_emit = {emit}
@@ -272,16 +273,17 @@ def main():
         ok = False
 
     # openPMD round trip: the same bunch written by Bmad's hdf5_write_beam and read
-    # back through dist_file (hdf5_read_beam) must reproduce the RNG-free outputs to
+    # back through beam_init%position_file must reproduce the RNG-free outputs to
     # file precision -- the import's second input path, exercised end to end.
     write_nml(w/"imp_opmd.nml", "impopmd", 1000,
               extra='  load_only = T\n',
-              source='  dist_file = "impopmd.h5"\n')
+              source='  beam_init%position_file = "impopmd.h5"\n  beam_init%n_particle = 2048\n'
+                     '  beamlet_size = 8\n')
     run([args.exe, "imp_opmd.nml"], w/"imp_opmd.log", env=env1)
     mom_o, cur_o = read_import_file(w, "impopmd")
     dm = np.abs(mom_o - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_o - cur_ref).max() / max(cur_ref.max(), 1e-30)
-    print(f"openPMD round trip (write_openpmd_file -> dist_file): moments {dm:.3e}, currents {dc:.3e}")
+    print(f"openPMD round trip (write_openpmd_file -> beam_init%position_file): moments {dm:.3e}, currents {dc:.3e}")
     if dm > 1e-10 or dc > 1e-10:
         print("FAIL: openPMD round trip does not reproduce the bunch")
         ok = False
