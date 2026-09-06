@@ -9,6 +9,29 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Added: examples/lcls, the LCLS undulator line at SLAC at 1.5 Angstrom from its published
+  parameters, and with it the fourth machine the filter's derived default is measured on. The lattice
+  is thirty-three planar segments of 114 periods at 3.0 cm and 1.25 T with a quadrupole in each break,
+  and the beam is a flat 3.0 kA slab at 0.4 mm mrad and 13.6 GeV, all from P. Emma, PAC09 TH3PBI01,
+  and Emma et al., Nature Photonics 4, 641 (2010). The field and K agree to 0.04 percent and the
+  resonance that follows is 1.5099 Angstrom against the published 1.5. The paper gives the maximum
+  quadrupole gradient and not the operating one, so the strengths are chosen to hold the published
+  30 m mean beta, and they land at 96 percent of that maximum. Over four seeds the run gives a power
+  gain length of 3.81 +- 0.04 m against the measured 3.3 m and the design 4.5 m, saturation at
+  64.7 +- 1.9 m against about 60 m, and a peak power of 14.1 +- 1.0 GW in one slice against 15 GW,
+  which at the published 75 fs pulse duration is 1.06 mJ against 1.1 mJ. The deck states no grid and
+  takes the derived one, 127 points over 191 um. The page gains the fourth machine's section and two
+  tables over the four machines. The default holds a fourth time and at a converged load is nearly
+  free, removing 105 times the wide-angle power while moving the mode power 4 percent and the
+  saturation point not at all. The ratio of the two angles the default is built from goes as
+  1/sqrt(z_R/L_g) to 4 percent over the four, so the rho angle wins only above z_R/L_g of about 46,
+  which none of the four reaches and no hard X-ray line is built to: the default is measured over the
+  range machines occupy. The condition on the in-cone startup comparison is settled with it, since
+  over the four the measured ratio rises with the first segment's length in gain lengths, from 0.81 at
+  1.2 to 2.6 at 5.8 (FINDINGS 7.56). tests/scripts/startup_noise.py gains --machine lcls and a
+  per-machine long window, since twelve wavelengths per slice do not reach the slippage at 1.5
+  Angstrom.
+
 - 2026-09-06 Added: every run reports the split between the mode and the wide-angle emission of the
   point macroparticle beamlets, and derives its transverse grid from the beam when the deck states
   none. The split costs nothing new: each element end that takes the field angle moments already

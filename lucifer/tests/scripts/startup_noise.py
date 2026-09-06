@@ -75,13 +75,14 @@ M_E_EV = 0.51099895e6
 EPS0 = 8.8541878128e-12
 I_ALFVEN = 17045.0
 
-# Three machines. The Aramis benchmark is the page's own. The second is a line in the
-# FLASH regime, a hundred times the wavelength on a beam five times the size, whose
-# z_R/L_g is 2.6 times smaller. The filter's default is built from two angles whose ratio
-# goes as 1/sqrt(z_R/L_g), so a second machine is what says whether the default is general
-# or a property of the first (fel-physics.md sec-source-filter). The third is FLASH1 at
-# DESY at 13.7 nm, a real machine at its published parameters (examples/flash1), which
-# is planar where the other two are helical, so its coupling factor is not one.
+# Four machines. The Aramis benchmark is the page's own. The second is a probe at FLASH's
+# scales, a hundred times the wavelength on a beam five times the size, whose z_R/L_g is
+# 2.6 times smaller. The filter's default is built from two angles whose ratio goes as
+# 1/sqrt(z_R/L_g), so a second machine is what says whether the default is general or a
+# property of the first (fel-physics.md sec-source-filter). The third and fourth are real
+# machines at their published parameters, FLASH1 at DESY at 13.7 nm (examples/flash1) and
+# LCLS at SLAC at 1.5 Angstrom (examples/lcls). Both are planar where the other two are
+# helical, so their coupling factor is not one.
 #
 # coupling is the undulator's own coupling to the resonant wavelength, one for a helical
 # device and the Bessel factor JJ for a planar one. It multiplies aw wherever the
@@ -89,7 +90,9 @@ I_ALFVEN = 17045.0
 #
 # dumps and und_end_record place the far-field dumps: five undulator ends, and the record
 # index of each in a stats file written with comb_ds_save = -1, where a record is an
-# element end.
+# element end. window is the long window of experiments a, b and g, (slices, wavelengths
+# per slice), which must be longer than the line's whole slippage. At 1.5 Angstrom the
+# slippage is 3762 wavelengths, so the first machine's twelve per slice would not reach it.
 
 MACHINES = {
     "aramis": dict(lat="aramis.bmad", lat2="aramis_x2.bmad", lambda0=1e-10, half_width=2e-4,
@@ -97,6 +100,7 @@ MACHINES = {
                    aw=0.84853, coupling=1.0, lambda_u=0.015, seg_length=3.99,
                    beta_a=8.53711, beta_b=17.3899,
                    gaps=(0.44, 0.08, 0.24), filter_grid=256, cuts=(2e-6, 3e-6, 5e-6),
+                   window=(300, 12),
                    dumps=("UND##1", "UND##2", "UND##4", "UND##8", "UND##12"),
                    und_end_record={1: 0, 2: 4, 4: 12, 8: 28, 12: 44}),
     "flash": dict(lat="flash.bmad", lat2=None, lambda0=1e-8, half_width=1e-3,
@@ -104,6 +108,7 @@ MACHINES = {
                   aw=0.9, coupling=1.0, lambda_u=0.0273, seg_length=4.5045,
                   beta_a=10.0, beta_b=10.0,
                   gaps=(0.6, 0.1, 0.3), filter_grid=128, cuts=(4e-5, 6.52e-5, 1e-4),
+                  window=(300, 12),
                   dumps=("UND##1", "UND##2", "UND##4", "UND##8", "UND##12"),
                   und_end_record={1: 0, 2: 4, 4: 12, 8: 28, 12: 44}),
     "flash1": dict(lat="flash1.bmad", lat2=None, lambda0=1.37e-8, half_width=1e-3,
@@ -111,8 +116,21 @@ MACHINES = {
                    aw=0.847162, coupling=0.885232, lambda_u=0.0273, seg_length=4.5045,
                    beta_a=10.1189, beta_b=9.8031,
                    gaps=(0.25, 0.10, 0.25), filter_grid=128, cuts=(5e-5, 8.1e-5, 1.2e-4),
+                   window=(300, 12),
                    dumps=("UND##1", "UND##2", "UND##3", "UND##4", "UND##6"),
                    und_end_record={1: 0, 2: 6, 3: 12, 4: 18, 6: 30}),
+    # LCLS: the grid derives to 127 points over 191 um, so the sweep runs at the device's
+    # 128. Dumps at the ends of undulators 1, 6, 12, 20 and 30 span the startup, the
+    # exponential regime and saturation, which on this line sits near 60 m. A cell is six
+    # segments and twelve breaks, so undulator n ends at record 4(n-1) + floor((n-1)/3).
+    "lcls": dict(lat="lcls.bmad", lat2=None, lambda0=1.50992e-10, half_width=1.914e-4,
+                 current=3000.0, sig_pz=1.3e-4, norm_emit=4.0e-7, gamma0=26614.536,
+                 aw=2.475918, coupling=0.744325, lambda_u=0.03, seg_length=3.42,
+                 beta_a=26.830, beta_b=33.341,
+                 gaps=(0.135, 0.20, 0.135), filter_grid=128, cuts=(3e-6, 4.5e-6, 7e-6),
+                 window=(300, 68),
+                 dumps=("UND##1", "UND##6", "UND##12", "UND##20", "UND##30"),
+                 und_end_record={1: 0, 6: 20, 12: 44, 20: 76, 30: 116}),
 }
 
 LAMBDA0 = 1e-10
@@ -144,6 +162,7 @@ def select_machine(name):
     g["FILL"] = m["seg_length"] / (m["seg_length"] + sum(m["gaps"]))
     g["DUMP_ELES"] = m["dumps"]
     g["UND_END_RECORDS"] = m["und_end_record"]
+    g["LONG"] = m["window"]
     # The middle cut is the one reported: on the first machine the 3 urad of the page, on
     # the second the edge the code derives for it, 65 urad, since a cut inside the mode
     # would report the mode's own shape rather than the split.
@@ -160,7 +179,7 @@ def cut_key(kind):
     return f"{kind}_{REPORT_CUT}"
 GRIDS = (64, 128, 256, 512)
 NPARTS = (1024, 4096, 16384, 65536)
-LONG = (300, 12)          # (slices, sample) the window longer than the line's slippage
+LONG = (300, 12)          # (slices, sample), per machine, longer than the line's slippage
 DOUBLED = (600, 12)       # the same for the line twice
 EXAMPLE = (96, 3)         # the examples' own window
 INTERIOR = slice(80, 230)
@@ -531,7 +550,9 @@ def exp_filter(rn, args, lat, results):
             cases.append((k + "_sharp", v["xcut"], SHARP_WIDTH))
     res["sharp_width"] = SHARP_WIDTH
 
-    loads = (1024, 4096) if args.machine == "aramis" else (1024,)
+    # The second machine answers one question at one load. The first and the fourth carry
+    # both, since the load is what the wide-angle share scales with.
+    loads = (1024,) if args.machine in ("flash", "flash1") else (1024, 4096)
     for npart in loads:
         for name, xcut, width in cases:
             # The unfiltered case is experiment a's own deck, so the runner skips it when

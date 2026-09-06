@@ -1,0 +1,64 @@
+! LCLS at SLAC, the undulator line that lased at 1.5 Angstrom in April 2009, from the
+! published numbers.
+!
+! Undulator and optics, from P. Emma, "First lasing of the LCLS X-ray FEL at 1.5 A",
+! PAC09, TH3PBI01, Table 4: thirty-three planar segments of 3.4 m at a 3.0 cm period,
+! peak field 1.25 T, undulator parameter K = 3.5, a fixed 6.8 mm pole gap, and a mean
+! beta function of 30 m. Its text gives the break structure: 47 cm between segments with
+! every third break 90 cm, one quadrupole in each, of integrated gradient up to 3.0 T,
+! for 132 m of line holding 112 m of undulator. Emma et al., Nature Photonics 4, 641
+! (2010) is the same machine.
+!
+! Two numbers here are this file's and not the paper's.
+!
+! The segment is 114 periods, 3.42 m, since 3.4 m is 113.3 of them and the FEL step wants
+! a whole number. The line is then 112.86 m of undulator inside 132.20 m, against the
+! paper's 112 and 132.
+!
+! The quadrupole strengths are chosen so the mean beta function is the paper's 30 m,
+! which it holds to between 26.1 and 34.2 m over the six-segment supercell. The paper
+! gives the maximum integrated gradient and not the operating one. What these strengths
+! ask for is 2.88 T over a 0.20 m quadrupole, 96 percent of that maximum, so the machine
+! runs its quadrupoles nearly hard to hold 30 m. A planar undulator focuses vertically
+! only, and its own focusing here gives beta_y = 51.3 m, which is why the two strengths
+! are not equal and opposite.
+!
+! b_max = 1.25 T at l_period = 0.03 gives K = 3.50148 by eq. awmap of the physics manual,
+! against the paper's 3.5, and aw = K/sqrt(2) = 2.475918. The resonance at 13.6 GeV is
+! then 1.5099 Angstrom against the paper's 1.5. Both agree far better than the 2.7
+! percent the FLASH1 line carries, since here the field and K are consistent.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 13.6e9
+
+! The matched periodic Twiss of the supercell below, at the entrance of a segment.
+beginning[beta_a]  = 26.830
+beginning[alpha_a] = -0.84237
+beginning[beta_b]  = 33.341
+beginning[alpha_b] = 1.03711
+
+! ds_step = 3 periods, 38 steps per segment, the step this line's checks were run at.
+UND: wiggler, l = 3.42, l_period = 0.03, field_calc = planar_model, &
+     b_max = 1.25, tracking_method = fel_averaged, ds_step = 0.09
+
+DS: drift, l = 0.135      ! Either side of a quadrupole in a 47 cm break.
+DL: drift, l = 0.350      ! Either side of a quadrupole in a 90 cm break.
+QF: quadrupole, l = 0.20, k1 =  0.3178
+QD: quadrupole, l = 0.20, k1 = -0.3113
+
+BSF: line = (DS, QF, DS)
+BSD: line = (DS, QD, DS)
+BLF: line = (DL, QF, DL)
+BLD: line = (DL, QD, DL)
+
+! Six segments, breaks 47, 47, 90, 47, 47, 90, quadrupoles alternating. The break
+! pattern has period three and the quadrupole polarity period two, so six is the cell.
+CELL: line = (UND, BSF, UND, BSD, UND, BLF, UND, BSD, UND, BSF, UND, BLD)
+
+! Thirty-three segments: five whole cells and three more, so the last two breaks are
+! short and carry a focusing and a defocusing quadrupole as the pattern asks.
+LCLS: line = (5*CELL, UND, BSF, UND, BSD, UND)
+
+use, LCLS
