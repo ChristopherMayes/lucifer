@@ -57,6 +57,8 @@ NML = """&fel_params
   global%write_diag = T
   global%source_filter = {on}
   global%source_filter_xcut = {xcut}
+  global%source_filter_ycut = {xcut}
+  global%source_filter_width = 1
   global%source_filter_mutate = {mutate}
 {end}/
 &fel_beam_init
@@ -113,6 +115,87 @@ def level(diag, out, nslice):
     worst = float(np.max(np.abs(fp - gp) / scale))
     exit_rel = float(abs(fp[-1].sum() - gp[-1].sum()) / abs(gp[-1].sum()))
     return worst, exit_rel, float(gp[-1].sum()), float(fp[-1].sum())
+
+
+REFUSE = """&fel_params
+  lat_file = "aramis_1seg.bmad"
+  global%out_root = "sfref"
+  global%source_filter = T
+{extra}/
+&fel_beam_init
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+/
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 5e3
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 64
+  wavefront_init%grid_half_width = 2e-4
+/
+"""
+
+
+def refusals(exe, wd):
+    """
+    The three settings that must stop a run rather than quietly do something else.
+
+    The soft width is the one that cost half the physical seed with nothing in the output
+    saying so. The angle together with the grid-relative cuts has no meaning, since one is
+    a property of the physics and the other of the mesh. A negative angle is not an angle.
+    """
+    ok = True
+    for extra, want, what in (
+        ("  global%source_filter_width = 1\n", "ON AXIS", "a width that attenuates the axis"),
+        ('  global%source_filter_angle = 3e-6\n  global%source_filter_xcut = 1\n',
+         "ARE BOTH SET", "the angle and the cut together"),
+        ("  global%source_filter_angle = -1e-6\n", "MUST BE POSITIVE", "a negative angle"),
+    ):
+        (wd / "sfref.nml").write_text(REFUSE.format(extra=extra))
+        r = subprocess.run([exe, "sfref.nml"], cwd=wd, capture_output=True, text=True)
+        good = r.returncode != 0 and want in r.stdout
+        print(f"  refused, {what}: {'ok' if good else 'MISSED'}")
+        ok = ok and good
+    return ok
+
+
+def containment(exe, wd):
+    """
+    The default edge has to contain the mode, and the on-axis transmission cannot say so:
+    a sigmoid that is 1 on axis can still clip a gain-guided mode whose divergence exceeds
+    the beam's diffraction angle. This measures it instead, on a seeded steady-state run
+    with the filter off, read at the first record rather than at the exit. At the exit the
+    field is the mode plus the wide-angle emission of the beamlets, which is 10 percent of
+    the power even at 2048 beamlets, so a containment measured there reports the artifact
+    and not the edge. At the first record the field is the injected Gaussian and nothing
+    else. Containing it is the stronger statement in any case, since the gain-guided mode
+    that grows out of it is narrower than the seed.
+    """
+    deck = REFUSE.replace('lat_file = "aramis_1seg.bmad"', 'lat_file = "aramis.bmad"')
+    deck = deck.replace("beam_init%n_particle = 512", "beam_init%n_particle = 2048")
+    deck = deck.replace('global%out_root = "sfref"', 'global%out_root = "sfcont"')
+    deck = deck.replace("  global%source_filter = T\n", "")
+    (wd / "sfcont.nml").write_text(deck.format(extra=""))
+    r = subprocess.run([exe, "sfcont.nml"], cwd=wd, capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"FAIL: containment run exited {r.returncode}:\n{r.stdout[-1500:]}", file=sys.stderr)
+        return False
+    with h5py.File(wd / "sfcont.stats.h5") as h:
+        g = h["field/total"]
+        angle = float(np.ravel(g["split_angle"][()])[0])
+        p_in = np.asarray(g["power_inside_angle"])
+        p_tot = np.asarray(g["power"])
+    live = np.isfinite(p_in).all(axis=1) & (p_tot.sum(axis=1) > 0)
+    ir = np.where(live)[0]
+    frac = float(p_in[ir[0]].sum() / p_tot[ir[0]].sum())
+    good = frac > 0.99
+    print(f"  seed containment at the default edge {angle:.3e} rad: {frac:.5f} of the "
+          f"power inside (check > 0.99)  {'ok' if good else 'FAIL'}")
+    return good
 
 
 def main():
@@ -174,6 +257,9 @@ def main():
             print(f"FAIL: mutation ({what}) is inside the tolerance {a.tol:.1e}, "
                   f"so the check cannot fail", file=sys.stderr)
             ok = False
+
+    ok = refusals(exe, wd) and ok
+    ok = containment(exe, wd) and ok
 
     print("  source-filter checks: PASS" if ok else "  source-filter checks: FAIL")
     return 0 if ok else 1

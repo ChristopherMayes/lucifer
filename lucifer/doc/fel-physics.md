@@ -441,10 +441,30 @@ $$
 $$ (eq-sigmoid)
 
 in which $k_{\mathrm{Ny}} = \pi/\mathit{dgrid}$ is the grid's Nyquist wavenumber, $c_x$
-and $c_y$ are `source_filter_xcut` and `source_filter_ycut`, and $w$ is
-`source_filter_width`. The cuts and the width are in units of half the Nyquist frequency,
-so $c_x = c_y = 1$ puts the sigmoid's half-height at $k_{\mathrm{Ny}}/2$, which is an
-angle $\lambda/(4\,\mathit{dgrid})$. The filtered source is then added to the field in
+and $c_y$ place the sigmoid's half-height per plane in units of half that frequency, and
+$w$ is its width as a fraction of the edge, so the sigmoid on axis is
+$1/(1 + e^{-1/w})$.
+
+The edge is set as an angle, since it is a property of the beam and the gain and not of
+the mesh. $c_x = c_y = 1$ is the angle $\lambda/(4\,\mathit{dgrid})$, and
+`source_filter_angle` divided by that is what the kernel builds from. Left unset, the
+angle is
+
+$$
+  \theta_{edge} = \max\!\left(\frac{4\lambda}{2\pi\sigma},\;
+                              \sqrt{\frac{2\rho\lambda}{\lambda_u}}\right) ,
+$$ (eq-filter-edge)
+
+the larger of four diffraction angles of the fundamental mode, with $\sigma$ the rms
+transverse size of the loaded beam, and the angle at which the resonant wavelength
+red-shifts by $\rho$. Inside the first lies the radiation that can couple to the mode.
+Outside the second, emission is beyond the bandwidth of the interaction. Their ratio goes
+as $\sqrt{z_R/L_g}$, which is 15 on the Aramis benchmark and near unity on a
+diffraction-dominated machine, so neither serves alone. The larger is taken because
+cutting into the mode loses real radiation while leaving artifact in only weakens the
+filter. $\rho$ is the one-dimensional Pierce parameter in Genesis's form, from the
+undulator's coupling and the peak current of the loaded beam. Both angles, their ratio
+and which one won are printed at setup, with a warning when the ratio leaves 0.3 to 3. The filtered source is then added to the field in
 Fourier space, before the one inverse transform:
 
 $$
@@ -461,7 +481,18 @@ transformed source, and the coherent source ([](#sec-coherent-source)) has alrea
 the per-particle deposit by an analytic Gaussian that carries no wide-angle content. Both
 combinations are refused rather than filtered. A non-positive cut or width is refused too:
 Genesis4 turns its own filter off there, and a run that asked for the filter and silently
-did not get it is worse than one that stops.
+did not get it is worse than one that stops. So is a width that leaves the sigmoid below
+0.99 on axis, since such a filter attenuates the coherent source as much as the wide
+angles: Genesis4's own default of 1 puts the axis at 0.73, and measured, that halves the
+physical in-cone startup power and delays saturation by five to nine metres
+([](startup-noise.md)). The grid-relative cuts lift that guard, since placing the edge
+where Genesis4 places it means taking its width too.
+
+The same angle serves the statistics whether or not the filter is on. Every record that
+takes the field angle moments reports `power_inside_angle`, the power within
+$\theta_{edge}$ of the axis, from the transform those moments already pay for. Its
+complement to the total is the wide-angle emission of the point beamlets, which is what a
+SASE run has to separate from the mode before quoting a power.
 
 :::{admonition} Provenance
 :class: note

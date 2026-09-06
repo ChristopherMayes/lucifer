@@ -1311,13 +1311,16 @@ end subroutine wavefront_fft_free
 !   err_flag     -- logical: Set True on error (FFT failure), False otherwise.
 !-
 
-subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag)
+subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag, &
+                                                                        theta_cut, power_inside)
 
 complex(wf_rp) plane(:,:)
 real(rp) dx, wavelength, dz_slice
 type (wavefront_params_struct) pms
 real(rp) nan
 logical with_angles, err_flag
+real(rp), optional :: theta_cut, power_inside
+real(rp) s_in, theta2, cut2
 
 complex(wf_rp), allocatable :: ft(:,:), dxe(:,:), dye(:,:)
 real(rp) wt, wsum, x, y, ks, dk, shift, kx, ky, scl
@@ -1389,6 +1392,7 @@ if (.not. with_angles .or. wsum <= 0) then
   pms%sigma(2,:) = nan;  pms%sigma(:,2) = nan
   pms%sigma(4,:) = nan;  pms%sigma(:,4) = nan
   pms%emit_x = nan;      pms%emit_y = nan
+  if (present(power_inside)) power_inside = nan
   err_flag = .false.
   return
 endif
@@ -1402,6 +1406,15 @@ call wavefront_fft2 (ft, wf_fft_forward$, err);  if (err) return
 
 dk = twopi / (nx * dx)
 stx = 0;  sty = 0;  stxx = 0;  styy = 0
+
+! The power inside an angular radius rides this transform rather than paying for one of
+! its own. It is the quantity doc/startup-noise.md splits on: inside it lies the radiation
+! that can couple to the mode, outside it the wide-angle emission of the point beamlets,
+! which is most of an unseeded run's power at grids and loads in common use.
+
+s_in = 0
+cut2 = 0
+if (present(theta_cut)) cut2 = (theta_cut * ks)**2
 ! The kernel's fftshift storage reduces to the standard FFT frequency order:
 ! stored index s (0-based) holds frequency s for s <= (n-1)/2, s-n above.
 
@@ -1414,6 +1427,8 @@ do iy = 1, ny
     stxx = stxx + wt * kx**2;   styy = styy + wt * ky**2
     dxe(ix,iy) = cmplx(0.0_rp, kx, wf_rp) * ft(ix,iy)
     dye(ix,iy) = cmplx(0.0_rp, ky, wf_rp) * ft(ix,iy)
+    theta2 = kx**2 + ky**2
+    if (theta2 <= cut2) s_in = s_in + wt
   enddo
 enddo
 ! Parseval: sum|ft|^2 = nx*ny * sum|E|^2 for this unnormalized transform.
@@ -1422,6 +1437,12 @@ pms%centroid(2) = stx / (scl * ks)
 pms%centroid(4) = sty / (scl * ks)
 pms%sigma(2,2) = stxx / (scl * ks**2) - pms%centroid(2)**2
 pms%sigma(4,4) = styy / (scl * ks**2) - pms%centroid(4)**2
+
+! Parseval again: sum|ft|^2 over a region, divided by nx*ny, is the |E|^2 sum that region
+! carries, and the same dx^2/(2 Z0) makes it a power.
+
+if (present(power_inside)) power_inside = s_in / (real(nx, rp) * real(ny, rp)) &
+                                          * dx**2 / (2 * (mu_0_vac * c_light))
 
 call wavefront_fft2 (dxe, wf_fft_backward$, err);  if (err) return
 call wavefront_fft2 (dye, wf_fft_backward$, err);  if (err) return

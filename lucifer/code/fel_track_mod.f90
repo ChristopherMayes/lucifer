@@ -100,6 +100,7 @@ type fel_source_filter_struct
   real(rp) :: xcut = 1, ycut = 1   ! Sigmoid edge per plane, in half-Nyquist units.
   real(rp) :: width = 1            ! Sigmoid width, same units. Genesis4's sigmoid.
   logical :: mutate = .false.      ! The check's self-test: filter the field, not the source.
+  real(rp) :: angle = 0            ! The edge as an angle [rad], 0 when set by xcut instead.
 end type
 
 type fel_und_struct
@@ -2665,6 +2666,91 @@ kn%ks = ks
 kn%dz = dz
 
 end subroutine fel_field_kernel_init
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_filter_angles (beam, und, lambda, th_mode, th_rho)
+!
+! Routine to compute the two angles a source filter's edge can be set from
+! (fel-physics.md sec-source-filter). Both come from the beam the run loaded and the
+! undulator it enters, so a deck states neither.
+!
+! th_mode is four diffraction angles of the fundamental mode, 4 lambda / (2 pi sigma),
+! with sigma the rms transverse size of the beam. Inside it lies the radiation that can
+! couple to the mode.
+!
+! th_rho is sqrt(2 rho lambda / lambda_u), the angle at which the resonant wavelength
+! red-shifts by rho and beyond which emission is outside the bandwidth of the
+! interaction. rho is the one-dimensional Pierce parameter in Genesis's own form, with
+! the undulator's coupling and the peak current of the loaded beam.
+!
+! Their ratio goes as sqrt(z_R / L_g), which is 15 on the Aramis benchmark and near 1 on
+! a diffraction-dominated machine, so neither angle alone serves as a default.
+!
+! Input:
+!   beam    -- fel_beam_struct: The loaded beam, for the transverse size and the current.
+!   und     -- fel_und_struct: The undulator, for aw, ku and the coupling.
+!   lambda  -- real(rp): Fundamental radiation wavelength [m].
+!
+! Output:
+!   th_mode -- real(rp): Four mode diffraction angles [rad]. Zero if the beam has no size.
+!   th_rho  -- real(rp): The rho angle [rad]. Zero if the beam carries no charge.
+!-
+
+subroutine fel_filter_angles (beam, und, lambda, th_mode, th_rho)
+
+type (fel_beam_struct), target :: beam
+type (fel_und_struct) und
+type (fel_slice_struct), pointer :: sl
+real(rp) lambda, th_mode, th_rho
+real(rp) q, qx, qy, qxx, qyy, sigma, cur, cur_max, gam, rho3, fc, i_alfven
+integer is
+
+!
+
+th_mode = 0
+th_rho = 0
+
+! The rms transverse size about the beam's own centroid, weighted, over both planes,
+! and the peak current over slices. A steady-state run is one slice and its current is
+! that slice's.
+
+q = 0;  qx = 0;  qy = 0;  qxx = 0;  qyy = 0;  cur_max = 0
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  if (sl%n == 0) cycle
+  q = q + sum(sl%weight(1:sl%n))
+  qx = qx + sum(sl%weight(1:sl%n) * sl%x(1:sl%n))
+  qy = qy + sum(sl%weight(1:sl%n) * sl%y(1:sl%n))
+  qxx = qxx + sum(sl%weight(1:sl%n) * sl%x(1:sl%n)**2)
+  qyy = qyy + sum(sl%weight(1:sl%n) * sl%y(1:sl%n)**2)
+  cur = sum(sl%weight(1:sl%n)) * c_light / beam%slice_spacing
+  cur_max = max(cur_max, cur)
+enddo
+if (q <= 0) return
+
+sigma = sqrt(max(0.5_rp * ((qxx - qx**2 / q) + (qyy - qy**2 / q)) / q, 0.0_rp))
+if (sigma > 0) th_mode = 4 * lambda / (twopi * sigma)
+
+! rho^3 = (I / I_A) fc^2 / (8 gamma^3 sigma^2 ku^2), Genesis's form with the undulator's
+! own coupling, which already carries aw. The Alfven current is 4 pi eps0 m c^3 / e, which
+! with the rest energy in eV is 4 pi m_electron / (mu_0 c), 1.70e4 A.
+
+gam = fel_gamma0(beam)
+fc = fel_und_coupling(und, 1)
+if (sigma <= 0 .or. cur_max <= 0 .or. und%ku <= 0 .or. fc == 0 .or. gam <= 0) return
+
+i_alfven = 4 * pi * m_electron / (mu_0_vac * c_light)
+rho3 = (cur_max / i_alfven) * fc**2 / (8 * gam**3 * sigma**2 * und%ku**2)
+if (rho3 <= 0) return
+
+! lambda_u = twopi / ku, so 2 rho lambda / lambda_u is rho lambda ku / pi.
+
+th_rho = sqrt(rho3**(1.0_rp/3.0_rp) * lambda * und%ku / pi)
+
+end subroutine fel_filter_angles
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

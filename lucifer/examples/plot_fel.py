@@ -79,6 +79,13 @@ def load(fn):
         "f_valid": st["field/x/angle_moments_valid"].astype(bool),
         "power_x": st["field/x/power"],
     }
+    # The mode split (fel-physics.md sec-source-filter): the power within split_angle of
+    # the axis, at the records that took the field angle moments. Its complement is the
+    # wide-angle emission of the point beamlets, which is most of an unseeded run's power
+    # at grids and loads in common use, so a power curve without it can mislead.
+    if "field/total/power_inside_angle" in st:
+        q["power_in"] = st["field/total/power_inside_angle"]
+        q["split_angle"] = float(np.ravel(st["field/total/split_angle"])[0])
     if "y" in st.components:
         q["power_y"] = st["field/y/power"]
     # Harmonics: each group carries its own total, since a detector separates colors
@@ -165,9 +172,17 @@ def main():
                              ("energy", "energy", "field energy (J)")):
         label = "total" if nslice > 1 else None
         panel_series(axd[key], s, q[quant], BLUE, label=label, reduce="sum")
+        if key == "power" and "power_in" in q:
+            pin = np.asarray(q["power_in"])[:len(s)]
+            # A slice with no field yet reports NaN rather than zero, so the window sum
+            # skips those rather than becoming NaN itself.
+            live = np.isfinite(pin).any(axis=1)
+            axd[key].semilogy(np.asarray(s)[live], np.nansum(pin[live], axis=1), "o--",
+                              ms=3, color="tab:red",
+                              label=f"inside {q['split_angle'] * 1e6:.2f} urad")
         axd[key].set_yscale("log")
         axd[key].set_ylabel(ylab)
-        if nslice > 1:
+        if nslice > 1 or "power_in" in q:
             axd[key].legend(frameon=False)
         panel_series(axd[key + "_lin"], s, q[quant], BLUE, reduce="sum")
         axd[key + "_lin"].set_ylabel(ylab)

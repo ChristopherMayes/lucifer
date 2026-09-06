@@ -107,6 +107,12 @@ type fel_stats_struct
   real(rp), allocatable :: f_centroid(:,:,:)      ! (4, nslice, nrec)
   real(rp), allocatable :: f_sigma(:,:,:)         ! (16, nslice, nrec)
   real(rp), allocatable :: f_energy(:,:), f_power(:,:), f_on_axis(:,:)
+  ! The power inside split_angle, per slice per record, NaN where the record did not take
+  ! the angle moments (fel-physics.md sec-source-filter). Its complement to f_power is the
+  ! wide-angle emission of the point beamlets, which is what a SASE run has to separate
+  ! from the mode before quoting a power (doc/startup-noise.md).
+  real(rp), allocatable :: f_p_in(:,:)
+  real(rp) :: split_angle = 0
   real(rp), allocatable :: f_emit_x(:,:), f_emit_y(:,:)
   integer, allocatable :: f_angles_valid(:,:)     ! 0/1
   real(rp), allocatable :: f2_centroid(:,:,:), f2_sigma(:,:,:)
@@ -234,6 +240,8 @@ allocate (stats%n_particle_live(nslice, nrec))
 allocate (stats%b_rel_max(7, nslice, nrec), stats%b_rel_min(7, nslice, nrec))
 allocate (stats%f_centroid(4, nslice, nrec), stats%f_sigma(16, nslice, nrec))
 allocate (stats%f_energy(nslice, nrec), stats%f_power(nslice, nrec), stats%f_on_axis(nslice, nrec))
+allocate (stats%f_p_in(nslice, nrec))
+stats%f_p_in = 0
 allocate (stats%f_emit_x(nslice, nrec), stats%f_emit_y(nslice, nrec))
 allocate (stats%f_angles_valid(nslice, nrec))
 if (two_pol) then
@@ -294,6 +302,7 @@ type (fel_field_struct), target :: ff(:)
 type (wavefront_struct), pointer :: wf
 type (fel_slice_struct), pointer :: sl
 type (wavefront_params_struct) pms
+real(rp) p_in
 integer io
 type (fel_slice_diag_struct) bdiag_arr(:)
 real(rp) fpow(:), fonax(:)
@@ -329,7 +338,7 @@ any_err = .false.
 ! identical serial code, so diag.txt is bit-for-bit what it always was. What changed
 ! is that the per-record diag sweeps, once serial, now ride this parallel loop.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, err) &
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, p_in, err) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
@@ -397,13 +406,15 @@ do is = 1, nslice
   ! The field slice this beam slice couples to, unrotated exactly as the dumps are.
 
   call wavefront_params_of_plane (wf%Ex(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
-                                  wf%wavelength, beam%slice_spacing, pms, with_angles, err)
+                                  wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
+                                  theta_cut = stats%split_angle, power_inside = p_in)
   any_err = any_err .or. err
   pms%s = z_now
   stats%f_centroid(:, is, ir) = pms%centroid
   stats%f_sigma(:, is, ir) = reshape(pms%sigma, [16])
   stats%f_energy(is, ir) = pms%energy
   stats%f_power(is, ir) = pms%power
+  stats%f_p_in(is, ir) = p_in
   stats%f_on_axis(is, ir) = pms%on_axis_intensity
   stats%f_emit_x(is, ir) = pms%emit_x
   stats%f_emit_y(is, ir) = pms%emit_y
@@ -1131,6 +1142,28 @@ else
   call write_field_total (b_id, stats%f_power(:,1:ir), stats%f_energy(:,1:ir), &
                           stats%f_on_axis(:,1:ir), 1, 1, err)
 endif
+
+! The mode split of doc/startup-noise.md, written once for the fundamental. NaN at every
+! record that did not take the angle moments, since the transform it rides is taken at
+! element ends.
+
+block
+  integer(hid_t) t_id
+  integer h5e
+  call H5Gopen_f (b_id, 'total', t_id, h5e)
+  if (h5e == 0) then
+    call fel_h5_real (t_id, 'power_inside_angle', 'W', 'power inside the split angle', &
+          'Radiation power of the slice within split_angle of the axis, from the ' // &
+          'transform the angle moments take. NaN where they were not taken.', &
+          'record,slice', stats%f_p_in(:,1:ir), err)
+    call fel_h5_real_rank0 (t_id, 'split_angle', 'rad', 'split angle', &
+          'The angular radius power_inside_angle is measured within: the larger of four ' // &
+          'mode diffraction angles and the angle where the resonant wavelength ' // &
+          'red-shifts by rho.', 'none', stats%split_angle, err)
+    call H5Gclose_f (t_id, h5e)
+  endif
+end block
+
 if (err) return
 
 call H5Gcreate_f (b_id, 'x', g_id, h5_err)

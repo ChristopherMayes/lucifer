@@ -29,6 +29,9 @@ import sys
 import h5py
 import numpy as np
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fieldio  # noqa: E402
+
 import beamio
 from nml import to_groups
 
@@ -105,6 +108,73 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
     return samples
 
 
+SPLIT_NML = """  lat_file = "{lat}"
+  out_root = "sn_split"
+  dump_field_at = "END"
+  ran_seed = 4321
+  lambda0 = 1e-10
+  beam_init%n_particle = 1024
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  seed_power = 5e3
+  seed_waist_size = 30e-6
+  grid_n_pts = 64
+  grid_half_width = 2e-4
+&end
+"""
+
+
+def split_check(exe, lat, workdir):
+    """
+    The stats file's mode split against the same quantity taken from a field dump.
+
+    Every record that takes the field angle moments also reports the power within
+    split_angle of the axis, from the transform those moments already pay for
+    (fel-physics.md sec-source-filter). A dump's own far field is the independent route to
+    the same number, and Parseval makes them equal, so a difference is a bug in the
+    masking or the normalization rather than a tolerance. One seeded steady-state segment
+    is enough: the split does not care what the field is, only how it is resolved.
+    """
+    root = "sn_split"
+    (workdir / f"{root}.nml").write_text(to_groups(SPLIT_NML.format(lat=lat)))
+    r = subprocess.run([str(exe), f"{root}.nml"], cwd=workdir, capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"FAIL: split run exited {r.returncode}:\n{r.stdout[-2000:]}")
+        return False
+
+    dumps = sorted(workdir.glob(f"{root}-at*.wf.h5")) + sorted(workdir.glob(f"{root}-final.wf.h5"))
+    if not dumps:
+        print("FAIL: the split run wrote no field dump")
+        return False
+
+    with h5py.File(workdir / f"{root}.stats.h5") as h:
+        g = h["field/total"]
+        angle = float(np.ravel(g["split_angle"][()])[0])
+        p_in = np.atleast_1d(g["power_inside_angle"][-1])
+
+    f = fieldio.read_field(str(dumps[-1]))
+    u, dx = f["u"], f["dx"]
+    n = u.shape[-1]
+    kx = 2 * np.pi * np.fft.fftfreq(n, d=dx)
+    theta = np.sqrt(kx[None, :] ** 2 + kx[:, None] ** 2) / (2 * np.pi / f["wavelength"])
+    spec = np.abs(np.fft.fft2(u, axes=(1, 2))) ** 2 / (n * n)
+    inside = (spec * (theta <= angle)).sum(axis=(1, 2)) * dx * dx / (2 * fieldio.MU0_C)
+
+    live = np.isfinite(p_in) & (inside > 0)
+    if not live.any():
+        print("FAIL: no slice carried both a split and a dump")
+        return False
+    worst = float(np.max(np.abs(p_in[live] - inside[live]) / inside[live]))
+    good = worst <= 1e-6
+    print(f"--- mode split against the dump's far field: worst {worst:.3e} over "
+          f"{int(live.sum())} slices, angle {angle:.3e} rad (check <= 1e-6)  "
+          f"{'ok' if good else 'FAIL'}")
+    return good
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     p.add_argument("--exe", required=True)
@@ -135,6 +205,8 @@ def main():
             goodh = abs(mh - 1) < bh
             ok = ok and goodh
             print(f"      harmonic {h}: {mh:.4f} (+- {bh:.3f})  {'ok' if goodh else 'FAIL'}")
+
+    ok = split_check(exe, PARSED.lat, workdir) and ok
 
     print("shot-noise statistical check:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

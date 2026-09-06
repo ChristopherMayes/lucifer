@@ -16,8 +16,9 @@ number rather than an assumption.
 The exit power of a run like this one is set by the transverse cell size and the
 macroparticle count as much as by the physics, since each beamlet radiates into every
 angle the grid carries. The documentation's SASE convergence page measures that and says
-how to choose the grid, the window and the load. `global%source_filter = T` suppresses
-the wide-angle part and takes this deck from 3.0 GW to 0.73 GW.
+how to choose the grid, the window and the load. `global%source_filter = T` suppresses the wide-angle part, with its edge derived from the beam
+and the gain and printed at setup. Every run also reports `power_inside_angle` beside the
+total power at each element end, so the separation is in the stats file without a dump.
 
 The beam is a flat coasting bunch said in Bmad's own vocabulary:
 `distribution_type(3) = "GRID"` over the window extent, with the current derived as

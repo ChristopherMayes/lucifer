@@ -265,18 +265,51 @@ if (run%global%source_filter) then
                                    'SOURCE IS ALREADY AN ANALYTIC GAUSSIAN AND CARRIES NO WIDE-ANGLE CONTENT.')
     err_flag = .true.;  return
   endif
-  if (run%global%source_filter_xcut <= 0 .or. run%global%source_filter_ycut <= 0 .or. &
-      run%global%source_filter_width <= 0) then
-    call out_io (s_error$, r_name, 'SOURCE_FILTER_XCUT, SOURCE_FILTER_YCUT AND ' // &
-                                   'SOURCE_FILTER_WIDTH MUST ALL BE POSITIVE.', &
-                 'GOT: \3es12.3\ ', r_array = [run%global%source_filter_xcut, &
-                 run%global%source_filter_ycut, run%global%source_filter_width])
+  if (run%global%source_filter_width <= 0) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER_WIDTH MUST BE POSITIVE: \es12.3\ ', &
+                 r_array = [run%global%source_filter_width])
     err_flag = .true.;  return
   endif
+
+  ! The width is a fraction of the edge, so the sigmoid on axis is 1/(1 + exp(-1/width)).
+  ! Genesis4's own default of 1 puts that at 0.73, which attenuates the coherent source as
+  ! much as the wide angles: measured, it halves the physical in-cone startup power and
+  ! delays saturation by five to nine metres, with nothing in the output saying so
+  ! (doc/startup-noise.md). A filter meant to remove wide angles keeps the axis, so a
+  ! transmission under 0.99 is refused with the width that would pass. The
+  ! validation-internal cuts lift the guard, since placing the edge where Genesis4 places
+  ! it means taking its width too, and that comparison is the one thing the soft sigmoid
+  ! is still for.
+
+  if (run%global%source_filter_xcut == 0 .and. run%global%source_filter_ycut == 0 .and. &
+      1 / (1 + exp(-1 / run%global%source_filter_width)) < 0.99_rp) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER_WIDTH = \es12.3\ LEAVES THE SIGMOID AT ' // &
+                 '\f6.3\ ON AXIS, SO THE FILTER ATTENUATES THE COHERENT SOURCE.', &
+                 'POSSIBLE SOLUTION: USE SOURCE_FILTER_WIDTH AT OR BELOW \es9.2\ , WHICH KEEPS 0.99.', &
+                 r_array = [run%global%source_filter_width, &
+                            1 / (1 + exp(-1 / run%global%source_filter_width)), 0.217_rp])
+    err_flag = .true.;  return
+  endif
+
+  ! The edge is either an angle, which the run may derive, or Genesis4's grid-relative
+  ! cuts, which exist so the transcription check can place the edge where Genesis4 does.
+  ! Both together have no meaning, so they are refused rather than ranked.
+
+  if (run%global%source_filter_angle /= 0 .and. &
+      (run%global%source_filter_xcut /= 0 .or. run%global%source_filter_ycut /= 0)) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER_ANGLE AND SOURCE_FILTER_XCUT OR _YCUT ' // &
+                 'ARE BOTH SET. THE CUTS ARE VALIDATION-INTERNAL AND MOVE WITH THE GRID.', &
+                 'POSSIBLE SOLUTION: SET THE ANGLE ALONE, OR LEAVE IT UNSET TO DERIVE IT.')
+    err_flag = .true.;  return
+  endif
+  if (run%global%source_filter_angle < 0) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER_ANGLE MUST BE POSITIVE: \es12.3\ ', &
+                 r_array = [run%global%source_filter_angle])
+    err_flag = .true.;  return
+  endif
+
   where (is_fel)
     und_of%filter%on = .true.
-    und_of%filter%xcut = run%global%source_filter_xcut
-    und_of%filter%ycut = run%global%source_filter_ycut
     und_of%filter%width = run%global%source_filter_width
     und_of%filter%mutate = run%global%source_filter_mutate
   end where
@@ -662,6 +695,87 @@ if (wake_on) then
       call out_io (s_info$, r_name, 'Wrote wake kernels: ' // trim(run%chamber_wake%write_kernels))
     end block
   endif
+endif
+
+! The source filter's edge (fel-physics.md sec-source-filter). The angle is the knob and
+! the grid-relative cut is what the kernel builds from, so the conversion happens here,
+! where the beam that sets the angle and the grid that receives it both exist. Half the
+! grid's Nyquist frequency is the angle lambda/(4 dx), which is what xcut = 1 means.
+
+if (any(is_fel)) then
+  block
+    real(rp) th_mode, th_rho, th, half_nyq, ratio
+    character(24) origin
+    integer ie_first
+
+    ! xcut = 1 places the edge at half the grid's Nyquist frequency, which is the angle
+    ! lambda/(4 dx). The grid comes from the input rather than from the built wavefront,
+    ! since the conversion has to hold for every member of the field set.
+
+    ie_first = findloc(is_fel, .true., dim = 1)
+    half_nyq = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (8 * run%winit%grid_half_width)
+
+    call fel_filter_angles (fbeam, run%und_of(ie_first), fbeam%wavelength, th_mode, th_rho)
+
+    ! The angle the stats split reports, whether or not the filter is on: it is the angle
+    ! that separates the mode from the wide-angle emission of the point beamlets, and a
+    ! run wants to see that separation most when it is not filtering.
+
+    run%split_angle = max(th_mode, th_rho)
+    if (run%global%source_filter_angle > 0) run%split_angle = run%global%source_filter_angle
+
+    if (.not. run%global%source_filter) then
+      continue
+    else if (run%global%source_filter_xcut /= 0 .or. run%global%source_filter_ycut /= 0) then
+      where (is_fel)
+        run%und_of%filter%xcut = max(run%global%source_filter_xcut, 1.0e-12_rp)
+        run%und_of%filter%ycut = max(run%global%source_filter_ycut, 1.0e-12_rp)
+        run%und_of%filter%angle = 0
+      end where
+      call out_io (s_info$, r_name, 'Source filter: edge from xcut and ycut, ' // &
+                   'validation-internal, at \es10.3\ rad on this grid.', &
+                   r_array = [run%global%source_filter_xcut * half_nyq])
+
+    else
+      if (run%global%source_filter_angle > 0) then
+        th = run%global%source_filter_angle
+        origin = 'set by the deck'
+      else if (max(th_mode, th_rho) <= 0) then
+        call out_io (s_error$, r_name, 'SOURCE_FILTER IS ON AND ITS ANGLE CANNOT BE ' // &
+                     'DERIVED: THE BEAM HAS NO TRANSVERSE SIZE OR NO CURRENT.', &
+                     'POSSIBLE SOLUTION: SET SOURCE_FILTER_ANGLE.')
+        err_flag = .true.;  return
+      else
+        th = max(th_mode, th_rho)
+        origin = merge('the mode angle  ', 'the rho angle   ', th_mode >= th_rho)
+      endif
+
+      ! Cutting into the mode loses real radiation and leaving artifact in only weakens
+      ! the filter, so the default is the larger of the two. Their ratio goes as
+      ! sqrt(z_R/L_g), 15 on the Aramis benchmark and near 1 on a diffraction-dominated
+      ! machine, and a case far outside that range is unlike the one the default was
+      ! measured on (doc/startup-noise.md).
+
+      ratio = 0
+      if (th_rho > 0) ratio = th_mode / th_rho
+      call out_io (s_info$, r_name, 'Source filter: mode angle \es10.3\ rad, ' // &
+                   'rho angle \es10.3\ rad, ratio \f8.2\ .', &
+                   'Edge at \es10.3\ rad, ' // trim(origin) // '. Sigmoid on axis \f7.4\ .', &
+                   r_array = [th_mode, th_rho, ratio, th, &
+                              1 / (1 + exp(-1 / run%global%source_filter_width))])
+      if (ratio > 0 .and. (ratio < 0.3_rp .or. ratio > 3.0_rp)) then
+        call out_io (s_warn$, r_name, 'The two filter angles differ by more than the range ' // &
+                     'the default was measured over (0.3 to 3).', &
+                     'Check the power inside the edge against the total before trusting the run.')
+      endif
+
+      where (is_fel)
+        run%und_of%filter%xcut = th / half_nyq
+        run%und_of%filter%ycut = th / half_nyq
+        run%und_of%filter%angle = th
+      end where
+    endif
+  end block
 endif
 
 ! More than one slice means a time-dependent run with slippage active. One slice is the
@@ -1105,6 +1219,7 @@ enddo
 
 run%nrec_stats = nrec_stats;  run%nend_stats = nend_stats
 call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c, two_pol, harmonics(2:n_harm))
+stats%split_angle = run%split_angle
 allocate (run%bdiag_arr(nslice), run%fpow_arr(nslice), run%fonax_arr(nslice))
 
 end subroutine setup_diagnostics

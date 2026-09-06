@@ -72,12 +72,22 @@ type fel_global_struct
   ! reaches the field, so the wide-angle emission of the point-like beamlets is suppressed
   ! while the field itself propagates untouched (doc/startup-noise.md).
   logical :: source_filter = .false.
-  ! The sigmoid's edge, in units of half the grid's Nyquist frequency, per plane. Genesis4
-  ! calls these xcut and ycut. 1 puts the edge at half Nyquist.
-  real(rp) :: source_filter_xcut = 1
-  real(rp) :: source_filter_ycut = 1
-  ! The sigmoid's width in the same units, Genesis4's sigmoid. Small is a sharp edge.
-  real(rp) :: source_filter_width = 1
+  ! The sigmoid's edge as an angle [rad]. Unset, the run derives it from the beam and the
+  ! gain: the larger of four mode diffraction angles and the angle at which the resonant
+  ! wavelength red-shifts by rho, printed with both and with which one won. Cutting into
+  ! the mode loses real radiation while leaving artifact in only weakens the filter, so
+  ! the default errs wide.
+  real(rp) :: source_filter_angle = 0
+  ! The sigmoid's edge in units of half the grid's Nyquist frequency, per plane, which is
+  ! Genesis4's xcut and ycut. Validation-internal: they place the edge where Genesis4
+  ! places it, and a run that sets them and the angle together is refused. An angle is
+  ! independent of the grid and these are not.
+  real(rp) :: source_filter_xcut = 0
+  real(rp) :: source_filter_ycut = 0
+  ! The sigmoid's width as a fraction of its edge, Genesis4's sigmoid. Small is a sharp
+  ! edge. Genesis4's own default of 1 leaves the sigmoid at 0.73 on axis, which attenuates
+  ! the coherent source as much as the wide angles and measurably delays saturation.
+  real(rp) :: source_filter_width = 0.05
   ! The filter check's self-test, the fp32_mutate pattern: apply the sigmoid to the
   ! propagated field instead of to the source. Both suppress wide angles, so a run still
   ! completes and still looks reasonable, and only the comparison against Genesis4 says
@@ -236,6 +246,11 @@ type fel_run_struct
   type (fel_unavg_struct) :: ustate
   ! The schedule (fel_setup): per tracked element.
   type (fel_und_struct), allocatable :: und_of(:)
+  ! The angle at which the stats split the field power, whether or not the filter is on:
+  ! the larger of four mode diffraction angles and the rho angle, derived from the beam
+  ! and the first FEL element (fel-physics.md sec-source-filter). Inside it lies what can
+  ! couple to the mode, outside it the wide-angle emission of the point beamlets.
+  real(rp) :: split_angle = 0
   integer, allocatable :: fel_mode(:), fel_spp(:)
   real(rp), allocatable :: fel_ramp(:)
   real(rp), allocatable :: ele_slip(:)     ! Slippage after each element's last step [wavelengths].

@@ -370,13 +370,16 @@ def source_filter(args, wd, exe):
     The mutation hook is the CPU check's own, so the device refuses it rather than
     carrying a second wrong solve.
     """
+    # A 256-point grid rather than the 64 the rest of this file uses. The filter removes
+    # emission at angles the grid carries beyond the edge, and a coarse grid carries
+    # almost none: at 6.3 um cells the Nyquist angle is 7.9 urad against an edge near 3,
+    # so there is nothing to remove and the check could not see a filter that did nothing.
     nslice = 8
-    base = BASE.format(root="{root}", extra=DEV + TD_EXTRA + "{filt}")
     for root, filt, extra in (("dev_sf", "  source_filter = T\n", DEV),
                               ("dev_sfoff", "", DEV),
                               ("cpu_sf", "  source_filter = T\n", "")):
         text = BASE.format(root=root, extra=extra + TD_EXTRA + filt)
-        run(args.exe, wd, f"{root}.in", text)
+        run(args.exe, wd, f"{root}.in", text.replace("grid_n_pts = 64", "grid_n_pts = 256"))
 
     pd = diag_power(wd, "dev_sf", nslice)
     pc = diag_power(wd, "cpu_sf", nslice)
@@ -389,7 +392,7 @@ def source_filter(args, wd, exe):
     r = run(args.exe, wd, "dev_sfm.in",
             BASE.format(root="dev_sfm", extra=DEV + TD_EXTRA +
                         "  source_filter = T\n  source_filter_mutate = T\n"),
-            expect_fail=True)
+            expect_fail=True)  # refused before the grid matters
     refused = r.returncode != 0 and "DOES NOT COVER SOURCE_FILTER_MUTATE" in r.stdout
     ok("refused: source_filter_mutate on the device", refused, "True", refused)
 

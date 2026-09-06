@@ -4698,6 +4698,40 @@ Output:
   FFTW plans are warmed serially (the parallel loops then only execute).
 ```
 
+(api-fel-filter-angles)=
+### `fel_filter_angles`
+
+*Subroutine* `(beam, und, lambda, th_mode, th_rho)`
+
+```
+Routine to compute the two angles a source filter's edge can be set from
+(fel-physics.md sec-source-filter). Both come from the beam the run loaded and the
+undulator it enters, so a deck states neither.
+
+th_mode is four diffraction angles of the fundamental mode, 4 lambda / (2 pi sigma),
+with sigma the rms transverse size of the beam. Inside it lies the radiation that can
+couple to the mode.
+
+th_rho is sqrt(2 rho lambda / lambda_u), the angle at which the resonant wavelength
+red-shifts by rho and beyond which emission is outside the bandwidth of the
+interaction. rho is the one-dimensional Pierce parameter in Genesis's own form, with
+the undulator's coupling and the peak current of the loaded beam.
+
+Their ratio goes as sqrt(z_R / L_g), which is 15 on the Aramis benchmark and near 1 on
+a diffraction-dominated machine, so neither angle alone serves as a default.
+```
+
+```
+Input:
+  beam    -- fel_beam_struct: The loaded beam, for the transverse size and the current.
+  und     -- fel_und_struct: The undulator, for aw, ku and the coupling.
+  lambda  -- real(rp): Fundamental radiation wavelength [m].
+
+Output:
+  th_mode -- real(rp): Four mode diffraction angles [rad]. Zero if the beam has no size.
+  th_rho  -- real(rp): The rho angle [rad]. Zero if the beam carries no charge.
+```
+
 (api-fel-kernel-index)=
 ### `fel_kernel_index`
 
