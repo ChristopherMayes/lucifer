@@ -165,7 +165,7 @@ class Stats:
         """(ns,) light-travel distance of each slice ahead of the reference [m].
 
         exact and free of beta, and the coordinate slippage counts in: one slice is
-        window_sample wavelengths of it. See t_slice and z_slice.
+        n_wavelength wavelengths of it. See t_slice and z_slice.
         """
         return self["coords/ct_slice"]
 
@@ -325,7 +325,7 @@ if __name__ == "__main__":
           f"harmonics {st.harmonics}")
     wi = st.params.get("wavefront_init", {})
     print(f"  window: lambda0 {wi.get('lambda0', float('nan')):.4e} m, sample "
-          f"{wi.get('window_sample', 0)}, spacing {st.run['slice_spacing']:.4e} m, "
+          f"{wi.get('n_wavelength', 0)}, spacing {st.run['slice_spacing']:.4e} m, "
           f"head at {st.head_direction}")
     print(f"  axes: {', '.join(f'{a}[{len(st.coord(a))}]' for a in st.axis_names)}")
     m = st.meta

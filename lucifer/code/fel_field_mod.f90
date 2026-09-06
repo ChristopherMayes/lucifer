@@ -29,7 +29,8 @@ type fel_slip_struct
   logical :: timerun = .false.  ! Time-dependent run? False: slippage is a no-op.
   integer :: first = 0          ! Rotation offset of the field record, 0-based (Field::first).
   real(rp) :: accuslip = 0      ! Accumulated slippage [radiation wavelengths] (Field::accuslip).
-  real(rp) :: sample = 1        ! Slice spacing / radiation wavelength (Control::sample).
+  integer :: sample = 1         ! Wavelengths per slice (Control::sample), the beam's
+                                !   n_wavelength. An integer by construction.
   real(rp) :: u_escaped = 0     ! Energy [J] transmitted out of the window by slippage
                                 ! (summed over every zero-filled slice). The TD energy
                                 ! ledger's escape column, so E_beam + U_window + U_escaped

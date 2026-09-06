@@ -58,6 +58,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
   lat_file = "wake_lattice.bmad"
   global%out_root = "bmad_wake"
   global%ran_seed = 12345
+  slicing%window_length = 2.88e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -78,8 +80,6 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 255
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.88e-8
-  wavefront_init%window_sample = 3
 /
 ```
 
@@ -94,6 +94,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
   chamber_wake%radius = 0.5e-3
   chamber_wake%material = "CU"
   global%ran_seed = 12345
+  slicing%window_length = 2.88e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -114,8 +116,6 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 255
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.88e-8
-  wavefront_init%window_sample = 3
 /
 ```
 

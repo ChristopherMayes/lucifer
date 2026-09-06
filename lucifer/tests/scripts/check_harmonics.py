@@ -173,7 +173,7 @@ NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   grid_n_pts = 63
   grid_half_width = 2e-4
   window_length = 8e-10
-  window_sample = 1
+  n_wavelength = 1
   shot_noise = T
   ran_seed = 777
   harmonics = 1, 3
@@ -445,7 +445,7 @@ def main():
     buncher = buncher.replace("  beam_init%grid(3)%x_min = -4e-10\n", "")
     buncher = buncher.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
     buncher = buncher.replace("  window_length = 8e-10\n", "")
-    buncher = buncher.replace("  window_sample = 1\n", "")
+    buncher = buncher.replace("  n_wavelength = 1\n", "")
     buncher = buncher.replace("  shot_noise = T\n", "")
     buncher = buncher.replace("beam_init%n_particle = 2048", "beam_init%n_particle = 8192")
     buncher = buncher.replace("bunch_charge = 8.0e-15", "bunch_charge = 1.000692285594e-15")

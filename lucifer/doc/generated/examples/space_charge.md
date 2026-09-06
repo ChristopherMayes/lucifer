@@ -103,6 +103,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
   space_charge%nz = 2
   space_charge%nphi = 1
   space_charge%longrange = T
+  slicing%window_length = 2.4e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -119,8 +121,6 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 129
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.4e-8
-  wavefront_init%window_sample = 3
 /
 ```
 
@@ -136,6 +136,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
   space_charge%nz = 2
   space_charge%nphi = 1
   space_charge%longrange = T
+  slicing%window_length = 2.4e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -152,8 +154,6 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 129
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.4e-8
-  wavefront_init%window_sample = 3
 /
 ```
 
@@ -163,6 +163,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_params
   lat_file = "../aramis.bmad"
   global%out_root = "sc_off"
+  slicing%window_length = 2.4e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -179,8 +181,6 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 129
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.4e-8
-  wavefront_init%window_sample = 3
 /
 ```
 

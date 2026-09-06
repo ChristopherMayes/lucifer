@@ -63,7 +63,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   grid_n_pts = 63
   grid_half_width = 2e-4
   window_length = 8e-10
-  window_sample = 1
+  n_wavelength = 1
   shot_noise = T
   ran_seed = 777
   write_diag = T
@@ -82,7 +82,7 @@ def ss(nml):
     out = out.replace("  beam_init%grid(3)%x_min = -4e-10\n", "")
     out = out.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
     out = out.replace("  window_length = 8e-10\n", "")
-    out = out.replace("  window_sample = 1\n", "")
+    out = out.replace("  n_wavelength = 1\n", "")
     out = out.replace("  shot_noise = T\n", "")
     return out
 

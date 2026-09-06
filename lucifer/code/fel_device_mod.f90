@@ -376,7 +376,7 @@ type (fel_beam_struct) beam
 character(*) device_req
 integer ngrid, fp32_iu, npol
 integer harm(:)
-real(rp) sample
+integer sample
 logical err_flag
 
 character(kind=c_char) c_reason(256)
@@ -443,15 +443,17 @@ dev%ngrid = ngrid
 ! The exact-wrap assertion, on the device's own arithmetic: a bucket shift and its
 ! return must be bit-exact, and the extracted phase must never see the shift. Wraps
 ! are modular arithmetic, so this asserts exactly rather than to a tolerance. The
-! bucket is sample whole periods, which requires an integer sample.
+! bucket is sample whole periods, and the sample is an integer from the deck to here
+! (fel_slicing_struct), so this cannot fire. It stands because the arithmetic below
+! depends on it and a future path that reached here another way would be caught.
 
-if (abs(sample - nint(sample)) > 0) then
-  call out_io (s_error$, r_name, 'DEVICE = "metal" NEEDS AN INTEGER WINDOW_SAMPLE FOR EXACT', &
-                                 'BUCKET ARITHMETIC; THIS RUN HAS \es10.2\ .', r_array = [sample])
+if (sample < 1) then
+  call out_io (s_error$, r_name, 'DEVICE = "metal" HAS A SLICE SPACING OF \i0\ WAVELENGTHS.', &
+               'PLEASE REPORT THIS!', i_array = [sample])
   err_flag = .true.
   return
 endif
-bucket = int(nint(sample), c_int64_t) * 4294967296_c_int64_t
+bucket = int(sample, c_int64_t) * 4294967296_c_int64_t
 if (luc_dev_wrap_check(bucket) /= 0) then
   call out_io (s_error$, r_name, 'THE DEVICE EXACT-WRAP ASSERTION FAILED: A BUCKET SHIFT DID NOT', &
                                  'RETURN BIT-EXACTLY. THIS IS A KERNEL BUG BY DEFINITION.')

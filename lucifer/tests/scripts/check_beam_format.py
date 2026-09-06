@@ -80,7 +80,7 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
   grid_half_width = 2e-4
   beamlet_size = 8
   window_length = 4.8e-9
-  window_sample = 3
+  n_wavelength = 3
   ran_seed = 777
   write_diag = T
 {extra}&end

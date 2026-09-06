@@ -789,7 +789,7 @@ timerun = (nslice > 1)
 do ih = 1, n_harm       ! Same values for every field: one window, lockstep rotation
                         ! in fundamental-wavelength units (Genesis's one Control::sample).
   ffield(ih)%slip%timerun = timerun
-  ffield(ih)%slip%sample = fbeam%slice_spacing / fbeam%wavelength
+  ffield(ih)%slip%sample = fbeam%n_wavelength
 enddo
 run%gamma0_ref = fel_gamma0(fbeam)
 gamma0_ref = run%gamma0_ref

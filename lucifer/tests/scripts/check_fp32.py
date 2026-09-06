@@ -64,7 +64,7 @@ TD_EXTRA = """  beam_init%bunch_charge = 1.601107656951e-14
   shot_noise = T
   beamlet_size = 8
   window_length = 2.4e-9
-  window_sample = 3
+  n_wavelength = 3
 """
 
 # The recorded ceilings, set at three times the measured levels of the cases below

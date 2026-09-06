@@ -119,6 +119,7 @@ LAT
   global%out_root = "sweep_p$np"
   global%interlude_model = "bmad"
   global%write_diag = T
+  slicing%n_wavelength = 12
 /
 &fel_beam_init
   beam_file = "AramisS12-initial.beam.h5"
@@ -127,7 +128,6 @@ LAT
 &fel_wavefront_init
   field_file = "AramisS12-initial.wf.h5"
   wavefront_init%lambda0 = 1e-10
-  wavefront_init%window_sample = 12
 /
 NML
   echo "--- lucifer: ds_step = $np period(s) -----------------------------------"

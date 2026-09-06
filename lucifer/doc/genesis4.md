@@ -59,7 +59,7 @@ parameter reference is [](input-reference.md).
 | `&setup lambda0` | `wavefront_init%lambda0` | Required when starting from a beam dump, since the dump carries the slice partition and not the wavelength it was sliced on |
 | `&setup delz` | the element's `ds_step` | Bmad's own step attribute. The step count `round(l/ds_step)` matches Genesis4's unroll |
 | `&setup rootname` | `global%out_root` | |
-| `&time sample` | `wavefront_init%window_sample` | Slice spacing in wavelengths, an integer in both |
+| `&time sample` | `slicing%n_wavelength` | Slice spacing in wavelengths, an integer in both |
 | `&time slen` | the number of slices in the starting state | Lucifer takes the window from the beam it is given rather than a length |
 | `&beam npart` | `beam_init%n_particle` | Per slice in both. Lucifer requires a positive multiple of `beamlet_size` |
 | `&beam nbins` | `beamlet_size` | Beamlet size of the quiet start. No dump format carries it, so it is named on both sides |

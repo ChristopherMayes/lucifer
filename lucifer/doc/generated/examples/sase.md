@@ -65,6 +65,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_params
   lat_file = "../aramis.bmad"
   global%out_root = "sase"
+  slicing%window_length = 2.88e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -86,7 +88,5 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%grid_n_pts = 255
   wavefront_init%grid_half_width = 2e-4
 
-  wavefront_init%window_length = 2.88e-8
-  wavefront_init%window_sample = 3
 /
 ```

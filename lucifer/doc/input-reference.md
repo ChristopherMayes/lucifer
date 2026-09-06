@@ -30,6 +30,10 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 | `global%out_root` | `"fel_track"` | Prefix for every output file |
 | `global%interlude_model` | `"bmad"` | How field-free elements are tracked: `"bmad"` (the seam) or `"genesis"` (transcribed) |
 | `global%transport_model` | `"bmad"` | Transverse transport inside averaged FEL elements: `"bmad"` (Bmad's own kernel) or `"genesis"` (transcribed, validation-internal) |
+| `slicing%window_length` | `0` | Time window [m]. Zero derives it from the bunch, or is one slice |
+| `slicing%n_wavelength` | `1` | Slice spacing in wavelengths, an integer ([](#param-slicing)) |
+| `slicing%n_slice` | `0` | The window as a slice count instead. Both it and `window_length` is refused |
+| `slicing%current` | `0` | A flat current [A], which needs no z description. Zero takes the current from the bunch |
 | `global%source_model` | `"deposit"` | The FEL source: `"deposit"` per particle, or `"coherent"` for the coherent retrieval |
 | `global%source_filter` | `F` | Filter the source term at wide transverse angles ([](#param-global-source-filter)) |
 | `global%source_filter_angle` | `0` | The filter's sigmoid edge as an angle [rad]. 0 derives it from the beam and the gain |
@@ -221,7 +225,7 @@ Every other `beam_init` field that is set is refused. A standard structure that 
 
 ### The resampler: `resample%`
 
-Named after Genesis4's `&importdistribution` where an equivalent exists. `window_sample`, `ran_seed` and the seed field are shared with the generator: one seed governs generation, resampling and noise.
+Named after Genesis4's `&importdistribution` where an equivalent exists. `slicing%n_wavelength`, `ran_seed` and the seed field are shared with the generator: one seed governs generation, resampling and noise.
 
 | Parameter | Default | Meaning |
 |---|---|---|
@@ -255,7 +259,7 @@ Not physics input. The validation harness sets these.
 ```
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
-  wavefront_init%window_sample = 3
+  slicing%n_wavelength = 3
   wavefront_init%seed_power = 5e3
   wavefront_init%seed_waist_size = 30e-6
   wavefront_init%grid_half_width = 2e-4
@@ -266,8 +270,7 @@ Not physics input. The validation harness sets these.
 |---|---|---|
 | `field_file` | `""` | openPMD EXT_Wavefront field dump to start from |
 | `wavefront_init%lambda0` | `0` | Radiation wavelength [m]. Required for generation |
-| `wavefront_init%window_length` | `0` | Time window [m]. Zero derives it from the bunch |
-| `wavefront_init%window_sample` | `1` | Slice spacing in wavelengths, an integer |
+
 | `wavefront_init%grid_n_pts` | `255` | Transverse grid points per side |
 | `wavefront_init%grid_half_width` | `0` | Transverse grid half width [m] |
 | `wavefront_init%seed_power` | `0` | Gaussian seed power [W]. Zero is a dark start |
@@ -276,10 +279,16 @@ Not physics input. The validation harness sets these.
 | `wavefront_init%harmonics` | `1` | The field set. The first entry must be the fundamental |
 
 (param-wavefront-lambda0)=
-**`wavefront_init%lambda0`** is required, and deliberately not defaulted from the lattice resonance, since the first undulator may be detuned. Starting from a beam dump it is required too: the file carries the slice partition but not the radiation wavelength it was sliced on, and `window_sample` is required for the same reason.
+**`wavefront_init%lambda0`** is required, and deliberately not defaulted from the lattice resonance, since the first undulator may be detuned. Starting from a beam dump it is required too: the file carries the slice partition but not the radiation wavelength it was sliced on, and `slicing%n_wavelength` is required for the same reason.
 
-(param-wavefront-window-length)=
-**`wavefront_init%window_length`** derives from the bunch when zero, four sigma either side of a Gaussian or the grid extent when flat, and one slice in the steady state. Override it for slippage headroom. A window that clips the bunch warns.
+(param-slicing)=
+**`slicing%`** is the longitudinal discretization of the run, and it belongs to neither the beam nor the field: the beam's slices and the field's longitudinal samples are one partition, stated once. A wavefront carries only the spacing that follows, since a wavefront travelling through mirrors and gratings has no slices.
+
+`slicing%n_wavelength` is the spacing in wavelengths, Genesis4's `sample`. It is an integer because slippage rotates the field's slice ring by one index per slice, exactly and without interpolation, which holds only for a whole number, and it is carried as an integer from the deck to every consumer rather than recovered by dividing a spacing in metres by a wavelength. A beam or field read from a dump is the one place it is recovered, since no dump format records it, and a spacing that is not a whole number of wavelengths is refused there.
+
+`slicing%window_length` derives from the bunch when zero, four sigma either side of a Gaussian or the grid extent when flat, and one slice in the steady state. Override it for slippage headroom. A window that clips the bunch warns. `slicing%n_slice` states the same window as a count instead, and setting both is refused.
+
+`slicing%current` states a flat current directly, which is Genesis4's `&beam current`: the bunch's z structure is then not read, so with a window it is a flat time-dependent run and with none it is the steady state of one slice, and no separate steady-state switch exists. Unset, the current comes from `beam_init%bunch_charge` and the bunch's own z distribution. Setting both is refused.
 
 (param-wavefront-harmonics)=
 **`wavefront_init%harmonics`** is a gap-free increasing list whose first entry must be `1`: the fundamental anchors the optical phase, the reference advance and the slippage schedule, and the harmonics ride on it. Anything else is refused. Nothing is ever summed across harmonics. See [](fel-physics.md#sec-field-set).

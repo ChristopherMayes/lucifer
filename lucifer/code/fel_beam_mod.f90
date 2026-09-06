@@ -96,6 +96,12 @@ type fel_beam_struct
   real(rp) :: phi0 = 0             ! Common ponderomotive reference phase [rad].
   real(rp) :: wavelength = 0       ! Radiation wavelength [m]. From the deck: no dump carries it.
   real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. From the deck likewise.
+  integer :: n_wavelength = 1      ! Wavelengths per slice, slice_spacing / wavelength as the
+                                   !   integer it is. Slippage rotates the slice ring by one
+                                   !   index per n_wavelength undulator periods, exactly, and
+                                   !   that holds only for a whole number. Carried rather than
+                                   !   re-derived: dividing the two reals gives 12 to the last
+                                   !   bit rather than 12 (FINDINGS 7.52).
   real(rp) :: s0 = 0               ! Start of the time window [m].
   integer :: beamlet_size = 0      ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
@@ -376,6 +382,8 @@ beam%p0c = sqrt(gamma0**2 - 1) * m_electron
 beam%phi0 = 0
 beam%wavelength = wavelength
 beam%slice_spacing = spacing
+beam%n_wavelength = fel_n_wavelength(spacing, wavelength, err)
+if (err) return
 beam%beamlet_size = beamlet_size
 beam%s0 = 0
 
@@ -991,7 +999,8 @@ real(rp) ks, charge_dropped, drop_re, drop_im
 integer n_moved
 logical err_flag
 
-real(rp) p0_mc, slen, sample, theta, beta, z_new
+real(rp) p0_mc, slen, theta, beta, z_new
+integer sample
 integer ia, ib, il, nslice, atar, idest
 character(*), parameter :: r_name = 'fel_migrate_slices'
 
@@ -1009,13 +1018,7 @@ if (nslice < 2) then
   return
 endif
 
-sample = beam%slice_spacing / beam%wavelength
-if (abs(sample - nint(sample)) > 1e-9_rp * sample) then
-  call out_io (s_error$, r_name, &
-        'MIGRATION NEEDS AN INTEGER sample (SLICE SPACING OVER WAVELENGTH): PHASE CONTINUITY', &
-        'ACROSS A MOVE HOLDS ONLY THEN. GOT: \es16.8\ ', r_array = [sample])
-  return
-endif
+sample = beam%n_wavelength
 
 p0_mc = fel_p0_mc(beam)
 slen = ks * beam%slice_spacing            ! Window length in phase: 2*pi*sample.
@@ -1111,6 +1114,59 @@ end function fel_phi0_rate
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_n_wavelength (spacing, wavelength, err_flag) result (n)
+!
+! Routine to recover the wavelengths per slice from a spacing in metres.
+!
+! The deck states this as an integer and the code carries it as one. A dump does not:
+! openPMD and Genesis's own format both record the spacing and not what it is a multiple
+! of, so a beam read from one recovers the integer here, once, and every consumer reads
+! it afterwards. A spacing that is not a whole number of wavelengths is refused: the
+! slice ring rotates by one index per slice of slippage, which is exact only then, and a
+! run that silently rounded would drift a fraction of a wavelength per slice.
+!
+! Input:
+!   spacing     -- real(rp): Slice spacing [m].
+!   wavelength  -- real(rp): Radiation wavelength [m].
+!
+! Output:
+!   err_flag    -- logical: Set True if the spacing is not a whole number of wavelengths.
+!   n           -- integer: Wavelengths per slice.
+!-
+
+function fel_n_wavelength (spacing, wavelength, err_flag) result (n)
+
+real(rp) spacing, wavelength, ratio
+integer n
+logical err_flag
+character(*), parameter :: r_name = 'fel_n_wavelength'
+
+!
+
+n = 1
+err_flag = .true.
+if (wavelength <= 0 .or. spacing <= 0) then
+  call out_io (s_error$, r_name, 'A SLICE SPACING AND A WAVELENGTH MUST BOTH BE POSITIVE: ' // &
+               '\2es14.6\ ', r_array = [spacing, wavelength])
+  return
+endif
+
+ratio = spacing / wavelength
+n = nint(ratio)
+if (n < 1 .or. abs(ratio - n) > 1e-9_rp * ratio) then
+  call out_io (s_error$, r_name, 'THE SLICE SPACING IS NOT A WHOLE NUMBER OF WAVELENGTHS:', &
+               'SPACING \es16.8\ m OVER WAVELENGTH \es16.8\ m IS \es16.8\ .', &
+               'SLIPPAGE ROTATES THE SLICE RING BY ONE INDEX PER SLICE, WHICH IS EXACT ONLY', &
+               'FOR A WHOLE NUMBER.', r_array = [spacing, wavelength, ratio])
+  return
+endif
+
+err_flag = .false.
+
+end function fel_n_wavelength
+
 !------------------------------------------------------------------------------
 !+
 ! Subroutine fel_slice_diag (beam, sl, ks, diag)

@@ -140,6 +140,8 @@ DECK = """&fel_params
   lat_file = "{lat}"
   global%out_root = "{root}"
   global%comb_ds_save = -1
+  slicing%window_length = {slen:.6e}
+  slicing%n_wavelength = {sample}
 {extra}/
 
 &fel_beam_init
@@ -160,8 +162,6 @@ DECK = """&fel_params
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = {ngrid}
   wavefront_init%grid_half_width = {half:.6e}
-  wavefront_init%window_length = {slen:.6e}
-  wavefront_init%window_sample = {sample}
 /
 """
 
@@ -217,6 +217,7 @@ LUCIFER_FROM_GENESIS = """&fel_params
   global%interlude_model = "genesis"
   global%transport_model = "genesis"
   global%write_diag = T
+  slicing%n_wavelength = 3
 /
 &fel_beam_init
   beam_file = "{gen}-initial.beam.h5"
@@ -225,7 +226,6 @@ LUCIFER_FROM_GENESIS = """&fel_params
 &fel_wavefront_init
   field_file = "{gen}-initial.wf.h5"
   wavefront_init%lambda0 = 1e-10
-  wavefront_init%window_sample = 3
 /
 """
 

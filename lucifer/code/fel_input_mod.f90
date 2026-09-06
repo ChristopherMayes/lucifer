@@ -53,6 +53,7 @@ type (fel_run_struct), target :: run
 ! The namelist member names, as the input file writes them.
 type (fel_global_struct) global
 type (wavefront_init_struct) wavefront_init
+type (fel_slicing_struct) slicing
 type (fel_chamber_wake_init_struct) chamber_wake
 type (fel_space_charge_input_struct) space_charge
 type (beam_init_struct) beam_init
@@ -70,7 +71,7 @@ integer iu, ios
 character(600) iomsg_text
 character(*), parameter :: r_name = 'fel_read_input'
 
-namelist / fel_params / lat_file, global, bmad_com, space_charge_com, chamber_wake, space_charge
+namelist / fel_params / lat_file, global, slicing, bmad_com, space_charge_com, chamber_wake, space_charge
 namelist / fel_beam_init / beam_init, resample, beam_file, dist_file, write_genesis_dist, &
                         write_openpmd_file, use_beam_init, beamlet_size, shot_noise, &
                         split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
@@ -86,6 +87,7 @@ lat_file = run%lat_file
 field_file = run%field_file
 global = run%global
 wavefront_init = run%winit
+slicing = run%slicing
 chamber_wake = run%chamber_wake
 space_charge = run%space_charge
 beam_init = run%beam_init
@@ -153,6 +155,7 @@ run%lat_file = lat_file
 run%field_file = field_file
 run%global = global
 run%winit = wavefront_init
+run%slicing = slicing
 run%chamber_wake = chamber_wake
 run%space_charge = space_charge
 run%beam_init = beam_init
@@ -198,6 +201,7 @@ integer iu
 
 type (fel_global_struct) global
 type (wavefront_init_struct) wavefront_init
+type (fel_slicing_struct) slicing
 type (fel_chamber_wake_init_struct) chamber_wake
 type (fel_space_charge_input_struct) space_charge
 type (beam_init_struct) beam_init
@@ -208,7 +212,7 @@ logical use_beam_init, shot_noise
 logical split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
 integer beamlet_size
 
-namelist / fel_params / lat_file, global, bmad_com, space_charge_com, chamber_wake, space_charge
+namelist / fel_params / lat_file, global, slicing, bmad_com, space_charge_com, chamber_wake, space_charge
 namelist / fel_beam_init / beam_init, resample, beam_file, dist_file, write_genesis_dist, &
                         write_openpmd_file, use_beam_init, beamlet_size, shot_noise, &
                         split_weights, swap_beam_xy, gen_test_weights, resample_split_weights
@@ -220,6 +224,7 @@ lat_file = run%lat_file
 field_file = run%field_file
 global = run%global
 wavefront_init = run%winit
+slicing = run%slicing
 chamber_wake = run%chamber_wake
 space_charge = run%space_charge
 beam_init = run%beam_init
@@ -290,16 +295,16 @@ end function group_present
 !+
 ! Function has_retired_group (param_file) result (found)
 !
-! Refuse the retired flat &fel_track_params group: list every parameter set
-! in it together with the group and name it moved to, so migration is a mechanical
-! edit of the input file.
+! Refuse retired input names, each with the name that replaced it, so migration is a
+! mechanical edit of the input file. Two are refused: the flat &fel_track_params group,
+! and the window parameters that moved out of wavefront_init into slicing.
 !
 ! Input:
 !   param_file -- character(*): Input file name.
 !
 ! Output:
-!   found      -- logical: True when the retired &fel_track_params group is present
-!                   (the caller then refuses with the parameter mapping table).
+!   found      -- logical: True when a retired name is present (the caller then refuses,
+!                   the message naming what replaced it).
 !-
 
 function has_retired_group (param_file) result (found)
@@ -311,8 +316,10 @@ integer iu, ios
 character(400) line
 character(*), parameter :: r_name = 'fel_read_input'
 
-! A textual scan, because Fortran ignores an unknown namelist group in silence: a deck
-! written against the retired flat group would otherwise run on defaults.
+! A textual scan, because Fortran ignores an unknown namelist group in silence and a
+! retired component of a live group is a parse error whose message names the component
+! and not what to do about it. A deck written against either would otherwise run on
+! defaults or stop without advice.
 
 found = .false.
 open (newunit = iu, file = param_file, status = 'old', action = 'read', iostat = ios)
@@ -328,6 +335,22 @@ do
     call out_io (s_error$, r_name, '&fel_track_params IS NOT AN INPUT GROUP.', &
       'THE THREE GROUPS ARE &fel_params, &fel_beam_init AND &fel_wavefront_init.', &
       'SEE doc/input-reference.md.')
+    exit
+  endif
+
+  ! The window is the FEL interaction's, not the field's, so it left wavefront_init for
+  ! slicing when the wavelengths per slice became the integer it always was.
+
+  if (index(line, 'wavefront_init%window_sample') /= 0) then
+    found = .true.
+    call out_io (s_error$, r_name, 'wavefront_init%window_sample IS RETIRED.', &
+      'POSSIBLE SOLUTION: SET slicing%n_wavelength IN &fel_params.')
+    exit
+  endif
+  if (index(line, 'wavefront_init%window_length') /= 0) then
+    found = .true.
+    call out_io (s_error$, r_name, 'wavefront_init%window_length IS RETIRED.', &
+      'POSSIBLE SOLUTION: SET slicing%window_length IN &fel_params.')
     exit
   endif
 enddo

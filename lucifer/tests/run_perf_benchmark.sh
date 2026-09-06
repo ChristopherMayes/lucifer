@@ -196,6 +196,7 @@ if [[ $PHASES -eq 1 ]]; then
 &fel_params
   lat_file = "aramis.bmad"
   global%out_root = "$3"
+  slicing%window_length = $slen
 /
 &fel_beam_init
   beam_init%n_particle = $NPART
@@ -213,8 +214,6 @@ if [[ $PHASES -eq 1 ]]; then
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 255
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = $slen
-  wavefront_init%window_sample = 3
 /
 DECK
   }
@@ -429,7 +428,6 @@ cat > perf.nml <<NML
 &fel_wavefront_init
   field_file = "AramisPerf-initial.wf.h5"
   wavefront_init%lambda0 = 1e-10
-  wavefront_init%window_sample = 3
 /
 NML
 

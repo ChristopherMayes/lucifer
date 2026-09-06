@@ -44,6 +44,34 @@ use fel_stats_mod
 implicit none
 
 !+
+! Struct fel_slicing_struct
+!
+! The longitudinal discretization of the run, exposed in &fel_params as slicing%. One
+! window, one definition: the beam's slices and the field's z samples are the same
+! partition, so it belongs to neither the beam nor the field and sits beside them.
+!
+! Slippage is an index rotation of the slice ring, exact and free of interpolation,
+! which holds only when the spacing is a whole number of wavelengths. n_wavelength is
+! that whole number, and it is carried as an integer from here to every consumer:
+! recovering it by dividing a spacing in metres by a wavelength gives 12 to the last
+! bit rather than 12, which the device's exact bucket arithmetic then refuses
+! (FINDINGS 7.52).
+!
+! The window is stated as a length or as a slice count, never both. current states a
+! flat current directly, which is Genesis's &beam current: with a window it is a flat
+! time-dependent run, and with none it is the steady state of one slice, so no separate
+! steady-state switch exists. Unset, the current comes from the bunch's own z structure.
+!-
+
+type fel_slicing_struct
+  real(rp) :: window_length = 0      ! Time window [m]. 0 = from the bunch, or one slice.
+  integer :: n_wavelength = 1        ! Wavelengths per slice (Genesis's sample). Integer by
+                                     !   construction: slippage rotates the ring by one.
+  integer :: n_slice = 0             ! 0 = from window_length. Both set is refused.
+  real(rp) :: current = 0            ! Flat current [A]. 0 = from the bunch's z structure.
+end type
+
+!+
 ! Struct fel_global_struct
 !
 ! The run-level switches and names, exposed in &fel_params as global%... (the
@@ -140,16 +168,14 @@ end type
 ! Struct wavefront_init_struct
 !
 ! The radiation starting condition, the beam_init_struct analog (&fel_wavefront_init).
-! The field record is the time window, so the window lives here: window_length and
-! window_sample set the slice count and spacing for the field and the generated beam
-! (one window, one definition). harmonics requests the field set. field_file imports
-! override the seed.
+! A wavefront is an optical object: a transverse grid, a wavelength, a longitudinal
+! spacing and nothing else longitudinal. The time window that sets that spacing is the
+! FEL interaction's, not the field's, and lives in fel_slicing_struct. harmonics requests
+! the field set. field_file imports override the seed.
 !-
 
 type wavefront_init_struct
   real(rp) :: lambda0 = 0            ! Resonant wavelength [m]. Required for generation.
-  real(rp) :: window_length = 0      ! Time window [m]. 0 = derived from the bunch.
-  integer :: window_sample = 1       ! Slice spacing in wavelengths (Genesis's sample).
   integer :: grid_n_pts = 255        ! Transverse grid points per side (Genesis ngrid).
   real(rp) :: grid_half_width = 0    ! Transverse half width [m] (Genesis dgrid).
   real(rp) :: seed_power = 0         ! Gaussian seed power [W]. 0 = dark start.
@@ -228,6 +254,7 @@ type fel_run_struct
   ! The resolved inputs.
   type (fel_global_struct) :: global
   type (wavefront_init_struct) :: winit
+  type (fel_slicing_struct) :: slicing
   type (fel_chamber_wake_init_struct) :: chamber_wake
   type (fel_space_charge_input_struct) :: space_charge
   type (beam_init_struct) :: beam_init

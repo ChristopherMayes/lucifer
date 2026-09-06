@@ -9,6 +9,22 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-05 Changed: the time window moved out of `wavefront_init` into `slicing`, a struct of
+  its own in `&fel_params`, and the wavelengths per slice are carried as the integer they are.
+  A wavefront is an optical object with a longitudinal spacing and no slices; the rule that the
+  spacing is a whole number of wavelengths belongs to the FEL interaction, since it is what lets
+  the field record rotate by one index with no interpolation. `slicing%n_wavelength` replaces
+  `wavefront_init%window_sample` and `slicing%window_length` replaces
+  `wavefront_init%window_length`, both retired names refused with the name that replaced them.
+  `slicing%n_slice` states the window as a count instead, and `slicing%current` states a flat
+  current directly, which needs no z description: with a window it is a flat time-dependent run
+  and with none the steady state of one slice, so a steady-state deck no longer computes a
+  bunch charge and a z grid to say what a current says. The integer reaches every consumer from
+  the deck rather than being recovered by dividing a spacing in metres by a wavelength, which
+  returns 12 to the last bit rather than 12 and which the device refused: a 10 nm deck that ran
+  35 minutes on twelve CPU threads now runs on the device. A beam or field from a dump is the one
+  place the integer is recovered, and a spacing that is not whole is refused there.
+
 - 2026-09-05 Added: doc/startup-noise.md, the dependence of SASE power on the transverse cell
   size and the macroparticle count, with tests/scripts/startup_noise.py producing every number and
   figure on demand. The field power of an unseeded run has two parts. The power inside the mode, taken from

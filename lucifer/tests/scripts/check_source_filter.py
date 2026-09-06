@@ -60,6 +60,7 @@ NML = """&fel_params
   global%source_filter_ycut = {xcut}
   global%source_filter_width = 1
   global%source_filter_mutate = {mutate}
+  slicing%n_wavelength = {sample}
 {end}/
 &fel_beam_init
   beam_file = "{dumps}-initial.beam.h5"
@@ -68,7 +69,6 @@ NML = """&fel_params
 &fel_wavefront_init
   field_file = "{dumps}-initial.wf.h5"
   wavefront_init%lambda0 = {lam:.12e}
-  wavefront_init%window_sample = {sample}
 /
 """
 

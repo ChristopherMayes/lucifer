@@ -80,7 +80,15 @@ drift surrogate $k_u^{\mathrm{like}} = k_s/(2\gamma_0^2)$ is used
 ### The time window
 
 A time-dependent beam is a set of slices spaced by
-$\Delta = \texttt{sample}\cdot\lambda_s$ (integer `sample`). *Higher slice
+$\Delta = \texttt{n\_wavelength}\cdot\lambda_s$, the deck's `slicing%n_wavelength`.
+The window belongs to neither the beam nor the field: the beam's slices and the field's
+longitudinal samples are one partition, so `slicing` states it once and both read it. A
+wavefront carries only the spacing $\Delta$ that follows, since a wavefront travelling
+through mirrors and gratings has no slices. `n_wavelength` is an integer from the deck to
+every consumer, never recovered by dividing $\Delta$ by $\lambda_s$, which returns 12 to
+the last bit rather than 12 and which the device's exact bucket arithmetic then refuses.
+The one place it is recovered is a beam or field read from a dump, since no dump format
+records it, and there `fel_n_wavelength` refuses a spacing that is not whole. *Higher slice
 index is the window head* (earlier arrival, larger Bmad $z$). The global window
 position of a particle in slice $i$ is
 
@@ -105,7 +113,7 @@ so the grid is exactly uniform in arrival time and in $ct$, and only $\beta$-dep
 uniform in $z$. That is why the concatenation stores every particle's entry $\beta$
 rather than one number. It is also what makes slippage an exact integer shift: the light
 advances one $\lambda_s$ per undulator period, at the rate
-$(1+a_w^2)/(2\gamma^2\lambda_s)$ per unit length, so one slice is exactly `sample`
+$(1+a_w^2)/(2\gamma^2\lambda_s)$ per unit length, so one slice is exactly `n_wavelength`
 periods of slippage and the field record rotates by one index with no interpolation
 ([](#sec-slippage)). Uniformity in $ct$ is the reason that works. The file therefore
 publishes the two exact coordinates, $t$ and $ct$, and Bmad's $z$ only at the reference
@@ -527,7 +535,7 @@ $$
   \delta_{\mathrm{slip}} = \frac{\delta z\,(1 + a_w^2)}{2\gamma_0^2\,\lambda_s},
 $$ (eq-slipstep)
 
-and whenever $|\mathrm{accuslip}| > 0.8\cdot\texttt{sample}$ the record rotates one
+and whenever $|\mathrm{accuslip}| > 0.8\cdot\texttt{n\_wavelength}$ the record rotates one
 slice: the slice coupled to the window *head* is zeroed and re-enters at the
 tail. Radiation leaves at the head and fresh vacuum enters behind the bunch (a
 non-periodic fill). Backward slippage mirrors the direction. Interludes slip nothing
@@ -577,7 +585,7 @@ evaluated at the slice centers with the bunch centered in the window. $\sigma_z 
 is the steady state (the whole charge in one slice window, $I = Qc/\Delta s$)
 and is refused for time-dependent windows. The default window covers the
 described bunch ($\pm4\sigma_z$ Gaussian, the grid extent flat), exactly as the
-import derives its window from real particles. `window_length` overrides it
+import derives its window from real particles. `slicing%window_length` overrides it
 for slippage headroom and warns with numbers when it clips the bunch.
 
 Generated slices load $m = n_{\mathrm{part}}/n_{\mathrm{bins}}$ beamlets: each beamlet
@@ -642,7 +650,7 @@ phase-space interpolation: normalize the five coordinates $(\gamma,x,y,\hat p_x,
 draws, and place the child at the midpoint plus $\mathrm{uniform}[-1,1]$ times the
 difference per coordinate. $\theta$ is refilled uniformly over one beamlet spacing,
 mirrored into $n_{\mathrm{bins}}$, and [](#sec-noise) imposes the noise with
-$n_e = \mathrm{nint}(I\lambda_s\,\texttt{sample}/(e c))$. The file's $p_x/p_y$ are
+$n_e = \mathrm{nint}(I\lambda_s\,\texttt{n\_wavelength}/(e c))$. The file's $p_x/p_y$ are
 *slopes*. The slope-to-momentum conversion $\hat p = x'\gamma$ happens at the
 copy into the candidate set. Genesis4's `match`/`center` transforms are not
 ported (a Bmad lattice carries its optics, and `init_beam_distribution`
@@ -677,7 +685,7 @@ would silently read back uniform.
 The slice partition is `particlePatches`, the standard's own partition of a species
 record: one patch per slice, in window order, an empty slice as a patch of no particles.
 The patch count is therefore the window, and the file states nothing else about it. What
-openPMD has no place for comes from the deck: `lambda0`, `window_sample` and
+openPMD has no place for comes from the deck: `lambda0`, `slicing%n_wavelength` and
 `beamlet_size`. Reading a dump with no `lambda0` is refused rather than defaulted,
 since a wrong wavelength rescales every phase in the run. `one4one` is not stored
 either: the flag asserts that every macroparticle carries one electron, which is what the
@@ -711,13 +719,13 @@ Measured levels and how they are checked: [](validation.md#val-distribution-impo
 
 With per-particle weights, migration needs no one4one: a mover carries its own charge.
 The criterion is Genesis4's in this chart: with the derived $\theta$ of
-Eq. [](#eq-theta) and the slice window $[0, 2\pi\,\texttt{sample})$,
-$a_{\mathrm{tar}} = \lfloor\theta/(2\pi\,\texttt{sample})\rfloor$ is the relative
+Eq. [](#eq-theta) and the slice window $[0, 2\pi\,\texttt{n\_wavelength})$,
+$a_{\mathrm{tar}} = \lfloor\theta/(2\pi\,\texttt{n\_wavelength})\rfloor$ is the relative
 destination (positive $\theta$ drift moves toward higher index, the head). A mover's
 $z$ shifts by exactly $-a_{\mathrm{tar}}\,\beta\,\Delta s$, changing $\theta$ by
-$-a_{\mathrm{tar}}\cdot2\pi\,\texttt{sample}$: for integer `sample` the phase every
+$-a_{\mathrm{tar}}\cdot2\pi\,\texttt{n\_wavelength}$: for integer `n_wavelength` the phase every
 deposition sees is continuous across the move to rounding, at every harmonic $h$ too
-since $h\cdot2\pi\,\texttt{sample}$ stays a multiple of $2\pi$, and
+since $h\cdot2\pi\,\texttt{n\_wavelength}$ stays a multiple of $2\pi$, and
 Eq. [](#eq-zglobal) is invariant. Removal is swap-with-last with rescan. Particles
 whose destination lies beyond the window are dropped *with their charge counted*
 (Genesis4 discards silently). Off by default: the Genesis4 tiers compare against
@@ -725,11 +733,11 @@ non-one4one Genesis4, which never migrates.
 
 `sample > 1` is the intended case, not a tolerated one. In a sampled window the slices
 are the only represented longitudinal positions, so the slice spacing is the only move
-the discretization can express, and a particle drifting within the $2\pi\,\texttt{sample}$
+the discretization can express, and a particle drifting within the $2\pi\,\texttt{n\_wavelength}$
 window has nowhere finer to go. The sub-window position is invisible to the per-slice
 current until the threshold, and that error is below the slice spacing, the window's own
 resolution. Genesis4's `localSort` uses the same sample-scaled window. What migration
-does require is *integer* `sample`, since the phase continuity above holds only then,
+does require is *integer* `n_wavelength`, since the phase continuity above holds only then,
 and a non-integer value is refused at the first migration pass.
 
 :::{admonition} Provenance
@@ -779,12 +787,12 @@ slice currents interpolate to $\lambda_s$ resolution with a zero pad past the he
 (the trapezoidal density model whose half-slice head deficit is the derived bound of
 the seam-wake cross-validation), convert to electrons per bin, and each slice sums
 causally *toward the head* (a trailing slice collects the wake of the charge
-ahead), averaged over the `sample` sub-steps:
+ahead), averaged over the `n_wavelength` sub-steps:
 
 $$
   \begin{aligned}
-    \mathcal{E}_i = \frac{1}{\texttt{sample}}
-      \sum_{j=0}^{\texttt{sample}-1} \sum_{k\ge0} \Bigl[
+    \mathcal{E}_i = \frac{1}{\texttt{n\_wavelength}}
+      \sum_{j=0}^{\texttt{n\_wavelength}-1} \sum_{k\ge0} \Bigl[
         &N_{i,j+k}\,\bigl(w_{\mathrm{res}}+w_{\mathrm{rou}}\bigr)_k \\
         &+ N'_{i,j+k}\, w_{\mathrm{geo},k} \Bigr]
       + \mathcal{E}_{\mathrm{ext}} .
@@ -1329,7 +1337,7 @@ matching nothing is refused. openPMD, like every other dump.
 transmitted beyond the window is fixed information: slippage is one-directional, so it
 never re-interacts and evolves by free space alone. Each transmitted slice streams to
 `<out_root>-escaped.fld.h5` at the zero fill (peak memory a handful of grid
-planes. One banked slice per `sample`$\cdot\lambda$ of slippage, inheriting the
+planes. One banked slice per `n_wavelength`$\cdot\lambda$ of slippage, inheriting the
 window's decimation) with its `wavefront_params` and transmission $z$. These two
 diagnostic files keep Genesis4 field conventions rather than openPMD, since the
 per-slice `wavefront_params` and transmission $z$ beside each plane have no home
@@ -1413,7 +1421,7 @@ $\varepsilon_0 = 8.854\times10^{-12}$ in the roughness coefficient
 the terms it enables.
 
 *Step size.* Measured convergence (one shared 32-slice dump at
-$\texttt{sample}=12$, `ds_step` swept): roughly first order in the exponential
+$\texttt{n\_wavelength}=12$, `ds_step` swept): roughly first order in the exponential
 gain region. Saturation power holds to $\sim$3% up to six periods per step and
 misses by 26% at twelve. Two to three periods per step is the operating point.
 SIMPLEX's twelve-period economy belongs to its semianalytic solver and does not

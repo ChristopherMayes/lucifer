@@ -35,9 +35,12 @@ BEAM = {
 }
 # Keys that become wavefront_init%<key> in &fel_wavefront_init.
 WAVEFRONT = {
-    "lambda0", "window_length", "window_sample", "grid_n_pts", "grid_half_width",
+    "lambda0", "grid_n_pts", "grid_half_width",
     "seed_power", "seed_waist_size", "seed_polarization", "harmonics",
 }
+# Keys that become slicing%<key> in &fel_params. The window is the FEL interaction's,
+# not the field's, so it left wavefront_init.
+SLICING = {"window_length", "n_wavelength", "n_slice", "current"}
 WAVEFRONT_LOOSE = {"field_file"}
 
 # Keys already written in new-style form pass through to their group.
@@ -72,6 +75,8 @@ def to_groups(flat_text):
             params.append(f"  space_charge%{root[3:]}{subs} {rest}")
         elif root in BEAM:
             beam.append("  " + line)
+        elif root in SLICING:
+            params.append(f"  slicing%{root}{subs} {rest}")
         elif root in WAVEFRONT:
             wavefront.append(f"  wavefront_init%{root}{subs} {rest}")
         elif root in WAVEFRONT_LOOSE:

@@ -95,8 +95,8 @@ SASE_B = """  beamlet_size = 8
   beam_init%grid(3)%x_min = -1.6e-9
   beam_init%grid(3)%x_max = 1.6e-9
 """
-SASE_W = """  wavefront_init%window_length = 3.2e-9
-  wavefront_init%window_sample = 1
+SASE_W = """  slicing%window_length = 3.2e-9
+  slicing%n_wavelength = 1
 """
 
 
@@ -111,10 +111,10 @@ def check(name, value, tol, note="", low=None):
 
 def run(exe, wd, root, m, coherent, seed=777, bextra="", wextra="", pextra="", threads="8",
         sase=False, expect_fail=None, sig_z=None, lat="coh.bmad"):
-    extra = (COHERENT if coherent else "") + pextra
+    extra = (COHERENT if coherent else "") + (SASE_W if sase else "") + pextra
     text = NML.format(root=root, m=m, seed=seed, extra=extra, lat=lat,
                       bextra=(SASE_B if sase else "") + bextra,
-                      wextra=(SASE_W if sase else "") + wextra)
+                      wextra=wextra)
     if sig_z is not None:
         text = text.replace("  beam_init%sig_z = 0\n", f"  beam_init%sig_z = {sig_z}\n")
     if sase:
@@ -193,7 +193,7 @@ def main():
     (wd / "cohshort.bmad").write_text(LAT.replace("l = 3.96,", "l = 0.90,"))
     IMP = ('  dist_file = "beam0.h5"\n  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n'
            '  resample%n_slice = 0\n  resample%slice_width = 0.05\n')
-    WIN = '  wavefront_init%window_sample = 20\n'
+    WIN = '  slicing%n_wavelength = 20\n'
     run(exe, wd, "seedbeam", 200000, False, pextra='  global%load_only = T\n', sig_z='4e-9',
         bextra='  use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'
                '  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n')
@@ -206,7 +206,7 @@ def main():
             pp["position/x"][...] = x + 2e-5 + 0.3 * y      # offset + tilt
             break
     for root, coh in (("mdep", False), ("mcoh", True)):
-        run(exe, wd, root, 2048, coh, sig_z='4e-9', bextra=IMP, wextra=WIN, lat="cohshort.bmad")
+        run(exe, wd, root, 2048, coh, sig_z='4e-9', bextra=IMP, pextra=WIN, lat="cohshort.bmad")
     _, md = curve(wd, "mdep")
     _, mc = curve(wd, "mcoh")
     # Measured 8.9e-2: the SS model bias (1.9e-2) plus the residual emission
@@ -224,7 +224,7 @@ def main():
             x = pp["position/x"][()]
             pp["position/x"][...] = x + 6e-5 * np.sign(x - np.median(x))  # double horn
             break
-    ok = run(exe, wd, "mhorn", 2048, True, sig_z='4e-9', bextra=IMP, wextra=WIN, lat="cohshort.bmad",
+    ok = run(exe, wd, "mhorn", 2048, True, sig_z='4e-9', bextra=IMP, pextra=WIN, lat="cohshort.bmad",
              expect_fail="GAUSSIAN ENOUGH")
     print(f"--- double-horn beam refused (GAUSSIAN ENOUGH): {'ok' if ok else '** FAIL **'}")
     FAILED = FAILED or not ok

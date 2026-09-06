@@ -86,8 +86,31 @@ ran_seed = run%global%ran_seed
 out_root = run%global%out_root
 field_file = run%field_file
 lambda0 = run%winit%lambda0
-window_length = run%winit%window_length
-window_sample = run%winit%window_sample
+window_length = run%slicing%window_length
+window_sample = run%slicing%n_wavelength
+
+! A slice count states the window as well as a length does, and Genesis's own decks
+! think in one or the other. Both together would have to be reconciled, so they are
+! refused instead.
+
+if (run%slicing%n_slice > 0) then
+  if (window_length > 0) then
+    call out_io (s_error$, r_name, 'SLICING%WINDOW_LENGTH AND SLICING%N_SLICE BOTH STATE THE', &
+                                   'WINDOW. GIVE ONE.')
+    err_flag = .true.;  return
+  endif
+  window_length = run%slicing%n_slice * window_sample * lambda0
+endif
+
+! A flat current is Genesis's &beam current: the bunch's z structure is then not
+! consulted, and with no window it is the steady state of one slice. It and
+! beam_init%bunch_charge are two ways to say the same thing, so both is refused.
+
+if (run%slicing%current > 0 .and. beam_init%bunch_charge > 0) then
+  call out_io (s_error$, r_name, 'SLICING%CURRENT AND BEAM_INIT%BUNCH_CHARGE BOTH SET THE CHARGE.', &
+                                 'GIVE ONE.')
+  err_flag = .true.;  return
+endif
 grid_n_pts = run%winit%grid_n_pts
 grid_half_width = run%winit%grid_half_width
 seed_power = run%winit%seed_power
@@ -132,7 +155,7 @@ if (beam_file /= '') then
   if (lambda0 <= 0) then
     call out_io (s_error$, r_name, 'READING A BEAM DUMP NEEDS LAMBDA0 > 0.', &
                  'AN openPMD BEAM FILE CARRIES THE SLICE PARTITION AND NOT THE RADIATION', &
-                 'IT WAS SLICED ON, SO THE DECK MUST STATE lambda0 AND window_sample.', &
+                 'IT WAS SLICED ON, SO THE DECK MUST STATE lambda0 AND slicing%n_wavelength.', &
                  'FILE: ' // trim(beam_file))
     err_flag = .true.;  return
   endif
@@ -214,9 +237,9 @@ if (beam_init%a_norm_emit <= 0 .or. beam_init%b_norm_emit <= 0) then
   call out_io (s_error$, r_name, 'BEAM_INIT%A_NORM_EMIT AND %B_NORM_EMIT MUST BE POSITIVE.')
   err_flag = .true.;  return
 endif
-if (beam_init%bunch_charge <= 0) then
-  call out_io (s_error$, r_name, 'THE CURRENT IS DERIVED FROM THE DESCRIPTION; BEAM_INIT%BUNCH_CHARGE', &
-                                 'MUST BE POSITIVE (THERE IS NO CURRENT PARAMETER).')
+if (beam_init%bunch_charge <= 0 .and. run%slicing%current <= 0) then
+  call out_io (s_error$, r_name, 'THE CHARGE IS UNSTATED: SET BEAM_INIT%BUNCH_CHARGE FOR A BUNCH', &
+                                 'WITH A Z STRUCTURE, OR SLICING%CURRENT FOR A FLAT ONE.')
   err_flag = .true.;  return
 endif
 
@@ -234,7 +257,7 @@ endif
 if (beam_init%sig_pz < 0 .or. seed_power < 0 .or. grid_n_pts < 3 .or. grid_half_width <= 0 .or. &
     window_sample < 1) then
   call out_io (s_error$, r_name, 'CHECK BEAM_INIT%SIG_PZ, SEED_POWER, GRID_N_PTS, GRID_HALF_WIDTH,', &
-                                 'WINDOW_SAMPLE.')
+                                 'SLICING%N_WAVELENGTH.')
   err_flag = .true.;  return
 endif
 if (seed_power > 0 .and. seed_waist_size <= 0) then
@@ -276,12 +299,13 @@ else
 endif
 
 if (window_length > 0) then
-  if (zlen_gen == 0 .and. window_length > 1.5_rp * spacing_gen) then
+  if (zlen_gen == 0 .and. run%slicing%current <= 0 .and. window_length > 1.5_rp * spacing_gen) then
     call out_io (s_error$, r_name, 'SIG_Z = 0 (THE STEADY-STATE DESCRIPTION) IS INVALID FOR A', &
-                 'TIME-DEPENDENT WINDOW. GIVE THE BUNCH A LENGTH (SIG_Z, OR A GRID EXTENT).')
+                 'TIME-DEPENDENT WINDOW. GIVE THE BUNCH A LENGTH (SIG_Z, OR A GRID EXTENT),', &
+                 'OR STATE SLICING%CURRENT, WHICH IS FLAT AND NEEDS NO Z DESCRIPTION.')
     err_flag = .true.;  return
   endif
-  if (window_length < zlen_gen) then
+  if (window_length < zlen_gen .and. run%slicing%current <= 0) then
     call out_io (s_warn$, r_name, 'window_length = \es10.3\ m CLIPS the described bunch (\es10.3\ m).', &
                  r_array = [window_length, zlen_gen])
   endif
@@ -308,6 +332,7 @@ fbeam%p0c = p0_mc * m_electron
 fbeam%phi0 = 0
 fbeam%wavelength = lambda0
 fbeam%slice_spacing = spacing_gen
+fbeam%n_wavelength = window_sample
 fbeam%s0 = 0
 fbeam%beamlet_size = beamlet_size
 fbeam%one4one = .false.
@@ -315,11 +340,15 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 
-! The derived per-slice current: flat Q*c/extent inside the grid extent. Gaussian
+! The derived per-slice current: slicing%current where the deck states one, which needs
+! no z description and is Genesis's own &beam current. Otherwise from the bunch:
+! flat Q*c/extent inside the grid extent. Gaussian
 ! profile at the slice centers, bunch centered in the window. Steady state = the
 ! whole charge in the one slice window, I = Q*c/spacing.
 
-if (flat_z) then
+if (run%slicing%current > 0) then
+  cur_gen = run%slicing%current
+elseif (flat_z) then
   cur_gen = 0
   do is_g = 1, nslice_gen
     s_i = (is_g - 1) * spacing_gen - (nslice_gen - 1) * spacing_gen / 2

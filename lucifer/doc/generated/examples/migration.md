@@ -84,6 +84,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
   global%out_root = "migration"
   global%migrate = T
   global%migrate_check = T
+  slicing%window_length = 2.88e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -103,8 +105,6 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 151
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.88e-8
-  wavefront_init%window_sample = 3
 /
 ```
 
@@ -114,6 +114,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_params
   lat_file = "../aramis.bmad"
   global%out_root = "no_migrate"
+  slicing%window_length = 2.88e-8
+  slicing%n_wavelength = 3
 /
 
 &fel_beam_init
@@ -133,7 +135,5 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = 151
   wavefront_init%grid_half_width = 2e-4
-  wavefront_init%window_length = 2.88e-8
-  wavefront_init%window_sample = 3
 /
 ```

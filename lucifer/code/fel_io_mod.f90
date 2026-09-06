@@ -1159,19 +1159,32 @@ call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
       run%resample%n_slice, merr)
 call H5Gclose_f (g_id, h5e)
 
+! ------------------------------------------------------------ the slicing.
+
+call sub_open ('slicing', 'fel_slicing_struct', &
+      'The longitudinal discretization shared by the beam and the field (&fel_params slicing%).')
+call fel_h5_real (g_id, 'window_length', 'm', 'window length', &
+      'Time window. Zero means derived from the bunch, or one slice.', '', &
+      run%slicing%window_length, merr)
+call fel_h5_int (g_id, 'n_wavelength', '1', 'wavelengths per slice', &
+      'Slice spacing in wavelengths (Genesis''s sample), and so the number of ' // &
+      'undulator periods of slippage per slice. An integer, which is what lets the ' // &
+      'field record rotate by one index with no interpolation.', '', &
+      run%slicing%n_wavelength, merr)
+call fel_h5_int (g_id, 'n_slice', '1', 'slice count', &
+      'The window as a slice count. Zero means it came from window_length.', '', &
+      run%slicing%n_slice, merr)
+call fel_h5_real (g_id, 'current', 'A', 'flat current', &
+      'A flat current, which needs no z description. Zero means the current came ' // &
+      'from the bunch.', '', run%slicing%current, merr)
+call H5Gclose_f (g_id, h5e)
+
 ! ------------------------------------------------------------ the radiation start.
 
 call sub_open ('wavefront_init', 'wavefront_init_struct', &
       'The radiation starting condition (&fel_wavefront_init wavefront_init%).')
 call fel_h5_real (g_id, 'lambda0', 'm', 'lambda0', &
       'Fundamental radiation wavelength.', '', run%winit%lambda0, merr)
-call fel_h5_real (g_id, 'window_length', 'm', 'window length', &
-      'Time window. Zero means derived from the bunch.', '', run%winit%window_length, merr)
-call fel_h5_int (g_id, 'window_sample', '1', 'sample', &
-      'Slice spacing in wavelengths (Genesis''s sample), and so the number of ' // &
-      'undulator periods of slippage per slice. An integer, which is what lets the ' // &
-      'field record rotate by one index with no interpolation.', '', &
-      run%winit%window_sample, merr)
 call fel_h5_int (g_id, 'grid_n_pts', '1', 'grid points', &
       'Transverse grid points per side.', '', run%winit%grid_n_pts, merr)
 call fel_h5_real (g_id, 'grid_half_width', 'm', 'grid half width', &

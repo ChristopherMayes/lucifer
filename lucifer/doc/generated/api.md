@@ -565,6 +565,32 @@ Output:
   rate     -- real(rp): dphi0/ds [rad/m].
 ```
 
+(api-fel-n-wavelength)=
+### `fel_n_wavelength`
+
+*Function* `(spacing, wavelength, err_flag) result (n)`
+
+```
+Routine to recover the wavelengths per slice from a spacing in metres.
+
+The deck states this as an integer and the code carries it as one. A dump does not:
+openPMD and Genesis's own format both record the spacing and not what it is a multiple
+of, so a beam read from one recovers the integer here, once, and every consumer reads
+it afterwards. A spacing that is not a whole number of wavelengths is refused: the
+slice ring rotates by one index per slice of slippage, which is exact only then, and a
+run that silently rounded would drift a fraction of a wavelength per slice.
+```
+
+```
+Input:
+  spacing     -- real(rp): Slice spacing [m].
+  wavelength  -- real(rp): Radiation wavelength [m].
+
+Output:
+  err_flag    -- logical: Set True if the spacing is not a whole number of wavelengths.
+  n           -- integer: Wavelengths per slice.
+```
+
 (api-fel-slice-diag)=
 ### `fel_slice_diag`
 
@@ -2303,9 +2329,9 @@ Output:
 *Function* `(param_file) result (found)`
 
 ```
-Refuse the retired flat &fel_track_params group: list every parameter set
-in it together with the group and name it moved to, so migration is a mechanical
-edit of the input file.
+Refuse retired input names, each with the name that replaced it, so migration is a
+mechanical edit of the input file. Two are refused: the flat &fel_track_params group,
+and the window parameters that moved out of wavefront_init into slicing.
 ```
 
 ```
@@ -2313,8 +2339,8 @@ Input:
   param_file -- character(*): Input file name.
 
 Output:
-  found      -- logical: True when the retired &fel_track_params group is present
-                  (the caller then refuses with the parameter mapping table).
+  found      -- logical: True when a retired name is present (the caller then refuses,
+                  the message naming what replaced it).
 ```
 
 ## `fel_io_mod.f90`
@@ -3351,6 +3377,29 @@ driver wants several passes over one state. fel_run_struct passes as an argument
 everywhere.
 ```
 
+(api-fel-slicing-struct)=
+### `fel_slicing_struct`
+
+*Struct*
+
+```
+The longitudinal discretization of the run, exposed in &fel_params as slicing%. One
+window, one definition: the beam's slices and the field's z samples are the same
+partition, so it belongs to neither the beam nor the field and sits beside them.
+
+Slippage is an index rotation of the slice ring, exact and free of interpolation,
+which holds only when the spacing is a whole number of wavelengths. n_wavelength is
+that whole number, and it is carried as an integer from here to every consumer:
+recovering it by dividing a spacing in metres by a wavelength gives 12 to the last
+bit rather than 12, which the device's exact bucket arithmetic then refuses
+(FINDINGS 7.52).
+
+The window is stated as a length or as a slice count, never both. current states a
+flat current directly, which is Genesis's &beam current: with a window it is a flat
+time-dependent run, and with none it is the steady state of one slice, so no separate
+steady-state switch exists. Unset, the current comes from the bunch's own z structure.
+```
+
 (api-fel-global-struct)=
 ### `fel_global_struct`
 
@@ -3369,10 +3418,10 @@ physics description lives in the lattice, beam_init and wavefront_init.
 
 ```
 The radiation starting condition, the beam_init_struct analog (&fel_wavefront_init).
-The field record is the time window, so the window lives here: window_length and
-window_sample set the slice count and spacing for the field and the generated beam
-(one window, one definition). harmonics requests the field set. field_file imports
-override the seed.
+A wavefront is an optical object: a transverse grid, a wavelength, a longitudinal
+spacing and nothing else longitudinal. The time window that sets that spacing is the
+FEL interaction's, not the field's, and lives in fel_slicing_struct. harmonics requests
+the field set. field_file imports override the seed.
 ```
 
 (api-fel-chamber-wake-init-struct)=

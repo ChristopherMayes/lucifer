@@ -399,7 +399,7 @@ integer nslice, sample, is, ic, i, j, is0, idx
 if (.not. wake%on) return
 
 nslice = size(beam%slice)
-sample = nint(beam%slice_spacing / beam%wavelength)
+sample = beam%n_wavelength
 dscur = beam%slice_spacing
 
 allocate (cur(0:nslice), current(0:wake%ns-1), dcurrent(0:wake%ns-1))

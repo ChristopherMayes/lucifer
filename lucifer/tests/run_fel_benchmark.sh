@@ -373,6 +373,7 @@ make_nml () {
   global%interlude_model = "$4"
   global%transport_model = "genesis"
   global%write_diag = T
+  slicing%n_wavelength = $sample
 ${6:+  $6}
 /
 &fel_beam_init
@@ -383,7 +384,6 @@ ${7:+  $7}
 &fel_wavefront_init
   field_file = "$5-initial.wf.h5"
   wavefront_init%lambda0 = $lam
-  wavefront_init%window_sample = $sample
 /
 NML
 }

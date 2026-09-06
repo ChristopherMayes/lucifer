@@ -188,6 +188,8 @@ fbeam%p0c = p0_mc * m_electron
 fbeam%phi0 = 0
 fbeam%wavelength = lambda0
 fbeam%slice_spacing = slice_spacing
+fbeam%n_wavelength = fel_n_wavelength(slice_spacing, lambda0, err_flag)
+if (err_flag) return
 fbeam%s0 = 0
 fbeam%beamlet_size = prm%beamlet_size
 fbeam%one4one = .false.
