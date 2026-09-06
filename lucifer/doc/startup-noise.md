@@ -232,9 +232,11 @@ within a factor of 1.5 over cell sizes of 0.78 to 6.35 µm and beamlet counts of
 
 ## The source filter, measured
 
-Of the four remedies below, one is now in this code and measured against the split this page defines. `global%source_filter` multiplies the transformed source by a sigmoid in normalized transverse spatial frequency, transcribed from Genesis4's own filter and agreeing with it at 2.2e-6 ([](fel-physics.md#sec-source-filter), [](validation.md#val-source-filter)). Two things set it: where the sigmoid's edge sits, and how sharply it falls. Both matter, and the second one turns out to matter more.
+Of the four remedies below, one is now in this code and measured against the split this page defines. `global%source_filter` multiplies the transformed source by a sigmoid in normalized transverse spatial frequency, transcribed from Genesis4's own filter and agreeing with it at 2.2e-6 ([](fel-physics.md#sec-source-filter), [](validation.md#val-source-filter)). Two things set it: where the sigmoid's edge sits, and how sharply it falls. Both matter, and the second decides whether the filter helps or harms.
 
-The measurement is the sweep of this page at 1.57 µm cells, with the filter's edge at the central cone of one segment, 7.1 µrad, and at the 3 µrad cut this page splits at. Genesis4's default width of 1 is in the same normalized units as the edge, which makes the sigmoid 0.73 on axis: at that width the filter attenuates the coherent source as much as the wide angles. The sharp rows use a width of 0.05.
+The measurement is the sweep of this page at 1.57 µm cells, with the filter's edge at the central cone of one segment, 7.1 µrad, and at the 3 µrad cut this page splits at, each at two widths. Genesis4's own default width of 1 is in the same units as the edge, which puts the sigmoid at 0.73 on axis: at that width the filter attenuates the coherent source as much as the wide angles. The sharp rows use a width of 0.05 of the edge. Genesis4's default edge, `xcut = 1`, lies at twice the Nyquist angle, off the grid, so its default filter is the soft roll-off alone.
+
+The derived default rows set nothing. The run computes the edge from the beam and the gain as the larger of four mode diffraction angles, 2.97 µrad here, and the angle at which the resonant wavelength red-shifts by ρ, 2.61 µrad ([](fel-physics.md#sec-source-filter)), at the default width. It lands on the 3 µrad cut this page chose by hand, and the two rows are the same filter to the digits shown.
 
 ```{table} The source filter against the split, 1.57 µm cells, 300-slice window. The wide-angle column is the factor by which the power outside 3 µrad falls at the exit. The in-cone column is the power inside 3 µrad at the end of the first undulator, where the physical spontaneous emission within that angle is 0.13 MW. The mode column is the change in the power inside 3 µrad at the exit, against a SASE fluctuation of about 25 percent.
 :name: tab-sn-filter
@@ -242,15 +244,17 @@ The measurement is the sweep of this page at 1.57 µm cells, with the filter's e
 | particles | edge | width | wide-angle at exit | in-cone at z = 4 m (MW) | mode at exit | bunching at 37 m | saturation (m) |
 |---|---|---|---|---|---|---|---|
 | 1024 | none | | 1 | 0.133 | | | 28.2 |
-| 1024 | cone | 1 | 2.8x | 0.067 | -18% | -32% | 37.7 |
-| 1024 | 3 µrad | 1 | 5.5x | 0.062 | +4% | -35% | 37.7 |
-| 1024 | cone | 0.05 | 1.1x | 0.132 | +13% | +3% | 28.2 |
-| 1024 | 3 µrad | 0.05 | 3.6x | 0.129 | +49% | +7% | 32.9 |
+| 1024 | derived, 2.97 µrad | 0.05 | 1500x | 0.111 | +102% | +28% | 32.9 |
+| 1024 | 7.1 µrad | 1 | 12x | 0.058 | +24% | -40% | 37.7 |
+| 1024 | 7.1 µrad | 0.05 | 10x | 0.129 | +69% | +17% | 32.9 |
+| 1024 | 3 µrad | 1 | 85x | 0.043 | +56% | -53% | 37.7 |
+| 1024 | 3 µrad | 0.05 | 1300x | 0.112 | +102% | +28% | 32.9 |
 | 4096 | none | | 1 | 0.123 | | | 32.9 |
-| 4096 | cone | 1 | 3.1x | 0.063 | -8% | -57% | 37.7 |
-| 4096 | 3 µrad | 1 | 5.9x | 0.059 | -6% | -59% | 37.7 |
-| 4096 | cone | 0.05 | 1.1x | 0.122 | +2% | 0% | 32.9 |
-| 4096 | 3 µrad | 0.05 | 3.2x | 0.122 | +17% | +1% | 32.9 |
+| 4096 | derived, 2.97 µrad | 0.05 | 1100x | 0.106 | +19% | +5% | 32.9 |
+| 4096 | 7.1 µrad | 1 | 13x | 0.055 | -6% | -63% | 37.7 |
+| 4096 | 7.1 µrad | 0.05 | 9x | 0.122 | +12% | 0% | 32.9 |
+| 4096 | 3 µrad | 1 | 83x | 0.042 | -7% | -70% | 42.4 |
+| 4096 | 3 µrad | 0.05 | 860x | 0.107 | +19% | +5% | 32.9 |
 ```
 
 ```{figure} generated/startup-noise/source-filter.png
@@ -259,13 +263,38 @@ The measurement is the sweep of this page at 1.57 µm cells, with the filter's e
 Power per slice inside 3 µrad (circles) and outside it (crosses) against z, with the filter off and at four settings, for 1024 and 4096 macroparticles per slice at 1.57 µm cells.
 ```
 
-At Genesis4's default width the filter halves the power inside the cone at the end of the first undulator, from 0.13 MW to 0.06 MW, where 0.13 MW is the physical spontaneous emission the beam radiates into that angle. It removes half the startup seed along with the artifact, and the gain arrives late: the bunching at 37 m falls by a third to a half and saturation moves from 28 to 33 m out to 37.7 m. The power at the exit is then no better a measure of the machine than it was before, since the run has not finished saturating.
+The wide-angle column is the filter doing what a filter does. Free propagation conserves angle, so once the source is cut beyond the edge nothing arrives there, and a sharp edge on the 3 µrad cut leaves 0.9 MW per slice outside it at the exit where the unfiltered run had 0.96 GW. That column says the filter works. The other three columns say what it costs, and they are the measurement.
 
-At a sharp edge on the 3 µrad cut the same filter removes 3.2 to 3.6 times the wide-angle power while the in-cone startup power is unchanged to 3 percent, the bunching at 37 m is unchanged to a few percent, and the saturation point moves by at most one FODO cell. The power inside the mode at the exit rises by 17 to 49 percent, inside the fluctuation of the process at 1024 particles and above it at 4096, which is the mode keeping power that used to diffract away. A sharp edge at the cone removes almost nothing, because most of the wide-angle power sits between the cut and the cone rather than beyond it.
+At Genesis4's default width the filter halves the power inside the cone at the end of the first undulator, from 0.13 MW to 0.04 or 0.06 MW, where 0.13 MW is the physical spontaneous emission the beam radiates into that angle. It removes half the startup seed along with the artifact, and the gain arrives late: the bunching at 37 m falls by a third to two thirds and saturation moves from 28 and 33 m out to 38 and 42 m. The power at the exit is then no better a measure of the machine than before, since the run has not finished saturating.
 
-What the filter does not do is make the total power a converged quantity. Even at the sharp 3 µrad edge the wide-angle part is still 0.30 GW per slice at the exit against 0.56 GW inside the mode, so the criterion of [](#sn-recommendations) still applies and the split is still the measurement to take. The filter costs 14 percent of the wall clock at 4096 macroparticles, 31 s against 27 s, since the source gains a transform pair it did not need.
+At a sharp edge on the 3 µrad cut, the derived default, the in-cone startup power is 0.107 to 0.112 MW, which is 14 percent under the unfiltered 0.123 to 0.133: the sigmoid's fall, 0.15 µrad wide, sits inside the measurement cut and trims the edge of the physical cone. Saturation absorbs it. At 4096 particles the bunching at 37 m is unchanged to 5 percent, the saturation point does not move, and the power inside the mode at the exit rises 19 percent, which is the mode keeping power that used to diffract away and is inside the fluctuation of the process. At 1024 particles the same filter raises the mode power by a factor of two and the bunching at 37 m by 28 percent, and saturation moves from 28.2 to 32.9 m. This page's earlier sections found that at 128 beamlets the wide-angle emission drains the beam. The filter removes the drain, and the beam at 1024 particles then saturates where the beam at 4096 does. A sharp edge at the cone, 7.1 µrad, removes 9 to 10 times the wide-angle power and leaves a tenth of it, since the emission between the cut and the cone is the larger share.
 
-Two cautions carry from this. The width is not a detail: Genesis4's default of 1 attenuates the source on axis by 27 percent in amplitude, and a filter meant to remove only the wide angles wants a width well below the edge it cuts at. And a filter alone does not restore what it removes. The half of the physical spontaneous emission the soft filter takes out is exactly what Tanaka's remedy adds back analytically ([](references.md#ref-tanaka)), and this measurement is the case for that add-back rather than against it.
+With the default filter on, the outside part is 0.2 percent of the inside part at the exit, and the total power is a converged quantity by the criterion of [](#sn-recommendations). The filter costs 14 percent of the wall clock at 4096 macroparticles, 31 s against 27 s, since the source gains a transform pair it did not need.
+
+Two cautions carry from this. The width is not a detail: Genesis4's default leaves the sigmoid at 0.73 on axis, and a filter meant to remove only the wide angles wants a width well below the edge it cuts at, which is why the code refuses a width that puts the axis below 0.99. And an edge near the mode trims the physical seed by a measured 14 percent that saturation hides. A filter removes what it removes and restores nothing, and the seed a soft filter takes out is exactly what Tanaka's remedy adds back analytically ([](references.md#ref-tanaka)). This measurement is the case for that add-back rather than against it.
+
+## The default on a second machine
+
+A default verified on one machine has been verified against that machine's coincidences. On Aramis the two angles the default is built from, four mode diffraction angles and the ρ angle, are 2.96 and 2.61 µrad, and both sit in the wide band between the mode and the grid's Nyquist angle of 32 µrad, so an edge four times too wide would have looked as good as the right one. It did, for a day: the first version of the conversion from an angle to Genesis4's `xcut` was a factor of four off, and every edge quoted above was measured at four times its stated angle before a second machine exposed it (FINDINGS 7.51).
+
+The second machine is a line in the FLASH régime, `tests/bmad/flash.bmad`: 10 nm from an 803 MeV beam through twelve helical segments of 165 periods at 27.3 mm, 1.5 kA, 1.5 µm normalized emittance, a beam five times the size of Aramis's and a wavelength a hundred times longer. Its ratio of Rayleigh length to gain length is 2.6 times smaller, so the two angles come out in a different ratio: the mode angle is 65.2 µrad and the ρ angle 34.8, ratio 1.87 against Aramis's 1.13, and the mode angle wins again. The central cone of one segment is 66.6 µrad, so on this machine the default edge and the physical cone nearly coincide. The grid is the beam's, 128 points at 15.7 µm cells, and the load is 1024 macroparticles per slice in a 300-slice window; the run is on the CPU, since the device refuses this window's sample as a real number that is not quite 12, and takes about 35 minutes on twelve threads.
+
+```{table} The derived default on the second machine. The split is at the derived edge, 65.2 µrad, and the bunching is read at the end of the eighth undulator, z = 43 m.
+:name: tab-sn-filter-flash
+
+| filter | in-cone at z = 4.5 m (kW) | inside at exit (GW) | outside at exit | bunching at 43 m | saturation (m) |
+|---|---|---|---|---|---|
+| none | 6.75 | 1.22 | 0.68 GW | 0.062 | 27.1 |
+| derived default, 65.2 µrad, width 0.05 | 4.75 | 1.29 | 4.1 MW | 0.072 | 27.1 |
+```
+
+```{figure} generated/startup-noise/source-filter-flash.png
+:name: fig-sn-filter-flash
+
+Power per slice inside 65.2 µrad (circles) and outside it (crosses) against z on the second machine, with the filter off and at its derived default, 1024 macroparticles per slice at 15.7 µm cells.
+```
+
+The default holds. The power inside the mode at the exit rises 6 percent, inside the fluctuation, saturation does not move, and the power outside the edge falls from 0.68 GW to 4 MW per slice, 165 times. What the default costs here is the same thing it cost on Aramis, more of it: the in-cone startup power falls from 6.75 to 4.75 kW, 30 percent, because the edge sits on the physical cone and the sigmoid's fall, 3.3 µrad wide, takes the cone's rim with it. Saturation absorbs it, as it did the 14 percent on Aramis, and the bunching at 43 m is 16 percent higher with the filter than without. On both machines the mode angle won, so the ρ angle's case, where four mode angles fall inside the bandwidth of the interaction, is not yet measured: it needs $z_R/L_g$ above about 50, a hard X-ray line with a small beam. Until it is, the default is measured over ratios of 1.1 to 1.9, and the warning the code prints outside 0.3 to 3 is where that measurement's authority ends.
 
 ## The other remedies
 

@@ -446,7 +446,8 @@ $w$ is its width as a fraction of the edge, so the sigmoid on axis is
 $1/(1 + e^{-1/w})$.
 
 The edge is set as an angle, since it is a property of the beam and the gain and not of
-the mesh. $c_x = c_y = 1$ is the angle $\lambda/(4\,\mathit{dgrid})$, and
+the mesh. Genesis normalizes the shifted grid index by the grid size, so $c_x = c_y = 1$
+is twice the Nyquist index, the angle $\lambda/\mathit{dgrid}$, off the grid, and
 `source_filter_angle` divided by that is what the kernel builds from. Left unset, the
 angle is
 
@@ -500,7 +501,8 @@ SASE run has to separate from the mode before quoting a power.
 filtered branch, lines 74-100) and `FieldSolverFFT::initSourceFilter` (lines 158-170).
 Genesis4 added the filter in release 4.6.12 with its FFT solver, describing it in the
 changelog as suppressing strongly diffracting field components from a rough distribution of
-the source term. The exponent of Eq. [](#eq-sigmoid) is clamped at 700 here, which Genesis
+the source term. At its defaults the edge lies beyond the grid, so its default filter is
+the soft roll-off of the sigmoid alone. The exponent of Eq. [](#eq-sigmoid) is clamped at 700 here, which Genesis
 does not do: it is unreachable at Genesis4's own cuts and overflows for a cut small enough
 to carry the grid's corner far outside the edge, where $\sigma$ is already zero in double
 precision.

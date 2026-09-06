@@ -704,16 +704,20 @@ endif
 
 if (any(is_fel)) then
   block
-    real(rp) th_mode, th_rho, th, half_nyq, ratio
+    real(rp) th_mode, th_rho, th, ang_per_xcut, ratio
     character(24) origin
     integer ie_first
 
-    ! xcut = 1 places the edge at half the grid's Nyquist frequency, which is the angle
-    ! lambda/(4 dx). The grid comes from the input rather than from the built wavefront,
-    ! since the conversion has to hold for every member of the field set.
+    ! Genesis normalizes the shifted grid index by ngrid, so its x = 1 is the index ngrid
+    ! itself, twice the Nyquist index, and xcut = 1 places the sigmoid's edge at the angle
+    ! lambda/dx, off the grid. An edge at the angle theta is therefore xcut = theta dx /
+    ! lambda. A first version of this line had lambda/(4 dx) and every edge landed four
+    ! times wider than its name, which the Aramis benchmark hid and a second machine
+    ! caught (FINDINGS 7.51). The grid comes from the input rather than from the built
+    ! wavefront, since the conversion has to hold for every member of the field set.
 
     ie_first = findloc(is_fel, .true., dim = 1)
-    half_nyq = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (8 * run%winit%grid_half_width)
+    ang_per_xcut = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (2 * run%winit%grid_half_width)
 
     call fel_filter_angles (fbeam, run%und_of(ie_first), fbeam%wavelength, th_mode, th_rho)
 
@@ -734,7 +738,7 @@ if (any(is_fel)) then
       end where
       call out_io (s_info$, r_name, 'Source filter: edge from xcut and ycut, ' // &
                    'validation-internal, at \es10.3\ rad on this grid.', &
-                   r_array = [run%global%source_filter_xcut * half_nyq])
+                   r_array = [run%global%source_filter_xcut * ang_per_xcut])
 
     else
       if (run%global%source_filter_angle > 0) then
@@ -770,8 +774,8 @@ if (any(is_fel)) then
       endif
 
       where (is_fel)
-        run%und_of%filter%xcut = th / half_nyq
-        run%und_of%filter%ycut = th / half_nyq
+        run%und_of%filter%xcut = th / ang_per_xcut
+        run%und_of%filter%ycut = th / ang_per_xcut
         run%und_of%filter%angle = th
       end where
     endif

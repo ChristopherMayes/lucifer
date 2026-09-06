@@ -78,10 +78,10 @@ type fel_global_struct
   ! the mode loses real radiation while leaving artifact in only weakens the filter, so
   ! the default errs wide.
   real(rp) :: source_filter_angle = 0
-  ! The sigmoid's edge in units of half the grid's Nyquist frequency, per plane, which is
-  ! Genesis4's xcut and ycut. Validation-internal: they place the edge where Genesis4
-  ! places it, and a run that sets them and the angle together is refused. An angle is
-  ! independent of the grid and these are not.
+  ! The sigmoid's edge in Genesis4's own units, xcut and ycut: the shifted grid index over
+  ! ngrid, so 1 is twice the Nyquist index and the angle xcut lambda/dx. Validation-internal:
+  ! they place the edge where Genesis4 places it, and a run that sets them and the angle
+  ! together is refused. An angle is independent of the grid and these are not.
   real(rp) :: source_filter_xcut = 0
   real(rp) :: source_filter_ycut = 0
   ! The sigmoid's width as a fraction of its edge, Genesis4's sigmoid. Small is a sharp

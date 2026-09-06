@@ -1,0 +1,27 @@
+! A soft X-ray line in the FLASH régime, for the second machine the source filter's
+! default is measured on (doc/startup-noise.md). It is not FLASH: it is a line with
+! FLASH's scales, chosen so that the ratio of the two angles the filter's default is
+! built from differs from the Aramis benchmark's. Each segment is 165 periods, so the
+! wiggler has a whole number of them. The beam is ten times the emittance
+! and five times the size, the wavelength a hundred times longer, and z_R/L_g falls
+! from 41 to about 16, which moves the ratio of the mode angle to the rho angle from
+! 1.13 to about 1.9.
+
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 8.0333e8
+
+beginning[beta_a] = 10.0
+beginning[beta_b] = 10.0
+
+UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = helical_model, &
+     b_max = 0.35307, tracking_method = fel_averaged, mat6_calc_method = tracking
+
+D1: drift, l = 0.6
+D2: drift, l = 0.3
+QF: quadrupole, l = 0.1, k1 = 2.5
+QD: quadrupole, l = 0.1, k1 = -2.5
+
+FODO: line = (UND, D1, QF, D2, UND, D1, QD, D2)
+FLASHLINE: line = (6*FODO)
+use, FLASHLINE

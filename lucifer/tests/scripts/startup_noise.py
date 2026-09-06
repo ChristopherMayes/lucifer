@@ -70,6 +70,23 @@ M_E_EV = 0.51099895e6
 EPS0 = 8.8541878128e-12
 I_ALFVEN = 17045.0
 
+# Two machines. The Aramis benchmark is the page's own, and the second is a line in the
+# FLASH regime, a hundred times the wavelength on a beam five times the size, whose
+# z_R/L_g is 2.6 times smaller. The filter's default is built from two angles whose ratio
+# goes as 1/sqrt(z_R/L_g), so a second machine is what says whether the default is general
+# or a property of the first (fel-physics.md sec-source-filter).
+
+MACHINES = {
+    "aramis": dict(lat="aramis.bmad", lat2="aramis_x2.bmad", lambda0=1e-10, half_width=2e-4,
+                   current=3000.0, sig_pz=8.804506566858e-5, norm_emit=4e-7, gamma0=11357.82,
+                   aw=0.84853, lambda_u=0.015, seg_length=3.99, beta_a=8.53711, beta_b=17.3899,
+                   gaps=(0.44, 0.08, 0.24), filter_grid=256, cuts=(2e-6, 3e-6, 5e-6)),
+    "flash": dict(lat="flash.bmad", lat2=None, lambda0=1e-8, half_width=1e-3,
+                  current=1500.0, sig_pz=1.0e-4, norm_emit=1.5e-6, gamma0=1572.0,
+                  aw=0.9, lambda_u=0.0273, seg_length=4.5045, beta_a=10.0, beta_b=10.0,
+                  gaps=(0.6, 0.1, 0.3), filter_grid=128, cuts=(4e-5, 6.52e-5, 1e-4)),
+}
+
 LAMBDA0 = 1e-10
 HALF_WIDTH = 2e-4
 CURRENT = 3000.0
@@ -83,7 +100,32 @@ BETA_A = 8.53711
 BETA_B = 17.3899
 FILL = SEG_LENGTH / (SEG_LENGTH + 0.44 + 0.08 + 0.24)   # undulator length per meter of line
 
+
+def select_machine(name):
+    """Point the module's deck and theory constants at one machine."""
+    m = MACHINES[name]
+    g = globals()
+    g["LAMBDA0"] = m["lambda0"];      g["HALF_WIDTH"] = m["half_width"]
+    g["CURRENT"] = m["current"];      g["SIG_PZ"] = m["sig_pz"]
+    g["NORM_EMIT"] = m["norm_emit"];  g["GAMMA0"] = m["gamma0"]
+    g["AW"] = m["aw"];                g["LAMBDA_U"] = m["lambda_u"]
+    g["SEG_LENGTH"] = m["seg_length"]
+    g["BETA_A"] = m["beta_a"];        g["BETA_B"] = m["beta_b"]
+    g["FILL"] = m["seg_length"] / (m["seg_length"] + sum(m["gaps"]))
+    # The middle cut is the one reported: on the first machine the 3 urad of the page, on
+    # the second the edge the code derives for it, 65 urad, since a cut inside the mode
+    # would report the mode's own shape rather than the split.
+    g["THETA_CUTS"] = m["cuts"]
+    g["REPORT_CUT"] = f"{m['cuts'][1]:.0e}"
+    return m
+
 THETA_CUTS = (2e-6, 3e-6, 5e-6)   # rad, the far-field radii. 3e-6 is the one reported.
+REPORT_CUT = "3e-06"              # the key of the reported radius, f"{cut:.0e}"
+
+
+def cut_key(kind):
+    """The far-field key for the reported radius, 'in' or 'out'."""
+    return f"{kind}_{REPORT_CUT}"
 GRIDS = (64, 128, 256, 512)
 NPARTS = (1024, 4096, 16384, 65536)
 LONG = (300, 12)          # (slices, sample) the window longer than the line's slippage
@@ -104,20 +146,20 @@ DECK = """&fel_params
   beam_init%n_particle = {npart}
   beam_init%bunch_charge = {charge:.12e}
   beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -{half:.6e}
-  beam_init%grid(3)%x_max = {half:.6e}
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam_init%grid(3)%x_min = -{zhalf:.6e}
+  beam_init%grid(3)%x_max = {zhalf:.6e}
+  beam_init%sig_pz = {sigpz:.12e}
+  beam_init%a_norm_emit = {emit:.6e}
+  beam_init%b_norm_emit = {emit:.6e}
   shot_noise = T
   beamlet_size = {beamlet}
 /
 
 &fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+  wavefront_init%lambda0 = {lam0:.12e}
   wavefront_init%seed_power = 0
   wavefront_init%grid_n_pts = {ngrid}
-  wavefront_init%grid_half_width = 2e-4
+  wavefront_init%grid_half_width = {half:.6e}
   wavefront_init%window_length = {slen:.6e}
   wavefront_init%window_sample = {sample}
 /
@@ -198,9 +240,9 @@ def cell_size(ngrid):
 def filter_xcut(ngrid, theta):
     """The source filter's xcut that puts its sigmoid's edge at the angle theta.
 
-    The edge sits at half the grid's Nyquist frequency times xcut, and half Nyquist is
-    the angle lambda/(4 dx) (fel-physics.md sec-source-filter)."""
-    return theta / (LAMBDA0 / (4 * cell_size(ngrid)))
+    Genesis normalizes the shifted grid index by ngrid, so xcut = 1 is the angle
+    lambda/dx, twice the Nyquist angle (fel-physics.md sec-source-filter)."""
+    return theta * cell_size(ngrid) / LAMBDA0
 
 
 def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0):
@@ -210,7 +252,9 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
     extra = ""
     if device != "off":
         extra += f'  global%device = "{device}"\n'
-    if xcut is not None:
+    if xcut == "default":
+        extra += '  global%source_filter = T\n'
+    elif xcut is not None:
         extra += ('  global%source_filter = T\n'
                   f'  global%source_filter_xcut = {xcut:.9f}\n'
                   f'  global%source_filter_ycut = {xcut:.9f}\n'
@@ -218,7 +262,8 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
     if dumps:
         extra += "  global%dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
     return DECK.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
-                       charge=charge, half=slen / 2, slen=slen, sample=sample, extra=extra)
+                       charge=charge, zhalf=slen / 2, slen=slen, sample=sample, extra=extra,
+                       lam0=LAMBDA0, sigpz=SIG_PZ, emit=NORM_EMIT, half=HALF_WIDTH)
 
 
 class Runner:
@@ -404,7 +449,7 @@ def exp_floor(rn, args, lat, results):
     rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
     dev = res["floor_g64_n1024"]["dumps"]
     rel = max(abs(a["total"] - b["total"]) / b["total"] for a, b in zip(dev, rows))
-    rel_in = max(abs(a["in_3e-06"] - b["in_3e-06"]) / b["in_3e-06"] for a, b in zip(dev, rows))
+    rel_in = max(abs(a[cut_key("in")] - b[cut_key("in")]) / b[cut_key("in")] for a, b in zip(dev, rows))
     res["cpu_cross_check"] = {"worst_total_rel": rel, "worst_inside_rel": rel_in, "dumps": rows}
     print(f"  device vs CPU at grid 64, 1024 particles: total {rel:.2e}, inside 3 urad {rel_in:.2e}")
     results["floor"] = res
@@ -420,11 +465,13 @@ def exp_filter(rn, args, lat, results):
     of one segment, which is where the physical emission stops, and the 3 urad cut this
     page splits at, which is inside the cone and inside the coherent mode.
     """
-    print("== g. the source filter against the mode power, grid 256 ==")
-    ng = 256
+    # The grid comes from the beam, as the page's own criterion says: cells of about
+    # sigma/7. The second machine's beam is five times the first's, so its grid is coarser.
+    ng = MACHINES[args.machine]["filter_grid"]
+    print(f"== g. the source filter against the mode power, grid {ng} ==")
     th = results["theory"]
-    edges = {"cone": th["theta_cone_one_segment"], "cut": 3e-6}
-    res = {"ngrid": ng, "dx": cell_size(ng), "edges": {}}
+    edges = {"cone": th["theta_cone_one_segment"], "cut": THETA_CUTS[1]}   # the reported cut
+    res = {"ngrid": ng, "dx": cell_size(ng), "edges": {}, "machine": args.machine}
     for name, theta in edges.items():
         res["edges"][name] = {"theta": theta, "xcut": filter_xcut(ng, theta)}
 
@@ -432,13 +479,18 @@ def exp_filter(rn, args, lat, results):
     # very soft roll-off: the sigmoid is 1/(1 + exp(-1/w)) = 0.73 on axis, so it attenuates
     # the coherent source as well as the wide angles. The sharp pair separates the filter's
     # angular selectivity from that softness.
-    cases = [("off", None, 1.0)]
-    for k, v in res["edges"].items():
-        cases.append((k, v["xcut"], 1.0))
-        cases.append((k + "_sharp", v["xcut"], SHARP_WIDTH))
+    cases = [("off", None, 1.0), ("default", "default", 0.0)]
+    if args.machine == "aramis":
+        # The edge and width sweep is the first machine's. The second answers one
+        # question, whether the derived default holds there, and its runs are on the CPU
+        # at about 48 minutes each on four threads, so it takes the two cases that answer it.
+        for k, v in res["edges"].items():
+            cases.append((k, v["xcut"], 1.0))
+            cases.append((k + "_sharp", v["xcut"], SHARP_WIDTH))
     res["sharp_width"] = SHARP_WIDTH
 
-    for npart in (1024, 4096):
+    loads = (1024, 4096) if args.machine == "aramis" else (1024,)
+    for npart in loads:
         for name, xcut, width in cases:
             # The unfiltered case is experiment a's own deck, so the runner skips it when
             # that experiment has already run in this work directory.
@@ -457,13 +509,13 @@ def exp_filter(rn, args, lat, results):
             }
 
     # The three numbers the page needs, at the last dump and at z = 37 m.
-    for npart in (1024, 4096):
+    for npart in loads:
         base = res[f"n{npart}_off"]
         for name, _, _ in cases[1:]:
             r = res[f"n{npart}_{name}"]
             for tag, i in (("z37", 3), ("exit", 4)):
-                o0, o1 = base["dumps"][i]["out_3e-06"], r["dumps"][i]["out_3e-06"]
-                i0, i1 = base["dumps"][i]["in_3e-06"], r["dumps"][i]["in_3e-06"]
+                o0, o1 = base["dumps"][i][cut_key("out")], r["dumps"][i][cut_key("out")]
+                i0, i1 = base["dumps"][i][cut_key("in")], r["dumps"][i][cut_key("in")]
                 r[f"wide_factor_{tag}"] = o0 / o1 if o1 > 0 else float("inf")
                 r[f"mode_rel_{tag}"] = (i1 - i0) / i0
             r["b_rel_z37"] = (r["b"][UND_END_RECORDS[8]] - base["b"][UND_END_RECORDS[8]]) \
@@ -501,8 +553,13 @@ def saturation_point(z, P):
     lnP = np.log(np.maximum(P, 1e-300))
     rate = np.gradient(lnP, z)
     i0 = int(np.argmax(rate))
+    # The growth rate dips to zero in every drift, and a run whose startup is far below
+    # its saturated power has a peak rate high enough for such a dip to pass the test in
+    # the exponential regime. Saturation is where the growth stops near the top, so the
+    # power there has to be within a decade of the run's maximum.
+    pmax = float(np.max(P))
     for i in range(i0, len(z)):
-        if rate[i] < 0.1 * rate[i0]:
+        if rate[i] < 0.1 * rate[i0] and P[i] > 0.1 * pmax:
             return float(z[i]), float(P[i])
     return float("nan"), float("nan")
 
@@ -597,23 +654,29 @@ def filter_figure(results, out):
              ("cut", "edge at 3 urad, width 1", "tab:red", "-"),
              ("cone_sharp", f"edge at the cone, width {fi['sharp_width']}", "tab:green", "--"),
              ("cut_sharp", f"edge at 3 urad, width {fi['sharp_width']}", "tab:blue", "--")]
-    fig, ax = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
-    for j, npart in enumerate((1024, 4096)):
+    loads = [n for n in (1024, 4096) if f"n{n}_off" in fi]
+    fig, ax = plt.subplots(1, len(loads), figsize=(5 * len(loads), 4), sharey=True, squeeze=False)
+    ax = ax[0]
+    for j, npart in enumerate(loads):
         for name, label, c, ls in cases:
+            if f"n{npart}_{name}" not in fi:
+                continue          # the second machine runs the default alone
             r = fi[f"n{npart}_{name}"]
             z = [d["z"] for d in r["dumps"]]
-            ax[j].semilogy(z, [d["in_3e-06"] for d in r["dumps"]], ls, color=c, marker="o",
+            ax[j].semilogy(z, [d[cut_key("in")] for d in r["dumps"]], ls, color=c, marker="o",
                            ms=3, label=label if j == 0 else None)
-            ax[j].semilogy(z, [d["out_3e-06"] for d in r["dumps"]], ls, color=c, marker="x",
+            ax[j].semilogy(z, [d[cut_key("out")] for d in r["dumps"]], ls, color=c, marker="x",
                            ms=4, alpha=0.45)
         ax[j].set_title(f"{npart} macroparticles per slice")
         ax[j].set_xlabel("z [m]")
     ax[0].set_ylabel("power per slice [W]")
     ax[0].legend(fontsize=7, loc="lower right")
-    fig.suptitle("Inside 3 urad (circles) and outside it (crosses), with and without the "
-                 "source filter", fontsize=10)
+    fig.suptitle(f"Inside {float(REPORT_CUT) * 1e6:.3g} urad (circles) and outside it (crosses), "
+                 "with and without the source filter", fontsize=10)
     fig.tight_layout()
-    fig.savefig(pathlib.Path(out) / "source-filter.png", dpi=130)
+    # The second machine's figure carries its name, so the two never overwrite each other.
+    suffix = "" if fi.get("machine", "aramis") == "aramis" else f"-{fi['machine']}"
+    fig.savefig(pathlib.Path(out) / f"source-filter{suffix}.png", dpi=130)
     plt.close(fig)
 
 
@@ -622,7 +685,7 @@ def figures(results, out):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.rcParams.update({"font.size": 9, "axes.grid": True, "grid.alpha": 0.3})
-    cut = "3e-06"
+    cut = REPORT_CUT
     th = results["theory"]
 
     # 1. The floor and the gain, versus z.
@@ -757,17 +820,24 @@ def main():
     ap.add_argument("--device", default="metal")
     ap.add_argument("--cpu-threads", default="12")
     ap.add_argument("--only", default="a,b,c,d,e,f,g")
+    ap.add_argument("--machine", default="aramis", choices=sorted(MACHINES))
     args = ap.parse_args()
 
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    rn = Runner(args.exe, args.workdir, "4")
-    lat = "aramis.bmad"
-    (rn.wd / lat).write_bytes((pathlib.Path(args.examples) / lat).read_bytes())
+    rn = Runner(args.exe, args.workdir, "4" if args.device != "off" else args.cpu_threads)
+    mach = select_machine(args.machine)
+    lat = mach["lat"]
+    src = pathlib.Path(args.examples) / lat
+    if not src.exists():
+        src = pathlib.Path(args.latdir) / "bmad" / lat
+    (rn.wd / lat).write_bytes(src.read_bytes())
     lat2 = "aramis_twice.bmad"
     (rn.wd / lat2).write_text("call, file = aramis.bmad\nARAMIS2: line = (ARAMIS, ARAMIS)\nuse, ARAMIS2\n")
 
-    results_file = out / "startup-noise.json"
+    # The second machine writes beside the first, never over it.
+    suffix = "" if args.machine == "aramis" else f"-{args.machine}"
+    results_file = out / f"startup-noise{suffix}.json"
     results = json.loads(results_file.read_text()) if results_file.exists() else {}
     want = set(args.only.split(","))
 

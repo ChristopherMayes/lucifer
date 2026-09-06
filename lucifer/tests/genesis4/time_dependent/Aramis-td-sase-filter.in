@@ -2,8 +2,8 @@
 # is what the port's own filter is transcribed against (fel-physics.md sec-source-filter).
 # Everything else is that deck: same window, same grid, same shot noise, same FFT solver,
 # which is the solver the filter lives in. The filter's own parameters are Genesis4's
-# defaults, xcut = ycut = sigmoid = 1, so the sigmoid's edge sits at half the grid's
-# Nyquist frequency.
+# defaults, xcut = ycut = sigmoid = 1, so the sigmoid's edge sits at twice the Nyquist
+# angle, off the grid, and the filter is the sigmoid's soft roll-off alone.
 #
 # The chain writes its own initial dumps rather than borrowing the unfiltered chain's. Both
 # codes then start from the same particles and the same field by construction, which is the

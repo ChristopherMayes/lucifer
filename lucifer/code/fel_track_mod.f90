@@ -2638,8 +2638,9 @@ enddo
 kn%exp_k2 = exp(kn%k2 * dz)
 
 ! The source filter's sigmoid, in the same FFT order as K2 and on the same normalized
-! frequency axis: FieldSolverFFT.cpp:133-144, where x runs over (ix + shift)/ngrid/xcut so
-! that xcut = 1 puts the sigmoid's edge at half the Nyquist frequency. Genesis leaves the
+! frequency axis: FieldSolverFFT.cpp:133-144, where x runs over (ix + shift)/ngrid/xcut.
+! The shifted index spans half of ngrid either side of the axis, so x = 1 is twice the
+! Nyquist index and xcut = 1 puts the sigmoid's edge at the angle lambda/dx, off the grid. Genesis leaves the
 ! exponent unguarded, which is safe at its own cuts and overflows for a cut small enough to
 ! carry the grid's corner far outside the edge. The clamp holds the value it already has
 ! there, since 1/(1 + exp(700)) is zero in double precision.
