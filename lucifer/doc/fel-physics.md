@@ -528,22 +528,31 @@ $$
 $$ (eq-fieldindex)
 
 and everything reading the record in time order (diagnostics, dumps) unrotates through
-the same map. Slippage accumulates in units of $\lambda_s$. Each undulator step
-contributes
+the same map. Slippage accumulates in units of $\lambda_s$ in a running total $S$
+(Genesis4's `accuslip`). Each undulator step adds
 
 $$
   \delta_{\mathrm{slip}} = \frac{\delta z\,(1 + a_w^2)}{2\gamma_0^2\,\lambda_s},
 $$ (eq-slipstep)
 
-and whenever $|\mathrm{accuslip}| > 0.8\cdot\texttt{n\_wavelength}$ the record rotates one
-slice: the slice coupled to the window *head* is zeroed and re-enters at the
-tail. Radiation leaves at the head and fresh vacuum enters behind the bunch (a
-non-periodic fill). Backward slippage mirrors the direction. Interludes slip nothing
-per step. Instead their lengths $L_z$ accumulate and, when an undulator follows, the last
-interlude element receives $\lfloor L_z/(2\gamma_0^2\lambda_s)\rfloor + 1$ wavelengths
-of autophasing. The end-of-lattice fixup is *unguarded*: the final element always
-receives the same $+1$, even with no trailing interlude at all. That is a Genesis4
-quirk kept deliberately, since guarding it leaves the record one rotation short.
+and whenever $|S| > 0.8\cdot\texttt{n\_wavelength}$ the record rotates one slice and
+$S$ drops by `n_wavelength`: the slice coupled to the window *head* is zeroed and
+re-enters at the tail. Radiation leaves at the head and fresh vacuum enters behind the
+bunch (a non-periodic fill). Backward slippage mirrors the direction.
+
+Interludes rotate the record by no step of their own. The particles still advance
+through them. The Genesis4 interlude model samples the path-length term of
+Eq. [](#eq-interludetheta) once per element, and the Bmad seam tracks each slice
+through the element's own map, so the momentum dependence of the path length,
+$R_{56}$ and its transverse partners, reaches every particle's $z$ and through
+Eq. [](#eq-theta) its $\theta$, while the reference phase follows the beam through
+`fel_phi0_rate`. What the interludes contribute to the record is their lengths $L_z$,
+accumulated until an undulator follows, when the last interlude element receives
+$\lfloor L_z/(2\gamma_0^2\lambda_s)\rfloor + 1$ wavelengths of autophasing, whole
+rotations of the record. The end-of-lattice fixup is *unguarded*: the final element
+always receives the same $+1$, even with no trailing interlude at all. That is a
+Genesis4 quirk kept deliberately, since guarding it leaves the record one rotation
+short.
 
 :::{admonition} Provenance
 :class: note
