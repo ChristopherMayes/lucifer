@@ -42,6 +42,11 @@ Usage:
   startup_noise.py --exe <lucifer> --genesis <genesis4> --pyrepo <openPMD-beamphysics>
                    --examples <lucifer/examples> --latdir <lucifer/tests> --workdir <dir>
                    --out <doc/generated/startup-noise> [--device metal|off] [--only a,b,...]
+                   [--machine aramis|flash|flash1]
+
+The second and third machines take experiments e and g: the line of experiments c and d
+is the first machine's own, and the sweep of a and b is priced against what its answer
+adds. Their results and figures carry the machine's name.
 """
 
 from __future__ import annotations
@@ -70,24 +75,48 @@ M_E_EV = 0.51099895e6
 EPS0 = 8.8541878128e-12
 I_ALFVEN = 17045.0
 
-# Two machines. The Aramis benchmark is the page's own, and the second is a line in the
+# Three machines. The Aramis benchmark is the page's own. The second is a line in the
 # FLASH regime, a hundred times the wavelength on a beam five times the size, whose
 # z_R/L_g is 2.6 times smaller. The filter's default is built from two angles whose ratio
 # goes as 1/sqrt(z_R/L_g), so a second machine is what says whether the default is general
-# or a property of the first (fel-physics.md sec-source-filter).
+# or a property of the first (fel-physics.md sec-source-filter). The third is FLASH1 at
+# DESY at 13.7 nm, a real machine at its published parameters (examples/flash1), which
+# is planar where the other two are helical, so its coupling factor is not one.
+#
+# coupling is the undulator's own coupling to the resonant wavelength, one for a helical
+# device and the Bessel factor JJ for a planar one. It multiplies aw wherever the
+# interaction reads it and never where the resonance does.
+#
+# dumps and und_end_record place the far-field dumps: five undulator ends, and the record
+# index of each in a stats file written with comb_ds_save = -1, where a record is an
+# element end.
 
 MACHINES = {
     "aramis": dict(lat="aramis.bmad", lat2="aramis_x2.bmad", lambda0=1e-10, half_width=2e-4,
                    current=3000.0, sig_pz=8.804506566858e-5, norm_emit=4e-7, gamma0=11357.82,
-                   aw=0.84853, lambda_u=0.015, seg_length=3.99, beta_a=8.53711, beta_b=17.3899,
-                   gaps=(0.44, 0.08, 0.24), filter_grid=256, cuts=(2e-6, 3e-6, 5e-6)),
+                   aw=0.84853, coupling=1.0, lambda_u=0.015, seg_length=3.99,
+                   beta_a=8.53711, beta_b=17.3899,
+                   gaps=(0.44, 0.08, 0.24), filter_grid=256, cuts=(2e-6, 3e-6, 5e-6),
+                   dumps=("UND##1", "UND##2", "UND##4", "UND##8", "UND##12"),
+                   und_end_record={1: 0, 2: 4, 4: 12, 8: 28, 12: 44}),
     "flash": dict(lat="flash.bmad", lat2=None, lambda0=1e-8, half_width=1e-3,
                   current=1500.0, sig_pz=1.0e-4, norm_emit=1.5e-6, gamma0=1572.0,
-                  aw=0.9, lambda_u=0.0273, seg_length=4.5045, beta_a=10.0, beta_b=10.0,
-                  gaps=(0.6, 0.1, 0.3), filter_grid=128, cuts=(4e-5, 6.52e-5, 1e-4)),
+                  aw=0.9, coupling=1.0, lambda_u=0.0273, seg_length=4.5045,
+                  beta_a=10.0, beta_b=10.0,
+                  gaps=(0.6, 0.1, 0.3), filter_grid=128, cuts=(4e-5, 6.52e-5, 1e-4),
+                  dumps=("UND##1", "UND##2", "UND##4", "UND##8", "UND##12"),
+                  und_end_record={1: 0, 2: 4, 4: 12, 8: 28, 12: 44}),
+    "flash1": dict(lat="flash1.bmad", lat2=None, lambda0=1.37e-8, half_width=1e-3,
+                   current=2500.0, sig_pz=6.0e-4, norm_emit=1.5e-6, gamma0=1308.2103,
+                   aw=0.847162, coupling=0.885232, lambda_u=0.0273, seg_length=4.5045,
+                   beta_a=10.1189, beta_b=9.8031,
+                   gaps=(0.25, 0.10, 0.25), filter_grid=128, cuts=(5e-5, 8.1e-5, 1.2e-4),
+                   dumps=("UND##1", "UND##2", "UND##3", "UND##4", "UND##6"),
+                   und_end_record={1: 0, 2: 6, 3: 12, 4: 18, 6: 30}),
 }
 
 LAMBDA0 = 1e-10
+FC = 1.0                  # undulator coupling: 1 helical, the Bessel factor JJ planar
 HALF_WIDTH = 2e-4
 CURRENT = 3000.0
 SIG_PZ = 8.804506566858e-5
@@ -111,7 +140,10 @@ def select_machine(name):
     g["AW"] = m["aw"];                g["LAMBDA_U"] = m["lambda_u"]
     g["SEG_LENGTH"] = m["seg_length"]
     g["BETA_A"] = m["beta_a"];        g["BETA_B"] = m["beta_b"]
+    g["FC"] = m["coupling"]
     g["FILL"] = m["seg_length"] / (m["seg_length"] + sum(m["gaps"]))
+    g["DUMP_ELES"] = m["dumps"]
+    g["UND_END_RECORDS"] = m["und_end_record"]
     # The middle cut is the one reported: on the first machine the 3 urad of the page, on
     # the second the edge the code derives for it, 65 urad, since a cut inside the mode
     # would report the mode's own shape rather than the split.
@@ -365,13 +397,13 @@ def analyze_dumps(wd, root, cache):
 # Theory
 
 def pierce():
-    """The 1D Pierce parameter for the deck, Genesis's own form with the rms aw and the
-    helical coupling fc = 1, and the transverse size from the mean matched beta."""
+    """The 1D Pierce parameter for the deck, Genesis's own form with the rms aw times the
+    undulator's coupling, and the transverse size from the mean matched beta."""
     beta = 0.5 * (BETA_A + BETA_B)
     emit = NORM_EMIT / GAMMA0
     sigma = math.sqrt(emit * beta)
     ku = 2 * math.pi / LAMBDA_U
-    rho3 = (CURRENT / I_ALFVEN) * AW ** 2 / (8 * GAMMA0 ** 3 * sigma ** 2 * ku ** 2)
+    rho3 = (CURRENT / I_ALFVEN) * (AW * FC) ** 2 / (8 * GAMMA0 ** 3 * sigma ** 2 * ku ** 2)
     return rho3 ** (1 / 3), sigma, emit, beta
 
 
@@ -404,8 +436,11 @@ def ssy(lg):
     The number of electrons per coherence volume N_c = I N_g lambda / (e c) with N_g the
     field gain length in periods. The saturation length 0.6 L_g,field ln N_c and the
     efficiency 0.17 / eps_hat with eps_hat = 2 pi eps / lambda, their eq. (18). The
-    incoherent undulator power of the beam in the central cone, their eq. (1), for a
-    helical undulator with A_JJ = 1."""
+    incoherent undulator power of the beam in the central cone, their eq. (1), carrying
+    the undulator's coupling squared, which is one for a helical device. The cone is the
+    resonance's, so its own aw has no coupling in it. The share of that power inside the
+    reported cut goes as the square of the angle and is capped at the whole cone, since
+    outside the cone the emission is off resonance and the square is not its measure."""
     rho, sigma, emit, beta = pierce()
     p_beam = CURRENT * GAMMA0 * M_E_EV
     n_lambda = CURRENT * LAMBDA0 / (E_CHARGE * C_LIGHT)
@@ -417,12 +452,13 @@ def ssy(lg):
     rho_bar = LAMBDA_U / (4 * math.pi * math.sqrt(3) * lg)
     p_sat = 0.17 / eps_hat * rho_bar * p_beam
     k2 = AW ** 2
-    w_incoh = math.pi * E_CHARGE * CURRENT / (EPS0 * LAMBDA0) * k2 / (1 + k2)
+    w_incoh = math.pi * E_CHARGE * CURRENT / (EPS0 * LAMBDA0) * k2 * FC ** 2 / (1 + k2)
     theta_cone_seg = math.sqrt(1 + k2) / (GAMMA0 * math.sqrt(SEG_LENGTH / LAMBDA_U))
+    cut = THETA_CUTS[1]
     return {"N_lambda": n_lambda, "P_eff": p_eff, "N_c": n_c, "L_sat_ssy": l_sat,
             "eps_hat": eps_hat, "P_sat_ssy": p_sat, "W_incoh_cone": w_incoh,
             "theta_cone_one_segment": theta_cone_seg,
-            "W_incoh_in_3urad_one_segment": w_incoh * (3e-6 / theta_cone_seg) ** 2,
+            "W_incoh_in_cut_one_segment": w_incoh * min(1.0, (cut / theta_cone_seg) ** 2),
             "theta_mode": LAMBDA0 / (2 * math.pi * sigma)}
 
 
@@ -470,6 +506,12 @@ def exp_filter(rn, args, lat, results):
     ng = MACHINES[args.machine]["filter_grid"]
     print(f"== g. the source filter against the mode power, grid {ng} ==")
     th = results["theory"]
+    # The edge the code derives, from the nominal beam. It takes the larger of four mode
+    # diffraction angles and the angle at which the resonance red-shifts by rho, and the
+    # run derives its own from the beam it loaded, which differs by the load's statistics.
+    mode_edge, rho_edge = 4 * th["theta_mode"], math.sqrt(2 * th["rho"] * LAMBDA0 / LAMBDA_U)
+    print(f"  derived edge {max(mode_edge, rho_edge):.3e} rad: four mode angles {mode_edge:.3e}, "
+          f"rho angle {rho_edge:.3e}, ratio {max(mode_edge, rho_edge) / min(mode_edge, rho_edge):.2f}")
     edges = {"cone": th["theta_cone_one_segment"], "cut": THETA_CUTS[1]}   # the reported cut
     res = {"ngrid": ng, "dx": cell_size(ng), "edges": {}, "machine": args.machine}
     for name, theta in edges.items():
@@ -508,21 +550,25 @@ def exp_filter(rn, args, lat, results):
                 "z_sat": zs, "P_sat": Ps, "wall_s": wall,
             }
 
-    # The three numbers the page needs, at the last dump and at z = 37 m.
+    # The three numbers the page needs, at the last dump and at the one before it, which
+    # is the last still inside the exponential regime on all three machines.
+    late = sorted(UND_END_RECORDS)[-2]
     for npart in loads:
         base = res[f"n{npart}_off"]
         for name, _, _ in cases[1:]:
             r = res[f"n{npart}_{name}"]
-            for tag, i in (("z37", 3), ("exit", 4)):
+            for tag, i in (("late", 3), ("exit", 4)):
                 o0, o1 = base["dumps"][i][cut_key("out")], r["dumps"][i][cut_key("out")]
                 i0, i1 = base["dumps"][i][cut_key("in")], r["dumps"][i][cut_key("in")]
                 r[f"wide_factor_{tag}"] = o0 / o1 if o1 > 0 else float("inf")
                 r[f"mode_rel_{tag}"] = (i1 - i0) / i0
-            r["b_rel_z37"] = (r["b"][UND_END_RECORDS[8]] - base["b"][UND_END_RECORDS[8]]) \
-                / base["b"][UND_END_RECORDS[8]]
+            r["b_z_late"] = r["z"][UND_END_RECORDS[late]]
+            r["b_rel_late"] = (r["b"][UND_END_RECORDS[late]] - base["b"][UND_END_RECORDS[late]]) \
+                / base["b"][UND_END_RECORDS[late]]
             print(f"  {npart:5d} particles, edge at the {name}: wide-angle down "
                   f"{r['wide_factor_exit']:.1f}x at the exit, mode power "
-                  f"{r['mode_rel_exit']:+.0%}, bunching at 37 m {r['b_rel_z37']:+.0%}, "
+                  f"{r['mode_rel_exit']:+.0%}, bunching at {r['b_z_late']:.0f} m "
+                  f"{r['b_rel_late']:+.0%}, "
                   f"saturation {r['z_sat']:.1f} m against {base['z_sat']:.1f} m")
     results["filter"] = res
 
@@ -828,12 +874,16 @@ def main():
     rn = Runner(args.exe, args.workdir, "4" if args.device != "off" else args.cpu_threads)
     mach = select_machine(args.machine)
     lat = mach["lat"]
-    src = pathlib.Path(args.examples) / lat
-    if not src.exists():
-        src = pathlib.Path(args.latdir) / "bmad" / lat
+    ex = pathlib.Path(args.examples)
+    for src in (ex / lat, ex / args.machine / lat, pathlib.Path(args.latdir) / "bmad" / lat):
+        if src.exists():
+            break
+    else:
+        raise SystemExit(f"{lat}: not found under {ex} or {args.latdir}/bmad")
     (rn.wd / lat).write_bytes(src.read_bytes())
     lat2 = "aramis_twice.bmad"
-    (rn.wd / lat2).write_text("call, file = aramis.bmad\nARAMIS2: line = (ARAMIS, ARAMIS)\nuse, ARAMIS2\n")
+    if mach["lat2"]:
+        (rn.wd / lat2).write_text("call, file = aramis.bmad\nARAMIS2: line = (ARAMIS, ARAMIS)\nuse, ARAMIS2\n")
 
     # The second machine writes beside the first, never over it.
     suffix = "" if args.machine == "aramis" else f"-{args.machine}"
@@ -852,7 +902,7 @@ def main():
         exp_floor(rn, args, lat, results)
     if "b" in want:
         exp_beamlets(rn, args, lat, results)
-    if "c" in want or "d" in want:
+    if ("c" in want or "d" in want) and mach["lat2"]:
         exp_line(rn, args, lat, lat2, results)
     if "f" in want:
         exp_genesis(rn, args, results)

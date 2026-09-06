@@ -45,6 +45,7 @@ times slower.
 | [`steady_state/`](steady_state/) | Seeded single-slice gain curve, and mid-run openPMD dumps | 5 s |
 | [`taper/`](taper/) | The same line with a two-stage undulator taper, past saturation | 5 s |
 | [`sase/`](sase/) | Pure SASE: 96 slices, dark start, physical shot noise, slippage | 25 s |
+| [`flash1/`](flash1/) | FLASH1 at DESY at 13.7 nm from its published parameters, against its measured gain length and pulse energy | 20 s |
 | [`sase_wake/`](sase_wake/) | The SASE run through a narrow chamber: resistive-wall, gap and roughness wakes | 25 s |
 | [`bmad_wake/`](bmad_wake/) | The same resistive-wall kernel through Bmad's own `z_long` machinery, against the transcribed model | 25 s each |
 | [`space_charge/`](space_charge/) | Long-range space charge on an attosecond bunch, and the short-range harmonics on a bunched beam | 7 s each |

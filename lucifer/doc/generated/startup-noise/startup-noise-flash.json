@@ -17,7 +17,7 @@
   "P_sat_ssy": 506370000.0,
   "W_incoh_cone": 3816.0,
   "theta_cone_one_segment": 6.6626e-05,
-  "W_incoh_in_3urad_one_segment": 7.7368,
+  "W_incoh_in_cut_one_segment": 3654.4,
   "theta_mode": 1.6293e-05
  },
  "filter": {

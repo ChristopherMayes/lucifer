@@ -142,7 +142,7 @@ At the end of the first segment the power outside the cut is independent of the 
 | 0.78 | 9.9 | 9.2 | 8.7 | 7.1 |
 ```
 
-At the same point the power within the cut is 0.09 to 0.13 MW per slice for every grid and every particle count. The spontaneous power of the beam within the central cone, eq. (1) of Saldin, Schneidmiller and Yurkov, is 0.71 MW and independent of the number of periods, of which the share within 3 µrad of the 7.1 µrad cone of one segment is 0.13 MW. The loaded noise therefore radiates the physical power at the angles where a real beam radiates. What the model adds is the emission outside the cone.
+At the same point the power within the cut is 0.09 to 0.13 MW per slice for every grid and every particle count. The spontaneous power of the beam within the central cone, eq. (1) of Saldin, Schneidmiller and Yurkov, is 0.71 MW and independent of the number of periods, of which the share within 3 µrad of the 7.1 µrad cone of one segment is 0.13 MW. The loaded noise therefore radiates the physical power at the angles where a real beam radiates. What the model adds is the emission outside the cone. This comparison holds where the first segment is short in gain lengths, 2.2 of them here. It does not hold on the third machine, whose first segment is 5.8 ([](#the-default-on-a-third-machine-a-real-one)).
 
 ```{figure} generated/startup-noise/wide-angle-vs-cell-size-and-particle-count.png
 :name: fig-sn-scaling
@@ -222,7 +222,7 @@ Genesis4 discretizes the transverse plane and the particle distribution in the s
 
 **Estimate the wide-angle share in advance.** At saturation the ratio of the wide-angle emission to the mode power measured here is
 $$\frac{P_{wide}}{P_{mode}} \approx \frac{100}{N_b}\left(\frac{1.57\,\mu\mathrm{m}}{dx}\right)^2,$$
-within a factor of 1.5 over cell sizes of 0.78 to 6.35 µm and beamlet counts of 128 to 2048, where $N_b$ is the number of beamlets per slice and $dx$ the cell size. The prefactor is for the beam of [](#tab-sn-beam) and scales with the bunching factor squared. Keeping the ratio below a tenth requires $N_b > 1000\,(1.57\,\mu\mathrm{m}/dx)^2$, which is 4096 macroparticles per slice at a beamlet size of 8 for 3.15 µm cells and 16384 for 1.57 µm cells.
+within a factor of 1.5 over cell sizes of 0.78 to 6.35 µm and beamlet counts of 128 to 2048, where $N_b$ is the number of beamlets per slice and $dx$ the cell size. The prefactor is for the beam of [](#tab-sn-beam) and scales with the bunching factor squared. It does not carry to another machine: on FLASH1 at 13.7 nm the same expression is 40 times low over cell sizes of 3.9 to 31 µm, so the form is the guide and the prefactor is measured per beam. Keeping the ratio below a tenth requires $N_b > 1000\,(1.57\,\mu\mathrm{m}/dx)^2$, which is 4096 macroparticles per slice at a beamlet size of 8 for 3.15 µm cells and 16384 for 1.57 µm cells.
 
 **Choose the cell size from the beam, not from the field.** Cells of about $\sigma_x/7$, 3 µm here, resolve the beam and the mode. Finer cells increase the wide-angle emission as $1/dx^2$ and leave the mode power unchanged.
 
@@ -277,7 +277,7 @@ Two cautions carry from this. The width is not a detail: Genesis4's default leav
 
 A default verified on one machine has been verified against that machine's coincidences. On Aramis the two angles the default is built from, four mode diffraction angles and the ρ angle, are 2.96 and 2.61 µrad, and both sit in the wide band between the mode and the grid's Nyquist angle of 32 µrad, so an edge four times too wide would have looked as good as the right one. It did, for a day: the first version of the conversion from an angle to Genesis4's `xcut` was a factor of four off, and every edge quoted above was measured at four times its stated angle before a second machine exposed it (FINDINGS 7.51).
 
-The second machine is a line in the FLASH régime, `tests/bmad/flash.bmad`: 10 nm from an 803 MeV beam through twelve helical segments of 165 periods at 27.3 mm, 1.5 kA, 1.5 µm normalized emittance, a beam five times the size of Aramis's and a wavelength a hundred times longer. Its ratio of Rayleigh length to gain length is 2.6 times smaller, so the two angles come out in a different ratio: the mode angle is 65.2 µrad and the ρ angle 34.8, ratio 1.87 against Aramis's 1.13, and the mode angle wins again. The central cone of one segment is 66.6 µrad, so on this machine the default edge and the physical cone nearly coincide. The grid is the beam's, 128 points at 15.7 µm cells, and the load is 1024 macroparticles per slice in a 300-slice window. Each run takes 68 to 93 s on the device. It took 35 minutes on twelve CPU threads until the slice spacing became an integer the deck states rather than a real the code recovered by division, which the device's exact bucket arithmetic refused at 12 to the last bit ([](fel-physics.md#sec-window)).
+The second machine is a probe at FLASH's scales, `tests/bmad/flash.bmad`: 10 nm from an 803 MeV beam through twelve helical segments of 165 periods at 27.3 mm, 1.5 kA, 1.5 µm normalized emittance, a beam five times the size of Aramis's and a wavelength a hundred times longer. It is not FLASH, and no number in it comes from a FLASH publication. FLASH1 itself is the third machine below. Its ratio of Rayleigh length to gain length is 2.6 times smaller, so the two angles come out in a different ratio: the mode angle is 65.2 µrad and the ρ angle 34.8, ratio 1.87 against Aramis's 1.13, and the mode angle wins again. The central cone of one segment is 66.6 µrad, so on this machine the default edge and the physical cone nearly coincide. The grid is the beam's, 128 points at 15.7 µm cells, and the load is 1024 macroparticles per slice in a 300-slice window. Each run takes 68 to 93 s on the device. It took 35 minutes on twelve CPU threads until the slice spacing became an integer the deck states rather than a real the code recovered by division, which the device's exact bucket arithmetic refused at 12 to the last bit ([](fel-physics.md#sec-window)).
 
 ```{table} The derived default on the second machine. The split is at the derived edge, 65.2 µrad, and the bunching is read at the end of the eighth undulator, z = 43 m.
 :name: tab-sn-filter-flash
@@ -295,6 +295,31 @@ Power per slice inside 65.2 µrad (circles) and outside it (crosses) against z o
 ```
 
 The default holds. The power inside the mode at the exit rises 6 percent, inside the fluctuation, saturation does not move, and the power outside the edge falls from 0.68 GW to 4 MW per slice, 165 times. What the default costs here is the same thing it cost on Aramis, more of it: the in-cone startup power falls from 6.75 to 4.75 kW, 30 percent, because the edge sits on the physical cone and the sigmoid's fall, 3.3 µrad wide, takes the cone's rim with it. Saturation absorbs it, as it did the 14 percent on Aramis, and the bunching at 43 m is 15 percent higher with the filter than without. On both machines the mode angle won, so the ρ angle's case, where four mode angles fall inside the bandwidth of the interaction, is not yet measured: it needs $z_R/L_g$ above about 50, a hard X-ray line with a small beam. Until it is, the default is measured over ratios of 1.1 to 1.9, and the warning the code prints outside 0.3 to 3 is where that measurement's authority ends.
+
+## The default on a third machine, a real one
+
+The third machine is FLASH1 at DESY, the line that lased at 13.7 nm in 2006, at its published parameters: six planar segments of 165 periods at 27.3 mm and 0.47 T, a 668 MeV beam of 2.5 kA and 1.5 µm normalized emittance through a doublet lattice holding the beta function at 10 m. The lattice, the beam and the sources are [`examples/flash1`](../examples/flash1/README.md). It is planar where the other two machines are helical, so its undulator couples to the resonance through the Bessel factor 0.885 rather than through unity, and that factor enters the Pierce parameter and the spontaneous power alike.
+
+Its rms beam size is 107 µm, so the grid is 128 points over a 1 mm half width at 15.7 µm cells, again the beam's own $\sigma_x/7$. The two angles the default is built from are 81.6 µrad, four mode diffraction angles, and 44.4 µrad, the ρ angle, a ratio of 1.84 against the second machine's 1.87 and the first's 1.13. The mode angle wins for the third time. The run derives its edge from the beam it loaded rather than from the nominal one, which puts it at 81 µrad, again beside the central cone of one segment, 78.0 µrad.
+
+```{table} The derived default on the third machine. The split is at the derived edge, 81 µrad, 1024 macroparticles per slice at 15.7 µm cells, and the bunching is read at the end of the fourth undulator, z = 20.4 m.
+:name: tab-sn-filter-flash1
+
+| filter | in-cone at z = 4.5 m (kW) | inside at exit (GW) | outside at exit | bunching at 20.4 m | saturation (m) |
+|---|---|---|---|---|---|
+| none | 8.93 | 2.07 | 754 MW | 0.134 | 20.7 |
+| derived default, 81 µrad, width 0.05 | 6.22 | 2.75 | 6.1 MW | 0.177 | 20.7 |
+```
+
+```{figure} generated/startup-noise/source-filter-flash1.png
+:name: fig-sn-filter-flash1
+
+Power per slice inside 81 µrad (circles) and outside it (crosses) against z on FLASH1, with the filter off and at its derived default, 1024 macroparticles per slice at 15.7 µm cells.
+```
+
+The default holds a third time. The power outside the edge at the exit falls from 754 to 6.1 MW per slice, 123 times, the power inside the mode rises 33 percent, the bunching at 20.4 m rises 10 percent, and the saturation point does not move. What it costs is again the rim of the physical cone: the in-cone startup power falls from 8.93 to 6.22 kW, 30 percent, the same 30 percent the second machine paid and for the same reason, that the sigmoid's fall sits on the cone. Over three machines the default is now measured at ratios of the two angles of 1.13, 1.84 and 1.87, and the ρ angle's regime remains unmeasured.
+
+The startup power is the one measurement that does not transfer. On the first machine the power within the cut at the end of the first segment equals the spontaneous emission of the beam within that cut, which is what says the loading is right. On FLASH1 the measured 8.93 kW is 2.6 times the 3.40 kW the same formula gives, and the excess is not the discretization: it is the same 2.5 to 3.4 times at every cell size from 3.9 to 31 µm and at every load from 1024 to 65536 macroparticles per slice. The reason is the gain length. FLASH1's first segment is 4.50 m against a power gain length of 0.78 m, which is 5.8 gain lengths, where the Aramis benchmark's first segment is 2.2. The in-cone power grows by a factor of 70 between the first and second dumps on FLASH1 and by 3.2 on Aramis over the same ratio in z, so by the end of the first FLASH1 segment the radiation has been amplified and is no longer the spontaneous emission alone. A startup measurement needs a dump within the first gain length, not at the first segment's end.
 
 ## The other remedies
 

@@ -1,0 +1,24 @@
+&fel_params
+  lat_file = "flash1.bmad"
+  global%out_root = "flash1"
+  slicing%n_slice = 351
+  slicing%n_wavelength = 12
+/
+
+&fel_beam_init
+  beam_init%n_particle = 4096
+  beam_init%bunch_charge = 7.983503e-11
+  beam_init%sig_z = 3.819304e-6
+  beam_init%sig_pz = 6e-4
+  beam_init%a_norm_emit = 1.5e-6
+  beam_init%b_norm_emit = 1.5e-6
+  shot_noise = T
+/
+
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1.37e-8
+
+  wavefront_init%seed_power = 0
+  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_half_width = 1.0e-3
+/

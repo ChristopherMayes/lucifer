@@ -17,7 +17,7 @@
   "P_sat_ssy": 515620000.0,
   "W_incoh_cone": 713900.0,
   "theta_cone_one_segment": 7.0799e-06,
-  "W_incoh_in_3urad_one_segment": 128180.0,
+  "W_incoh_in_cut_one_segment": 128180.0,
   "theta_mode": 7.4486e-07
  },
  "floor": {

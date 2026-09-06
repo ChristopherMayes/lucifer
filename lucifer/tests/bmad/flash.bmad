@@ -1,11 +1,15 @@
-! A soft X-ray line in the FLASH régime, for the second machine the source filter's
-! default is measured on (doc/startup-noise.md). It is not FLASH: it is a line with
-! FLASH's scales, chosen so that the ratio of the two angles the filter's default is
-! built from differs from the Aramis benchmark's. Each segment is 165 periods, so the
-! wiggler has a whole number of them. The beam is ten times the emittance
-! and five times the size, the wavelength a hundred times longer, and z_R/L_g falls
-! from 41 to about 16, which moves the ratio of the mode angle to the rho angle from
-! 1.13 to about 1.9.
+! A probe at FLASH's scales, for the second machine the source filter's default is
+! measured on (doc/startup-noise.md). This is not FLASH. It is a helical line whose
+! wavelength, energy, current and emittance are of FLASH's order, chosen so that the
+! ratio of the two angles the filter's default is built from differs from the Aramis
+! benchmark's. FLASH1 itself, planar and at its published parameters, is
+! examples/flash1/flash1.bmad. Nothing here is taken from a FLASH publication, and the
+! numbers this file's runs produced stand as measurements of this probe.
+!
+! Each segment is 165 periods, so the wiggler has a whole number of them. The beam is
+! ten times the emittance and five times the size of the Aramis benchmark's, the
+! wavelength a hundred times longer, and z_R/L_g falls from 41 to about 16, which moves
+! the ratio of the mode angle to the rho angle from 1.13 to about 1.9.
 
 parameter[geometry] = open
 parameter[particle] = electron

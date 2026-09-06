@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Added: examples/flash1, the FLASH1 undulator line at DESY at 13.7 nm from its published
+  parameters, and with it a third machine for every numerical default. The lattice is six planar
+  segments of 165 periods at 27.3 mm and 0.47 T with a quadrupole doublet in each intersection, and
+  the beam is 2.5 kA over a 30 fs spike at 1.5 mm mrad, all from Ackermann et al., Nature Photonics
+  1, 336 (2007) and Schreiber and Faatz, High Power Laser Science and Engineering 3, e20 (2015). The
+  two published numbers for the undulator disagree by 2.7 percent, since 0.47 T at 27.3 mm gives
+  K = 1.19807 against the stated 1.23, so the field is taken and the resonance at 13.7 nm sets
+  668.494 MeV against the machine's stated 700. The lattice header marks that and the three numbers
+  the file chose, which are the whole-period segment length, the intersection length and the doublet
+  strengths. Over four seeds the run gives a field gain length of 2.05 +- 0.16 m against the measured
+  2.5 +- 0.3 m, an exit pulse energy of 50.3 +- 3.1 uJ against 40 uJ characterized and 70 uJ
+  demonstrated, and the end of exponential growth at 20.9 +- 1.1 m inside the 27 m line. The README
+  carries one row per numerical setting with the Aramis value, the value this machine needs and the
+  measurement behind it. Two of the SASE convergence page's numbers do not carry to it: the estimate
+  of the wide-angle share is 40 times low, and the agreement of the in-cone startup power with the
+  spontaneous emission holds only where the first segment is short in gain lengths, 2.2 on Aramis
+  against 5.8 here (FINDINGS 7.54). The page gains the third machine's table, tests/scripts/startup_noise.py
+  gains --machine flash1 and the undulator coupling factor that a planar device needs, and
+  tests/bmad/flash.bmad says in its header that it is a probe at FLASH's scales and not FLASH.
+
 - 2026-09-06 Changed: one path loads the beam. A bunch comes from `beam_init`, generated or
   read through `beam_init%position_file`, and `load_mode` says what becomes of the particles in
   a slice: `"sample"` loads `beam_init%n_particle` macroparticles into every slice with weights

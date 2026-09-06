@@ -1,0 +1,56 @@
+! FLASH1 at DESY, the undulator line that lased at 13.7 nm, from the published numbers.
+!
+! Undulator, from Ackermann et al., Nature Photonics 1, 336 (2007): a fixed 12 mm gap
+! permanent magnet device of period 2.73 cm and peak field 0.47 T, in six segments of
+! 4.5 m. Schreiber and Faatz, High Power Laser Science and Engineering 3, e20 (2015),
+! section 3.4, give K = 1.23 with K_rms = 0.9 and a quadrupole doublet in each
+! intersection holding the beta function near 10 m, over an energy range of 350 MeV to
+! 1.25 GeV that lased from 52 to 4.1 nm.
+!
+! Three numbers here are this file's and not the papers'.
+!
+! The segment is 165 periods, 4.5045 m, since 4.5 m is 164.84 of them and the FEL step
+! wants a whole number. The line is then 27.027 m of undulator against the papers' 27.
+!
+! b_max = 0.47 T and l_period = 0.0273 give K = 1.19807 by eq. awmap of the physics
+! manual, and aw = K/sqrt(2) = 0.847162 for a planar device. The papers' K = 1.23 needs
+! 0.4825 T at this period, so the two published numbers are 2.7 percent apart. The field
+! is the one taken, since Bmad's wiggler is described by its field.
+!
+! e_tot follows from the resonance at 13.7 nm: lambda = l_period (1 + aw^2)/(2 gamma^2)
+! gives gamma = 1308.21 and 668.494 MeV. The papers state 700 MeV for the machine, with
+! the lasing spike of their Fig. 2 near 680 MeV. The 4.5 percent gap is the same K
+! disagreement seen through the resonance, since K = 1.23 at 13.7 nm needs 686 MeV.
+!
+! The intersection is 0.8 m of this file's choosing: the papers name a doublet, the
+! monitors and the wire scanners it holds, and no length. The strengths k1 = 1.3 and
+! -0.8 m^-2 are chosen so the mean beta function is 10.0 m horizontally and 10.0 m
+! vertically, the papers' number, with beta between 9.3 and 10.6 m over the cell. A
+! planar undulator focuses vertically only, and its own focusing gives beta_y = 6.71 m,
+! so the doublet raises the vertical beta while it makes the horizontal one.
+
+no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 6.684941e8
+
+! The matched periodic Twiss of the cell below, at the entrance of a segment.
+beginning[beta_a]  = 10.1189
+beginning[alpha_a] = 0.18898
+beginning[beta_b]  = 9.8031
+beginning[alpha_b] = -0.23996
+
+! ds_step = 3 periods, 55 steps per segment, the step this line's checks were run at.
+UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = planar_model, &
+     b_max = 0.47, tracking_method = fel_averaged, ds_step = 0.0819
+
+D1: drift, l = 0.25
+D2: drift, l = 0.10
+D3: drift, l = 0.25
+QF: quadrupole, l = 0.1, k1 =  1.3
+QD: quadrupole, l = 0.1, k1 = -0.8
+
+CELL: line = (UND, D1, QF, D2, QD, D3)
+FLASH1: line = (6*CELL)
+
+use, FLASH1
