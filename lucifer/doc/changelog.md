@@ -9,6 +9,16 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Changed: the branch takes Bmad main at 20260904-1, 158 commits since the last common
+  point. The two FEL tracking methods, the wiggler-averaged and the unaveraged, and the openPMD
+  wavefront work in the HDF5 layer merged without conflict, and the parser hook that gives an FEL
+  element its custom pointers merged with them. Nothing under the wiggler, the undulator, the Twiss
+  or the field solver moved upstream, and all eleven tier digits and the 27 check sections land where
+  they were recorded. The regression suite reports 53 passed and 3 skipped, one more than before:
+  upstream added exact_bend_edge_test, which passes. One upstream change reaches a path this branch
+  runs, the multipole conversion, which now recomputes rather than reading its cache, and no lattice
+  here carries a multipole.
+
 - 2026-09-06 Added: examples/lcls, the LCLS undulator line at SLAC at 1.5 Angstrom from its published
   parameters, and with it the fourth machine the filter's derived default is measured on. The lattice
   is thirty-three planar segments of 114 periods at 3.0 cm and 1.25 T with a quadrupole in each break,
