@@ -176,8 +176,11 @@ end type
 
 type wavefront_init_struct
   real(rp) :: lambda0 = 0            ! Resonant wavelength [m]. Required for generation.
-  integer :: grid_n_pts = 255        ! Transverse grid points per side (Genesis ngrid).
-  real(rp) :: grid_half_width = 0    ! Transverse half width [m] (Genesis dgrid).
+  ! The transverse grid (Genesis ngrid and dgrid). Zero means derive it from the beam
+  ! at setup, by fel_cells_per_sigma$ and fel_widths_per_sigma$ below. One may be set
+  ! and the other derived against it.
+  integer :: grid_n_pts = 0          ! Transverse grid points per side.
+  real(rp) :: grid_half_width = 0    ! Transverse half width [m].
   real(rp) :: seed_power = 0         ! Gaussian seed power [W]. 0 = dark start.
   real(rp) :: seed_waist_size = 0    ! Seed intensity 1/e^2 radius [m].
   character(1) :: seed_polarization = 'x'   ! 'x' or 'y'.
@@ -185,6 +188,16 @@ type wavefront_init_struct
   ! harmonic numbers in increasing order, 0 = unused.
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
 end type
+
+! The transverse grid derived from the beam when the deck states none
+! (doc/startup-noise.md, Recommendations). Cells of a seventh of the rms beam size
+! resolve the beam and the mode, and finer cells raise the wide-angle emission of the
+! point beamlets without moving the mode power. A half width of nine beam sizes contains
+! the mode, and the half width does not enter above that. Both were measured on three
+! machines a hundred times apart in wavelength (FINDINGS 7.54).
+
+real(rp), parameter :: fel_cells_per_sigma$ = 7
+real(rp), parameter :: fel_widths_per_sigma$ = 9
 
 !+
 ! Struct fel_chamber_wake_init_struct
@@ -290,6 +303,7 @@ type fel_run_struct
   ! and the first FEL element (fel-physics.md sec-source-filter). Inside it lies what can
   ! couple to the mode, outside it the wide-angle emission of the point beamlets.
   real(rp) :: split_angle = 0
+  character(24) :: split_origin = ''       ! Where split_angle came from, for the report.
   integer, allocatable :: fel_mode(:), fel_spp(:)
   real(rp), allocatable :: fel_ramp(:)
   real(rp), allocatable :: ele_slip(:)     ! Slippage after each element's last step [wavelengths].

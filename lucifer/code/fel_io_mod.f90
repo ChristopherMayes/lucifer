@@ -184,9 +184,18 @@ else
 endif
 call out_io (s_blank$, r_name, trim(line))
 
-write (line, '(5a, i0, 2a)') ' Radiation   lambda0 = ', trim(adjustl(fel_si_str(run%winit%lambda0, 'm'))), &
-      ', slice spacing ', trim(adjustl(fel_si_str(run%fbeam%slice_spacing, 'm'))), ', ', &
-      run%n_harm, ' field(s), grid half width ', trim(adjustl(fel_si_str(run%winit%grid_half_width, 'm')))
+! The grid is the built wavefront's, not the input's, since a field read from a file
+! carries its own and the deck then states none.
+
+block
+  integer n_grid(3)
+  n_grid = wavefront_shape(run%ffield(1)%wf)
+  write (line, '(5a, i0, a, i0, 2a)') ' Radiation   lambda0 = ', &
+        trim(adjustl(fel_si_str(run%winit%lambda0, 'm'))), &
+        ', slice spacing ', trim(adjustl(fel_si_str(run%fbeam%slice_spacing, 'm'))), ', ', &
+        run%n_harm, ' field(s), grid ', n_grid(1), ' points of ', &
+        trim(adjustl(fel_si_str(run%ffield(1)%wf%dx, 'm')))
+end block
 call out_io (s_blank$, r_name, trim(line))
 
 write (line, '(a, l1, a, l1, a, l1)') ' Switches    sr wakes ', run%coll%wake%on, &
@@ -220,8 +229,9 @@ type (fel_run_struct), target :: run
 type (fel_stats_struct), pointer :: stats
 character(300) line
 character(*), parameter :: r_name = 'lucifer'
+type (fel_convergence_struct) cvg
 integer ir, ih, n_listed
-real(rp) pow, ene, bun
+real(rp) pow, ene, bun, worst
 character(8) hsuf
 
 !
@@ -239,6 +249,47 @@ call fel_stats_exit_light (stats, pow, ene, bun)
 write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
       ', pulse energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', <|b|> ', bun
 call out_io (s_blank$, r_name, trim(line))
+
+! The mode against the wide-angle emission of the point beamlets, from the records the
+! run already took (doc/startup-noise.md). The share is reported and not estimated: a
+! formula fitted on one machine was 40 times low on another (FINDINGS 7.54), while the
+! split itself held on all three.
+
+call fel_stats_convergence (stats, cvg)
+if (cvg%ok) then
+  write (line, '(4a)') ' Split       ', trim(adjustl(fel_si_str(cvg%angle, 'rad'))), &
+        ', ', trim(run%split_origin) // '. Inside it the mode, outside it the beamlets.'
+  call out_io (s_blank$, r_name, trim(line))
+  do ir = 1, 2
+    if (ir == 2 .and. cvg%z(2) == cvg%z(1)) cycle
+    write (line, '(2a, f0.3, 5a, es9.2, a, f6.4)') '             ', &
+          merge('mode peak, z =   ', 'last record, z = ', ir == 1), cvg%z(ir), ' m: inside ', &
+          trim(adjustl(fel_si_str(cvg%p_in(ir), 'W'))), ', outside ', &
+          trim(adjustl(fel_si_str(cvg%p_out(ir), 'W'))), ', ratio ', cvg%ratio(ir), &
+          ', <|b|> ', cvg%bunching(ir)
+    call out_io (s_blank$, r_name, trim(line))
+  enddo
+
+  ! The verdict reads the worse of the two records. The criterion is stated at the mode's
+  ! saturation, and a run that passes there can still exit with most of its power outside
+  ! the mode, since the artifact keeps growing after the mode turns over.
+
+  worst = maxval(cvg%ratio)
+  if (worst > 0.1_rp) then
+    call out_io (s_warn$, r_name, &
+          'The power outside the split angle reaches \f0.2\ times the power inside it.', &
+          'That part of the total is the wide-angle emission of the point beamlets, which', &
+          'no physical beam radiates, so a total power quoted from this run is mostly', &
+          'representation. Possible solutions: more macroparticles per slice at the same', &
+          'beamlet_size, or global%source_filter = T. The criterion and the measured levels', &
+          'are in doc/startup-noise.md.', r_array = [worst])
+  else if (worst < 0.01_rp) then
+    call out_io (s_info$, r_name, 'The power outside the split angle stays under \f0.4\ ' // &
+          'times the power inside it.', &
+          'The total power is converged by the criterion of doc/startup-noise.md.', &
+          r_array = [worst])
+  endif
+endif
 
 ! Where the time went, one row per phase the run entered. The phases partition the
 ! walk, so the unaccounted row is the walk's own overhead and nothing is counted twice.

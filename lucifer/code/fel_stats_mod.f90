@@ -136,6 +136,32 @@ type fel_stats_struct
 end type
 
 !+
+! Structure fel_convergence_struct
+!
+! What the run's own field records say about its convergence: the power inside the
+! split angle against the power outside it, at two records. Inside the angle lies the
+! mode, outside it the wide-angle emission of the point beamlets, which is an artifact
+! of the macroparticle representation and carries the whole dependence on the cell size
+! and the macroparticle count (doc/startup-noise.md).
+!
+! Entry 1 is where the power inside the angle peaked, which is where the mode saturates
+! and where the criterion is stated. Entry 2 is the last record, where a reader quoting
+! an exit power is standing. The verdict reads the worse of the two: a run whose mode
+! saturates cleanly can still exit with most of its power outside the mode, since the
+! artifact keeps accumulating after the mode turns over.
+!-
+
+type fel_convergence_struct
+  logical :: ok = .false.        ! A record took the angle moments.
+  real(rp) :: angle = 0          ! The split angle [rad].
+  real(rp) :: z(2) = 0           ! [m] 1: the mode's peak. 2: the last record.
+  real(rp) :: p_in(2) = 0        ! Power inside the angle, summed over slices [W].
+  real(rp) :: p_out(2) = 0       ! Power outside it [W].
+  real(rp) :: ratio(2) = 0       ! p_out / p_in.
+  real(rp) :: bunching(2) = 0    ! |b| at the fundamental, charge weighted over slices.
+end type
+
+!+
 ! Structure fel_stats_params_struct
 !
 ! The few run scalars the stats writer itself needs, filled by the caller (fel_io_mod,
@@ -783,6 +809,105 @@ end subroutine fel_stats_exit_light
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_stats_convergence (stats, cvg)
+!
+! Routine to read the mode-against-artifact split out of the records the run already
+! took. Nothing is computed here that the accumulator did not already hold: every
+! element end that takes the field angle moments pays for one transform pair and stores
+! the power inside split_angle beside the total (fel-physics.md sec-source-filter).
+!
+! The peak-power record is the one the criterion of doc/startup-noise.md reads, since
+! that criterion is stated at saturation, and the last record is where a reader looking
+! at an exit power is standing. Only records that took the angle moments are considered.
+!
+! Input:
+!   stats -- fel_stats_struct: The filled accumulator.
+!
+! Output:
+!   cvg   -- fel_convergence_struct: The split at the two records. %ok is False when no
+!              record took the angle moments, and nothing else is then set.
+!-
+
+subroutine fel_stats_convergence (stats, cvg)
+
+type (fel_stats_struct) stats
+type (fel_convergence_struct) cvg
+real(rp) pow, p_in, q
+integer ir, ir_peak, ir_last, k
+
+!
+
+cvg = fel_convergence_struct()
+if (stats%irec < 1 .or. .not. allocated(stats%f_p_in)) return
+
+ir_peak = 0;  ir_last = 0
+do ir = 1, stats%irec
+  if (all(stats%f_angles_valid(:, ir) == 0)) cycle
+  ir_last = ir
+  if (ir_peak == 0) ir_peak = ir
+  if (mode_power(ir) > mode_power(ir_peak)) ir_peak = ir
+enddo
+if (ir_last == 0) return
+
+cvg%ok = .true.
+cvg%angle = stats%split_angle
+do k = 1, 2
+  ir = merge(ir_peak, ir_last, k == 1)
+  pow = window_power(ir)
+  p_in = sum(stats%f_p_in(:, ir), mask = stats%f_angles_valid(:, ir) == 1)
+  cvg%z(k) = stats%z(ir)
+  cvg%p_in(k) = p_in
+  cvg%p_out(k) = max(0.0_rp, pow - p_in)
+  if (p_in > 0) cvg%ratio(k) = cvg%p_out(k) / p_in
+  ! Charge weighted, so the slices a bunch left empty do not dilute the number the
+  ! recommendation is stated for. On a flat window this is the plain mean.
+  q = sum(stats%charge_live(:, ir))
+  if (q > 0) cvg%bunching(k) = sum(stats%bunching(:, ir) * stats%charge_live(:, ir)) / q
+enddo
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Function window_power (ir) result (pow)
+!
+! Routine to give the fundamental's power summed over the window at one record, both
+! polarizations where two are live. The harmonics are separate colors and are not summed.
+!-
+
+function window_power (ir) result (pow)
+
+integer ir
+real(rp) pow
+
+pow = sum(stats%f_power(:, ir))
+if (allocated(stats%f2_power)) pow = pow + sum(stats%f2_power(:, ir))
+
+end function window_power
+
+!+
+! Function mode_power (ir) result (pow)
+!
+! Routine to give the power inside the split angle summed over the window at one record.
+! Its maximum is where the mode saturates. The window total peaks elsewhere on a run
+! whose wide-angle emission keeps growing, and at z = 0 on one whose seed only decays.
+!-
+
+function mode_power (ir) result (pow)
+
+integer ir
+real(rp) pow
+
+pow = sum(stats%f_p_in(:, ir), mask = stats%f_angles_valid(:, ir) == 1)
+
+end function mode_power
+
+end subroutine fel_stats_convergence
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_stats_write (stats, prm, file_name, err_flag)
 !
 ! Routine to write the stats file: the identity, coords/, run/, beam/ and field/.
@@ -807,6 +932,7 @@ subroutine fel_stats_write (stats, prm, file_name, err_flag)
 
 type (fel_stats_struct) stats
 type (fel_stats_params_struct) prm
+type (fel_convergence_struct) cvg
 integer(hid_t) f_id, g_id, b_id, s_id
 integer h5_err, ir, ie, ns, ihh, is, ip, ne
 integer, allocatable :: rec(:), e_ix(:)
@@ -1023,6 +1149,40 @@ call fel_h5_int (g_id, 'n_element_end', '1', 'element ends', &
       'counter, and equal to the count of coords/at_element_end.', '', ie, err)
 call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
       'Slices in the time window, the length of the slice axis.', '', ns, err)
+
+! The split between the mode and the wide-angle emission of the point beamlets, at the
+! record where the window power peaked, which is the record the criterion of
+! doc/startup-noise.md is stated at. The powers at every record are field/total/power
+! and field/total/power_inside_angle and the angle is field/total/split_angle, so what
+! these add is which record to stand at and the charge weighting of the bunching.
+! Written only where a record took the field angle moments.
+
+call fel_stats_convergence (stats, cvg)
+if (cvg%ok) then
+  call fel_h5_real (g_id, 'z_mode_peak', 'm', 'z of the mode peak', &
+        'Position of the record where the power inside split_angle peaked, which is ' // &
+        'where the mode saturates, among the records that took the field angle moments.', &
+        'none', cvg%z(1), err)
+  call fel_h5_real (g_id, 'power_inside_angle_peak', 'W', 'mode power', &
+        'Power within field/total/split_angle of the axis, summed over the window, ' // &
+        'at z_mode_peak. This is the part that couples to the mode.', 'none', cvg%p_in(1), err)
+  call fel_h5_real (g_id, 'power_outside_angle_peak', 'W', 'wide-angle power', &
+        'Power outside that angle, summed over the window, at z_mode_peak. This is ' // &
+        'the emission of the point macroparticle beamlets, which grows as the cells ' // &
+        'shrink and falls as the beamlet count rises.', 'none', cvg%p_out(1), err)
+  call fel_h5_real (g_id, 'wide_angle_ratio', '1', 'wide-angle ratio', &
+        'power_outside_angle_peak over power_inside_angle_peak. Under about 0.1 the ' // &
+        'total power is the mode''s there. The run reports the worse of this and ' // &
+        'wide_angle_ratio_last.', &
+        'none', cvg%ratio(1), err)
+  call fel_h5_real (g_id, 'wide_angle_ratio_last', '1', 'wide-angle ratio at the end', &
+        'The same ratio at the last record that took the field angle moments.', &
+        'none', cvg%ratio(2), err)
+  call fel_h5_real (g_id, 'bunching_peak', '1', 'bunching', &
+        'Bunching |b| at the fundamental at z_mode_peak, weighted by the live charge ' // &
+        'of each slice so that empty slices do not dilute it.', 'none', cvg%bunching(1), err)
+endif
+
 call H5Gclose_f (g_id, h5_err)
 if (err) return
 

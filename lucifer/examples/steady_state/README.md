@@ -30,4 +30,7 @@ another program or restarted from the middle, and a single slice keeps them unde
 1.5 MB here. The same two lines on a 96-slice run write 111 MB.
 
 Read [reading an output file](../../doc/reading-output.md) for the stats file and the ten plot panels.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At saturation the power outside the split angle is 0.11 times the power inside it, and at the exit 0.83 times, so 45 percent of the 761.5 MW quoted above is that emission. The saturated 1.62 GW is 91 percent mode.
+
 Runs in ~5 s.
+

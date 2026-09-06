@@ -163,6 +163,9 @@ if (err_flag) return
 is_fel => run%is_fel
 fel_mode => run%fel_mode
 
+call derive_grid ()          ! Needs the FEL elements, and runs before any field is built.
+if (err_flag) return
+
 ! The field set (fel-physics.md sec-field-set). Validate the harmonics request, then allocate
 ! the set and point the fundamental aliases at entry 1 before any field construction:
 ! every construction path below builds the fundamental through wf.
@@ -478,6 +481,91 @@ endif
 
 end subroutine setup_fel_elements
 
+!------------------------------------------------------------------------------
+!+
+! Subroutine derive_grid ()
+!
+! Routine to derive the transverse grid from the beam where the deck states none
+! (doc/startup-noise.md, Recommendations). The rms beam size comes from the emittances
+! the deck states and the matched Twiss the lattice states, averaged over the FEL
+! elements by length, since that is the beta the mode sees. Cells are then a seventh of
+! it and the half width nine of it, and the point count follows from whichever half
+! width is in force. A stated value is never overridden, and the other is derived
+! against it, so a deck that fixes the cell size gets the containment it needs and one
+! that fixes the point count gets the resolution.
+!
+! Nothing is derived without an emittance to derive from. A run that loads its beam from
+! a dump has none, and the refusals that already ask for the grid still ask.
+!-
+
+subroutine derive_grid ()
+
+real(rp) sig, eps_a, eps_b, beta_a, beta_b, wt, dx_want, half
+integer je, n_pts, n_dev
+logical dev_on
+
+!
+
+if (run%winit%grid_n_pts > 0 .and. run%winit%grid_half_width > 0) return
+if (run%gamma0 <= 0) return
+eps_a = run%beam_init%a_norm_emit / run%gamma0
+eps_b = run%beam_init%b_norm_emit / run%gamma0
+if (eps_a <= 0 .or. eps_b <= 0) return
+
+! The length-weighted mean beta over the FEL elements. A lattice whose Twiss was never
+! propagated leaves these at zero, and the beginning element is then the one truth there
+! is. The generated load refuses a lattice with no Twiss at all, so this falls back
+! rather than refusing twice.
+
+beta_a = 0;  beta_b = 0;  wt = 0
+do je = 1, branch%n_ele_track
+  if (.not. is_fel(je)) cycle
+  if (branch%ele(je)%a%beta <= 0 .or. branch%ele(je)%b%beta <= 0) cycle
+  beta_a = beta_a + branch%ele(je)%value(l$) * branch%ele(je)%a%beta
+  beta_b = beta_b + branch%ele(je)%value(l$) * branch%ele(je)%b%beta
+  wt = wt + branch%ele(je)%value(l$)
+enddo
+if (wt > 0) then
+  beta_a = beta_a / wt;  beta_b = beta_b / wt
+else
+  beta_a = branch%ele(0)%a%beta;  beta_b = branch%ele(0)%b%beta
+endif
+if (beta_a <= 0 .or. beta_b <= 0) return
+
+! One size for a grid that is square: the quadratic mean of the two planes.
+
+sig = sqrt(0.5_rp * (eps_a * beta_a + eps_b * beta_b))
+if (sig <= 0) return
+
+half = run%winit%grid_half_width
+if (half <= 0) then
+  half = fel_widths_per_sigma$ * sig
+  run%winit%grid_half_width = half
+  call out_io (s_info$, r_name, 'Grid half width \es10.3\ m, derived: \f0.1\ rms beam sizes ' // &
+               'of \es10.3\ m (doc/startup-noise.md).', &
+               r_array = [half, fel_widths_per_sigma$, sig])
+endif
+
+if (run%winit%grid_n_pts <= 0) then
+  dx_want = sig / fel_cells_per_sigma$
+  n_pts = 2 * ceiling(half / dx_want) + 1
+  dev_on = (run%global%device /= '' .and. run%global%device /= 'off')
+  if (dev_on) then
+    n_dev = 1
+    do while (n_dev < n_pts)
+      n_dev = 2 * n_dev
+    enddo
+    n_pts = n_dev
+  endif
+  run%winit%grid_n_pts = n_pts
+  call out_io (s_info$, r_name, 'Grid \i0\ points, derived: cells of \es10.3\ m, ' // &
+               'a beam size over \f0.1\ .', &
+               i_array = [n_pts], r_array = [2 * half / (n_pts - 1), fel_cells_per_sigma$])
+  if (dev_on) call out_io (s_info$, r_name, 'Rounded up to a power of two, which the device solver takes.')
+endif
+
+end subroutine derive_grid
+
 end subroutine fel_setup_lattice
 
 !------------------------------------------------------------------------------
@@ -717,7 +805,12 @@ if (any(is_fel)) then
     ! wavefront, since the conversion has to hold for every member of the field set.
 
     ie_first = findloc(is_fel, .true., dim = 1)
-    ang_per_xcut = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (2 * run%winit%grid_half_width)
+    ! A run whose field came from a file states no grid, so there is nothing to convert
+    ! against. The filter is refused on that path below, and this stays finite.
+
+    ang_per_xcut = 0
+    if (run%winit%grid_half_width > 0 .and. run%winit%grid_n_pts > 1) &
+        ang_per_xcut = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (2 * run%winit%grid_half_width)
 
     call fel_filter_angles (fbeam, run%und_of(ie_first), fbeam%wavelength, th_mode, th_rho)
 
@@ -726,7 +819,12 @@ if (any(is_fel)) then
     ! run wants to see that separation most when it is not filtering.
 
     run%split_angle = max(th_mode, th_rho)
-    if (run%global%source_filter_angle > 0) run%split_angle = run%global%source_filter_angle
+    run%split_origin = 'the mode angle'
+    if (th_rho > th_mode) run%split_origin = 'the rho angle'
+    if (run%global%source_filter_angle > 0) then
+      run%split_angle = run%global%source_filter_angle
+      run%split_origin = 'set by the deck'
+    endif
 
     if (.not. run%global%source_filter) then
       continue
@@ -751,7 +849,7 @@ if (any(is_fel)) then
         err_flag = .true.;  return
       else
         th = max(th_mode, th_rho)
-        origin = merge('the mode angle  ', 'the rho angle   ', th_mode >= th_rho)
+        origin = run%split_origin
       endif
 
       ! Cutting into the mode loses real radiation and leaving artifact in only weakens

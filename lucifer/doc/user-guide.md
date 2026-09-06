@@ -296,7 +296,7 @@ completion block listing what was written.
  Lattice     aramis.bmad
              49 elements, 57.000 m, 12 FEL segments
  Beam        1 slice x 8192 particles, gamma0 = 11357.82
- Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid half width 200.000 um
+ Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid 255 points of 1.575 um
  Switches    sr wakes F, space charge F, radiation damping F
  Output      out_root "steady_state", threads 12
 ================================================================================
@@ -307,6 +307,9 @@ completion block listing what was written.
 --------------------------------------------------------------------------------
  Done        57.000 m, 48 element ends
  Exit        power 761.499 MW, pulse energy 254.009 pJ, <|b|> 0.1854
+ Split       2.966 urad, the mode angle. Inside it the mode, outside it the beamlets.
+             mode peak, z =   37.240 m: inside 1.466 GW, outside 154.729 MW, ratio  1.06E-01, <|b|> 0.2827
+             last record, z = 57.000 m: inside 415.655 MW, outside 345.844 MW, ratio  8.32E-01, <|b|> 0.1854
  Wrote       steady_state-final.beam.h5                      710.760 kB
              steady_state-final.wf.h5                        1.048 MB
              steady_state.stats.h5                           841.220 kB
@@ -321,6 +324,22 @@ truncation rule, no name shoving the numbers rightward. The **step column is bla
 one-step elements**, which is most of a real lattice. And the distance column is **`s`**,
 Bmad's arc length along the reference orbit: through a bending break the arc exceeds the
 chord the light takes, which is exactly what the light-path correction accounts for.
+
+The **Radiation** line reports the grid the run built, which is the file's when the field
+came from one and the derived one when the deck stated none ([](input-reference.md#param-wavefront-grid)).
+
+The **Split** block is the run's own convergence report. The field power is separated into
+the part inside an angle of about four mode diffraction angles, which is what couples to
+the mode, and the part outside it, which is the emission of macroparticles that occupy one
+grid point each. That second part is an artifact of the representation, it grows as the
+cells shrink and falls as the beamlet count rises, and at common settings it is most of
+the total power of an unseeded run ([](startup-noise.md)). The block reports both at the
+record where the mode peaked and at the last record, and the run then warns when the
+outside part reaches a tenth of the inside part and confirms convergence below a
+hundredth. In the run above 45 percent of the 761.5 MW exit power is that emission, and
+9 percent of the 1.62 GW at saturation. The same numbers are in the statistics file under
+`run/`, and the per-record per-slice arrays are `field/total/power_inside_angle` beside
+`field/total/power`.
 
 The physics columns are filled whatever the comb setting: with per-record rows they come
 from the current record, and with `comb_ds_save < 0` from the element-end row, which is

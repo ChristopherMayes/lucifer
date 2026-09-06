@@ -35,8 +35,13 @@ decades of gain, ../steady_state's configuration):
 | `lucifer.in` | coherent, 512 | 7.46e+08 W | ln 0.021 | 2.2 s |
 
 The middle row is the trap this feature exists to remove: cutting particles
-without the coherent source silently multiplies the predicted power by 7.6 on
-this case, with nothing anywhere reporting a problem. The last row is the same
+without the coherent source multiplies the predicted power by 7.6 on
+this case. Nothing about the power curve says so, and the run's own convergence report
+is what does: the power outside the split angle is 8.5 times the power inside it at the
+exit on that row, against 0.83 on the reference row and 0.050 with the coherent source
+([SASE convergence](../../startup-noise.md)). The power the middle row adds is the
+wide-angle emission of 64 beamlets, which the coherent source does not have because it
+never puts a macroparticle on a grid point. The last row is the same
 particle count giving the converged answer. (Per-slice cost dominates real
 time-dependent runs, where the same particle reduction pays proportionally.)
 

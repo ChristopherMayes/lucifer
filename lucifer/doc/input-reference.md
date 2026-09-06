@@ -283,12 +283,17 @@ Not physics input. The validation harness sets these.
 | `field_file` | `""` | openPMD EXT_Wavefront field dump to start from |
 | `wavefront_init%lambda0` | `0` | Radiation wavelength [m]. Required for generation |
 
-| `wavefront_init%grid_n_pts` | `255` | Transverse grid points per side |
-| `wavefront_init%grid_half_width` | `0` | Transverse grid half width [m] |
+| `wavefront_init%grid_n_pts` | `0` | Transverse grid points per side. Zero derives it |
+| `wavefront_init%grid_half_width` | `0` | Transverse grid half width [m]. Zero derives it |
 | `wavefront_init%seed_power` | `0` | Gaussian seed power [W]. Zero is a dark start |
 | `wavefront_init%seed_waist_size` | `0` | Seed intensity 1/e^2 radius [m] |
 | `wavefront_init%seed_polarization` | `"x"` | `"x"` or `"y"` |
 | `wavefront_init%harmonics` | `1` | The field set. The first entry must be the fundamental |
+
+(param-wavefront-grid)=
+**`wavefront_init%grid_n_pts`** and **`wavefront_init%grid_half_width`** are derived from the beam when the deck leaves them at zero, and both are printed with their origin at setup. The rms beam size comes from the emittances the deck states and the matched Twiss the lattice states, averaged over the FEL elements by length. The half width is nine of those, which contains the mode, and the cells are a seventh of one, which resolves the beam and the mode. Both constants were measured on three machines a hundred times apart in wavelength ([](startup-noise.md#sn-recommendations)), and the two together fix the point count at 127, since the beam size cancels. On the device the count is rounded up to the power of two its field solver takes.
+
+One may be set and the other derived against it. A stated half width keeps the cell rule, so the point count follows from it. A stated point count keeps the containment rule, so the half width is nine beam sizes and the cells are whatever the count makes them. Nothing is derived without an emittance to derive from: a run that loads its beam from a dump states its own grid, or takes the field's from `field_file`.
 
 (param-wavefront-lambda0)=
 **`wavefront_init%lambda0`** is required, and deliberately not defaulted from the lattice resonance, since the first undulator may be detuned. Starting from a beam dump it is required too: the file carries the slice partition but not the radiation wavelength it was sliced on, and `slicing%n_wavelength` is required for the same reason.

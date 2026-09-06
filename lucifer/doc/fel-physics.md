@@ -417,6 +417,28 @@ $c\,w_j/\Delta s$. Field diagnostics: power $= \sum_{\mathrm{cells}}|E|^2\,
 \mathit{dgrid}^2/(2Z_0)$, and on-axis intensity is $|E(0,0)|^2/(2Z_0)$. The window field
 energy plotted by the tools is $U = \sum_i P_i\,\Delta s/c$.
 
+The grid itself is derived from the beam when the deck states neither `grid_n_pts` nor
+`grid_half_width`, and both are printed with their origin at setup. The rms beam size
+$\sigma$ is taken from the emittances the deck states and the matched Twiss the lattice
+states, averaged over the FEL elements by length, as the quadratic mean of the two
+planes. The half width is then $9\sigma$ and the cell size $\sigma/7$:
+
+$$
+  \mathit{dgrid} = 9\sigma, \qquad dx = \sigma/7, \qquad
+  N = 2\lceil \mathit{dgrid}/dx \rceil + 1 = 127 .
+$$ (eq-gridrule)
+
+The point count is 127 whatever the beam is, since $\sigma$ cancels between the two
+rules. Cells of a seventh of the beam resolve the beam and the mode, and finer cells
+raise the wide-angle emission of [](#sec-source-filter) without moving the mode power.
+Nine beam sizes contain the mode, and above that the half width does not enter. Both
+constants were measured on three machines a hundred times apart in wavelength
+([](startup-noise.md#sn-recommendations)). On the device the count is rounded up to the
+power of two the field solver there takes. One of the two may be set and the other is
+then derived against it: a stated half width keeps the cell rule and a stated point
+count keeps the containment rule. Nothing is derived without an emittance to derive
+from, so a run that starts from a dump states its own grid or takes the field's.
+
 :::{admonition} Provenance
 :class: note
 `FieldSolverFFT::advance`, `FFT`, `init` (unfiltered path);

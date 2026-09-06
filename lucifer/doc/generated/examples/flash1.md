@@ -14,7 +14,7 @@ One command, Bmad only:
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py flash1.stats.h5
 
-FLASH at DESY lased at 13.7 nm in 2006, the first saturated free-electron laser in the extreme ultraviolet, and reported its undulator, its beam and its performance. This example is that line: six planar segments, a Gaussian bunch on the published beam, and SASE from the quiet start through 27 m of undulator. Every other example in this directory runs the Aramis benchmark at 0.1 nm, so this one is also the third machine the numerical defaults are measured on ([SASE convergence](../../startup-noise.md)).
+FLASH at DESY lased at 13.7 nm in 2006, the first free-electron laser to reach saturation at that wavelength, and reported its undulator, its beam and its performance. This example is that line: six planar segments, a Gaussian bunch on the published beam, and SASE from the quiet start through 27 m of undulator. Every other example in this directory runs the Aramis benchmark at 0.1 nm, so this one is also the third machine the numerical defaults are measured on ([SASE convergence](../../startup-noise.md)).
 
 The two sources are Ackermann et al., *Operation of a free-electron laser from the extreme ultraviolet to the water window*, Nature Photonics **1**, 336 (2007), [doi:10.1038/nphoton.2007.76](https://doi.org/10.1038/nphoton.2007.76), and Schreiber and Faatz, *The free-electron laser FLASH*, High Power Laser Science and Engineering **3**, e20 (2015), [doi:10.1017/hpl.2015.16](https://doi.org/10.1017/hpl.2015.16).
 
@@ -81,7 +81,9 @@ Two of these do not carry over from Aramis. The convergence page estimates the w
 
 The lattice carries the optics, so the bunch is generated matched to the periodic solution in the `beginning` statement, and there is no `gamma0` and no match transform. The current is derived from `bunch_charge` and `sig_z` and is never given. The window covers the bunch to four sigma either side with 990 wavelengths of slippage headroom at each end, because radiation made at the head of the bunch slips out of a shorter window before the exit. About a quarter of the slices therefore carry no charge, which is the price of holding the whole pulse.
 
-Measured on this input at the `ran_seed` default of 12345: the exit power is 84.5 GW summed over the window and the pulse energy is 46.3 µJ.
+Measured on this input at the `ran_seed` default of 12345: the exit power is 84.5 GW summed over the window and the pulse energy is 46.3 µJ. The run's own convergence report puts the power outside the split angle of 81 µrad at 0.078 times the power inside it, so 7 percent of that total is the wide-angle emission of the point beamlets and the rest is the mode.
+
+Leaving `grid_n_pts` and `grid_half_width` out of the deck derives 127 points over a 962 µm half width, cells of 15.27 µm against the 15.63 µm here. That run gives 46.33 µJ against 46.35 and a ratio of 0.080 against 0.078, so the stated grid is the derived one.
 
 Runs in ~20 s.
 

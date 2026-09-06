@@ -3135,6 +3135,25 @@ wiggler attributes are deliberately NOT read: their helical sign disagrees with 
 tracking locals. Nothing here cross-uses them.
 ```
 
+(api-derive-grid)=
+### `derive_grid`
+
+*Subroutine* `()`
+
+```
+Routine to derive the transverse grid from the beam where the deck states none
+(doc/startup-noise.md, Recommendations). The rms beam size comes from the emittances
+the deck states and the matched Twiss the lattice states, averaged over the FEL
+elements by length, since that is the beta the mode sees. Cells are then a seventh of
+it and the half width nine of it, and the point count follows from whichever half
+width is in force. A stated value is never overridden, and the other is derived
+against it, so a deck that fixes the cell size gets the containment it needs and one
+that fixes the point count gets the resolution.
+
+Nothing is derived without an emittance to derive from. A run that loads its beam from
+a dump has none, and the refusals that already ask for the grid still ask.
+```
+
 (api-fel-setup-schedule)=
 ### `fel_setup_schedule`
 
@@ -3297,6 +3316,25 @@ particle, and documented rather than hidden inside a convention.
 The accumulated statistics of one run: the per-record per-slice beam and field
 arrays, and the element-end evaluated bunch_params rows. Sized once by
 fel_stats_init from exact counts precomputed on the lattice walk.
+```
+
+(api-fel-convergence-struct)=
+### `fel_convergence_struct`
+
+*Structure*
+
+```
+What the run's own field records say about its convergence: the power inside the
+split angle against the power outside it, at two records. Inside the angle lies the
+mode, outside it the wide-angle emission of the point beamlets, which is an artifact
+of the macroparticle representation and carries the whole dependence on the cell size
+and the macroparticle count (doc/startup-noise.md).
+
+Entry 1 is where the power inside the angle peaked, which is where the mode saturates
+and where the criterion is stated. Entry 2 is the last record, where a reader quoting
+an exit power is standing. The verdict reads the worse of the two: a run whose mode
+saturates cleanly can still exit with most of its power outside the mode, since the
+artifact keeps accumulating after the mode turns over.
 ```
 
 (api-fel-stats-params-struct)=
@@ -3462,6 +3500,52 @@ Output:
   pow   -- real(rp): Total radiation power [W].
   ene   -- real(rp): Total window field energy [J].
   bun   -- real(rp): Mean |b| over slices.
+```
+
+(api-fel-stats-convergence)=
+### `fel_stats_convergence`
+
+*Subroutine* `(stats, cvg)`
+
+```
+Routine to read the mode-against-artifact split out of the records the run already
+took. Nothing is computed here that the accumulator did not already hold: every
+element end that takes the field angle moments pays for one transform pair and stores
+the power inside split_angle beside the total (fel-physics.md sec-source-filter).
+
+The peak-power record is the one the criterion of doc/startup-noise.md reads, since
+that criterion is stated at saturation, and the last record is where a reader looking
+at an exit power is standing. Only records that took the angle moments are considered.
+```
+
+```
+Input:
+  stats -- fel_stats_struct: The filled accumulator.
+
+Output:
+  cvg   -- fel_convergence_struct: The split at the two records. %ok is False when no
+             record took the angle moments, and nothing else is then set.
+```
+
+(api-window-power)=
+### `window_power`
+
+*Function* `(ir) result (pow)`
+
+```
+Routine to give the fundamental's power summed over the window at one record, both
+polarizations where two are live. The harmonics are separate colors and are not summed.
+```
+
+(api-mode-power)=
+### `mode_power`
+
+*Function* `(ir) result (pow)`
+
+```
+Routine to give the power inside the split angle summed over the window at one record.
+Its maximum is where the mode saturates. The window total peaks elsewhere on a run
+whose wide-angle emission keeps growing, and at z = 0 on one whose seed only decays.
 ```
 
 (api-fel-stats-write)=

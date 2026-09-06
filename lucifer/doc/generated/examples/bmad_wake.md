@@ -45,6 +45,8 @@ The two means differ by 0.69%. Per slice across the window interior the agreemen
 implementations, two application granularities, and what separates them is the
 granularity rather than the physics.
 
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 27 times the power inside it in both runs, so the exit powers here are mostly that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
+
 Runs in ~25 s.
 
 ## The input files

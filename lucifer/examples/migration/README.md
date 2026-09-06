@@ -61,4 +61,7 @@ and the 7.61e-16 above is that residual. Migration under weights is this port's
 generalization of a Genesis4 method that requires one4one, and the check is what earns
 the generalization.
 
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 8.7 times the power inside it with migration on and 8.8 times with it off, so 90 percent of both exit powers is that emission. The factor of 1.73 between them is 1.75 in the power inside the mode, so what migration is worth here survives the split.
+
 Runs in ~15 s each.
+

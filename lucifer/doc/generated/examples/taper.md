@@ -38,6 +38,8 @@ bit-identical until the first record inside the first `UND2`, at z = 38.045 m, w
 is the check that the two runs differ in the taper and in nothing else. The exit
 power is 12.66x the untapered exit and 5.95x the untapered saturation peak.
 
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 0.10 times the power inside it on the tapered line, so 9 percent of the 9.64 GW is that emission and the taper's gain is the mode's.
+
 Runs in ~4 s.
 
 ## The input files

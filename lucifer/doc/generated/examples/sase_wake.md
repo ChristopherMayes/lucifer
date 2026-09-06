@@ -39,6 +39,8 @@ The same resistive-wall kernel applied through Bmad's own wake machinery instead
 the transcribed model is `../bmad_wake`, which carries both runs and their agreement.
 What a loss this size does to the ponderomotive phases is `../migration`.
 
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 69 times the power inside it, so 99 percent of the 2.94 GW above is that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
+
 Runs in ~25 s.
 
 ## The input files

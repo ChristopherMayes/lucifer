@@ -72,6 +72,8 @@ Two of these do not carry over from Aramis. The convergence page estimates the w
 
 The lattice carries the optics, so the bunch is generated matched to the periodic solution in the `beginning` statement, and there is no `gamma0` and no match transform. The current is derived from `bunch_charge` and `sig_z` and is never given. The window covers the bunch to four sigma either side with 990 wavelengths of slippage headroom at each end, because radiation made at the head of the bunch slips out of a shorter window before the exit. About a quarter of the slices therefore carry no charge, which is the price of holding the whole pulse.
 
-Measured on this input at the `ran_seed` default of 12345: the exit power is 84.5 GW summed over the window and the pulse energy is 46.3 µJ.
+Measured on this input at the `ran_seed` default of 12345: the exit power is 84.5 GW summed over the window and the pulse energy is 46.3 µJ. The run's own convergence report puts the power outside the split angle of 81 µrad at 0.078 times the power inside it, so 7 percent of that total is the wide-angle emission of the point beamlets and the rest is the mode.
+
+Leaving `grid_n_pts` and `grid_half_width` out of the deck derives 127 points over a 962 µm half width, cells of 15.27 µm against the 15.63 µm here. That run gives 46.33 µJ against 46.35 and a ratio of 0.080 against 0.078, so the stated grid is the derived one.
 
 Runs in ~20 s.

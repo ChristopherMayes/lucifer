@@ -48,3 +48,5 @@ resampled particle, so the noise falls on different phasors. `../sase` describes
 sensitivity: in a dark start, a small change re-rolls the realization. The keep mode
 costs what its 400000 macroparticles cost. A production run with a bunch from an
 accelerator simulation would keep fewer copies or sample.
+
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 75 times the power inside it in the keep mode and 86 times in the sample mode, so the two exit powers above are almost entirely that emission. Both modes load the same bunch on the same grid, so the comparison between them is unaffected.

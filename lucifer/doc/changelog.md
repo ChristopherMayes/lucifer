@@ -9,6 +9,27 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Added: every run reports the split between the mode and the wide-angle emission of the
+  point macroparticle beamlets, and derives its transverse grid from the beam when the deck states
+  none. The split costs nothing new: each element end that takes the field angle moments already
+  stores the power inside `field/total/split_angle` beside the total, and the footer reads it back
+  at the record where the mode peaked and at the last record. Above a tenth the run warns that a
+  total power quoted from it is mostly representation and names the two remedies, more
+  macroparticles per slice at the same `beamlet_size` or `global%source_filter = T`, and below a
+  hundredth it says the total is converged. The same numbers go to `run/` in the statistics file.
+  Eleven of the sixteen examples exceed a tenth, the dark starts worst at 21 to 86, and every
+  README that quotes a power now says what share of it is that emission. Where the comparison an
+  example exists for survives the split, the README states it in the mode as well: migration is
+  worth 1.75 there against 1.73 in the total, and the mixed line costs 3.6e-2 in ln P against
+  7.4e-3. `wavefront_init%grid_n_pts` and `%grid_half_width` now default to zero and derive from
+  the rms beam size, cells of a seventh of it and a half width of nine of it, which fixes the point
+  count at 127 since the beam size cancels, rounded up to a power of two on the device. Both are
+  printed with their origin. The derivation reproduces the grids chosen by hand on the FLASH probe
+  and on FLASH1, and on the Aramis benchmark it gives 127 points over 192 um against the examples'
+  255 over 200, which lowers the wide-angle ratio of the `sase` deck from 21 to 5.4 (FINDINGS 7.55).
+  The header's Radiation line now reports the grid the run built rather than the one the deck
+  stated, which a run starting from a field file did not have.
+
 - 2026-09-06 Added: examples/flash1, the FLASH1 undulator line at DESY at 13.7 nm from its published
   parameters, and with it a third machine for every numerical default. The lattice is six planar
   segments of 165 periods at 27.3 mm and 0.47 T with a quadrupole doublet in each intersection, and
