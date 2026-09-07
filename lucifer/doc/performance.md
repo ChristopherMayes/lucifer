@@ -9,7 +9,7 @@ The instrument is `code/fel_timer_mod.f90`. It accumulates wall clock per phase 
 
 Timers cannot see inside a parallel region. The deposit and its FFT interleave per slice, and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
 
-The tables below are also the calibration of the cost estimate every run prints in its header. `code/fel_cost_mod.f90` holds the fitted rates, one for the particle push and two for the field solve, and reproduces all eight configurations measured here to within 2 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-fitting those constants.
+The tables below are also the calibration of the cost estimate every run prints in its header. `code/fel_cost_mod.f90` holds the fitted rates, one for the particle push and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the logs the runs below wrote. Over the thirteen runs of this page the worst residual on the walk is 4.0 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-running that script and pasting its five constants back.
 
 (perf-reproducing)=
 ## Reproducing this
@@ -40,25 +40,35 @@ It takes the compile command from the production build's own makefile, so the re
 (perf-the-phase-profile)=
 ## The phase profile
 
-Apple M3 Max, 12 performance cores, production build, full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 255, 12 threads.
+Apple M3 Max, 12 performance cores, production build, full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 255, 12 threads, the source filter at its default. The `was` columns are the same runs measured before that default changed, and they are given wherever the move exceeds the run-to-run spread below.
 
-| phase | 96 slices | 504 slices |
-|---|---|---|
-| field solve (deposit and FFT) | 15.435 s, 64.5% | 82.072 s, 64.4% |
-| particle push (transverse maps, RK4) | 4.485 s, 18.8% | 23.608 s, 18.5% |
-| `= FEL step`, the sum of the phases inside it | 19.966 s, 83.5% | 105.731 s, 83.0% |
-| stats and diag | 3.201 s, 13.4% | 18.223 s, 14.3% |
-| field drift through the breaks | 0.510 s, 2.1% | 2.556 s, 2.0% |
-| seam interlude | 0.103 s, 0.4% | 0.574 s, 0.5% |
-| slippage | 0.102 s, 0.4% | 0.109 s, 0.1% |
-| undulator prep (plans, kernel cache) | 0.046 s, 0.2% | 0.051 s, 0.0% |
-| element end | 0.032 s, 0.1% | 0.170 s, 0.1% |
-| unaccounted | 0.003 s, 0.0% | 0.006 s, 0.0% |
-| walk | 23.917 s | 127.370 s |
+| phase | 96 slices | was | 504 slices | was |
+|---|---|---|---|---|
+| field solve (deposit and FFT) | 21.687 s, 71.5% | 15.435 s, 64.5% | 118.060 s, 71.7% | 82.072 s, 64.4% |
+| particle push (transverse maps, RK4) | 4.735 s, 15.6% | 4.485 s, 18.8% | 24.509 s, 14.9% | 23.608 s, 18.5% |
+| `= FEL step`, the sum of the phases inside it | 26.468 s, 87.3% | 19.966 s, 83.5% | 142.645 s, 86.6% | 105.731 s, 83.0% |
+| stats and diag | 3.140 s, 10.4% | 3.201 s, 13.4% | 18.559 s, 11.3% | 18.223 s, 14.3% |
+| field drift through the breaks | 0.490 s, 1.6% | 0.510 s, 2.1% | 2.597 s, 1.6% | 2.556 s, 2.0% |
+| seam interlude | 0.096 s, 0.3% | 0.103 s, 0.4% | 0.578 s, 0.4% | 0.574 s, 0.5% |
+| slippage | 0.104 s, 0.3% | 0.102 s, 0.4% | 0.106 s, 0.1% | 0.109 s, 0.1% |
+| undulator prep (plans, kernel cache) | 0.045 s, 0.1% | 0.046 s, 0.2% | 0.075 s, 0.0% | 0.051 s, 0.0% |
+| element end | 0.032 s, 0.1% | 0.032 s, 0.1% | 0.159 s, 0.1% | 0.170 s, 0.1% |
+| unaccounted | 0.004 s, 0.0% | 0.003 s, 0.0% | 0.007 s, 0.0% | 0.006 s, 0.0% |
+| walk | 30.333 s | 23.917 s | 164.650 s | 127.370 s |
+
+One phase moved and it moved the walk with it. The field solve is up 40 percent at 96 slices and 44 percent at 504, and everything else is inside the spread. The source filter is why: it adds a forward transform of the source per field per step, where an unfiltered solve adds the source in real space and transforms twice rather than three times ([](fel-physics.md#sec-source-filter)). Measured directly on the 96-slice configuration, the same deck with the filter off and on:
+
+| | filter off | filter on | ratio |
+|---|---|---|---|
+| field solve | 15.011 s | 21.339 s | 1.42 |
+| particle push | 4.484 s | 4.441 s | 0.99 |
+| walk | 23.392 s | 29.646 s | 1.27 |
+
+Two runs each, mean. The filter costs 27 percent of this walk and 42 percent of its field solve, and it leaves the push alone. The 8 to 14 percent [](fel-physics.md#sec-convergence) quotes is the cost at the derived grid on a shorter line, where the transform is a smaller share of a run; this line at `ngrid` 255 is where the transform dominates, so it is where the filter costs most. The filter-off walk of 23.392 s reproduces the 23.917 s recorded before the default changed, so nothing else in the code moved between the two measurements.
 
 The `= FEL step` row is derived rather than measured, which its label says: it is the sum of the undulator prep, the space-charge profile, the particle push and the field solve, so it is the share of the walk the undulator segments own. It is left out of the leaf sum, and the other rows still add to the walk minus the remainder.
 
-The shares are the result and the third decimal is noise. Repeating the 96-slice run gives a walk of 23.583 s against 23.917 s and a field solve of 64.0% against 64.5%, so the run-to-run spread is about 1.4% on the total and half a point on a share.
+The shares are the result and the third decimal is noise. Two 96-slice runs back to back give walks of 29.625 s and 29.667 s, and a third taken in a different batch gives 30.333 s, so the run-to-run spread is about 2% on a walk and a few tenths of a point on a share.
 
 The shares hold across a factor of 5.25 in slice count. The run row against the walk row is everything outside the walk: the parse, the beam and field build, the slippage schedule, the final dumps and the stats file. That is 0.2 s at 96 slices and 0.8 s at 504.
 
@@ -69,15 +79,17 @@ Slippage is 0.4% of the walk and 0.1% at the larger size. [](validation.md#val-p
 
 The field solve and the particle push scale differently, so their ratio is a property of the configuration and not of the code. Same machine and line, 96 slices, 12 threads.
 
+Two runs at each count, mean.
+
 | particles per slice | particle push | field solve | walk |
 |---|---|---|---|
-| 512 | 1.217 s, 6.3% | 14.878 s, 77.3% | 19.250 s |
-| 2048 | 4.485 s, 18.8% | 15.435 s, 64.5% | 23.917 s |
-| 8192 | 17.619 s, 42.6% | 16.677 s, 40.3% | 41.375 s |
+| 512 | 1.178 s, 4.6% | 21.182 s, 83.2% | 25.446 s |
+| 2048 | 4.441 s, 15.0% | 21.339 s, 72.0% | 29.646 s |
+| 8192 | 16.722 s, 36.2% | 22.934 s, 49.6% | 46.224 s |
 
-The push is linear in the particles (1.217, 4.485, 17.619 for 512, 2048, 8192) and the field solve is nearly flat (14.878, 15.435, 16.677). Two FFTs of $255^2$ points per slice per step do not care how many particles deposited into the grid. The crossover is near 8192 particles per slice at `ngrid` 255.
+The push is linear in the particles (1.178, 4.441, 16.722 for 512, 2048, 8192) and the field solve is nearly flat (21.182, 21.339, 22.934). Three FFTs of $255^2$ points per slice per step do not care how many particles deposited into the grid. The crossover has moved past 8192 particles per slice at `ngrid` 255, since the filter raised the flat part and left the push where it was.
 
-That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 14.76$ s and $d = 2.34 \times 10^{-4}$ s per particle. At 2048 particles per slice that predicts 14.76 s of transform and propagator plus 0.48 s of deposit, so 15.24 s against the 15.435 s measured, a 1.3% residual on a two-point fit. The transform and propagator are 95.6% of the solve by that fit. The sampling profile below gives 95.2% from independent evidence, which is the same number.
+That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 21.06$ s and $d = 2.28 \times 10^{-4}$ s per particle. The slope is the deposit and it is unchanged, which it should be: the filter multiplies a transformed source and does not touch how the source is built. At 2048 particles per slice the fit predicts 21.06 s of transform and propagator plus 0.47 s of deposit, so 21.53 s against the 21.339 s measured, a 0.9% residual on a two-point fit. The transform and propagator are 98.7% of the solve by that fit against 95.6% by the sampling profile below, where the two agreed to half a point before the filter. The fit's deposit term is now 2% of a larger solve, so the two-point $C$ carries the solve's own 1.5% spread almost whole.
 
 [](validation.md#val-the-particlepath-cost-measured) measured a real 131-slice case where the particle path dominated at 8192 particles per slice while the field FFTs stayed constant. That is this table, and the two agree.
 
@@ -88,11 +100,13 @@ That flatness also splits the field solve without a profiler. Fitting the 512 an
 
 | threads | walk | speedup | efficiency | implied serial |
 |---|---|---|---|---|
-| 1 | 219.1 s | 1.00 | the reference | |
-| 2 | 113.6 s | 1.93 | 96% | 3.7% |
-| 4 | 58.5 s | 3.74 | 94% | 2.3% |
-| 8 | 32.4 s | 6.76 | 84% | 2.6% |
-| 12 | 23.9 s | 9.16 | 76% | 2.8% |
+| 1 | 290.8 s | 1.00 | the reference | |
+| 2 | 149.7 s | 1.94 | 97% | 3.0% |
+| 4 | 76.5 s | 3.80 | 95% | 1.7% |
+| 8 | 41.6 s | 7.00 | 87% | 2.0% |
+| 12 | 30.3 s | 9.59 | 80% | 2.3% |
+
+The scaling improved with the filter on, from 9.16x to 9.59x at twelve threads and from 76% efficiency to 80%. The filter's work is a transform per slice, which is the parallel part, so adding it lengthens the parallel region and leaves the serial part alone. The estimate takes 2.1% as the serial fraction, fitted over the whole sweep.
 
 [](validation.md#val-parallelism-openmp-over-slices) records 3.97x at 8 threads on 32 slices in a debug build and says that is the floor of the scaling rather than its ceiling. At 96 slices in a production build the same 8 threads give 6.76x, so the claim holds.
 
@@ -103,21 +117,23 @@ A steady-state run gets nothing from threads. The parallelism is over slices, an
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
 
-96 slices, 2048 particles per slice, 12 threads, 15 s of samples at 1 ms, 116236 samples. Exclusive cost, categorized by symbol.
+96 slices, 2048 particles per slice, 12 threads, the filter at its default, 15 s of samples at 1 ms, 120732 samples. Exclusive cost, categorized by symbol. The `was` column is the same measurement before the default changed.
 
-| | share |
-|---|---|
-| FFT transform (libfftw3, `wavefront_fft2`) | 61.3% |
-| thread wait | 10.0% |
-| libm sin and cos | 8.5% |
-| transverse maps (`quad_mat2_calc`, and its `cexp`) | 5.9% |
-| deposit and propagator multiply | 5.7% |
-| diagnostics | 4.6% |
-| longitudinal RK4 and ODE | 3.6% |
-| slippage and drift | 0.1% |
-| everything else | 0.4% |
+| | share | was |
+|---|---|---|
+| FFT transform (libfftw3, `wavefront_fft2`) | 68.8% | 61.3% |
+| libm sin and cos | 6.5% | 8.5% |
+| diagnostics | 5.5% | 4.6% |
+| thread wait | 5.1% | 10.0% |
+| deposit and propagator multiply | 4.9% | 5.7% |
+| transverse maps (`quad_mat2_calc`, and its `cexp`) | 4.9% | 5.9% |
+| longitudinal RK4 and ODE | 3.7% | 3.6% |
+| slippage and drift | 0.1% | 0.1% |
+| everything else | 0.6% | 0.4% |
 
-An earlier estimate put the field solve near 10% of a run, and at these parameters it is 64.4% by the phase timer and 61.3% in the transform alone by samples. That estimate came from a configuration with many more particles per slice, where the table above shows the balance reversing.
+The transform took the filter's third pass and rose 7.5 points, which is the whole of what moved. The thread wait halved, and the thread scan above agrees: a longer parallel region against the same serial part is better efficiency, not worse.
+
+An earlier estimate put the field solve near 10% of a run, and at these parameters it is 71.5% by the phase timer and 68.8% in the transform alone by samples. That estimate came from a configuration with many more particles per slice, where the table above shows the balance reversing.
 
 `quad_mat2_calc` is Bmad's own quadrupole map, and its cost is a complex exponential per particle: `cexp` and the `exp` beneath it are the whole 5.9%. The libm sin and cos are the deposit's phase factor and the ODE's, through `fel_sincos`.
 
@@ -244,27 +260,27 @@ The single-precision question is measured rather than argued. `global%fp32_check
 
 Every run prints an estimated walk in its header and the measured walk beside it in its footer. The rates are fitted to the tables above and are this machine's. Measured here on the eleven comparison tiers and four examples, each run on its own rather than beside the other keystone jobs, since a machine running five jobs at once measures the load and not the deck.
 
-| run | measured | estimate | estimate/measured |
-|---|---|---|---|
-| tier1 | 0.298 s | 0.332 s | 1.11 |
-| tier1_unavg | 12.4 s | 19.9 s | 1.60 |
-| tier2_bmad | 3.8 s | 4.0 s | 1.05 |
-| tier2_genesis | 3.8 s | 4.0 s | 1.05 |
-| td1 | 1.1 s | 0.660 s | 0.60 |
-| td2_bmad | 9.2 s | 7.9 s | 0.86 |
-| td2_genesis | 8.8 s | 7.9 s | 0.90 |
-| tdsase | 8.6 s | 7.9 s | 0.92 |
-| tdsc | 0.731 s | 0.660 s | 0.90 |
-| tdwk | 0.685 s | 0.660 s | 0.96 |
-| weight_split | 0.461 s | 0.523 s | 1.13 |
-| `sase` | 31.0 s | 23.8 s | 0.77 |
-| `steady_state` | 5.0 s | 4.0 s | 0.80 |
-| `taper` | 5.0 s | 4.0 s | 0.80 |
-| `flash1` | 22.4 s | 18.0 s | 0.80 |
+| run | filter | measured | estimate | estimate/measured |
+|---|---|---|---|---|
+| tier1 | off | 0.297 s | 0.394 s | 1.33 |
+| tier1_unavg | off | 12.6 s | 23.6 s | 1.87 |
+| tier2_bmad | off | 3.8 s | 4.7 s | 1.24 |
+| tier2_genesis | off | 3.7 s | 4.7 s | 1.27 |
+| td1 | off | 0.671 s | 0.845 s | 1.26 |
+| td2_bmad | off | 8.6 s | 10.1 s | 1.17 |
+| td2_genesis | off | 8.8 s | 10.1 s | 1.15 |
+| tdsase | off | 8.9 s | 10.1 s | 1.13 |
+| tdsc | off | 0.738 s | 0.845 s | 1.15 |
+| tdwk | off | 0.691 s | 0.845 s | 1.22 |
+| weight_split | off | 0.453 s | 0.576 s | 1.27 |
+| `sase` | on | 31.5 s | 30.4 s | 0.97 |
+| `steady_state` | on | 5.0 s | 4.7 s | 0.94 |
+| `taper` | on | 5.1 s | 4.7 s | 0.92 |
+| `flash1` | on | 22.6 s | 18.5 s | 0.82 |
 
-Every row is inside a factor of two, which is what the estimate is held to. The two ends of the spread are the ones to read. `tier1_unavg` is the highest at 1.60: the unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period, and the count carries those substeps while the rates it multiplies are the averaged path's. `td1` is the lowest at 0.60 on a walk of one second, where the parse and the beam build are a real share of a short run.
+Every row is inside a factor of two, which is what the estimate is held to. The filter column is what separates the two blocks. The examples take the default, and three of the four now read between 0.92 and 0.97 where all four read 0.80 against the previous rates. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)), so their field solve is the cheaper two-transform one while the rate pricing it is the filtered default's. That is the 1.13 to 1.33 the tier block sits at, and it is a property of the configuration rather than of the machine.
 
-The four examples cluster at 0.8 because they run with the source filter on, which costs 8 to 14 percent of wall clock ([](fel-physics.md#sec-convergence)), and the tables above were measured before that became the default. Re-measuring this page would take that bias out of the rates.
+`tier1_unavg` is the highest at 1.87 and is high for a second reason: the unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period, and the count carries those substeps while the rates it multiplies are the averaged path's. `flash1` is the lowest at 0.82, on 351 slices at `ngrid` 129, which is the furthest configuration here from the one the rates were fitted on.
 
 (perf-device)=
 ## The device, measured against the CPU

@@ -182,6 +182,11 @@ if [[ $PHASES -eq 1 ]]; then
   # A time window of nslice slices at sample = 3 is nslice * 3 * lambda0 long, which is
   # the same arithmetic the head-to-head above does for Genesis.
   #
+  # The deck states its slice spacing. An unstated one is derived from the beam and the
+  # gain, which on this line is 38 wavelengths rather than 3, so the same window_length
+  # would build 8 slices where this profile wants 96. The slice count is what the two
+  # columns compare, so it is stated and then checked below.
+  #
   # The bunch charge does not scale with the window, so a longer window is a lower
   # current and a different gain. That is deliberate and it does not matter here: the
   # work per step is the same whatever the charge, which the measurement confirms (the
@@ -197,6 +202,7 @@ if [[ $PHASES -eq 1 ]]; then
   lat_file = "aramis.bmad"
   global%out_root = "$3"
   slicing%window_length = $slen
+  slicing%n_wavelength = 3
 /
 &fel_beam_init
   beam_init%n_particle = $NPART
@@ -232,6 +238,17 @@ DECK
     fi
     if ! grep -q '^ Timing' "$log"; then
       echo "FAILED: the run printed no Timing block. An old binary, or a phase left open." >&2
+      exit 1
+    fi
+
+    # The profile compares two slice counts, so a run that built a different one is
+    # measuring a different configuration. The header says what it built.
+
+    local built
+    built="$(awk '/^ Beam / {for (i = 1; i <= NF; i++) if ($i == "slices" || $i == "slice") print $(i-1)}' "$log")"
+    if [[ "$built" != "$ns" ]]; then
+      echo "FAILED: asked for $ns slices and the run built ${built:-none}." >&2
+      echo "The deck states slicing%n_wavelength; a derived spacing would change the count." >&2
       exit 1
     fi
   }

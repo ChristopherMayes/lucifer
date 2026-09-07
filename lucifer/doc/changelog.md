@@ -9,6 +9,28 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Changed: doc/performance.md is re-measured with the source filter at its default, and the
+  cost estimate's rates are re-fitted to it. One phase moved. The field solve is up 40 percent at 96
+  slices and 44 percent at 504, and the walk with it, from 23.917 to 30.333 s and from 127.370 to
+  164.650 s. The filter is the whole of it: measured on one deck both ways, it costs 42 percent of the
+  field solve, 27 percent of the walk, and nothing of the particle push, which is the arithmetic of a
+  third transform per field per step against two. The filter-off walk of 23.392 s reproduces the 23.917 s
+  recorded before the default changed, so nothing else moved between the two measurements. Thread scaling
+  improved, 9.59x at twelve threads against 9.16x and 80 percent efficiency against 76, since the filter
+  lengthens the parallel region and leaves the serial part alone. The sampling split puts the transform at
+  68.8 percent of the run against 61.3, and the thread wait at 5.1 against 10.0. The estimate's five
+  constants are re-fitted by tests/scripts/fit_cost_rates.py, which reads the logs the runs wrote, so the
+  next re-measurement is a command: the transform rate rises 58 percent, the push and the deposit stay
+  where they were, the serial fraction falls from 2.8 to 2.1 percent and the walk share rises from 0.83
+  to 0.878, with a worst residual of 4.0 percent over thirteen runs. Against the clock the four examples
+  now read 0.82 to 0.97 where all four read 0.80, and the eleven tiers read 1.13 to 1.87 because every
+  one of them turns the filter off to compare against a code that carries none, so their solve is the
+  cheaper two-transform one priced at the filtered default's rate. Every row is inside the factor of two
+  the estimate is held to. The phases mode of run_perf_benchmark.sh states slicing%n_wavelength and checks
+  the slice count the run built: an unstated spacing is derived from the beam and the gain, which on this
+  line is 38 wavelengths rather than 3, so the profile had been measuring 8 slices where it reports 96
+  (FINDINGS 7.63).
+
 - 2026-09-07 Added: a run states its cost and its convergence standing before it tracks. The header gains
   three lines. Work counts the integration steps over the line, the macroparticles in the window, their
   product in particle-steps and the transverse grid points the field solve touches per step, all of them

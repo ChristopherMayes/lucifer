@@ -880,10 +880,10 @@ also little schedule slack: 4 slices per thread at 8 threads. Production-size ru
 the floor of the scaling rather than its ceiling.
 
 [](performance.md#perf-thread-scaling) measures the same curve at 96 slices in a
-production build and gets 6.76x at 8 threads and 9.16x at 12, which holds that claim. It
-also prices what the serial fraction is made of. The slippage rotation is 0.4% of the
+production build and gets 7.00x at 8 threads and 9.59x at 12, which holds that claim. It
+also prices what the serial fraction is made of. The slippage rotation is 0.3% of the
 walk, the per-slice diagnostics reduction runs slice-parallel, and every phase this file
-can name totals 0.6%, so the rest is the cost of entering a parallel region.
+can name totals 0.5%, so the rest is the cost of entering a parallel region.
 
 ### Head to head against Genesis4 at 12 workers
 

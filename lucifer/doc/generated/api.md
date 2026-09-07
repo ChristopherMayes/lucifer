@@ -1079,21 +1079,20 @@ linear in particle-steps. The field solve is a transform that does not care how 
 particles deposited into the grid, going as ngrid^2 log2(ngrid) per slice per step,
 with a deposit linear in particle-steps beside it. The 512 and 8192 particle rows of
 the performance page separate the two, since the push moves by a factor of 14 across
-them while the transform moves by 12 percent.
+them while the transform moves by 8 percent.
 
 Rates below are per thread. The page's tables were taken at twelve threads, and the
-thread scan there inverts to a serial fraction of 2.8 percent, which reproduces the
-measured speedup at 2, 4, 8 and 12 threads to better than 2 percent. The parallelism
-is over slices, so a window of one slice gets nothing from threads and the effective
-thread count is the smaller of the two.
+thread scan there inverts to a serial fraction of 2.1 percent. The parallelism is over
+slices, so a window of one slice gets nothing from threads and the effective thread
+count is the smaller of the two.
 
-Against the eight configurations the performance page measures, the estimate lands
-within 2 percent. That is the calibration set and not a claim about another machine
-or another line. On the examples and the comparison tiers the estimate runs low by 20
-to 40 percent, and part of that is dated: the page's runs were taken before the source
-filter became the default, and the filter costs 8 to 14 percent of wall clock
-(doc/fel-physics.md sec-convergence). The estimate is a number to plan a run against,
-so it is checked against the clock in the footer of every run rather than trusted.
+The rates are fitted by tests/scripts/fit_cost_rates.py from the logs of the runs the
+page records, so a re-measurement is a command and the constants are not derived by
+hand twice. Fitted 2026-09-07 over thirteen runs, three particle counts and two slice
+counts at five thread counts: the worst residual on the walk is 4.0 percent. That is
+the calibration set and not a claim about another machine or another line. The
+estimate is a number to plan a run against, so the footer of every run prints the
+measured walk beside it rather than leaving it unchecked.
 ```
 
 (api-fel-cost-count)=
