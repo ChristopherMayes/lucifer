@@ -186,6 +186,23 @@ do ih = 2, 9
     err_flag = .true.;  return
   endif
 enddo
+! The load has to carry the harmonic it is asked to start. The quiet start leaves no
+! bunching below harmonic beamlet_size, and fel_fawley_noise then imposes the physical
+! level on harmonics 1 through (beamlet_size - 1)/2. A harmonic field above that starts
+! from a load with no noise at its own frequency, so its SASE has nothing to grow from
+! and the run would report a number with no startup behind it. The refusal names the
+! beamlet size that would carry it, 2h + 1. A seeded harmonic needs no such noise, so
+! the check applies where shot noise is asked for.
+
+if (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size - 1) / 2) then
+  call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
+               'NOISE AT, WHICH IS (BEAMLET_SIZE - 1)/2 = \i0\ AT BEAMLET_SIZE = \i0\ .', &
+               'POSSIBLE SOLUTION: SET BEAM_INIT%BEAMLET_SIZE TO \i0\ OR MORE.', &
+               i_array = [maxval(harmonics), (run%bparam%beamlet_size - 1) / 2, &
+                          run%bparam%beamlet_size, 2 * maxval(harmonics) + 1])
+  err_flag = .true.;  return
+endif
+
 if (n_harm > 1 .and. any(fel_mode == unaveraged$ .and. is_fel)) then
   call out_io (s_error$, r_name, 'HARMONIC FIELDS WITH AN UNAVERAGED ELEMENT ARE NOT IMPLEMENTED', &
                                  '(THE UNAVERAGED MODE CARRIES THE FUNDAMENTAL ENVELOPE ONLY; ITS HARMONIC', &

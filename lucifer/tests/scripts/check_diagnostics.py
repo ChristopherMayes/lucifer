@@ -16,6 +16,9 @@ escaped-field bank, held by cross-identities rather than reference files --
   5. thread invariance: every dataset of stats.h5, escaped and pulse files identical
      at 1 vs 8 threads (dataset-level: HDF5 headers embed creation times).
   6. refusal: a dump_beam_at entry matching no element is refused.
+  7. the pre-run: the header's work count, cost estimate and load standing, the footer's
+     thin-slice list on a deck loaded under the measured floor, load_only stopping after
+     the header, and the refusal of a harmonic the load carries no shot noise at.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -24,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -71,6 +75,35 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 
 WRAP = """call, file = aramis_1seg.bmad
 wiggler::*[FEL_METHOD] = unaveraged
+"""
+
+# The pre-run deck. Averaged, seeded so it reaches saturation in one segment and costs
+# little, and loaded at 512 macroparticles in beamlets of 8. That is 64 beamlets, half
+# the floor the source filter's convergence was measured at, so the load standing and
+# the thin-slice list both have something to report.
+
+PRE_NML = """! flat keys; routed into the three groups by nml.to_groups
+  lat_file = "aramis_1seg.bmad"
+  out_root = "{root}"
+  lambda0 = 1e-10
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 8.0e-15
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -4e-10
+  beam_init%grid(3)%x_max = 4e-10
+  beam_init%sig_pz = 8.8045e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 1e4
+  seed_waist_size = 30e-6
+  grid_n_pts = 63
+  grid_half_width = 2e-4
+  window_length = 8e-10
+  n_wavelength = 1
+  shot_noise = T
+  ran_seed = 999
+{extra}&end
 """
 
 # Zero-length wake elements, both polarities, for check 7. A zero-length element carrying
@@ -139,6 +172,7 @@ def run(exe, wd, name, text, threads="8"):
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}\n{r.stderr[-1000:]}")
         sys.exit(1)
+    return r
 
 
 def main():
@@ -585,6 +619,71 @@ def main():
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = r.returncode != 0 and "NO_SUCH_ELEMENT" in (r.stdout + r.stderr)
     check("refusal: unknown dump_beam_at element refused (1 = yes)",
+          0.0 if refused else 1.0, 0.5)
+
+    # 7. The pre-run (doc/user-guide.md). The deck loads 512 macroparticles per slice in
+    # beamlets of 8, which is 64 beamlets and half the measured floor, so the load
+    # standing and the thin-slice list both have something to report. The count is
+    # arithmetic and is checked as arithmetic; the estimate is one machine's and is
+    # checked only for being present and positive.
+
+    r = run(exe, wd, "pre", PRE_NML.format(root="pre", extra=""), threads="4")
+    out = r.stdout
+    work = next((l for l in out.splitlines() if l.startswith(" Work ")), "")
+    m = re.search(r"(\d+) FEL steps, (\d+) macroparticles, ([\d.E+]+) particle-steps, "
+                  r"([\d.E+]+) grid points per step", work)
+    check("pre-run: the header states the work", 0.0 if m else 1.0, 0.5,
+          note=f"[{work.strip()}]")
+    if m:
+        nstep, npart, pstep = int(m.group(1)), int(m.group(2)), float(m.group(3))
+        # The line carries three significant figures, so the identity is checked to
+        # what it prints and not to what it computed.
+        check("pre-run: particle-steps is the product of the two counts",
+              abs(pstep - nstep * npart) / max(pstep, 1.0), 1e-2)
+
+    est = next((l for l in out.splitlines() if l.startswith(" Estimate ")), "")
+    m = re.search(r"Estimate\s+([\d.]+) s of walk", est)
+    check("pre-run: the header estimates the walk and names the machine",
+          0.0 if (m and float(m.group(1)) > 0 and "M3 Max" in est) else 1.0, 0.5,
+          note=f"[{est.strip()}]")
+
+    check("pre-run: the load standing reads under the measured floor",
+          0.0 if "Under the measured load" in out else 1.0, 0.5)
+    check("pre-run: the beamlet size is stated by the harmonics it carries",
+          0.0 if "Shot noise on harmonics 1 to 3" in out else 1.0, 0.5)
+
+    thin = [l for l in out.splitlines() if l.strip().startswith("slice ")]
+    check("pre-run: the footer lists the thin slices", 0.0 if thin else 1.0, 0.5,
+          note=f"[{len(thin)} listed]")
+    check("pre-run: and names the remedy",
+          0.0 if 'load_mode = "sample"' in out else 1.0, 0.5)
+    cost = next((l for l in out.splitlines() if l.startswith(" Cost ")), "")
+    check("pre-run: the footer prints the clock beside the estimate",
+          0.0 if ("measured" in cost and "estimated" in cost) else 1.0, 0.5,
+          note=f"[{cost.strip()}]")
+
+    # load_only prints the same header and stops: the pre-run is the header without the
+    # tracking, so the two headers have to agree line for line.
+
+    r2 = run(exe, wd, "pre2", PRE_NML.format(root="pre2", extra="  load_only = T\n"),
+             threads="4")
+    head = lambda s, root: [l.replace(root, "R") for l in s.splitlines()
+                            if l.startswith((" Work ", " Estimate ", " Load "))]
+    check("pre-run: load_only gives the same header as the run does",
+          0.0 if head(out, "pre") == head(r2.stdout, "pre2") else 1.0, 0.5)
+    check("pre-run: load_only tracks nothing", 0.0 if " Cost " not in r2.stdout else 1.0, 0.5)
+
+    # The refusal: a harmonic above (beamlet_size - 1)/2 has no shot noise at its own
+    # frequency, so a dark-start run there would report a number with no startup behind
+    # it. The message names the beamlet size that would carry it.
+
+    (wd / "pre_h.nml").write_text(to_groups(PRE_NML.format(root="pre_h",
+                                  extra="  harmonics = 1, 5\n")))
+    r3 = subprocess.run([str(exe), "pre_h.nml"], cwd=wd, capture_output=True, text=True,
+                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    said = r3.stdout + r3.stderr
+    refused = r3.returncode != 0 and "BEAMLET_SIZE TO 11" in said
+    check("refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it",
           0.0 if refused else 1.0, 0.5)
 
     if FAILED:

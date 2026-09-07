@@ -154,6 +154,7 @@ end type
 type fel_convergence_struct
   logical :: ok = .false.        ! A record took the angle moments.
   real(rp) :: angle = 0          ! The split angle [rad].
+  integer :: ir(2) = 0           ! The two records' indices, for a per-slice read.
   real(rp) :: z(2) = 0           ! [m] 1: the mode's peak. 2: the last record.
   real(rp) :: p_in(2) = 0        ! Power inside the angle, summed over slices [W].
   real(rp) :: p_out(2) = 0       ! Power outside it [W].
@@ -853,6 +854,7 @@ cvg%ok = .true.
 cvg%angle = stats%split_angle
 do k = 1, 2
   ir = merge(ir_peak, ir_last, k == 1)
+  cvg%ir(k) = ir
   pow = window_power(ir)
   p_in = sum(stats%f_p_in(:, ir), mask = stats%f_angles_valid(:, ir) == 1)
   cvg%z(k) = stats%z(ir)

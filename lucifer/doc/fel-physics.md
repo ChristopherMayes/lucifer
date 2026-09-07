@@ -555,6 +555,23 @@ slice regardless. And an irregular load is what the resampler exists for: sample
 redraws every slice at one beamlet count from the imported distribution, which gives every
 slice the same statistics and leaves the filter one job.
 
+**What the run says about its own load.** The header states the macroparticles in the
+thinnest slice, the beamlet size and the beamlet count, and then where that stands: at the
+load the filter's convergence was measured on, or under it, or, with the filter off, that
+no estimate carries between machines and the two tests are a run at twice the load and the
+report in the footer. It also states what the beamlet size buys, which is the harmonics the
+shot noise is imposed at, `(beamlet_size - 1)/2`. A harmonic field above that would start
+from a load with no noise at its own frequency, so it is refused with the beamlet size that
+would carry it.
+
+The footer then names the thin slices by index and position: those carrying charge whose
+beamlet count is under 128, or whose power outside the split angle is over a tenth of the
+power inside it, at the record where the mode peaked. A window ratio is a mean over the
+window, so a thin tail averages away inside it, and an imported beam with irregular counts
+is where a thin tail comes from. Setting `global%load_only` prints the header and stops,
+which prices a deck and reads its load before any tracking is paid for
+([](user-guide.md)).
+
 (sec-source-filter)=
 ## The source filter
 

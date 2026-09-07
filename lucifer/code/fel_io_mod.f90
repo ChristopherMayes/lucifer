@@ -16,6 +16,7 @@ module fel_io_mod
 use fel_struct
 use fel_input_mod
 use fel_timer_mod
+use fel_cost_mod
 use wavefront_openpmd_mod
 ! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read in
 ! fel_write_meta, which is the only place this module reaches into the parser.
@@ -198,6 +199,68 @@ block
 end block
 call out_io (s_blank$, r_name, trim(line))
 
+! What the run will do and what that costs. The count is exact and the estimate is one
+! machine's, which the line says (fel_cost_mod). load_only stops after this block, so a
+! deck can be priced without tracking it (doc/user-guide.md).
+
+block
+  real(rp) n_pstep, n_gpt, secs
+  integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise
+  character(16) backend
+
+  call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
+  write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Work        ', nstep, &
+        ' FEL steps, ', n_particle, ' macroparticles, ', n_pstep, ' particle-steps, ', &
+        n_gpt, ' grid points per step'
+  call out_io (s_blank$, r_name, trim(line))
+
+  call fel_cost_estimate (run, secs, backend)
+  write (line, '(5a)') ' Estimate    ', trim(fel_cost_secs_str(secs)), ' of walk on the ' // &
+        trim(backend) // ' path, for ', fel_cost_machine$, '.'
+  call out_io (s_blank$, r_name, trim(line))
+
+  ! The load against the floor the filter's convergence was measured at: 1024
+  ! macroparticles per slice in 128 beamlets, below which the mode power in the
+  ! exponential regime rises on its own (doc/fel-physics.md sec-convergence).
+
+  nbeamlet = minval(run%fbeam%slice%n) / max(1, run%bparam%beamlet_size)
+  write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', minval(run%fbeam%slice%n), &
+        ' macroparticles in the thinnest slice, beamlets of ', run%bparam%beamlet_size, &
+        ', ', nbeamlet, ' beamlets.'
+  call out_io (s_blank$, r_name, trim(line))
+
+  if (.not. run%global%source_filter) then
+    call out_io (s_blank$, r_name, '             The source filter is off, and no estimate of the ' // &
+          'wide-angle share carries')
+    call out_io (s_blank$, r_name, '             between machines. The two tests are a run at twice ' // &
+          'this load and the')
+    call out_io (s_blank$, r_name, '             convergence report in this run''s footer.')
+  else if (minval(run%fbeam%slice%n) >= 1024 .and. nbeamlet >= 128) then
+    call out_io (s_blank$, r_name, '             This load is the one the filter''s convergence ' // &
+          'was measured on (fel-physics.md).')
+  else
+    call out_io (s_blank$, r_name, '             Under the measured load of 1024 macroparticles in ' // &
+          '128 beamlets, where the')
+    call out_io (s_blank$, r_name, '             exponential-regime mode power rises on its own and ' // &
+          'the filter is not')
+    call out_io (s_blank$, r_name, '             measured to remove it (fel-physics.md).')
+  endif
+
+  ! The beamlet size stated by what it does. The quiet start leaves no bunching below
+  ! harmonic beamlet_size, and fel_fawley_noise then imposes the physical level on
+  ! harmonics 1 through (beamlet_size - 1)/2.
+
+  nharm_noise = (run%bparam%beamlet_size - 1) / 2
+  if (run%bparam%shot_noise) then
+    write (line, '(a, i0, a)') '             Shot noise on harmonics 1 to ', nharm_noise, &
+          ', which is (beamlet_size - 1)/2.'
+  else
+    write (line, '(a, i0, a)') '             No shot noise. The quiet start leaves no bunching ' // &
+          'below harmonic ', run%bparam%beamlet_size, '.'
+  endif
+  call out_io (s_blank$, r_name, trim(line))
+end block
+
 write (line, '(a, l1, a, l1, a, l1)') ' Switches    sr wakes ', run%coll%wake%on, &
       ', space charge ', any(run%sc_here), ', radiation damping ', bmad_com%radiation_damping_on
 call out_io (s_blank$, r_name, trim(line))
@@ -230,9 +293,11 @@ type (fel_stats_struct), pointer :: stats
 character(300) line
 character(*), parameter :: r_name = 'lucifer'
 type (fel_convergence_struct) cvg
-integer ir, ih, n_listed
-real(rp) pow, ene, bun, worst
+integer ir, ih, n_listed, is, n_thin, n_shown, nbl
+real(rp) pow, ene, bun, worst, secs, ratio_s
 character(8) hsuf
+character(16) backend
+integer, parameter :: n_thin_max$ = 8
 
 !
 
@@ -293,6 +358,43 @@ if (cvg%ok) then
           'The total power is converged by the criterion of doc/startup-noise.md.', &
           r_array = [worst])
   endif
+
+  ! The thin slices, named rather than averaged away. A window ratio is a mean over the
+  ! window, so a tail whose beamlets are under the measured floor or whose light is
+  ! mostly wide angle disappears into it. An imported beam with irregular counts per
+  ! slice is the case this is for, and load_mode = "sample" is what levels it.
+
+  n_thin = 0;  n_shown = 0
+  do is = 1, min(stats%nslice, size(run%fbeam%slice))
+
+    ! A slice the bunch never reached is outside the beam and not a thin load. A window
+    ! that holds the slippage has a quarter of its slices empty by construction
+    ! (doc/fel-physics.md sec-window), and listing those would bury the ones that matter.
+
+    if (stats%charge_live(is, cvg%ir(1)) <= 0) cycle
+    nbl = run%fbeam%slice(is)%n / max(1, run%bparam%beamlet_size)
+    ratio_s = 0
+    if (stats%f_angles_valid(is, cvg%ir(1)) == 1 .and. stats%f_p_in(is, cvg%ir(1)) > 0) &
+          ratio_s = max(0.0_rp, stats%f_power(is, cvg%ir(1)) - stats%f_p_in(is, cvg%ir(1))) / &
+                    stats%f_p_in(is, cvg%ir(1))
+    if (nbl >= 128 .and. ratio_s <= 0.1_rp) cycle
+    n_thin = n_thin + 1
+    if (n_shown >= n_thin_max$) cycle
+    if (n_shown == 0) call out_io (s_blank$, r_name, '             Thin slices at the mode ' // &
+          'peak, under 128 beamlets or over a tenth outside the mode:')
+    n_shown = n_shown + 1
+    write (line, '(a, i0, a, 2a, i0, a, es9.2)') '               slice ', is, ', z = ', &
+          trim(adjustl(fel_si_str((is - 1) * run%fbeam%slice_spacing, 'm'))), ', ', nbl, &
+          ' beamlets, ratio ', ratio_s
+    call out_io (s_blank$, r_name, trim(line))
+  enddo
+  if (n_thin > n_shown) then
+    write (line, '(a, i0, a, i0, a, i0)') '               and ', n_thin - n_shown, ' more, ', &
+          n_thin, ' thin of ', stats%nslice
+    call out_io (s_blank$, r_name, trim(line))
+  endif
+  if (n_thin > 0) call out_io (s_blank$, r_name, '             Possible solution: ' // &
+        'load_mode = "sample", which draws the same number of beamlets in every slice.')
 endif
 
 ! Where the time went, one row per phase the run entered. The phases partition the
@@ -300,6 +402,16 @@ endif
 ! doc/performance.md reads a table like this one.
 
 call fel_timer_write (r_name)
+
+! The estimate beside the clock, on every run. An estimate nobody reads against a
+! measurement drifts away from the machine it was fitted on (fel_cost_mod).
+
+call fel_cost_estimate (run, secs, backend)
+write (line, '(7a)') ' Cost        walk ', &
+      trim(fel_cost_secs_str(fel_timer_seconds(fel_t_walk$))), ' measured, ', &
+      trim(fel_cost_secs_str(secs)), ' estimated on the ' // trim(backend) // ' path for ', &
+      fel_cost_machine$, '.'
+call out_io (s_blank$, r_name, trim(line))
 
 ! The FP32 lockstep instrument's worst case, when it ran. The full per-step record
 ! and the summary block are in the .fp32.txt file listed below.

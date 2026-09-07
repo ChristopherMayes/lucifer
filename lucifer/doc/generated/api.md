@@ -1059,6 +1059,112 @@ Output:
   ez(:) -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
 ```
 
+## `fel_cost_mod.f90`
+
+(api-fel-cost-mod)=
+### `fel_cost_mod`
+
+*Module*
+
+```
+What a run will cost, counted before it tracks and estimated from rates measured on
+one machine (doc/performance.md).
+
+The count is exact. Once the setup pass has run, the slices, the macroparticles, the
+integration steps and the grid points are all known, and their product is the work.
+The estimate is not exact, and the line that prints it names the machine it is for.
+
+The model is two terms, which is what the measurement supports. The particle push is
+linear in particle-steps. The field solve is a transform that does not care how many
+particles deposited into the grid, going as ngrid^2 log2(ngrid) per slice per step,
+with a deposit linear in particle-steps beside it. The 512 and 8192 particle rows of
+the performance page separate the two, since the push moves by a factor of 14 across
+them while the transform moves by 12 percent.
+
+Rates below are per thread. The page's tables were taken at twelve threads, and the
+thread scan there inverts to a serial fraction of 2.8 percent, which reproduces the
+measured speedup at 2, 4, 8 and 12 threads to better than 2 percent. The parallelism
+is over slices, so a window of one slice gets nothing from threads and the effective
+thread count is the smaller of the two.
+
+Against the eight configurations the performance page measures, the estimate lands
+within 2 percent. That is the calibration set and not a claim about another machine
+or another line. On the examples and the comparison tiers the estimate runs low by 20
+to 40 percent, and part of that is dated: the page's runs were taken before the source
+filter became the default, and the filter costs 8 to 14 percent of wall clock
+(doc/fel-physics.md sec-convergence). The estimate is a number to plan a run against,
+so it is checked against the clock in the footer of every run rather than trusted.
+```
+
+(api-fel-cost-count)=
+### `fel_cost_count`
+
+*Subroutine* `(run, nstep, n_particle, n_pstep, n_gpt, ngrid)`
+
+```
+Routine to count the work of a run from the state the setup pass built. Exact: every
+number here is known before the first step.
+```
+
+```
+Input:
+  run        -- fel_run_struct: The run, after fel_setup_schedule.
+
+Output:
+  nstep      -- integer: FEL integration steps over the walk, summed over the segments
+                  the walk covers. An unaveraged segment counts its own substeps,
+                  which is what it integrates and deposits on.
+  n_particle -- integer: Macroparticles in the window.
+  n_pstep    -- real(rp): Particle-steps, the product of the two. Real because it
+                  passes 2^31 on an ordinary time-dependent run.
+  n_gpt      -- real(rp): Transverse grid points the field solve touches per step,
+                  over the window and over every member and plane of the field set.
+  ngrid      -- integer: Transverse points on a side of one grid.
+  nstep_unavg -- integer: How many of nstep are unaveraged substeps.
+```
+
+(api-fel-cost-estimate)=
+### `fel_cost_estimate`
+
+*Subroutine* `(run, secs, backend)`
+
+```
+Routine to estimate the wall clock of a run's walk on the recording machine.
+
+The estimate covers the walk, which is the tracking. The parse, the beam and field
+build and the final dumps are outside it and are 1 percent of the walk on the page's
+own runs.
+```
+
+```
+Input:
+  run     -- fel_run_struct: The run, after fel_setup_schedule.
+
+Output:
+  secs    -- real(rp): Estimated walk seconds.
+  backend -- character(*): 'CPU' or the device name, whichever the estimate is for.
+```
+
+(api-fel-cost-secs-str)=
+### `fel_cost_secs_str`
+
+*Function* `(secs) result (str)`
+
+```
+Routine to write a number of seconds for a human. Seconds are the unit either way, so
+fel_si_str is not used here: its bare-unit row leaves two spaces before the unit, and
+its prefixes would report a short run in milliseconds where the line beside it is in
+seconds.
+```
+
+```
+Input:
+  secs -- real(rp): Seconds.
+
+Output:
+  str  -- character(16): The number and its unit, left justified.
+```
+
 ## `fel_device_mod.f90`
 
 (api-fel-device-mod)=

@@ -293,28 +293,34 @@ completion block listing what was written.
 
 ```
 ================================================================================
- Lucifer -- FEL tracking in Bmad, Bmad version 20260810-0
+ Lucifer -- FEL tracking in Bmad, Bmad version 20260904-1
 --------------------------------------------------------------------------------
  Lattice     aramis.bmad
              49 elements, 57.000 m, 12 FEL segments
  Beam        1 slice x 8192 particles, gamma0 = 11357.82
  Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid 255 points of 1.575 um
+ Work        1068 FEL steps, 8192 macroparticles, 8.75E+06 particle-steps, 6.50E+04 grid points per step
+ Estimate    4.0 s of walk on the CPU path, for Apple M3 Max, 12 cores, 2026-09-07.
+ Load        8192 macroparticles in the thinnest slice, beamlets of 8, 1024 beamlets.
+             This load is the one the filter's convergence was measured on (fel-physics.md).
+             No shot noise. The quiet start leaves no bunching below harmonic 8.
  Switches    sr wakes F, space charge F, radiation damping F
  Output      out_root "steady_state", threads 12
 ================================================================================
-     %        s       ele       step        power       energy    <|b|>  elapsed  element
-    7.0     3.990      1/49      89/89     4.230 kW     1.411 fJ   0.0006    0:00  UND
-   15.3     8.740      5/49      89/89    34.562 kW    11.529 fJ   0.0017    0:00  UND
-  100.0    57.000     48/49              761.499 MW   254.009 pJ   0.1854    0:06  D2
+     %        s       ele       step          power         energy    <|b|>  elapsed  element
+    7.0     3.990      1/49      89/89       4.165 kW       1.389 fJ   0.0006    0:00  UND
+   15.3     8.740      5/49      89/89      31.735 kW      10.586 fJ   0.0016    0:00  UND
+  100.0    57.000     48/49                792.748 MW     264.432 pJ   0.2432    0:04  D2
 --------------------------------------------------------------------------------
  Done        57.000 m, 48 element ends
- Exit        power 761.499 MW, pulse energy 254.009 pJ, <|b|> 0.1854
+ Exit        power 792.748 MW, pulse energy 264.432 pJ, <|b|> 0.2432
  Split       2.966 urad, the mode angle. Inside it the mode, outside it the beamlets.
-             mode peak, z =   37.240 m: inside 1.466 GW, outside 154.729 MW, ratio  1.06E-01, <|b|> 0.2827
-             last record, z = 57.000 m: inside 415.655 MW, outside 345.844 MW, ratio  8.32E-01, <|b|> 0.1854
- Wrote       steady_state-final.beam.h5                      710.760 kB
+             mode peak, z =   37.240 m: inside 1.558 GW, outside 1.257 MW, ratio  8.07E-04, <|b|> 0.3013
+             last record, z = 57.000 m: inside 790.824 MW, outside 1.924 MW, ratio  2.43E-03, <|b|> 0.2432
+ Cost        walk 4.8 s measured, 4.0 s estimated on the CPU path for Apple M3 Max, 12 cores, 2026-09-07.
+ Wrote       steady_state-final.beam.h5                      497.424 kB
              steady_state-final.wf.h5                        1.048 MB
-             steady_state.stats.h5                           841.220 kB
+             steady_state.stats.h5                           1.120 MB
 ================================================================================
 ```
 
@@ -330,6 +336,23 @@ chord the light takes, which is exactly what the light-path correction accounts 
 The **Radiation** line reports the grid the run built, which is the file's when the field
 came from one and the derived one when the deck stated none ([](input-reference.md#param-wavefront-grid)).
 
+The **Work**, **Estimate** and **Load** lines are the pre-run. Work counts what the run
+will do, and every number in it is known before the first step: the integration steps
+over the line, the macroparticles in the window, their product, and the transverse grid
+points the field solve touches per step over the window and every member of the field
+set. Estimate turns that into wall clock at rates measured on one machine, which the
+line names, from the particle push and the field solve ([](performance.md)). It is an
+estimate and it is checked: the **Cost** line in the completion block prints the clock
+beside it on every run. Load says where the macroparticle count stands against the load
+the source filter's convergence was measured at, 1024 macroparticles in 128 beamlets, and
+what the beamlet size buys, which is the harmonics the shot noise is imposed at,
+`(beamlet_size - 1)/2`. A harmonic field above that is refused with the beamlet size that
+would carry it.
+
+Setting `global%load_only` stops the run after this block. That is the pre-run on its own:
+everything the deck derives and everything it will cost, with the initial state written
+and nothing tracked ([](input-reference.md#param-global-load-only)).
+
 The **Split** block is the run's own convergence report. The field power is separated into
 the part inside an angle of about four mode diffraction angles, which is what couples to
 the mode, and the part outside it, which is the emission of macroparticles that occupy one
@@ -339,10 +362,18 @@ the total power of an unseeded run. The angular filter that removes it is on by 
 and what it costs and what load it wants is [](fel-physics.md#sec-convergence). The block reports both at the
 record where the mode peaked and at the last record, and the run then warns when the
 outside part reaches a tenth of the inside part and confirms convergence below a
-hundredth. In the run above 45 percent of the 761.5 MW exit power is that emission, and
-9 percent of the 1.62 GW at saturation. The same numbers are in the statistics file under
+hundredth. In the run above the filter is on, so 0.2 percent of the 792.7 MW exit power is
+that emission and 0.08 percent of the 1.56 GW at saturation. The same numbers are in the statistics file under
 `run/`, and the per-record per-slice arrays are `field/total/power_inside_angle` beside
 `field/total/power`.
+
+Below the two records the block names the **thin slices**: the slices carrying charge
+whose beamlet count is under 128 or whose power outside the split angle is over a tenth
+of the power inside it, by index and position, up to eight of them with a count of the
+rest. A window ratio is a mean over the window, so a thin tail disappears into it, and a
+beam imported with irregular counts per slice is where that happens. The remedy the line
+names is `load_mode = "sample"`, which draws the same number of beamlets in every slice
+([](input-reference.md#param-beam-load-mode)).
 
 The physics columns are filled whatever the comb setting: with per-record rows they come
 from the current record, and with `comb_ds_save < 0` from the element-end row, which is

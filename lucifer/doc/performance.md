@@ -9,6 +9,8 @@ The instrument is `code/fel_timer_mod.f90`. It accumulates wall clock per phase 
 
 Timers cannot see inside a parallel region. The deposit and its FFT interleave per slice, and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
 
+The tables below are also the calibration of the cost estimate every run prints in its header. `code/fel_cost_mod.f90` holds the fitted rates, one for the particle push and two for the field solve, and reproduces all eight configurations measured here to within 2 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-fitting those constants.
+
 (perf-reproducing)=
 ## Reproducing this
 
@@ -236,6 +238,33 @@ The deposit's `on_grid` guard cannot become a mask. `fel_grid_weights` leaves `i
 Thread scaling at production slice counts is 9.16x on 12 cores and the nameable serial cost is 0.6% of the walk, so there is little left to win by removing serial work.
 
 The single-precision question is measured rather than argued. `global%fp32_check` steps an FP32 twin of the averaged advance beside the FP64 path and records the divergence per quantity, with the reformulations FP32 forces (offset energy, residual phase, difference-form detuning) and a runtime guard on the one failure that is silent, a residual too coarse for the per-step increment. The measured levels and the guard's own first catch are in [](validation.md#val-fp32-lockstep), and the field solve has its own twin there: FP32 deposit, single-precision transform pair, rounded propagator, with an end-to-end freerun number for the complete single-precision run (1.0e-3 on exit power over a gain segment, and 2.7e-1 in deep saturation where phase decorrelation dominates). An FP32 six-vector is 24 bytes per particle against 48, which is the bandwidth argument for a device path. Whether an FP32 CPU mode ever ships is a decision against those recorded levels, not taken here.
+
+(perf-estimate)=
+## The estimate against the clock
+
+Every run prints an estimated walk in its header and the measured walk beside it in its footer. The rates are fitted to the tables above and are this machine's. Measured here on the eleven comparison tiers and four examples, each run on its own rather than beside the other keystone jobs, since a machine running five jobs at once measures the load and not the deck.
+
+| run | measured | estimate | estimate/measured |
+|---|---|---|---|
+| tier1 | 0.298 s | 0.332 s | 1.11 |
+| tier1_unavg | 12.4 s | 19.9 s | 1.60 |
+| tier2_bmad | 3.8 s | 4.0 s | 1.05 |
+| tier2_genesis | 3.8 s | 4.0 s | 1.05 |
+| td1 | 1.1 s | 0.660 s | 0.60 |
+| td2_bmad | 9.2 s | 7.9 s | 0.86 |
+| td2_genesis | 8.8 s | 7.9 s | 0.90 |
+| tdsase | 8.6 s | 7.9 s | 0.92 |
+| tdsc | 0.731 s | 0.660 s | 0.90 |
+| tdwk | 0.685 s | 0.660 s | 0.96 |
+| weight_split | 0.461 s | 0.523 s | 1.13 |
+| `sase` | 31.0 s | 23.8 s | 0.77 |
+| `steady_state` | 5.0 s | 4.0 s | 0.80 |
+| `taper` | 5.0 s | 4.0 s | 0.80 |
+| `flash1` | 22.4 s | 18.0 s | 0.80 |
+
+Every row is inside a factor of two, which is what the estimate is held to. The two ends of the spread are the ones to read. `tier1_unavg` is the highest at 1.60: the unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period, and the count carries those substeps while the rates it multiplies are the averaged path's. `td1` is the lowest at 0.60 on a walk of one second, where the parse and the beam build are a real share of a short run.
+
+The four examples cluster at 0.8 because they run with the source filter on, which costs 8 to 14 percent of wall clock ([](fel-physics.md#sec-convergence)), and the tables above were measured before that became the default. Re-measuring this page would take that bias out of the rates.
 
 (perf-device)=
 ## The device, measured against the CPU

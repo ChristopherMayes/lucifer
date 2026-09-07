@@ -147,8 +147,14 @@ if (run%global%write_initial .or. run%global%load_only) then
   if (err) stop 1
 endif
 
+! The pre-run. The header above has already printed everything the run derived and
+! everything it will cost, so a deck can be priced and its load read before any of the
+! tracking is paid for (doc/user-guide.md).
+
 if (run%global%load_only) then
-  call out_io (s_info$, r_name, 'load_only set; initial state written, no tracking.')
+  call out_io (s_info$, r_name, 'load_only is set. The header above is the pre-run: what the deck ' // &
+        'derives, what it will cost and where its load stands. The initial state is written and ' // &
+        'nothing is tracked.')
   stop 0
 endif
 

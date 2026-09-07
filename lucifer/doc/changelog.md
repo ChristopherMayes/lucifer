@@ -9,6 +9,25 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Added: a run states its cost and its convergence standing before it tracks. The header gains
+  three lines. Work counts the integration steps over the line, the macroparticles in the window, their
+  product in particle-steps and the transverse grid points the field solve touches per step, all of them
+  known before the first step. Estimate turns that into wall clock from rates fitted to the eight
+  configurations of doc/performance.md, one for the particle push and two for the field solve, which the
+  fit reproduces to within 2 percent. The line names the machine the rates are for, and the footer prints
+  the measured walk beside the estimate on every run. Load states the macroparticles in the thinnest
+  slice, the beamlet size and the beamlet count, then where that stands against the 1024 macroparticles
+  in 128 beamlets the source filter's convergence was measured at, and what the beamlet size buys, which
+  is the harmonics the shot noise is imposed at. A harmonic field above (beamlet_size - 1)/2 is refused
+  with the beamlet size that would carry it, since it would otherwise start from a load with no noise at
+  its own frequency. The convergence footer names the thin slices by index and position, those carrying
+  charge whose beamlet count is under 128 or whose power outside the split angle is over a tenth of the
+  power inside it, up to eight with a count of the rest, and names sample mode as the remedy: on the
+  import example that is 12 slices of 34. global%load_only prints the header and stops, which is the
+  pre-run, and the user guide and the input reference describe it as one. Against the comparison tiers
+  and the examples the estimate reads 20 to 40 percent low, inside the factor of two it is held to, and
+  part of that is the source filter, which became the default after the performance page was measured.
+
 - 2026-09-07 Changed: global%source_filter is on by default. The filter is measured on four machines, two
   of them real, over angle ratios of 1.14 to 1.86, and at a converged load it removes about a hundred
   times the wide-angle power while moving the mode power a few percent and the saturation point not at
