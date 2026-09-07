@@ -65,8 +65,10 @@ implicit none
 
 type fel_slicing_struct
   real(rp) :: window_length = 0      ! Time window [m]. 0 = from the bunch, or one slice.
-  integer :: n_wavelength = 1        ! Wavelengths per slice (Genesis's sample). Integer by
+  integer :: n_wavelength = 0        ! Wavelengths per slice (Genesis's sample). Integer by
                                      !   construction: slippage rotates the ring by one.
+                                     !   0 derives it from the gain, and is 1 in the steady
+                                     !   state, where the spacing states the current.
   integer :: n_slice = 0             ! 0 = from window_length. Both set is refused.
   real(rp) :: current = 0            ! Flat current [A]. 0 = from the bunch's z structure.
 end type

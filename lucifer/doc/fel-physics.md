@@ -81,6 +81,29 @@ drift surrogate $k_u^{\mathrm{like}} = k_s/(2\gamma_0^2)$ is used
 
 A time-dependent beam is a set of slices spaced by
 $\Delta = \texttt{n\_wavelength}\cdot\lambda_s$, the deck's `slicing%n_wavelength`.
+
+A deck that states no spacing has it derived from the gain. The cooperation length
+$\ell_c = \lambda_s/(4\pi\rho)$ is the distance radiation slips forward in one gain
+length, so it is the scale over which the beam's slices are not independent, and the
+spacing is the whole number of wavelengths in a quarter of it: four slices per
+cooperation length, the resolution at which FLASH1's pulse energy converged. The Pierce
+parameter comes from the beam the deck describes and the first FEL element, the same
+expression the source filter's edge uses, computed before the beam is sliced because the
+spacing has to be known to slice it. Two descriptions are not resolutions and keep one
+wavelength: the steady state, where the whole charge sits in the one slice so the spacing
+states the current, and a run whose beam is loaded rather than described, which has
+nothing to derive from. The run prints which of the three it took.
+
+The default window holds every particle of the bunch and the line's slippage, one
+wavelength per undulator period, ahead of the window head. Radiation slips toward higher
+slice index, so the added length is at the high-index end and the bunch sits low in the
+window it was given. A Gaussian has no last particle, so its extent is the length beyond
+which a slice would hold less than one electron of the charge, which scales with the
+charge where a fixed number of sigmas does not. A flat bunch takes its grid extent. A
+loaded bunch spans its own particles and gets no slippage added, because a loaded window
+is data: it came from the run or the code that wrote the dump, and widening it would put
+this program's beam in a different window from the one a comparison starts in. A stated
+window says its own headroom, centers the bunch it is given, and warns when it clips it.
 The window belongs to neither the beam nor the field: the beam's slices and the field's
 longitudinal samples are one partition, so `slicing` states it once and both read it. A
 wavefront carries only the spacing $\Delta$ that follows, since a wavefront travelling
@@ -144,8 +167,8 @@ Measured levels and how they are checked: [](validation.md#val-validation-from-o
 (sec-element)=
 ## The FEL element
 
-An FEL segment is a Bmad `wiggler`/`undulator` whose `tracking_method` is one of Bmad's
-two FEL methods, recognized by key and method, never by name. Its FEL
+An FEL segment is a Bmad `wiggler`/`undulator` whose `fel_method` is not `off`,
+recognized by key and method, never by name. Its FEL
 parameters derive from lattice attributes:
 
 $$
@@ -166,6 +189,18 @@ helical $k_x = k_y = \tfrac12 k_u^2$. Planar $k_x = 0$, $k_y = k_u^2$. The integ
 step is the element's own `ds_step`/`num_steps`. The bookkeeper's
 $n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\texttt{ds\_step}))$ is exactly Genesis4's
 unroll.
+
+An element that states neither has its step derived from the gain, as the slice spacing
+is ([](#sec-window)): a twentieth of the one-dimensional gain length
+$L_{1D} = \lambda_u/(4\pi\sqrt{3}\rho)$, rounded down to whole periods and at least one.
+Twenty steps per gain length is where the Aramis step sweep puts the saturated power
+within 3 percent, and one period per step against three landed inside the seed spread on
+FLASH1 and reproduced LCLS's gain length to two decimals. What it replaces is not silence
+but Bmad's own default for a wiggler, $\lambda_u/20$, which resolves the wiggle this
+model has already averaged over: the FLASH-scale probe ran at 3300 steps a segment
+against FLASH1's 55 for that reason. The unset state is that exact quotient, since the
+bookkeeper leaves nothing else to read, so an element whose step is $\lambda_u/20$ by the
+deck's own choice is derived over. Any other stated step is kept.
 
 The mode is the element's own `fel_method` attribute, `averaged` or `unaveraged`,
 class-settable as `wiggler::*[FEL_METHOD] = ...`, so averaged and unaveraged segments mix

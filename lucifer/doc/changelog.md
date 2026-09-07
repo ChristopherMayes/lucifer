@@ -9,6 +9,28 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Added: the slice spacing and the integration step are derived from the gain, and the
+  default window holds the line's slippage. A deck that states no slicing%n_wavelength gets the whole
+  number of wavelengths in a quarter of the cooperation length, four slices per cooperation length,
+  which is where FLASH1's pulse energy converged. On FLASH1's own beam that derives 10 wavelengths
+  against the 12 its example states by hand, and over four seeds the two give 50.0 +- 4.2 and
+  50.8 +- 6.8 uJ, 1.4 percent apart inside a seed spread of 8 to 14 percent. Two descriptions are not
+  resolutions and keep one wavelength: the steady state, where the whole charge sits in the one slice
+  so the spacing states the current, and a run whose beam is loaded rather than described. An element
+  that states neither ds_step nor num_steps gets a twentieth of the one-dimensional gain length in
+  whole periods. What that replaces is not silence but Bmad's own default for a wiggler, a twentieth
+  of a period, which resolves the wiggle the averaged model has already averaged over: the FLASH-scale
+  probe of doc/startup-noise.md ran at 3300 steps a segment against FLASH1's 55 for that reason, and
+  at the derived 165 its two instrument runs take 8 and 9 s rather than 67 and 85. Against half the
+  derived step at matched seeds the pulse energy moves 1.8 and 2.1 percent. The default window holds
+  every particle of the bunch and one wavelength per undulator period ahead of the window head, so
+  radiation that slips forward has somewhere to go. A Gaussian has no last particle, so it spans the
+  length beyond which a slice would hold less than one electron of the charge, a rule that scales with
+  the charge where a fixed number of sigmas does not. A loaded bunch spans its own particles and gets
+  no slippage added, a loaded window being data rather than a choice. No example moves, since every
+  time-dependent deck states its own window and spacing. The second machine's numbers are re-recorded
+  at the derived step (FINDINGS 7.59).
+
 - 2026-09-06 Changed: an FEL segment is a wiggler or undulator carrying Bmad's fel_method attribute,
   which replaces the two FEL tracking methods. tracking_method names how one particle crosses an
   element, and multiparticle physics riding on it has its own per-element attribute in Bmad, as

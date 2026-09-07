@@ -3154,6 +3154,71 @@ Nothing is derived without an emittance to derive from. A run that loads its bea
 a dump has none, and the refusals that already ask for the grid still ask.
 ```
 
+(api-described-beam-size)=
+### `described_beam_size`
+
+*Function* `() result (sig)`
+
+```
+The rms transverse size of the beam the deck describes, from the emittances it states
+and the matched Twiss the lattice states, averaged over the FEL elements by length
+since that is the beta the mode sees. The quadratic mean of the two planes, one size
+for a round description. Zero where there is nothing to derive from, which a run that
+loads its beam from a dump has, and the refusals that already ask still ask.
+```
+
+```
+Output:
+  sig -- real(rp): The rms size [m], or zero.
+```
+
+(api-described-pierce)=
+### `described_pierce`
+
+*Function* `() result (rho)`
+
+```
+The one-dimensional Pierce parameter of the beam the deck describes, at the first FEL
+element, in Genesis's form: rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2), with the
+undulator's own coupling, which already carries aw. This is the same expression the
+source filter's edge uses (fel_filter_angles), computed from the description rather
+than from the built beam, because the slice spacing has to be known before the beam is
+sliced at it.
+
+The peak current is the deck's own: a stated flat current, else the Gaussian peak
+Q c / (sqrt(2 pi) sig_z), else the flat extent, else the steady state's whole charge in
+one slice at the stated spacing.
+```
+
+```
+Output:
+  rho -- real(rp): The Pierce parameter, or zero where there is nothing to derive from.
+```
+
+(api-derive-slicing-and-step)=
+### `derive_slicing_and_step`
+
+*Subroutine* `()`
+
+```
+Routine to derive the slice spacing and the integration step from the gain where the
+deck states neither (fel-physics.md sec-window and sec-element).
+
+The spacing is the whole number of wavelengths in a quarter of the cooperation length
+lambda/(4 pi rho), which is four slices per cooperation length, the resolution FLASH1's
+pulse energy converged at. It is derived only for a time-dependent description. In the
+steady state the spacing is not a resolution at all: the whole charge sits in the one
+slice, so the spacing sets the current, and a derived one would rewrite the beam.
+
+The step is a twentieth of the one-dimensional gain length lambda_u/(4 pi sqrt(3) rho),
+rounded down to whole periods and at least one. Bmad's bookkeeper gives any wiggler
+with a period a step of l_period/20 when the deck states neither ds_step nor num_steps,
+and fills num_steps from it, which resolves the wiggle the averaged model has already
+averaged over. The derived step replaces it. The unset state is that exact quotient,
+since the bookkeeper leaves nothing else to read, so an element whose step is
+l_period/20 by the deck's own choice is derived over. Any other stated step is kept.
+```
+
 (api-fel-setup-schedule)=
 ### `fel_setup_schedule`
 

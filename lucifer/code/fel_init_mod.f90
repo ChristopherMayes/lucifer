@@ -41,6 +41,31 @@ contains
 !   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
+function fel_line_slippage (run, lambda) result (slip)
+
+type (fel_run_struct), target :: run
+type (branch_struct), pointer :: br
+real(rp) lambda, slip
+integer je
+
+! The line slips one wavelength per undulator period, so this is the headroom a window
+! needs at its head for radiation that leaves the bunch behind (fel-physics.md sec-window).
+
+slip = 0
+br => run%lat%branch(0)
+do je = 1, br%n_ele_track
+  if (.not. run%is_fel(je)) cycle
+  if (br%ele(je)%value(l_period$) <= 0) cycle
+  slip = slip + br%ele(je)%value(l$) / br%ele(je)%value(l_period$)
+enddo
+slip = slip * lambda
+
+end function fel_line_slippage
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+
 subroutine fel_init_beam (run, err_flag)
 
 type (fel_run_struct), target :: run
@@ -220,7 +245,8 @@ real(rp) dx_grid, w_part, e0, xg, yg, wsum, w2sum, n_lambda, n_eff, floor_b2, ta
 real(rp) phi, an, nbl, br, bi
 real(rp), allocatable :: theta_work(:), beta_work(:), kick(:), cur_gen(:)
 real(rp) nl_min, nl_max, neff_min, neff_max, floor_max, floor_nl
-real(rp) spacing_gen, zlen_gen, s_i
+real(rp) spacing_gen, zlen_gen, s_i, q_slice, zbunch_gen, slip_gen
+integer ncenter_gen
 integer ib, im, ip, mbase, ix, iy, is_g, nslice_gen, ih, nharm, n_clamp, rule, rule_seen, n_group_w
 integer, allocatable :: group_w(:)
 logical flat_z
@@ -276,10 +302,14 @@ endif
 
 ! The window and the per-slice current derive from the beam_init description (manual
 ! sec-loading): one bulk bunch, evaluated analytically at the slice centers. The
-! default window covers the described bunch (as the import derives its window from
-! real particles). window_length overrides it for slippage headroom and warns when it
-! clips the bunch. sig_z = 0 is the steady state (the whole charge in one slice
-! window) and is refused for time-dependent windows.
+! default window holds every particle of the described bunch and the line's slippage
+! ahead of its head, so radiation that slips forward has somewhere to go before it
+! leaves. A Gaussian has no last particle, so its extent is the length beyond which a
+! slice would hold less than one electron of the charge, a rule that scales with the
+! charge where a fixed number of sigmas does not. A flat bunch takes its grid's extent.
+! window_length or n_slice overrides all of it and warns when it clips the bunch.
+! sig_z = 0 is the steady state (the whole charge in one slice window) and is refused
+! for time-dependent windows.
 
 flat_z = .false.
 select case (trim(beam_init%distribution_type(3)))
@@ -302,9 +332,31 @@ if (flat_z) then
     err_flag = .true.;  return
   endif
 elseif (beam_init%sig_z > 0) then
-  zlen_gen = 8 * beam_init%sig_z          ! +-4 sigma covers the described bunch.
+
+  ! The charge in a slice at s is Q spacing exp(-s^2/2 sig_z^2) / (sqrt(2 pi) sig_z), so
+  ! the length that holds every electron is where that falls to one electron's worth.
+  ! A description too weak to put one electron in its peak slice keeps the old eight
+  ! sigmas, there being no length that satisfies the rule.
+
+  q_slice = beam_init%bunch_charge * spacing_gen / (sqrt(twopi) * beam_init%sig_z * e_charge)
+  if (q_slice > 1) then
+    zlen_gen = 2 * beam_init%sig_z * sqrt(2 * log(q_slice))
+  else
+    zlen_gen = 8 * beam_init%sig_z
+  endif
 else
   zlen_gen = 0                            ! Steady state.
+endif
+
+! The line's slippage, one wavelength per undulator period, ahead of the window head,
+! which is its high-index end (fel-physics.md sec-window). A stated window says its own
+! headroom and gets none added.
+
+zbunch_gen = zlen_gen
+slip_gen = 0
+if (zlen_gen > 0 .and. window_length <= 0 .and. run%slicing%n_slice <= 0) then
+  slip_gen = fel_line_slippage (run, lambda0)
+  zlen_gen = zlen_gen + slip_gen
 endif
 
 if (window_length > 0) then
@@ -355,17 +407,23 @@ allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 ! profile at the slice centers, bunch centered in the window. Steady state = the
 ! whole charge in the one slice window, I = Q*c/spacing.
 
+if (slip_gen > 0) then
+  ncenter_gen = max(1, nint(zbunch_gen / spacing_gen))   ! The derived window: bunch low, headroom at the head.
+else
+  ncenter_gen = nslice_gen                               ! A stated window centers the bunch it is given.
+endif
+
 if (run%slicing%current > 0) then
   cur_gen = run%slicing%current
 elseif (flat_z) then
   cur_gen = 0
   do is_g = 1, nslice_gen
-    s_i = (is_g - 1) * spacing_gen - (nslice_gen - 1) * spacing_gen / 2
-    if (abs(s_i) <= zlen_gen / 2) cur_gen(is_g) = beam_init%bunch_charge * c_light / zlen_gen
+    s_i = (is_g - 1) * spacing_gen - (ncenter_gen - 1) * spacing_gen / 2
+    if (abs(s_i) <= zbunch_gen / 2) cur_gen(is_g) = beam_init%bunch_charge * c_light / zbunch_gen
   enddo
 elseif (zlen_gen > 0) then
   do is_g = 1, nslice_gen
-    s_i = (is_g - 1) * spacing_gen - (nslice_gen - 1) * spacing_gen / 2
+    s_i = (is_g - 1) * spacing_gen - (ncenter_gen - 1) * spacing_gen / 2
     cur_gen(is_g) = beam_init%bunch_charge * c_light / (sqrt(twopi) * beam_init%sig_z) * &
                     exp(-s_i**2 / (2 * beam_init%sig_z**2))
   enddo
@@ -842,6 +900,11 @@ if (run%slicing%n_slice > 0) then
 elseif (window_length > 0) then
   nslice_k = max(1, nint(window_length / spacing_k))
 else
+  ! The bunch's own extent, and no slippage added. A loaded window is data: it came from
+  ! the run or the code that wrote the dump, and widening it would put this program's
+  ! beam in a different window from the one the comparison starts in. A continuation that
+  ! wants headroom states it. The described bunch, which this program sizes itself, does
+  ! get the slippage.
   nslice_k = max(1, ceiling(ttotal / spacing_k - 1e-9_rp))
 endif
 offset = (nslice_k * spacing_k - ttotal) / 2       ! The bunch centered in a stated window.

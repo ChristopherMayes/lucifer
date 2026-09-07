@@ -374,8 +374,12 @@ def main():
     # imported (real particles resampled). The quiet-load must match the analytic
     # Gaussian profile exactly -- this is also the sqrt(2pi) mutation check on the
     # driver's current derivation -- and the import must match it statistically.
+    # The window is stated, so the bunch is centered in it and the comparison below is
+    # against the Gaussian at the window's own center. The default window would hold the
+    # line's slippage as well and place the bunch low, which is a different geometry and
+    # not what this check measures: it measures the current derivation.
     (w/"imp_xq.nml").write_text(to_groups(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
-        sample=SAMPLE, nslice=NSLICE, extra='  load_only = T\n',
+        sample=SAMPLE, nslice=NSLICE, extra=f'  load_only = T\n  n_slice = {NSLICE}\n',
         source="""  beam_init%n_particle = 512
   beam_init%a_norm_emit = {emit}
   beam_init%b_norm_emit = {emit}

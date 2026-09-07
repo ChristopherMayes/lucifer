@@ -159,6 +159,9 @@ fel_mode => run%fel_mode
 call derive_grid ()          ! Needs the FEL elements, and runs before any field is built.
 if (err_flag) return
 
+call derive_slicing_and_step ()   ! Needs the FEL elements, and runs before the beam is sliced.
+if (err_flag) return
+
 ! The field set (fel-physics.md sec-field-set). Validate the harmonics request, then allocate
 ! the set and point the fundamental aliases at entry 1 before any field construction:
 ! every construction path below builds the fundamental through wf.
@@ -464,41 +467,15 @@ end subroutine setup_fel_elements
 
 subroutine derive_grid ()
 
-real(rp) sig, eps_a, eps_b, beta_a, beta_b, wt, dx_want, half
-integer je, n_pts, n_dev
+real(rp) sig, dx_want, half
+integer n_pts, n_dev
 logical dev_on
 
 !
 
 if (run%winit%grid_n_pts > 0 .and. run%winit%grid_half_width > 0) return
-if (run%gamma0 <= 0) return
-eps_a = run%beam_init%a_norm_emit / run%gamma0
-eps_b = run%beam_init%b_norm_emit / run%gamma0
-if (eps_a <= 0 .or. eps_b <= 0) return
 
-! The length-weighted mean beta over the FEL elements. A lattice whose Twiss was never
-! propagated leaves these at zero, and the beginning element is then the one truth there
-! is. The generated load refuses a lattice with no Twiss at all, so this falls back
-! rather than refusing twice.
-
-beta_a = 0;  beta_b = 0;  wt = 0
-do je = 1, branch%n_ele_track
-  if (.not. is_fel(je)) cycle
-  if (branch%ele(je)%a%beta <= 0 .or. branch%ele(je)%b%beta <= 0) cycle
-  beta_a = beta_a + branch%ele(je)%value(l$) * branch%ele(je)%a%beta
-  beta_b = beta_b + branch%ele(je)%value(l$) * branch%ele(je)%b%beta
-  wt = wt + branch%ele(je)%value(l$)
-enddo
-if (wt > 0) then
-  beta_a = beta_a / wt;  beta_b = beta_b / wt
-else
-  beta_a = branch%ele(0)%a%beta;  beta_b = branch%ele(0)%b%beta
-endif
-if (beta_a <= 0 .or. beta_b <= 0) return
-
-! One size for a grid that is square: the quadratic mean of the two planes.
-
-sig = sqrt(0.5_rp * (eps_a * beta_a + eps_b * beta_b))
+sig = described_beam_size ()
 if (sig <= 0) return
 
 half = run%winit%grid_half_width
@@ -529,6 +506,217 @@ if (run%winit%grid_n_pts <= 0) then
 endif
 
 end subroutine derive_grid
+
+!------------------------------------------------------------------------------
+! contains
+!+
+! Function described_beam_size () result (sig)
+!
+! The rms transverse size of the beam the deck describes, from the emittances it states
+! and the matched Twiss the lattice states, averaged over the FEL elements by length
+! since that is the beta the mode sees. The quadratic mean of the two planes, one size
+! for a round description. Zero where there is nothing to derive from, which a run that
+! loads its beam from a dump has, and the refusals that already ask still ask.
+!
+! Output:
+!   sig -- real(rp): The rms size [m], or zero.
+!-
+
+function described_beam_size () result (sig)
+
+real(rp) sig, eps_a, eps_b, beta_a, beta_b, wt
+integer je
+
+!
+
+sig = 0
+if (run%gamma0 <= 0) return
+eps_a = run%beam_init%a_norm_emit / run%gamma0
+eps_b = run%beam_init%b_norm_emit / run%gamma0
+if (eps_a <= 0 .or. eps_b <= 0) return
+
+! A lattice whose Twiss was never propagated leaves these at zero, and the beginning
+! element is then the one truth there is.
+
+beta_a = 0;  beta_b = 0;  wt = 0
+do je = 1, branch%n_ele_track
+  if (.not. is_fel(je)) cycle
+  if (branch%ele(je)%a%beta <= 0 .or. branch%ele(je)%b%beta <= 0) cycle
+  beta_a = beta_a + branch%ele(je)%value(l$) * branch%ele(je)%a%beta
+  beta_b = beta_b + branch%ele(je)%value(l$) * branch%ele(je)%b%beta
+  wt = wt + branch%ele(je)%value(l$)
+enddo
+if (wt > 0) then
+  beta_a = beta_a / wt;  beta_b = beta_b / wt
+else
+  beta_a = branch%ele(0)%a%beta;  beta_b = branch%ele(0)%b%beta
+endif
+if (beta_a <= 0 .or. beta_b <= 0) return
+
+sig = sqrt(0.5_rp * (eps_a * beta_a + eps_b * beta_b))
+
+end function described_beam_size
+
+!------------------------------------------------------------------------------
+! contains
+!+
+! Function described_pierce () result (rho)
+!
+! The one-dimensional Pierce parameter of the beam the deck describes, at the first FEL
+! element, in Genesis's form: rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2), with the
+! undulator's own coupling, which already carries aw. This is the same expression the
+! source filter's edge uses (fel_filter_angles), computed from the description rather
+! than from the built beam, because the slice spacing has to be known before the beam is
+! sliced at it.
+!
+! The peak current is the deck's own: a stated flat current, else the Gaussian peak
+! Q c / (sqrt(2 pi) sig_z), else the flat extent, else the steady state's whole charge in
+! one slice at the stated spacing.
+!
+! Output:
+!   rho -- real(rp): The Pierce parameter, or zero where there is nothing to derive from.
+!-
+
+function described_pierce () result (rho)
+
+type (fel_und_struct), pointer :: und
+real(rp) rho, sig, cur, fc, zlen, spacing
+integer je, je_first
+
+!
+
+rho = 0
+sig = described_beam_size ()
+if (sig <= 0) return
+
+je_first = 0
+do je = 1, branch%n_ele_track
+  if (is_fel(je)) then
+    je_first = je
+    exit
+  endif
+enddo
+if (je_first == 0) return
+und => run%und_of(je_first)
+if (und%ku <= 0) return
+fc = fel_und_coupling (und, 1)
+if (fc == 0) return
+
+! The peak current of the description.
+
+if (run%slicing%current > 0) then
+  cur = run%slicing%current
+else if (run%beam_init%bunch_charge <= 0) then
+  return
+else if (run%beam_init%sig_z > 0) then
+  cur = run%beam_init%bunch_charge * c_light / (sqrt(twopi) * run%beam_init%sig_z)
+else
+  zlen = run%beam_init%grid(3)%x_max - run%beam_init%grid(3)%x_min
+  if (zlen > 0) then
+    cur = run%beam_init%bunch_charge * c_light / zlen
+  else
+    spacing = max(1, run%slicing%n_wavelength) * run%winit%lambda0
+    if (spacing <= 0) return
+    cur = run%beam_init%bunch_charge * c_light / spacing
+  endif
+endif
+if (cur <= 0) return
+
+rho = ((cur / (4 * pi * m_electron / (mu_0_vac * c_light))) * fc**2 / &
+       (8 * run%gamma0**3 * sig**2 * und%ku**2)) ** (1.0_rp / 3.0_rp)
+
+end function described_pierce
+
+!------------------------------------------------------------------------------
+! contains
+!+
+! Subroutine derive_slicing_and_step ()
+!
+! Routine to derive the slice spacing and the integration step from the gain where the
+! deck states neither (fel-physics.md sec-window and sec-element).
+!
+! The spacing is the whole number of wavelengths in a quarter of the cooperation length
+! lambda/(4 pi rho), which is four slices per cooperation length, the resolution FLASH1's
+! pulse energy converged at. It is derived only for a time-dependent description. In the
+! steady state the spacing is not a resolution at all: the whole charge sits in the one
+! slice, so the spacing sets the current, and a derived one would rewrite the beam.
+!
+! The step is a twentieth of the one-dimensional gain length lambda_u/(4 pi sqrt(3) rho),
+! rounded down to whole periods and at least one. Bmad's bookkeeper gives any wiggler
+! with a period a step of l_period/20 when the deck states neither ds_step nor num_steps,
+! and fills num_steps from it, which resolves the wiggle the averaged model has already
+! averaged over. The derived step replaces it. The unset state is that exact quotient,
+! since the bookkeeper leaves nothing else to read, so an element whose step is
+! l_period/20 by the deck's own choice is derived over. Any other stated step is kept.
+!-
+
+subroutine derive_slicing_and_step ()
+
+type (ele_struct), pointer :: ele
+real(rp) rho, l_coop, l_1d, step, l_per
+integer je, n_wl, n_step, n_done
+logical td
+
+!
+
+rho = described_pierce ()
+
+! The spacing. It is derived only for a time-dependent description this program sizes
+! itself: in the steady state the whole charge sits in the one slice, so the spacing
+! states the current rather than a resolution, and a run that loads its beam has no
+! description to derive from. Both of those keep the one wavelength that was the default
+! before anything was derived, and the spacing is never left unset.
+
+if (run%slicing%n_wavelength <= 0) then
+  td = (run%beam_init%sig_z > 0 .or. &
+        run%beam_init%grid(3)%x_max > run%beam_init%grid(3)%x_min .or. &
+        run%slicing%window_length > 0 .or. run%slicing%n_slice > 0)
+  if (td .and. rho > 0) then
+    l_coop = run%winit%lambda0 / (4 * pi * rho)
+    n_wl = max(1, int(0.25_rp * l_coop / run%winit%lambda0))
+    run%slicing%n_wavelength = n_wl
+    call out_io (s_info$, r_name, 'Slice spacing \i0\ wavelengths, derived: a quarter of the ' // &
+                 'cooperation length \es10.3\ m at rho = \es10.3\ .', &
+                 i_array = [n_wl], r_array = [l_coop, rho])
+  else if (td) then
+    run%slicing%n_wavelength = 1
+    call out_io (s_info$, r_name, 'Slice spacing 1 wavelength: nothing to derive it from, ' // &
+                 'the beam being loaded rather than described.')
+  else
+    run%slicing%n_wavelength = 1
+    call out_io (s_info$, r_name, 'Slice spacing 1 wavelength: the steady state holds the whole ' // &
+                 'charge in one slice, so the spacing states the current.')
+  endif
+endif
+
+if (rho <= 0) return
+
+! The step, per element, where the deck states none.
+
+l_1d = 0
+n_done = 0
+do je = 1, branch%n_ele_track
+  if (.not. is_fel(je)) cycle
+  ele => branch%ele(je)
+  l_per = ele%value(l_period$)
+  if (l_per <= 0) cycle
+  if (ele%value(ds_step$) /= l_per / 20) cycle
+
+  l_1d = twopi / (run%und_of(je)%ku * 4 * pi * sqrt(3.0_rp) * rho)
+  step = max(1.0_rp, real(int(l_1d / 20 / l_per), rp)) * l_per
+  n_step = max(1, nint(ele%value(l$) / step))
+  ele%value(num_steps$) = n_step
+  ele%value(ds_step$) = ele%value(l$) / n_step
+  n_done = n_done + 1
+enddo
+
+if (n_done > 0) then
+  call out_io (s_info$, r_name, 'Integration step \es10.3\ m on \i0\ element(s), derived: a ' // &
+               'twentieth of the gain length \es10.3\ m, in whole periods.', &
+               i_array = [n_done], r_array = [step, l_1d])
+endif
+
+end subroutine derive_slicing_and_step
 
 end subroutine fel_setup_lattice
 
