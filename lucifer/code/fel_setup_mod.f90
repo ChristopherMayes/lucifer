@@ -19,7 +19,6 @@ implicit none
 
 ! The lattice-attribute registration is process-global and idempotent: registered
 ! once, reused by every later run in the same process (the re-entrancy contract).
-logical, save, private :: fel_attributes_registered = .false.
 
 contains
 
@@ -92,6 +91,18 @@ if (run%global%transport_model /= 'bmad' .and. run%global%transport_model /= 'ge
   err_flag = .true.;  return
 endif
 
+if (run%global%unaveraged_steps_per_period < 10) then
+  call out_io (s_error$, r_name, 'UNAVERAGED_STEPS_PER_PERIOD IS BELOW THE CONVERGENCE FLOOR OF 10, GOT: ' // &
+               int_str(run%global%unaveraged_steps_per_period))
+  err_flag = .true.;  return
+endif
+
+if (run%global%unaveraged_ramp_periods < -1) then
+  call out_io (s_error$, r_name, 'UNAVERAGED_RAMP_PERIODS MUST BE POSITIVE, 0 (THE DEFAULT OF 2), OR THE', &
+               'HARD-EDGE SENTINEL -1, GOT: ' // int_str(run%global%unaveraged_ramp_periods))
+  err_flag = .true.;  return
+endif
+
 ! (bmad_com%radiation_damping_on / %radiation_fluctuations_on come straight from the
 ! &fel_params namelist: Bmad's own switches, exposed directly as Tao exposes them.)
 
@@ -105,36 +116,18 @@ endif
 ! benchmark methodology, where the reference code's dumps are converted at the harness
 ! boundary), or a self-generated steady-state condition when both file names are blank.
 !
-! FEL elements carry tracking_method = fel_averaged or fel_unaveraged, and Bmad
-! dispatches both through track1_custom_ptr as it dispatches custom (the reference
-! time/energy pass inside bmad_parser, any track1 at the seam). Point it at the standard
-! periodic-wiggler kernel, so the element behaves as the plain Bmad wiggler it is
-! everywhere except inside this driver's own FEL walk. In particular the reference time
-! acquires the resonant undulation delay from Bmad's own code, not from anything written
-! here.
+! An FEL element carries fel_method and whatever tracking_method it says, which is
+! bmad_standard, so Bmad's own periodic-wiggler kernel gives it its reference time and
+! its transport everywhere outside this driver's FEL walk. The custom hooks below are
+! for a wiggler whose tracking_method is custom, which names some other program's
+! tracking: Bmad calls through both pointers and jumps through a null one if either is
+! unset, so both are supplied and both track the element as the wiggler it is.
 
 ! Both hooks are needed: mat6_calc_method resolves to custom too (auto follows the
 ! tracking method), and make_mat6 calls through a null make_mat6_custom_ptr otherwise.
 
 track1_custom_ptr => fel_ele_as_wiggler
 make_mat6_custom_ptr => fel_mat6_as_wiggler
-
-! The unaveraged mode's two numbers live on the lattice (fel-physics.md sec-element),
-! registered program-side so no lattice declares them. The same slot index serves
-! wigglers and undulators. The mode itself is not here: it is the element's
-! tracking_method, which Bmad names.
-
-if (.not. fel_attributes_registered) then
-  call set_custom_attribute_name ('WIGGLER::FEL_STEPS_PER_PERIOD', err, 2)
-  if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_STEPS_PER_PERIOD', err, 2)
-  if (.not. err) call set_custom_attribute_name ('WIGGLER::FEL_RAMP_PERIODS', err, 3)
-  if (.not. err) call set_custom_attribute_name ('UNDULATOR::FEL_RAMP_PERIODS', err, 3)
-  if (err) then
-    call out_io (s_error$, r_name, 'COULD NOT REGISTER THE FEL LATTICE ATTRIBUTES.')
-    err_flag = .true.;  return
-  endif
-  fel_attributes_registered = .true.
-endif
 
 ! err_flag matters: bmad_parser reports attribute errors (e.g. a wake on an element
 ! type that cannot carry one) and returns. Without the check the run continues on a
@@ -190,7 +183,7 @@ do ih = 2, 9
     err_flag = .true.;  return
   endif
 enddo
-if (n_harm > 1 .and. any(fel_mode == fel_unaveraged$ .and. is_fel)) then
+if (n_harm > 1 .and. any(fel_mode == unaveraged$ .and. is_fel)) then
   call out_io (s_error$, r_name, 'HARMONIC FIELDS WITH AN UNAVERAGED ELEMENT ARE NOT IMPLEMENTED', &
                                  '(THE UNAVERAGED MODE CARRIES THE FUNDAMENTAL ENVELOPE ONLY; ITS HARMONIC', &
                                  'COUPLINGS ARE VALIDATED THROUGH THE PARTICLE SPECTRA, NOT A CARRIED FIELD).')
@@ -212,7 +205,7 @@ endif
 select case (run%global%source_model)
 case ('deposit')
 case ('coherent')
-  if (any(fel_mode == fel_unaveraged$ .and. is_fel)) then
+  if (any(fel_mode == unaveraged$ .and. is_fel)) then
     call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH AN UNAVERAGED ELEMENT: THE', &
                                    'UNAVERAGED MODE RESOLVES EVERYTHING EXPLICITLY, SO VARIANCE REDUCTION IS REFUSED.')
     err_flag = .true.;  return
@@ -258,7 +251,7 @@ end select
 ! silently did not get it is worse than one that stops, so this refuses instead.
 
 if (run%global%source_filter) then
-  if (any(fel_mode == fel_unaveraged$ .and. is_fel)) then
+  if (any(fel_mode == unaveraged$ .and. is_fel)) then
     call out_io (s_error$, r_name, 'SOURCE_FILTER WITH AN UNAVERAGED ELEMENT: THE UNAVERAGED', &
                                    'MODE DEPOSITS FROM THE RESOLVED MOTION AND BUILDS NO FILTERED SOURCE.')
     err_flag = .true.;  return
@@ -359,51 +352,22 @@ fel_mode => run%fel_mode;  fel_spp => run%fel_spp;  fel_ramp => run%fel_ramp
 is_fel = .false.
 fel_mode = 0;  fel_spp = 0;  fel_ramp = 0
 
-! The mode is the element's tracking_method, which Bmad names: FEL_Averaged or
-! FEL_Unaveraged. A wiggler tracked any other way is not this program's element, and
-! that includes tracking_method = custom, which means some other program's tracking and
-! is left to the seam.
+! The mode is the element's fel_method, which Bmad carries as it carries
+! space_charge_method: Averaged or Unaveraged names the multiparticle physics, and the
+! element's tracking_method still names how one particle crosses it. A wiggler whose
+! fel_method is Off is not this program's element and is left to the seam.
 
 do je = 1, branch%n_ele_track
   w => branch%ele(je)
   if (.not. (w%key == wiggler$ .or. w%key == undulator$)) cycle
-  select case (w%tracking_method)
-  case (fel_averaged$, fel_unaveraged$);  fel_mode(je) = w%tracking_method
-  case default;                           cycle
+  select case (w%fel_method)
+  case (averaged$, unaveraged$);  fel_mode(je) = w%fel_method
+  case default;                   cycle
   end select
 
-  rv = value_of_attribute(w, 'FEL_STEPS_PER_PERIOD', err_a)
-  if (err_a) then
-    err_flag = .true.;  return
-  endif
-  fel_spp(je) = nint(rv)
-  if (fel_spp(je) == 0) fel_spp(je) = 20
-  if (fel_spp(je) < 10) then
-    call out_io (s_error$, r_name, 'FEL_STEPS_PER_PERIOD IS BELOW THE CONVERGENCE FLOOR OF 10,', &
-                 'AT ELEMENT: ' // trim(w%name))
-    err_flag = .true.;  return
-  endif
-
-  ! fel_ramp_periods: an attribute's unset value is 0, and a silent hard edge would
-  ! reintroduce the K/gamma handoff hazard by omission. Thus unset/0 means the default
-  ! of 2 periods, and a true hard edge (the mutation/test configuration) must be asked
-  ! for explicitly with the sentinel -1.
-
-  rv = value_of_attribute(w, 'FEL_RAMP_PERIODS', err_a)
-  if (err_a) then
-    err_flag = .true.;  return
-  endif
-  if (rv == 0) then
-    fel_ramp(je) = 2
-  elseif (rv == -1) then
-    fel_ramp(je) = 0
-  elseif (rv < 0) then
-    call out_io (s_error$, r_name, 'FEL_RAMP_PERIODS MUST BE POSITIVE, 0/UNSET (DEFAULT 2), OR THE', &
-                 'HARD-EDGE TEST SENTINEL -1, AT ELEMENT: ' // trim(w%name))
-    err_flag = .true.;  return
-  else
-    fel_ramp(je) = rv
-  endif
+  fel_spp(je) = run%global%unaveraged_steps_per_period
+  fel_ramp(je) = run%global%unaveraged_ramp_periods
+  if (fel_ramp(je) == -1) fel_ramp(je) = 0
 
   ! The wiggler sanity assertions live in fel_assert_wiggler_sane, one authority. It is
   ! called from the track1/mat6 hooks (where they fire first, during the parse) and
@@ -446,7 +410,7 @@ do je = 1, branch%n_ele_track
                    'SYMMETRIC FIELD -- A NO-OP THAT READS AS A MISTAKE: ' // trim(w%name))
       err_flag = .true.;  return
     endif
-    if (run%global%transport_model == 'genesis' .and. fel_mode(je) == fel_averaged$) then
+    if (run%global%transport_model == 'genesis' .and. fel_mode(je) == averaged$) then
       call out_io (s_error$, r_name, 'THE TRANSCRIBED-GENESIS MAPS KNOW NO TILT, SINCE GENESIS4 HAS', &
                    'NONE. SET TRANSPORT_MODEL = "bmad" TO TILT: ' // trim(w%name))
       err_flag = .true.;  return
@@ -894,7 +858,7 @@ gamma0_ref = run%gamma0_ref
 
 call check_wake_window ()
 if (err_flag) return
-run%any_unavg = any(fel_mode == fel_unaveraged$ .and. is_fel)
+run%any_unavg = any(fel_mode == unaveraged$ .and. is_fel)
 
 ! The collective terms are not wired into the unaveraged step (fel-physics.md
 ! sec-unaveraged), and a mixed line would apply them in some segments and silently

@@ -21,8 +21,8 @@ real helical field, quiver and all, at 20 integration substeps per period with s
 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path
 knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
 
-The mode is `seg1.bmad`'s own tracking method, `fel_unaveraged`, and the substep count and
-ramp length are element attributes too, `fel_steps_per_period` and `fel_ramp_periods`.
+The mode is `seg1.bmad`'s own `fel_method`, `unaveraged`, and the substep count and
+ramp length are element attributes too, `global%unaveraged_steps_per_period` and `global%unaveraged_ramp_periods`.
 `lucifer_averaged.in` runs the identical configuration through the averaged default by
 calling the same lattice and overriding that one attribute.
 
@@ -108,8 +108,8 @@ The deck, its variants, and any lattice they name, as they are on disk.
 ```fortran
 ! One undulator segment of the benchmark line, ../aramis.bmad's UND and nothing else:
 ! 3.99 m and 266 periods of helical undulator, aw = 0.85 rms, resonant at 1 Angstrom at
-! 5.8 GeV. The element's tracking_method is fel_unaveraged, which is what selects the
-! mode, and the averaged twin sets the method back to fel_averaged.
+! 5.8 GeV. The element's fel_method is unaveraged, which is what selects the mode, and
+! the averaged twin sets it back to averaged.
 
 no_digested
 parameter[geometry] = open
@@ -123,7 +123,7 @@ beginning[alpha_b] = 1.40348
 
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = fel_unaveraged, ds_step = 0.045
+     fel_method = unaveraged, ds_step = 0.045
 
 SEG1: line = (UND)
 
@@ -133,8 +133,8 @@ use, SEG1
 ### `seg1_averaged.bmad`
 
 ```fortran
-! The averaged twin of seg1.bmad: the same element tracked by fel_averaged, which is
+! The averaged twin of seg1.bmad: the same element with fel_method = averaged, which is
 ! the wiggle-averaged model on Bmad's own periodic-wiggler maps.
 call, file = seg1.bmad
-UND[TRACKING_METHOD] = fel_averaged
+UND[FEL_METHOD] = averaged
 ```

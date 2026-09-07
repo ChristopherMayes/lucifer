@@ -12,16 +12,16 @@ Running the validation harness needs one thing beyond the binary, a Python envir
 with numpy, h5py and pytest, described by `lucifer/wavefront/tests/environment.yml`. The
 exact commands the harness runs are in [`validation.md`](validation.md).
 
-## The two tracking methods
+## The two FEL methods
 
-Bmad's own named methods, set on the element as any tracking method is, and they mix freely in one line.
+Bmad's own `fel_method` attribute, set on the element as any attribute is, and they mix freely in one line.
 
 | `tracking_method` | what it is for |
 |---|---|
-| `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
-| `fel_unaveraged` | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also an independent check on the averaged method, since the two share no approximation. |
+| `averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production workhorse. |
+| `unaveraged` | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also an independent check on the averaged method, since the two share no approximation. |
 
-A lattice writes them as it writes any method, `tracking_method = fel_unaveraged`, and class-settable as `wiggler::*[TRACKING_METHOD] = fel_unaveraged`. The averaged method's maps have one more option behind them, `global%transport_model`, described in [`input-reference.md`](input-reference.md).
+A lattice writes them as it writes any attribute, `fel_method = unaveraged`, and class-settable as `wiggler::*[FEL_METHOD] = unaveraged`. The averaged method's maps have one more option behind them, `global%transport_model`, described in [`input-reference.md`](input-reference.md).
 
 ## Running
 
@@ -172,9 +172,9 @@ as Genesis4 does on the way out. Beam slices never rotate.
 (Physics: manual [](fel-physics.md#sec-element).)
 
 An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying
-`tracking_method = fel_averaged` or `fel_unaveraged`, Bmad's own names for the two FEL
+`fel_method = averaged` or `unaveraged`, Bmad's own attribute for the two FEL
 methods, which this driver supplies through the same hook Bmad uses for `custom`.
-Recognition is by key and tracking method, never by name, and a wiggler carrying
+Recognition is by key and FEL method, never by name, and a wiggler carrying
 `tracking_method = custom` is some other program's element: this driver leaves it to the
 seam. There are no per-undulator namelist parameters. The FEL parameters derive from the
 element attributes:
@@ -192,16 +192,18 @@ element attributes:
   attribute is not yet mapped onto that split and must be zero.
 
 Outside the driver's own FEL walk the element is just a periodic wiggler, tracked by
-Bmad's standard kernel through two hooks wired before `bmad_parser`:
-`track1_custom_ptr` and `make_mat6_custom_ptr` both delegate to `track_a_wiggler`, so
-the reference time acquires the resonant undulation delay from Bmad's own code
-and the transfer-matrix bookkeeping works. Both hooks are load-bearing:
-`mat6_calc_method` resolves to custom alongside the tracking method, and Bmad calls
-through a null `make_mat6_custom_ptr` (a jump to address zero) if a program sets only
+Bmad's standard kernel, because its `tracking_method` says `bmad_standard` and the FEL
+method rides alongside. The reference time acquires the resonant undulation delay from
+Bmad's own code and the transfer-matrix bookkeeping works, with nothing wired in.
+The driver still supplies `track1_custom_ptr` and `make_mat6_custom_ptr`, both
+delegating to `track_a_wiggler`, for a wiggler whose `tracking_method` is `custom` and
+so names some other program's tracking. Both are load-bearing when that happens, since
+`mat6_calc_method` resolves to custom alongside the tracking method and Bmad calls
+through a null `make_mat6_custom_ptr`, a jump to address zero, if a program sets only
 the tracking hook.
 
-The 7.5 assertions are enforced at the element's first touch (the reference pass
-inside `bmad_parser`, through those hooks) and refuse: a missing `b_max`
+The 7.5 assertions are enforced where the driver claims the element, in the setup pass
+that reads `fel_method`, and refuse: a missing `b_max`
 (Bmad's own kernel would silently give `osc_amplitude = 0`: no field, no resonance, no
 error), a missing `l_period` (same silence), and a fieldmap `field_calc` (which
 segfaults the parse-time reference tracking if allowed through). Enforcing them any
@@ -217,11 +219,11 @@ reproduces the last namelist-driven build's run to a max relative difference of
 `aw` difference from deriving `aw` through the `b_max` attribute round trip rather than
 reading it from input.
 
-**The FEL mode is the element's tracking method**, class-settable as
-`wiggler::*[TRACKING_METHOD] = fel_unaveraged`, so averaged and unaveraged segments mix
-freely in one line. `fel_averaged` uses the transverse maps of Bmad's own
+**The FEL mode is the element's `fel_method`**, class-settable as
+`wiggler::*[FEL_METHOD] = unaveraged`, so averaged and unaveraged segments mix
+freely in one line. `averaged` uses the transverse maps of Bmad's own
 `bmad_standard` periodic-wiggler kernel, flattened per `ds_step` (`track_a_wiggler`'s
-matrix with the octupole-like end kicks, chromatic via `p0/p`). `fel_unaveraged` is a
+matrix with the octupole-like end kicks, chromatic via `p0/p`). `unaveraged` is a
 production method whose cost buys the full quiver dynamics (see the manual's
 unaveraged-mode section).
 
@@ -233,11 +235,11 @@ no production run sets it. The two averaged models are priced, measured over the
 full time-dependent line (32 slices, 90 records): power differs by 5.0e-5 max (exit
 total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching
 phase 1.3e-2 rad max, for +3.8% runtime. That is period-averaged Genesis4 focusing
-against Bmad's end-field treatment. The unaveraged parameters are attributes too:
-`fel_steps_per_period` (unset becomes 20, below 10 refused) and `fel_ramp_periods`
-(unset becomes 2). A true hard edge, the test configuration, is the explicit sentinel
--1, because an attribute's unset value is 0 and a silent hard edge would reintroduce
-the K/gamma handoff hazard.
+against Bmad's end-field treatment. The unaveraged mode's two numbers are run switches for the same reason:
+`global%unaveraged_steps_per_period` (20, below 10 refused) and
+`global%unaveraged_ramp_periods` (2). A true hard edge, the test configuration, is the
+explicit sentinel -1, because a silent hard edge would reintroduce the K/gamma handoff
+hazard.
 
 The examples directory exercises the heterogeneity this buys: `examples/taper/` is the same
 line with the last two cells' undulators a second element definition with `b_max` 0.4%

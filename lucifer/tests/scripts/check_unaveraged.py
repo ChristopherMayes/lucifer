@@ -13,7 +13,7 @@ the averaged mode's inputs (the coupling factor fc).
    the radiation kick), and the emittance survives the RK4 push through the ramps.
    This also checks the handoff: with the sin^2 ramps the quiver vanishes at the
    segment ends, so the exit emittance equals the entry emittance; a hard-edge entry
-   (fel_ramp_periods = -1, the explicit test sentinel) fails the orbit instrument loudly.
+   (unaveraged_ramp_periods = -1, the explicit sentinel) fails the orbit instrument loudly.
 
 3. fc measured, both limits. Paired probes (12 and 20 periods, identical 2-period
    ramps): the difference of the two energy-modulation phasors
@@ -83,16 +83,19 @@ PROBE = """! flat keys; routed into the three groups by nml.to_groups
   grid_n_pts = 129
   grid_half_width = 2e-3
   ran_seed = 4242
+  unaveraged_steps_per_period = {spp}
+  unaveraged_ramp_periods = {ramp}
   write_initial = T
   write_diag = T
 &end
 """
 
 def probe_nml(wd, **kw):
-    """probe with the steady-state charge derived (I = Q*c/spacing, spacing = lam) and
-    the unaveraged mode selected by a wrapper lattice (attributes, not namelist)."""
+    """probe with the steady-state charge derived (I = Q*c/spacing, spacing = lam), the
+    unaveraged mode selected on the lattice and its two numbers stated by the run."""
     kw.setdefault("q", f"{3000 * float(kw['lam']) / 2.99792458e8:.12e}")
-    kw["lat"] = unavg_wrapper(wd, kw["lat"], kw.pop("spp"), kw.pop("ramp"))
+    kw["ramp"] = int(kw["ramp"])
+    kw["lat"] = unavg_wrapper(wd, kw["lat"])
     return PROBE.format(**kw)
 
 GAIN = """! flat keys; routed into the three groups by nml.to_groups
@@ -140,15 +143,13 @@ TDID = """! flat keys; routed into the three groups by nml.to_groups
 &end
 """
 
-def unavg_wrapper(wd, base, spp, ramp):
-    """A wrapper lattice selecting the unaveraged mode with per-run parameters --
-    the delz-sweep pattern: the mode and its knobs are lattice attributes."""
-    name = f"w_{base.replace('.bmad','')}_s{spp}_r{str(ramp).replace('-','m').replace('.','p')}.bmad"
+def unavg_wrapper(wd, base):
+    """A wrapper lattice selecting the unaveraged mode. The mode is per element, so it is
+    a lattice attribute; its two numbers are uniform, so the run states them."""
+    name = f"w_{base.replace('.bmad','')}.bmad"
     (wd / name).write_text(
         f"call, file = {base}\n"
-        f"wiggler::*[TRACKING_METHOD] = fel_unaveraged\n"
-        f"wiggler::*[FEL_STEPS_PER_PERIOD] = {spp}\n"
-        f"wiggler::*[FEL_RAMP_PERIODS] = {ramp}\n")
+        f"wiggler::*[FEL_METHOD] = unaveraged\n")
     return name
 
 FAILED = False
@@ -275,7 +276,7 @@ def main():
           float(np.abs(d1["gamma"] - d0["gamma"]).max() / GAMMA0), 1e-12)
     check("ballistic: |emit_x out/in - 1| (ramp handoff)",
           abs(emit(d1) / emit(d0) - 1), 1e-6)
-    # The coherent-quiver instruments. A hard-edge entry (fel_ramp_periods = -1, the
+    # The coherent-quiver instruments. A hard-edge entry (unaveraged_ramp_periods = -1, the
     # explicit test sentinel) starts the quiver about the wrong DC (pi = -a0 instead of 0), which
     # integrates to a centroid displacement ~a0*L/gamma -- measured 3.2e-5 m against
     # 1.9e-9 pristine, 19 sigma of this beam -- and a non-integer-period hard exit
@@ -318,7 +319,7 @@ def main():
 
     # 6. Gain curve: benchmark segment, unaveraged vs averaged, same start.
     run(exe, wd, "uv_gain_unavg", GAIN.format(root="uv_gain_unavg",
-        lat=unavg_wrapper(wd, "aramis_1seg.bmad", 20, 2)))
+        lat=unavg_wrapper(wd, "aramis_1seg.bmad")))
     run(exe, wd, "uv_gain_avg", GAIN.format(root="uv_gain_avg", lat="aramis_1seg.bmad"))
     pu = np.loadtxt(wd / "uv_gain_unavg.diag.txt")[:, 2]
     pa = np.loadtxt(wd / "uv_gain_avg.diag.txt")[:, 2]
@@ -333,7 +334,7 @@ def main():
     # power is priced against the all-averaged twin.
     (wd / "sandwich_avg.bmad").write_text(
         "call, file = unavg_sandwich.bmad\n"
-        "UNDB[TRACKING_METHOD] = fel_averaged\n")
+        "UNDB[FEL_METHOD] = averaged\n")
     run(exe, wd, "uv_sand", GAIN.format(root="uv_sand", lat="unavg_sandwich.bmad"))
     run(exe, wd, "uv_sand_avg", GAIN.format(root="uv_sand_avg", lat="sandwich_avg.bmad"))
     led = np.loadtxt(wd / "uv_sand.ledger.txt")
@@ -360,7 +361,7 @@ def main():
     # through the field) at 1 thread and at 8 threads must produce byte-identical
     # diagnostics AND ledger -- the same guarantee the averaged path carries
     # (per-slice private state, fixed-order energy reduction).
-    wl = unavg_wrapper(wd, "aramis_1seg.bmad", 20, 2)
+    wl = unavg_wrapper(wd, "aramis_1seg.bmad")
     run(exe, wd, "uv_tid1", TDID.format(root="uv_tid1", lat=wl), threads="1")
     run(exe, wd, "uv_tid8", TDID.format(root="uv_tid8", lat=wl), threads="8")
     same = all((wd / f"uv_tid1{s}").read_bytes() == (wd / f"uv_tid8{s}").read_bytes()

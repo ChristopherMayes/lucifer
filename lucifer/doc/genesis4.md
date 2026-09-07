@@ -74,7 +74,7 @@ parameter reference is [](input-reference.md).
 | `&write beam`, `&write field` | `beam_file`, `field_file` on the input side; openPMD dumps on the output side | See file exchange below |
 | `&importbeam`, `&importfield` | `beam_file`, `field_file` | Lucifer reads openPMD only, so convert first |
 | (no equivalent) | `global%migrate` | Slice migration. Off by default, since the comparison tiers run against a code that never migrates |
-| (no equivalent) | `tracking_method = fel_averaged` or `fel_unaveraged` | Selects the method per element, and `global%transport_model` selects the averaged method's maps |
+| (no equivalent) | `fel_method = averaged` or `unaveraged` | Selects the method per element, and `global%transport_model` selects the averaged method's maps |
 
 ## Conventions that differ
 

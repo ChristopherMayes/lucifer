@@ -9,6 +9,24 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-06 Changed: an FEL segment is a wiggler or undulator carrying Bmad's fel_method attribute,
+  which replaces the two FEL tracking methods. tracking_method names how one particle crosses an
+  element, and multiparticle physics riding on it has its own per-element attribute in Bmad, as
+  space_charge_method and csr_method do. Encoding the FEL step as a tracking method made every
+  lattice here unloadable in Tao: the released Tao refused the switch at parse and this tree's Tao
+  parsed it and then died in track1 on an unset custom pointer. All twenty-five lattices now carry
+  fel_method and leave tracking_method at bmad_standard, and a new benchmark section runs Tao over
+  every committed lattice and requires a zero exit with no error line. Twenty-one load. The
+  unaveraged mode's two numbers stop being attributes this program registered, which the released
+  Tao also refused, and become global%unaveraged_steps_per_period, 20 and refused below 10, and
+  global%unaveraged_ramp_periods, 2 with -1 the explicit hard edge. Averaged and unaveraged elements
+  still mix per element. Two refusal checks changed with the encoding, since an ordinary Bmad
+  wiggler meets Bmad's own sanity checks first: a missing l_period is now Bmad's refusal naming the
+  attribute, and the field-map case carries a real cartesian map, because Bmad accepts only the two
+  analytic field models without one and a map-free element would be refused for lacking a map rather
+  than for having one. All eleven tier digits are unchanged, since only recognition and plumbing
+  moved.
+
 - 2026-09-06 Fixed: tests/bmad/flash.bmad holds the beta function its header claims. The probe stated
   beta = 10 m with zero alpha, which is not the matched periodic solution of its own cell, and at
   quadrupole strengths of plus and minus 2.5 m^-2 the cell held a mean beta of 8.19 m rather than the

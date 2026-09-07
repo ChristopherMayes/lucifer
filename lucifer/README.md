@@ -22,14 +22,14 @@ The documents render as one site. With `mystmd` available, `myst build --html` i
 `doc/` produces it and `myst start` serves it locally. Each page also reads on its own
 as Markdown.
 
-## The two tracking methods
+## The two FEL methods
 
-Bmad's own named methods, set on the element as any tracking method is, and they mix freely in one line.
+Bmad's own `fel_method` attribute, set on the element as any attribute is, and they mix freely in one line.
 
 | `tracking_method` | what it is for |
 |---|---|
-| `fel_averaged` | The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
-| `fel_unaveraged` | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also an independent check on the averaged path, since the two share no approximation. |
+| `averaged` | The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
+| `unaveraged` | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also an independent check on the averaged path, since the two share no approximation. |
 
 The averaged method's transverse maps have one more option behind them, the transcribed Genesis4 maps, selected for a whole run by `global%transport_model`. It is validation-internal and no production run sets it.
 

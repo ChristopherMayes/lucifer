@@ -34,7 +34,7 @@ beginning[beta_b]  = 13.39578
 beginning[alpha_b] = 0.768195
 
 UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = helical_model, &
-     b_max = 0.35307, tracking_method = fel_averaged, mat6_calc_method = tracking
+     b_max = 0.35307, fel_method = averaged, mat6_calc_method = tracking
 
 D1: drift, l = 0.6
 D2: drift, l = 0.3

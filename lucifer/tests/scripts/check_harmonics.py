@@ -131,7 +131,7 @@ beginning[beta_b] = 15
 
 UNDP: wiggler, l = {length}, l_period = 0.015, field_calc = planar_model, &
       b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.045
+      fel_method = averaged, ds_step = 0.045
 
 SEGP: line = (UNDP)
 
@@ -497,7 +497,7 @@ def main():
     FAILED = FAILED or not ok
 
     (wd / "planar_uv.bmad").write_text("call, file = planar.bmad\n"
-                                       "wiggler::*[TRACKING_METHOD] = fel_unaveraged\n")
+                                       "wiggler::*[FEL_METHOD] = unaveraged\n")
     ok = refuse(exe, wd, "rf_unavg",
                 NML_TD.format(lat="planar_uv.bmad", root="rf_unavg", extra=""),
                 "UNAVERAGED")

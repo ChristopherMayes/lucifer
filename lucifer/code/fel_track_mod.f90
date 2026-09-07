@@ -188,9 +188,10 @@ end type
 integer, parameter :: fel_source_deposit$ = 0
 integer, parameter :: fel_source_coherent$ = 1
 
-! The FEL mode of an element is its tracking_method, and Bmad names the two values:
-! fel_averaged$ and fel_unaveraged$ (bmad_struct.f90). There is no separate mode enum
-! here, so a lattice, the parser, show ele and this code all say the same thing.
+! The FEL mode of an element is its fel_method attribute, and Bmad names the two values:
+! averaged$ and unaveraged$ (bmad_struct.f90). There is no separate mode enum here, so a
+! lattice, the parser, show ele and this code all say the same thing. The element's
+! tracking_method still names how one particle crosses it, outside the FEL walk.
 
 type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 
@@ -253,8 +254,6 @@ type (track_struct), optional :: track
 
 !
 
-call fel_assert_wiggler_sane (ele)
-
 err_flag = .false.
 finished = .true.
 call track_a_wiggler (orbit, ele, param)
@@ -267,13 +266,12 @@ end subroutine fel_ele_as_wiggler
 !+
 ! Subroutine fel_assert_wiggler_sane (ele)
 !
-! The brief's 7.5 assertions, enforced at the first touch of the element: the
-! reference time/energy pass inside bmad_parser, through the hooks above. Enforcing
-! them any later is too late. A missing b_max parses cleanly and only fails downstream
-! with an unrelated message. A fieldmap field_calc segfaults track_a_wiggler during
-! the parse itself. The refusal names the attribute so a lattice author knows what to fix.
-! (The reference pass runs before lat_sanity_check, so these fire first. Bmad's own
-! sanity check would also refuse a missing l_period if this were removed.)
+! The brief's 7.5 assertions, enforced where the program claims the element, in the
+! setup pass that reads fel_method. The refusal names the attribute so a lattice author
+! knows what to fix. These once fired from the tracking hooks, because an FEL element
+! tracked as custom and its first touch was the reference pass inside bmad_parser. An FEL
+! element now tracks as the periodic wiggler it is, so Bmad handles every field_calc on
+! its own and the setup pass is early enough. One authority, called from one place.
 !
 ! Input:
 !   ele -- ele_struct: The FEL wiggler/undulator element to validate.
@@ -367,8 +365,6 @@ type (lat_param_struct) param
 logical err_flag
 
 !
-
-call fel_assert_wiggler_sane (ele)
 
 err_flag = .false.
 end_orb = start_orb

@@ -1117,6 +1117,12 @@ call fel_h5_real (g_id, 'comb_ds_save', 'm', 'comb', &
       run%global%comb_ds_save, merr)
 call fel_h5_int (g_id, 'ran_seed', '1', 'seed', &
       'The one RNG seed: generation, import and noise.', '', run%global%ran_seed, merr)
+call fel_h5_int (g_id, 'unaveraged_steps_per_period', '1', 'steps per period', &
+      'Integration steps per undulator period in unaveraged elements. Refused below 10.', &
+      '', run%global%unaveraged_steps_per_period, merr)
+call fel_h5_int (g_id, 'unaveraged_ramp_periods', '1', 'ramp periods', &
+      'Periods the field ramps over at each end of an unaveraged element. -1 is a hard edge.', &
+      '', run%global%unaveraged_ramp_periods, merr)
 call fel_h5_flag (g_id, 'write_diag', 'write diag', &
       'Write the Genesis-comparison text diag file.', run%global%write_diag, merr)
 call fel_h5_flag (g_id, 'write_initial', 'write initial', &

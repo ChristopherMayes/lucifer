@@ -87,6 +87,17 @@ type fel_global_struct
   ! validation-internal: the comparison tiers need transcription-level transport, so it is a
   ! run switch rather than a tracking method, and no production run sets it.
   character(16) :: transport_model = 'bmad'
+  ! The unaveraged model's two numbers. They were per-element attributes registered by
+  ! this program, which every other Bmad program then refused to parse, so they are run
+  ! switches selected uniformly. Averaged and unaveraged elements still mix per element,
+  ! through the fel_method attribute Bmad carries.
+  ! Steps per undulator period. Below 10 the push does not converge (fel-physics.md
+  ! sec-unaveraged), so a smaller number is refused rather than rounded up.
+  integer :: unaveraged_steps_per_period = 20
+  ! Periods over which the field ramps at each end. 0 is not a hard edge: a silent hard
+  ! edge reintroduces the handoff phase jump by omission, so the hard edge is asked for
+  ! with -1 and 0 keeps the default of 2.
+  integer :: unaveraged_ramp_periods = 2
   ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
   ! per-particle scatter (bit-for-bit unchanged). 'coherent' is the
   ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the

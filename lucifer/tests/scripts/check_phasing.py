@@ -80,7 +80,7 @@ beginning[beta_b] = 15
 {absline}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.015
+      fel_method = averaged, ds_step = 0.015
 UND2: UND, z_offset = {zoff}
 D: pipe, l = {gap}
 SEG: line = (UND, D, UND2)
@@ -97,7 +97,7 @@ beginning[beta_b] = 15
 {absline}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.015
+      fel_method = averaged, ds_step = 0.015
 ANG = {ang}
 B1: sbend, l = 0.05, g =  ANG / 0.05
 B2: sbend, l = 0.05, g = -ANG / 0.05
@@ -111,7 +111,7 @@ use, SEG
 CHIC_MID = "B1, DD, B2, DD, B3, DD, B4"
 OPEN_MID = "B1, DD, B2, DD, B3"          # Three bends: NOT a closed bump.
 
-UNAVG = "wiggler::*[TRACKING_METHOD] = fel_unaveraged"
+UNAVG = "wiggler::*[FEL_METHOD] = unaveraged"
 
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
@@ -143,7 +143,7 @@ beginning[beta_b] = 15
 {absline}
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.015
+      fel_method = averaged, ds_step = 0.015
 DD: pipe, l = 0.025
 STR: pipe, l = 0.275               ! ARC-MATCHED to the bump (5*0.025 + 4*0.05 = 0.325
                                    ! total with the flanking DDs), so the two runs share

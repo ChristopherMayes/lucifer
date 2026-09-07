@@ -30,6 +30,8 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 | `global%out_root` | `"fel_track"` | Prefix for every output file |
 | `global%interlude_model` | `"bmad"` | How field-free elements are tracked: `"bmad"` (the seam) or `"genesis"` (transcribed) |
 | `global%transport_model` | `"bmad"` | Transverse transport inside averaged FEL elements: `"bmad"` (Bmad's own kernel) or `"genesis"` (transcribed, validation-internal) |
+| `global%unaveraged_steps_per_period` | `20` | Integration steps per undulator period in unaveraged elements ([](#param-global-unaveraged-steps-per-period)) |
+| `global%unaveraged_ramp_periods` | `2` | Length of the sin^2 entry and exit ramps, in periods ([](#param-global-unaveraged-ramp-periods)) |
 | `slicing%window_length` | `0` | Time window [m]. Zero derives it from the bunch, or is one slice |
 | `slicing%n_wavelength` | `1` | Slice spacing in wavelengths, an integer ([](#param-slicing)) |
 | `slicing%n_slice` | `0` | The window as a slice count instead. Both it and `window_length` is refused |
@@ -57,6 +59,12 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 
 (param-global-transport-model)=
 **`global%transport_model`** selects the transverse maps inside an averaged FEL element. `"bmad"`, the default and the production model, is Bmad's own periodic-wiggler kernel with its end-field treatment and chromaticity through `p0/p`. `"genesis"` is Genesis4's maps verbatim, with the focusing matrix built from `aw`, `kx`, `ky` and chromaticity through `gammaz`. The second is validation-internal: a transcription comparison needs transcription-level transport, so the comparison tiers set it and no production run does. The two are priced against each other in the manual's element section, and the unaveraged mode integrates the field rather than applying a map, so the switch does not reach it.
+
+(param-global-unaveraged-steps-per-period)=
+**`global%unaveraged_steps_per_period`** is 20 by default. Below 10 is refused, the floor our own coupling-factor convergence supports: [](validation.md) tabulates it at 10, 20 and 30 steps per period. It reaches unaveraged elements only, and averaged elements take their step from `ds_step` as before.
+
+(param-global-unaveraged-ramp-periods)=
+**`global%unaveraged_ramp_periods`** is 2 by default. A true hard edge is a test configuration and has the explicit sentinel `-1`, so silence never means hard edge. A ramp pair longer than the segment is refused. It was a per-element attribute this program registered, which every other Bmad program then refused to parse, so it is a run switch selected uniformly. Averaged and unaveraged elements still mix per element, through `fel_method`.
 
 (param-global-source-model)=
 **`global%source_model`** is `"deposit"`, the standard per-particle scatter, or `"coherent"`, the coherent-Gaussian retrieval in which the spatially incoherent part of the source is dropped, the slice bunch factor keeps the physical shot noise, and the transverse shape is a guarded Gaussian. A profile that is measurably not Gaussian is refused. See [](fel-physics.md#sec-coherent-source).
@@ -313,14 +321,15 @@ One may be set and the other derived against it. A stated half width keeps the c
 (lattice-attributes)=
 ## Lattice attributes
 
-An FEL segment is a wiggler or undulator whose `tracking_method` is one of Bmad's two FEL methods, and the method is what selects the physics:
+An FEL segment is a wiggler or undulator carrying Bmad's `fel_method` attribute, and the method is what selects the physics:
 
-| `tracking_method` | Meaning |
+| `fel_method` | Meaning |
 |---|---|
-| `fel_averaged` | The wiggle-averaged model. The production workhorse |
-| `fel_unaveraged` | Direct integration through the undulator field, with no period averaging |
+| `off` | The default. Not an FEL segment, and this program leaves it to the seam |
+| `averaged` | The wiggle-averaged model. The production workhorse |
+| `unaveraged` | Direct integration through the undulator field, with no period averaging |
 
-Both are Bmad's own named methods rather than anything this program registers, so `show ele` prints them, a written lattice keeps them, and the parser refuses a misspelling. They are class-settable as any attribute is, `wiggler::*[TRACKING_METHOD] = fel_unaveraged`, and they mix freely in one line. A wiggler tracked any other way is not an FEL segment: `tracking_method = custom` means some other program's tracking and this program leaves it to the seam.
+It is Bmad's own attribute rather than anything this program registers, so `show ele` prints it, a written lattice keeps it, the parser refuses a misspelling, and every other Bmad program loads the lattice. It is class-settable as any attribute is, `wiggler::*[FEL_METHOD] = unaveraged`, and the two settings mix freely in one line. `tracking_method` is a separate axis and names how one particle crosses the element, as it does everywhere in Bmad: an FEL segment leaves it at `bmad_standard` and is the plain periodic wiggler its field attributes describe outside the FEL walk.
 
 Space charge is per element too, through Bmad's own `space_charge_method` attribute rather than anything this program registers:
 
@@ -331,21 +340,10 @@ Space charge is per element too, through Bmad's own `space_charge_method` attrib
 
 `fft_3d` and `cathode_fft_3d` are refused on an FEL element, since their solvers want a three-dimensional grid this walk does not build. Bmad's master switch applies as it does everywhere else: `bmad_com%csr_and_space_charge_on` must also be true, and when elements ask for `slice` while it is false the run says so and tracks without space charge. `space_charge_com%n_bin` is ignored, because the slices are the bins. Inside the Bmad seam the same attribute drives Bmad's own machinery, so one lattice reads the same way in every Bmad program.
 
-The unaveraged mode's two numbers are per-element attributes, registered by this program and usable on any wiggler or undulator:
-
-| Attribute | Default | Meaning |
-|---|---|---|
-| `fel_steps_per_period` | unset, meaning 20 | Unaveraged substeps per undulator period |
-| `fel_ramp_periods` | unset, meaning 2 | Length of the sin^2 entry and exit ramps, in periods |
+The unaveraged mode's two numbers are run switches, [](#param-global-unaveraged-steps-per-period) and [](#param-global-unaveraged-ramp-periods), rather than per-element attributes.
 
 (attr-fel-tracking)=
-**`fel_unaveraged`** is a full Newton-Lorentz quiver with no period averaging and no coupling factor anywhere in its inputs, and the run writes an energy ledger beside its other outputs. **`fel_averaged`** is the wiggle-averaged model, whose transverse maps are chosen by [](#param-global-transport-model). See [](fel-physics.md#sec-unaveraged).
-
-(attr-fel-steps-per-period)=
-**`fel_steps_per_period`** defaults to 20 when unset. Below 10 is refused, the floor our own coupling-factor convergence supports: [](validation.md) tabulates it at 10, 20 and 30 steps per period.
-
-(attr-fel-ramp-periods)=
-**`fel_ramp_periods`** defaults to 2 when unset. A true hard edge is a test configuration, and it has an explicit sentinel of `-1`, so silence never means hard edge. A ramp pair longer than the segment is refused.
+**`unaveraged`** is a full Newton-Lorentz quiver with no period averaging and no coupling factor anywhere in its inputs, and the run writes an energy ledger beside its other outputs. **`averaged`** is the wiggle-averaged model, whose transverse maps are chosen by [](#param-global-transport-model). See [](fel-physics.md#sec-unaveraged).
 
 The FEL parameters themselves come from the element: `aw` from `b_max` and `l_period`, the helicity from `field_calc`, and the step from `ds_step`. Each is asserted at setup. See [](fel-physics.md#sec-element).
 

@@ -4,7 +4,7 @@
 
 call, file = ../aramis.bmad
 
-UNDU: UND, tracking_method = fel_unaveraged
+UNDU: UND, fel_method = unaveraged
 
 CELL:  line = (UND,  D1, QF, D2, UND, D1, QD, D2)
 CELLU: line = (UNDU, D1, QF, D2, UND, D1, QD, D2)

@@ -58,7 +58,7 @@ beginning[beta_a] = 15
 beginning[beta_b] = 15
 UNDP: wiggler, l = 3.96, l_period = 0.015, field_calc = planar_model, &
       b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.045
+      fel_method = averaged, ds_step = 0.045
 SEG: line = (UNDP)
 use, SEG
 """

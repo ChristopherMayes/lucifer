@@ -42,7 +42,7 @@ beginning[alpha_b] = -0.23996
 
 ! ds_step = 3 periods, 55 steps per segment, the step this line's checks were run at.
 UND: wiggler, l = 4.5045, l_period = 0.0273, field_calc = planar_model, &
-     b_max = 0.47, tracking_method = fel_averaged, ds_step = 0.0819
+     b_max = 0.47, fel_method = averaged, ds_step = 0.0819
 
 D1: drift, l = 0.25
 D2: drift, l = 0.10

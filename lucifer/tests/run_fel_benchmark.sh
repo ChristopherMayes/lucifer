@@ -427,15 +427,20 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = 
 # the parse-time reference tracking (fieldmap). Each check mutates one attribute of the
 # real single-segment lattice and requires both a nonzero exit and the by-name message.
 #
-# The fieldmap case is refused by Bmad rather than by this program: an FEL method is not
-# valid on a wiggler whose field is a map, so the lattice does not parse. That is one step
-# earlier than the program's own assertion, and the assertion stays as the second line of
-# defense for a lattice built through the API rather than parsed.
+# An FEL element is an ordinary Bmad wiggler now, so Bmad's own sanity checks reach it
+# first and two of these are Bmad's refusals rather than this program's. A missing
+# l_period is one: Bmad names the attribute and refuses to compute the element, which is
+# the earlier and better place for it. The field map is the other, and it takes a real
+# map here on purpose. Bmad accepts only the two analytic field models without one, so a
+# map-free mutation would be refused for having no map rather than for being a map, and
+# the check would stop testing this program at all. With the map the lattice parses and
+# the refusal is this program's own, naming the element and the attribute.
 
 echo "--- FEL-element assertion checks (refusal messages) ----------------------------"
 grep -v "b_max" aramis_1seg.bmad                                   > refusal_bmax.bmad
 sed 's/l_period = 0.015, //' aramis_1seg.bmad                      > refusal_lperiod.bmad
-sed 's/field_calc = helical_model/field_calc = fieldmap/' aramis_1seg.bmad > refusal_fieldmap.bmad
+sed 's/field_calc = helical_model, &/field_calc = fieldmap, cartesian_map = {term = {1.0, 4, 5, 3, 0.2, 0.1, 2, x}}, \&/' \
+    aramis_1seg.bmad > refusal_fieldmap.bmad
 
 CHECKS_OK=1
 run_assert_refusal () {   # <name> <by-name message fragment> [extra &fel_params lines]
@@ -477,19 +482,20 @@ wiggler::*[SPACE_CHARGE_METHOD] = slice
 LAT
 
 run_assert_refusal bmax     "ZERO B_MAX"
-run_assert_refusal lperiod  "ZERO L_PERIOD"
-run_assert_refusal fieldmap "NOT A VALID TRACKING_METHOD"
+run_assert_refusal lperiod  "L_PERIOD NOR N_PERIOD"
+run_assert_refusal fieldmap "FIELD_CALC MUST BE PLANAR_MODEL OR HELICAL_MODEL"
 run_assert_refusal lrwake   "LR (MULTI-BUNCH) WAKES ARE NOT SUPPORTED"
 run_assert_refusal zmax     "Z_MAX CAN HANDLE"
 run_assert_refusal scnone   "NEITHER SPACE-CHARGE TERM IS CONFIGURED" \
                             "bmad_com%csr_and_space_charge_on = T"
 
 # tracking_method = custom on a wiggler means some other program's tracking, so this
-# program must not claim the element. With the only wiggler tracked that way there is no
-# FEL segment left, which is refused: the alternative, silently tracking it as an
-# FEL element, is what the named methods exist to prevent.
+# program must not claim the element. Nor must it claim a wiggler carrying no fel_method
+# at all. With the only wiggler left without one there is no FEL segment, which is
+# refused: the alternative, silently tracking it as an FEL element, is what the attribute
+# exists to prevent.
 
-sed 's/tracking_method = fel_averaged/tracking_method = custom/' aramis_1seg.bmad > custom_seam.bmad
+sed 's/fel_method = averaged, //' aramis_1seg.bmad > custom_seam.bmad
 make_nml custom_seam.nml custom_seam.bmad custom_seam bmad Aramis
 if "$EXE" custom_seam.nml > fel-custom_seam.log 2>&1; then
   echo "FAIL: a custom-tracked wiggler was claimed as an FEL segment" >&2
@@ -852,6 +858,21 @@ if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$WORK_DIR/program" --exe 
   exit 1
 fi
 section_time program-structure
+
+echo
+echo "--- Tao loads every committed lattice --------------------------------------"
+TAO="${EXE%lucifer}tao"
+if [[ ! -x "$TAO" ]]; then
+  echo "FAIL: tao not found beside the tracker at $TAO" >&2
+  exit 1
+fi
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_tao_lattices.py" --tao "$TAO" \
+        --latdir "$SCRIPT_DIR/bmad" --examples "$SCRIPT_DIR/../examples" \
+        --workdir "$WORK_DIR/tao"; then
+  echo "FAIL: a committed lattice does not load in Tao; outputs kept in: $WORK_DIR/tao" >&2
+  exit 1
+fi
+section_time tao-lattices
 
 echo
 echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"

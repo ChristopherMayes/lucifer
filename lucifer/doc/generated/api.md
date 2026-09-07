@@ -4363,13 +4363,12 @@ Output:
 *Subroutine* `(ele)`
 
 ```
-The brief's 7.5 assertions, enforced at the first touch of the element: the
-reference time/energy pass inside bmad_parser, through the hooks above. Enforcing
-them any later is too late. A missing b_max parses cleanly and only fails downstream
-with an unrelated message. A fieldmap field_calc segfaults track_a_wiggler during
-the parse itself. The refusal names the attribute so a lattice author knows what to fix.
-(The reference pass runs before lat_sanity_check, so these fire first. Bmad's own
-sanity check would also refuse a missing l_period if this were removed.)
+The brief's 7.5 assertions, enforced where the program claims the element, in the
+setup pass that reads fel_method. The refusal names the attribute so a lattice author
+knows what to fix. These once fired from the tracking hooks, because an FEL element
+tracked as custom and its first touch was the reference pass inside bmad_parser. An FEL
+element now tracks as the periodic wiggler it is, so Bmad handles every field_calc on
+its own and the setup pass is early enough. One authority, called from one place.
 ```
 
 ```

@@ -550,14 +550,14 @@ Two bookkeeping identities ride with the seam wake. Energy bookkeeping, $d\langl
 van der Slot) is the published existence proof for this physics. Only its published
 work was used: nothing here is compared against a MINERVA run.)
 
-`tracking_method = fel_unaveraged` is per element, so unaveraged segments mix
+`fel_method = unaveraged` is per element, so unaveraged segments mix
 with averaged ones in a single line. It integrates the particles through the undulator's
-real field: the full Newton-Lorentz quiver, RK4 at `fel_steps_per_period` (default
+real field: the full Newton-Lorentz quiver, RK4 at `global%unaveraged_steps_per_period` (default
 20, floor 10 on the convergence measured below), with the radiation field as a Strang-split kick and a source
 built from the actual quiver current. Nothing from the averaged coupling path appears
 in it (the harness greps `fel_und_coupling|faw` out of the module), so the averaged
 mode's inputs become measurements. Entry/exit are sin² amplitude ramps
-(`fel_ramp_periods`, default 2) with continuous slope, so the quiver vanishes at the
+(`global%unaveraged_ramp_periods`, default 2) with continuous slope, so the quiver vanishes at the
 segment ends where the averaged and unaveraged momentum conventions coincide. The
 beam carries a `quiver_in_px` convention flag that every averaged/seam entry asserts.
 In a mixed line those handoffs happen at real internal boundaries, and the sandwich
@@ -600,7 +600,7 @@ harmonic-agnostic.
 Mutations bite, each on its named check: flipping the E·v kick sign fails the ledger
 at 2.0 (energy created) and the gain comparison at 0.69, while the magnitude-blind
 fc checks pass it, which is why the ledger is check zero. A hard-edge entry
-(`fel_ramp_periods = -1`, the explicit sentinel) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
+(`global%unaveraged_ramp_periods = -1`, the explicit sentinel) fails the orbit-handoff check at 3.2e-5 m (19 sigma of the
 probe beam. Note the exit momentum re-absorbs the quiver at integer-period lengths,
 so the orbit, not the exit mean px, is the reliable instrument).
 skipping the exit handoff flag is refused at the first seam element.

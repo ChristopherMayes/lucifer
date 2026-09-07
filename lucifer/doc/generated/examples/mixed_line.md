@@ -1,5 +1,5 @@
 ---
-title: "Two tracking methods in one line"
+title: "Two FEL methods in one line"
 short_title: "mixed_line"
 ---
 
@@ -15,10 +15,10 @@ Two commands, Bmad only:
     ../../../production/bin/lucifer lucifer_averaged.in
     python ../plot_fel.py mixed_line.stats.h5
 
-The tracking method is an element attribute, so a line whose segments are tracked
+The FEL method is an element attribute, so a line whose segments are tracked
 differently is a line of elements that differ. `mixed.bmad` calls `../aramis.bmad`
 for its parameters, defines `UNDU` as the same undulator carrying
-`tracking_method = fel_unaveraged`, and puts one `UNDU` in the third FODO cell. Eleven
+`fel_method = unaveraged`, and puts one `UNDU` in the third FODO cell. Eleven
 segments run the averaged default and the fifth runs unaveraged, integrating the real
 helical field with no period averaging (the manual's [unaveraged-mode section](../../fel-physics.md)).
 
@@ -127,7 +127,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 
 call, file = ../aramis.bmad
 
-UNDU: UND, tracking_method = fel_unaveraged
+UNDU: UND, fel_method = unaveraged
 
 CELL:  line = (UND,  D1, QF, D2, UND, D1, QD, D2)
 CELLU: line = (UNDU, D1, QF, D2, UND, D1, QD, D2)
@@ -144,5 +144,5 @@ use, MIXED
 
 call, file = mixed.bmad
 
-UNDU[TRACKING_METHOD] = fel_averaged
+UNDU[FEL_METHOD] = averaged
 ```

@@ -95,7 +95,7 @@ def cold(nml):
     return nml.replace("sig_pz = 8.804506566858e-05", "sig_pz = 1e-12")
 
 WRAP = """call, file = spont_probe.bmad
-wiggler::*[TRACKING_METHOD] = fel_unaveraged
+wiggler::*[FEL_METHOD] = unaveraged
 """
 
 
@@ -253,7 +253,7 @@ def main():
     print("--- bmad_com%radiation_damping_on, both FEL modes:")
     check("damping: averaged mode vs analytic, |ratio - 1|",
           abs(loss(wd, "sp_avg_d") / analytic - 1), 0.0, 5e-3)
-    l_ramp = 2 * LAMBDA_U                       # fel_ramp_periods default 2
+    l_ramp = 2 * LAMBDA_U                       # unaveraged_ramp_periods default 2
     composite = (1 - 2 * (5 / 8) * l_ramp / L_UND) + meas[NGRID_REF] / analytic
     check("damping: unaveraged mode vs the ramp+capture composite, |ratio - 1|",
           abs(loss(wd, "sp_uv_d") / (composite * analytic) - 1), 0.0, 2e-2,

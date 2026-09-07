@@ -54,7 +54,7 @@ beginning[beta_a] = 15
 beginning[beta_b] = 15
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.015
+      fel_method = averaged, ds_step = 0.015
 SEG: line = (UND)
 use, SEG
 """
@@ -67,7 +67,7 @@ beginning[beta_a] = 15
 beginning[beta_b] = 15
 UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
       b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.015
+      fel_method = averaged, ds_step = 0.015
 UND2: UND
 D: pipe, l = 0.30
 SEG: line = (UND, D, UND2)

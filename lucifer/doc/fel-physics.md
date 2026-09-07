@@ -167,21 +167,21 @@ step is the element's own `ds_step`/`num_steps`. The bookkeeper's
 $n_{\mathrm{step}} = \max(1, \mathrm{nint}(L/\texttt{ds\_step}))$ is exactly Genesis4's
 unroll.
 
-The mode is the element's own tracking method, `fel_averaged` or `fel_unaveraged`,
-class-settable as `wiggler::*[TRACKING_METHOD] = ...`, so averaged and unaveraged
-segments mix freely in one line. `fel_averaged` is the averaged model on the
-`bmad_standard` kernel's transverse maps ([](#sec-undbmad)) and `fel_unaveraged` is
-[](#sec-unaveraged). Bmad names both, so a lattice, the parser and `show ele` say the
-same thing and a misspelling is refused rather than read as an integer. The transcribed
-maps are still selectable, as the run switch `global%transport_model = "genesis"`, since
-they are chosen for a whole comparison rather than per element. The unaveraged mode's own
-two parameters remain per-element attributes registered program-side:
-`fel_steps_per_period` (unset $\to$ 20, below 10 refused) and `fel_ramp_periods`
-(unset $\to$ 2). An attribute's unset
-value
-is 0 and a silent hard edge would reintroduce the $K/\gamma$ handoff hazard, so a
-true hard edge (the test configuration) must be asked for explicitly with the
-sentinel $-1$. Silence never means hard edge. The ramps carry two priced end
+The mode is the element's own `fel_method` attribute, `averaged` or `unaveraged`,
+class-settable as `wiggler::*[FEL_METHOD] = ...`, so averaged and unaveraged segments mix
+freely in one line. `averaged` is the averaged model on the `bmad_standard` kernel's
+transverse maps ([](#sec-undbmad)) and `unaveraged` is [](#sec-unaveraged). Bmad carries
+the attribute, as it carries `space_charge_method`, so a lattice, the parser and `show
+ele` say the same thing, a misspelling is refused rather than read as an integer, and
+every other Bmad program loads the lattice. The element's `tracking_method` is a separate
+axis naming how one particle crosses it, and an FEL segment leaves it at `bmad_standard`.
+The transcribed maps are still selectable, as the run switch
+`global%transport_model = "genesis"`, since they are chosen for a whole comparison rather
+than per element. The unaveraged mode's own two numbers are run switches for the same
+reason, `global%unaveraged_steps_per_period` (20, below 10 refused) and
+`global%unaveraged_ramp_periods` (2). A silent hard edge would reintroduce the
+$K/\gamma$ handoff hazard, so a true hard edge (the test configuration) must be asked for
+explicitly with the sentinel $-1$. Silence never means hard edge. The ramps carry two priced end
 effects ([](#sec-unaveraged)): their slippage deficit is compensated exactly by
 the mode's built-in end-of-segment phase jump, and their reduced coupling length
 costs $\sim$2% in $\ln P$ per 266-period benchmark segment at the default 2
@@ -1013,7 +1013,7 @@ Measured levels and how they are checked: [](validation.md#val-validation-from-o
 ## The unaveraged mode
 
 This mode (`fel_unaveraged_mod`, selected per element by
-`tracking_method = fel_unaveraged`, [](#sec-element)) integrates the
+`fel_method = unaveraged`, [](#sec-element)) integrates the
 particles through the undulator's *real* field with the radiation as a
 co-evolving kick. There is no period averaging and no resonance approximation. It
 keeps the grid field and the Lorentz force where MINERVA (the published existence

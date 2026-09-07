@@ -1,7 +1,7 @@
 ! One undulator segment of the benchmark line, ../aramis.bmad's UND and nothing else:
 ! 3.99 m and 266 periods of helical undulator, aw = 0.85 rms, resonant at 1 Angstrom at
-! 5.8 GeV. The element's tracking_method is fel_unaveraged, which is what selects the
-! mode, and the averaged twin sets the method back to fel_averaged.
+! 5.8 GeV. The element's fel_method is unaveraged, which is what selects the mode, and
+! the averaged twin sets it back to averaged.
 
 no_digested
 parameter[geometry] = open
@@ -15,7 +15,7 @@ beginning[alpha_b] = 1.40348
 
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = fel_unaveraged, ds_step = 0.045
+     fel_method = unaveraged, ds_step = 0.045
 
 SEG1: line = (UND)
 

@@ -73,7 +73,7 @@ One row per feature declared in [the introduction](../../index.md).
 | Feature | Shown by |
 |---|---|
 | The FEL element: parameters as lattice attributes | [`steady_state/`](steady_state.md), and [`taper/`](taper.md) for a heterogeneous line |
-| Two tracking methods, Bmad's own named methods, mixable per element in one line | [`mixed_line/`](mixed_line.md), [`unaveraged/`](unaveraged.md) |
+| Two FEL methods, Bmad's own fel_method attribute, mixable per element in one line | [`mixed_line/`](mixed_line.md), [`unaveraged/`](unaveraged.md) |
 | Per-particle weights throughout | [`sase/`](sase.md) for weighted shot noise, [`migration/`](migration.md) for weighted migration |
 | Time dependence with an exact integer slippage shift | [`sase/`](sase.md) |
 | Slice migration | [`migration/`](migration.md) |
@@ -173,7 +173,7 @@ beginning[alpha_b] = 1.40348
 ! encodes aw = 0.84853 as an expression in Bmad's own constants.
 UND: wiggler, l = 3.99, l_period = 0.015, field_calc = helical_model, &
      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-     tracking_method = fel_averaged, ds_step = 0.045
+     fel_method = averaged, ds_step = 0.045
 D1: drift, l = 0.44
 D2: drift, l = 0.24
 QF: quadrupole, l = 0.08, k1 = 2.0

@@ -41,7 +41,7 @@ beginning[alpha_b] = 1.03711
 
 ! ds_step = 3 periods, 38 steps per segment, the step this line's checks were run at.
 UND: wiggler, l = 3.42, l_period = 0.03, field_calc = planar_model, &
-     b_max = 1.25, tracking_method = fel_averaged, ds_step = 0.09
+     b_max = 1.25, fel_method = averaged, ds_step = 0.09
 
 DS: drift, l = 0.135      ! Either side of a quadrupole in a 47 cm break.
 DL: drift, l = 0.350      ! Either side of a quadrupole in a 90 cm break.

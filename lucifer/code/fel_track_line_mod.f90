@@ -253,7 +253,7 @@ do ie = run%i_start, run%i_end
     und%nstep = max(1, nint(ele%value(num_steps$)))
     und%dz = ele%value(l$) / und%nstep
 
-    if (fel_mode(ie) == fel_unaveraged$) then
+    if (fel_mode(ie) == unaveraged$) then
       ! The concatenated wake kick would meet the quiver-carrying chart mid-segment.
       ! Nothing in this mode needs element wakes, so refuse rather than approximate.
       if (associated(wake_src)) then
@@ -280,7 +280,7 @@ do ie = run%i_start, run%i_end
     ! through the element. Element wakes are the one refusal only this walk can
     ! make, since only it resolves them through the lords.
 
-    if (run%dev%on .and. .not. run%fp32%on .and. fel_mode(ie) /= fel_unaveraged$) then
+    if (run%dev%on .and. .not. run%fp32%on .and. fel_mode(ie) /= unaveraged$) then
       if (associated(wake_src)) then
         call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // &
                      '" DOES NOT COVER ELEMENT WAKES. AT ELEMENT: ' // trim(ele%name))
@@ -290,7 +290,7 @@ do ie = run%i_start, run%i_end
     endif
 
     do istep = 1, und%nstep
-      if (fel_mode(ie) == fel_unaveraged$) then
+      if (fel_mode(ie) == unaveraged$) then
         call fel_tic (fel_t_unavg$)
         call fel_unavg_step (und, run%ustate, fbeam, wf, slip, und%dz, istep == 1, &
                              istep == und%nstep, dE_step, dU_step, err)
@@ -333,7 +333,7 @@ do ie = run%i_start, run%i_end
         call fel_device_readback (run%dev, fbeam, ffield)
         call take_stats_record (istep == und%nstep)
         if (err_flag) return
-        if (fel_mode(ie) == fel_unaveraged$) call write_ledger_row ()
+        if (fel_mode(ie) == unaveraged$) call write_ledger_row ()
         call write_diag_rows()
       endif
       if (istep /= und%nstep) call progress_line (.false., istep, und%nstep)
@@ -805,7 +805,7 @@ call fel_tic (fel_t_radiation$)
 ! The envelope integral over this record: the substep-grid midpoint sum for the
 ! unaveraged mode (matching its own integration grid), dz exactly for the averaged.
 
-if (fel_mode(ie) == fel_unaveraged$) then
+if (fel_mode(ie) == unaveraged$) then
   intg2 = 0
   do ipr = 1, run%ustate%nsub
     s0 = (run%ustate%s - und%dz) + (ipr - 0.5_rp) * run%ustate%dsub

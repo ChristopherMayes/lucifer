@@ -70,7 +70,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-UV = "wiggler::*[TRACKING_METHOD] = fel_unaveraged\n"
+UV = "wiggler::*[FEL_METHOD] = unaveraged\n"
 
 
 def ss(nml):

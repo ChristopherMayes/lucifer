@@ -80,7 +80,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 ! Harmonic-lasing example lattice: one planar undulator segment at the benchmark
 ! energy and rms aw (planar, so the odd-harmonic couplings fc(h) are alive -- a
 ! helical device couples only the fundamental). Resonant at 1 Angstrom, and the
-! third harmonic radiates at 1/3 Angstrom. Production defaults: the fel_averaged method
+! third harmonic radiates at 1/3 Angstrom. Production defaults: the averaged FEL method
 ! on Bmad's own kernel maps, ds_step = 3 periods.
 
 no_digested
@@ -93,7 +93,7 @@ beginning[beta_b] = 15
 
 UNDP: wiggler, l = 3.96, l_period = 0.015, field_calc = planar_model, &
       b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, &
-      tracking_method = fel_averaged, ds_step = 0.045
+      fel_method = averaged, ds_step = 0.045
 
 SEGP: line = (UNDP)
 
