@@ -25,6 +25,14 @@ The last two, and the unfiltered run beside them, stop at the second undulator.
 The two mutations must land far outside the tolerance the first run holds, or the check
 reports that it cannot fail and stops.
 
+Then the edge's refusals, the containment of the seed inside the derived edge, and where
+the filter reaches. That last one is measured rather than read off the line the run prints:
+the filter is on by default, so an unaveraged element and a coherent source are no-ops
+instead of refusals, and a no-op that works and a no-op that quietly filters print the same
+line. Each pair runs with the switch on and off. The unaveraged line and the coherent source
+must not move, the mixed line must, and the coherent case is the one that caught a fall
+through the arming of the per-element state (FINDINGS 7.60).
+
 Usage:
 
   check_source_filter.py --exe <lucifer> --workdir <dir> [--tol <rel>]
@@ -198,6 +206,83 @@ def containment(exe, wd):
     return good
 
 
+SCOPE = """&fel_params
+  lat_file = "{lat}"
+  global%out_root = "{root}"
+  global%source_filter = {on}
+{extra}/
+&fel_beam_init
+  beam_init%n_particle = 512
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+/
+&fel_wavefront_init
+  wavefront_init%lambda0 = 1e-10
+  wavefront_init%seed_power = 5e3
+  wavefront_init%seed_waist_size = 30e-6
+  wavefront_init%grid_n_pts = 64
+  wavefront_init%grid_half_width = 2e-4
+/
+"""
+
+
+def exit_power(wd, root):
+    """Total field power at the last record of a run."""
+    with h5py.File(wd / f"{root}.stats.h5") as h:
+        return float(np.asarray(h["field/total/power"])[-1].sum())
+
+
+def scope(exe, wd):
+    """
+    Where the filter reaches, measured rather than read off a printed line.
+
+    The filter is applied to the source term the averaged deposit builds, so an
+    unaveraged element has nothing for it to act on and a coherent source is an analytic
+    Gaussian that carries no wide-angle content. Both are no-ops rather than refusals,
+    since the filter is on by default and a deck that never asked for it must still run.
+    A no-op that is announced and a no-op that is silent print the same line, so each
+    pair here is run with the filter on and off and the exit powers compared. The mixed
+    line is the one that has to move: it holds two averaged segments around one
+    unaveraged segment, so a filter that reached neither would leave it unchanged.
+    """
+    ok = True
+    for lat, extra, want_move, what in (
+        ("aramis_1seg_unavg.bmad", "", False, "an unaveraged line"),
+        ('  global%source_model = "coherent"\n', "", False, "a coherent source"),
+        ("unavg_sandwich.bmad", "", True, "a mixed line, two averaged segments of three"),
+    ):
+        # The coherent case is the one row whose first field is a setting, not a lattice.
+        if lat.startswith("  global"):
+            lat, extra = "aramis_1seg.bmad", lat
+        p = {}
+        for on in ("T", "F"):
+            root = f"sfscope{on}"
+            (wd / f"{root}.nml").write_text(SCOPE.format(lat=lat, root=root, on=on, extra=extra))
+
+            # Four threads, the cap run() takes above and for the same reason: these six
+            # runs land in the middle of a pass that shares the machine with four other
+            # jobs, and an unbounded one here took an unrelated section down with it.
+
+            r = subprocess.run([exe, f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+                               env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+            if r.returncode != 0:
+                print(f"FAIL: {what} with global%source_filter = {on} exited "
+                      f"{r.returncode}:\n{r.stdout[-1500:]}", file=sys.stderr)
+                return False
+            p[on] = exit_power(wd, root)
+        rel = abs(p["T"] - p["F"]) / abs(p["F"])
+        moved = rel > 1e-9
+        good = moved == want_move
+        verb = "moves" if want_move else "is untouched"
+        print(f"  the filter {verb} on {what}: exit power {p['T']:.6e} W on against "
+              f"{p['F']:.6e} W off, relative {rel:.3e}  {'ok' if good else 'FAIL'}")
+        ok = ok and good
+    return ok
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--exe", required=True)
@@ -260,6 +345,7 @@ def main():
 
     ok = refusals(exe, wd) and ok
     ok = containment(exe, wd) and ok
+    ok = scope(exe, wd) and ok
 
     print("  source-filter checks: PASS" if ok else "  source-filter checks: FAIL")
     return 0 if ok else 1

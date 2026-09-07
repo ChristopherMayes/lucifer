@@ -335,7 +335,8 @@ the part inside an angle of about four mode diffraction angles, which is what co
 the mode, and the part outside it, which is the emission of macroparticles that occupy one
 grid point each. That second part is an artifact of the representation, it grows as the
 cells shrink and falls as the beamlet count rises, and at common settings it is most of
-the total power of an unseeded run ([](startup-noise.md)). The block reports both at the
+the total power of an unseeded run. The angular filter that removes it is on by default,
+and what it costs and what load it wants is [](fel-physics.md#sec-convergence). The block reports both at the
 record where the mode peaked and at the last record, and the run then warns when the
 outside part reaches a tenth of the inside part and confirms convergence below a
 hundredth. In the run above 45 percent of the 761.5 MW exit power is that emission, and

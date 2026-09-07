@@ -79,6 +79,7 @@ WAKE_ZLONG = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
 NML_GEN = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   n_wavelength = {sample}
   beam_init%n_particle = 512
@@ -113,6 +114,7 @@ def gen_nml(**kw):
 NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   n_wavelength = {sample}
   resample%n_particle_per_slice = 512

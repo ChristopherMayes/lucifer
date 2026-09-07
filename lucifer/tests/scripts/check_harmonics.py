@@ -144,6 +144,7 @@ use, SEGP
 NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   transport_model = "genesis"
   beam_file = "{beam}"
   field_file = "{field}"
@@ -157,6 +158,7 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   transport_model = "genesis"
   lambda0 = 1e-10
   beam_init%n_particle = 2048

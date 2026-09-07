@@ -109,6 +109,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_params
   lat_file = "aramis.bmad"
   global%out_root = "sat-avg"
+  global%source_filter = F   ! Compared against Genesis4, which has no such filter.
   global%interlude_model = "bmad"
   global%write_diag = T
 /
@@ -128,6 +129,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_params
   lat_file = "sat_unavg.bmad"
   global%out_root = "sat-unavg"
+  global%source_filter = F   ! Compared against Genesis4, which has no such filter.
   global%interlude_model = "bmad"
   global%write_diag = T
 /

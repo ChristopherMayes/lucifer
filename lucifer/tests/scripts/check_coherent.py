@@ -66,6 +66,7 @@ use, SEG
 NML = """&fel_params
   lat_file = "{lat}"
   global%out_root = "{root}"
+  global%source_filter = F
   global%interlude_model = "genesis"
   global%transport_model = "genesis"
   global%ran_seed = {seed}

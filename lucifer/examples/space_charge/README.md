@@ -59,8 +59,8 @@ to act on, by matching the `../steady_state` deck parameter for parameter and ad
 
 | run | exit power | exit bunching |
 |---|---|---|
-| `../steady_state` (no space charge) | 761.5 MW | 0.1854 |
-| `lucifer_short_range.in` | 767.2 MW | 0.1868 |
+| `../steady_state` (no space charge) | 792.7 MW | 0.2432 |
+| `lucifer_short_range.in` | 805.8 MW | 0.2430 |
 
 That is +0.75% in exit power, past saturation, from the short-range term acting on a
 beam the FEL has bunched.
@@ -76,7 +76,7 @@ that is how a lattice is run without space charge without editing it.
 false. The run says so and tracks the space-charge-free path, measured as exactly
 the control run's zero.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.84 times the power inside it on the short-range deck, so 46 percent of its 767.2 MW is that emission, and the same fraction of the 761.5 MW it is compared against. The long-range decks start dark and their femtowatt fields are that emission almost entirely, which is why the comparison there is made on the beam.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.25 percent of the power inside it on the short-range deck, so its 805.8 MW is the mode, as is the 792.7 MW it is compared against. With the filter off both reported 46 percent of their power as that emission. The long-range decks start dark, and what the filter leaves of their femtowatt fields is 1.6 percent outside the mode, which is why the comparison there is made on the beam.
 
 Runs in ~7 s each.
 

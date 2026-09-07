@@ -58,6 +58,7 @@ SPACING = 3 * LAMBDA0
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 1024
   beam_init%bunch_charge = 4.803322970853e-14
@@ -124,6 +125,7 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
 KEEP_NML = """&fel_params
   lat_file = "{lat}"
   global%out_root = "{root}"
+  global%source_filter = F
   global%ran_seed = {seed}
   global%load_only = T
   slicing%n_wavelength = 3
@@ -218,6 +220,7 @@ def other_loads(exe, lat, workdir, seeds):
 
 SPLIT_NML = """  lat_file = "{lat}"
   out_root = "sn_split"
+  source_filter = F
   dump_field_at = "END"
   ran_seed = 4321
   lambda0 = 1e-10

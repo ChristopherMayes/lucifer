@@ -1,6 +1,7 @@
 &fel_params
   lat_file = "sat_unavg.bmad"
   global%out_root = "sat-unavg"
+  global%source_filter = F   ! Compared against Genesis4, which has no such filter.
   global%interlude_model = "bmad"
   global%write_diag = T
 /

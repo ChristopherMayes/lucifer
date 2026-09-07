@@ -66,6 +66,7 @@ SPACING = SAMPLE * LAMBDA0
 BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis.bmad"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 1024
   beam_init%bunch_charge = 4.803322970853e-14

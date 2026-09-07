@@ -1,6 +1,7 @@
 &fel_params
   lat_file = "mixed.bmad"
   global%out_root = "mixed_line"
+  global%source_filter = F   ! The averaged and unaveraged twins compare like for like.
 /
 
 &fel_beam_init

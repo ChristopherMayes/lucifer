@@ -47,7 +47,7 @@ The slice energy spread. The papers give no value at the undulator, and two numb
 
 ## What the run measures
 
-Four seeds at the settings below. The spread is the SASE fluctuation of a 300-slice window.
+Four seeds at the settings below, measured with the source filter off, before it became the default. The spread is the SASE fluctuation of a 300-slice window. What the filter changes is measured below.
 
 | quantity | this deck | published | source |
 |---|---|---|---|
@@ -78,9 +78,21 @@ Every value is measured on this machine.
 | `ds_step` (lattice) | 0.09 m | three periods, 38 steps per segment. One period gives the same gain length to two decimals and 4 percent more exit power, inside the seed spread, at 2.3 times the wall clock |
 | `beam_init%n_particle` | 4096 | 1024 leaves 21 percent of the exit power outside the mode, 4096 leaves 5.4 percent. The convergence page asks for under 10 |
 | `beamlet_size` | 8, the default | |
-| `global%source_filter` | F, the default | on at its derived 4.5 µrad edge it removes 105 times the wide-angle power and moves the mode power 4 percent, since 4096 macroparticles has already converged |
+| `global%source_filter` | T, the default | at its derived 4.5 µrad edge it removes 105 times the wide-angle power and moves the mode power 4 percent, since 4096 macroparticles has already converged. The rows above were measured with it off |
 
-The run's own convergence report puts the power outside the split angle of 4.5 µrad at 0.057 times the power inside it, so 5 percent of the total field power is the wide-angle emission of the point beamlets and the rest is the mode.
+The run's own convergence report puts the power outside the split angle of 4.5 µrad at 0.0003 times the power inside it, so the total field power is the mode. With the filter off the same deck reported 5 percent of its total outside the mode.
+
+The four seeds were rerun with the filter on and analysed the same way as without it, so the two columns differ only in the filter. The saturation point, the peak bunching, the pulse energy and the energy loss move by 1 to 3 percent, which is the table above standing. The fitted gain length moves by 12 percent, which it does not.
+
+| quantity, one analysis over the same four seeds | filter off | filter on |
+|---|---|---|
+| exit pulse energy | 260.0 +- 3.6 µJ | 257.0 +- 5.5 µJ |
+| saturation, where the mean bunching peaks | 64.9 +- 0.7 m | 65.9 +- 0.8 m |
+| peak mean bunching | 0.387 +- 0.007 | 0.397 +- 0.007 |
+| mean energy loss at the exit | 9.81 +- 0.09 MeV | 9.57 +- 0.13 MeV |
+| power gain length fitted over the exponential decade | 4.72 +- 0.05 m | 4.14 +- 0.05 m |
+
+The gain length is the one number the artifact biases, and it biases it upward. The wide-angle emission is large at startup and grows more slowly than the mode, so it flattens the early part of the power curve and a fit over the exponential decade reads a longer gain length than the mode has. Removing it shortens the fitted value by 12 percent, six times the fluctuation. The absolute values in this table are from a fit over the window's total power and are not the fit that produced the 3.81 m in the table above, so they compare with each other and not with it.
 
 The lattice carries the optics, so the beam is generated matched to the periodic solution in the `beginning` statement, which the run holds between 26.1 and 34.3 m over the line. There is no `gamma0` and no match transform.
 

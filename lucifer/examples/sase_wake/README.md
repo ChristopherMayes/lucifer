@@ -21,7 +21,7 @@ Measured on this input: the run writes the per-slice energy-loss rate to
 least because the wake is causal and the head has little charge ahead of it. The mean
 energy drops 8.29 m_e c^2, about 4.24 MeV, over the 57 m line, and the per-slice drop
 runs from 0.25 to 13.56 m_e c^2 across the window. That is clearly visible in the
-energy panel against the 1 m_e c^2 initial spread. The SASE still reaches 2.94 GW,
+energy panel against the 1 m_e c^2 initial spread. The SASE still reaches 26.7 MW,
 against 3.02 GW for the same run with no wake. Both powers are those of this input's grid
 and particle count. The power of an unseeded run depends on both
 ([SASE convergence](../../doc/startup-noise.md)).
@@ -30,7 +30,7 @@ The same resistive-wall kernel applied through Bmad's own wake machinery instead
 the transcribed model is `../bmad_wake`, which carries both runs and their agreement.
 What a loss this size does to the ponderomotive phases is `../migration`.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 69 times the power inside it, so 99 percent of the 2.94 GW above is that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.9 percent of the power inside it, so the 26.7 MW above is the mode. With the filter off the same deck reported 2.94 GW, of which 99 percent was that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
 
 Runs in ~25 s.
 

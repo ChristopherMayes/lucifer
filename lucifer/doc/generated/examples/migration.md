@@ -35,12 +35,18 @@ Measured on this input:
 | particles moved between slices | 148,777 over 48 element ends |
 | charge dropped off the window ends | 4.23e-15 C, 1.47% of the 2.88e-13 C beam |
 | worst bunching deviation | 7.61e-16 |
-| exit power, `migrate = T` | 3.13 GW, exit bunching 0.051 |
-| exit power, `migrate = F` | 1.81 GW, exit bunching 0.035 |
+| exit power, `migrate = T` | 86.3 MW, exit bunching 0.036 |
+| exit power, `migrate = F` | 123.4 MW, exit bunching 0.028 |
 
 The exit powers are those of this input's grid and particle count. The power of an
-unseeded run depends on both ([SASE convergence](../../startup-noise.md)). The ratio
-between the two rows is the measurement here.
+unseeded run depends on both ([SASE convergence](../../startup-noise.md)). Each of
+those two rows is also one SASE realization on a 96-slice window, and over four seeds the
+ratio between them runs from 0.30 to 1.54, so the exit power of a single pair does not
+measure what migration is worth. The exit bunching over those same four seeds is 0.035
++- 0.006 with migration on and 0.025 +- 0.003 with it off, and it is the higher of the two
+in every seed, by a factor of 1.41 +- 0.30. The bunching is a mean over 96 slices where
+the exit power follows the largest spike, which is why one of the two separates the runs
+and the other is swamped.
 
 `migration.migration.txt` carries one row per event with the s position, the count,
 the charge dropped and the phasor deviation, and the totals at the end. The rows are
@@ -56,10 +62,10 @@ near 0.05. That is a small-population artifact rather than physics: a slice with
 fifteenth of its charge left has a noisy bunching estimate, and `n_eff` in the diag
 columns is what says so.
 
-The last two table rows are the reason this is not a bookkeeping detail. With migration
+The bunching is the reason this is not a bookkeeping detail. With migration
 off, a particle whose phase has left its slice keeps radiating into the field of the
 slice it started in, and the bunching each slice sees is smeared by contributions that
-belong elsewhere. On this configuration that costs a factor of 1.73 in exit power. The
+belong elsewhere. On this configuration that costs a factor of 1.41 in exit bunching. The
 default is off because Genesis 1.3 Version 4 (Genesis4) does not migrate without
 one4one, so the comparison tiers would be measuring a model difference rather than a
 transcription ([validation](../../validation.md), the slice-migration section).
@@ -70,7 +76,7 @@ and the 7.61e-16 above is that residual. Migration under weights is this port's
 generalization of a Genesis4 method that requires one4one, and the check is what earns
 the generalization.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 8.7 times the power inside it with migration on and 8.8 times with it off, so 90 percent of both exit powers is that emission. The factor of 1.73 between them is 1.75 in the power inside the mode, so what migration is worth here survives the split.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 1.3 percent of the power inside it with migration on and 1.0 percent with it off, so both exit powers are the mode. With the filter off the same decks reported 3.13 and 1.81 GW, and 90 percent of each of those was that emission.
 
 Runs in ~15 s each.
 

@@ -47,6 +47,7 @@ C_LIGHT = 2.99792458e8
 BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = {npart}
   beam_init%bunch_charge = {q}

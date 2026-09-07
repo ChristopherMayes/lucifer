@@ -54,6 +54,7 @@ do ipass = 1, 2
   run%global%out_root = out_root(ipass)
   run%global%interlude_model = 'genesis'
   run%global%transport_model = 'genesis'   ! Matches the namelist twin this is compared against.
+  run%global%source_filter = .false.       ! Likewise: both sides state it, neither takes the default.
   run%global%write_diag = .true.
   run%global%ran_seed = 777
 

@@ -190,7 +190,8 @@ def incone(exe, wd):
   quiet_start = T
   shot_noise = T
 """
-    pextra = (f'  global%track_end = "UND##1"\n  global%source_filter_angle = {INCONE_CUT:.1e}\n'
+    pextra = (f'  global%track_end = "UND##1"\n  global%source_filter = F\n'
+              f'  global%source_filter_angle = {INCONE_CUT:.1e}\n'
               f'  slicing%window_length = {WINDOW:.6e}\n')
     rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=255,
                   sample=INCONE_SAMPLE)

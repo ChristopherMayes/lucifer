@@ -20,7 +20,8 @@ calling the same lattice and overriding that one attribute.
 Measured on this input: the two gain curves agree to 7.6e-4 in ln P at the segment
 exit, 4.421 kW against 4.418 kW. That is two independent formulations of the same
 physics, sharing no approximation, and the agreement is what pins the averaged mode's
-coupling factor. The harness measures the factor itself to about 6e-4 with dedicated
+coupling factor. `lucifer_averaged.in` states `global%source_filter = F`, since the
+unaveraged mode builds no source to filter and the two must compare like for like. The harness measures the factor itself to about 6e-4 with dedicated
 probes ([validation](../../doc/validation.md)).
 
 The run also writes `unaveraged.ledger.txt`: beam energy relative to the reference and

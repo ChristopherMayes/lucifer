@@ -280,9 +280,13 @@ if (cvg%ok) then
           'The power outside the split angle reaches \f0.2\ times the power inside it.', &
           'That part of the total is the wide-angle emission of the point beamlets, which', &
           'no physical beam radiates, so a total power quoted from this run is mostly', &
-          'representation. Possible solutions: more macroparticles per slice at the same', &
-          'beamlet_size, or global%source_filter = T. The criterion and the measured levels', &
-          'are in doc/startup-noise.md.', r_array = [worst])
+          'representation. Possible solution: more macroparticles per slice at the same', &
+          'beamlet_size. The criterion and the measured levels are in doc/startup-noise.md.', &
+          r_array = [worst])
+    if (.not. run%global%source_filter) then
+      call out_io (s_warn$, r_name, 'This run has global%source_filter = F. The filter is on by ' // &
+            'default and removes that emission at a converged load.')
+    endif
   else if (worst < 0.01_rp) then
     call out_io (s_info$, r_name, 'The power outside the split angle stays under \f0.4\ ' // &
           'times the power inside it.', &

@@ -44,7 +44,7 @@ The slice energy spread. The papers give a bound on the beam and no slice value.
 
 ## What the run measures
 
-Four seeds at the settings below. The spread is the SASE fluctuation of a 351-slice window.
+Four seeds at the settings below, measured with the source filter off, before it became the default. The spread is the SASE fluctuation of a 351-slice window. Those four seeds were run again with the filter on, as the deck now runs, and one analysis was applied to both sets: the exit pulse energy is 50.8 +- 6.8 µJ with the filter off against 50.8 +- 6.7 µJ with it on, the peak bunching 0.241 +- 0.006 against 0.247 +- 0.019, and the field gain length 2.11 +- 0.11 m against 2.01 +- 0.14 m. Those six numbers are one fit over both sets and are not the fit the rows below were recorded with, so they compare with each other and not with the table. The table stands. The fitted gain length is 5 percent shorter with the filter on. The wide-angle emission raises the startup level the fit begins from, so a curve carrying it climbs more slowly through the fit window and reads longer.
 
 | quantity | this deck | published | source |
 |---|---|---|---|
@@ -70,20 +70,20 @@ Every value is measured on this machine. The Aramis column is what the other exa
 | `ds_step` | 0.045 m | 0.0819 m | three periods, 55 steps per segment. One period gives 48.8 µJ against 46.3, inside the seed spread, at 2.7 times the wall clock |
 | `slicing%n_wavelength` | 3 | 12 | 3.4 slices per cooperation length of 40 wavelengths. Six wavelengths per slice give 48.5 µJ against 46.3, inside the seed spread, at twice the wall clock |
 | `slicing%n_slice` | 96 | 351 | the bunch to four sigma either side, plus 990 wavelengths of slippage at each end |
-| `beam_init%n_particle` | 2048 | 4096 | 1024 leaves 25 percent of the exit power outside the mode, 4096 leaves 7 percent, 16384 leaves 2 percent. The convergence page asks for under 10 |
+| `beam_init%n_particle` | 2048 | 4096 | measured with the filter off, 1024 leaves 25 percent of the exit power outside the mode, 4096 leaves 7 percent and 16384 leaves 2 percent, against the convergence page's 10. The filter row below is what the load now rests on |
 | `beamlet_size` | 8 | 8 | at 4096 particles, 4 leaves 3 percent outside the mode and 16 leaves 11. Eight resolves three harmonics where four resolves one |
-| `global%source_filter` | F | F | on at its derived 81 µrad edge it removes 162 times the wide-angle power and moves the pulse energy 0.8 percent, since 4096 particles has already converged. At 1024 particles it removes 219 times and reaches the same answer at two thirds of the wall clock |
+| `global%source_filter` | T | T | the default, at a derived edge of 81 µrad. It removes 162 times the wide-angle power here and moves the pulse energy 0.8 percent, since 4096 particles has already converged. At 1024 particles it removes 219 times and reaches the same answer at two thirds of the wall clock |
 | `resample%slice_width` | 0.01 | not read | the deck describes its bunch and the loader evaluates it per slice, so nothing is resampled |
 
-Two of these do not carry over from Aramis. The convergence page estimates the wide-angle share in advance as 100/N_b times (1.57 µm/dx) squared, which gives 0.2 percent here where the measurement gives 7.9. The prefactor is the first machine's, as the page says, and it is 40 times low on this one, over cell sizes of 7.8 to 31 µm. The other is the cell size. The criterion sigma_x/7 holds, and it lands on 129 points at a 1 mm half width rather than 255 at 0.2 mm, so a deck copied from `../sase` would have run a grid 16 times too fine and reported a power that is mostly artifact.
+Two of these do not carry over from Aramis. The convergence page estimates the wide-angle share in advance as 100/N_b times (1.57 µm/dx) squared, which gives 0.2 percent here where the measurement with the filter off gives 7.9. The prefactor is the first machine's, as the page says, and it is 40 times low on this one, over cell sizes of 7.8 to 31 µm. The other is the cell size. The criterion sigma_x/7 holds, and it lands on 129 points at a 1 mm half width rather than 255 at 0.2 mm, so a deck copied from `../sase` would have run a grid 16 times too fine and reported a power that is mostly artifact.
 
 ## The beam and the window
 
 The lattice carries the optics, so the bunch is generated matched to the periodic solution in the `beginning` statement, and there is no `gamma0` and no match transform. The current is derived from `bunch_charge` and `sig_z` and is never given. The window covers the bunch to four sigma either side with 990 wavelengths of slippage headroom at each end, because radiation made at the head of the bunch slips out of a shorter window before the exit. About a quarter of the slices therefore carry no charge, which is the price of holding the whole pulse.
 
-Measured on this input at the `ran_seed` default of 12345: the exit power is 84.5 GW summed over the window and the pulse energy is 46.3 µJ. The run's own convergence report puts the power outside the split angle of 81 µrad at 0.078 times the power inside it, so 7 percent of that total is the wide-angle emission of the point beamlets and the rest is the mode.
+Measured on this input at the `ran_seed` default of 12345: the exit power is 85.2 GW summed over the window and the pulse energy is 46.7 µJ. The run's own convergence report puts the power outside the split angle of 81 µrad at 0.0004 times the power inside it, so the total is the mode. With the filter off the same deck gave 84.5 GW and 46.3 µJ with 7 percent of the total outside the mode: at 4096 macroparticles per slice the filter removes an artifact that was already small here, and the settings table above was measured without it.
 
-Leaving `grid_n_pts` and `grid_half_width` out of the deck derives 127 points over a 962 µm half width, cells of 15.27 µm against the 15.63 µm here. That run gives 46.33 µJ against 46.35 and a ratio of 0.080 against 0.078, so the stated grid is the derived one.
+Leaving `grid_n_pts` and `grid_half_width` out of the deck derives 127 points over a 962 µm half width, cells of 15.27 µm against the 15.63 µm here. That run gives 46.74 µJ against 46.72 and a ratio of 0.0003 against 0.0004, so the stated grid is the derived one.
 
 Runs in ~20 s.
 

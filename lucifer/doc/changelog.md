@@ -9,6 +9,35 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Changed: global%source_filter is on by default. The filter is measured on four machines, two
+  of them real, over angle ratios of 1.14 to 1.86, and at a converged load it removes about a hundred
+  times the wide-angle power while moving the mode power a few percent and the saturation point not at
+  all. On the Aramis benchmark at the derived grid, 1024 macroparticles per slice with the filter and
+  8192 in beamlets of four without it are both converged, at 7 and 12 s, and the filter's own cost is 8
+  percent of wall clock there and 14 at the fine grid. fel-physics.md gains sec-convergence, one section
+  carrying the whole story, and every other mention points to it. The filter reaches the elements that
+  build a source to filter: an unaveraged element is left alone and the coherent source turns it off
+  for the run, each with a line at setup, where both were refused before, since a deck that asks for
+  the unaveraged mode has not asked for the filter. Nothing recorded moves: the tier template and every
+  deck a check writes state the filter, off where a level was recorded without it and on where the
+  filter is what is tested, 25 templates in 16 scripts, and the library twin states it in Fortran as
+  it states the transport. Three of those were silent off cases that the new default would have turned
+  on, in the device check, the load check and the startup-noise instrument, and each would have passed
+  while measuring something else. The examples take the default and their exit lines move where the
+  filter reaches. The unseeded SASE decks fall by up to a factor of ninety, sase from 3.02 GW to 33.6 MW
+  and import from 3.5 MW to 42 kW, since at 128 beamlets on a 96-slice window almost all of the
+  reported power was the artifact, and their READMEs say so. The seeded and steady-state decks move by
+  one to five percent. The two real machines move inside their seed spread, FLASH1 from 46.35 to 46.72
+  uJ and LCLS from 255.3 to 252.8 uJ, and their four-seed tables stand as measured. Three decks state
+  the filter off because they compare against Genesis4, which carries none, and three because they
+  compare the two FEL methods like for like. The coherent-source example's trap shrinks with the
+  filter on, a low load costing 39 percent rather than a factor of 7.6. The migration example measures
+  its comparison over four seeds instead of one: the exit power ratio between migration on and off runs
+  from 0.30 to 1.54 and settles nothing, while the exit bunching is higher with migration in all four
+  seeds, by a factor of 1.41 +- 0.30. The source-filter section gains a check on where the filter
+  reaches, run rather than read off the line the run prints, and it found a coherent-source run arming
+  the per-element filter with no edge set and moving its exit power by 3.3e-9 (FINDINGS 7.60).
+
 - 2026-09-07 Fixed: the FP32 lockstep instrument allocated its field record on first use inside the
   per-slice loop, which carries an OpenMP parallel do, so two threads could pass the allocation test
   together and both allocate the same array. A bounds-checked build stops there, on about one run in

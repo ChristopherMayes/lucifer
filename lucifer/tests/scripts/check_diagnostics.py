@@ -44,6 +44,7 @@ FAILED = False
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 512
   beam_init%bunch_charge = 8.0e-15

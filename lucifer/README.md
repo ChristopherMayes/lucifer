@@ -16,6 +16,7 @@ FEL segments are real Bmad wiggler elements tracked by a Bmad FEL method, so a L
 | [`doc/fel-physics.md`](doc/fel-physics.md) | What does it compute, and why is that right? |
 | [`doc/BMAD-STATS-SPEC.md`](doc/BMAD-STATS-SPEC.md) | The statistics file format, normatively, with [`doc/BMAD-STATS-EXT-FEL.md`](doc/BMAD-STATS-EXT-FEL.md) |
 | [`examples/`](examples) | Runnable cases, each a directory of real input files with its own README |
+| [`doc/startup-noise.md`](doc/startup-noise.md) | How much of an unseeded run's power is the FEL, measured on four machines |
 | [`doc/changelog.md`](doc/changelog.md) | What changed on this branch, newest first |
 
 The documents render as one site. With `mystmd` available, `myst build --html` in
@@ -59,7 +60,7 @@ See [`doc/user-guide.md`](doc/user-guide.md) for the input file's three namelist
 
 ## Where it stands
 
-Validated against Genesis4 on eleven tiers plus nineteen check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
+Validated against Genesis4 on eleven tiers plus twenty-eight check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
 Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`doc/validation.md`](doc/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 

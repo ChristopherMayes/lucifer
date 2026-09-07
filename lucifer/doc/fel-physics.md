@@ -483,6 +483,78 @@ converts to Eq. [](#eq-source) by [](#sec-units).
 :::
 Measured levels and how they are checked: [](validation.md#val-validation-from-one-command).
 
+(sec-convergence)=
+## Convergence of an unseeded run
+
+An unseeded run starts the field at zero and lets the beam's shot noise seed it, and the
+power it reports depends on two numbers with no physical counterpart: the transverse cell
+size and the macroparticles per slice. This section is the whole of it. The mechanism and
+its scaling are [](startup-noise.md), the equations of the filter that answers it are
+[](#sec-source-filter), and what follows is what a user has to decide.
+
+**What the artifact is.** Each beamlet is one transverse point on the deposition grid and
+the source has no angular dependence, so a beamlet radiates into every angle the grid
+carries. A real undulator radiates the resonant wavelength only within its central cone.
+The difference is the coherent emission of each beamlet with itself, it goes as one over
+the beamlet count, it grows as the cells shrink, and at grids and loads in common use it
+is most of the power an unseeded run reports. The power inside the mode carries none of
+that dependence.
+
+**What the filter does and what it costs.** It multiplies the transformed source by a
+sigmoid beyond a derived edge, so the beam adds nothing at angles the undulator does not
+radiate into, while the field already present propagates untouched. Measured on four
+machines, two of them real, at a converged load it removes about a hundred times the
+wide-angle power while moving the mode power a few percent and the saturation point not at
+all. What it removes with the artifact is the rim of the physical cone, 14 percent of the
+in-cone startup power where the derived edge sits well inside the cone and 28 to 30 percent
+where the edge and the cone nearly coincide. Saturation absorbed that on every machine
+measured. In wall clock it costs 8 to 14 percent, the source gaining a transform pair.
+
+**Why it is on.** Because what it removes is emission no physical beam produces, and
+because it is the cheaper route to a converged answer. The four configurations below were
+measured on one machine at its derived grid, one seed each.
+
+```{table} Four configurations on the Aramis benchmark at the derived grid of 3.15 um cells, a 300-slice window, one seed. The wide-angle columns are the power outside the mode over the power inside it, at the mode's saturation and at the exit.
+:name: tab-convergence
+
+| macroparticles | beamlet size | beamlets | filter | wall clock | mode power at exit | wide/mode at saturation | wide/mode at exit | saturation |
+|---|---|---|---|---|---|---|---|---|
+| 1024 | 8 | 128 | on | 7 s | 1.64 GW | 0.000 | 0.001 | 32.9 m |
+| 4096 | 8 | 512 | off | 9 s | 0.52 GW | 0.062 | 0.641 | 32.9 m |
+| 8192 | 4 | 2048 | off | 12 s | 1.67 GW | 0.020 | 0.069 | 32.9 m |
+| 8192 | 4 | 2048 | on | 13 s | 1.73 GW | 0.000 | 0.000 | 32.9 m |
+```
+
+The first and the third are both converged and the first costs 60 percent of the third.
+The third is the reference code's own default load, which reaches convergence without any
+filter, and the fourth shows the filter changing that answer by 4 percent, inside the
+fluctuation of the process. The second is the configuration to avoid: 512 beamlets without
+the filter leaves two thirds of the exit power outside the mode.
+
+**When to turn it off.** One case: a comparison against a code that carries no such
+filter, or against a level recorded without one. That is what the comparison tiers do, and
+their decks say so. A run with the filter off is otherwise identical arithmetic, so the
+recorded levels are unmoved.
+
+**The load, once the filter is on.** At or above 1024 macroparticles per slice in beamlets
+of eight, which is 128 beamlets, the total power is converged by the criterion: the run's
+own report reads under a hundredth. Below about 128 beamlets the power inside the mode
+rises in the exponential regime by about a factor of two, which is each beamlet's field
+acting back on itself, and the filter is not measured to remove it. With the filter off
+there is no formula that carries between machines, since the estimate fitted on the first
+machine was 40 times low on the third, so the test is to double the macroparticles at the
+same beamlet size and see whether the mode power moves, or to read the run's report.
+
+**Why the filter is not applied per slice.** An imported beam can carry very different
+particle counts from slice to slice, and the artifact is largest where the count is
+smallest, so filtering only the thin slices is a natural thought. It is refused. The
+filter is physics that holds for every slice, and its cost on a well-populated slice has
+no measured consequence, so there is nothing to save. Slippage carries the field from
+slice to slice, so unfiltered light from the core would pass through every filtered tail
+slice regardless. And an irregular load is what the resampler exists for: sample mode
+redraws every slice at one beamlet count from the imported distribution, which gives every
+slice the same statistics and leaves the filter one job.
+
 (sec-source-filter)=
 ## The source filter
 
@@ -493,7 +565,7 @@ resonant wavelength only within the central cone of half angle
 $\theta_{con} = \sqrt{1+K^2}/(\gamma\sqrt{N_w})$, and emission at larger angles is
 red-shifted out of the bandwidth. The difference is an artifact of the representation, and
 at grids and macroparticle counts in common use it is most of the power an unseeded run
-reports ([](startup-noise.md)).
+reports. What that means for a deck is [](#sec-convergence); the equations are here.
 
 The source filter suppresses it. With `global%source_filter` on, the source of Eq.
 [](#eq-source) gets a forward transform of its own and is multiplied there by a sigmoid in
@@ -525,8 +597,10 @@ the larger of four diffraction angles of the fundamental mode, with $\sigma$ the
 transverse size of the loaded beam, and the angle at which the resonant wavelength
 red-shifts by $\rho$. Inside the first lies the radiation that can couple to the mode.
 Outside the second, emission is beyond the bandwidth of the interaction. Their ratio goes
-as $\sqrt{z_R/L_g}$, which is 15 on the Aramis benchmark and near unity on a
-diffraction-dominated machine, so neither serves alone. The larger is taken because
+as $1/\sqrt{z_R/L_g}$ with a coefficient of 6.8 measured to 5 percent over four machines,
+so the mode angle is the larger below $z_R/L_g \approx 46$ and the $\rho$ angle above it.
+None of the four machines reaches that, and the measured ratios run from 1.14 to 1.86, so
+neither angle serves alone and the larger is taken. The larger is taken because
 cutting into the mode loses real radiation while leaving artifact in only weakens the
 filter. $\rho$ is the one-dimensional Pierce parameter in Genesis's form, from the
 undulator's coupling and the peak current of the loaded beam. Both angles, their ratio
@@ -539,13 +613,20 @@ $$ (eq-filtered-add)
 
 The field itself is never multiplied by $\sigma$. Only what the beam adds is filtered, so
 a seed, an imported field and everything already radiated propagate exactly as they do with
-the filter off. The switch is off by default, and a run with it off takes the arithmetic of
-Eq. [](#eq-k2) unchanged, which is why every recorded digit is unmoved.
+the filter off. The switch is on by default ([](#sec-convergence)), and a run with it off
+takes the arithmetic of Eq. [](#eq-k2) unchanged, which is why a level recorded without it
+is unmoved by a deck that says so.
 
 The unaveraged mode ([](#sec-unaveraged)) deposits from the resolved motion and builds no
 transformed source, and the coherent source ([](#sec-coherent-source)) has already replaced
-the per-particle deposit by an analytic Gaussian that carries no wide-angle content. Both
-combinations are refused rather than filtered. A non-positive cut or width is refused too:
+the per-particle deposit by an analytic Gaussian that carries no wide-angle content. Neither
+is refused, since the filter is the default and a deck that never asked for it must still
+run. The filter is a property of each element, so it reaches the averaged elements and
+leaves the unaveraged ones, and a mixed line filters the averaged part of itself. The
+coherent source turns the filter off for the whole run. Both cases say so at setup, and the
+harness measures them rather than reading those lines: an unaveraged line and a coherent
+source give the same exit power with the switch either way, and a mixed line of two averaged
+segments around one unaveraged segment moves by 1.2e-3. A non-positive cut or width is refused:
 Genesis4 turns its own filter off there, and a run that asked for the filter and silently
 did not get it is worse than one that stops. So is a width that leaves the sigmoid below
 0.99 on axis, since such a filter attenuates the coherent source as much as the wide

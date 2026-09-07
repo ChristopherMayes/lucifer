@@ -49,7 +49,7 @@ inside the unaveraged segment, and a wake on that segment must be refused
 ([validation](../../doc/validation.md)). This directory is the runnable version of that
 check.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 3.0 times the power inside it in both runs, so three quarters of each exit power is that emission. The difference between the two runs is 3.6e-2 in ln P inside the mode against 7.4e-3 in the total, so the price the mixed line pays is five times larger in the mode than in the number the table quotes.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 3.0 times the power inside it in both runs, so three quarters of each exit power is that emission. The difference between the two runs is 3.6e-2 in ln P inside the mode against 7.4e-3 in the total, so the price the mixed line pays is five times larger in the mode than in the number the table quotes. Both decks state `global%source_filter = F`, so the two FEL methods compare like for like: the filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
 
 Runs in ~7 s, and the averaged twin in ~1 s.
 

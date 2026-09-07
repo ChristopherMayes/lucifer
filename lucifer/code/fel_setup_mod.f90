@@ -247,22 +247,32 @@ end select
 ! The source filter (fel-physics.md sec-source-filter), validated and stamped onto every
 ! FEL element the same way. It multiplies the transformed source, which the unaveraged
 ! mode does not build (it deposits from the resolved motion) and which the coherent source
-! has already replaced by an analytic Gaussian carrying no wide-angle content. Both are
-! refused rather than filtered. Genesis turns its own filter off for a non-positive cut or
-! width, since those are divisors and a width of zero has no sigmoid
-! (initSourceFilter, FieldSolverFFT.cpp:158-170). A run that asked for the filter and
-! silently did not get it is worse than one that stops, so this refuses instead.
+! has already replaced by an analytic Gaussian carrying no wide-angle content. Neither is
+! refused. The filter reaches the elements that build a source to filter and does nothing
+! where there is none, as transport_model reaches the averaged elements only: it is on by
+! default, so a deck that asks for the unaveraged mode has not asked for the filter and
+! must not be stopped by it. A mixed line filters its averaged elements and leaves the
+! unaveraged one alone, which is what the per-element filter state already does. Both
+! cases say so at setup, since a switch that quietly does nothing is worth a line.
+! Genesis turns its own filter off for a non-positive cut or width, since those are
+! divisors and a width of zero has no sigmoid (initSourceFilter, FieldSolverFFT.cpp:158-170).
+! A run that asked for a filter it can have and silently did not get it is worse than one
+! that stops, so those still refuse.
+
+! The coherent source is turned off ahead of the block below rather than inside it. The
+! block arms the per-element filter state, and the edge is derived further down under the
+! same switch, so a run that fell through to the arming would filter with no edge set.
+
+if (run%global%source_filter .and. run%global%source_model == 'coherent') then
+  call out_io (s_info$, r_name, 'The source filter is off for this run: the coherent source is ' // &
+               'an analytic Gaussian and carries no wide-angle content to remove.')
+  run%global%source_filter = .false.
+endif
 
 if (run%global%source_filter) then
   if (any(fel_mode == unaveraged$ .and. is_fel)) then
-    call out_io (s_error$, r_name, 'SOURCE_FILTER WITH AN UNAVERAGED ELEMENT: THE UNAVERAGED', &
-                                   'MODE DEPOSITS FROM THE RESOLVED MOTION AND BUILDS NO FILTERED SOURCE.')
-    err_flag = .true.;  return
-  endif
-  if (run%global%source_model == 'coherent') then
-    call out_io (s_error$, r_name, 'SOURCE_FILTER WITH SOURCE_MODEL = "coherent": THE COHERENT', &
-                                   'SOURCE IS ALREADY AN ANALYTIC GAUSSIAN AND CARRIES NO WIDE-ANGLE CONTENT.')
-    err_flag = .true.;  return
+    call out_io (s_info$, r_name, 'The source filter reaches the averaged elements only. The ' // &
+                 'unaveraged mode deposits from the resolved motion and builds no source to filter.')
   endif
   if (run%global%source_filter_width <= 0) then
     call out_io (s_error$, r_name, 'SOURCE_FILTER_WIDTH MUST BE POSITIVE: \es12.3\ ', &
@@ -307,7 +317,7 @@ if (run%global%source_filter) then
     err_flag = .true.;  return
   endif
 
-  where (is_fel)
+  where (is_fel .and. fel_mode == averaged$)
     und_of%filter%on = .true.
     und_of%filter%width = run%global%source_filter_width
     und_of%filter%mutate = run%global%source_filter_mutate

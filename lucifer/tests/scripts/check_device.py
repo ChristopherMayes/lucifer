@@ -91,6 +91,7 @@ FAILED = False
 BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 1024
   beam_init%bunch_charge = 1.000692285594e-15
@@ -186,6 +187,7 @@ PLANAR_LAT = ch.BMAD_LAT
 HARM_BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 8192
   beam_init%bunch_charge = 1.000692285594e-15
@@ -376,7 +378,7 @@ def source_filter(args, wd, exe):
     # so there is nothing to remove and the check could not see a filter that did nothing.
     nslice = 8
     for root, filt, extra in (("dev_sf", "  source_filter = T\n", DEV),
-                              ("dev_sfoff", "", DEV),
+                              ("dev_sfoff", "  source_filter = F\n", DEV),
                               ("cpu_sf", "  source_filter = T\n", "")):
         text = BASE.format(root=root, extra=extra + TD_EXTRA + filt)
         run(args.exe, wd, f"{root}.in", text.replace("grid_n_pts = 64", "grid_n_pts = 256"))

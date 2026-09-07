@@ -74,6 +74,7 @@ fft_fieldsolver = true
 BMAD_NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 2048
   beam_init%bunch_charge = 9.606645941707e-14

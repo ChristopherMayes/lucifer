@@ -303,9 +303,12 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
     extra = ""
     if device != "off":
         extra += f'  global%device = "{device}"\n'
-    if xcut == "default":
+    if xcut is None:
+        extra += '  global%source_filter = F\n'      # Silence now means on, and this page's
+                                                      # unfiltered rows are the comparison.
+    elif xcut == "default":
         extra += '  global%source_filter = T\n'
-    elif xcut is not None:
+    else:
         extra += ('  global%source_filter = T\n'
                   f'  global%source_filter_xcut = {xcut:.9f}\n'
                   f'  global%source_filter_ycut = {xcut:.9f}\n'

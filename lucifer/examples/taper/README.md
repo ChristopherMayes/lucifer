@@ -21,15 +21,15 @@ Measured against `../steady_state` (same seed, same starting state):
 
 | line | P at 57 m | behavior |
 |---|---|---|
-| `../aramis.bmad` (untapered) | 761.5 MW | saturates at 1.62 GW at z = 37.24 m, then falls back |
-| `taper.bmad` (0.4% step at z = 38.0 m) | 9.64 GW | still climbing at the exit |
+| `../aramis.bmad` (untapered) | 792.7 MW | saturates at 1.56 GW at z = 37.2 m, then falls back |
+| `taper.bmad` (0.4% step at z = 38.0 m) | 8.85 GW | still climbing at the exit |
 
 The step is at z = 38.0 m, where the fourth FODO cell ends. The two gain curves are
 bit-identical until the first record inside the first `UND2`, at z = 38.045 m, which
 is the check that the two runs differ in the taper and in nothing else. The exit
 power is 12.66x the untapered exit and 5.95x the untapered saturation peak.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.10 times the power inside it on the tapered line, so 9 percent of the 9.64 GW is that emission and the taper's gain is the mode's.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.08 percent of the power inside it on the tapered line, so the 8.85 GW is the mode and the taper's gain is the mode's. With the filter off the same deck reported 9.64 GW, of which 9 percent was that emission.
 
 Runs in ~4 s.
 

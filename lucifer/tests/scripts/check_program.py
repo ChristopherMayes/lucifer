@@ -78,6 +78,7 @@ use, SEG
 NML_TWIN = """&fel_params
   lat_file = "smoke.bmad"
   global%out_root = "{root}"
+  global%source_filter = F
   global%interlude_model = "genesis"
   global%transport_model = "genesis"
   global%write_diag = T
@@ -103,6 +104,7 @@ NML_TWIN = """&fel_params
 OLD_STYLE = """&fel_track_params
   lat_file = "smoke.bmad"
   out_root = "old"
+  source_filter = F
   lambda0 = 1e-10
   wake_on = T
 /

@@ -116,6 +116,7 @@ UNAVG = "wiggler::*[FEL_METHOD] = unaveraged"
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
+  source_filter = F
   lambda0 = 1e-10
   interlude_model = '{imodel}'
   transport_model = '{transport}'
@@ -156,6 +157,7 @@ use, SEG
 NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
+  source_filter = F
   lambda0 = 1e-10
   interlude_model = 'bmad'
   transport_model = '{transport}'
@@ -276,6 +278,7 @@ fft_fieldsolver = true
 NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
+  source_filter = F
   beam_file = "PSP-initial.beam.h5"
   field_file = "PSP-initial.wf.h5"
   lambda0 = 1e-10

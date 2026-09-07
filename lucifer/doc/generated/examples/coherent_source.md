@@ -30,16 +30,11 @@ decades of gain, ../steady_state's configuration):
 
 | run | source, particles/slice | exit power | vs reference | wall (12 threads) |
 |---|---|---|---|---|
-| `lucifer_reference.in` | deposit, 8192 | 7.62e+08 W | -- | 4.3 s |
-| `lucifer_low_m.in` | deposit, 512 | 5.82e+09 W | 7.6x high (ln +2.03) | 2.0 s |
-| `lucifer.in` | coherent, 512 | 7.46e+08 W | ln 0.021 | 2.2 s |
+| `lucifer_reference.in` | deposit, 8192 | 7.93e+08 W | -- | 5 s |
+| `lucifer_low_m.in` | deposit, 512 | 1.11e+09 W | 1.39x high (ln +0.33) | 3 s |
+| `lucifer.in` | coherent, 512 | 7.46e+08 W | ln -0.061 | 3 s |
 
-The middle row is the trap this feature exists to remove: cutting particles
-without the coherent source multiplies the predicted power by 7.6 on
-this case. Nothing about the power curve says so, and the run's own convergence report
-is what does: the power outside the split angle is 8.5 times the power inside it at the
-exit on that row, against 0.83 on the reference row and 0.050 with the coherent source
-([SASE convergence](../../startup-noise.md)). The power the middle row adds is the
+The middle row is the trap this feature was built to remove, and the source filter, on by default, now removes most of it: cutting particles without the coherent source multiplies the predicted power by 1.39 on this case, where with the filter off it multiplied it by 7.6. The run's own convergence report puts the power outside the split angle at 1.9 percent of the power inside it on that row and 0.2 percent on the reference row. The coherent source builds no transformed source for the filter to act on, so the filter turns itself off for it and says so, and its own ratio at the exit is 5.0 percent ([the convergence section](../../fel-physics.md#sec-convergence)). The power the middle row adds is the
 wide-angle emission of 64 beamlets, which the coherent source does not have because it
 never puts a macroparticle on a grid point. The last row is the same
 particle count giving the converged answer. (Per-slice cost dominates real

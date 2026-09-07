@@ -67,6 +67,7 @@ LATTICE_TWISS = dict(betax=8.53711, alphax=-0.703306, betay=17.3899, alphay=1.40
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
+  source_filter = F
   lambda0 = {lambda0}
   n_wavelength = {sample}
   resample%n_particle_per_slice = 2048

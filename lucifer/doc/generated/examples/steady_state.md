@@ -27,8 +27,8 @@ encodes 3 kA exactly. The current is always derived this way, never entered
 Measured on this input: the quiet start is exact to an initial bunching of 4.0e-17,
 so the FEL grows from the seed rather than from sampling noise. The power gain
 length is 2.25 m, fitted to ln P over 4 to 30 m of lattice, which includes the
-gainless breaks between segments. Saturation reaches 1.62 GW at z = 37.24 m, and
-past saturation the power falls back to 761.5 MW at the exit as particles rotate in
+gainless breaks between segments. Saturation reaches 1.56 GW at z = 37.2 m, and
+past saturation the power falls back to 792.7 MW at the exit as particles rotate in
 the bucket. The beam sizes start on the lattice's matched values, since `init_beam_distribution`
 generates the bunch from the Twiss in the lattice's `beginning` statement.
 
@@ -39,7 +39,7 @@ another program or restarted from the middle, and a single slice keeps them unde
 1.5 MB here. The same two lines on a 96-slice run write 111 MB.
 
 Read [reading an output file](../../reading-output.md) for the stats file and the ten plot panels.
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.11 times the power inside it, and at the exit 0.83 times, so 45 percent of the 761.5 MW quoted above is that emission. The saturated 1.62 GW is 91 percent mode.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.08 percent of the power inside it, and at the exit 0.24 percent, so the 792.7 MW quoted above is the mode. With the filter off the same deck reported 761.5 MW at the exit and 1.62 GW at saturation, of which 45 and 9 percent were that emission.
 
 Runs in ~5 s.
 

@@ -372,6 +372,7 @@ make_nml () {
   global%out_root = "$3"
   global%interlude_model = "$4"
   global%transport_model = "genesis"
+  global%source_filter = F
   global%write_diag = T
   slicing%n_wavelength = $sample
 ${6:+  $6}

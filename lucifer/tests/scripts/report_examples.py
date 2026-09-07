@@ -54,10 +54,11 @@ def rewrite_links(text, names, where):
         t = m.group(1)
         if t.startswith(("http://", "https://", "#")):
             return m.group(0)
-        # A doc page, from a per-directory README (../../doc/x.md) or the index (../doc/x.md).
-        d = re.fullmatch(r"\.\./(?:\.\./)?doc/([A-Za-z0-9._-]+\.md)", t)
+        # A doc page, from a per-directory README (../../doc/x.md) or the index (../doc/x.md),
+        # with an optional section anchor on the end (../../doc/x.md#sec-y).
+        d = re.fullmatch(r"\.\./(?:\.\./)?doc/([A-Za-z0-9._-]+\.md)(#[A-Za-z0-9._-]+)?", t)
         if d:
-            return f"](../../{d.group(1)})"
+            return f"](../../{d.group(1)}{d.group(2) or ''})"
         # A sibling example, which the index names as a directory.
         s = re.fullmatch(r"([A-Za-z0-9_]+)/", t)
         if s and s.group(1) in names:

@@ -51,6 +51,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_params
   lat_file = "harmonics.bmad"
   global%out_root = "harmonics"
+  global%source_filter = F   ! Compared against Genesis4, which has no such filter.
   global%ran_seed = 12345
 /
 

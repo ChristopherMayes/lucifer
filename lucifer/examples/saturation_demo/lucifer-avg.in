@@ -1,6 +1,7 @@
 &fel_params
   lat_file = "aramis.bmad"
   global%out_root = "sat-avg"
+  global%source_filter = F   ! Compared against Genesis4, which has no such filter.
   global%interlude_model = "bmad"
   global%write_diag = T
 /

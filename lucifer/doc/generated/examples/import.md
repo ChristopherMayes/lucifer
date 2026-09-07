@@ -49,8 +49,8 @@ the particles that fell into each slice's sampling window by Genesis4's
 34 slices come out, since both modes bin the same bunch on the same spacing. `write_genesis_dist`
 is the third direction, handing the identical bunch to Genesis4's `&importdistribution`.
 
-Measured on these inputs: the keep mode exits at 3.5 MW after 57 m in 43 s, and the
-sample mode at 11.2 MW in 9 s. Both are a startup from a real bunch rather than a
+Measured on these inputs: the keep mode exits at 42.2 kW after 57 m in 45 s, and the
+sample mode at 84.3 kW in 12 s. Both are a startup from a real bunch rather than a
 saturated FEL, and the two are different SASE realizations of the same physics: the keep
 mode draws no random number before the noise and the sample mode draws for every
 resampled particle, so the noise falls on different phasors. `../sase` describes the same
@@ -58,7 +58,7 @@ sensitivity: in a dark start, a small change re-rolls the realization. The keep 
 costs what its 400000 macroparticles cost. A production run with a bunch from an
 accelerator simulation would keep fewer copies or sample.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 75 times the power inside it in the keep mode and 86 times in the sample mode, so the two exit powers above are almost entirely that emission. Both modes load the same bunch on the same grid, so the comparison between them is unaffected.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 3 percent of the power inside it in both modes. With the filter off the same decks reported 3.5 and 11.2 MW, of which 99 percent was that emission, which is why the exit powers here are eighty times lower and are the mode. Both modes load the same bunch on the same grid, so the comparison between them is unaffected.
 
 ## The input files
 

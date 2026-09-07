@@ -106,13 +106,15 @@ type fel_global_struct
   ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
   ! physical shot noise, and the transverse shape is a guarded Gaussian.
   character(16) :: source_model = 'deposit'
-  ! The angular filter on the source term (fel-physics.md sec-source-filter), transcribed
-  ! from Genesis4's source_filter, which release 4.6.12 added with its FFT solver. Off by
-  ! default, and a run with it off is bit-for-bit the run without it. On, the transformed
-  ! source is multiplied by a sigmoid in normalized transverse spatial frequency before it
-  ! reaches the field, so the wide-angle emission of the point-like beamlets is suppressed
-  ! while the field itself propagates untouched (doc/startup-noise.md).
-  logical :: source_filter = .false.
+  ! The angular filter on the source term (fel-physics.md sec-convergence), transcribed
+  ! from Genesis4's source_filter, which release 4.6.12 added with its FFT solver. The
+  ! transformed source is multiplied by a sigmoid in normalized transverse spatial
+  ! frequency before it reaches the field, so the wide-angle emission of the point-like
+  ! beamlets is suppressed while the field itself propagates untouched. On by default:
+  ! it is measured on four machines, and what it removes is emission no physical beam
+  ! radiates. Turn it off to compare against a code that has no such filter, which is
+  ! what the comparison tiers do.
+  logical :: source_filter = .true.
   ! The sigmoid's edge as an angle [rad]. Unset, the run derives it from the beam and the
   ! gain: the larger of four mode diffraction angles and the angle at which the resonant
   ! wavelength red-shifts by rho, printed with both and with which one won. Cutting into

@@ -58,7 +58,7 @@ is small against the 1 m_e c^2 the beam starts with and the 4.5 m_e c^2 the FEL 
 drives by saturation. They are refused together with slice migration, since one draw
 per beamlet and a pass that regroups beamlets cannot both be right.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.13 times the power inside it and at the exit 0.81 times, so 45 percent of the exit power is that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.1 percent of the power inside it and at the exit 0.4 percent, so the exit power is the mode. With the filter off the same deck reported 45 percent of its exit power as that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch.
 
 Runs in ~5 s each.
 
