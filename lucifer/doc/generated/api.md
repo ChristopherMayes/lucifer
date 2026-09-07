@@ -1668,6 +1668,32 @@ Output:
   err_flag -- logical: Set True on an unrecognized mode. False otherwise.
 ```
 
+(api-fel-fp32-field-prep)=
+### `fel_fp32_field_prep`
+
+*Subroutine* `(fp32, nx, ny)`
+
+```
+Routine to allocate the twin's field record before a slice loop reaches it.
+
+The record is one array for the whole window, and fel_fp32_twin_slice runs under the
+slice loop's OMP parallel do, so the loop cannot be what first touches it. Allocating
+it there on first use let two threads find it unallocated at the same moment and both
+allocate it, which stops a bounds-checked build with no message on stdout. A one-slice
+window never raced and an eight-slice window raced about one run in five under load
+(FINDINGS 7.61). The grid is not known at fel_fp32_setup, which is why this is separate.
+```
+
+```
+Input:
+  fp32 -- fel_fp32_struct: The instrument, after fel_fp32_setup.
+  nx   -- integer: Transverse grid points in x.
+  ny   -- integer: Transverse grid points in y.
+
+Output:
+  fp32 -- fel_fp32_struct: With e32 allocated and zeroed.
+```
+
 (api-fel-fp32-renorm)=
 ### `fel_fp32_renorm`
 

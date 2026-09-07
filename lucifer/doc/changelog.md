@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Fixed: the FP32 lockstep instrument allocated its field record on first use inside the
+  per-slice loop, which carries an OpenMP parallel do, so two threads could pass the allocation test
+  together and both allocate the same array. A bounds-checked build stops there, on about one run in
+  five of the eight-slice deck under load, and a one-slice window never raced at all. The record spans
+  the window rather than a slice, so fel_fp32_field_prep now allocates it before the loop and the
+  per-slice routine writes only its own page. The FP32 check prints a failed run's stderr beside its
+  stdout, since a compiler runtime error is written there and two keystones reported a run that
+  stopped after its banner with nothing to read (FINDINGS 7.61).
+
 - 2026-09-06 Added: the slice spacing and the integration step are derived from the gain, and the
   default window holds the line's slippage. A deck that states no slicing%n_wavelength gets the whole
   number of wavelengths in a quarter of the cooperation length, four slices per cooperation length,

@@ -865,6 +865,12 @@ endif
 ! per-slice pure, so folding them into one loop is arithmetic-identical to Genesis's
 ! four sweeps.
 
+! The twin's field record spans the window, so it is allocated here rather than on first
+! use inside the loop below, where two threads reached it at once (FINDINGS 7.61).
+
+if (fp_on .and. .not. dev_twin) call fel_fp32_field_prep (fp32, size(ff(1)%wf%Ex, 1), &
+                                                                size(ff(1)%wf%Ex, 2))
+
 call fel_tic (fel_t_particles$)
 !$OMP parallel do
 do is = 1, size(beam%slice)

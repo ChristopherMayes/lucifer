@@ -39,6 +39,7 @@ FAILED = False
 BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
+  source_filter = F
   lambda0 = 1e-10
   beam_init%n_particle = 1024
   beam_init%bunch_charge = 1.000692285594e-15
@@ -93,6 +94,14 @@ def run(exe, wd, name, text, threads="4", expect_fail=False):
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:")
         print(r.stdout[-3000:])
+
+        # A runtime error from the compiler goes to stderr, not to out_io, and a run that
+        # stops there prints nothing on stdout after its banner. Printing only stdout left
+        # one such stop with no message at all to read.
+
+        if r.stderr:
+            print(f"--- {name} stderr:")
+            print(r.stderr[-3000:])
         sys.exit(1)
     return r
 
