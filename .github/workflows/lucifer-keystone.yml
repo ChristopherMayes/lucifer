@@ -41,20 +41,24 @@
 # on a runner with no Metal device and skips with its reason recorded, the one section allowed
 # to.
 #
-# Both triggers below read this file from the repository's DEFAULT branch rather than
-# from the ref they name, which is GitHub's rule for `workflow_dispatch` and `schedule`
-# alike. On a fork whose default branch is `main`, that makes them inert while this file
-# lives only on `lucifer-dev`: `gh workflow run --ref lucifer-dev` answers 404, and the
-# cron never fires. They are declared anyway, because they are the cadence this job is
-# meant to have and they start working the moment the file reaches a default branch,
-# whether by a merge or by making `lucifer-dev` the default. The job itself was proved on
-# a probe branch carrying a temporary `push` trigger, which is the one trigger that reads
-# the pushed ref. Anyone who needs a run before then can do the same.
+# `workflow_dispatch` and `schedule` read this file from the repository's DEFAULT branch
+# rather than from the ref they name, which is GitHub's rule for both. They were inert
+# while the fork's default branch was `main` and this file lived only on `lucifer-dev`,
+# and they went live when `lucifer-dev` became the default: a dispatch against that ref
+# now returns a run rather than a 404. `push` is the trigger that reads the pushed ref,
+# and it is the one that does not depend on which branch is the default.
 #
-# Weekly, off the hour. The branch gets per-push build coverage from ci.yml already, and
-# the wall clock recorded on the job below is what an argument for running this more
-# often has to answer. A path filter would be no substitute: the defects this reaches
-# come from the platform, not from which file moved.
+# On every push to the branch, and weekly besides. Every commit here is validated before
+# it lands, and the keystone that does it runs on one macOS machine, so a per-push run is
+# what extends that rule to a second platform. The wall clock recorded below is the
+# price, and the concurrency group above bounds it: a second push cancels the first run
+# rather than queueing behind it, so a day of six pushes costs one run and not six. A
+# path filter would be no substitute, since the defects this reaches come from the
+# platform rather than from which file moved.
+#
+# It does not replace the per-push build coverage from ci.yml, conda-build.yml and
+# pytao.yml, which build the whole distribution and are what caught a compile error this
+# job would have reached only on the following Monday.
 
 name: Lucifer - Keystone (Linux)
 
@@ -62,6 +66,8 @@ permissions:
   contents: read
 
 on:
+  push:
+    branches: [lucifer-dev]
   workflow_dispatch:
   schedule:
     - cron: "17 9 * * 1"
