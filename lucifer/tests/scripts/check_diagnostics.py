@@ -19,6 +19,10 @@ escaped-field bank, held by cross-identities rather than reference files --
   7. the pre-run: the header's work count, cost estimate and load standing, the footer's
      thin-slice list on a deck loaded under the measured floor, load_only stopping after
      the header, and the refusal of a harmonic the load carries no shot noise at.
+  8. the frame series (global%dump_at_comb): one frame per stats record, a frame at an
+     element end identical to that element's own dump, labels unique in every frame and
+     following migration, the frame's attributes against the lattice, a restart from a
+     mid-line frame, and a run with frames identical to the same run without.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -81,6 +85,33 @@ wiggler::*[FEL_METHOD] = unaveraged
 # little, and loaded at 512 macroparticles in beamlets of 8. That is 64 beamlets, half
 # the floor the source filter's convergence was measured at, so the load standing and
 # the thin-slice list both have something to report.
+
+# The frame-series deck. A short segment, a coarse comb so the frame count stays small,
+# and migration on so labels have to follow particles between slices.
+
+FRAME_NML = """! flat keys; routed into the three groups by nml.to_groups
+  lat_file = "aramis_1seg.bmad"
+  out_root = "{root}"
+  lambda0 = 1e-10
+  beam_init%n_particle = 256
+  beam_init%bunch_charge = 8.0e-15
+  beam_init%distribution_type(3) = "GRID"
+  beam_init%grid(3)%x_min = -4e-10
+  beam_init%grid(3)%x_max = 4e-10
+  beam_init%sig_pz = 8.8045e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 1e4
+  seed_waist_size = 30e-6
+  grid_n_pts = 63
+  grid_half_width = 2e-4
+  window_length = 8e-10
+  n_wavelength = 1
+  shot_noise = T
+  ran_seed = 999
+{extra}&end
+"""
 
 PRE_NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
@@ -685,6 +716,110 @@ def main():
     refused = r3.returncode != 0 and "BEAMLET_SIZE TO 11" in said
     check("refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it",
           0.0 if refused else 1.0, 0.5)
+
+    # 8. The frame series (doc/reading-output.md). The deck migrates, so labels have to
+    # survive particles changing slice, and its comb is coarse enough to keep the frame
+    # count small. The element-end dump is asked for by name so the two writers can be
+    # compared on one position.
+
+    fr_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
+                '  global%migrate = T\n  global%dump_beam_at = "UND"\n')
+    r = run(exe, wd, "fr", FRAME_NML.format(root="fr", extra=fr_extra), threads="4")
+    frames = sorted(wd.glob("fr-[0-9]*.beam.h5"))
+    wframes = sorted(wd.glob("fr-[0-9]*.wf.h5"))
+    with read_stats(wd / "fr.stats.h5") as st:
+        nrec = len(st.s)
+    check("frames: one beam frame per stats record", abs(len(frames) - nrec), 0.5,
+          note=f"[{len(frames)} frames, {nrec} records]")
+    check("frames: one field frame per stats record", abs(len(wframes) - nrec), 0.5)
+
+    # The cost line counts them before the run, from the schedule alone.
+    m = re.search(r"^ Frames\s+(\d+) at the comb", r.stdout, re.M)
+    check("frames: the header's count matches the files written",
+          abs(int(m.group(1)) - len(frames)) if m else 1.0, 0.5,
+          note=f"[header {m.group(1) if m else 'absent'}]")
+
+    # A frame at an element end and that element's own dump are one writer at one state.
+    end_dump = wd / "fr-at1-UND.beam.h5"
+    same = any(h5_identical(f, end_dump) for f in frames) if end_dump.exists() else False
+    check("frames: a frame at an element end equals that element's own dump (0 = yes)",
+          0.0 if same else 1.0, 0.5)
+
+    # Labels: unique inside a frame, and no label appears that was not there before.
+    def labels(path):
+        with h5py.File(path) as h:
+            g = h[f"data/{list(h['data'])[0]}/particles/electron"]
+            ids = g["id"][()]
+            npart = g["particlePatches/numParticles"][()]
+            slot, k = {}, 0
+            for islice, cnt in enumerate(npart):
+                for _ in range(int(cnt)):
+                    slot[int(ids[k])] = islice
+                    k += 1
+            return ids, slot
+
+    dup = 0
+    for f in frames:
+        ids, _ = labels(f)
+        dup += len(ids) - len(set(ids.tolist()))
+    check("frames: every label appears once in every frame", dup, 0.5)
+
+    _, first = labels(frames[0])
+    _, last = labels(frames[-1])
+    moved = sum(1 for i in first if i in last and first[i] != last[i])
+    check("frames: no label appears that the first frame did not carry",
+          len(set(last) - set(first)), 0.5,
+          note=f"[{moved} labels changed slice, {len(set(first) - set(last))} left the window]")
+    check("frames: migration moved labels between slices, so the check has something to see",
+          0.0 if moved > 0 else 1.0, 0.5)
+
+    # The attributes say where the frame was taken. The element the run reports for a
+    # record is the element the frame must name.
+    with read_stats(wd / "fr.stats.h5") as st:
+        names = [n.strip() for n in st.ele_name]
+        s_rec = np.asarray(st.s).copy()
+    bad_attr = 0
+    for i, f in enumerate(frames):
+        with h5py.File(f) as h:
+            got = h.attrs["elementName"]
+            got = got.decode() if isinstance(got, bytes) else str(got)
+            spos = float(np.ravel(h.attrs["sPosition"])[0])
+        if got.strip() != names[i] or abs(spos - s_rec[i]) > 1e-9:
+            bad_attr += 1
+    check("frames: each frame names the element and s the stats row carries", bad_attr, 0.5)
+
+    # An FEL frame carries the undulator a reader rebuilds the wiggle from.
+    with h5py.File(frames[-1]) as h:
+        has_und = all(k in h.attrs for k in ("aw", "ku", "helical", "tilt", "felMethod"))
+    check("frames: an FEL frame carries aw, ku and the method (0 = yes)",
+          0.0 if has_und else 1.0, 0.5)
+
+    # A run that writes frames must be the run that does not. The instrument may not
+    # steer what it observes, which is why the field's rotation is put back.
+    run(exe, wd, "nofr", FRAME_NML.format(root="nofr",
+        extra='  global%comb_ds_save = 1.0\n  global%migrate = T\n'), threads="4")
+    check("frames: the run is identical to the same run without them (0 = yes)",
+          0.0 if h5_identical(wd / "fr.stats.h5", wd / "nofr.stats.h5") else 1.0, 0.5)
+
+    # Restarting from a frame needs no check of its own. A frame at an element end is
+    # dataset-identical to that element's dump, which the check above measures, and
+    # check_program holds the windowed composition for those dumps. A frame taken inside
+    # an element is not a restart point at all, since global%track_start names elements
+    # and not positions.
+    #
+    # What does need measuring is that frames land inside an element, which is the whole
+    # reason for the series: a comb that only fired at element ends would pass every
+    # check above and give a movie with one frame per undulator.
+    inside = 0
+    for i, f in enumerate(frames):
+        with h5py.File(f) as h:
+            spos = float(np.ravel(h.attrs["sPosition"])[0])
+            nm = h.attrs["elementName"]
+            nm = (nm.decode() if isinstance(nm, bytes) else str(nm)).strip()
+        if nm == "UND" and 0.0 < spos < 3.99:
+            inside += 1
+    check("frames: the series lands inside the undulator, not only at its ends",
+          0.0 if inside >= 2 else 1.0, 0.5, note=f"[{inside} of {len(frames)} inside UND]")
 
     if FAILED:
         print("diagnostic checks: FAIL")

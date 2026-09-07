@@ -214,6 +214,12 @@ endif
 if (split_weights) call do_split_weights (fbeam)
 run%nslice = size(fbeam%slice)
 
+! Every load path ends here, and the labels are handed out once for all of them. A beam
+! read from a dump keeps the labels the file carried, so a restart follows the same
+! particles the run before it did.
+
+call fel_assign_ids (fbeam)
+
 ! Check instrument (check_two_polarization.py's rotation identity): swap the beam's
 ! transverse planes after generation, (x,px) <-> (y,py).
 

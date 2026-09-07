@@ -152,6 +152,11 @@ type fel_global_struct
   real(rp) :: comb_ds_save = 0
   character(60) :: dump_beam_at(40) = ''     ! Element locators for mid-run beam dumps.
   character(60) :: dump_field_at(40) = ''    ! Element locators for mid-run field dumps.
+  ! Write the beam and the field at every comb position as a frame series, for a
+  ! visualization that wants z resolution inside the undulators rather than at their
+  ! ends. The comb already schedules the stats rows, so a frame and its row share an
+  ! index (doc/reading-output.md).
+  logical :: dump_at_comb = .false.
   integer :: ran_seed = 12345                ! The one RNG seed (generation, import, noise).
   logical :: write_diag = .false.            ! The Genesis-comparison text diag file (large).
   logical :: write_initial = .false.         ! Dump the initial state before tracking.

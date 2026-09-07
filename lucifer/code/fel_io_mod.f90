@@ -72,6 +72,153 @@ end subroutine fel_dump_beam
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_frame_attributes (file_name, run, ie, err_flag)
+!
+! Routine to stamp a dump with where it was taken.
+!
+! A frame is read on its own, so it has to say where along the line it is and what the
+! beam was moving through. The averaged mode integrates the quiver away, and a reader
+! that wants the physical orbit rebuilds it from aw, ku and s (doc/reading-output.md),
+! which is why those ride the file rather than being looked up in a lattice the reader
+! may not have. A frame taken in a break carries the element and no undulator numbers.
+!
+! The attributes go on the root of a file the writers have already closed, so neither
+! writer's layout changes and both kinds of file are stamped the same way.
+!
+! Input:
+!   file_name -- character(*): An openPMD file the writers have finished.
+!   run       -- fel_run_struct: Run state, read for the element and the undulator.
+!   ie        -- integer: Index of the element the frame was taken in.
+!
+! Output:
+!   err_flag  -- logical: Set True if the file could not be stamped. False otherwise.
+!-
+
+subroutine fel_frame_attributes (file_name, run, ie, err_flag)
+
+type (fel_run_struct), target :: run
+type (fel_und_struct), pointer :: und
+type (branch_struct), pointer :: branch
+integer(hid_t) f_id
+integer ie, h5_err
+logical err_flag, err
+character(*) file_name
+character(*), parameter :: r_name = 'fel_frame_attributes'
+
+!
+
+err_flag = .true.
+branch => run%lat%branch(0)
+
+call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
+
+call hdf5_write_attribute_real (f_id, 'sPosition', run%z_now, err)
+call hdf5_write_attribute_string (f_id, 'elementName', trim(branch%ele(ie)%name), err)
+call hdf5_write_attribute_int (f_id, 'elementIndex', ie, err)
+call hdf5_write_attribute_real (f_id, 'phi0', run%fbeam%phi0, err)
+
+! The lattice's elements run from 0, which is the entry face, and the run's per-element
+! arrays run from 1. The frame taken before the walk enters its first element therefore
+! has a name and a position and no method and no undulator, which is what it is.
+
+if (ie >= 1) then
+  call hdf5_write_attribute_string (f_id, 'felMethod', &
+        trim(fel_method_name(max(1, min(3, run%fel_mode(ie))))), err)
+
+  ! The undulator, where there is one. A break has an element and no aw.
+
+  if (run%is_fel(ie)) then
+    und => run%und_of(ie)
+    call hdf5_write_attribute_real (f_id, 'aw', und%aw, err)
+    call hdf5_write_attribute_real (f_id, 'ku', und%ku, err)
+    call hdf5_write_attribute_real (f_id, 'tilt', und%tilt, err)
+    call hdf5_write_attribute_int (f_id, 'helical', merge(1, 0, und%helical), err)
+  endif
+endif
+
+call h5fclose_f (f_id, h5_err)
+err_flag = .false.
+
+end subroutine fel_frame_attributes
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_dump_frame (run, ie, err_flag)
+!
+! Routine to write one frame of the series global%dump_at_comb asks for: the beam and
+! the field set at this comb position, through the same writers the element-end dumps
+! use, named <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
+! the stats row this frame sits on. A frame and its row therefore share one index.
+!
+! The field's records are rotated to time order to be written and rotated back, so the
+! run continues from the state it had. fel_dump_field_set leaves them unrotated, which
+! is right at the end of a run and wrong in the middle of one: a diagnostic that changes
+! the state it observes is the failure the FP32 twin's read-only proof exists to catch.
+!
+! Input:
+!   run       -- fel_run_struct: Run state.
+!   ie        -- integer: Index of the element the frame is taken in.
+!
+! Output:
+!   err_flag  -- logical: Set True if a file could not be written. False otherwise.
+!-
+
+subroutine fel_dump_frame (run, ie, err_flag)
+
+type (fel_run_struct), target :: run
+type (fel_field_struct), pointer :: ffield(:)
+integer ie, ihh, first_was
+logical err_flag, eerr
+character(200) prefix
+character(8) hsuf
+
+!
+
+err_flag = .true.
+ffield => run%ffield
+
+write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
+
+call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
+                             trim(prefix) // '.beam.h5', eerr)
+if (eerr) return
+call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
+if (eerr) return
+
+do ihh = 1, run%n_harm
+  first_was = ffield(ihh)%slip%first
+  if (first_was /= 0) then
+    ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = first_was, dim = 3)
+    if (allocated(ffield(ihh)%wf%Ey)) &
+        ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = first_was, dim = 3)
+  endif
+
+  hsuf = ''
+  if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
+  call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
+                                run%z_now, eerr)
+  if (.not. eerr) call fel_frame_attributes (trim(prefix) // trim(hsuf) // '.wf.h5', run, ie, eerr)
+
+  ! Back to the rotation the walk is carrying, whether or not the write succeeded.
+
+  if (first_was /= 0) then
+    ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = -first_was, dim = 3)
+    if (allocated(ffield(ihh)%wf%Ey)) &
+        ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = -first_was, dim = 3)
+  endif
+  if (eerr) return
+enddo
+
+err_flag = .false.
+
+end subroutine fel_dump_frame
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_dump_field_set (run, prefix, err_flag)
 !
 ! Routine to write the whole field set at the given filename prefix as openPMD
@@ -218,6 +365,18 @@ block
   write (line, '(5a)') ' Estimate    ', trim(fel_cost_secs_str(secs)), ' of walk on the ' // &
         trim(backend) // ' path, for ', fel_cost_machine$, '.'
   call out_io (s_blank$, r_name, trim(line))
+
+  ! The frame series, when it is on. A comb of zero on a long line is a frame per step,
+  ! so the bytes are stated before the run rather than discovered on a full disk. The
+  ! per-frame size is the beam's coordinates and the field set's grid, which are the two
+  ! counts above.
+
+  if (run%global%dump_at_comb) then
+    write (line, '(a, i0, a, es8.2, a)') ' Frames      ', run%stats%nrec, &
+          ' at the comb, beam and field, about ', &
+          run%stats%nrec * (88.0_rp * n_particle + 16.0_rp * n_gpt), ' bytes in all'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
 
   ! The load against the floor the filter's convergence was measured at: 1024
   ! macroparticles per slice in 128 beamlets, below which the mode power in the

@@ -296,6 +296,30 @@ Output:
   err_flag    -- logical: Set True on error, False otherwise.
 ```
 
+(api-fel-assign-ids)=
+### `fel_assign_ids`
+
+*Subroutine* `(beam)`
+
+```
+Routine to label every macroparticle that has no label yet, in window order.
+
+A label follows its macroparticle for the rest of the run: migration carries it to the
+next slice and the dumps write it, so a frame series reads as trajectories rather than
+as snapshots. A beam read from a dump arrives with its labels already set and keeps
+them, and anything the loader added beside them (a split-weight copy, a resampled
+beamlet) is numbered after the largest one the file carried. Labels are unique over
+the window and are not otherwise interpreted.
+```
+
+```
+Input:
+  beam -- fel_beam_struct: The loaded beam.
+
+Output:
+  beam -- fel_beam_struct: With every slice's id set.
+```
+
 (api-fel-slice-reallocate)=
 ### `fel_slice_reallocate`
 
@@ -2761,6 +2785,60 @@ Input:
   run       -- fel_run_struct: Run state.
   ele       -- ele_struct: Element the beam sits at.
   prefix    -- character(*): Filename prefix. Format suffixes are appended.
+
+Output:
+  err_flag  -- logical: Set True if a file could not be written. False otherwise.
+```
+
+(api-fel-frame-attributes)=
+### `fel_frame_attributes`
+
+*Subroutine* `(file_name, run, ie, err_flag)`
+
+```
+Routine to stamp a dump with where it was taken.
+
+A frame is read on its own, so it has to say where along the line it is and what the
+beam was moving through. The averaged mode integrates the quiver away, and a reader
+that wants the physical orbit rebuilds it from aw, ku and s (doc/reading-output.md),
+which is why those ride the file rather than being looked up in a lattice the reader
+may not have. A frame taken in a break carries the element and no undulator numbers.
+
+The attributes go on the root of a file the writers have already closed, so neither
+writer's layout changes and both kinds of file are stamped the same way.
+```
+
+```
+Input:
+  file_name -- character(*): An openPMD file the writers have finished.
+  run       -- fel_run_struct: Run state, read for the element and the undulator.
+  ie        -- integer: Index of the element the frame was taken in.
+
+Output:
+  err_flag  -- logical: Set True if the file could not be stamped. False otherwise.
+```
+
+(api-fel-dump-frame)=
+### `fel_dump_frame`
+
+*Subroutine* `(run, ie, err_flag)`
+
+```
+Routine to write one frame of the series global%dump_at_comb asks for: the beam and
+the field set at this comb position, through the same writers the element-end dumps
+use, named <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
+the stats row this frame sits on. A frame and its row therefore share one index.
+
+The field's records are rotated to time order to be written and rotated back, so the
+run continues from the state it had. fel_dump_field_set leaves them unrotated, which
+is right at the end of a run and wrong in the middle of one: a diagnostic that changes
+the state it observes is the failure the FP32 twin's read-only proof exists to catch.
+```
+
+```
+Input:
+  run       -- fel_run_struct: Run state.
+  ie        -- integer: Index of the element the frame is taken in.
 
 Output:
   err_flag  -- logical: Set True if a file could not be written. False otherwise.

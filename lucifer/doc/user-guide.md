@@ -349,6 +349,11 @@ what the beamlet size buys, which is the harmonics the shot noise is imposed at,
 `(beamlet_size - 1)/2`. A harmonic field above that is refused with the beamlet size that
 would carry it.
 
+The **Frames** line appears when `global%dump_at_comb` is on, and states how many frames
+the run will write and roughly how many bytes they take. A comb of zero is a frame at
+every integration step, so the number is worth reading before the run rather than after
+the disk fills ([](input-reference.md#param-global-dump-at-comb), [](reading-output.md)).
+
 Setting `global%load_only` stops the run after this block. That is the pre-run on its own:
 everything the deck derives and everything it will cost, with the initial state written
 and nothing tracked ([](input-reference.md#param-global-load-only)).

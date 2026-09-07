@@ -9,6 +9,28 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Added: global%dump_at_comb writes the beam and the field at every comb position as an
+  openPMD fileBased series, <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
+  zero padded to six digits. The index is the stats record's, so a frame and the row describing it are
+  read on one axis, and comb_ds_save sets the frame spacing. The writers are the element-end dumps' own,
+  so a frame taken at an element end is byte for byte the file that element's dump_beam_at entry writes.
+  The header's Frames line states the count and the bytes before the run tracks, since a comb of zero on
+  a long line is tens of gigabytes. Writing frames does not change the run: the field's records are
+  rotated to time order to be written and rotated back, so a run with frames is dataset-identical to the
+  same run without them, which the harness measures.
+
+  Every macroparticle now carries a label, assigned at load, unique over the window, and unchanged by
+  migration, so a series reads as trajectories rather than as unrelated snapshots. It is written as
+  openPMD's own id record through coord_struct%ix_user, which Bmad's beam writer and reader gained, and
+  a beam read from a dump keeps the labels the file carried. On a migrating deck 419 of 2048 labels
+  changed slice between the first frame and the last and none appeared that the first frame did not
+  carry.
+
+  Both files say where they were taken: sPosition, elementName, elementIndex and phi0, and inside an FEL
+  element felMethod with aw, ku, tilt and helical. The averaged mode integrates the quiver away, so a
+  reader that wants the physical orbit rebuilds it from aw, ku and s, which doc/reading-output.md states
+  along with which mode it applies to. The diagnostics section gains nine checks over the series.
+
 - 2026-09-07 Changed: doc/performance.md is re-measured with the source filter at its default, and the
   cost estimate's rates are re-fitted to it. One phase moved. The field solve is up 40 percent at 96
   slices and 44 percent at 504, and the walk with it, from 23.917 to 30.333 s and from 127.370 to

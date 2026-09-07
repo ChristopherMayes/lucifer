@@ -223,6 +223,58 @@ Known scaling limit, named for the follow-on: the stats accumulate in memory and
 once (demo: 64 MB). A tens-of-thousands-of-slices hard-X-ray window wants chunked
 incremental writes instead.
 
+## Frames: a run as a series along z
+
+`global%dump_at_comb` writes the beam and the field at every position the stats comb
+takes a row ([](input-reference.md#param-global-dump-at-comb)). The files are
+`<out_root>-<record>.beam.h5` and `<out_root>-<record>.wf.h5`, the record zero padded to
+six digits, which is openPMD's fileBased series. The index is the stats record's, so
+frame `n` and row `n` of the statistics file are the same position and can be plotted on
+one axis. `comb_ds_save` sets the spacing.
+
+```python
+from pmd_beamphysics import ParticleGroup
+from pmd_beamphysics.wavefront import Wavefront
+import glob, h5py
+
+frames = sorted(glob.glob("run-[0-9]*.beam.h5"))
+beam = ParticleGroup(frames[3])
+with h5py.File(frames[3]) as h:
+    s, aw, ku = h.attrs["sPosition"], h.attrs["aw"], h.attrs["ku"]
+```
+
+Each file says where it was taken. `sPosition`, `elementName` and `elementIndex` are on
+every frame, and a frame inside an FEL element also carries `felMethod` with `aw`, `ku`,
+`tilt` and `helical`. `phi0` is the beam's reference phase there.
+
+**The wiggle is not in an averaged frame, and the frame carries what rebuilds it.** The
+averaged mode integrates over the undulator period, so a particle's stored `x` is the
+guiding centre and not the physical orbit. A reader that wants the orbit adds the quiver
+back, for a planar device
+
+$$x \to x + \frac{a_w}{\gamma k_u}\cos(k_u s), \qquad
+  x' \to x' - \frac{a_w}{\gamma}\sin(k_u s)$$
+
+with `aw`, `ku` and `s` from the frame's own attributes, and the analogous pair in `y`
+for a helical device, where `helical` is 1. This is postprocessing and the tracker never
+does it: the averaged equations are written for the guiding centre and adding the quiver
+to the state would change the physics rather than the picture. The unaveraged mode
+resolves the motion itself, so its frames carry the physical orbit already and nothing is
+added. `felMethod` on the frame says which mode wrote it.
+
+**Following a particle between frames.** Every macroparticle carries a label in openPMD's
+`id` record, unique over the window and unchanged for the life of the run. Migration
+moves a particle to a neighbouring slice and its label goes with it, so a series reads as
+trajectories rather than as a sequence of unrelated snapshots. A label that stops
+appearing is a particle slippage carried off the end of the window, which the migration
+report counts. A beam read back from a dump keeps the labels the file carried, so a
+restart follows the same particles. Labels are not otherwise interpreted, and a file
+written by a program that sets none is all -1.
+
+Writing frames does not change the run: the field's records are rotated to time order to
+be written and rotated straight back, so a run with frames is dataset-identical to the
+same run without them. The harness measures that.
+
 ## Particle dumps: openPMD carries the weights, Genesis4 .par cannot
 
 A Genesis4 `.par.h5` holds one current per slice. A writer sends

@@ -78,6 +78,10 @@ type fel_slice_struct
   real(rp), allocatable :: z(:)        ! -beta*c*(t - t_ref) [m]
   real(rp), allocatable :: pz(:)       ! (p - p0)/p0
   real(rp), allocatable :: weight(:)   ! Macroparticle charge [C]
+  ! A label that follows the macroparticle, unique over the window and unchanged by
+  ! migration, so a frame series can be read as trajectories rather than as snapshots
+  ! (doc/reading-output.md). Written as openPMD's id record through coord_struct%ix_user.
+  integer, allocatable :: id(:)
   integer :: n = 0                     ! Fill count.
   ! Independent transverse samples at load: (sum_g W_g)^2 / sum_g W_g^2 over the groups
   ! of particles sharing their transverse coordinates, which is the beamlet count for
@@ -537,6 +541,53 @@ end subroutine fel_write_openpmd_beam
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_assign_ids (beam)
+!
+! Routine to label every macroparticle that has no label yet, in window order.
+!
+! A label follows its macroparticle for the rest of the run: migration carries it to the
+! next slice and the dumps write it, so a frame series reads as trajectories rather than
+! as snapshots. A beam read from a dump arrives with its labels already set and keeps
+! them, and anything the loader added beside them (a split-weight copy, a resampled
+! beamlet) is numbered after the largest one the file carried. Labels are unique over
+! the window and are not otherwise interpreted.
+!
+! Input:
+!   beam -- fel_beam_struct: The loaded beam.
+!
+! Output:
+!   beam -- fel_beam_struct: With every slice's id set.
+!-
+
+subroutine fel_assign_ids (beam)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
+integer is, ip, next
+
+!
+
+next = 0
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  if (sl%n > 0) next = max(next, maxval(sl%id(1:sl%n)))
+enddo
+
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  do ip = 1, sl%n
+    if (sl%id(ip) > 0) cycle
+    next = next + 1
+    sl%id(ip) = next
+  enddo
+enddo
+
+end subroutine fel_assign_ids
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_slice_reallocate (sl, capacity)
 !
 ! Routine to allocate a slice's arrays to at least the given capacity. Existing live
@@ -566,9 +617,11 @@ if (allocated(sl%x)) then
   call re_allocate (sl%z, capacity)
   call re_allocate (sl%pz, capacity)
   call re_allocate (sl%weight, capacity)
+  call re_allocate (sl%id, capacity)
 else
   allocate (sl%x(capacity), sl%px(capacity), sl%y(capacity), sl%py(capacity), &
-            sl%z(capacity), sl%pz(capacity), sl%weight(capacity))
+            sl%z(capacity), sl%pz(capacity), sl%weight(capacity), sl%id(capacity))
+  sl%id = -1
 endif
 
 end subroutine fel_slice_reallocate
@@ -1195,6 +1248,7 @@ do ip = 1, sl%n
   ! whose reference momentum changes and must not touch vec(6) here.
   call init_coord (bunch%particle(ip), vec, ele, upstream_end$, electron$, shift_vec6 = .false.)
   bunch%particle(ip)%charge = sl%weight(ip)
+  bunch%particle(ip)%ix_user = sl%id(ip)
 enddo
 
 bunch%n_live = sl%n
@@ -1251,6 +1305,7 @@ do ip = 1, sl%n
   sl%z(ip)  = bunch%particle(ip)%vec(5)
   sl%pz(ip) = bunch%particle(ip)%vec(6)
   sl%weight(ip) = bunch%particle(ip)%charge
+  sl%id(ip) = bunch%particle(ip)%ix_user
 enddo
 
 err_flag = .false.
@@ -1537,6 +1592,7 @@ do ia = 1, nslice
       sd%y(sd%n) = sl%y(ib);   sd%py(sd%n) = sl%py(ib)
       sd%z(sd%n) = z_new;      sd%pz(sd%n) = sl%pz(ib)
       sd%weight(sd%n) = sl%weight(ib)
+      sd%id(sd%n) = sl%id(ib)
       n_moved = n_moved + 1
     endif
 
@@ -1547,6 +1603,7 @@ do ia = 1, nslice
     sl%y(ib) = sl%y(il);   sl%py(ib) = sl%py(il)
     sl%z(ib) = sl%z(il);   sl%pz(ib) = sl%pz(il)
     sl%weight(ib) = sl%weight(il)
+    sl%id(ib) = sl%id(il)
     sl%n = sl%n - 1
   enddo
 enddo

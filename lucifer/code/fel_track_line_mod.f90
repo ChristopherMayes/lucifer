@@ -953,6 +953,19 @@ call fel_toc (fel_t_stats$)
 if (serr) then
   err_flag = .true.;  return
 endif
+
+! The frame series rides the comb, so a frame carries the index of the row just taken
+! and the two are read on one axis. Every caller of this routine is a comb position, and
+! on the device the state came back to the host before the row was taken.
+
+if (run%global%dump_at_comb) then
+  call fel_tic (fel_t_dumps$)
+  call fel_dump_frame (run, max(ie, 0), serr)
+  call fel_toc (fel_t_dumps$)
+  if (serr) then
+    err_flag = .true.;  return
+  endif
+endif
 end subroutine take_stats_record
 
 !------------------------------------------------------------------------------
