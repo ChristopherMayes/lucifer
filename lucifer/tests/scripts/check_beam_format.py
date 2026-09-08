@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Checks for the particle dump format (fel-physics.md sec-import). The tracker writes and reads
-openPMD and nothing else, so every claim here is a round trip against the beam that was
-written, never against another code.
+Checks for the particle dump format (fel-physics.md sec-import). Most claims here are a
+round trip against the beam that was written. A round trip proves that this program agrees
+with itself, which is not the same as proving the file says what it means: a convention
+that is wrong and self-consistent survives every one of them, and one did (FINDINGS 7.64).
+Section 8 therefore reads a dump with openPMD-beamphysics, which knows the standard and
+nothing about this program.
 
 1. The file round trip is exact. A run writes .beam.h5, a second run reads it back and
    writes it again, and every dataset of the two files must be bit-identical. This is the
@@ -115,11 +118,24 @@ def refused(label, code, out, phrase):
 
 
 def datasets(fn):
-    """Every shaped dataset of an openPMD particle file, by path."""
+    """Every record of an openPMD particle file, by path, constant ones expanded.
+
+    A constant record is a group carrying value and shape rather than a dataset, and
+    collecting only shaped datasets makes those invisible. timeOffset was one until it
+    began carrying the slice placement, so this round trip compared everything in the
+    file except the one record it had no eyes for.
+    """
     out = {}
+
+    def take(name, obj):
+        if isinstance(obj, h5py.Dataset) and obj.shape:
+            out[name] = obj[...]
+        elif isinstance(obj, h5py.Group) and "value" in obj.attrs and "shape" in obj.attrs:
+            n = int(np.ravel(obj.attrs["shape"])[0])
+            out[name] = np.full(n, np.ravel(obj.attrs["value"])[0])
+
     with h5py.File(fn) as h5:
-        h5.visititems(lambda n, o: out.__setitem__(n, o[...])
-                      if isinstance(o, h5py.Dataset) and o.shape else None)
+        h5.visititems(take)
     return out
 
 
@@ -168,6 +184,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     p.add_argument("--exe", required=True)
     p.add_argument("--workdir", required=True)
+    p.add_argument("--pyrepo", help="openPMD-beamphysics checkout. "
+                   "Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     a = p.parse_args()
     wd = pathlib.Path(a.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -181,8 +199,26 @@ def main():
     run(exe, wd, "bfp", restart("bfp", "bf1-final.beam.h5", "bf1-final.wf.h5"))
 
     a1, a2 = datasets(wd / "bf1-final.beam.h5"), datasets(wd / "bfp-initial.beam.h5")
-    same = sorted(a1) == sorted(a2) and all(np.array_equal(a1[k], a2[k]) for k in a1)
+
+    # Three records say where the beam is rather than what it is, and a restart that
+    # re-emits it at the start of the line rather than at the plane it was dumped from is
+    # entitled to move all three: the element it sits in, the path length there, and the
+    # arrival time. They were invisible to this check until constant records were
+    # expanded, which is how timeOffset came to carry the slice placement unexamined.
+    #
+    # What must survive is the placement, which is timeOffset measured against its own
+    # head. It survives to a few ulps of the absolute time rather than bit for bit, since
+    # a double at 1.9e-7 s resolves 4e-23 s and a slice step here is 1e-18 s.
+    WHERE = ["data/00001/particles/electron/" + k
+             for k in ("timeOffset", "sPosition", "elementIndex")]
+    same = sorted(a1) == sorted(a2) and \
+           all(np.array_equal(a1[k], a2[k]) for k in a1 if k not in WHERE)
     check("file datasets bit-identical (write, read, write)", 0.0 if same else 1.0, 0.5)
+
+    toff = "data/00001/particles/electron/timeOffset"
+    pa, pb = a1[toff] - a1[toff].max(), a2[toff] - a2[toff].max()
+    check("the slice placement survives the round trip",
+          float(np.max(np.abs(pa - pb))) / (SPACING / 2.99792458e8), 1e-4)
 
     # ------------------------------------------------------------------
     print("== the state round trip, seen in the other chart ==")
@@ -273,6 +309,84 @@ def main():
     code, out = run(exe, wd, "bfnq", restart("bfnq", "noq.beam.h5", "bf1-final.wf.h5"),
                     expect_fail=True)
     refused("a file that carries no charge", code, out, "FILE CARRIES NO CHARGE")
+
+    # 8. The file read by a reader that shares none of this program's conventions.
+    # particlePatches partitions the window and a general reader does not walk it, so the
+    # placement of a slice in the bunch has to be in the particle data. It is: openPMD's
+    # time and timeOffset sum to a particle's time, the lag rides time and the slice's own
+    # offset rides timeOffset. Dropped, every slice lands on one and the bunch reads one
+    # slice long (FINDINGS 7.64).
+    #
+    # The placement is checked on the per-patch offset and not on the spread of t. With
+    # migration off a particle whose phase leaves its slice keeps going, so the lag is not
+    # bounded by the slice width and the spread of t is a property of the physics. The
+    # offset is a property of the format.
+    #
+    # The level is 1e-4 and it is a floor of the standard's own arithmetic, not of this
+    # writer. timeOffset is an absolute time, and the ratio of a beamline's arrival time
+    # to one slice spacing is 3e10 here, so a double leaves about five digits for the
+    # slice structure: the ulp at t_ref is 6.5e-6 of a slice step. That is ample for
+    # placing a picture and is not the exact partition, which stays particlePatches.
+
+    print("== the file as openPMD, read by a reader that knows nothing of this program ==")
+    convert_genesis._beamphysics(a.pyrepo)
+    from beamphysics import ParticleGroup
+
+    C_LIGHT = 2.99792458e8
+
+    def patch_offsets(path):
+        """Each patch's own time offset, which is what places its slice in the bunch."""
+        with h5py.File(path) as h5:
+            g = h5["data/00001/particles/electron"]
+            n = g["particlePatches/numParticles"][()]
+            off = g["particlePatches/numParticlesOffset"][()]
+            to = g["timeOffset"]
+            n_tot = g["id"].shape[0]
+            tov = to[()] if isinstance(to, h5py.Dataset) else \
+                  np.full(n_tot, float(np.ravel(to.attrs["value"])[0]))
+        return np.array([tov[off[k]] for k in range(len(n)) if n[k] > 0]), n, n_tot
+
+    tos, n_patch, n_file = patch_offsets(wd / "bf1-final.beam.h5")
+    P = ParticleGroup(str(wd / "bf1-final.beam.h5"))
+
+    # Consecutive slices are one spacing apart in light-travel distance, toward the head.
+    step = -C_LIGHT * np.diff(tos)
+    print(f"    slice step {step.mean():.6e} m over {len(tos)} patches, spacing {SPACING:.6e} m")
+    check("consecutive slices sit one spacing apart in the file",
+          float(np.max(np.abs(step - SPACING))) / SPACING, 1e-4)
+    span = C_LIGHT * (tos.max() - tos.min())
+    check("the bunch spans its window and not one slice",
+          abs(span - (len(tos) - 1) * SPACING) / ((len(tos) - 1) * SPACING), 1e-4)
+    check("the reader sees every particle", abs(len(P) - n_file), 0.5)
+    with h5py.File(wd / "bf1-final.beam.h5") as h5:
+        w = h5["data/00001/particles/electron/weight"]
+        q_file = float(np.sum(w[()])) if isinstance(w, h5py.Dataset) \
+                 else n_file * float(np.ravel(w.attrs["value"])[0])
+    check("the reader sees the whole charge",
+          abs(P.charge - q_file) / max(abs(q_file), 1e-30), 1e-12)
+
+    # A frame cut to a range places the slices it carries at their true window positions.
+    # Two runs at one comb, one whole and one cut, so the same frame is compared with and
+    # without the range and the reference time is the same on both sides.
+
+    frame_extra = "  dump_at_comb = T\n  comb_ds_save = 2.0\n"
+    run(exe, wd, "bffull", BASE.format(root="bffull", sig_pz="8.8045e-5", extra=frame_extra))
+    run(exe, wd, "bfrng", BASE.format(root="bfrng", sig_pz="8.8045e-5",
+        extra=frame_extra + "  dump_slice_first = 4\n  dump_slice_last = 9\n"))
+    full = sorted(wd.glob("bffull-[0-9]*.beam.h5"))
+    rng = sorted(wd.glob("bfrng-[0-9]*.beam.h5"))
+    if not full or not rng:
+        check("a frame cut to a range places its slices where the whole window does", 1.0, 0.5)
+    else:
+        to_f = patch_offsets(full[-1])[0]
+        to_r, nr, _ = patch_offsets(rng[-1])
+        print(f"    range: {len(nr)} patches against {len(to_f)} in the whole window")
+        check("a range carries the slices it asked for",
+              abs(len(nr) - 6), 0.5)
+        # Patch k of the range is window slice k + 3, so it must carry that slice's offset.
+        worst = max(abs(C_LIGHT * (to_r[k] - to_f[k + 3])) / SPACING for k in range(len(to_r)))
+        check("a frame cut to a range places its slices where the whole window does",
+              worst, 1e-4)
 
     print("checks: " + ("FAIL" if FAILED else "PASS"))
     sys.exit(1 if FAILED else 0)

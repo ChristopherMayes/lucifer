@@ -446,10 +446,11 @@ block
     character(12) lab
     nrng = run%dump_is2 - run%dump_is1 + 1
     n_rng = real(nrng, rp) / max(1, run%nslice)
-    ! 60 bytes a macroparticle, measured on a real frame: six coordinates, the time the
-    ! phase folds into, the reference momentum and the label. The writer stores a uniform
-    ! weight and the zero z as constant records, which cost nothing per particle.
-    b_frame = 60.0_rp * n_particle * n_rng
+    ! 68 bytes a macroparticle, measured on a real frame: six coordinates, the time the
+    ! phase folds into, the offset that places the slice, the reference momentum and the
+    ! label. The writer stores a uniform weight and the zero z as constant records, which
+    ! cost nothing per particle.
+    b_frame = 68.0_rp * n_particle * n_rng
     f_frame = 16.0_rp * n_gpt * n_rng
     red_bytes = 0
     if (run%stats%n_red > 0) red_bytes = 8.0_rp * run%stats%nrec * run%stats%n_red * &

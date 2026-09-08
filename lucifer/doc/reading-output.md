@@ -331,6 +331,25 @@ defaulted, since a wrong wavelength rescales every phase in the run. `one4one` n
 storage at all: the flag asserts that every macroparticle carries one electron, which is
 what the weights say.
 
+**Where a slice sits in the bunch.** openPMD sums two records for a particle's time,
+`time` and `timeOffset`. `time` is the lag inside the particle's own slice, and
+`timeOffset` is the reference arrival time plus that slice's own offset,
+`-(slice - 1) * slice_spacing / c`. Their sum is the position along the bunch, so a
+reader that never walks `particlePatches` still sees the whole thing:
+
+```python
+from beamphysics import ParticleGroup
+P = ParticleGroup("run-000006.beam.h5")
+P.t                       # already the sum: the bunch, not one slice
+```
+
+The two are kept apart on purpose. The lag is a part in 1e8 of the arrival time here, so
+a single global time would lose it to rounding, and would lose it completely in single
+precision. That is what an offset record is for. It cuts the other way as well: the
+placement is stored inside an absolute time, so a double resolves it to about five
+digits, 6.5e-6 of a slice spacing on the test line. `particlePatches` remains the exact
+partition, and the placement is for reading the bunch rather than for arithmetic on it.
+
 The reference phase is folded into the file's time coordinate. The chart splits a
 particle's ponderomotive phase into a per-beam reference and a per-particle lag,
 `theta_j = phi0 + ks z_j / beta_j`, and no dump format has anywhere to put `phi0`, so

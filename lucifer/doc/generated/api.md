@@ -562,7 +562,7 @@ Output:
 (api-fel-slice-to-bunch)=
 ### `fel_slice_to_bunch`
 
-*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0)`
+*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice)`
 
 ```
 Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
@@ -586,6 +586,16 @@ So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks, 
 makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact. Genesis
 stores theta itself and its reader does the same fold, and convert_genesis.py maps a
 Genesis theta to the same time, so the two formats agree on what a dump means.
+
+ix_slice places the slice in the bunch, and is for a dump as well. vec(5) is the lag
+inside the slice and says nothing about which slice that is, so a bunch written from it
+alone piles every slice on one: openPMD's time and timeOffset sum to a particle's time,
+and with the placement in neither, a reader that does not walk particlePatches sees a
+bunch one slice long. The slice's own offset therefore goes on p%t, which is what
+timeOffset carries, leaving vec(5) and so the file's time record untouched. Their sum is
+the position along the bunch. Keeping the two apart is what the offset field is for: a
+global time would drown the lag, which is a part in 1e8 of it here, and would drown it
+completely in single precision.
 ```
 
 ```
@@ -595,6 +605,11 @@ Input:
   ele         -- ele_struct: Element at whose upstream end the coords are initialized.
   fold_phi0   -- logical, optional: Fold the reference phase into the lag, for a dump.
                    Default False, which is what tracking wants.
+  ix_slice    -- integer, optional: The slice's index in the window, which places it in
+                   time as -(ix_slice - 1) * slice_spacing / c (BMAD-STATS-EXT-FEL F3).
+                   Omitted, the slice is placed at the reference, which is what tracking
+                   wants: the seam hands one slice to a Bmad element and its own lag is
+                   the whole of its z.
 
 Output:
   bunch       -- bunch_struct: The slice as a Bmad bunch.

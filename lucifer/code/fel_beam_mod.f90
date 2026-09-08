@@ -369,8 +369,8 @@ type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
-integer is, np, nb, n_slice, n_win
-real(rp) gamma0, q_file, wavelength, spacing
+integer is, ip, np, nb, n_slice, n_win
+real(rp) gamma0, q_file, wavelength, spacing, t0_ref, t0_p
 logical err_flag, err
 character(*) file_name
 character(*), parameter :: r_name = 'fel_read_openpmd_beam'
@@ -421,6 +421,31 @@ do is = 1, n_win
   call fel_slice_reallocate (beam%slice(is), np)
   beam%slice(is)%n = np
   if (np == 0) cycle
+
+  ! A patch is one slice, so its particles share one placement: the file's timeOffset is
+  ! the reference time plus that slice's own offset, and the lag it does not contain is
+  ! the time record, which is what vec(5) came back from. A patch whose placements
+  ! disagree describes particles from different slices in one slice, and averaging them
+  ! would move charge along the bunch without saying so.
+
+  t0_ref = beam_b%bunch(is)%particle(1)%t + &
+           beam_b%bunch(is)%particle(1)%vec(5) / (beam_b%bunch(is)%particle(1)%beta * c_light)
+  do ip = 1, np
+    t0_p = beam_b%bunch(is)%particle(ip)%t + &
+           beam_b%bunch(is)%particle(ip)%vec(5) / (beam_b%bunch(is)%particle(ip)%beta * c_light)
+    ! The scale is one slice step in time, which is what the placement distinguishes. The
+    ! offset itself is no scale at all: a single-slice window places its one slice at zero.
+
+    if (abs(t0_p - t0_ref) > 1e-6_rp * spacing / c_light) then
+      call out_io (s_error$, r_name, 'PARTICLE \i0\ OF SLICE \i0\ CARRIES A DIFFERENT ' // &
+                   'TIMEOFFSET FROM THE FIRST OF ITS PATCH.', &
+                   'FILE: ' // trim(file_name), &
+                   'A PATCH IS ONE SLICE AND ITS PARTICLES SHARE ONE PLACEMENT IN THE BUNCH.', &
+                   i_array = [ip, is])
+      return
+    endif
+  enddo
+
   call fel_bunch_to_slice (beam_b%bunch(is), ele, beam%slice(is), err)
   if (err) return
 enddo
@@ -528,7 +553,8 @@ endif
 call reallocate_beam (beam_b, i2 - i1 + 1)
 
 do is = i1, i2
-  call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is - i1 + 1), err, fold_phi0 = .true.)
+  call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is - i1 + 1), err, &
+                           fold_phi0 = .true., ix_slice = is)
   if (err) return
 enddo
 nb = i2 - i1 + 1
@@ -1175,7 +1201,7 @@ end function fel_m_ind
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0)
+! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice)
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
 ! stored coordinates are coord_struct's. The element's p0c must match the beam's
@@ -1199,26 +1225,42 @@ end function fel_m_ind
 ! stores theta itself and its reader does the same fold, and convert_genesis.py maps a
 ! Genesis theta to the same time, so the two formats agree on what a dump means.
 !
+! ix_slice places the slice in the bunch, and is for a dump as well. vec(5) is the lag
+! inside the slice and says nothing about which slice that is, so a bunch written from it
+! alone piles every slice on one: openPMD's time and timeOffset sum to a particle's time,
+! and with the placement in neither, a reader that does not walk particlePatches sees a
+! bunch one slice long. The slice's own offset therefore goes on p%t, which is what
+! timeOffset carries, leaving vec(5) and so the file's time record untouched. Their sum is
+! the position along the bunch. Keeping the two apart is what the offset field is for: a
+! global time would drown the lag, which is a part in 1e8 of it here, and would drown it
+! completely in single precision.
+!
 ! Input:
 !   beam        -- fel_beam_struct: The beam (for p0c, phi0 and the chart assertion).
 !   sl          -- fel_slice_struct: Slice to convert.
 !   ele         -- ele_struct: Element at whose upstream end the coords are initialized.
 !   fold_phi0   -- logical, optional: Fold the reference phase into the lag, for a dump.
 !                    Default False, which is what tracking wants.
+!   ix_slice    -- integer, optional: The slice's index in the window, which places it in
+!                    time as -(ix_slice - 1) * slice_spacing / c (BMAD-STATS-EXT-FEL F3).
+!                    Omitted, the slice is placed at the reference, which is what tracking
+!                    wants: the seam hands one slice to a Bmad element and its own lag is
+!                    the whole of its z.
 !
 ! Output:
 !   bunch       -- bunch_struct: The slice as a Bmad bunch.
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0)
+subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice)
 
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (ele_struct) ele
 type (bunch_struct) bunch
-real(rp) vec(6), dz_phi0, p0_mc
+real(rp) vec(6), dz_phi0, p0_mc, t_place
 integer ip
+integer, optional :: ix_slice
 logical err_flag
 logical, optional :: fold_phi0
 character(*), parameter :: r_name = 'fel_slice_to_bunch'
@@ -1246,6 +1288,12 @@ p0_mc = fel_p0_mc(beam)
 dz_phi0 = 0
 if (logic_option(.false., fold_phi0)) dz_phi0 = beam%phi0 * beam%wavelength / twopi
 
+! Where this slice sits in the bunch, in time, negative toward the window head (F3). It
+! rides p%t and so timeOffset, never vec(5), so the file's time record is the lag alone.
+
+t_place = 0
+if (present(ix_slice)) t_place = -(ix_slice - 1) * beam%slice_spacing / c_light
+
 do ip = 1, sl%n
   vec = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)]
 
@@ -1257,6 +1305,7 @@ do ip = 1, sl%n
   call init_coord (bunch%particle(ip), vec, ele, upstream_end$, electron$, shift_vec6 = .false.)
   bunch%particle(ip)%charge = sl%weight(ip)
   bunch%particle(ip)%ix_user = sl%id(ip)
+  bunch%particle(ip)%t = bunch%particle(ip)%t + t_place
 enddo
 
 bunch%n_live = sl%n

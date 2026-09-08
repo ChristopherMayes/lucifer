@@ -173,8 +173,25 @@ def write_openpmd_beam(path, groups, spacing):
     # vec(5) = -beta*c*time. Since a Genesis z is theta*lambda/(2 pi), time = -z/c makes
     # vec(5) come out as beta*theta/ks, which is exactly what reading the Genesis file
     # directly would have given.
-    t = -cat("z", offset_per_slice=True) / C_LIGHT
-    t_ref = 0.0
+    t_lag = -cat("z", offset_per_slice=True) / C_LIGHT
+
+    # The slice offset that came out of the lag goes into timeOffset, which is where the
+    # tracker's own writer puts it. openPMD sums the two, so a reader that does not walk
+    # particlePatches still gets the whole bunch, and a converted file and a native one
+    # mean the same thing. Dropping it on both sides is what made a bunch read one slice
+    # long (FINDINGS 7.64).
+    #
+    # The two are written as they are, with no subtraction between them: the lag is what
+    # Bmad's reader turns into vec(5), and moving any of the placement into it would move
+    # the beam the comparison tiers import.
+    t_place = np.zeros(n_tot)
+    i = 0
+    for k, g in enumerate(groups):
+        if g is None:
+            continue
+        n_g = np.asarray(g.x).size
+        t_place[i:i + n_g] = -k * spacing / C_LIGHT
+        i += n_g
 
     with h5py.File(path, "w") as h5:
         h5.attrs["dataType"] = np.bytes_(b"openPMD")
@@ -208,8 +225,8 @@ def write_openpmd_beam(path, groups, spacing):
         # invent a second one, and a beam's mean momentum is not the lattice's: doing that
         # shifted gamma by 5.1e-4 in the first version of this converter.
 
-        _pmd_dataset(sp, "time", t - t_ref, 1.0, UNIT_SEC, "t - t_ref")
-        _pmd_dataset(sp, "timeOffset", np.full(n_tot, t_ref), 1.0, UNIT_SEC, "t_ref")
+        _pmd_dataset(sp, "time", t_lag, 1.0, UNIT_SEC, "t - t_ref")
+        _pmd_dataset(sp, "timeOffset", t_place, 1.0, UNIT_SEC, "t_ref")
         _pmd_dataset(sp, "weight", w, 1.0, UNIT_1, "macro-charge")
         _pmd_dataset(sp, "sPosition", np.zeros(n_tot), 1.0, UNIT_M, "s")
 

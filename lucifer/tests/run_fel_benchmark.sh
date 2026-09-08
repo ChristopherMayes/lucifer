@@ -795,7 +795,7 @@ section_time two-polarization
 
 echo
 echo "--- particle dump format checks (openPMD and Genesis .par) ---------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$WORK_DIR"; then
+if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$WORK_DIR" --pyrepo "$BEAMPHYSICS"; then
   echo "FAIL: beam-format checks; outputs kept in: $WORK_DIR" >&2
   exit 1
 fi

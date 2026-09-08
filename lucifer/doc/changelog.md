@@ -9,6 +9,30 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Fixed: a beam dump places its slices in the bunch, so a reader that knows openPMD and
+  nothing about this program gets the whole thing. The per-particle time record was the lag inside a
+  particle's own slice and timeOffset was a constant reference, so the slice's own position lived only in
+  particlePatches. Measured with ParticleGroup on a four-slice frame: a bunch 1.00 slices long, every
+  slice on top of the others. The slice's offset now rides p%t and so timeOffset, which openPMD sums with
+  time, and the same frame reads 4.00 slices long. vec(5) is untouched, so the time record is byte for
+  byte what it was and the windowed composition still restarts mid-line at 3.7e-14. The two numbers stay
+  apart on purpose: the lag is a part in 1e8 of the arrival time and a single global time would lose it,
+  entirely so in single precision. The cost is eight bytes a macroparticle, 60.2 to 68.2 measured, and
+  doc/performance.md says so. convert_genesis.py carries the placement too, so a converted file and a
+  native one mean the same thing.
+
+  The harness restarted a run mid-line from its own dumps at 3.9e-14 throughout and could not have caught
+  this, since this program wrote and read both ends and re-supplied the offset from the patches. The file
+  comparison beside it collected only shaped datasets, so a constant record was invisible and timeOffset
+  was the one record it never compared. check_beam_format now expands constant records and gains a
+  section that reads a dump with openPMD-beamphysics, which shares none of this program's conventions:
+  the slices sit one spacing apart, the bunch spans its window, the reader sees every particle and the
+  whole charge, and a frame cut to a slice range places those slices exactly where the whole window does.
+  The round trip now also names the three records a restart may move, the element, the path length and
+  the arrival time, and holds the placement across it. The placement lives inside an absolute time, so a
+  double carries it to 6.5e-6 of a slice spacing and particlePatches stays the exact partition
+  (FINDINGS 7.64).
+
 - 2026-09-07 Added: the frame series can be cut to a slice range, and the field's reductions are
   written per record. global%dump_slice_first and dump_slice_last name the slices a frame carries, in
   window order, with -1 as the last meaning the last slice. The beam file's patch count is then the

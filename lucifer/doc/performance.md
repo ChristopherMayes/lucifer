@@ -290,9 +290,9 @@ What a frame costs, on the same machine, so that the layout questions a series r
 | | size | per unit |
 |---|---|---|
 | field frame, 96 x 255 x 255 complex128 | 95.3 MB | 1.02 kB per grid point |
-| beam frame, 196608 macroparticles | 11.3 MB | 60.2 B per macroparticle |
+| beam frame, 196608 macroparticles | 12.8 MB | 68.2 B per macroparticle |
 
-The beam frame carries no overhead to trim. Its 60 bytes are six coordinates, the time the reference phase folds into, the reference momentum and the label, and nothing else: the uniform weight and the zero longitudinal position are constant records that cost nothing per particle. The field is six times the beam and is where a series' bytes are.
+The beam frame carries no overhead to trim. Its 68 bytes are six coordinates, the time the reference phase folds into, the time offset that places the particle's slice in the bunch, the reference momentum and the label, and nothing else: the uniform weight and the zero longitudinal position are constant records that cost nothing per particle. The field is seven times the beam and is where a series' bytes are.
 
 Compression does not pay on this data. Chunked one slice at a time with the shuffle filter:
 
