@@ -26,6 +26,7 @@ Lucifer is the reference writer. The escaped-field and pulse field files are com
 - **F12.** `field/total/`, kind `derived` with `@derived_from` (core R38): the sum over the live polarizations of one wavelength, always written, whether one component is live or two, so no reader asks what else the file holds before it knows what power means (core R29).
 - **F12a.** `field/total/power_inside_angle` and `field/total/split_angle`: the power of each slice within `split_angle` of the axis, and that angle. The angle is a run-level scalar and is the filter's edge whether or not the filter is on. The power rides the transform the theta moments take, so it is NaN at every record where they were not (core R28), and its complement to `power` is the wide-angle emission of the point macroparticle beamlets.
 - **F13.** One group per harmonic, kind `harmonic` (`field/harm<h>`), carrying `@harmonic`, a true scalar integer (core R24), and its own components and `total/` under the same dataset names. Nothing is ever summed across harmonics: a detector separates colors.
+- **F16.** `field/<component>/reduced/`, kind `projected`, OPTIONAL: intensity projections of that component, each summed over the axis it drops, and the field on axis. Datasets: `xy_intensity` over `(record, grid_y, grid_x)`, `slice_x_intensity` over `(record, slice, grid_x)`, `slice_y_intensity` over `(record, slice, grid_y)`, and `on_axis_field_re` and `on_axis_field_im` over `(record, slice)`. Intensity is `|E|^2 / (2 mu_0 c)`, the same quantity as `on_axis_intensity` beside it, so the projections integrate to `power`: a conforming writer's `xy_intensity` summed over the transverse grid times the cell area equals that record's total `power`, and `slice_x_intensity` does the same per slice. The group exists so that a reader can draw a run without opening a field dump, and it is optional because the transverse projection is the grid's own size at every record. Present with it: `coords/grid_x` and `coords/grid_y`, the transverse positions in metres measured from the axis.
 
 ## 4. Parameters
 
@@ -34,11 +35,11 @@ Lucifer is the reference writer. The escaped-field and pulse field files are com
 
 ## 5. Kinds and axes this extension adds
 
-Kinds: `per_slice`, `field`, `component`, `harmonic`, `beam`, `projected`, `twiss`, `modes`. Axes: `slice`, `wavefront`, `wavefront_col`, `bmad_t`. Attributes: `@head_direction`, `@harmonic`, `@harmonics`, `@fel_version`.
+Kinds: `per_slice`, `field`, `component`, `harmonic`, `beam`, `projected`, `twiss`, `modes`. Axes: `slice`, `wavefront`, `wavefront_col`, `bmad_t`, `grid_x`, `grid_y`. Attributes: `@head_direction`, `@harmonic`, `@harmonics`, `@fel_version`.
 
 ## 6. Writer-harness identities
 
-Not checkable by the generic validator, required of a conforming writer's own tests: `t_slice == -ct_slice/c` exactly, `z_slice == beta0 * ct_slice`, `field/total` equal to the sum of its `@derived_from`, the angle-moment validity flags matching where the FFTs actually ran, the position entries of `rel_max` and `rel_min` matching extremes over a particle dump at the same plane, and every repeated `coords/s` straddling an element boundary.
+Not checkable by the generic validator, required of a conforming writer's own tests: `t_slice == -ct_slice/c` exactly, `z_slice == beta0 * ct_slice`, the `reduced/` projections integrating to `power` per record and per slice where they are written, `field/total` equal to the sum of its `@derived_from`, the angle-moment validity flags matching where the FFTs actually ran, the position entries of `rel_max` and `rel_min` matching extremes over a particle dump at the same plane, and every repeated `coords/s` straddling an element boundary.
 
 ## 7. Open questions
 

@@ -43,6 +43,7 @@ times slower.
 | Example | What it is | Time |
 |---|---|---|
 | [`steady_state/`](steady_state/) | Seeded single-slice gain curve, and mid-run openPMD dumps | 5 s |
+| [`frames/`](frames/) | A frame series along z over a slice range, with the field's reductions | 0.4 s |
 | [`taper/`](taper/) | The same line with a two-stage undulator taper, past saturation | 5 s |
 | [`sase/`](sase/) | Pure SASE: 96 slices, dark start, physical shot noise, slippage | 25 s |
 | [`flash1/`](flash1/) | FLASH1 at DESY at 13.7 nm from its published parameters, against its measured gain length and pulse energy | 20 s |
@@ -82,7 +83,7 @@ One row per feature declared in [the introduction](../doc/index.md).
 | Phasing between segments | [`chicane/`](chicane/) |
 | Shared-memory parallelism, bit-identical at any thread count | Demonstrated inline, below |
 | A GPU backend for the averaged method | [`steady_state/`](steady_state/), [`sase/`](sase/), [`harmonics/`](harmonics/), [`crossed_undulator/`](crossed_undulator/) and [`migration/`](migration/) run on it with `global%device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
-| openPMD dumps in both directions | [`steady_state/`](steady_state/) writes mid-run, [`import/`](import/) round-trips a bunch through a file, [`saturation_demo/`](saturation_demo/) reads Genesis4's |
+| openPMD dumps in both directions | [`steady_state/`](steady_state/) writes mid-run, [`import/`](import/) round-trips a bunch through a file, [`frames/`](frames/) writes a series along z, [`saturation_demo/`](saturation_demo/) reads Genesis4's |
 | A self-describing statistics file | Every example writes one |
 | One load path | [`import/`](import/) |
 | A coherent source model | [`coherent_source/`](coherent_source/) |

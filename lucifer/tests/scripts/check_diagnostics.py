@@ -21,8 +21,11 @@ escaped-field bank, held by cross-identities rather than reference files --
      the header, and the refusal of a harmonic the load carries no shot noise at.
   8. the frame series (global%dump_at_comb): one frame per stats record, a frame at an
      element end identical to that element's own dump, labels unique in every frame and
-     following migration, the frame's attributes against the lattice, a restart from a
-     mid-line frame, and a run with frames identical to the same run without.
+     following migration, the frame's attributes against the lattice, frames landing
+     inside an element, and a run with frames identical to the same run without.
+  9. a frame against the stats row it sits on: per-slice bunching from the frame's own
+     particles, per-slice power from the field frame, and the reduced projections
+     integrating to the row's power. Plus a slice range cutting both files.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -820,6 +823,96 @@ def main():
             inside += 1
     check("frames: the series lands inside the undulator, not only at its ends",
           0.0 if inside >= 2 else 1.0, 0.5, note=f"[{inside} of {len(frames)} inside UND]")
+
+    # 9. A frame against its stats row. These three identities pin the phase convention,
+    # the time-order rotation and the slice indexing end to end: a picture drawn from a
+    # frame and a number read from the row have to be the same run.
+
+    rr_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
+                '  global%dump_reduced = T\n')
+    run(exe, wd, "id", FRAME_NML.format(root="id", extra=rr_extra), threads="4")
+    idf = sorted(wd.glob("id-[0-9]*.beam.h5"))
+    idw = sorted(wd.glob("id-[0-9]*.wf.h5"))
+
+    with read_stats(wd / "id.stats.h5") as st:
+        b_row = np.asarray(st["beam/slice/bunching"]).copy()
+        p_row = np.asarray(st["field/total/power"]).copy()
+        spacing = float(np.ravel(st.run["slice_spacing"])[0])
+
+    # Bunching per slice, from the frame's own particles. read_slices does the documented
+    # reconstruction, theta = -ks c t, which is where the reference phase the writer
+    # folded into the time coordinate comes back.
+    worst_b = 0.0
+    for i, f in enumerate(idf):
+        sl = read_slices(f, wavelength=1e-10, spacing=spacing)
+        for isl, s in enumerate(sl):
+            if s["n"] == 0:
+                continue
+            w = np.asarray(s["weight"])
+            th = np.asarray(s["theta"])
+            b = abs((w * np.exp(1j * th)).sum() / w.sum())
+            worst_b = max(worst_b, abs(b - b_row[i, isl]))
+    check("frame vs row: per-slice bunching from the frame's particles", worst_b, 2e-12,
+          note=f"[{len(idf)} frames]")
+
+    # Power per slice, from the raw field frame.
+    Z0 = 1.25663706127e-6 * 299792458.0   # mu_0 * c, Bmad's own constants.
+    worst_p = 0.0
+    for i, f in enumerate(idw):
+        with h5py.File(f) as h:
+            it = list(h["data"])[0]
+            m = h[f"data/{it}/meshes/electricField"]
+            E = m["x"][()]
+            dx = float(np.ravel(m.attrs["gridSpacing"])[2])
+            dy = float(np.ravel(m.attrs["gridSpacing"])[1])
+        e2 = E["r"] ** 2 + E["i"] ** 2 if E.dtype.names else np.abs(E) ** 2
+        pw = e2.sum(axis=(1, 2)) * dx * dy / (2 * Z0)
+        rel = np.abs(pw - p_row[i]) / np.maximum(p_row[i], 1e-30)
+        worst_p = max(worst_p, float(np.max(rel)))
+    check("frame vs row: per-slice power from the field frame", worst_p, 1e-10)
+
+    # The reduced projections integrate to the row's power, which is F16's own identity.
+    with h5py.File(wd / "id.stats.h5") as h:
+        gx = h["coords/grid_x"][()]
+        gy = h["coords/grid_y"][()]
+        xy = h["field/x/reduced/xy_intensity"][()]
+        sx = h["field/x/reduced/slice_x_intensity"][()]
+        pwx = h["field/x/power"][()]
+    dxg = float(gx[1] - gx[0]);  dyg = float(gy[1] - gy[0])
+    tot = xy.sum(axis=(1, 2)) * dxg * dyg
+    rel_xy = np.abs(tot - pwx.sum(axis=1)) / np.maximum(pwx.sum(axis=1), 1e-30)
+    check("frame vs row: the transverse projection integrates to the record's power",
+          float(np.max(rel_xy)), 1e-10)
+    per = sx.sum(axis=2) * dxg * dyg
+    rel_sx = np.abs(per - pwx) / np.maximum(pwx, 1e-30)
+    check("frame vs row: the slice projection integrates to each slice's power",
+          float(np.max(rel_sx)), 1e-10)
+
+    # A slice range cuts both files and says which slices it carried.
+    run(exe, wd, "rg", FRAME_NML.format(root="rg",
+        extra='  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
+              '  global%dump_slice_first = 3\n  global%dump_slice_last = 5\n'), threads="4")
+    rgf = sorted(wd.glob("rg-[0-9]*.beam.h5"))
+    rgw = sorted(wd.glob("rg-[0-9]*.wf.h5"))
+    with h5py.File(rgf[-1]) as h:
+        it = list(h["data"])[0]
+        npatch = h[f"data/{it}/particles/electron/particlePatches/numParticles"].shape[0]
+        s1 = int(np.ravel(h.attrs["sliceFirst"])[0])
+        s2 = int(np.ravel(h.attrs["sliceLast"])[0])
+    with h5py.File(rgw[-1]) as h:
+        it = list(h["data"])[0]
+        nsf = h[f"data/{it}/meshes/electricField/x"].shape[0]
+    check("range: the beam frame's patch count is the range", abs(npatch - 3), 0.5,
+          note=f"[slices {s1} to {s2}, {npatch} patches]")
+    check("range: the field frame carries the range's slices", abs(nsf - 3), 0.5)
+
+    # The range is refused where it leaves the window.
+    (wd / "rgbad.nml").write_text(to_groups(FRAME_NML.format(root="rgbad",
+        extra='  global%dump_slice_first = 4\n  global%dump_slice_last = 99\n')))
+    r4 = subprocess.run([str(exe), "rgbad.nml"], cwd=wd, capture_output=True, text=True,
+                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    check("refusal: a slice range outside the window refused (1 = yes)",
+          0.0 if (r4.returncode != 0 and "INSIDE THE WINDOW" in (r4.stdout + r4.stderr)) else 1.0, 0.5)
 
     if FAILED:
         print("diagnostic checks: FAIL")

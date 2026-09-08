@@ -96,6 +96,9 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 | `global%dump_beam_at` | `""` | Element locators for mid-run beam dumps |
 | `global%dump_field_at` | `""` | Element locators for mid-run field dumps |
 | `global%dump_at_comb` | `F` | Write the beam and the field at every comb position as a frame series ([](#param-global-dump-at-comb)) |
+| `global%dump_slice_first` | `1` | First slice a frame carries, in window order |
+| `global%dump_slice_last` | `-1` | Last slice a frame carries. `-1` is the last slice of the window |
+| `global%dump_reduced` | `F` | Write the field's intensity projections per record into the stats file ([](#param-global-dump-reduced)) |
 | `global%keep_escaped_field` | `F` | Bank the field slices slippage carries out of the window, and rebuild the full pulse at exit |
 | `global%comb_ds_save` | `0` | Minimum z advance between per-record statistics rows |
 | `global%record_environment` | `F` | Also record the user name and working directory in the statistics file |
@@ -109,6 +112,11 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 Every frame carries where it was taken: `sPosition`, `elementName`, `elementIndex`, `phi0`, and inside an FEL element `felMethod` with `aw`, `ku`, `tilt` and `helical`. The averaged mode integrates the quiver away, so a reader that wants the physical orbit rebuilds it from those ([](reading-output.md)). A frame at the entry face carries a position and a name and no undulator.
 
 Writing frames does not change the run. The field's records are rotated to time order to be written and rotated back, so a run with frames is dataset-identical to the same run without them.
+
+**`global%dump_slice_first`** and **`global%dump_slice_last`** cut the series to a range of the window, in window order, with `-1` as the last meaning the last slice. Frames then carry the particles and the field of those slices only, the beam file's patch count is the range's length, and both files state `sliceFirst` and `sliceLast`. A run at one wavelength per slice has thousands of slices and a whole-window field frame is gigabytes, so a view that wants the core of the bunch asks for it here rather than reading it out afterwards. A range outside the window, or with the first past the last, is refused. Nothing else is affected: `dump_beam_at`, `dump_field_at` and the initial and final dumps stay whole, because a run restarts from those. A frame from a sub-window, or from inside an element, is not a restart point.
+
+(param-global-dump-reduced)=
+**`global%dump_reduced`** writes the field's intensity projections into the statistics file, one set per member and plane of the field set, at every record: the transverse intensity summed over the window, the intensity against slice and x summed over y, the same against slice and y, and the complex field on axis per slice. They are what a picture of a run is drawn from, summed once from the field the tracker already holds rather than recomputed from a raw field frame, and they integrate back to the record's `power` exactly. The group is [](BMAD-STATS-EXT-FEL.md)'s F16 and the axes it needs, `coords/grid_x` and `coords/grid_y`, appear with it. It is off by default because the transverse projection is the grid's own size at every record, and the header's `Reduced` line states the bytes before the run tracks.
 
 (param-global-keep-escaped-field)=
 **`global%keep_escaped_field`** banks each field slice that slippage transmits beyond the window, with its `wavefront_params` and transmission position, and at finalize propagates each to the exit plane to write the whole pulse. Field that has left the window never re-interacts, so it is fixed information. See [](fel-physics.md#sec-stats).

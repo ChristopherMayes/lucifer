@@ -282,6 +282,40 @@ Every row is inside a factor of two, which is what the estimate is held to. The 
 
 `tier1_unavg` is the highest at 1.87 and is high for a second reason: the unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period, and the count carries those substeps while the rates it multiplies are the averaged path's. `flash1` is the lowest at 0.82, on 351 slices at `ngrid` 129, which is the furthest configuration here from the one the rates were fitted on.
 
+(perf-frames)=
+## The frame series, measured
+
+What a frame costs, on the same machine, so that the layout questions a series raises are decided against numbers rather than against expectations. The deck is the `sase` example, 96 slices of 2048 macroparticles at `ngrid` 255, one frame every 20 m.
+
+| | size | per unit |
+|---|---|---|
+| field frame, 96 x 255 x 255 complex128 | 95.3 MB | 1.02 kB per grid point |
+| beam frame, 196608 macroparticles | 11.3 MB | 60.2 B per macroparticle |
+
+The beam frame carries no overhead to trim. Its 60 bytes are six coordinates, the time the reference phase folds into, the reference momentum and the label, and nothing else: the uniform weight and the zero longitudinal position are constant records that cost nothing per particle. The field is six times the beam and is where a series' bytes are.
+
+Compression does not pay on this data. Chunked one slice at a time with the shuffle filter:
+
+| | size | ratio | read |
+|---|---|---|---|
+| stored, uncompressed | 95.3 MB | | 0.009 s |
+| gzip level 1 | 73.2 MB | 1.30x | 0.135 s |
+| gzip level 4 | 72.6 MB | 1.31x | 0.139 s |
+| float32 | 47.6 MB | 2.00x | |
+
+A saturated FEL field is not sparse. The wide-angle emission of the point beamlets fills the grid, and a float64 mantissa of a noise-like field is incompressible, so gzip buys 1.3 times for sixteen times the read. Storing the field as float32 halves it exactly and costs 5.9e-8 of relative accuracy, which is far below anything a picture or a moment needs and far above single-precision tracking's own floor. Neither is taken here: the measurement is what a later decision is made against.
+
+Writing frames dominates a run at a movie-grade comb, and the device readback does not. One undulator segment, 15 slices of 4096 at `ngrid` 256 on the Metal backend, a comb of 0.1 m and 31 records:
+
+| | frames off | frames on |
+|---|---|---|
+| walk | 0.134 s | 0.582 s |
+| dumps | 0.000 s | 0.402 s, 69.1% |
+| stats and diag | 0.027 s | 0.025 s |
+| device step | 0.001 s | 0.002 s |
+
+The readback is about 0.10 s either way, since it happens at every comb row whether or not a frame is written, and it is the unaccounted remainder in both columns. With frames on it is a sixth of the walk and the file writing is two thirds. So a series that costs too much is not answered by moving the per-slice reductions onto the device, which would save readback the run is not spending its time in. It is answered by writing fewer slices, which `global%dump_slice_first` and `dump_slice_last` do, or fewer records, which the comb does.
+
 (perf-device)=
 ## The device, measured against the CPU
 

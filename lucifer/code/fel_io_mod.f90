@@ -99,10 +99,14 @@ subroutine fel_frame_attributes (file_name, run, ie, err_flag)
 type (fel_run_struct), target :: run
 type (fel_und_struct), pointer :: und
 type (branch_struct), pointer :: branch
-integer(hid_t) f_id
+type (hdf5_info_struct) obj_info
+type (floor_position_struct) fl
+integer(hid_t) f_id, d_id, it_id
 integer ie, h5_err
+real(rp) t_ref, ds_ele
 logical err_flag, err
 character(*) file_name
+character(200) it_name
 character(*), parameter :: r_name = 'fel_frame_attributes'
 
 !
@@ -112,10 +116,57 @@ branch => run%lat%branch(0)
 
 call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
 
+call hdf5_write_attribute_string (f_id, 'frameFormat', 'lucifer-frames 1.0', err)
 call hdf5_write_attribute_real (f_id, 'sPosition', run%z_now, err)
 call hdf5_write_attribute_string (f_id, 'elementName', trim(branch%ele(ie)%name), err)
 call hdf5_write_attribute_int (f_id, 'elementIndex', ie, err)
 call hdf5_write_attribute_real (f_id, 'phi0', run%fbeam%phi0, err)
+call hdf5_write_attribute_int (f_id, 'sliceFirst', run%dump_is1, err)
+call hdf5_write_attribute_int (f_id, 'sliceLast', run%dump_is2, err)
+
+! Where the frame sits in the lab. s is a curvilinear coordinate, so a scene holding a
+! line with a bend needs the floor to place the frame and the grid transverse to it. The
+! floor is taken at the frame's own s rather than the element's, since a frame lands
+! mid-element and ele%floor is the downstream face. coords_curvilinear_to_floor walks the
+! geometry, so a bend is right and not straightened.
+
+fl = coords_curvilinear_to_floor ([0.0_rp, 0.0_rp, run%z_now], branch, err)
+if (.not. err) then
+  call hdf5_write_attribute_real (f_id, 'floorPosition', [fl%r(1), fl%r(2), fl%r(3)], err)
+  call hdf5_write_attribute_real (f_id, 'floorAngles', [fl%theta, fl%phi, fl%psi], err)
+endif
+
+! openPMD orders a series by the iteration's time and has no notion of s, so the frame
+! carries Bmad's own reference time rather than a number defined as s over c. The
+! reference momentum is constant through an undulator, so the time at a position inside
+! an element is linear between the element's two faces. The writers leave the attribute
+! at zero, which would stack a whole series at one instant.
+
+t_ref = branch%ele(ie)%ref_time
+if (ie >= 1) then
+  ds_ele = branch%ele(ie)%s - branch%ele(ie-1)%s
+  if (ds_ele > 0) t_ref = branch%ele(ie-1)%ref_time + (branch%ele(ie)%ref_time - &
+                          branch%ele(ie-1)%ref_time) * (run%z_now - branch%ele(ie-1)%s) / ds_ele
+endif
+
+! The iteration group's name differs between the two writers, so it is found rather than
+! spelled: each file holds exactly one.
+
+d_id = hdf5_open_group (f_id, 'data', err, .true.)
+if (.not. err) then
+  if (hdf5_group_n_links(d_id, err) == 1) then
+    call hdf5_get_object_by_index (d_id, 0, it_name, obj_info, err)
+    if (.not. err) then
+      it_id = hdf5_open_group (d_id, trim(it_name), err, .true.)
+      if (.not. err) then
+        call hdf5_write_attribute_real (it_id, 'time', t_ref, err)
+        call hdf5_write_attribute_real (it_id, 'timeUnitSI', 1.0_rp, err)
+        call H5Gclose_f (it_id, h5_err)
+      endif
+    endif
+  endif
+  call H5Gclose_f (d_id, h5_err)
+endif
 
 ! The lattice's elements run from 0, which is the entry face, and the run's per-element
 ! arrays run from 1. The frame taken before the walk enters its first element therefore
@@ -169,6 +220,7 @@ subroutine fel_dump_frame (run, ie, err_flag)
 
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
+type (wavefront_struct) wf_sub
 integer ie, ihh, first_was
 logical err_flag, eerr
 character(200) prefix
@@ -182,7 +234,7 @@ ffield => run%ffield
 write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
 
 call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
-                             trim(prefix) // '.beam.h5', eerr)
+                             trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2)
 if (eerr) return
 call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
 if (eerr) return
@@ -197,8 +249,20 @@ do ihh = 1, run%n_harm
 
   hsuf = ''
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
-  call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
-                                run%z_now, eerr)
+
+  ! A range writes the slices it asks for. The records are in time order here, so slice
+  ! index and window index are the same thing, and the slab is taken rather than the
+  ! writer taught a range: a sub-window is small by construction, which is the point.
+
+  if (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice) then
+    call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
+                                  run%z_now, eerr)
+  else
+    wf_sub = ffield(ihh)%wf
+    wf_sub%Ex = ffield(ihh)%wf%Ex(:, :, run%dump_is1:run%dump_is2)
+    if (allocated(ffield(ihh)%wf%Ey)) wf_sub%Ey = ffield(ihh)%wf%Ey(:, :, run%dump_is1:run%dump_is2)
+    call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', run%z_now, eerr)
+  endif
   if (.not. eerr) call fel_frame_attributes (trim(prefix) // trim(hsuf) // '.wf.h5', run, ie, eerr)
 
   ! Back to the rotation the walk is carrying, whether or not the write succeeded.
@@ -371,12 +435,41 @@ block
   ! per-frame size is the beam's coordinates and the field set's grid, which are the two
   ! counts above.
 
-  if (run%global%dump_at_comb) then
-    write (line, '(a, i0, a, es8.2, a)') ' Frames      ', run%stats%nrec, &
-          ' at the comb, beam and field, about ', &
-          run%stats%nrec * (88.0_rp * n_particle + 16.0_rp * n_gpt), ' bytes in all'
-    call out_io (s_blank$, r_name, trim(line))
-  endif
+  ! What the series will write. The beam and the field carry the slice range and nothing
+  ! else does, so the range is what they are priced over. The reductions are per record
+  ! whether or not frames are on, and the transverse projection is the grid's own size,
+  ! so they are priced separately and stated even without a series.
+
+  block
+    real(rp) n_rng, b_frame, f_frame, red_bytes
+    integer nrng
+    character(12) lab
+    nrng = run%dump_is2 - run%dump_is1 + 1
+    n_rng = real(nrng, rp) / max(1, run%nslice)
+    ! 60 bytes a macroparticle, measured on a real frame: six coordinates, the time the
+    ! phase folds into, the reference momentum and the label. The writer stores a uniform
+    ! weight and the zero z as constant records, which cost nothing per particle.
+    b_frame = 60.0_rp * n_particle * n_rng
+    f_frame = 16.0_rp * n_gpt * n_rng
+    red_bytes = 0
+    if (run%stats%n_red > 0) red_bytes = 8.0_rp * run%stats%nrec * run%stats%n_red * &
+          (real(ngrid, rp)**2 + 2.0_rp * run%nslice * ngrid)
+
+    if (run%global%dump_at_comb) then
+      write (line, '(a, i0, a, i0, a, es8.2, a)') ' Frames      ', run%stats%nrec, &
+            ' at the comb over ', nrng, ' slices, about ', &
+            run%stats%nrec * (b_frame + f_frame), ' bytes of beam and field'
+      call out_io (s_blank$, r_name, trim(line))
+    endif
+    if (red_bytes > 0) then
+      lab = ' Reduced    '
+      if (run%global%dump_at_comb) lab = '            '
+      write (line, '(a, i0, a, es8.2, a)') lab // ' The field''s reductions over ', &
+            run%stats%n_red, ' of the field set, about ', red_bytes, &
+            ' bytes in the stats file'
+      call out_io (s_blank$, r_name, trim(line))
+    endif
+  end block
 
   ! The load against the floor the filter's convergence was measured at: 1024
   ! macroparticles per slice in 128 beamlets, below which the mode power in the
@@ -965,6 +1058,8 @@ out_root = run%global%out_root
 sprm%slice_spacing = fbeam%slice_spacing
 sprm%species = 'electron'
 sprm%beta0 = fel_p0_mc(fbeam) / sqrt(fel_p0_mc(fbeam)**2 + 1)
+sprm%grid_dx = run%ffield(1)%wf%dx
+sprm%grid_dy = run%ffield(1)%wf%dy
 
 call fel_stats_write (run%stats, sprm, trim(out_root) // '.stats.h5', ferr)
 call fel_write_params (run, trim(out_root) // '.stats.h5')

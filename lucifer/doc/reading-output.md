@@ -243,9 +243,22 @@ with h5py.File(frames[3]) as h:
     s, aw, ku = h.attrs["sPosition"], h.attrs["aw"], h.attrs["ku"]
 ```
 
-Each file says where it was taken. `sPosition`, `elementName` and `elementIndex` are on
-every frame, and a frame inside an FEL element also carries `felMethod` with `aw`, `ku`,
-`tilt` and `helical`. `phi0` is the beam's reference phase there.
+The series is `run-%06T.beam.h5` as an openPMD pattern, which is what a reader that takes
+one wants.
+
+Each file says where it was taken. `frameFormat` names the layout, and `sPosition`,
+`elementName`, `elementIndex`, `phi0`, `sliceFirst` and `sliceLast` are on every frame. A
+frame inside an FEL element also carries `felMethod` with `aw`, `ku`, `tilt` and
+`helical`. `floorPosition` and `floorAngles` place the frame in the lab: `s` is a
+curvilinear coordinate, so a scene holding a line with a bend needs the floor, and it is
+taken at the frame's own position rather than the element's end. The iteration's `time` is
+Bmad's reference time there, which is what orders a series for a reader that knows openPMD
+and nothing about beamlines.
+
+`global%dump_slice_first` and `global%dump_slice_last` cut the frames to a range of the
+window. The beam file's patch count is then the range and the field file carries that many
+slices, with `sliceFirst` and `sliceLast` saying which. Everything else is unchanged, so a
+reader places a sub-window frame by its own attributes.
 
 **The wiggle is not in an averaged frame, and the frame carries what rebuilds it.** The
 averaged mode integrates over the undulator period, so a particle's stored `x` is the
@@ -274,6 +287,28 @@ written by a program that sets none is all -1.
 Writing frames does not change the run: the field's records are rotated to time order to
 be written and rotated straight back, so a run with frames is dataset-identical to the
 same run without them. The harness measures that.
+
+**The pictures without the frames.** `global%dump_reduced` writes the field's intensity
+projections into the statistics file at every record, under `field/<component>/reduced/`:
+`xy_intensity` over the transverse grid summed across the window, `slice_x_intensity` and
+`slice_y_intensity` against slice, and `on_axis_field_re` and `on_axis_field_im` per
+slice. `coords/grid_x` and `coords/grid_y` are their transverse axes, in metres from the
+axis. They are the same quantity as `on_axis_intensity`, `|E|^2/(2 mu_0 c)`, so they
+integrate back to `power`:
+
+```python
+import h5py, numpy as np
+with h5py.File("run.stats.h5") as h:
+    gx, gy = h["coords/grid_x"][()], h["coords/grid_y"][()]
+    xy = h["field/x/reduced/xy_intensity"][()]      # (record, grid_y, grid_x)
+    power = h["field/x/power"][()]                  # (record, slice)
+da = (gx[1] - gx[0]) * (gy[1] - gy[0])
+assert np.allclose(xy.sum(axis=(1, 2)) * da, power.sum(axis=1))
+```
+
+The harness holds that identity per record and per slice. A run that writes them needs no
+field frame to draw a picture of itself, which is the point: the projections are two
+hundred times smaller than the frames they replace.
 
 ## Particle dumps: openPMD carries the weights, Genesis4 .par cannot
 

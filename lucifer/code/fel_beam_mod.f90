@@ -493,13 +493,14 @@ end subroutine fel_read_openpmd_beam
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag)
+subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
-integer is, nb, nslice
+integer is, nb, nslice, i1, i2
+integer, optional :: is1, is2
 logical err_flag, err
 character(*) file_name
 character(*), parameter :: r_name = 'fel_write_openpmd_beam'
@@ -509,21 +510,28 @@ character(*), parameter :: r_name = 'fel_write_openpmd_beam'
 err_flag = .true.
 nslice = size(beam%slice)
 
-if (sum(beam%slice(1:nslice)%n) == 0) then
+! The slices to write. A frame series may carry a range of the window and nothing else
+! does, so the patch count is the range's length and the file says which range it is.
+
+i1 = integer_option(1, is1)
+i2 = integer_option(nslice, is2)
+
+if (sum(beam%slice(i1:i2)%n) == 0) then
   call out_io (s_error$, r_name, 'BEAM HAS NO PARTICLES IN ANY SLICE; NOTHING TO WRITE.', &
                'FILE: ' // trim(file_name))
   return
 endif
 
-! Every slice becomes a patch, empty ones included: the patch count is the window.
+! Every slice becomes a patch, empty ones included: the patch count is the window, or
+! the range where one was asked for.
 
-call reallocate_beam (beam_b, nslice)
+call reallocate_beam (beam_b, i2 - i1 + 1)
 
-do is = 1, nslice
-  call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is), err, fold_phi0 = .true.)
+do is = i1, i2
+  call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is - i1 + 1), err, fold_phi0 = .true.)
   if (err) return
 enddo
-nb = nslice
+nb = i2 - i1 + 1
 
 ! The patches are the window: one per slice, in order, empty ones as zero-count
 ! patches. Nothing else about the window goes in the file. The wavelength, the slice

@@ -72,6 +72,7 @@ parameter reference is [](input-reference.md).
 | `&importdistribution` (match, center) | not ported | A Bmad lattice matches the beam, so these are the lattice's job |
 | `&sponrad` | `bmad_com%radiation_damping_on`, `bmad_com%radiation_fluctuations_on` | Lucifer exposes Bmad's own switches directly, as Tao does, rather than an FEL-local flag. Both default off, matching Genesis4's `&sponrad` default |
 | `&write beam`, `&write field` | `beam_file`, `field_file` on the input side; openPMD dumps on the output side | See file exchange below |
+| `&track beamdumpstep`, `fielddumpstep` | `global%dump_at_comb` with `global%comb_ds_save` | Genesis4 strides in integration steps and separately for the beam and the field. Here one comb sets the cadence in metres and both files are written on it, so a frame and its statistics row share an index. A field that is wanted less often is read less often rather than written less often |
 | `&importbeam`, `&importfield` | `beam_file`, `field_file` | Lucifer reads openPMD only, so convert first |
 | (no equivalent) | `global%migrate` | Slice migration. Off by default, since the comparison tiers run against a code that never migrates |
 | (no equivalent) | `fel_method = averaged` or `unaveraged` | Selects the method per element, and `global%transport_model` selects the averaged method's maps |

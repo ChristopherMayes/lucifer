@@ -131,6 +131,18 @@ type fel_stats_struct
   ! Element ends: the evaluated bunch_params_struct, whole bunch and per slice. The
   ! rows align with the records at_end marks, so they carry no z or ix_ele of their
   ! own, and nothing here duplicates a per-record array.
+  ! The field's reductions, when the run asked for them (BMAD-STATS-EXT-FEL F16). The
+  ! projections a picture is drawn from, summed once per record over the field the run
+  ! already holds, so a view needs no raw field frame. One entry per member and plane of
+  ! the field set, named in red_name.
+  integer :: n_red = 0
+  character(12), allocatable :: red_name(:)       ! (n_red)
+  real(rp), allocatable :: red_xy(:,:,:,:)        ! (nx, ny, nrec, n_red) [W/m^2]
+  real(rp), allocatable :: red_sx(:,:,:,:)        ! (nx, nslice, nrec, n_red)
+  real(rp), allocatable :: red_sy(:,:,:,:)        ! (ny, nslice, nrec, n_red)
+  real(rp), allocatable :: red_onax_re(:,:,:)     ! (nslice, nrec, n_red) [V/m]
+  real(rp), allocatable :: red_onax_im(:,:,:)     ! (nslice, nrec, n_red) [V/m]
+
   real(rp), allocatable :: e_bunch(:,:)           ! (n_bp, nend)
   real(rp), allocatable :: e_slice(:,:,:)         ! (n_bp, nslice, nend)
 end type
@@ -173,6 +185,8 @@ end type
 type fel_stats_params_struct
   real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m] (window_sample * lambda0).
   real(rp) :: beta0 = 1            ! Reference beta, for the slice z variable.
+  real(rp) :: grid_dx = 0          ! Transverse grid spacing [m], for the projections'
+  real(rp) :: grid_dy = 0          !   own axes. Zero where no projection is written.
   character(20) :: species = ''    ! Particle species name.
 end type
 
@@ -291,6 +305,109 @@ endif
 allocate (stats%e_bunch(fel_stats_n_bp$, nend), stats%e_slice(fel_stats_n_bp$, nslice, nend))
 
 end subroutine fel_stats_init
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_stats_reduced_init (stats, nx, ny, names)
+!
+! Routine to allocate the field's reduced projections, which only a run that asked for
+! them pays for. They are large: the transverse projection alone is nx by ny per record
+! per member, so the header prices them before the run tracks.
+!
+! Kept out of fel_stats_init because the grid is not known there, and because a run that
+! did not ask should allocate nothing at all.
+!
+! Input:
+!   stats    -- fel_stats_struct: Allocated accumulator.
+!   nx, ny   -- integer: Transverse grid points.
+!   names(:) -- character(*): One name per member and plane, in the order the recorder
+!                 fills them.
+!
+! Output:
+!   stats    -- fel_stats_struct: With the reduced arrays allocated and zeroed.
+!-
+
+subroutine fel_stats_reduced_init (stats, nx, ny, names)
+
+type (fel_stats_struct) stats
+integer nx, ny, nr, ns, i
+character(*) names(:)
+
+!
+
+stats%n_red = size(names)
+nr = stats%nrec;  ns = stats%nslice
+allocate (stats%red_name(stats%n_red))
+do i = 1, stats%n_red
+  stats%red_name(i) = names(i)
+enddo
+allocate (stats%red_xy(nx, ny, nr, stats%n_red))
+allocate (stats%red_sx(nx, ns, nr, stats%n_red))
+allocate (stats%red_sy(ny, ns, nr, stats%n_red))
+allocate (stats%red_onax_re(ns, nr, stats%n_red), stats%red_onax_im(ns, nr, stats%n_red))
+stats%red_xy = 0;  stats%red_sx = 0;  stats%red_sy = 0
+stats%red_onax_re = 0;  stats%red_onax_im = 0
+
+end subroutine fel_stats_reduced_init
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_stats_reduce_plane (stats, ir, ired, e, imap)
+!
+! Routine to sum one plane of one field member into the record's projections: the
+! transverse intensity summed over slices, the two slice-against-transverse intensities
+! summed over the other axis, and the complex field on axis per slice.
+!
+! Intensity is |E|^2 / (2 mu_0 c), the same as the on-axis intensity beside it, so the
+! projections and the per-slice numbers are one quantity.
+!
+! Input:
+!   stats -- fel_stats_struct: With the reduced arrays allocated.
+!   ir    -- integer: Record index.
+!   ired  -- integer: Member and plane index.
+!   e(:,:,:) -- complex(wf_rp): The field, (nx, ny, nslice), in its stored rotation.
+!   imap(:)  -- integer: Record index of each window slice, from fel_field_index. The
+!                 field is stored rotated by slippage, so the projections are gathered
+!                 through the same map the per-slice moments use, and slice is means the
+!                 same thing in every dataset of the file.
+!
+! Output:
+!   stats -- fel_stats_struct: Record ir of member ired filled.
+!-
+
+subroutine fel_stats_reduce_plane (stats, ir, ired, e, imap)
+
+type (fel_stats_struct) stats
+complex(wf_rp) e(:,:,:)
+real(rp) scl
+integer imap(:)
+integer ir, ired, ix, iy, is, js, nx, ny, ns, ic
+
+!
+
+nx = size(e, 1);  ny = size(e, 2);  ns = size(e, 3)
+scl = 1 / (2 * (mu_0_vac * c_light))
+ic = nx / 2 + 1
+
+do is = 1, ns
+  js = imap(is)
+  stats%red_xy(:, :, ir, ired) = stats%red_xy(:, :, ir, ired) + &
+        scl * (real(e(:, :, js), rp)**2 + aimag(e(:, :, js))**2)
+  do ix = 1, nx
+    stats%red_sx(ix, is, ir, ired) = scl * sum(real(e(ix, :, js), rp)**2 + aimag(e(ix, :, js))**2)
+  enddo
+  do iy = 1, ny
+    stats%red_sy(iy, is, ir, ired) = scl * sum(real(e(:, iy, js), rp)**2 + aimag(e(:, iy, js))**2)
+  enddo
+  stats%red_onax_re(is, ir, ired) = real(e(ic, ny/2 + 1, js), rp)
+  stats%red_onax_im(is, ir, ired) = aimag(e(ic, ny/2 + 1, js))
+enddo
+
+end subroutine fel_stats_reduce_plane
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -479,6 +596,30 @@ do is = 1, nslice
   enddo
 enddo
 !$OMP end parallel do
+
+! The field's reductions, where the run asked for them. Outside the slice loop above,
+! since each one sums over the whole window and the loop is parallel over slices.
+
+if (stats%n_red > 0) then
+  block
+    integer, allocatable :: imap(:)
+    integer ired, nsf
+    allocate (imap(nslice))
+    ired = 0
+    do io = 1, size(ff)
+      nsf = size(ff(io)%wf%Ex, 3)
+      do is = 1, nslice
+        imap(is) = fel_field_index(ff(io)%slip, is, nsf)
+      enddo
+      ired = ired + 1
+      call fel_stats_reduce_plane (stats, ir, ired, ff(io)%wf%Ex, imap)
+      if (allocated(ff(io)%wf%Ey)) then
+        ired = ired + 1
+        call fel_stats_reduce_plane (stats, ir, ired, ff(io)%wf%Ey, imap)
+      endif
+    enddo
+  end block
+endif
 
 err_flag = any_err
 
@@ -938,6 +1079,7 @@ type (fel_convergence_struct) cvg
 integer(hid_t) f_id, g_id, b_id, s_id
 integer h5_err, ir, ie, ns, ihh, is, ip, ne
 integer, allocatable :: rec(:), e_ix(:)
+integer ired_w
 integer, allocatable :: sl(:)
 real(rp), allocatable :: ct_slice(:), t_slice(:), z_slice(:), e_s(:)
 real(rp), allocatable :: cur(:,:), energy(:,:), sig_energy(:,:)
@@ -1050,6 +1192,27 @@ call fel_h5_real (g_id, 'ct_slice', 'm', 'ct', &
 call fel_h5_real (g_id, 't_slice', 's', 't', &
       'Arrival time of each slice relative to the reference, -ct_slice/c exactly. More ' // &
       'negative toward the window head.', 'slice', t_slice, err)
+
+! The transverse grid, an axis only where the field's projections run over it.
+
+if (stats%n_red > 0) then
+  block
+    real(rp), allocatable :: gx(:), gy(:)
+    integer nx, ny, i
+    nx = size(stats%red_xy, 1);  ny = size(stats%red_xy, 2)
+    allocate (gx(nx), gy(ny))
+    do i = 1, nx
+      gx(i) = (i - (nx / 2 + 1)) * prm%grid_dx
+    enddo
+    do i = 1, ny
+      gy(i) = (i - (ny / 2 + 1)) * prm%grid_dy
+    enddo
+    call fel_h5_real (g_id, 'grid_x', 'm', 'x', &
+          'Transverse grid position in x, measured from the axis.', 'grid_x', gx, err)
+    call fel_h5_real (g_id, 'grid_y', 'm', 'y', &
+          'Transverse grid position in y, measured from the axis.', 'grid_y', gy, err)
+  end block
+endif
 call fel_h5_real (g_id, 'z_slice', 'm', 'z', &
       'Bmad z of each slice at the reference beta, beta0*ct_slice. A given particle''s ' // &
       'own offset uses its own beta, so this one number cannot serve for all of them.', &
@@ -1333,6 +1496,8 @@ call group_note (b_id, 'x', 'component', 'The x polarization component.', err)
 call write_field_component (g_id, stats%f_centroid(:,:,1:ir), stats%f_sigma(:,:,1:ir), &
         stats%f_power(:,1:ir), stats%f_energy(:,1:ir), stats%f_on_axis(:,1:ir), &
         stats%f_emit_x(:,1:ir), stats%f_emit_y(:,1:ir), stats%f_angles_valid(:,1:ir), err)
+ired_w = 1
+call write_field_reduced (g_id, stats, ired_w, ir, err)
 call H5Gclose_f (g_id, h5_err)
 if (err) return
 
@@ -1342,6 +1507,8 @@ if (allocated(stats%f2_power)) then
   call write_field_component (g_id, stats%f2_centroid(:,:,1:ir), stats%f2_sigma(:,:,1:ir), &
           stats%f2_power(:,1:ir), stats%f2_energy(:,1:ir), stats%f2_on_axis(:,1:ir), &
           stats%f2_emit_x(:,1:ir), stats%f2_emit_y(:,1:ir), stats%f_angles_valid(:,1:ir), err)
+  ired_w = ired_w + 1
+  call write_field_reduced (g_id, stats, ired_w, ir, err)
   call H5Gclose_f (g_id, h5_err)
   if (err) return
 endif
@@ -1366,6 +1533,8 @@ if (allocated(stats%fh_power)) then
     call write_field_component (g_id, stats%fh_centroid(:,:,1:ir,ihh), stats%fh_sigma(:,:,1:ir,ihh), &
             stats%fh_power(:,1:ir,ihh), stats%fh_energy(:,1:ir,ihh), stats%fh_on_axis(:,1:ir,ihh), &
             stats%fh_emit_x(:,1:ir,ihh), stats%fh_emit_y(:,1:ir,ihh), stats%fh_angles_valid(:,1:ir,ihh), err)
+    ired_w = ired_w + 1
+    call write_field_reduced (g_id, stats, ired_w, ir, err)
     call H5Gclose_f (g_id, h5_err)
     call H5Gclose_f (s_id, h5_err)
     if (err) return
@@ -1537,6 +1706,51 @@ call fel_h5_flag (id, 'angle_moments_valid', 'angles valid', &
       'ends only).', 'record,slice', valid, err)
 
 end subroutine write_field_component
+
+!+
+! Subroutine write_field_reduced (id, stats, ired, ir, err)
+!
+! Routine to write one component's reduced projections, the pictures a view is drawn
+! from, summed once per record over the field the run held (BMAD-STATS-EXT-FEL F16).
+! Written only where the run asked for them, since the transverse projection alone is
+! the grid's own size per record.
+!-
+
+subroutine write_field_reduced (id, stats, ired, ir, err)
+
+type (fel_stats_struct) stats
+integer(hid_t) id, r_id
+integer ired, ir, h5e
+logical err
+
+!
+
+if (stats%n_red < ired) return
+
+call H5Gcreate_f (id, 'reduced', r_id, h5e)
+call group_note (id, 'reduced', 'projected', 'Intensity projections of this component, ' // &
+      'summed over the axis each one drops, and the field on axis.', err)
+
+call fel_h5_real (r_id, 'xy_intensity', 'W/m^2', 'intensity', &
+      'Transverse intensity summed over every slice of the window.', &
+      'record,grid_y,grid_x', stats%red_xy(:,:,1:ir,ired), err)
+call fel_h5_real (r_id, 'slice_x_intensity', 'W/m^2', 'intensity', &
+      'Intensity against slice and x, summed over y.', &
+      'record,slice,grid_x', stats%red_sx(:,:,1:ir,ired), err)
+call fel_h5_real (r_id, 'slice_y_intensity', 'W/m^2', 'intensity', &
+      'Intensity against slice and y, summed over x.', &
+      'record,slice,grid_y', stats%red_sy(:,:,1:ir,ired), err)
+call fel_h5_real (r_id, 'on_axis_field_re', 'V/m', 'Re E', &
+      'Real part of the field at the grid center, per slice. Its modulus squared over ' // &
+      '2 mu_0 c is on_axis_intensity beside it.', 'record,slice', &
+      stats%red_onax_re(:,1:ir,ired), err)
+call fel_h5_real (r_id, 'on_axis_field_im', 'V/m', 'Im E', &
+      'Imaginary part of the field at the grid center, per slice.', 'record,slice', &
+      stats%red_onax_im(:,1:ir,ired), err)
+
+call H5Gclose_f (r_id, h5e)
+
+end subroutine write_field_reduced
 
 !+
 ! Subroutine write_bp_bunch (id, rows, err)

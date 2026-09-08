@@ -9,6 +9,36 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-07 Added: the frame series can be cut to a slice range, and the field's reductions are
+  written per record. global%dump_slice_first and dump_slice_last name the slices a frame carries, in
+  window order, with -1 as the last meaning the last slice. The beam file's patch count is then the
+  range and the field file carries that many slices, both stating sliceFirst and sliceLast. A run at one
+  wavelength per slice has thousands of slices and a whole-window field frame at ngrid 255 is 95 MB, so
+  a view that wants the core of the bunch asks for it rather than reading it out afterwards. The dumps a
+  run restarts from stay whole, and a range outside the window is refused.
+
+  global%dump_reduced writes the field's intensity projections into the statistics file at every record,
+  one set per member and plane: the transverse intensity summed over the window, the intensity against
+  slice and x summed over y, the same against slice and y, and the complex field on axis. They are
+  BMAD-STATS-EXT-FEL's F16, with coords/grid_x and coords/grid_y as their axes, and they integrate back
+  to the record's power to 5e-15. Two hundred times smaller than the frames they replace, so a picture of
+  a run needs no field frame.
+
+  Every frame now states frameFormat, sliceFirst and sliceLast, the floor position and angles at its own
+  s rather than the element's end, and the iteration time as Bmad's reference time there, since openPMD
+  orders a series by time and has no notion of s. The Frames line prices the beam, the field and the
+  reductions with the range's slice count, at 60 bytes a macroparticle measured rather than assumed.
+
+  Three identities are checked, and they pin the phase convention, the time-order rotation and the slice
+  indexing end to end. Per-slice bunching from a frame's own particles agrees with the statistics row to
+  4.2e-15, per-slice power from a raw field frame to 7.4e-16, and the projections integrate to the row's
+  power to 5.5e-15. doc/performance.md gains the frame measurements. A field frame compresses 1.30 times under
+  gzip with shuffle for sixteen times the read, and stores as float32 at half the size for 5.9e-8 of
+  relative error, neither of which is taken here. A beam frame carries no overhead to trim. At a comb of
+  a tenth of a metre with frames on, writing them is 69 percent of the walk and the device readback is a
+  sixth, so a series that costs too much is answered by writing fewer slices rather than by moving
+  reductions onto the device. examples/frames runs the whole of it in 0.4 s.
+
 - 2026-09-07 Added: global%dump_at_comb writes the beam and the field at every comb position as an
   openPMD fileBased series, <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
   zero padded to six digits. The index is the stats record's, so a frame and the row describing it are

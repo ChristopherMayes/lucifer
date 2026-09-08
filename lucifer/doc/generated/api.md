@@ -3645,6 +3645,60 @@ Output:
   stats          -- fel_stats_struct: Allocated accumulator with zero fill counts.
 ```
 
+(api-fel-stats-reduced-init)=
+### `fel_stats_reduced_init`
+
+*Subroutine* `(stats, nx, ny, names)`
+
+```
+Routine to allocate the field's reduced projections, which only a run that asked for
+them pays for. They are large: the transverse projection alone is nx by ny per record
+per member, so the header prices them before the run tracks.
+
+Kept out of fel_stats_init because the grid is not known there, and because a run that
+did not ask should allocate nothing at all.
+```
+
+```
+Input:
+  stats    -- fel_stats_struct: Allocated accumulator.
+  nx, ny   -- integer: Transverse grid points.
+  names(:) -- character(*): One name per member and plane, in the order the recorder
+                fills them.
+
+Output:
+  stats    -- fel_stats_struct: With the reduced arrays allocated and zeroed.
+```
+
+(api-fel-stats-reduce-plane)=
+### `fel_stats_reduce_plane`
+
+*Subroutine* `(stats, ir, ired, e, imap)`
+
+```
+Routine to sum one plane of one field member into the record's projections: the
+transverse intensity summed over slices, the two slice-against-transverse intensities
+summed over the other axis, and the complex field on axis per slice.
+
+Intensity is |E|^2 / (2 mu_0 c), the same as the on-axis intensity beside it, so the
+projections and the per-slice numbers are one quantity.
+```
+
+```
+Input:
+  stats -- fel_stats_struct: With the reduced arrays allocated.
+  ir    -- integer: Record index.
+  ired  -- integer: Member and plane index.
+  e(:,:,:) -- complex(wf_rp): The field, (nx, ny, nslice), in its stored rotation.
+  imap(:)  -- integer: Record index of each window slice, from fel_field_index. The
+                field is stored rotated by slippage, so the projections are gathered
+                through the same map the per-slice moments use, and slice is means the
+                same thing in every dataset of the file.
+
+Output:
+  stats -- fel_stats_struct: Record ir of member ired filled.
+```
+
 (api-fel-stats-record)=
 ### `fel_stats_record`
 
@@ -3905,6 +3959,18 @@ marked @derived_from so that summing the children of field/ cannot double-count.
 ```
 Routine to write one polarization component: the full wavefront_params set under the
 same dataset names every component and harmonic uses.
+```
+
+(api-write-field-reduced)=
+### `write_field_reduced`
+
+*Subroutine* `(id, stats, ired, ir, err)`
+
+```
+Routine to write one component's reduced projections, the pictures a view is drawn
+from, summed once per record over the field the run held (BMAD-STATS-EXT-FEL F16).
+Written only where the run asked for them, since the transverse projection alone is
+the grid's own size per record.
 ```
 
 (api-write-bp-bunch)=

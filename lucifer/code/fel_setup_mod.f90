@@ -1173,6 +1173,26 @@ if (run%i_start > run%i_end) then
   err_flag = .true.;  return
 endif
 
+! The slices a frame carries. The default pair is the whole window, and -1 as the last
+! reads as the last slice so a range needs one convention and not two. The dumps that a
+! run restarts from are whole whatever this says, so the range is refused only against
+! the window it is a range of.
+
+run%dump_is1 = run%global%dump_slice_first
+run%dump_is2 = run%global%dump_slice_last
+if (run%dump_is2 == -1) run%dump_is2 = run%nslice
+if (run%dump_is1 < 1 .or. run%dump_is2 > run%nslice) then
+  call out_io (s_error$, r_name, 'DUMP_SLICE_FIRST \i0\ AND DUMP_SLICE_LAST \i0\ ARE NOT ' // &
+               'INSIDE THE WINDOW OF \i0\ SLICES.', &
+               i_array = [run%dump_is1, run%dump_is2, run%nslice])
+  err_flag = .true.;  return
+endif
+if (run%dump_is1 > run%dump_is2) then
+  call out_io (s_error$, r_name, 'DUMP_SLICE_FIRST \i0\ IS PAST DUMP_SLICE_LAST \i0\ .', &
+               i_array = [run%dump_is1, run%dump_is2])
+  err_flag = .true.;  return
+endif
+
 call setup_diagnostics ()
 if (err_flag) return
 
@@ -1501,6 +1521,31 @@ enddo
 run%nrec_stats = nrec_stats;  run%nend_stats = nend_stats
 call fel_stats_init (stats, nrec_stats, nend_stats, nslice, fbeam%p0c, two_pol, harmonics(2:n_harm))
 stats%split_angle = run%split_angle
+
+! The field's reduced projections, where the run asked for them. One entry per member and
+! plane, named as the recorder fills them.
+
+if (run%global%dump_reduced) then
+  block
+    character(12), allocatable :: rname(:)
+    integer nred, k, ih, ngrid(3)
+    nred = n_harm * merge(2, 1, two_pol)
+    allocate (rname(nred))
+    k = 0
+    do ih = 1, n_harm
+      k = k + 1
+      write (rname(k), '(a, i0, a)') 'h', harmonics(ih), '_x'
+      if (two_pol) then
+        k = k + 1
+        write (rname(k), '(a, i0, a)') 'h', harmonics(ih), '_y'
+      endif
+    enddo
+    ! The grid is the built wavefront's and not the deck's: a derived grid or one read
+    ! from a field file is what the projections are summed over.
+    ngrid = wavefront_shape(run%ffield(1)%wf)
+    call fel_stats_reduced_init (stats, ngrid(1), ngrid(2), rname)
+  end block
+endif
 allocate (run%bdiag_arr(nslice), run%fpow_arr(nslice), run%fonax_arr(nslice))
 
 end subroutine setup_diagnostics

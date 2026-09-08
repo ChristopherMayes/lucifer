@@ -157,6 +157,15 @@ type fel_global_struct
   ! ends. The comb already schedules the stats rows, so a frame and its row share an
   ! index (doc/reading-output.md).
   logical :: dump_at_comb = .false.
+  ! The slices a frame carries, in window order. The default pair is the whole window,
+  ! and a range cuts the series where a view wants only part of the bunch: a sample = 1
+  ! run has thousands of slices and a whole-window field frame is gigabytes. The
+  ! element-end, initial and final dumps are unaffected, being restart points.
+  integer :: dump_slice_first = 1
+  integer :: dump_slice_last = -1            ! -1 is the last slice of the window.
+  ! The field's own reductions, per record, into the stats file: the projections a
+  ! picture is drawn from, written once rather than recomputed from raw frames.
+  logical :: dump_reduced = .false.
   integer :: ran_seed = 12345                ! The one RNG seed (generation, import, noise).
   logical :: write_diag = .false.            ! The Genesis-comparison text diag file (large).
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
@@ -335,6 +344,7 @@ type fel_run_struct
   logical, allocatable :: sc_here(:)
   logical, allocatable :: dump_beam_here(:), dump_field_here(:)
   integer :: i_start = 1, i_end = 0        ! The resolved tracking window [elements].
+  integer :: dump_is1 = 1, dump_is2 = 0    ! The resolved frame slice range [slices].
   ! Run facts.
   real(rp) :: gamma0 = 0                   ! From the lattice e_tot.
   real(rp) :: gamma0_ref = 0               ! fel_gamma0(fbeam), the walk's reference.
