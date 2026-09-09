@@ -61,6 +61,8 @@ do ipass = 1, 2
   run%winit%lambda0 = 1e-10_rp
   run%winit%seed_power = 1e7_rp
   run%winit%seed_waist_size = 30e-6_rp
+  ! 63, and deliberately not a power of two. See check_program.py, which runs the
+  ! namelist twin of this configuration and must match it byte for byte.
   run%winit%grid_n_pts = 63
   run%winit%grid_half_width = 2e-4_rp
 

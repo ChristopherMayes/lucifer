@@ -73,7 +73,7 @@ BUNCH = """  beam_init%n_particle = 40000
 """
 
 
-def run(exe, wd, root, bextra, pextra="", lat="aramis_1seg.bmad", seed=777, ngrid=63,
+def run(exe, wd, root, bextra, pextra="", lat="aramis_1seg.bmad", seed=777, ngrid=64,
         sample=SAMPLE, threads="4"):
     """One run. Returns (returncode, stdout)."""
     (wd / f"{root}.nml").write_text(DECK.format(lat=lat, root=root, seed=seed, pextra=pextra,
@@ -193,7 +193,7 @@ def incone(exe, wd):
     pextra = (f'  global%track_end = "UND##1"\n  global%source_filter = F\n'
               f'  global%source_filter_angle = {INCONE_CUT:.1e}\n'
               f'  slicing%window_length = {WINDOW:.6e}\n')
-    rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=255,
+    rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
                   sample=INCONE_SAMPLE)
     if rc != 0:
         print(f"FAIL: the in-cone run exited {rc}:\n{out[-1500:]}")

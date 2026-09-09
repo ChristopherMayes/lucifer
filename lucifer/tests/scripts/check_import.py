@@ -75,7 +75,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   shot_noise = T
   ran_seed = {seed}
   seed_power = 0
-  grid_n_pts = 255
+  grid_n_pts = 256
   grid_half_width = 2e-4
 {source}  resample%n_slice = {nslice}
   resample%slice_width = 0.01
@@ -137,7 +137,7 @@ slicewidth = 0.01
 &field
 power=0
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 &end
 
 &track

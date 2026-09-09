@@ -57,7 +57,11 @@ LAMBDA_U = 0.015
 AW = 0.84853
 L_UND = 0.60          # spont_probe.bmad
 DGRID = 2e-4          # grid half width used below
-NGRID_REF = 255
+NGRID_REF = 256
+# The acceptance scan's ladder, coarsest first. Each step halves the cell at a fixed box,
+# so the captured solid angle spans 16x across it. Named once because the scan is written
+# in two places and its coarse end is divided by in a third.
+NGRID_SCAN = (64, 128, NGRID_REF)
 
 FAILED = False
 
@@ -199,7 +203,7 @@ def main():
                     ngrid=NGRID_REF,
                     extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="8"),
     ]
-    for ngrid in (63, 127, NGRID_REF):
+    for ngrid in NGRID_SCAN:
         jobs.append(lambda ngrid=ngrid: run(exe, wd, f"sp_uv{ngrid}",
                     NML.format(lat="sp_uv.bmad", root=f"sp_uv{ngrid}", ngrid=ngrid, extra="")))
     for root, lat, extra in (("sp_avg_f", "spont_probe.bmad", "  radiation_fluctuations = T\n"),
@@ -225,7 +229,7 @@ def main():
     # 4. The unaveraged mode: grid-acceptance-limited, and it must scale that way.
     print("--- unaveraged mode, grid angular-acceptance scan (box fixed):")
     meas, pred = {}, {}
-    for ngrid in (63, 127, NGRID_REF):
+    for ngrid in NGRID_SCAN:
         root = f"sp_uv{ngrid}"
         theta, u = acceptance(ngrid)
         meas[ngrid] = loss(wd, root)
@@ -239,8 +243,8 @@ def main():
           meas[NGRID_REF] / analytic, 1e-2, 8e-2,
           note="(only what the SVEA grid can hold)")
     # The shape test: a 16x range in captured solid angle.
-    r_meas = meas[NGRID_REF] / meas[63]
-    r_pred = pred[NGRID_REF] / pred[63]
+    r_meas = meas[NGRID_REF] / meas[NGRID_SCAN[0]]
+    r_pred = pred[NGRID_REF] / pred[NGRID_SCAN[0]]
     check("unaveraged: acceptance SCALING, measured/predicted ratio over 16x solid angle",
           r_meas / r_pred, 0.5, 2.0,
           note=f"(measured {r_meas:.2f}x vs predicted {r_pred:.2f}x)")

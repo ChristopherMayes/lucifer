@@ -83,6 +83,54 @@ Almost nothing here is checked against a stored expected-output file. A referenc
 
 A check that has never failed on a real defect is untested, so several here carry their own mutation record: what was broken deliberately, and how loudly the check noticed. And a measurement without a stated tolerance is not a check, so every number below is paired with the level it is held at.
 
+(val-the-transverse-grid)=
+## The transverse grid, and where the reference cannot be followed
+
+Every deck the harness runs carries a power-of-two transverse grid, and the derived count
+rounds up to one ([](input-reference.md#param-wavefront-grid)), so a deck runs on the CPU
+and on the Metal field solver unchanged. The LCLS example is the case that shows what that
+buys: 300 slices of 4096 macroparticles at grid 128, one deck, and the two backends land
+at 7.407 TW against 7.404 TW on exit power and 253.674 uJ against 253.561 uJ on pulse
+energy, a relative 4.1e-4 and 4.5e-4 inside the device's own 5.1e-4 band. Before the grids
+moved the same deck derived 127 points on the CPU and 128 on the device, so no such
+comparison could be made at all.
+
+Moving to those grids is what made a defect in the field solver's propagator reachable.
+The transverse wavenumbers were built as an offset index, which lands on whole multiples
+of the fundamental only when the point count is odd. On an even count every mode was
+propagated half a step out and the constant mode at half a step rather than at zero, and
+the error grows with the mode. The kernel now builds the wavenumbers the transform
+carries. On an odd grid the two tables are the same one, so the change is bit-identical
+there and every digit recorded on an odd grid is unmoved, checked by building both and
+running one deck in one directory. On an even grid it is a correction of 1.4e-1 peak
+normalized on the 57 m line at 256 points.
+
+Genesis4 builds the same table the same way, so this was transcribed faithfully and the
+defect is upstream. The two codes therefore agreed with each other on an even grid while
+both were wrong, at 1.4e-6, which is why no comparison against the reference could find
+it. What found it is the one tier that compares two models of the same thing inside this
+code, the Bmad seam against the transcribed interlude, since the seam moves the field with
+`wavefront_drift`, whose wavenumbers were right at both parities. FINDINGS 7.67 in the
+design repository carries the measurements.
+
+Four places therefore hold an odd grid on purpose, each saying so where it is written. The
+five Genesis reference decks under `tests/genesis4/` and the harmonic and phasing checks
+compare against Genesis at levels between 1e-6 and 1e-3, and a comparison that tight has to
+run where the reference is right: at 64 and 256 the harmonic tier reads 1.4e-3 against a
+1e-6 level and the phasing curve 1.0e-6 against the same. The saturation demo is held for
+the same reason. And `lucifer_smoke_test` with its namelist twin stays at 63 to keep the
+odd-grid path itself under test, since a user may write an odd count and an imported
+Genesis field can carry one. The device refuses an odd grid and names the nearest
+supported size, which `check_device` asserts. Those exceptions go away when the upstream
+fix lands.
+
+The other four checks that run Genesis4 are unaffected and stay on powers of two: the
+distribution import, the SASE startup cross-check, the beam format check and the device's
+own Genesis comparison compare loaders, formats and short propagations rather than a long
+field solve. The device's Genesis anchor at grid 64 moved from 8.4e-7 to 6.4e-5 with the
+correction, which is the upstream defect measured on a short planar segment, and it sits
+25 times inside that check's 1.6e-3 level.
+
 (val-validation-from-one-command)=
 ## Validation, from one command
 
@@ -767,9 +815,9 @@ zero, so a future change that starts debiting the beam cannot pass unnoticed.
 The **unaveraged mode conserves energy by construction**, so its beam pays, but only
 for the radiation the grid can hold. An SVEA grid represents angles to the FFT Nyquist
 θ_max = λ/2dx, and the evidence that the captured 3.3% really is acceptance-limited
-undulator radiation is its scaling: varying only the acceptance (ngrid 127/255/511 at
-fixed box, θ_max = 1.6/3.2/6.4e-5 rad) moves the captured loss 0.84% -> 3.28% -> 11.4%,
-a measured 13.7x against a predicted 10.5x across a 16x range in captured solid angle.
+undulator radiation is its scaling: varying only the acceptance (ngrid 64/128/256 at
+fixed box, θ_max = 0.79/1.6/3.2e-5 rad) moves the captured loss 0.21% -> 0.82% -> 3.32%,
+a measured 15.5x against a predicted 14.3x across a 16x range in captured solid angle.
 The absolute normalization sits ~3x below a dipole-limit estimate of the angular
 distribution, which is that estimate's own accuracy at a_w ~ 1 -- so the test checks
 the shape tightly and the magnitude loosely, which is the honest split.

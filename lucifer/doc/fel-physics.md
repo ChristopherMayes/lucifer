@@ -464,12 +464,13 @@ $$
 $$ (eq-gridrule)
 
 The point count is 127 whatever the beam is, since $\sigma$ cancels between the two
-rules. Cells of a seventh of the beam resolve the beam and the mode, and finer cells
+rules, and it is rounded up from there to 128. Cells of a seventh of the beam resolve the beam and the mode, and finer cells
 raise the wide-angle emission of [](#sec-source-filter) without moving the mode power.
 Nine beam sizes contain the mode, and above that the half width does not enter. Both
 constants were measured on three machines a hundred times apart in wavelength
-([](startup-noise.md#sn-recommendations)). On the device the count is rounded up to the
-power of two the field solver there takes. One of the two may be set and the other is
+([](startup-noise.md#sn-recommendations)). The rounding to a power of two is what lets
+one derived deck run on the CPU and on the device at one grid, and it only ever refines,
+more points across one half width being smaller cells. One of the two may be set and the other is
 then derived against it: a stated half width keeps the cell rule and a stated point
 count keeps the containment rule. Nothing is derived without an emittance to derive
 from, so a run that starts from a dump states its own grid or takes the field's.

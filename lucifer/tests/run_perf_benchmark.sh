@@ -218,7 +218,7 @@ if [[ $PHASES -eq 1 ]]; then
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_n_pts = 256
   wavefront_init%grid_half_width = 2e-4
 /
 DECK
@@ -400,7 +400,7 @@ sample = 3
 &field
 power=5e3
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 waist_size=30e-6
 &end
 

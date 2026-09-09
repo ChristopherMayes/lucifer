@@ -69,7 +69,7 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
   seed_power = 0
-  grid_n_pts = 33
+  grid_n_pts = 32
   grid_half_width = 2e-4
   beamlet_size = 8
   window_length = 4.8e-9
@@ -139,7 +139,7 @@ KEEP_NML = """&fel_params
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 33
+  wavefront_init%grid_n_pts = 32
   wavefront_init%grid_half_width = 2e-4
 /
 """

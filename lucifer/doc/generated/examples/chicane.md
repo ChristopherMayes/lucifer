@@ -69,7 +69,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 
   wavefront_init%seed_power = 2e8
   wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 151
+  wavefront_init%grid_n_pts = 128
   wavefront_init%grid_half_width = 2e-4
 /
 ```
@@ -97,7 +97,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 
   wavefront_init%seed_power = 2e8
   wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 151
+  wavefront_init%grid_n_pts = 128
   wavefront_init%grid_half_width = 2e-4
 /
 ```

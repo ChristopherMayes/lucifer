@@ -3375,7 +3375,9 @@ Routine to derive the transverse grid from the beam where the deck states none
 the deck states and the matched Twiss the lattice states, averaged over the FEL
 elements by length, since that is the beta the mode sees. Cells are then a seventh of
 it and the half width nine of it, and the point count follows from whichever half
-width is in force. A stated value is never overridden, and the other is derived
+width is in force, rounded up to a power of two. The rounding only ever refines, more
+points over one half width being smaller cells, and it leaves the count the same on
+every backend, so a derived deck runs on the device and on the CPU at one grid. A stated value is never overridden, and the other is derived
 against it, so a deck that fixes the cell size gets the containment it needs and one
 that fixes the point count gets the resolution.
 

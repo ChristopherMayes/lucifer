@@ -512,7 +512,7 @@ def field_set(args, wd, exe):
     (wd / "devp_c.bmad").write_text("call, file = crossed_probe.bmad\nuse, CROSSED\n")
     (wd / "devp_xd.bmad").write_text("call, file = crossed_probe.bmad\nDEQ: pipe, l = 0.60\n"
                                      "XDRIFT: line = (UNDX, D1, DEQ)\nuse, XDRIFT\n")
-    pn = tp.ss(tp.NML).replace("grid_n_pts = 63", "grid_n_pts = 64")
+    pn = tp.ss(tp.NML)
     run(args.exe, wd, "devp_ss.in", pn.format(lat="devp_c.bmad", root="devpss",
         extra=DEV + '  global%fp32_check = "lockstep"\n'))
     s = summary(wd, "devpss")
@@ -544,7 +544,7 @@ def field_set(args, wd, exe):
        f"<= {ISO_CEIL:.1e}", iso <= ISO_CEIL)
     ok("crossed device: afterburner floor, Py/Px", f"{py_d/px_d:.3e}", f">= {PYPX_FLOOR:.0e}",
        py_d / px_d >= PYPX_FLOOR)
-    tdn = tp.NML.replace("grid_n_pts = 63", "grid_n_pts = 64")
+    tdn = tp.NML
     run(args.exe, wd, "devp_td.in", tdn.format(lat="devp_c.bmad", root="devptd",
         extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devptd")
@@ -686,7 +686,7 @@ def reproducible(args, wd, exe):
 def migration(args, wd, exe):
     """Slice migration with the device, on check_migration's decks at grid 64."""
     print("== slice migration with the device ==")
-    base = cm.BASE.replace("grid_n_pts = 65", "grid_n_pts = 64").replace("&end\n", "{extra}&end\n")
+    base = cm.BASE.replace("&end\n", "{extra}&end\n")
     # check_migration's heavy deck is a dark quiet start, which suits its accounting and
     # not the instrument: a slice whose field sits at FP64 roundoff normalizes the source
     # and field rows to nothing (the harmonic floor's lesson, doc/validation.md), and

@@ -499,7 +499,9 @@ end subroutine setup_fel_elements
 ! the deck states and the matched Twiss the lattice states, averaged over the FEL
 ! elements by length, since that is the beta the mode sees. Cells are then a seventh of
 ! it and the half width nine of it, and the point count follows from whichever half
-! width is in force. A stated value is never overridden, and the other is derived
+! width is in force, rounded up to a power of two. The rounding only ever refines, more
+! points over one half width being smaller cells, and it leaves the count the same on
+! every backend, so a derived deck runs on the device and on the CPU at one grid. A stated value is never overridden, and the other is derived
 ! against it, so a deck that fixes the cell size gets the containment it needs and one
 ! that fixes the point count gets the resolution.
 !
@@ -510,8 +512,7 @@ end subroutine setup_fel_elements
 subroutine derive_grid ()
 
 real(rp) sig, dx_want, half
-integer n_pts, n_dev
-logical dev_on
+integer n_pts, n_raw
 
 !
 
@@ -531,20 +532,15 @@ endif
 
 if (run%winit%grid_n_pts <= 0) then
   dx_want = sig / fel_cells_per_sigma$
-  n_pts = 2 * ceiling(half / dx_want) + 1
-  dev_on = (run%global%device /= '' .and. run%global%device /= 'off')
-  if (dev_on) then
-    n_dev = 1
-    do while (n_dev < n_pts)
-      n_dev = 2 * n_dev
-    enddo
-    n_pts = n_dev
-  endif
+  n_raw = 2 * ceiling(half / dx_want) + 1
+  n_pts = 1
+  do while (n_pts < n_raw)
+    n_pts = 2 * n_pts
+  enddo
   run%winit%grid_n_pts = n_pts
-  call out_io (s_info$, r_name, 'Grid \i0\ points, derived: cells of \es10.3\ m, ' // &
-               'a beam size over \f0.1\ .', &
-               i_array = [n_pts], r_array = [2 * half / (n_pts - 1), fel_cells_per_sigma$])
-  if (dev_on) call out_io (s_info$, r_name, 'Rounded up to a power of two, which the device solver takes.')
+  call out_io (s_info$, r_name, 'Grid \i0\ points, derived: cells of \es10.3\ m, a beam size ' // &
+               'over \f0.1\ , rounded up from \i0\ to a power of two.', &
+               i_array = [n_pts, n_raw], r_array = [2 * half / (n_pts - 1), fel_cells_per_sigma$])
 endif
 
 end subroutine derive_grid

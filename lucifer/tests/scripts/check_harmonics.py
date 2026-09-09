@@ -155,6 +155,14 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
+# The grids here are odd, and deliberately, where the rest of the harness runs powers of
+# two. Genesis propagates the transverse field on wavenumbers that are whole multiples of
+# dk only when ngrid is odd. On an even ngrid its FieldSolverFFT carries every mode half a
+# step out (FINDINGS 7.67). Lucifer used to carry the same offset and the two agreed by
+# sharing it. Lucifer's kernel is now correct, so a power comparison this tight against
+# Genesis has to run where Genesis is right, which is an odd grid. Moving these to 64 and
+# 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed upstream.
+
 NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"

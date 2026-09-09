@@ -2630,6 +2630,7 @@ integer ngrid
 real(rp) dgrid, ks, dz
 type (fel_source_filter_struct), optional :: filter
 real(rp) dk, shift, dx, dy, xf, yf, r
+integer mx, my
 type (fel_kernel_struct), allocatable :: grow(:)
 type (fel_kernel_struct), pointer :: kn
 integer ix, iy, iix, iiy, ik
@@ -2679,22 +2680,41 @@ if (allocated(kn%k2)) deallocate(kn%k2, kn%exp_k2)
 allocate (kn%k2(ngrid, ngrid), kn%exp_k2(ngrid, ngrid))
 
 dk = twopi / (ngrid * dgrid)
-shift = -0.5_rp * (ngrid - 1)
+
+! The transverse wavenumbers a discrete transform of ngrid points actually carries:
+! 0, 1, ... up to just under half of ngrid, then the negatives, each a whole multiple of
+! dk. Genesis builds the same table as (ix - (ngrid-1)/2) * dk and rotates it into
+! transform order (FieldSolverFFT.cpp, FieldSolverFFT::init). For an odd ngrid that
+! offset is a whole number and the two tables are the same one. For an even ngrid it is
+! a half, so every mode there is carried at (m + 1/2) * dk and the constant mode at
+! dk/2 rather than at zero. The error in k^2 is m + 1/4, which grows with the mode, and
+! the field it propagates picks up a phase that no beam produced (FINDINGS 7.67).
+!
+! Odd grids are bit-identical across this change, which is why every digit recorded on
+! one is unmoved.
 
 do iy = 0, ngrid-1
-  dy = iy + shift
+  my = iy;  if (2*my > ngrid-1) my = my - ngrid
+  dy = my
   do ix = 0, ngrid-1
-    dx = ix + shift
-    iiy = mod(iy + (ngrid+1)/2, ngrid)
-    iix = mod(ix + (ngrid+1)/2, ngrid)
-    kn%k2(iix+1, iiy+1) = cmplx(0.0_rp, -(dx*dx + dy*dy) * dk * dk / 2 / ks, rp)
+    mx = ix;  if (2*mx > ngrid-1) mx = mx - ngrid
+    dx = mx
+    kn%k2(ix+1, iy+1) = cmplx(0.0_rp, -(dx*dx + dy*dy) * dk * dk / 2 / ks, rp)
   enddo
 enddo
 
 kn%exp_k2 = exp(kn%k2 * dz)
 
-! The source filter's sigmoid, in the same FFT order as K2 and on the same normalized
-! frequency axis: FieldSolverFFT.cpp:133-144, where x runs over (ix + shift)/ngrid/xcut.
+! The source filter's sigmoid, in the same FFT order as K2 and on Genesis's own
+! normalized frequency axis: FieldSolverFFT.cpp:133-144, where x runs over
+! (ix + shift)/ngrid/xcut.
+!
+! That axis is the shifted one K2 no longer uses, so on an even grid the sigmoid's edge
+! sits half a wavenumber out from the modes it multiplies. It is left where Genesis puts
+! it. The filter is a transcribed shape and check_source_filter judges it by fidelity to
+! the reference, where the propagator above carries physics and was corrected against it.
+! Half a wavenumber is far inside the sigmoid's own width, which defaults to a twentieth
+! of an edge tens of wavenumbers out.
 ! The shifted index spans half of ngrid either side of the axis, so x = 1 is twice the
 ! Nyquist index and xcut = 1 puts the sigmoid's edge at the angle lambda/dx, off the grid. Genesis leaves the
 ! exponent unguarded, which is safe at its own cuts and overflows for a cut small enough to
@@ -2705,6 +2725,7 @@ if (allocated(kn%sigmoid)) deallocate (kn%sigmoid)
 
 if (want_sigmoid) then
   allocate (kn%sigmoid(ngrid, ngrid))
+  shift = -0.5_rp * (ngrid - 1)
   do iy = 0, ngrid-1
     yf = (iy + shift) / ngrid / filter%ycut
     do ix = 0, ngrid-1

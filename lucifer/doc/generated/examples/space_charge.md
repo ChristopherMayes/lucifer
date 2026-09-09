@@ -121,7 +121,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_n_pts = 128
   wavefront_init%grid_half_width = 2e-4
 /
 ```
@@ -154,7 +154,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_n_pts = 128
   wavefront_init%grid_half_width = 2e-4
 /
 ```
@@ -181,7 +181,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 129
+  wavefront_init%grid_n_pts = 128
   wavefront_init%grid_half_width = 2e-4
 /
 ```
@@ -211,7 +211,7 @@ The deck, its variants, and any lattice they name, as they are on disk.
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 5e3
   wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 255
+  wavefront_init%grid_n_pts = 256
   wavefront_init%grid_half_width = 2e-4
 /
 ```

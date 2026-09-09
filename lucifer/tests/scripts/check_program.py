@@ -75,6 +75,13 @@ use, SEG
 """
 
 # The namelist twin of lucifer_smoke_test's in-code configuration (same values).
+# grid_n_pts is 63 here on purpose, and this pair is the only place in the harness that is
+# not a power of two. Every other deck runs a power-of-two grid, which is what the Metal
+# field solver takes, so a deck moves between the backends unchanged. This pair holds the
+# odd-grid path on the CPU, which has to keep working: a user writing a Genesis-style odd
+# count gets one, and an imported Genesis field can carry one. The value has to match
+# lucifer_smoke_test.f90, since the check below compares the two runs byte for byte.
+
 NML_TWIN = """&fel_params
   lat_file = "smoke.bmad"
   global%out_root = "{root}"

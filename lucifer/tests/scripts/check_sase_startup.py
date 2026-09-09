@@ -55,7 +55,7 @@ sample = 3
 &field
 power=0
 dgrid=2.000000e-04
-ngrid=255
+ngrid=256
 waist_size=30e-6
 &end
 
@@ -85,7 +85,7 @@ BMAD_NML = """! flat keys; routed into the three groups by nml.to_groups
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
   seed_power = 0
-  grid_n_pts = 255
+  grid_n_pts = 256
   grid_half_width = 2e-4
   beamlet_size = 8
   window_length = 9.6e-9

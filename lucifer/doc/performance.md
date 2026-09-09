@@ -18,6 +18,11 @@ The tables below are also the calibration of the cost estimate every run prints 
 ./lucifer/tests/run_perf_benchmark.sh --phases
 ```
 
+Every table below whose deck states `ngrid` 255 was measured before the harness moved
+to power-of-two grids, and `run_perf_benchmark.sh` now states 256, so a fresh run reports
+walks about 1.17x those numbers on the large grid ([](#perf-the-transform-length)). The shares
+between phases are what those tables are for and they do not move with the grid.
+
 No genesis4 and no MPI: the phases mode compares the code against itself, so it starts from the tracker's own shot-noise quiet start rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice and `--big-slices` the larger case.
 
 The sampling split, on macOS:
@@ -75,6 +80,33 @@ The shares hold across a factor of 5.25 in slice count. The run row against the 
 Slippage is 0.4% of the walk and 0.1% at the larger size. [](validation.md#val-parallelism-openmp-over-slices) named the slippage rotation as part of the serial cost that capped scaling, which the measurement does not support. The field solve and the particle push are where the time is, and both are slice-parallel.
 
 (perf-the-particles-against-the-grid)=
+(perf-the-transform-length)=
+## The transform length
+
+Every deck in the harness runs a power-of-two transverse grid, so one deck runs on the
+CPU and on the Metal field solver unchanged, and the derived count rounds up to one
+([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is
+measured here rather than assumed. The `steady_state` example, one slice of 8192
+macroparticles over the full 57 m line, 12 threads, production build, varying only
+`grid_n_pts`. The 255 and 256 rows are six runs alternating between the two so that any
+drift falls on both, and the best of each is taken.
+
+| ngrid | factors | points | walk | seconds a point |
+|---|---|---|---|---|
+| 128 | 2^7 | 16384 | 4.366 s | 2.66e-4 |
+| 151 | prime | 22801 | 5.766 s | 2.53e-4 |
+| 255 | 3 x 5 x 17 | 65025 | 5.252 s | 8.08e-5 |
+| 256 | 2^8 | 65536 | 6.148 s | 9.38e-5 |
+| 257 | prime | 66049 | 8.046 s | 1.22e-4 |
+
+The power of two is the slower of the two large grids, at 1.17x the walk of 255 for 0.8
+percent more points. FFTW's mixed radix takes 3 x 5 x 17 better than it takes 2^8, and a
+power-of-two stride is where a two-dimensional transform's rows collide in the cache. A
+prime is worse than either, 1.56x against 255, which is the transform falling back to its
+general algorithm. What the grid convention buys is a deck that moves between the
+backends. On this machine it costs speed to get that, where a power of two is usually
+assumed to pay for itself.
+
 ## The particles against the grid
 
 The field solve and the particle push scale differently, so their ratio is a property of the configuration and not of the code. Same machine and line, 96 slices, 12 threads.

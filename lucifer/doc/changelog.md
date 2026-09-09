@@ -9,6 +9,29 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-09 Fixed: the field solver's transverse propagator carried the wrong wavenumbers on an even grid.
+  The table was built as an offset index, which lands on whole multiples of the fundamental only when the
+  point count is odd. On an even count every mode was propagated half a step out and the constant mode at
+  half a step rather than at zero, an error that grows with the mode. The kernel now builds the wavenumbers
+  the transform carries. On an odd grid the two tables are the same one, so the change is bit-identical
+  there, verified by building both and running one deck in one directory, and all eleven tier digits are
+  unmoved. On an even grid it is a correction of 1.4e-1 peak normalized on the 57 m line at 256 points.
+  Genesis4 builds the same table the same way, so the transcription was faithful and the defect is upstream,
+  and the two codes agreed with each other at 1.4e-6 on an even grid while both were wrong. What found it
+  was the tier comparing the Bmad seam against the transcribed interlude, the seam moving the field with
+  wavefront_drift, whose wavenumbers were right at both parities.
+
+- 2026-09-09 Changed: every deck in the tests and examples runs a power-of-two transverse grid, and the
+  derived count rounds up to one instead of only doing so for the device. A deck now runs on the CPU and on
+  the Metal field solver unchanged: the LCLS example at 300 slices of 4096 macroparticles and grid 128 lands
+  at 7.407 TW against 7.404 TW on exit power, a relative 4.1e-4 inside the device's 5.1e-4 band, where before
+  it derived 127 points on the CPU and 128 on the device and the two could not be compared. Six replacements
+  in check_device that existed only to patch an odd deck to an even one are gone with it. The cost is CPU
+  time and it is priced in doc/performance.md: 256 points take 1.17x the walk of 255 on the Aramis line,
+  FFTW taking 3 x 5 x 17 better than it takes 2^8. Four places hold an odd grid on purpose and say why,
+  the five Genesis reference decks, the harmonic and phasing checks, the saturation demo, and the smoke
+  test with its namelist twin, which keeps the odd-grid path under test.
+
 - 2026-09-09 Fixed: two device runs of one deck now agree bit for bit. The source deposit accumulated with
   atomic float adds, four corners a macroparticle and two a corner, and float addition is neither associative
   nor commutative, so the order threads reached a cell set the bits. On the time-dependent window with

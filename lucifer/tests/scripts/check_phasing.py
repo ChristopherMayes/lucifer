@@ -88,6 +88,13 @@ use, SEG
 {modeline}
 """
 
+# The grids here are odd on purpose, as in check_harmonics and for the same reason. This
+# check compares a phase curve against Genesis at 1e-6, and Genesis propagates the field
+# on half-integer wavenumbers when ngrid is even (FINDINGS 7.67). Lucifer's kernel is
+# correct now, so the comparison has to run where the reference is right. At 128 and 64
+# the two checks below read 1.0e-6 and 1.0e-5 against a 1e-6 level. Convert them once
+# Genesis is fixed upstream.
+
 LATCHIC = """no_digested
 parameter[geometry] = open
 parameter[particle] = electron

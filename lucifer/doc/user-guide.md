@@ -295,12 +295,12 @@ completion block listing what was written.
 ================================================================================
  Lucifer -- FEL tracking in Bmad, Bmad version 20260904-1
 --------------------------------------------------------------------------------
- Lattice     aramis.bmad
+ Lattice     ../aramis.bmad
              49 elements, 57.000 m, 12 FEL segments
  Beam        1 slice x 8192 particles, gamma0 = 11357.82
- Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid 255 points of 1.575 um
- Work        1068 FEL steps, 8192 macroparticles, 8.75E+06 particle-steps, 6.50E+04 grid points per step
- Estimate    4.0 s of walk on the CPU path, for Apple M3 Max, 12 cores, 2026-09-07.
+ Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid 256 points of 1.569 um
+ Work        1068 FEL steps, 8192 macroparticles, 8.75E+06 particle-steps, 6.55E+04 grid points per step
+ Estimate    4.7 s of walk on the CPU path, for Apple M3 Max, 12 cores, 2026-09-07.
  Load        8192 macroparticles in the thinnest slice, beamlets of 8, 1024 beamlets.
              This load is the one the filter's convergence was measured on (fel-physics.md).
              No shot noise. The quiet start leaves no bunching below harmonic 8.
@@ -308,18 +308,18 @@ completion block listing what was written.
  Output      out_root "steady_state", threads 12
 ================================================================================
      %        s       ele       step          power         energy    <|b|>  elapsed  element
-    7.0     3.990      1/49      89/89       4.165 kW       1.389 fJ   0.0006    0:00  UND
-   15.3     8.740      5/49      89/89      31.735 kW      10.586 fJ   0.0016    0:00  UND
-  100.0    57.000     48/49                792.748 MW     264.432 pJ   0.2432    0:04  D2
+    7.0     3.990      1/49      89/89       4.164 kW       1.389 fJ   0.0006    0:00  UND
+   15.3     8.740      5/49      89/89      31.738 kW      10.587 fJ   0.0016    0:01  UND
+  100.0    57.000     48/49                801.994 MW     267.516 pJ   0.2413    0:07  D2
 --------------------------------------------------------------------------------
  Done        57.000 m, 48 element ends
- Exit        power 792.748 MW, pulse energy 264.432 pJ, <|b|> 0.2432
+ Exit        power 801.994 MW, pulse energy 267.516 pJ, <|b|> 0.2413
  Split       2.966 urad, the mode angle. Inside it the mode, outside it the beamlets.
-             mode peak, z =   37.240 m: inside 1.558 GW, outside 1.257 MW, ratio  8.07E-04, <|b|> 0.3013
-             last record, z = 57.000 m: inside 790.824 MW, outside 1.924 MW, ratio  2.43E-03, <|b|> 0.2432
- Cost        walk 4.8 s measured, 4.0 s estimated on the CPU path for Apple M3 Max, 12 cores, 2026-09-07.
- Wrote       steady_state-final.beam.h5                      497.424 kB
-             steady_state-final.wf.h5                        1.048 MB
+             mode peak, z =   38.000 m: inside 1.558 GW, outside 2.141 MW, ratio  1.37E-03, <|b|> 0.3014
+             last record, z = 57.000 m: inside 799.509 MW, outside 2.484 MW, ratio  3.11E-03, <|b|> 0.2413
+ Cost        walk 7.3 s measured, 4.7 s estimated on the CPU path for Apple M3 Max, 12 cores, 2026-09-07.
+ Wrote       steady_state-final.beam.h5                      530.872 kB
+             steady_state-final.wf.h5                        1.056 MB
              steady_state.stats.h5                           1.120 MB
 ================================================================================
 ```

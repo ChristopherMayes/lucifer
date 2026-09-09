@@ -25,7 +25,7 @@ The beam is a flat coasting bunch said in Bmad's own vocabulary:
 `I = Q*c/extent`, so `bunch_charge` encodes 3 kA exactly.
 
 Measured on this input (`ran_seed` at its 12345 default): startup power settles near
-0.06 MW per slice after the first segment, the total reaches 33.6 MW at z = 57 m with a
+0.06 MW per slice after the first segment, the total reaches 34.0 MW at z = 57 m with a
 per-slice spread of 1.3, which is the SASE fluctuation, and the induced energy
 spread grows from 0.99 to 1.01 m_e c^2. With the source filter off the same deck reports
 4 MW per slice at startup and 3.0 GW at the exit, of which 96 percent is the wide-angle
@@ -45,7 +45,7 @@ reconstructed pulse come to 1.2 GB and 1.3 GB, and because those two files are t
 one place the tracker still writes Genesis4 field conventions rather than openPMD
 ([reading an output file](../../doc/reading-output.md)).
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). The filter is on by default and this deck runs with it: at the exit the power outside the split angle of 3.0 µrad is 1.1 percent of the power inside it, so the 33.6 MW above is the mode. With the filter off the same deck reports 3.0 GW at a ratio of 21, 96 percent of it that emission, and four times the macroparticles is not enough on this window, since 8192 per slice still gives 887 MW at a ratio of 13. Leaving the grid out of the deck derives 127 points over 192 µm instead of the 255 over 200 µm here, and that grid gives 31.3 MW at 0.0068, so two grids a factor of two apart in cell size agree to 7 percent once the artifact is gone.
+The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). The filter is on by default and this deck runs with it: at the exit the power outside the split angle of 3.0 µrad is 1.9 percent of the power inside it, so the 34.0 MW above is the mode. With the filter off the same deck reports 3.0 GW at a ratio of 24, 96 percent of it that emission, and four times the macroparticles is not enough on this window, since 8192 per slice still gives 920 MW at a ratio of 12. Leaving the grid out of the deck derives 128 points over 192 µm instead of the 256 over 200 µm here, and that grid gives 31.6 MW at 0.013, so two grids a factor of two apart in cell size agree to 7 percent once the artifact is gone.
 
 Runs in ~25 s.
 

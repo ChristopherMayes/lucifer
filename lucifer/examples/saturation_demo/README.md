@@ -30,6 +30,12 @@ unaveraged ledger closing exactly along z.
 
 ## The measured result
 
+The grid here is `ngrid` 255, and odd where the rest of the examples run powers of two.
+This demo's headline is an agreement with Genesis4, and Genesis4 propagates the transverse
+field on half-integer wavenumbers when `ngrid` is even, so a comparison this tight has to
+run where the reference is right (`lucifer/doc/validation.md`, and FINDINGS 7.67 in the
+design repository). Move it to 256 once that is fixed upstream.
+
 Measured (M3 Max, 12 performance cores, production builds both sides):
 
 | | wall | exit total power | vs Genesis4 |
