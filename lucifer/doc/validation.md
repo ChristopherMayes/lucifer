@@ -1103,15 +1103,57 @@ of the sum rather than of the order. Thirty-two bits would not serve. A scale th
 the worst case inside an int leaves a quantum that loses to the float accumulation it
 replaces by a factor of seven, where sixty-four bits beat it by the same factor, and the
 four configurations in the table below hold at the float deposit's own levels. The bound is
-every macroparticle in one cell in phase at a gamma floored an eighth of the reference.
-The run's charge gives it at setup, the element's source scale and the roll-off at the
-grid's corner complete it at the first step, and the scale, that origin and the headroom
-are printed there: on the Aramis segment, 2^24 ticks per volt per metre against a bound
-of 2.7e11 V/m, the quantum 37 bits below the FP32 spacing of the bound. The run is
-refused where that headroom would not beat the float accumulation, before anything
-converts. The scale is chosen against the bound the headroom is measured against, so the
-37 bits do not move with the deck and no deck reaches the refusal. Raising the minimum
-past 37 fires it.
+every macroparticle of the run in one cell in phase at an eighth of the lowest gamma the
+run loaded. That gamma is measured over the beam rather than assumed of the reference, and
+the eighth is then margin for what tracking can take off a particle, which is of order rho
+and a thousand times smaller. The run's charge gives the bound at setup, the element's
+source scale and the roll-off complete it at the first step, and the scale, that origin
+and the headroom are printed there: on the Aramis segment, 2^24 ticks per volt per metre
+against a bound of 2.7e11 V/m, the quantum 37 bits below the FP32 spacing of the bound.
+
+The roll-off is the kernel's own, not a simpler stand-in for it. The kernel takes the
+particle's offset from the undulator axis, rotates it when the segment is tilted, and
+forms the roll-off from that, so the bound takes the box half width plus the axis offset
+and puts the whole of that radius against the larger of the two curvatures. Bounding each
+axis at the half width with no offset and no rotation, which is what this did first, is
+short by up to four and a half in the roll-off term and about twelve percent in the bound.
+
+That floor is checked in the kernel, where the deposit happens. A readback cannot do it:
+it sees the state at an element's last step, so a particle is free to cross the floor and
+come back before anything looks, and a breach found there is found after that element's
+deposits have already used the bound. The kernel tests every particle before its
+contribution is converted or accumulated, drops one that fails, and records a fault that
+survives to the next drain. The test is written so that a gamma which is not a number
+fails it. On seeing the fault the host stops the run at that readback, which is ahead of
+any stats row, dump or exit line drawn from the step, so nothing computed across a
+breached interval is written. Raising the floor above the beam demonstrates it: the run
+exits non-zero, names the floor and the lowest gamma read back, and writes no output file.
+Guarding in the kernel also covers the twin, which is never resident and whose readback a
+host check never reaches.
+
+What the quantum contributes is measured rather than bounded. The deposit's scale can be
+shifted by whole bits, which moves the quantization and leaves the phase and the FP32
+arithmetic beside it alone, so the source row's composition can be read off directly. On
+the cancelling-phase deck the row is 1.4673e-05 at the derived scale and the same to every
+digit with the quantum 24 bits coarser, a factor of sixteen million. It first moves at 26
+bits coarser, to 1.0100x, and reaches 1.0505x at 29, which is the last shift the headroom
+refusal allows. So the floor of eight bits sits where quantization begins to cost a few
+percent, and at the thirty-seven bits the derivation delivers it costs nothing the row can
+resolve. Both ends are asserted, the row unmoved at 24 bits coarser and the run refused at
+30.
+
+Two refusals guard the scale, and they guard different things. The headroom refusal
+catches a quantum that would not beat the float accumulation it replaced. It cannot catch
+everything, because the scale is chosen against the same bound the headroom is measured
+against, so their product always lands in one binade and the headroom reads 37 bits
+whatever the deck: no deck reaches that refusal, and raising the minimum past 37 is what
+fires it. What the headroom cannot see is a scale the kernel cannot hold. The scale and
+its reciprocal reach the kernel in single precision, and a bound below about 5e-20 volts
+per metre sends the scale past the largest float while a bound above about 4e56 sends its
+reciprocal there. Either would deposit through an infinity with the headroom still
+reporting 37 bits. Both are refused explicitly. Neither is reachable by a deck with charge
+in it, the tested decks sitting some thirty orders inside the nearer edge, and the refusal
+is demonstrated by forcing the scale past what a float holds.
 
 One deliberate divergence from the reference backend, stated where the citation is: the longitudinal state is not an absolute FP32 theta but a 64-bit fixed-point phase, in ticks of $2\pi/2^{32}$ off a static FP64 per-slice reference. The low 32 bits are the phase modulo one radiation period at a uniform 1.5e-9 rad, the high bits count whole periods, and a bucket crossing is exact integer arithmetic. The uniform quantum is what lets the reference stay static for a whole element where the FP32 residual of [](#val-fp32-lockstep) needed a moving one. Bucket wraps are modular arithmetic and are asserted exactly, on the device's own arithmetic at every setup: a bucket shift and its return must be bit-exact and the extracted phase must never see the shift, a statement no tolerance is allowed to soften.
 

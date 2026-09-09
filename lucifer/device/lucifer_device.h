@@ -74,6 +74,12 @@ typedef struct {
    * costs one rounding. The caller derives it from a bound on the per-cell sum that
    * holds for the run and refuses a deck whose bound it cannot carry. */
   double dep_scale;
+  /* The gamma the deposit's bound assumes no particle falls below. The kernel drops a
+   * particle under it without converting or accumulating it and records a fault, which
+   * luc_dev_dep_fault reports so the caller can refuse the run. Checking in the kernel
+   * rather than on a readback covers the interval between two readbacks, which is where
+   * the bound could otherwise be breached and used. */
+  double dep_gam_floor;
   int32_t first;         /* field ring offset, Genesis's Field::first, one for the set */
   int32_t helical;       /* octupole kick shape (1 = both planes) */
   int32_t mutate;        /* falsifiability hook: perturb the kernel's detuning */
@@ -170,6 +176,10 @@ void luc_dev_sync (void);
  * bit-identical under bucket shifts (wraps are modular arithmetic, so this
  * asserts exactly rather than to a tolerance). */
 int luc_dev_wrap_check (int64_t bucket_ticks);
+
+/* Nonzero once any deposit has met a particle below dep_gam_floor. Sticky, and it
+ * drains before reading, so a caller that sees zero has seen every step encoded. */
+int luc_dev_dep_fault (void);
 
 /* Seconds the device spent executing since init, from command-buffer
  * timestamps, and the resident footprint in bytes. */

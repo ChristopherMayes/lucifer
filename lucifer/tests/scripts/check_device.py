@@ -71,6 +71,7 @@ import argparse
 import os
 import pathlib
 import shutil
+import re
 import subprocess
 import sys
 
@@ -563,6 +564,7 @@ def field_set(args, wd, exe):
     migration(args, wd, exe)
     reproducible(args, wd, exe)
     precision(args, wd, exe)
+    quantization(args, wd, exe)
 
     # 7g. The combination is refused for the device as for the CPU.
     r = run(args.exe, wd, "devp_rh.in", pn.format(lat="devp_c.bmad", root="devprh",
@@ -593,6 +595,11 @@ PRECISION_CASES = (
     ("charge in few cells", "  beam_init%a_norm_emit = 4e-9\n"
                             "  beam_init%b_norm_emit = 4e-9\n", 6.889e-06),
     ("the largest load", "  beam_init%n_particle = 32768\n", 2.507e-06),
+    # The load doc/performance.md prices the deposit at. It carries no float-deposit
+    # number beside it, the float deposit never having been measured here and not being
+    # measurable now, so it is held to the recorded ceiling and to the headroom instead.
+    # Its purpose is that the accuracy cases reach the load the cost table uses.
+    ("the performance load", "  beam_init%n_particle = 131072\n", None),
 )
 
 # The float deposit is not reproducible, so its numbers above carry their own scatter and
@@ -600,6 +607,28 @@ PRECISION_CASES = (
 # accumulator came in at 1.462e-05, 1.462e-05, 6.948e-06 and 2.506e-06: the same levels,
 # two of them slightly better and one nine parts in a thousand worse.
 PRECISION_MARGIN = 1.05
+
+# The quantum has to sit this far below the FP32 spacing of the deposit's own bound, in
+# bits, on every deck the precision cases run. The scale is derived per run and the run
+# prints the headroom it reached, so this is read back rather than assumed. The setup
+# refusal requires only 8, which is where fixed point stops beating the float accumulation
+# it replaced. 24 is the margin the derivation actually delivers, and
+# holding the checks to it means a derivation that quietly lost precision would be caught
+# here rather than passing on a combined source row.
+PRECISION_BITS_MIN = 24
+
+# What the quantum costs, measured rather than bounded. global%device_dep_mutate shifts
+# the derived scale by whole bits and touches nothing else, so coarsening the quantum by a
+# known factor and watching the source row is a direct separation of the quantization from
+# the phase and arithmetic error beside it. Measured on the cancelling-phase deck: the row
+# is 1.4673e-05 at the derived scale and the same to every digit 24 bits coarser, first
+# moves at 26 (1.0100x), and reaches 1.0505x at 29, which is the last shift the headroom
+# refusal allows. So the 8-bit floor sits where quantization starts to cost a few percent,
+# and at the 37 bits the derivation delivers it costs nothing that the row can see.
+QUANT_SHIFT = -24          # 16 million times the quantum, and still nothing
+QUANT_UNMOVED = 1.001      # the row may not move by even a part in a thousand there
+QUANT_REFUSED = -30        # one bit past the floor, where the run must be refused
+BITS_RE = re.compile(r"(\d+) bits below the FP32 spacing")
 
 
 def precision(args, wd, exe):
@@ -615,6 +644,15 @@ def precision(args, wd, exe):
     that keeps the bound but quantizes away what matters. Thirty-two bits would have done
     exactly that here, losing to the float deposit by a factor of seven. These four say
     the sixty-four-bit accumulator did not.
+
+    The source row is a combined number, carrying the FP32 arithmetic and the phase error
+    along with the quantization, so on its own it cannot say which of the three moved. The
+    quantization is separated here by asserting the property it depends on directly, per
+    deck: the run derives its own scale and prints how far the quantum sits below the FP32
+    spacing of the bound it was chosen against, and that headroom is read back and required
+    to be at least PRECISION_BITS_MIN. A quantum that far under the spacing cannot be what
+    a source row of 1e-5 is made of. The two together are the separation: the headroom
+    bounds the quantization per deck, and the source row prices everything at once.
     """
     print("== 10. the deposit's accuracy against the CPU's FP64 deposit ==")
     for name, extra, before in PRECISION_CASES:
@@ -625,9 +663,61 @@ def precision(args, wd, exe):
             ok(f"deposit accuracy, {name}", "run failed", "exit 0", False)
             continue
         v = summary(wd, root)["source"]
-        ok(f"deposit accuracy, {name}", f"{v:.3e}",
-           f"<= {CEIL['source']:.1e} and <= the float deposit's {before:.2e}",
-           v <= CEIL["source"] and v <= before * PRECISION_MARGIN)
+        if before is None:
+            ok(f"deposit accuracy, {name}", f"{v:.3e}",
+               f"<= {CEIL['source']:.1e}", v <= CEIL["source"])
+        else:
+            ok(f"deposit accuracy, {name}", f"{v:.3e}",
+               f"<= {CEIL['source']:.1e} and <= the float deposit's {before:.2e}",
+               v <= CEIL["source"] and v <= before * PRECISION_MARGIN)
+        m = BITS_RE.search(r.stdout)
+        bits = int(m.group(1)) if m else -1
+        ok(f"deposit quantum below the FP32 spacing of its bound, {name}",
+           f"{bits} bits" if m else "the run printed no headroom",
+           f">= {PRECISION_BITS_MIN} bits", bits >= PRECISION_BITS_MIN)
+
+
+def quantization(args, wd, exe):
+    """
+    What the quantum contributes to the measured deposit error, which is nothing.
+
+    The source row prices the phase error, the FP32 arithmetic and the quantization
+    together, so on its own it cannot say which of the three it is made of. Shifting the
+    deposit's scale moves one of them and leaves the other two alone. The row does not
+    move at all with a quantum 16 million times coarser, so the level the precision cases
+    record is not quantization, and the accumulator could be far coarser than it is before
+    the deposit noticed.
+
+    The other end is checked too. One bit past the headroom floor the run is refused, so
+    the guard that keeps the quantum out of the answer is demonstrated rather than assumed.
+    """
+    print("== 11. what the deposit's quantum contributes ==")
+    base = None
+    for shift in (0, QUANT_SHIFT):
+        root = f"devq{abs(shift)}"
+        extra = DEV + '  global%fp32_check = "lockstep"\n  beamlet_size = 8\n'
+        if shift:
+            extra += f"  global%device_dep_mutate = {shift}\n"
+        r = run(exe, wd, f"{root}.in", BASE.format(root=root, extra=extra))
+        if r.returncode != 0:
+            ok(f"quantum shifted {shift} bits", "run failed", "exit 0", False)
+            return
+        v = summary(wd, root)["source"]
+        if shift == 0:
+            base = v
+            continue
+        ok(f"the source row with the quantum {abs(shift)} bits coarser",
+           f"{v:.4e} against {base:.4e}, {v/base:.4f}x",
+           f"unmoved to {QUANT_UNMOVED:.3f}x, so the row is not quantization",
+           v <= base * QUANT_UNMOVED)
+
+    root = "devqref"
+    extra = (DEV + '  global%fp32_check = "lockstep"\n  beamlet_size = 8\n'
+             f"  global%device_dep_mutate = {QUANT_REFUSED}\n")
+    r = run(exe, wd, f"{root}.in", BASE.format(root=root, extra=extra), expect_fail=True)
+    refused = r.returncode != 0 and "CANNOT CARRY ITS BOUND AND ITS PRECISION" in r.stdout
+    ok(f"refused: a quantum {abs(QUANT_REFUSED)} bits coarser, one past the floor",
+       refused, "True", refused)
 
 
 def stats_arrays(path, skip=REPRO_SKIP):

@@ -1077,7 +1077,7 @@ contains
 subroutine fill_device_par (par, ok)
 
 type (fel_device_par_struct) par
-real(rp) g_max, p0_mc_l, s_bound
+real(rp) g_max, p0_mc_l, s_bound, r_max, dscale_sp, dsinv_sp
 integer ngrid_l(3), io, dep_bits
 logical ok
 
@@ -1139,20 +1139,64 @@ par%pol_im = aimag(und%pol)
 ! fires it and how it was verified.
 
 ok = .false.
-par%dep_scale = 1
-s_bound = sqrt(1 + abs(par%kx) * par%gridmax**2 + abs(par%ky) * par%gridmax**2) * &
+
+! A readback found a particle below the gamma the bound was built on, so the bound no
+! longer holds and nothing further is deposited. fel_device_readback named the gamma.
+
+if (dev%dep_breach) return
+
+! The roll-off the kernel actually applies, bounded. It takes the particle's offset from
+! the undulator axis, rotates that offset when the segment is tilted, and forms
+! 1 + kx*ddx^2 + ky*ddy^2. A particle can sit anywhere in the box, so the offset reaches
+! gridmax plus the axis offset itself, and a rotation moves the whole of that radius onto
+! either axis, which puts all of it against whichever of kx and ky is larger. Bounding
+! each axis at gridmax with no offset and no rotation, as this once did, is short by up
+! to a factor of four and a half in the roll-off term.
+
+r_max = par%gridmax + max(abs(par%ax), abs(par%ay))
+s_bound = sqrt(1 + 2 * max(abs(par%kx), abs(par%ky)) * r_max**2) * &
           maxval(par%scl_w(1:size(ff))) * dev%dep_qbound
+par%dep_scale = 1
+par%dep_gam_floor = dev%dep_gam_floor
 if (s_bound <= 0) then
   call out_io (s_error$, r_name, 'THE DEVICE DEPOSIT SCALE HAS NO POSITIVE BOUND.', 'PLEASE REPORT THIS!')
   return
 endif
 
-par%dep_scale = 2.0_rp ** floor(log(fel_dev_dep_room$ / s_bound) / log(2.0_rp))
+par%dep_scale = 2.0_rp ** (floor(log(fel_dev_dep_room$ / s_bound) / log(2.0_rp)) + dev%dep_mutate)
+
+! dep_mutate is zero in every run but the one check that measures what the quantum costs.
+! It is a power of two, so it moves the quantum and leaves everything else alone, which is
+! what lets the quantization be measured against the phase and arithmetic error rather
+! than bounded away from them. A shift down coarsens the quantum and eats the headroom
+! below, so a large enough shift is refused there like any other unusable scale.
 
 ! The FP32 spacing at the bound lies between 2^-24 and 2^-23 of it. The narrower is
 ! taken, so the reported headroom is the one the bound's own binade cannot undercut.
 
 dep_bits = floor(log(0.5_rp * epsilon(1.0_sp) * s_bound * par%dep_scale) / log(2.0_rp))
+
+! The scale and its reciprocal reach the kernel as single precision, so both have to be
+! finite and normal there. The headroom above cannot catch this: the scale is chosen
+! against the same bound the headroom is measured against, so their product always lands
+! in one binade and the headroom reads 37 bits whatever the deck. A bound below about
+! 5e-20 V/m sends the scale past the largest float and a bound above about 4e56 sends its
+! reciprocal there, and either would deposit through an infinity while the headroom still
+! reported healthy. Neither is reachable by a deck with charge in it, the tested decks
+! sitting some thirty orders inside the nearer edge, and both are refused rather than
+! assumed away.
+
+dscale_sp = real(real(par%dep_scale, sp), rp)
+dsinv_sp = real(1.0_sp / real(par%dep_scale, sp), rp)
+if (.not. (dscale_sp > tiny(1.0_sp) .and. dscale_sp < huge(1.0_sp) .and. &
+           dsinv_sp > tiny(1.0_sp) .and. dsinv_sp < huge(1.0_sp))) then
+  call out_io (s_error$, r_name, &
+       'THE DEVICE DEPOSIT SCALE IS NOT REPRESENTABLE IN THE KERNEL''S SINGLE PRECISION.', &
+       'THE BOUND ON ONE CELL IS \es10.2\ V/M, WHICH ASKS FOR A SCALE OF 2^\i0\ .', &
+       r_array = [s_bound], i_array = [nint(log(par%dep_scale) / log(2.0_rp))])
+  return
+endif
+
 if (dep_bits < fel_dev_dep_bits_min$) then
   call out_io (s_error$, r_name, &
        'THE DEVICE DEPOSIT CANNOT CARRY ITS BOUND AND ITS PRECISION AT ONCE.', &
@@ -1165,11 +1209,11 @@ endif
 if (.not. dev%dep_told) then
   dev%dep_told = .true.
   call out_io (s_info$, r_name, 'Device: the deposit accumulates in fixed point at 2^\i0\ ticks ' // &
-               'per V/m,', '  bounded by \es9.2\ V/m in one cell (the run''s charge at a gamma ' // &
-               'floor of gamma0 / \i0\,', '  the element''s source scale and the roll-off at the ' // &
-               'grid''s corner), with the quantum', '  \i0\ bits below the FP32 spacing of that bound.', &
+               'per V/m,', '  bounded by \es9.2\ V/m in one cell (the run''s charge at an eighth ' // &
+               'of its lowest loaded gamma,', '  the element''s source scale and the roll-off at the ' // &
+               'box corner), with the quantum', '  \i0\ bits below the FP32 spacing of that bound.', &
                r_array = [s_bound], &
-               i_array = [nint(log(par%dep_scale) / log(2.0_rp)), nint(fel_dev_gamma_floor$), dep_bits])
+               i_array = [nint(log(par%dep_scale) / log(2.0_rp)), dep_bits])
 endif
 
 ok = .true.

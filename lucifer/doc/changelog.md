@@ -9,6 +9,41 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-09 Fixed: the device deposit's overflow bound is now checked where it was assumed, and its clear
+  costs a quarter of what it did. The bound took the reference gamma over a fixed floor, where a
+  contribution carries w/gamma and so needs the lowest gamma the run will ever deposit at: setup measures
+  that over the loaded beam, every readback checks the beam has not fallen under an eighth of it, and a
+  particle that has refuses the run. The roll-off took the box half width with no axis offset and no
+  rotation, where the kernel offsets and rotates before forming it, which was short by up to four and a
+  half in the roll-off term. And the scale is now required to be finite and normal in the kernel's single
+  precision: the headroom refusal beside it cannot see that, the scale being chosen against the same bound
+  the headroom is measured against, so a bound below about 5e-20 V/m or above 4e56 would have deposited
+  through an infinity while the headroom read a healthy 37 bits. No deck reaches either edge, the tested
+  ones sitting thirty orders inside the nearer.
+
+  What the quantum costs is now measured. global%device_dep_mutate shifts the scale by whole bits and
+  moves nothing else, so the source row's composition can be read off: on the cancelling-phase deck it is
+  1.4673e-05 at the derived scale and the same to every digit with the quantum sixteen million times
+  coarser, first moves at 26 bits coarser and reaches 1.05x at 29, one short of the refusal. The level the
+  precision cases record is therefore phase and FP32 arithmetic, not quantization.
+
+  The clear writes four words a thread where it wrote one. It is a memory fill, it was the largest single
+  pass on a many-slice window at 0.0863 s of 0.328 s busy, and widening the store halves it. The same
+  widening on the float deposit is worth nothing, 0.99x and 1.01x, since that clear writes half the words
+  and was never the bottleneck, so the saving belongs to the fixed point's own bytes. On a 96-slice window
+  at ngrid 256 the deposit's price falls from 1.17x to 1.09x of the float walk at 1024 particles a slice
+  and from 1.31x to 1.11x at 8192, measured six pairs alternating between the two builds. Output is
+  unchanged: two runs still agree on all 127 arrays and every recorded precision level holds to its
+  printed digits.
+
+  The gamma the bound assumes is checked in the kernel rather than at a readback. A readback sees an
+  element's last step, so a particle can cross the floor and return before anything looks, and a breach
+  found there is found after that element's deposits have used the bound. The kernel tests every particle
+  before its contribution is converted, drops one that fails, and records a fault the host reads at the
+  next drain and stops the run on, ahead of any stats row or dump drawn from the step. It costs nothing
+  the walk can resolve. Guarding there also covers the twin, which is never resident and whose readback a
+  host check never reaches.
+
 - 2026-09-09 Fixed: the field solver's transverse propagator carried the wrong wavenumbers on an even grid.
   The table was built as an offset index, which lands on whole multiples of the fundamental only when the
   point count is odd. On an even count every mode was propagated half a step out and the constant mode at
@@ -58,8 +93,12 @@ and it is written at the merge.
   and the solve's last pass when it is off, since nothing transforms the source then. The instrument's source
   readback decodes the accumulator for the same reason. Accuracy is unchanged, measured against the CPU's FP64
   deposit on cancelling phases, unequal weights, charge in few cells and the largest load: 1.46e-5, 1.46e-5,
-  6.95e-6 and 2.51e-6 against the float deposit's 1.46e-5, 1.47e-5, 6.89e-6 and 2.51e-6. The cost is a quarter
-  to a third more device time and six to seven percent more wall clock, priced in doc/performance.md.
+  6.95e-6 and 2.51e-6 against the float deposit's 1.46e-5, 1.47e-5, 6.89e-6 and 2.51e-6. The cost depends on how much of a
+  walk the backend holds. On a single slice, where the host's dispatch dominates, it is a quarter to a third
+  more device time and six to seven percent more wall clock. On a 96-slice window at ngrid 256, where the
+  backend is busy for about 68 percent of the walk, it is a quarter to two fifths more device time and 17 to
+  31 percent more wall clock. Both are in doc/performance.md, with the per-pass table repeated after the
+  change: the clear and the deposit carry all of it and every other pass is unmoved.
   check_device gained the two-run comparison over every array, on both filter settings, and its no-op check
   is equality with its floor deleted.
 

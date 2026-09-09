@@ -407,14 +407,64 @@ best of five. The float deposit is the run before the accumulator changed.
 | 8192 | 0.1240 s | 0.1640 s | 1.32x | 0.683 s | 0.733 s | 1.07x |
 | 131072 | 0.2740 s | 0.3550 s | 1.30x | 1.700 s | 1.800 s | 1.06x |
 
-A quarter to a third more device time, and six to seven percent more wall clock, because
-the step is dominated by the host's dispatch at these sizes rather than by the device.
-Three passes pay it. The deposit does two atomic adds a component where it did one, since
-the 64-bit accumulator is two 32-bit words. The source clear writes twice the words. And
-the pass that converts reads four integers where it read two floats, which is the first of
-the filter's source passes with the filter on and the solve's last pass with it off. What
-that buys is in [](validation.md#val-device): two runs of one deck identical on every
-array of the statistics file, where 54 of 127 differed before.
+A quarter to a third more device time on those decks, and six to seven percent more wall
+clock, because a single slice leaves the step dominated by the host's dispatch rather than
+by the device: the backend is busy for only about a sixth of the walk there. That is the
+cheap end of the range and not a general figure, so the same comparison is made below on a
+window that keeps the device busy.
+
+Where the device time goes after the change, on item 1's own deck and conditions, so that
+the passes can be compared against the table above rather than inferred.
+
+| particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1024 | 0.820 s | 0.227 s | 0.0157 s | 0.0162 s | 0.0150 s | 0.0162 s | 0.0605 s | 0.0507 s | 0.1743 s | 26.4% |
+| 8192 | 0.891 s | 0.236 s | 0.0188 s | 0.0176 s | 0.0187 s | 0.0187 s | 0.0664 s | 0.0571 s | 0.1974 s | 3.8% |
+| 131072 | 1.898 s | 0.356 s | 0.0452 s | 0.0399 s | 0.0230 s | 0.1347 s | 0.0692 s | 0.0593 s | 0.3713 s | 3.4% |
+
+The two tables were taken in different sessions, so the passes the change does not touch
+are what says whether they can be compared at all. At 8192 and 131072 the transverse, push
+and solve lines sit at 0.94 to 0.97 of the earlier ones, close enough to read the rest;
+at 1024 they sit at 0.56 to 0.59 and its spread is 26 percent, so that row prices nothing.
+On the two rows that carry, the clear is 1.6x and the deposit 1.3x at 8192 and 1.6x at
+131072, and every other pass is unmoved. The deposit does two atomic adds a component
+where it did one, the clear writes twice the words, and the pass that converts reads four
+integers where it read two floats.
+
+What it costs where the device is the bottleneck. One Aramis segment, 96 slices at `ngrid`
+256 with shot noise and `comb_ds_save = -1`, which leaves the backend busy for about 68
+percent of the walk instead of a sixth. The two builds are the commit before the
+accumulator changed and the commit after, timing off on both, best of five after a
+discarded warm-up.
+
+| slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
+|---|---|---|---|---|---|---|
+| 96 x 1024 | 0.329 s | 0.385 s | 1.17x | 0.226 s | 0.283 s | 1.25x |
+| 96 x 8192 | 0.357 s | 0.466 s | 1.31x | 0.244 s | 0.337 s | 1.38x |
+
+That was with the clear as it first stood, one word a thread, and on this window the clear
+was the largest single pass at 0.0863 s of 0.328 s busy, a quarter of all device time,
+since it writes 96 slices of 256 by 256 accumulators every step. It is a memory fill, so
+what it costs is the width of a store: four words a thread halves it, to 0.0427 s. The
+same widening on the float deposit is worth nothing, 0.99x and 1.01x on the walk, because
+that clear writes half the words and was never the bottleneck. The saving belongs to the
+fixed point's own bytes and is credited there.
+
+With the clear widened on both sides and the deposit's gamma guard in the kernel, six
+pairs alternating between the two builds so that drift falls on both:
+
+| slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
+|---|---|---|---|---|---|---|
+| 96 x 1024 | 0.318 s | 0.348 s | 1.09x | 0.217 s | 0.239 s | 1.10x |
+| 96 x 8192 | 0.366 s | 0.405 s | 1.11x | 0.248 s | 0.293 s | 1.18x |
+
+So the wall-clock price is six to seven percent where the host's dispatch dominates and
+nine to eleven percent where the device does, and the share of the walk the backend holds
+is what sets which end a deck sits at. The kernel's gamma guard is inside those numbers
+and costs nothing the walk can resolve, one comparison and one branch a particle.
+
+What the price buys is in [](validation.md#val-device): two runs of one deck identical on
+every array of the statistics file, where 54 of 127 differed before.
 
 The field set, on the planar segment of the harmonics check (3.96 m, 88 steps) with the same 96 x 8192 window at `ngrid` 256 and `comb_ds_save = -1`, since a helical segment couples only the fundamental and the set has nothing to carry there:
 

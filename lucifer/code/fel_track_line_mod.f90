@@ -331,6 +331,7 @@ do ie = run%i_start, run%i_end
         ! arrays. Between rows the host state is stale by design. No-op off-device.
 
         call fel_device_readback (run%dev, fbeam, ffield)
+        if (run%dev%dep_breach) then;  err_flag = .true.;  return;  endif
         call take_stats_record (istep == und%nstep)
         if (err_flag) return
         if (fel_mode(ie) == unaveraged$) call write_ledger_row ()
@@ -339,6 +340,12 @@ do ie = run%i_start, run%i_end
       if (istep /= und%nstep) call progress_line (.false., istep, und%nstep)
     enddo
     call fel_device_element_end (run%dev, fbeam, ffield)   ! The residency boundary: z re-forms in FP64.
+
+    ! A deposit met a particle below the gamma its bound assumes and dropped it, so this
+    ! element's field is not what the physics asked for. Nothing downstream may read it:
+    ! the run stops here, before a stats row, a dump or an exit line is written from it.
+
+    if (run%dev%dep_breach) then;  err_flag = .true.;  return;  endif
     if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
     call end_of_element ()              ! Fills the element-end row before this element's
     if (err_flag) return                !   last progress row reads it.
@@ -613,6 +620,7 @@ call fel_tic (fel_t_migration$)
 if (run%dev%resident) then
   call fel_device_readback (run%dev, fbeam, ffield)
   call fel_device_release (run%dev)
+  if (run%dev%dep_breach) then;  err_flag = .true.;  return;  endif
 endif
 
 if (migrate_check) call whole_beam_phasor (sb_re, sb_im, wsum)

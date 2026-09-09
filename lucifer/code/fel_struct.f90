@@ -206,6 +206,7 @@ type fel_global_struct
   ! production path does not pay, so it is off by default and a price is measured with it
   ! off (doc/performance.md perf-device).
   logical :: device_timing = .false.
+  integer :: device_dep_mutate = 0     ! Shift the deposit's fixed-point scale, in bits.
 end type
 
 !+

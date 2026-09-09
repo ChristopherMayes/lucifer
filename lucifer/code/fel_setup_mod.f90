@@ -1297,7 +1297,7 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
     call fel_device_setup (run%dev, run%global%device, fbeam, ngrid_dev(1), &
                            run%ffield(1)%slip%sample, run%ffield(1:run%n_harm)%harm, &
                            merge(2, 1, run%two_pol), run%fp32%iu, &
-                           run%global%device_timing, err_flag)
+                           run%global%device_timing, run%global%device_dep_mutate, err_flag)
   end block
   if (err_flag) return
 endif

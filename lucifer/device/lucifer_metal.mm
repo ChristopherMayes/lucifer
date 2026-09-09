@@ -323,12 +323,15 @@ kernel void push (device float* G [[buffer(0)]], device long* U [[buffer(1)]],
 // fel_field_step's harm*theta, into its own source plane.
 
 struct DepPar {
-    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale;
+    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale, gam_floor;
     uint  ngrid, npart, nslice, first, mutate, nf;
 };
 
-kernel void zero_src (device uint* s [[buffer(0)]], uint gid [[thread_position_in_grid]]){
-    s[gid] = 0u;
+// The accumulator's clear, four words a thread. It is a memory fill and nothing else, so
+// what it costs is the width of a store and the number of threads issued, not arithmetic.
+// One word a thread left it the largest single pass on a many-slice window.
+kernel void zero_src (device uint4* s [[buffer(0)]], uint gid [[thread_position_in_grid]]){
+    s[gid] = uint4(0u);
 }
 
 kernel void deposit (device atomic_uint* S [[buffer(0)]],
@@ -338,6 +341,7 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
                      const device float2* BASE [[buffer(6)]],
                      constant DepPar& P [[buffer(7)]],
                      constant SetPar& SP [[buffer(8)]],
+                     device atomic_uint* FAULT [[buffer(9)]],
                      uint gid [[thread_position_in_grid]]){
     uint is = gid / P.npart;
     float x = X[gid], y = Y[gid];
@@ -358,6 +362,19 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
         ddx = t;
     }
     float gam = P.gam0 + G[gid];
+
+    // The scale the host chose assumes no particle deposits below this gamma, a
+    // contribution carrying w/gamma. One that does is not converted and not accumulated,
+    // and the fault is recorded for the host to refuse the run at the next readback,
+    // before anything derived from this step is written. The test is written so that a
+    // gamma that is not a number fails it. Checking here rather than on the host closes
+    // the interval between two readbacks, which is the only place the bound could have
+    // been breached and used.
+    if (!(gam >= P.gam_floor)) {
+        atomic_fetch_or_explicit(FAULT, 1u, memory_order_relaxed);
+        return;
+    }
+
     float sq = sqrt(1.0f + P.kx * ddx * ddx + P.ky * ddy * ddy);
 
     float d = phase_of(U[gid]);
@@ -670,7 +687,7 @@ struct SetPar {
 };
 
 struct DepPar {
-    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale;
+    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale, gam_floor;
     uint32_t ngrid, npart, nslice, first, mutate, nf;
 };
 
@@ -698,7 +715,7 @@ struct Impl {
 
     id<MTLBuffer> bX, bPX, bY, bPY, bG, bU, bW;
     id<MTLBuffer> bField, bSrc, bSrcI, bExpK, bSig, bTw, bBase, bBaseDep;
-    id<MTLBuffer> bProbe, bPh;
+    id<MTLBuffer> bProbe, bPh, bFault;
 
     id<MTLComputePipelineState> pTrk, pPush, pZero, pDep, pRow, pRowM, pCol, pColA;
     id<MTLComputePipelineState> pRowF, pColAF;   // the two that convert where they read
@@ -916,6 +933,8 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bBase = alloc((size_t) nfield * nslice * 8);
         p->bBaseDep = alloc((size_t) nfield * nslice * 8);
         p->bProbe = alloc(4096 * 8);
+        p->bFault = alloc(4);
+        if (p->bFault != nil) *((uint32_t *) [p->bFault contents]) = 0u;
         p->bPh = alloc(4096 * 4);
         if (p->bX == nil || p->bU == nil || p->bField == nil || p->bSrc == nil ||
             p->bSrcI == nil) {
@@ -1106,6 +1125,16 @@ void luc_dev_download_source_slice (int im, int is, float *s)
     }
 }
 
+int luc_dev_dep_fault (void)
+{
+    // Sticky, and read after a drain: any deposit that met a particle under the gamma the
+    // host bounded the scale against set it, dropped that particle, and left the rest of
+    // the step alone. The host refuses the run on seeing it.
+    if (gImpl == nil || gImpl->bFault == nil) return 0;
+    gImpl->sync();
+    return (int) (*((const uint32_t *) [gImpl->bFault contents]) != 0u);
+}
+
 void luc_dev_set_kernel (int im, const float *expk)
 {
     Impl *p = gImpl;
@@ -1219,6 +1248,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
 
         DepPar D;
         D.dscale = dscale;
+        D.gam_floor = (float) par->dep_gam_floor;
         D.gridmax = (float) par->gridmax;
         D.dgrid = (float) par->dgrid;
         D.kx = (float) par->kx;
@@ -1279,7 +1309,9 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         e = p->pass(LUC_DEV_PASS_ZERO);
         [e setComputePipelineState:p->pZero];
         [e setBuffer:p->bSrcI offset:0 atIndex:0];
-        [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nslice * nn * 4, 1, 1)
+        // nn is a square of a power of two and every accumulator is four words, so the
+        // fill divides by four exactly.
+        [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nslice * nn, 1, 1)
              threadsPerThreadgroup:tgp];
 
         e = p->pass(LUC_DEV_PASS_DEP);
@@ -1293,6 +1325,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBuffer:p->bBaseDep offset:0 atIndex:6];
         [e setBytes:&D length:sizeof(D) atIndex:7];
         [e setBytes:&S length:sizeof(S) atIndex:8];
+        [e setBuffer:p->bFault offset:0 atIndex:9];
         [e dispatchThreads:grid threadsPerThreadgroup:tgp];
 
         // The source filter (fel-physics.md sec-source-filter). The CPU adds the filtered

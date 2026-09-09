@@ -123,6 +123,7 @@ type, bind(c) :: fel_device_par_struct
   real(c_double) :: scl_w(fel_dev_max_field$)   ! Per member: fel_field_step's scl_w at h.
   real(c_double) :: pol_re(2), pol_im(2)        ! The element's polarization pair.
   real(c_double) :: dep_scale                   ! Deposit's fixed-point scale [ticks per V/m].
+  real(c_double) :: dep_gam_floor               ! The gamma the deposit's bound assumes.
   integer(c_int) :: first, helical, mutate, source_filter, nfield, npol, pad
 end type
 
@@ -152,12 +153,15 @@ type fel_device_struct
   character(64) :: name = ''            ! The device, for the log line.
   logical :: wrap_exact = .false.       ! The exact-wrap assertion's verdict.
   logical :: timing = .false.           ! Per-pass timing is on, one encoder a pass.
+  integer :: dep_mutate = 0             ! Deposit scale shift in bits, a check's hook.
   ! The deposit's fixed-point bound: the whole beam's charge over the gamma floor,
   ! which is every particle landing in one cell of one slice after migration has
   ! concentrated it. Everything but the step's own scl_w and roll-off, which are the
   ! element's and are applied per step.
   real(rp) :: dep_qbound = 0
   logical :: dep_told = .false.       ! The deposit scale's origin line is out.
+  real(rp) :: dep_gam_floor = 0       ! The gamma the deposit bound was built on.
+  logical :: dep_breach = .false.     ! A readback found a particle under it.
   integer :: nstep = 0                  ! Device steps encoded this run.
   ! The instrument's per-member record: run-level worst phasor, source and field
   ! divergence of each member, the footer's attribution when the set has more than
@@ -269,6 +273,11 @@ interface
 
   subroutine luc_dev_sync () bind(c, name = 'luc_dev_sync')
   end subroutine
+
+  function luc_dev_dep_fault () bind(c, name = 'luc_dev_dep_fault') result (ierr)
+    import c_int
+    integer(c_int) ierr
+  end function
 
   function luc_dev_wrap_check (bucket_ticks) bind(c, name = 'luc_dev_wrap_check') result (ierr)
     import c_int, c_int64_t
@@ -394,7 +403,7 @@ end subroutine from_c
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, timing, err_flag)
+! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, timing, dep_mutate, err_flag)
 !
 ! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
 ! asks for the one backend this tree knows; a build without it (the stub) refuses with
@@ -413,6 +422,8 @@ end subroutine from_c
 !   npol       -- integer: Planes per member, 1 or 2.
 !   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
 !   timing     -- logical: Time each pass of a step separately, one encoder a pass.
+!   dep_mutate -- integer: Shift the deposit's fixed-point scale by this many bits.
+!                 Zero in every run but the check that measures what the quantum costs.
 !                   A device that samples no counters at an encoder boundary refuses.
 !
 ! Output:
@@ -421,7 +432,7 @@ end subroutine from_c
 !-
 
 subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, &
-                             timing, err_flag)
+                             timing, dep_mutate, err_flag)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
@@ -429,12 +440,14 @@ character(*) device_req
 integer ngrid, fp32_iu, npol
 integer harm(:)
 integer sample
+integer dep_mutate
 logical timing, err_flag
 
 character(kind=c_char) c_reason(256)
 character(256) reason
 character(64) name
-integer is, np, ierr
+integer is, np, ierr, ip
+real(rp) p0_mc_l, gam_min, gam_p
 integer(c_int64_t) bucket
 logical usable
 character(*), parameter :: r_name = 'fel_device_setup'
@@ -533,20 +546,42 @@ dev%wrap_exact = .true.
 ! The deposit accumulates in fixed point so that the answer does not depend on the
 ! order threads reach a cell (FINDINGS 7.66). The scale has to keep the per-cell sum
 ! inside a signed 64-bit integer, and the bound taken here is the one nothing can
-! breach: every macroparticle of every slice in one cell, in phase, at a gamma floored
-! well under the reference. Cancellation cannot hide an overflow, since the accumulator
-! is modular and only the total has to fit, but the absolute sum is bounded anyway.
+! breach: every macroparticle of every slice in one cell, in phase, at the lowest gamma
+! the run can reach. Cancellation cannot hide an overflow, since the accumulator is
+! modular and only the total has to fit, but the absolute sum is bounded anyway.
+!
+! A contribution carries w/gamma, so the bound needs the smallest gamma the run will
+! ever deposit at. That is measured here over the loaded beam rather than assumed of the
+! reference, and fel_dev_gamma_floor$ is then applied to what was measured. The margin
+! covers what tracking can take off a particle: an FEL extracts of order rho, a part in
+! a thousand, so a factor of eight below the loaded minimum is conservative past any
+! argument and costs three of the bound's spare bits.
 !
 ! The charge is what setup can bound. The element's own deposit scale and the grid's
 ! roll-off complete it at the first step, which is where the scale, its origin and its
-! headroom are printed and where too little headroom refuses the run.
+! headroom are printed and where a scale the device cannot carry refuses the run.
 
+p0_mc_l = fel_p0_mc(beam)
+gam_min = -1
 dev%dep_qbound = 0
 do is = 1, size(beam%slice)
-  if (beam%slice(is)%n > 0) dev%dep_qbound = dev%dep_qbound + &
-                                             sum(beam%slice(is)%weight(1:beam%slice(is)%n))
+  if (beam%slice(is)%n == 0) cycle
+  dev%dep_qbound = dev%dep_qbound + sum(beam%slice(is)%weight(1:beam%slice(is)%n))
+  do ip = 1, beam%slice(is)%n
+    gam_p = sqrt((p0_mc_l * (1 + beam%slice(is)%pz(ip)))**2 + 1)
+    if (gam_min < 0 .or. gam_p < gam_min) gam_min = gam_p
+  enddo
 enddo
-dev%dep_qbound = dev%dep_qbound * fel_dev_gamma_floor$ / fel_gamma0(beam)
+
+if (gam_min <= 0) then
+  call out_io (s_error$, r_name, 'DEVICE = "metal" LOADED A PARTICLE AT A NON-POSITIVE GAMMA.', &
+               'PLEASE REPORT THIS!')
+  err_flag = .true.
+  return
+endif
+dev%dep_mutate = dep_mutate
+dev%dep_gam_floor = gam_min / fel_dev_gamma_floor$
+dev%dep_qbound = dev%dep_qbound * fel_dev_gamma_floor$ / gam_min
 if (dev%dep_qbound <= 0) then
   call out_io (s_error$, r_name, 'DEVICE = "metal" LOADED NO CHARGE, SO THE DEPOSIT SCALE ' // &
                'CANNOT BE BOUNDED.', 'PLEASE REPORT THIS!')
@@ -872,7 +907,9 @@ type (fel_device_struct) dev
 type (fel_beam_struct) beam
 type (fel_field_struct) ff(:)
 real(rp) p0_mc, gamma0, ks
+real(rp), allocatable :: gam_low(:)
 integer is, im, ip
+character(*), parameter :: r_name = 'fel_device_readback'
 
 !
 
@@ -886,6 +923,16 @@ ks = twopi / beam%wavelength
 ! the parallel loops below never touch the backend's encoder state.
 
 call luc_dev_sync ()
+
+! The deposit's bound assumes no particle deposits below dev%dep_gam_floor, an eighth of
+! the lowest gamma the run loaded. Setup measured that, and here it is checked: every
+! readback happens at an element's last step, so a beam that passes here is a beam the
+! next element starts from. Together those two cover the state before every element's
+! deposits. What is not covered is evolution inside one element, which is the interval
+! between two checks, and an FEL takes of order rho off a particle over a whole line.
+
+allocate (gam_low(size(beam%slice)))
+gam_low = huge(1.0_rp)
 
 !$OMP parallel do
 do is = 1, size(beam%slice)
@@ -904,6 +951,7 @@ do is = 1, size(beam%slice)
       beam%slice(is)%y(ip) = real(by(ip), rp)
       beam%slice(is)%py(ip) = real(bpy(ip), rp)
       gam = gamma0 + real(bg(ip), rp)
+      gam_low(is) = min(gam_low(is), gam)
       p_mc = sqrt(gam**2 - 1)
       beam%slice(is)%pz(ip) = (p_mc - p0_mc) / p0_mc
       beta = p_mc / gam
@@ -913,6 +961,22 @@ do is = 1, size(beam%slice)
   end block
 enddo
 !$OMP end parallel do
+
+! The kernel drops any particle under the floor without converting or accumulating it and
+! records a fault, so this reports what the deposit already refused to use. The readback's
+! own minimum is printed beside it and can look healthy: a particle is free to cross the
+! floor and come back between two readbacks, which is exactly the interval the kernel
+! covers and a readback cannot.
+
+if (luc_dev_dep_fault() /= 0) then
+  dev%dep_breach = .true.
+  call out_io (s_error$, r_name, 'A PARTICLE DEPOSITED BELOW THE GAMMA THE DEVICE DEPOSIT ' // &
+               'BOUND WAS BUILT ON.', 'THE KERNEL DROPPED IT RATHER THAN ACCUMULATING IT, AND ' // &
+               'THE RUN STOPS HERE: THE', 'FIXED-POINT ACCUMULATOR CAN NO LONGER BE SHOWN NOT ' // &
+               'TO OVERFLOW. THE FLOOR IS', '\es12.5\ AND THE LOWEST GAMMA READ BACK IS ' // &
+               '\es12.5\ . PLEASE REPORT THIS!', &
+               r_array = [dev%dep_gam_floor, minval(gam_low)])
+endif
 
 do im = 1, dev%nfield
   do ip = 1, dev%npol

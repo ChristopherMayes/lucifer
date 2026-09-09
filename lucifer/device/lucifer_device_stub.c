@@ -92,6 +92,11 @@ int luc_dev_timing (int on, char *reason, int reason_len)
   return 1;
 }
 
+int luc_dev_dep_fault (void)
+{
+    return 0;
+}
+
 int luc_dev_pass_seconds (double *sec, int64_t *count, int n)
 {
   int i;

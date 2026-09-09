@@ -1344,7 +1344,7 @@ Output:
 (api-fel-device-setup)=
 ### `fel_device_setup`
 
-*Subroutine* `(dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, timing, err_flag)`
+*Subroutine* `(dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, timing, dep_mutate, err_flag)`
 
 ```
 Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
@@ -1366,6 +1366,8 @@ Input:
   npol       -- integer: Planes per member, 1 or 2.
   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
   timing     -- logical: Time each pass of a step separately, one encoder a pass.
+  dep_mutate -- integer: Shift the deposit's fixed-point scale by this many bits.
+                Zero in every run but the check that measures what the quantum costs.
                   A device that samples no counters at an encoder boundary refuses.
 
 Output:
