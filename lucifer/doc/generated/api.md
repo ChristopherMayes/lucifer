@@ -1251,10 +1251,13 @@ fel_fp32_mod's own machinery with the device's arithmetic under test. The guard
 column is then the median per-step phase increment in ticks of the fixed-point
 quantum rather than in FP32 ulps; the same floor applies.
 
-The device deposit accumulates with atomic adds whose ordering is not fixed, so two
-runs of the same step differ in the source's last bit or two. Both reference
-backends behave the same way (manual/GPU.md, gpu/metal-engine 4919b01), so no device
-output is asserted byte-identical; the ceilings absorb it.
+The device deposit accumulates in fixed point, so two runs of one deck agree bit for
+bit. Integer addition is associative and commutative where float addition is neither,
+so the order threads reach a cell cannot change the answer. Both reference backends
+deposit in floats and are reproducible in neither (manual/GPU.md, gpu/metal-engine
+4919b01). The float deposit left a divergence here of 2.0e-7 on a field power, far
+inside the ceilings, and what it cost was the right to assert a device output
+exactly. Every array of the statistics file is asserted exactly now.
 
 The field set. The resident field is every member of the run's set (the fundamental
 and its harmonics, one grid) with one or two planes each (Ex, or the (Ex, Ey) pair

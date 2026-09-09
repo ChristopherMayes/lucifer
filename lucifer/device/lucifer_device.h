@@ -67,6 +67,13 @@ typedef struct {
   double rtmp[LUC_DEV_MAX_FIELD];   /* per member: energy-exchange coupling fc(h) / (sqrt(2) m_e) */
   double scl_w[LUC_DEV_MAX_FIELD];  /* per member: deposit scale, fel_field_step's scl_w at h */
   double pol_re[2], pol_im[2];      /* the element's polarization pair on (Ex, Ey) */
+  /* The deposit's fixed-point scale, in ticks per volt per metre, one for the whole
+   * set. Integer addition is associative where float addition is not, so a deposit
+   * that accumulates in ticks does not depend on the order threads reach a cell. A
+   * power of two, so the scale and its reciprocal are exact and the conversion back
+   * costs one rounding. The caller derives it from a bound on the per-cell sum that
+   * holds for the run and refuses a deck whose bound it cannot carry. */
+  double dep_scale;
   int32_t first;         /* field ring offset, Genesis's Field::first, one for the set */
   int32_t helical;       /* octupole kick shape (1 = both planes) */
   int32_t mutate;        /* falsifiability hook: perturb the kernel's detuning */

@@ -169,16 +169,14 @@ PY_E2E_CEIL = 1.3e-2
 PYPX_FLOOR = 5e-3           # check_two_polarization's afterburner floor.
 
 # Migration: the heavy-migration window's exit power against the CPU, at three times
-# the first measurement, and the no-op flutter floor: two migrate = F device runs may
-# be bit-identical on a small dark deck, and a zero flutter tripled is zero, so the
-# floor is a level in slice spacings under which FP32 cannot express a difference.
+# the first measurement. The no-op flutter floor that sat here is gone with the flutter:
+# the fixed-point deposit made the no-op comparison exact, so it needs no level at all.
 MIG_E2E_CEIL = 3e-3
 
 # The source filter's device-against-CPU ceiling. The device filters the source by four
 # FP32 passes of its own where the CPU multiplies inside the field's FP64 transform pair,
 # so the two differ by more than the plain solve does. Measured 1.7e-4 end to end.
 SF_E2E_CEIL = 1.0e-3
-NOOP_FLOOR = 1e-12
 
 # The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
 # segment is helical and couples only the fundamental, at the device's grid.
@@ -563,12 +561,126 @@ def field_set(args, wd, exe):
            f"<= {band:.1e}", abs(pd - pc) / pc <= band)
 
     migration(args, wd, exe)
+    reproducible(args, wd, exe)
+    precision(args, wd, exe)
 
     # 7g. The combination is refused for the device as for the CPU.
     r = run(args.exe, wd, "devp_rh.in", pn.format(lat="devp_c.bmad", root="devprh",
             extra=DEV + '  harmonics = 1, 3\n'), expect_fail=True)
     refused = r.returncode != 0 and "TWO LIVE POLARIZATIONS" in r.stdout
     ok("refused: harmonics together with two live polarizations", refused, "True", refused)
+
+
+# Three things cannot match and none of them is physics: the resolved parameters and the
+# echoed input carry the out_root, which differs by construction, and the timestamp is
+# the wall clock. Everything else is compared, the field and beam records among them,
+# and the Bmad versions and the lattice source are compared and do match. The timestamp
+# was found by this check rather than reasoned about: the first pair of runs landed in
+# one second and the second pair did not.
+REPRO_SKIP = ("params", "meta/input_echo", "meta/timestamp")
+
+
+# The four configurations the recorded ceilings do not isolate, each measured as the
+# lockstep source row: the device's deposit against the same deposit in FP64. The
+# fixed-point accumulator has to be no worse than the float one it replaced on every
+# one, and the numbers beside them are that float deposit measured on these same decks.
+# Cancelling phases come first because a quiet start leaves the slice phasor at
+# roundoff, which is where a coarse quantum would show before anywhere else (7.47).
+
+PRECISION_CASES = (
+    ("cancelling phases", "  beamlet_size = 8\n", 1.464e-05),
+    ("unequal weights", "  beamlet_size = 8\n  split_weights = T\n", 1.465e-05),
+    ("charge in few cells", "  beam_init%a_norm_emit = 4e-9\n"
+                            "  beam_init%b_norm_emit = 4e-9\n", 6.889e-06),
+    ("the largest load", "  beam_init%n_particle = 32768\n", 2.507e-06),
+)
+
+# The float deposit is not reproducible, so its numbers above carry their own scatter and
+# the comparison allows five percent over them. Measured against it the fixed-point
+# accumulator came in at 1.462e-05, 1.462e-05, 6.948e-06 and 2.506e-06: the same levels,
+# two of them slightly better and one nine parts in a thousand worse.
+PRECISION_MARGIN = 1.05
+
+
+def precision(args, wd, exe):
+    """
+    What the fixed-point deposit costs in accuracy, which is nothing.
+
+    The lockstep source row is the device's deposit against the same deposit carried in
+    FP64 on the host, so it prices the accumulator directly rather than through a power.
+    Each case is asserted twice: under the recorded source ceiling, and no worse than the
+    float accumulator measured on the same deck, which is the number carried beside it.
+
+    A fixed-point accumulator can be reproducible and still be worse, by taking a scale
+    that keeps the bound but quantizes away what matters. Thirty-two bits would have done
+    exactly that here, losing to the float deposit by a factor of seven. These four say
+    the sixty-four-bit accumulator did not.
+    """
+    print("== 10. the deposit's accuracy against the CPU's FP64 deposit ==")
+    for name, extra, before in PRECISION_CASES:
+        root = "devprec" + name.split()[0][:4]
+        r = run(exe, wd, f"{root}.in", BASE.format(
+            root=root, extra=DEV + '  global%fp32_check = "lockstep"\n' + extra))
+        if r.returncode != 0:
+            ok(f"deposit accuracy, {name}", "run failed", "exit 0", False)
+            continue
+        v = summary(wd, root)["source"]
+        ok(f"deposit accuracy, {name}", f"{v:.3e}",
+           f"<= {CEIL['source']:.1e} and <= the float deposit's {before:.2e}",
+           v <= CEIL["source"] and v <= before * PRECISION_MARGIN)
+
+
+def stats_arrays(path, skip=REPRO_SKIP):
+    """Every dataset of a statistics file, by path, as raw bytes."""
+    out = {}
+    with h5py.File(path) as h:
+        def walk(name, obj):
+            if isinstance(obj, h5py.Dataset) and not name.startswith(skip):
+                out[name] = np.asarray(obj[()]).tobytes()
+        h.visititems(walk)
+    return out
+
+
+def reproducible(args, wd, exe):
+    """
+    Two runs of one deck, bit for bit.
+
+    The deposit accumulates in fixed point precisely so that this holds: integer
+    addition is associative and commutative where float addition is neither, so the
+    order threads reach a cell cannot reach the answer. Before that it could, and this
+    deck is the one that showed it: the time-dependent window with shot noise, whose
+    eight slices of 1024 macroparticles contend for cells on every step. Run against the
+    float deposit, 54 of these 127 arrays differ with the filter on and 54 with it off,
+    the field power by 2.0e-07 and 1.5e-07 and the exit power by 1.6e-08 and 2.2e-08. The
+    level below is exact equality, asserted rather than toleranced.
+
+    A small dark deck is no test: two runs of the float deposit could already agree on
+    one, which is why the no-op floor beneath section 8c existed. This deck carries
+    charge, noise and slippage.
+
+    Both filter settings run. They read the source at different points, since with the
+    filter on the first of its four source passes converts the accumulator and with it
+    off nothing transforms the source and the solve's last pass converts as it reads.
+    """
+    print("== 9. two runs of one deck, bit for bit ==")
+    for on, what in (("T", "the filter on"), ("F", "the filter off")):
+        roots = []
+        for i in (1, 2):
+            root = f"devrep{on}{i}"
+            extra = TD_EXTRA + DEV + f"  source_filter = {on}\n"
+            r = run(exe, wd, f"{root}.in", BASE.format(root=root, extra=extra), threads="8")
+            if r.returncode != 0:
+                print(f"FAIL: {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
+                ok(f"two runs bit for bit, {what}", "run failed", "exit 0", False)
+                return
+            roots.append(root)
+        a = stats_arrays(wd / f"{roots[0]}.stats.h5")
+        b = stats_arrays(wd / f"{roots[1]}.stats.h5")
+        same_keys = sorted(a) == sorted(b)
+        differ = [k for k in sorted(a) if same_keys and a[k] != b[k]]
+        ok(f"two runs bit for bit, {what}: {len(a)} arrays compared",
+           "identical" if same_keys and not differ else f"{len(differ)} differ: {differ[:3]}",
+           "every array identical", same_keys and not differ)
 
 
 def migration(args, wd, exe):
@@ -624,11 +736,13 @@ def migration(args, wd, exe):
     same = (wd / "devml.diag.txt").read_bytes() == (wd / "devmc.diag.txt").read_bytes()
     ok("migrating FP64 diag byte-identical, device twin on vs off", same, "True", same)
 
-    # 8c. The no-op, self-referenced against the device's own flutter. The frozen deck
-    # is dark, so its power is FP32 noise and says nothing; the read-back beam does. With
-    # zero moves the migrate = T run differs from migrate = F only in where the readback
-    # happened, so the final beam dumps must agree to within the flutter two migrate = F
-    # device runs show between themselves, measured on z in units of the slice spacing.
+    # 8c. The no-op, exact. The frozen deck is dark, so its power is FP32 noise and says
+    # nothing. The read-back beam is what carries the check. With zero moves the migrate = T run differs from
+    # migrate = F only in where the readback happened, so the final beam dumps must agree
+    # exactly. They once could not: the float deposit made two migrate = F runs of this
+    # deck differ between themselves, and the level was three times that flutter with a
+    # floor under it for the decks where the flutter came out zero. The fixed-point
+    # deposit removed the flutter, so both comparisons below are equality.
     run(args.exe, wd, "devm_f1.in", base.format(root="devmf1", mig="F", extra=DEV, **frozen), threads="8")
     run(args.exe, wd, "devm_f2.in", base.format(root="devmf2", mig="F", extra=DEV, **frozen), threads="8")
     run(args.exe, wd, "devm_t.in", base.format(root="devmt", mig="T", extra=DEV, **frozen), threads="8")
@@ -636,12 +750,14 @@ def migration(args, wd, exe):
     z1 = beam_z(wd / "devmf1-final.beam.h5")
     z2 = beam_z(wd / "devmf2-final.beam.h5")
     zt = beam_z(wd / "devmt-final.beam.h5")
-    flutter = float(np.max(np.abs(z1 - z2))) / 3e-10
-    tol = max(3 * flutter, NOOP_FLOOR)
-    dev_t = float(np.max(np.abs(zt - z1))) / 3e-10
     ok("migration no-op on the device: moves", moved, "0", moved == 0)
-    ok("migration no-op on the device: migrate T vs F final beam z [spacings]", f"{dev_t:.2e}",
-       f"<= {tol:.1e} (3 x flutter {flutter:.1e})", dev_t <= tol)
+    ok("two migrate = F device runs, final beam z", "identical" if np.array_equal(z1, z2)
+       else f"{float(np.max(np.abs(z1 - z2))) / 3e-10:.2e} spacings",
+       "identical", np.array_equal(z1, z2))
+    ok("migration no-op on the device: migrate T vs F final beam z",
+       "identical" if np.array_equal(zt, z1)
+       else f"{float(np.max(np.abs(zt - z1))) / 3e-10:.2e} spacings",
+       "identical", np.array_equal(zt, z1))
 
 
 def beam_z(path):

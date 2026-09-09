@@ -70,6 +70,44 @@ inline float phase_of (long u){
 
 inline float2 cmul (float2 a, float2 b){ return float2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
 
+// ---------------- the source accumulator ----------------
+// The deposit accumulates in fixed point so that the answer does not depend on the
+// order threads reach a cell. Integer addition is associative and commutative where
+// float addition is neither, so any arrival order gives one bit pattern.
+//
+// Sixty-four bits are carried as two 32-bit words because this hardware has no 64-bit
+// atomic of any kind: atomic_ulong exists as a type and store, load, fetch_add,
+// fetch_min, fetch_or and compare_exchange are all invalid for it. Every low addend is
+// unsigned, so the number of carries is the number of times the low word passes 2^32,
+// which is a property of the sum and not of the order, and both words are modular adds.
+// The pair is therefore the exact 64-bit modular sum, and reinterpreting it as signed
+// recovers the true sum whenever that sum fits, which the host's scale guarantees. An
+// intermediate word may wrap freely: nothing reads one, and modular addition composes.
+//
+// Thirty-two bits would not do. A scale that keeps the worst case in an int leaves a
+// quantum coarse enough to lose to the float accumulation it replaces, measured at 7.3
+// times its error, where sixty-four bits beat it by the same factor.
+//
+// The scale is a power of two, so it and its reciprocal are exact and the conversion
+// costs one rounding rather than the n the float accumulation paid.
+
+inline void acc_fixed (device atomic_uint* SI, ulong ci, float v, float scale){
+    ulong u = (ulong) (long) rint(v * scale);
+    uint qlo = (uint) (u & 0xFFFFFFFFul);
+    uint qhi = (uint) (u >> 32);
+    uint prev = atomic_fetch_add_explicit(&SI[2u*ci], qlo, memory_order_relaxed);
+    uint add_hi = qhi + ((prev + qlo < prev) ? 1u : 0u);
+    if (add_hi != 0u) atomic_fetch_add_explicit(&SI[2u*ci + 1u], add_hi, memory_order_relaxed);
+}
+
+// One complex source element, decoded where its first consumer reads it.
+inline float2 dec_fixed (const device uint* SI, ulong ie, float sinv){
+    ulong b = 4u*ie;
+    ulong ur = ((ulong) SI[b + 1u] << 32) | (ulong) SI[b];
+    ulong ui = ((ulong) SI[b + 3u] << 32) | (ulong) SI[b + 2u];
+    return float2(float((long) ur) * sinv, float((long) ui) * sinv);
+}
+
 // ---------------- transverse half step ----------------
 // fel_transverse_track_bmad flattened per particle: optional tilt rotation in,
 // the leading/trailing octupole-like kick, one quad_mat2_calc map per plane
@@ -277,23 +315,23 @@ kernel void push (device float* G [[buffer(0)]], device long* U [[buffer(1)]],
 // ---------------- source deposit ----------------
 // fel_fp32_mod's dep32: faw2 (no half -- Genesis's own roll-off, transcribed),
 // part = sqrt(faw2)*scl*w/gamma, cpart = i e^{-i theta} * part through the
-// per-slice base rotator, bilinear scatter. The accumulation is a device
-// atomic add per corner; the order threads reach a cell is not fixed, so two
-// runs of the same step differ in the last bit or two of the source, exactly
-// as both reference backends do (manual/GPU.md records it). Every member of the
+// per-slice base rotator, bilinear scatter. The accumulation is in fixed point
+// through acc_fixed, so the order threads reach a cell does not reach the answer:
+// both reference backends add floats there and two of their runs differ in the
+// last bit or two of the source (manual/GPU.md records it). Every member of the
 // set is written from the one particle at its own phase h*theta and scale,
 // fel_field_step's harm*theta, into its own source plane.
 
 struct DepPar {
-    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0;
+    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale;
     uint  ngrid, npart, nslice, first, mutate, nf;
 };
 
-kernel void zero_src (device float* s [[buffer(0)]], uint gid [[thread_position_in_grid]]){
-    s[gid] = 0.0f;
+kernel void zero_src (device uint* s [[buffer(0)]], uint gid [[thread_position_in_grid]]){
+    s[gid] = 0u;
 }
 
-kernel void deposit (device atomic_float* S [[buffer(0)]],
+kernel void deposit (device atomic_uint* S [[buffer(0)]],
                      const device float* X [[buffer(1)]], const device float* Y [[buffer(2)]],
                      const device float* G [[buffer(3)]], const device long* U [[buffer(4)]],
                      const device float* W [[buffer(5)]],
@@ -345,21 +383,21 @@ kernel void deposit (device atomic_float* S [[buffer(0)]],
         float2 b = BASE[m * P.nslice + is];
         float2 cp = cmul(float2(-b.y, b.x), float2(c_d, -s_d)) * ppart;
 
-        uint idx = (m * P.nslice + fs) * nn + cell;
+        ulong idx = (ulong) (m * P.nslice + fs) * nn + cell;
         float w;
-        uint dcell;
+        ulong dcell;
         w = wx * wy;                     dcell = 2u * idx;
-        atomic_fetch_add_explicit(&S[dcell],      w * cp.x, memory_order_relaxed);
-        atomic_fetch_add_explicit(&S[dcell + 1u], w * cp.y, memory_order_relaxed);
+        acc_fixed(S, dcell,      w * cp.x, P.dscale);
+        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
         w = (1.0f - wx) * wy;            dcell = 2u * (idx + 1u);
-        atomic_fetch_add_explicit(&S[dcell],      w * cp.x, memory_order_relaxed);
-        atomic_fetch_add_explicit(&S[dcell + 1u], w * cp.y, memory_order_relaxed);
+        acc_fixed(S, dcell,      w * cp.x, P.dscale);
+        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
         w = wx * (1.0f - wy);            dcell = 2u * (idx + P.ngrid);
-        atomic_fetch_add_explicit(&S[dcell],      w * cp.x, memory_order_relaxed);
-        atomic_fetch_add_explicit(&S[dcell + 1u], w * cp.y, memory_order_relaxed);
+        acc_fixed(S, dcell,      w * cp.x, P.dscale);
+        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
         w = (1.0f - wx) * (1.0f - wy);   dcell = 2u * (idx + P.ngrid + 1u);
-        atomic_fetch_add_explicit(&S[dcell],      w * cp.x, memory_order_relaxed);
-        atomic_fetch_add_explicit(&S[dcell + 1u], w * cp.y, memory_order_relaxed);
+        acc_fixed(S, dcell,      w * cp.x, P.dscale);
+        acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
     }
 }
 
@@ -488,6 +526,23 @@ kernel void fft_rows (device float2* d [[buffer(0)]], const device float2* W [[b
     for (uint cc = 0; cc < CHUNK; cc++)
         for (uint j = 0; j < LANES; j++) p[OUTK(cc, j)] = a[cc*LANES + j];
 }
+// The filter's first pass over the source: it reads the accumulator, converts, and
+// transforms, so the conversion costs no dispatch of its own.
+kernel void fft_rows_fix (device float2* d [[buffer(0)]], const device uint* si [[buffer(1)]],
+                          const device float2* W [[buffer(2)]], constant float& sgn [[buffer(3)]],
+                          constant float& sinv [[buffer(4)]],
+                          uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]]){
+    threadgroup float2 sh[RF_ROWS * NG];
+    uint lane = t % LANES, r = t / LANES;
+    ulong row = (ulong)(tg.x * RF_ROWS + r);
+    ulong base = (ulong)tg.y * ((ulong)N * N) + row * N;
+    device float2* p = d + base;
+    float2 a[REGS];
+    for (uint n1 = 0; n1 < REGS; n1++) a[n1] = dec_fixed(si, base + LANES*n1 + lane, sinv);
+    fftN(a, sh + r*NG, W, lane, sgn);
+    for (uint cc = 0; cc < CHUNK; cc++)
+        for (uint j = 0; j < LANES; j++) p[OUTK(cc, j)] = a[cc*LANES + j];
+}
 kernel void fft_rows_mul (device float2* d [[buffer(0)]], const device float2* W [[buffer(1)]],
                           constant float& sgn [[buffer(2)]], const device float2* expK [[buffer(3)]],
                           constant uint& ppm [[buffer(4)]],
@@ -551,6 +606,38 @@ kernel void fft_cols_add (device float2* d [[buffer(0)]], const device float2* W
 // Device arithmetic itself, not a host emulation of it: the wrap check shifts
 // resident accumulators by whole buckets and extracts phases on the GPU.
 
+// The unfiltered solve's last pass: with no filter nothing transforms the source, so
+// this is where it is first read and therefore where it is converted.
+kernel void fft_cols_add_fix (device float2* d [[buffer(0)]], const device float2* W [[buffer(1)]],
+                              constant float& sgn [[buffer(2)]], constant float& scale [[buffer(3)]],
+                              const device uint* si [[buffer(4)]],
+                              constant AddPar& A [[buffer(5)]], constant float& sinv [[buffer(6)]],
+                              uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]]){
+    threadgroup float2 sh[CC_COLS * NG];
+    uint c = t % CC_COLS, lane = t / CC_COLS;
+    uint m = tg.y / A.ppm, rem = tg.y % A.ppm;
+    uint pl = rem / A.nslice, is = rem % A.nslice;
+    ulong off = (ulong)tg.y * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
+    ulong soff = ((ulong)m * A.nslice + is) * ((ulong)N * N) + (ulong)tg.x * CC_COLS + c;
+    device float2* b = d + off;
+    float2 a[REGS];
+    for (uint n1 = 0; n1 < REGS; n1++) a[n1] = b[(ulong)(LANES*n1 + lane) * N];
+    fftN(a, sh + c*NG, W, lane, sgn);
+    if (A.npol == 2u) {
+        float2 pol = A.pol[pl];
+        for (uint cc = 0; cc < CHUNK; cc++)
+            for (uint j = 0; j < LANES; j++){
+                ulong q = (ulong)OUTK(cc, j) * N;
+                b[q] = a[cc*LANES + j] * scale + 2.0f * cmul(pol, dec_fixed(si, soff + q, sinv));
+            }
+    } else {
+        for (uint cc = 0; cc < CHUNK; cc++)
+            for (uint j = 0; j < LANES; j++){
+                ulong q = (ulong)OUTK(cc, j) * N;
+                b[q] = a[cc*LANES + j] * scale + 2.0f * dec_fixed(si, soff + q, sinv);
+            }
+    }
+}
 kernel void wrap_shift (device long* u [[buffer(0)]], constant long& s [[buffer(1)]],
                         uint gid [[thread_position_in_grid]]){
     u[gid] += s;
@@ -583,7 +670,7 @@ struct SetPar {
 };
 
 struct DepPar {
-    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0;
+    float gridmax, dgrid, kx, ky, ax, ay, cos_t, sin_t, gam0, dscale;
     uint32_t ngrid, npart, nslice, first, mutate, nf;
 };
 
@@ -610,14 +697,16 @@ struct Impl {
     size_t nplanes () const { return (size_t) nfield * npol * nslice; }
 
     id<MTLBuffer> bX, bPX, bY, bPY, bG, bU, bW;
-    id<MTLBuffer> bField, bSrc, bExpK, bSig, bTw, bBase, bBaseDep;
+    id<MTLBuffer> bField, bSrc, bSrcI, bExpK, bSig, bTw, bBase, bBaseDep;
     id<MTLBuffer> bProbe, bPh;
 
     id<MTLComputePipelineState> pTrk, pPush, pZero, pDep, pRow, pRowM, pCol, pColA;
+    id<MTLComputePipelineState> pRowF, pColAF;   // the two that convert where they read
     id<MTLComputePipelineState> pWShift, pWPhase;
 
     int64_t bytes {0};
     double busy {0};
+    double srcScale {1};   // the last step's deposit scale, for the source readback
 
     // Per-pass timing (lucifer_device.h). Off by default: it costs an encoder a pass,
     // which the production path does not pay. The sample buffer takes two timestamps
@@ -820,6 +909,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bG = alloc(np * 4);  p->bU = alloc(np * 8);  p->bW = alloc(np * 4);
         p->bField = alloc(p->nplanes() * nn * 8);
         p->bSrc = alloc((size_t) nfield * nslice * nn * 8);
+        p->bSrcI = alloc((size_t) nfield * nslice * nn * 16);
         p->bExpK = alloc((size_t) nfield * nn * 8);
         p->bSig = alloc((size_t) nfield * nn * 8);
         p->bTw = alloc((size_t) ngrid * 8);
@@ -827,7 +917,8 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bBaseDep = alloc((size_t) nfield * nslice * 8);
         p->bProbe = alloc(4096 * 8);
         p->bPh = alloc(4096 * 4);
-        if (p->bX == nil || p->bU == nil || p->bField == nil || p->bSrc == nil) {
+        if (p->bX == nil || p->bU == nil || p->bField == nil || p->bSrc == nil ||
+            p->bSrcI == nil) {
             char msg[256];
             snprintf(msg, sizeof(msg),
                      "resident buffers do not fit: %lld MB wanted on %s",
@@ -892,6 +983,8 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->pRowM = pso(@"fft_rows_mul");
         p->pCol = pso(@"fft_cols");
         p->pColA = pso(@"fft_cols_add");
+        p->pRowF = pso(@"fft_rows_fix");
+        p->pColAF = pso(@"fft_cols_add_fix");
         p->pWShift = pso(@"wrap_shift");
         p->pWPhase = pso(@"wrap_phase");
         if (!ok) {
@@ -994,7 +1087,23 @@ void luc_dev_download_source_slice (int im, int is, float *s)
     Impl *p = gImpl;
     p->sync();
     const size_t nn = (size_t) p->ngrid * p->ngrid;
-    memcpy(s, (const float *) [p->bSrc contents] + p->srcPlane(im, is) * nn * 2, nn * 8);
+
+    // Decoded from the fixed-point accumulator rather than copied from the float source.
+    // With the filter off nothing transforms the source and the solve's last pass
+    // converts as it reads, so the float buffer holds no plane to copy. The decode here
+    // is the same arithmetic that pass does, in double, so the instrument's rows read
+    // what the device deposited. With the filter on that is now the deposit rather than
+    // the filtered source this used to copy, which is what the caller compares against:
+    // its reference is fel_fp32_deposit64, and no filter runs there.
+
+    const uint32_t *w = (const uint32_t *) [p->bSrcI contents] + p->srcPlane(im, is) * nn * 4;
+    const double inv = 1.0 / p->srcScale;
+    for (size_t i = 0; i < nn; i++) {
+        uint64_t ur = ((uint64_t) w[4*i + 1] << 32) | (uint64_t) w[4*i];
+        uint64_t ui = ((uint64_t) w[4*i + 3] << 32) | (uint64_t) w[4*i + 2];
+        s[2*i]     = (float) ((double) (int64_t) ur * inv);
+        s[2*i + 1] = (float) ((double) (int64_t) ui * inv);
+    }
 }
 
 void luc_dev_set_kernel (int im, const float *expk)
@@ -1102,7 +1211,14 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
             S.polc[2*q + 1] = (float) -par->pol_im[q];
         }
 
+        // A power of two, so the scale and its reciprocal are both exact and the
+        // conversion costs one rounding where the float accumulation paid n.
+        const float dscale = (float) par->dep_scale;
+        const float sinv = 1.0f / dscale;
+        p->srcScale = par->dep_scale;
+
         DepPar D;
+        D.dscale = dscale;
         D.gridmax = (float) par->gridmax;
         D.dgrid = (float) par->dgrid;
         D.kx = (float) par->kx;
@@ -1162,13 +1278,13 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
 
         e = p->pass(LUC_DEV_PASS_ZERO);
         [e setComputePipelineState:p->pZero];
-        [e setBuffer:p->bSrc offset:0 atIndex:0];
-        [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nslice * nn * 2, 1, 1)
+        [e setBuffer:p->bSrcI offset:0 atIndex:0];
+        [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nslice * nn * 4, 1, 1)
              threadsPerThreadgroup:tgp];
 
         e = p->pass(LUC_DEV_PASS_DEP);
         [e setComputePipelineState:p->pDep];
-        [e setBuffer:p->bSrc offset:0 atIndex:0];
+        [e setBuffer:p->bSrcI offset:0 atIndex:0];
         [e setBuffer:p->bX offset:0 atIndex:1];
         [e setBuffer:p->bY offset:0 atIndex:2];
         [e setBuffer:p->bG offset:0 atIndex:3];
@@ -1195,10 +1311,12 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
             const MTLSize sColT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
 
             e = p->pass(LUC_DEV_PASS_FILTER);
-            [e setComputePipelineState:p->pRow];
+            [e setComputePipelineState:p->pRowF];
             [e setBuffer:p->bSrc offset:0 atIndex:0];
-            [e setBuffer:p->bTw offset:0 atIndex:1];
-            [e setBytes:&fwd length:4 atIndex:2];
+            [e setBuffer:p->bSrcI offset:0 atIndex:1];
+            [e setBuffer:p->bTw offset:0 atIndex:2];
+            [e setBytes:&fwd length:4 atIndex:3];
+            [e setBytes:&sinv length:4 atIndex:4];
             [e dispatchThreadgroups:sRowTG threadsPerThreadgroup:sRowT];
 
             e = p->pass(LUC_DEV_PASS_FILTER);
@@ -1258,13 +1376,14 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
         e = p->pass(LUC_DEV_PASS_SOLVE);
-        [e setComputePipelineState:p->pColA];
+        [e setComputePipelineState:(par->source_filter ? p->pColA : p->pColAF)];
         [e setBuffer:p->bField offset:0 atIndex:0];
         [e setBuffer:p->bTw offset:0 atIndex:1];
         [e setBytes:&inv length:4 atIndex:2];
         [e setBytes:&nrm length:4 atIndex:3];
-        [e setBuffer:p->bSrc offset:0 atIndex:4];
+        [e setBuffer:(par->source_filter ? p->bSrc : p->bSrcI) offset:0 atIndex:4];
         [e setBytes:&A length:sizeof(A) atIndex:5];
+        if (!par->source_filter) [e setBytes:&sinv length:4 atIndex:6];
         [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
     }
     return 0;

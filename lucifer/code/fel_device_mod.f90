@@ -41,10 +41,13 @@
 ! column is then the median per-step phase increment in ticks of the fixed-point
 ! quantum rather than in FP32 ulps; the same floor applies.
 !
-! The device deposit accumulates with atomic adds whose ordering is not fixed, so two
-! runs of the same step differ in the source's last bit or two. Both reference
-! backends behave the same way (manual/GPU.md, gpu/metal-engine 4919b01), so no device
-! output is asserted byte-identical; the ceilings absorb it.
+! The device deposit accumulates in fixed point, so two runs of one deck agree bit for
+! bit. Integer addition is associative and commutative where float addition is neither,
+! so the order threads reach a cell cannot change the answer. Both reference backends
+! deposit in floats and are reproducible in neither (manual/GPU.md, gpu/metal-engine
+! 4919b01). The float deposit left a divergence here of 2.0e-7 on a field power, far
+! inside the ceilings, and what it cost was the right to assert a device output
+! exactly. Every array of the statistics file is asserted exactly now.
 !
 ! The field set. The resident field is every member of the run's set (the fundamental
 ! and its harmonics, one grid) with one or two planes each (Ex, or the (Ex, Ey) pair
@@ -83,6 +86,22 @@ integer, parameter :: fel_dev_max_field$ = 9
 ! The pass slots of lucifer_device.h, and their names for the report. The two mirrors
 ! move together, as the parameter struct's do.
 
+! The deposit's fixed-point constants. The accumulator is a signed 64-bit integer built
+! from two 32-bit atomic words, and the scale is a power of two so that it and its
+! reciprocal are exact. fel_dev_dep_room$ leaves two bits above the sign for the modular
+! head. The gamma floor is the divisor the bound assumes a particle's energy can fall to:
+! an FEL extracts of order rho, a part in a thousand, so an eighth of the reference is
+! conservative past any argument and costs three of the bound's spare bits.
+
+real(rp), parameter :: fel_dev_dep_room$ = 4.611686018427388e18_rp   ! 2^62
+real(rp), parameter :: fel_dev_gamma_floor$ = 8.0_rp
+
+! Below this many bits between the quantum and the FP32 spacing of the bound, the fixed
+! point would not be finer than the float accumulation it replaces, and the run is
+! refused at the first step, before anything converts (fel_track_mod's fill_device_par).
+
+integer, parameter :: fel_dev_dep_bits_min$ = 8
+
 integer, parameter :: fel_dev_pass_n$ = 6
 character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
         [character(10):: 'transverse', 'push', 'zero', 'deposit', 'filter', 'solve']
@@ -103,6 +122,7 @@ type, bind(c) :: fel_device_par_struct
   real(c_double) :: rtmp(fel_dev_max_field$)    ! Per member: fc(h) / (sqrt(2) m_e).
   real(c_double) :: scl_w(fel_dev_max_field$)   ! Per member: fel_field_step's scl_w at h.
   real(c_double) :: pol_re(2), pol_im(2)        ! The element's polarization pair.
+  real(c_double) :: dep_scale                   ! Deposit's fixed-point scale [ticks per V/m].
   integer(c_int) :: first, helical, mutate, source_filter, nfield, npol, pad
 end type
 
@@ -132,6 +152,12 @@ type fel_device_struct
   character(64) :: name = ''            ! The device, for the log line.
   logical :: wrap_exact = .false.       ! The exact-wrap assertion's verdict.
   logical :: timing = .false.           ! Per-pass timing is on, one encoder a pass.
+  ! The deposit's fixed-point bound: the whole beam's charge over the gamma floor,
+  ! which is every particle landing in one cell of one slice after migration has
+  ! concentrated it. Everything but the step's own scl_w and roll-off, which are the
+  ! element's and are applied per step.
+  real(rp) :: dep_qbound = 0
+  logical :: dep_told = .false.       ! The deposit scale's origin line is out.
   integer :: nstep = 0                  ! Device steps encoded this run.
   ! The instrument's per-member record: run-level worst phasor, source and field
   ! divergence of each member, the footer's attribution when the set has more than
@@ -503,6 +529,30 @@ if (luc_dev_wrap_check(bucket) /= 0) then
   return
 endif
 dev%wrap_exact = .true.
+
+! The deposit accumulates in fixed point so that the answer does not depend on the
+! order threads reach a cell (FINDINGS 7.66). The scale has to keep the per-cell sum
+! inside a signed 64-bit integer, and the bound taken here is the one nothing can
+! breach: every macroparticle of every slice in one cell, in phase, at a gamma floored
+! well under the reference. Cancellation cannot hide an overflow, since the accumulator
+! is modular and only the total has to fit, but the absolute sum is bounded anyway.
+!
+! The charge is what setup can bound. The element's own deposit scale and the grid's
+! roll-off complete it at the first step, which is where the scale, its origin and its
+! headroom are printed and where too little headroom refuses the run.
+
+dev%dep_qbound = 0
+do is = 1, size(beam%slice)
+  if (beam%slice(is)%n > 0) dev%dep_qbound = dev%dep_qbound + &
+                                             sum(beam%slice(is)%weight(1:beam%slice(is)%n))
+enddo
+dev%dep_qbound = dev%dep_qbound * fel_dev_gamma_floor$ / fel_gamma0(beam)
+if (dev%dep_qbound <= 0) then
+  call out_io (s_error$, r_name, 'DEVICE = "metal" LOADED NO CHARGE, SO THE DEPOSIT SCALE ' // &
+               'CANNOT BE BOUNDED.', 'PLEASE REPORT THIS!')
+  err_flag = .true.
+  return
+endif
 
 allocate (dev%z_ref(dev%nslice))
 dev%z_ref = 0

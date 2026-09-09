@@ -9,6 +9,37 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-09 Fixed: two device runs of one deck now agree bit for bit. The source deposit accumulated with
+  atomic float adds, four corners a macroparticle and two a corner, and float addition is neither associative
+  nor commutative, so the order threads reached a cell set the bits. On the time-dependent window with
+  shot noise, 54 of the 127 arrays of the statistics file differed between two runs, the field power by 2.0e-7
+  and the exit power by 1.6e-8. That sat far inside the 5.1e-4 band against the CPU and was never an accuracy
+  problem, but it cost every device output the right to be compared exactly, and check_device measured the
+  migration no-op against the device's own spread between two identical runs for want of one.
+
+  The deposit accumulates in fixed point instead. Integers do not depend on arrival order, so the answer does
+  not either. Sixty-four bits are carried as two 32-bit words because this hardware has no 64-bit atomic of
+  any kind, atomic_ulong existing as a type with store, load, fetch_add, fetch_min, fetch_or and
+  compare_exchange all invalid for it: every low addend is unsigned, so the number of carries is a property of
+  the sum rather than of the order. Thirty-two bits were tried and rejected on measurement, a scale that keeps
+  the worst case inside an int leaving a quantum that loses to the float accumulation by a factor of seven
+  where sixty-four bits beat it by the same factor. The scale is a power of two, so it and its reciprocal are
+  exact and the conversion costs one rounding where the float deposit paid one per contribution. It is bounded
+  by every macroparticle in one cell in phase at a gamma floored an eighth of the reference. The run's charge
+  gives the bound at setup, the element's source scale and the grid's roll-off complete it at the first step,
+  and the run prints the scale with its origin and its headroom there: 2^24 ticks per volt per metre against
+  a bound of 2.7e11 V/m on the Aramis segment, the quantum 37 bits below the FP32 spacing of that bound. A
+  headroom too small to beat the float accumulation refuses the run before anything converts.
+
+  The conversion adds no dispatch: it rides the first of the filter's four source passes with the filter on,
+  and the solve's last pass when it is off, since nothing transforms the source then. The instrument's source
+  readback decodes the accumulator for the same reason. Accuracy is unchanged, measured against the CPU's FP64
+  deposit on cancelling phases, unequal weights, charge in few cells and the largest load: 1.46e-5, 1.46e-5,
+  6.95e-6 and 2.51e-6 against the float deposit's 1.46e-5, 1.47e-5, 6.89e-6 and 2.51e-6. The cost is a quarter
+  to a third more device time and six to seven percent more wall clock, priced in doc/performance.md.
+  check_device gained the two-run comparison over every array, on both filter settings, and its no-op check
+  is equality with its floor deleted.
+
 - 2026-09-09 Added: global%device_timing times each pass of a device step separately, so the deposit's share
   step is a measured number rather than an inference. The backend's busy seconds come from one command buffer,
   and a command buffer holds every step between two host touches, so they price a step, not a pass. On, each

@@ -740,7 +740,7 @@ real(rp) fp_rtmp, fp_gridmax
 real(rp), allocatable :: dev_s0(:,:,:)
 type (fel_coherent_struct), allocatable :: coh(:)
 integer is, io, nslice, nslice_f, ngrid_arr(3)
-logical any_err, err, fp_on, dev_on, dev_twin, dev_prod
+logical any_err, err, ok, fp_on, dev_on, dev_twin, dev_prod
 character(*), parameter :: r_name = 'fel_track_und_step'
 
 !
@@ -798,7 +798,8 @@ dev_twin = dev_on .and. fp_on
 dev_prod = dev_on .and. .not. fp_on
 
 if (dev_on) then
-  call fill_device_par (dpar)
+  call fill_device_par (dpar, ok)
+  if (.not. ok) return
   if (fp_on) dpar%mutate = merge(1, 0, fp32%mutate)
 endif
 
@@ -1073,11 +1074,12 @@ contains
 ! transverse map's k1 locals are fel_transverse_track_bmad's forms.
 !-
 
-subroutine fill_device_par (par)
+subroutine fill_device_par (par, ok)
 
 type (fel_device_par_struct) par
-real(rp) g_max, p0_mc_l
-integer ngrid_l(3), io
+real(rp) g_max, p0_mc_l, s_bound
+integer ngrid_l(3), io, dep_bits
+logical ok
 
 !
 
@@ -1119,6 +1121,58 @@ do io = 1, size(ff)
 enddo
 par%pol_re = real(und%pol, rp)
 par%pol_im = aimag(und%pol)
+
+! The deposit's fixed-point scale, the largest power of two that keeps the bounded
+! per-cell sum inside the accumulator. The bound is the charge the run loaded over the
+! gamma floor (fel_device_setup) times this element's own deposit scale and the roll-off
+! at the grid's corner, which is every macroparticle in one cell at the worst coupling
+! the mesh carries. A power of two, so the scale and its reciprocal are exact and the
+! conversion back to a float source costs one rounding.
+!
+! The headroom is the margin the fixed point wins by. A quantum below the FP32
+! spacing of the bound resolves the accumulator everywhere more finely than the float
+! accumulation it replaces, and the bits between the two are what the run reports. Too
+! few of them and the run is refused here, before the first step converts anything.
+! The scale is chosen against the same bound the headroom is measured against, so their
+! product lands between 2^61 and 2^62 whatever the deck and the headroom is 37 bits. No
+! deck therefore reaches the refusal, and raising fel_dev_dep_bits_min$ past 37 is what
+! fires it and how it was verified.
+
+ok = .false.
+par%dep_scale = 1
+s_bound = sqrt(1 + abs(par%kx) * par%gridmax**2 + abs(par%ky) * par%gridmax**2) * &
+          maxval(par%scl_w(1:size(ff))) * dev%dep_qbound
+if (s_bound <= 0) then
+  call out_io (s_error$, r_name, 'THE DEVICE DEPOSIT SCALE HAS NO POSITIVE BOUND.', 'PLEASE REPORT THIS!')
+  return
+endif
+
+par%dep_scale = 2.0_rp ** floor(log(fel_dev_dep_room$ / s_bound) / log(2.0_rp))
+
+! The FP32 spacing at the bound lies between 2^-24 and 2^-23 of it. The narrower is
+! taken, so the reported headroom is the one the bound's own binade cannot undercut.
+
+dep_bits = floor(log(0.5_rp * epsilon(1.0_sp) * s_bound * par%dep_scale) / log(2.0_rp))
+if (dep_bits < fel_dev_dep_bits_min$) then
+  call out_io (s_error$, r_name, &
+       'THE DEVICE DEPOSIT CANNOT CARRY ITS BOUND AND ITS PRECISION AT ONCE.', &
+       'THE BOUND ON ONE CELL IS \es10.2\ V/M AND THE QUANTUM SITS \i0\ BITS BELOW', &
+       'THE FP32 SPACING THERE, WHERE \i0\ ARE NEEDED.', &
+       r_array = [s_bound], i_array = [dep_bits, fel_dev_dep_bits_min$])
+  return
+endif
+
+if (.not. dev%dep_told) then
+  dev%dep_told = .true.
+  call out_io (s_info$, r_name, 'Device: the deposit accumulates in fixed point at 2^\i0\ ticks ' // &
+               'per V/m,', '  bounded by \es9.2\ V/m in one cell (the run''s charge at a gamma ' // &
+               'floor of gamma0 / \i0\,', '  the element''s source scale and the roll-off at the ' // &
+               'grid''s corner), with the quantum', '  \i0\ bits below the FP32 spacing of that bound.', &
+               r_array = [s_bound], &
+               i_array = [nint(log(par%dep_scale) / log(2.0_rp)), nint(fel_dev_gamma_floor$), dep_bits])
+endif
+
+ok = .true.
 
 par%first = ff(1)%slip%first
 par%helical = merge(1, 0, und%helical)

@@ -365,6 +365,25 @@ production loads, which is the same conclusion the load scan of [](#perf-device)
 from the outside: the step is dominated by the grid and not by the particles until the
 load is very high.
 
+What the fixed-point deposit costs. The same three loads and the same deck as the two
+tables above, timing off on both sides so the instrument's own boundaries are out of it,
+best of five. The float deposit is the run before the accumulator changed.
+
+| particles a slice | busy, float | busy, fixed point | busy | walk, float | walk, fixed point | walk |
+|---|---|---|---|---|---|---|
+| 1024 | 0.1120 s | 0.1390 s | 1.24x | 0.611 s | 0.649 s | 1.06x |
+| 8192 | 0.1240 s | 0.1640 s | 1.32x | 0.683 s | 0.733 s | 1.07x |
+| 131072 | 0.2740 s | 0.3550 s | 1.30x | 1.700 s | 1.800 s | 1.06x |
+
+A quarter to a third more device time, and six to seven percent more wall clock, because
+the step is dominated by the host's dispatch at these sizes rather than by the device.
+Three passes pay it. The deposit does two atomic adds a component where it did one, since
+the 64-bit accumulator is two 32-bit words. The source clear writes twice the words. And
+the pass that converts reads four integers where it read two floats, which is the first of
+the filter's source passes with the filter on and the solve's last pass with it off. What
+that buys is in [](validation.md#val-device): two runs of one deck identical on every
+array of the statistics file, where 54 of 127 differed before.
+
 The field set, on the planar segment of the harmonics check (3.96 m, 88 steps) with the same 96 x 8192 window at `ngrid` 256 and `comb_ds_save = -1`, since a helical segment couples only the fundamental and the set has nothing to carry there:
 
 | case | CPU, 12 threads | device wall | device busy | ratio |
