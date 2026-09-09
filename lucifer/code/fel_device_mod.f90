@@ -80,6 +80,13 @@ real(rp), parameter :: fel_dev_rad_per_tick$ = twopi / 4294967296.0_rp
 
 integer, parameter :: fel_dev_max_field$ = 9
 
+! The pass slots of lucifer_device.h, and their names for the report. The two mirrors
+! move together, as the parameter struct's do.
+
+integer, parameter :: fel_dev_pass_n$ = 6
+character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
+        [character(10):: 'transverse', 'push', 'zero', 'deposit', 'filter', 'solve']
+
 !+
 ! Struct fel_device_par_struct
 !
@@ -124,6 +131,7 @@ type fel_device_struct
   real(rp), allocatable :: k_key(:,:)   ! Propagator upload key, (4, nfield).
   character(64) :: name = ''            ! The device, for the log line.
   logical :: wrap_exact = .false.       ! The exact-wrap assertion's verdict.
+  logical :: timing = .false.           ! Per-pass timing is on, one encoder a pass.
   integer :: nstep = 0                  ! Device steps encoded this run.
   ! The instrument's per-member record: run-level worst phasor, source and field
   ! divergence of each member, the footer's attribution when the set has more than
@@ -252,6 +260,21 @@ interface
     integer(c_int64_t) b
   end function
 
+  function luc_dev_timing (on, reason, reason_len) bind(c, name = 'luc_dev_timing') result (ierr)
+    import c_int, c_char
+    integer(c_int), value :: on, reason_len
+    character(c_char) reason(*)
+    integer(c_int) ierr
+  end function
+
+  function luc_dev_pass_seconds (sec, count, n) bind(c, name = 'luc_dev_pass_seconds') result (early)
+    import c_int, c_double, c_int64_t
+    real(c_double) sec(*)
+    integer(c_int64_t) count(*)
+    integer(c_int), value :: n
+    integer(c_int) early
+  end function
+
 end interface
 
 ! A generic name, kept inside the module: every caller of it is here, and the seam's
@@ -345,7 +368,7 @@ end subroutine from_c
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, err_flag)
+! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, timing, err_flag)
 !
 ! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
 ! asks for the one backend this tree knows; a build without it (the stub) refuses with
@@ -363,13 +386,16 @@ end subroutine from_c
 !   harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the member count.
 !   npol       -- integer: Planes per member, 1 or 2.
 !   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
+!   timing     -- logical: Time each pass of a step separately, one encoder a pass.
+!                   A device that samples no counters at an encoder boundary refuses.
 !
 ! Output:
 !   dev        -- fel_device_struct: Armed (or left dark).
 !   err_flag   -- logical: Set True on any refusal. False otherwise.
 !-
 
-subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, err_flag)
+subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, &
+                             timing, err_flag)
 
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
@@ -377,7 +403,7 @@ character(*) device_req
 integer ngrid, fp32_iu, npol
 integer harm(:)
 integer sample
-logical err_flag
+logical timing, err_flag
 
 character(kind=c_char) c_reason(256)
 character(256) reason
@@ -439,6 +465,22 @@ endif
 dev%nslice = size(beam%slice)
 dev%npart = np
 dev%ngrid = ngrid
+
+! Per-pass timing, asked for before anything is encoded, which is the one point the
+! backend accepts it. A device that samples no counters at an encoder boundary refuses
+! rather than reporting zeros, since a table of zeros reads like a free pass.
+
+if (timing) then
+  if (luc_dev_timing(1_c_int, c_reason, 256) /= 0) then
+    call from_c (c_reason, reason)
+    call out_io (s_error$, r_name, 'DEVICE_TIMING = T REFUSED: ' // trim(reason) // '.')
+    err_flag = .true.
+    return
+  endif
+  dev%timing = .true.
+  call out_io (s_info$, r_name, 'Device: per-pass timing on, one encoder a pass. ' // &
+               'The production path pays no such boundary, so a price is taken with it off.')
+endif
 
 ! The exact-wrap assertion, on the device's own arithmetic: a bucket shift and its
 ! return must be bit-exact, and the extracted phase must never see the shift. Wraps
@@ -1316,7 +1358,9 @@ subroutine fel_device_close_run (dev, fp32)
 
 type (fel_device_struct) dev
 type (fel_fp32_struct) fp32
-integer im
+real(c_double) psec(fel_dev_pass_n$)
+integer(c_int64_t) pcount(fel_dev_pass_n$)
+integer im, ip, early
 character(*), parameter :: r_name = 'fel_device_close_run'
 
 !
@@ -1335,6 +1379,32 @@ endif
 
 call out_io (s_info$, r_name, 'Device: \i0\ steps encoded, device busy \f10.3\ s.', &
              i_array = [dev%nstep], r_array = [real(luc_dev_seconds(), rp)])
+
+! The per-pass table, when the run asked for it. The passes of one kind in a step sum
+! into one line: the transverse map runs twice a step, and the filter and the solve are
+! four dispatches each, so the count says how many encoders went into each figure. The
+! sum is reported against the busy seconds above, which is the same time measured by
+! the command buffer rather than by the encoders inside it.
+
+if (dev%timing) then
+  early = luc_dev_pass_seconds (psec, pcount, fel_dev_pass_n$)
+  call out_io (s_info$, r_name, 'Device per pass, seconds and encoders:')
+  do ip = 1, fel_dev_pass_n$
+    call out_io (s_info$, r_name, '  ' // fel_dev_pass_name$(ip) // &
+                 ' \f10.4\ s over \i0\ encoders.', &
+                 r_array = [real(psec(ip), rp)], i_array = [int(pcount(ip))])
+  enddo
+  call out_io (s_info$, r_name, '  the six together \f10.4\ s against the busy ' // &
+               '\f10.4\ s above.', &
+               r_array = [real(sum(psec), rp), real(luc_dev_seconds(), rp)])
+  if (early > 0) then
+    call out_io (s_warn$, r_name, 'The sample buffer filled \i0\ times, so that many ' // &
+                 'command buffers were committed early.', &
+                 'The batching those steps ran under was the instrument''s, not the run''s.', &
+                 i_array = [early])
+  endif
+endif
+
 call luc_dev_close ()
 
 end subroutine fel_device_close_run

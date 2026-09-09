@@ -198,6 +198,14 @@ type fel_global_struct
   ! and the FP64 run is untouched. Everything the backend does not cover is refused
   ! at setup or first use, never quietly run on the CPU instead.
   character(16) :: device = 'off'
+  ! Per-pass device timing (lucifer_device.h). The backend's own busy seconds are one
+  ! command buffer, which holds every step between two host touches, so they cannot say
+  ! what a pass costs. On, each pass of a step is encoded into its own compute encoder
+  ! carrying a timestamp attachment, which is what stage-boundary counter sampling can
+  ! measure, and the run reports the seconds per pass. That costs encoder boundaries the
+  ! production path does not pay, so it is off by default and a price is measured with it
+  ! off (doc/performance.md perf-device).
+  logical :: device_timing = .false.
 end type
 
 !+

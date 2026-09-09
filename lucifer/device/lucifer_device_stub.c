@@ -84,3 +84,20 @@ void luc_dev_sync (void) {}
 int luc_dev_wrap_check (int64_t bucket_ticks) { (void) bucket_ticks; return 1; }
 double luc_dev_seconds (void) { return 0; }
 int64_t luc_dev_bytes (void) { return 0; }
+
+int luc_dev_timing (int on, char *reason, int reason_len)
+{
+  (void) on;
+  put_str (reason, reason_len, "no device backend in this build");
+  return 1;
+}
+
+int luc_dev_pass_seconds (double *sec, int64_t *count, int n)
+{
+  int i;
+  for (i = 0; i < n; i++) {
+    if (sec != NULL) sec[i] = 0;
+    if (count != NULL) count[i] = 0;
+  }
+  return 0;
+}

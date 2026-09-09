@@ -328,6 +328,43 @@ The Metal backend ([](validation.md#val-device)) run against the CPU path on the
 | SASE window, 96 x 8192 | 3.92 s | 0.316 s | 0.196 s | 12.4x |
 | dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.037 s | 0.009 s | 0.9x |
 
+Where a step's device seconds go, per pass. `global%device_timing` encodes each pass into
+its own compute encoder carrying a timestamp attachment, which is what stage-boundary
+counter sampling can measure on an Apple GPU: dispatch-boundary sampling would time each
+dispatch inside one encoder and the M3 Max reports it absent. The full Aramis line, 12
+segments and 1068 steps, one slice, `ngrid` 256, the filter on and `comb_ds_save = -1`, so
+the readbacks fall at element ends and each element's steps batch into one command buffer.
+Best complete run of five, never a per-pass minimum, with the spread over the five beside
+it. The transverse map runs twice a step, and the filter and the solve are four dispatches
+each, so those lines sum more encoders than the others.
+
+| particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1024 | 0.953 s | 0.311 s | 0.0278 s | 0.0273 s | 0.0143 s | 0.0201 s | 0.0831 s | 0.0871 s | 0.2597 s | 12.5% |
+| 8192 | 0.875 s | 0.256 s | 0.0197 s | 0.0184 s | 0.0116 s | 0.0142 s | 0.0577 s | 0.0605 s | 0.1821 s | 27.7% |
+| 131072 | 1.800 s | 0.312 s | 0.0482 s | 0.0423 s | 0.0147 s | 0.0825 s | 0.0590 s | 0.0614 s | 0.3081 s | 7.1% |
+
+The instrument is not free, and its price is what says how far the table above can be
+read. The same three loads with the timing off against on, best of five:
+
+| particles a slice | walk off | walk on | busy off | busy on | busy |
+|---|---|---|---|---|---|
+| 1024 | 0.611 s | 0.912 s | 0.1120 s | 0.2920 s | 2.61x |
+| 8192 | 0.683 s | 0.882 s | 0.1240 s | 0.2580 s | 2.08x |
+| 131072 | 1.700 s | 1.800 s | 0.2740 s | 0.3170 s | 1.16x |
+
+So the absolute seconds in the per-pass table are the instrument's rather than a
+production run's, and at the two lighter loads the encoder boundaries cost about as much
+as the work. The shares survive that better than the seconds do, with one bias to keep in
+mind: a pass bears one boundary per encoder, so the deposit's one encoder a step carries
+less of the overhead than the filter's four or the solve's four, and the deposit's share
+is therefore a floor. Read that way the deposit is 7.7 percent of the six at 1024 and 8192
+particles a slice and 26.8 percent at 131072, where the overhead is smallest and the
+figure is firmest. The transform, filter and solve together are two thirds of a step at
+production loads, which is the same conclusion the load scan of [](#perf-device) reaches
+from the outside: the step is dominated by the grid and not by the particles until the
+load is very high.
+
 The field set, on the planar segment of the harmonics check (3.96 m, 88 steps) with the same 96 x 8192 window at `ngrid` 256 and `comb_ds_save = -1`, since a helical segment couples only the fundamental and the set has nothing to carry there:
 
 | case | CPU, 12 threads | device wall | device busy | ratio |

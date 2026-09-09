@@ -169,6 +169,42 @@ int luc_dev_wrap_check (int64_t bucket_ticks);
 double luc_dev_seconds (void);
 int64_t luc_dev_bytes (void);
 
+/* Per-pass timing. luc_dev_seconds above is a whole command buffer, and a command
+ * buffer holds every step between two host touches, so it cannot say what a pass
+ * costs. With timing on, each pass of luc_dev_step is encoded into its own compute
+ * encoder carrying a timestamp counter attachment, all still inside the one command
+ * buffer the step batching rests on, and the per-pass seconds accumulate into these
+ * slots. The passes of one kind in a step sum into one slot: the transverse map runs
+ * twice a step, and the filter and the solve are four dispatches each.
+ *
+ * Dispatch-boundary counter sampling would time each dispatch inside one encoder and
+ * is absent on the hardware this backend runs (Apple M3 Max reports stage boundary
+ * alone), so an encoder a pass is what stage-boundary sampling allows. The instrument
+ * therefore costs encoder boundaries the production path does not pay, which is why it
+ * is off by default and why the price is measured with it off.
+ *
+ * The counter sample buffer holds 4096 samples on this hardware, two a pass, so a
+ * command buffer covering more than 2048 passes is committed early to make room. That
+ * is a batching change the instrument caused, so the count of those is returned. */
+#define LUC_DEV_PASS_TRK    0   /* transverse map, twice a step */
+#define LUC_DEV_PASS_PUSH   1   /* longitudinal push and field gather */
+#define LUC_DEV_PASS_ZERO   2   /* clear the source planes */
+#define LUC_DEV_PASS_DEP    3   /* source deposit */
+#define LUC_DEV_PASS_FILTER 4   /* the source filter's four passes */
+#define LUC_DEV_PASS_SOLVE  5   /* the field solve's four passes */
+#define LUC_DEV_PASS_N      6
+
+/* Turn per-pass timing on or off. Legal only with nothing encoded, which the caller
+ * arranges by calling it before the first step. Returns 0, or nonzero with 'reason'
+ * filled when the hardware carries no timestamp counter set. */
+int luc_dev_timing (int on, char *reason, int reason_len);
+
+/* Fill sec(1:n) with the accumulated per-pass seconds, n at most LUC_DEV_PASS_N, and
+ * count(1:n) with the passes summed into each. Returns the number of command buffers
+ * committed early to make room in the sample buffer. Zero everywhere when timing was
+ * never on. */
+int luc_dev_pass_seconds (double *sec, int64_t *count, int n);
+
 #ifdef __cplusplus
 }
 #endif

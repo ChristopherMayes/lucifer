@@ -619,6 +619,19 @@ struct Impl {
     int64_t bytes {0};
     double busy {0};
 
+    // Per-pass timing (lucifer_device.h). Off by default: it costs an encoder a pass,
+    // which the production path does not pay. The sample buffer takes two timestamps
+    // an encoder and the hardware caps it at 4096 samples, so kMaxPass encoders fit in
+    // one command buffer and a step that would pass that commits early.
+    static const int kMaxPass = 2048;
+    id<MTLCounterSampleBuffer> bSample {nil};
+    bool timing {false};
+    int nPass {0};
+    int passSlot[kMaxPass];
+    double passSec[LUC_DEV_PASS_N] {0};
+    int64_t passCount[LUC_DEV_PASS_N] {0};
+    int earlyCommits {0};
+
     // One command buffer per step, MetalEngine.mm's discipline: dispatches
     // accumulate into an open encoder, and every host touch of a buffer drains
     // first. sync() is the only committer, so no GPU work is in flight while
@@ -633,17 +646,57 @@ struct Impl {
         }
         return enc;
     }
+
+    // One pass's encoder. With timing off this is the shared encoder every dispatch
+    // has always accumulated into. With it on the open encoder is closed and a new one
+    // begun carrying this pass's two counter samples, which is what stage-boundary
+    // sampling can measure. Every dispatch site sets its own pipeline state and all of
+    // its buffers, so no encoder here inherits state from the one before it.
+    id<MTLComputeCommandEncoder> pass (int slot){
+        if (!timing) return encoder();
+        if (enc != nil) { [enc endEncoding];  enc = nil; }
+        if (nPass >= kMaxPass) { sync();  earlyCommits++; }
+        if (cb == nil) cb = [queue commandBuffer];
+        MTLComputePassDescriptor *pd = [MTLComputePassDescriptor computePassDescriptor];
+        pd.dispatchType = MTLDispatchTypeSerial;
+        pd.sampleBufferAttachments[0].sampleBuffer = bSample;
+        pd.sampleBufferAttachments[0].startOfEncoderSampleIndex = (NSUInteger) (2 * nPass);
+        pd.sampleBufferAttachments[0].endOfEncoderSampleIndex = (NSUInteger) (2 * nPass + 1);
+        passSlot[nPass] = slot;
+        nPass++;
+        enc = [cb computeCommandEncoderWithDescriptor:pd];
+        return enc;
+    }
+
+    // The timestamps of the passes in the command buffer just drained. A sample the
+    // hardware could not take comes back with MTLCounterErrorValue, which is dropped
+    // rather than accumulated as a wild interval.
+    void resolve (){
+        if (!timing || nPass == 0) { nPass = 0;  return; }
+        NSData *rd = [bSample resolveCounterRange:NSMakeRange(0, (NSUInteger) (2 * nPass))];
+        if (rd != nil) {
+            const MTLCounterResultTimestamp *r = (const MTLCounterResultTimestamp *) [rd bytes];
+            for (int i = 0; i < nPass; i++) {
+                MTLTimestamp t0 = r[2*i].timestamp, t1 = r[2*i + 1].timestamp;
+                if (t0 == MTLCounterErrorValue || t1 == MTLCounterErrorValue || t1 < t0) continue;
+                passSec[passSlot[i]] += (double) (t1 - t0) * 1.0e-9;
+                passCount[passSlot[i]] += 1;
+            }
+        }
+        nPass = 0;
+    }
     // Not thread-safe in general: encoder() and a draining sync() both touch enc.
     // What the header's concurrency contract rests on is the narrow case: after one
     // serial drain with nothing encoded since, enc is nil, concurrent transfer calls
     // all take the early return below, and their memcpys of disjoint regions of the
     // shared-storage buffers race nothing.
     void sync (){
-        if (enc == nil) return;
-        [enc endEncoding];
+        if (enc == nil && cb == nil) return;
+        if (enc != nil) [enc endEncoding];
         [cb commit];
         [cb waitUntilCompleted];
         busy += [cb GPUEndTime] - [cb GPUStartTime];
+        resolve();
         enc = nil;
         cb = nil;
     }
@@ -1073,10 +1126,11 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         A.pad = 0;
         for (int i = 0; i < 4; i++) A.pol[i] = S.pol[i];
 
-        id<MTLComputeCommandEncoder> e = p->encoder();
+        id<MTLComputeCommandEncoder> e = nil;
 
         auto encTrk = [&](uint32_t leading) {
             T.leading = leading;
+            e = p->pass(LUC_DEV_PASS_TRK);
             [e setComputePipelineState:p->pTrk];
             [e setBuffer:p->bX offset:0 atIndex:0];
             [e setBuffer:p->bPX offset:0 atIndex:1];
@@ -1089,6 +1143,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
 
         encTrk(1);
 
+        e = p->pass(LUC_DEV_PASS_PUSH);
         [e setComputePipelineState:p->pPush];
         [e setBuffer:p->bG offset:0 atIndex:0];
         [e setBuffer:p->bU offset:0 atIndex:1];
@@ -1105,11 +1160,13 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
 
         encTrk(0);
 
+        e = p->pass(LUC_DEV_PASS_ZERO);
         [e setComputePipelineState:p->pZero];
         [e setBuffer:p->bSrc offset:0 atIndex:0];
         [e dispatchThreads:MTLSizeMake((size_t) p->nfield * p->nslice * nn * 2, 1, 1)
              threadsPerThreadgroup:tgp];
 
+        e = p->pass(LUC_DEV_PASS_DEP);
         [e setComputePipelineState:p->pDep];
         [e setBuffer:p->bSrc offset:0 atIndex:0];
         [e setBuffer:p->bX offset:0 atIndex:1];
@@ -1137,12 +1194,14 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
             const MTLSize sColTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nsrcplane, 1);
             const MTLSize sColT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
 
+            e = p->pass(LUC_DEV_PASS_FILTER);
             [e setComputePipelineState:p->pRow];
             [e setBuffer:p->bSrc offset:0 atIndex:0];
             [e setBuffer:p->bTw offset:0 atIndex:1];
             [e setBytes:&fwd length:4 atIndex:2];
             [e dispatchThreadgroups:sRowTG threadsPerThreadgroup:sRowT];
 
+            e = p->pass(LUC_DEV_PASS_FILTER);
             [e setComputePipelineState:p->pCol];
             [e setBuffer:p->bSrc offset:0 atIndex:0];
             [e setBuffer:p->bTw offset:0 atIndex:1];
@@ -1150,6 +1209,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
             [e setBytes:&one length:4 atIndex:3];
             [e dispatchThreadgroups:sColTG threadsPerThreadgroup:sColT];
 
+            e = p->pass(LUC_DEV_PASS_FILTER);
             [e setComputePipelineState:p->pRowM];
             [e setBuffer:p->bSrc offset:0 atIndex:0];
             [e setBuffer:p->bTw offset:0 atIndex:1];
@@ -1158,6 +1218,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
             [e setBytes:&srcPPM length:4 atIndex:4];
             [e dispatchThreadgroups:sRowTG threadsPerThreadgroup:sRowT];
 
+            e = p->pass(LUC_DEV_PASS_FILTER);
             [e setComputePipelineState:p->pCol];
             [e setBuffer:p->bSrc offset:0 atIndex:0];
             [e setBuffer:p->bTw offset:0 atIndex:1];
@@ -1172,12 +1233,14 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         const MTLSize colTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nplane, 1);
         const MTLSize colT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
 
+        e = p->pass(LUC_DEV_PASS_SOLVE);
         [e setComputePipelineState:p->pRow];
         [e setBuffer:p->bField offset:0 atIndex:0];
         [e setBuffer:p->bTw offset:0 atIndex:1];
         [e setBytes:&fwd length:4 atIndex:2];
         [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
+        e = p->pass(LUC_DEV_PASS_SOLVE);
         [e setComputePipelineState:p->pCol];
         [e setBuffer:p->bField offset:0 atIndex:0];
         [e setBuffer:p->bTw offset:0 atIndex:1];
@@ -1185,6 +1248,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBytes:&one length:4 atIndex:3];
         [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
 
+        e = p->pass(LUC_DEV_PASS_SOLVE);
         [e setComputePipelineState:p->pRowM];
         [e setBuffer:p->bField offset:0 atIndex:0];
         [e setBuffer:p->bTw offset:0 atIndex:1];
@@ -1193,6 +1257,7 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e setBytes:&ppm length:4 atIndex:4];
         [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
+        e = p->pass(LUC_DEV_PASS_SOLVE);
         [e setComputePipelineState:p->pColA];
         [e setBuffer:p->bField offset:0 atIndex:0];
         [e setBuffer:p->bTw offset:0 atIndex:1];
@@ -1267,6 +1332,63 @@ int luc_dev_wrap_check (int64_t bucket_ticks)
 double luc_dev_seconds (void)
 {
     return (gImpl != nullptr) ? gImpl->busy : 0;
+}
+
+int luc_dev_timing (int on, char *reason, int reason_len)
+{
+    Impl *p = gImpl;
+    if (p == nullptr) {
+        put_str(reason, reason_len, "device not initialized");
+        return 1;
+    }
+    if (on == 0) {
+        p->timing = false;
+        return 0;
+    }
+
+    // Stage-boundary sampling times an encoder, which is why a pass gets one of its
+    // own. Dispatch-boundary sampling would time each dispatch inside a single encoder
+    // and is absent here, so the refusal names what the device does carry.
+
+    if (![p->dev supportsCounterSampling:MTLCounterSamplingPointAtStageBoundary]) {
+        put_str(reason, reason_len, "this device samples no counters at an encoder boundary");
+        return 1;
+    }
+    if (p->bSample == nil) {
+        id<MTLCounterSet> ts = nil;
+        for (id<MTLCounterSet> cs in [p->dev counterSets])
+            if ([[cs name] isEqualToString:MTLCommonCounterSetTimestamp]) ts = cs;
+        if (ts == nil) {
+            put_str(reason, reason_len, "this device carries no timestamp counter set");
+            return 1;
+        }
+        MTLCounterSampleBufferDescriptor *sd = [MTLCounterSampleBufferDescriptor new];
+        sd.counterSet = ts;
+        sd.sampleCount = (NSUInteger) (2 * Impl::kMaxPass);
+        sd.storageMode = MTLStorageModeShared;
+        NSError *err = nil;
+        p->bSample = [p->dev newCounterSampleBufferWithDescriptor:sd error:&err];
+        if (p->bSample == nil) {
+            put_str(reason, reason_len, err != nil
+                    ? std::string([[err localizedDescription] UTF8String])
+                    : std::string("the counter sample buffer would not allocate"));
+            return 1;
+        }
+    }
+    p->timing = true;
+    return 0;
+}
+
+int luc_dev_pass_seconds (double *sec, int64_t *count, int n)
+{
+    Impl *p = gImpl;
+    if (p == nullptr) return 0;
+    if (n > LUC_DEV_PASS_N) n = LUC_DEV_PASS_N;
+    for (int i = 0; i < n; i++) {
+        if (sec != nullptr) sec[i] = p->passSec[i];
+        if (count != nullptr) count[i] = p->passCount[i];
+    }
+    return p->earlyCommits;
 }
 
 int64_t luc_dev_bytes (void)

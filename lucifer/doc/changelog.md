@@ -9,6 +9,24 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-09 Added: global%device_timing times each pass of a device step separately, so the deposit's share
+  step is a measured number rather than an inference. The backend's busy seconds come from one command buffer,
+  and a command buffer holds every step between two host touches, so they price a step, not a pass. On, each
+  pass is encoded into its own compute encoder carrying a timestamp counter attachment, still inside the one
+  command buffer the step batching rests on, and the run reports seconds and encoder counts for the transverse
+  map, the push, the source clear, the deposit, the filter and the solve. Stage-boundary counter sampling is
+  what an Apple GPU carries and it times an encoder rather than a dispatch, which is why a pass gets its own;
+  the M3 Max reports dispatch-boundary sampling absent, and a device that samples nothing at an encoder
+  boundary refuses rather than reporting zeros.
+
+  Measured on the full Aramis line, 12 segments and 1068 steps, one slice, ngrid 256, the filter on, best
+  complete run of five: the deposit is 7.7 percent of the six passes at 1024 and at 8192 particles a slice and
+  26.8 percent at 131072, and the filter and the solve together are two thirds of a step at production loads.
+  The instrument costs 2.61, 2.08 and 1.16 times the device busy seconds at those three loads, so its absolute
+  seconds are its own rather than a run's and doc/performance.md says so beside the table. It is off
+  by default for that reason. The sample buffer holds 2048 passes, about 157 steps, and a command buffer
+  needing more is committed early with a warning naming how often, since that batching was the instrument's.
+
 - 2026-09-08 Added: global%source_filter_tolerance places the source filter's edge relative to the angle it
   protects rather than on that angle. The derived edge was the larger of the mode and rho angles, which puts
   the sigmoid's half-amplitude point on it and so keeps a quarter of the source intensity at the angle setup
