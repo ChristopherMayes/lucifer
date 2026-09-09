@@ -621,7 +621,42 @@ neither angle serves alone and the larger is taken. The larger is taken because
 cutting into the mode loses real radiation while leaving artifact in only weakens the
 filter. $\rho$ is the one-dimensional Pierce parameter in Genesis's form, from the
 undulator's coupling and the peak current of the loaded beam. Both angles, their ratio
-and which one won are printed at setup, with a warning when the ratio leaves 0.3 to 3. The filtered source is then added to the field in
+and which one won are printed at setup, with a warning when the ratio leaves 0.3 to 3.
+
+That larger angle $\theta_p$ is the one the filter protects, and where the edge goes
+relative to it is a separate question. An edge on $\theta_p$ puts the sigmoid's
+half-amplitude point there, so the source keeps a quarter of its intensity at the angle
+the run just derived as physical. `global%source_filter_tolerance` names the largest
+fraction of source intensity the filter may take anywhere inside $\theta_p$, and the edge
+is placed to hold it,
+
+$$
+  \theta_{edge} = \frac{\theta_p}{1 - w \ln\!\big[t/(1-t)\big]}, \qquad
+  t = \sqrt{1 - \epsilon} ,
+$$ (eq-filter-tolerance)
+
+with $\epsilon$ the tolerance. The sigmoid passes amplitude $t$ at $\theta_p$ and
+intensity $t^2$ there, so the tolerance fixes $t$. At $\epsilon = 3/4$ the logarithm is
+zero, the margin is one and the edge is $\theta_p$ itself, which is the placement in use
+before the tolerance existed and is its default. The 0.75 is the loss that placement
+implies rather than a number chosen for it. Smaller tolerances move the edge out by 1.12
+at 0.2 and 1.36 at 0.01, holding the transmission across $\theta_p$ at the cost of leaving
+more wide-angle source in.
+
+The logarithm is taken as $\ln t + \ln(1+t) - \ln\epsilon$, which is the same number since
+$\epsilon = (1-t)(1+t)$ and which never forms $1 - t$. Formed directly, $1 - t$ is exactly
+zero for any tolerance below about $2.2\times10^{-16}$, where $1 - \epsilon$ rounds to
+one, and at a width of 0.01 such a tolerance still has a margin of 0.60 and is an edge the
+run can build. The three logarithms also cancel to the bit at $\epsilon = 3/4$, so the
+default edge is bitwise the edge derived before the input existed. A tolerance outside the
+open interval from 0 to 1 is refused, checked before anything takes a logarithm: both ends
+are singular, and at one the margin runs to positive infinity and the edge collapses onto
+the axis, which a test on the margin's sign would take. A width too large for the
+tolerance leaves the margin at or below zero and is refused with the width that would meet
+it. Setting the angle, or the grid-relative cuts, places the edge directly and bypasses the
+tolerance, and setup says which happened.
+
+The filtered source is then added to the field in
 Fourier space, before the one inverse transform:
 
 $$
@@ -652,9 +687,11 @@ physical in-cone startup power and delays saturation by five to nine metres
 ([](startup-noise.md)). The grid-relative cuts lift that guard, since placing the edge
 where Genesis4 places it means taking its width too.
 
-The same angle serves the statistics whether or not the filter is on. Every record that
-takes the field angle moments reports `power_inside_angle`, the power within
-$\theta_{edge}$ of the axis, from the transform those moments already pay for. Its
+The protected angle serves the statistics whether or not the filter is on. Every record
+that takes the field angle moments reports `power_inside_angle`, the power within
+$\theta_p$ of the axis, from the transform those moments already pay for. It does not
+follow the edge out as the tolerance falls, so a scan of the tolerance is measured
+against one acceptance. Its
 complement to the total is the wide-angle emission of the point beamlets, which is what a
 SASE run has to separate from the mode before quoting a power.
 

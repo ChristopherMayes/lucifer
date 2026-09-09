@@ -296,7 +296,8 @@ def filter_xcut(ngrid, theta):
     return theta * cell_size(ngrid) / LAMBDA0
 
 
-def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0):
+def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0,
+              tolerance=None):
     nslice, sample = window
     slen = nslice * sample * LAMBDA0
     charge = CURRENT * slen / C_LIGHT
@@ -313,6 +314,8 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
                   f'  global%source_filter_xcut = {xcut:.9f}\n'
                   f'  global%source_filter_ycut = {xcut:.9f}\n'
                   f'  global%source_filter_width = {width:.9f}\n')
+    if tolerance is not None:
+        extra += f'  global%source_filter_tolerance = {tolerance:.9f}\n'
     if dumps:
         extra += "  global%dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
     return DECK.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
@@ -595,6 +598,109 @@ def exp_filter(rn, args, lat, results):
                   f"{r['b_rel_late']:+.0%}, "
                   f"saturation {r['z_sat']:.1f} m against {base['z_sat']:.1f} m")
     results["filter"] = res
+
+
+def fit_gain_length(z, power, z_sat):
+    """
+    Power gain length fitted through the exponential regime, in undulator metres.
+
+    The fit runs from ten times the starting power up to two thirds of the way to
+    saturation, which keeps the startup transient and the roll-over out of it. FILL
+    converts the slope along the line into a gain length along undulator, which is the
+    convention Ming Xie's estimate and this page's figures use.
+    """
+    p = np.asarray(power, dtype=float)
+    live = np.isfinite(p) & (p > 0)
+    if live.sum() < 4 or not z_sat:
+        return None
+    zz, pp = np.asarray(z, dtype=float)[live], p[live]
+
+    # Every record a decade above the starting power and below saturation. A band set from
+    # the saturated power instead collapses onto one metre on the two six-segment lines,
+    # where the records are element ends and few, and it returned a gain length of 60 m
+    # against a line that saturates at 21.6 m.
+
+    band = (pp > 10 * pp[0]) & (zz < z_sat)
+    if band.sum() < 4:
+        return None
+    slope = np.polyfit(zz[band], np.log(pp[band]), 1)[0]
+    return float(FILL / slope) if slope > 0 else None
+
+
+def accepted_power(wd, root, record):
+    """Power inside the reported split angle at one record, summed over interior slices."""
+    with h5py.File(wd / f"{root}.stats.h5") as h:
+        g = h["field/total"]
+        p_in = np.asarray(g["power_inside_angle"], dtype=float)
+    row = p_in[record]
+    return float(np.nansum(row[INTERIOR])) if np.isfinite(row).any() else None
+
+
+def exp_tolerance(rn, args, lat, results):
+    """
+    Where the source filter's edge sits relative to the angle it protects
+    (fel-physics.md sec-source-filter).
+
+    The edge used to be the protected angle itself, which puts the sigmoid's
+    half-amplitude point on it and takes three quarters of the source intensity there.
+    global%source_filter_tolerance names the largest loss allowed inside that angle and
+    moves the edge out to hold it. This sweeps it while the reported split stays on the
+    protected angle, so every row is measured against one acceptance.
+
+    One seed a row. That is an exploratory sweep: it says whether the tolerance reaches
+    the gain at all and how far, and it cannot select a default, which needs paired
+    ensembles over the seed spread this page measures at about 25 percent.
+    """
+    ng = MACHINES[args.machine]["filter_grid"]
+    tols = (0.75, 0.2, 0.1, 0.01)
+    print(f"== h. the filter's passband tolerance, grid {ng} ==")
+    res = {"ngrid": ng, "machine": args.machine, "tolerances": list(tols), "rows": {}}
+    first_end = UND_END_RECORDS[min(UND_END_RECORDS)]
+
+    for tol in tols:
+        root = f"tol{str(tol).replace('.', 'p')}_n1024"
+        t0 = time.time()
+        rn.run(root, deck_text(lat, root, ng, 1024, 8, LONG, args.device, DUMP_ELES,
+                               xcut="default", tolerance=tol))
+        wall = time.time() - t0
+        rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
+        z, P, b = element_end_power(rn.wd, root)
+        Pi = interior(P)
+        zs, Ps = saturation_point(z, Pi)
+        slen = LONG[1] * LAMBDA0
+        row = {
+            "tolerance": tol, "wall_s": wall,
+            "accepted_first_segment_W": accepted_power(rn.wd, root, first_end),
+            "z_sat": zs, "P_sat": Ps,
+            "Lg_fit": fit_gain_length(z, Pi, zs),
+            "pulse_energy_exit_J": float(np.nansum(P[-1][INTERIOR]) * slen / C_LIGHT),
+        }
+        for tag, i in (("late", 3), ("exit", 4)):
+            row[f"wide_over_mode_{tag}"] = (rows[i][cut_key("out")] / rows[i][cut_key("in")]
+                                            if rows[i][cut_key("in")] > 0 else float("inf"))
+        res["rows"][str(tol)] = row
+        def g(v, fmt=".4g"):
+            return "n/a" if v is None else format(v, fmt)
+        print(f"  tolerance {tol:<5}: accepted at the first segment "
+              f"{g(row['accepted_first_segment_W'])} W, wide/mode "
+              f"{g(row['wide_over_mode_late'], '.3g')} late and "
+              f"{g(row['wide_over_mode_exit'], '.3g')} at the exit, gain length "
+              f"{g(row['Lg_fit'])} m, saturation {g(row['z_sat'], '.1f')} m, pulse energy "
+              f"{g(row['pulse_energy_exit_J'])} J, {wall:.0f} s")
+
+    base = res["rows"]["0.75"]
+    for tol in tols[1:]:
+        r = res["rows"][str(tol)]
+        for k in ("accepted_first_segment_W", "pulse_energy_exit_J", "Lg_fit"):
+            if base[k] and r[k]:
+                r[k + "_rel"] = (r[k] - base[k]) / base[k]
+        r["wide_over_mode_exit_factor"] = (r["wide_over_mode_exit"] / base["wide_over_mode_exit"]
+                                           if base["wide_over_mode_exit"] > 0 else float("inf"))
+        print(f"  against 0.75, tolerance {tol}: accepted {r.get('accepted_first_segment_W_rel', 0):+.1%}, "
+              f"pulse energy {r.get('pulse_energy_exit_J_rel', 0):+.1%}, gain length "
+              f"{r.get('Lg_fit_rel', 0):+.2%}, wide/mode x{r['wide_over_mode_exit_factor']:.2f}, "
+              f"saturation {r['z_sat']:.1f} m against {base['z_sat']:.1f} m")
+    results["tolerance"] = res
 
 
 def exp_beamlets(rn, args, lat, results):
@@ -889,7 +995,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="metal")
     ap.add_argument("--cpu-threads", default="12")
-    ap.add_argument("--only", default="a,b,c,d,e,f,g")
+    ap.add_argument("--only", default="a,b,c,d,e,f,g,h")
     ap.add_argument("--machine", default="aramis", choices=sorted(MACHINES))
     args = ap.parse_args()
 
@@ -932,6 +1038,8 @@ def main():
         exp_genesis(rn, args, results)
     if "g" in want:
         exp_filter(rn, args, lat, results)
+    if "h" in want:
+        exp_tolerance(rn, args, lat, results)
     results_file.write_text(json.dumps(rounded(results), indent=1))
     if all(k in results for k in ("floor", "beamlets", "line")):
         figures(results, out)

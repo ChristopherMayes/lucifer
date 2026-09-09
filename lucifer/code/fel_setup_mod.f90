@@ -297,6 +297,21 @@ if (run%global%source_filter) then
     err_flag = .true.;  return
   endif
 
+  ! The tolerance fixes the amplitude the sigmoid has to pass at the angle it protects, and
+  ! both ends of its range are singular in the margin (fel_filter_margin). At zero the
+  ! logarithm of the tolerance diverges. At one the margin runs to positive infinity and the
+  ! edge collapses onto the axis, so a caller testing only the margin's sign would take it.
+  ! Checked here, before anything takes a logarithm, and whether or not the derived path
+  ! will use it.
+
+  if (run%global%source_filter_tolerance <= 0 .or. run%global%source_filter_tolerance >= 1) then
+    call out_io (s_error$, r_name, 'SOURCE_FILTER_TOLERANCE MUST LIE STRICTLY BETWEEN ' // &
+                 '0 AND 1: \es12.3\ ', &
+                 'POSSIBLE SOLUTION: LEAVE IT AT 0.75, WHICH PUTS THE EDGE ON THE PROTECTED ANGLE.', &
+                 r_array = [run%global%source_filter_tolerance])
+    err_flag = .true.;  return
+  endif
+
   ! The width is a fraction of the edge, so the sigmoid on axis is 1/(1 + exp(-1/width)).
   ! Genesis4's own default of 1 puts that at 0.73, which attenuates the coherent source as
   ! much as the wide angles: measured, it halves the physical in-cone startup power and
@@ -971,7 +986,7 @@ endif
 
 if (any(is_fel)) then
   block
-    real(rp) th_mode, th_rho, th, ang_per_xcut, ratio
+    real(rp) th_mode, th_rho, th, th_p, margin, ang_per_xcut, ratio
     character(24) origin
     integer ie_first
 
@@ -1015,6 +1030,7 @@ if (any(is_fel)) then
       end where
       call out_io (s_info$, r_name, 'Source filter: edge from xcut and ycut, ' // &
                    'validation-internal, at \es10.3\ rad on this grid.', &
+                   'The cuts place the edge directly, so source_filter_tolerance is bypassed.', &
                    r_array = [run%global%source_filter_xcut * ang_per_xcut])
 
     else
@@ -1027,23 +1043,50 @@ if (any(is_fel)) then
                      'POSSIBLE SOLUTION: SET SOURCE_FILTER_ANGLE.')
         err_flag = .true.;  return
       else
-        th = max(th_mode, th_rho)
+
+        ! The larger of the two angles is the one protected, since cutting into the mode
+        ! loses real radiation while leaving artifact in only weakens the filter. Where
+        ! the edge then goes is a separate question, and the tolerance answers it: the
+        ! sigmoid's half-amplitude point on the protected angle passes a quarter of the
+        ! intensity there, which is a filter taking three quarters of the source at the
+        ! very angle it was told to keep. The edge is moved out until the transmission
+        ! across that angle is what the tolerance allows.
+
+        th_p = max(th_mode, th_rho)
+        margin = fel_filter_margin (run%global%source_filter_tolerance, &
+                                    run%global%source_filter_width)
+        if (margin <= 0) then
+          call out_io (s_error$, r_name, 'SOURCE_FILTER_WIDTH = \es12.3\ IS TOO LARGE FOR ' // &
+                       'SOURCE_FILTER_TOLERANCE = \es12.3\ : NO EDGE HOLDS THAT TRANSMISSION.', &
+                       'POSSIBLE SOLUTION: USE SOURCE_FILTER_WIDTH BELOW \es9.2\ , OR RAISE THE TOLERANCE.', &
+                       r_array = [run%global%source_filter_width, &
+                                  run%global%source_filter_tolerance, &
+                                  run%global%source_filter_width / (1 - margin)])
+          err_flag = .true.;  return
+        endif
+        th = th_p / margin
         origin = run%split_origin
       endif
 
-      ! Cutting into the mode loses real radiation and leaving artifact in only weakens
-      ! the filter, so the default is the larger of the two. Their ratio goes as
-      ! sqrt(z_R/L_g), 15 on the Aramis benchmark and near 1 on a diffraction-dominated
-      ! machine, and a case far outside that range is unlike the one the default was
-      ! measured on (doc/startup-noise.md).
+      ! Their ratio goes as sqrt(z_R/L_g), 15 on the Aramis benchmark and near 1 on a
+      ! diffraction-dominated machine, and a case far outside that range is unlike the one
+      ! the default was measured on (doc/startup-noise.md).
 
       ratio = 0
       if (th_rho > 0) ratio = th_mode / th_rho
       call out_io (s_info$, r_name, 'Source filter: mode angle \es10.3\ rad, ' // &
                    'rho angle \es10.3\ rad, ratio \f8.2\ .', &
-                   'Edge at \es10.3\ rad, ' // trim(origin) // '. Sigmoid on axis \f7.4\ .', &
-                   r_array = [th_mode, th_rho, ratio, th, &
-                              1 / (1 + exp(-1 / run%global%source_filter_width))])
+                   r_array = [th_mode, th_rho, ratio])
+      if (run%global%source_filter_angle > 0) then
+        call out_io (s_info$, r_name, 'Edge at \es12.5\ rad, set by the deck, so ' // &
+                     'source_filter_tolerance is bypassed. Sigmoid on axis \f7.4\ .', &
+                     r_array = [th, 1 / (1 + exp(-1 / run%global%source_filter_width))])
+      else
+        call out_io (s_info$, r_name, 'Protected angle \es12.5\ rad, ' // trim(origin) // &
+                     '. Tolerance \f7.4\ puts the edge at \es12.5\ rad. Sigmoid on axis \f7.4\ .', &
+                     r_array = [th_p, run%global%source_filter_tolerance, th, &
+                                1 / (1 + exp(-1 / run%global%source_filter_width))])
+      endif
       if (ratio > 0 .and. (ratio < 0.3_rp .or. ratio > 3.0_rp)) then
         call out_io (s_warn$, r_name, 'The two filter angles differ by more than the range ' // &
                      'the default was measured over (0.3 to 3).', &

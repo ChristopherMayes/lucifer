@@ -25,8 +25,9 @@ The last two, and the unfiltered run beside them, stop at the second undulator.
 The two mutations must land far outside the tolerance the first run holds, or the check
 reports that it cannot fail and stops.
 
-Then the edge's refusals, the containment of the seed inside the derived edge, and where
-the filter reaches. That last one is measured rather than read off the line the run prints:
+Then the edge's refusals, where the tolerance puts the edge relative to the angle it
+protects, the containment of the seed inside the derived edge, and where the filter
+reaches. That last one is measured rather than read off the line the run prints:
 the filter is on by default, so an unaveraged element and a coherent source are no-ops
 instead of refusals, and a no-op that works and a no-op that quietly filters print the same
 line. Each pair runs with the switch on and off. The unaveraged line and the coherent source
@@ -40,6 +41,7 @@ Usage:
 
 import argparse
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -206,6 +208,143 @@ def containment(exe, wd):
     return good
 
 
+EDGE_LINE = re.compile(r"Protected angle\s+([0-9.eE+-]+)\s+rad.*?"
+                       r"puts the edge at\s+([0-9.eE+-]+)\s+rad")
+
+
+def edge_margin(tol, width):
+    """The factor the code places the edge outside the protected angle by."""
+    t = np.sqrt(1 - tol)
+    return 1 - width * (np.log(t) + np.log1p(t) - np.log(tol))
+
+
+def tolerance_run(exe, wd, extra, root="sftol"):
+    """One short run with extra namelist lines. Returns its result and stdout."""
+    deck = REFUSE.replace('global%out_root = "sfref"', f'global%out_root = "{root}"')
+    (wd / f"{root}.nml").write_text(deck.format(extra=extra))
+    return subprocess.run([exe, f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+                          env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+
+
+def tolerance(exe, wd):
+    """
+    Where the edge goes relative to the angle it protects.
+
+    The derived edge used to be the protected angle itself, which puts the sigmoid's
+    half-amplitude point on it and passes a quarter of the source intensity there. The
+    tolerance names the largest intensity loss allowed inside that angle and the edge
+    moves out to hold it.
+
+    Every check here has to fail against a run that reads source_filter_tolerance and
+    then derives the old edge anyway, so each one compares the edge the run printed
+    against the edge the tolerance asks for. An unchanged tier digit cannot do that
+    work: the default reproduces the old edge to the bit, which is the point of it.
+    """
+    ok = True
+    width = 0.05
+
+    # The default and an explicit 0.75 are the edge in use before the tolerance existed,
+    # and the two smaller tolerances have to move it by the margin and by nothing else.
+
+    protected = None
+    for extra, tol, what in (
+        ("", 0.75, "left unset"),
+        ("  global%source_filter_tolerance = 0.75\n", 0.75, "stated as 0.75"),
+        ("  global%source_filter_tolerance = 0.2\n", 0.2, "stated as 0.2"),
+        ("  global%source_filter_tolerance = 0.01\n", 0.01, "stated as 0.01"),
+    ):
+        r = tolerance_run(exe, wd, extra)
+        m = EDGE_LINE.search(r.stdout.replace("\n", " ")) if r.returncode == 0 else None
+        if m is None:
+            print(f"FAIL: the tolerance {what} did not derive an edge "
+                  f"(exit {r.returncode}):\n{r.stdout[-1500:]}", file=sys.stderr)
+            return False
+        th_p, edge = float(m.group(1)), float(m.group(2))
+        if protected is None:
+            protected = th_p
+        want = th_p / edge_margin(tol, width)
+
+        # The transmission the edge actually delivers at the protected angle, which is
+        # what the tolerance was asked for.
+        got_loss = 1 - (1 / (1 + np.exp((th_p / edge - 1) / width)))**2
+        good = (abs(edge - want) <= 2e-4 * want and abs(th_p - protected) <= 1e-9 * protected
+                and abs(got_loss - tol) <= 2e-3)
+        print(f"  tolerance {what}: protected {th_p:.5e} rad, edge {edge:.5e} rad against "
+              f"{want:.5e}, loss there {got_loss:.4f} against {tol}  "
+              f"{'ok' if good else 'FAIL'}")
+        ok = ok and good
+
+    # The reported split is the acceptance, so it must not follow the edge out. A scan of
+    # the tolerance that moved it would compare each run against a different question.
+
+    angles = []
+    for tol in (0.75, 0.2, 0.01):
+        tolerance_run(exe, wd, f"  global%source_filter_tolerance = {tol}\n")
+        with h5py.File(wd / "sftol.stats.h5") as h:
+            angles.append(float(np.ravel(h["field/total/split_angle"][()])[0]))
+    spread = max(angles) - min(angles)
+    good = spread <= 1e-9 * angles[0]
+    print(f"  the reported split across that scan: {angles[0]:.5e} rad, spread "
+          f"{spread:.1e}  {'ok' if good else 'FAIL'}")
+    ok = ok and good
+
+    # Both ends of the range are singular. At one the margin runs to positive infinity and
+    # the edge collapses onto the axis, which a test on the margin's sign would take, so
+    # the range is checked before anything takes a logarithm.
+
+    for extra, want, what in (
+        ("  global%source_filter_tolerance = 0\n", "MUST LIE STRICTLY", "a tolerance of zero"),
+        ("  global%source_filter_tolerance = 1\n", "MUST LIE STRICTLY", "a tolerance of one"),
+        ("  global%source_filter_tolerance = 1.5\n", "MUST LIE STRICTLY", "a tolerance above one"),
+        ("  global%source_filter_tolerance = -0.1\n", "MUST LIE STRICTLY", "a negative tolerance"),
+        ("  global%source_filter_tolerance = 0.01\n  global%source_filter_width = 0.217\n",
+         "IS TOO LARGE FOR", "a width too large for the tolerance"),
+    ):
+        r = tolerance_run(exe, wd, extra)
+        good = r.returncode != 0 and want in r.stdout
+        print(f"  refused, {what}: {'ok' if good else 'MISSED'}")
+        ok = ok and good
+
+    # A tolerance below about 2.2e-16 rounds 1 - tolerance to one, so the amplitude rounds
+    # to one and 1 - amplitude to zero. At a width of 0.01 that tolerance still has a
+    # margin of 0.60 and is an edge the run can build, so forming 1 - amplitude directly
+    # would divide by zero on an input the run has to accept.
+
+    r = tolerance_run(exe, wd, "  global%source_filter_tolerance = 1e-17\n"
+                               "  global%source_filter_width = 0.01\n")
+    m = EDGE_LINE.search(r.stdout.replace("\n", " ")) if r.returncode == 0 else None
+    if m is None:
+        print(f"FAIL: a tolerance of 1e-17 at a width of 0.01 is feasible and did not "
+              f"derive an edge (exit {r.returncode}):\n{r.stdout[-1500:]}", file=sys.stderr)
+        ok = False
+    else:
+        th_p, edge = float(m.group(1)), float(m.group(2))
+        want = th_p / edge_margin(1e-17, 0.01)
+        good = abs(edge - want) <= 2e-4 * want
+        print(f"  a tolerance of 1e-17 at a width of 0.01: edge {edge:.5e} rad against "
+              f"{want:.5e}  {'ok' if good else 'FAIL'}")
+        ok = ok and good
+
+    # A stated edge is a stated edge. Neither the angle nor the grid-relative cuts go
+    # through the derivation, and a run that applied the tolerance to them would move an
+    # edge the deck placed itself.
+
+    for extra, what in (
+        ("  global%source_filter_tolerance = 0.01\n  global%source_filter_angle = 5e-6\n",
+         "a stated angle"),
+        ("  global%source_filter_tolerance = 0.01\n  global%source_filter_xcut = 1\n"
+         "  global%source_filter_ycut = 1\n  global%source_filter_width = 1\n",
+         "stated cuts"),
+    ):
+        r = tolerance_run(exe, wd, extra)
+        good = (r.returncode == 0 and "is bypassed" in r.stdout
+                and EDGE_LINE.search(r.stdout.replace("\n", " ")) is None)
+        print(f"  the tolerance is bypassed by {what}: {'ok' if good else 'FAIL'}")
+        ok = ok and good
+
+    return ok
+
+
 SCOPE = """&fel_params
   lat_file = "{lat}"
   global%out_root = "{root}"
@@ -344,6 +483,7 @@ def main():
             ok = False
 
     ok = refusals(exe, wd) and ok
+    ok = tolerance(exe, wd) and ok
     ok = containment(exe, wd) and ok
     ok = scope(exe, wd) and ok
 

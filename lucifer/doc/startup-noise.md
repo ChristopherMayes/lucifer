@@ -365,6 +365,37 @@ so the mode angle stops winning only above $z_R/L_g \approx 46$. None of the fou
 
 Below about two gain lengths the first dump is still spontaneous emission and the comparison measures the loading. Above about five it measures amplified light, and the excess is the gain, not a defect in the loading. A startup measurement on a machine with a short segment relative to its gain length needs a dump inside the first gain length rather than at the segment's end.
 
+## Where the edge sits inside the protected angle
+
+The four sections above put the edge on the larger of the two derived angles, which places the sigmoid's half-amplitude point on it and passes a quarter of the source intensity there. `global%source_filter_tolerance` names the largest source-intensity loss allowed anywhere inside that angle and moves the edge out until the transmission holds, and its default of 0.75 is the loss the older placement implies rather than a number anyone chose ([](fel-physics.md#sec-source-filter)). The reported split stays on the protected angle whatever the tolerance, so every row below is measured against one acceptance. The sweep is experiment `h` of `tests/scripts/startup_noise.py`.
+
+```{table} The passband tolerance on the four machines, grid 256 on Aramis and 128 on the others, 1024 macroparticles per slice, one seed a row, each machine's rows against its own 0.75 row. The accepted power is the power inside the reported cut at the end of the first undulator, which on the two lines whose first segment is long in gain lengths is amplified light rather than the loading ([](#tab-sn-startup-four)).
+:name: tab-sn-tolerance
+
+| machine | tolerance | accepted at the first segment | wide/mode at the exit | gain length | saturation | pulse energy |
+|---|---|---|---|---|---|---|
+| Aramis | 0.75 | 16.4 MW | 1.66e-3 | 2.40 m | 32.9 m | 0.974 uJ |
+| | 0.2 | +9.3% | x6.2 | +1.6% | 32.9 m | -2.0% |
+| | 0.1 | +10.6% | x9.8 | -2.0% | 32.9 m | -2.1% |
+| | 0.01 | +12.0% | x28.4 | -0.5% | 32.9 m | -1.8% |
+| FLASH probe | 0.75 | 0.706 MW | 1.84e-3 | 1.02 m | 21.6 m | 112 uJ |
+| | 0.2 | +11.0% | x6.0 | +0.8% | 21.6 m | -3.1% |
+| | 0.1 | +13.7% | x9.3 | +1.2% | 21.6 m | -3.2% |
+| | 0.01 | +19.4% | x24.9 | +2.1% | 21.6 m | -3.8% |
+| FLASH1 | 0.75 | 0.935 MW | 2.23e-3 | 1.01 m | 20.7 m | 226 uJ |
+| | 0.2 | +12.5% | x4.9 | +1.0% | 20.7 m | +0.8% |
+| | 0.1 | +15.7% | x7.5 | +1.3% | 20.7 m | +1.2% |
+| | 0.01 | +21.9% | x19.2 | +2.1% | 20.7 m | +1.4% |
+| LCLS | 0.75 | 13.1 MW | 1.98e-3 | 3.64 m | 55.7 m | 145 uJ |
+| | 0.2 | +10.1% | x6.1 | +1.5% | 55.7 m | +1.6% |
+| | 0.1 | +11.6% | x9.5 | +2.0% | 55.7 m | +2.2% |
+| | 0.01 | +13.1% | x26.3 | +3.9% | 55.7 m | +2.9% |
+```
+
+**What the sweep says.** The accepted power at the first segment rises with a tighter tolerance on every machine, by 9 to 13 percent at 0.2 and by 12 to 22 percent at 0.01. The wide-angle power over the same range rises faster, by 4.9 to 6.2 times at 0.2 and by 19 to 28 times at 0.01. The saturation point does not move on any machine at any tolerance. The fitted gain length stays inside 4 percent and the pulse energy inside 4 percent. Over this range and at this load the tolerance reaches the startup seed and leaves the gain alone, and what it buys in seed saturates while what it costs in wide-angle power does not.
+
+**What it does not settle.** One seed a row. The interior mean of a 300-slice window fluctuates by about 25 percent on this page's own measurement, so a 2 percent move in pulse energy is inside the noise of one realization and only the trends that hold across all four machines carry. The fitted gain length comes from the records a decade above the starting power and below saturation, which on the six-segment lines is a handful of element ends. Choosing a default needs paired ensembles over seeds, priced against the seed saturating while the retained wide-angle power does not. The default stays at 0.75.
+
 ## The other remedies
 
 Three remain, and none has been measured against the power inside the mode. Tanaka's coherent retrieval keeps the lowest Laguerre-Gauss orders of the bunching and adds the physical spontaneous emission back analytically ([](references.md#ref-tanaka)); this code carries it as `global%source_model = "coherent"`, which refuses a dark start for the reason the measurement above illustrates. Litvinenko's clones separate the induced from the spontaneous radiation by pairing each macroparticle with one of opposite charge ([](references.md#ref-litvinenko)). A deposition kernel of fixed physical width, wider than one cell, is the real-space form of the form factor of Pausch and co-workers ([](references.md#ref-pausch)). Any of the three changes the field the two codes compute from the same distributions, so each would be a switch, off by default, and measured against the power inside the mode rather than against Genesis4.

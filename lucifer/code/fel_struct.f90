@@ -119,8 +119,15 @@ type fel_global_struct
   ! gain: the larger of four mode diffraction angles and the angle at which the resonant
   ! wavelength red-shifts by rho, printed with both and with which one won. Cutting into
   ! the mode loses real radiation while leaving artifact in only weakens the filter, so
-  ! the default errs wide.
+  ! the default errs wide. Setting the angle bypasses source_filter_tolerance below.
   real(rp) :: source_filter_angle = 0
+  ! The largest fraction of source intensity the filter may take anywhere inside the
+  ! protected angle, which is the larger of the two derived angles. The edge is then
+  ! placed outside that angle by however much the sigmoid's width needs to hold the
+  ! transmission. A half-amplitude edge sitting on the protected angle passes a quarter
+  ! of the intensity there, so 0.75 is the loss the placement used before this input
+  ! existed implies, and it reproduces that edge to the bit. Strictly between 0 and 1.
+  real(rp) :: source_filter_tolerance = 0.75_rp
   ! The sigmoid's edge in Genesis4's own units, xcut and ycut: the shifted grid index over
   ! ngrid, so 1 is twice the Nyquist index and the angle xcut lambda/dx. Validation-internal:
   ! they place the edge where Genesis4 places it, and a run that sets them and the angle

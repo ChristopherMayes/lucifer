@@ -9,6 +9,36 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-08 Added: global%source_filter_tolerance places the source filter's edge relative to the angle it
+  protects rather than on that angle. The derived edge was the larger of the mode and rho angles, which puts
+  the sigmoid's half-amplitude point on it and so keeps a quarter of the source intensity at the angle setup
+  had just derived as physical. The tolerance is the largest fraction of source intensity the filter may take
+  anywhere inside the protected angle, and the edge moves out by 1/(1 - width*log(t/(1-t))) with
+  t = sqrt(1 - tolerance) to hold it. doc/startup-noise.md records what the old placement costs the in-cone
+  startup power, 14 percent where the derived edge sits well inside the cone and 28 to 30 percent where the
+  two nearly coincide, and the on-axis width guard cannot see any of it because it constrains one angle.
+
+  The default of 0.75 is the loss the old placement implies rather than a number chosen for it, and its margin
+  is exactly one, so the derived edge is bitwise what it was and no recorded digit moves. At a width of 0.05 a
+  tolerance of 0.2 moves the edge out by 1.12 and 0.01 by 1.36. The statistics split stays on the protected
+  angle, so power_inside_angle answers one question across a tolerance scan. A stated source_filter_angle or
+  the grid-relative cuts place the edge directly and bypass the tolerance, and setup says which happened.
+
+  Swept on the four machines of doc/startup-noise.md at 0.75, 0.2, 0.1 and 0.01, one seed a row, the accepted
+  power at the first segment rises by 9 to 13 percent at 0.2 and by 12 to 22 percent at 0.01, while the
+  wide-angle power rises by 4.9 to 6.2 times and then by 19 to 28 times. The saturation point does not move
+  on any machine at any tolerance, and the fitted gain length and the pulse energy stay inside 4 percent. The
+  sweep is experiment h of tests/scripts/startup_noise.py. The default is unchanged, since one seed a row
+  cannot select one.
+
+  A tolerance outside the open interval from 0 to 1 is refused before anything takes a logarithm, since at one
+  the margin runs to positive infinity and the edge collapses onto the axis, which a test on the margin's sign
+  would take. A width too large for the tolerance is refused with the width that would meet it. The logarithm
+  is taken as log t + log(1+t) - log(tolerance), which never forms 1 - t: that difference is exactly zero for
+  any tolerance below about 2.2e-16, and at a width of 0.01 such a tolerance still has a margin of 0.60 and is
+  an edge the run can build. check_source_filter gained thirteen checks, and three of them fail against a run
+  that reads the input and derives the old edge anyway.
+
 - 2026-09-07 Fixed: a beam dump places its slices in the bunch, so a reader that knows openPMD and
   nothing about this program gets the whole thing. The per-particle time record was the lag inside a
   particle's own slice and timeOffset was a constant reference, so the slice's own position lived only in

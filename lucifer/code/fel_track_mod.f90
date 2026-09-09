@@ -2759,6 +2759,53 @@ end subroutine fel_filter_angles
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function fel_filter_margin (tolerance, width) result (margin)
+!
+! Routine to return the factor that places a source filter's edge outside the angle it
+! protects (fel-physics.md sec-source-filter). The edge is the protected angle over this
+! margin, so a margin of one leaves the edge on that angle.
+!
+! The sigmoid of Eq. eq-sigmoid passes amplitude t at the protected angle when the edge
+! sits at that angle over 1 - width log[t/(1-t)], and the intensity there is t^2, so a
+! stated largest intensity loss fixes t as sqrt(1 - tolerance).
+!
+! The logarithm is taken as log t + log(1+t) - log(tolerance), which is the same number
+! since tolerance = (1-t)(1+t), and which never forms 1 - t. Formed directly, 1 - t is
+! exactly zero for any tolerance below about 2.2e-16, where 1 - tolerance rounds to one:
+! at a width of 0.01 such a tolerance still has a margin of 0.60 and is a filter the run
+! can build. This form also leaves the margin exactly one for a tolerance of 0.75, since
+! the three logarithms cancel to the bit, so the edge derived there is the edge the run
+! derived before the tolerance existed.
+!
+! Note: the caller checks that the tolerance lies strictly between zero and one. Both
+! ends are singular here, and at one the margin is positive infinity rather than
+! negative, so a caller testing only the sign of the result would take it.
+!
+! Input:
+!   tolerance -- real(rp): Largest fraction of source intensity the filter may take
+!                 anywhere inside the protected angle. Strictly between 0 and 1.
+!   width     -- real(rp): The sigmoid's width as a fraction of its edge.
+!
+! Output:
+!   margin    -- real(rp): The protected angle divided by the edge. At or below zero the
+!                 width is too large for the tolerance and no edge meets it.
+!-
+
+function fel_filter_margin (tolerance, width) result (margin)
+
+real(rp) tolerance, width, margin, t
+
+!
+
+t = sqrt(1 - tolerance)
+margin = 1 - width * (log(t) + log(1 + t) - log(tolerance))
+
+end function fel_filter_margin
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_kernel_index (ngrid, dgrid, ks, dz) result (ik)
 !
 ! Look up the cached kernel entry matching all four keys exactly. A miss returns 0.
