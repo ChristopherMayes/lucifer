@@ -804,6 +804,52 @@ def main():
     check("frames: the run is identical to the same run without them (0 = yes)",
           0.0 if h5_identical(wd / "fr.stats.h5", wd / "nofr.stats.h5") else 1.0, 0.5)
 
+    # The unaveraged chart, written and named. A frame inside an unaveraged segment is
+    # taken where px still carries the undulator quiver, and the writer is allowed that
+    # chart because the frame names it. The mode wrote no frames at all before: the chart
+    # assertion sat inside the slice-to-bunch conversion, so the whole segment interior
+    # refused, and dump_at_comb = F was the only way an unaveraged run could finish.
+    #
+    # The quiver is a common offset at a position along the undulator and not a spread,
+    # so it is the mean of px that carries it and not the rms. Its size is aw/gamma of
+    # the reference momentum, which on this deck is about 4e5 eV/c, where the averaged
+    # chart holds a few hundred. Asserting the swing is what proves the file holds the
+    # chart it claims rather than a quietly averaged one.
+
+    (wd / "dg_unavg.bmad").write_text(WRAP)
+    ua_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
+                '  global%device = "off"\n')
+    # Run it without run()'s own exit, so that a mode which cannot write a frame is a
+    # named failing check here rather than an abort with the reason buried in a log.
+    ua_text = (FRAME_NML.format(root="ua", extra=ua_extra)
+               .replace('lat_file = "aramis_1seg.bmad"', 'lat_file = "dg_unavg.bmad"'))
+    (wd / "ua.nml").write_text(to_groups(ua_text))
+    r = subprocess.run([str(exe), "ua.nml"], cwd=wd, capture_output=True, text=True,
+                       env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    ua_frames = sorted(wd.glob("ua-[0-9]*.beam.h5"))
+    check("frames: an unaveraged run writes them at all (exit 0)", float(r.returncode), 0.5,
+          note="" if r.returncode == 0 else f"[{r.stdout.strip().splitlines()[-1][:70]}]")
+    check("frames: the unaveraged run wrote a series",
+          0.0 if len(ua_frames) > 1 else 1.0, 0.5, note=f"[{len(ua_frames)} frames]")
+
+    if len(ua_frames) > 1:
+        def px_mean(f):
+            with h5py.File(f) as h:
+                m = h.attrs.get("felMethod", b"")
+                m = m.decode() if isinstance(m, bytes) else str(m)
+                g = h["data"]; it = g[list(g.keys())[0]]
+                pg = it["particles"]; b0 = pg[list(pg.keys())[0]]
+                return m, float(np.asarray(b0["momentum"]["x"][()]).mean())
+        named = [px_mean(f) for f in ua_frames[1:]]
+        avg = [px_mean(f) for f in frames[1:]]
+        bad_name = sum(1 for m, _ in named if m != "Unaveraged")
+        check("frames: every unaveraged frame names its chart", bad_name, 0.5)
+        swing_u = max(abs(v) for _, v in named)
+        swing_a = max(abs(v) for _, v in avg)
+        check("frames: the unaveraged chart carries the quiver in the mean of px",
+              0.0 if swing_u > 20 * swing_a else 1.0, 0.5,
+              note=f"[unaveraged {swing_u:.2e}, averaged {swing_a:.2e} eV/c]")
+
     # Restarting from a frame needs no check of its own. A frame at an element end is
     # dataset-identical to that element's dump, which the check above measures, and
     # check_program holds the windowed composition for those dumps. A frame taken inside

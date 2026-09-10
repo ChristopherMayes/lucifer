@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-09 Fixed: an unaveraged run can write a frame series. global%dump_at_comb died at the first comb
+  position inside a segment, so the mode could produce no particle frames at all and dump_at_comb = F was
+  the only way to finish, which writes the final beam and nothing else. The chart assertion sat at the top
+  of fel_slice_to_bunch, which converts a slice into a Bmad bunch, and quiver_in_px is true for the whole
+  interior of an unaveraged segment. That refused every caller, the frame writer among them.
+
+  The conversion is the same six numbers whichever chart the beam is in, so the assertion belongs to what
+  the caller does next rather than to the conversion. A caller handing the bunch to Bmad's tracking needs
+  the averaged convention and gets the refusal by default. The frame writer states that its file names the
+  chart, since fel_frame_attributes writes felMethod beside the element and the undulator, and is allowed
+  the chart the beam is in. The beam dump of fel_dump_beam writes no felMethod and keeps the refusal, which
+  costs nothing: dump_beam_at resolves through Bmad's locator and lands on element boundaries, where the
+  ramps have handed back the averaged convention.
+
+  Measured on the one-segment unaveraged example at a 0.5 m comb: nine frames where there were none, each
+  carrying felMethod Unaveraged, and the quiver is in them. The mean px swings over 2.9e5, -5.4e4, -3.6e5
+  and -4.2e5 eV/c across successive frames, which is the aw/gamma amplitude of 4.3e5 the chart implies,
+  where the averaged run holds -6.5e2 throughout. The rms is unmoved at 1.46e4 either way, the quiver being
+  a common offset at a position along the undulator rather than a spread.
+
 - 2026-09-09 Fixed: the device deposit's overflow bound is now checked where it was assumed, and its clear
   costs a quarter of what it did. The bound took the reference gamma over a fixed floor, where a
   contribution carries w/gamma and so needs the lowest gamma the run will ever deposit at: setup measures

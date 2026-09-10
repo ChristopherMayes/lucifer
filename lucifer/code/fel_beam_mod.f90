@@ -518,7 +518,7 @@ end subroutine fel_read_openpmd_beam
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2)
+subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, chart_named)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
@@ -527,6 +527,7 @@ type (beam_struct) beam_b
 integer is, nb, nslice, i1, i2
 integer, optional :: is1, is2
 logical err_flag, err
+logical, optional :: chart_named
 character(*) file_name
 character(*), parameter :: r_name = 'fel_write_openpmd_beam'
 
@@ -554,7 +555,7 @@ call reallocate_beam (beam_b, i2 - i1 + 1)
 
 do is = i1, i2
   call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is - i1 + 1), err, &
-                           fold_phi0 = .true., ix_slice = is)
+                           fold_phi0 = .true., ix_slice = is, chart_named = chart_named)
   if (err) return
 enddo
 nb = i2 - i1 + 1
@@ -1252,7 +1253,7 @@ end function fel_m_ind
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice)
+subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named)
 
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
@@ -1262,15 +1263,24 @@ real(rp) vec(6), dz_phi0, p0_mc, t_place
 integer ip
 integer, optional :: ix_slice
 logical err_flag
-logical, optional :: fold_phi0
+logical, optional :: fold_phi0, chart_named
 character(*), parameter :: r_name = 'fel_slice_to_bunch'
 
 !
 
 err_flag = .true.
 
-call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
-if (err_flag) return
+! The conversion itself is the same six numbers whichever chart the beam is in. What
+! differs is what the caller does next. A caller that hands the bunch to Bmad's tracking
+! needs the averaged convention, and that is the default here, so a caller that says
+! nothing gets the refusal. A caller writing the bunch to a file that names the chart it
+! holds needs no such thing: the quiver is the beam's real transverse momentum, and a
+! reader that knows which chart it is reading can use it (fel-physics.md sec-unaveraged).
+
+if (.not. logic_option(.false., chart_named)) then
+  call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
+  if (err_flag) return
+endif
 err_flag = .true.
 
 if (abs(ele%value(p0c$) - beam%p0c) > 1e-10_rp * beam%p0c) then

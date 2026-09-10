@@ -233,8 +233,16 @@ ffield => run%ffield
 
 write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
 
+! A frame is written wherever the comb falls, which inside an unaveraged segment is a
+! place where px still carries the quiver. fel_frame_attributes names the chart on the
+! file below, felMethod beside the element and the undulator, so the frame is readable as
+! what it is and the conversion is told so. The beam dump of fel_dump_beam names no chart
+! and keeps the refusal, which costs nothing today: dump_beam_at resolves through Bmad's
+! locator and so lands on element boundaries, where the chart is averaged either way.
+
 call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
-                             trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2)
+                             trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2, &
+                             chart_named = .true.)
 if (eerr) return
 call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
 if (eerr) return
