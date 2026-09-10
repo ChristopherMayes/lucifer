@@ -69,6 +69,17 @@
 ! design): disjoint particle arrays and field slices per iteration, serial kernel
 ! init, threadprivate FFT plans, per-slice energy summed in fixed order. Results
 ! are bit-identical across thread counts, and the harness checks it.
+!
+! The device path (fel_device_mod, doc/validation.md val-device-unaveraged). With a
+! backend armed the beam and the field stay resident for the whole segment and one
+! record step is one command buffer of nsub substeps. Three kernels are this mode's own
+! and the rest of a substep is the kernels the averaged path already had. Residency
+! starts inside the first record step rather than at the walk's element entry, because
+! the entry handoff moves z and the chart conversion has to see the moved value, and it
+! ends inside the last one for the same reason. The quantities that do not depend on the
+! particle are built here in FP64 and uploaded once a substep, which is the hoist
+! FINDINGS 7.37 records. With fp32_check on, the device takes the instrument's twin role
+! instead and the FP64 path below runs untouched.
 !-
 
 module fel_unaveraged_mod
@@ -296,34 +307,40 @@ end subroutine fel_unavg_bfield
 !   und       -- fel_und_struct: Undulator parameters.
 !   ustate    -- fel_unavg_struct: Substep grid and work arrays.
 !   beam      -- fel_beam_struct: The beam in the quiver chart.
-!   wf        -- wavefront_struct: The fundamental field.
-!   slip      -- fel_slip_struct: The rotating field record.
+!   ff(:)     -- fel_field_struct: The field set. This mode carries one member of one
+!                  plane, so ff(1) holds the field and the rotating record.
 !   dz_record -- real(rp): The record step to advance by [m].
 !   first     -- logical: True on the segment's first record step (entry handoff).
 !   last      -- logical: True on the last (exit handoff and ramp phase jump).
+!   fp32      -- fel_fp32_struct: The lockstep instrument, dark when it is off.
+!   dev       -- fel_device_struct: The device backend, dark when it is off. With the
+!                  instrument off it runs the step; with it on it is the twin.
 !
 ! Output:
 !   beam      -- fel_beam_struct: Advanced by Newton-Lorentz RK4 through the field.
-!   wf        -- wavefront_struct: Sources deposited, records diffracted.
+!   ff(:)     -- fel_field_struct: Sources deposited, records diffracted.
 !   dE_beam   -- real(rp): The step's kick-side beam energy change [J] (ledger).
 !   dU_spont  -- real(rp): The step's spontaneous source energy [J] (ledger).
 !   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
-subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, dU_spont, fp32, err_flag)
+subroutine fel_unavg_step (und, ustate, beam, ff, dz_record, first, last, dE_beam, dU_spont, fp32, dev, err_flag)
 
 type (fel_und_struct) und
 type (fel_unavg_struct) ustate
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
-type (wavefront_struct), target :: wf
-type (fel_slip_struct) slip
+type (fel_field_struct), target :: ff(:)
+type (wavefront_struct), pointer :: wf
+type (fel_slip_struct), pointer :: slip
 type (fel_fp32_struct), target :: fp32
+type (fel_device_struct) dev
 
 real(rp) dz_record, dE_beam, dU_spont
 logical first, last, err_flag
 
 real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:), dU_sp_slice(:)
+real(rp), allocatable :: dEturn_slice(:), dev_s0(:,:,:)
 real(rp), allocatable :: kst(:,:,:)
 real(rp), allocatable :: cx(:), cy(:), cpx(:), cpy(:), cz(:), cpz(:)
 complex(rp), allocatable :: crsource(:,:), crsource_y(:,:)
@@ -334,7 +351,8 @@ complex(rp), pointer :: exp_k2_p(:,:)
 complex(rp) ehat, jhat, wphasor, cdep, ehat_y, cph
 logical two_pol
 integer is, ip, isub, nslice, ifld, ix, iy, ngrid_arr(3), ngrid
-logical on_grid, err, any_err
+logical on_grid, err, any_err, dev_twin
+integer n_s0
 character(*), parameter :: r_name = 'fel_unavg_step'
 
 !
@@ -343,6 +361,8 @@ err_flag = .true.
 dE_beam = 0
 dU_spont = 0
 
+wf => ff(1)%wf
+slip => ff(1)%slip
 nslice = size(wf%Ex, 3)
 two_pol = allocated(wf%Ey)
 if (size(beam%slice) /= nslice) then
@@ -406,10 +426,46 @@ if (first) then
   call unavg_ramp_phase_jump ()
 endif
 
-allocate (dE_slice(nslice), dU_sp_slice(nslice))
+! The device path (fel_device_mod). The beam and the field stay resident for the whole
+! segment and one record step is one command buffer of nsub substeps. Residency starts
+! here rather than at the walk's element entry because the entry handoff above moves z,
+! and the chart conversion has to see the moved value.
+
+if (dev%on .and. .not. fp32%on) then
+  call unavg_device_step (err)
+  if (err) return
+  err_flag = .false.
+  return
+endif
+
+allocate (dE_slice(nslice), dU_sp_slice(nslice), dEturn_slice(nslice))
 dE_slice = 0
 dU_sp_slice = 0
+dEturn_slice = 0
 any_err = .false.
+
+! The device in the instrument's twin role. It advances the same record step from the
+! state this one received, encoded before the FP64 loop below so the two overlap and so
+! its field image rounds from the pre-step record. The FP64 path is untouched, which the
+! harness asserts the way it does for the CPU twin.
+
+dev_twin = dev%on .and. fp32%on
+if (dev_twin) then
+  allocate (dev_s0(6, maxval(beam%slice(:)%n), nslice))
+  do is = 1, nslice
+    n_s0 = beam%slice(is)%n
+    dev_s0(1, 1:n_s0, is) = beam%slice(is)%x(1:n_s0)
+    dev_s0(2, 1:n_s0, is) = beam%slice(is)%px(1:n_s0)
+    dev_s0(3, 1:n_s0, is) = beam%slice(is)%y(1:n_s0)
+    dev_s0(4, 1:n_s0, is) = beam%slice(is)%py(1:n_s0)
+    dev_s0(5, 1:n_s0, is) = beam%slice(is)%z(1:n_s0)
+    dev_s0(6, 1:n_s0, is) = beam%slice(is)%pz(1:n_s0)
+  enddo
+  call fel_device_unavg_twin_begin (dev, beam, ff, dev_s0, ustate%nsub, fp32%mutate, err)
+  if (err) return
+  call unavg_dev_encode (err)
+  if (err) return
+endif
 
 ! Parallel over slices, the averaged step's own design: each slice
 ! touches only its own particle arrays and its own field slice (the beam-to-field
@@ -497,6 +553,7 @@ do is = 1, nslice
         dgam = -dsub * real(cmplx(0.0_rp, -1.0_rp, rp) * (ehat * ux(ip) + ehat_y * uy(ip)) * cph, rp) &
                      / (u_s * m_electron)
         dE_slice(is) = dE_slice(is) + sl%weight(ip) * dgam * m_electron
+        if (fp32%on) dEturn_slice(is) = dEturn_slice(is) + sl%weight(ip) * abs(dgam) * m_electron
         gam(ip) = gam(ip) + dgam
 
         cdep = cmplx(0.0_rp, 1.0_rp, rp) * conjg(cph) * scl_u * sl%weight(ip) / u_s
@@ -518,6 +575,7 @@ do is = 1, nslice
         wphasor = cmplx(0.0_rp, -1.0_rp, rp) * ehat * exp(cmplx(0.0_rp, psi_mid - ks*tau(ip), rp))
         dgam = -dsub * real(wphasor * conjg(jhat), rp) / (u_s * m_electron)
         dE_slice(is) = dE_slice(is) + sl%weight(ip) * dgam * m_electron
+        if (fp32%on) dEturn_slice(is) = dEturn_slice(is) + sl%weight(ip) * abs(dgam) * m_electron
         gam(ip) = gam(ip) + dgam
 
         ! /u_s, not Genesis's averaged /gamma: the source and the E.v force are exact
@@ -584,8 +642,10 @@ do is = 1, nslice
 
   deallocate (ux, uy, xx, yy, tau, gam, crsource, kst)
   if (two_pol) deallocate (crsource_y)
-  if (fp32%on) then
+  if (fp32%on .and. .not. dev_twin) then
     call unavg_twin_slice (is, sl%n, ifld, cx, cy, cpx, cpy, cz, cpz)
+    deallocate (cx, cy, cpx, cpy, cz, cpz)
+  elseif (fp32%on) then
     deallocate (cx, cy, cpx, cpy, cz, cpz)
   endif
 
@@ -600,6 +660,13 @@ beam%phi0 = beam%phi0 + dz_record * phi0_rate_avg
 ustate%s = ustate%s + dz_record
 
 ! Exit handoff: the ramp has closed (a = 0), kinetic equals canonical again.
+
+! The device twin's rows, read before the exit handoff: the ramp's phase jump moves z
+! on the host and the twin advanced the record step, not the handoff, so a comparison
+! taken after it would price the jump instead of the arithmetic. The CPU twin runs
+! inside the loop above and sits before the handoff for the same reason.
+
+if (dev_twin) call fel_device_unavg_twin_rows (dev, fp32, beam, ff, ks, dE_slice, dEturn_slice)
 
 if (last) then
   beam%quiver_in_px = .false.
@@ -622,6 +689,155 @@ err_flag = .false.
 
 !------------------------------------------------------------------------------
 contains
+
+! One record step on the device. The quantities that do not depend on the particle are
+! built here in FP64 and uploaded once a substep rather than once a particle, which is
+! the hoist FINDINGS 7.37 records, and everything else is the kernels'. What the device
+! does not carry the caller has refused at setup, so nothing here falls back.
+
+subroutine unavg_device_step (uerr)
+
+real(rp) du_now
+logical uerr
+
+uerr = .true.
+
+if (first) then
+  dev%unavg = .true.
+  dev%spont_prev = 0
+  call fel_device_element_begin (dev, beam, ff)
+  call fel_device_unavg_begin (dev, ustate%nsub, err)
+  if (err) return
+endif
+
+call unavg_dev_encode (err)
+if (err) return
+
+! The ledger's two device-side terms. The command buffer has to drain before the next
+! record step's stage factors can be written anyway, so reading them here costs the
+! step nothing it was not already paying.
+
+call fel_device_unavg_ledger (dev, beam, dE_beam, du_now)
+dU_spont = du_now - dev%spont_prev
+dev%spont_prev = du_now
+
+beam%phi0 = beam%phi0 + dz_record * phi0_rate_avg
+ustate%s = ustate%s + dz_record
+
+! Exit handoff. The state comes back to the host first, since the ramp phase jump and
+! the chart flag are the host arrays' business and the walk's slippage and stats read
+! them from here on.
+
+if (last) then
+  call fel_device_readback (dev, beam, ff)
+  call fel_device_release (dev)
+  dev%unavg = .false.
+  if (dev%dep_breach) return
+  beam%quiver_in_px = .false.
+  ustate%active = .false.
+  call unavg_ramp_phase_jump ()
+endif
+
+uerr = .false.
+
+end subroutine unavg_device_step
+
+! One record step's encode: the propagator, the per-substep stage factors and carrier
+! rotators, the deposit's bound, and the command buffer itself. The production path and
+! the instrument's twin role both go through here, so the arithmetic under test is one
+! arithmetic.
+
+subroutine unavg_dev_encode (uerr)
+
+type (fel_device_unavg_par_struct) upar
+real(rp), allocatable :: fqs(:,:,:,:)
+complex(rp), allocatable :: cbase(:,:)
+real(rp) s0, psi_m, psi_s, s_bound, q_tot
+integer j, is_d
+logical uerr
+
+uerr = .true.
+
+! A readback found a particle whose |j|/u_s broke the deposit's bound, so the bound no
+! longer holds and nothing further is deposited. The walk stops the run at the comb
+! position that read it; this is the second reading, as fill_device_par's is.
+
+if (dev%dep_breach) return
+
+! The propagator at the substep, the entry fel_field_diffract reads. The cache was
+! filled for this ngrid, spacing and substep above, so a miss is a bug.
+
+exp_k2_p => fel_field_kernel_exp_k2 (ks)
+if (.not. associated(exp_k2_p)) then
+  call out_io (s_error$, r_name, 'THE UNAVERAGED SUBSTEP PROPAGATOR IS NOT IN THE KERNEL CACHE.', &
+               'PLEASE REPORT THIS!')
+  return
+endif
+call fel_device_set_kernel (dev, 1, exp_k2_p)
+
+! The stage field factors of both half pushes, and the optical carrier's base rotator
+! per substep per slice. psi_mid reaches some 1700 radians over a segment, which no
+! float carries, so it is reduced modulo 2 pi here and crosses the seam as a rotator.
+! The lag reference is the slice's own mean, held in FP64 by the device state.
+
+allocate (fqs(4, 4, 2, ustate%nsub), cbase(nslice, ustate%nsub))
+do j = 1, ustate%nsub
+  s0 = ustate%s + (j - 1) * dsub
+  call unavg_field_quartet (s0, dsub/2, fq)
+  fqs(:,:,1,j) = fq
+  call unavg_field_quartet (s0 + dsub/2, dsub/2, fq)
+  fqs(:,:,2,j) = fq
+  psi_m = beam%phi0 + (s0 - ustate%s + dsub/2) * phi0_rate_avg - und%ku * (s0 + dsub/2)
+  do is_d = 1, nslice
+    psi_s = modulo(psi_m - ks * dev%z_ref(is_d), twopi)
+    cbase(is_d, j) = cmplx(cos(psi_s), sin(psi_s), rp)
+  enddo
+enddo
+
+upar%dsub = dsub
+upar%ks = ks
+upar%ku = und%ku
+upar%aw = und%aw
+upar%gam0 = gamma0b
+upar%beta0 = p0_mc / gamma0b
+upar%g0inv2 = 1 / gamma0b**2
+upar%cos_t = und%cos_t
+upar%sin_t = und%sin_t
+upar%gridmax = (ngrid - 1) * dgrid / 2
+upar%dgrid = dgrid
+upar%scl_u = scl_u
+upar%m_electron = m_electron
+upar%spont_fac = 4 * dgrid**2 / (2 * (mu_0_vac * c_light)) * (beam%slice_spacing / c_light)
+upar%nsub = ustate%nsub
+upar%first = slip%first
+upar%helical = merge(1, 0, und%helical)
+upar%pad = 0
+
+! The deposit's bound. A contribution here carries |j|/u_s where the averaged deposit
+! carries a roll-off over gamma, so the bound is the run's whole charge times the
+! largest ratio the kernel is allowed to meet. The quiver sets that ratio: |j| reaches
+! sqrt(2) aw at the peak of a planar wiggle and less on a helical one, the betatron
+! momentum adds a hundredth of that on the checked decks, and u_s falls no lower than
+! the gamma floor the device measured at setup. One rest momentum of headroom on the
+! numerator covers a transverse momentum no FEL beam has. The kernel checks the ratio
+! on every particle and refuses the run through the same fault the averaged deposit's
+! gamma floor uses, so the bound is checked rather than assumed.
+
+q_tot = dev%dep_qbound * dev%dep_gam_floor
+upar%dep_u_bound = (sqrt(2.0_rp) * und%aw + 1) / dev%dep_gam_floor
+s_bound = scl_u * q_tot * upar%dep_u_bound
+call fel_device_dep_scale (dev, s_bound, 'the run''s charge, the substep''s source ' // &
+        'scale and the largest quiver-to-longitudinal momentum ratio the kernel allows', &
+        upar%dep_scale, err)
+if (err) return
+
+upar%mutate = merge(1, 0, fp32%mutate)
+call fel_device_unavg_step (dev, upar, fqs, cbase, err)
+if (err) return
+
+uerr = .false.
+
+end subroutine unavg_dev_encode
 
 ! The ramp's slippage compensation, applied as one discrete jump per segment end,
 ! at the handoffs where the envelope is exactly zero and nothing couples. The

@@ -468,6 +468,41 @@ and costs nothing the walk can resolve, one comparison and one branch a particle
 What the price buys is in [](validation.md#val-device): two runs of one deck identical on
 every array of the statistics file, where 54 of 127 differed before.
 
+(perf-device-unaveraged)=
+## The unaveraged mode on the device
+
+The mode's parallelism on the CPU is over slices and nothing else, so what the device is worth depends on how many slices a deck has. Both regimes are measured, because they are different questions and only the second shows the parallelism the CPU leaves unused. One 4 m Aramis segment in the unaveraged mode, 89 record steps of 60 substeps, `ngrid` 128, `comb_ds_save` at its default, production builds, M3 Max. Best of five after a discarded warm-up, the spread over the five beside each.
+
+| slices x particles | CPU | device | ratio | device busy | busy share of the walk |
+|---|---|---|---|---|---|
+| 32 x 512, 12 threads | 8.508 s, 3.8% | 0.941 s, 13.1% | 9.0x | 0.833 s | 89% |
+| 32 x 4096, 12 threads | 16.662 s, 3.0% | 1.573 s, 3.1% | 10.6x | 1.308 s | 83% |
+| 1 x 2048, one core of twelve | 3.687 s, 1.5% | 0.365 s, 3.6% | 10.1x | 0.299 s | 82% |
+| 1 x 16384, one core of twelve | 12.616 s, 1.0% | 0.455 s, 2.9% | 27.7x | 0.335 s | 74% |
+
+The single-slice rows are against a CPU using one core of twelve, which is what that deck gets on the CPU today, and the last row is where the difference is largest: the device carries sixteen times the particles for 25% more time while the CPU pays the full factor. The many-slice rows are against twelve CPU threads and land near ten. The backend is busy for three quarters to nine tenths of the walk in every row, so this mode is device-bound rather than dispatch-bound, which the averaged path's single-slice decks are not.
+
+Where a step's device seconds go, per pass, with `global%device_timing = T`. The 32-slice deck above, the same conditions, one complete run. The half push runs twice a substep and the solve is four dispatches, so those lines carry more encoders than the others, and the record step's energy baseline adds one dispatch to the quiver line.
+
+| particles a slice | busy | solve | zero | quiver | kick | spont | the five |
+|---|---|---|---|---|---|---|---|
+| 512 | 1.568 s | 0.7011 s | 0.1895 s | 0.1521 s | 0.1407 s | 0.1702 s | 1.354 s |
+| 4096 | 1.722 s | 0.5098 s | 0.1475 s | 0.2990 s | 0.4431 s | 0.1248 s | 1.524 s |
+
+The kernels this mode adds are the quiver, kick and spont lines: 34% of the five at 512 particles a slice and 57% at 4096, against the solve and the clear at 66% and 43%. That is the same crossover the CPU's own sampling split shows ([](#perf-the-sampling-split-unaveraged)), where the transform is 21% of the mode at 16384 particles a slice and the mode is field-solve dominated at low load. The ledger's spontaneous reduction is 8 to 13% of the device's time, which is what banking that term costs.
+
+The instrument's own price applies here as it does above: encoder boundaries the production path does not pay, and this mode encodes eight dispatches a substep, so a segment runs past 42,000 of them and the sample buffer is committed early many times over. The seconds in that table are the instrument's; the shares are what carries.
+
+What the fixed-point deposit costs, re-measured here rather than carried over. This mode deposits twenty times an undulator period where the averaged path deposits once a record step, so the question is whether the higher rate changes the answer. The comparison is the accumulator narrowed to one 32-bit atomic a component and a two-word clear, which is the float accumulator's own traffic, against the fixed point as it ships. Same decks, timing off on both, best of five.
+
+| slices x particles | walk, narrow | walk, fixed point | walk | busy, narrow | busy, fixed point | busy |
+|---|---|---|---|---|---|---|
+| 32 x 512 | 0.897 s | 0.901 s | 1.00x | 0.776 s | 0.819 s | 1.06x |
+| 32 x 4096 | 1.421 s | 1.598 s | 1.12x | 1.140 s | 1.327 s | 1.16x |
+| 1 x 16384 | 0.427 s | 0.488 s | 1.14x | 0.300 s | 0.353 s | 1.18x |
+
+Zero to fourteen percent on the walk and six to eighteen on device time, which is the range the averaged path measured for the same change. The rate does not set the price: the load per deposit does, and a deck with few particles a slice pays almost nothing because the clear rather than the atomics is what it is paying for. What the price buys is in [](validation.md#val-device-unaveraged): two device runs of one unaveraged deck agree on their diag and ledger files bit for bit, at 4 threads against 8.
+
 The field set, on the planar segment of the harmonics check (3.96 m, 88 steps) with the same 96 x 8192 window at `ngrid` 256 and `comb_ds_save = -1`, since a helical segment couples only the fundamental and the set has nothing to carry there:
 
 | case | CPU, 12 threads | device wall | device busy | ratio |

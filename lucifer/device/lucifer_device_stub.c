@@ -80,6 +80,24 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
   return 1;
 }
 
+int luc_dev_unavg_begin (int nsub, char *reason, int reason_len)
+{
+  (void) nsub;
+  put_str (reason, reason_len, "no device backend in this build");
+  return 1;
+}
+
+int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
+                        const float *cbase, char *reason, int reason_len)
+{
+  (void) par; (void) fq; (void) cbase;
+  put_str (reason, reason_len, "no device backend in this build");
+  return 1;
+}
+
+double luc_dev_unavg_spont (void) { return 0; }
+void luc_dev_download_g0 (int is, int n, float *g0) { (void) is; (void) n; (void) g0; }
+
 void luc_dev_sync (void) {}
 int luc_dev_wrap_check (int64_t bucket_ticks) { (void) bucket_ticks; return 1; }
 double luc_dev_seconds (void) { return 0; }

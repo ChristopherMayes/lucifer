@@ -1241,6 +1241,14 @@ lockstep levels price them; the fixed-point phase replaces the FP32 residual dzr
 whose ulp floor forced that module's moving reference (FINDINGS 7.39): with a
 uniform 1.5e-9 rad quantum the reference can stay static for a whole element.
 
+Two modes. The averaged FEL step is the one this module was written for, and the
+unaveraged step rides the same buffers in its own chart: px and py carry the kinetic
+transverse momenta ux and uy where the averaged chart carries Bmad's, and the phase
+accumulator carries ks (tau - tau_ref) where the averaged chart carries the whole
+theta. dev%unavg says which chart the staging and the readback use, and the
+fel_device_unavg_* routines below carry the rest. doc/validation.md's
+val-device-unaveraged records what that mode's kernels transcribe and what they cost.
+
 Two roles. With fp32_check off the device is the run inside averaged FEL elements:
 beam and field upload at element entry, stay resident through the element, and come
 back at the comb's stats positions and the element end (fel_track_line_mod owns that
@@ -1278,6 +1286,17 @@ single-field path it was before the set.
 One step's constants for luc_dev_step, mirroring luc_dev_step_par of
 lucifer_device.h field for field (all doubles, then the 32-bit ints). Editing
 either mirror alone skews the layout silently; keep them together.
+```
+
+(api-fel-device-unavg-par-struct)=
+### `fel_device_unavg_par_struct`
+
+*Struct*
+
+```
+One unaveraged record step's constants for luc_dev_unavg_step, mirroring
+luc_dev_unavg_par of lucifer_device.h field for field (all doubles, then the
+32-bit ints). Editing either mirror alone skews the layout silently.
 ```
 
 (api-fel-device-struct)=
@@ -1646,6 +1665,175 @@ pair a wall clock is judged against (the dispatch floor is their difference). Wh
 the device held the twin's role over a set of more than one member, its per-member
 worst levels go into the instrument's footer first, since the ten-column stream
 carries only the worst over members. The caller closes that stream afterwards.
+```
+
+(api-fel-device-dep-scale)=
+### `fel_device_dep_scale`
+
+*Subroutine* `(dev, s_bound, origin, dep_scale, err_flag)`
+
+```
+Routine to choose the deposit's fixed-point scale from a bound on what one cell can
+hold, and to refuse a bound the kernel's arithmetic cannot carry. Both modes deposit
+through the same accumulator and differ only in how the bound is built, so the choice,
+the two refusals and the origin line live here once.
+
+The scale is the largest power of two that keeps the bounded per-cell sum inside the
+accumulator, so the scale and its reciprocal are both exact and the conversion back to
+a float source costs one rounding.
+
+The headroom is the margin the fixed point wins by. A quantum below the FP32 spacing of
+the bound resolves the accumulator everywhere more finely than the float accumulation it
+replaces, and the bits between the two are what the run reports. Too few of them and the
+run is refused here, before the first step converts anything. The scale is chosen against
+the same bound the headroom is measured against, so their product lands between 2^61 and
+2^62 whatever the deck and the headroom is 37 bits. No deck therefore reaches that
+refusal, and raising fel_dev_dep_bits_min$ past 37 is what fires it and how it was
+verified.
+
+The scale and its reciprocal reach the kernel as single precision, so both have to be
+finite and normal there. The headroom cannot catch that, for the same reason it always
+reads 37 bits: a bound below about 5e-20 V/m sends the scale past the largest float and
+a bound above about 4e56 sends its reciprocal there, and either would deposit through an
+infinity while the headroom still reported healthy.
+```
+
+```
+Input:
+  s_bound  -- real(rp): The bound on one cell's accumulated source [V/m].
+  origin   -- character(*): What the bound is built from, for the origin line.
+
+Output:
+  dep_scale -- real(rp): Ticks per V/m, a power of two.
+  err_flag  -- logical: Set True if the bound cannot be carried. False otherwise.
+```
+
+(api-fel-device-unavg-begin)=
+### `fel_device_unavg_begin`
+
+*Subroutine* `(dev, nsub, err_flag)`
+
+```
+Routine to size the unaveraged mode's own device buffers for one segment and clear
+the ledger's banked spontaneous energy. Called at an unaveraged element's entry,
+after fel_device_element_begin has made the beam and the field resident in that
+mode's chart. The per-substep stage factors and carrier rotators are sized here
+because nsub is the segment's (fel_unavg_setup), and the banked energy is cleared
+because the caller reads it as this element's own.
+```
+
+```
+Input:
+  nsub     -- integer: Substeps in one record step of this segment.
+
+Output:
+  dev      -- fel_device_struct: Ready for fel_device_unavg_step.
+  err_flag -- logical: Set True if the backend refuses. False otherwise.
+```
+
+(api-fel-device-unavg-step)=
+### `fel_device_unavg_step`
+
+*Subroutine* `(dev, par, fq, cbase, err_flag)`
+
+```
+Routine to encode one unaveraged record step: nsub substeps of clear, half push,
+radiation kick with its deposit, half push, the ledger's spontaneous reduction and
+the four-pass solve, all in one command buffer. Nothing is waited on here.
+```
+
+```
+Input:
+  par        -- fel_device_unavg_par_struct: The step's constants, from the caller.
+  fq(:,:,:)  -- real(rp): The stage factors (4, 4 stages, 2 halves) a substep, as
+                  unavg_field_quartet built them. Rounded to FP32 here.
+  cbase(:,:) -- complex(rp): e^{i(psi_mid - ks tau_ref)} per substep per slice, FP64
+                  on the caller's side and rounded once here. psi_mid reaches some
+                  1700 radians over a segment, which no float carries, so the caller
+                  reduces it modulo 2 pi before it becomes a rotator.
+
+Output:
+  dev        -- fel_device_struct: One more record step encoded.
+  err_flag   -- logical: Set True if the backend refuses. False otherwise.
+```
+
+(api-fel-device-unavg-ledger)=
+### `fel_device_unavg_ledger`
+
+*Subroutine* `(dev, beam, dE_step, u_spont)`
+
+```
+Routine to read the unaveraged ledger's two device-side terms.
+
+dE_step is the beam energy the kicks moved over the record step just encoded.
+gamma changes only in the kick, exactly (B does no work), so the step's change is
+sum w (gamma_end - gamma_start) m_e and the two energy offsets are what the device
+holds. Summed in FP64 slice by slice and particle by particle, which is the CPU
+step's own order, so no thread and no device schedule reaches the answer.
+
+u_spont is the energy this element's deposits banked as spontaneous emission,
+4 sum|src|^2 over the source grid and over every substep, which is the one
+field-energy term the kick/deposit duality does not charge to the beam.
+```
+
+```
+Output:
+  dE_step -- real(rp): The record step's kick-side beam energy change [J].
+  u_spont -- real(rp): The element's banked spontaneous energy so far [J].
+```
+
+(api-fel-device-unavg-twin-begin)=
+### `fel_device_unavg_twin_begin`
+
+*Subroutine* `(dev, beam, ff, s0, nsub, err_flag)`
+
+```
+Routine to put the device in the twin's role for one unaveraged record step, part
+one: the shared pre-step state uploads in the unaveraged chart, the field images
+round from the pre-step FP64 records, and the work buffers are sized on the first
+step. The encoded step then runs while the FP64 path advances the same record step.
+
+Lockstep only, so the state is rebuilt from FP64 every record step and the lag
+reference moves to the slice's own mean. Residency is never claimed: a readback of
+twin state into the run's arrays would be the instrument steering what it observes.
+```
+
+```
+Input:
+  s0(:,:,:) -- real(rp): Pre-step FP64 state, (6, npart, nslice) as x, px, y, py,
+                 z, pz in the beam's stored chart. px carries the quiver mid-segment
+                 and the conversion here is fel_unavg_step's own.
+  nsub      -- integer: Substeps in one record step of this segment.
+  mutate    -- logical: global%fp32_mutate, the check's own failure hook.
+```
+
+(api-fel-device-unavg-twin-rows)=
+### `fel_device_unavg_twin_rows`
+
+*Subroutine* `(dev, fp32, beam, ff, ks, de_cpu, deturn)`
+
+```
+Routine to put the device in the twin's role, part two: read the device state back
+after the record step and fill fel_fp32_mod's nine rows against the FP64 unaveraged
+path. The columns mean what that mode's own twin makes them mean: rows 1 to 4 are
+the quiver chart, so they are a worst per-particle difference and see the common
+offset an rms would miss (FINDINGS 7.68), row 8 is the ledger's kick-side term and
+row 9 the field.
+
+The guard is the median per-record-step phase increment in ticks of the fixed-point
+quantum. There is no common advance to subtract here: the accumulator carries the
+lag alone, where the averaged chart carries the whole theta and the step's phi0
+advance comes out of it.
+```
+
+```
+Input:
+  de_cpu(:) -- real(rp): The FP64 step's kick-side energy change per slice [J].
+  deturn(:) -- real(rp): The FP64 step's energy turnover per slice [J], the sum of
+                 the absolute exchanges, which is what row 8 is scaled by. Over a
+                 record step the gains and losses very nearly cancel, so the net is
+                 a small difference of large exchanges and a ratio against it says
+                 nothing about precision.
 ```
 
 ## `fel_field_mod.f90`
@@ -5777,6 +5965,17 @@ Parallel over slices with the averaged step's own guarantees (the OpenMP design'
 design): disjoint particle arrays and field slices per iteration, serial kernel
 init, threadprivate FFT plans, per-slice energy summed in fixed order. Results
 are bit-identical across thread counts, and the harness checks it.
+
+The device path (fel_device_mod, doc/validation.md val-device-unaveraged). With a
+backend armed the beam and the field stay resident for the whole segment and one
+record step is one command buffer of nsub substeps. Three kernels are this mode's own
+and the rest of a substep is the kernels the averaged path already had. Residency
+starts inside the first record step rather than at the walk's element entry, because
+the entry handoff moves z and the chart conversion has to see the moved value, and it
+ends inside the last one for the same reason. The quantities that do not depend on the
+particle are built here in FP64 and uploaded once a substep, which is the hoist
+FINDINGS 7.37 records. With fp32_check on, the device takes the instrument's twin role
+instead and the FP64 path below runs untouched.
 ```
 
 (api-fel-unavg-struct)=
@@ -5899,15 +6098,18 @@ Input:
   und       -- fel_und_struct: Undulator parameters.
   ustate    -- fel_unavg_struct: Substep grid and work arrays.
   beam      -- fel_beam_struct: The beam in the quiver chart.
-  wf        -- wavefront_struct: The fundamental field.
-  slip      -- fel_slip_struct: The rotating field record.
+  ff(:)     -- fel_field_struct: The field set. This mode carries one member of one
+                 plane, so ff(1) holds the field and the rotating record.
   dz_record -- real(rp): The record step to advance by [m].
   first     -- logical: True on the segment's first record step (entry handoff).
   last      -- logical: True on the last (exit handoff and ramp phase jump).
+  fp32      -- fel_fp32_struct: The lockstep instrument, dark when it is off.
+  dev       -- fel_device_struct: The device backend, dark when it is off. With the
+                 instrument off it runs the step; with it on it is the twin.
 
 Output:
   beam      -- fel_beam_struct: Advanced by Newton-Lorentz RK4 through the field.
-  wf        -- wavefront_struct: Sources deposited, records diffracted.
+  ff(:)     -- fel_field_struct: Sources deposited, records diffracted.
   dE_beam   -- real(rp): The step's kick-side beam energy change [J] (ledger).
   dU_spont  -- real(rp): The step's spontaneous source energy [J] (ledger).
   err_flag  -- logical: Set True if there is an error. False otherwise.

@@ -9,6 +9,46 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-10 Added: the Metal backend runs the unaveraged mode. device = "metal" refused that mode until now,
+  so the only way to resolve the undulator quiver was the CPU path, whose parallelism is over slices and gives
+  a steady-state deck one core of twelve. Three kernels are the mode's own, the quiver-resolving Strang push,
+  the radiation kick with its deposit from the resolved motion, and the ledger's spontaneous reduction. The
+  rest of a substep is the kernels the averaged path already had: the four-pass solve, the accumulator's clear
+  and the fixed-point scatter. On one Aramis segment the device runs 9.0x a twelve-thread CPU at 32 slices of
+  512 particles and 10.6x at 4096, and 10.1x and 27.7x on a single slice where the CPU has no parallelism to
+  use. The backend is busy for three quarters to nine tenths of the walk, so the mode is device-bound.
+
+  The lag rides the 64-bit tick accumulator rather than a single-precision residual. dtau/ds depends on gamma,
+  ux and uy alone, so the push integrates it from zero over a substep and adds the increment exactly, and no
+  arithmetic differences the increment against a lag that grew. The phase row reads 3.4e-6 rad against the CPU
+  twin's 9.9e-6 and the phasor row 6.5e-8 against 7.7e-8. The three per-substep quantities that do not depend
+  on the particle are built in FP64 on the host and uploaded once a substep: the envelope and the undulator
+  phase at the four RK stage positions, the optical carrier's base rotator, and the propagator at the substep.
+
+  The instrument judges it. The device takes the twin's role in the unaveraged lockstep, the nine rows land
+  inside recorded ceilings on a steady deck and an 8-slice window, the FP64 diag and ledger are byte identical
+  with the twin on against off, and the mutation takes the phase row from 3.4e-6 to 9.8e-5 and the field row
+  from 6.4e-6 to 7.7e-4. Two device runs of one unaveraged deck agree on their diag and ledger bit for bit at
+  4 threads against 8: the deposit accumulates in fixed point and the ledger's spontaneous term reduces with
+  one threadgroup owning one slot and no atomic at all. Two live polarizations inside the mode is refused,
+  which the CPU carries and the device does not.
+
+  One measurement sets those ceilings and it predates the mode. An FP32 forward transform, propagator multiply
+  and inverse transform lose about 1.3e-7 of the field's energy every time they run, systematically, where the
+  FP64 pair drifts 1.6e-12 over 5340 applications. The averaged mode runs the pair once a record step and a
+  12-segment line loses 1.4e-4 of the field energy, under every ceiling it records. This mode runs it nsub
+  times, so an 89-step segment of 60 substeps loses 7.2e-4, which is the whole of a weakly seeded deck's
+  1.7e-3 exit-power divergence from the CPU. The unaveraged energy ledger therefore does not close on the
+  device at the 4.2e-6 of turnover it closes at on the CPU, and doc/validation.md says so with the numbers.
+
+- 2026-09-10 Fixed: the device deposit's residual-coarsening mutation hook returned its argument unchanged.
+  The step was written as fabs(d) * 3.05175781e-5, a fixed fraction of the value, and that constant is exactly
+  2^-15, so d/step is exactly 32768 for every d and rounding it to the nearest integer is the identity. The
+  Fortran it transcribes uses 256 * spacing(d), whose step comes from the exponent alone and really quantizes.
+  check_device's mutation assertions passed throughout on the other hook, the coarsening of the uploaded phase
+  accumulator, which covers the lockstep path but not freerun's deposit. The shader now takes the step from
+  frexp and ldexp. The mutated levels move further than they did and the straight levels are unchanged.
+
 - 2026-09-10 Added: the unaveraged twin carries a ledger row and a field row, and the stream's source and
   field columns hold them. The ledger row is the energy the twin's own kicks took from the beam against the
   FP64 step's, scaled by the energy the step moved rather than by the energy it netted. Over a record step

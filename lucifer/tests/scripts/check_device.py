@@ -24,8 +24,9 @@ and everything the backend does not cover is refused.
 5. Time dependence. An 8-slice shot-noise window with slippage rotating the resident
    record holds the same ceilings, read-only proof and production band.
 6. Refused. Wakes, spontaneous radiation, harmonics together with two live
-   polarizations, the unaveraged mode, an unsupported grid (the message names the
-   nearest supported size) and an unknown backend name each stop the run.
+   polarizations, two live polarizations inside the unaveraged mode, an unsupported
+   grid (the message names the nearest supported size) and an unknown backend name
+   each stop the run.
 7. The field set. Harmonic members ride the device (planar segment, harmonics 1 and 3)
    and so do two polarization planes (the crossed undulator of check_two_polarization),
    each judged the same four ways: the lockstep rows inside the recorded ceilings with
@@ -42,6 +43,12 @@ and everything the backend does not cover is refused.
    instead, ~1e-7 of the charge in the phasor row, and its P3 lands two decades above
    the CPU's. The device resolves harmonic bunching down to that floor and not below,
    which the phasor row states per member. The harmonic checks here sit above it.
+9. The unaveraged mode, whose quiver-resolving push, kick and deposit and ledger
+   reduction are the kernels this mode adds and whose field solve is the one above.
+   Judged the same ways, with the transform pair's own energy loss measured beside
+   them because it is what sets its ceilings: that mode runs the pair nsub times a
+   record step where the averaged mode runs it once. See unaveraged() below.
+
 8. Slice migration, from check_migration's own decks at the device's grid. Migration
    needs no kernel: at an element's last step the walk reads the beam back and releases
    residency before re-slicing, so conservation and phase continuity hold on the device
@@ -178,6 +185,37 @@ MIG_E2E_CEIL = 3e-3
 # FP32 passes of its own where the CPU multiplies inside the field's FP64 transform pair,
 # so the two differ by more than the plain solve does. Measured 1.7e-4 end to end.
 SF_E2E_CEIL = 1.0e-3
+
+# The unaveraged mode's own ceilings, each three times its first measurement (this
+# machine, both builds, the check's own decks). They are wider than the averaged ones
+# and the reason is arithmetic rather than the port: this mode runs the transform pair
+# nsub times a record step where the averaged mode runs it once, and an FP32 pair loses
+# about 1.3e-7 of the field's energy every time it runs (doc/validation.md's unaveraged
+# device section). The transverse rows are the FP32 push's own, so they sit an order
+# above the averaged mode's, whose transverse maps are one map a step.
+#
+# The source column carries this mode's ledger term rather than a source grid, scaled
+# by the energy the record step turned over. On a dark-start shot-noise window a slice
+# can turn over almost nothing, which widens that row and nothing else.
+
+CEIL_U = {"x": 3.5e-6, "px": 2.5e-5, "y": 3.0e-6, "py": 2.1e-5, "pz": 6.5e-6,
+          "theta": 1.1e-5, "phasor": 2.5e-7, "source": 5.0e-3, "field": 2.0e-5}
+GUARD_FLOOR_U = 1e9
+U_E2E_CEIL = 5.0e-3
+
+# The end-to-end band against the CPU's own unaveraged run. It is set by the transform
+# pair's loss below rather than by anything the port chose: on the steady deck, whose
+# seed barely grows over one segment, the exit power sits 1.7e-3 under the CPU's, which
+# is 5340 pairs of that loss carried into the power. The time-dependent window measures
+# 1.5e-6 because its power comes from a beam that is radiating rather than from a seed
+# the arithmetic is slowly eating.
+
+# What one FP32 transform pair does to the field's energy, with no beam to feed it.
+# Measured -1.29e-7 a pair on the averaged path and -1.34e-7 on the unaveraged one,
+# and it is what sets the ceilings above. The band is wide enough to carry a grid
+# change and narrow enough that a pair which stopped being nearly unitary would show.
+
+PAIR_LOSS = (5e-8, 4e-7)
 
 # The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
 # segment is helical and couples only the fundamental, at the device's grid.
@@ -343,18 +381,137 @@ def main():
     refused = r.returncode != 0 and "nearest supported size is 64" in r.stdout
     ok("refused: unsupported grid, nearest size named", refused, "True", refused)
 
-    r = run(args.exe, wd, "dev_ru.in",
-            BASE.format(root="dev_ru", extra=DEV).replace("aramis_1seg.bmad", "aramis_1seg_unavg.bmad"),
-            expect_fail=True)
-    refused = r.returncode != 0 and "DOES NOT COVER THE UNAVERAGED MODE" in r.stdout
-    ok("refused: the unaveraged mode", refused, "True", refused)
-
     field_set(args, wd, exe)
     source_filter(args, wd, exe)
+    unaveraged(args, wd, exe)
 
     print("PASS" if not FAILED else "FAIL")
     return 1 if FAILED else 0
 
+
+
+def unaveraged(args, wd, exe):
+    """
+    The unaveraged mode on the device (doc/validation.md's unaveraged device section).
+
+    The mode resolves the undulator quiver, so a record step is nsub Strang substeps of
+    half push, radiation kick with its deposit, half push and the slice's own diffract
+    and source add. Three kernels are the mode's own and the rest of the step is the
+    kernels the averaged path already had, the four-pass solve above all.
+
+    The instrument judges it the way it judges the averaged path: the device takes the
+    twin's role in the unaveraged lockstep, the nine rows land inside recorded ceilings,
+    the FP64 stream is byte identical with the twin on against off, and the mutation
+    moves the rows the mutation reaches. What the mode's own twin makes the columns mean
+    is in check_unaveraged.py: rows 1 to 4 are the quiver chart and are a worst
+    per-particle difference, the source column carries the ledger's kick-side term, and
+    the field column carries the twin's own record.
+
+    The transform pair's energy loss is measured here rather than inferred, because it
+    is what sets these ceilings: a run with no charge leaves the repeated diffract as the
+    only thing acting on the field, and what the field then loses is the pair's own
+    arithmetic.
+    """
+    print("== the unaveraged mode on the device ==")
+    latdir = pathlib.Path(args.latdir)
+    for f in ("aramis_1seg.bmad", "aramis_1seg_unavg.bmad", "crossed_probe.bmad"):
+        (wd / f).write_bytes((latdir / f).read_bytes())
+    (wd / "dvu_cross.bmad").write_text(
+        "call, file = crossed_probe.bmad\nuse, CROSSED\nwiggler::*[FEL_METHOD] = unaveraged\n")
+    lat = "aramis_1seg_unavg.bmad"
+    base = BASE.replace("aramis_1seg.bmad", lat)
+
+    # 1. Steady lockstep, the device in the twin's role.
+    run(args.exe, wd, "dvu_ss.in", base.format(root="dvuss",
+        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+    s = summary(wd, "dvuss")
+    for q in CEIL_U:
+        ok(f"unaveraged lockstep steady worst_{q}", f"{s[q]:.3e}",
+           f"<= {CEIL_U[q]:.1e}", s[q] <= CEIL_U[q])
+    ok("unaveraged lockstep steady guard [ticks]", f"{s['guard']:.3e}",
+       f">= {GUARD_FLOOR_U:.0e}", s["guard"] >= GUARD_FLOOR_U)
+
+    # 2. Read-only. The FP64 run here carries neither the device nor the instrument, so
+    # what is compared is the CPU's own unaveraged step with the twin beside it and
+    # without.
+    run(args.exe, wd, "dvu_off.in", base.format(root="dvuoff", extra=""))
+    same = (wd / "dvuss.diag.txt").read_bytes() == (wd / "dvuoff.diag.txt").read_bytes()
+    ok("unaveraged FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    same = (wd / "dvuss.ledger.txt").read_bytes() == (wd / "dvuoff.ledger.txt").read_bytes()
+    ok("unaveraged FP64 ledger byte-identical, device twin on vs off", same, "True", same)
+
+    # 3. Falsifiable. The hook coarsens the uploaded lag accumulator by 65536 ticks
+    # (9.6e-5 rad) and the residual angle the kick reads, and the rows those reach must
+    # move. The transverse rows are not among them: gamma changes only in the kick, so a
+    # phase perturbation reaches x and px only at second order.
+    run(args.exe, wd, "dvu_mut.in", base.format(root="dvumut",
+        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+    m = summary(wd, "dvumut")
+    for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
+        ok(f"unaveraged mutation moves worst_{q}", f"{m[q]:.3e} vs {s[q]:.3e}",
+           f">= {factor}x", m[q] >= factor * s[q])
+
+    # 4. The production role, against the CPU's own unaveraged run.
+    run(args.exe, wd, "dvu_pr.in", base.format(root="dvupr", extra=DEV))
+    pc = diag_power(wd, "dvuoff", 1)
+    pd = diag_power(wd, "dvupr", 1)
+    rel = abs(pd - pc) / pc
+    ok("unaveraged production power vs CPU", f"{rel:.3e}", f"<= {U_E2E_CEIL:.1e}",
+       rel <= U_E2E_CEIL)
+
+    # 5. A time-dependent window: slippage rotates the resident record between record
+    # steps and the ledger's banked terms cross the seam every record step.
+    run(args.exe, wd, "dvu_td.in", base.format(root="dvutd",
+        extra=DEV + TD_EXTRA + '  global%fp32_check = "lockstep"\n'))
+    t = summary(wd, "dvutd")
+    for q in CEIL_U:
+        ok(f"unaveraged lockstep TD worst_{q}", f"{t[q]:.3e}",
+           f"<= {CEIL_U[q]:.1e}", t[q] <= CEIL_U[q])
+    run(args.exe, wd, "dvu_tdoff.in", base.format(root="dvutdoff", extra=TD_EXTRA))
+    same = (wd / "dvutd.diag.txt").read_bytes() == (wd / "dvutdoff.diag.txt").read_bytes()
+    ok("unaveraged TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    run(args.exe, wd, "dvu_tdpr.in", base.format(root="dvutdpr", extra=DEV + TD_EXTRA))
+    pc = diag_power(wd, "dvutdoff", 8)
+    pd = diag_power(wd, "dvutdpr", 8)
+    rel = abs(pd - pc) / pc
+    ok("unaveraged production TD window power vs CPU", f"{rel:.3e}",
+       f"<= {U_E2E_CEIL:.1e}", rel <= U_E2E_CEIL)
+
+    # 6. Two device runs of one unaveraged deck agree bit for bit. The deposit
+    # accumulates in fixed point and the ledger's spontaneous term reduces without an
+    # atomic, so no arrival order reaches either.
+    run(args.exe, wd, "dvu_r1.in", base.format(root="dvur1", extra=DEV + TD_EXTRA))
+    run(args.exe, wd, "dvu_r2.in", base.format(root="dvur2", extra=DEV + TD_EXTRA),
+        threads="8")
+    same = ((wd / "dvur1.diag.txt").read_bytes() == (wd / "dvur2.diag.txt").read_bytes()
+            and (wd / "dvur1.ledger.txt").read_bytes() == (wd / "dvur2.ledger.txt").read_bytes())
+    ok("two unaveraged device runs, diag and ledger identical", same, "True", same)
+
+    # 7. The transform pair's own energy loss, with no charge to feed the field. The
+    # CPU's FP64 pair holds the energy to 1.6e-12 over the same 5340 applications.
+    for root, extra, npair in (("dvu_darku", DEV, 89 * 60), ("dvu_darka", DEV, 89)):
+        text = base.format(root=root, extra=extra)
+        if root.endswith("a"):
+            text = text.replace(lat, "aramis_1seg.bmad")
+        run(args.exe, wd, f"{root}.in",
+            text.replace("bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
+        p0 = diag_power(wd, root, 1)
+        rows = [l.split() for l in (wd / f"{root}.diag.txt").read_text().splitlines()
+                if not l.startswith("#")]
+        loss = (float(rows[0][2]) - p0) / float(rows[0][2]) / npair
+        mode = "unaveraged" if root.endswith("u") else "averaged"
+        good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
+        ok(f"FP32 transform pair energy loss, {mode} deck", f"{loss:.3e} a pair",
+           f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good)
+
+    # 8. Refused. Two live polarizations in this mode is the one configuration the CPU
+    # carries and the device does not.
+    r = run(args.exe, wd, "dvu_rp.in",
+            base.format(root="dvurp", extra=DEV).replace(
+                'lat_file = "' + lat + '"', 'lat_file = "dvu_cross.bmad"'),
+            expect_fail=True)
+    refused = r.returncode != 0 and "TWO POLARIZATIONS IN THE UNAVERAGED MODE" in r.stdout
+    ok("refused: two polarizations in the unaveraged mode", refused, "True", refused)
 
 def source_filter(args, wd, exe):
     """

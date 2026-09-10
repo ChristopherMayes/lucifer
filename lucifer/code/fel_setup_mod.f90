@@ -1264,8 +1264,9 @@ if (err_flag) return
 ! element re-uploads into a rectangle grown to the new largest fill.
 
 if (run%global%device /= '' .and. run%global%device /= 'off') then
-  if (run%any_unavg) then
-    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE UNAVERAGED MODE.')
+  if (run%any_unavg .and. run%two_pol) then
+    call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // &
+                 '" DOES NOT COVER TWO POLARIZATIONS IN THE UNAVERAGED MODE.')
     err_flag = .true.;  return
   endif
   if (run%global%source_model == 'coherent') then

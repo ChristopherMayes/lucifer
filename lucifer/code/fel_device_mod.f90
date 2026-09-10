@@ -31,6 +31,14 @@
 ! whose ulp floor forced that module's moving reference (FINDINGS 7.39): with a
 ! uniform 1.5e-9 rad quantum the reference can stay static for a whole element.
 !
+! Two modes. The averaged FEL step is the one this module was written for, and the
+! unaveraged step rides the same buffers in its own chart: px and py carry the kinetic
+! transverse momenta ux and uy where the averaged chart carries Bmad's, and the phase
+! accumulator carries ks (tau - tau_ref) where the averaged chart carries the whole
+! theta. dev%unavg says which chart the staging and the readback use, and the
+! fel_device_unavg_* routines below carry the rest. doc/validation.md's
+! val-device-unaveraged records what that mode's kernels transcribe and what they cost.
+!
 ! Two roles. With fp32_check off the device is the run inside averaged FEL elements:
 ! beam and field upload at element entry, stay resident through the element, and come
 ! back at the comb's stats positions and the element end (fel_track_line_mod owns that
@@ -102,9 +110,10 @@ real(rp), parameter :: fel_dev_gamma_floor$ = 8.0_rp
 
 integer, parameter :: fel_dev_dep_bits_min$ = 8
 
-integer, parameter :: fel_dev_pass_n$ = 6
+integer, parameter :: fel_dev_pass_n$ = 9
 character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
-        [character(10):: 'transverse', 'push', 'zero', 'deposit', 'filter', 'solve']
+        [character(10):: 'transverse', 'push', 'zero', 'deposit', 'filter', 'solve', &
+                         'quiver', 'kick', 'spont']
 
 !+
 ! Struct fel_device_par_struct
@@ -128,6 +137,26 @@ type, bind(c) :: fel_device_par_struct
 end type
 
 !+
+! Struct fel_device_unavg_par_struct
+!
+! One unaveraged record step's constants for luc_dev_unavg_step, mirroring
+! luc_dev_unavg_par of lucifer_device.h field for field (all doubles, then the
+! 32-bit ints). Editing either mirror alone skews the layout silently.
+!-
+
+type, bind(c) :: fel_device_unavg_par_struct
+  real(c_double) :: dsub, ks, ku, aw
+  real(c_double) :: gam0, beta0, g0inv2
+  real(c_double) :: cos_t, sin_t, gridmax, dgrid
+  real(c_double) :: scl_u                       ! fel_unavg_step's own source scale.
+  real(c_double) :: m_electron                  ! The kick's divisor [eV].
+  real(c_double) :: dep_scale
+  real(c_double) :: dep_u_bound                 ! The largest |j|/u_s the bound assumes.
+  real(c_double) :: spont_fac                   ! Joules per unit sum|src|^2.
+  integer(c_int) :: nsub, first, helical, mutate, pad
+end type
+
+!+
 ! Struct fel_device_struct
 !
 ! The device run state: the knob's answer, the residency flag the walk consults, the
@@ -144,6 +173,12 @@ type fel_device_struct
   ! instrument steering the run it observes -- the exact failure the read-only proof
   ! exists to catch, and the first thing it caught.
   logical :: resident = .false.         ! Production role: beam and field live on the device.
+  ! The unaveraged mode's residency reads the same seven particle buffers in its own
+  ! chart, so the flag says which chart the staging and the readback use. z_ref then
+  ! holds the slice's mean lag tau [m] rather than its mean z.
+  logical :: unavg = .false.            ! The resident element is an unaveraged segment.
+  integer :: nsub = 0                   ! Substeps a record step, this segment's.
+  real(rp) :: spont_prev = 0            ! The element's banked spontaneous energy, last read.
   logical :: twin_live = .false.        ! Instrument role: the freerun twin state carries.
   integer :: nslice = 0, npart = 0, ngrid = 0
   integer :: nfield = 1, npol = 1       ! The set: members, and planes per member.
@@ -272,6 +307,37 @@ interface
   end function
 
   subroutine luc_dev_sync () bind(c, name = 'luc_dev_sync')
+  end subroutine
+
+  function luc_dev_unavg_begin (nsub, reason, reason_len) &
+                                bind(c, name = 'luc_dev_unavg_begin') result (ierr)
+    import c_char, c_int
+    integer(c_int), value :: nsub, reason_len
+    character(kind=c_char) :: reason(*)
+    integer(c_int) ierr
+  end function
+
+  function luc_dev_unavg_step (par, fq, cbase, reason, reason_len) &
+                               bind(c, name = 'luc_dev_unavg_step') result (ierr)
+    import c_char, c_int, c_float, c_float_complex
+    import fel_device_unavg_par_struct
+    type (fel_device_unavg_par_struct) :: par
+    real(c_float) :: fq(*)
+    complex(c_float_complex) :: cbase(*)
+    character(kind=c_char) :: reason(*)
+    integer(c_int), value :: reason_len
+    integer(c_int) ierr
+  end function
+
+  function luc_dev_unavg_spont () bind(c, name = 'luc_dev_unavg_spont') result (u)
+    import c_double
+    real(c_double) u
+  end function
+
+  subroutine luc_dev_download_g0 (is, n, g0) bind(c, name = 'luc_dev_download_g0')
+    import c_int, c_float
+    integer(c_int), value :: is, n
+    real(c_float) :: g0(*)
   end subroutine
 
   function luc_dev_dep_fault () bind(c, name = 'luc_dev_dep_fault') result (ierr)
@@ -639,15 +705,32 @@ subroutine fel_device_element_begin (dev, beam, ff)
 type (fel_device_struct) dev
 type (fel_beam_struct) beam
 type (fel_field_struct) ff(:)
-integer is
+integer is, n, ip
+real(rp) p0_mc, gam, p_mc, beta
 
 !
 
 call fel_device_ensure_capacity (dev, beam)
+p0_mc = fel_p0_mc(beam)
 do is = 1, size(beam%slice)
+  n = beam%slice(is)%n
   dev%z_ref(is) = 0
-  if (beam%slice(is)%n > 0) dev%z_ref(is) = &
-                            sum(beam%slice(is)%z(1:beam%slice(is)%n)) / beam%slice(is)%n
+
+  ! The unaveraged chart's reference is the slice's mean lag tau = -z/beta, since that
+  ! is the quantity its accumulator carries. Both references are the slice's own mean,
+  ! so both conversions stay near zero where FP64 has the most to give.
+
+  if (n > 0 .and. dev%unavg) then
+    do ip = 1, n
+      p_mc = p0_mc * (1 + beam%slice(is)%pz(ip))
+      gam = sqrt(p_mc**2 + 1)
+      beta = p_mc / gam
+      dev%z_ref(is) = dev%z_ref(is) - beam%slice(is)%z(ip) / beta
+    enddo
+    dev%z_ref(is) = dev%z_ref(is) / n
+  elseif (n > 0) then
+    dev%z_ref(is) = sum(beam%slice(is)%z(1:n)) / n
+  endif
   call fel_device_stage_slice (dev, beam, is, dev%z_ref(is))
   call luc_dev_upload_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
                              dev%sg, dev%su, dev%sw)
@@ -787,15 +870,27 @@ n = beam%slice(is)%n
 
 do ip = 1, n
   dev%sx(ip) = real(beam%slice(is)%x(ip), c_float)
-  dev%spx(ip) = real(beam%slice(is)%px(ip), c_float)
   dev%sy(ip) = real(beam%slice(is)%y(ip), c_float)
-  dev%spy(ip) = real(beam%slice(is)%py(ip), c_float)
   dev%sw(ip) = real(beam%slice(is)%weight(ip), c_float)
   p_mc = p0_mc * (1 + beam%slice(is)%pz(ip))
   gam = sqrt(p_mc**2 + 1)
   beta = p_mc / gam
   dev%sg(ip) = real(gam - gamma0, c_float)
-  delta = ks * beam%slice(is)%z(ip) / beta - ks * z_ref
+
+  ! The unaveraged chart: the kinetic transverse momenta where the averaged chart
+  ! carries Bmad's, and the lag off the slice's own mean where it carries z. The
+  ! entry ramp makes the vector potential zero at a segment's ends, so the stored
+  ! px is the kinetic momentum there and this conversion is fel_unavg_step's own.
+
+  if (dev%unavg) then
+    dev%spx(ip) = real(beam%slice(is)%px(ip) * p0_mc, c_float)
+    dev%spy(ip) = real(beam%slice(is)%py(ip) * p0_mc, c_float)
+    delta = ks * (-beam%slice(is)%z(ip) / beta) - ks * z_ref
+  else
+    dev%spx(ip) = real(beam%slice(is)%px(ip), c_float)
+    dev%spy(ip) = real(beam%slice(is)%py(ip), c_float)
+    delta = ks * beam%slice(is)%z(ip) / beta - ks * z_ref
+  endif
   dev%su(ip) = nint(delta * fel_dev_ticks_per_rad$, c_int64_t)
 enddo
 do ip = n+1, dev%npart
@@ -947,16 +1042,27 @@ do is = 1, size(beam%slice)
     call luc_dev_download_slice (is-1, dev%npart, bx, bpx, by, bpy, bg, bu)
     do ip = 1, n
       beam%slice(is)%x(ip) = real(bx(ip), rp)
-      beam%slice(is)%px(ip) = real(bpx(ip), rp)
       beam%slice(is)%y(ip) = real(by(ip), rp)
-      beam%slice(is)%py(ip) = real(bpy(ip), rp)
       gam = gamma0 + real(bg(ip), rp)
       gam_low(is) = min(gam_low(is), gam)
       p_mc = sqrt(gam**2 - 1)
       beam%slice(is)%pz(ip) = (p_mc - p0_mc) / p0_mc
       beta = p_mc / gam
       delta = real(bu(ip), rp) * fel_dev_rad_per_tick$
-      beam%slice(is)%z(ip) = beta * (dev%z_ref(is) + delta / ks)
+
+      ! fel_unavg_step's own exit chart where the segment is unaveraged: px carries
+      ! the quiver (the beam's flag says so) and z is -beta tau with the
+      ! full-momentum beta.
+
+      if (dev%unavg) then
+        beam%slice(is)%px(ip) = real(bpx(ip), rp) / p0_mc
+        beam%slice(is)%py(ip) = real(bpy(ip), rp) / p0_mc
+        beam%slice(is)%z(ip) = -beta * (dev%z_ref(is) + delta / ks)
+      else
+        beam%slice(is)%px(ip) = real(bpx(ip), rp)
+        beam%slice(is)%py(ip) = real(bpy(ip), rp)
+        beam%slice(is)%z(ip) = beta * (dev%z_ref(is) + delta / ks)
+      endif
     enddo
   end block
 enddo
@@ -1522,5 +1628,499 @@ endif
 call luc_dev_close ()
 
 end subroutine fel_device_close_run
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_dep_scale (dev, s_bound, origin, dep_scale, err_flag)
+!
+! Routine to choose the deposit's fixed-point scale from a bound on what one cell can
+! hold, and to refuse a bound the kernel's arithmetic cannot carry. Both modes deposit
+! through the same accumulator and differ only in how the bound is built, so the choice,
+! the two refusals and the origin line live here once.
+!
+! The scale is the largest power of two that keeps the bounded per-cell sum inside the
+! accumulator, so the scale and its reciprocal are both exact and the conversion back to
+! a float source costs one rounding.
+!
+! The headroom is the margin the fixed point wins by. A quantum below the FP32 spacing of
+! the bound resolves the accumulator everywhere more finely than the float accumulation it
+! replaces, and the bits between the two are what the run reports. Too few of them and the
+! run is refused here, before the first step converts anything. The scale is chosen against
+! the same bound the headroom is measured against, so their product lands between 2^61 and
+! 2^62 whatever the deck and the headroom is 37 bits. No deck therefore reaches that
+! refusal, and raising fel_dev_dep_bits_min$ past 37 is what fires it and how it was
+! verified.
+!
+! The scale and its reciprocal reach the kernel as single precision, so both have to be
+! finite and normal there. The headroom cannot catch that, for the same reason it always
+! reads 37 bits: a bound below about 5e-20 V/m sends the scale past the largest float and
+! a bound above about 4e56 sends its reciprocal there, and either would deposit through an
+! infinity while the headroom still reported healthy.
+!
+! Input:
+!   s_bound  -- real(rp): The bound on one cell's accumulated source [V/m].
+!   origin   -- character(*): What the bound is built from, for the origin line.
+!
+! Output:
+!   dep_scale -- real(rp): Ticks per V/m, a power of two.
+!   err_flag  -- logical: Set True if the bound cannot be carried. False otherwise.
+!-
+
+subroutine fel_device_dep_scale (dev, s_bound, origin, dep_scale, err_flag)
+
+type (fel_device_struct) dev
+real(rp) s_bound, dep_scale
+character(*) origin
+logical err_flag
+
+real(rp) dscale_sp, dsinv_sp
+integer dep_bits
+character(*), parameter :: r_name = 'fel_device_dep_scale'
+
+!
+
+err_flag = .true.
+dep_scale = 1
+
+if (s_bound <= 0) then
+  call out_io (s_error$, r_name, 'THE DEVICE DEPOSIT SCALE HAS NO POSITIVE BOUND.', 'PLEASE REPORT THIS!')
+  return
+endif
+
+dep_scale = 2.0_rp ** (floor(log(fel_dev_dep_room$ / s_bound) / log(2.0_rp)) + dev%dep_mutate)
+
+! dep_mutate is zero in every run but the one check that measures what the quantum costs.
+! It is a power of two, so it moves the quantum and leaves everything else alone, which is
+! what lets the quantization be measured against the phase and arithmetic error rather
+! than bounded away from them. A shift down coarsens the quantum and eats the headroom
+! below, so a large enough shift is refused there like any other unusable scale.
+
+! The FP32 spacing at the bound lies between 2^-24 and 2^-23 of it. The narrower is
+! taken, so the reported headroom is the one the bound's own binade cannot undercut.
+
+dep_bits = floor(log(0.5_rp * epsilon(1.0_sp) * s_bound * dep_scale) / log(2.0_rp))
+
+dscale_sp = real(real(dep_scale, sp), rp)
+dsinv_sp = real(1.0_sp / real(dep_scale, sp), rp)
+if (.not. (dscale_sp > tiny(1.0_sp) .and. dscale_sp < huge(1.0_sp) .and. &
+           dsinv_sp > tiny(1.0_sp) .and. dsinv_sp < huge(1.0_sp))) then
+  call out_io (s_error$, r_name, &
+       'THE DEVICE DEPOSIT SCALE IS NOT REPRESENTABLE IN THE KERNEL''S SINGLE PRECISION.', &
+       'THE BOUND ON ONE CELL IS \es10.2\ V/M, WHICH ASKS FOR A SCALE OF 2^\i0\ .', &
+       r_array = [s_bound], i_array = [nint(log(dep_scale) / log(2.0_rp))])
+  return
+endif
+
+if (dep_bits < fel_dev_dep_bits_min$) then
+  call out_io (s_error$, r_name, &
+       'THE DEVICE DEPOSIT CANNOT CARRY ITS BOUND AND ITS PRECISION AT ONCE.', &
+       'THE BOUND ON ONE CELL IS \es10.2\ V/M AND THE QUANTUM SITS \i0\ BITS BELOW', &
+       'THE FP32 SPACING THERE, WHERE \i0\ ARE NEEDED.', &
+       r_array = [s_bound], i_array = [dep_bits, fel_dev_dep_bits_min$])
+  return
+endif
+
+if (.not. dev%dep_told) then
+  dev%dep_told = .true.
+  call out_io (s_info$, r_name, 'Device: the deposit accumulates in fixed point at 2^\i0\ ticks ' // &
+               'per V/m,', '  bounded by \es9.2\ V/m in one cell (' // trim(origin) // '),', &
+               '  with the quantum \i0\ bits below the FP32 spacing of that bound.', &
+               r_array = [s_bound], &
+               i_array = [nint(log(dep_scale) / log(2.0_rp)), dep_bits])
+endif
+
+err_flag = .false.
+
+end subroutine fel_device_dep_scale
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_unavg_begin (dev, nsub, err_flag)
+!
+! Routine to size the unaveraged mode's own device buffers for one segment and clear
+! the ledger's banked spontaneous energy. Called at an unaveraged element's entry,
+! after fel_device_element_begin has made the beam and the field resident in that
+! mode's chart. The per-substep stage factors and carrier rotators are sized here
+! because nsub is the segment's (fel_unavg_setup), and the banked energy is cleared
+! because the caller reads it as this element's own.
+!
+! Input:
+!   nsub     -- integer: Substeps in one record step of this segment.
+!
+! Output:
+!   dev      -- fel_device_struct: Ready for fel_device_unavg_step.
+!   err_flag -- logical: Set True if the backend refuses. False otherwise.
+!-
+
+subroutine fel_device_unavg_begin (dev, nsub, err_flag)
+
+type (fel_device_struct) dev
+integer nsub
+logical err_flag
+
+character(kind=c_char) c_reason(256)
+character(256) reason
+character(*), parameter :: r_name = 'fel_device_unavg_begin'
+
+!
+
+err_flag = .false.
+if (.not. dev%on) return
+
+if (luc_dev_unavg_begin(int(nsub, c_int), c_reason, 256) /= 0) then
+  call from_c (c_reason, reason)
+  call out_io (s_error$, r_name, 'DEVICE REFUSED THE UNAVERAGED SEGMENT: ' // trim(reason) // '.')
+  err_flag = .true.
+  return
+endif
+dev%nsub = nsub
+
+end subroutine fel_device_unavg_begin
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_unavg_step (dev, par, fq, cbase, err_flag)
+!
+! Routine to encode one unaveraged record step: nsub substeps of clear, half push,
+! radiation kick with its deposit, half push, the ledger's spontaneous reduction and
+! the four-pass solve, all in one command buffer. Nothing is waited on here.
+!
+! Input:
+!   par        -- fel_device_unavg_par_struct: The step's constants, from the caller.
+!   fq(:,:,:)  -- real(rp): The stage factors (4, 4 stages, 2 halves) a substep, as
+!                   unavg_field_quartet built them. Rounded to FP32 here.
+!   cbase(:,:) -- complex(rp): e^{i(psi_mid - ks tau_ref)} per substep per slice, FP64
+!                   on the caller's side and rounded once here. psi_mid reaches some
+!                   1700 radians over a segment, which no float carries, so the caller
+!                   reduces it modulo 2 pi before it becomes a rotator.
+!
+! Output:
+!   dev        -- fel_device_struct: One more record step encoded.
+!   err_flag   -- logical: Set True if the backend refuses. False otherwise.
+!-
+
+subroutine fel_device_unavg_step (dev, par, fq, cbase, err_flag)
+
+type (fel_device_struct) dev
+type (fel_device_unavg_par_struct) par
+real(rp) fq(:,:,:,:)
+complex(rp) cbase(:,:)
+logical err_flag
+
+real(c_float), allocatable :: sfq(:)
+complex(c_float_complex), allocatable :: scb(:)
+integer j, k, m, is, n
+character(kind=c_char) c_reason(256)
+character(256) reason
+character(*), parameter :: r_name = 'fel_device_unavg_step'
+
+!
+
+err_flag = .false.
+
+allocate (sfq(4 * 4 * 2 * par%nsub))
+n = 0
+do j = 1, par%nsub
+  do m = 1, 2
+    do k = 1, 4
+      sfq(n+1:n+4) = real(fq(1:4, k, m, j), c_float)
+      n = n + 4
+    enddo
+  enddo
+enddo
+
+allocate (scb(par%nsub * dev%nslice))
+n = 0
+do j = 1, par%nsub
+  do is = 1, dev%nslice
+    n = n + 1
+    scb(n) = cmplx(cbase(is, j), kind = c_float_complex)
+  enddo
+enddo
+
+if (luc_dev_unavg_step(par, sfq, scb, c_reason, 256) /= 0) then
+  call from_c (c_reason, reason)
+  call out_io (s_error$, r_name, 'DEVICE UNAVERAGED STEP REFUSED: ' // trim(reason) // '.')
+  err_flag = .true.
+  return
+endif
+dev%nstep = dev%nstep + 1
+
+end subroutine fel_device_unavg_step
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_unavg_ledger (dev, beam, dE_step, u_spont)
+!
+! Routine to read the unaveraged ledger's two device-side terms.
+!
+! dE_step is the beam energy the kicks moved over the record step just encoded.
+! gamma changes only in the kick, exactly (B does no work), so the step's change is
+! sum w (gamma_end - gamma_start) m_e and the two energy offsets are what the device
+! holds. Summed in FP64 slice by slice and particle by particle, which is the CPU
+! step's own order, so no thread and no device schedule reaches the answer.
+!
+! u_spont is the energy this element's deposits banked as spontaneous emission,
+! 4 sum|src|^2 over the source grid and over every substep, which is the one
+! field-energy term the kick/deposit duality does not charge to the beam.
+!
+! Output:
+!   dE_step -- real(rp): The record step's kick-side beam energy change [J].
+!   u_spont -- real(rp): The element's banked spontaneous energy so far [J].
+!-
+
+subroutine fel_device_unavg_ledger (dev, beam, dE_step, u_spont)
+
+type (fel_device_struct) dev
+type (fel_beam_struct) beam
+real(rp) dE_step, u_spont
+
+real(c_float), allocatable :: g0(:), g1(:)
+integer is, ip, n
+
+!
+
+dE_step = 0
+u_spont = 0
+if (.not. dev%resident) return
+
+allocate (g0(dev%npart), g1(dev%npart))
+do is = 1, size(beam%slice)
+  n = beam%slice(is)%n
+  call luc_dev_download_g0 (is-1, dev%npart, g0)
+  call luc_dev_download_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, g1, dev%su)
+  do ip = 1, n
+    dE_step = dE_step + beam%slice(is)%weight(ip) * (real(g1(ip), rp) - real(g0(ip), rp)) * m_electron
+  enddo
+enddo
+
+u_spont = real(luc_dev_unavg_spont(), rp)
+
+end subroutine fel_device_unavg_ledger
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_unavg_twin_begin (dev, beam, ff, s0, nsub, err_flag)
+!
+! Routine to put the device in the twin's role for one unaveraged record step, part
+! one: the shared pre-step state uploads in the unaveraged chart, the field images
+! round from the pre-step FP64 records, and the work buffers are sized on the first
+! step. The encoded step then runs while the FP64 path advances the same record step.
+!
+! Lockstep only, so the state is rebuilt from FP64 every record step and the lag
+! reference moves to the slice's own mean. Residency is never claimed: a readback of
+! twin state into the run's arrays would be the instrument steering what it observes.
+!
+! Input:
+!   s0(:,:,:) -- real(rp): Pre-step FP64 state, (6, npart, nslice) as x, px, y, py,
+!                  z, pz in the beam's stored chart. px carries the quiver mid-segment
+!                  and the conversion here is fel_unavg_step's own.
+!   nsub      -- integer: Substeps in one record step of this segment.
+!   mutate    -- logical: global%fp32_mutate, the check's own failure hook.
+!-
+
+subroutine fel_device_unavg_twin_begin (dev, beam, ff, s0, nsub, mutate, err_flag)
+
+type (fel_device_struct) dev
+type (fel_beam_struct) beam
+type (fel_field_struct) ff(:)
+real(rp) s0(:,:,:)
+integer nsub
+logical mutate, err_flag
+
+real(rp) p0_mc, gamma0, ks, p_mc, gam, beta, tau_r, delta
+integer is, ip, n
+
+!
+
+err_flag = .false.
+p0_mc = fel_p0_mc(beam)
+gamma0 = fel_gamma0(beam)
+ks = twopi / beam%wavelength
+
+call fel_device_ensure_capacity (dev, beam)
+if (dev%nsub /= nsub) then
+  call fel_device_unavg_begin (dev, nsub, err_flag)
+  if (err_flag) return
+endif
+
+do is = 1, size(beam%slice)
+  n = beam%slice(is)%n
+  tau_r = 0
+  do ip = 1, n
+    p_mc = p0_mc * (1 + s0(6, ip, is))
+    gam = sqrt(p_mc**2 + 1)
+    tau_r = tau_r - s0(5, ip, is) / (p_mc / gam)
+  enddo
+  if (n > 0) tau_r = tau_r / n
+  dev%z_ref(is) = tau_r
+
+  do ip = 1, n
+    dev%sx(ip) = real(s0(1, ip, is), c_float)
+    dev%sy(ip) = real(s0(3, ip, is), c_float)
+    dev%spx(ip) = real(s0(2, ip, is) * p0_mc, c_float)
+    dev%spy(ip) = real(s0(4, ip, is) * p0_mc, c_float)
+    dev%sw(ip) = real(beam%slice(is)%weight(ip), c_float)
+    p_mc = p0_mc * (1 + s0(6, ip, is))
+    gam = sqrt(p_mc**2 + 1)
+    beta = p_mc / gam
+    dev%sg(ip) = real(gam - gamma0, c_float)
+    delta = ks * (-s0(5, ip, is) / beta) - ks * tau_r
+    dev%su(ip) = nint(delta * fel_dev_ticks_per_rad$, c_int64_t)
+
+    ! The check's mutation reaches the shared state here, the coarsening the averaged
+    ! twin applies to its own accumulator: 65536 ticks is 9.6e-5 rad, which the recorded
+    ! rows must feel. Without it the run's own arithmetic would be the only thing under
+    ! test and a level nothing can move proves nothing.
+
+    if (mutate) dev%su(ip) = 65536_c_int64_t * (dev%su(ip) / 65536_c_int64_t)
+  enddo
+  do ip = n+1, dev%npart
+    dev%sx(ip) = 0;  dev%spx(ip) = 0;  dev%sy(ip) = 0;  dev%spy(ip) = 0
+    dev%sg(ip) = 0;  dev%sw(ip) = 0;  dev%su(ip) = 0
+  enddo
+  dev%su0(:, is) = dev%su
+  call luc_dev_upload_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
+                             dev%sg, dev%su, dev%sw)
+enddo
+
+call fel_device_upload_fields (dev, ff)
+
+end subroutine fel_device_unavg_twin_begin
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_device_unavg_twin_rows (dev, fp32, beam, ff, ks, de_cpu, deturn)
+!
+! Routine to put the device in the twin's role, part two: read the device state back
+! after the record step and fill fel_fp32_mod's nine rows against the FP64 unaveraged
+! path. The columns mean what that mode's own twin makes them mean: rows 1 to 4 are
+! the quiver chart, so they are a worst per-particle difference and see the common
+! offset an rms would miss (FINDINGS 7.68), row 8 is the ledger's kick-side term and
+! row 9 the field.
+!
+! The guard is the median per-record-step phase increment in ticks of the fixed-point
+! quantum. There is no common advance to subtract here: the accumulator carries the
+! lag alone, where the averaged chart carries the whole theta and the step's phi0
+! advance comes out of it.
+!
+! Input:
+!   de_cpu(:) -- real(rp): The FP64 step's kick-side energy change per slice [J].
+!   deturn(:) -- real(rp): The FP64 step's energy turnover per slice [J], the sum of
+!                  the absolute exchanges, which is what row 8 is scaled by. Over a
+!                  record step the gains and losses very nearly cancel, so the net is
+!                  a small difference of large exchanges and a ratio against it says
+!                  nothing about precision.
+!-
+
+subroutine fel_device_unavg_twin_rows (dev, fp32, beam, ff, ks, de_cpu, deturn)
+
+type (fel_device_struct) dev
+type (fel_fp32_struct) fp32
+type (fel_beam_struct), target :: beam
+type (fel_field_struct) ff(:)
+real(rp) ks, de_cpu(:), deturn(:)
+
+type (fel_slice_struct), pointer :: sl
+complex(c_float_complex), allocatable :: edev(:,:)
+real(c_float), allocatable :: g0(:)
+real(rp), allocatable :: incr(:)
+real(rp) p0_mc, gamma0, gam, p_mc, beta, pzd, delta, tau64, th32, th64
+real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$), wsum, tick_med, de_dev
+real(rp) p32r, p32i, p64r, p64i, w_f, enorm
+integer is, ip, n, ng, ifld, ix, iy
+
+!
+
+p0_mc = fel_p0_mc(beam)
+gamma0 = fel_gamma0(beam)
+ng = size(ff(1)%wf%Ex, 1)
+allocate (edev(ng, ng), incr(dev%npart), g0(dev%npart))
+
+do is = 1, size(beam%slice)
+  sl => beam%slice(is)
+  n = sl%n
+  ifld = 1 + mod(is - 1 + ff(1)%slip%first, size(ff(1)%wf%Ex, 3))
+
+  call luc_dev_download_g0 (is-1, dev%npart, g0)
+  call luc_dev_download_slice (is-1, dev%npart, dev%sx, dev%spx, dev%sy, dev%spy, &
+                               dev%sg, dev%su)
+
+  dstat = 0
+  wsum = 0
+  de_dev = 0
+  p32r = 0;  p32i = 0;  p64r = 0;  p64i = 0
+  do ip = 1, n
+    gam = gamma0 + real(dev%sg(ip), rp)
+    p_mc = sqrt(gam**2 - 1)
+    pzd = (p_mc - p0_mc) / p0_mc
+    delta = real(dev%su(ip), rp) * fel_dev_rad_per_tick$
+    incr(ip) = abs(real(dev%su(ip) - dev%su0(ip, is), rp))
+    de_dev = de_dev + sl%weight(ip) * (real(dev%sg(ip), rp) - real(g0(ip), rp)) * m_electron
+
+    p_mc = p0_mc * (1 + sl%pz(ip))
+    beta = p_mc / sqrt(p_mc**2 + 1)
+    tau64 = -sl%z(ip) / beta
+    th32 = -(ks * dev%z_ref(is) + delta)
+    th64 = -ks * tau64
+
+    dstat(1) = max(dstat(1), abs(real(dev%sx(ip), rp) - sl%x(ip)))
+    dstat(2) = max(dstat(2), abs(real(dev%spx(ip), rp) / p0_mc - sl%px(ip)))
+    dstat(3) = max(dstat(3), abs(real(dev%sy(ip), rp) - sl%y(ip)))
+    dstat(4) = max(dstat(4), abs(real(dev%spy(ip), rp) / p0_mc - sl%py(ip)))
+    dstat(5) = max(dstat(5), abs(pzd - sl%pz(ip)))
+    dstat(6) = max(dstat(6), abs(modulo(th32 - th64 + pi, twopi) - pi))
+
+    wsum = wsum + sl%weight(ip)
+    p32r = p32r + sl%weight(ip) * cos(th32)
+    p32i = p32i - sl%weight(ip) * sin(th32)
+    p64r = p64r + sl%weight(ip) * cos(th64)
+    p64i = p64i - sl%weight(ip) * sin(th64)
+  enddo
+
+  sc(1) = maxval(abs(sl%x(1:n))) + 1e-30_rp
+  sc(2) = maxval(abs(sl%px(1:n))) + 1e-30_rp
+  sc(3) = maxval(abs(sl%y(1:n))) + 1e-30_rp
+  sc(4) = maxval(abs(sl%py(1:n))) + 1e-30_rp
+  sc(5) = maxval(abs(sl%pz(1:n))) + 1e-30_rp
+  sc(6) = 1
+  sc(7) = wsum + 1e-30_rp
+
+  fp32%div_slice(1:6, is) = dstat(1:6) / sc(1:6)
+  fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
+  fp32%div_slice(8, is) = abs(de_dev - de_cpu(is)) / (deturn(is) + 1e-30_rp)
+  fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
+  fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
+
+  call luc_dev_download_field_slice (0, 0, ifld-1, edev)
+  w_f = 0
+  enorm = 0
+  do iy = 1, ng
+    do ix = 1, ng
+      w_f = w_f + abs(cmplx(edev(ix,iy), kind=rp) - ff(1)%wf%Ex(ix,iy,ifld))**2
+      enorm = enorm + real(ff(1)%wf%Ex(ix,iy,ifld), rp)**2 + aimag(ff(1)%wf%Ex(ix,iy,ifld))**2
+    enddo
+  enddo
+  fp32%div_slice(9, is) = sqrt(w_f) / (sqrt(enorm) + 1e-30_rp)
+  fp32%pow64(is) = enorm
+  fp32%pow32(is) = sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
+
+  call fel_fp32_median (incr, n, tick_med)
+  fp32%ulp_slice(is) = tick_med
+enddo
+
+end subroutine fel_device_unavg_twin_rows
 
 end module fel_device_mod

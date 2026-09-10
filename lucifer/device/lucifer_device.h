@@ -89,6 +89,33 @@ typedef struct {
   int32_t pad;
 } luc_dev_step_par;
 
+/* One unaveraged record step's constants, mirrored field for field by
+ * fel_device_unavg_par_struct in fel_device_mod.f90 (all doubles, then the 32-bit
+ * ints). Editing one mirror alone skews the layout silently. */
+typedef struct {
+  double dsub;           /* substep length [m], the Strang step */
+  double ks, ku, aw;     /* radiation and undulator wavenumbers [1/m], rms aw */
+  double gam0, beta0;    /* reference gamma and its beta */
+  double g0inv2;         /* 1/gamma0^2, the slippage identity's second half */
+  double cos_t, sin_t;   /* wiggle-plane tilt */
+  double gridmax, dgrid; /* grid half width and spacing [m] */
+  double scl_u;          /* the unaveraged source scale, fel_unavg_step's scl_u */
+  double m_electron;     /* electron rest energy [eV], the kick's divisor */
+  double dep_scale;      /* the deposit's fixed-point scale [ticks per V/m] */
+  /* The deposit's bound rests on one ratio: a contribution carries |j|/u_s, and this
+   * is the largest value of it the bound assumes. The kernel drops a particle above
+   * it without converting or accumulating it and records the same fault the averaged
+   * deposit's gamma floor records, so the caller refuses the run. The quiver sets the
+   * scale of the ratio and the bound is generous against it. */
+  double dep_u_bound;
+  double spont_fac;      /* 4 dgrid^2 / (2 Z0) times the slice time, J per |src|^2 */
+  int32_t nsub;          /* substeps in this record step */
+  int32_t first;         /* field ring offset, constant across the record step */
+  int32_t helical;       /* the undulator's helicity */
+  int32_t mutate;        /* falsifiability hook: coarsen the lag's residual angle */
+  int32_t pad;
+} luc_dev_unavg_par;
+
 /* Backend presence and the device it would run on. Returns 1 when a backend is
  * compiled in and a usable device exists, else 0 with 'reason' naming what is
  * missing. Safe to call on any machine; allocates nothing. */
@@ -170,6 +197,50 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
  * transfer above syncs itself; this exists for the caller's own sequencing. */
 void luc_dev_sync (void);
 
+/* ---------------- the unaveraged mode ----------------
+ *
+ * The quiver-resolving advance of fel_unaveraged_mod, one record step at a time.
+ * The field set is one member of one plane here and the caller refuses anything
+ * else, so these calls carry no member or plane index.
+ *
+ * The chart across this seam is the same seven buffers luc_dev_upload_slice
+ * fills, read differently, and the caller owns the reading: px and py carry the
+ * kinetic transverse momenta ux and uy (in units of m_e c) where the averaged
+ * chart carries Bmad's px and py, and the phase accumulator carries
+ * ks (tau - tau_ref) in ticks where the averaged chart carries ks z/beta - ks
+ * z_ref. goff, the weights and the transverse positions are the same quantities
+ * in both. The tick chart is what lets the lag be carried exactly: the push
+ * integrates its increment from zero over a substep and adds it, so no
+ * arithmetic ever differences the increment against a lag that grew. */
+
+/* Size the unaveraged work buffers for nsub substeps a record step, which is
+ * fel_unavg_setup's own count, and clear the ledger's accumulators. Called at each
+ * unaveraged element's entry, after luc_dev_init and the beam upload. Refuses
+ * (nonzero, reason filled) a nsub the buffers cannot hold. */
+int luc_dev_unavg_begin (int nsub, char *reason, int reason_len);
+
+/* Encode one record step: nsub substeps of clear, half push, kick and deposit,
+ * half push, spontaneous reduction and the four-pass solve. fq holds the
+ * per-substep stage factors, 8 float4 a substep as (g, gp, cos(ku s), sin(ku s))
+ * at the four RK stage positions of each half push, and cbase the per-substep
+ * per-slice carrier rotator e^{i psi_mid}, nsub by nslice. Both are computed in
+ * FP64 by the caller and rounded once here. One command buffer holds the whole
+ * record step and nothing is waited on. */
+int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
+                        const float *cbase, char *reason, int reason_len);
+
+/* The element's banked spontaneous energy, sum over slices and substeps of
+ * 4 sum|src|^2 scaled by the caller's factor, in FP64 over the per-threadgroup
+ * partials in index order. Drains first. */
+double luc_dev_unavg_spont (void);
+
+/* One slice's energy offsets as they stood at the start of the record step now
+ * encoded, npart floats. gamma changes only in the kick, so the caller forms the
+ * step's beam-energy change from these and the offsets luc_dev_download_slice
+ * returns, in FP64 and in its own order. Drains first, and obeys the same
+ * post-drain concurrency contract as the other transfers. */
+void luc_dev_download_g0 (int is, int n, float *g0);
+
 /* The exact-wrap assertion, run on the device itself: a probe set of phase
  * accumulators is shifted by whole buckets and back through device arithmetic.
  * Returns 0 only if the round trip is bit-exact and the extracted phase is
@@ -209,7 +280,10 @@ int64_t luc_dev_bytes (void);
 #define LUC_DEV_PASS_DEP    3   /* source deposit */
 #define LUC_DEV_PASS_FILTER 4   /* the source filter's four passes */
 #define LUC_DEV_PASS_SOLVE  5   /* the field solve's four passes */
-#define LUC_DEV_PASS_N      6
+#define LUC_DEV_PASS_UPUSH  6   /* unaveraged: the half magnetic push, twice a substep */
+#define LUC_DEV_PASS_UKICK  7   /* unaveraged: the radiation kick and its deposit */
+#define LUC_DEV_PASS_USPONT 8   /* unaveraged: the ledger's spontaneous reduction */
+#define LUC_DEV_PASS_N      9
 
 /* Turn per-pass timing on or off. Legal only with nothing encoded, which the caller
  * arranges by calling it before the first step. Returns 0, or nonzero with 'reason'

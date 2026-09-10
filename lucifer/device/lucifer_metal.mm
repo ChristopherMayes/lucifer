@@ -34,6 +34,17 @@
 // plane with its member's propagator. With one member and one plane every kernel is
 // the single-field arithmetic it was before the set, term for term.
 //
+// The unaveraged mode. A record step there is nsub Strang substeps of half
+// magnetic push, radiation kick with its deposit, half push, and the slice's own
+// diffract and source add, so three kernels are that mode's own (unavg_push,
+// unavg_kick and unavg_spont) and the rest of a substep is the kernels above:
+// the four-pass solve, the accumulator's clear and the fixed-point scatter. The
+// state rides the same seven particle buffers in that mode's chart, which the
+// caller owns and lucifer_device.h states. What sets that mode's recorded levels
+// is the transform pair rather than its own kernels: an FP32 pair loses about
+// 1.3e-7 of the field's energy every time it runs, and this mode runs it nsub
+// times a record step where the averaged mode runs it once (FINDINGS 7.72).
+//
 // The shader structs below are mirrored in host C++ immediately after the MSL
 // string, and luc_dev_step_par is mirrored again in fel_device_mod.f90. Editing
 // any one alone skews a buffer layout silently; keep all mirrors together.
@@ -58,6 +69,9 @@ using namespace metal;
 
 constant uint N = NG;
 
+// The spontaneous reduction's shape: threads a group, and groups a slice.
+#define SPONT_T 256u
+
 // Ticks of phase: 2^32 per radiation period. The extraction takes the low 32
 // bits as a SIGNED fraction, so the working angle sits in [-pi, pi) where FP32
 // spacing is finest, and is exactly invariant under whole-period shifts.
@@ -69,6 +83,19 @@ inline float phase_of (long u){
 }
 
 inline float2 cmul (float2 a, float2 b){ return float2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
+
+// The check's own failure hook: quantize to 256 ulps of the value, which is
+// fel_fp32_mod's anint(x / (256 spacing(x))) * 256 spacing(x). The step has to come
+// from the exponent alone. Taking it as a fixed fraction of |x| makes x/step the same
+// integer for every x and the hook returns its argument unchanged, which is what this
+// once did (FINDINGS 7.71).
+inline float coarsen256 (float x){
+    if (!(fabs(x) > 0.0f)) return x;
+    int ex;
+    frexp(x, ex);                          // |x| in [2^(ex-1), 2^ex)
+    float sp = ldexp(1.0f, ex - 16);       // 256 ulps of x
+    return rint(x / sp) * sp;
+}
 
 // ---------------- the source accumulator ----------------
 // The deposit accumulates in fixed point so that the answer does not depend on the
@@ -380,10 +407,7 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
     float d = phase_of(U[gid]);
     // The check's mutation reaches the source row here: coarsen the residual
     // angle by eight mantissa bits, fel_fp32_mod's own hook transcribed.
-    if (P.mutate != 0u) {
-        float sp = fabs(d) * 3.05175781e-5f;    // 256 ulps of a [-pi,pi) angle
-        if (sp > 0.0f) d = rint(d / sp) * sp;
-    }
+    if (P.mutate != 0u) d = coarsen256(d);
 
     uint fs = (is + P.first) % P.nslice;
     uint nn = P.ngrid * P.ngrid;
@@ -416,6 +440,277 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
         acc_fixed(S, dcell,      w * cp.x, P.dscale);
         acc_fixed(S, dcell + 1u, w * cp.y, P.dscale);
     }
+}
+
+
+// ---------------- the unaveraged mode ----------------
+// The quiver-resolving advance (fel_unaveraged_mod's step header): nsub Strang
+// substeps of half magnetic push, radiation kick and source deposit at the
+// midpoint, half push, then the slice's own diffract and source add. The four
+// passes of that last part are the transform kernels below, unchanged, so what
+// is written here is the push, the kick with its deposit, and the ledger's
+// spontaneous term. The FP64 routines are fel_unavg_bfield, unavg_ode,
+// unavg_push_all and the kick block of fel_unavg_step, and the single-precision
+// forms are fel_fp32_mod's fel_fp32_unavg_bfield, _ode and _push, whose
+// divergence from FP64 doc/validation.md records.
+//
+// Three quantities do not depend on the particle and are computed in FP64 on the
+// host, once a substep rather than once a particle, which is the hoist FINDINGS
+// 7.37 records:
+//
+//   FQ    the envelope g, its slope gp, and cos(ku s), sin(ku s) at the four RK
+//         stage positions of each half push. Eight float4 a substep.
+//   CB    e^{i psi_mid} of each substep, per slice, the optical carrier's base.
+//         psi_mid reaches some 1700 radians over a segment, which no float can
+//         carry, so the host reduces it modulo 2 pi and sends the rotator.
+//   the propagator exp(K2 dsub), uploaded through luc_dev_set_kernel as member 0.
+//
+// The lag. tau is the one state variable of the push that no other line reads:
+// dtau/ds depends on gamma, ux and uy alone. The push therefore integrates it
+// from zero over the substep and adds the increment to the 64-bit tick
+// accumulator, so the lag is carried exactly and the arithmetic never differences
+// the increment against a lag that grew. That is what the FP32 twin could not do,
+// and its guard on the residual is the measurement of what it cost there
+// (doc/validation.md): the residual's own quantum overtakes the per-substep change
+// on a long window, where a tick is 2 pi / 2^32 of a radiation period whatever the
+// window. The kick then reads the lag as phase_of, an angle in [-pi, pi) where
+// FP32 spacing is finest, exactly as the averaged push reads its own.
+
+struct UnavgPar {
+    float h, dsub, ks, ku, aw, cos_t, sin_t;
+    float gam0, beta0, g0inv2, me;
+    float gridmax, dgrid, scl_u, dscale, u_bound;
+    uint  ngrid, npart, nslice, first, helical, mutate;
+};
+
+struct U5 { float x, y, ux, uy, tau; };
+
+inline U5 u5axpy (U5 a, float s, U5 b){
+    U5 r;
+    r.x = a.x + s*b.x;  r.y = a.y + s*b.y;  r.ux = a.ux + s*b.ux;
+    r.uy = a.uy + s*b.uy;  r.tau = a.tau + s*b.tau;
+    return r;
+}
+
+// fel_unavg_bfield, term for term, with the four s-dependent factors arriving in fq.
+inline void ubfield (constant UnavgPar& P, float x, float y, float4 fq,
+                     thread float& bx, thread float& by, thread float& bz){
+    float xl = x, yl = y;
+    if (P.sin_t != 0.0f) {
+        xl =  P.cos_t * x + P.sin_t * y;
+        yl = -P.sin_t * x + P.cos_t * y;
+    }
+    float g = fq.x, gp = fq.y, c_u = fq.z, s_u = fq.w;
+    float a0;
+    if (P.helical != 0u) {
+        a0 = P.aw;
+        float fperp = 1.0f + (P.ku*P.ku / 4.0f) * (xl*xl + yl*yl);
+        bx = -a0 * (gp * s_u + g * P.ku * c_u) * fperp;
+        by =  a0 * (gp * c_u - g * P.ku * s_u) * fperp;
+        bz =  a0 * g * (P.ku*P.ku / 2.0f) * (s_u * xl - c_u * yl);
+    } else {
+        a0 = sqrt(2.0f) * P.aw;
+        bx = 0.0f;
+        by = a0 * (gp * c_u - g * P.ku * s_u) * cosh(P.ku * yl);
+        bz = -a0 * g * c_u * P.ku * sinh(P.ku * yl);
+    }
+    if (P.sin_t != 0.0f) {
+        float bt = P.cos_t * bx - P.sin_t * by;
+        by = P.sin_t * bx + P.cos_t * by;
+        bx = bt;
+    }
+}
+
+// unavg_ode in single precision, fel_fp32_unavg_ode's reformulation of the fifth
+// line: gamma/u_s - 1/beta0 is a difference of two numbers that are both one to
+// within 1.3e-8, so in single precision it is exactly zero and the slippage is
+// gone. The identity 1/ra - 1/rb = (a - b)/(ra rb (ra + rb)) moves the
+// cancellation into a difference of two small like quantities (FINDINGS 7.69).
+inline U5 uode (constant UnavgPar& P, U5 y, float4 fq, float goff){
+    float gam = P.gam0 + goff;
+    float bx, by, bz;
+    ubfield(P, y.x, y.y, fq, bx, by, bz);
+    float us = sqrt(gam*gam - 1.0f - y.ux*y.ux - y.uy*y.uy);
+    U5 d;
+    d.x = y.ux / us;
+    d.y = y.uy / us;
+    d.ux = by - y.uy * bz / us;
+    d.uy = -bx + y.ux * bz / us;
+    float aa = (1.0f + y.ux*y.ux + y.uy*y.uy) / (gam*gam);
+    float ra = us / gam;
+    d.tau = (aa - P.g0inv2) / (ra * P.beta0 * (ra + P.beta0));
+    return d;
+}
+
+kernel void unavg_push (device float* X [[buffer(0)]], device float* Y [[buffer(1)]],
+                        device float* UX [[buffer(2)]], device float* UY [[buffer(3)]],
+                        device long* U [[buffer(4)]], const device float* G [[buffer(5)]],
+                        const device float4* FQ [[buffer(6)]],
+                        constant UnavgPar& P [[buffer(7)]],
+                        uint gid [[thread_position_in_grid]]){
+    U5 y0;
+    y0.x = X[gid];  y0.y = Y[gid];  y0.ux = UX[gid];  y0.uy = UY[gid];  y0.tau = 0.0f;
+    float goff = G[gid];
+    float h = P.h;
+
+    // unavg_push_all's stage bookkeeping, verbatim. gamma is untouched: B does no work.
+    U5 k1 = uode(P, y0, FQ[0], goff);
+    U5 k2 = uode(P, u5axpy(y0, 0.5f*h, k1), FQ[1], goff);
+    U5 k3 = uode(P, u5axpy(y0, 0.5f*h, k2), FQ[2], goff);
+    U5 k4 = uode(P, u5axpy(y0, h, k3), FQ[3], goff);
+
+    float f = h / 6.0f;
+    X[gid]  = y0.x  + f * (k1.x  + 2.0f*k2.x  + 2.0f*k3.x  + k4.x);
+    Y[gid]  = y0.y  + f * (k1.y  + 2.0f*k2.y  + 2.0f*k3.y  + k4.y);
+    UX[gid] = y0.ux + f * (k1.ux + 2.0f*k2.ux + 2.0f*k3.ux + k4.ux);
+    UY[gid] = y0.uy + f * (k1.uy + 2.0f*k2.uy + 2.0f*k3.uy + k4.uy);
+
+    // The lag's increment, rounded once into ticks and added exactly.
+    float dtau = f * (k1.tau + 2.0f*k2.tau + 2.0f*k3.tau + k4.tau);
+    U[gid] += long(rint((dtau * P.ks) * TICKS_PER_RAD));
+}
+
+// The radiation kick and the source deposit at the substep midpoint, one kernel
+// because the two are exact energy duals only while they share operands: the same
+// u_s, the same bilinear weights and the same phase (fel_unaveraged_mod's step
+// header). u_s needs no reformulation, which measurement settled: it loses the 1
+// and the ux^2 entirely, and they are 6.7e-9 of the result.
+kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
+                        device float* G [[buffer(1)]],
+                        const device float* X [[buffer(2)]], const device float* Y [[buffer(3)]],
+                        const device float* UX [[buffer(4)]], const device float* UY [[buffer(5)]],
+                        const device float* W [[buffer(6)]], const device long* U [[buffer(7)]],
+                        const device float2* E [[buffer(8)]],
+                        const device float2* CB [[buffer(9)]],
+                        constant UnavgPar& P [[buffer(10)]],
+                        device atomic_uint* FAULT [[buffer(11)]],
+                        uint gid [[thread_position_in_grid]]){
+    uint is = gid / P.npart;
+    float x = X[gid], y = Y[gid];
+
+    // Off the grid is dark and deposits nothing, fel_unavg_step's on_grid branch.
+    if (!(x > -P.gridmax && x < P.gridmax && y > -P.gridmax && y < P.gridmax)) return;
+    float wx = (x + P.gridmax) / P.dgrid;
+    float wy = (y + P.gridmax) / P.dgrid;
+    float fx = floor(wx), fy = floor(wy);
+    wx = 1.0f + fx - wx;
+    wy = 1.0f + fy - wy;
+    int jx = int(fx), jy = int(fy);
+    if (jx < 0 || jy < 0 || jx + 1 >= int(P.ngrid) || jy + 1 >= int(P.ngrid)) return;
+
+    float gam = P.gam0 + G[gid];
+    float ux = UX[gid], uy = UY[gid];
+    float us = sqrt(gam*gam - 1.0f - ux*ux - uy*uy);
+    float2 jhat = (P.helical != 0u) ? float2(ux, -uy) * (1.0f / sqrt(2.0f))
+                                    : float2(ux, 0.0f);
+
+    // A contribution carries |j|/u_s, and the host's scale assumes that ratio stays
+    // under u_bound. One that does not is neither converted nor accumulated, and the
+    // fault stops the run at the next readback, before anything derived from this step
+    // is written. Written so that a value that is not a number fails it. Checking here
+    // rather than on the host closes the interval between two readbacks, which is the
+    // only place the bound could have been breached and used.
+    float ub = P.u_bound * us;
+    if (!(jhat.x*jhat.x + jhat.y*jhat.y <= ub * ub)) {
+        atomic_fetch_or_explicit(FAULT, 1u, memory_order_relaxed);
+        return;
+    }
+
+    uint fs = (is + P.first) % P.nslice;
+    uint nn = P.ngrid * P.ngrid;
+    uint cell = uint(jy) * P.ngrid + uint(jx);
+    uint b = fs * nn + cell;
+    float2 ehat = E[b] * (wx * wy)
+                + E[b + 1u] * ((1.0f - wx) * wy)
+                + E[b + P.ngrid] * (wx * (1.0f - wy))
+                + E[b + P.ngrid + 1u] * ((1.0f - wx) * (1.0f - wy));
+
+    // The carrier e^{i(psi_mid - ks tau)}: the host's FP64 base rotator times the
+    // lag's own small angle, which is the split the averaged push already uses.
+    float d = phase_of(U[gid]);
+    if (P.mutate != 0u) d = coarsen256(d);
+    float s_d, c_d;
+    s_d = sin(d);  c_d = cos(d);
+    float2 cph = cmul(CB[is], float2(c_d, -s_d));
+
+    // W = -i Ehat e^{i Psi};  dgamma = -dsub Re[W conj(j)] / (u_s m_e).
+    float2 t = cmul(ehat, cph);
+    float2 wph = float2(t.y, -t.x);
+    float dgam = -P.dsub * (wph.x * jhat.x + wph.y * jhat.y) / (us * P.me);
+    G[gid] = G[gid] + dgam;
+
+    // src += i e^{-i Psi} j scl_u w / u_s. The /u_s where the averaged deposit has
+    // Genesis's /gamma is what makes the pair exact duals (sec-unaveraged).
+    float2 cj = cmul(float2(cph.x, -cph.y), jhat);
+    float2 cdep = float2(-cj.y, cj.x) * (P.scl_u * W[gid] / us);
+
+    ulong idx = (ulong) b;
+    float w;
+    ulong dcell;
+    w = wx * wy;                     dcell = 2u * idx;
+    acc_fixed(S, dcell,      w * cdep.x, P.dscale);
+    acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
+    w = (1.0f - wx) * wy;            dcell = 2u * (idx + 1u);
+    acc_fixed(S, dcell,      w * cdep.x, P.dscale);
+    acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
+    w = wx * (1.0f - wy);            dcell = 2u * (idx + P.ngrid);
+    acc_fixed(S, dcell,      w * cdep.x, P.dscale);
+    acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
+    w = (1.0f - wx) * (1.0f - wy);   dcell = 2u * (idx + P.ngrid + 1u);
+    acc_fixed(S, dcell,      w * cdep.x, P.dscale);
+    acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
+}
+
+// The ledger's spontaneous term, 4 sum|src|^2 over one slice's source grid, summed
+// over the substeps of an element. This is the one field-energy increment the
+// kick/deposit duality does not charge to the beam, so the time-dependent ledger
+// closes only if it is banked (fel_unaveraged_mod's step).
+//
+// No atomic, and that is the point. One threadgroup owns one chunk of one slice
+// and one accumulator slot, reduces its chunk in threadgroup memory over a fixed
+// pairing, and adds the chunk's sum into its own slot. Nothing is contended, so
+// the arithmetic runs in one order and two runs of a deck give one answer, which
+// is what the fixed-point deposit bought for the source and what a float atomic
+// would have given back here. The slot is a compensated pair, since a slice's
+// grid contributes some five thousand times over an element and a bare float sum
+// would carry that accumulation's own error into the ledger.
+kernel void unavg_spont (const device uint* SI [[buffer(0)]],
+                         device float2* ACC [[buffer(1)]],
+                         constant uint& nn [[buffer(2)]],
+                         constant float& sinv [[buffer(3)]],
+                         constant float& fac [[buffer(4)]],
+                         uint2 tg [[threadgroup_position_in_grid]],
+                         uint t [[thread_index_in_threadgroup]],
+                         uint2 ng [[threadgroups_per_grid]]){
+    threadgroup float sh[SPONT_T];
+    ulong base = (ulong) tg.y * (ulong) nn;
+    float acc = 0.0f;
+    for (uint i = tg.x * SPONT_T + t; i < nn; i += ng.x * SPONT_T) {
+        float2 v = dec_fixed(SI, base + (ulong) i, sinv);
+        acc += v.x * v.x + v.y * v.y;
+    }
+    sh[t] = acc;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint s = SPONT_T / 2u; s > 0u; s >>= 1u) {
+        if (t < s) sh[t] += sh[t + s];
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (t != 0u) return;
+    uint slot = tg.y * ng.x + tg.x;
+    float2 k = ACC[slot];
+    float yv = sh[0] * fac - k.y;
+    float tt = k.x + yv;
+    k.y = (tt - k.x) - yv;
+    k.x = tt;
+    ACC[slot] = k;
+}
+
+// The record step's energy baseline: gamma changes only in the kick, so the step's
+// beam-energy change is sum w (gamma_end - gamma_start) m_e, and the host forms it
+// in FP64 from the two readbacks rather than reducing a bounded quantity here.
+kernel void unavg_gsave (device float* G0 [[buffer(0)]], const device float* G [[buffer(1)]],
+                         uint gid [[thread_position_in_grid]]){
+    G0[gid] = G[gid];
 }
 
 // ---------------- the transform ----------------
@@ -696,6 +991,19 @@ struct AddPar {
     float pol[4];     // float2 pol[2]
 };
 
+struct UnavgPar {
+    float h, dsub, ks, ku, aw, cos_t, sin_t;
+    float gam0, beta0, g0inv2, me;
+    float gridmax, dgrid, scl_u, dscale, u_bound;
+    uint32_t ngrid, npart, nslice, first, helical, mutate;
+};
+
+// The spontaneous reduction's shape, mirroring SPONT_T in the shader. One
+// threadgroup owns one accumulator slot, so the count is part of the layout.
+static const int kSpontThreads = 256;
+static const int kSpontGroups = 64;
+static const int kMaxSub = 4096;
+
 namespace {
 
 struct Impl {
@@ -716,10 +1024,15 @@ struct Impl {
     id<MTLBuffer> bX, bPX, bY, bPY, bG, bU, bW;
     id<MTLBuffer> bField, bSrc, bSrcI, bExpK, bSig, bTw, bBase, bBaseDep;
     id<MTLBuffer> bProbe, bPh, bFault;
+    // The unaveraged mode's own buffers: the record step's baseline energies, the
+    // per-substep stage factors and carrier rotators, and the ledger's partials.
+    id<MTLBuffer> bG0 {nil}, bFQ {nil}, bCB {nil}, bSpont {nil};
+    int nsub {0};
 
     id<MTLComputePipelineState> pTrk, pPush, pZero, pDep, pRow, pRowM, pCol, pColA;
     id<MTLComputePipelineState> pRowF, pColAF;   // the two that convert where they read
     id<MTLComputePipelineState> pWShift, pWPhase;
+    id<MTLComputePipelineState> pUPush, pUKick, pUSpont, pUGsave;
 
     int64_t bytes {0};
     double busy {0};
@@ -1006,6 +1319,10 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->pColAF = pso(@"fft_cols_add_fix");
         p->pWShift = pso(@"wrap_shift");
         p->pWPhase = pso(@"wrap_phase");
+        p->pUPush = pso(@"unavg_push");
+        p->pUKick = pso(@"unavg_kick");
+        p->pUSpont = pso(@"unavg_spont");
+        p->pUGsave = pso(@"unavg_gsave");
         if (!ok) {
             put_str(reason, reason_len, "compute pipeline creation failed");
             delete p;
@@ -1041,6 +1358,7 @@ void luc_dev_resize_particles (int npart)
         p->bG = [p->dev newBufferWithLength:np * 4 options:kShared];
         p->bU = [p->dev newBufferWithLength:np * 8 options:kShared];
         p->bW = [p->dev newBufferWithLength:np * 4 options:kShared];
+        if (p->bG0 != nil) p->bG0 = [p->dev newBufferWithLength:np * 4 options:kShared];
         p->npart = npart;
     }
 }
@@ -1420,6 +1738,244 @@ int luc_dev_step (const luc_dev_step_par *par, int64_t cret_ticks,
         [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
     }
     return 0;
+}
+
+int luc_dev_unavg_begin (int nsub, char *reason, int reason_len)
+{
+    Impl *p = gImpl;
+    if (p == nullptr) {
+        put_str(reason, reason_len, "device not initialized");
+        return 1;
+    }
+    if (nsub < 1 || nsub > kMaxSub) {
+        char msg[160];
+        snprintf(msg, sizeof(msg), "the record step holds %d substeps; the device carries 1 to %d",
+                 nsub, kMaxSub);
+        put_str(reason, reason_len, msg);
+        return 1;
+    }
+    @autoreleasepool {
+        p->sync();
+        const size_t np = (size_t) p->nslice * p->npart;
+        if (p->bG0 == nil) {
+            p->bG0 = [p->dev newBufferWithLength:np * 4 options:kShared];
+            p->bytes += (int64_t) (np * 4);
+        }
+        if (p->bSpont == nil) {
+            const size_t n = (size_t) p->nslice * kSpontGroups * 8;
+            p->bSpont = [p->dev newBufferWithLength:n options:kShared];
+            p->bytes += (int64_t) n;
+        }
+        if (nsub > p->nsub) {
+            const size_t nfq = (size_t) nsub * 8 * 16;
+            const size_t ncb = (size_t) nsub * p->nslice * 8;
+            p->bFQ = [p->dev newBufferWithLength:nfq options:kShared];
+            p->bCB = [p->dev newBufferWithLength:ncb options:kShared];
+            p->bytes += (int64_t) (nfq + ncb);
+            p->nsub = nsub;
+        }
+        if (p->bG0 == nil || p->bSpont == nil || p->bFQ == nil || p->bCB == nil) {
+            put_str(reason, reason_len, "the unaveraged work buffers would not allocate");
+            return 1;
+        }
+        memset([p->bSpont contents], 0, (size_t) p->nslice * kSpontGroups * 8);
+    }
+    return 0;
+}
+
+int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
+                        const float *cbase, char *reason, int reason_len)
+{
+    Impl *p = gImpl;
+    if (p == nullptr) {
+        put_str(reason, reason_len, "device not initialized");
+        return 1;
+    }
+    if (par->nsub < 1 || par->nsub > p->nsub) {
+        char msg[160];
+        snprintf(msg, sizeof(msg), "the record step holds %d substeps and the buffers carry %d",
+                 par->nsub, p->nsub);
+        put_str(reason, reason_len, msg);
+        return 1;
+    }
+    @autoreleasepool {
+        // The stage factors and the carrier rotators are host writes, so the device
+        // drains before they land, as every other transfer here does.
+        p->sync();
+        memcpy([p->bFQ contents], fq, (size_t) par->nsub * 8 * 16);
+        memcpy([p->bCB contents], cbase, (size_t) par->nsub * p->nslice * 8);
+
+        const size_t nthread = (size_t) p->nslice * p->npart;
+        const size_t nn = (size_t) p->ngrid * p->ngrid;
+        const MTLSize grid = MTLSizeMake(nthread, 1, 1);
+        const MTLSize tgp = MTLSizeMake(256, 1, 1);
+        const float inv = -1.0f, fwd = 1.0f, one = 1.0f;
+        const float nrm = 1.0f / (float) nn;
+        const float dscale = (float) par->dep_scale;
+        const float sinv = 1.0f / dscale;
+        const float sfac = (float) par->spont_fac;
+        const uint32_t unn = (uint32_t) nn;
+        p->srcScale = par->dep_scale;
+
+        UnavgPar P;
+        P.h = (float) (0.5 * par->dsub);
+        P.dsub = (float) par->dsub;
+        P.ks = (float) par->ks;
+        P.ku = (float) par->ku;
+        P.aw = (float) par->aw;
+        P.cos_t = (float) par->cos_t;
+        P.sin_t = (float) par->sin_t;
+        P.gam0 = (float) par->gam0;
+        P.beta0 = (float) par->beta0;
+        P.g0inv2 = (float) par->g0inv2;
+        P.me = (float) par->m_electron;
+        P.gridmax = (float) par->gridmax;
+        P.dgrid = (float) par->dgrid;
+        P.scl_u = (float) par->scl_u;
+        P.dscale = dscale;
+        P.u_bound = (float) par->dep_u_bound;
+        P.ngrid = (uint32_t) p->ngrid;
+        P.npart = (uint32_t) p->npart;
+        P.nslice = (uint32_t) p->nslice;
+        P.first = (uint32_t) par->first;
+        P.helical = (uint32_t) par->helical;
+        P.mutate = (uint32_t) par->mutate;
+
+        AddPar A;
+        A.ppm = (uint32_t) p->nslice;
+        A.nslice = (uint32_t) p->nslice;
+        A.npol = 1u;
+        A.pad = 0;
+        for (int i = 0; i < 4; i++) A.pol[i] = 0.0f;
+        A.pol[0] = 1.0f;
+
+        const size_t nplane = p->nplanes();
+        const MTLSize rowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), nplane, 1);
+        const MTLSize rowT = MTLSizeMake((size_t) (p->rowsPerTG * p->lanes), 1, 1);
+        const MTLSize colTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nplane, 1);
+        const MTLSize colT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
+        const MTLSize spTG = MTLSizeMake((size_t) kSpontGroups, (size_t) p->nslice, 1);
+        const MTLSize spT = MTLSizeMake((size_t) kSpontThreads, 1, 1);
+
+        id<MTLComputeCommandEncoder> e = nil;
+
+        // The record step's energy baseline. gamma changes only in the kick, so the
+        // step's beam-energy change is a difference of two gammas and needs no
+        // reduction of its own.
+        e = p->pass(LUC_DEV_PASS_UPUSH);
+        [e setComputePipelineState:p->pUGsave];
+        [e setBuffer:p->bG0 offset:0 atIndex:0];
+        [e setBuffer:p->bG offset:0 atIndex:1];
+        [e dispatchThreads:grid threadsPerThreadgroup:tgp];
+
+        for (int j = 0; j < par->nsub; j++) {
+            e = p->pass(LUC_DEV_PASS_ZERO);
+            [e setComputePipelineState:p->pZero];
+            [e setBuffer:p->bSrcI offset:0 atIndex:0];
+            [e dispatchThreads:MTLSizeMake((size_t) p->nslice * nn, 1, 1)
+                 threadsPerThreadgroup:tgp];
+
+            for (int half = 0; half < 2; half++) {
+                if (half == 1) {
+                    e = p->pass(LUC_DEV_PASS_UKICK);
+                    [e setComputePipelineState:p->pUKick];
+                    [e setBuffer:p->bSrcI offset:0 atIndex:0];
+                    [e setBuffer:p->bG offset:0 atIndex:1];
+                    [e setBuffer:p->bX offset:0 atIndex:2];
+                    [e setBuffer:p->bY offset:0 atIndex:3];
+                    [e setBuffer:p->bPX offset:0 atIndex:4];
+                    [e setBuffer:p->bPY offset:0 atIndex:5];
+                    [e setBuffer:p->bW offset:0 atIndex:6];
+                    [e setBuffer:p->bU offset:0 atIndex:7];
+                    [e setBuffer:p->bField offset:0 atIndex:8];
+                    [e setBuffer:p->bCB offset:(NSUInteger) ((size_t) j * p->nslice * 8) atIndex:9];
+                    [e setBytes:&P length:sizeof(P) atIndex:10];
+                    [e setBuffer:p->bFault offset:0 atIndex:11];
+                    [e dispatchThreads:grid threadsPerThreadgroup:tgp];
+                }
+                e = p->pass(LUC_DEV_PASS_UPUSH);
+                [e setComputePipelineState:p->pUPush];
+                [e setBuffer:p->bX offset:0 atIndex:0];
+                [e setBuffer:p->bY offset:0 atIndex:1];
+                [e setBuffer:p->bPX offset:0 atIndex:2];
+                [e setBuffer:p->bPY offset:0 atIndex:3];
+                [e setBuffer:p->bU offset:0 atIndex:4];
+                [e setBuffer:p->bG offset:0 atIndex:5];
+                [e setBuffer:p->bFQ offset:(NSUInteger) (((size_t) j * 8 + (size_t) half * 4) * 16)
+                       atIndex:6];
+                [e setBytes:&P length:sizeof(P) atIndex:7];
+                [e dispatchThreads:grid threadsPerThreadgroup:tgp];
+            }
+
+            e = p->pass(LUC_DEV_PASS_USPONT);
+            [e setComputePipelineState:p->pUSpont];
+            [e setBuffer:p->bSrcI offset:0 atIndex:0];
+            [e setBuffer:p->bSpont offset:0 atIndex:1];
+            [e setBytes:&unn length:4 atIndex:2];
+            [e setBytes:&sinv length:4 atIndex:3];
+            [e setBytes:&sfac length:4 atIndex:4];
+            [e dispatchThreadgroups:spTG threadsPerThreadgroup:spT];
+
+            // The slice's own diffract and source add, the transform kernels unchanged:
+            // field = IFFT(FFT(field) exp(K2 dsub))/N^2 + 2 src, four passes.
+            e = p->pass(LUC_DEV_PASS_SOLVE);
+            [e setComputePipelineState:p->pRow];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&fwd length:4 atIndex:2];
+            [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+
+            e = p->pass(LUC_DEV_PASS_SOLVE);
+            [e setComputePipelineState:p->pCol];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&fwd length:4 atIndex:2];
+            [e setBytes:&one length:4 atIndex:3];
+            [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
+
+            e = p->pass(LUC_DEV_PASS_SOLVE);
+            [e setComputePipelineState:p->pRowM];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&inv length:4 atIndex:2];
+            [e setBuffer:p->bExpK offset:0 atIndex:3];
+            [e setBytes:&A.ppm length:4 atIndex:4];
+            [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
+
+            e = p->pass(LUC_DEV_PASS_SOLVE);
+            [e setComputePipelineState:p->pColAF];
+            [e setBuffer:p->bField offset:0 atIndex:0];
+            [e setBuffer:p->bTw offset:0 atIndex:1];
+            [e setBytes:&inv length:4 atIndex:2];
+            [e setBytes:&nrm length:4 atIndex:3];
+            [e setBuffer:p->bSrcI offset:0 atIndex:4];
+            [e setBytes:&A length:sizeof(A) atIndex:5];
+            [e setBytes:&sinv length:4 atIndex:6];
+            [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
+        }
+    }
+    return 0;
+}
+
+void luc_dev_download_g0 (int is, int n, float *g0)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || p->bG0 == nil) return;
+    p->sync();
+    memcpy(g0, (const float *) [p->bG0 contents] + (size_t) is * p->npart, (size_t) n * 4);
+}
+
+double luc_dev_unavg_spont (void)
+{
+    Impl *p = gImpl;
+    if (p == nullptr || p->bSpont == nil) return 0;
+    p->sync();
+    // FP64 over the partials in index order, so the sum is the same whatever the
+    // device did: every partial was written by one threadgroup and by no other.
+    const float *a = (const float *) [p->bSpont contents];
+    double tot = 0;
+    for (int i = 0; i < p->nslice * kSpontGroups; i++) tot += (double) a[2*i];
+    return tot;
 }
 
 void luc_dev_sync (void)
