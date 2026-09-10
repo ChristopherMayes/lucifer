@@ -1235,11 +1235,18 @@ endif
 call setup_diagnostics ()
 if (err_flag) return
 
-! The FP32 lockstep instrument. Its twin mirrors the averaged advance, so a lattice
-! with unaveraged segments is refused rather than half-instrumented.
+! The FP32 lockstep instrument. It carries a twin for each advance, so a lattice of
+! either mode or of both is instrumented, each segment by the twin that mirrors it. The
+! unaveraged twin prices that mode's particle path, which is where its reformulations
+! live, and doc/validation.md says what it does not yet reach.
+!
+! Freerun compounds a single-precision state across steps and the unaveraged twin does
+! not carry one, so that combination is refused rather than reported as a lockstep.
 
-if (run%global%fp32_check /= '' .and. run%global%fp32_check /= 'off' .and. run%any_unavg) then
-  call out_io (s_error$, r_name, 'FP32_CHECK DOES NOT COVER THE UNAVERAGED MODE.')
+if (run%global%fp32_check == 'freerun' .and. run%any_unavg) then
+  call out_io (s_error$, r_name, 'FP32_CHECK = "freerun" DOES NOT COVER THE UNAVERAGED MODE.', &
+               'THE UNAVERAGED TWIN IS A LOCKSTEP: IT IS REBUILT FROM THE FP64 STATE EVERY', &
+               'RECORD STEP AND CARRIES NOTHING ACROSS THEM. USE FP32_CHECK = "lockstep".')
   err_flag = .true.;  return
 endif
 call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, run%nslice, &

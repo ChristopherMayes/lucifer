@@ -386,6 +386,59 @@ def main():
     check("TD ledger: max|d(E_beam+U_window+U_escaped-U_spont+E_rad)| / turnover",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
 
+    # 8. The single-precision twin (doc/validation.md, and this mode's section of
+    # fel_unaveraged_mod). Apple GPUs carry no FP64, so a device port of this mode needs
+    # a single-precision form of the advance with its divergence from FP64 measured
+    # first. The twin is that measurement, and the levels below are what it reads.
+    #
+    # Four rows are asserted. The transverse pair and the energy price the reformulated
+    # charts. theta prices the phase, and it is the row the mode lives on: the slippage
+    # rate is a difference of two numbers that are both one to within 1.3e-8, so the
+    # naive single-precision form returns exactly zero and the phase is destroyed.
+    # Replacing the identity with that form takes this row from 1.3e-5 rad to 1.7 rad,
+    # which is the mutation record for it.
+    #
+    # The instrument may not steer what it observes, so the FP64 stream and the ledger
+    # are required byte-identical with the twin on against off. That is the same demand
+    # the averaged instrument carries and it is the one that would catch a twin writing
+    # into the run's own state.
+
+    print("--- the single-precision twin of the unaveraged advance:")
+    run(exe, wd, "uv_tw", GAIN.format(root="uv_tw", lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
+        .replace("&end", '  global%fp32_check = "lockstep"\n&end'))
+    rows = [l.split() for l in (wd / "uv_tw.fp32.txt").read_text().splitlines()
+            if l and not l.startswith("#") and l.split()[0].isdigit()]
+    if not rows:
+        check("twin: the stream carries per-step rows", 1.0, 0.5, note="[none written]")
+    else:
+        cols = np.array([[float(v) for v in r] for r in rows])
+        worst = cols.max(axis=0)
+        print(f"      {len(rows)} steps instrumented, worst over the run:")
+        for i, nm in ((1, "x"), (2, "px"), (3, "y"), (4, "py"), (5, "pz"), (6, "theta"), (7, "phasor")):
+            print(f"        {nm:<7} {worst[i]:.3e}")
+        check("twin: worst transverse row", max(worst[1], worst[3]), 1e-5)
+        check("twin: worst transverse momentum row", max(worst[2], worst[4]), 1e-4)
+        check("twin: worst energy row", worst[5], 1e-4)
+        check("twin: worst phase row [rad]", worst[6], 1e-3,
+              note="(the slippage identity holds it here; the naive form reads 1.7)")
+        check("twin: worst phasor row", worst[7], 1e-5)
+
+    run(exe, wd, "uv_twoff", GAIN.format(root="uv_twoff",
+        lat=unavg_wrapper(wd, "aramis_1seg.bmad")))
+    same_diag = (wd / "uv_tw.diag.txt").read_bytes() == (wd / "uv_twoff.diag.txt").read_bytes()
+    same_led = (wd / "uv_tw.ledger.txt").read_bytes() == (wd / "uv_twoff.ledger.txt").read_bytes()
+    check("twin: the FP64 stream is identical with it on against off (0 = yes)",
+          0.0 if same_diag else 1.0, 0.5)
+    check("twin: the ledger is identical with it on against off (0 = yes)",
+          0.0 if same_led else 1.0, 0.5)
+
+    # freerun compounds a single-precision state across steps and this twin carries none,
+    # so it is refused rather than reported as something it is not.
+    run_expect_refusal(exe, wd, "uv_twfree", GAIN.format(root="uv_twfree",
+        lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
+        .replace("&end", '  global%fp32_check = "freerun"\n&end'),
+        "DOES NOT COVER THE UNAVERAGED MODE")
+
     if FAILED:
         print("unaveraged checks: FAIL")
         sys.exit(1)

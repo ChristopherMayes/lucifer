@@ -9,6 +9,31 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-10 Added: the unaveraged advance has a single-precision twin, so fp32_check no longer refuses that
+  mode. Apple GPUs carry no FP64 and this tree's rule is that a single-precision form of an advance exists
+  with its divergence from FP64 measured before a kernel is written for it. The averaged advance has had one
+  since fel_fp32_mod; the unaveraged advance had none, so nothing could have judged a device port of it.
+
+  The twin advances every substep of a record step from the state that step received and is compared where
+  the record step ends, a substep being internal to the integrator where a record step is where the FP64 path
+  and a port would synchronize. Four quantities single precision destroys there, each measured on a real
+  mid-segment state: the slippage rate gamma/u_s - 1/beta0, whose two terms are both one to within 1.3e-8 and
+  whose difference is 0.016 of the quantum of one, so the naive form returns exactly zero and the slippage
+  disappears; gamma, whose per-substep change is a thousandth of its quantum; the lag, resolved at 4.4e5
+  quanta on one slice and 0.84 on a 351-slice window; and the phase carried whole, at 2.7e-5 rad by a
+  segment's end. The replacements are the offset charts the averaged twin already uses, a base phase held in
+  FP64 one number a slice a substep, and for the slippage the exact identity that moves the cancellation into
+  a difference of two small like quantities. u_s needs no reformulation, which measurement settled against
+  expectation: the terms it loses are 6.7e-9 of the result.
+
+  Two are mutation records rather than arguments. The naive slippage takes the phase row from 9.9e-6 rad to
+  1.7 rad, which is comparable to pi and leaves the bunching phase meaningless, and an absolute gamma takes
+  the energy row from 2.1e-6 to 2.0e-4. check_unaveraged asserts five rows, the guard on the lag residual,
+  and that the FP64 diag and ledger are byte identical with the twin on against off. The field is not
+  reached: this mode diffracts sixty times a record step where the averaged one diffracts once, so its
+  single-precision field accumulation is a separate quantity and the stream's source and field columns are
+  zero in the mode to say so. freerun stays refused, that mode compounding a state this twin does not carry.
+
 - 2026-09-09 Fixed: an unaveraged run can write a frame series. global%dump_at_comb died at the first comb
   position inside a segment, so the mode could produce no particle frames at all and dump_at_comb = F was
   the only way to finish, which writes the final beam and nothing else. The chart assertion sat at the top

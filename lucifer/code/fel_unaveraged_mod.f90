@@ -310,7 +310,7 @@ end subroutine fel_unavg_bfield
 !   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
-subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, dU_spont, err_flag)
+subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, dU_spont, fp32, err_flag)
 
 type (fel_und_struct) und
 type (fel_unavg_struct) ustate
@@ -318,12 +318,14 @@ type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (wavefront_struct), target :: wf
 type (fel_slip_struct) slip
+type (fel_fp32_struct), target :: fp32
 
 real(rp) dz_record, dE_beam, dU_spont
 logical first, last, err_flag
 
 real(rp), allocatable :: ux(:), uy(:), xx(:), yy(:), tau(:), gam(:), dE_slice(:), dU_sp_slice(:)
 real(rp), allocatable :: kst(:,:,:)
+real(rp), allocatable :: cx(:), cy(:), cpx(:), cpy(:), cz(:), cpz(:)
 complex(rp), allocatable :: crsource(:,:), crsource_y(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
@@ -399,6 +401,7 @@ any_err = .false.
 ! bit-identical across thread counts, and the harness checks that.
 
 !$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, crsource_y, s_sub, isub, ip, &
+!$OMP&   cx, cy, cpx, cpy, cz, cpz, &
 !$OMP&   p_mc, beta, psi_mid, u_s, jhat, wx, wy, ix, iy, on_grid, ehat, ehat_y, wphasor, dgam, cdep, cph, err, fq, kst) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
@@ -409,6 +412,15 @@ do is = 1, nslice
   if (two_pol) allocate (crsource_y(ngrid, ngrid))
   allocate (ux(sl%n), uy(sl%n), xx(sl%n), yy(sl%n), tau(sl%n), gam(sl%n))
   allocate (kst(5, sl%n, 4))     ! The push's RK stage arrays, one allocation per slice.
+
+  ! The instrument's copy of the state this step received, taken before the FP64 advance
+  ! touches it. The twin runs from this afterwards and the comparison reads both.
+
+  if (fp32%on) then
+    allocate (cx(sl%n), cy(sl%n), cpx(sl%n), cpy(sl%n), cz(sl%n), cpz(sl%n))
+    cx = sl%x(1:sl%n);    cy = sl%y(1:sl%n);    cpx = sl%px(1:sl%n)
+    cpy = sl%py(1:sl%n);  cz = sl%z(1:sl%n);    cpz = sl%pz(1:sl%n)
+  endif
   do ip = 1, sl%n
     p_mc = p0_mc * (1 + sl%pz(ip))
     gam(ip) = sqrt(p_mc**2 + 1)
@@ -544,6 +556,11 @@ do is = 1, nslice
 
   deallocate (ux, uy, xx, yy, tau, gam, crsource, kst)
   if (two_pol) deallocate (crsource_y)
+  if (fp32%on) then
+    call unavg_twin_slice (is, sl%n, ifld, cx, cy, cpx, cpy, cz, cpz)
+    deallocate (cx, cy, cpx, cpy, cz, cpz)
+  endif
+
 enddo
 !$OMP end parallel do
 if (any_err) return
@@ -560,6 +577,17 @@ if (last) then
   beam%quiver_in_px = .false.
   ustate%active = .false.
   call unavg_ramp_phase_jump ()
+endif
+
+! The instrument's serial epilogue, which reduces this step's per-slice rows and writes
+! the stream. Outside the parallel region by contract, as the averaged path's is.
+
+if (fp32%on) then
+  call fel_fp32_step_close (fp32, err)
+  if (err) then
+    err_flag = .true.
+    return
+  endif
 endif
 
 err_flag = .false.
@@ -706,6 +734,241 @@ dyds(4) = -bx + y(3) * bz / us_l
 dyds(5) = gamma / us_l - inv_beta0
 
 end subroutine unavg_ode
+
+!------------------------------------------------------------------------------
+! contains
+!+
+! Subroutine unavg_twin_slice (is, n, x0, y0, px0, py0, z0, pz0)
+!
+! Routine to advance one slice's single-precision twin over this record step's
+! substeps and fill the slice's divergence row. The FP64 arrays are the state as this
+! step received it, and beam%slice(is) already carries the FP64 result, so the two are
+! compared where the record step ends. That granularity is the choice: a substep is
+! internal to the integrator, where a record step is the point the FP64 path and any
+! device port synchronize, so it measures what a port would have to match.
+!
+! Both sides gather the field from the FP64 record. What the twin therefore prices is
+! the particle path, which is where every reformulation below lives. The field's own
+! single-precision accumulation is a separate quantity and is not measured here: this
+! mode diffracts nsub times a record step where the averaged mode diffracts once, so it
+! pays that many roundings, and the averaged instrument's field row does not carry over.
+! doc/validation.md says so where the levels are recorded.
+!
+! What single precision destroys in this advance, each measured on a real mid-segment
+! state of the one-segment deck rather than argued:
+!
+!   slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
+!             the difference is 1.9e-9, which is 0.016 of the quantum of one in single
+!             precision, so the naive difference is exactly zero and the slippage is
+!             gone. Formed through the identity in fel_fp32_unavg_ode it comes back to
+!             1.2e-7. This is the reformulation the mode lives on.
+!   energy    gamma is 11358 with a quantum of 9.8e-4 against a per-substep change of
+!             1.0e-6, which is a thousandth of a quantum. The working variable is
+!             goff = gamma - gamma0, whose quantum is 6.0e-8 and which carries the same
+!             change at 18 quanta.
+!   lag       tau is the particle's lag and its per-substep change is 3.1e-12 m, which
+!             the guard below measures rather than infers. Most of that is the quiver's
+!             own longitudinal oscillation and not the slippage drift, so a figure taken
+!             from two states many substeps apart understates it by nearly three orders.
+!             Carrying the whole lag, one slice resolves the change at 4.4e5 quanta and
+!             32 slices at 1.4e4, but a 351-slice window at 164 nm reaches 5.8e-5 m and
+!             resolves it at 0.84 of a quantum, which is lost. The residual off a
+!             per-slice FP64 reference is one slice's spread whatever the window, so it
+!             does not move with the slice count. The margin is the reason the guard
+!             watches this and not something else.
+!   phase     Psi carried whole per particle costs 2.7e-5 rad at a segment's end and
+!             grows with s. The base is one FP64 number a slice a substep, which is
+!             what a device kernel would upload, and only the residual ks*dtaur is
+!             single precision, at 2.4e-7 rad.
+!
+! u_s itself needs no reformulation, which measurement rather than expectation settled:
+! sqrt(gamma^2 - 1 - ux^2 - uy^2) does lose the 1 and the ux^2 entirely in single
+! precision, but they are 6.7e-9 of the result, so the naive and the reformed values
+! agree to 5.0e-8. The same value serves the kick and the deposit, which is what keeps
+! the pair exact energy duals.
+!
+! Runs inside the caller's parallel slice loop: everything written is indexed by is.
+!-
+
+subroutine unavg_twin_slice (is, n, ifl, x0, y0, px0, py0, z0, pz0)
+
+! ifl is passed and not host-associated, and the slice is reached through beam, which
+! is shared: this module's push header states the rule, that a variable the caller's
+! OMP region privatizes is not redirected inside a called procedure.
+
+integer is, n, ifl
+real(rp) x0(:), y0(:), px0(:), py0(:), z0(:), pz0(:)
+
+type (fel_fp32_unavg_slice_struct), pointer :: t
+type (fel_fp32_unavg_struct) uc
+real(sp) fq32(4,4), h32, psi_b32, ks32, ehat_r, ehat_i, cs, sn, ang
+real(sp) us32, dg32, jr, ji, wr, wi
+real(rp) fqd(4,4), s_t, psi_b, tau_r, gam_l, beta_l, p_mc_l
+real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$), wsum, tau64
+real(rp), allocatable :: dtau_ulp(:)
+real(sp), allocatable :: tsave(:)
+real(rp) gmed
+real(rp) p32r, p32i, p64r, p64i, th64, th32
+integer ip, jsub, ixl, iyl
+logical og
+real(rp) wxd, wyd
+real(sp) wxl, wyl
+
+!
+
+t => fp32%un32(is)
+if (.not. allocated(t%xx)) then
+  allocate (t%xx(n), t%yy(n), t%ux(n), t%uy(n), t%dtaur(n), t%goff(n))
+elseif (size(t%xx) /= n) then
+  deallocate (t%xx, t%yy, t%ux, t%uy, t%dtaur, t%goff)
+  allocate (t%xx(n), t%yy(n), t%ux(n), t%uy(n), t%dtaur(n), t%goff(n))
+endif
+
+! The constants the twin's arithmetic reads, rounded once. beta0 and 1/gamma0^2 are the
+! slippage identity's two halves, and they are formed in FP64 here because they are
+! per-run scalars: a device would upload them the same way.
+
+uc%aw = real(und%aw, sp);        uc%ku = real(und%ku, sp)
+uc%cos_t = real(und%cos_t, sp);  uc%sin_t = real(und%sin_t, sp)
+uc%gam0 = real(gamma0b, sp)
+uc%beta0 = real(p0_mc / gamma0b, sp)
+uc%g0inv2 = real(1 / gamma0b**2, sp)
+uc%helical = und%helical
+
+! The lag reference is this slice's own FP64 mean, so the residual the twin carries is a
+! slice's spread and not a window's offset.
+
+tau_r = 0
+do ip = 1, n
+  p_mc_l = p0_mc * (1 + pz0(ip))
+  gam_l = sqrt(p_mc_l**2 + 1)
+  tau_r = tau_r - z0(ip) / (p_mc_l / gam_l)
+enddo
+tau_r = tau_r / max(1, n)
+t%tau_ref = tau_r
+
+do ip = 1, n
+  p_mc_l = p0_mc * (1 + pz0(ip))
+  gam_l = sqrt(p_mc_l**2 + 1)
+  beta_l = p_mc_l / gam_l
+  t%xx(ip) = real(x0(ip), sp)
+  t%yy(ip) = real(y0(ip), sp)
+  t%ux(ip) = real(px0(ip) * p0_mc, sp)
+  t%uy(ip) = real(py0(ip) * p0_mc, sp)
+  t%goff(ip) = real(gam_l - gamma0b, sp)
+  t%dtaur(ip) = real(-z0(ip) / beta_l - tau_r, sp)
+enddo
+
+ks32 = real(ks, sp)
+h32 = real(dsub, sp)
+s_t = ustate%s
+
+! The guard. The lag residual is the one single-precision quantity here whose per-substep
+! change can fall under its own quantum, and whether it does depends on the window and
+! not on the physics: the residual is a slice's own spread, where the whole lag grows with
+! the slice count. The statistic is that change in units of the residual's spacing, summed
+! over the substeps here and reduced to a median at the end, which is the shape and the
+! floor the averaged instrument's guard already uses.
+
+allocate (dtau_ulp(n), tsave(n))
+dtau_ulp = 0
+
+do jsub = 1, ustate%nsub
+
+  tsave = t%dtaur
+  call unavg_field_quartet (s_t, dsub/2, fqd)
+  fq32 = real(fqd, sp)
+  call fel_fp32_unavg_push (h32/2, n, t, uc, fq32)
+
+  ! The kick, at the substep midpoint. The base phase is one FP64 number for the whole
+  ! slice, so the per-particle single-precision angle is the residual alone.
+
+  psi_b = beam%phi0 + (s_t - ustate%s + dsub/2) * phi0_rate_avg - und%ku * (s_t + dsub/2) &
+          - ks * tau_r
+  psi_b32 = real(modulo(psi_b, twopi), sp)
+
+  do ip = 1, n
+    call fel_grid_weights (wf, real(t%xx(ip), rp), real(t%yy(ip), rp), ixl, iyl, wxd, wyd, og)
+    if (.not. og) cycle
+    wxl = real(wxd, sp);  wyl = real(wyd, sp)
+    ehat_r = real(real(wf%Ex(ixl, iyl, ifl), rp) * wxd * wyd &
+                + real(wf%Ex(ixl+1, iyl, ifl), rp) * (1-wxd) * wyd &
+                + real(wf%Ex(ixl, iyl+1, ifl), rp) * wxd * (1-wyd) &
+                + real(wf%Ex(ixl+1, iyl+1, ifl), rp) * (1-wxd) * (1-wyd), sp)
+    ehat_i = real(aimag(wf%Ex(ixl, iyl, ifl)) * wxd * wyd &
+                + aimag(wf%Ex(ixl+1, iyl, ifl)) * (1-wxd) * wyd &
+                + aimag(wf%Ex(ixl, iyl+1, ifl)) * wxd * (1-wyd) &
+                + aimag(wf%Ex(ixl+1, iyl+1, ifl)) * (1-wxd) * (1-wyd), sp)
+    ang = psi_b32 - ks32 * t%dtaur(ip)
+    cs = cos(ang);  sn = sin(ang)
+    us32 = sqrt((uc%gam0 + t%goff(ip))**2 - 1.0_sp - t%ux(ip)**2 - t%uy(ip)**2)
+    if (uc%helical) then
+      jr = t%ux(ip) / sqrt(2.0_sp);  ji = -t%uy(ip) / sqrt(2.0_sp)
+    else
+      jr = t%ux(ip);  ji = 0.0_sp
+    endif
+    ! W = -i Ehat e^{i ang}; dgamma = -dsub Re[W conj(j)] / (u_s m_e).
+    wr =  ehat_r * sn + ehat_i * cs
+    wi = -ehat_r * cs + ehat_i * sn
+    dg32 = -h32 * (wr * jr + wi * ji) / (us32 * real(m_electron, sp))
+    t%goff(ip) = t%goff(ip) + dg32
+  enddo
+
+  call unavg_field_quartet (s_t + dsub/2, dsub/2, fqd)
+  fq32 = real(fqd, sp)
+  call fel_fp32_unavg_push (h32/2, n, t, uc, fq32)
+  do ip = 1, n
+    if (spacing(t%dtaur(ip)) > 0) dtau_ulp(ip) = dtau_ulp(ip) + &
+              abs(real(t%dtaur(ip) - tsave(ip), rp)) / real(spacing(t%dtaur(ip)), rp)
+  enddo
+  s_t = s_t + dsub
+enddo
+
+! The rows. Every one is a worst per-particle difference, which sees a common offset:
+! ux and uy hold the quiver, which is an offset a slice shares and not a spread, so a
+! statistic blind to an offset would report health on a wrong chart.
+
+dstat = 0
+wsum = 0
+p32r = 0;  p32i = 0;  p64r = 0;  p64i = 0
+do ip = 1, n
+  p_mc_l = p0_mc * (1 + beam%slice(is)%pz(ip))
+  gam_l = sqrt(p_mc_l**2 + 1)
+  beta_l = p_mc_l / gam_l
+  tau64 = -beam%slice(is)%z(ip) / beta_l
+  dstat(1) = max(dstat(1), abs(real(t%xx(ip), rp) - beam%slice(is)%x(ip)))
+  dstat(2) = max(dstat(2), abs(real(t%ux(ip), rp) / p0_mc - beam%slice(is)%px(ip)))
+  dstat(3) = max(dstat(3), abs(real(t%yy(ip), rp) - beam%slice(is)%y(ip)))
+  dstat(4) = max(dstat(4), abs(real(t%uy(ip), rp) / p0_mc - beam%slice(is)%py(ip)))
+  dstat(5) = max(dstat(5), abs((real(t%goff(ip), rp) + gamma0b - gam_l) / p0_mc))
+  th32 = -ks * (real(t%dtaur(ip), rp) + tau_r)
+  th64 = -ks * tau64
+  dstat(6) = max(dstat(6), abs(modulo(th32 - th64 + pi, twopi) - pi))
+  wsum = wsum + beam%slice(is)%weight(ip)
+  p32r = p32r + beam%slice(is)%weight(ip) * cos(th32)
+  p32i = p32i - beam%slice(is)%weight(ip) * sin(th32)
+  p64r = p64r + beam%slice(is)%weight(ip) * cos(th64)
+  p64i = p64i - beam%slice(is)%weight(ip) * sin(th64)
+enddo
+
+sc(1) = maxval(abs(beam%slice(is)%x(1:n))) + 1e-30_rp
+sc(2) = maxval(abs(beam%slice(is)%px(1:n))) + 1e-30_rp
+sc(3) = maxval(abs(beam%slice(is)%y(1:n))) + 1e-30_rp
+sc(4) = maxval(abs(beam%slice(is)%py(1:n))) + 1e-30_rp
+sc(5) = maxval(abs(beam%slice(is)%pz(1:n))) + 1e-30_rp
+sc(6) = 1
+sc(7) = wsum + 1e-30_rp
+
+fp32%div_slice(1:6, is) = dstat(1:6) / sc(1:6)
+fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
+fp32%div_slice(8:9, is) = 0        ! The field rows: not measured in this mode, see above.
+fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
+fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
+call fel_fp32_median (dtau_ulp, n, gmed)
+fp32%ulp_slice(is) = gmed / max(1, ustate%nsub)
+deallocate (dtau_ulp, tsave)
+
+end subroutine unavg_twin_slice
 
 end subroutine fel_unavg_step
 

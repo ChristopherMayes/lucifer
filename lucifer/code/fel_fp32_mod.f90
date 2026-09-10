@@ -107,6 +107,41 @@ end type
 ! worst-case accumulators the footer and the check read.
 !-
 
+!+
+! Struct fel_fp32_unavg_slice_struct
+!
+! One slice's packed single-precision state for the unaveraged twin. The chart is the
+! mode's own: ux and uy are the kinetic transverse momenta with the undulator quiver in
+! them, so they carry a common offset of order aw and not a spread. dtaur is the lag's
+! residual off tau_ref, and goff is gamma - gamma0. Both offsets are forced, and the
+! quanta that force them are in fel_fp32_unavg_slice's header.
+!-
+
+type fel_fp32_unavg_slice_struct
+  real(sp), allocatable :: xx(:), yy(:)      ! Transverse position [m].
+  real(sp), allocatable :: ux(:), uy(:)      ! Kinetic transverse momenta, quiver included.
+  real(sp), allocatable :: dtaur(:)          ! Lag residual off tau_ref [m].
+  real(sp), allocatable :: goff(:)           ! gamma - gamma0.
+  real(rp) :: tau_ref = 0                    ! The slice's FP64 lag reference [m].
+end type
+
+!+
+! Struct fel_fp32_unavg_struct
+!
+! What the unaveraged twin's arithmetic needs that does not change inside a step: the
+! undulator, the references the two offset charts hang off, and the constants of the
+! slippage identity. Single precision throughout, since a device kernel would upload
+! these once and read them the same way.
+!-
+
+type fel_fp32_unavg_struct
+  real(sp) :: aw = 0, ku = 0, cos_t = 1, sin_t = 0
+  real(sp) :: gam0 = 0                       ! The reference goff hangs off.
+  real(sp) :: beta0 = 0                      ! p0_mc / gamma0, the slippage identity's rb.
+  real(sp) :: g0inv2 = 0                     ! 1 / gamma0^2, its b.
+  logical :: helical = .false.
+end type
+
 type fel_fp32_struct
   logical :: on = .false.
   logical :: freerun = .false.       ! dzr/pz/field persist across steps (compounding measured).
@@ -126,6 +161,8 @@ type fel_fp32_struct
   complex(sp), allocatable :: k32(:,:)       ! The propagator, rounded from the FP64 kernel.
   real(rp) :: k32_key(4) = -1                ! (ngrid, dgrid, ks, dz) the rounding matches.
   real(rp), allocatable :: pow32(:), pow64(:)   ! Post-solve field power sums, this step.
+  ! The unaveraged twin's per-slice sets, allocated only where that mode runs.
+  type (fel_fp32_unavg_slice_struct), allocatable :: un32(:)
   real(rp), allocatable :: bmag32(:), bmag64(:) ! |phasor|/charge, this step (bunching).
 end type
 
@@ -209,6 +246,7 @@ fp32%on = .true.
 fp32%mutate = mutate
 allocate (fp32%sl32(nslice))
 allocate (fp32%div_slice(fel_fp32_nq$, nslice))
+allocate (fp32%un32(nslice))     ! The unaveraged twin fills its own sets at first use.
 allocate (fp32%ulp_slice(nslice))
 allocate (fp32%pow32(nslice), fp32%pow64(nslice), fp32%bmag32(nslice), fp32%bmag64(nslice))
 fp32%pow32 = 0;  fp32%pow64 = 0;  fp32%bmag32 = 0;  fp32%bmag64 = 0
@@ -219,6 +257,13 @@ write (fp32%iu, '(a)') '# FP32 twin against the FP64 path from a shared state at
 write (fp32%iu, '(a)') '# absolute [rad], guard_ulp is the median per-step residual phase increment in'
 write (fp32%iu, '(a)') '# ulps of the residual (the silent-z guard: small means FP32 cannot resolve the'
 write (fp32%iu, '(a)') '# step and the run refuses).'
+write (fp32%iu, '(a)') '# An unaveraged segment writes one row a record step, its twin having advanced'
+write (fp32%iu, '(a)') '# every substep of that step, and px and py are its own chart, the undulator'
+write (fp32%iu, '(a)') '# quiver included: those rows are a worst per-particle difference, which sees a'
+write (fp32%iu, '(a)') '# common offset. Its source and field columns are zero, that mode diffracting'
+write (fp32%iu, '(a)') '# many times a record step where the averaged one diffracts once, so the field'
+write (fp32%iu, '(a)') '# arithmetic is a different quantity and is not measured here. Its guard watches'
+write (fp32%iu, '(a)') '# the lag residual, whose margin is the one that moves with the window.'
 write (fp32%iu, '(a, l1)') '# freerun = ', fp32%freerun
 
 ! Migration in the residual representation is a bucket renormalization: a mover's
@@ -1151,5 +1196,139 @@ close (fp32%iu)
 fp32%iu = 0
 
 end subroutine fel_fp32_close
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_unavg_bfield (aw, ku, helical, cos_t, sin_t, x, y, g, gp, c_u, s_u, bx, by, bz)
+!
+! fel_unavg_bfield in single precision, term for term. Nothing here needs a
+! reformulation: the arguments are of order one and the products carry no
+! cancellation. ku*y reaches 4e-3 on the checked decks, so cosh and sinh are
+! evaluated where they are well conditioned.
+!-
+
+subroutine fel_fp32_unavg_bfield (aw, ku, helical, cos_t, sin_t, x, y, g, gp, c_u, s_u, bx, by, bz)
+
+real(sp) aw, ku, cos_t, sin_t, x, y, g, gp, c_u, s_u, bx, by, bz
+real(sp) a0, fperp, xl, yl, bt
+logical helical
+
+!
+
+xl = x;  yl = y
+if (sin_t /= 0) then
+  xl =  cos_t * x + sin_t * y
+  yl = -sin_t * x + cos_t * y
+endif
+
+if (helical) then
+  a0 = aw
+  fperp = 1 + (ku**2 / 4) * (xl*xl + yl*yl)
+  bx = -a0 * (gp * s_u + g * ku * c_u) * fperp
+  by =  a0 * (gp * c_u - g * ku * s_u) * fperp
+  bz =  a0 * g * (ku**2 / 2) * (s_u * xl - c_u * yl)
+else
+  a0 = sqrt(2.0_sp) * aw
+  bx = 0
+  by = a0 * (gp * c_u - g * ku * s_u) * cosh(ku * yl)
+  bz = -a0 * g * c_u * ku * sinh(ku * yl)
+endif
+
+if (sin_t /= 0) then
+  bt = cos_t * bx - sin_t * by
+  by = sin_t * bx + cos_t * by
+  bx = bt
+endif
+
+end subroutine fel_fp32_unavg_bfield
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_unavg_ode (y, fq, goff, u, dyds)
+!
+! unavg_ode in single precision. The transverse four lines transcribe directly.
+! The fifth does not, and it is the one the mode lives on.
+!
+! The FP64 form is dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within
+! 1.3e-8 and their difference is the slippage, 1.9e-9 on the checked deck. In
+! single precision a number near one has a quantum of 1.19e-7, so the answer is
+! 0.016 of one quantum and the naive difference is exactly zero: the slippage
+! disappears and with it the physics. Measured on a real mid-segment state, the
+! naive form is wrong by the whole of the answer.
+!
+! The identity 1/ra - 1/rb = (a - b) / (ra*rb*(ra + rb)), with ra = u_s/gamma,
+! rb = beta0, a = 1 - ra^2 and b = 1 - rb^2, moves the cancellation into a - b,
+! which is a difference of two small like quantities and carries no ones at all.
+! It is exact and not a series, so there is no truncation to budget for. The same
+! shape as the averaged twin's detuning (this module's header).
+!-
+
+subroutine fel_fp32_unavg_ode (y, fq, goff, u, dyds)
+
+type (fel_fp32_unavg_struct) u
+real(sp) y(5), fq(4), goff, dyds(5)
+real(sp) bx, by, bz, gam, us, ra, aa
+
+!
+
+gam = u%gam0 + goff
+call fel_fp32_unavg_bfield (u%aw, u%ku, u%helical, u%cos_t, u%sin_t, &
+                            y(1), y(2), fq(1), fq(2), fq(3), fq(4), bx, by, bz)
+us = sqrt(gam*gam - 1.0_sp - y(3)*y(3) - y(4)*y(4))
+
+dyds(1) = y(3) / us
+dyds(2) = y(4) / us
+dyds(3) = by - y(4) * bz / us
+dyds(4) = -bx + y(3) * bz / us
+
+aa = (1.0_sp + y(3)*y(3) + y(4)*y(4)) / (gam*gam)
+ra = us / gam
+dyds(5) = (aa - u%g0inv2) / (ra * u%beta0 * (ra + u%beta0))
+
+end subroutine fel_fp32_unavg_ode
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_unavg_push (h, n, t, u, fq)
+!
+! unavg_push_all in single precision, one RK4 magnetic push of the slice over h.
+! Particle outermost where the FP64 routine is stage outermost, which is a cache
+! choice there and changes no arithmetic: each particle's four stages depend on
+! that particle alone.
+!-
+
+subroutine fel_fp32_unavg_push (h, n, t, u, fq)
+
+type (fel_fp32_unavg_slice_struct) t
+type (fel_fp32_unavg_struct) u
+real(sp) h, fq(4,4)
+real(sp) y0(5), yt(5), k1(5), k2(5), k3(5), k4(5)
+integer n, ip
+
+!
+
+do ip = 1, n
+  y0 = [t%xx(ip), t%yy(ip), t%ux(ip), t%uy(ip), t%dtaur(ip)]
+  call fel_fp32_unavg_ode (y0, fq(:,1), t%goff(ip), u, k1)
+  yt = y0 + (h/2) * k1
+  call fel_fp32_unavg_ode (yt, fq(:,2), t%goff(ip), u, k2)
+  yt = y0 + (h/2) * k2
+  call fel_fp32_unavg_ode (yt, fq(:,3), t%goff(ip), u, k3)
+  yt = y0 + h * k3
+  call fel_fp32_unavg_ode (yt, fq(:,4), t%goff(ip), u, k4)
+  t%xx(ip)    = y0(1) + (h/6) * (k1(1) + 2*k2(1) + 2*k3(1) + k4(1))
+  t%yy(ip)    = y0(2) + (h/6) * (k1(2) + 2*k2(2) + 2*k3(2) + k4(2))
+  t%ux(ip)    = y0(3) + (h/6) * (k1(3) + 2*k2(3) + 2*k3(3) + k4(3))
+  t%uy(ip)    = y0(4) + (h/6) * (k1(4) + 2*k2(4) + 2*k3(4) + k4(4))
+  t%dtaur(ip) = y0(5) + (h/6) * (k1(5) + 2*k2(5) + 2*k3(5) + k4(5))
+enddo
+
+end subroutine fel_fp32_unavg_push
 
 end module fel_fp32_mod

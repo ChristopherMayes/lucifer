@@ -1796,6 +1796,31 @@ table the parallel loop fills and the serial epilogue reduces, and the guard and
 worst-case accumulators the footer and the check read.
 ```
 
+(api-fel-fp32-unavg-slice-struct)=
+### `fel_fp32_unavg_slice_struct`
+
+*Struct*
+
+```
+One slice's packed single-precision state for the unaveraged twin. The chart is the
+mode's own: ux and uy are the kinetic transverse momenta with the undulator quiver in
+them, so they carry a common offset of order aw and not a spread. dtaur is the lag's
+residual off tau_ref, and goff is gamma - gamma0. Both offsets are forced, and the
+quanta that force them are in fel_fp32_unavg_slice's header.
+```
+
+(api-fel-fp32-unavg-struct)=
+### `fel_fp32_unavg_struct`
+
+*Struct*
+
+```
+What the unaveraged twin's arithmetic needs that does not change inside a step: the
+undulator, the references the two offset charts hang off, and the constants of the
+slippage identity. Single precision throughout, since a device kernel would upload
+these once and read them the same way.
+```
+
 (api-fel-fp32-setup)=
 ### `fel_fp32_setup`
 
@@ -2042,6 +2067,53 @@ design brief records.
 
 ```
 Routine to write the run summary block and close the stream.
+```
+
+(api-fel-fp32-unavg-bfield)=
+### `fel_fp32_unavg_bfield`
+
+*Subroutine* `(aw, ku, helical, cos_t, sin_t, x, y, g, gp, c_u, s_u, bx, by, bz)`
+
+```
+fel_unavg_bfield in single precision, term for term. Nothing here needs a
+reformulation: the arguments are of order one and the products carry no
+cancellation. ku*y reaches 4e-3 on the checked decks, so cosh and sinh are
+evaluated where they are well conditioned.
+```
+
+(api-fel-fp32-unavg-ode)=
+### `fel_fp32_unavg_ode`
+
+*Subroutine* `(y, fq, goff, u, dyds)`
+
+```
+unavg_ode in single precision. The transverse four lines transcribe directly.
+The fifth does not, and it is the one the mode lives on.
+
+The FP64 form is dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within
+1.3e-8 and their difference is the slippage, 1.9e-9 on the checked deck. In
+single precision a number near one has a quantum of 1.19e-7, so the answer is
+0.016 of one quantum and the naive difference is exactly zero: the slippage
+disappears and with it the physics. Measured on a real mid-segment state, the
+naive form is wrong by the whole of the answer.
+
+The identity 1/ra - 1/rb = (a - b) / (ra*rb*(ra + rb)), with ra = u_s/gamma,
+rb = beta0, a = 1 - ra^2 and b = 1 - rb^2, moves the cancellation into a - b,
+which is a difference of two small like quantities and carries no ones at all.
+It is exact and not a series, so there is no truncation to budget for. The same
+shape as the averaged twin's detuning (this module's header).
+```
+
+(api-fel-fp32-unavg-push)=
+### `fel_fp32_unavg_push`
+
+*Subroutine* `(h, n, t, u, fq)`
+
+```
+unavg_push_all in single precision, one RK4 magnetic push of the slice over h.
+Particle outermost where the FP64 routine is stage outermost, which is a cache
+choice there and changes no arithmetic: each particle's four stages depend on
+that particle alone.
 ```
 
 ## `fel_h5_mod.f90`
@@ -5800,6 +5872,62 @@ Output:
   dE_beam   -- real(rp): The step's kick-side beam energy change [J] (ledger).
   dU_spont  -- real(rp): The step's spontaneous source energy [J] (ledger).
   err_flag  -- logical: Set True if there is an error. False otherwise.
+```
+
+(api-unavg-twin-slice)=
+### `unavg_twin_slice`
+
+*Subroutine* `(is, n, x0, y0, px0, py0, z0, pz0)`
+
+```
+Routine to advance one slice's single-precision twin over this record step's
+substeps and fill the slice's divergence row. The FP64 arrays are the state as this
+step received it, and beam%slice(is) already carries the FP64 result, so the two are
+compared where the record step ends. That granularity is the choice: a substep is
+internal to the integrator, where a record step is the point the FP64 path and any
+device port synchronize, so it measures what a port would have to match.
+
+Both sides gather the field from the FP64 record. What the twin therefore prices is
+the particle path, which is where every reformulation below lives. The field's own
+single-precision accumulation is a separate quantity and is not measured here: this
+mode diffracts nsub times a record step where the averaged mode diffracts once, so it
+pays that many roundings, and the averaged instrument's field row does not carry over.
+doc/validation.md says so where the levels are recorded.
+
+What single precision destroys in this advance, each measured on a real mid-segment
+state of the one-segment deck rather than argued:
+
+  slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
+            the difference is 1.9e-9, which is 0.016 of the quantum of one in single
+            precision, so the naive difference is exactly zero and the slippage is
+            gone. Formed through the identity in fel_fp32_unavg_ode it comes back to
+            1.2e-7. This is the reformulation the mode lives on.
+  energy    gamma is 11358 with a quantum of 9.8e-4 against a per-substep change of
+            1.0e-6, which is a thousandth of a quantum. The working variable is
+            goff = gamma - gamma0, whose quantum is 6.0e-8 and which carries the same
+            change at 18 quanta.
+  lag       tau is the particle's lag and its per-substep change is 3.1e-12 m, which
+            the guard below measures rather than infers. Most of that is the quiver's
+            own longitudinal oscillation and not the slippage drift, so a figure taken
+            from two states many substeps apart understates it by nearly three orders.
+            Carrying the whole lag, one slice resolves the change at 4.4e5 quanta and
+            32 slices at 1.4e4, but a 351-slice window at 164 nm reaches 5.8e-5 m and
+            resolves it at 0.84 of a quantum, which is lost. The residual off a
+            per-slice FP64 reference is one slice's spread whatever the window, so it
+            does not move with the slice count. The margin is the reason the guard
+            watches this and not something else.
+  phase     Psi carried whole per particle costs 2.7e-5 rad at a segment's end and
+            grows with s. The base is one FP64 number a slice a substep, which is
+            what a device kernel would upload, and only the residual ks*dtaur is
+            single precision, at 2.4e-7 rad.
+
+u_s itself needs no reformulation, which measurement rather than expectation settled:
+sqrt(gamma^2 - 1 - ux^2 - uy^2) does lose the 1 and the ux^2 entirely in single
+precision, but they are 6.7e-9 of the result, so the naive and the reformed values
+agree to 5.0e-8. The same value serves the kick and the deposit, which is what keeps
+the pair exact energy duals.
+
+Runs inside the caller's parallel slice loop: everything written is indexed by is.
 ```
 
 ## `lucifer.f90`

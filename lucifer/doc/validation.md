@@ -1208,6 +1208,66 @@ Slice migration runs with the device resident, and no kernel is involved. `fel_m
 One property was inherited from the reference backends and no longer holds here. Their deposits accumulate with device atomic adds whose ordering is not fixed, so two runs of one step differed in the source's last bit or two, and no device output could be asserted byte-identical against another device run. The fixed-point accumulator above ends that, and the two-run comparison covers every array of the statistics file. Everything the kernels do not cover is refused at setup or first use, and a build without the backend refuses the knob itself with the stub's own message. Which build that is comes from detection rather than from the platform: the backend needs macOS and a Clang-family Objective-C++ compiler, since it is ARC-managed Objective-C++ against the Metal framework, and a macOS build whose Objective-C++ compiler is a GNU one takes the stub like any other. The configure output names the backend it built, and a capability-free build was measured to produce byte-identical physics to a full one.
 
 (val-the-coarsestep-measurement)=
+## The unaveraged advance in single precision
+
+Apple GPUs carry no FP64, so this project's rule is that a single-precision form of an
+advance exists with its divergence from the FP64 path measured before any kernel is
+written for it. The averaged advance has had one since [](#val-fp32-lockstep). The
+unaveraged advance now has one too, and until it did, nothing could have judged a device
+port of that mode: `fp32_check` refused the mode outright.
+
+The twin advances every substep of a record step from the state that step received, and
+the comparison is read where the record step ends. That granularity is a choice with a
+reason: a substep is internal to the integrator, where a record step is the point the
+FP64 path and any device port synchronize, so it prices what a port would have to match.
+The FP64 run is untouched, which is asserted rather than asserted of: the diag stream and
+the ledger are both byte identical with the twin on against off.
+
+Four things single precision destroys in this advance, each measured on a real
+mid-segment state rather than argued from the formula:
+
+| quantity | the naive form | what it costs |
+|---|---|---|
+| slippage rate, `gamma/u_s - 1/beta0` | both terms are one to within 1.3e-8 | the difference is 1.9e-9, which is 0.016 of the quantum of one, so it returns exactly zero and the slippage is gone |
+| energy, gamma | 11358, quantum 9.8e-4 | the per-substep change is 1.0e-6, a thousandth of a quantum |
+| lag, tau | quantum grows with the window | the per-substep change is 3.1e-12 m, resolved at 4.4e5 quanta on one slice and 0.84 on a 351-slice window |
+| phase, Psi | carried whole per particle | 2.7e-5 rad at a segment's end, growing with s |
+
+The forms that replace them are the offset charts the averaged twin already uses, `goff`
+and a per-slice residual, a base phase held in FP64 one number a slice a substep, and for
+the slippage the identity `1/ra - 1/rb = (a - b)/(ra rb (ra + rb))`, which moves the
+cancellation into a difference of two small like quantities and is exact rather than a
+series. `u_s` needs no reformulation at all, which measurement settled against
+expectation: `sqrt(gamma^2 - 1 - ux^2 - uy^2)` does lose the 1 and the `ux^2` entirely,
+but they are 6.7e-9 of the result, so the naive and the reformed values agree to 5.0e-8.
+
+Two of those are mutation records and not arguments. Replacing the slippage identity with
+the naive difference takes the phase row from 9.9e-6 rad to 1.7 rad, a factor of 170,000,
+and 1.7 rad is comparable to pi: the bunching phase is meaningless. Storing gamma
+absolutely instead of as an offset takes the energy row from 2.1e-6 to 2.0e-4.
+
+Measured levels, worst over the run (M3 Max, both builds agree, the benchmark segment at
+2048 macroparticles and grid 128, 89 record steps of 60 substeps):
+
+| check (harness section `unaveraged`) | level |
+|---|---|
+| transverse rows, x and y | 1.0e-6 (measured 9.98e-7) |
+| transverse momentum rows, the quiver chart | 1e-4 (measured 7.11e-6) |
+| energy row | 1e-4 (measured 2.12e-6) |
+| phase row [rad] | 1e-3 (measured 9.88e-6) |
+| phasor row | 1e-5 (measured 7.75e-8) |
+| the FP64 diag and ledger, twin on against off | byte identical |
+| the lag residual's guard [ulps a substep] | >= 32 (measured 8.8e5) |
+
+What this twin does not reach is the field. The mode diffracts once a substep, sixty times
+a record step on this deck, where the averaged mode diffracts once, so it pays that many
+roundings and the averaged instrument's field row does not carry over. Both sides here
+gather from the FP64 record, so the rows price the particle path, which is where every
+reformulation above lives. The field's own single-precision accumulation is a separate
+measurement and the source and field columns of the stream are zero in this mode to say
+so. `fp32_check = "freerun"` is refused for the mode, since freerun compounds a
+single-precision state across steps and this twin carries none.
+
 ## The coarse-step measurement
 
 (Summarized in manual [](fel-physics.md#sec-numerics).)

@@ -293,7 +293,7 @@ do ie = run%i_start, run%i_end
       if (fel_mode(ie) == unaveraged$) then
         call fel_tic (fel_t_unavg$)
         call fel_unavg_step (und, run%ustate, fbeam, wf, slip, und%dz, istep == 1, &
-                             istep == und%nstep, dE_step, dU_step, err)
+                             istep == und%nstep, dE_step, dU_step, run%fp32, err)
         call fel_toc (fel_t_unavg$)
         u_spont_cum = u_spont_cum + dU_step
       else
