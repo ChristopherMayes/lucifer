@@ -64,10 +64,38 @@ module fel_fp32_mod
 
 use fel_beam_mod
 use wavefront_mod
+use, intrinsic :: iso_c_binding
 
 implicit none
 
 integer, parameter :: fel_fp32_nq$ = 9   ! x, px, y, py, pz, theta, phasor, source, field.
+
+#ifdef LUCIFER_HAVE_FFTW3F
+
+! The single-precision transform's plan cache, threadprivate for the reason
+! wavefront_mod's is: the axis of parallelism is the slice and not the transform, so
+! every thread needs its own plans and its own aligned buffer. FFTW's new-array execute
+! rule makes running a plan on a differently aligned array undefined, which is why the
+! buffer is FFTW's own allocation and the transform runs on it rather than on the
+! caller's array.
+!
+! The planner is not thread safe where the executor is, so the build of a thread's cache
+! holds a named lock and fel_fp32_fft_plan_threads fills every thread's cache before the
+! slice loops start. Four threads planning at once segfault inside the library. That is
+! wavefront_fft2_plan_threads' arrangement, and the reason it exists.
+!
+! The plans are FFTW_ESTIMATE, so which thread's plan runs cannot move a digit.
+! FFTW_MEASURE chooses by timing and is nondeterministic at the ulp level, the same
+! decision recorded in wavefront_mod.
+
+type (c_ptr), private, save :: f32_plan_f = c_null_ptr
+type (c_ptr), private, save :: f32_plan_b = c_null_ptr
+type (c_ptr), private, save :: f32_buf_p = c_null_ptr
+complex(c_float_complex), private, pointer, save :: f32_buf(:,:) => null()
+integer, private, save :: f32_ng = 0
+!$OMP threadprivate(f32_plan_f, f32_plan_b, f32_buf_p, f32_buf, f32_ng)
+
+#endif
 
 ! The field twin transforms with FFTW's single-precision interface, and not every
 ! toolchain carries it: the conda environment does, and the off-site distribution
@@ -260,10 +288,12 @@ write (fp32%iu, '(a)') '# step and the run refuses).'
 write (fp32%iu, '(a)') '# An unaveraged segment writes one row a record step, its twin having advanced'
 write (fp32%iu, '(a)') '# every substep of that step, and px and py are its own chart, the undulator'
 write (fp32%iu, '(a)') '# quiver included: those rows are a worst per-particle difference, which sees a'
-write (fp32%iu, '(a)') '# common offset. Its source and field columns are zero, that mode diffracting'
-write (fp32%iu, '(a)') '# many times a record step where the averaged one diffracts once, so the field'
-write (fp32%iu, '(a)') '# arithmetic is a different quantity and is not measured here. Its guard watches'
-write (fp32%iu, '(a)') '# the lag residual, whose margin is the one that moves with the window.'
+write (fp32%iu, '(a)') '# common offset. Two columns carry that mode''s own quantities: source holds'
+write (fp32%iu, '(a)') '# the energy its kicks moved against the FP64 step''s, scaled by the turnover'
+write (fp32%iu, '(a)') '# rather than by the near-cancelling net, and field holds the twin''s record'
+write (fp32%iu, '(a)') '# after every substep''s transform pair, propagator and source add, relative to'
+write (fp32%iu, '(a)') '# the FP64 field''s norm. Its guard watches the lag residual, whose margin is'
+write (fp32%iu, '(a)') '# the one that moves with the window.'
 write (fp32%iu, '(a, l1)') '# freerun = ', fp32%freerun
 
 ! Migration in the residual representation is a bucket renormalization: a mover's
@@ -946,7 +976,7 @@ enddo
 ! the twin applies the same step to its FP32 record with the single-precision transform
 ! and the rounded propagator.
 
-call fp32_kernel_cache (fp32, exp_k2, ng)
+call fel_fp32_kernel_cache (fp32, exp_k2, ng)
 call fft32_solve (fp32%e32(:,:,is), fp32%k32, ng)
 fp32%e32(:,:,is) = fp32%e32(:,:,is) + 2 * s32
 
@@ -1008,14 +1038,14 @@ end subroutine fel_fp32_field_twin
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fp32_kernel_cache (fp32, exp_k2, ng)
+! Subroutine fel_fp32_kernel_cache (fp32, exp_k2, ng)
 !
 ! Routine to hold the FP32 image of the FP64 propagator, rebuilt only when the FP64
 ! kernel it rounds from changes (keyed by the values themselves: the caller's kernel
 ! cache already resolves grid, wavelength and step).
 !-
 
-subroutine fp32_kernel_cache (fp32, exp_k2, ng)
+subroutine fel_fp32_kernel_cache (fp32, exp_k2, ng)
 
 type (fel_fp32_struct) fp32
 complex(rp) exp_k2(:,:)
@@ -1031,7 +1061,7 @@ allocate (fp32%k32(ng, ng))
 fp32%k32 = cmplx(exp_k2, kind=sp)
 fp32%k32_key = key
 
-end subroutine fp32_kernel_cache
+end subroutine fel_fp32_kernel_cache
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1052,6 +1082,109 @@ end subroutine fp32_kernel_cache
 ! so rather than pretending to a fallback.
 !-
 
+!+
+! Subroutine fft32_plan (ng, ok)
+!
+! Routine to fill the calling thread's single-precision plan cache for an ng by ng
+! transform, rebuilding it where the size changed. One thread's cache and one thread's
+! buffer, so a caller inside a parallel region touches nothing another thread holds.
+!
+! The build holds a named lock, the planner and the allocator carrying global state where
+! the executor carries none. fel_fp32_fft_plan_threads calls this from every thread ahead
+! of the slice loops, so a call from inside a parallel region afterwards finds its own
+! cache already warm, plans nothing and takes no lock.
+!-
+
+subroutine fft32_plan (ng, ok)
+
+use, intrinsic :: iso_c_binding
+
+integer ng
+logical ok
+
+#ifdef LUCIFER_HAVE_FFTW3F
+
+include 'fftw3.f03'
+
+!
+
+ok = .true.
+if (ng == f32_ng .and. c_associated(f32_plan_f)) return
+
+! The allocator and the planner carry global state where the executor carries none, so
+! the build runs one thread at a time. The buffer and the two plan handles are this
+! thread's own, and the transforms themselves run outside this lock. Four threads
+! planning at once segfault inside the library, which is what this prevents.
+
+!$OMP CRITICAL (fel_fp32_fft_plan_lock)
+
+f32_ng = 0
+if (c_associated(f32_plan_f)) call fftwf_destroy_plan (f32_plan_f)
+if (c_associated(f32_plan_b)) call fftwf_destroy_plan (f32_plan_b)
+if (c_associated(f32_buf_p)) call fftwf_free (f32_buf_p)
+f32_plan_f = c_null_ptr;  f32_plan_b = c_null_ptr;  f32_buf_p = c_null_ptr
+f32_buf => null()
+
+! fftwf_alloc_complex and fftwf_plan_dft_2d both return null on failure, and a null plan
+! reaching fftwf_execute_dft is a crash rather than a diagnosable error.
+
+f32_buf_p = fftwf_alloc_complex (int(ng, c_size_t) * int(ng, c_size_t))
+if (c_associated(f32_buf_p)) then
+  call c_f_pointer (f32_buf_p, f32_buf, [ng, ng])
+  f32_plan_f = fftwf_plan_dft_2d (ng, ng, f32_buf, f32_buf, FFTW_FORWARD,  FFTW_ESTIMATE)
+  f32_plan_b = fftwf_plan_dft_2d (ng, ng, f32_buf, f32_buf, FFTW_BACKWARD, FFTW_ESTIMATE)
+  if (c_associated(f32_plan_f) .and. c_associated(f32_plan_b)) f32_ng = ng
+endif
+
+ok = (f32_ng == ng)
+
+!$OMP END CRITICAL (fel_fp32_fft_plan_lock)
+
+#else
+
+ok = .false.
+
+#endif
+
+end subroutine fft32_plan
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_fp32_fft_plan_threads (ng, err_flag)
+!
+! Routine to warm every thread's single-precision plan cache from this serial context, so
+! that no FFTW planner call runs beside a transform once the parallel regions start. The
+! shape and the reason are wavefront_fft2_plan_threads', and a build without the
+! single-precision library refuses at setup rather than reaching here.
+!-
+
+subroutine fel_fp32_fft_plan_threads (ng, err_flag)
+
+integer ng
+logical err_flag, any_bad, cache_ok
+character(*), parameter :: r_name = 'fel_fp32_fft_plan_threads'
+
+!
+
+any_bad = .false.
+
+!$OMP PARALLEL private(cache_ok) reduction(.or.: any_bad)
+call fft32_plan (ng, cache_ok)
+any_bad = any_bad .or. .not. cache_ok
+!$OMP END PARALLEL
+
+err_flag = any_bad
+if (any_bad) call out_io (s_error$, r_name, &
+      'FFTW COULD NOT PLAN A \i0\ BY \i0\ SINGLE-PRECISION TRANSFORM FOR EVERY THREAD.', &
+      'PLEASE REPORT THIS!', i_array = [ng, ng])
+
+end subroutine fel_fp32_fft_plan_threads
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine fft32_solve (e, k32, ng)
 
 use, intrinsic :: iso_c_binding
@@ -1063,31 +1196,23 @@ integer ng
 
 include 'fftw3.f03'
 
-type (c_ptr), save :: plan_f = c_null_ptr, plan_b = c_null_ptr, pbuf = c_null_ptr
-integer, save :: ng_plan = 0
-complex(c_float_complex), pointer, save :: buf(:,:) => null()
+logical cache_ok
 character(*), parameter :: r_name = 'fft32_solve'
 
 !
 
-if (ng /= ng_plan) then
-  if (c_associated(plan_f)) then
-    call fftwf_destroy_plan (plan_f)
-    call fftwf_destroy_plan (plan_b)
-    call fftwf_free (pbuf)
-  endif
-  pbuf = fftwf_alloc_complex (int(ng * ng, c_size_t))
-  call c_f_pointer (pbuf, buf, [ng, ng])
-  plan_f = fftwf_plan_dft_2d (ng, ng, buf, buf, FFTW_FORWARD,  FFTW_ESTIMATE)
-  plan_b = fftwf_plan_dft_2d (ng, ng, buf, buf, FFTW_BACKWARD, FFTW_ESTIMATE)
-  ng_plan = ng
+call fft32_plan (ng, cache_ok)
+if (.not. cache_ok) then
+  call out_io (s_fatal$, r_name, 'FFTW COULD NOT PLAN A \i0\ BY \i0\ SINGLE-PRECISION TRANSFORM.', &
+        'PLEASE REPORT THIS!', i_array = [ng, ng])
+  stop 1
 endif
 
-buf = e
-call fftwf_execute_dft (plan_f, buf, buf)
-buf = buf * k32
-call fftwf_execute_dft (plan_b, buf, buf)
-e = buf / real(ng * ng, sp)
+f32_buf = e
+call fftwf_execute_dft (f32_plan_f, f32_buf, f32_buf)
+f32_buf = f32_buf * k32
+call fftwf_execute_dft (f32_plan_b, f32_buf, f32_buf)
+e = f32_buf / real(ng * ng, sp)
 
 #else
 

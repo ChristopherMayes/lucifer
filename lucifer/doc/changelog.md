@@ -9,6 +9,28 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-10 Added: the unaveraged twin carries a ledger row and a field row, and the stream's source and
+  field columns hold them. The ledger row is the energy the twin's own kicks took from the beam against the
+  FP64 step's, scaled by the energy the step moved rather than by the energy it netted. Over a record step
+  the gains and the losses very nearly cancel, so the net is a small difference of large exchanges, and
+  against it the ratio reaches 3, which says something about the cancellation and nothing about precision.
+  Scaled by the turnover the row reads 1.56e-5. The field row is the twin's own single-precision record,
+  advanced on every substep by a single-precision transform pair against a rounded propagator with the
+  step's source added, compared with the FP64 field in the L2 norm. Sixty substeps stand behind one row on
+  the benchmark segment and it reads 6.0e-6. check_unaveraged holds the two under 1e-4 and 5e-5, and
+  doc/validation.md carries the levels beside the six that were already there.
+
+  The field row runs the single-precision transform inside the slice loop, so fel_fp32_mod's FFTW plan cache
+  moved from routine-local save variables to module scope under threadprivate, with a warm-up that fills
+  every thread's cache before the loops start. That is wavefront_mod's arrangement and its reason: the axis
+  of parallelism is the slice and not the transform, and FFTW's new-array execute rule makes a plan on a
+  differently aligned array undefined, so each thread owns its plans and its aligned buffer. The build holds
+  a named lock, the planner and the allocator carrying global state where the executor carries none. Four
+  threads planning at once segfault inside the library, and a single-threaded run never shows it.
+
+  The instrument is 1.75 times the walk of the same run without it on that segment, 6.1 s against 3.5 s at
+  one slice, which doc/performance.md records. Nothing in a production run turns it on.
+
 - 2026-09-10 Added: the unaveraged advance has a single-precision twin, so fp32_check no longer refuses that
   mode. Apple GPUs carry no FP64 and this tree's rule is that a single-precision form of an advance exists
   with its divergence from FP64 measured before a kernel is written for it. The averaged advance has had one

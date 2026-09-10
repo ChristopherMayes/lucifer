@@ -330,6 +330,7 @@ complex(rp), allocatable :: crsource(:,:), crsource_y(:,:)
 real(rp) p0_mc, gamma0b, inv_beta0, ks, dsub, s_sub, phi0_rate_avg, scl_u, dgrid
 real(rp) u_s, wx, wy, psi_mid, dgam, p_mc, beta
 real(rp) fq(4,4)     ! The stage field factors, rebuilt per push. Private per thread.
+complex(rp), pointer :: exp_k2_p(:,:)
 complex(rp) ehat, jhat, wphasor, cdep, ehat_y, cph
 logical two_pol
 integer is, ip, isub, nslice, ifld, ix, iy, ngrid_arr(3), ngrid
@@ -364,6 +365,23 @@ ngrid_arr = wavefront_shape(wf)
 ngrid = ngrid_arr(1)
 dgrid = wf%dx
 call fel_field_kernel_init (ngrid, dgrid, ks, dsub)
+
+! The twin's own field. Its propagator is this mode's, one substep and not one record
+! step, which is the whole reason the averaged instrument's field row does not carry over
+! here: sixty of these run where that one runs once, so the roundings are sixty deep.
+! Both caches are filled from this serial context, the single-precision planner not being
+! thread safe where its executor is.
+
+if (fp32%on) then
+  call fel_fp32_field_prep (fp32, ngrid, ngrid)
+  call fel_fp32_fft_plan_threads (ngrid, err)
+  if (err) then
+    err_flag = .true.
+    return
+  endif
+  exp_k2_p => fel_field_kernel_exp_k2 (ks)
+  if (associated(exp_k2_p)) call fel_fp32_kernel_cache (fp32, exp_k2_p, ngrid)
+endif
 
 ! The averaged ponderomotive rate: phi0 advances exactly as the averaged mode's, so
 ! theta-derived diagnostics and the downstream bookkeeping see one convention. The
@@ -417,6 +435,7 @@ do is = 1, nslice
   ! touches it. The twin runs from this afterwards and the comparison reads both.
 
   if (fp32%on) then
+    fp32%e32(:,:,is) = cmplx(wf%Ex(:,:,ifld), kind = sp)
     allocate (cx(sl%n), cy(sl%n), cpx(sl%n), cpy(sl%n), cz(sl%n), cpz(sl%n))
     cx = sl%x(1:sl%n);    cy = sl%y(1:sl%n);    cpx = sl%px(1:sl%n)
     cpy = sl%py(1:sl%n);  cz = sl%z(1:sl%n);    cpz = sl%pz(1:sl%n)
@@ -522,6 +541,15 @@ do is = 1, nslice
     call fel_field_diffract (wf, ifld, dsub, err)
     any_err = any_err .or. err
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
+
+    ! The same step on the twin's record, in single precision, from the source the FP64
+    ! side just built: the row then prices the transform pair, the rounded propagator and
+    ! the accumulation over the substeps, and not the deposit that fed them.
+
+    if (fp32%on .and. allocated(fp32%k32)) then
+      call fft32_solve (fp32%e32(:,:,is), fp32%k32, ngrid)
+      fp32%e32(:,:,is) = fp32%e32(:,:,is) + 2 * cmplx(crsource, kind = sp)
+    endif
     if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
 
     ! The deposit's own energy |dE|^2 = 4|src|^2: the one term of the field-energy
@@ -980,7 +1008,15 @@ fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
 ! noise-level sum.
 
 fp32%div_slice(8, is) = abs(dE32 - dE_slice(is)) / (dEturn + 1e-30_rp)
-fp32%div_slice(9, is) = 0          ! The field row: not measured in this mode, see above.
+! The field row, the twin's record against the FP64 one, normalized by the FP64 field's
+! own norm as the averaged instrument's is.
+
+if (allocated(fp32%k32)) then
+  fp32%div_slice(9, is) = sqrt(sum(abs(cmplx(fp32%e32(:,:,is), kind = rp) - wf%Ex(:,:,ifl))**2)) / &
+                          (sqrt(sum(abs(wf%Ex(:,:,ifl))**2)) + 1e-30_rp)
+else
+  fp32%div_slice(9, is) = 0
+endif
 fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
 fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
 call fel_fp32_median (dtau_ulp, n, gmed)

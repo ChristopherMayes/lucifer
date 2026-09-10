@@ -2668,6 +2668,36 @@ end subroutine fel_field_step
 !   FFTW plans are warmed serially (the parallel loops then only execute).
 !-
 
+!+
+! Function fel_field_kernel_exp_k2 (ks) result (p)
+!
+! Routine to point at the cached step propagator for this wavelength, so that a caller
+! outside this module can round it into another precision. Null where no entry has been
+! built, which is a caller that has not run fel_field_kernel_init first.
+!-
+
+function fel_field_kernel_exp_k2 (ks) result (p)
+
+complex(rp), pointer :: p(:,:)
+real(rp) ks
+integer ik
+
+!
+
+p => null()
+if (.not. allocated(fel_kernels)) return
+do ik = 1, size(fel_kernels)
+  if (fel_kernels(ik)%ks == ks .and. allocated(fel_kernels(ik)%exp_k2)) then
+    p => fel_kernels(ik)%exp_k2
+    return
+  endif
+enddo
+
+end function fel_field_kernel_exp_k2
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine fel_field_kernel_init (ngrid, dgrid, ks, dz, filter)
 
 integer ngrid

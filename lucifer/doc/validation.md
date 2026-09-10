@@ -1080,7 +1080,7 @@ The gain-regime figure sits at the order of the published backends' end-to-end S
 | instrument stream at 1 vs 8 threads | byte-identical |
 | wake with the instrument on | refused |
 
-The instrument is read-only on the physics by construction and by check: nothing outside it reads the FP32 state, and the instrumented run's FP64 outputs are byte-identical to the uninstrumented run's. Configurations the twin does not cover (harmonics, two polarizations, the coherent source, wakes, space charge, the unaveraged mode) are refused rather than half-measured.
+The instrument is read-only on the physics by construction and by check: nothing outside it reads the FP32 state, and the instrumented run's FP64 outputs are byte-identical to the uninstrumented run's. Configurations this twin does not cover (harmonics, two polarizations, the coherent source, wakes, space charge) are refused rather than half-measured. The unaveraged mode has a twin of its own, [](#val-unaveraged-fp32).
 
 (val-device)=
 ## The Metal backend, judged by the instrument
@@ -1207,7 +1207,7 @@ Slice migration runs with the device resident, and no kernel is involved. `fel_m
 
 One property was inherited from the reference backends and no longer holds here. Their deposits accumulate with device atomic adds whose ordering is not fixed, so two runs of one step differed in the source's last bit or two, and no device output could be asserted byte-identical against another device run. The fixed-point accumulator above ends that, and the two-run comparison covers every array of the statistics file. Everything the kernels do not cover is refused at setup or first use, and a build without the backend refuses the knob itself with the stub's own message. Which build that is comes from detection rather than from the platform: the backend needs macOS and a Clang-family Objective-C++ compiler, since it is ARC-managed Objective-C++ against the Metal framework, and a macOS build whose Objective-C++ compiler is a GNU one takes the stub like any other. The configure output names the backend it built, and a capability-free build was measured to produce byte-identical physics to a full one.
 
-(val-the-coarsestep-measurement)=
+(val-unaveraged-fp32)=
 ## The unaveraged advance in single precision
 
 Apple GPUs carry no FP64, so this project's rule is that a single-precision form of an
@@ -1244,19 +1244,24 @@ but they are 6.7e-9 of the result, so the naive and the reformed values agree to
 Two of those are mutation records and not arguments. Replacing the slippage identity with
 the naive difference takes the phase row from 9.9e-6 rad to 1.7 rad, a factor of 170,000,
 and 1.7 rad is comparable to pi: the bunching phase is meaningless. Storing gamma
-absolutely instead of as an offset takes the energy row from 2.1e-6 to 2.0e-4.
+absolutely instead of as an offset takes the energy row from 2.1e-6 to 2.0e-4. The field
+row has its own: dropping the factor of 2 the substep's source carries takes it from
+6.0e-6 to 1.3e-2, a factor of 2200, so a wrong constant in the twin's field arithmetic
+lands well above the level the row is held to.
 
-Measured levels, worst over the run (M3 Max, both builds agree, the benchmark segment at
-2048 macroparticles and grid 128, 89 record steps of 60 substeps):
+Measured levels, worst over the run and worst of the two builds, which agree on every row
+to a few percent (M3 Max, the benchmark segment at 2048 macroparticles and grid 128, 89
+record steps of 60 substeps):
 
 | check (harness section `unaveraged`) | level |
 |---|---|
-| transverse rows, x and y | 1.0e-6 (measured 9.98e-7) |
-| transverse momentum rows, the quiver chart | 1e-4 (measured 7.11e-6) |
+| transverse rows, x and y | 1e-5 (measured 9.98e-7) |
+| transverse momentum rows, the quiver chart | 1e-4 (measured 7.64e-6) |
 | energy row | 1e-4 (measured 2.12e-6) |
 | phase row [rad] | 1e-3 (measured 9.88e-6) |
 | phasor row | 1e-5 (measured 7.75e-8) |
-| ledger row, the twin's energy against the step's | 1e-4 (measured 1.31e-5) |
+| ledger row, the twin's energy against the step's | 1e-4 (measured 1.56e-5) |
+| field row, the twin's record against the step's | 5e-5 (measured 6.03e-6) |
 | the FP64 diag and ledger, twin on against off | byte identical |
 | the lag residual's guard [ulps a substep] | >= 32 (measured 8.8e5) |
 
@@ -1268,15 +1273,18 @@ single precision. The turnover is what the ledger's own conservation check norma
 for the same reason, and what the averaged instrument's phasor row does when it scales to
 charge rather than to a noise-level sum.
 
-What this twin does not reach is the field. The mode diffracts once a substep, sixty times
-a record step on this deck, where the averaged mode diffracts once, so it pays that many
-roundings and the averaged instrument's field row does not carry over. Both sides here
-gather from the FP64 record, so the rows price the particle path, which is where every
-reformulation above lives. The field's own single-precision accumulation is a separate
-measurement and the source and field columns of the stream are zero in this mode to say
-so. `fp32_check = "freerun"` is refused for the mode, since freerun compounds a
-single-precision state across steps and this twin carries none.
+The field row is this mode's and not the averaged instrument's. The mode diffracts once a
+substep, sixty times a record step on this deck, where the averaged mode diffracts once,
+so the twin keeps its own single-precision record and advances it every substep: a
+single-precision transform pair against a rounded propagator, then the step's source
+added. Sixty of those stand behind one row, and the row reads 6.0e-6 of the FP64 field's
+norm. The twin's particles gather from the FP64 record throughout, so the eight rows
+above price the particle path alone, which is where every reformulation lives, and the
+field row prices the field arithmetic alone. `fp32_check = "freerun"` is refused for the
+mode, since freerun compounds a single-precision state across steps and this twin carries
+none.
 
+(val-the-coarsestep-measurement)=
 ## The coarse-step measurement
 
 (Summarized in manual [](fel-physics.md#sec-numerics).)

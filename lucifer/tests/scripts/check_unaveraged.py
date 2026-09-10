@@ -415,7 +415,7 @@ def main():
         worst = cols.max(axis=0)
         print(f"      {len(rows)} steps instrumented, worst over the run:")
         for i, nm in ((1, "x"), (2, "px"), (3, "y"), (4, "py"), (5, "pz"), (6, "theta"),
-                      (7, "phasor"), (8, "ledger")):
+                      (7, "phasor"), (8, "ledger"), (9, "field")):
             print(f"        {nm:<7} {worst[i]:.3e}")
         check("twin: worst transverse row", max(worst[1], worst[3]), 1e-5)
         check("twin: worst transverse momentum row", max(worst[2], worst[4]), 1e-4)
@@ -429,6 +429,11 @@ def main():
         # reaches 3, which says something about the cancellation and nothing about
         # single precision.
         check("twin: worst ledger row, its energy against the FP64 step's", worst[8], 1e-4)
+        # The field row is this mode's and not the averaged instrument's: sixty substeps
+        # of transform pair, rounded propagator and source add stand behind one row where
+        # the averaged twin's field crosses one. The row is the twin's record against the
+        # FP64 field in the L2 norm, so the tolerance is the deeper accumulation's.
+        check("twin: worst field row, after every substep of the record step", worst[9], 5e-5)
 
     run(exe, wd, "uv_twoff", GAIN.format(root="uv_twoff",
         lat=unavg_wrapper(wd, "aramis_1seg.bmad")))

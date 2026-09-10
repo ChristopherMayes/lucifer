@@ -1237,8 +1237,8 @@ if (err_flag) return
 
 ! The FP32 lockstep instrument. It carries a twin for each advance, so a lattice of
 ! either mode or of both is instrumented, each segment by the twin that mirrors it. The
-! unaveraged twin prices that mode's particle path, which is where its reformulations
-! live, and doc/validation.md says what it does not yet reach.
+! unaveraged twin prices that mode's particle path, where its reformulations live, and a
+! field row of its own. doc/validation.md records both.
 !
 ! Freerun compounds a single-precision state across steps and the unaveraged twin does
 ! not carry one, so that combination is refused rather than reported as a lockstep.

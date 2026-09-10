@@ -2017,8 +2017,8 @@ Both rows are normalized by the post-solve FP64 field's norm: the source alone c
 sit at noise level on a dark start, and the post-solve field bounds it from below.
 ```
 
-(api-fp32-kernel-cache)=
-### `fp32_kernel_cache`
+(api-fel-fp32-kernel-cache)=
+### `fel_fp32_kernel_cache`
 
 *Subroutine* `(fp32, exp_k2, ng)`
 
@@ -2045,6 +2045,34 @@ A build without the single-precision library compiles the body out, since a call
 fftwf_execute_dft would fail to link at all. Setup refuses such a build
 (fel_fp32_have_fftw3f$), so this routine is unreachable there, and the message says
 so rather than pretending to a fallback.
+```
+
+(api-fft32-plan)=
+### `fft32_plan`
+
+*Subroutine* `(ng, ok)`
+
+```
+Routine to fill the calling thread's single-precision plan cache for an ng by ng
+transform, rebuilding it where the size changed. One thread's cache and one thread's
+buffer, so a caller inside a parallel region touches nothing another thread holds.
+
+The build holds a named lock, the planner and the allocator carrying global state where
+the executor carries none. fel_fp32_fft_plan_threads calls this from every thread ahead
+of the slice loops, so a call from inside a parallel region afterwards finds its own
+cache already warm, plans nothing and takes no lock.
+```
+
+(api-fel-fp32-fft-plan-threads)=
+### `fel_fp32_fft_plan_threads`
+
+*Subroutine* `(ng, err_flag)`
+
+```
+Routine to warm every thread's single-precision plan cache from this serial context, so
+that no FFTW planner call runs beside a transform once the parallel regions start. The
+shape and the reason are wavefront_fft2_plan_threads', and a build without the
+single-precision library refuses at setup rather than reaching here.
 ```
 
 (api-fel-fp32-step-close)=
@@ -5517,6 +5545,17 @@ Input:
 Output:
   None directly: the module kernel cache (fel_kernels) gains an entry, and the
   FFTW plans are warmed serially (the parallel loops then only execute).
+```
+
+(api-fel-field-kernel-exp-k2)=
+### `fel_field_kernel_exp_k2`
+
+*Function* `(ks) result (p)`
+
+```
+Routine to point at the cached step propagator for this wavelength, so that a caller
+outside this module can round it into another precision. Null where no entry has been
+built, which is a caller that has not run fel_field_kernel_init first.
 ```
 
 (api-fel-filter-angles)=
