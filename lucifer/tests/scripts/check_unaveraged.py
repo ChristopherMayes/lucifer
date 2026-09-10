@@ -414,7 +414,8 @@ def main():
         cols = np.array([[float(v) for v in r] for r in rows])
         worst = cols.max(axis=0)
         print(f"      {len(rows)} steps instrumented, worst over the run:")
-        for i, nm in ((1, "x"), (2, "px"), (3, "y"), (4, "py"), (5, "pz"), (6, "theta"), (7, "phasor")):
+        for i, nm in ((1, "x"), (2, "px"), (3, "y"), (4, "py"), (5, "pz"), (6, "theta"),
+                      (7, "phasor"), (8, "ledger")):
             print(f"        {nm:<7} {worst[i]:.3e}")
         check("twin: worst transverse row", max(worst[1], worst[3]), 1e-5)
         check("twin: worst transverse momentum row", max(worst[2], worst[4]), 1e-4)
@@ -422,6 +423,12 @@ def main():
         check("twin: worst phase row [rad]", worst[6], 1e-3,
               note="(the slippage identity holds it here; the naive form reads 1.7)")
         check("twin: worst phasor row", worst[7], 1e-5)
+        # The energy the twin's kicks moved against the FP64 step's, scaled by the
+        # energy the step actually moved rather than by what it netted: over a record
+        # step the gains and losses very nearly cancel, and against that net the ratio
+        # reaches 3, which says something about the cancellation and nothing about
+        # single precision.
+        check("twin: worst ledger row, its energy against the FP64 step's", worst[8], 1e-4)
 
     run(exe, wd, "uv_twoff", GAIN.format(root="uv_twoff",
         lat=unavg_wrapper(wd, "aramis_1seg.bmad")))

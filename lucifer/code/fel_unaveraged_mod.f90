@@ -807,7 +807,7 @@ real(rp) fqd(4,4), s_t, psi_b, tau_r, gam_l, beta_l, p_mc_l
 real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$), wsum, tau64
 real(rp), allocatable :: dtau_ulp(:)
 real(sp), allocatable :: tsave(:)
-real(rp) gmed
+real(rp) gmed, dE32, dEturn
 real(rp) p32r, p32i, p64r, p64i, th64, th32
 integer ip, jsub, ixl, iyl
 logical og
@@ -872,6 +872,8 @@ s_t = ustate%s
 
 allocate (dtau_ulp(n), tsave(n))
 dtau_ulp = 0
+dE32 = 0
+dEturn = 0
 
 do jsub = 1, ustate%nsub
 
@@ -911,6 +913,8 @@ do jsub = 1, ustate%nsub
     wr =  ehat_r * sn + ehat_i * cs
     wi = -ehat_r * cs + ehat_i * sn
     dg32 = -h32 * (wr * jr + wi * ji) / (us32 * real(m_electron, sp))
+    dE32 = dE32 + beam%slice(is)%weight(ip) * real(dg32, rp) * m_electron
+    dEturn = dEturn + beam%slice(is)%weight(ip) * abs(real(dg32, rp)) * m_electron
     t%goff(ip) = t%goff(ip) + dg32
   enddo
 
@@ -961,7 +965,22 @@ sc(7) = wsum + 1e-30_rp
 
 fp32%div_slice(1:6, is) = dstat(1:6) / sc(1:6)
 fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
-fp32%div_slice(8:9, is) = 0        ! The field rows: not measured in this mode, see above.
+! The energy the twin's kicks took from the beam, against the FP64 step's own. This is
+! the ledger's own term and not a coordinate, and it is the row a single-precision path
+! that quietly stopped conserving would move first, the kick and the deposit being exact
+! duals only while they share operands.
+!
+! The scale is the energy the step actually moved and not the energy it netted. Over a
+! record step the gains and the losses very nearly cancel, so the net is a small
+! difference of large exchanges and a relative error against it means nothing: on the
+! benchmark segment that ratio reaches 3, which is a statement about the cancellation
+! rather than about single precision. The turnover is the sum of the absolute exchanges,
+! which is what the ledger's own check normalizes by for the same reason, and what the
+! averaged instrument's phasor row does when it scales to charge rather than to a
+! noise-level sum.
+
+fp32%div_slice(8, is) = abs(dE32 - dE_slice(is)) / (dEturn + 1e-30_rp)
+fp32%div_slice(9, is) = 0          ! The field row: not measured in this mode, see above.
 fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
 fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
 call fel_fp32_median (dtau_ulp, n, gmed)

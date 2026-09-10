@@ -1256,8 +1256,17 @@ Measured levels, worst over the run (M3 Max, both builds agree, the benchmark se
 | energy row | 1e-4 (measured 2.12e-6) |
 | phase row [rad] | 1e-3 (measured 9.88e-6) |
 | phasor row | 1e-5 (measured 7.75e-8) |
+| ledger row, the twin's energy against the step's | 1e-4 (measured 1.31e-5) |
 | the FP64 diag and ledger, twin on against off | byte identical |
 | the lag residual's guard [ulps a substep] | >= 32 (measured 8.8e5) |
+
+The ledger row is the mode's own term and not a coordinate, and it is scaled by the
+energy the step moved rather than by the energy it netted. Over a record step the gains
+and the losses very nearly cancel, so the net is a small difference of large exchanges:
+against it the ratio reaches 3, which is a statement about the cancellation and not about
+single precision. The turnover is what the ledger's own conservation check normalizes by
+for the same reason, and what the averaged instrument's phasor row does when it scales to
+charge rather than to a noise-level sum.
 
 What this twin does not reach is the field. The mode diffracts once a substep, sixty times
 a record step on this deck, where the averaged mode diffracts once, so it pays that many
