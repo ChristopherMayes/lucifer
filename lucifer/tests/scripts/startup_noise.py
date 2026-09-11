@@ -297,11 +297,11 @@ def filter_xcut(ngrid, theta):
 
 
 def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0,
-              tolerance=None):
+              tolerance=None, half=None, more=""):
     nslice, sample = window
     slen = nslice * sample * LAMBDA0
     charge = CURRENT * slen / C_LIGHT
-    extra = ""
+    extra = more
     if device != "off":
         extra += f'  global%device = "{device}"\n'
     if xcut is None:
@@ -320,7 +320,8 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
         extra += "  global%dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
     return DECK.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
                        charge=charge, zhalf=slen / 2, slen=slen, sample=sample, extra=extra,
-                       lam0=LAMBDA0, sigpz=SIG_PZ, emit=NORM_EMIT, half=HALF_WIDTH)
+                       lam0=LAMBDA0, sigpz=SIG_PZ, emit=NORM_EMIT,
+                       half=HALF_WIDTH if half is None else half)
 
 
 class Runner:
@@ -804,6 +805,340 @@ def exp_genesis(rn, args, results):
     results["genesis"] = res
 
 
+
+# ---------------------------------------------------------------------------
+# i. The cell-size exponent, derived and measured to its cause
+#
+# The source's exponent is 2 (deposit-demo.ipynb) and the reported floor's falls from
+# 2 toward 1 as the cells shrink (doc/startup-noise.md's floor table). The derivation
+# in the design record (docs/analyses/cell-size-exponent.md) says why: the field
+# record slips one slice every L_ref = sample * lambda_u of undulator, so a field slice
+# sees the same static source for N_ref = L_ref / dz steps and an independent one
+# after, a mode at k_perp dephases by phi = k_perp^2 dz / (2 k_s) between deposits, and
+# a block of N deposits adds as sin^2(N phi/2)/sin^2(phi/2), N^2 while N phi is small
+# and N once it is not. The knee is theta_t = sqrt(lambda / (sample lambda_u)). The
+# same sum is evaluated here beside every measurement, with nothing fitted, so the
+# JSON carries the prediction and the number in one place.
+
+CAUSE_GRIDS = (64, 128, 256, 512)
+CAUSE_DS = (0.0225, 0.045, 0.09, 0.18)      # m, N_ref of 8, 4, 2 and 1 at sample 12
+CAUSE_SAMPLES = (3, 6, 12, 24, 48)          # wavelengths a slice, theta_t of 47 to 12 urad
+CAUSE_WIDTHS = (2e-4, 4e-4, 8e-4)           # m, at cells near 3.15 and 1.57 um
+CAUSE_STAIR_LENGTH = 0.585                  # m, thirteen steps, three slice rotations
+CAUSE_PLANE_COMB = 0.27                     # m, a frame every six steps
+
+
+def cause_blocks(dz, sample, z):
+    """The deposit blocks a field slice sees, in steps, replaying the tracker's own
+    rotation rule: the record turns when the accumulated slip passes 0.8 of a slice."""
+    nstep = int(round(SEG_LENGTH / dz))
+    dz_eff = SEG_LENGTH / nstep
+    slip = dz_eff / LAMBDA_U
+    n = int(round(z / dz_eff))
+    acc, cur, out = 0.0, 0, []
+    for _ in range(n):
+        cur += 1
+        acc += slip
+        if abs(acc) > 0.8 * sample:
+            acc -= sample
+            out.append(cur)
+            cur = 0
+    return out + ([cur] if cur else []), dz_eff
+
+
+def cause_model(ngrid, half, dz, sample, z, cut, shape="cic", sigma_xp=None, nxi=33):
+    """The wide-angle power outside the cut at plane z, up to a constant common to every
+    grid: the sum over the grid's own modes of the shape's power transform times the
+    block factor, summed over the blocks. Returns (power, cell size)."""
+    if sigma_xp is None:
+        sigma_xp = math.sqrt(NORM_EMIT / GAMMA0 / (0.5 * (BETA_A + BETA_B)))
+    ks = 2 * math.pi / LAMBDA0
+    blocks, dz_eff = cause_blocks(dz, sample, z)
+    dx = 2 * half / (ngrid - 1)
+    k1 = 2 * np.pi * np.fft.fftfreq(ngrid, d=dx)
+    kx, ky = np.meshgrid(k1, k1)
+    k2 = kx ** 2 + ky ** 2
+    theta = np.sqrt(k2) / ks
+    shp = (np.sinc(kx * dx / (2 * np.pi)) * np.sinc(ky * dx / (2 * np.pi))) ** (2 if shape == "cic" else 1)
+    phi = k2 * dz_eff / (2 * ks)
+    xi = np.linspace(-3, 3, nxi)
+    wxi = np.exp(-xi ** 2 / 2)
+    wxi /= wxi.sum()
+    g = np.zeros_like(k2)
+    for nb in blocks:
+        m = np.arange(nb)
+        for x, w in zip(xi, wxi):
+            ph = (phi - np.sqrt(k2) * sigma_xp * x * dz_eff).ravel()
+            g += w * np.abs(np.exp(-1j * np.outer(m, ph)).sum(axis=0)).reshape(k2.shape) ** 2
+    return float((shp ** 2 * g * (theta > cut)).sum()), dx
+
+
+def cause_exponents(powers):
+    """The exponent in 1/dx over each halving of the cell, from the powers at successive
+    grids, coarse to fine."""
+    p = np.asarray(powers, dtype=float)
+    return (np.log2(p[1:] / p[:-1])).tolist()
+
+
+def cause_frames(wd, root, cut):
+    """Far-field splits of a run's comb frames in record order, cached as JSON beside the
+    run so the frames can go and a second pass reproduces the numbers without them."""
+    cache = wd / f"{root}.farfield.json"
+    if cache.exists():
+        return json.loads(cache.read_text())
+    files = sorted(wd.glob(f"{root}-[0-9]*.wf.h5"),
+                   key=lambda p: int(p.name.split("-")[-1].split(".")[0]))
+    if not files:
+        raise RuntimeError(f"{root}: no comb frames and no cache")
+    rows = [far_field_split(p, (cut,)) for p in files]
+    cache.write_text(json.dumps(rows))
+    for p in files:
+        p.unlink()
+    for p in wd.glob(f"{root}-[0-9]*.beam.h5"):
+        p.unlink()
+    return rows
+
+
+def cause_fit(results):
+    """The scaling law's cell-size factor, re-fitted on the data it was built from: the
+    ratio of the power outside the cut to the power inside it at the saturation dump of
+    the floor runs, over the law's own range of 128 to 2048 beamlets. Two factors are
+    fitted, the (1.57 um/dx)^2 the law carries and the floor's own factor as this block
+    measures it, and the residual range of each is what says which to keep. The run at
+    0.78 um cells and 128 beamlets is set aside from the fit and reported beside it: the
+    artifact drains that beam and the ratio there is a property of the drain."""
+    fl = results["floor"]
+    c = results["cause"]
+    cut = c["cut"]
+    ko, ki = f"out_{cut:.0e}", f"in_{cut:.0e}"
+    base = {r["ngrid"]: r for r in c["base"]["rows"]}
+    ref = base[256]
+    factors = {"law": {ng: (ref["dx"] / base[ng]["dx"]) ** 2 for ng in base},
+               "floor": {ng: base[ng]["out"] / ref["out"] for ng in base}}
+    idump = 3    # the eighth undulator's end, the saturation plane the law is stated at
+    pts = [(ng, n // 8, fl[f"floor_g{ng}_n{n}"]["dumps"][idump])
+           for ng in CAUSE_GRIDS for n in NPARTS]
+    z_sat = pts[0][2]["z"]
+    drained = [(512, 128)]
+    out = {"z": z_sat, "beamlets_fitted": [128, 512, 2048], "set_aside": drained,
+           "factor": {k: {str(ng): v[ng] for ng in CAUSE_GRIDS} for k, v in factors.items()},
+           "ratio": {str(ng): {str(nb): p[ko] / p[ki] for g, nb, p in pts if g == ng} for ng in CAUSE_GRIDS},
+           "saturation_exponent": {}, "fit": {}, "criterion": {}}
+    for nb in (128, 512, 2048, 8192):
+        o = [p[ko] for g, b, p in pts if b == nb]
+        out["saturation_exponent"][str(nb)] = cause_exponents(o)
+    sel = [q for q in pts if q[1] <= 2048 and (q[0], q[1]) not in drained]
+    for name, F in factors.items():
+        a = math.exp(np.mean([math.log(p[ko] / p[ki] * nb / F[ng]) for ng, nb, p in sel]))
+        res = [p[ko] / p[ki] / (a * F[ng] / nb) for ng, nb, p in sel]
+        out["fit"][name] = {"prefactor": a, "residual_low": min(res), "residual_high": max(res)}
+        # The criterion N_b > 1000 F(dx), and the ratio it lands on at each cell, read from the
+        # measured ratios by interpolation in log N_b.
+        crit = {}
+        for ng in CAUSE_GRIDS:
+            nbs = np.array([128, 512, 2048, 8192], dtype=float)
+            rat = np.array([out["ratio"][str(ng)][str(int(b))] for b in nbs])
+            need = 1000 * F[ng]
+            crit[str(ng)] = {"beamlets": need,
+                             "ratio_there": float(np.exp(np.interp(math.log(need), np.log(nbs), np.log(rat))))}
+        out["criterion"][name] = crit
+    c["fit"] = out
+    print(f"  law re-fitted at z = {z_sat:.1f} m over {out['beamlets_fitted']} beamlets:")
+    for name in factors:
+        f = out["fit"][name]
+        print(f"    {name:6s} factor: prefactor {f['prefactor']:.0f}, residual {f['residual_low']:.2f} to {f['residual_high']:.2f}")
+
+
+def exp_cause(rn, args, results):
+    print("== i. the cell-size exponent, one segment, 1024 particles ==")
+    cut = THETA_CUTS[1]
+    key_out, key_in = f"out_{cut:.0e}", f"in_{cut:.0e}"
+    lat1 = "aramis_1seg.bmad"
+    src = pathlib.Path(args.latdir) / "bmad" / lat1
+    (rn.wd / lat1).write_bytes(src.read_bytes())
+    npart, beamlet = 1024, 8
+    nslice = LONG[0]
+    res = {"cut": cut, "npart": npart, "nslice": nslice, "seg_length": SEG_LENGTH,
+           "lambda_u": LAMBDA_U, "ds_step_lattice": 0.045}
+
+    def one(root, lat, ngrid, sample, half, dz, more="", dumps=("UND",), device=None, threads=None):
+        text = deck_text(lat, root, ngrid, npart, beamlet, (nslice, sample), device or args.device,
+                         dumps=dumps, half=half, more=more)
+        rn.run(root, text, env_threads=threads)
+        row = None
+        if dumps:
+            cache = rn.wd / f"{root}.farfield.json"
+            if cache.exists():
+                row = json.loads(cache.read_text())
+            else:
+                row = far_field_split(dumps_of(rn.wd, root, nele=1)[0], THETA_CUTS)
+                cache.write_text(json.dumps(row))
+        pred, dx = cause_model(ngrid, half, dz, sample, SEG_LENGTH, cut)
+        out = {"ngrid": ngrid, "dx": dx, "sample": sample, "half": half, "dz": dz, "model": pred}
+        if row is not None:
+            out.update({"out": row[key_out], "in": row[key_in], "theta_nyquist": row["theta_nyquist"]})
+        return out
+
+    def sweep(rows):
+        """Measured and predicted exponents over the halvings, coarse to fine."""
+        return {"rows": rows, "exponent": cause_exponents([r["out"] for r in rows]),
+                "exponent_model": cause_exponents([r["model"] for r in rows])}
+
+    def say(label, sw):
+        print(f"  {label:14s} exponents", [f"{e:.2f}" for e in sw["exponent"]],
+              "derived", [f"{e:.2f}" for e in sw["exponent_model"]])
+
+    # The base: the lattice's own step and the sweep's own spacing and window.
+    base = [one(f"cause_base_g{ng}", lat1, ng, LONG[1], HALF_WIDTH, 0.045) for ng in CAUSE_GRIDS]
+    res["base"] = sweep(base)
+    say("base", res["base"])
+
+    # The step, at the spacing and window of the base. A wrapper sets the element's step.
+    res["step"] = {}
+    for dz in CAUSE_DS:
+        lat = lat1
+        tag = int(round(dz * 1e4))
+        if dz != 0.045:
+            lat = f"cause_ds{tag}.bmad"
+            (rn.wd / lat).write_text(f"call, file = {lat1}\nUND[ds_step] = {dz}\n")
+        rows = [one(f"cause_ds{tag}_g{ng}", lat, ng, LONG[1], HALF_WIDTH, dz) for ng in CAUSE_GRIDS]
+        res["step"][str(dz)] = sweep(rows)
+        say(f"dz {dz:.4f}", res["step"][str(dz)])
+
+    # The slice spacing, at the step and window of the base.
+    res["spacing"] = {}
+    for smp in CAUSE_SAMPLES:
+        rows = [one(f"cause_s{smp}_g{ng}", lat1, ng, smp, HALF_WIDTH, 0.045) for ng in CAUSE_GRIDS]
+        res["spacing"][str(smp)] = sweep(rows)
+        say(f"sample {smp}", res["spacing"][str(smp)])
+
+    # The half width, at cells near 3.15 and 1.57 um. The device takes powers of two, so
+    # the cell moves by 0.4 percent between widths; both grids of a pair move together and
+    # the exponent over the pair is what is compared. The 1024-point grid is the CPU's.
+    res["width"] = {}
+    for half in CAUSE_WIDTHS:
+        grids = tuple(1 << int(round(math.log2(2 * half / d + 1))) for d in (3.15e-6, 1.569e-6))
+        cpu = grids[1] > 512
+        rows = [one(f"cause_w{int(half * 1e6)}_g{ng}", lat1, ng, LONG[1], half, 0.045,
+                    device="off" if cpu else None, threads=args.cpu_threads if cpu else None)
+                for ng in grids]
+        res["width"][str(half)] = sweep(rows)
+        say(f"half {half * 1e6:.0f} um", res["width"][str(half)])
+
+    # The plane: frames along the segment, the wide-angle power against z.
+    res["plane"] = {}
+    for ng in (128, 256):
+        root = f"cause_plane_g{ng}"
+        one(root, lat1, ng, LONG[1], HALF_WIDTH, 0.045, dumps=(),
+            more=f"  global%dump_at_comb = T\n  global%comb_ds_save = {CAUSE_PLANE_COMB}\n")
+        rows = cause_frames(rn.wd, root, cut)
+        zs = [r["z"] for r in rows]
+        pred = [cause_model(ng, HALF_WIDTH, 0.045, LONG[1], z, cut)[0] if z > 0 else 0.0 for z in zs]
+        res["plane"][str(ng)] = {"z": zs, "out": [r[key_out] for r in rows],
+                                 "in": [r[key_in] for r in rows], "model": pred}
+    # The staircase: every step over three slice rotations of a short element.
+    lat = "cause_stair.bmad"
+    (rn.wd / lat).write_text(f"call, file = {lat1}\nUND[l] = {CAUSE_STAIR_LENGTH}\n")
+    root = "cause_stair_g256"
+    one(root, lat, 256, LONG[1], HALF_WIDTH, 0.045, dumps=(),
+        more="  global%dump_at_comb = T\n  global%comb_ds_save = 0\n")
+    rows = cause_frames(rn.wd, root, cut)
+    res["stair"] = {"z": [r["z"] for r in rows], "out": [r[key_out] for r in rows]}
+
+    # The CPU cross-check at one grid of the base.
+    cpu = one("cause_base_g128_cpu", lat1, 128, LONG[1], HALF_WIDTH, 0.045, device="off",
+              threads=args.cpu_threads)
+    rel = abs(cpu["out"] - base[1]["out"]) / base[1]["out"]
+    res["cpu_cross_check"] = {"rel_out": rel}
+    print(f"  device vs CPU at grid 128, wide-angle power: {rel:.2e}")
+    results["cause"] = res
+    if "floor" in results:
+        cause_fit(results)
+
+
+def cause_figure(results, out):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({"font.size": 9, "axes.grid": True, "grid.alpha": 0.3})
+    c = results["cause"]
+    fig, ax = plt.subplots(2, 3, figsize=(13, 7.5))
+
+    rows = c["base"]["rows"]
+    dx = np.array([r["dx"] for r in rows]) * 1e6
+    meas = np.array([r["out"] for r in rows])
+    mod = np.array([r["model"] for r in rows]) * (meas[2] / rows[2]["model"])
+    a = ax[0, 0]
+    a.loglog(dx, meas, "o", label="measured")
+    a.loglog(dx, mod, "-", label="derived, scaled at 1.57 um")
+    a.loglog(dx, meas[2] * (dx[2] / dx) ** 2, "--", color="gray", label="$1/dx^2$")
+    a.set_xlabel("cell size (um)")
+    a.set_ylabel("power per slice outside 3 urad (W)")
+    a.set_title("the floor at z = 3.99 m")
+    a.legend(fontsize=8)
+
+    def expo_panel(a, key, xs, xlabel, title, which):
+        a.semilogx(xs, [c[key][str(x)]["exponent"][which] for x in xs], "o", label="measured")
+        a.semilogx(xs, [c[key][str(x)]["exponent_model"][which] for x in xs], "-", label="derived")
+        a.axhline(2, color="gray", ls="--", lw=0.8)
+        a.set_xticks(list(xs))
+        a.set_xticklabels([f"{x:g}" for x in xs])
+        a.minorticks_off()
+        a.set_xlabel(xlabel)
+        a.set_ylabel("exponent over one halving")
+        a.set_title(title)
+        a.set_ylim(0, 2.6)
+        a.legend(fontsize=8)
+
+    expo_panel(ax[0, 1], "spacing", CAUSE_SAMPLES, "slice spacing (wavelengths)",
+               "the slice spacing moves the knee, 3.15 to 1.57 um", 1)
+    expo_panel(ax[0, 2], "step", CAUSE_DS, "ds_step (m)", "the step at fixed spacing, 1.57 to 0.78 um", 2)
+    a = ax[1, 0]
+    ws = [w * 1e6 for w in CAUSE_WIDTHS]
+    a.semilogx(ws, [c["width"][str(w)]["exponent"][0] for w in CAUSE_WIDTHS], "o", label="measured")
+    a.semilogx(ws, [c["width"][str(w)]["exponent_model"][0] for w in CAUSE_WIDTHS], "-", label="derived")
+    a.axhline(2, color="gray", ls="--", lw=0.8)
+    a.set_xticks(ws)
+    a.set_xticklabels([f"{w:g}" for w in ws])
+    a.minorticks_off()
+    a.set_xlabel("half width (um)")
+    a.set_ylabel("exponent, 3.15 to 1.57 um")
+    a.set_title("the window does not enter")
+    a.set_ylim(0, 2.6)
+    a.legend(fontsize=8)
+
+    a = ax[1, 1]
+    for ng, mk in ((128, "o"), (256, "s")):
+        p = c["plane"][str(ng)]
+        z = np.array(p["z"])
+        o = np.array(p["out"])
+        m = np.array(p["model"])
+        keep = z > 0
+        a.plot(z[keep], o[keep] / o[keep][-1], mk, label=f"grid {ng}, measured")
+        a.plot(z[keep], m[keep] / m[keep][-1], "-", lw=0.8, label=f"grid {ng}, derived")
+    a.plot([0, c["seg_length"]], [0, 1], "--", color="gray", label="linear in z")
+    a.set_xlabel("z (m)")
+    a.set_ylabel("power outside 3 urad, relative to the end")
+    a.set_title("the plane: blocks add in power")
+    a.legend(fontsize=7)
+
+    a = ax[1, 2]
+    st = c["stair"]
+    z = np.array(st["z"])
+    o = np.array(st["out"])
+    keep = z > 0
+    dz_eff = CAUSE_STAIR_LENGTH / round(CAUSE_STAIR_LENGTH / c["ds_step_lattice"])
+    a.plot(z[keep] / dz_eff, o[keep], "o-")
+    for k in (4, 8, 12):
+        a.axvline(k, color="gray", ls=":", lw=0.8)
+    a.set_xlabel("step")
+    a.set_ylabel("power per slice outside 3 urad (W)")
+    a.set_title("the first three slice rotations, grid 256")
+    fig.tight_layout()
+    fig.savefig(out / "cell-size-cause.png", dpi=130)
+    plt.close(fig)
+
+
 def rounded(obj, digits=5):
     """The same structure with every float at `digits` significant figures."""
     if isinstance(obj, float):
@@ -995,7 +1330,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="metal")
     ap.add_argument("--cpu-threads", default="12")
-    ap.add_argument("--only", default="a,b,c,d,e,f,g,h")
+    ap.add_argument("--only", default="a,b,c,d,e,f,g,h,i")
     ap.add_argument("--machine", default="aramis", choices=sorted(MACHINES))
     args = ap.parse_args()
 
@@ -1040,7 +1375,11 @@ def main():
         exp_filter(rn, args, lat, results)
     if "h" in want:
         exp_tolerance(rn, args, lat, results)
+    if "i" in want and args.machine == "aramis":
+        exp_cause(rn, args, results)
     results_file.write_text(json.dumps(rounded(results), indent=1))
+    if "cause" in results:
+        cause_figure(results, out)
     if all(k in results for k in ("floor", "beamlets", "line")):
         figures(results, out)
     if "filter" in results:
