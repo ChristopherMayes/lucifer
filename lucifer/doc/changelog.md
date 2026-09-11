@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-11 Added: the frame series with the device resident in the unaveraged mode is checked. That
+  combination became supported when the Metal backend took that mode and nothing in the harness held it,
+  which is the shape a producer and a consumer written to the same feature take when neither is exercised.
+  A device run writes the same nine beam and nine field frames the CPU run writes at the same s exactly, a
+  frame taken inside the segment names its chart through felMethod, and its mean px carries the undulator
+  quiver at 4.2e5 eV/c where the averaged chart sits near 1e2. The comparison is the mean and not the
+  spread, an rms being blind to the common offset the quiver is, and the device's mean tracks the CPU's to
+  1.9e-7.
+
 - 2026-09-10 Added: global%interlude_ds_step cuts an interlude element into pieces, so statistics rows and
   openPMD frames land along a drift or a quadrupole the way they already land along a wiggler. A frame
   series had particles through an undulator and one frame through the break after it, and no comb setting

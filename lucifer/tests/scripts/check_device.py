@@ -47,7 +47,10 @@ and everything the backend does not cover is refused.
    reduction are the kernels this mode adds and whose field solve is the one above.
    Judged the same ways, with the transform pair's own energy loss measured beside
    them because it is what sets its ceilings: that mode runs the pair nsub times a
-   record step where the averaged mode runs it once. See unaveraged() below.
+   record step where the averaged mode runs it once. The frame series rides the comb
+   there too, so a frame is written from arrays the readback refreshed, and what it
+   must carry is the chart: the undulator quiver sits in px as a common offset, which
+   the mean sees and an rms does not (FINDINGS 7.68). See unaveraged() below.
 
 8. Slice migration, from check_migration's own decks at the device's grid. Migration
    needs no kernel: at an element's last step the walk reads the beam back and releases
@@ -202,6 +205,13 @@ CEIL_U = {"x": 3.5e-6, "px": 2.5e-5, "y": 3.0e-6, "py": 2.1e-5, "pz": 6.5e-6,
           "theta": 1.1e-5, "phasor": 2.5e-7, "source": 5.0e-3, "field": 2.0e-5}
 GUARD_FLOOR_U = 1e9
 U_E2E_CEIL = 5.0e-3
+
+# The frame series with the device resident in this mode. The mean px a frame carries is
+# the quiver chart's own, and the device's differs from the CPU's by the FP32 round trip
+# of the chart rather than by the transform loss that sets the band above: measured
+# 1.9e-7, and this sits well under that band so a chart error cannot hide in it.
+
+U_FRAME_CEIL = 1.0e-5
 
 # The end-to-end band against the CPU's own unaveraged run. It is set by the transform
 # pair's loss below rather than by anything the port chose: on the steady deck, whose
@@ -458,6 +468,60 @@ def unaveraged(args, wd, exe):
     rel = abs(pd - pc) / pc
     ok("unaveraged production power vs CPU", f"{rel:.3e}", f"<= {U_E2E_CEIL:.1e}",
        rel <= U_E2E_CEIL)
+
+    # 4b. The frame series with the device resident in this mode. The comb's positions
+    # are where the resident state comes back to the host, so a frame is written from
+    # arrays the device refreshed rather than from stale ones. The chart is the thing to
+    # check: a frame taken mid-segment carries the undulator quiver in px, and a
+    # statistic that cannot see a common offset would pass with the quiver missing
+    # (FINDINGS 7.68), so the mean is compared and not the spread.
+    frame_extra = '  global%comb_ds_save = 0.5\n  global%dump_at_comb = T\n'
+    run(args.exe, wd, "dvu_fr.in", base.format(root="dvufr", extra=DEV + frame_extra))
+    run(args.exe, wd, "dvu_froff.in", base.format(root="dvufroff", extra=frame_extra))
+    fd = sorted(wd.glob("dvufr-[0-9]*.beam.h5"))
+    fc = sorted(wd.glob("dvufroff-[0-9]*.beam.h5"))
+    ok("unaveraged frames on the device, count against the CPU",
+       f"{len(fd)} against {len(fc)}", "equal and nonzero",
+       len(fd) == len(fc) and len(fd) > 0)
+    ok("unaveraged field frames on the device, count against the CPU",
+       f"{len(sorted(wd.glob('dvufr-[0-9]*.wf.h5')))} against {len(fd)}", "equal",
+       len(sorted(wd.glob("dvufr-[0-9]*.wf.h5"))) == len(fd))
+
+    if fd and len(fd) == len(fc):
+        def read(path):
+            with h5py.File(path) as h:
+                it = list(h["data"])[0]
+                m = h.attrs.get("felMethod")
+                m = np.ravel(m)[0] if m is not None else None
+                if isinstance(m, bytes):
+                    m = m.decode()
+                return (float(np.ravel(h.attrs["sPosition"])[0]), m,
+                        float(np.mean(h[f"data/{it}/particles/electron/momentum/x"])))
+
+        d = [read(f) for f in fd]
+        c = [read(f) for f in fc]
+        sdev = max(abs(a[0] - b[0]) for a, b in zip(d, c))
+        ok("unaveraged frames on the device land at the CPU's own s", f"{sdev:.3e}",
+           "<= 1e-9", sdev <= 1e-9)
+
+        # A frame taken outside an FEL element carries no felMethod, which the frame at
+        # the line's start is. Inside one, this mode's frames must name the chart they
+        # hold, since the averaged physics and the Bmad seam read the two differently.
+        inside = [a for a in d if a[1] is not None]
+        m = sorted({a[1].lower() for a in inside})
+        ok("unaveraged frames on the device name the chart they hold",
+           f"{m} over {len(inside)} of {len(d)} frames", "['unaveraged'], some inside",
+           m == ["unaveraged"] and len(inside) > 0)
+
+        # The quiver is a common offset of order aw/gamma, so the mean carries it and an
+        # rms does not. It reaches 1e5 eV/c mid-segment against 1e2 in the averaged chart.
+        quiver = max(abs(a[2]) for a in inside) if inside else 0.0
+        ok("unaveraged frames on the device carry the quiver in px", f"{quiver:.3e}",
+           "> 1e4", quiver > 1e4)
+        scale = max(max(abs(b[2]) for b in c), 1e-300)
+        rel = max(abs(a[2] - b[2]) for a, b in zip(d, c)) / scale
+        ok("unaveraged frame px mean, device against CPU", f"{rel:.3e}",
+           f"<= {U_FRAME_CEIL:.1e}", rel <= U_FRAME_CEIL)
 
     # 5. A time-dependent window: slippage rotates the resident record between record
     # steps and the ledger's banked terms cross the seam every record step.
