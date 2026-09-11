@@ -79,6 +79,10 @@ logical prog_header_done
 logical write_diag, keep_escaped_field, migrate, migrate_check, any_unavg, two_pol, err
 character(400) out_root
 character(16) interlude_model
+type (ele_struct), target :: slice_ele          ! One interlude piece, element_slice_iterator's.
+type (ele_struct), pointer :: ele_p             ! The element the piece's arithmetic reads.
+integer i_piece, n_piece
+real(rp) l_piece, f_piece, z_ele0
 character(*), parameter :: r_name = 'track_fel_line'
 
 !
@@ -353,142 +357,199 @@ do ie = run%i_start, run%i_end
 
   elseif (interlude_model == 'bmad') then
 
-    ! The seam: Bmad tracks each slice's bunch (coordinate copies in and out),
-    ! wavefront_drift moves the field (every slice, rotation-invariant), and the common
-    ! phase phi0 advances by the reference rate with Genesis's drift surrogate
-    ! ks/(2*gamma0^2) as the reference wavenumber.
+    ! The interlude's own steps. Tao's comb has two halves and comb_ds_save carries the
+    ! first: save_a_bunch_step selects among positions a tracker already reaches. This is
+    ! the second, tao_lattice_calc_mod's own n_slice branch, which cuts an element into
+    ! pieces with element_slice_iterator where the tracker would cross it in one map.
+    ! Without it a drift reaches one position, its end, and no comb setting adds another,
+    ! so a frame series has particles through a wiggler and one frame through a break.
     !
-    ! This slice loop is deliberately serial: track1_bunch parallelizes over particles
-    ! internally (track1_bunch_hom, "$OMP parallel do if (thread_safe)", on by default
-    ! via global_com%mp_threading_is_safe). The threads are already busy inside each
-    ! call, so parallelizing here as well would nest. The FEL step's parallelism over
-    ! slices lives in fel_track_mod.
+    ! Tao declines to cut where CSR or space charge would see the cut. The same judgment
+    ! is made here for the element short-range wake, which is Bmad's own once-per-passage
+    ! kick of the element's length and would become one kick a piece. The chamber wake
+    ! needs no such refusal: it is an energy loss proportional to the length applied
+    ! additively in gamma, so pieces sum to the element's own kick.
 
-    call fel_tic (fel_t_seam$)
-    if (associated(wake_src)) then
+    n_piece = 1
+    if (.not. associated(wake_src)) &
+            n_piece = fel_interlude_pieces(run%global%interlude_ds_step, ele%value(l$))
+    z_ele0 = z_now
 
-      ! Wake-carrying interlude: All slices as one bunch in global window coordinates,
-      ! through Bmad's own track1_bunch, which applies the sr wake at ds_wake with the
-      ! whole window visible head to tail (fel-physics.md sec-seamwake). The per-slice path below
-      ! is untouched for everything else, keeping its numerics bit-identical.
-
-      call fel_concat_slices (fbeam, ele, run%wake_bunch, run%wake_beta0, err)
-      if (err) then
-        err_flag = .true.;  return
-      endif
-      call track1_bunch (run%wake_bunch, ele, err)
-      if (err) then
-        call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
-        err_flag = .true.;  return
-      endif
-      call fel_split_slices (run%wake_bunch, ele, fbeam, run%wake_beta0, .false., err)
-      if (err) then
-        err_flag = .true.;  return
-      endif
-    else
-
-      ! The slices are independent (disjoint data, one private bunch scratch per
-      ! thread), so the loop runs slice-parallel. track1_bunch's own particle-level
-      ! OMP region nests inside and, with nesting off (the OpenMP default), runs
-      ! serial per thread: coarse slice granularity replaces fine particle
-      ! granularity, and each slice's arithmetic is untouched (bit-for-bit, and the
-      ! thread-identity checks cover it). Radiation fluctuations draw from the one
-      ! shared RNG stream inside track1, whose draw order must stay fixed: that
-      ! (rare, check-mode) configuration keeps the serial loop.
-
-      if (bmad_com%radiation_fluctuations_on) then
-        do is = 1, nslice
-          call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch, err)
-          if (err) then
-            err_flag = .true.;  return
-          endif
-          call track1_bunch (bunch, ele, err)
-          if (err) then
-            call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
-            err_flag = .true.;  return
-          endif
-          call fel_bunch_to_slice (bunch, ele, fbeam%slice(is), err)
-          if (err) then
-            err_flag = .true.;  return
-          endif
-        enddo
+    do i_piece = 1, n_piece
+      if (n_piece == 1) then
+        ele_p => ele
       else
-        err = .false.
-        !$OMP parallel do firstprivate(err) reduction(.or.: err_flag) schedule(static)
-        do is = 1, nslice
-          if (.not. err) then
+        call element_slice_iterator (ele, branch%param, i_piece, n_piece, slice_ele)
+        ele_p => slice_ele
+      endif
+      l_piece = ele_p%value(l$)
 
-            ! The scratch bunch is block-local: freshly default-initialized each
-            ! iteration by Fortran's own semantics. (An OMP private clause on the
-            ! subroutine-level scratch left the derived type's components
-            ! improperly initialized under gfortran -- found as a deterministic
-            ! 2x bunching shift -- so the scratch's definition lives here, where
-            ! no clause semantics are involved.)
+      ! The break's chord-vs-arc correction is a property of the whole break and lands on
+      ! its last element (fel_setup_mod's close_geometry_break). It lands on that
+      ! element's last piece here, so the pieces sum to what the element did before. The
+      ! slippage is length proportional and splits.
 
-            block
-              type (bunch_struct) bunch_l
-              call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele, bunch_l, err)
-              if (.not. err) call track1_bunch (bunch_l, ele, err)
-              if (.not. err) call fel_bunch_to_slice (bunch_l, ele, fbeam%slice(is), err)
-              if (err) err_flag = .true.
-            end block
-          endif
-        enddo
-        !$OMP end parallel do
-        if (err_flag) then
+      f_piece = 0
+      if (i_piece == n_piece) f_piece = 1
+
+      ! The seam: Bmad tracks each slice's bunch (coordinate copies in and out),
+      ! wavefront_drift moves the field (every slice, rotation-invariant), and the common
+      ! phase phi0 advances by the reference rate with Genesis's drift surrogate
+      ! ks/(2*gamma0^2) as the reference wavenumber.
+      !
+      ! This slice loop is deliberately serial: track1_bunch parallelizes over particles
+      ! internally (track1_bunch_hom, "$OMP parallel do if (thread_safe)", on by default
+      ! via global_com%mp_threading_is_safe). The threads are already busy inside each
+      ! call, so parallelizing here as well would nest. The FEL step's parallelism over
+      ! slices lives in fel_track_mod.
+
+      call fel_tic (fel_t_seam$)
+      if (associated(wake_src)) then
+
+        ! Wake-carrying interlude: All slices as one bunch in global window coordinates,
+        ! through Bmad's own track1_bunch, which applies the sr wake at ds_wake with the
+        ! whole window visible head to tail (fel-physics.md sec-seamwake). The per-slice path below
+        ! is untouched for everything else, keeping its numerics bit-identical.
+
+        call fel_concat_slices (fbeam, ele_p, run%wake_bunch, run%wake_beta0, err)
+        if (err) then
+          err_flag = .true.;  return
+        endif
+        call track1_bunch (run%wake_bunch, ele_p, err)
+        if (err) then
           call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
-          return
+          err_flag = .true.;  return
+        endif
+        call fel_split_slices (run%wake_bunch, ele_p, fbeam, run%wake_beta0, .false., err)
+        if (err) then
+          err_flag = .true.;  return
+        endif
+      else
+
+        ! The slices are independent (disjoint data, one private bunch scratch per
+        ! thread), so the loop runs slice-parallel. track1_bunch's own particle-level
+        ! OMP region nests inside and, with nesting off (the OpenMP default), runs
+        ! serial per thread: coarse slice granularity replaces fine particle
+        ! granularity, and each slice's arithmetic is untouched (bit-for-bit, and the
+        ! thread-identity checks cover it). Radiation fluctuations draw from the one
+        ! shared RNG stream inside track1, whose draw order must stay fixed: that
+        ! (rare, check-mode) configuration keeps the serial loop.
+
+        if (bmad_com%radiation_fluctuations_on) then
+          do is = 1, nslice
+            call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch, err)
+            if (err) then
+              err_flag = .true.;  return
+            endif
+            call track1_bunch (bunch, ele_p, err)
+            if (err) then
+              call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
+              err_flag = .true.;  return
+            endif
+            call fel_bunch_to_slice (bunch, ele_p, fbeam%slice(is), err)
+            if (err) then
+              err_flag = .true.;  return
+            endif
+          enddo
+        else
+          err = .false.
+          !$OMP parallel do firstprivate(err) reduction(.or.: err_flag) schedule(static)
+          do is = 1, nslice
+            if (.not. err) then
+
+              ! The scratch bunch is block-local: freshly default-initialized each
+              ! iteration by Fortran's own semantics. (An OMP private clause on the
+              ! subroutine-level scratch left the derived type's components
+              ! improperly initialized under gfortran -- found as a deterministic
+              ! 2x bunching shift -- so the scratch's definition lives here, where
+              ! no clause semantics are involved.)
+
+              block
+                type (bunch_struct) bunch_l
+                call fel_slice_to_bunch (fbeam, fbeam%slice(is), ele_p, bunch_l, err)
+                if (.not. err) call track1_bunch (bunch_l, ele_p, err)
+                if (.not. err) call fel_bunch_to_slice (bunch_l, ele_p, fbeam%slice(is), err)
+                if (err) err_flag = .true.
+              end block
+            endif
+          enddo
+          !$OMP end parallel do
+          if (err_flag) then
+            call out_io (s_error$, r_name, 'TRACKING ERROR IN ELEMENT: ' // trim(ele%name))
+            return
+          endif
         endif
       endif
-    endif
-    call fel_toc (fel_t_seam$)
+      call fel_toc (fel_t_seam$)
 
-    fbeam%phi0 = fbeam%phi0 + ele%value(l$) * &
-                    fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
+      fbeam%phi0 = fbeam%phi0 + l_piece * &
+                      fel_phi0_rate(ks, ks * 0.5_rp / gamma0_ref**2, fel_p0_mc(fbeam))
 
-    call fel_tic (fel_t_drift$)
-    do ih = 1, n_harm      ! Each field diffracts at its own wavelength. Through a
-                         ! geometry break the light goes the chord, not the arc, and
-                         ! the correction lands on the break's last element.
-    call wavefront_drift (ffield(ih)%wf, ele%value(l$) - light_corr(ie), err)
-    if (err) exit
-  enddo
-  call fel_toc (fel_t_drift$)
+      call fel_tic (fel_t_drift$)
+      do ih = 1, n_harm      ! Each field diffracts at its own wavelength. Through a
+                             ! geometry break the light goes the chord, not the arc, and
+                             ! the correction lands on the break's last element.
+        call wavefront_drift (ffield(ih)%wf, l_piece - light_corr(ie) * f_piece, err)
+        if (err) exit
+      enddo
+      call fel_toc (fel_t_drift$)
 
-  ! Absolute-time phasing (fel-physics.md sec-phasing, bmad_com's global switch through
-  ! Bmad's own resolver): keep the real beam-vs-light carrier phase of this break,
-  ! the drift slip plus any geometric (chicane) delay, where the relative mode
-  ! re-anchors. Whole turns wrap. No floors needed on a phase.
+      ! Absolute-time phasing (fel-physics.md sec-phasing, bmad_com's global switch through
+      ! Bmad's own resolver): keep the real beam-vs-light carrier phase of this break,
+      ! the drift slip plus any geometric (chicane) delay, where the relative mode
+      ! re-anchors. Whole turns wrap. No floors needed on a phase.
 
-  if (absolute_time_tracking(ele)) then
-    fbeam%phi0 = fbeam%phi0 - phase_rate * ele%value(l$) - twopi * light_corr(ie) / wf%wavelength
-  endif
-    if (err) then
-      err_flag = .true.;  return
-    endif
-    ! The chamber does not end where the undulator does: the wake's energy loss applies
-    ! through seam interludes too, as one kick of the element's length (Genesis applies
-    ! it every step, and an interlude is one step).
+      if (absolute_time_tracking(ele)) then
+        fbeam%phi0 = fbeam%phi0 - phase_rate * l_piece - &
+                     twopi * light_corr(ie) * f_piece / wf%wavelength
+      endif
+      if (err) then
+        err_flag = .true.;  return
+      endif
+      ! The chamber does not end where the undulator does: the wake's energy loss applies
+      ! through seam interludes too, as one kick of the element's length (Genesis applies
+      ! it every step, and an interlude is one step).
 
-    call fel_tic (fel_t_wake$)
-    call fel_wake_apply (coll%wake, fbeam, ele%value(l$))
-    call fel_toc (fel_t_wake$)
+      call fel_tic (fel_t_wake$)
+      call fel_wake_apply (coll%wake, fbeam, l_piece)
+      call fel_toc (fel_t_wake$)
 
-    z_now = z_now + ele%value(l$)
-    call apply_slippage_banked (ele_slip(ie))
-    if (err_flag) return
+      ! One piece keeps the arithmetic every run had. Several take the piece boundary
+      ! from the element's start, so the walk and the setup's record-count precompute
+      ! reach the same z bit for bit and the stats arrays stay exact-sized. An element's
+      ! last boundary can then differ from z + l in its last bit, which is why the
+      ! single-piece form is kept rather than written as the n = 1 case of the other.
 
-    call do_migrate ()
-    if (err_flag) return
-    if (fel_comb_take(comb, z_now, run%z_last_rec, .true.)) then
-      call take_stats_record (.true.)
+      if (n_piece == 1) then
+        z_now = z_now + l_piece
+      else
+        z_now = z_ele0 + i_piece * (ele%value(l$) / n_piece)
+      endif
+      call apply_slippage_banked (ele_slip(ie) / n_piece)
       if (err_flag) return
-      call write_diag_rows()
-    endif
-    call end_of_element ()              ! Fills the element-end row before the progress
-    if (err_flag) return                !   row that reads it when there are no records.
-    call progress_line (.true., 1, 1)
-    if (err_flag) return
+
+      if (i_piece == n_piece) then
+        call do_migrate ()
+        if (err_flag) return
+      endif
+      if (fel_comb_take(comb, z_now, run%z_last_rec, i_piece == n_piece)) then
+        call take_stats_record (i_piece == n_piece)
+        if (err_flag) return
+        call write_diag_rows()
+      endif
+      if (i_piece == n_piece) then
+        call end_of_element ()            ! Fills the element-end row before the progress
+        if (err_flag) return              !   row that reads it when there are no records.
+      endif
+      call progress_line (i_piece == n_piece, i_piece, n_piece)
+      if (err_flag) return
+    enddo
+
+    ! element_slice_iterator leaves pointer components on its scratch element, and
+    ! Fortran does not release those for a local variable. Its own first call releases
+    ! the previous element's, and this releases the last one's.
+
+    if (n_piece > 1) call deallocate_ele_pointers (slice_ele)
 
   else
 

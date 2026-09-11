@@ -9,6 +9,39 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-10 Added: global%interlude_ds_step cuts an interlude element into pieces, so statistics rows and
+  openPMD frames land along a drift or a quadrupole the way they already land along a wiggler. A frame
+  series had particles through an undulator and one frame through the break after it, and no comb setting
+  changed that. comb_ds_save is the selecting half of Tao's comb, save_a_bunch_step's, which chooses among
+  the positions a tracker already reaches. Tao's beam-track loop carries a second half that cuts an element
+  the tracker would otherwise cross in one map, and this is it. An FEL element reaches one position per
+  ds_step, so the comb was already fine-grained inside a wiggler. An interlude was one track1_bunch call
+  over the whole element, so it reached one position, at its end.
+
+  Each piece tracks the beam through its own sliced element, drifts the field by its own length, advances
+  the common phase over it and takes its share of the element's slippage, which is an accumulator in whole
+  slices and therefore sums to the element's own. The pieces come from Bmad's element_slice_iterator, the
+  routine Tao's comb uses, so an element's fringes stay at its ends rather than appearing at every cut. On a
+  wiggler, quadrupole, pipe, wiggler line a cut run's exit power agrees with the whole-element run's at
+  1.2e-13 and its exit sigma_x at 6.0e-16. Zero, the default, tracks the element whole: a deck naming zero
+  reproduces a deck that never names it byte for byte in the diag stream and on every array of the
+  statistics file but the input echo and the timestamp, which is what leaves the recorded tier digits alone.
+
+  Two configurations decline the cut, both in the shape Tao declines where CSR or space charge would see
+  one. An element carrying a Bmad short-range wake is tracked whole, that wake being a once-per-passage kick
+  of the element's length. interlude_model = "genesis" refuses the setting, that model being a transcription
+  whose step is Genesis's own element. The chamber wake needs no refusal: it is an energy loss proportional
+  to the length applied additively in gamma, so the pieces sum to the element's kick.
+
+  The price is the field's drift rather than the beam's tracking, since a piece drifts every slice of the
+  window where it tracks one bunch per slice. On 32 slices of 512 macroparticles at ngrid 128 the walk goes
+  from 0.285 s whole to 0.325 s at ten pieces an element and 0.427 s at thirty, and the drift goes from 1.3
+  percent of the walk to 24 percent while the FEL step is unmoved. doc/performance.md carries the table.
+
+- 2026-09-10 Changed: doc/input-reference.md said comb_ds_save carries Bmad's bunch_track_struct%ds_save
+  name and semantics. It carries the selecting half of them. The entry now says which half and points at
+  interlude_ds_step for the other, and says what the setting does and does not do inside an interlude.
+
 - 2026-09-10 Added: the Metal backend runs the unaveraged mode. device = "metal" refused that mode until now,
   so the only way to resolve the undulator quiver was the CPU path, whose parallelism is over slices and gives
   a steady-state deck one core of twelve. Three kernels are the mode's own, the quiver-resolving Strang push,

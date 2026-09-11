@@ -97,6 +97,19 @@ if (run%global%unaveraged_steps_per_period < 10) then
   err_flag = .true.;  return
 endif
 
+! The interlude step cuts an interlude into pieces with Bmad's element_slice_iterator,
+! which the seam model's own track1_bunch call takes whole. The transcribed Genesis
+! interlude is validated by transcription fidelity and its step is Genesis's own, so
+! cutting it would leave it something else.
+
+if (run%global%interlude_ds_step > 0 .and. run%global%interlude_model /= 'bmad') then
+  call out_io (s_error$, r_name, 'INTERLUDE_DS_STEP CUTS THE SEAM INTERLUDE AND INTERLUDE_MODEL IS "' // &
+               trim(run%global%interlude_model) // '".', &
+               'THAT MODEL IS A TRANSCRIPTION OF GENESIS''S OWN INTERLUDE, WHOSE STEP IS THE', &
+               'ELEMENT. POSSIBLE SOLUTION: INTERLUDE_MODEL = "bmad".')
+  err_flag = .true.;  return
+endif
+
 if (run%global%unaveraged_ramp_periods < -1) then
   call out_io (s_error$, r_name, 'UNAVERAGED_RAMP_PERIODS MUST BE POSITIVE, 0 (THE DEFAULT OF 2), OR THE', &
                'HARD-EDGE SENTINEL -1, GOT: ' // int_str(run%global%unaveraged_ramp_periods))
@@ -1502,8 +1515,8 @@ end subroutine close_geometry_break
 subroutine setup_diagnostics ()
 
 type (ele_pointer_struct), allocatable :: eles(:)
-integer i, j, n_loc, nstep_r, istep_r
-real(rp) comb_r, z_r, z_last_r, dz_r
+integer i, j, n_loc, nstep_r, istep_r, npiece_r
+real(rp) comb_r, z_r, z_last_r, dz_r, z0_r
 logical derr
 
 !
@@ -1547,6 +1560,8 @@ z_r = branch%ele(run%i_start - 1)%s
 z_last_r = -1e30_rp
 nrec_stats = 0
 nend_stats = 0
+run%n_int_piece = 0
+run%n_int_ele = 0
 if (fel_comb_take(comb_r, z_r, z_last_r, .false.)) nrec_stats = nrec_stats + 1
 do i = run%i_start, run%i_end
   ele => branch%ele(i)
@@ -1561,8 +1576,28 @@ do i = run%i_start, run%i_end
       if (fel_comb_take(comb_r, z_r, z_last_r, istep_r == nstep_r)) nrec_stats = nrec_stats + 1
     enddo
   else
-    z_r = z_r + ele%value(l$)
-    if (fel_comb_take(comb_r, z_r, z_last_r, .true.)) nrec_stats = nrec_stats + 1
+
+    ! The interlude's pieces, through fel_interlude_pieces, which the walk reads too. The
+    ! element short-range wake refuses the cut in the walk, so it refuses here. The z
+    ! arithmetic is the walk's own in both branches, so the two reach the same positions
+    ! bit for bit.
+
+    npiece_r = 1
+    if (.not. associated(wake_src)) npiece_r = &
+                     fel_interlude_pieces(run%global%interlude_ds_step, ele%value(l$))
+    run%n_int_piece = run%n_int_piece + npiece_r
+    if (npiece_r > 1) run%n_int_ele = run%n_int_ele + 1
+    if (npiece_r == 1) then
+      z_r = z_r + ele%value(l$)
+      if (fel_comb_take(comb_r, z_r, z_last_r, .true.)) nrec_stats = nrec_stats + 1
+    else
+      z0_r = z_r
+      dz_r = ele%value(l$) / npiece_r
+      do istep_r = 1, npiece_r
+        z_r = z0_r + istep_r * dz_r
+        if (fel_comb_take(comb_r, z_r, z_last_r, istep_r == npiece_r)) nrec_stats = nrec_stats + 1
+      enddo
+    endif
   endif
 enddo
 

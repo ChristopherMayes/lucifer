@@ -26,6 +26,12 @@ escaped-field bank, held by cross-identities rather than reference files --
   9. a frame against the stats row it sits on: per-slice bunching from the frame's own
      particles, per-slice power from the field frame, and the reduced projections
      integrating to the row's power. Plus a slice range cutting both files.
+ 10. the interlude's own steps (global%interlude_ds_step): the knob at zero reproduces
+     the run that never named it byte for byte, cutting an element reproduces tracking
+     it whole, rows and frames land inside a quadrupole and a pipe at the s the rows
+     carry, the stats file is exact-sized against the rows written, the header states
+     the pieces before it tracks, a wake-carrying element is not cut, and the
+     transcribed Genesis interlude refuses the knob.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -208,6 +214,178 @@ def run(exe, wd, name, text, threads="8"):
         sys.exit(1)
     return r
 
+
+
+# The interlude's own steps (global%interlude_ds_step). Tao's comb has two halves and
+# comb_ds_save is the first: save_a_bunch_step selects among positions a tracker already
+# reaches. This is the second, tao_lattice_calc_mod's n_slice branch, which cuts an
+# element that would otherwise be crossed in one map. The lattice is a wiggler, a
+# quadrupole whose fringes are live, a pipe and a wiggler, so a cut element of each kind
+# is exercised and the wigglers keep their own steps either way.
+
+INT_LAT = """no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+UND: wiggler, l = 0.3, l_period = 0.015, field_calc = helical_model,
+     b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light,
+     fel_method = averaged, ds_step = 0.015
+QF: quadrupole, l = 0.20, k1 = 8.0, fringe_type = full
+P1: pipe, l = 0.40
+SEG: line = (UND, QF, P1, UND)
+use, SEG
+"""
+
+INT_NML = """! flat keys; routed into the three groups by nml.to_groups
+  lat_file = "{lat}"
+  out_root = "{root}"
+  source_filter = F
+  lambda0 = 1e-10
+  beam_init%n_particle = 256
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 5e3
+  seed_waist_size = 30e-6
+  grid_n_pts = 64
+  grid_half_width = 2e-4
+  ran_seed = 999
+  comb_ds_save = 0.02
+  write_diag = T
+{extra}&end
+"""
+
+
+def interludes(exe, wd):
+    """
+    stats rows and frames along an interlude, and the guarantees the knob carries.
+
+    The knob is off by default and off has to be the path every run took before it
+    existed, so the first check is byte identity against a deck that never names it.
+    The second is that cutting an element reproduces tracking it whole: the pieces come
+    from Bmad's element_slice_iterator, which is what keeps an element's fringes at its
+    own ends rather than giving every piece a pair. That construction is why the
+    iterator is used; on FEL beam sizes the difference it buys is below notice, and the
+    hand-split comparison here records that rather than asserting it.
+    """
+    print("--- the interlude's own steps:")
+    (wd / "intlat.bmad").write_text(INT_LAT)
+    hand = INT_LAT.replace("QF: quadrupole, l = 0.20, k1 = 8.0, fringe_type = full",
+                           "QFS: quadrupole, l = 0.02, k1 = 8.0, fringe_type = full\n"
+                           "QF: line = (10*QFS)")
+    hand = hand.replace("P1: pipe, l = 0.40", "P1S: pipe, l = 0.04\nP1: line = (10*P1S)")
+    (wd / "intlath.bmad").write_text(hand)
+
+    run(exe, wd, "int_w", INT_NML.format(lat="intlat.bmad", root="int_w", extra=""))
+    run(exe, wd, "int_off", INT_NML.format(lat="intlat.bmad", root="int_off",
+        extra="  global%interlude_ds_step = 0\n"))
+    same = (wd / "int_w.diag.txt").read_bytes() == (wd / "int_off.diag.txt").read_bytes()
+    check("interlude: the knob at zero is the run that never named it (0 = yes)",
+          0.0 if same else 1.0, 0.5)
+
+    run(exe, wd, "int_p", INT_NML.format(lat="intlat.bmad", root="int_p",
+        extra="  global%interlude_ds_step = 0.04\n"))
+    run(exe, wd, "int_h", INT_NML.format(lat="intlath.bmad", root="int_h", extra=""))
+    w = np.loadtxt(wd / "int_w.diag.txt")
+    p = np.loadtxt(wd / "int_p.diag.txt")
+    h = np.loadtxt(wd / "int_h.diag.txt")
+
+    # The pieces are tracking, not bookkeeping, so what they must not do is change the
+    # answer: the element's exit is the element's exit however many pieces crossed it.
+    check("interlude: cut into pieces, exit power against the whole element",
+          abs(p[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
+    check("interlude: cut into pieces, exit sigma_x against the whole element",
+          abs(p[-1, 8] - w[-1, 8]) / w[-1, 8], 1e-9)
+    check("interlude: the hand-split lattice agrees too, so the fringe difference the "
+          "iterator buys is below notice here",
+          abs(h[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
+
+    # Rows land inside the quadrupole and inside the pipe, where none did before. The
+    # element spans are 0.3 to 0.5 and 0.5 to 0.9 on this line.
+    def inside(rows, z0, z1):
+        z = rows[:, 0]
+        return int(((z > z0 + 1e-9) & (z < z1 - 1e-9)).sum())
+    check("interlude: rows strictly inside the quadrupole, whole (0 expected)",
+          abs(inside(w, 0.3, 0.5) - 0), 0.5)
+    check("interlude: rows strictly inside the quadrupole, cut (4 expected)",
+          abs(inside(p, 0.3, 0.5) - 4), 0.5, note=f"[{inside(p, 0.3, 0.5)}]")
+    check("interlude: rows strictly inside the pipe, cut (9 expected)",
+          abs(inside(p, 0.5, 0.9) - 9), 0.5, note=f"[{inside(p, 0.5, 0.9)}]")
+
+    # The record-count precompute replays the walk, so the stats file is exact-sized:
+    # a mismatch would mean the two disagree about where a row falls.
+    with h5py.File(wd / "int_p.stats.h5") as f:
+        nrec = f["coords/s"].shape[0]
+        step = float(np.ravel(f["params/global/interlude_ds_step"])[0])
+    check("interlude: the stats file holds exactly the rows the diag carries",
+          abs(nrec - len(p)), 0.5, note=f"[{nrec} against {len(p)}]")
+    check("interlude: the stats file records the step it ran at", abs(step - 0.04), 1e-12)
+
+    # Frames along the interlude, which is what the knob is for.
+    run(exe, wd, "int_f", INT_NML.format(lat="intlat.bmad", root="int_f",
+        extra="  global%interlude_ds_step = 0.04\n  global%dump_at_comb = T\n"))
+    frames = sorted(wd.glob("int_f-[0-9]*.beam.h5"))
+    check("interlude: one frame per stats row with the pieces on",
+          abs(len(frames) - len(p)), 0.5, note=f"[{len(frames)} frames, {len(p)} rows]")
+    zs = []
+    for fr in frames:
+        with h5py.File(fr) as f:
+            zs.append(float(np.ravel(f.attrs["sPosition"])[0]))
+    zs = np.array(zs)
+    check("interlude: the frames carry the rows' own s", np.abs(zs - p[:, 0]).max(), 1e-9)
+    nin = int(((zs > 0.5 + 1e-9) & (zs < 0.9 - 1e-9)).sum())
+    check("interlude: frames strictly inside the pipe (9 expected)", abs(nin - 9), 0.5,
+          note=f"[{nin}]")
+
+    # The pre-run header states the pieces before it tracks, and says nothing when the
+    # element is tracked whole.
+    r = run(exe, wd, "int_hdr", INT_NML.format(lat="intlat.bmad", root="int_hdr",
+        extra="  global%interlude_ds_step = 0.04\n  global%load_only = T\n"))
+    m = re.search(r"Interlude   steps of .*: (\d+) pieces, (\d+) element", r.stdout)
+    check("interlude: the header states the pieces before it tracks",
+          0.0 if (m and int(m.group(1)) == 15 and int(m.group(2)) == 2) else 1.0, 0.5,
+          note=f"[{m.group(0) if m else 'absent'}]")
+    r = run(exe, wd, "int_hdr0", INT_NML.format(lat="intlat.bmad", root="int_hdr0",
+        extra="  global%load_only = T\n"))
+    check("interlude: and says nothing where nothing is cut",
+          0.0 if "Interlude" not in r.stdout else 1.0, 0.5)
+
+    # Refused. The element short-range wake is Bmad's own once-per-passage kick of the
+    # element's length, so a cut element would take one kick a piece: the walk declines
+    # to cut there, as Tao declines where CSR or space charge would see the cut. The
+    # transcribed Genesis interlude is validated by transcription fidelity and its step
+    # is the element, so the knob is refused outright with that model.
+    # A wake whose table is zero everywhere: the element carries one, which is what the
+    # walk keys on, and the physics is the no-wake run's, so the rows are the only thing
+    # that may differ.
+    (wd / "intlatw.bmad").write_text(INT_LAT.replace(
+        "P1: pipe, l = 0.40",
+        "P1: pipe, l = 0.40, sr_wake = {scale_with_length = T, z_long = "
+        "{position_dependence = none, w = {-1e-6 0.0, 0.0 0.0, 1e-6 0.0,}}}"))
+    run(exe, wd, "int_wk", INT_NML.format(lat="intlatw.bmad", root="int_wk",
+        extra="  global%interlude_ds_step = 0.04\n"))
+    wk = np.loadtxt(wd / "int_wk.diag.txt")
+    check("interlude: a wake-carrying element is not cut", abs(inside(wk, 0.5, 0.9) - 0), 0.5,
+          note=f"[{inside(wk, 0.5, 0.9)} rows inside it]")
+    check("interlude: and the elements without a wake still are",
+          abs(inside(wk, 0.3, 0.5) - 4), 0.5, note=f"[{inside(wk, 0.3, 0.5)}]")
+    check("interlude: the zero wake left the physics alone, so only the rows differ",
+          abs(wk[-1, 2] - p[-1, 2]) / p[-1, 2], 1e-9)
+
+    (wd / "int_gen.nml").write_text(to_groups(INT_NML.format(lat="intlat.bmad", root="int_gen",
+        extra='  global%interlude_ds_step = 0.04\n  global%interlude_model = "genesis"\n')))
+    rg = subprocess.run([str(exe), "int_gen.nml"], cwd=wd, capture_output=True, text=True,
+                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    refused = rg.returncode != 0 and "TRANSCRIPTION OF GENESIS" in (rg.stdout + rg.stderr)
+    check("interlude: refused with the transcribed Genesis interlude (0 = yes)",
+          0.0 if refused else 1.0, 0.5)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -959,6 +1137,8 @@ def main():
                         env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     check("refusal: a slice range outside the window refused (1 = yes)",
           0.0 if (r4.returncode != 0 and "INSIDE THE WINDOW" in (r4.stdout + r4.stderr)) else 1.0, 0.5)
+
+    interludes(exe, wd)
 
     if FAILED:
         print("diagnostic checks: FAIL")

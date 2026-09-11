@@ -433,6 +433,16 @@ block
         n_gpt, ' grid points per step'
   call out_io (s_blank$, r_name, trim(line))
 
+  ! The interlude's pieces, when the knob cuts them. Only then: a run that tracks an
+  ! interlude whole says nothing, which is every run that does not ask for this.
+
+  if (run%n_int_ele > 0) then
+    write (line, '(3a, i0, a, i0, a)') ' Interlude   steps of ', &
+          trim(adjustl(fel_si_str(run%global%interlude_ds_step, 'm'))), ': ', &
+          run%n_int_piece, ' pieces, ', run%n_int_ele, ' element(s) cut'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
+
   call fel_cost_estimate (run, secs, backend)
   write (line, '(5a)') ' Estimate    ', trim(fel_cost_secs_str(secs)), ' of walk on the ' // &
         trim(backend) // ' path, for ', fel_cost_machine$, '.'
@@ -1491,6 +1501,10 @@ call fel_h5_text (g_id, 'track_start', 'track start', &
 call fel_h5_text (g_id, 'track_end', 'track end', &
       'Element locator bounding the walk. Blank means the whole line.', &
       run%global%track_end, merr)
+call fel_h5_real (g_id, 'interlude_ds_step', 'm', 'interlude step', &
+      'The length an interlude element is cut into, for stats rows and frames along ' // &
+      'it. Zero tracks the element whole.', '', &
+      run%global%interlude_ds_step, merr)
 call fel_h5_real (g_id, 'comb_ds_save', 'm', 'comb', &
       'Minimum z advance between per-record rows. 0 every record, negative none.', '', &
       run%global%comb_ds_save, merr)

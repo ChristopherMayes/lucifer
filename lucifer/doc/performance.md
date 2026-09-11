@@ -350,6 +350,28 @@ Writing frames dominates a run at a movie-grade comb, and the device readback do
 
 The readback is about 0.10 s either way, since it happens at every comb row whether or not a frame is written, and it is the unaccounted remainder in both columns. With frames on it is a sixth of the walk and the file writing is two thirds. So a series that costs too much is not answered by moving the per-slice reductions onto the device, which would save readback the run is not spending its time in. It is answered by writing fewer slices, which `global%dump_slice_first` and `dump_slice_last` do, or fewer records, which the comb does.
 
+(perf-interlude-steps)=
+## The interlude's pieces, measured
+
+`global%interlude_ds_step` cuts an interlude element into pieces so that stats rows and frames land along it ([](validation.md#val-interlude-steps)). What that costs is the field's drift rather than the beam's tracking, since a piece drifts every slice of the window where it tracks one bunch per slice. Three undulators of 0.6 m with two pipes of 0.6 m between them, 32 slices of 512 macroparticles at `ngrid` 128, `comb_ds_save = 0.02`, 12 threads, production build, best of three.
+
+| `interlude_ds_step` | pieces an element | walk | rows |
+|---|---|---|---|
+| 0, the default | 1 | 0.285 s | 2016 |
+| 0.06 | 10 | 0.325 s | 2592 |
+| 0.02 | 30 | 0.427 s | 3680 |
+
+Where the time goes, from the run's own phase table at the two ends of that scan:
+
+| phase | whole | cut at 0.02 |
+|---|---|---|
+| field drift | 0.004 s over 2 regions | 0.101 s over 60 |
+| seam interlude | 0.001 s over 2 | 0.020 s over 60 |
+| stats and diag | 0.035 s | 0.055 s |
+| the FEL step | 0.240 s | 0.244 s |
+
+The FEL step is untouched, which it must be. The drift is 1.3% of the walk whole and 24% cut thirty ways, and it dominates because it is one transform pair per slice per piece where the seam's own tracking is one bunch per slice. So the price is set by the window's slice count and the pieces per element, and a deck that wants frames through a break pays for the field's diffraction rather than for the beam's transport. Rows cost the rest: 2016 to 3680 of them moves stats and diag by 0.020 s.
+
 (perf-device)=
 ## The device, measured against the CPU
 

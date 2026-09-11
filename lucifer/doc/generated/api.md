@@ -4507,6 +4507,30 @@ Output:
   take         -- logical: True when a stats row is due.
 ```
 
+(api-fel-interlude-pieces)=
+### `fel_interlude_pieces`
+
+*Function* `(ds_step, length) result (n_piece)`
+
+```
+Routine to say how many pieces an interlude element is tracked in, the one authority
+for it: the walk cuts the element this many ways and the setup's record-count
+precompute replays the same count, so the stats arrays stay exact-sized.
+
+The expression is Tao's own (tao_lattice_calc_mod's beam-track loop), including the
+1.01 factor, which keeps an element of exactly n whole steps from rounding down to
+n-1 pieces.
+```
+
+```
+Input:
+  ds_step -- real(rp): global%interlude_ds_step. Zero or negative gives one piece.
+  length  -- real(rp): The element's length [m].
+
+Output:
+  n_piece -- integer: Pieces, at least one.
+```
+
 ## `fel_timer_mod.f90`
 
 (api-fel-timer-mod)=

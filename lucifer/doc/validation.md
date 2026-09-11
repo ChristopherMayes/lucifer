@@ -1368,6 +1368,31 @@ tied to its semianalytic field advance and does not transfer to this Genesis4-st
 integrator as-is. `ds_step` of two to three periods is the operating point here. Six periods
 is defensible when only saturation power matters.
 
+(val-interlude-steps)=
+## The interlude's own steps
+
+Tao's comb carries two halves. `save_a_bunch_step` selects among the positions a tracker already reaches, and `tao_lattice_calc_mod`'s beam-track loop cuts an element into `max(1, int(1.01 L / ds))` pieces with `element_slice_iterator` where the tracker would otherwise cross it in one map. `comb_ds_save` here was the first half alone. An FEL element reaches one position per `ds_step`, so the comb had a fine grid to select from inside a wiggler. An interlude was one `track1_bunch` call over the whole element, so it reached one position, its end, and no comb setting added another. A frame series therefore had particles through a wiggler and a single frame through a break. `global%interlude_ds_step` is the second half.
+
+Each piece tracks the beam through its own sliced element, drifts the field by its own length, advances the common phase at the reference rate over it and takes its share of the element's slippage. Slippage is an accumulator in whole slices, so the pieces sum to the element's own and the ring rotates where the light actually passes a slice rather than at the element's end. A chicane's chord-versus-arc correction is a property of the whole break and lands on its last element, so it lands on that element's last piece and the pieces sum to what the element did before.
+
+What the pieces must not do is change the answer, and that is the check with teeth. On a wiggler, quadrupole, pipe, wiggler line the exit power of a cut run agrees with the whole-element run at 1.2e-13 and the exit `sigma_x` at 6.0e-16. The pieces come from Bmad's own `element_slice_iterator` rather than from splitting the lattice by hand, which is why an element's fringes stay at its own ends instead of appearing at every cut. What that construction buys is below notice at FEL beam sizes: a hand-split lattice of ten sub-quadrupoles with `fringe_type = full` agrees with the whole element at 9.7e-14 on the same line, the fringe kick being cubic in a transverse offset of order ten microns. The iterator is used because it is the correct construction, not because the difference shows.
+
+Off is the default and off is the path every run took before the setting existed. A deck naming `interlude_ds_step = 0` reproduces a deck that never names it byte for byte in the diag stream and on every array of the statistics file but the input echo and the timestamp. That is what lets the recorded tier digits stand unmoved: the single-piece branch keeps `z_now = z_now + L` where the several-piece branch takes each boundary from the element's start, so the walk and the setup's record-count precompute reach the same z bit for bit and the stats arrays stay exact-sized.
+
+Two configurations decline the cut, and the shape of both is Tao's. An element carrying a Bmad short-range wake is tracked whole: that wake is a once-per-passage kick of the element's length and pieces would make it one kick a piece, which is the judgment Tao makes where CSR or space charge would see a cut. The chamber wake needs no such refusal, being an energy loss proportional to the length applied additively in gamma, so its pieces sum to the element's own kick. `interlude_model = "genesis"` refuses the setting, that model being a transcription of Genesis's own interlude whose step is the element.
+
+Measured on the checks' own line, a quadrupole of 0.2 m and a pipe of 0.4 m at `interlude_ds_step = 0.04` and `comb_ds_save = 0.02`:
+
+| | whole | cut |
+|---|---|---|
+| rows strictly inside the quadrupole | 0 | 4 |
+| rows strictly inside the pipe | 0 | 9 |
+| frames, with `dump_at_comb` | one a row | one a row |
+| frames strictly inside the pipe | 0 | 9 |
+| exit power against the whole element | | 1.2e-13 |
+
+One thing Tao does not do and this does. Tao's comb gives statistics along an element but its beam dumps stay at element ends, `ix_slice == -1` guarding both the internal save and the dump file. `dump_at_comb` writes a frame at every comb row, so with the pieces on a frame lands wherever a row does, which is what a movie through a break wants.
+
 (val-the-saturation-demo)=
 ## The saturation demo
 

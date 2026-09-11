@@ -157,6 +157,18 @@ type fel_global_struct
   !        deliberate deviation from Tao's -1 default, with identical semantics).
   !   > 0: a row when z has advanced comb_ds_save past the last row, and element ends always.
   real(rp) :: comb_ds_save = 0
+  ! The interlude step. Tao's comb carries two halves: save_a_bunch_step selects among
+  ! the positions a tracker already reaches, and tao_lattice_calc_mod's beam-track loop
+  ! cuts an element into n_slice pieces with element_slice_iterator where the tracker
+  ! would otherwise cross it in one map. comb_ds_save above is the first half. This is
+  ! the second, and it is its own knob rather than the comb's for two reasons: the comb
+  ! defaults to zero here where Tao's defaults to -1, so it names no length to cut by,
+  ! and the comb must not change what the tracking does. Zero, the default, tracks an
+  ! interlude whole, which is what every run did before this knob existed.
+  !   <= 0: one piece, the element.
+  !   >  0: pieces of about this length [m], so stats rows and frames land inside a
+  !         drift the way they already land inside a wiggler.
+  real(rp) :: interlude_ds_step = 0
   character(60) :: dump_beam_at(40) = ''     ! Element locators for mid-run beam dumps.
   character(60) :: dump_field_at(40) = ''    ! Element locators for mid-run field dumps.
   ! Write the beam and the field at every comb position as a frame series, for a
@@ -377,6 +389,10 @@ type fel_run_struct
   type (fel_slice_diag_struct), allocatable :: bdiag_arr(:)
   real(rp), allocatable :: fpow_arr(:), fonax_arr(:)
   real(rp), allocatable :: e_rad_slice(:), rad_kick(:,:)
+  ! The interlude's pieces, counted by the record-count precompute that already replays
+  ! the walk, so the pre-run header states them without a second loop and a second rule.
+  integer :: n_int_piece = 0            ! Pieces the interludes will take.
+  integer :: n_int_ele = 0              ! Interlude elements that take more than one.
   integer :: nrec_stats = 0, nend_stats = 0
   real(rp) :: z_last_rec = -1e30_rp        ! The comb's last-row position.
   ! Escaped-field bank state, one slot per field.
@@ -497,5 +513,40 @@ endif
 if (take) z_last = z
 
 end function fel_comb_take
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_interlude_pieces (ds_step, length) result (n_piece)
+!
+! Routine to say how many pieces an interlude element is tracked in, the one authority
+! for it: the walk cuts the element this many ways and the setup's record-count
+! precompute replays the same count, so the stats arrays stay exact-sized.
+!
+! The expression is Tao's own (tao_lattice_calc_mod's beam-track loop), including the
+! 1.01 factor, which keeps an element of exactly n whole steps from rounding down to
+! n-1 pieces.
+!
+! Input:
+!   ds_step -- real(rp): global%interlude_ds_step. Zero or negative gives one piece.
+!   length  -- real(rp): The element's length [m].
+!
+! Output:
+!   n_piece -- integer: Pieces, at least one.
+!-
+
+function fel_interlude_pieces (ds_step, length) result (n_piece)
+
+real(rp) ds_step, length
+integer n_piece
+
+!
+
+n_piece = 1
+if (ds_step <= 0 .or. length <= 0) return
+n_piece = max(1, int(1.01_rp * length / ds_step))
+
+end function fel_interlude_pieces
 
 end module fel_struct
