@@ -501,6 +501,31 @@ the beamlet count, it grows as the cells shrink, and at grids and loads in commo
 is most of the power an unseeded run reports. The power inside the mode carries none of
 that dependence.
 
+**How it depends on the cell size.** The deposit alone radiates as one over the cell
+size squared, since the grid carries that many transverse modes and a point beamlet
+feeds them all alike. The power a run reports rises more slowly than that once the
+grid's widest angle passes a knee, and the knee is set by two lengths the deck fixes
+without naming them. Between deposits the solver propagates the field, and a mode at
+angle $\theta$ slips against the axial wave by $k_s\theta^2\Delta z/2$ a step, which is
+the paraxial form of the angular red shift. The field record slips one slice past the
+beam every $s\lambda_u$ of undulator, $s$ being `slicing%n_wavelength`, so a field slice
+receives the deposits of one static beam slice for that long and of an independent one
+after. A wide-angle mode therefore adds coherently over one slippage of the record and
+incoherently across them, and the modes beyond
+
+$$\theta_t = \sqrt{\lambda / (s\,\lambda_u)}$$
+
+count a fraction $\Delta z/(s\lambda_u)$ of what the modes below it count. On the Aramis
+benchmark at a spacing of 12 wavelengths that angle is 23.6 µrad, the exponent of the
+reported power is 2.25, 1.42 and 1.08 over cells of 6.35 to 0.78 µm, and the derived sum
+gives 2.26, 1.47 and 0.90 with nothing fitted. The half width does not enter, the spacing
+moves the knee as $s^{-1/2}$, and a step of one slice rotation returns the exponent to 2
+([](startup-noise.md#fig-sn-cause)). The mechanism is physical and the cutoff is what is
+missing: a real electron dephases at the same rate, and the red shift leaves it no power
+at that angle in the undulator's band. The model gets the coherence length of the
+wide-angle light right and its spectrum wrong, which is why the remedy is a cutoff on the
+source and not a change to the propagation.
+
 **What the filter does and what it costs.** It multiplies the transformed source by a
 sigmoid beyond a derived edge, so the beam adds nothing at angles the undulator does not
 radiate into, while the field already present propagates untouched. Measured on four
