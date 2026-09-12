@@ -910,6 +910,28 @@ run%sc_here = .false.
 n_sc = 0
 
 do je = 1, branch%n_ele_track
+
+  ! A Bmad-seam interlude tracks one slice's bunch at a time through track1_bunch, whose
+  ! own space-charge and CSR paths want the centroid orbit of the whole beam, which this
+  ! walk does not carry. Bmad then prints that the centroid must be supplied and returns
+  ! the bunch untracked with no error flag set, so a drift carrying the attribute lost its
+  ! transport and the run reported success. The slice-binned solve runs inside FEL elements
+  ! and the transcribed Genesis interlude, which applies it itself. Refuse the combination.
+
+  if (.not. run%is_fel(je) .and. bmad_com%csr_and_space_charge_on .and. &
+      run%global%interlude_model == 'bmad') then
+    if (branch%ele(je)%space_charge_method /= off$ .or. branch%ele(je)%csr_method /= off$) then
+      call out_io (s_error$, r_name, 'SPACE_CHARGE_METHOD OR CSR_METHOD IS SET ON ' // &
+                   trim(branch%ele(je)%name) // ', WHICH IS NOT AN FEL ELEMENT.', &
+                   'THE SLICE-BINNED SOLVE RUNS INSIDE FEL ELEMENTS AND THE TRANSCRIBED GENESIS', &
+                   'INTERLUDE ONLY. THE BMAD SEAM TRACKS ONE SLICE AT A TIME THROUGH TRACK1_BUNCH, WHOSE', &
+                   'OWN SPACE-CHARGE AND CSR PATHS NEED A CENTROID ORBIT THIS WALK DOES NOT CARRY, AND', &
+                   'BMAD WOULD RETURN THE BUNCH UNTRACKED. SET THE METHOD ON THE FEL ELEMENTS ONLY, OR', &
+                   'TURN BMAD_COM%CSR_AND_SPACE_CHARGE_ON OFF.')
+      err_flag = .true.;  return
+    endif
+  endif
+
   select case (branch%ele(je)%space_charge_method)
   case (off$)
     cycle

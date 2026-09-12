@@ -1149,10 +1149,13 @@ per-particle ODE term is $e_z^{\mathrm{short}}(j) - E_i/(m_ec^2)$.
 `csr_and_space_charge_on` gates the lattice as a whole, exactly as in any Bmad program.
 An FEL element set to `slice` gets the two terms above, with the FEL slices as the bins,
 so `space_charge_com%n_bin` is not consulted. A genesis-model interlude set to `slice`
-gets them through the transcribed interlude step. A Bmad-seam interlude reads the same
-attribute and gets Bmad's own machinery, which is a different model: Gaussian-slab
-longitudinal kicks plus a transverse defocusing term, binned on its own `n_bin`. Nothing
-in an FEL element is Bmad's, and nothing in the seam is this solver's.
+gets them through the transcribed interlude step. A Bmad-seam interlude carries neither.
+It tracks one slice's bunch at a time through `track1_bunch`, whose own space-charge and
+CSR paths want the centroid orbit of the whole beam, which this walk does not carry, and
+Bmad would return the bunch untracked with no error set. An interlude element that sets
+`space_charge_method` or `csr_method` while the master switch is on is therefore refused
+at setup. Nothing in an FEL element is Bmad's, and the seam's collective terms are the
+chamber wake and the element wake.
 
 A Bmad-slice implementation of the terms above, selected by `space_charge%model`, remains
 a named follow-on. The default stays the transcribed solver on the physics: it carries the

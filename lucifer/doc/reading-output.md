@@ -260,8 +260,11 @@ the file see the same frame.
 
 `global%dump_slice_first` and `global%dump_slice_last` cut the frames to a range of the
 window. The beam file's patch count is then the range and the field file carries that many
-slices, with `sliceFirst` and `sliceLast` saying which. Everything else is unchanged, so a
-reader places a sub-window frame by its own attributes.
+slices, with `sliceFirst` and `sliceLast` saying which. The field's mesh keeps its place:
+`gridGlobalOffset` along z is the first slice's, `(sliceFirst - 1)` times the slice spacing,
+so a reader that walks the standard attributes puts the cut field where the whole window's
+would sit, beside the cut beam whose `timeOffset` keeps each slice's own placement.
+Everything else is unchanged, so a reader places a sub-window frame by its own attributes.
 
 **The wiggle is not in an averaged frame, and the frame carries what rebuilds it.** The
 averaged mode integrates over the undulator period, so a particle's stored `x` is the

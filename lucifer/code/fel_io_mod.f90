@@ -271,7 +271,10 @@ do ihh = 1, run%n_harm
 
   ! A range writes the slices it asks for. The records are in time order here, so slice
   ! index and window index are the same thing, and the slab is taken rather than the
-  ! writer taught a range: a sub-window is small by construction, which is the point.
+  ! writer taught a range: a sub-window is small by construction, which is the point. The
+  ! slab keeps its place: the mesh's z origin is the first slice's, so a reader that walks
+  ! the standard attributes puts the cut field where the whole window's would sit, beside
+  ! the cut beam whose timeOffset carries each slice's own placement.
 
   if (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice) then
     call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
@@ -280,7 +283,8 @@ do ihh = 1, run%n_harm
     wf_sub = ffield(ihh)%wf
     wf_sub%Ex = ffield(ihh)%wf%Ex(:, :, run%dump_is1:run%dump_is2)
     if (allocated(ffield(ihh)%wf%Ey)) wf_sub%Ey = ffield(ihh)%wf%Ey(:, :, run%dump_is1:run%dump_is2)
-    call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', run%z_now, eerr)
+    call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', run%z_now, eerr, &
+                                  z_offset = (run%dump_is1 - 1) * ffield(ihh)%wf%dz)
   endif
   if (.not. eerr) call fel_frame_attributes (trim(prefix) // trim(hsuf) // '.wf.h5', run, ie, eerr)
 

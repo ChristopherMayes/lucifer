@@ -399,6 +399,25 @@ def interludes(exe, wd):
     check("interlude: and its physics is the whole-element run's",
           abs(wko[-1, 2] - p[-1, 2]) / p[-1, 2], 1e-9)
 
+    # Space charge on a Bmad-seam interlude is refused. The seam tracks one slice's bunch
+    # at a time through track1_bunch, whose own space-charge and CSR paths want the centroid
+    # orbit of the whole beam, and without it Bmad printed that it must be supplied and
+    # returned the bunch untracked with no error set: a 0.1 m drift carrying the attribute
+    # lost its transport and the run reported success. The deck configures a term so the
+    # refusal reached is this one and not the one for a solver with nothing to solve.
+    (wd / "intlat_sc.bmad").write_text(INT_LAT.replace(
+        "P1: pipe, l = 0.40", "P1: pipe, l = 0.40, space_charge_method = slice"))
+    (wd / "int_sc.nml").write_text(to_groups(INT_NML.format(lat="intlat_sc.bmad", root="int_sc",
+        extra="  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 1\n"
+              "  space_charge%rmax = 250e-6\n")))
+    rs = subprocess.run([str(exe), "int_sc.nml"], cwd=wd, capture_output=True, text=True,
+                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    refused = rs.returncode != 0 and "NOT AN FEL ELEMENT" in (rs.stdout + rs.stderr)
+    check("interlude: space charge on a seam interlude is refused (0 = yes)",
+          0.0 if refused else 1.0, 0.5)
+    check("interlude: and Bmad's own centroid message never printed (0 = yes)",
+          0.0 if "CENTROID MUST BE SUPPLIED" not in (rs.stdout + rs.stderr) else 1.0, 0.5)
+
     # A zero-length element that can act is tracked. The walk skips a zero-length element
     # Bmad tracks as the identity, and once skipped every zero-length element without a
     # wake, a thin kicker among them, whose kick then vanished with no message. The same
@@ -1183,9 +1202,22 @@ def main():
     with h5py.File(rgw[-1]) as h:
         it = list(h["data"])[0]
         nsf = h[f"data/{it}/meshes/electricField/x"].shape[0]
+        off_cut = np.ravel(h[f"data/{it}/meshes/electricField"].attrs["gridGlobalOffset"])
+        dz_cut = float(np.ravel(h[f"data/{it}/meshes/electricField"].attrs["gridSpacing"])[0])
+    with h5py.File(wframes[-1]) as h:
+        it = list(h["data"])[0]
+        off_all = np.ravel(h[f"data/{it}/meshes/electricField"].attrs["gridGlobalOffset"])
     check("range: the beam frame's patch count is the range", abs(npatch - 3), 0.5,
           note=f"[slices {s1} to {s2}, {npatch} patches]")
     check("range: the field frame carries the range's slices", abs(nsf - 3), 0.5)
+    # The cut field keeps its place. Its mesh once started at zero whatever the range, so a
+    # standard reader put the cut field at the head of the window while the cut beam's
+    # timeOffset kept each slice where it was.
+    check("range: the cut field's mesh starts at its first slice's z [m]",
+          abs(off_cut[0] - (off_all[0] + (s1 - 1) * dz_cut)), 1e-18,
+          note=f"[{off_cut[0]:.3e} against {(s1 - 1) * dz_cut:.3e}]")
+    check("range: and its transverse origin is the whole window's [m]",
+          float(np.max(np.abs(off_cut[1:] - off_all[1:]))), 1e-18)
 
     # The range is refused where it leaves the window.
     (wd / "rgbad.nml").write_text(to_groups(FRAME_NML.format(root="rgbad",

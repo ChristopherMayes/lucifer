@@ -18,7 +18,9 @@
 !                            contradiction is resolved here in the record's favor:
 !                            photonEnergy is a property of one field):
 !                            geometry 'cartesian', axisLabels ['z','y','x'],
-!                            gridSpacing [dz,dy,dx], gridGlobalOffset [0,-gmax,-gmax],
+!                            gridSpacing [dz,dy,dx], gridGlobalOffset [z0,-gmax,-gmax]
+!                            (z0 is 0 for a whole window and the first slice's z for a
+!                            frame cut to a slice range),
 !                            gridUnitSI [1,1,1], gridUnitDimension (a length per axis),
 !                            unitDimension (1,1,-3,-1,0,0,0) (V/m),
 !                            timeOffset 0, photonEnergy [J], temporalDomain 'time',
@@ -107,16 +109,21 @@ end function file_is_openpmd
 !   wf         -- wavefront_struct: The field. Ey written when allocated.
 !   file_name  -- character(*): Output file.
 !   s_pos      -- real(rp): Lattice position of the dump plane [m] (zCoordinate).
+!   z_offset   -- real(rp), optional: Where the first record sits along the window [m],
+!                   gridGlobalOffset's z. A field cut to a slice range passes the first
+!                   slice's z, so the mesh lands where the whole window's would have put
+!                   those slices. Default 0, the whole window.
 !
 ! Output:
 !   err_flag   -- logical: Set True on error, False otherwise.
 !-
 
-subroutine wavefront_write_openpmd (wf, file_name, s_pos, err_flag)
+subroutine wavefront_write_openpmd (wf, file_name, s_pos, err_flag, z_offset)
 
 type (wavefront_struct), target :: wf
 character(*) file_name
 real(rp) s_pos, gmax_x, gmax_y, e_photon
+real(rp), optional :: z_offset
 integer(hid_t) f_id, it_id, m_id, complex_t
 integer h5_err, i
 logical err_flag, err
@@ -166,7 +173,7 @@ e_photon = h_planck * c_light / wf%wavelength * e_charge     ! [J]. h_planck is 
 call hdf5_write_attribute_string (m_id, 'geometry', 'cartesian', err)
 call hdf5_write_attribute_string (m_id, 'axisLabels', [character(1):: 'z', 'y', 'x'], err)
 call hdf5_write_attribute_real (m_id, 'gridSpacing', [wf%dz, wf%dy, wf%dx], err)
-call hdf5_write_attribute_real (m_id, 'gridGlobalOffset', [0.0_rp, -gmax_y, -gmax_x], err)
+call hdf5_write_attribute_real (m_id, 'gridGlobalOffset', [real_option(0.0_rp, z_offset), -gmax_y, -gmax_x], err)
 call hdf5_write_attribute_real (m_id, 'gridUnitSI', [1.0_rp, 1.0_rp, 1.0_rp], err)
 call hdf5_write_attribute_real (m_id, 'gridUnitDimension', [(len_dim, i = 1, 3)], err)
 call hdf5_write_attribute_real (m_id, 'unitDimension', [1.0_rp, 1.0_rp, -3.0_rp, -1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp], err)

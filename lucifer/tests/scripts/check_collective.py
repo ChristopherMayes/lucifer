@@ -16,6 +16,14 @@ tiers live in compare_fel.py).
    loudly. The checker parses the driver's record of recomputes rather than
    reimplementing the convolution.
 
+3. A stride that only drops. A particle dropped off the window's end changes the
+   current profile as a move does, and the recompute once keyed on moves alone, so a
+   stride that dropped charge and moved nothing left the wake computed from charge no
+   longer there. The case is built rather than found: a cold beam confined to the head
+   slice by editing a dump, detuned so it slips out of the window and never into
+   another slice. Its migration record must show drops and no moves, and the wake
+   record must hold one block per such stride beyond the hoist.
+
 Usage: check_collective.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad and aramis.bmad. Exit 0 only if all pass.
 """
@@ -23,11 +31,13 @@ The workdir must hold aramis_1seg.bmad and aramis.bmad. Exit 0 only if all pass.
 from __future__ import annotations
 
 import argparse
+import shutil
 import pathlib
 import re
 import subprocess
 import sys
 
+import h5py
 import numpy as np
 
 from nml import to_groups
@@ -75,6 +85,55 @@ def run(exe, wd, name, text):
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
     return r.stdout
+
+
+def migration_events(fn):
+    """[(s, moved, charge_dropped)] per migration event, the per-event rows only."""
+    events = []
+    for line in pathlib.Path(fn).read_text().splitlines():
+        f = line.split()
+        if not f or line.startswith("#") or f[0] in ("moved", "charge_dropped_total",
+                                                       "worst_bunching_deviation"):
+            continue
+        events.append((float(f[0]), int(f[1]), float(f[2])))
+    return events
+
+
+def keep_one_patch(src, dst, k):
+    """Copy a beam dump keeping the particles of patch k only (-1 is the last, the head).
+
+    A dump is one particlePatch per slice, so a beam confined to one slice is the dump
+    with the other patches emptied: every per-particle record cut to the patch's range,
+    the constant records' shape and the species' numParticles set to the count kept, and
+    the patch table rewritten with one patch full and the offsets at zero.
+    """
+    shutil.copy(src, dst)
+    with h5py.File(dst, "r+") as h5:
+        g = h5["data/00001/particles/electron"]
+        n = g["particlePatches/numParticles"][()]
+        off = g["particlePatches/numParticlesOffset"][()]
+        k = k % len(n)
+        n_tot, a, b = int(n.sum()), int(off[k]), int(off[k] + n[k])
+        names = []
+        g.visititems(lambda nm, o: names.append(nm)
+                     if isinstance(o, h5py.Dataset) and o.shape and o.shape[0] == n_tot
+                     and not nm.startswith("particlePatches") else None)
+        for nm in names:
+            data, attrs = g[nm][a:b], dict(g[nm].attrs)
+            del g[nm]
+            d = g.create_dataset(nm, data=data)
+            for key, val in attrs.items():
+                d.attrs[key] = val
+        def cut_shape(nm, o):
+            if "shape" in o.attrs and int(np.ravel(o.attrs["shape"])[0]) == n_tot:
+                o.attrs["shape"] = np.array([b - a], dtype=o.attrs["shape"].dtype)
+        g.visititems(cut_shape)
+        g.attrs["numParticles"] = np.array([b - a], dtype=g.attrs["numParticles"].dtype)
+        kept = np.zeros_like(n)
+        kept[k] = b - a
+        g["particlePatches/numParticles"][...] = kept
+        g["particlePatches/numParticlesOffset"][...] = np.zeros_like(off)
+    return b - a
 
 
 def wake_blocks(fn):
@@ -137,6 +196,37 @@ def main():
     ok = ok and m_ok
     print(f"--- stale-wake structure: {len(blocks)} eloss blocks under heavy migration, "
           f"changed = {changed}  {'ok' if m_ok else 'FAIL'}")
+
+    # 3. A stride that only drops. The source run writes the initial state at the detuned
+    # wavelength, the dump is cut to its head slice, and the cut beam is loaded back with
+    # the field the source wrote. Two segments: the first stride moves nothing, the
+    # second drops most of the slice off the head and moves nothing, and the rest of the
+    # beam is still there for the final dump. A cold beam at a low charge, so the slip is
+    # the detuning's alone and no gain spreads it into both directions.
+    drop_extra = ("  write_initial = T\n  load_only = T\n")
+    src = BASE.format(lat="aramis.bmad", root="colld_src", sig_pz="1e-8", extra=drop_extra)
+    src = src.replace("lambda0 = 1e-10", "lambda0 = 1.006e-10").replace(
+        "bunch_charge = 2.401661485427e-14", "bunch_charge = 2.401661485427e-16")
+    run(exe, wd, "colld_src.nml", src)
+    n_head = keep_one_patch(wd / "colld_src-initial.beam.h5", wd / "colld_head.beam.h5", -1)
+    text = BASE.format(lat="aramis.bmad", root="colld", sig_pz="1e-8",
+                       extra='  migrate = T\n  beam_file = "colld_head.beam.h5"\n'
+                             '  field_file = "colld_src-initial.wf.h5"\n  load_mode = "keep"\n'
+                             '  global%track_end = "UND##2"\n')
+    text = text.replace("lambda0 = 1e-10", "lambda0 = 1.006e-10").replace(
+        "bunch_charge = 2.401661485427e-14", "bunch_charge = 2.401661485427e-16")
+    run(exe, wd, "colld.nml", text)
+    events = migration_events(wd / "colld.migration.txt")
+    drop_only = [e for e in events if e[1] == 0 and e[2] > 0]
+    with_moves = [e for e in events if e[1] > 0]
+    blocks_d = wake_blocks(wd / "colld.wake.txt")
+    refreshed = len(blocks_d) == 1 + len(events) and all(
+        not np.array_equal(blocks_d[0][1], b) for _, b in blocks_d[1:])
+    d_ok = len(drop_only) >= 1 and not with_moves and refreshed
+    ok = ok and d_ok
+    print(f"--- drop-only stride: {n_head} particles in the head slice, {len(drop_only)} stride(s) "
+          f"dropped and moved nothing, {len(with_moves)} moved; {len(blocks_d)} eloss blocks "
+          f"for {len(events)} stride(s), refreshed = {refreshed}  {'ok' if d_ok else 'FAIL'}")
 
     print("collective checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

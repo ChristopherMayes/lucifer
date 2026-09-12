@@ -685,11 +685,13 @@ n_moved_tot = n_moved_tot + nm
 charge_dropped_tot = charge_dropped_tot + chd
 
 ! Migration changes the current profile, which the wake convolution was hoisted on
-! (the hoist predates migration): recompute at this stride. Every recompute appends
-! a z-stamped block to <out_root>.wake.txt, so "the wake followed the currents"
-! is a structural fact a check can parse without reimplementing the convolution.
+! (the hoist predates migration): recompute at this stride. A particle dropped off the
+! window's end changes the profile as a particle moved between slices does, and a stride
+! that only dropped once left the table computed from charge no longer there. Every
+! recompute appends a z-stamped block to <out_root>.wake.txt, so "the wake followed the
+! currents" is a structural fact a check can parse without reimplementing the convolution.
 
-if (nm > 0 .and. coll%wake%on) then
+if ((nm > 0 .or. chd > 0) .and. coll%wake%on) then
   call fel_wake_update (coll%wake, fbeam)
   call fel_write_wake_block (run, z_now)
 endif

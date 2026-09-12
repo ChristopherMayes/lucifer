@@ -9,6 +9,25 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: space charge on a Bmad-seam interlude is refused rather than tracked with nothing
+  applied. The seam tracks one slice's bunch at a time through `track1_bunch`, whose own space-charge and
+  CSR paths want the centroid orbit of the whole beam, and without it Bmad printed that the centroid must be
+  supplied and returned the bunch untracked with no error set: a 0.1 m drift carrying `space_charge_method =
+  slice` under the master switch left every position and momentum record unchanged, and the run reported
+  success. Setup now refuses an interlude element with a space-charge or CSR method under the master switch
+  and the `bmad` interlude model, and names why. The transcribed Genesis interlude still applies the slice
+  solve itself.
+- 2026-09-12 Fixed: the chamber wake follows a migration stride that only drops. The recompute keyed on
+  particles moved between slices, and a stride that dropped charge off the window's ends and moved nothing
+  left the wake computed from charge no longer there: on an eight-slice window losing its head slice, the
+  next 0.1 m at a 10 um chamber radius lost 12.7 keV more than a restart from the same state. The recompute
+  now keys on moves or drops, and the check builds a drop-only stride and holds one refreshed block per
+  stride.
+- 2026-09-12 Fixed: a field frame cut to a slice range keeps its longitudinal origin. The writer put zero in
+  `gridGlobalOffset` along z whatever the range, so a frame of slices 4 to 6 started at 0 m where the whole
+  window's would have put those slices at 3e-10 m, and a standard reader placed the cut field and the cut
+  beam apart. The mesh now starts at the first slice's z, and the check holds it there against the whole
+  window's frame.
 - 2026-09-12 Fixed: a zero-length element that can act is tracked. The walk skipped every zero-length
   element without a wake that could act, and a thin kicker, a multipole, a patch or a zero-length cavity
   went with the markers: an hkicker of zero length and kick 1e-5 rad left the beam exactly as a kicker with

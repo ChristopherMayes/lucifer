@@ -6955,7 +6955,9 @@ Layout decisions (see the physics manual, fel-physics.md sec-field-set):
                            contradiction is resolved here in the record's favor:
                            photonEnergy is a property of one field):
                            geometry 'cartesian', axisLabels ['z','y','x'],
-                           gridSpacing [dz,dy,dx], gridGlobalOffset [0,-gmax,-gmax],
+                           gridSpacing [dz,dy,dx], gridGlobalOffset [z0,-gmax,-gmax]
+                           (z0 is 0 for a whole window and the first slice's z for a
+                           frame cut to a slice range),
                            gridUnitSI [1,1,1], gridUnitDimension (a length per axis),
                            unitDimension (1,1,-3,-1,0,0,0) (V/m),
                            timeOffset 0, photonEnergy [J], temporalDomain 'time',
@@ -7016,6 +7018,10 @@ Input:
   wf         -- wavefront_struct: The field. Ey written when allocated.
   file_name  -- character(*): Output file.
   s_pos      -- real(rp): Lattice position of the dump plane [m] (zCoordinate).
+  z_offset   -- real(rp), optional: Where the first record sits along the window [m],
+                  gridGlobalOffset's z. A field cut to a slice range passes the first
+                  slice's z, so the mesh lands where the whole window's would have put
+                  those slices. Default 0, the whole window.
 
 Output:
   err_flag   -- logical: Set True on error, False otherwise.

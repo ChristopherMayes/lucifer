@@ -486,9 +486,15 @@ advance and the second transverse half step, theta held fixed through the kick, 
 longitudinal space charge as the per-particle `ez` in the pendulum equation, from the
 per-slice radial-harmonic tridiagonal solves plus the whole-window long-range term, both
 weighted (`c*w_j/slice_spacing` where Genesis4 has `current/npart`). The convolution is
-hoisted once, as Genesis4's is, and recomputed at the migration stride when migration can
-change the currents. Every recompute appends a z-stamped eloss block to
-`<out_root>.wake.txt`, making "the wake followed the currents" a parseable fact.
+hoisted once, as Genesis4's is, and recomputed at every migration stride that moved a
+particle between slices or dropped one off the window's ends, since both change the
+currents. Every recompute appends a z-stamped eloss block to
+`<out_root>.wake.txt`, making "the wake followed the currents" a parseable fact. The
+recompute once keyed on moves alone, so a stride that only dropped left the table
+computed from charge no longer there. `check_collective.py` builds that stride: a cold
+beam confined to the head slice by editing a dump, detuned by 0.6% so it slips off the
+head over two segments and never into another slice, and holds one refreshed block per
+such stride.
 
 Two decisions recorded here as much as in the code: the numerical impedance is a clean,
 separable routine (`fel_resistive_wall_wake`) because that computation is a future port
