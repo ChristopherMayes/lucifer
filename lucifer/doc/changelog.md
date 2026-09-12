@@ -9,6 +9,12 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-11 Added: the run header projects what the device's FP32 transform pair will cost a deck. The pair
+  loses about 0.17 of an FP32 quantum of the field's energy a butterfly stage, in one direction, and how
+  much a deck loses is set by how often the pair runs, once a record step in an averaged element and nsub
+  times in an unaveraged one. The header counts the pairs a field record sees over the line and states the
+  projected loss, 6.5e-4 on the one-segment unaveraged deck and 1.1e-5 on the averaged one. The check holds
+  the count to the deck's and the projection within a factor of two of what the same run measured.
 - 2026-09-11 Added: the frame series with the device resident in the unaveraged mode is checked. That
   combination became supported when the Metal backend took that mode and nothing in the harness held it,
   which is the shape a producer and a consumer written to the same feature take when neither is exercised.

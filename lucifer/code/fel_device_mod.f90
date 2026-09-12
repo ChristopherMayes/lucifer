@@ -110,6 +110,14 @@ real(rp), parameter :: fel_dev_gamma_floor$ = 8.0_rp
 
 integer, parameter :: fel_dev_dep_bits_min$ = 8
 
+! What the FP32 transform pair loses of the field's energy each time it runs, in one
+! direction: about 0.17 of an FP32 quantum a butterfly stage, over the 2 log2(ngrid)
+! stages of a forward and an inverse transform. Measured with no charge on the field at
+! grids 64 to 512, 1.27e-7 to 1.79e-7 a pair, which the rate gives as 1.22e-7 to 1.83e-7
+! (validation.md, val-device-unaveraged). The run header projects a deck's loss from it.
+
+real(rp), parameter :: fel_dev_stage_loss$ = 0.17_rp / 16777216.0_rp   ! 0.17 * 2^-24
+
 integer, parameter :: fel_dev_pass_n$ = 9
 character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
         [character(10):: 'transverse', 'push', 'zero', 'deposit', 'filter', 'solve', &
@@ -2122,5 +2130,32 @@ do is = 1, size(beam%slice)
 enddo
 
 end subroutine fel_device_unavg_twin_rows
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_dev_pair_loss (ngrid) result (loss)
+!
+! Routine to project the fraction of the field's energy the device's FP32 transform pair
+! loses each time it runs on an ngrid-point grid, fel_dev_stage_loss$ a butterfly stage
+! over the 2 log2(ngrid) stages of a forward and an inverse transform. The device takes
+! powers of two only, so the stage count is exact.
+!-
+
+function fel_dev_pair_loss (ngrid) result (loss)
+
+real(rp) loss
+integer ngrid, n, nstage
+
+nstage = 0
+n = ngrid
+do while (n > 1)
+  n = n / 2
+  nstage = nstage + 1
+enddo
+loss = fel_dev_stage_loss$ * 2 * nstage
+
+end function fel_dev_pair_loss
 
 end module fel_device_mod

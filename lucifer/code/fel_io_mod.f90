@@ -433,6 +433,19 @@ block
         n_gpt, ' grid points per step'
   call out_io (s_blank$, r_name, trim(line))
 
+  ! The device's transform pair is single precision and loses a fixed fraction of the
+  ! field's energy every time it runs, in one direction, so what a deck loses is set by
+  ! how often the pair runs: once a record step in an averaged element and nsub times in
+  ! an unaveraged one, where nstep already counts the substeps. Nothing else in the output
+  ! says which regime a deck is in (validation.md, val-device-unaveraged).
+
+  if (run%dev%on) then
+    write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Device      FP32 transform pair ', nstep, &
+          ' times a field record (', nstep_unavg, ' unaveraged substeps), projected field-energy loss ', &
+          fel_dev_pair_loss(ngrid), ' a pair, ', fel_dev_pair_loss(ngrid) * nstep, ' over the line'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
+
   ! The interlude's pieces, when the knob cuts them. Only then: a run that tracks an
   ! interlude whole says nothing, which is every run that does not ask for this.
 

@@ -226,6 +226,11 @@ U_FRAME_CEIL = 1.0e-5
 # change and narrow enough that a pair which stopped being nearly unitary would show.
 
 PAIR_LOSS = (5e-8, 4e-7)
+# The header's projection of that loss against what the same run measures. The rate it
+# projects from is one machine's fit to four grids, so a factor of two either way.
+PAIR_RE = re.compile(r"FP32 transform pair (\d+) times a field record \((\d+) unaveraged "
+                     r"substeps\), projected field-energy loss ([-+.0-9Ee]+) a pair")
+PROJ_BAND = (0.5, 2.0)
 
 # The planar segment of check_harmonics, since fc(3) is alive there where the Aramis
 # segment is helical and couples only the fundamental, at the device's grid.
@@ -552,13 +557,16 @@ def unaveraged(args, wd, exe):
     ok("two unaveraged device runs, diag and ledger identical", same, "True", same)
 
     # 7. The transform pair's own energy loss, with no charge to feed the field. The
-    # CPU's FP64 pair holds the energy to 1.6e-12 over the same 5340 applications.
-    for root, extra, npair in (("dvu_darku", DEV, 89 * 60), ("dvu_darka", DEV, 89)):
+    # CPU's FP64 pair holds the energy to 1.6e-12 over the same 5340 applications. The
+    # run header counts the pairs and projects the loss from the recorded rate, and the
+    # count must be the deck's and the projection must sit near what the run measured.
+    for root, extra, npair, nsub in (("dvu_darku", DEV, 89 * 60, 89 * 60),
+                                     ("dvu_darka", DEV, 89, 0)):
         text = base.format(root=root, extra=extra)
         if root.endswith("a"):
             text = text.replace(lat, "aramis_1seg.bmad")
-        run(args.exe, wd, f"{root}.in",
-            text.replace("bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
+        r = run(args.exe, wd, f"{root}.in",
+                text.replace("bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
         p0 = diag_power(wd, root, 1)
         rows = [l.split() for l in (wd / f"{root}.diag.txt").read_text().splitlines()
                 if not l.startswith("#")]
@@ -567,6 +575,13 @@ def unaveraged(args, wd, exe):
         good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
         ok(f"FP32 transform pair energy loss, {mode} deck", f"{loss:.3e} a pair",
            f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good)
+        m = PAIR_RE.search(r.stdout)
+        counts = (int(m.group(1)), int(m.group(2))) if m else None
+        ok(f"header counts the transform pairs, {mode} deck", counts, f"== {(npair, nsub)}",
+           counts == (npair, nsub))
+        ratio = float(m.group(3)) / loss if m else float("nan")
+        ok(f"header projection over measured loss, {mode} deck", f"{ratio:.3f}",
+           f"in [{PROJ_BAND[0]}, {PROJ_BAND[1]}]", PROJ_BAND[0] <= ratio <= PROJ_BAND[1])
 
     # 8. Refused. Two live polarizations in this mode is the one configuration the CPU
     # carries and the device does not.

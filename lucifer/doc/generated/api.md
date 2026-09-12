@@ -1836,6 +1836,18 @@ Input:
                  nothing about precision.
 ```
 
+(api-fel-dev-pair-loss)=
+### `fel_dev_pair_loss`
+
+*Function* `(ngrid) result (loss)`
+
+```
+Routine to project the fraction of the field's energy the device's FP32 transform pair
+loses each time it runs on an ngrid-point grid, fel_dev_stage_loss$ a butterfly stage
+over the 2 log2(ngrid) stages of a forward and an inverse transform. The device takes
+powers of two only, so the stage count is exact.
+```
+
 ## `fel_field_mod.f90`
 
 (api-fel-field-mod)=
