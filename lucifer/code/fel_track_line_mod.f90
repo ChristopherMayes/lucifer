@@ -263,10 +263,11 @@ do ie = run%i_start, run%i_end
     endif
 
     ! The off-phase knob (fel-physics.md sec-phasing): a displaced element sees the extra
-    ! upstream-break phase at entry and gives it back at exit (the downstream break
-    ! is shorter by the same delta), so the anchor stays nominal downstream. Sign:
-    ! positive z_offset = a longer upstream break = more beam delay = theta backwards,
-    ! Genesis's phase-shifter convention, anchored by the cross-code phi scan.
+    ! upstream-break phase at entry and gives it back at its last step, before the
+    ! migration there (the downstream break is shorter by the same delta), so the anchor
+    ! stays nominal downstream. Sign: positive z_offset = a longer upstream break = more
+    ! beam delay = theta backwards, Genesis's phase-shifter convention, anchored by the
+    ! cross-code phi scan.
 
     if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 - phase_rate * fel_zoff(ie)
 
@@ -317,8 +318,17 @@ do ie = run%i_start, run%i_end
         call apply_slippage_banked (und%dz * und_slip_step)
         if (err_flag) return
       endif
-      if (istep == und%nstep) call do_migrate ()
-      if (err_flag) return
+      ! The offset is given back before the migration re-slices the beam. Migration
+      ! reads each particle's phase against its slice's window, and an assignment made
+      ! while the displaced phase was still applied left every mover outside its new
+      ! slice once the nominal phase returned: at a full carrier turn of offset every
+      ! particle moved one slice and an eighth of the charge fell off the window.
+
+      if (istep == und%nstep) then
+        if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
+        call do_migrate ()
+        if (err_flag) return
+      endif
       if (fel_comb_take(comb, z_now, run%z_last_rec, istep == und%nstep)) then
 
         ! The comb's positions are where the resident state comes back to the host:
@@ -341,7 +351,6 @@ do ie = run%i_start, run%i_end
     ! the run stops here, before a stats row, a dump or an exit line is written from it.
 
     if (run%dev%dep_breach) then;  err_flag = .true.;  return;  endif
-    if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
     call end_of_element ()              ! Fills the element-end row before this element's
     if (err_flag) return                !   last progress row reads it.
     call progress_line (.true., und%nstep, und%nstep)

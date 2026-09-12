@@ -71,6 +71,24 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
 """
 
 
+# A leading break of 0.1 m, which the offset must fit inside, and one averaged segment.
+OFFSET_LAT = """no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+D0: drift, l = 0.1
+UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model,
+     b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light,
+     fel_method = averaged, ds_step = 0.015, z_offset = {zoff}
+SEG: line = (D0, UND)
+use, SEG
+"""
+
+
 def run(exe, wd, nml_name, text):
     (wd / nml_name).write_text(to_groups(text))
     r = subprocess.run([str(exe), nml_name], cwd=wd, capture_output=True, text=True,
@@ -175,6 +193,39 @@ def main():
     ok = ok and n_ok
     print(f"--- migration no-op: {moved} moves, diag byte-equal {diag_eq}, "
           f"dumps dataset-equal {d_eq}  {'ok' if n_ok else 'FAIL'}")
+
+    # 4: migration against the restored phase. A displaced element carries its
+    # z_offset phase inside and gives it back at its last step, and the migration there
+    # once read the displaced phase: at a full carrier turn every particle moved one
+    # slice and an eighth of the charge fell off the window, and the survivors sat
+    # outside their new slices once the nominal phase returned. Cold, nearly chargeless
+    # and at the frozen-phase emittance of check 3, so nothing moves on its own and the
+    # offset run and the zero-offset run hold the same beam. n_particle is per slice.
+    z_turn = 2 * 11357.82**2 * 1e-10
+    runs = {}
+    for tag, zoff, mig in (("zo0f", 0.0, "F"), ("zo1f", z_turn, "F"),
+                           ("zo0t", 0.0, "T"), ("zo1t", z_turn, "T")):
+        (wd / f"{tag}.bmad").write_text(OFFSET_LAT.format(zoff=zoff))
+        run(exe, wd, f"{tag}.nml", BASE.format(lat=f"{tag}.bmad", root=tag,
+            sig_pz="1e-8", emit="1e-13", npart=128, slen="2.4e-9", q="2.401661485427e-18",
+            half="1.2e-9", mig=mig))
+        sls = beamio.read_slices(wd / f"{tag}-final.beam.h5", 1e-10, 3e-10)
+        th = np.concatenate([sl["theta"] for sl in sls])
+        runs[tag] = dict(n=int(sum(sl["n"] for sl in sls)), theta=th,
+                         out=int(np.sum((th < -1e-9) | (th >= slen + 1e-9))),
+                         moved=read_migration_file(wd, tag)[0] if mig == "T" else 0)
+    kept = all(r["n"] == 1024 for r in runs.values())
+    still = runs["zo0t"]["moved"] == 0 and runs["zo1t"]["moved"] == 0
+    inside = runs["zo0t"]["out"] == 0 and runs["zo1t"]["out"] == 0
+    dth = float(np.max(np.abs(np.sort(runs["zo1t"]["theta"]) - np.sort(runs["zo0t"]["theta"]))))
+    same = dth < 1e-9
+    o_ok = kept and still and inside and same
+    ok = ok and o_ok
+    print(f"--- migration with a full-turn z_offset: particles kept "
+          f"{[r['n'] for r in runs.values()]}, moves {runs['zo0t']['moved']} and "
+          f"{runs['zo1t']['moved']}, outside their window {runs['zo0t']['out']} and "
+          f"{runs['zo1t']['out']}, theta against zero offset {dth:.2e} rad  "
+          f"{'ok' if o_ok else 'FAIL'}")
 
     print("migration checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

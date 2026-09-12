@@ -1521,8 +1521,12 @@ The deliberate off-phase knob is the wiggler's own `z_offset`: standard
 Bmad misalignment, girder-composed, no new element or attribute. The autophase
 anchor is the element's nominal reference position, so a physical displacement
 $\delta$ adds the real, never-re-anchored entry phase
-$\Delta\phi = -2\pi\,\delta/(2\gamma^2\lambda)$, returned at exit (the downstream
-break is shorter by the same $\delta$, and downstream elements stay anchored). Measured
+$\Delta\phi = -2\pi\,\delta/(2\gamma^2\lambda)$, returned at the element's last step
+(the downstream break is shorter by the same $\delta$, and downstream elements stay
+anchored). It is returned before the slice migration that step runs, since migration
+reads each particle's phase against its slice's window and an assignment made against
+the displaced phase left every mover outside its new slice once the nominal phase came
+back. Measured
 against the analytic slope, and against Genesis4's own
 `PHASESHIFTER` element scanned over $\phi = 2\pi\,\delta/(2\gamma^2\lambda)$:
 the two bunching-phase curves agree at $1.9\times10^{-8}$ and the exit power against

@@ -763,6 +763,8 @@ Measured (check_harmonics.py, the harness's harmonics section):
 (val-phasing-between-segments-measured)=
 ## Phasing between segments: measured, then built
 
+The offset and the migration are checked together, since each alone was checked and the pair was not: the migration checks ran without an offset and the phasing checks without migration, and the migration at a displaced element's last step read the displaced phase. On eight cold, nearly chargeless slices behind a 0.1 m break, a full carrier turn of `z_offset` (25.8 mm) moved every particle one slice and dropped an eighth of the charge, with the survivors outside their new slices once the phase was nominal again. The offset is now returned before that migration. `check_migration.py` runs the four cases, offset on and off against migration on and off, and holds every particle kept, no moves, every particle inside its window, and the offset run's phases against the zero-offset run's at 1e-9 rad.
+
 Between undulator segments the default is Genesis4's behavior, verified by
 measurement before anything was written: scanning an inter-segment gap by fractions
 of 2 gamma^2 lambda (25.8 mm per turn at the benchmark) leaves the bunching phase

@@ -9,6 +9,13 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: a displaced element gives its `z_offset` phase back before the migration at its last
+  step. Migration reads each particle's phase against its slice's window, and the assignment was made while
+  the displaced phase was still applied and undone after: at a full carrier turn of offset every particle
+  moved one slice, an eighth of the charge fell off the window, and the survivors sat outside their new
+  slices, on the CPU and the device alike, with the run reporting success. The check runs offset on and off
+  against migration on and off and holds every particle kept and inside its window, with the offset run's
+  phases against the zero-offset run's at 1e-9 rad.
 - 2026-09-12 Fixed: the device's slippage counts a harmonic's escaped energy in full. The device routine
   formed the transmitted slice's light time from the member's wavelength alone, where `sample` counts
   fundamental wavelengths, so a third harmonic's escaped energy came out a third of what left the record;
