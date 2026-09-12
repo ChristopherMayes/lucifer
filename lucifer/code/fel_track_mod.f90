@@ -522,7 +522,7 @@ end subroutine fel_apply_slippage
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_apply_slippage (dev, slip, wf, slippage)
+! Subroutine fel_device_apply_slippage (dev, im, slip, wf, slippage, harm)
 !
 ! Routine to account one step's slippage while the field is resident on the device:
 ! fel_apply_slippage's exact bookkeeping with the two data motions the rotation needs
@@ -530,29 +530,41 @@ end subroutine fel_apply_slippage
 ! energy read back (one slice, the reference backends' own slippage traffic) and its
 ! device slice zeroed. The host FP64 record stays stale, as between any two
 ! readbacks. The escape bank is absent: keep_escaped_field is refused with the
-! device, and so is every harmonic beyond the fundamental.
+! device. Every member of the field set comes through here, one call a member.
 !
 ! Input:
 !   dev         -- fel_device_struct: The resident device state.
-!   slip        -- fel_slip_struct: Slippage state of the fundamental's record.
+!   im          -- integer: The field-set member.
+!   slip        -- fel_slip_struct: Slippage state of this member's record.
 !   wf          -- wavefront_struct: The field record (geometry only; data stays put).
 !   slippage    -- real(rp): Slippage of this step [radiation wavelengths].
+!   harm        -- integer, optional: The member's harmonic number, as fel_apply_slippage
+!                    takes it. Default 1.
 !
 ! Output:
 !   dev, slip   -- Updated state; the device record rotated.
 !-
 
-subroutine fel_device_apply_slippage (dev, im, slip, wf, slippage)
+subroutine fel_device_apply_slippage (dev, im, slip, wf, slippage, harm)
 
 type (fel_device_struct) dev
 type (fel_slip_struct) slip
 type (wavefront_struct) wf
 real(rp) slippage, t_slice
 integer im, nslice, last, direction
+integer, optional :: harm
 
 !
 
+! The transmitted slice's light time, as fel_apply_slippage forms it: sample counts
+! fundamental wavelengths and a harmonic's wf%wavelength is the fundamental's over
+! harm, so the product is scaled back up by harm. Without the factor a third harmonic's
+! escaped energy came out a third of what left the record.
+
 t_slice = (slip%sample * wf%wavelength / c_light)
+if (present(harm)) then
+  if (harm /= 1) t_slice = t_slice * harm
+endif
 
 if (.not. slip%timerun) return
 

@@ -226,6 +226,8 @@ U_FRAME_CEIL = 1.0e-5
 # change and narrow enough that a pair which stopped being nearly unitary would show.
 
 PAIR_LOSS = (5e-8, 4e-7)
+# The footer's line on what slippage transmitted out of the window, per member.
+ESCAPED_RE = re.compile(r"Escaped\s+h1\s+([-+.0-9Ee]+) J,\s+h3\s+([-+.0-9Ee]+) J")
 # The header's projection of that loss against what the same run measures. The rate it
 # projects from is one machine's fit to four grids, so a factor of two either way.
 PAIR_RE = re.compile(r"FP32 transform pair (\d+) times a field record \((\d+) unaveraged "
@@ -708,10 +710,24 @@ def field_set(args, wd, exe):
     for q in CEIL_H:
         ok(f"harmonic lockstep TD worst_{q}", f"{t.get(q, float('nan')):.3e}", f"<= {CEIL_H[q]:.1e}",
            q in t and t[q] <= CEIL_H[q])
-    run(args.exe, wd, "devh_tdoff.in", td.format(lat="dev_planar.bmad", root="devhtdoff", extra=""), threads="8")
+    r_off = run(args.exe, wd, "devh_tdoff.in", td.format(lat="dev_planar.bmad", root="devhtdoff", extra=""), threads="8")
     same = (wd / "devhtd.diag.txt").read_bytes() == (wd / "devhtdoff.diag.txt").read_bytes()
     ok("harmonic TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
-    run(args.exe, wd, "devh_tdpr.in", td.format(lat="dev_planar.bmad", root="devhtdpr", extra=DEV), threads="8")
+    r_pr = run(args.exe, wd, "devh_tdpr.in", td.format(lat="dev_planar.bmad", root="devhtdpr", extra=DEV), threads="8")
+
+    # The energy slippage transmitted out of the window, per member. The device's own
+    # bookkeeping once formed the transmitted slice's light time from the harmonic's
+    # wavelength alone, so a third harmonic's escaped energy came out a third of what
+    # left the record while the surviving field and the window power were right.
+    e_off, e_pr = ESCAPED_RE.search(r_off.stdout), ESCAPED_RE.search(r_pr.stdout)
+    for name, m in (("CPU", e_off), ("device", e_pr)):
+        ok(f"harmonic TD footer states the escaped energy ({name})", bool(m), "True", bool(m))
+    if e_off and e_pr:
+        for grp, label, ceil in ((1, "h1", E2E_CEIL), (2, "h3", H_E2E_CEIL)):
+            c, d = float(e_off.group(grp)), float(e_pr.group(grp))
+            ok(f"harmonic production TD escaped energy {label} vs CPU",
+               f"{abs(d-c)/c:.3e} [{d:.4e} vs {c:.4e} J]", f"<= {ceil:.1e}",
+               c > 0 and abs(d - c) / c <= ceil)
     c1, c3 = harm_powers(wd, "devhtdoff", window=True)
     d1, d3 = harm_powers(wd, "devhtdpr", window=True)
     ok("harmonic production TD window P1 vs CPU", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",

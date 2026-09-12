@@ -5204,7 +5204,7 @@ Output:
 (api-fel-device-apply-slippage)=
 ### `fel_device_apply_slippage`
 
-*Subroutine* `(dev, slip, wf, slippage)`
+*Subroutine* `(dev, im, slip, wf, slippage, harm)`
 
 ```
 Routine to account one step's slippage while the field is resident on the device:
@@ -5213,15 +5213,18 @@ done against the resident record through fel_device_mod -- the transmitted slice
 energy read back (one slice, the reference backends' own slippage traffic) and its
 device slice zeroed. The host FP64 record stays stale, as between any two
 readbacks. The escape bank is absent: keep_escaped_field is refused with the
-device, and so is every harmonic beyond the fundamental.
+device. Every member of the field set comes through here, one call a member.
 ```
 
 ```
 Input:
   dev         -- fel_device_struct: The resident device state.
-  slip        -- fel_slip_struct: Slippage state of the fundamental's record.
+  im          -- integer: The field-set member.
+  slip        -- fel_slip_struct: Slippage state of this member's record.
   wf          -- wavefront_struct: The field record (geometry only; data stays put).
   slippage    -- real(rp): Slippage of this step [radiation wavelengths].
+  harm        -- integer, optional: The member's harmonic number, as fel_apply_slippage
+                   takes it. Default 1.
 
 Output:
   dev, slip   -- Updated state; the device record rotated.

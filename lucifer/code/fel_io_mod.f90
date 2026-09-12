@@ -722,6 +722,20 @@ if (run%fp32%on) then
   call out_io (s_blank$, r_name, trim(line))
 endif
 
+! What slippage transmitted out of the window, per member of the field set. The energy
+! the record lost this way is the other half of a conservation statement the window's
+! own power cannot make, and the unaveraged ledger is otherwise its only reader.
+
+if (run%ffield(1)%slip%timerun) then
+  line = ' Escaped    '
+  do ih = 1, run%n_harm
+    write (line, '(2a, i0, a, es12.5, a)') trim(line), ' h', run%ffield(ih)%harm, ' ', &
+          run%ffield(ih)%slip%u_escaped, ' J'
+    if (ih < run%n_harm) line = trim(line) // ','
+  enddo
+  call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
+endif
+
 ! The file list is by existence, not by replaying which switches were on: a candidate
 ! name that is there gets listed with its size, and the naming rules stay in the one
 ! place that owns them (the writers).

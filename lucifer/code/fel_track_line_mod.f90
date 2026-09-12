@@ -1100,7 +1100,8 @@ logical err_b
 if (run%dev%resident) then
   call fel_tic (fel_t_slippage$)
   do ihh = 1, n_harm
-    call fel_device_apply_slippage (run%dev, ihh, ffield(ihh)%slip, ffield(ihh)%wf, slippage)
+    call fel_device_apply_slippage (run%dev, ihh, ffield(ihh)%slip, ffield(ihh)%wf, slippage, &
+                                    harm = ffield(ihh)%harm)
   enddo
   call fel_toc (fel_t_slippage$)
   return

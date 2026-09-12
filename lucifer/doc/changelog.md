@@ -9,6 +9,13 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: the device's slippage counts a harmonic's escaped energy in full. The device routine
+  formed the transmitted slice's light time from the member's wavelength alone, where `sample` counts
+  fundamental wavelengths, so a third harmonic's escaped energy came out a third of what left the record;
+  the CPU routine carried the harmonic factor and the device's did not. The surviving field and the window
+  power were right, and nothing the averaged path writes read the value. The routine takes the harmonic
+  number as the CPU's does, the footer now states the escaped energy per member, and the check holds the
+  device's to the CPU's on the time-dependent harmonic deck, the third harmonic at 1.2e-5.
 - 2026-09-12 Fixed: a field file's `y` component must be shaped as its `x` is. The reader allocated both
   buffers from `x` and read `y` into one of them with no bound, so a `y` twice as wide wrote past the buffer's
   end: the debug build stopped on the trap and the production build reported success and wrote a `y` of `x`'s
