@@ -15,7 +15,7 @@ Lucifer is the reference writer. The escaped-field and pulse field files are com
 
 ## 2. The record axis, FEL reading
 
-- **F7.** The core `record` axis carries the per-record beam and field data. `coords/s` (path length, Bmad's s) may legitimately repeat at a zero-length element that applies a wake kick, which is the case core R16 exists for. A repeat inside one element is a writer defect, and the writer's harness checks it.
+- **F7.** The core `record` axis carries the per-record beam and field data. `coords/s` (path length, Bmad's s) may legitimately repeat at a zero-length element that acts, a wake kick or a thin kicker, which is the case core R16 exists for. A repeat inside one element is a writer defect, and the writer's harness checks it.
 
 ## 3. Groups
 

@@ -513,17 +513,23 @@ end subroutine fel_read_openpmd_beam
 !   beam        -- fel_beam_struct: Beam to write.
 !   ele         -- ele_struct: Element the beam sits at, for the coord_struct conversion.
 !   file_name   -- character(*): File to create.
+!   is1, is2    -- integer, optional: The slice range to write. Default the whole window.
+!   chart_named -- logical, optional: The file names the beam's chart, so an unaveraged
+!                    beam is written rather than refused. Default False.
+!   s_pos       -- real(rp), optional: Where along ele the beam sits, for a frame taken
+!                    inside an element (fel_slice_to_bunch). Default the upstream end.
 !
 ! Output:
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, chart_named)
+subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, chart_named, s_pos)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
+real(rp), optional :: s_pos
 integer is, nb, nslice, i1, i2
 integer, optional :: is1, is2
 logical err_flag, err
@@ -555,7 +561,8 @@ call reallocate_beam (beam_b, i2 - i1 + 1)
 
 do is = i1, i2
   call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is - i1 + 1), err, &
-                           fold_phi0 = .true., ix_slice = is, chart_named = chart_named)
+                           fold_phi0 = .true., ix_slice = is, chart_named = chart_named, &
+                           s_pos = s_pos)
   if (err) return
 enddo
 nb = i2 - i1 + 1
@@ -1202,7 +1209,7 @@ end function fel_m_ind
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice)
+! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named, s_pos)
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
 ! stored coordinates are coord_struct's. The element's p0c must match the beam's
@@ -1247,20 +1254,29 @@ end function fel_m_ind
 !                    Omitted, the slice is placed at the reference, which is what tracking
 !                    wants: the seam hands one slice to a Bmad element and its own lag is
 !                    the whole of its z.
+!   chart_named -- logical, optional: The caller writes a file that names the chart the
+!                    beam is in, so an unaveraged beam is converted rather than refused.
+!                    Default False.
+!   s_pos       -- real(rp), optional: Where along ele the coords are initialized, for a
+!                    frame taken inside an element. The particle s and reference time are
+!                    then the frame's own, interpolated between the element's faces as
+!                    fel_frame_attributes interpolates the iteration's time. Omitted, the
+!                    coords sit at the upstream end, which is what tracking wants.
 !
 ! Output:
 !   bunch       -- bunch_struct: The slice as a Bmad bunch.
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named)
+subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named, s_pos)
 
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 type (ele_struct) ele
 type (bunch_struct) bunch
 real(rp) vec(6), dz_phi0, p0_mc, t_place
-integer ip
+real(rp), optional :: s_pos
+integer ip, loc
 integer, optional :: ix_slice
 logical err_flag
 logical, optional :: fold_phi0, chart_named
@@ -1304,6 +1320,19 @@ if (logic_option(.false., fold_phi0)) dz_phi0 = beam%phi0 * beam%wavelength / tw
 t_place = 0
 if (present(ix_slice)) t_place = -(ix_slice - 1) * beam%slice_spacing / c_light
 
+! Where along the element the particles are. A bunch handed to Bmad's tracking enters at
+! the element's upstream face. A frame is taken wherever the comb falls, and its s and
+! reference time are the frame's own: init_coord interpolates the reference time between
+! the element's faces at s_pos, the same line fel_frame_attributes stamps on the
+! iteration, so the particle records and the file's attributes say one position.
+
+loc = upstream_end$
+if (present(s_pos)) then
+  loc = inside$
+  if (s_pos == ele%s) loc = downstream_end$
+  if (s_pos == ele%s_start) loc = upstream_end$
+endif
+
 do ip = 1, sl%n
   vec = [sl%x(ip), sl%px(ip), sl%y(ip), sl%py(ip), sl%z(ip), sl%pz(ip)]
 
@@ -1312,7 +1341,7 @@ do ip = 1, sl%n
 
   ! init_coord derives beta, t and state consistently. shift_vec6 exists for elements
   ! whose reference momentum changes and must not touch vec(6) here.
-  call init_coord (bunch%particle(ip), vec, ele, upstream_end$, electron$, shift_vec6 = .false.)
+  call init_coord (bunch%particle(ip), vec, ele, loc, electron$, shift_vec6 = .false., s_pos = s_pos)
   bunch%particle(ip)%charge = sl%weight(ip)
   bunch%particle(ip)%ix_user = sl%id(ip)
   bunch%particle(ip)%t = bunch%particle(ip)%t + t_place

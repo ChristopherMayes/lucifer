@@ -555,7 +555,18 @@ and `ele%wake` is null on its slaves. Checking `ele%wake` directly was the first
 shipped version's hole, found by a user's lattice whose lord wakes fell through to the
 per-slice path (the zero-charge INFO spam returning was the symptom). Zero-length wake
 elements are kept in the walk for the same reason (a wake on a marker-like element is
-a standard Bmad idiom). Zero-length elements without wakes are skipped as before.
+a standard Bmad idiom). A zero-length element is skipped only where Bmad tracks it as the
+identity: a marker, drift, pipe, instrument or monitor with no kick, no multipole, no
+aperture and no wake that can act. A thin kicker, a multipole, a patch or a zero-length
+cavity is tracked whatever its length. The rule is `fel_element_inert` in `fel_struct`,
+and the walk and the setup's record-count precompute both read it, as they both read
+`fel_interlude_wake` for which element's wake acts. Each once made its own decision, and
+the two disagreed twice: the walk skipped a zero-length kicker, dropping a kick of
+`1e-5` rad with no message, and with `bmad_com%sr_wakes_on` off the walk cut a
+wake-carrying element into pieces that setup had counted whole, so the run stopped at
+the stats writer with more records than the precomputed count. `check_diagnostics.py`
+holds a zero-length kicker to the same kick through a finite length at 1e-3, and cuts a
+wake-carrying pipe with the switch off.
 
 Checks (`scripts/check_seam_wake.py`, self-referenced, every wake
 measurement an A-B difference against a bit-identical no-wake run on a one-step

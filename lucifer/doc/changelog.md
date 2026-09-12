@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: a zero-length element that can act is tracked. The walk skipped every zero-length
+  element without a wake that could act, and a thin kicker, a multipole, a patch or a zero-length cavity
+  went with the markers: an hkicker of zero length and kick 1e-5 rad left the beam exactly as a kicker with
+  no kick did, and the run reported success. The skip is now `fel_element_inert`, which keeps only what
+  Bmad tracks as the identity, a marker, drift, pipe, instrument or monitor with no kick, no multipole, no
+  aperture and no acting wake. The check holds the zero-length kicker to the same kick through a kicker of
+  1e-6 m at 1e-3.
+- 2026-09-12 Fixed: with `bmad_com%sr_wakes_on` off, a wake-carrying element and `global%interlude_ds_step`
+  stopped the run at the stats writer with more records than the precomputed count. The walk dropped the
+  wake with the switch and cut the element, and the setup's record-count precompute resolved the wake
+  without the switch and counted the element whole. Both now read `fel_interlude_wake` in `fel_struct`, the
+  one authority for which element's wake acts, and the check cuts a wake-carrying pipe with the switch off.
+- 2026-09-12 Fixed: a frame's particle records say where the frame is. The beam writer initialized every
+  particle at the containing element's upstream face, so a frame taken inside an element carried the
+  element's start in `sPosition` and its entry time in `timeOffset` while the file's own attributes and the
+  iteration's `time` said the frame's position: 0.045 m against 0.145 m, and a reference time behind by the
+  light travel time through 0.1 m. The element-end and final dumps had the same face: a dump written at an
+  element's end placed its particles at that element's start. The writers now take the position the beam
+  is at, and the particle `sPosition` and `timeOffset` land on the file's attributes at 1e-12 m and 1e-18 s
+  on every frame of the check's series. The initial dump, at the first element's upstream face, is unchanged.
 - 2026-09-11 Added: the run header projects what the device's FP32 transform pair will cost a deck. The pair
   loses about 0.17 of an FP32 quantum of the field's energy a butterfly stage, in one direction, and how
   much a deck loses is set by how often the pair runs, once a record step in an averaged element and nsub

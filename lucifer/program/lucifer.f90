@@ -165,7 +165,8 @@ if (err) stop 1
 ! the time window holds record slice 1 + mod(is-1+first, nslice)), which is what
 ! Genesis's field writer does on the fly (fel-physics.md sec-slippage).
 
-call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err)
+call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err, &
+                    s_pos = run%lat%branch(0)%ele(run%i_end)%s)
 if (err) stop 1
 
 call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err)

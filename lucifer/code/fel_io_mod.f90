@@ -44,15 +44,19 @@ contains
 !   run       -- fel_run_struct: Run state.
 !   ele       -- ele_struct: Element the beam sits at.
 !   prefix    -- character(*): Filename prefix. Format suffixes are appended.
+!   s_pos     -- real(rp), optional: Where along ele the beam sits. A dump at an element's
+!                  end passes ele%s, so the particle records carry the downstream face.
+!                  Omitted, the beam sits at the upstream face, which is the initial dump.
 !
 ! Output:
 !   err_flag  -- logical: Set True if a file could not be written. False otherwise.
 !-
 
-subroutine fel_dump_beam (run, ele, prefix, err_flag)
+subroutine fel_dump_beam (run, ele, prefix, err_flag, s_pos)
 
 type (fel_run_struct), target :: run
 type (ele_struct) ele
+real(rp), optional :: s_pos
 character(*) prefix
 logical err_flag
 logical eerr
@@ -61,7 +65,7 @@ logical eerr
 
 err_flag = .true.
 
-call fel_write_openpmd_beam (run%fbeam, ele, prefix // '.beam.h5', eerr)
+call fel_write_openpmd_beam (run%fbeam, ele, prefix // '.beam.h5', eerr, s_pos = s_pos)
 if (eerr) return
 
 err_flag = .false.
@@ -196,7 +200,7 @@ end subroutine fel_frame_attributes
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_dump_frame (run, ie, err_flag)
+! Subroutine fel_dump_frame (run, ie, at_end, err_flag)
 !
 ! Routine to write one frame of the series global%dump_at_comb asks for: the beam and
 ! the field set at this comb position, through the same writers the element-end dumps
@@ -211,18 +215,23 @@ end subroutine fel_frame_attributes
 ! Input:
 !   run       -- fel_run_struct: Run state.
 !   ie        -- integer: Index of the element the frame is taken in.
+!   at_end    -- logical: The frame is at the element's end. The walk's z_now reaches an
+!                  end by accumulation and can miss ele%s in its last bit, so the beam is
+!                  placed at the downstream face by this flag rather than by comparing the
+!                  two, and a frame at an element end is the element's own dump exactly.
 !
 ! Output:
 !   err_flag  -- logical: Set True if a file could not be written. False otherwise.
 !-
 
-subroutine fel_dump_frame (run, ie, err_flag)
+subroutine fel_dump_frame (run, ie, at_end, err_flag)
 
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (wavefront_struct) wf_sub
+real(rp) s_frame
 integer ie, ihh, first_was
-logical err_flag, eerr
+logical at_end, err_flag, eerr
 character(200) prefix
 character(8) hsuf
 
@@ -240,9 +249,11 @@ write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
 ! and keeps the refusal, which costs nothing today: dump_beam_at resolves through Bmad's
 ! locator and so lands on element boundaries, where the chart is averaged either way.
 
+s_frame = run%z_now
+if (at_end .and. ie >= 1) s_frame = run%lat%branch(0)%ele(ie)%s
 call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
                              trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2, &
-                             chart_named = .true.)
+                             chart_named = .true., s_pos = s_frame)
 if (eerr) return
 call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
 if (eerr) return

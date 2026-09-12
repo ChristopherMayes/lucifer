@@ -387,6 +387,63 @@ def interludes(exe, wd):
     check("interlude: refused with the transcribed Genesis interlude (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
+    # The switch off. With bmad_com%sr_wakes_on off the walk applies no wake and cuts the
+    # element like any other, and the setup's record-count precompute must make the same
+    # decision: it once counted the element whole while the walk cut it, and the run
+    # stopped at the stats writer with more records than the precomputed count.
+    wo = run(exe, wd, "int_wko", INT_NML.format(lat="intlatw.bmad", root="int_wko",
+        extra="  global%interlude_ds_step = 0.04\n  bmad_com%sr_wakes_on = F\n"))
+    wko = np.loadtxt(wd / "int_wko.diag.txt")
+    check("interlude: with sr_wakes_on off the wake element is cut like any other",
+          abs(inside(wko, 0.5, 0.9) - 9), 0.5, note=f"[{inside(wko, 0.5, 0.9)} rows inside it]")
+    check("interlude: and its physics is the whole-element run's",
+          abs(wko[-1, 2] - p[-1, 2]) / p[-1, 2], 1e-9)
+
+    # A zero-length element that can act is tracked. The walk skips a zero-length element
+    # Bmad tracks as the identity, and once skipped every zero-length element without a
+    # wake, a thin kicker among them, whose kick then vanished with no message. The same
+    # kick through a kicker of finite length is the control, and a zero-length pipe in the
+    # kicker's place says how large the kick is against the beam's own centroid and is
+    # the one element of the three the walk still skips, so its stats file is one record
+    # shorter: a kicker is tracked whatever its kick, since its key carries a map.
+    for tag, hk in (("thin", "HK: hkicker, l = 0, kick = 1e-5"),
+                    ("long", "HK: hkicker, l = 1e-6, kick = 1e-5"),
+                    ("none", "HK: pipe, l = 0")):
+        (wd / f"intlat_{tag}.bmad").write_text(INT_LAT.replace(
+            "P1: pipe, l = 0.40\n", f"P1: pipe, l = 0.40\n{hk}\n").replace(
+            "SEG: line = (UND, QF, P1, UND)", "SEG: line = (UND, QF, HK, P1, UND)"))
+        run(exe, wd, f"int_{tag}", INT_NML.format(lat=f"intlat_{tag}.bmad", root=f"int_{tag}",
+            extra=""))
+    px = {}
+    nrec = {}
+    for tag in ("thin", "long", "none"):
+        with read_stats(wd / f"int_{tag}.stats.h5") as st:
+            px[tag] = float(st["beam/slice/centroid"][-1, 0, 1])
+            nrec[tag] = len(st.s)
+    kick = px["thin"] - px["none"]
+    check("thin kicker: a zero-length kicker kicks (1e-5 expected)", abs(kick - 1e-5) / 1e-5, 1e-3,
+          note=f"[{kick:.4e}]")
+    check("thin kicker: the same kick through a finite length agrees",
+          abs(px["thin"] - px["long"]) / abs(kick), 1e-3)
+    check("thin kicker: it takes a record, and the zero-length pipe is still skipped",
+          abs((nrec["thin"] - nrec["none"]) - 1), 0.5, note=f"[{nrec['thin']} vs {nrec['none']}]")
+
+    # A frame's particle records say where the frame is. The beam writer initialized the
+    # coords at the containing element's upstream face whatever the frame's position, so
+    # a frame inside a piece carried the element's start in sPosition and its entry time
+    # in timeOffset while the file's own attributes said the frame's position.
+    worst_s, worst_t = 0.0, 0.0
+    for fr in frames:
+        with h5py.File(fr) as f:
+            it = f["data"][sorted(f["data"])[0]]
+            el = it["particles/electron"]
+            def value(rec):
+                return float(np.ravel(rec.attrs["value"] if "value" in rec.attrs else rec[()])[0])
+            worst_s = max(worst_s, abs(value(el["sPosition"]) - float(np.ravel(f.attrs["sPosition"])[0])))
+            worst_t = max(worst_t, abs(value(el["timeOffset"]) - float(np.ravel(it.attrs["time"])[0])))
+    check("frames: the particle sPosition is the frame's own [m]", worst_s, 1e-12)
+    check("frames: the particle timeOffset is the iteration's time [s]", worst_t, 1e-18)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)

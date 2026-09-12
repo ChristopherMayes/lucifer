@@ -291,6 +291,11 @@ Input:
   beam        -- fel_beam_struct: Beam to write.
   ele         -- ele_struct: Element the beam sits at, for the coord_struct conversion.
   file_name   -- character(*): File to create.
+  is1, is2    -- integer, optional: The slice range to write. Default the whole window.
+  chart_named -- logical, optional: The file names the beam's chart, so an unaveraged
+                   beam is written rather than refused. Default False.
+  s_pos       -- real(rp), optional: Where along ele the beam sits, for a frame taken
+                   inside an element (fel_slice_to_bunch). Default the upstream end.
 
 Output:
   err_flag    -- logical: Set True on error, False otherwise.
@@ -562,7 +567,7 @@ Output:
 (api-fel-slice-to-bunch)=
 ### `fel_slice_to_bunch`
 
-*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice)`
+*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named, s_pos)`
 
 ```
 Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
@@ -610,6 +615,14 @@ Input:
                    Omitted, the slice is placed at the reference, which is what tracking
                    wants: the seam hands one slice to a Bmad element and its own lag is
                    the whole of its z.
+  chart_named -- logical, optional: The caller writes a file that names the chart the
+                   beam is in, so an unaveraged beam is converted rather than refused.
+                   Default False.
+  s_pos       -- real(rp), optional: Where along ele the coords are initialized, for a
+                   frame taken inside an element. The particle s and reference time are
+                   then the frame's own, interpolated between the element's faces as
+                   fel_frame_attributes interpolates the iteration's time. Omitted, the
+                   coords sit at the upstream end, which is what tracking wants.
 
 Output:
   bunch       -- bunch_struct: The slice as a Bmad bunch.
@@ -3107,6 +3120,9 @@ Input:
   run       -- fel_run_struct: Run state.
   ele       -- ele_struct: Element the beam sits at.
   prefix    -- character(*): Filename prefix. Format suffixes are appended.
+  s_pos     -- real(rp), optional: Where along ele the beam sits. A dump at an element's
+                 end passes ele%s, so the particle records carry the downstream face.
+                 Omitted, the beam sits at the upstream face, which is the initial dump.
 
 Output:
   err_flag  -- logical: Set True if a file could not be written. False otherwise.
@@ -3143,7 +3159,7 @@ Output:
 (api-fel-dump-frame)=
 ### `fel_dump_frame`
 
-*Subroutine* `(run, ie, err_flag)`
+*Subroutine* `(run, ie, at_end, err_flag)`
 
 ```
 Routine to write one frame of the series global%dump_at_comb asks for: the beam and
@@ -3161,6 +3177,10 @@ the state it observes is the failure the FP32 twin's read-only proof exists to c
 Input:
   run       -- fel_run_struct: Run state.
   ie        -- integer: Index of the element the frame is taken in.
+  at_end    -- logical: The frame is at the element's end. The walk's z_now reaches an
+                 end by accumulation and can miss ele%s in its last bit, so the beam is
+                 placed at the downstream face by this flag rather than by comparing the
+                 two, and a frame at an element end is the element's own dump exactly.
 
 Output:
   err_flag  -- logical: Set True if a file could not be written. False otherwise.
@@ -4543,6 +4563,58 @@ Output:
   n_piece -- integer: Pieces, at least one.
 ```
 
+(api-fel-interlude-wake)=
+### `fel_interlude_wake`
+
+*Function* `(ele) result (wake_src)`
+
+```
+Routine to say which element's short-range wake acts on an interlude, the one
+authority for it: the walk routes a wake-carrying element through the whole-window
+path and refuses to cut it into pieces, and the setup's record-count precompute
+replays both decisions, so the two must agree or the stats arrays are mis-sized.
+
+Bmad's own resolver, pointer_to_wake_ele, finds the wake on the element or on exactly
+one slave of a split lord. With bmad_com%sr_wakes_on off, track1_bunch applies no
+wake, so no element carries one here. A zero-length element whose wake scales with
+its length (Bmad's default) kicks by identically zero and carries none either. A
+long-range wake has no scale_with_length and acts at zero length, so it is kept.
+```
+
+```
+Input:
+  ele      -- ele_struct: The element.
+
+Output:
+  wake_src -- ele_struct, pointer: The element whose wake acts, or null.
+```
+
+(api-fel-element-inert)=
+### `fel_element_inert`
+
+*Function* `(ele, wake_src) result (inert)`
+
+```
+Routine to say whether the walk skips an element, the one authority for it, read by
+the walk and by the setup's record-count precompute alike.
+
+Only a zero-length element is a candidate, and only one that cannot act. A thin
+kicker, a multipole, a patch, a zero-length cavity or any other element whose key
+carries a map is tracked whatever its length: Bmad tracks it, and skipping it dropped
+its kick with no message. What is skipped is a marker, drift, pipe, instrument or
+monitor of zero length with no kick, no multipole, no aperture and no wake that can
+act, which Bmad tracks as the identity.
+```
+
+```
+Input:
+  ele      -- ele_struct: The element.
+  wake_src -- ele_struct, pointer: fel_interlude_wake's answer for it.
+
+Output:
+  inert    -- logical: True when the walk skips the element.
+```
+
 ## `fel_timer_mod.f90`
 
 (api-fel-timer-mod)=
@@ -4861,17 +4933,6 @@ blanked: the question a mid-element row answers is "is it alive and roughly wher
 Routine to take one stats record at the current z_now through fel_stats_record.
 with_angles fills the field theta moments (element ends). Sets the host err_flag
 on error.
-```
-
-(api-lr-wake-acts)=
-### `lr_wake_acts`
-
-*Function* `(wake_ele) result (acts)`
-
-```
-Routine to say whether an element's long-range wake can act. A long-range wake has no
-scale_with_length, so unlike a short-range one it is not silenced by a zero length,
-which is what makes it the exception to the zero-length skip above.
 ```
 
 (api-end-of-element)=

@@ -549,4 +549,104 @@ n_piece = max(1, int(1.01_rp * length / ds_step))
 
 end function fel_interlude_pieces
 
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_interlude_wake (ele) result (wake_src)
+!
+! Routine to say which element's short-range wake acts on an interlude, the one
+! authority for it: the walk routes a wake-carrying element through the whole-window
+! path and refuses to cut it into pieces, and the setup's record-count precompute
+! replays both decisions, so the two must agree or the stats arrays are mis-sized.
+!
+! Bmad's own resolver, pointer_to_wake_ele, finds the wake on the element or on exactly
+! one slave of a split lord. With bmad_com%sr_wakes_on off, track1_bunch applies no
+! wake, so no element carries one here. A zero-length element whose wake scales with
+! its length (Bmad's default) kicks by identically zero and carries none either. A
+! long-range wake has no scale_with_length and acts at zero length, so it is kept.
+!
+! Input:
+!   ele      -- ele_struct: The element.
+!
+! Output:
+!   wake_src -- ele_struct, pointer: The element whose wake acts, or null.
+!-
+
+function fel_interlude_wake (ele) result (wake_src)
+
+type (ele_struct), target :: ele
+type (ele_struct), pointer :: wake_src
+
+!
+
+wake_src => null()
+if (.not. bmad_com%sr_wakes_on) return
+wake_src => pointer_to_wake_ele(ele)
+if (.not. associated(wake_src)) return
+
+if (ele%value(l$) == 0 .and. wake_src%wake%sr%scale_with_length) then
+  if (.not. bmad_com%lr_wakes_on) then
+    wake_src => null()
+  elseif (.not. allocated(wake_src%wake%lr%mode)) then
+    wake_src => null()
+  elseif (size(wake_src%wake%lr%mode) == 0) then
+    wake_src => null()
+  endif
+endif
+
+end function fel_interlude_wake
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_element_inert (ele, wake_src) result (inert)
+!
+! Routine to say whether the walk skips an element, the one authority for it, read by
+! the walk and by the setup's record-count precompute alike.
+!
+! Only a zero-length element is a candidate, and only one that cannot act. A thin
+! kicker, a multipole, a patch, a zero-length cavity or any other element whose key
+! carries a map is tracked whatever its length: Bmad tracks it, and skipping it dropped
+! its kick with no message. What is skipped is a marker, drift, pipe, instrument or
+! monitor of zero length with no kick, no multipole, no aperture and no wake that can
+! act, which Bmad tracks as the identity.
+!
+! Input:
+!   ele      -- ele_struct: The element.
+!   wake_src -- ele_struct, pointer: fel_interlude_wake's answer for it.
+!
+! Output:
+!   inert    -- logical: True when the walk skips the element.
+!-
+
+function fel_element_inert (ele, wake_src) result (inert)
+
+type (ele_struct) ele
+type (ele_struct), pointer :: wake_src
+logical inert
+
+!
+
+inert = .false.
+if (ele%value(l$) /= 0) return
+if (associated(wake_src)) return
+
+select case (ele%key)
+case (marker$, beginning_ele$, null_ele$, fiducial$, floor_shift$, fork$, photon_fork$, &
+      drift$, pipe$, instrument$, monitor$, detector$)
+case default
+  return
+end select
+
+if (ele_has_nonzero_kick(ele)) return
+if (associated(ele%a_pole) .or. associated(ele%a_pole_elec)) return
+if (ele%value(x1_limit$) /= 0 .or. ele%value(x2_limit$) /= 0) return
+if (ele%value(y1_limit$) /= 0 .or. ele%value(y2_limit$) /= 0) return
+
+inert = .true.
+
+end function fel_element_inert
+
 end module fel_struct

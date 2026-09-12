@@ -1565,8 +1565,8 @@ run%n_int_ele = 0
 if (fel_comb_take(comb_r, z_r, z_last_r, .false.)) nrec_stats = nrec_stats + 1
 do i = run%i_start, run%i_end
   ele => branch%ele(i)
-  wake_src => pointer_to_wake_ele(ele)
-  if (ele%value(l$) == 0 .and. .not. associated(wake_src)) cycle
+  wake_src => fel_interlude_wake (ele)
+  if (fel_element_inert (ele, wake_src)) cycle
   nend_stats = nend_stats + 1
   if (is_fel(i)) then
     nstep_r = max(1, nint(ele%value(num_steps$)))
