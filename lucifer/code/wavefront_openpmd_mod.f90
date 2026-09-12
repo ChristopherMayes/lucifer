@@ -263,9 +263,9 @@ subroutine wavefront_read_openpmd (wf, file_name, err_flag, photon_energy)
 type (wavefront_struct), target :: wf
 character(*) file_name
 real(rp) photon_energy
-real(rp) spacing(3), offset(3), rval
+real(rp) spacing(3), offset(3), gunit(3), rval
 integer(hid_t) f_id, m_id, complex_t
-integer h5_err, ndim(3)
+integer h5_err, ndim(3), ndim_y(3)
 logical err_flag, err
 character(40) sval
 character(4), allocatable :: labels(:)
@@ -343,6 +343,19 @@ if (err) then
   call out_io (s_error$, r_name, 'REQUIRED ATTRIBUTE gridSpacing MISSING IN ' // trim(file_name))
   return
 endif
+! openPMD states the grid in its own units and the SI factor beside them, and a file
+! written elsewhere is entitled to use that: the spacing is what the factor makes it.
+
+call hdf5_read_attribute_real (m_id, 'gridUnitSI', gunit, err, .false.)
+if (err) then
+  call out_io (s_error$, r_name, 'REQUIRED ATTRIBUTE gridUnitSI MISSING IN ' // trim(file_name))
+  return
+endif
+if (any(gunit <= 0)) then
+  call out_io (s_error$, r_name, 'gridUnitSI MUST BE POSITIVE ON EVERY AXIS IN ' // trim(file_name))
+  return
+endif
+spacing = spacing * gunit
 wf%dz = spacing(1);  wf%dy = spacing(2);  wf%dx = spacing(3)
 wf%wavelength = h_planck * c_light * e_charge / photon_energy
 
@@ -350,10 +363,17 @@ call hdf5_read_attribute_real (m_id, 'gridGlobalOffset', offset, err, .false.)  
                                             ! the walk's grid is centered by convention.
 
 ! The components. Dataset dims come back in Fortran order (nx, ny, nz), the same API
-! symmetry the writer used.
+! symmetry the writer used. The buffer is allocated from x's dims and both components
+! are read into buffers of that shape, so y must be shaped as x is: an HDF5 read has no
+! bound of its own, and a larger y once wrote past the end of the buffer, which the
+! debug build caught and the production build did not.
 
 info = hdf5_object_info (m_id, 'x', err, .true.);  if (err) return
 ndim = int(info%data_dim(1:3))
+if (any(ndim <= 0)) then
+  call out_io (s_error$, r_name, 'COMPONENT x IS NOT A THREE-DIMENSIONAL DATASET IN ' // trim(file_name))
+  return
+endif
 if (allocated(wf%Ex)) deallocate (wf%Ex)
 if (allocated(wf%Ey)) deallocate (wf%Ey)
 allocate (wf%Ex(ndim(1), ndim(2), ndim(3)))
@@ -361,8 +381,21 @@ allocate (wf%Ex(ndim(1), ndim(2), ndim(3)))
 call pmd_init_compound_complex (complex_t)
 call read_component ('x', wf%Ex, err)
 if (.not. err .and. hdf5_exists(m_id, 'y', err, .false.)) then
-  allocate (wf%Ey(ndim(1), ndim(2), ndim(3)))
-  call read_component ('y', wf%Ey, err)
+  info = hdf5_object_info (m_id, 'y', err, .true.)
+  if (.not. err) then
+    ndim_y = int(info%data_dim(1:3))
+    if (any(ndim_y /= ndim)) then
+      call out_io (s_error$, r_name, 'COMPONENT y IS SHAPED (\i0\, \i0\, \i0\) WHERE x IS ' // &
+                   '(\i0\, \i0\, \i0\) IN ' // trim(file_name), &
+                   'BOTH POLARIZATIONS OF ONE FIELD SHARE ONE GRID.', &
+                   i_array = [ndim_y(3), ndim_y(2), ndim_y(1), ndim(3), ndim(2), ndim(1)])
+      err = .true.
+    endif
+  endif
+  if (.not. err) then
+    allocate (wf%Ey(ndim(1), ndim(2), ndim(3)))
+    call read_component ('y', wf%Ey, err)
+  endif
 endif
 call pmd_kill_compound_complex (complex_t)
 if (err) return
@@ -385,7 +418,8 @@ subroutine read_component (name, fld, cerr)
 
 character(*) name
 complex(wf_rp), target, contiguous :: fld(:,:,:)
-logical cerr
+real(rp) unit
+logical cerr, uerr
 integer(hid_t) d_id
 type(c_ptr) f_ptr
 
@@ -393,10 +427,26 @@ type(c_ptr) f_ptr
 
 cerr = .true.
 call h5dopen_f (m_id, name, d_id, h5_err);  if (h5_err < 0) return
+
+! The samples are in the file's own unit and unitSI takes them to V/m. openPMD requires
+! the attribute on every component, and this writer puts 1 there.
+
+call hdf5_read_attribute_real (d_id, 'unitSI', unit, uerr, .false.)
+if (uerr) then
+  call out_io (s_error$, r_name, 'REQUIRED ATTRIBUTE unitSI MISSING ON COMPONENT ' // trim(name) // &
+                                 ' IN ' // trim(file_name))
+  call h5dclose_f (d_id, h5_err);  return
+endif
+if (unit <= 0) then
+  call out_io (s_error$, r_name, 'unitSI MUST BE POSITIVE ON COMPONENT ' // trim(name) // ' IN ' // trim(file_name))
+  call h5dclose_f (d_id, h5_err);  return
+endif
+
 f_ptr = c_loc(fld)
 call h5dread_f (d_id, complex_t, f_ptr, h5_err)
 call h5dclose_f (d_id, h5_err)
 if (h5_err < 0) return
+if (unit /= 1) fld = fld * real(unit, wf_rp)
 cerr = .false.
 
 end subroutine read_component

@@ -9,6 +9,20 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: a field file's `y` component must be shaped as its `x` is. The reader allocated both
+  buffers from `x` and read `y` into one of them with no bound, so a `y` twice as wide wrote past the buffer's
+  end: the debug build stopped on the trap and the production build reported success and wrote a `y` of `x`'s
+  shape. The reader now refuses a `y` shaped unlike `x`, naming both shapes, before anything is read.
+- 2026-09-12 Fixed: the source filter acts on an imported field whether or not the deck repeats the grid. The
+  conversion from the filter's angle to a cutoff in grid units came from the deck's grid keys, which a deck
+  that imports its field need not state, and the cutoff was then infinite: every mode passed while the header
+  named the angle asked for, and angles of 1e-6 and 1e-5 rad gave identical fields. The conversion comes from
+  the field's own spacing on the import path, and the check holds a deck without the grid keys to one with
+  them at 1e-9.
+- 2026-09-12 Fixed: the field reader applies `unitSI` and `gridUnitSI`. Samples and spacing were taken as
+  written whatever the factors beside them said, so a file stating its samples at `unitSI = 0.5` loaded four
+  times the power. Both factors are applied and must be positive, and a file without them is refused, since
+  openPMD requires them.
 - 2026-09-12 Fixed: space charge on a Bmad-seam interlude is refused rather than tracked with nothing
   applied. The seam tracks one slice's bunch at a time through `track1_bunch`, whose own space-charge and
   CSR paths want the centroid orbit of the whole beam, and without it Bmad printed that the centroid must be

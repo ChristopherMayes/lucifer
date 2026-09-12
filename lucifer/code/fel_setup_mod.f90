@@ -1026,16 +1026,19 @@ if (any(is_fel)) then
     ! lambda/dx, off the grid. An edge at the angle theta is therefore xcut = theta dx /
     ! lambda. A first version of this line had lambda/(4 dx) and every edge landed four
     ! times wider than its name, which the Aramis benchmark hid and a second machine
-    ! caught (FINDINGS 7.51). The grid comes from the input rather than from the built
-    ! wavefront, since the conversion has to hold for every member of the field set.
+    ! caught (FINDINGS 7.51). On the generated path the grid comes from the input, the
+    ! numbers the field was built from, and the conversion holds for every member of the
+    ! field set. A field read from field_file has the file's grid, whatever the deck
+    ! states or leaves at zero, so the conversion is taken from the field itself: taken
+    ! from the deck it was zero when the deck stated no grid, every cutoff was infinite,
+    ! and the filter passed every mode while the header named the angle asked for.
 
     ie_first = findloc(is_fel, .true., dim = 1)
-    ! A run whose field came from a file states no grid, so there is nothing to convert
-    ! against. The filter is refused on that path below, and this stays finite.
-
-    ang_per_xcut = 0
-    if (run%winit%grid_half_width > 0 .and. run%winit%grid_n_pts > 1) &
-        ang_per_xcut = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (2 * run%winit%grid_half_width)
+    if (run%field_file(1) /= '') then
+      ang_per_xcut = fbeam%wavelength / run%ffield(1)%wf%dx
+    else
+      ang_per_xcut = fbeam%wavelength * (run%winit%grid_n_pts - 1) / (2 * run%winit%grid_half_width)
+    endif
 
     call fel_filter_angles (fbeam, run%und_of(ie_first), fbeam%wavelength, th_mode, th_rho)
 

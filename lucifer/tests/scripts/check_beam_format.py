@@ -221,6 +221,92 @@ def main():
           float(np.max(np.abs(pa - pb))) / (SPACING / 2.99792458e8), 1e-4)
 
     # ------------------------------------------------------------------
+    # The field file read as an import. Three things a file written elsewhere may do
+    # that this writer never does: state its samples in a unit other than V/m with
+    # unitSI carrying the factor, state its grid with gridUnitSI carrying the factor,
+    # and carry a y component shaped unlike x. The first two must read as the file
+    # this writer would have written for the same field, and the third is refused
+    # before the buffer is written past.
+
+    print("== the field file as an import ==")
+
+    def mesh(h5):
+        """The one mesh record of a field file, whichever iteration holds it."""
+        return h5["data"][sorted(h5["data"])[0]]["meshes/electricField"]
+
+    def field_arrays(fn):
+        """Every dataset of a field file, by path."""
+        out = {}
+        with h5py.File(fn) as h5:
+            h5.visititems(lambda n, o: out.__setitem__(n, o[...])
+                          if isinstance(o, h5py.Dataset) else None)
+        return out
+
+    def scaled_copy(src, dst, sample_factor, unit, grid_factor):
+        shutil.copy(src, dst)
+        with h5py.File(dst, "r+") as h5:
+            m = mesh(h5)
+            for comp in ("x", "y"):
+                if comp in m:
+                    m[comp][...] = m[comp][...] * sample_factor
+                    m[comp].attrs["unitSI"] = np.array([unit])
+            m.attrs["gridSpacing"] = np.ravel(m.attrs["gridSpacing"]) / grid_factor
+            m.attrs["gridUnitSI"] = np.ravel(m.attrs["gridUnitSI"]) * grid_factor
+
+    plain = field_arrays(wd / "bfp-initial.wf.h5")
+    scaled_copy(wd / "bf1-final.wf.h5", wd / "unit_half.wf.h5", 2.0, 0.5, 1.0)
+    run(exe, wd, "bfun", restart("bfun", "bf1-final.beam.h5", "unit_half.wf.h5"))
+    got = field_arrays(wd / "bfun-initial.wf.h5")
+    same = sorted(got) == sorted(plain) and all(np.array_equal(got[k], plain[k]) for k in plain)
+    check("unitSI = 0.5 on doubled samples reads as the plain file (0 = yes)",
+          0.0 if same else 1.0, 0.5)
+
+    scaled_copy(wd / "bf1-final.wf.h5", wd / "grid_unit.wf.h5", 1.0, 1.0, 2.0)
+    run(exe, wd, "bfgu", restart("bfgu", "bf1-final.beam.h5", "grid_unit.wf.h5"))
+    got = field_arrays(wd / "bfgu-initial.wf.h5")
+    with h5py.File(wd / "bfgu-initial.wf.h5") as h5:
+        sp_got = np.ravel(mesh(h5).attrs["gridSpacing"])
+    with h5py.File(wd / "bfp-initial.wf.h5") as h5:
+        sp_plain = np.ravel(mesh(h5).attrs["gridSpacing"])
+    same = sorted(got) == sorted(plain) and all(np.array_equal(got[k], plain[k]) for k in plain)
+    check("gridUnitSI = 2 on a halved spacing reads as the plain file (0 = yes)",
+          0.0 if (same and np.array_equal(sp_got, sp_plain)) else 1.0, 0.5)
+
+    shutil.copy(wd / "bf1-final.wf.h5", wd / "ey_wide.wf.h5")
+    with h5py.File(wd / "ey_wide.wf.h5", "r+") as h5:
+        m = mesh(h5)
+        x = m["x"]
+        wide = np.concatenate([x[...], x[...]], axis=2)
+        y = m.create_dataset("y", data=wide)
+        for k, v in x.attrs.items():
+            y.attrs[k] = v
+    code, out = run(exe, wd, "bfey", restart("bfey", "bf1-final.beam.h5", "ey_wide.wf.h5"),
+                    expect_fail=True)
+    refused("a y component shaped unlike x", code, out, "COMPONENT y IS SHAPED")
+
+    # The source filter on an imported field. Its angle is converted to a cutoff on the
+    # grid, and the conversion once came from the grid the deck stated, which a deck that
+    # imports its field need not state: the cutoff was then infinite and every mode
+    # passed while the header named the angle asked for. The conversion comes from the
+    # field's own spacing now, so a deck without the grid keys filters as one with them.
+    nogrid = BASE.replace("  grid_n_pts = 64\n", "").replace("  grid_half_width = 2e-4\n", "")
+    load = ('  beam_file = "bf1-final.beam.h5"\n  field_file = "bf1-final.wf.h5"\n'
+            '  global%track_end = "UND##1"\n  source_filter = T\n')
+    for root, deck, ang in (("bff6", nogrid, "1e-6"), ("bff5", nogrid, "1e-5"), ("bffg", BASE, "1e-5")):
+        run(exe, wd, root, deck.replace("  source_filter = F\n", "").format(
+            root=root, sig_pz="5.282703940115e-03",
+            extra=load + f"  global%source_filter_angle = {ang}\n"))
+    def x_field(fn):
+        with h5py.File(fn) as h5:
+            return mesh(h5)["x"][...]
+    f6, f5, fg = (x_field(wd / f"{r}-final.wf.h5") for r in ("bff6", "bff5", "bffg"))
+    scale = float(np.max(np.abs(f5)))
+    check("the filter angle acts on an imported field with no grid in the deck (relative move)",
+          1.0 / max(float(np.max(np.abs(f6 - f5))) / scale, 1e-300) * 1e-6, 1.0)
+    check("and the deck with the grid keys filters as the deck without them",
+          float(np.max(np.abs(fg - f5))) / scale, 1e-9)
+
+    # ------------------------------------------------------------------
     print("== the state round trip, seen in the other chart ==")
 
     g0 = as_genesis(wd, "bf1-final.beam.h5", "bf1-conv.par.h5")
