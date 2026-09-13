@@ -7,21 +7,23 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 (val-the-keystone-rule)=
 ## The keystone rule
 
-Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. From the `bmad-ecosystem` root:
+Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. From the `bmad-ecosystem` root, with the interpreter of the `bmad-fel-validate` environment:
 
 ```
 BUILD_PRODUCTION=N ./util/conda_compile      # debug
 ./util/conda_compile                         # production
+python3 -m pytest lucifer/tests/test_keystone.py -v
+```
 
-# Everything below is independent, so start it all and wait. Each benchmark pass
-# needs its own --work-dir once they run together.
-./lucifer/tests/run_fel_benchmark.sh --results /tmp/fel-debug.txt --work-dir /tmp/wd-dbg &
+The suite launches the five jobs at once, each from an absolute working directory into its own log under a fresh artifact directory it names, and keeps every outcome, a launch that failed and a job that timed out included. Five tests read those outcomes, one each, and a sixth regenerates the three page sets and requires the Markdown diff to be empty, verifying for itself that all five passed before it runs a generator, so it cannot pass on a partial run and does not lean on test order. Selecting one test still runs all five jobs, xdist is refused, and a job past its hour is killed as a process group. The five jobs are the ones below, unchanged, and the suite launches them where a retyped recipe twice launched a benchmark from a directory an earlier command had moved into, ran four jobs of five, and reported a complete keystone from a one-line log.
+
+```
+./lucifer/tests/run_fel_benchmark.sh --results <art>/fel-debug.txt --work-dir <art>/wd-dbg
 ./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer \
-        --results /tmp/fel-prod.txt --work-dir /tmp/wd-prd &
-(cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin) &
-./lucifer/wavefront/tests/run_validation.sh &
-./lucifer/examples/run_examples.sh --no-figures &
-wait
+        --results <art>/fel-prod.txt --work-dir <art>/wd-prd
+(cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin)
+./lucifer/wavefront/tests/run_validation.sh
+./lucifer/examples/run_examples.sh --no-figures
 ```
 
 The five run at once because they share only a source tree they read: separate work directories, separate output roots, and no shared state anywhere else (checked: nothing persists FFTW wisdom or writes outside its own directory). Measured on an M3 Max, the whole thing takes 7.7 minutes with the Genesis references cached and 9.2 without, against 25 minutes when every step ran in sequence and the references were regenerated twice per run. The references are cached because they are a pure function of the reference binary and the decks that make them, under a key naming both and the pinned version besides, and each run says whether it hit or missed. Deleting `~/.cache/lucifer/genesis-refs` is always safe and costs one cold run.
@@ -35,7 +37,7 @@ The five run at once because they share only a source tree they read: separate w
 
 Every section runs in every keystone. Nothing is behind a flag, and there is no shorter mode to reach for, which is deliberate: a cheap run that checks less is the thing a keystone exists to prevent.
 
-Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module (FINDINGS 7.43), so treat these four commands as one step.
+Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module (FINDINGS 7.43), so treat these four commands as one step, which the suite's regeneration test does.
 
 ```
 python3 lucifer/tests/scripts/report_validation.py \

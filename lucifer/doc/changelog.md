@@ -9,6 +9,14 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Added: the keystone runs as one pytest suite, `lucifer/tests/test_keystone.py`. Its session
+  fixture launches the five jobs at once through a thread pool, each from an absolute working directory into
+  its own log under a fresh artifact directory, and keeps every outcome, a failed launch and a timeout
+  included. Five tests read those outcomes and a sixth regenerates the three page sets and requires the
+  Markdown diff to be empty, verifying for itself that all five passed first. The five check scripts are
+  unchanged. A retyped recipe had twice launched a benchmark from a directory an earlier command had moved
+  into and reported a complete keystone from a one-line log. xdist is refused, a job past its hour is killed
+  as a process group, and `doc/validation.md` states the invocation.
 - 2026-09-13 Changed: a frame written inside an unaveraged segment is carried onto its plane on a scratch
   copy. The carry added the day before diffracted the live record back for the write and forward again after
   it, and the two transform pairs left 5e-15 of the field's rounding in the continuing run, measured by an
