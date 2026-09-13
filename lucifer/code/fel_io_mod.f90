@@ -229,9 +229,10 @@ subroutine fel_dump_frame (run, ie, at_end, err_flag)
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (wavefront_struct) wf_sub
+complex(wf_rp), allocatable :: eslab(:,:,:)
 real(rp) s_frame
 integer ie, ihh, first_was, ifr
-logical at_end, err_flag, eerr
+logical at_end, err_flag, eerr, whole
 character(200) prefix
 character(8) hsuf
 
@@ -258,69 +259,75 @@ if (eerr) return
 call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
 if (eerr) return
 
-! Inside an unaveraged segment the record is the substep's midpoint field, half a
-! substep past the plane this frame is named for (fel_unaveraged_mod). The frame
-! carries the plane's own field: the record is carried back for the write and forward
-! again after, so the walk continues from the state it had. Power is unchanged either
-! way, since the carry is unitary; what moves is the field's transverse phase.
-
-if (run%ustate%active) then
-  do ihh = 1, run%n_harm
-    do ifr = 1, size(ffield(ihh)%wf%Ex, 3)
-      call fel_field_diffract_by (ffield(ihh)%wf, ifr, -0.5_rp * run%ustate%dsub, eerr)
-      if (eerr) return
-    enddo
-  enddo
-endif
-
 do ihh = 1, run%n_harm
   first_was = ffield(ihh)%slip%first
-  if (first_was /= 0) then
-    ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = first_was, dim = 3)
-    if (allocated(ffield(ihh)%wf%Ey)) &
-        ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = first_was, dim = 3)
-  endif
-
+  whole = (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice)
   hsuf = ''
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
 
-  ! A range writes the slices it asks for. The records are in time order here, so slice
-  ! index and window index are the same thing, and the slab is taken rather than the
-  ! writer taught a range: a sub-window is small by construction, which is the point. The
-  ! slab keeps its place: the mesh's z origin is the first slice's, so a reader that walks
-  ! the standard attributes puts the cut field where the whole window's would sit, beside
-  ! the cut beam whose timeOffset carries each slice's own placement.
+  if (run%ustate%active .or. .not. whole) then
 
-  if (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice) then
-    call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
-                                  run%z_now, eerr)
-  else
+    ! A scratch copy. Inside an unaveraged segment the record is the substep's midpoint
+    ! field, half a substep past the plane this frame is named for (fel_unaveraged_mod),
+    ! and the frame carries the plane's own field: the copy is carried back and written,
+    ! and the live record is not touched, so a run with frames on and one with them off
+    ! hold the same field to the bit. Carrying the live record back and forward again
+    ! would leave two transform pairs of rounding in it, 5e-15 of the field on the mixed
+    ! line, which is a diagnostic steering the run it observes by a little rather than by
+    ! nothing. A slice range takes its slab from the same copy. The copy is in time order
+    ! for the write, as the whole-window path below rotates the live record to be.
+
     wf_sub = ffield(ihh)%wf
-    wf_sub%Ex = ffield(ihh)%wf%Ex(:, :, run%dump_is1:run%dump_is2)
-    if (allocated(ffield(ihh)%wf%Ey)) wf_sub%Ey = ffield(ihh)%wf%Ey(:, :, run%dump_is1:run%dump_is2)
+    if (run%ustate%active) then
+      do ifr = 1, size(wf_sub%Ex, 3)
+        call fel_field_diffract_by (wf_sub, ifr, -0.5_rp * run%ustate%dsub, eerr)
+        if (eerr) return
+      enddo
+    endif
+    if (first_was /= 0) then
+      wf_sub%Ex = cshift(wf_sub%Ex, shift = first_was, dim = 3)
+      if (allocated(wf_sub%Ey)) wf_sub%Ey = cshift(wf_sub%Ey, shift = first_was, dim = 3)
+    endif
+    if (.not. whole) then
+
+      ! The slab keeps its place: the mesh's z origin is the first slice's, so a reader
+      ! that walks the standard attributes puts the cut field where the whole window's
+      ! would sit, beside the cut beam whose timeOffset carries each slice's own placement.
+
+      eslab = wf_sub%Ex(:, :, run%dump_is1:run%dump_is2)
+      call move_alloc (eslab, wf_sub%Ex)
+      if (allocated(wf_sub%Ey)) then
+        eslab = wf_sub%Ey(:, :, run%dump_is1:run%dump_is2)
+        call move_alloc (eslab, wf_sub%Ey)
+      endif
+    endif
     call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', run%z_now, eerr, &
                                   z_offset = (run%dump_is1 - 1) * ffield(ihh)%wf%dz)
-  endif
-  if (.not. eerr) call fel_frame_attributes (trim(prefix) // trim(hsuf) // '.wf.h5', run, ie, eerr)
+    if (eerr) return
+  else
 
-  ! Back to the rotation the walk is carrying, whether or not the write succeeded.
+    ! The whole window on the averaged path is written in place: rotated to time order,
+    ! written, rotated back, which is a permutation and exact. The field frame of a
+    ! saturated run is the largest thing this program writes, and this path copies none
+    ! of it.
 
-  if (first_was /= 0) then
-    ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = -first_was, dim = 3)
-    if (allocated(ffield(ihh)%wf%Ey)) &
-        ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = -first_was, dim = 3)
+    if (first_was /= 0) then
+      ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = first_was, dim = 3)
+      if (allocated(ffield(ihh)%wf%Ey)) &
+          ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = first_was, dim = 3)
+    endif
+    call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
+                                  run%z_now, eerr)
+    if (first_was /= 0) then      ! Back to the rotation the walk carries, whatever the write did.
+      ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = -first_was, dim = 3)
+      if (allocated(ffield(ihh)%wf%Ey)) &
+          ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = -first_was, dim = 3)
+    endif
+    if (eerr) return
   endif
+  call fel_frame_attributes (trim(prefix) // trim(hsuf) // '.wf.h5', run, ie, eerr)
   if (eerr) return
 enddo
-
-if (run%ustate%active) then
-  do ihh = 1, run%n_harm
-    do ifr = 1, size(ffield(ihh)%wf%Ex, 3)
-      call fel_field_diffract_by (ffield(ihh)%wf, ifr, 0.5_rp * run%ustate%dsub, eerr)
-      if (eerr) return
-    enddo
-  enddo
-endif
 
 err_flag = .false.
 

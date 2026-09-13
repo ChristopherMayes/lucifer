@@ -503,6 +503,19 @@ def unaveraged(args, wd, exe):
        f"{len(sorted(wd.glob('dvufr-[0-9]*.wf.h5')))} against {len(fd)}", "equal",
        len(sorted(wd.glob("dvufr-[0-9]*.wf.h5"))) == len(fd))
 
+    # The frames steer nothing. Inside the unaveraged segment the frame carries the
+    # plane's field where the record holds the substep's midpoint field, so the writer
+    # diffracts, and it does so on a copy: the same run with the same comb and no frames
+    # ends in the same beam and field to the bit, on the device and on the CPU.
+    comb_only = '  global%comb_ds_save = 0.5\n'
+    run(args.exe, wd, "dvu_frnf.in", base.format(root="dvufrnf", extra=DEV + comb_only))
+    run(args.exe, wd, "dvu_froffnf.in", base.format(root="dvufroffnf", extra=comb_only))
+    for tag, a, b in (("device", "dvufr", "dvufrnf"), ("CPU", "dvufroff", "dvufroffnf")):
+        same = all(dumps_identical(wd / f"{a}-final.{k}.h5", wd / f"{b}-final.{k}.h5")
+                   for k in ("beam", "wf"))
+        ok(f"unaveraged frames on against off, final beam and field identical ({tag})",
+           same, "True", same)
+
     if fd and len(fd) == len(fc):
         def read(path):
             with h5py.File(path) as h:
@@ -637,6 +650,17 @@ def unaveraged(args, wd, exe):
         rel = abs(pd - pc) / max(pc, 1e-300)
         ok(f"two-plane unaveraged production power {comp} vs CPU", f"{rel:.3e}",
            f"<= {ceil:.1e}", pc > 0 and rel <= ceil)
+
+    # And with both planes: frames inside the segment carry both planes back onto the
+    # plane, on a copy, and the run with frames ends where the run without them does.
+    run(args.exe, wd, "dvu_2pfr.in", xb.format(root="dvu2pfr",
+        extra=DEV + '  global%comb_ds_save = 0.5\n  global%dump_at_comb = T\n'))
+    run(args.exe, wd, "dvu_2pfrnf.in", xb.format(root="dvu2pfrnf",
+        extra=DEV + '  global%comb_ds_save = 0.5\n'))
+    same = all(dumps_identical(wd / f"dvu2pfr-final.{k}.h5", wd / f"dvu2pfrnf-final.{k}.h5")
+               for k in ("beam", "wf"))
+    ok("two-plane unaveraged frames on against off, final beam and field identical (device)",
+       same, "True", same)
 
     # The transform pair's loss on two planes, with no charge to feed either. The loss is
     # each plane's own, so the pair costs the set the same fraction it costs one plane
@@ -1213,6 +1237,15 @@ def beam_z(path):
         rec = h5["data"][list(h5["data"].keys())[0]]["particles"]
         name = list(rec.keys())[0]
         return 2.99792458e8 * np.asarray(rec[name]["time"][...], dtype=float)
+
+
+def dumps_identical(fa, fb):
+    """Whether two openPMD dumps hold the same datasets to the bit, meta excluded."""
+    with h5py.File(fa) as a, h5py.File(fb) as b:
+        names = []
+        a.visititems(lambda n, o: names.append(n)
+                     if isinstance(o, h5py.Dataset) and not n.startswith("meta/") else None)
+        return all(n in b and np.array_equal(a[n][()], b[n][()]) for n in names)
 
 
 def harm_powers(wd, root, window=False):

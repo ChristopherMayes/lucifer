@@ -254,8 +254,9 @@ curvilinear coordinate, so a scene holding a line with a bend needs the floor, a
 taken at the frame's own position rather than the element's end. The iteration's `time` is
 Bmad's reference time there, which is what orders a series for a reader that knows openPMD
 and nothing about beamlines. A frame inside an unaveraged segment holds the field of the
-plane it is named for: the segment advances the substep's midpoint field and carries it
-back half a substep for the write. The particle records agree with the attributes: `sPosition`
+plane it is named for: the segment advances the substep's midpoint field, and the writer
+carries a copy of it back half a substep for the write, so the run continues from the
+record it had, to the bit. The particle records agree with the attributes: `sPosition`
 is the frame's own `s` and `timeOffset` is the reference time there plus the slice's own
 offset, so a reader that takes the position from the particles and one that takes it from
 the file see the same frame.

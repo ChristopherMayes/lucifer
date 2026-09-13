@@ -47,6 +47,7 @@ import pathlib
 import subprocess
 import sys
 
+import h5py
 import numpy as np
 
 import beamio
@@ -190,6 +191,15 @@ UNDW: undb, sr_wake = {amp_scale = 1, scale_with_length = T,
 SEGW: line = (UNDA, P1, UNDW, P1, UNDA)
 use, SEGW
 """
+
+
+def dumps_identical(fa, fb):
+    """Whether two openPMD dumps hold the same datasets to the bit, meta excluded."""
+    with h5py.File(fa) as a, h5py.File(fb) as b:
+        names = []
+        a.visititems(lambda n, o: names.append(n)
+                     if isinstance(o, h5py.Dataset) and not n.startswith("meta/") else None)
+        return all(n in b and np.array_equal(a[n][()], b[n][()]) for n in names)
 
 
 def read_par(path, lam):
@@ -395,6 +405,24 @@ def main():
     turn = np.abs(np.diff(led[:, 2])).sum()
     check("sandwich: ledger max|d(E+U)| / sum|dU| on the middle segment",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
+    # A diagnostic must not steer the run it observes, and a frame written inside the
+    # unaveraged segment is the one that could: the record there is the substep's midpoint
+    # field and the frame carries the plane's, so the writer diffracts. It does so on a
+    # copy. With frames every 0.1 m through the mixed line, six of them inside the
+    # unaveraged segment, the final beam and field must be the frames-off run's to the bit.
+    run(exe, wd, "uv_sandfr", GAIN.format(root="uv_sandfr", lat="unavg_sandwich.bmad").replace(
+        "  write_diag = T\n", "  write_diag = T\n  global%dump_at_comb = T\n  global%comb_ds_save = 0.1\n"))
+    inside = 0
+    for fr in sorted(wd.glob("uv_sandfr-[0-9]*.wf.h5")):
+        with h5py.File(fr) as h5:
+            z = float(np.ravel(h5.attrs["sPosition"])[0])
+        inside += int(0.81 + 1e-9 < z < 1.41 - 1e-9)
+    same = all(dumps_identical(wd / f"uv_sandfr-final.{k}.h5", wd / f"uv_sand-final.{k}.h5")
+               for k in ("beam", "wf"))
+    check(f"sandwich: frames on against off, final beam and field identical to the bit "
+          f"({inside} frames inside the unaveraged segment) (0 = yes)", 0.0 if same else 1.0, 0.5)
+    check("sandwich: frames landed inside the unaveraged segment (5 expected)", abs(inside - 5), 0.5)
+
     ps = np.loadtxt(wd / "uv_sand.diag.txt")[:, 2]
     pa2 = np.loadtxt(wd / "uv_sand_avg.diag.txt")[:, 2]
     check(f"sandwich: |ln(P_mixed/P_averaged)| at exit  [{ps[-1]:.4e} vs {pa2[-1]:.4e}]",

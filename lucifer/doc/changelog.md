@@ -9,6 +9,13 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Changed: a frame written inside an unaveraged segment is carried onto its plane on a scratch
+  copy. The carry added the day before diffracted the live record back for the write and forward again after
+  it, and the two transform pairs left 5e-15 of the field's rounding in the continuing run, measured by an
+  independent review across 48 mixed-line cases with frames on against off; no particle moved. The copy
+  leaves the live record untouched, the whole-window frame of an averaged element keeps its exact in-place
+  rotation, and the checks hold the final beam and field identical to the bit with frames on against off on
+  the mixed line, on the device and the CPU, and with two planes.
 - 2026-09-13 Fixed: the unaveraged segment carries its field record onto the substep midpoint at entry
   and back onto the plane at exit. The step advances the midpoint field, M(n+1) = D(M(n) + 2S), which is the
   symmetric split with the half diffractions merged, and second order only with a half-step carry at each
