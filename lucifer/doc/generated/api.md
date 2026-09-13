@@ -6066,8 +6066,9 @@ The step, per substep delta (Strang split, second order):
 
 Units: E in V/m (wavefront convention), m_electron in eV, b in 1/m. The physical
 field of the scalar envelope: planar E_x = Re[-i Ehat e^{i Psi}]; helical
-(E_x, E_y) = (Re[-i Ehat e^{i Psi}], -Re[Ehat e^{i Psi}])/sqrt(2). Both give
-intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
+(E_x, E_y) = (Re[-i Ehat e^{i Psi}], Re[Ehat e^{i Psi}])/sqrt(2), the pair (1, +i)
+that rotates with the electron (jhat = (u_x - i u_y)/sqrt(2) below is its dual). Both
+give intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 
 The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables,
 chosen on merit: the currency here is short-probe

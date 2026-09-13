@@ -469,8 +469,18 @@ do je = 1, branch%n_ele_track
   endif
   und_of(je)%cos_t = cos(und_of(je)%tilt)
   und_of(je)%sin_t = sin(und_of(je)%tilt)
+  ! The helical element's light is circular, and its handedness follows from the
+  ! motion and the carrier convention. The helical potential a = a0 (cos k_u s, sin k_u s)
+  ! turns the transverse velocity counterclockwise along s, the same sense as Bmad's
+  ! helical_model field, and a component's physical field is Re[-i Ehat_c e^{i Psi}] with
+  ! the carrier Psi decreasing in time, so the pair that rotates with the electron is
+  ! (1, +i)/sqrt(2): E_eff = conj(pol).E = (Ehat_x - i Ehat_y)/sqrt(2), the co-rotating
+  ! combination the unaveraged mode's Lorentz force selects on its own. The first version
+  ! carried (1, -i), the counter-rotating pair, and a seed of that handedness drove the
+  ! averaged element while the unaveraged one ignored it (FINDINGS 7.85).
+
   if (und_of(je)%helical) then
-    und_of(je)%pol = [cmplx(1.0_rp, 0.0_rp, rp), cmplx(0.0_rp, -1.0_rp, rp)] / sqrt(2.0_rp)
+    und_of(je)%pol = [cmplx(1.0_rp, 0.0_rp, rp), cmplx(0.0_rp, 1.0_rp, rp)] / sqrt(2.0_rp)
   else
     und_of(je)%pol = [cmplx(und_of(je)%cos_t, 0.0_rp, rp), cmplx(und_of(je)%sin_t, 0.0_rp, rp)]
   endif

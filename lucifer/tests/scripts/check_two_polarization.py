@@ -31,6 +31,8 @@ Run by the benchmark harness; exits nonzero on failure.
 from __future__ import annotations
 
 import argparse
+import h5py
+import shutil
 import pathlib
 import re
 import subprocess
@@ -230,6 +232,58 @@ def main():
     hel = np.abs(dv_[:n, :, 2] - ds_[:n, :, 2]).max() / ds_[:n, :, 2].max()
     check("helical re-anchor: vector vs scalar path, shot-noise power", hel, TOL_HEL,
           note="(co-rotating radiation, two representations)")
+
+    # 5b. Handedness. A total power cannot tell the two circular polarizations apart,
+    #     and the averaged vector once carried the counter-rotating pair while the
+    #     unaveraged Lorentz force selected the co-rotating one, so a seed drove one mode
+    #     and not the other. A cold, nearly chargeless beam is driven by a uniform seed
+    #     as the scalar envelope and as each circular pair of the same total intensity,
+    #     and the rms energy modulation at the exit says which pair the mode couples to.
+    #     Both modes must prefer (1, +i), and each must reproduce its scalar seed with it.
+    print("--- helical handedness (seeded, cold, both modes):")
+    (wd / "p2_hel_uv.bmad").write_text("call, file = spont_probe.bmad\n" + UV)
+    #     The seed is strong and the beam cold enough that the modulation is the seed's:
+    #     a uniform 1e9 W seed modulates by about 1 keV where the beam's own spread at
+    #     sig_pz = 1e-12 is a few meV, so the counter-rotating pair's residue is read
+    #     against the modulation and not against the spread it started with.
+    cold = ss(NML).replace("seed_waist_size = 30e-6", "seed_waist_size = 1e-2").replace(
+        "seed_power = 1e4", "seed_power = 1e9").replace(
+        "beam_init%sig_pz = 8.804506566858e-05", "beam_init%sig_pz = 1e-12").replace(
+        "beam_init%bunch_charge = 8.0e-15", "beam_init%bunch_charge = 8.0e-18")
+    run(exe, wd, "p2s_src", cold.format(lat="p2_hel.bmad", root="p2s_src",
+                                        extra="  write_initial = T\n  load_only = T\n"))
+
+    def circular(src, dst, sign):
+        """The scalar seed as the pair (1, sign i)/sqrt2 of the same total intensity."""
+        shutil.copy(src, dst)
+        with h5py.File(dst, "r+") as h5:
+            m = h5["data"][sorted(h5["data"])[0]]["meshes/electricField"]
+            x = m["x"][...] / np.sqrt(2.0)
+            m["x"][...] = x
+            y = m.create_dataset("y", data=sign * 1j * x)
+            for k, v in m["x"].attrs.items():
+                y.attrs[k] = v
+
+    circular(wd / "p2s_src-initial.wf.h5", wd / "p2s_plus.wf.h5", +1)
+    circular(wd / "p2s_src-initial.wf.h5", wd / "p2s_minus.wf.h5", -1)
+    for mode, lat in (("averaged", "p2_hel.bmad"), ("unaveraged", "p2_hel_uv.bmad")):
+        sig = {}
+        for tag, ff in (("scalar", "p2s_src-initial.wf.h5"), ("plus", "p2s_plus.wf.h5"),
+                        ("minus", "p2s_minus.wf.h5")):
+            root = f"p2s_{mode[:2]}_{tag}"
+            run(exe, wd, root, cold.format(lat=lat, root=root,
+                extra=f'  beam_file = "p2s_src-initial.beam.h5"\n  field_file = "{ff}"\n'
+                      '  load_mode = "keep"\n'))
+            sig[tag] = float(diag(wd, root)[-1, 0, 7])
+        check(f"handedness, {mode}: the pair (1, +i) reproduces the scalar seed's energy modulation",
+              abs(sig["plus"] - sig["scalar"]) / sig["scalar"], 1e-6,
+              note=f"({sig['plus']:.4f} vs {sig['scalar']:.4f} eV)")
+        # The counter-rotating pair still drives the electron at the beat of the two
+        # rotations, which averages to nothing over whole periods and leaves a residue
+        # from the ramps: 1e-3 of the modulation in the unaveraged mode here, 4e-6 in the
+        # averaged mode, which carries no beat at all. Two orders under the modulation.
+        check(f"handedness, {mode}: the pair (1, -i) leaves the beam unmodulated",
+              sig["minus"] / sig["scalar"], 1e-2, note=f"({sig['minus']:.3e} eV)")
 
     # 6. Refusals.
     (wd / "p2_hel_tilt.bmad").write_text("call, file = spont_probe.bmad\nUNDS[tilt] = 0.3\n")

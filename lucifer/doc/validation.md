@@ -687,11 +687,13 @@ polarization allocated one plane in the stats and the device and wrote past it a
 first record. An imported field now decides its own planes, the refusals that depend on
 the state are made again after the import, and the check restarts a y-seeded helical
 run with and without the seed's polarization and holds the two diag files byte identical. Kick and deposit act through each element's polarization 2-vector (planar:
-(cos t, sin t), helical (1,-i)/sqrt2). The unaveraged mode needs no polarization
+(cos t, sin t), helical (1,+i)/sqrt2). The unaveraged mode needs no polarization
 code at all, since its real per-particle currents work against and deposit into their own
 components. One openPMD dump holds both polarizations as components x and y of its
 mesh record, and the stats file carries field/total, field/x and field/y under the same
 dataset names.
+
+The helical handedness is checked with seeds of both circular polarizations, since a total power cannot tell them apart and the dark-start comparison of the scalar and vector paths never could. A cold, nearly chargeless beam through the helical probe is driven by a uniform seed as the scalar envelope, as the pair (1, +i)/sqrt2 and as the pair (1, -i)/sqrt2 of the same total intensity, in the averaged mode and the unaveraged one. In each mode the co-rotating pair reproduces the scalar seed's rms energy modulation at 1e-6 and the counter-rotating pair leaves it below 1e-2 of that: 4e-6 in the averaged mode, which carries no beat between the two rotations, and 1e-3 in the unaveraged mode, where the beat averages to nothing over whole periods and the ramps leave that much. The averaged vector once carried (1, -i), so the two modes selected opposite handedness from one field: a seed that drove the averaged element left the unaveraged one unmodulated, and a mixed two-plane line radiated the two elements into opposite circular polarizations. The unaveraged mode's Lorentz force, which needs no vector, is the authority the averaged vector now follows.
 
 Measured (check_two_polarization.py, in the harness -- symmetries and physics, not
 reference files):

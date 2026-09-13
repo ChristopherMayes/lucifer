@@ -9,6 +9,16 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: the averaged helical element couples to the circular polarization its electrons
+  radiate. Its polarization vector was (1, -i)/sqrt2, the counter-rotating pair in this code's convention,
+  where the unaveraged mode's Lorentz force selects (1, +i)/sqrt2 with no vector at all: the helical
+  potential turns the velocity counterclockwise along s, as Bmad's helical_model field does, and with a
+  component's physical field Re[-i E e^(i Psi)] and the carrier decreasing in time that is the pair that
+  rotates with the electron. A circular seed that drove the averaged element left the unaveraged one
+  unmodulated, and a mixed two-plane helical line radiated its elements into opposite polarizations. The
+  vector is (1, +i)/sqrt2, the manual's statement of the helical scalar field is corrected with it, and the
+  check drives both modes with seeds of both handedness: the co-rotating pair reproduces the scalar seed's
+  energy modulation at 1e-6 and the counter-rotating pair leaves it below 1e-2 of that.
 - 2026-09-12 Fixed: a field imported with both polarization planes sets the run to two planes. The state
   was decided at lattice setup from the seed's polarization and the elements' tilts, and a file carrying
   Ey under a deck that stated no seed polarization left it at one plane: the stats and the device allocated

@@ -1324,7 +1324,8 @@ beam's only exit channel) is enforced by this mode's wake and space-charge
 refusals. A wake would drain beam energy to the environment with no ledger column,
 which is one more reason those refusals exist. The physical field of the
 scalar envelope: planar $E_x = \mathrm{Re}[-i\hat E e^{i\Psi}]$. Helical
-$(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], -\mathrm{Re}[\hat E e^{i\Psi}])/\sqrt2$.
+$(E_x, E_y) = (\mathrm{Re}[-i\hat E e^{i\Psi}], \mathrm{Re}[\hat E e^{i\Psi}])/\sqrt2$,
+the pair $(1, +i)$ that rotates with the electron.
 Both give intensity $|\hat E|^2/2Z_0$, so [](#sec-field)'s power diagnostic is
 mode-independent.
 
@@ -1412,10 +1413,15 @@ is tilted (or the seed is y-polarized). Otherwise $\hat E_y$ is never allocated 
 the single-component path runs with its arithmetic untouched (every tier reproduces
 bit for bit). Diffraction is polarization-diagonal. Power and intensity are totals
 $|\hat E_x|^2 + |\hat E_y|^2$. Each averaged element carries a polarization 2-vector
-$\hat p$: planar with tilt $t$ is $(\cos t, \sin t)$, helical is $(1, -i)/\sqrt2$.
+$\hat p$: planar with tilt $t$ is $(\cos t, \sin t)$, helical is $(1, +i)/\sqrt2$.
 Its kick reads $E_{\mathrm{eff}} = \hat p^\dagger\!\cdot\!(\hat E_x,\hat E_y)$
 and its deposit writes $\hat p\,S$, which reproduces the scalar convention exactly
-when one polarization is live. The unaveraged mode needs no polarization vector at
+when one polarization is live. The helical handedness is not a choice: the potential
+$a = a_0(\cos k_u s, \sin k_u s)$ turns the velocity counterclockwise along $s$, as
+Bmad's `helical_model` field does, and with a component's physical field
+$\mathrm{Re}[-i\hat E_c e^{i\Psi}]$ and the carrier decreasing in time, the pair that
+rotates with the electron is $(1, +i)$. The unaveraged mode's Lorentz force selects it
+with no vector at all, and a seed of the other handedness leaves its beam unmodulated. The unaveraged mode needs no polarization vector at
 all: the instantaneous kinetic momenta are real, and each component works against and
 deposits into its own field component (the tilted element's field is the untilted
 analytic potential evaluated in the rotated frame). The scalar helical envelope is
