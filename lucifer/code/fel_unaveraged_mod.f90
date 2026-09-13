@@ -39,11 +39,14 @@
 !      The source is the same SVEA deposit as the averaged solver with the coupling
 !      Removed and the actual quiver current in its place:
 !        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
-!      followed by the shared pure diffraction (fel_field_diffract) and the +2*src
-!      convention. The /u_s (where the averaged solver has Genesis's /gamma) makes the
-!      kick/deposit pair exact energy duals per substep (same operands, same bilinear
-!      weights, unitary diffraction between), so the ledger closes to the physical
-!      spontaneous-emission term and rounding, by construction. Period-averaging the
+!      added to the record as +2*src and the pair then carried through the shared pure
+!      diffraction (fel_field_diffract): E' = D (E + 2 src). The /u_s (where the
+!      averaged solver has Genesis's /gamma) makes the kick/deposit pair exact energy
+!      duals per substep (same operands, same bilinear weights, and the source landing
+!      on the record the kick read before the unitary diffraction), so the ledger closes
+!      to the physical spontaneous-emission term and rounding, by construction. With the
+!      source added after the diffraction the two sides carried different cross terms,
+!      first order in the substep's diffraction phase (FINDINGS 7.86). Period-averaging the
 !      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
 !      emerges from the figure-8).
 !   3. half magnetic push.
@@ -597,19 +600,30 @@ do is = 1, nslice
     call unavg_field_quartet (s_sub + dsub/2, dsub/2, fq)
     call unavg_push_all (dsub/2, sl%n, xx, yy, ux, uy, tau, gam, fq, kst)
 
+    ! The source lands on the record the kick read, and the pair diffracts together:
+    ! E' = D (E + 2 src). The kick charged the beam the cross term 2 Re<E, dE> against
+    ! this E, and with D unitary the record's energy moves by exactly that plus the
+    ! deposit's own 4|src|^2, so the ledger closes to rounding. Diffracting first and
+    ! adding after, E' = D E + 2 src, charges the beam against E while the record gains
+    ! the cross term against D E, and the difference, 4 Re<(D - I) E, dE>, is first
+    ! order in the substep's diffraction phase: 1.2 percent of the turnover at 20
+    ! substeps a period on a seed of 100 um waist, halving with the substep (FINDINGS
+    ! 7.86). The stored record is then the substep's midpoint field, which is the same
+    ! Strang split read at the other half step, and the device's solve does the same.
+
+    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
+    if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
     call fel_field_diffract (wf, ifld, dsub, err)
     any_err = any_err .or. err
-    wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
 
     ! The same step on the twin's record, in single precision, from the source the FP64
     ! side just built: the row then prices the transform pair, the rounded propagator and
     ! the accumulation over the substeps, and not the deposit that fed them.
 
     if (fp32%on .and. allocated(fp32%k32)) then
-      call fft32_solve (fp32%e32(:,:,is), fp32%k32, ngrid)
       fp32%e32(:,:,is) = fp32%e32(:,:,is) + 2 * cmplx(crsource, kind = sp)
+      call fft32_solve (fp32%e32(:,:,is), fp32%k32, ngrid)
     endif
-    if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
 
     ! The deposit's own energy |dE|^2 = 4|src|^2: the one term of the field-energy
     ! increment the kick/deposit duality does not charge to the beam (the beam pays the

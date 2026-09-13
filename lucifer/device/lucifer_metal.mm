@@ -838,6 +838,39 @@ kernel void fft_rows (device float2* d [[buffer(0)]], const device float2* W [[b
     for (uint cc = 0; cc < CHUNK; cc++)
         for (uint j = 0; j < LANES; j++) p[OUTK(cc, j)] = a[cc*LANES + j];
 }
+// The unaveraged solve's first pass: the record with the substep's fixed-point source
+// landed on it, E + 2 src, read, converted and transformed in one pass, so the source
+// meets the diffraction on the record the kick read (fel_unaveraged_mod). The plane's
+// source is found as fft_cols_add_fix finds it.
+kernel void fft_rows_add_fix (device float2* d [[buffer(0)]], const device float2* W [[buffer(1)]],
+                              constant float& sgn [[buffer(2)]], const device uint* si [[buffer(3)]],
+                              constant AddPar& A [[buffer(4)]], constant float& sinv [[buffer(5)]],
+                              uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]]){
+    threadgroup float2 sh[RF_ROWS * NG];
+    uint lane = t % LANES, r = t / LANES;
+    uint m = tg.y / A.ppm, rem = tg.y % A.ppm;
+    uint pl = rem / A.nslice, is = rem % A.nslice;
+    ulong row = (ulong)(tg.x * RF_ROWS + r);
+    ulong off = (ulong)tg.y * ((ulong)N * N) + row * N;
+    ulong soff = ((ulong)m * A.nslice + is) * ((ulong)N * N) + row * N;
+    device float2* p = d + off;
+    float2 a[REGS];
+    if (A.npol == 2u) {
+        float2 pol = A.pol[pl];
+        for (uint n1 = 0; n1 < REGS; n1++){
+            ulong q = LANES*n1 + lane;
+            a[n1] = p[q] + 2.0f * cmul(pol, dec_fixed(si, soff + q, sinv));
+        }
+    } else {
+        for (uint n1 = 0; n1 < REGS; n1++){
+            ulong q = LANES*n1 + lane;
+            a[n1] = p[q] + 2.0f * dec_fixed(si, soff + q, sinv);
+        }
+    }
+    fftN(a, sh + r*NG, W, lane, sgn);
+    for (uint cc = 0; cc < CHUNK; cc++)
+        for (uint j = 0; j < LANES; j++) p[OUTK(cc, j)] = a[cc*LANES + j];
+}
 // The filter's first pass over the source: it reads the accumulator, converts, and
 // transforms, so the conversion costs no dispatch of its own.
 kernel void fft_rows_fix (device float2* d [[buffer(0)]], const device uint* si [[buffer(1)]],
@@ -1031,6 +1064,7 @@ struct Impl {
 
     id<MTLComputePipelineState> pTrk, pPush, pZero, pDep, pRow, pRowM, pCol, pColA;
     id<MTLComputePipelineState> pRowF, pColAF;   // the two that convert where they read
+    id<MTLComputePipelineState> pRowAF;          // the unaveraged solve's first pass
     id<MTLComputePipelineState> pWShift, pWPhase;
     id<MTLComputePipelineState> pUPush, pUKick, pUSpont, pUGsave;
 
@@ -1317,6 +1351,7 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->pColA = pso(@"fft_cols_add");
         p->pRowF = pso(@"fft_rows_fix");
         p->pColAF = pso(@"fft_cols_add_fix");
+        p->pRowAF = pso(@"fft_rows_add_fix");
         p->pWShift = pso(@"wrap_shift");
         p->pWPhase = pso(@"wrap_phase");
         p->pUPush = pso(@"unavg_push");
@@ -1916,13 +1951,18 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             [e setBytes:&sfac length:4 atIndex:4];
             [e dispatchThreadgroups:spTG threadsPerThreadgroup:spT];
 
-            // The slice's own diffract and source add, the transform kernels unchanged:
-            // field = IFFT(FFT(field) exp(K2 dsub))/N^2 + 2 src, four passes.
+            // The slice's own source add and diffract, four passes, the first landing the
+            // substep's source on the record the kick read and the rest the transform
+            // kernels unchanged: field = IFFT(FFT(field + 2 src) exp(K2 dsub))/N^2, the
+            // order the CPU's step takes (fel_unaveraged_mod, FINDINGS 7.86).
             e = p->pass(LUC_DEV_PASS_SOLVE);
-            [e setComputePipelineState:p->pRow];
+            [e setComputePipelineState:p->pRowAF];
             [e setBuffer:p->bField offset:0 atIndex:0];
             [e setBuffer:p->bTw offset:0 atIndex:1];
             [e setBytes:&fwd length:4 atIndex:2];
+            [e setBuffer:p->bSrcI offset:0 atIndex:3];
+            [e setBytes:&A length:sizeof(A) atIndex:4];
+            [e setBytes:&sinv length:4 atIndex:5];
             [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
             e = p->pass(LUC_DEV_PASS_SOLVE);
@@ -1943,14 +1983,11 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
             e = p->pass(LUC_DEV_PASS_SOLVE);
-            [e setComputePipelineState:p->pColAF];
+            [e setComputePipelineState:p->pCol];
             [e setBuffer:p->bField offset:0 atIndex:0];
             [e setBuffer:p->bTw offset:0 atIndex:1];
             [e setBytes:&inv length:4 atIndex:2];
             [e setBytes:&nrm length:4 atIndex:3];
-            [e setBuffer:p->bSrcI offset:0 atIndex:4];
-            [e setBytes:&A length:sizeof(A) atIndex:5];
-            [e setBytes:&sinv length:4 atIndex:6];
             [e dispatchThreadgroups:colTG threadsPerThreadgroup:colT];
         }
     }

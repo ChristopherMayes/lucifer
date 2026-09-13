@@ -270,6 +270,22 @@ def main():
     check("ledger internal: |dE_kick - dE_beam| / max|dE|",
           np.abs(kick_col - dE_beam).max() / max(np.abs(dE_beam).max(), 1e-300), 1e-4)
 
+    # 1b. The ledger on a field that diffracts. The broad seed above diffracts little in a
+    #     substep, and a source added after the diffraction carried a cross term the kick
+    #     had not charged, first order in the substep's diffraction phase: 1.2 percent of
+    #     the turnover at 20 substeps a period on a 100 um waist, halving with the
+    #     substep. The source now lands on the record the kick read, so this closes at the
+    #     same floor as the broad seed at both resolutions, and no trend with the substep.
+    for spp in (20, 40):
+        root = f"uv_ledgd{spp}"
+        run(exe, wd, root, probe_nml(wd, lat="unavg_probe_helical_b.bmad", root=root,
+            spp=spp, ramp=N_RAMP, lam=LAMBDA1, power=1e8, w0=1e-4))
+        led = np.loadtxt(wd / f"{root}.ledger.txt")
+        etot = led[:, 1] + led[:, 2]
+        turnover = np.abs(np.diff(led[:, 2])).sum()
+        check(f"energy ledger, 100 um seed, {spp} substeps a period: max|d(E_beam+U_field)| / sum|dU|",
+              np.abs(etot - etot[0]).max() / max(turnover, 1e-300), 1e-4)
+
     # 2. Ballistic dark run: B does no work. Ramps hand the emittance back.
     run(exe, wd, "uv_dark", probe_nml(wd, lat="unavg_probe_planar_b.bmad", root="uv_dark",
         spp=20, ramp=N_RAMP, lam=LAMBDA1, power=0.0, w0=SEED_W0))

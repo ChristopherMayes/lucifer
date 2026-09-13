@@ -9,6 +9,18 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: the unaveraged substep lands the source on the record the kick read and diffracts
+  the pair together, E' = D(E + 2S). The source was added after the diffraction, so the beam paid the cross
+  term against E while the record gained it against DE, a first-order splitting error the broad-seed ledger
+  check could not see: a 100 um seed left 1.2 percent of the field-energy turnover in the ledger at 20
+  substeps a period and half that at 40. The same order runs on the CPU, in the FP32 twin and in the device's
+  solve, whose first pass now lands the fixed-point source as it reads. The 100 um seed closes at 3.5e-6 and
+  2.1e-6 at 20 and 40 substeps a period, the broad seed at 3.7e-6 where it closed at 1.0e-5, and the sandwich
+  line's middle segment at 1.3e-4 where it closed at 3.3e-4. One recorded digit moves, and it is the one the
+  scheme reaches: `tier1_unavg`, the priced model difference against Genesis4 that the final-field phase
+  dominates, goes from 6.934613e-02 to 7.032578e-02 on the debug tree and from 6.934017e-02 to 7.032919e-02
+  on production, inside its level. Every other tier is unmoved, and the device's unaveraged rows sit where
+  they sat.
 - 2026-09-12 Fixed: the averaged helical element couples to the circular polarization its electrons
   radiate. Its polarization vector was (1, -i)/sqrt2, the counter-rotating pair in this code's convention,
   where the unaveraged mode's Lorentz force selects (1, +i)/sqrt2 with no vector at all: the helical

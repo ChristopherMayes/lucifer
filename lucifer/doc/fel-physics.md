@@ -1243,7 +1243,7 @@ Eq. [](#eq-fc), and does *not* take it as an input.
 *The step.* Per substep $\delta$ ($\lambda_u/20$ by default, with a floor of 10 that
 this mode's own convergence measurement supports and the published 10 to 30 envelope
 corroborates), a Strang split: half magnetic push, radiation kick and source
-deposit at the midpoint, half magnetic push, then the shared pure diffraction
+deposit at the midpoint, half magnetic push, then the source landed on the record the kick read and the pair carried through the shared pure diffraction
 (Eq. [](#eq-k2)) and the $+2\cdot$source convention of [](#sec-field). The
 magnetic push is classical RK4 on the exact $z$-ODEs in kinetic variables
 $u = \gamma\beta$,
@@ -1286,9 +1286,16 @@ the averaged deposit of Eq. [](#eq-source) with the coupling removed and the act
 quiver current in its place. The $1/u_s$ (where the averaged solver carries
 Genesis4's $1/\gamma$) is a merit choice: kick and source are exact duals of one
 wave equation, and using the same $u_s$ in both (same operands, same bilinear
-weights, unitary diffraction between substeps) makes the coherent energy exchange
+weights, and the source landing on the record the kick read before the unitary
+diffraction, $E' = D(E + 2S)$) makes the coherent energy exchange
 cancel in $E+U$ *identically*, leaving only physical spontaneous emission and
-rounding in the ledger. Measured, this tightened the ledger 65$\times$ over the
+rounding in the ledger. The order matters: with the source added after the
+diffraction, $E' = DE + 2S$, the beam is charged the cross term against $E$ while the
+record gains it against $DE$, and the difference $4\,\mathrm{Re}\langle (D-I)E, 2S\rangle$
+is first order in the substep's diffraction phase, 1.2 percent of the turnover at 20
+substeps a period on a seed of 100 um waist and halving with the substep. The stored
+record is the substep's midpoint field, the same Strang split read at the other half
+step. Measured, this tightened the ledger 65$\times$ over the
 $1/\gamma$ convention. The period-averaged limit shifts by
 $O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
 [](#sec-coupling): the $JJ$ Bessel factor emerges from the figure-8.

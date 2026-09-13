@@ -6055,11 +6055,14 @@ The step, per substep delta (Strang split, second order):
      The source is the same SVEA deposit as the averaged solver with the coupling
      Removed and the actual quiver current in its place:
        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
-     followed by the shared pure diffraction (fel_field_diffract) and the +2*src
-     convention. The /u_s (where the averaged solver has Genesis's /gamma) makes the
-     kick/deposit pair exact energy duals per substep (same operands, same bilinear
-     weights, unitary diffraction between), so the ledger closes to the physical
-     spontaneous-emission term and rounding, by construction. Period-averaging the
+     added to the record as +2*src and the pair then carried through the shared pure
+     diffraction (fel_field_diffract): E' = D (E + 2 src). The /u_s (where the
+     averaged solver has Genesis's /gamma) makes the kick/deposit pair exact energy
+     duals per substep (same operands, same bilinear weights, and the source landing
+     on the record the kick read before the unitary diffraction), so the ledger closes
+     to the physical spontaneous-emission term and rounding, by construction. With the
+     source added after the diffraction the two sides carried different cross terms,
+     first order in the substep's diffraction phase (FINDINGS 7.86). Period-averaging the
      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
      emerges from the figure-8).
   3. half magnetic push.
