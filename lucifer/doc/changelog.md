@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: the short-range space-charge solve centers on the slice's charge-weighted centroid. Its
+  radial bins and azimuthal basis came from an unweighted mean of the particle positions where every source
+  term it carries is charge weighted, so two descriptions of one physical beam gave different fields:
+  replacing a particle by sixteen colocated copies of a sixteenth its charge moved the unweighted centroid
+  and changed the field at every point, worth 2.1e-5 of the diagnostics on a seeded segment. Genesis gives
+  every macroparticle the same charge and does not distinguish the two means; this port's weights differ
+  within a slice, through a loaded beam's own charges, a beamlet's copies and migration. A slice carrying no
+  charge keeps the origin at zero, where it has no source either. The check splits one particle sixteen ways
+  and holds every physical diagnostic at 1.4e-14, with the space-charge-off and all-particle-split controls
+  that pass either way. No recorded digit moved: every harness deck loads equal weights within a slice,
+  where the two means agree exactly.
 - 2026-09-12 Added: the Metal backend runs the unaveraged mode with two live polarization planes. The
   kernels were written to the mode's scalar fold when the device took that mode, so the kick read one plane
   and filled one source, and the combination was refused at setup. The mode needs no polarization vector:

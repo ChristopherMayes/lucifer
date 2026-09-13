@@ -1112,8 +1112,8 @@ hoisted while currents cannot change and recomputed at the migration stride.
 (sec-spacecharge)=
 ### Space charge
 
-*Short range* (`fel_shortrange_ez`), per slice: center and radially bin the
-particles, then for azimuthal modes $m = -n_\phi..n_\phi$ and longitudinal harmonics
+*Short range* (`fel_shortrange_ez`), per slice: center on the slice's charge-weighted
+centroid and radially bin the particles, then for azimuthal modes $m = -n_\phi..n_\phi$ and longitudinal harmonics
 $l = 1..n_z$ solve the radial tridiagonal system of the harmonic potential
 (cell volumes $V_1 = \pi\,dr^2$, $V_i = \pi dr^2(2i-1)$, off-diagonals
 $2\pi(i-1)$. $\log$ ring terms $-2\pi m^2\ln\frac{i}{i-1}$. Outer boundary

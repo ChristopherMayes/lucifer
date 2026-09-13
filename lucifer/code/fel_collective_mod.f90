@@ -654,7 +654,7 @@ type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 real(rp) gz2, ks, ez(:)
 
-real(rp) xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef
+real(rp) xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef, wtot
 real(rp), allocatable :: vol(:), ldig(:), rlog(:), lmid(:), theta_p(:), econst_p(:)
 complex(rp), allocatable :: cwork(:), csrc(:), clow(:), cmid(:), cupp(:), celm(:), gam_w(:), cph(:,:)
 integer, allocatable :: idxr(:)
@@ -673,9 +673,25 @@ allocate (vol(ngrid), ldig(ngrid+1), rlog(ngrid), lmid(ngrid))
 allocate (csrc(ngrid), clow(ngrid), cmid(ngrid), cupp(ngrid), celm(ngrid), gam_w(ngrid))
 
 ! analyseBeam: slice centroid, radial extent, bins and azimuthal phases.
+!
+! The centroid is charge weighted, since everything built on it is: the radial bins, the
+! azimuthal basis and the source each particle deposits with its own weight. Genesis
+! gives every macroparticle the same charge, so its unweighted mean is its weighted one
+! and the transcription does not distinguish them. This port's weights differ within a
+! slice -- a loaded beam keeps its file's charges, a beamlet's copies share one, and
+! migration moves particles one at a time -- and with the unweighted mean, splitting one
+! particle into colocated copies of the same total charge moved the origin and changed
+! the field at every physical point. A slice carrying no charge has no source and no
+! centroid to find, so the origin stays at zero there and every ez comes out zero.
 
-xcen = sum(sl%x(1:np)) / np
-ycen = sum(sl%y(1:np)) / np
+wtot = sum(sl%weight(1:np))
+if (wtot > 0) then
+  xcen = dot_product(sl%weight(1:np), sl%x(1:np)) / wtot
+  ycen = dot_product(sl%weight(1:np), sl%y(1:np)) / wtot
+else
+  xcen = 0
+  ycen = 0
+endif
 
 rbound = 0
 do ip = 1, np

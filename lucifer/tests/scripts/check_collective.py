@@ -99,6 +99,64 @@ def migration_events(fn):
     return events
 
 
+def split_particles(src, dst, parts, which=None):
+    """Copy a beam dump, replacing particles by colocated copies of divided charge.
+
+    The copies sit at the same coordinates and their weights sum to the original's, so
+    the beam is the same physical charge distribution described with more macroparticles.
+    Every field the slice produces, and every kick it receives, must be unchanged.
+
+    which = None splits every particle, which preserves an unweighted centroid as well as
+    a weighted one and is the control. An index splits that particle alone, which moves an
+    unweighted centroid and leaves the weighted one where it was.
+    """
+    shutil.copy(src, dst)
+    with h5py.File(dst, "r+") as h5:
+        g = h5["data/00001/particles/electron"]
+        n = g["particlePatches/numParticles"][()]
+        off = g["particlePatches/numParticlesOffset"][()]
+        n_tot = int(n.sum())
+        take = np.arange(n_tot)
+        reps = np.ones(n_tot, dtype=int)
+        reps[take if which is None else [which]] = parts
+        idx = np.repeat(take, reps)
+        names = []
+        g.visititems(lambda nm, o: names.append(nm)
+                     if isinstance(o, h5py.Dataset) and o.shape and o.shape[0] == n_tot
+                     and not nm.startswith("particlePatches") else None)
+        for nm in names:
+            data, attrs = g[nm][...][idx], dict(g[nm].attrs)
+            del g[nm]
+            d = g.create_dataset(nm, data=data)
+            for key, val in attrs.items():
+                d.attrs[key] = val
+
+        # The charge each copy carries. The loop above has already repeated a shaped
+        # weight record; a constant one becomes shaped here, since the copies no longer
+        # carry what the rest of the beam carries.
+        w = g["weight"]
+        if isinstance(w, h5py.Dataset) and w.shape:
+            wv = w[...] / reps[idx]
+            w[...] = wv
+        else:
+            wv = np.full(len(idx), float(np.ravel(w.attrs["value"])[0])) / reps[idx]
+            attrs = {k: v for k, v in w.attrs.items() if k not in ("value", "shape")}
+            del g["weight"]
+            d = g.create_dataset("weight", data=wv)
+            for k, v in attrs.items():
+                d.attrs[k] = v
+
+        for nm, o in list(g.items()):
+            if "shape" in o.attrs and int(np.ravel(o.attrs["shape"])[0]) == n_tot:
+                o.attrs["shape"] = np.array([len(idx)], dtype=o.attrs["shape"].dtype)
+        g.attrs["numParticles"] = np.array([len(idx)], dtype=g.attrs["numParticles"].dtype)
+        new_n = np.array([int(reps[off[k]:off[k] + n[k]].sum()) for k in range(len(n))])
+        g["particlePatches/numParticles"][...] = new_n
+        g["particlePatches/numParticlesOffset"][...] = np.concatenate(
+            [[0], np.cumsum(new_n)[:-1]]).astype(off.dtype)
+    return len(idx)
+
+
 def keep_one_patch(src, dst, k):
     """Copy a beam dump keeping the particles of patch k only (-1 is the last, the head).
 
@@ -227,6 +285,56 @@ def main():
     print(f"--- drop-only stride: {n_head} particles in the head slice, {len(drop_only)} stride(s) "
           f"dropped and moved nothing, {len(with_moves)} moved; {len(blocks_d)} eloss blocks "
           f"for {len(events)} stride(s), refreshed = {refreshed}  {'ok' if d_ok else 'FAIL'}")
+
+    # 4. The charge representation. Replacing a particle by colocated copies whose
+    # charges sum to the original's is the same physical beam described with more
+    # macroparticles, so every field it makes and every kick it takes must be unchanged.
+    # The short-range solve centers its radial bins and its azimuthal basis on the slice
+    # centroid, and that centroid was an unweighted mean where every source term is
+    # charge weighted: splitting one particle moved the origin and changed the field at
+    # every physical point. Splitting every particle equally leaves an unweighted mean
+    # where it was, which is why the harness's own beamlet loader could not see it, so
+    # the check splits one particle and keeps the all-particle case as the control.
+    sc_lat = (wd / "collsc.bmad")
+    sc_lat.write_text("call, file = aramis_1seg.bmad\nwiggler::*[SPACE_CHARGE_METHOD] = slice\n")
+    sc_on = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 2\n"
+             "  space_charge%nphi = 1\n  space_charge%rmax = 250e-6\n")
+    # Seeded, since a dark run's field is the numerical floor and comparing two floors
+    # says nothing about the solve that feeds them.
+    seeded = BASE.replace("seed_power = 0", "seed_power = 1e4\n  seed_waist_size = 30e-6")
+    src = seeded.format(lat="collsc.bmad", root="collsc_src", sig_pz="8.804506566858e-08",
+                        extra="  write_initial = T\n  load_only = T\n")
+    run(exe, wd, "collsc_src.nml", src)
+    n_sel = split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_sel.beam.h5",
+                            16, which=0)
+    n_all = split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_all.beam.h5", 2)
+    load = ('  beam_file = "{f}"\n  field_file = "collsc_src-initial.wf.h5"\n'
+            '  load_mode = "keep"\n')
+    for tag, extra in (("on", sc_on), ("off", "")):
+        base_run = f"collsc_{tag}"
+        for name, f in (("ref", "collsc_src-initial.beam.h5"), ("sel", "collsc_sel.beam.h5"),
+                        ("all", "collsc_all.beam.h5")):
+            run(exe, wd, f"{base_run}_{name}.nml",
+                seeded.format(lat="collsc.bmad", root=f"{base_run}_{name}",
+                              sig_pz="8.804506566858e-08", extra=load.format(f=f) + extra))
+        ref = np.loadtxt(wd / f"{base_run}_ref.diag.txt")
+        # The physical columns: power, on-axis intensity, bunching, the energy moments,
+        # the beam sizes and the current. n_eff counts macroparticles and is meant to
+        # move, and the bunching phase is an angle that wraps, so a difference across the
+        # wrap says nothing that the bunching magnitude beside it does not say better.
+        cols = [2, 3, 4, 6, 7, 8, 9, 10]
+        # Each column against its own range over the run, so a quantity that passes
+        # through zero is not compared against zero.
+        scale = np.maximum(np.abs(ref).max(axis=0), 1e-30)
+        worst = {}
+        for name in ("sel", "all"):
+            d = np.loadtxt(wd / f"{base_run}_{name}.diag.txt")
+            worst[name] = float(np.max(np.abs(d[:, cols] - ref[:, cols]) / scale[cols]))
+        s_ok = worst["sel"] < 1e-12 and worst["all"] < 1e-12
+        ok = ok and s_ok
+        print(f"--- charge representation, space charge {tag}: one particle split 16 ways "
+              f"{worst['sel']:.2e}, every particle split {worst['all']:.2e} "
+              f"(tol 1e-12)  {'ok' if s_ok else 'FAIL'}")
 
     print("collective checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

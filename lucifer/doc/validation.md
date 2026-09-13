@@ -498,6 +498,8 @@ beam confined to the head slice by editing a dump, detuned by 0.6% so it slips o
 head over two segments and never into another slice, and holds one refreshed block per
 such stride.
 
+The short-range solve centers its radial bins and its azimuthal basis on the slice's charge-weighted centroid, which is what every term built on it is. Genesis gives every macroparticle the same charge, so its unweighted mean is its weighted one, and the transcription did not distinguish them. This port's weights differ within a slice, and with the unweighted mean, replacing one particle by colocated copies whose charges sum to the original's, the same physical beam described with more macroparticles, moved the origin and changed the field at every physical point. `check_collective.py` splits one particle sixteen ways and holds every physical diagnostic to the unsplit run at 1e-12, measured 1.4e-14, with two controls that pass either way: the same split with space charge off, and every particle split, which leaves an unweighted mean where it was and is why the harness's own beamlet loader never saw it. With the unweighted centroid restored the selective case reads 2.1e-5 and the controls stay at 1e-13.
+
 Two decisions recorded here as much as in the code: the numerical impedance is a clean,
 separable routine (`fel_resistive_wall_wake`) because that computation is a future port
 target into Bmad proper as a wake source, and the space-charge solver sits behind an
