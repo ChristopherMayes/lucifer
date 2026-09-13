@@ -222,11 +222,8 @@ if (n_harm > 1 .and. any(fel_mode == unaveraged$ .and. is_fel)) then
                                  'COUPLINGS ARE VALIDATED THROUGH THE PARTICLE SPECTRA, NOT A CARRIED FIELD).')
   err_flag = .true.;  return
 endif
-if (n_harm > 1 .and. run%two_pol) then
-  call out_io (s_error$, r_name, 'HARMONIC FIELDS WITH TWO LIVE POLARIZATIONS ARE NOT VALIDATED', &
-                                 'TOGETHER YET; RUN ONE OR THE OTHER.')
-  err_flag = .true.;  return
-endif
+call fel_refuse_two_pol_combinations (run, err_flag)   ! Made again after a field import.
+if (err_flag) return
 
 ! The source model (fel-physics.md sec-coherent-source): validated, then stamped onto every
 ! FEL element. v1 scope refusals: the coherent source carries the
@@ -246,10 +243,6 @@ case ('coherent')
   if (n_harm > 1) then
     call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH HARMONIC FIELDS IS NOT IN V1', &
                                    '(EVEN HARMONICS ARE INVALID IN THE METHOD; ODD ONES ARE A NAMED FOLLOW-ON).')
-    err_flag = .true.;  return
-  endif
-  if (run%two_pol) then
-    call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH TWO LIVE POLARIZATIONS IS NOT IN V1.')
     err_flag = .true.;  return
   endif
   if (run%winit%seed_power <= 0 .and. run%field_file(1) == '') then

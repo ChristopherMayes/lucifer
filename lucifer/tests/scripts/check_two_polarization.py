@@ -243,6 +243,30 @@ def main():
     check("refusal: tilt on helical (1 = yes)", 0.0 if ok1 else 1.0, 0.5)
     check("refusal: tilt with transcribed maps (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
 
+    # 7. An imported vector field decides the run's planes. The state was set at lattice
+    #    setup from the seed's polarization and the tilts, and a file carrying Ey under a
+    #    deck that said nothing left it at one plane: the stats and the device allocated
+    #    one and the first record wrote past it, an array bound in the debug build and a
+    #    bus error in the production one. The source writes a y-seeded eight-slice field
+    #    on the untilted helical line, and the restart from it omits the seed's
+    #    polarization, against the control that states it.
+    print("--- an imported vector field sets the polarization state (TD, helical):")
+    run(exe, wd, "p2i_src", NML.format(lat="p2_hel.bmad", root="p2i_src",
+                                       extra="  seed_polarization = 'y'\n  write_initial = T\n"
+                                             "  load_only = T\n"))
+    load = ('  beam_file = "p2i_src-initial.beam.h5"\n  field_file = "p2i_src-initial.wf.h5"\n'
+            '  load_mode = "keep"\n')
+    run(exe, wd, "p2i_def", NML.format(lat="p2_hel.bmad", root="p2i_def", extra=load))
+    run(exe, wd, "p2i_y", NML.format(lat="p2_hel.bmad", root="p2i_y",
+                                     extra=load + "  seed_polarization = 'y'\n"))
+    same = (wd / "p2i_def.diag.txt").read_bytes() == (wd / "p2i_y.diag.txt").read_bytes()
+    check("import: the restart without the seed's polarization runs as the one with it (1 = yes)",
+          0.0 if same else 1.0, 0.5)
+    py = dump_power(wd, "p2i_def-final.wf.h5", "y")
+    px = dump_power(wd, "p2i_def-final.wf.h5", "x")
+    check("import: the y plane is carried to the end (Py/Px floor)", 1.0 / max(py / max(px, 1e-300), 1e-300),
+          1e3, note=f"(Py/Px = {py/max(px,1e-300):.3e})")
+
     if FAILED:
         print("two-polarization checks: FAIL")
         sys.exit(1)

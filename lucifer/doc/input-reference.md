@@ -326,7 +326,7 @@ Not physics input. The validation harness sets these.
 | `wavefront_init%grid_half_width` | `0` | Transverse grid half width [m]. Zero derives it |
 | `wavefront_init%seed_power` | `0` | Gaussian seed power [W]. Zero is a dark start |
 | `wavefront_init%seed_waist_size` | `0` | Seed intensity 1/e^2 radius [m] |
-| `wavefront_init%seed_polarization` | `"x"` | `"x"` or `"y"` |
+| `wavefront_init%seed_polarization` | `"x"` | `"x"` or `"y"`. A field from `field_file` decides its own planes |
 | `wavefront_init%harmonics` | `1` | The field set. The first entry must be the fundamental |
 
 (param-wavefront-grid)=

@@ -9,6 +9,13 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: a field imported with both polarization planes sets the run to two planes. The state
+  was decided at lattice setup from the seed's polarization and the elements' tilts, and a file carrying
+  Ey under a deck that stated no seed polarization left it at one plane: the stats and the device allocated
+  one, and the first record wrote past it, an array bound in the debug build and a bus error in the
+  production one, on a valid restart from this program's own dump. An imported field now decides its planes,
+  the refusals that depend on the state are made again after the import, and the check restarts a y-seeded
+  helical run with and without the seed's polarization and holds the two byte identical.
 - 2026-09-12 Fixed: a displaced element gives its `z_offset` phase back before the migration at its last
   step. Migration reads each particle's phase against its slice's window, and the assignment was made while
   the displaced phase was still applied and undone after: at a full carrier turn of offset every particle

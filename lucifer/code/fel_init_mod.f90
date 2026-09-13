@@ -1258,6 +1258,22 @@ if (field_file(1) /= '') then
   if (err) then
     err_flag = .true.;  return
   endif
+
+  ! The file decides its own planes. run%two_pol was set at lattice setup from the
+  ! seed's polarization and the elements' tilts, which is what a generated field needs,
+  ! and a file carrying Ey under a deck that said nothing left it false: the stats and
+  ! the device then allocated one plane and the first record wrote past it. A deck that
+  ! imports its field states no seed, so the seed's polarization cannot be the authority.
+
+  if (allocated(wf%Ey) .and. .not. two_pol) then
+    two_pol = .true.
+    run%two_pol = .true.
+    call out_io (s_info$, r_name, 'The field file carries both polarization planes, so the run tracks two.')
+    call fel_refuse_two_pol_combinations (run, err)
+    if (err) then
+      err_flag = .true.;  return
+    endif
+  endif
   if (two_pol .and. .not. allocated(wf%Ey)) then
     allocate (wf%Ey(size(wf%Ex,1), size(wf%Ex,2), size(wf%Ex,3)))
     wf%Ey = 0

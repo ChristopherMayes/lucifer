@@ -4615,6 +4615,26 @@ Output:
   inert    -- logical: True when the walk skips the element.
 ```
 
+(api-fel-refuse-two-pol-combinations)=
+### `fel_refuse_two_pol_combinations`
+
+*Subroutine* `(run, err_flag)`
+
+```
+Routine to refuse the combinations that two live polarizations are not validated
+with, the one authority for them. run%two_pol is decided twice: at lattice setup
+from the seed's polarization and the elements' tilts, and again when a field file
+turns out to carry both planes, so the refusals are made at both points from here.
+```
+
+```
+Input:
+  run      -- fel_run_struct: Run state with %two_pol, %n_harm and %global set.
+
+Output:
+  err_flag -- logical: Set True when a combination is refused. False otherwise.
+```
+
 ## `fel_timer_mod.f90`
 
 (api-fel-timer-mod)=

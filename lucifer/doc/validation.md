@@ -677,10 +677,16 @@ skipping the exit handoff flag is refused at the first seam element.
 ## Two polarizations: vector radiation, tilt honored, the crossed undulator
 
 The radiation carries (Ex, Ey) when any FEL element is tilted (`UNDY: UNDX,
-tilt = pi/2` is a y-planar undulator, standard Bmad, no new attribute), or when the seed
-is y-polarized (`seed_polarization = 'y'`). Otherwise Ey is never allocated and the
+tilt = pi/2` is a y-planar undulator, standard Bmad, no new attribute), when the seed
+is y-polarized (`seed_polarization = 'y'`), or when the field read from `field_file`
+carries both planes. Otherwise Ey is never allocated and the
 single-component path runs untouched (every tier bit-for-bit, the compatibility
-keystone). Kick and deposit act through each element's polarization 2-vector (planar:
+keystone). The third condition was missing: the state was decided at lattice setup from
+the first two, and a restart from a y-polarized field under a deck that stated no seed
+polarization allocated one plane in the stats and the device and wrote past it at the
+first record. An imported field now decides its own planes, the refusals that depend on
+the state are made again after the import, and the check restarts a y-seeded helical
+run with and without the seed's polarization and holds the two diag files byte identical. Kick and deposit act through each element's polarization 2-vector (planar:
 (cos t, sin t), helical (1,-i)/sqrt2). The unaveraged mode needs no polarization
 code at all, since its real per-particle currents work against and deposit into their own
 components. One openPMD dump holds both polarizations as components x and y of its

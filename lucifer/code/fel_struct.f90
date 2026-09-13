@@ -649,4 +649,45 @@ inert = .true.
 
 end function fel_element_inert
 
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_refuse_two_pol_combinations (run, err_flag)
+!
+! Routine to refuse the combinations that two live polarizations are not validated
+! with, the one authority for them. run%two_pol is decided twice: at lattice setup
+! from the seed's polarization and the elements' tilts, and again when a field file
+! turns out to carry both planes, so the refusals are made at both points from here.
+!
+! Input:
+!   run      -- fel_run_struct: Run state with %two_pol, %n_harm and %global set.
+!
+! Output:
+!   err_flag -- logical: Set True when a combination is refused. False otherwise.
+!-
+
+subroutine fel_refuse_two_pol_combinations (run, err_flag)
+
+type (fel_run_struct) run
+logical err_flag
+character(*), parameter :: r_name = 'fel_refuse_two_pol_combinations'
+
+!
+
+err_flag = .false.
+if (.not. run%two_pol) return
+
+if (run%n_harm > 1) then
+  call out_io (s_error$, r_name, 'HARMONIC FIELDS WITH TWO LIVE POLARIZATIONS ARE NOT VALIDATED', &
+                                 'TOGETHER YET; RUN ONE OR THE OTHER.')
+  err_flag = .true.;  return
+endif
+if (run%global%source_model == 'coherent') then
+  call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH TWO LIVE POLARIZATIONS IS NOT IN V1.')
+  err_flag = .true.;  return
+endif
+
+end subroutine fel_refuse_two_pol_combinations
+
 end module fel_struct
