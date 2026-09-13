@@ -204,6 +204,14 @@ SF_E2E_CEIL = 1.0e-3
 CEIL_U = {"x": 3.5e-6, "px": 2.5e-5, "y": 3.0e-6, "py": 2.1e-5, "pz": 6.5e-6,
           "theta": 1.1e-5, "phasor": 2.5e-7, "source": 5.0e-3, "field": 2.0e-5}
 GUARD_FLOOR_U = 1e9
+# The crossed probe's own guard floor. The guard is the median per-record-step phase
+# increment in ticks, so it is the deck's, not the mode's: this line's elements are 0.6 m
+# where the steady deck's are 4 m, and it measures 1.1e8.
+GUARD_FLOOR_2P = 1e7
+# The two-plane rows all sit inside the one-plane ceilings above, measured on the crossed
+# unaveraged deck: x 1.9e-6, px 2.5e-6, y 2.2e-6, py 3.0e-6, pz 5.0e-7, theta 2.0e-6,
+# phasor 1.6e-8, source 2.2e-4, field 2.0e-6. The field row is the whole record, both
+# planes summed, and the source row is the ledger's kick-side term.
 U_E2E_CEIL = 5.0e-3
 
 # The frame series with the device resident in this mode. The mean px a frame carries is
@@ -431,7 +439,8 @@ def unaveraged(args, wd, exe):
     """
     print("== the unaveraged mode on the device ==")
     latdir = pathlib.Path(args.latdir)
-    for f in ("aramis_1seg.bmad", "aramis_1seg_unavg.bmad", "crossed_probe.bmad"):
+    for f in ("aramis_1seg.bmad", "aramis_1seg_unavg.bmad", "crossed_probe.bmad",
+              "spont_probe.bmad"):
         (wd / f).write_bytes((latdir / f).read_bytes())
     (wd / "dvu_cross.bmad").write_text(
         "call, file = crossed_probe.bmad\nuse, CROSSED\nwiggler::*[FEL_METHOD] = unaveraged\n")
@@ -585,14 +594,109 @@ def unaveraged(args, wd, exe):
         ok(f"header projection over measured loss, {mode} deck", f"{ratio:.3f}",
            f"in [{PROJ_BAND[0]}, {PROJ_BAND[1]}]", PROJ_BAND[0] <= ratio <= PROJ_BAND[1])
 
-    # 8. Refused. Two live polarizations in this mode is the one configuration the CPU
-    # carries and the device does not.
-    r = run(args.exe, wd, "dvu_rp.in",
-            base.format(root="dvurp", extra=DEV).replace(
-                'lat_file = "' + lat + '"', 'lat_file = "dvu_cross.bmad"'),
-            expect_fail=True)
-    refused = r.returncode != 0 and "TWO POLARIZATIONS IN THE UNAVERAGED MODE" in r.stdout
-    ok("refused: two polarizations in the unaveraged mode", refused, "True", refused)
+    # 8. Two live polarizations. The mode needs no polarization vector: the two real
+    # kinetic momenta work against and deposit into their own field components, so the
+    # device's kick reads both planes and fills both source planes, and each plane meets
+    # the diffraction with its own source. The crossed line is the deck for it, an x set
+    # then a y set, so both planes carry power by the end.
+    xb = base.replace('lat_file = "' + lat + '"', 'lat_file = "dvu_cross.bmad"')
+
+    run(args.exe, wd, "dvu_2p.in", xb.format(root="dvu2p",
+        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+    t = summary(wd, "dvu2p")
+    for q in CEIL_U:
+        ok(f"two-plane unaveraged lockstep worst_{q}", f"{t[q]:.3e}", f"<= {CEIL_U[q]:.1e}",
+           t[q] <= CEIL_U[q])
+    ok("two-plane unaveraged lockstep guard [ticks]", f"{t['guard']:.3e}",
+       f">= {GUARD_FLOOR_2P:.0e}", t["guard"] >= GUARD_FLOOR_2P)
+
+    run(args.exe, wd, "dvu_2poff.in", xb.format(root="dvu2poff", extra=""))
+    same = (wd / "dvu2p.diag.txt").read_bytes() == (wd / "dvu2poff.diag.txt").read_bytes()
+    ok("two-plane unaveraged FP64 diag byte-identical, device twin on vs off", same, "True", same)
+    same = (wd / "dvu2p.ledger.txt").read_bytes() == (wd / "dvu2poff.ledger.txt").read_bytes()
+    ok("two-plane unaveraged FP64 ledger byte-identical, device twin on vs off", same, "True", same)
+
+    run(args.exe, wd, "dvu_2pm.in", xb.format(root="dvu2pm",
+        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+    m = summary(wd, "dvu2pm")
+    for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
+        ok(f"two-plane unaveraged mutation moves worst_{q}", f"{m[q]:.3e} vs {t[q]:.3e}",
+           f">= {factor}x", m[q] >= factor * t[q])
+
+    # The production role. Each plane is compared against its own CPU power, since a
+    # total would hide a plane that went dark: the second plane once did, its propagator
+    # asking for a member the kernel buffer does not hold, while the first plane and the
+    # total stayed in family. The y plane of this line is the afterburner's transfer and
+    # carries 1.3e-4 of the x plane, so its own relative agreement is what single
+    # precision does to a weak coherent transfer, measured 3.0e-2, where a plane that
+    # went dark would read 1.
+    run(args.exe, wd, "dvu_2ppr.in", xb.format(root="dvu2ppr", extra=DEV))
+    for comp, ceil in (("x", U_E2E_CEIL), ("y", 1.0e-1)):
+        pc = tp.dump_power(wd, "dvu2poff-final.wf.h5", comp)
+        pd = tp.dump_power(wd, "dvu2ppr-final.wf.h5", comp)
+        rel = abs(pd - pc) / max(pc, 1e-300)
+        ok(f"two-plane unaveraged production power {comp} vs CPU", f"{rel:.3e}",
+           f"<= {ceil:.1e}", pc > 0 and rel <= ceil)
+
+    # The transform pair's loss on two planes, with no charge to feed either. The loss is
+    # each plane's own, so the pair costs the set the same fraction it costs one plane
+    # (FINDINGS 7.72), and the band is the one section 7 holds.
+    r = run(args.exe, wd, "dvu_d2.in",
+            xb.format(root="dvud2", extra=DEV + "  global%write_initial = T\n").replace(
+                "bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
+    p0 = sum(tp.dump_power(wd, "dvud2-initial.wf.h5", c) for c in ("x", "y"))
+    p1 = sum(tp.dump_power(wd, "dvud2-final.wf.h5", c) for c in ("x", "y"))
+    npair = int(PAIR_RE.search(r.stdout).group(1))   # this line's own count, not the steady deck's
+    loss = (p0 - p1) / p0 / npair
+    good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
+    ok("FP32 transform pair energy loss, two-plane deck", f"{loss:.3e} a pair",
+       f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good)
+
+    # 9. The handedness the mode selects, on the device. A helical element radiates one
+    # circular polarization and couples to it, and which one is the electron's own
+    # (FINDINGS 7.85). A total power cannot tell the two apart, so the control is seeded:
+    # a cold beam driven by a uniform seed as the scalar envelope and as each circular
+    # pair of the same total intensity, and the rms energy modulation says which pair the
+    # device couples to. It must be the CPU's answer, and the CPU's is check_two_polarization's.
+    unavg_handedness(args, wd, exe)
+
+
+def unavg_handedness(args, wd, exe):
+    """The seeded handedness control of check_two_polarization, run on the device."""
+    (wd / "dvu_hel.bmad").write_text(
+        "call, file = spont_probe.bmad\nwiggler::*[FEL_METHOD] = unaveraged\n")
+    cold = tp.ss(tp.NML).replace("seed_waist_size = 30e-6", "seed_waist_size = 1e-2").replace(
+        "seed_power = 1e4", "seed_power = 1e9").replace(
+        "beam_init%sig_pz = 8.804506566858e-05", "beam_init%sig_pz = 1e-12").replace(
+        "beam_init%bunch_charge = 8.0e-15", "beam_init%bunch_charge = 8.0e-18")
+    run(args.exe, wd, "dvh_src.in", cold.format(lat="dvu_hel.bmad", root="dvhsrc",
+        extra="  write_initial = T\n  load_only = T\n"))
+
+    def circular(src, dst, sign):
+        shutil.copy(wd / src, wd / dst)
+        with h5py.File(wd / dst, "r+") as h5:
+            m = h5["data"][sorted(h5["data"])[0]]["meshes/electricField"]
+            x = m["x"][...] / np.sqrt(2.0)
+            m["x"][...] = x
+            y = m.create_dataset("y", data=sign * 1j * x)
+            for k, v in m["x"].attrs.items():
+                y.attrs[k] = v
+
+    circular("dvhsrc-initial.wf.h5", "dvh_plus.wf.h5", +1)
+    circular("dvhsrc-initial.wf.h5", "dvh_minus.wf.h5", -1)
+    sig = {}
+    for tag, ff in (("scalar", "dvhsrc-initial.wf.h5"), ("plus", "dvh_plus.wf.h5"),
+                    ("minus", "dvh_minus.wf.h5")):
+        run(args.exe, wd, f"dvh_{tag}.in", cold.format(lat="dvu_hel.bmad", root=f"dvh{tag}",
+            extra=f'  beam_file = "dvhsrc-initial.beam.h5"\n  field_file = "{ff}"\n'
+                  '  load_mode = "keep"\n' + DEV))
+        sig[tag] = float(tp.diag(wd, f"dvh{tag}")[-1, 0, 7])
+    rel = abs(sig["plus"] - sig["scalar"]) / sig["scalar"]
+    ok("handedness on the device: (1, +i) reproduces the scalar seed's energy modulation",
+       f"{rel:.3e} [{sig['plus']:.4f} vs {sig['scalar']:.4f} eV]", "<= 1.0e-5", rel <= 1.0e-5)
+    rel = sig["minus"] / sig["scalar"]
+    ok("handedness on the device: (1, -i) leaves the beam unmodulated",
+       f"{rel:.3e} [{sig['minus']:.3e} eV]", "<= 1.0e-2", rel <= 1.0e-2)
 
 def source_filter(args, wd, exe):
     """

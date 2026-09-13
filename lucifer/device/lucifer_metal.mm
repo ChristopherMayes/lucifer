@@ -480,7 +480,7 @@ struct UnavgPar {
     float h, dsub, ks, ku, aw, cos_t, sin_t;
     float gam0, beta0, g0inv2, me;
     float gridmax, dgrid, scl_u, dscale, u_bound;
-    uint  ngrid, npart, nslice, first, helical, mutate;
+    uint  ngrid, npart, nslice, first, helical, mutate, npol;
 };
 
 struct U5 { float x, y, ux, uy, tau; };
@@ -601,8 +601,17 @@ kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
     float gam = P.gam0 + G[gid];
     float ux = UX[gid], uy = UY[gid];
     float us = sqrt(gam*gam - 1.0f - ux*ux - uy*uy);
+
+    // The current the deposit carries and the kick works against. With one live plane
+    // it is the mode's scalar fold, planar (u_x, 0) or helical (u_x - i u_y)/sqrt2. With
+    // two it is the pair of real kinetic momenta themselves: each works against its own
+    // field component and deposits into its own source, and no polarization convention
+    // enters (fel_unaveraged_mod's two_pol branch, manual sec-vector). |j| is what the
+    // bound below is stated against, and it is sqrt(u_x^2 + u_y^2) either way up to the
+    // helical fold's 1/sqrt2, so one bound covers both.
     float2 jhat = (P.helical != 0u) ? float2(ux, -uy) * (1.0f / sqrt(2.0f))
                                     : float2(ux, 0.0f);
+    if (P.npol == 2u) jhat = float2(ux, uy);
 
     // A contribution carries |j|/u_s, and the host's scale assumes that ratio stays
     // under u_bound. One that does not is neither converted nor accumulated, and the
@@ -620,10 +629,17 @@ kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
     uint nn = P.ngrid * P.ngrid;
     uint cell = uint(jy) * P.ngrid + uint(jx);
     uint b = fs * nn + cell;
-    float2 ehat = E[b] * (wx * wy)
-                + E[b + 1u] * ((1.0f - wx) * wy)
-                + E[b + P.ngrid] * (wx * (1.0f - wy))
-                + E[b + P.ngrid + 1u] * ((1.0f - wx) * (1.0f - wy));
+    float w00 = wx * wy, w10 = (1.0f - wx) * wy;
+    float w01 = wx * (1.0f - wy), w11 = (1.0f - wx) * (1.0f - wy);
+    float2 ehat = E[b] * w00 + E[b + 1u] * w10
+                + E[b + P.ngrid] * w01 + E[b + P.ngrid + 1u] * w11;
+
+    // The second plane sits one slice block further on in the member-major set, and it
+    // is gathered with the same four weights, as the host's branch gathers it.
+    uint by = b + P.nslice * nn;
+    float2 ehat_y = float2(0.0f);
+    if (P.npol == 2u) ehat_y = E[by] * w00 + E[by + 1u] * w10
+                            + E[by + P.ngrid] * w01 + E[by + P.ngrid + 1u] * w11;
 
     // The carrier e^{i(psi_mid - ks tau)}: the host's FP64 base rotator times the
     // lag's own small angle, which is the split the averaged push already uses.
@@ -633,32 +649,57 @@ kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
     s_d = sin(d);  c_d = cos(d);
     float2 cph = cmul(CB[is], float2(c_d, -s_d));
 
-    // W = -i Ehat e^{i Psi};  dgamma = -dsub Re[W conj(j)] / (u_s m_e).
-    float2 t = cmul(ehat, cph);
+    // W = -i Ehat e^{i Psi};  dgamma = -dsub Re[W conj(j)] / (u_s m_e). With two planes
+    // the work is the sum over components, Re[-i (Ex u_x + Ey u_y) e^{i Psi}], which is
+    // the same expression with the pair's own Ehat and j.
+    float2 esum = (P.npol == 2u) ? (ehat * ux + ehat_y * uy) : ehat;
+    float2 jw = (P.npol == 2u) ? float2(1.0f, 0.0f) : jhat;
+    float2 t = cmul(esum, cph);
     float2 wph = float2(t.y, -t.x);
-    float dgam = -P.dsub * (wph.x * jhat.x + wph.y * jhat.y) / (us * P.me);
+    float dgam = -P.dsub * (wph.x * jw.x + wph.y * jw.y) / (us * P.me);
     G[gid] = G[gid] + dgam;
 
     // src += i e^{-i Psi} j scl_u w / u_s. The /u_s where the averaged deposit has
-    // Genesis's /gamma is what makes the pair exact duals (sec-unaveraged).
-    float2 cj = cmul(float2(cph.x, -cph.y), jhat);
+    // Genesis's /gamma is what makes the pair exact duals (sec-unaveraged). With two
+    // planes the rotator is the same and the two real momenta scale it, each into its
+    // own source plane, which sits one slice block on as the field's does.
+    float2 cj = cmul(float2(cph.x, -cph.y), (P.npol == 2u) ? float2(1.0f, 0.0f) : jhat);
     float2 cdep = float2(-cj.y, cj.x) * (P.scl_u * W[gid] / us);
+    float2 cdep_y = cdep * uy;
+    if (P.npol == 2u) cdep = cdep * ux;
 
     ulong idx = (ulong) b;
+    ulong sy = (ulong) P.nslice * (ulong) nn;
     float w;
     ulong dcell;
-    w = wx * wy;                     dcell = 2u * idx;
+    w = w00;   dcell = 2u * idx;
     acc_fixed(S, dcell,      w * cdep.x, P.dscale);
     acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
-    w = (1.0f - wx) * wy;            dcell = 2u * (idx + 1u);
+    if (P.npol == 2u) {
+        acc_fixed(S, 2u * (idx + sy),      w * cdep_y.x, P.dscale);
+        acc_fixed(S, 2u * (idx + sy) + 1u, w * cdep_y.y, P.dscale);
+    }
+    w = w10;   dcell = 2u * (idx + 1u);
     acc_fixed(S, dcell,      w * cdep.x, P.dscale);
     acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
-    w = wx * (1.0f - wy);            dcell = 2u * (idx + P.ngrid);
+    if (P.npol == 2u) {
+        acc_fixed(S, 2u * (idx + 1u + sy),      w * cdep_y.x, P.dscale);
+        acc_fixed(S, 2u * (idx + 1u + sy) + 1u, w * cdep_y.y, P.dscale);
+    }
+    w = w01;   dcell = 2u * (idx + P.ngrid);
     acc_fixed(S, dcell,      w * cdep.x, P.dscale);
     acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
-    w = (1.0f - wx) * (1.0f - wy);   dcell = 2u * (idx + P.ngrid + 1u);
+    if (P.npol == 2u) {
+        acc_fixed(S, 2u * (idx + P.ngrid + sy),      w * cdep_y.x, P.dscale);
+        acc_fixed(S, 2u * (idx + P.ngrid + sy) + 1u, w * cdep_y.y, P.dscale);
+    }
+    w = w11;   dcell = 2u * (idx + P.ngrid + 1u);
     acc_fixed(S, dcell,      w * cdep.x, P.dscale);
     acc_fixed(S, dcell + 1u, w * cdep.y, P.dscale);
+    if (P.npol == 2u) {
+        acc_fixed(S, 2u * (idx + P.ngrid + 1u + sy),      w * cdep_y.x, P.dscale);
+        acc_fixed(S, 2u * (idx + P.ngrid + 1u + sy) + 1u, w * cdep_y.y, P.dscale);
+    }
 }
 
 // The ledger's spontaneous term, 4 sum|src|^2 over one slice's source grid, summed
@@ -840,32 +881,23 @@ kernel void fft_rows (device float2* d [[buffer(0)]], const device float2* W [[b
 }
 // The unaveraged solve's first pass: the record with the substep's fixed-point source
 // landed on it, E + 2 src, read, converted and transformed in one pass, so the source
-// meets the diffraction on the record the kick read (fel_unaveraged_mod). The plane's
-// source is found as fft_cols_add_fix finds it.
+// meets the diffraction on the record the kick read (fel_unaveraged_mod). Each plane
+// takes its own source plane, at its own index, since an unaveraged deposit is one real
+// current per plane where the averaged deposit is one scalar projected onto both. That
+// is why this pass exists beside fft_cols_add_fix rather than reusing it.
 kernel void fft_rows_add_fix (device float2* d [[buffer(0)]], const device float2* W [[buffer(1)]],
                               constant float& sgn [[buffer(2)]], const device uint* si [[buffer(3)]],
-                              constant AddPar& A [[buffer(4)]], constant float& sinv [[buffer(5)]],
+                              constant float& sinv [[buffer(4)]],
                               uint2 tg [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]]){
     threadgroup float2 sh[RF_ROWS * NG];
     uint lane = t % LANES, r = t / LANES;
-    uint m = tg.y / A.ppm, rem = tg.y % A.ppm;
-    uint pl = rem / A.nslice, is = rem % A.nslice;
     ulong row = (ulong)(tg.x * RF_ROWS + r);
     ulong off = (ulong)tg.y * ((ulong)N * N) + row * N;
-    ulong soff = ((ulong)m * A.nslice + is) * ((ulong)N * N) + row * N;
     device float2* p = d + off;
     float2 a[REGS];
-    if (A.npol == 2u) {
-        float2 pol = A.pol[pl];
-        for (uint n1 = 0; n1 < REGS; n1++){
-            ulong q = LANES*n1 + lane;
-            a[n1] = p[q] + 2.0f * cmul(pol, dec_fixed(si, soff + q, sinv));
-        }
-    } else {
-        for (uint n1 = 0; n1 < REGS; n1++){
-            ulong q = LANES*n1 + lane;
-            a[n1] = p[q] + 2.0f * dec_fixed(si, soff + q, sinv);
-        }
+    for (uint n1 = 0; n1 < REGS; n1++){
+        ulong q = LANES*n1 + lane;
+        a[n1] = p[q] + 2.0f * dec_fixed(si, off + q, sinv);
     }
     fftN(a, sh + r*NG, W, lane, sgn);
     for (uint cc = 0; cc < CHUNK; cc++)
@@ -1028,7 +1060,7 @@ struct UnavgPar {
     float h, dsub, ks, ku, aw, cos_t, sin_t;
     float gam0, beta0, g0inv2, me;
     float gridmax, dgrid, scl_u, dscale, u_bound;
-    uint32_t ngrid, npart, nslice, first, helical, mutate;
+    uint32_t ngrid, npart, nslice, first, helical, mutate, npol;
 };
 
 // The spontaneous reduction's shape, mirroring SPONT_T in the shader. One
@@ -1273,7 +1305,10 @@ int luc_dev_init (int nslice, int npart, int ngrid, int nfield, int npol,
         p->bG = alloc(np * 4);  p->bU = alloc(np * 8);  p->bW = alloc(np * 4);
         p->bField = alloc(p->nplanes() * nn * 8);
         p->bSrc = alloc((size_t) nfield * nslice * nn * 8);
-        p->bSrcI = alloc((size_t) nfield * nslice * nn * 16);
+        p->bSrcI = alloc(p->nplanes() * nn * 16);   // one source plane per field plane:
+                                                   // the averaged deposit fills the
+                                                   // member's own and projects it, the
+                                                   // unaveraged fills each plane's.
         p->bExpK = alloc((size_t) nfield * nn * 8);
         p->bSig = alloc((size_t) nfield * nn * 8);
         p->bTw = alloc((size_t) ngrid * 8);
@@ -1797,7 +1832,7 @@ int luc_dev_unavg_begin (int nsub, char *reason, int reason_len)
             p->bytes += (int64_t) (np * 4);
         }
         if (p->bSpont == nil) {
-            const size_t n = (size_t) p->nslice * kSpontGroups * 8;
+            const size_t n = p->nplanes() * kSpontGroups * 8;
             p->bSpont = [p->dev newBufferWithLength:n options:kShared];
             p->bytes += (int64_t) n;
         }
@@ -1813,7 +1848,7 @@ int luc_dev_unavg_begin (int nsub, char *reason, int reason_len)
             put_str(reason, reason_len, "the unaveraged work buffers would not allocate");
             return 1;
         }
-        memset([p->bSpont contents], 0, (size_t) p->nslice * kSpontGroups * 8);
+        memset([p->bSpont contents], 0, p->nplanes() * kSpontGroups * 8);
     }
     return 0;
 }
@@ -1875,21 +1910,21 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
         P.first = (uint32_t) par->first;
         P.helical = (uint32_t) par->helical;
         P.mutate = (uint32_t) par->mutate;
+        P.npol = (uint32_t) p->npol;
 
-        AddPar A;
-        A.ppm = (uint32_t) p->nslice;
-        A.nslice = (uint32_t) p->nslice;
-        A.npol = 1u;
-        A.pad = 0;
-        for (int i = 0; i < 4; i++) A.pol[i] = 0.0f;
-        A.pol[0] = 1.0f;
+        // The planes each member carries, which is what the propagator pass maps a plane
+        // to its member with. The source needs no map here: the unaveraged first pass
+        // takes each plane's own source plane at the plane's own index.
+        const uint32_t uppm = (uint32_t) (p->npol * p->nslice);
 
         const size_t nplane = p->nplanes();
         const MTLSize rowTG = MTLSizeMake((size_t) (p->ngrid / p->rowsPerTG), nplane, 1);
         const MTLSize rowT = MTLSizeMake((size_t) (p->rowsPerTG * p->lanes), 1, 1);
         const MTLSize colTG = MTLSizeMake((size_t) (p->ngrid / p->colsPerTG), nplane, 1);
         const MTLSize colT = MTLSizeMake((size_t) (p->colsPerTG * p->lanes), 1, 1);
-        const MTLSize spTG = MTLSizeMake((size_t) kSpontGroups, (size_t) p->nslice, 1);
+        // Every plane reduces its own source into its own slots, so the banked
+        // spontaneous term is the sum over both planes that fel_unaveraged_mod banks.
+        const MTLSize spTG = MTLSizeMake((size_t) kSpontGroups, nplane, 1);
         const MTLSize spT = MTLSizeMake((size_t) kSpontThreads, 1, 1);
 
         id<MTLComputeCommandEncoder> e = nil;
@@ -1907,7 +1942,7 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             e = p->pass(LUC_DEV_PASS_ZERO);
             [e setComputePipelineState:p->pZero];
             [e setBuffer:p->bSrcI offset:0 atIndex:0];
-            [e dispatchThreads:MTLSizeMake((size_t) p->nslice * nn, 1, 1)
+            [e dispatchThreads:MTLSizeMake(nplane * nn, 1, 1)
                  threadsPerThreadgroup:tgp];
 
             for (int half = 0; half < 2; half++) {
@@ -1961,8 +1996,7 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             [e setBuffer:p->bTw offset:0 atIndex:1];
             [e setBytes:&fwd length:4 atIndex:2];
             [e setBuffer:p->bSrcI offset:0 atIndex:3];
-            [e setBytes:&A length:sizeof(A) atIndex:4];
-            [e setBytes:&sinv length:4 atIndex:5];
+            [e setBytes:&sinv length:4 atIndex:4];
             [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
             e = p->pass(LUC_DEV_PASS_SOLVE);
@@ -1979,7 +2013,7 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             [e setBuffer:p->bTw offset:0 atIndex:1];
             [e setBytes:&inv length:4 atIndex:2];
             [e setBuffer:p->bExpK offset:0 atIndex:3];
-            [e setBytes:&A.ppm length:4 atIndex:4];
+            [e setBytes:&uppm length:4 atIndex:4];
             [e dispatchThreadgroups:rowTG threadsPerThreadgroup:rowT];
 
             e = p->pass(LUC_DEV_PASS_SOLVE);
@@ -2011,7 +2045,7 @@ double luc_dev_unavg_spont (void)
     // device did: every partial was written by one threadgroup and by no other.
     const float *a = (const float *) [p->bSpont contents];
     double tot = 0;
-    for (int i = 0; i < p->nslice * kSpontGroups; i++) tot += (double) a[2*i];
+    for (size_t i = 0; i < p->nplanes() * kSpontGroups; i++) tot += (double) a[2*i];
     return tot;
 }
 

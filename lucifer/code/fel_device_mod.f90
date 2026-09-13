@@ -2112,6 +2112,10 @@ do is = 1, size(beam%slice)
   fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
   fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
 
+  ! The field row over the whole record, which is both planes when two are live: the
+  ! difference and the norm are summed over them, so the row prices the field the slice
+  ! holds rather than one of its components.
+
   call luc_dev_download_field_slice (0, 0, ifld-1, edev)
   w_f = 0
   enorm = 0
@@ -2121,9 +2125,22 @@ do is = 1, size(beam%slice)
       enorm = enorm + real(ff(1)%wf%Ex(ix,iy,ifld), rp)**2 + aimag(ff(1)%wf%Ex(ix,iy,ifld))**2
     enddo
   enddo
+  fp32%pow32(is) = sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
+
+  if (allocated(ff(1)%wf%Ey)) then
+    call luc_dev_download_field_slice (0, 1, ifld-1, edev)
+    do iy = 1, ng
+      do ix = 1, ng
+        w_f = w_f + abs(cmplx(edev(ix,iy), kind=rp) - ff(1)%wf%Ey(ix,iy,ifld))**2
+        enorm = enorm + real(ff(1)%wf%Ey(ix,iy,ifld), rp)**2 + aimag(ff(1)%wf%Ey(ix,iy,ifld))**2
+      enddo
+    enddo
+    fp32%pow32(is) = fp32%pow32(is) + &
+                     sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
+  endif
+
   fp32%div_slice(9, is) = sqrt(w_f) / (sqrt(enorm) + 1e-30_rp)
   fp32%pow64(is) = enorm
-  fp32%pow32(is) = sum(real(real(edev, sp), rp)**2 + real(aimag(edev), rp)**2)
 
   call fel_fp32_median (incr, n, tick_med)
   fp32%ulp_slice(is) = tick_med

@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Added: the Metal backend runs the unaveraged mode with two live polarization planes. The
+  kernels were written to the mode's scalar fold when the device took that mode, so the kick read one plane
+  and filled one source, and the combination was refused at setup. The mode needs no polarization vector:
+  the kick now gathers both planes with the same four weights, works each real kinetic momentum against its
+  own component, and fills a source plane for each, and each plane meets the diffraction with its own source.
+  On the crossed line every twin row sits inside the one-plane ceilings, the x plane agrees with the CPU at
+  2.0e-4 in the production role and the y plane, which carries 1.3e-4 of it, at 3.0e-2 of its own value. The
+  seeded handedness control runs on the device too: the pair (1, +i) reproduces the scalar seed's energy
+  modulation at 1.8e-7 and the pair (1, -i) leaves 1.0e-3 of it, the CPU's own residue. The transform pair
+  costs the set what it costs one plane, 1.3e-7 a pair, and the second plane costs 18% of device time and
+  14% of the walk on the same deck.
 - 2026-09-12 Fixed: the unaveraged substep lands the source on the record the kick read and diffracts
   the pair together, E' = D(E + 2S). The source was added after the diffraction, so the beam paid the cross
   term against E while the record gained it against DE, a first-order splitting error the broad-seed ledger

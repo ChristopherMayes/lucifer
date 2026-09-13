@@ -493,6 +493,8 @@ every array of the statistics file, where 54 of 127 differed before.
 (perf-device-unaveraged)=
 ## The unaveraged mode on the device
 
+The second polarization plane costs what a second plane costs: every field plane transforms, and the kick gathers and deposits into one more. On the one-segment unaveraged deck at 89 record steps, forcing the second plane raises the device's busy time from 0.250 s to 0.295 s and the walk from 0.325 s to 0.372 s, 18% of the device and 14% of the walk. The kernels are the same kernels with a branch, so a one-plane run pays none of it.
+
 The mode's parallelism on the CPU is over slices and nothing else, so what the device is worth depends on how many slices a deck has. Both regimes are measured, because they are different questions and only the second shows the parallelism the CPU leaves unused. One 4 m Aramis segment in the unaveraged mode, 89 record steps of 60 substeps, `ngrid` 128, `comb_ds_save` at its default, production builds, M3 Max. Best of five after a discarded warm-up, the spread over the five beside each.
 
 | slices x particles | CPU | device | ratio | device busy | busy share of the walk |
