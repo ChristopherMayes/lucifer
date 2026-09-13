@@ -9,6 +9,7 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Changed: `doc/validation.md` states what the regenerate-then-diff step catches and what it does not, that the Linux CI job (`lucifer-keystone.yml`) is a different check whose green run is not a completed keystone, and records the pytest suite's 11.2 to 11.6 minutes as a separate observation beside the shell recipe's timings.
 - 2026-09-13 Added: the keystone runs as one pytest suite, `lucifer/tests/test_keystone.py`. Its session
   fixture launches the five jobs at once through a thread pool, each from an absolute working directory into
   its own log under a fresh artifact directory, and keeps every outcome, a failed launch and a timeout

@@ -35,9 +35,15 @@ The five run at once because they share only a source tree they read: separate w
 | total | 7.7 min | 9.2 min |
 | the same work in sequence, before this arrangement | 25 min | 25 min |
 
+Those are the shell recipe's measurements. The pytest suite's first three runs on the same machine took 11.2 to 11.6 minutes (2026-09-13). That is a separate observation. The cache state, the machine's load and the check sections were not matched between the two recipes, and the difference is not attributed to anything until they are.
+
 Every section runs in every keystone. Nothing is behind a flag, and there is no shorter mode to reach for, which is deliberate: a cheap run that checks less is the thing a keystone exists to prevent.
 
 Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module (FINDINGS 7.43), so treat these four commands as one step, which the suite's regeneration test does.
+
+Regenerate then diff checks that the committed generated pages agree with what the current sources generate. It does not detect a page hand-edited in the working tree: the regeneration overwrites the edit, and the diff then compares the regenerated page with the committed one, which agree. The keystone removes such an edit and leaves the tree consistent. What the step does catch is a committed page whose source has moved, or a source that changed without its page being regenerated and committed (FINDINGS 7.43). A word moved in a routine header fails the diff, which prints the page.
+
+The Linux CI job (`.github/workflows/lucifer-keystone.yml`) is a different check, and a green run of it is not a completed keystone. The CI job builds the debug tree only, leaves the regression suite out of its build, and asserts the harness's tolerances rather than the recorded digits, which belong to the machine that recorded them. The CI job establishes portability and physics agreement within tolerance under that build configuration. The keystone establishes both builds, all five jobs, the regeneration and agreement with the recorded results, and only the suite above does that. Widening the CI job to the full suite would need a decision about platform-specific numerical expectations, and that decision has not been taken.
 
 ```
 python3 lucifer/tests/scripts/report_validation.py \
