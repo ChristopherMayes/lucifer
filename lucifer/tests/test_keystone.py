@@ -110,7 +110,14 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
         Job("regression", (sys.executable, "-m", "pytest", "test_fortran.py",
                            f"--bmad-bin={ROOT / 'debug' / 'bin'}"), ROOT / "regression_tests"),
         Job("wavefront", (str(WAVEFRONT),), ROOT),
-        Job("examples", (str(EXAMPLES), "--no-figures"), ROOT),
+        # One worker for the examples, which is this job's whole allocation while the
+        # five run together. The examples are not on the critical path, and every worker
+        # they take is taken from the two benchmark passes that are: measured on
+        # 2026-09-13, the examples at three workers finished in 347 s against 566 s and
+        # 570 s at one, and the debug pass they share the machine with went from 692 s
+        # and 694 s to 748 s.
+        # A standalone run of run_examples.sh takes its own default instead.
+        Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "1"), ROOT),
     )
 
 

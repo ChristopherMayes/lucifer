@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Changed: `examples/run_examples.sh` runs three example directories at once. A directory is
+  the unit, so the import example's second deck still reads the openPMD file its first deck wrote. Each
+  deck's return code, elapsed time and exit line are collected in its worker, and the table is printed
+  afterwards in the order a one-worker run prints it. A deck that left no outcome is printed by name and
+  fails the job, the case a schedule that skipped a directory would otherwise pass. The job takes 262 s at
+  three workers against 390 s in sequence, measured alone on 12 performance cores, and the directory, deck,
+  exit status and exit line columns are identical from one worker to six. `--jobs` sets the count, and the
+  keystone passes one: the examples are not its critical path, and at three workers they slowed the debug
+  pass from 694 s to 748 s and the keystone from 11.6 to 12.5 minutes.
 - 2026-09-13 Changed: `doc/validation.md` states what the regenerate-then-diff step catches and what it does not, that the Linux CI job (`lucifer-keystone.yml`) is a different check whose green run is not a completed keystone, and records the pytest suite's 11.2 to 11.6 minutes as a separate observation beside the shell recipe's timings.
 - 2026-09-13 Added: the keystone runs as one pytest suite, `lucifer/tests/test_keystone.py`. Its session
   fixture launches the five jobs at once through a thread pool, each from an absolute working directory into

@@ -37,6 +37,19 @@ The five run at once because they share only a source tree they read: separate w
 
 Those are the shell recipe's measurements. The pytest suite's first three runs on the same machine took 11.2 to 11.6 minutes (2026-09-13). That is a separate observation. The cache state, the machine's load and the check sections were not matched between the two recipes, and the difference is not attributed to anything until they are.
 
+The examples job runs its directories a few at a time. A directory is the unit and never a deck, because the import example's second deck reads the openPMD file its first deck writes. Directories share only the lattice files they read. Every deck's return code, elapsed time and exit line are collected in the worker that ran it, and the table is printed after every worker has finished, in the order a one-worker run prints it. A deck that left no outcome at all is printed by name and fails the job, which is the case a schedule that silently skipped a directory would otherwise pass.
+
+Measured alone on an M3 Max of 12 performance cores, with no other keystone job running (2026-09-13):
+
+| workers | 1 | 2 | 3 | 4 | 6 |
+|---|---|---|---|---|---|
+| seconds | 390 | 293 | 262 | 255 | 248 |
+| peak resident memory (GB) | 0.5 | 0.7 | 0.9 | 1.3 | 1.6 |
+
+The default is three workers, one per four performance cores. One example run is already parallel and draws 8.4 cores on average and 11.7 at its peak, so the fourth worker finds little idle capacity and buys 7 seconds. Every deck ran on the twelve threads the OpenMP runtime chose for it, which the run header prints and the runner does not set. That count is the same at every worker count. The directory, deck, exit status and exit line columns were identical across every schedule from one worker to six, the sequential run included.
+
+Inside a keystone the examples job takes one worker, which the suite passes to it. The examples are not on the critical path, and capacity they take comes from the two benchmark passes that are. At three workers the examples job finished in 347 s against 570 s at one, and every other job slowed: the debug pass went from 694 s to 748 s, the production pass from 472 s to 542 s, the regression suite from 155 s to 245 s, and the keystone from 11.6 to 12.5 minutes. Two runs at each setting on 2026-09-13. A job that is not the critical path has nothing to gain by finishing sooner than it does.
+
 Every section runs in every keystone. Nothing is behind a flag, and there is no shorter mode to reach for, which is deliberate: a cheap run that checks less is the thing a keystone exists to prevent.
 
 Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module (FINDINGS 7.43), so treat these four commands as one step, which the suite's regeneration test does.
