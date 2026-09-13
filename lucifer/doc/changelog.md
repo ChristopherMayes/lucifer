@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-12 Fixed: the long-range space-charge term keeps the field of a slice of vanishing width. Its
+  kernel, (1 - |d|/sqrt(d^2 + A)) / A over the boosted separation d and the source slice's transverse area A,
+  has the finite limit 1 / 2 d^2 as A goes to zero, where the whole term becomes the point charge's own
+  q / 4 pi eps0 d^2. Written with the subtraction it loses every digit once A is small against d^2 and
+  divides by a zero A, and a guard assigned a square metre of area in that case, so a slice whose charge sits
+  at one transverse point radiated orders too little. Migration reaches that state by moving particles out of
+  a slice until one is left. The kernel is now evaluated as 1 / (sqrt(d^2+A) (sqrt(d^2+A) + |d|)), and the
+  self term and a slice with no charge are skipped before it is formed rather than multiplied by zero after.
+  The check leaves one particle in a slice and holds its field on the three nearest slices to the closed form
+  at 9.9e-4, where the old form reads 9.5e-1. No recorded digit moved: every harness slice is populated and
+  wide, where the two forms agree to rounding.
 - 2026-09-12 Fixed: the short-range space-charge solve centers on the slice's charge-weighted centroid. Its
   radial bins and azimuthal basis came from an unweighted mean of the particle positions where every source
   term it carries is charge weighted, so two descriptions of one physical beam gave different fields:

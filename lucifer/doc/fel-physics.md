@@ -1112,6 +1112,13 @@ hoisted while currents cannot change and recomputed at the migration stride.
 (sec-spacecharge)=
 ### Space charge
 
+*Long range* (`fel_longrange_esc`) sums over slice pairs with the kernel
+$(1 - |d|/\sqrt{d^2+A})/A$, $d$ the boosted separation and $A = \sigma_x\sigma_y$ the
+source slice's area, evaluated as $1/[\sqrt{d^2+A}(\sqrt{d^2+A}+|d|)]$ so that it holds
+its value where the subtraction would lose it. A slice whose charge sits at one
+transverse point, which migration can leave behind, takes the limit $1/2d^2$, and the
+term is then the point charge's own $q/4\pi\varepsilon_0 d^2$.
+
 *Short range* (`fel_shortrange_ez`), per slice: center on the slice's charge-weighted
 centroid and radially bin the particles, then for azimuthal modes $m = -n_\phi..n_\phi$ and longitudinal harmonics
 $l = 1..n_z$ solve the radial tridiagonal system of the harmonic potential

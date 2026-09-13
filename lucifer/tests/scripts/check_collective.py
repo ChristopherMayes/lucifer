@@ -31,6 +31,7 @@ The workdir must hold aramis_1seg.bmad and aramis.bmad. Exit 0 only if all pass.
 from __future__ import annotations
 
 import argparse
+import math
 import shutil
 import pathlib
 import re
@@ -43,6 +44,8 @@ import numpy as np
 from nml import to_groups
 
 M_ELECTRON = 0.51099895069e6
+EPS0 = 8.8541878128e-12
+SPACING = 3e-10   # the probe deck's slice spacing, n_wavelength * lambda0
 
 BASE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
@@ -155,6 +158,64 @@ def split_particles(src, dst, parts, which=None):
         g["particlePatches/numParticlesOffset"][...] = np.concatenate(
             [[0], np.cumsum(new_n)[:-1]]).astype(off.dtype)
     return len(idx)
+
+
+def narrow_slice(src, dst, islice, factor=None, singleton=False):
+    """Copy a beam dump, narrowing one slice: its spread scaled, or one particle left.
+
+    Scaling shrinks the transverse spread about the slice's own centroid and keeps every
+    particle. singleton keeps one particle carrying the slice's whole charge, which is
+    the state migration reaches by moving particles out one at a time and is a slice of
+    exactly zero width for as long as it lasts. Either way the charge and its place are
+    what they were, so the long-range kernel sees the same source with a smaller area.
+    """
+    shutil.copy(src, dst)
+    with h5py.File(dst, "r+") as h5:
+        g = h5["data/00001/particles/electron"]
+        n = g["particlePatches/numParticles"][()]
+        off = g["particlePatches/numParticlesOffset"][()]
+        a, b = int(off[islice]), int(off[islice] + n[islice])
+        if not singleton:
+            for nm in ("position/x", "position/y"):
+                d = g[nm]
+                v = d[...]
+                mid = v[a:b].mean()
+                v[a:b] = mid + (v[a:b] - mid) * factor
+                d[...] = v
+            return
+        n_tot = int(n.sum())
+        keep = np.concatenate([np.arange(0, a + 1), np.arange(b, n_tot)])
+        names = []
+        g.visititems(lambda nm, o: names.append(nm)
+                     if isinstance(o, h5py.Dataset) and o.shape and o.shape[0] == n_tot
+                     and not nm.startswith("particlePatches") else None)
+        w = g["weight"]
+        wv = (w[...] if (isinstance(w, h5py.Dataset) and w.shape)
+              else np.full(n_tot, float(np.ravel(w.attrs["value"])[0])))
+        w_slice = wv[a:b].sum()
+        for nm in names:
+            data, attrs = g[nm][...][keep], dict(g[nm].attrs)
+            del g[nm]
+            d = g.create_dataset(nm, data=data)
+            for k, v in attrs.items():
+                d.attrs[k] = v
+        w = g["weight"]
+        if not (isinstance(w, h5py.Dataset) and w.shape):
+            attrs = {k: v for k, v in w.attrs.items() if k not in ("value", "shape")}
+            del g["weight"]
+            d = g.create_dataset("weight", data=wv[keep])
+            for k, v in attrs.items():
+                d.attrs[k] = v
+        g["weight"][a] = w_slice          # the kept particle carries the slice's charge
+        for nm, o in list(g.items()):
+            if "shape" in o.attrs and int(np.ravel(o.attrs["shape"])[0]) == n_tot:
+                o.attrs["shape"] = np.array([len(keep)], dtype=o.attrs["shape"].dtype)
+        g.attrs["numParticles"] = np.array([len(keep)], dtype=g.attrs["numParticles"].dtype)
+        new_n = n.copy()
+        new_n[islice] = 1
+        g["particlePatches/numParticles"][...] = new_n
+        g["particlePatches/numParticlesOffset"][...] = np.concatenate(
+            [[0], np.cumsum(new_n)[:-1]]).astype(off.dtype)
 
 
 def keep_one_patch(src, dst, k):
@@ -335,6 +396,54 @@ def main():
         print(f"--- charge representation, space charge {tag}: one particle split 16 ways "
               f"{worst['sel']:.2e}, every particle split {worst['all']:.2e} "
               f"(tol 1e-12)  {'ok' if s_ok else 'FAIL'}")
+
+    # 5. The long-range kernel at a vanishing source width, against the closed form it
+    # becomes there. A source slice contributes (1 - |d|/sqrt(d^2 + A)) / A with A its
+    # transverse area and d the boosted separation, and that has a finite limit as A goes
+    # to zero: 1 / 2 d^2, which carries the whole kernel to q / (4 pi eps0 d^2), the field
+    # of a point charge. Written with the subtraction it loses every digit once A is small
+    # against d^2 and divides by a zero A, and a guard put a square metre of area in its
+    # place, so the field of a slice whose charge sits at one transverse point came out
+    # orders too small. Migration reaches that state by moving particles out of a slice
+    # one at a time until one is left, which is the deck here.
+    #
+    # The deck isolates the term: dark, so no gain, the chamber wake off and the radial
+    # solve off, so a slice's mean energy moves only by the long-range term's work. The
+    # source's own contribution is isolated by differencing against the same beam with
+    # that slice's charge set to zero, which leaves every other source where it was.
+    lr_only = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 0\n"
+               "  space_charge%longrange = T\n  space_charge%rmax = 250e-6\n")
+    dark = BASE.replace("wake_on = T", "wake_on = F")
+    narrow_slice(wd / "collsc_src-initial.beam.h5", wd / "colllr_one.beam.h5", 0, singleton=True)
+    narrow_slice(wd / "collsc_src-initial.beam.h5", wd / "colllr_nq.beam.h5", 0, singleton=True)
+    with h5py.File(wd / "colllr_one.beam.h5") as h5:
+        g = h5["data/00001/particles/electron"]
+        q_one = float(g["weight"][int(g["particlePatches/numParticlesOffset"][()][0])])
+    with h5py.File(wd / "colllr_nq.beam.h5", "r+") as h5:
+        g = h5["data/00001/particles/electron"]
+        g["weight"][int(g["particlePatches/numParticlesOffset"][()][0])] = 0.0
+    got = {}
+    for tag in ("one", "nq"):
+        run(exe, wd, f"colllr_{tag}.nml",
+            dark.format(lat="collsc.bmad", root=f"colllr_{tag}", sig_pz="8.804506566858e-08",
+                        extra=load.format(f=f"colllr_{tag}.beam.h5") + lr_only))
+        d = np.loadtxt(wd / f"colllr_{tag}.diag.txt")
+        ns = int(d[:, 1].max())
+        d = d.reshape(-1, ns, d.shape[1])
+        got[tag] = (d[-1, :, 6] - d[0, :, 6], float(d[-1, 0, 0] - d[0, 0, 0]))
+    dE, length = got["one"][0] - got["nq"][0], got["one"][1]
+    # aw of the probe's wiggler, and the boost the kernel carries.
+    gamma_z = 11357.82 / math.sqrt(1 + 0.84853**2)
+    worst = 0.0
+    for i in range(1, 4):                      # the three nearest, where the term dominates
+        d_sep = i * SPACING * gamma_z
+        want = q_one / (4 * math.pi * EPS0 * d_sep**2) * length
+        worst = max(worst, abs(abs(dE[i]) / want - 1))
+    p_ok = worst < 5e-2
+    ok = ok and p_ok
+    print(f"--- long-range kernel at zero width: a slice migration left one particle in, "
+          f"its field on the three nearest slices against q / 4 pi eps0 d^2, worst "
+          f"{worst:.2e} (tol 5e-2)  {'ok' if p_ok else 'FAIL'}")
 
     print("collective checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

@@ -555,7 +555,7 @@ real(rp) gamma0, aw, long_esc(:)
 
 type (fel_slice_struct), pointer :: sl
 real(rp), allocatable :: fcur(:), fsize(:)
-real(rp) gamma, scl, efld, dsl, coef, sgn, wsum, x1, y1, x2, y2, w
+real(rp) gamma, scl, efld, dsl, kern, sgn, wsum, x1, y1, x2, y2, w, root
 integer nslice, i, j, ip
 
 !
@@ -571,7 +571,8 @@ allocate (fcur(nslice), fsize(nslice))
 ! the rms sizes, sigma_x*sigma_y: an effective area scale, not a variance sum
 ! (transcribed wrong once, caught by the SC tier at 1.7e-1, sec-spacecharge). Weighted
 ! moments where Genesis counts particles: identical for uniform weights, correct
-! otherwise. Zero-size guard as the original.
+! otherwise. A slice of zero width keeps its zero: the kernel below has a finite limit
+! there and takes it, where the original's guard put a square metre of area in its place.
 
 do i = 1, nslice
   sl => beam%slice(i)
@@ -590,24 +591,36 @@ do i = 1, nslice
   else
     fsize(i) = 0
   endif
-  if (fsize(i) <= 0) fsize(i) = 1
 enddo
 
 scl = beam%slice_spacing / pi / c_light / 2 / eps_0_vac
 
+! The kernel a source slice contributes to a witness slice is
+!
+!   (1 - |d| / sqrt(d^2 + A)) / A,   A = sigma_x sigma_y,  d = (j - i) spacing gamma,
+!
+! which is written here as 1 / (sqrt(d^2 + A) (sqrt(d^2 + A) + |d|)), the same quantity
+! with the subtraction rationalized away. The two are equal in arithmetic and not in
+! floating point: the first loses every significant digit when A is small against d^2,
+! and its A in the denominator has nothing to cancel against when A reaches zero. The
+! second is the limit itself, 1 / 2 d^2, for a slice of zero width, which is a slice
+! whose charge sits at one transverse point. A slice can reach that state in a run,
+! since migration moves particles one at a time and can leave one behind. The self term
+! carries no field, and a slice with no charge sends none, and both are skipped before
+! the kernel is formed rather than multiplied by zero after: at d = 0 or A = 0 the
+! rationalized form is a division by zero, and zero times a NaN is a NaN.
+
 do i = 1, nslice
   efld = 0
   do j = 1, nslice
+    if (j == i) cycle
+    if (fcur(j) == 0) cycle
     dsl = (j - i) * beam%slice_spacing * gamma
-    coef = 1 - sqrt(dsl*dsl / (dsl*dsl + fsize(j)))
-    if (j > i) then
-      sgn = -1
-    elseif (j < i) then
-      sgn = 1
-    else
-      sgn = 0
-    endif
-    efld = efld + sgn * coef * scl * fcur(j) / fsize(j)
+    root = sqrt(dsl*dsl + fsize(j))
+    kern = 1 / (root * (root + abs(dsl)))
+    sgn = 1
+    if (j > i) sgn = -1
+    efld = efld + sgn * kern * scl * fcur(j)
   enddo
   long_esc(i) = efld
 enddo
