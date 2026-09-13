@@ -9,6 +9,19 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Fixed: the short-range space-charge solve reports what it cannot do. Its radial grid needs a
+  scale, and a slice whose charge sits at one transverse point offers none: with `space_charge%rmax` at its
+  default of zero, such a slice crashed the run on a zero cell width. The field there has no limit, since the
+  cell volumes go as the cell width squared, and it is not zero either, since particles at one transverse
+  point and different ponderomotive phases push each other and only a lone particle feels nothing. The solve
+  refuses at the slice, naming `rmax`, and the refusal now travels out through `fel_advance` and the
+  interlude advance to the walk, so the run stops rather than integrating from a force it did not compute.
+  A slice with no charge returns zero before a grid is built. `space_charge%ngrid` below two and
+  `space_charge%nphi` below zero each ran and returned an exact zero with nothing said, a deck asking for
+  space charge and getting none; both are refused at setup with `nz` and `rmax`, whose domains are checked
+  with them. The check holds all five states: no charge and a lone particle take exactly zero from the
+  solve, a colocated pair opens a 1.1e6 eV spread with its mean a percent of that, and the three refusals
+  fire.
 - 2026-09-12 Fixed: the long-range space-charge term keeps the field of a slice of vanishing width. Its
   kernel, (1 - |d|/sqrt(d^2 + A)) / A over the boosted separation d and the source slice's transverse area A,
   has the finite limit 1 / 2 d^2 as A goes to zero, where the whole term becomes the point charge's own

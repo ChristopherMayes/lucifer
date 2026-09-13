@@ -877,6 +877,39 @@ if (run%space_charge%model /= 'genesis') then
   err_flag = .true.;  return
 endif
 
+! The solver's grid, checked where it is stated rather than where it is used. Each of
+! these described a solve that cannot run and ran anyway, returning an exact zero with
+! nothing said: a radial grid of one point has no width between its points, and an
+! azimuthal range whose upper bound is below its lower one iterates over no modes at all.
+! A deck that asks for space charge and gets none is the failure this refuses.
+
+if (sc_ngrid < 2) then
+  call out_io (s_error$, r_name, 'SPACE_CHARGE%NGRID IS THE RADIAL GRID''S POINT COUNT AND NEEDS AT ' // &
+               'LEAST 2, GOT: ' // int_str(sc_ngrid), &
+               'ONE POINT LEAVES NO WIDTH BETWEEN POINTS, AND THE SOLVE RETURNS ZERO.')
+  err_flag = .true.;  return
+endif
+
+if (sc_nphi < 0) then
+  call out_io (s_error$, r_name, 'SPACE_CHARGE%NPHI IS THE HIGHEST AZIMUTHAL MODE AND CANNOT BE ' // &
+               'NEGATIVE, GOT: ' // int_str(sc_nphi), &
+               'THE MODES RUN FROM -NPHI TO NPHI, WHICH IS NO MODES AT ALL BELOW ZERO, ' // &
+               'AND THE SOLVE RETURNS ZERO.')
+  err_flag = .true.;  return
+endif
+
+if (sc_nz < 0) then
+  call out_io (s_error$, r_name, 'SPACE_CHARGE%NZ IS THE LONGITUDINAL HARMONIC COUNT AND CANNOT BE ' // &
+               'NEGATIVE, GOT: ' // int_str(sc_nz), 'ZERO DISABLES THE SHORT-RANGE SOLVE.')
+  err_flag = .true.;  return
+endif
+
+if (sc_rmax < 0) then
+  call out_io (s_error$, r_name, 'SPACE_CHARGE%RMAX IS A RADIAL EXTENT AND CANNOT BE NEGATIVE, GOT: ' // &
+               real_str(sc_rmax, 6), 'ZERO LETS THE SLICE''S OWN EXTENT SET THE SCALE.')
+  err_flag = .true.;  return
+endif
+
 ! The solver's numbers are run-level. Whether it runs in a given element is that
 ! element's own space_charge_method, resolved into run%sc_here below: nothing here
 ! decides, so a stats file cannot record a configuration the run did not use.

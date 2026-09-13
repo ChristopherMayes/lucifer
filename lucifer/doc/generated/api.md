@@ -1108,7 +1108,10 @@ Input:
   ks    -- real(rp): Radiation wavenumber [1/m].
 
 Output:
-  ez(:) -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
+  ez(:)    -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
+  err_flag -- logical: Set True when the solve is refused, False otherwise. A refused
+                solve leaves ez zero and stops the run: the caller must not integrate
+                from a force it did not compute.
 ```
 
 ## `fel_cost_mod.f90`
@@ -5553,7 +5556,7 @@ Output:
 (api-fel-advance)=
 ### `fel_advance`
 
-*Subroutine* `(und, beam, sl, wf, ifld, delz, phi0_new, coll, is)`
+*Subroutine* `(und, beam, sl, ff, delz, phi0_new, coll, is, err_flag)`
 
 ```
 Routine to advance the longitudinal plane of every particle over delz. Transcribed from
@@ -5585,6 +5588,7 @@ Input:
   is       -- integer: Slice index (for the collective lookups).
 
 Output:
+  err_flag -- logical: Set True when the collective solve is refused, False otherwise.
   sl       -- fel_slice_struct: gamma/theta (and chart z) advanced by delz.
 ```
 

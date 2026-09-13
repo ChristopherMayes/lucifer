@@ -364,6 +364,8 @@ It is Bmad's own attribute rather than anything this program registers, so `show
 
 Space charge is per element too, through Bmad's own `space_charge_method` attribute rather than anything this program registers:
 
+`space_charge%ngrid` needs at least two radial points, `space_charge%nphi` and `space_charge%nz` cannot be negative, and `space_charge%rmax` cannot be negative: each is refused at setup. `rmax` is a floor under the radial scale and zero lets each slice's own extent set it, which is enough for any slice with transverse size. A slice whose charge sits at one transverse point has none, and the solve is refused there naming `rmax` as the scale to state.
+
 | `space_charge_method` | Meaning |
 |---|---|
 | `off` | The default. No space charge in this element |

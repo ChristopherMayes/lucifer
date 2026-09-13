@@ -30,6 +30,7 @@ type (fel_slice_struct), pointer :: sl
 integer :: npart = 8192, nstep = 400
 integer(8) c0, c1, crate
 integer ip, istep, ng, n_arg
+logical serr
 real(rp) t_full, t_rk, t_sc, delz, phi0, chk
 real(rp) gamma, theta, btpar, ez_ip, s, c
 complex(rp) rpart
@@ -95,7 +96,7 @@ call system_clock (c0, crate)
 phi0 = 0.1_rp
 call system_clock (c0)
 do istep = 1, nstep
-  call fel_advance (und, beam, sl, ff, delz, phi0, coll, 1)
+  call fel_advance (und, beam, sl, ff, delz, phi0, coll, 1, serr)
 enddo
 call system_clock (c1)
 t_full = real(c1 - c0, rp) / crate

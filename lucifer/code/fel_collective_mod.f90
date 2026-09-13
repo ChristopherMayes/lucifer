@@ -657,27 +657,39 @@ end subroutine fel_longrange_esc
 !   ks    -- real(rp): Radiation wavenumber [1/m].
 !
 ! Output:
-!   ez(:) -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
+!   ez(:)    -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
+!   err_flag -- logical: Set True when the solve is refused, False otherwise. A refused
+!                 solve leaves ez zero and stops the run: the caller must not integrate
+!                 from a force it did not compute.
 !-
 
-subroutine fel_shortrange_ez (ef, beam, sl, gz2, ks, ez)
+subroutine fel_shortrange_ez (ef, beam, sl, gz2, ks, ez, err_flag)
 
 type (fel_space_charge_struct) ef
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
 real(rp) gz2, ks, ez(:)
+logical err_flag
 
 real(rp) xcen, ycen, rbound, rmax_l, dr, tx, ty, radi, coef, wtot
 real(rp), allocatable :: vol(:), ldig(:), rlog(:), lmid(:), theta_p(:), econst_p(:)
 complex(rp), allocatable :: cwork(:), csrc(:), clow(:), cmid(:), cupp(:), celm(:), gam_w(:), cph(:,:)
 integer, allocatable :: idxr(:)
 integer np, ngrid, m, l, i, ip
+character(*), parameter :: r_name = 'fel_shortrange_ez'
 
 !
 
 np = sl%n
 ez(1:np) = 0
+err_flag = .false.
 if (.not. ef%active .or. ef%nz < 1 .or. np < 1) return
+
+! A slice carrying no charge has no source, and its field is zero however its particles
+! are placed. Returning here rather than through the solve keeps the grid out of a
+! degenerate state it has no reason to enter.
+
+if (sum(sl%weight(1:np)) <= 0) return
 
 ngrid = ef%ngrid
 
@@ -716,6 +728,27 @@ rbound = sqrt(rbound)
 
 rmax_l = ef%rmax
 if (rbound > rmax_l) rmax_l = rbound * 1.5_rp
+
+! The radial scale the bins and the cell volumes are built on. space_charge%rmax is a
+! floor under it and the slice's own extent raises it, so the scale is positive for any
+! slice with transverse size. A slice whose charge sits at one transverse point has none
+! to offer, and there is no scale to derive: the cell volumes go as dr^2, so the field of
+! such a slice grows without bound as the grid closes on it. That is a real force and not
+! a zero, since particles at one transverse point but different ponderomotive phases push
+! each other, so the run is refused rather than given a zero or an invented length.
+! Migration reaches this state by moving particles out of a slice until one is left, so
+! it is refused here, where the state arises, and not only at setup.
+
+if (rmax_l <= 0) then
+  call out_io (s_error$, r_name, 'THE SHORT-RANGE SPACE-CHARGE SOLVE HAS NO RADIAL SCALE: THIS SLICE''S', &
+               'CHARGE SITS AT ONE TRANSVERSE POINT AND SPACE_CHARGE%RMAX IS NOT POSITIVE.', &
+               'THE CELL VOLUMES GO AS THE CELL WIDTH SQUARED, SO THE FIELD OF A SLICE OF ZERO', &
+               'EXTENT HAS NO LIMIT, AND IT IS NOT ZERO: PARTICLES AT ONE TRANSVERSE POINT AND', &
+               'DIFFERENT PONDEROMOTIVE PHASES PUSH EACH OTHER.', &
+               'POSSIBLE SOLUTION: SET SPACE_CHARGE%RMAX TO THE RADIAL SCALE THE SOLVE SHOULD USE.')
+  err_flag = .true.;  return
+endif
+
 dr = rmax_l / (ngrid - 1)
 
 do ip = 1, np

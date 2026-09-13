@@ -885,7 +885,8 @@ if (fp_on .and. .not. dev_twin) call fel_fp32_field_prep (fp32, size(ff(1)%wf%Ex
                                                                 size(ff(1)%wf%Ex, 2))
 
 call fel_tic (fel_t_particles$)
-!$OMP parallel do
+any_err = .false.
+!$OMP parallel do private(err) reduction(.or.: any_err)
 do is = 1, size(beam%slice)
   if (dev_twin) then
 
@@ -921,7 +922,8 @@ do is = 1, size(beam%slice)
       cx = beam%slice(is)%x(1:nn);    cy = beam%slice(is)%y(1:nn)
       cpx = beam%slice(is)%px(1:nn);  cpy = beam%slice(is)%py(1:nn)
       cz = beam%slice(is)%z(1:nn);    cpz = beam%slice(is)%pz(1:nn)
-      call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is)
+      call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is, err)
+      any_err = any_err .or. err
       call fel_fp32_twin_slice (fp32, is, cx, cy, cpx, cpy, cz, cpz, beam%slice(is), beam, &
             ff(1)%wf%Ex(:, :, fel_field_index(ff(1)%slip, is, size(ff(1)%wf%Ex, 3))), &
             ff(1)%wf%dx, ff(1)%wf%dy, fp_gridmax, und%aw, und%ku, und%kx, und%ky, &
@@ -929,7 +931,8 @@ do is = 1, size(beam%slice)
             beam%phi0, phi0_new)
     end block
   else
-    call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is)
+    call fel_advance (und, beam, beam%slice(is), ff, und%dz, phi0_new, coll, is, err)
+    any_err = any_err .or. err
   endif
   call fel_wake_apply_slice (coll%wake, beam, is, und%dz)
   if (und%bmad_transport) then
@@ -940,6 +943,13 @@ do is = 1, size(beam%slice)
 enddo
 !$OMP end parallel do
 call fel_toc (fel_t_particles$)
+
+! A refused collective solve stops the step before the field is touched. This routine
+! reports success above, where its own work is done, so the flag is set again here.
+
+if (any_err) then
+  err_flag = .true.;  return
+endif
 
 ! The instrument's step epilogue (rows, stream, guard) now runs after the field twin,
 ! at the end of this routine, so the field rows of this step join the same line.
@@ -1277,7 +1287,9 @@ call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
 ! them private explicitly. A missed one here is a race, which is what the harness's
 ! thread-count-independence check exists to catch.
 
-!$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope, p_mc)
+any_err = .false.
+!$OMP parallel do private(sl, ip, gam, beta, theta, px_g, py_g, btpar, btpar0, slope, p_mc, err) &
+!$OMP     reduction(.or.: any_err)
 do is = 1, size(beam%slice)
   sl => beam%slice(is)
 
@@ -1285,7 +1297,8 @@ do is = 1, size(beam%slice)
 
   if (sc_active) then
 
-    call interlude_advance_full_rk (sl, is)
+    call interlude_advance_full_rk (sl, is, err)
+    any_err = any_err .or. err
 
   else
 
@@ -1317,6 +1330,7 @@ do is = 1, size(beam%slice)
   call interlude_transverse_half (sl, q_hat, length/2)
 enddo
 !$OMP end parallel do
+if (any_err) return
 
 beam%phi0 = phi0_new
 
@@ -1380,7 +1394,7 @@ end subroutine interlude_transverse_half
 ! the field-free RK4 step (rpart = 0) plus the collective Ez, Genesis's method.
 !-
 
-subroutine interlude_advance_full_rk (sl, is)
+subroutine interlude_advance_full_rk (sl, is, serr)
 
 ! Genesis's actual drift path (BeamSolver::advance with aw = 0): the full RK4 with
 ! rpart = 0 and the per-particle space-charge ez held through the stages. gamma changes
@@ -1389,13 +1403,15 @@ subroutine interlude_advance_full_rk (sl, is)
 
 type (fel_slice_struct) sl
 integer is
+logical serr
 
 real(rp), allocatable :: ez(:)
 real(rp) gam, beta, theta, px_g, py_g, btpar, esc_loss, p_mc
 integer ip
 
 allocate (ez(max(1, sl%n)))
-call fel_shortrange_ez (coll%efield, beam, sl, gamma0**2, xks, ez)   ! gz2 at aw = 0.
+call fel_shortrange_ez (coll%efield, beam, sl, gamma0**2, xks, ez, serr)   ! gz2 at aw = 0.
+if (serr) return          ! A force this slice does not have is not one to integrate from.
 esc_loss = -coll%long_esc(is) / m_electron
 
 do ip = 1, sl%n
@@ -1675,7 +1691,7 @@ end subroutine fel_apply_focus
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_advance (und, beam, sl, wf, ifld, delz, phi0_new, coll, is)
+! Subroutine fel_advance (und, beam, sl, ff, delz, phi0_new, coll, is, err_flag)
 !
 ! Routine to advance the longitudinal plane of every particle over delz. Transcribed from
 ! BeamSolver::advance. Gather the field at (x, y) by bilinear interpolation from field
@@ -1704,10 +1720,11 @@ end subroutine fel_apply_focus
 !   is       -- integer: Slice index (for the collective lookups).
 !
 ! Output:
+!   err_flag -- logical: Set True when the collective solve is refused, False otherwise.
 !   sl       -- fel_slice_struct: gamma/theta (and chart z) advanced by delz.
 !-
 
-subroutine fel_advance (und, beam, sl, ff, delz, phi0_new, coll, is)
+subroutine fel_advance (und, beam, sl, ff, delz, phi0_new, coll, is, err_flag)
 
 type (fel_und_struct) und
 type (fel_beam_struct) beam
@@ -1717,6 +1734,7 @@ type (wavefront_struct), pointer :: wf
 type (fel_collective_struct) coll
 integer is
 real(rp) delz, phi0_new
+logical err_flag
 
 real(rp) xks, xku, aw, rtmp, awloc, btpar, gamma, theta, beta, wx, wy, px_g, py_g, p_mc, p0_mc
 real(rp) gz2, ez_ip, esc_loss
@@ -1745,9 +1763,11 @@ aw = und%aw
 ! (BeamSolver::advance's order). The short-range solve is per-call-local, so this is
 ! parallel-slice safe. long_esc was refreshed serially by the caller.
 
+err_flag = .false.
 allocate (ez(max(1, sl%n)))
 gz2 = fel_gamma0(beam)**2 / (1 + aw**2)
-call fel_shortrange_ez (coll%efield, beam, sl, gz2, xks, ez)
+call fel_shortrange_ez (coll%efield, beam, sl, gz2, xks, ez, err_flag)
+if (err_flag) return       ! A force this slice does not have is not one to integrate from.
 esc_loss = 0
 if (allocated(coll%long_esc)) esc_loss = -coll%long_esc(is) / m_electron
 

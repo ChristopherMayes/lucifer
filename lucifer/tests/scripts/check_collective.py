@@ -160,6 +160,62 @@ def split_particles(src, dst, parts, which=None):
     return len(idx)
 
 
+def collapse_slice(src, dst, islice, keep, zero_charge=False):
+    """Copy a beam dump, leaving `keep` particles of one slice at one transverse point.
+
+    The kept particles take the slice's centroid in x, y, px and py, so they stay at one
+    point through the element rather than re-spreading from their own transverse momenta,
+    and they keep their own z, so they sit at different ponderomotive phases. keep = 1 is
+    the state migration leaves behind. The charge is preserved, or zeroed on request.
+    """
+    shutil.copy(src, dst)
+    with h5py.File(dst, "r+") as h5:
+        g = h5["data/00001/particles/electron"]
+        n = g["particlePatches/numParticles"][()]
+        off = g["particlePatches/numParticlesOffset"][()]
+        a, b = int(off[islice]), int(off[islice] + n[islice])
+        n_tot = int(n.sum())
+        idx = np.concatenate([np.arange(0, a + keep), np.arange(b, n_tot)])
+        names = []
+        g.visititems(lambda nm, o: names.append(nm)
+                     if isinstance(o, h5py.Dataset) and o.shape and o.shape[0] == n_tot
+                     and not nm.startswith("particlePatches") else None)
+        w = g["weight"]
+        wv = (w[...] if (isinstance(w, h5py.Dataset) and w.shape)
+              else np.full(n_tot, float(np.ravel(w.attrs["value"])[0])))
+        w_slice = wv[a:b].sum()
+        mid = {nm: float(g[nm][a:b].mean()) for nm in
+               ("position/x", "position/y", "momentum/x", "momentum/y")}
+        for nm in names:
+            data, attrs = g[nm][...][idx], dict(g[nm].attrs)
+            del g[nm]
+            d = g.create_dataset(nm, data=data)
+            for k, v in attrs.items():
+                d.attrs[k] = v
+        for nm, v in mid.items():
+            d = g[nm]
+            arr = d[...]
+            arr[a:a + keep] = v            # one transverse point, one transverse momentum
+            d[...] = arr
+        w = g["weight"]
+        if not (isinstance(w, h5py.Dataset) and w.shape):
+            attrs = {k: v for k, v in w.attrs.items() if k not in ("value", "shape")}
+            del g["weight"]
+            d = g.create_dataset("weight", data=wv[idx])
+            for k, v in attrs.items():
+                d.attrs[k] = v
+        g["weight"][a:a + keep] = 0.0 if zero_charge else w_slice / keep
+        for nm, o in list(g.items()):
+            if "shape" in o.attrs and int(np.ravel(o.attrs["shape"])[0]) == n_tot:
+                o.attrs["shape"] = np.array([len(idx)], dtype=o.attrs["shape"].dtype)
+        g.attrs["numParticles"] = np.array([len(idx)], dtype=g.attrs["numParticles"].dtype)
+        new_n = n.copy()
+        new_n[islice] = keep
+        g["particlePatches/numParticles"][...] = new_n
+        g["particlePatches/numParticlesOffset"][...] = np.concatenate(
+            [[0], np.cumsum(new_n)[:-1]]).astype(off.dtype)
+
+
 def narrow_slice(src, dst, islice, factor=None, singleton=False):
     """Copy a beam dump, narrowing one slice: its spread scaled, or one particle left.
 
@@ -444,6 +500,87 @@ def main():
     print(f"--- long-range kernel at zero width: a slice migration left one particle in, "
           f"its field on the three nearest slices against q / 4 pi eps0 d^2, worst "
           f"{worst:.2e} (tol 5e-2)  {'ok' if p_ok else 'FAIL'}")
+
+    # 6. What the short-range solve does with the states a run can reach. Its grid needs a
+    # radial scale, and a slice whose charge sits at one transverse point offers none: the
+    # cell volumes go as the cell width squared, so the field has no limit there. That is
+    # not a zero. Particles at one transverse point and different ponderomotive phases
+    # push each other, and only a lone particle feels nothing, its own harmonic sum
+    # cancelling. So the solve refuses where it has no scale, and where it has one it must
+    # give the lone particle nothing and the pair their mutual push.
+    sr_only = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 2\n"
+               "  space_charge%nphi = 1\n")
+    dark = BASE.replace("wake_on = T", "wake_on = F")
+
+    def sc_run(root, beam_file, extra, expect_fail=False):
+        text = dark.format(lat="collsc.bmad", root=root, sig_pz="8.804506566858e-08",
+                           extra=load.format(f=beam_file) + sr_only + extra)
+        (wd / f"{root}.nml").write_text(to_groups(text))
+        r = subprocess.run([str(exe), f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+                           env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+        if expect_fail:
+            return r
+        if r.returncode != 0:
+            print(f"FAIL: {root} exited {r.returncode}:\n{r.stdout[-1500:]}")
+            sys.exit(1)
+        d = np.loadtxt(wd / f"{root}.diag.txt")
+        ns = int(d[:, 1].max())
+        return d.reshape(-1, ns, d.shape[1])
+
+    collapse_slice(wd / "collsc_src-initial.beam.h5", wd / "collpc_one.beam.h5", 0, 1)
+    collapse_slice(wd / "collsc_src-initial.beam.h5", wd / "collpc_two.beam.h5", 0, 2)
+    collapse_slice(wd / "collsc_src-initial.beam.h5", wd / "collpc_nq.beam.h5", 0, 4,
+                   zero_charge=True)
+
+    # No radial scale to work from, and the solve says so rather than crashing or
+    # returning a zero. The same beam with a scale stated runs.
+    r = sc_run("collpc_r0", "collpc_one.beam.h5", "  space_charge%rmax = 0\n", expect_fail=True)
+    refused = r.returncode != 0 and "NO RADIAL SCALE" in (r.stdout + r.stderr)
+    r_ok = refused
+    print(f"--- short-range with no radial scale: refused (exit {r.returncode})  "
+          f"{'ok' if r_ok else 'FAIL'}")
+
+    # The configuration domains, refused where they are stated.
+    for tag, extra, phrase in (
+            ("collpc_nphi", "  space_charge%rmax = 250e-6\n  space_charge%nphi = -1\n",
+             "SPACE_CHARGE%NPHI"),
+            ("collpc_ngrid", "  space_charge%rmax = 250e-6\n  space_charge%ngrid = 1\n",
+             "SPACE_CHARGE%NGRID")):
+        r = sc_run(tag, "collsc_src-initial.beam.h5", extra, expect_fail=True)
+        got = r.returncode != 0 and phrase in (r.stdout + r.stderr)
+        r_ok = r_ok and got
+        print(f"--- {phrase.lower()} outside its domain: refused at setup  "
+              f"{'ok' if got else 'FAIL'}")
+
+    # Each case against itself with the solve off, so what is compared is this term's own
+    # work and not the radiation the dark beam exchanges with its field either way.
+    scale = "  space_charge%rmax = 250e-6\n"
+    got = {}
+    for tag, bf in (("one", "collpc_one.beam.h5"), ("two", "collpc_two.beam.h5"),
+                    ("nq", "collpc_nq.beam.h5")):
+        on = sc_run(f"collpc_{tag}", bf, scale)
+        off = sc_run(f"collpc_{tag}f", bf,
+                     scale + "  bmad_com%csr_and_space_charge_on = F\n")
+        got[tag] = (float((on[-1, 0, 6] - on[0, 0, 6]) - (off[-1, 0, 6] - off[0, 0, 6])),
+                    float((on[-1, 0, 7] - on[0, 0, 7]) - (off[-1, 0, 7] - off[0, 0, 7])))
+    # The collapsed slice is slice 1. A lone particle feels its own field and nothing
+    # else, and its harmonic sum cancels exactly; a slice with no charge has no source at
+    # all. Neither moves in energy. Two colocated particles at different phases push each
+    # other, equally and oppositely, so their mean holds while their spread opens.
+    d_one, s_one = abs(got["one"][0]), abs(got["one"][1])
+    d_nq, s_nq = abs(got["nq"][0]), abs(got["nq"][1])
+    d_two, s_two = abs(got["two"][0]), abs(got["two"][1])
+    # The pair's mean is not exactly still: the two exchange energy, which moves their
+    # phases apart, so the push stops being exactly equal and opposite within the step.
+    # Measured it is a percent of the spread they open, which is the statement that this
+    # is a mutual force and not a common one.
+    c_ok = (d_one < 1e-6 and s_one < 1e-6 and d_nq < 1e-6 and s_nq < 1e-6
+            and s_two > 1e-3 and d_two < 5e-2 * s_two)
+    ok = ok and r_ok and c_ok
+    print(f"--- a collapsed slice on a grid with a scale, the solve's own work: lone "
+          f"particle dE {d_one:.1e} eV and dsigma {s_one:.1e} eV, zero-charge slice dE "
+          f"{d_nq:.1e} eV, colocated pair dsigma {s_two:.3e} eV against its mean "
+          f"{d_two:.1e} eV  {'ok' if c_ok else 'FAIL'}")
 
     print("collective checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

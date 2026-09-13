@@ -1120,7 +1120,12 @@ transverse point, which migration can leave behind, takes the limit $1/2d^2$, an
 term is then the point charge's own $q/4\pi\varepsilon_0 d^2$.
 
 *Short range* (`fel_shortrange_ez`), per slice: center on the slice's charge-weighted
-centroid and radially bin the particles, then for azimuthal modes $m = -n_\phi..n_\phi$ and longitudinal harmonics
+centroid and radially bin the particles over a radial scale that `space_charge%rmax`
+floors and the slice's own extent raises. A slice whose charge sits at one transverse
+point has no scale to offer and the solve is refused there, since the cell volumes go as
+the cell width squared and the field has no limit: the force is real, particles at one
+point and different phases pushing each other, so neither a zero nor an invented length
+would do. Then then for azimuthal modes $m = -n_\phi..n_\phi$ and longitudinal harmonics
 $l = 1..n_z$ solve the radial tridiagonal system of the harmonic potential
 (cell volumes $V_1 = \pi\,dr^2$, $V_i = \pi dr^2(2i-1)$, off-diagonals
 $2\pi(i-1)$. $\log$ ring terms $-2\pi m^2\ln\frac{i}{i-1}$. Outer boundary
