@@ -230,7 +230,7 @@ type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (wavefront_struct) wf_sub
 real(rp) s_frame
-integer ie, ihh, first_was
+integer ie, ihh, first_was, ifr
 logical at_end, err_flag, eerr
 character(200) prefix
 character(8) hsuf
@@ -257,6 +257,21 @@ call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
 if (eerr) return
 call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
 if (eerr) return
+
+! Inside an unaveraged segment the record is the substep's midpoint field, half a
+! substep past the plane this frame is named for (fel_unaveraged_mod). The frame
+! carries the plane's own field: the record is carried back for the write and forward
+! again after, so the walk continues from the state it had. Power is unchanged either
+! way, since the carry is unitary; what moves is the field's transverse phase.
+
+if (run%ustate%active) then
+  do ihh = 1, run%n_harm
+    do ifr = 1, size(ffield(ihh)%wf%Ex, 3)
+      call fel_field_diffract_by (ffield(ihh)%wf, ifr, -0.5_rp * run%ustate%dsub, eerr)
+      if (eerr) return
+    enddo
+  enddo
+endif
 
 do ihh = 1, run%n_harm
   first_was = ffield(ihh)%slip%first
@@ -297,6 +312,15 @@ do ihh = 1, run%n_harm
   endif
   if (eerr) return
 enddo
+
+if (run%ustate%active) then
+  do ihh = 1, run%n_harm
+    do ifr = 1, size(ffield(ihh)%wf%Ex, 3)
+      call fel_field_diffract_by (ffield(ihh)%wf, ifr, 0.5_rp * run%ustate%dsub, eerr)
+      if (eerr) return
+    enddo
+  enddo
+endif
 
 err_flag = .false.
 

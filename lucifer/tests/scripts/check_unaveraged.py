@@ -50,6 +50,7 @@ import sys
 import numpy as np
 
 import beamio
+import fieldio
 from nml import to_groups
 from scipy.special import jv
 
@@ -285,6 +286,36 @@ def main():
         turnover = np.abs(np.diff(led[:, 2])).sum()
         check(f"energy ledger, 100 um seed, {spp} substeps a period: max|d(E_beam+U_field)| / sum|dU|",
               np.abs(etot - etot[0]).max() / max(turnover, 1e-300), 1e-4)
+
+    # 1c. The order of the split, measured. The lattice, the beam and the transverse grid
+    #     are held and the substep is refined, and the error of each resolution against the
+    #     finest is read for the field, as a complex array, and for the particles' energies.
+    #     The split is second order, and it measured first order for a diffracting seed:
+    #     the record the step advances is the substep's midpoint field, and it was named
+    #     for the plane half a substep behind it, so the particles worked against a field
+    #     offset by a half-substep diffraction and the exit plane was handed the same
+    #     offset (FINDINGS 7.91). With the half-step carries at the segment's ends the
+    #     observed order between successive resolutions must sit near two.
+    print("--- the split's order, fixed grid, 100 um seed:")
+    spps = (20, 40, 80, 160)
+    fld, gam = {}, {}
+    for spp in spps:
+        root = f"uv_ord{spp}"
+        run(exe, wd, root, probe_nml(wd, lat="unavg_probe_helical_b.bmad", root=root,
+            spp=spp, ramp=N_RAMP, lam=LAMBDA1, power=1e8, w0=1e-4))
+        fld[spp] = fieldio.read_field(wd / f"{root}-final.wf.h5", "x")["u"]
+        gam[spp] = read_par(wd / f"{root}-final.beam.h5", LAMBDA1)["gamma"]
+    ref_f, ref_g = fld[spps[-1]], gam[spps[-1]]
+    e_f = {s: float(np.linalg.norm(fld[s] - ref_f) / np.linalg.norm(ref_f)) for s in spps[:-1]}
+    e_g = {s: float(np.max(np.abs(gam[s] - ref_g)) * M_ELECTRON) for s in spps[:-1]}
+    for s in spps[:-1]:
+        print(f"      {s:3d} substeps/period: field {e_f[s]:.3e}, energy {e_g[s]:.3e} eV")
+    p_f = math.log2(e_f[20] / e_f[40])
+    p_g = math.log2(e_g[20] / e_g[40])
+    check("order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7)",
+          1.7 / p_f, 1.0, note=f"[p = {p_f:.2f}]")
+    check("order: particle energy, observed between 20 and 40 (2 expected, floor 1.7)",
+          1.7 / p_g, 1.0, note=f"[p = {p_g:.2f}]")
 
     # 2. Ballistic dark run: B does no work. Ramps hand the emittance back.
     run(exe, wd, "uv_dark", probe_nml(wd, lat="unavg_probe_planar_b.bmad", root="uv_dark",

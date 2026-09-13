@@ -3026,6 +3026,81 @@ end subroutine fel_field_diffract
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_field_diffract_by (wf, ifld, dz, err_flag)
+!
+! Routine to diffract one field record over a step the kernel cache does not hold, the
+! phase table exp(K2 dz) formed here from the cached wavenumbers of this grid and
+! wavelength. The cache carries one step per wavelength, the substep the unaveraged mode
+! runs on, and the two half steps that put the stored record on the plane it is named
+! for (fel_unaveraged_mod) would otherwise evict it at every element boundary. dz may be
+! negative, which undoes a forward step to rounding.
+!
+! Input:
+!   wf       -- wavefront_struct: The field.
+!   ifld     -- integer: Field-record index to diffract.
+!   dz       -- real(rp): Step length [m], either sign.
+!
+! Output:
+!   wf       -- wavefront_struct: The record advanced by exp(K2 dz).
+!   err_flag -- logical: Set True if no kernel of this grid and wavelength is cached.
+!-
+
+subroutine fel_field_diffract_by (wf, ifld, dz, err_flag)
+
+type (wavefront_struct), target :: wf
+integer ifld
+real(rp) dz
+logical err_flag
+
+complex(rp), allocatable :: ph(:,:)
+real(rp) xks
+integer ngrid_arr(3), ngrid, ik
+logical err
+character(*), parameter :: r_name = 'fel_field_diffract_by'
+
+!
+
+err_flag = .true.
+ngrid_arr = wavefront_shape(wf)
+ngrid = ngrid_arr(1)
+xks = twopi / wf%wavelength
+
+ik = 0
+if (allocated(fel_kernels)) then
+  do ik = 1, size(fel_kernels)
+    if (fel_kernels(ik)%ngrid == ngrid .and. fel_kernels(ik)%dgrid == wf%dx .and. &
+        fel_kernels(ik)%ks == xks .and. allocated(fel_kernels(ik)%k2)) exit
+  enddo
+  if (ik > size(fel_kernels)) ik = 0
+endif
+if (ik == 0) then
+  call out_io (s_error$, r_name, 'FIELD KERNEL NOT INITIALIZED FOR THIS GRID AND WAVELENGTH. ' // &
+                                 'CALL fel_field_kernel_init FIRST (SERIALLY).')
+  return
+endif
+
+allocate (ph(ngrid, ngrid))
+ph = exp(fel_kernels(ik)%k2 * dz)
+
+call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_forward$, err);  if (err) return
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) * ph
+call wavefront_fft2 (wf%Ex(:,:,ifld), wf_fft_backward$, err);  if (err) return
+wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) / real(ngrid*ngrid, rp)
+if (allocated(wf%Ey)) then
+  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_forward$, err);  if (err) return
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) * ph
+  call wavefront_fft2 (wf%Ey(:,:,ifld), wf_fft_backward$, err);  if (err) return
+  wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) / real(ngrid*ngrid, rp)
+endif
+
+err_flag = .false.
+
+end subroutine fel_field_diffract_by
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_field_diag (wf, ifld, power, on_axis_intensity)
 !
 ! Routine to compute the field diagnostics of field slice ifld from a field in V/m, the

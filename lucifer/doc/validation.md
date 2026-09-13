@@ -622,7 +622,9 @@ Two bookkeeping identities ride with the seam wake. Energy bookkeeping, $d\langl
 (val-the-unaveraged-mode-fc)=
 ## The unaveraged mode: fc measured, not assumed
 
-The ledger's closure depends on the order inside a substep, and the order was wrong for a field that diffracts. The source was added to the record after the diffraction, so the beam was charged the cross term against the field the kick read while the record gained the cross term against the diffracted field, and the difference is first order in the substep's diffraction phase. The broad seed the ledger check used diffracts little in a substep and closed at 1.0e-5. A seed of 100 um waist left 1.2 percent of the turnover in the ledger at 20 substeps a period and 0.6 at 40, found by an independent review. The source now lands on the record the kick read and the pair diffracts together, on the CPU, in the FP32 twin and in the device's solve, whose first pass lands the fixed-point source as it reads. The 100 um seed closes at 3.5e-6 at 20 substeps and 2.1e-6 at 40, with no trend, and the broad seed at 3.7e-6.
+The ledger's closure depends on the order inside a substep, and the order was wrong for a field that diffracts. The source was added to the record after the diffraction, so the beam was charged the cross term against the field the kick read while the record gained the cross term against the diffracted field, and the difference is first order in the substep's diffraction phase. The broad seed the ledger check used diffracts little in a substep and closed at 1.0e-5. A seed of 100 um waist left 1.2 percent of the turnover in the ledger at 20 substeps a period and 0.6 at 40, found by an independent review. The source now lands on the record the kick read and the pair diffracts together, on the CPU, in the FP32 twin and in the device's solve, whose first pass lands the fixed-point source as it reads. The 100 um seed closes at 3.7e-6 at 20 substeps and 2.4e-6 at 40, with no trend, and the broad seed at 9.4e-6.
+
+Closure is not order. The record the step advances is the substep's midpoint field, and the segment's own planes are half a substep from it, so the record is carried onto the midpoint at entry and back at exit, and a frame written inside the segment is carried back for the write. Before those carries the record kept its plane's name and not its plane, and a fixed-grid refinement of a diffracting seed converged at first order in the complex field and the particle energies alike, at 20 to 160 substeps a period, found by an independent review. `check_unaveraged.py` now refines the 100 um seed on a fixed grid and reads the error of each resolution against the finest: the field at 2.0e-8, 2.9e-9 and 6.8e-10 at 20, 40 and 80 substeps a period, the particle energies at 6.0, 0.38 and 0.024 eV, observed orders 2.8 and 2.1 for the field and 4.0 for the energies, with a floor of 1.7 on the first pair.
 
 (Physics, conventions, and provenance: manual [](fel-physics.md#sec-unaveraged). MINERVA (Freund and
 van der Slot) is the published existence proof for this physics. Only its published
@@ -639,7 +641,7 @@ mode's inputs become measurements. Entry/exit are sin² amplitude ramps
 segment ends where the averaged and unaveraged momentum conventions coincide. The
 beam carries a `quiver_in_px` convention flag that every averaged/seam entry asserts.
 In a mixed line those handoffs happen at real internal boundaries, and the sandwich
-check exercises them (ledger conserved on the middle segment at 1.3e-4 of turnover,
+check exercises them (ledger conserved on the middle segment at 1.5e-4 of turnover,
 mixed-vs-averaged exit price 2.9e-2 ln, a wake on the unaveraged segment refused by
 name). Parallel over slices with the averaged path's guarantees (results are
 bit-identical across thread counts. The harness checks it). Wakes/space
@@ -649,9 +651,10 @@ Measured (`check_unaveraged.py`, in the harness, self-referenced or closed-form)
 
 | Check | Measured | Check level |
 |---|---|---|
-| energy ledger: max d(E_beam+U_field) over field-energy turnover | **3.7e-6** | 1e-4 |
-| energy ledger, 100 um seed, 20 and 40 substeps a period | 3.5e-6, 2.1e-6 | 1e-4 |
-| ledger internal (kick-side vs realized beam change) | 7.7e-6 | 1e-4 |
+| energy ledger: max d(E_beam+U_field) over field-energy turnover | **9.4e-6** | 1e-4 |
+| energy ledger, 100 um seed, 20 and 40 substeps a period | 3.7e-6, 2.4e-6 | 1e-4 |
+| ledger internal (kick-side vs realized beam change) | 1.3e-5 | 1e-4 |
+| order of the split, 100 um seed, field and particle energy between 20 and 40 substeps a period | 2.8, 4.0 | 1.7 |
 | ballistic dark run: max dgamma (B does no work) | **exactly 0** | 1e-12 |
 | ramp handoff: emittance ratio − 1 / orbit shift / mean-px shift | 9.8e-11 / 1.9e-9 m / 3.6e-14 | 1e-6 / 1e-7 / 1e-6 |
 | fc planar (h=1) vs closed-form JJ: 0.75051 vs 0.75095 | **5.9e-4** | 5e-3 |

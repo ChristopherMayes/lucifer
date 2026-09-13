@@ -5988,6 +5988,31 @@ Output:
   err_flag -- logical: Set True if there is an error. False otherwise.
 ```
 
+(api-fel-field-diffract-by)=
+### `fel_field_diffract_by`
+
+*Subroutine* `(wf, ifld, dz, err_flag)`
+
+```
+Routine to diffract one field record over a step the kernel cache does not hold, the
+phase table exp(K2 dz) formed here from the cached wavenumbers of this grid and
+wavelength. The cache carries one step per wavelength, the substep the unaveraged mode
+runs on, and the two half steps that put the stored record on the plane it is named
+for (fel_unaveraged_mod) would otherwise evict it at every element boundary. dz may be
+negative, which undoes a forward step to rounding.
+```
+
+```
+Input:
+  wf       -- wavefront_struct: The field.
+  ifld     -- integer: Field-record index to diffract.
+  dz       -- real(rp): Step length [m], either sign.
+
+Output:
+  wf       -- wavefront_struct: The record advanced by exp(K2 dz).
+  err_flag -- logical: Set True if no kernel of this grid and wavelength is cached.
+```
+
 (api-fel-field-diag)=
 ### `fel_field_diag`
 

@@ -9,6 +9,21 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Fixed: the unaveraged segment carries its field record onto the substep midpoint at entry
+  and back onto the plane at exit. The step advances the midpoint field, M(n+1) = D(M(n) + 2S), which is the
+  symmetric split with the half diffractions merged, and second order only with a half-step carry at each
+  end. The record had kept its plane's name and not its plane, so the particles worked against a field half
+  a substep from where they stood and every handoff, dump and downstream element was handed a field half a
+  substep past its plane: a fixed-grid refinement of a diffracting seed converged at first order in the
+  field and the particle energies, found by an independent review. With the carries the observed orders
+  between 20 and 40 substeps a period are 2.8 for the complex field and 4.0 for the particle energies, and
+  2.1 and 4.0 between 40 and 80. A frame written inside the segment is carried back for the write. The
+  carries run on the host for the device path too, around its upload and readback, and the device's rows
+  sit where they sat. One recorded digit moves, the tier the exit field reaches: `tier1_unavg`, the priced
+  model difference against Genesis4, goes from 7.032578e-02 to 6.984497e-02 on the debug tree and from
+  7.032919e-02 to 6.984652e-02 on production, inside its level. The mode's ledger levels re-measure at
+  9.4e-6 for the broad seed, 3.7e-6 and 2.4e-6 for the 100 um seed, and 1.5e-4 on the sandwich line's middle
+  segment. Every other tier is unmoved.
 - 2026-09-13 Fixed: the short-range space-charge solve reports what it cannot do. Its radial grid needs a
   scale, and a slice whose charge sits at one transverse point offers none: with `space_charge%rmax` at its
   default of zero, such a slice crashed the run on a zero cell width. The field there has no limit, since the

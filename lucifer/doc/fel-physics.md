@@ -1306,8 +1306,19 @@ diffraction, $E' = DE + 2S$, the beam is charged the cross term against $E$ whil
 record gains it against $DE$, and the difference $4\,\mathrm{Re}\langle (D-I)E, 2S\rangle$
 is first order in the substep's diffraction phase, 1.2 percent of the turnover at 20
 substeps a period on a seed of 100 um waist and halving with the substep. The stored
-record is the substep's midpoint field, the same Strang split read at the other half
-step. Measured, this tightened the ledger 65$\times$ over the
+record is then the substep's midpoint field, $M_n = D_{h/2}E(z_n)$, which advances as
+$M_{n+1} = D_h(M_n + 2S_n)$: consecutive half diffractions of the symmetric split merge
+into whole ones. That is second order only if the record is carried onto the midpoint
+at the segment's entry and back onto the plane at its exit, $D_{\pm h/2}$ once each,
+since the field a segment receives sits on its entry plane and the field it hands on is
+consumed at its exit plane. Without the pair the record kept its plane's name and not
+its plane: the particles worked against a field half a substep from where they stood
+and the exit plane was handed a field half a substep past it, first order at both, and
+a fixed-grid refinement of a diffracting seed converged at first order. With the pair
+the observed order between successive resolutions is 2.8 and 2.1 for the complex field
+and 4.0 for the particle energies, the push being fourth order. A frame written inside
+the segment is carried back the same half step for the write, so it holds the field of
+the plane it is named for. Measured, this tightened the ledger 65$\times$ over the
 $1/\gamma$ convention. The period-averaged limit shifts by
 $O(1-\beta_\parallel) \sim 5\times10^{-9}$. Period-averaging the pair reproduces
 [](#sec-coupling): the $JJ$ Bessel factor emerges from the figure-8.

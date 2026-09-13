@@ -428,6 +428,21 @@ if (first) then
   beam%quiver_in_px = .true.
   ustate%active = .true.
   call unavg_ramp_phase_jump ()
+
+  ! The field the segment carries is the substep's midpoint field. The step below reads
+  ! the record for the kick at the midpoint and writes D(E + 2S) after, which is the
+  ! Strang split with the stored variable taken half a substep past the plane the
+  ! particles reach: consecutive half diffractions merge into whole ones, and the record
+  ! M_n = D_{h/2} E(z_n) advances as M_{n+1} = D_h (M_n + 2 S_n). The field the segment
+  ! receives sits on its entry plane, so it is carried the half step here, and carried
+  ! back at exit. Without the pair the record kept its plane's name and not its plane:
+  ! the particles worked against a field half a substep from where they stood and the
+  ! exit plane was handed a field half a substep past it, first order in the substep
+  ! at both, and the mode's convergence was first order for a diffracting field where
+  ! the split is second order (FINDINGS 7.91).
+
+  call unavg_field_to_midpoint (0.5_rp, err)
+  if (err) return
 endif
 
 ! The device path (fel_device_mod). The beam and the field stay resident for the whole
@@ -684,6 +699,8 @@ ustate%s = ustate%s + dz_record
 if (dev_twin) call fel_device_unavg_twin_rows (dev, fp32, beam, ff, ks, dE_slice, dEturn_slice)
 
 if (last) then
+  call unavg_field_to_midpoint (-0.5_rp, err)   ! Back onto the exit plane.
+  if (err) return
   beam%quiver_in_px = .false.
   ustate%active = .false.
   call unavg_ramp_phase_jump ()
@@ -748,6 +765,8 @@ if (last) then
   call fel_device_release (dev)
   dev%unavg = .false.
   if (dev%dep_breach) return
+  call unavg_field_to_midpoint (-0.5_rp, err)   ! Back onto the exit plane, on the host.
+  if (err) return
   beam%quiver_in_px = .false.
   ustate%active = .false.
   call unavg_ramp_phase_jump ()
@@ -853,6 +872,26 @@ if (err) return
 uerr = .false.
 
 end subroutine unavg_dev_encode
+
+! The half-substep carry between the plane the record is named for and the midpoint
+! field the step advances: +0.5 into the segment, -0.5 out of it. Every record of the
+! member, both planes, through the uncached diffraction, since the cache holds the
+! substep and this is half of it.
+
+subroutine unavg_field_to_midpoint (half, uerr)
+
+real(rp) half
+logical uerr
+integer jf
+
+uerr = .true.
+do jf = 1, size(wf%Ex, 3)
+  call fel_field_diffract_by (wf, jf, half * dsub, err)
+  if (err) return
+enddo
+uerr = .false.
+
+end subroutine unavg_field_to_midpoint
 
 ! The ramp's slippage compensation, applied as one discrete jump per segment end,
 ! at the handoffs where the envelope is exactly zero and nothing couples. The
