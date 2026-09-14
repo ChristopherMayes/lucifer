@@ -61,8 +61,8 @@ Measured on the same M3 Max, three keystones before and three after, at matched 
 | keystone wall time (s) | 696, 690, 689 | 573, 579, 575 |
 | debug pass (s) | 696, 690, 689 | 572, 578, 575 |
 | examples job (s) | 568, 566, 562 | 461, 458, 453 |
-| mean CPU over the run, of 1600% | 978% | 1210%, 1218%, 1217% |
-| peak resident memory, all processes (GB) | 4.3 | 4.3 |
+
+The wall times are the comparison. Utilization and memory are supporting observations with one baseline sample, since the sampler failed silently on two of the three baseline runs: the one sampled baseline averaged 978% CPU of the machine's 1600% over the run, and the three concurrent runs averaged 1210%, 1218% and 1217%. Peak resident memory summed over every tracker, reference and check process was 4.3 GB on the sampled baseline and on each of the three concurrent runs.
 
 The debug pass alone, with no other job running, took 365 s against 692 s under the old schedule inside a keystone, and its concurrent phase took 233 s. The new critical path is the debug pass, and inside it the spontaneous section: its check script runs a grid scan through a pool that the four-core allowance sizes to one worker, so the scan runs in sequence, 233 s alone and 292 to 326 s inside a keystone, and the concurrent phase ends when it does. The tiers also slow under the added load, 216 to 225 s inside a keystone against 115 s alone and 160 s under the old schedule. Those two are where the next gain would come from.
 
