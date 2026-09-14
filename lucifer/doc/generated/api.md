@@ -301,6 +301,27 @@ Output:
   err_flag    -- logical: Set True on error, False otherwise.
 ```
 
+(api-fel-write-momentum-chart)=
+### `fel_write_momentum_chart`
+
+*Subroutine* `(file_name, quiver_in_px, err_flag)`
+
+```
+Routine to stamp a beam file with the chart its momenta are in, the root attribute
+momentumChart, 'quiver' when px carries the undulator quiver and 'averaged' otherwise.
+It records the physical chart, which felMethod cannot, so a reader refuses a quiver-chart
+file rather than tracking it as averaged (doc/reading-output.md).
+```
+
+```
+Input:
+  file_name     -- character(*): The beam file, already written.
+  quiver_in_px  -- logical: The beam's momentum-convention flag.
+
+Output:
+  err_flag      -- logical: Set True if the attribute could not be written.
+```
+
 (api-fel-assign-ids)=
 ### `fel_assign_ids`
 

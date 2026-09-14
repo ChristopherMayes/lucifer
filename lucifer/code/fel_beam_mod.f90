@@ -388,6 +388,35 @@ endif
 ! lives in z. The wavelength and spacing are the deck's: a dump carries the beam, not
 ! the run's parameters.
 
+! The chart the file's momenta are in. Absent means a file written before the attribute
+! existed, and every such file is an element-boundary dump in the averaged chart, so its
+! absence is read as averaged, stated as a documented assumption and not proof. A file
+! that names the quiver chart, a frame written inside an unaveraged segment, is refused:
+! its px carries the undulator quiver, and tracking it as averaged is silently wrong
+! (doc/reading-output.md). Interior continuation, which would restore the chart, the
+! segment position and the ramp state, is separate work.
+block
+  integer(hid_t) fb_id
+  integer hb_err
+  type (hdf5_info_struct) cinfo
+  character(40) chart
+  logical cerr
+  call hdf5_open_file (file_name, 'READ', fb_id, cerr, .false.)
+  if (cerr) return
+  cinfo = hdf5_attribute_info (fb_id, 'momentumChart', cerr, .false.)
+  if (.not. cerr) then
+    call hdf5_read_attribute_string (fb_id, 'momentumChart', chart, cerr, .false.)
+    if (.not. cerr .and. trim(chart) == 'quiver') then
+      call h5fclose_f (fb_id, hb_err)
+      call out_io (s_error$, r_name, 'BEAM FILE IS IN THE QUIVER CHART: ' // trim(file_name), &
+             'ITS px CARRIES THE UNDULATOR QUIVER, WHICH THIS TRACKER CANNOT LOAD AS AVERAGED.', &
+             'IT IS A FRAME WRITTEN INSIDE AN UNAVERAGED SEGMENT. RESTART FROM AN ELEMENT BOUNDARY.')
+      return
+    endif
+  endif
+  call h5fclose_f (fb_id, hb_err)
+end block
+
 beam%p0c = sqrt(gamma0**2 - 1) * m_electron
 beam%phi0 = 0
 beam%wavelength = wavelength
@@ -575,9 +604,56 @@ nb = i2 - i1 + 1
 call hdf5_write_beam (file_name, beam_b%bunch(1:nb), .false., err, as_patches = .true.)
 if (err) return
 
+! The chart the momenta are in, as a root attribute, so a reader knows before tracking
+! whether px carries the undulator quiver. An element-boundary dump is in the averaged
+! chart, and a frame written inside an unaveraged segment is in the quiver chart: the
+! label distinguishes them where felMethod cannot, since felMethod names the element's
+! tracking method and an element-end frame reads unaveraged with the chart already handed
+! back. fel_read_openpmd_beam refuses a quiver-chart file, which averaged physics and the
+! seam cannot track (fel_assert_averaged_chart).
+call fel_write_momentum_chart (file_name, beam%quiver_in_px, err)
+if (err) return
+
 err_flag = .false.
 
 end subroutine fel_write_openpmd_beam
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_momentum_chart (file_name, quiver_in_px, err_flag)
+!
+! Routine to stamp a beam file with the chart its momenta are in, the root attribute
+! momentumChart, 'quiver' when px carries the undulator quiver and 'averaged' otherwise.
+! It records the physical chart, which felMethod cannot, so a reader refuses a quiver-chart
+! file rather than tracking it as averaged (doc/reading-output.md).
+!
+! Input:
+!   file_name     -- character(*): The beam file, already written.
+!   quiver_in_px  -- logical: The beam's momentum-convention flag.
+!
+! Output:
+!   err_flag      -- logical: Set True if the attribute could not be written.
+!-
+
+subroutine fel_write_momentum_chart (file_name, quiver_in_px, err_flag)
+
+integer(hid_t) f_id
+integer h5_err
+logical quiver_in_px, err_flag, err
+character(*) file_name
+
+!
+
+err_flag = .true.
+call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
+call hdf5_write_attribute_string (f_id, 'momentumChart', &
+                                  merge('quiver  ', 'averaged', quiver_in_px), err)
+call h5fclose_f (f_id, h5_err)
+err_flag = err
+
+end subroutine fel_write_momentum_chart
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

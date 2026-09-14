@@ -272,6 +272,16 @@ continues from zero, and that is a continuation from a whole-slice boundary and 
 exact one. A value the tracker could not have written, one whose magnitude reaches
 `n_wavelength` or is not finite, is refused rather than read as absent.
 
+A beam file also carries `momentumChart`, a root attribute reading `averaged` or `quiver`,
+the chart its momenta are in. An element-boundary dump is `averaged`: the unaveraged
+segment hands the averaged convention back at its ends, so the momenta are the averaged
+chart's even where `felMethod` reads unaveraged, and the label cannot tell the two apart.
+A frame written inside an unaveraged segment is `quiver`, its px carrying the undulator
+quiver. The reader refuses a `quiver` file, since tracking quiver momenta as averaged is
+silently wrong, and continuing from inside a segment would need the segment position and
+the ramp state besides. An absent attribute is read as `averaged`, a documented assumption
+and not proof: every file written before the attribute existed is an element-boundary dump.
+
 Two records exist for comparing a continued run with the run it continues. Each row of
 `<out_root>.migration.txt` ends with the smallest distance in phase, in radians, that any
 particle examined at that event had to a slice boundary, the particles dropped off the

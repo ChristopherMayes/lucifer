@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Added: a restart across an unaveraged segment boundary, and a refusal of a restart from
+  inside one. A beam file gains `momentumChart`, the chart its momenta are in, `averaged` at an element
+  boundary and `quiver` for a frame inside an unaveraged segment, since `felMethod` names the element's
+  method and cannot tell the two apart. `fel_read_openpmd_beam` refuses a `quiver` file, an absent
+  attribute read as `averaged` for legacy dumps. The program-structure check restarts a sandwich line at
+  the segment's end, holding at the floor, 2.6e-12 over 42 frames through the trailing averaged segment,
+  and refuses a restart from an interior frame. A restart at the boundary before the segment is not yet at
+  the floor: its entry field and beam are bit-identical by id, yet it diverges to 6.5e-8 because the phi0
+  fold rebuilds the reference phase at a different magnitude and the segment's gain amplifies the phi0
+  times epsilon difference. That is the fold's cost, recorded as a demonstration and not a relaxed
+  tolerance; carrying the phase and the local lag losslessly is separate work.
 - 2026-09-14 Added: a restart across a Bmad short-range element wake holds, on the element and through a
   wake a superimposed marker has split onto a lord. The program-structure check takes both sides of the
   kick, a checkpoint before the wake element and one at its end, reading the passage that applies it from
