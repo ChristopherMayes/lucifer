@@ -48,7 +48,23 @@ Measured alone on an M3 Max of 12 performance cores, with no other keystone job 
 
 The default is three workers, one per four performance cores. One example run is already parallel and draws 8.4 cores on average and 11.7 at its peak, so the fourth worker finds little idle capacity and buys 7 seconds. Every deck ran on the twelve threads the OpenMP runtime chose for it, which the run header prints and the runner does not set. That count is the same at every worker count. The directory, deck, exit status and exit line columns were identical across every schedule from one worker to six, the sequential run included.
 
-Inside a keystone the examples job takes one worker, which the suite passes to it. The examples are not on the critical path, and capacity they take comes from the two benchmark passes that are. At three workers the examples job finished in 347 s against 570 s at one, and every other job slowed: the debug pass went from 694 s to 748 s, the production pass from 472 s to 542 s, the regression suite from 155 s to 245 s, and the keystone from 11.6 to 12.5 minutes. Two runs at each setting on 2026-09-13. A job that is not the critical path has nothing to gain by finishing sooner than it does.
+Inside a keystone the examples job takes two workers, which the suite passes to it. While the benchmark's check sections ran in sequence the examples were not on the critical path, and capacity they took came from the two benchmark passes that were: at three workers the examples job finished in 347 s against 570 s at one, and every other job slowed, the debug pass from 694 s to 748 s, the production pass from 472 s to 542 s, the regression suite from 155 s to 245 s and the keystone from 11.6 to 12.5 minutes (two runs at each setting, 2026-09-13). With the check sections concurrent the passes finish sooner, and at one worker the examples job finished last, 592 s of a 592 s keystone. At two workers the keystone took 573 s and the debug pass finished last, and the two runs that followed took 579 s and 575 s.
+
+The benchmark's check sections run several at once after the tiers. Each section runs in its own directory under the work directory with the lattices and reference decks it may read copied in, source-filter alone also taking the converted reference it compares against, and nothing a section writes is read by another. The two sections that read the tiers' outputs, thread-independence and tier-comparison, keep their places. The output is printed after every section has finished, in the order the script lists them, each with its own wall time, and a results row is written for a pass or a skip and never for a failure, so a results file with a section missing names the section that did not pass. A section that left no record did not run, and that fails the pass by name too.
+
+The cores a pass may spend are one allocation, `--cpus`, and the sections of a pass spend it once between them: a check run takes four threads, so the allocation over four sections run at once, and each hands the allocation over that count to the pools inside its check script through `LUCIFER_CPU_BUDGET` (`tests/scripts/pool.py`). Run by hand a pass takes the performance cores. In a keystone the suite hands each pass the full count, the examples two workers, and the regression suite and the wavefront validation one process each, which is above the core count at its widest and is a measured choice. The device is one resource across both passes, so their device sections take turns under one lock (`tests/scripts/with_lock.py`) while the CPU sections of either pass carry on beside them. The wait is printed, and the debug pass waited 17 to 24 s for the production pass's device section on each of the four concurrent keystones.
+
+Measured on the same M3 Max, three keystones before and three after, at matched cache state with the machine otherwise idle (2026-09-13):
+
+| | before, sections in sequence | after, three sections at once a pass |
+|---|---|---|
+| keystone wall time (s) | 696, 690, 689 | 573, 579, 575 |
+| debug pass (s) | 696, 690, 689 | 572, 578, 575 |
+| examples job (s) | 568, 566, 562 | 461, 458, 453 |
+| mean CPU over the run, of 1600% | 978% | 1210%, 1218%, 1217% |
+| peak resident memory, all processes (GB) | 4.3 | 4.3 |
+
+The debug pass alone, with no other job running, took 365 s against 692 s under the old schedule inside a keystone, and its concurrent phase took 233 s. The new critical path is the debug pass, and inside it the spontaneous section: its check script runs a grid scan through a pool that the four-core allowance sizes to one worker, so the scan runs in sequence, 233 s alone and 292 to 326 s inside a keystone, and the concurrent phase ends when it does. The tiers also slow under the added load, 216 to 225 s inside a keystone against 115 s alone and 160 s under the old schedule. Those two are where the next gain would come from.
 
 Every section runs in every keystone. Nothing is behind a flag, and there is no shorter mode to reach for, which is deliberate: a cheap run that checks less is the thing a keystone exists to prevent.
 
@@ -71,8 +87,9 @@ git diff --exit-code -- 'lucifer/doc/generated/*.md' 'lucifer/doc/generated/exam
 
 The measured levels in this document are written by the harness that measured them, so
 a moved digit is a failing command rather than a discrepancy someone has to notice while
-reading. The benchmark regenerates the example pages itself, in its `examples` section,
-so the command above is the same work made explicit.
+reading. The benchmark's `examples` section generates the example pages into its own
+directory and compares them with the committed ones, so a stale committed page fails
+that section by name, and the regeneration above is the one write into the tree.
 
 The diff names the Markdown. The figures in `doc/generated/examples/` are committed
 beside the pages and deliberately excluded: a plotting-library upgrade rewrites every

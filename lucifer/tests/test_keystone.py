@@ -99,25 +99,54 @@ class Keystone:
     outcomes: dict[str, Outcome]
 
 
+def performance_cores() -> int:
+    """The cores the static allocation below divides: the performance cores on a Mac,
+    the logical cores elsewhere."""
+    for args in (["sysctl", "-n", "hw.perflevel0.physicalcpu"], ["sysctl", "-n", "hw.ncpu"]):
+        try:
+            n = int(subprocess.run(args, capture_output=True, text=True, check=True).stdout)
+            if n > 0:
+                return n
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            pass
+    return os.cpu_count() or 4
+
+
 def jobs(art: pathlib.Path) -> tuple[Job, ...]:
-    """The five jobs as the recorded recipe launches them, with this session's artifacts."""
+    """The five jobs as the recorded recipe launches them, with this session's artifacts.
+
+    The static allocation. The machine's performance cores are divided once, here, and
+    every job spends what it is handed and no more. Each benchmark pass is handed the
+    whole count in --cpus, so its check sections run cores/4 at once with cores over
+    that count for the pools inside them (run_fel_benchmark.sh), and the two passes'
+    device sections share one lock, since the device is one resource. The examples
+    take two workers. The regression suite and the wavefront validation take one
+    process each. The sum at the widest is two passes at the full count, two example
+    runs at the thread count their runtime chooses, and two more processes, which is
+    above the core count: the count is a measured choice (doc/validation.md). On 12
+    performance cores on 2026-09-13 the keystone took 592 s with the examples at one
+    worker, which then finished last, and 573 s at two, against 689 to 696 s with the
+    check sections in sequence.
+    """
+    cores = performance_cores()
+    lock = (("LUCIFER_DEVICE_LOCK", str(art / "device.lock")),)
     return (
         Job("debug", (str(BENCHMARK), "--results", str(art / "fel-debug.txt"),
-                      "--work-dir", str(art / "wd-dbg")), ROOT),
+                      "--work-dir", str(art / "wd-dbg"), "--cpus", str(cores)), ROOT, lock),
         Job("production", (str(BENCHMARK), "--exe", str(PRODUCTION_EXE),
                            "--results", str(art / "fel-prod.txt"),
-                           "--work-dir", str(art / "wd-prd")), ROOT),
+                           "--work-dir", str(art / "wd-prd"), "--cpus", str(cores)), ROOT, lock),
         Job("regression", (sys.executable, "-m", "pytest", "test_fortran.py",
                            f"--bmad-bin={ROOT / 'debug' / 'bin'}"), ROOT / "regression_tests"),
         Job("wavefront", (str(WAVEFRONT),), ROOT),
-        # One worker for the examples, which is this job's whole allocation while the
-        # five run together. The examples are not on the critical path, and every worker
-        # they take is taken from the two benchmark passes that are: measured on
-        # 2026-09-13, the examples at three workers finished in 347 s against 566 s and
-        # 570 s at one, and the debug pass they share the machine with went from 692 s
-        # and 694 s to 748 s.
-        # A standalone run of run_examples.sh takes its own default instead.
-        Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "1"), ROOT),
+        # Two workers for the examples, this job's whole allocation while the five run
+        # together. With the check sections concurrent the passes finish sooner, and at
+        # one worker the examples finished last, 592 s of a 592 s keystone (2026-09-13).
+        # At two the keystone took 573 s and the debug pass finished last. Three workers,
+        # measured while the sections still ran in sequence, slowed the passes by more
+        # than they saved (doc/validation.md). A standalone run of run_examples.sh takes
+        # its own default instead.
+        Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "2"), ROOT),
     )
 
 

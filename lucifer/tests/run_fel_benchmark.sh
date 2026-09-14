@@ -39,9 +39,14 @@
 #   --beamphysics <p>   openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
 #   --results <path>    Write a machine-readable results file (tiers, check sections,
 #                       build flavor) for doc generation. Default: none written.
+#   --cpus <n>          The cores this pass may spend on its check sections at once.
+#                       Default: the machine's performance cores. A check run takes
+#                       four threads, so n/4 sections run at once, each with n over
+#                       that count for the pools inside its check script.
 #
 # Two of these may run at once, which is how the keystone runs them: one pass per
-# build, each with its own --work-dir. They share only a source tree they read.
+# build, each with its own --work-dir and its share of the cores in --cpus. They share
+# only a source tree they read, and a lock the device section of each takes in turn.
 #
 # The Genesis reference dumps are cached, since they are a pure function of the
 # reference binary and the decks that make them. The cache sits under
@@ -78,6 +83,7 @@ PYTHON=""
 WORK_DIR=""
 BEAMPHYSICS=""
 RESULTS=""
+CPUS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -87,7 +93,8 @@ while [[ $# -gt 0 ]]; do
     --work-dir) WORK_DIR="$2"; shift 2 ;;
     --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
     --results)  RESULTS="$2";  shift 2 ;;
-    -h|--help)  sed -n '2,41p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --cpus)     CPUS="$2";     shift 2 ;;
+    -h|--help)  sed -n '2,46p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -141,6 +148,27 @@ if [[ -z "$BEAMPHYSICS" || ! -d "$BEAMPHYSICS/beamphysics/wavefront" ]]; then
   exit 1
 fi
 
+# The core allocation of this pass, and what it buys. A check run takes four threads
+# (the check scripts set that themselves), so the sections running at once number the
+# allocation over four, and each of them hands the allocation over that number to the
+# pools inside its check script through LUCIFER_CPU_BUDGET (scripts/pool.py). The
+# allocation is spent once between the sections of a pass and never once each. Run
+# by hand, a pass takes the machine's performance cores. In a keystone the suite
+# hands each pass its share (tests/test_keystone.py).
+if [[ -z "$CPUS" ]]; then
+  CPUS="$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || true)"
+  [[ -n "${CPUS:-}" ]] || CPUS="$(sysctl -n hw.ncpu 2>/dev/null || true)"
+  [[ -n "${CPUS:-}" ]] || CPUS="$(nproc 2>/dev/null || true)"
+  [[ -n "${CPUS:-}" ]] || CPUS=4
+fi
+if ! [[ "$CPUS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Error: --cpus takes a whole number of cores. Got: $CPUS" >&2
+  exit 2
+fi
+SECTION_WORKERS=$((CPUS / 4))
+[[ $SECTION_WORKERS -lt 1 ]] && SECTION_WORKERS=1
+SECTION_CPUS=$((CPUS / SECTION_WORKERS))
+
 KEEP_WORK_DIR=1
 if [[ -z "$WORK_DIR" ]]; then
   WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fel_benchmark.XXXXXX")"
@@ -181,6 +209,7 @@ echo "               $GENESIS_EEV"
 echo "  python:      $PYTHON"
 echo "  beamphysics: $BEAMPHYSICS"
 echo "  workdir:     $WORK_DIR"
+echo "  cores:       $CPUS for the check sections, $SECTION_WORKERS at once"
 echo
 
 # The results file is for doc generation, so it records what is reproducible: which
@@ -605,39 +634,73 @@ echo "  1-thread and 8-thread runs are bit-identical (diag byte-equal, dumps dat
 section_time thread-independence
 echo
 
+# ------------------------------------------------------------------------------
+# The check sections. Every section below is independent of the others and of the
+# tiers. Each runs in its own directory under $WORK_DIR/sections, with the lattices
+# and reference decks it may read copied in (never linked, since several rewrite a
+# lattice they were given), and source-filter alone also takes the converted
+# AramisTDSASEF reference it compares against. Nothing else is in a section's
+# directory when it starts, and nothing a section writes is read by another. They
+# run several at once, and their output is printed afterwards in the order
+# SECTION_ORDER lists them, with each one's own wall time, so a log reads the same
+# whatever the schedule. Two sections stay out of this set because they read the
+# tiers' outputs: thread-independence above and tier-comparison below.
+#
+# A section is a function taking its directory. It prints its own header, runs its
+# check, and returns the check's status. A return of 77 is a skip, with the reason
+# left in .skip in the directory, and only the device section uses it.
+#
+# How many run at once is the pass's core allocation over the four threads a check
+# run takes, and each section's own allowance for the pools inside the check
+# scripts is the allocation over that count, so the sections of one pass spend the
+# allocation once between them and not once each. --cpus sets the allocation, and
+# a keystone sets it for both passes together (tests/test_keystone.py). The device
+# is one resource across both passes, so the device section holds a lock the two
+# passes share while it runs, and the CPU sections of either pass carry on beside
+# it (scripts/with_lock.py).
+
+SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter fp32-lockstep device unaveraged spontaneous two-polarization beam-format harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
+
+# The launch order, longest first by the debug pass of 2026-09-13 (device 116 s,
+# source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section is
+# not left to run alone at the end. The printed order is SECTION_ORDER regardless.
+LAUNCH_ORDER="device source-filter spontaneous unaveraged import two-polarization diagnostics sase-startup phasing beam-format load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
+
+SECTIONS="$WORK_DIR/sections"
+DEVICE_LOCK="${LUCIFER_DEVICE_LOCK:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/device.lock}"
+
+stage_section () {   # <dir>: the inputs a section may read, and nothing it did not ask for
+  mkdir -p "$1"
+  cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/bmad/*.bmad "$1/"
+}
+
 # Shot-noise checks. The statistical check is self-referenced
 # (no cross-code reference exists: Genesis cannot represent weighted noise). The SASE startup cross-check pits the
 # two codes' fully independent loaders and RNGs against each other at the level the
 # noise sets, the startup power.
 
-echo "--- shot-noise statistical check (weighted Fawley loading) ---------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_shot_noise.py" --exe "$EXE" --workdir "$WORK_DIR" --seeds 15; then
-  echo "FAIL: shot-noise statistics; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time shot-noise
-echo
+sec_shot_noise () {
+  echo "--- shot-noise statistical check (weighted Fawley loading) ---------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_shot_noise.py" --exe "$EXE" --workdir "$1" --seeds 15 \
+    || { echo "FAIL: shot-noise statistics; outputs kept in: $1" >&2; return 1; }
+}
 
 # The load path. Keep mode must hand every bunch moment through unchanged, the split
 # weights must be invisible, a generated Gaussian bunch in sample mode must radiate the
 # physical spontaneous power inside the cone, and the two loads that would count the
 # noise twice must be refused.
 
-echo "--- the load path (keep exactness, split invariance, in-cone startup, refusals) ----"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_load.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: load path; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time load
-echo
+sec_load () {
+  echo "--- the load path (keep exactness, split invariance, in-cone startup, refusals) ----"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_load.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: load path; outputs kept in: $1" >&2; return 1; }
+}
 
-echo "--- SASE startup cross-check against Genesis's loader -------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
-  echo "FAIL: SASE startup level; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time sase-startup
-echo
+sec_sase_startup () {
+  echo "--- SASE startup cross-check against Genesis's loader -------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_sase_startup.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$1" --seeds 4 \
+    || { echo "FAIL: SASE startup level; outputs kept in: $1" >&2; return 1; }
+}
 
 # Seam-wake checks: element sr wakes across the whole window --
 # closed-form pseudomode ramp, exact causality with the d8 direction cross-check, the
@@ -645,13 +708,11 @@ echo
 # tight, resolved-beam at the derived boundary bound), split-weight invariance and
 # thread determinism. Self-referenced. Needs no Genesis.
 
-echo "--- seam-wake checks -------------------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_seam_wake.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: seam-wake checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time seam-wake
-echo
+sec_seam_wake () {
+  echo "--- seam-wake checks -------------------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_seam_wake.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: seam-wake checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # Distribution-import checks: the bunch_struct resampler transcribed
 # from Genesis's SDDSBeam.cpp -- exact where no RNG enters (the per-slice current
@@ -659,49 +720,41 @@ echo
 # hitting its Twiss targets, split-weight invariance, thread determinism), statistical
 # where the resampling RNG forces it (slice Twiss recovery, startup power cross-code).
 
-echo "--- distribution-import checks --------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_import.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$WORK_DIR" --seeds 4; then
-  echo "FAIL: distribution-import checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time import
-echo
+sec_import () {
+  echo "--- distribution-import checks --------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_import.py" --exe "$EXE" --genesis "$GENESIS" --workdir "$1" --seeds 4 \
+    || { echo "FAIL: distribution-import checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # Slice-migration checks: conservation under heavy migration, exact
 # phase continuity of the moves, and no-op bit identity (self-referenced
 # -- Genesis migrates only under one4one).
 
-echo "--- slice-migration checks ------------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_migration.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: migration checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time migration
-echo
+sec_migration () {
+  echo "--- slice-migration checks ------------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_migration.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: migration checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # Collective-effects self-referenced checks: exact energy bookkeeping of
 # the wake's eloss on a cold dark beam, and the stale-wake structural check (the
 # convolution must follow the currents under migration).
 
-echo "--- collective-effects checks ---------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: collective checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time collective
-echo
+sec_collective () {
+  echo "--- collective-effects checks ---------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_collective.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: collective checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # Source-filter checks: the transcribed angular filter on the source term run against
 # Genesis4's own, from the same particles and the same field, plus the two mutations that
 # leave a plausible power curve and only the reference can separate.
 
-echo "--- source-filter checks --------------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_source_filter.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: source-filter checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time source-filter
-echo
+sec_source_filter () {
+  echo "--- source-filter checks --------------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_source_filter.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: source-filter checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # FP32 lockstep checks: the single-precision particle path's divergence from the
 # FP64 reference lands inside its recorded ceilings, the instrument is read-only on
@@ -709,13 +762,11 @@ echo
 # recorded level so the check can fail, freerun measures the compounding rate, and
 # configurations the twin does not cover are refused.
 
-echo "--- FP32 lockstep checks --------------------------------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_fp32.py" --exe "$EXE" --workdir "$WORK_DIR"; then
-  echo "FAIL: FP32 lockstep checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time fp32-lockstep
-echo
+sec_fp32_lockstep () {
+  echo "--- FP32 lockstep checks --------------------------------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_fp32.py" --exe "$EXE" --workdir "$1" \
+    || { echo "FAIL: FP32 lockstep checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # Device backend checks: the Metal backend judged by the lockstep instrument with
 # the device in the twin's role, inside its recorded ceilings; the exact-wrap
@@ -735,29 +786,26 @@ echo
 # arrangement exists to prevent, which is why an unreadable banner fails the run
 # instead of skipping: a skip has to be justified by a stated reason.
 
-echo "--- Device backend checks -------------------------------------------------------"
-DEVICE_BACKEND="$("$EXE" 2>&1 | sed -n 's/^Device backend: //p' | head -1)"
-case "$DEVICE_BACKEND" in
-  none*)
-    echo "SKIP: ${DEVICE_BACKEND#none. }"
-    section_skip device "no usable device backend in this build"
-    ;;
-  '')
-    echo "FAIL: $EXE named no device backend, so a skip here could not be justified." >&2
-    echo "      The banner it prints without arguments is what this reads." >&2
-    exit 1
-    ;;
-  *)
-    echo "--- backend: $DEVICE_BACKEND"
-    if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$WORK_DIR" \
-           --latdir "$SCRIPT_DIR/bmad" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS"; then
-      echo "FAIL: device backend checks; outputs kept in: $WORK_DIR" >&2
-      exit 1
-    fi
-    section_time device
-    ;;
-esac
-echo
+sec_device () {
+  local backend
+  echo "--- Device backend checks -------------------------------------------------------"
+  backend="$("$EXE" 2>&1 | sed -n 's/^Device backend: //p' | head -1)"
+  case "$backend" in
+    none*)
+      echo "SKIP: ${backend#none. }"
+      echo "no usable device backend in this build" > "$1/.skip"
+      return 77 ;;
+    '')
+      echo "FAIL: $EXE named no device backend, so a skip here could not be justified." >&2
+      echo "      The banner it prints without arguments is what this reads." >&2
+      return 1 ;;
+  esac
+  echo "--- backend: $backend"
+  "$PYTHON" "$SCRIPT_DIR/scripts/with_lock.py" "$DEVICE_LOCK" \
+      "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$1" \
+      --latdir "$SCRIPT_DIR/bmad" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS" \
+    || { echo "FAIL: device backend checks; outputs kept in: $1" >&2; return 1; }
+}
 
 # Unaveraged-mode checks (fel-physics.md sec-unaveraged): the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
@@ -765,124 +813,196 @@ echo
 # comparison against the averaged mode. The fc/faw leak grep is part of the check: the
 # unaveraged path must not touch the averaged coupling quantities it measures.
 
-echo "--- unaveraged-mode checks ------------------------------------------------------"
-if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../code/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
-  echo "FAIL: averaged coupling quantities (fc/faw) leaked into the unaveraged path" >&2
-  exit 1
-fi
-echo "--- fc/faw leak grep: clean"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_unaveraged.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
-  echo "FAIL: unaveraged checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time unaveraged
+sec_unaveraged () {
+  echo "--- unaveraged-mode checks ------------------------------------------------------"
+  if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../code/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
+    echo "FAIL: averaged coupling quantities (fc/faw) leaked into the unaveraged path" >&2
+    return 1
+  fi
+  echo "--- fc/faw leak grep: clean"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_unaveraged.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
+    || { echo "FAIL: unaveraged checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- spontaneous-emission checks (FEL modes vs Bmad radiation vs analytic) -----"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_spontaneous.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
-  echo "FAIL: spontaneous checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time spontaneous
+sec_spontaneous () {
+  echo "--- spontaneous-emission checks (FEL modes vs Bmad radiation vs analytic) -----"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_spontaneous.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
+    || { echo "FAIL: spontaneous checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- two-polarization checks (vector radiation, tilt, crossed undulator) -------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_two_polarization.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
-  echo "FAIL: two-polarization checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time two-polarization
+sec_two_polarization () {
+  echo "--- two-polarization checks (vector radiation, tilt, crossed undulator) -------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_two_polarization.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
+    || { echo "FAIL: two-polarization checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- particle dump format checks (openPMD and Genesis .par) ---------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$WORK_DIR" --pyrepo "$BEAMPHYSICS"; then
-  echo "FAIL: beam-format checks; outputs kept in: $WORK_DIR" >&2
-  exit 1
-fi
-section_time beam-format
+sec_beam_format () {
+  echo "--- particle dump format checks (openPMD and Genesis .par) ---------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$1" --pyrepo "$BEAMPHYSICS" \
+    || { echo "FAIL: beam-format checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$WORK_DIR/harmonics" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS"; then
-  echo "FAIL: harmonic/openPMD checks; outputs kept in: $WORK_DIR/harmonics" >&2
-  exit 1
-fi
-section_time harmonics
+sec_harmonics () {
+  echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$1" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS" \
+    || { echo "FAIL: harmonic/openPMD checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- phasing checks (autophase, z_offset knob, absolute mode, chicanes) ---------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$WORK_DIR/phasing" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS"; then
-  echo "FAIL: phasing checks; outputs kept in: $WORK_DIR/phasing" >&2
-  exit 1
-fi
-section_time phasing
+sec_phasing () {
+  echo "--- phasing checks (autophase, z_offset knob, absolute mode, chicanes) ---------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$1" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS" \
+    || { echo "FAIL: phasing checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- coherent-source checks (SIMPLEX hybrid: limit, claim, guards, refusals) ----"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_coherent.py" "$WORK_DIR/coherent" --exe "$EXE"; then
-  echo "FAIL: coherent-source checks; outputs kept in: $WORK_DIR/coherent" >&2
-  exit 1
-fi
-section_time coherent-source
+sec_coherent_source () {
+  echo "--- coherent-source checks (SIMPLEX hybrid: limit, claim, guards, refusals) ----"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_coherent.py" "$1" --exe "$EXE" \
+    || { echo "FAIL: coherent-source checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- input-reference conformance (the stated defaults against the declarations) ---"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_input_reference.py"; then
-  echo "FAIL: the input reference disagrees with the struct declarations" >&2
-  exit 1
-fi
-section_time input-reference
+sec_input_reference () {
+  echo "--- input-reference conformance (the stated defaults against the declarations) ---"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_input_reference.py" \
+    || { echo "FAIL: the input reference disagrees with the struct declarations" >&2; return 1; }
+}
 
 # The examples are the feature list's evidence, so the two must agree. The generated
-# pages quote the decks verbatim, and regenerating them here is what keeps a page from
-# drifting: a deck edited without a regeneration leaves a diff the keystone refuses.
+# pages quote the decks verbatim. They are generated here into this section's own
+# directory and compared with the committed pages, so a deck edited without a
+# regeneration fails here by page name, and no pass writes into the tree while the
+# other may be reading it. The one write into the tree is the keystone's own
+# regeneration (tests/test_keystone.py), which then requires an empty diff.
 
-echo
-echo "--- examples conformance (the feature matrix, the directories, the pages) -----"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/report_examples.py" \
-       --examples "$BMAD_ROOT/lucifer/examples" \
-       --out "$BMAD_ROOT/lucifer/doc/generated/examples" > /dev/null; then
-  echo "FAIL: the example pages could not be generated" >&2
-  exit 1
-fi
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_examples.py"; then
-  echo "FAIL: the examples, the feature matrix and the generated pages disagree" >&2
-  exit 1
-fi
-section_time examples
+sec_examples () {
+  local pages="$BMAD_ROOT/lucifer/doc/generated/examples" f differ=0
+  echo "--- examples conformance (the feature matrix, the directories, the pages) -----"
+  "$PYTHON" "$SCRIPT_DIR/scripts/report_examples.py" \
+       --examples "$BMAD_ROOT/lucifer/examples" --out "$1/pages" > /dev/null \
+    || { echo "FAIL: the example pages could not be generated" >&2; return 1; }
+  for f in "$1"/pages/*.md; do
+    if ! cmp -s "$f" "$pages/$(basename "$f")"; then
+      echo "  committed page differs from what the examples generate: $(basename "$f")"
+      differ=1
+    fi
+  done
+  for f in "$pages"/*.md; do
+    if [[ ! -f "$1/pages/$(basename "$f")" ]]; then
+      echo "  committed page has no example to generate it: $(basename "$f")"
+      differ=1
+    fi
+  done
+  if [[ $differ -ne 0 ]]; then
+    echo "FAIL: the committed example pages are stale; regenerate them with scripts/report_examples.py" >&2
+    return 1
+  fi
+  echo "  $(ls "$1"/pages/*.md | wc -l | tr -d ' ') pages generated and identical to the committed ones"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_examples.py" \
+    || { echo "FAIL: the examples, the feature matrix and the generated pages disagree" >&2; return 1; }
+}
 
-echo
-echo "--- program-structure checks (library contract, the comb, the window) ---------"
-SMOKE="${EXE%lucifer}lucifer_smoke_test"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$WORK_DIR/program" --exe "$EXE" --smoke "$SMOKE"; then
-  echo "FAIL: program-structure checks; outputs kept in: $WORK_DIR/program" >&2
-  exit 1
-fi
-section_time program-structure
+sec_program_structure () {
+  local smoke="${EXE%lucifer}lucifer_smoke_test"
+  echo "--- program-structure checks (library contract, the comb, the window) ---------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_program.py" "$1" --exe "$EXE" --smoke "$smoke" \
+    || { echo "FAIL: program-structure checks; outputs kept in: $1" >&2; return 1; }
+}
 
-echo
-echo "--- Tao loads every committed lattice --------------------------------------"
-TAO="${EXE%lucifer}tao"
-if [[ ! -x "$TAO" ]]; then
-  echo "FAIL: tao not found beside the tracker at $TAO" >&2
-  exit 1
-fi
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_tao_lattices.py" --tao "$TAO" \
-        --latdir "$SCRIPT_DIR/bmad" --examples "$SCRIPT_DIR/../examples" \
-        --workdir "$WORK_DIR/tao"; then
-  echo "FAIL: a committed lattice does not load in Tao; outputs kept in: $WORK_DIR/tao" >&2
-  exit 1
-fi
-section_time tao-lattices
+sec_tao_lattices () {
+  local tao="${EXE%lucifer}tao"
+  echo "--- Tao loads every committed lattice --------------------------------------"
+  if [[ ! -x "$tao" ]]; then
+    echo "FAIL: tao not found beside the tracker at $tao" >&2
+    return 1
+  fi
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_tao_lattices.py" --tao "$tao" \
+        --latdir "$SCRIPT_DIR/bmad" --examples "$SCRIPT_DIR/../examples" --workdir "$1/tao" \
+    || { echo "FAIL: a committed lattice does not load in Tao; outputs kept in: $1/tao" >&2; return 1; }
+}
 
+sec_diagnostics () {
+  echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
+    || { echo "FAIL: diagnostic checks; outputs kept in: $1" >&2; return 1; }
+}
+
+# One section to its log and its record. The record carries the outcome, the exit
+# status, the seconds and a skip reason, and it is what the parent reads: a section
+# that ran leaves one, whatever happened, and a section with no record did not run.
+run_section () {   # <name> <dir>
+  local name="$1" dir="$2" fn t0=$SECONDS rc outcome reason=""
+  fn="sec_$(echo "$name" | tr '-' '_')"
+  ( cd "$dir" && LUCIFER_CPU_BUDGET="$SECTION_CPUS" "$fn" "$dir" ) > "$SECTIONS/$name.log" 2>&1
+  rc=$?
+  case $rc in
+    0)  outcome=pass ;;
+    77) outcome=skip; reason="$(cat "$dir/.skip" 2>/dev/null)" ;;
+    *)  outcome=fail ;;
+  esac
+  printf '%s\n%s\n%s\n%s\n' "$outcome" "$rc" "$((SECONDS - t0))" "$reason" > "$SECTIONS/$name.rec"
+}
+
+mkdir -p "$SECTIONS"
+for name in $SECTION_ORDER; do stage_section "$SECTIONS/$name"; done
+cp AramisTDSASEF.out.h5 AramisTDSASEF-initial.par.h5 AramisTDSASEF-initial.beam.h5 \
+   AramisTDSASEF-initial.wf.h5 "$SECTIONS/source-filter/"
+
+echo "--- check sections: $SECTION_WORKERS at once, $SECTION_CPUS cores each, in $SECTIONS ---"
 echo
-echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
-if ! "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$WORK_DIR"; then
-  echo "FAIL: diagnostic checks; outputs kept in: $WORK_DIR" >&2
+
+# A slot per worker, held in a fifo, since bash 3.2 has no "wait -n". A worker takes a
+# slot before it launches and returns it as it ends, whatever it returned.
+SLOTS="$SECTIONS/.slots"
+mkfifo "$SLOTS"
+exec 9<>"$SLOTS"
+i=0
+while [[ $i -lt $SECTION_WORKERS ]]; do printf '.\n' >&9; i=$((i + 1)); done
+SEC_T0=$SECONDS
+SEC_PIDS=""
+for name in $LAUNCH_ORDER; do
+  IFS= read -r -u 9 slot || { echo "FAIL: a section slot could not be taken" >&2; exit 1; }
+  ( run_section "$name" "$SECTIONS/$name"; printf '.\n' >&9 ) &
+  SEC_PIDS="$SEC_PIDS $!"
+done
+for pid in $SEC_PIDS; do wait "$pid"; done
+exec 9>&-
+
+# Every expected section exactly once, in the listed order, each with its own time.
+# A results row is written for a pass or a skip and never for a failure, so a
+# results file with a section missing says which section did not pass.
+SECTIONS_OK=1
+SECTIONS_FAILED=""
+for name in $SECTION_ORDER; do
+  [[ -f "$SECTIONS/$name.log" ]] && cat "$SECTIONS/$name.log"
+  if [[ ! -f "$SECTIONS/$name.rec" ]]; then
+    echo "  [time: $name -, FAILED: no record, the section did not run]"
+    SECTIONS_OK=0
+    SECTIONS_FAILED="$SECTIONS_FAILED $name"
+    echo
+    continue
+  fi
+  outcome=""; rc=""; secs=""; reason=""
+  { read -r outcome; read -r rc; read -r secs; IFS= read -r reason || reason=""; } < "$SECTIONS/$name.rec"
+  case "$outcome" in
+    pass)
+      echo "  [time: $name $secs s]"
+      if [[ -n "$RESULTS" ]]; then echo "section|$name|pass" >> "$RESULTS"; fi ;;
+    skip)
+      echo "  [time: $name $secs s, skipped: $reason]"
+      if [[ -n "$RESULTS" ]]; then echo "section|$name|skip|$reason" >> "$RESULTS"; fi ;;
+    *)
+      echo "  [time: $name $secs s, FAILED with exit $rc]"
+      SECTIONS_OK=0
+      SECTIONS_FAILED="$SECTIONS_FAILED $name" ;;
+  esac
+  echo
+done
+echo "  [time: sections-all-concurrent $((SECONDS - SEC_T0)) s, $SECTION_WORKERS at once]"
+echo
+BENCH_T_LAST=$SECONDS
+if [[ $SECTIONS_OK -ne 1 ]]; then
+  echo "FAIL: these sections did not pass:$SECTIONS_FAILED; outputs kept in: $SECTIONS" >&2
   exit 1
 fi
-section_time diagnostics
-echo
 
 COMPARE_ARGS=()
 if [[ -n "$RESULTS" ]]; then COMPARE_ARGS+=(--results "$RESULTS"); fi

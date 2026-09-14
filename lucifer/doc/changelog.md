@@ -9,6 +9,14 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Changed: `tests/run_fel_benchmark.sh` runs its check sections several at once after the
+  tiers, each in its own directory with its inputs copied in, and prints them afterwards in the listed
+  order with their own times. Its `--cpus` is one allocation the sections spend between them, handed on to
+  the pools inside the check scripts through `LUCIFER_CPU_BUDGET` (`scripts/pool.py`). The two passes' device
+  sections take turns under one lock (`scripts/with_lock.py`). The examples section generates its pages
+  into its own directory and compares them with the committed ones, so no pass writes into the tree. A
+  section with no record fails the pass by name and leaves no results row. The keystone takes 573, 579 and 575 s on three runs
+  against 689 to 696 s, and the suite hands the examples two workers.
 - 2026-09-13 Changed: `examples/run_examples.sh` runs three example directories at once. A directory is
   the unit, so the import example's second deck still reads the openPMD file its first deck wrote. Each
   deck's return code, elapsed time and exit line are collected in its worker, and the table is printed
