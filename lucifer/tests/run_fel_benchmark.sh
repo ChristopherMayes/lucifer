@@ -39,6 +39,9 @@
 #   --beamphysics <p>   openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
 #   --results <path>    Write a machine-readable results file (tiers, check sections,
 #                       build flavor) for doc generation. Default: none written.
+#   --tiers-marker <p>  Create this file when the tier block is done. Default: none.
+#   --wait-tiers <p>    Wait for this file before the tier block, at most 900 s
+#                       (LUCIFER_TIER_WAIT_MAX overrides, which the bound's own check uses).
 #   --cpus <n>          The cores this pass may spend on its check sections at once.
 #                       Default: the machine's performance cores. A check run takes
 #                       four threads, so n/4 sections run at once, each with n over
@@ -84,6 +87,8 @@ WORK_DIR=""
 BEAMPHYSICS=""
 RESULTS=""
 CPUS=""
+TIERS_MARKER=""
+WAIT_TIERS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -94,6 +99,8 @@ while [[ $# -gt 0 ]]; do
     --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
     --results)  RESULTS="$2";  shift 2 ;;
     --cpus)     CPUS="$2";     shift 2 ;;
+    --tiers-marker) TIERS_MARKER="$2"; shift 2 ;;
+    --wait-tiers)   WAIT_TIERS="$2";   shift 2 ;;
     -h|--help)  sed -n '2,46p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -556,6 +563,24 @@ export OMP_NUM_THREADS=1
 # arithmetic -- the documented tier numbers are unchanged.
 
 TIERS="tier1 tier1u tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk"
+
+# Two passes of a keystone reach their tier blocks at the same moment, and eleven
+# single-thread processes each is twenty-two on twelve cores: the block took 216 to
+# 225 s inside a keystone against 115 s with the machine to itself (2026-09-13). The
+# suite therefore lets one pass through the block first and holds the other here. The
+# held pass runs its setup meanwhile and its own block then runs on a quieter machine.
+# Waiting is bounded and says so: a pass whose partner died before writing its marker
+# runs its tiers rather than waiting out the keystone.
+TIER_WAIT_MAX="${LUCIFER_TIER_WAIT_MAX:-900}"
+if [[ -n "$WAIT_TIERS" ]]; then
+  TIER_WAIT_T0=$SECONDS
+  while [[ ! -f "$WAIT_TIERS" && $((SECONDS - TIER_WAIT_T0)) -lt $TIER_WAIT_MAX ]]; do sleep 2; done
+  if [[ -f "$WAIT_TIERS" ]]; then
+    echo "  tier order: waited $((SECONDS - TIER_WAIT_T0)) s for the other pass's tiers"
+  else
+    echo "  tier order: the other pass's tiers did not finish in $TIER_WAIT_MAX s, running anyway" >&2
+  fi
+fi
 TIER_PIDS=""
 for tier in $TIERS; do
   "$EXE" $tier.nml > fel-$tier.log 2>&1 &
@@ -576,6 +601,7 @@ for tier in $TIERS; do
   tail -4 fel-$tier.log
   echo
 done
+if [[ -n "$TIERS_MARKER" ]]; then : > "$TIERS_MARKER"; fi
 section_time tiers-all-eleven
 
 # Thread-count independence: the time-dependent single-segment configuration rerun with

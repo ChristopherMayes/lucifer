@@ -130,12 +130,19 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
     """
     cores = performance_cores()
     lock = (("LUCIFER_DEVICE_LOCK", str(art / "device.lock")),)
+    # The two passes reach their tier blocks together, and eleven single-thread
+    # processes each is twenty-two on twelve cores. The debug pass, which finishes
+    # last, runs its tiers first and says so in a marker; the production pass holds
+    # its own block until that marker appears and runs the rest of its work meanwhile.
+    tiers = str(art / "tiers-debug.done")
     return (
         Job("debug", (str(BENCHMARK), "--results", str(art / "fel-debug.txt"),
-                      "--work-dir", str(art / "wd-dbg"), "--cpus", str(cores)), ROOT, lock),
+                      "--work-dir", str(art / "wd-dbg"), "--cpus", str(cores),
+                      "--tiers-marker", tiers), ROOT, lock),
         Job("production", (str(BENCHMARK), "--exe", str(PRODUCTION_EXE),
                            "--results", str(art / "fel-prod.txt"),
-                           "--work-dir", str(art / "wd-prd"), "--cpus", str(cores)), ROOT, lock),
+                           "--work-dir", str(art / "wd-prd"), "--cpus", str(cores),
+                           "--wait-tiers", tiers), ROOT, lock),
         Job("regression", (sys.executable, "-m", "pytest", "test_fortran.py",
                            f"--bmad-bin={ROOT / 'debug' / 'bin'}"), ROOT / "regression_tests"),
         Job("wavefront", (str(WAVEFRONT),), ROOT),

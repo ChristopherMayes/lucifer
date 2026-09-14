@@ -9,6 +9,16 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Changed: the two benchmark passes of a keystone no longer run their tier blocks at the same
+  moment. `run_fel_benchmark.sh` takes `--tiers-marker` and `--wait-tiers`, and `tests/test_keystone.py`
+  sends the debug pass through the block first while the production pass holds at its own and runs its
+  setup meanwhile. Eleven single-thread trackers hold the machine at that moment rather than twenty-two.
+  The keystone took 523, 525 and 529 s against 573, 579 and 575 s on three runs each, the debug block 168
+  to 172 s against 216 to 225 s, mean CPU 1278 to 1319% of 1600% against 1210 to 1218%, and peak resident
+  memory 3.4 to 3.5 GB against 4.3 GB. Every printed check line and every results row is unchanged, and so
+  are the recorded digits. Giving the spontaneous section half the pass's cores was measured and rejected:
+  the section fell to 230 to 245 s from 326 s and the keystone rose to 626 to 640 s, since the sections of
+  a pass already reserve 3984 core-seconds of the 3996 their phase can hold.
 - 2026-09-13 Changed: `tests/run_fel_benchmark.sh` runs its check sections several at once after the
   tiers, each in its own directory with its inputs copied in, and prints them afterwards in the listed
   order with their own times. Its `--cpus` is one allocation the sections spend between them, handed on to
