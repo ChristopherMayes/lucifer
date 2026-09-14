@@ -78,7 +78,7 @@ end type
 
 ! The space-charge solver's numbers, as an input group. There is deliberately no gate
 ! here: whether space charge runs is the element's own space_charge_method, so an input
-! struct cannot claim one thing while the run does another (FINDINGS 7.34).
+! struct cannot claim one thing while the run does another.
 
 type fel_space_charge_input_struct
   ! Which space-charge implementation runs. 'genesis' is the transcribed solver, which

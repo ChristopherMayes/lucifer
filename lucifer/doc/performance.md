@@ -185,7 +185,7 @@ One slice, 16384 particles, `ngrid` 129, serial (the mode's parallelism is over 
 | everything else | 2.4% | 1.8% |
 | total samples | 13302 | 7964 |
 
-Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics and `fel_unavg_envelope` called two more, all four per particle per RK stage, when the argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all: the s-independence is structural rather than a comment. FINDINGS 7.37 records the defect.
+Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics and `fel_unavg_envelope` called two more, all four per particle per RK stage, when the argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all: the s-independence is structural rather than a comment.
 
 The share row hides how much moved, because the denominator moved too. In absolute samples libm fell from 6936 to 1221, which is 82% of the transcendental work gone, and the step's wall clock fell by the amounts in the next table.
 
@@ -239,7 +239,7 @@ Neither probe is a candidate implementation, and the second one is refused on it
 
 The shim it would replace was admitted at one ulp on $2 \times 10^{-6}$ of arguments, 73 mismatches in a 44M-point sweep ([](validation.md#val-the-particlepath-cost-measured)). This candidate is six ulp on a third of them, which is five orders of magnitude more arguments and six times the error, so it cannot be recorded as a 1-ulp change. The error is the two-term reduction rather than the kernels, and a reduction accurate enough to reach one ulp costs arithmetic that eats a 3.2% gain. The range is also not a constant: $\theta$ carries the common phase accumulating along the line, so a longer line moves toward the degradation with nothing to detect it.
 
-The version of this that could pay is a vectorized pair inside a loop that vectorizes, where one reduction amortizes over a whole vector. The averaged path has no such loop, for the reasons in the audit section below. FINDINGS 7.38 records the refusal.
+The version of this that could pay is a vectorized pair inside a loop that vectorizes, where one reduction amortizes over a whole vector. The averaged path has no such loop, for the reasons in the audit section below.
 
 (perf-the-vectorization-audit)=
 ## The vectorization audit

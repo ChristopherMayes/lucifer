@@ -3,7 +3,7 @@
 Checks for the particle dump format (fel-physics.md sec-import). Most claims here are a
 round trip against the beam that was written. A round trip proves that this program agrees
 with itself, which is not the same as proving the file says what it means: a convention
-that is wrong and self-consistent survives every one of them, and one did (FINDINGS 7.64).
+that is wrong and self-consistent survives every one of them, and one did.
 Section 8 therefore reads a dump with openPMD-beamphysics, which knows the standard and
 nothing about this program.
 
@@ -401,7 +401,7 @@ def main():
     # placement of a slice in the bunch has to be in the particle data. It is: openPMD's
     # time and timeOffset sum to a particle's time, the lag rides time and the slice's own
     # offset rides timeOffset. Dropped, every slice lands on one and the bunch reads one
-    # slice long (FINDINGS 7.64).
+    # slice long.
     #
     # The placement is checked on the per-patch offset and not on the spread of t. With
     # migration off a particle whose phase leaves its slice keeps going, so the lag is not

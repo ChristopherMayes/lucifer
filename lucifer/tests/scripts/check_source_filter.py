@@ -32,7 +32,7 @@ the filter is on by default, so an unaveraged element and a coherent source are 
 instead of refusals, and a no-op that works and a no-op that quietly filters print the same
 line. Each pair runs with the switch on and off. The unaveraged line and the coherent source
 must not move, the mixed line must, and the coherent case is the one that caught a fall
-through the arming of the per-element state (FINDINGS 7.60).
+through the arming of the per-element state.
 
 Usage:
 

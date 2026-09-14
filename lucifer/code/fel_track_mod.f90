@@ -879,7 +879,7 @@ endif
 ! four sweeps.
 
 ! The twin's field record spans the window, so it is allocated here rather than on first
-! use inside the loop below, where two threads reached it at once (FINDINGS 7.61).
+! use inside the loop below, where two threads reached it at once.
 
 if (fp_on .and. .not. dev_twin) call fel_fp32_field_prep (fp32, size(ff(1)%wf%Ex, 1), &
                                                                 size(ff(1)%wf%Ex, 2))
@@ -2730,7 +2730,7 @@ dk = twopi / (ngrid * dgrid)
 ! offset is a whole number and the two tables are the same one. For an even ngrid it is
 ! a half, so every mode there is carried at (m + 1/2) * dk and the constant mode at
 ! dk/2 rather than at zero. The error in k^2 is m + 1/4, which grows with the mode, and
-! the field it propagates picks up a phase that no beam produced (FINDINGS 7.67).
+! the field it propagates picks up a phase that no beam produced.
 !
 ! Odd grids are bit-identical across this change, which is why every digit recorded on
 ! one is unmoved.

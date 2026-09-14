@@ -54,8 +54,7 @@ implicit none
 ! which holds only when the spacing is a whole number of wavelengths. n_wavelength is
 ! that whole number, and it is carried as an integer from here to every consumer:
 ! recovering it by dividing a spacing in metres by a wavelength gives 12 to the last
-! bit rather than 12, which the device's exact bucket arithmetic then refuses
-! (FINDINGS 7.52).
+! bit rather than 12, which the device's exact bucket arithmetic then refuses.
 !
 ! The window is stated as a length or as a slice count, never both. current states a
 ! flat current directly, which is Genesis's &beam current: with a window it is a flat
@@ -251,7 +250,7 @@ end type
 ! resolve the beam and the mode, and finer cells raise the wide-angle emission of the
 ! point beamlets without moving the mode power. A half width of nine beam sizes contains
 ! the mode, and the half width does not enter above that. Both were measured on three
-! machines a hundred times apart in wavelength (FINDINGS 7.54).
+! machines a hundred times apart in wavelength.
 
 real(rp), parameter :: fel_cells_per_sigma$ = 7
 real(rp), parameter :: fel_widths_per_sigma$ = 9

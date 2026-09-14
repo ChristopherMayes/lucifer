@@ -50,7 +50,7 @@ and everything the backend does not cover is refused.
    record step where the averaged mode runs it once. The frame series rides the comb
    there too, so a frame is written from arrays the readback refreshed, and what it
    must carry is the chart: the undulator quiver sits in px as a common offset, which
-   the mean sees and an rms does not (FINDINGS 7.68). See unaveraged() below.
+   the mean sees and an rms does not. See unaveraged() below.
 
 8. Slice migration, from check_migration's own decks at the device's grid. Migration
    needs no kernel: at an element's last step the walk reads the beam back and releases
@@ -489,8 +489,8 @@ def unaveraged(args, wd, exe):
     # are where the resident state comes back to the host, so a frame is written from
     # arrays the device refreshed rather than from stale ones. The chart is the thing to
     # check: a frame taken mid-segment carries the undulator quiver in px, and a
-    # statistic that cannot see a common offset would pass with the quiver missing
-    # (FINDINGS 7.68), so the mean is compared and not the spread.
+    # statistic that cannot see a common offset would pass with the quiver missing, so
+    # the mean is compared and not the spread.
     frame_extra = '  global%comb_ds_save = 0.5\n  global%dump_at_comb = T\n'
     run(args.exe, wd, "dvu_fr.in", base.format(root="dvufr", extra=DEV + frame_extra))
     run(args.exe, wd, "dvu_froff.in", base.format(root="dvufroff", extra=frame_extra))
@@ -663,8 +663,8 @@ def unaveraged(args, wd, exe):
        same, "True", same)
 
     # The transform pair's loss on two planes, with no charge to feed either. The loss is
-    # each plane's own, so the pair costs the set the same fraction it costs one plane
-    # (FINDINGS 7.72), and the band is the one section 7 holds.
+    # each plane's own, so the pair costs the set the same fraction it costs one plane,
+    # and the band is the one section 7 holds.
     r = run(args.exe, wd, "dvu_d2.in",
             xb.format(root="dvud2", extra=DEV + "  global%write_initial = T\n").replace(
                 "bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
@@ -677,8 +677,8 @@ def unaveraged(args, wd, exe):
        f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good)
 
     # 9. The handedness the mode selects, on the device. A helical element radiates one
-    # circular polarization and couples to it, and which one is the electron's own
-    # (FINDINGS 7.85). A total power cannot tell the two apart, so the control is seeded:
+    # circular polarization and couples to it, and which one is the electron's own. A
+    # total power cannot tell the two apart, so the control is seeded:
     # a cold beam driven by a uniform seed as the scalar envelope and as each circular
     # pair of the same total intensity, and the rms energy modulation says which pair the
     # device couples to. It must be the CPU's answer, and the CPU's is check_two_polarization's.

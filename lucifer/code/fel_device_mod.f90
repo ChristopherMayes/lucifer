@@ -28,7 +28,7 @@
 ! device itself, not to a tolerance. The kernel-side reformulations (energy offset,
 ! detuning difference, base rotator times small angle) mirror fel_fp32_mod, whose
 ! lockstep levels price them; the fixed-point phase replaces the FP32 residual dzr,
-! whose ulp floor forced that module's moving reference (FINDINGS 7.39): with a
+! whose ulp floor forced that module's moving reference: with a
 ! uniform 1.5e-9 rad quantum the reference can stay static for a whole element.
 !
 ! Two modes. The averaged FEL step is the one this module was written for, and the
@@ -618,7 +618,7 @@ endif
 dev%wrap_exact = .true.
 
 ! The deposit accumulates in fixed point so that the answer does not depend on the
-! order threads reach a cell (FINDINGS 7.66). The scale has to keep the per-cell sum
+! order threads reach a cell. The scale has to keep the per-cell sum
 ! inside a signed 64-bit integer, and the bound taken here is the one nothing can
 ! breach: every macroparticle of every slice in one cell, in phase, at the lowest gamma
 ! the run can reach. Cancellation cannot hide an overflow, since the accumulator is
@@ -2016,7 +2016,7 @@ end subroutine fel_device_unavg_twin_begin
 ! after the record step and fill fel_fp32_mod's nine rows against the FP64 unaveraged
 ! path. The columns mean what that mode's own twin makes them mean: rows 1 to 4 are
 ! the quiver chart, so they are a worst per-particle difference and see the common
-! offset an rms would miss (FINDINGS 7.68), row 8 is the ledger's kick-side term and
+! offset an rms would miss, row 8 is the ledger's kick-side term and
 ! row 9 the field.
 !
 ! The guard is the median per-record-step phase increment in ticks of the fixed-point

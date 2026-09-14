@@ -111,7 +111,7 @@ type fel_beam_struct
                                    !   index per n_wavelength undulator periods, exactly, and
                                    !   that holds only for a whole number. Carried rather than
                                    !   re-derived: dividing the two reals gives 12 to the last
-                                   !   bit rather than 12 (FINDINGS 7.52).
+                                   !   bit rather than 12.
   real(rp) :: s0 = 0               ! Start of the time window [m].
   integer :: beamlet_size = 0      ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.

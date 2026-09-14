@@ -477,7 +477,7 @@ do je = 1, branch%n_ele_track
   ! (1, +i)/sqrt(2): E_eff = conj(pol).E = (Ehat_x - i Ehat_y)/sqrt(2), the co-rotating
   ! combination the unaveraged mode's Lorentz force selects on its own. The first version
   ! carried (1, -i), the counter-rotating pair, and a seed of that handedness drove the
-  ! averaged element while the unaveraged one ignored it (FINDINGS 7.85).
+  ! averaged element while the unaveraged one ignored it.
 
   if (und_of(je)%helical) then
     und_of(je)%pol = [cmplx(1.0_rp, 0.0_rp, rp), cmplx(0.0_rp, 1.0_rp, rp)] / sqrt(2.0_rp)
@@ -1062,7 +1062,7 @@ if (any(is_fel)) then
     ! lambda/dx, off the grid. An edge at the angle theta is therefore xcut = theta dx /
     ! lambda. A first version of this line had lambda/(4 dx) and every edge landed four
     ! times wider than its name, which the Aramis benchmark hid and a second machine
-    ! caught (FINDINGS 7.51). On the generated path the grid comes from the input, the
+    ! caught. On the generated path the grid comes from the input, the
     ! numbers the field was built from, and the conversion holds for every member of the
     ! field set. A field read from field_file has the file's grid, whatever the deck
     ! states or leaves at zero, so the conversion is taken from the field itself: taken

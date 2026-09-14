@@ -24,7 +24,9 @@ the tracking window.
      dumps its final state; run B = [after D, end] imports it; B's finals must be
      dataset-identical to the one-shot full run's finals, and A's finals to the full
      run's mid-line dumps at D.
-  6. A restart across a slippage residual: the window check above is steady state,
+  6. Committed prose cites committed artifacts: no file this program ships references
+     the design repository's numbered findings, which a reader of this tree cannot follow.
+  7. A restart across a slippage residual: the window check above is steady state,
      where slippage is a no-op, so a time-dependent pair follows it. The continuous run
      dumps at a pipe whose accumulated slip leaves half a slice of residual, the dump's
      slippageResidual attribute carries it, and the restart must reproduce the
@@ -32,7 +34,7 @@ the tracking window.
      floor. A restart from the dump with the attribute stripped rotates on its own
      schedule and differs from the second step of the second undulator, a pipe leaving a
      residual near zero makes that difference vanish, and an impossible residual is
-     refused (FINDINGS 7.93).
+     refused.
 
 Run by the benchmark harness; exits nonzero on failure. Self-referenced (no Genesis).
 """
@@ -56,6 +58,10 @@ from read_stats import read_stats, same_data
 FAILED = False
 
 LAMBDA0 = 1e-10          # the wavelength both decks below state
+
+# What the citation check below walks: the text this program ships.
+SOURCE_SUFFIXES = {".f90", ".mm", ".h", ".c", ".py", ".sh", ".md", ".bmad", ".lat", ".in",
+                   ".nml", ".yml", ".yaml", ".txt"}
 
 LAT1 = """no_digested
 parameter[geometry] = open
@@ -332,8 +338,8 @@ def main():
     # The composition check above runs steady state, where slippage is a no-op, so it
     # cannot see the one piece of the field's state a dump did not carry: the slip the
     # record has accumulated and not yet rotated, fel_slip_struct%accuslip. A restart
-    # that started it at zero rotated on a different schedule from the run it continued
-    # (FINDINGS 7.93). Two undulators with a pipe between, four wavelengths a slice, a
+    # that started it at zero rotated on a different schedule from the run it continued.
+    # Two undulators with a pipe between, four wavelengths a slice, a
     # deterministic seed ramped slice by slice so a rotation in the wrong place shows,
     # and the beam and field both imported so no loader noise enters. The residual at
     # the boundary is read from the dump's own slippageResidual attribute. Two pipes: one
@@ -528,6 +534,35 @@ def main():
                 expect_fail=True, fragment="slippageResidual")
     check("a residual of 7 wavelengths at 4 a slice is refused, and the message names slippageResidual", ok)
 
+
+    # ------------------------------------------------------------------
+    print("== committed prose cites committed artifacts ==")
+
+    # The numbered findings live in the design repository and do not ship with this
+    # program, so a reference to one dangles for every reader of this tree. A comment
+    # states the fact, or points at the page here that records it. The generated pages
+    # follow the headers they are built from, so they are not walked.
+    lucifer = pathlib.Path(__file__).resolve().parents[2]
+    skip = {"generated", "_build", "__pycache__", ".pytest_cache"}
+    # Spelled in halves so this file is not its own offender. Naming the file as an
+    # exception instead would blind the check to a real citation written here.
+    token = "FIND" + "INGS"
+    offenders = []
+    for f in sorted(lucifer.rglob("*")):
+        if not f.is_file() or f.suffix not in SOURCE_SUFFIXES:
+            continue
+        if skip & set(f.relative_to(lucifer).parts):
+            continue
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        for i, line in enumerate(text.split("\n"), 1):
+            if token in line:
+                offenders.append(f"{f.relative_to(lucifer.parent)}:{i}")
+    check("no committed file cites the design repository's findings", not offenders,
+          note=f"[{len(offenders)} reference(s)"
+               + (": " + ", ".join(offenders[:6]) if offenders else "") + "]")
 
     print("checks: " + ("FAIL" if FAILED else "PASS"))
     sys.exit(1 if FAILED else 0)

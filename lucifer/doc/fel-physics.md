@@ -780,7 +780,7 @@ instead, the restart's every later crossing of the threshold moves by the lost $
 two schedules may reach the same rotation count again, and the field has meanwhile been
 coupled to different slices, which later agreement does not undo. A file without the
 attribute continues from zero, and a value whose magnitude reaches `n_wavelength` is
-refused ([validation](validation.md), FINDINGS 7.93).
+refused ([validation](validation.md)).
 
 :::{admonition} Provenance
 :class: note

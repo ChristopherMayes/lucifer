@@ -1254,7 +1254,7 @@ operation a later landing needs -- and fel_device_setup asserts that exactly on 
 device itself, not to a tolerance. The kernel-side reformulations (energy offset,
 detuning difference, base rotator times small angle) mirror fel_fp32_mod, whose
 lockstep levels price them; the fixed-point phase replaces the FP32 residual dzr,
-whose ulp floor forced that module's moving reference (FINDINGS 7.39): with a
+whose ulp floor forced that module's moving reference: with a
 uniform 1.5e-9 rad quantum the reference can stay static for a whole element.
 
 Two modes. The averaged FEL step is the one this module was written for, and the
@@ -1833,7 +1833,7 @@ Routine to put the device in the twin's role, part two: read the device state ba
 after the record step and fill fel_fp32_mod's nine rows against the FP64 unaveraged
 path. The columns mean what that mode's own twin makes them mean: rows 1 to 4 are
 the quiver chart, so they are a worst per-particle difference and see the common
-offset an rms would miss (FINDINGS 7.68), row 8 is the ledger's kick-side term and
+offset an rms would miss, row 8 is the ledger's kick-side term and
 row 9 the field.
 
 The guard is the median per-record-step phase increment in ticks of the fixed-point
@@ -2072,8 +2072,8 @@ The record is one array for the whole window, and fel_fp32_twin_slice runs under
 slice loop's OMP parallel do, so the loop cannot be what first touches it. Allocating
 it there on first use let two threads find it unallocated at the same moment and both
 allocate it, which stops a bounds-checked build with no message on stdout. A one-slice
-window never raced and an eight-slice window raced about one run in five under load
-(FINDINGS 7.61). The grid is not known at fel_fp32_setup, which is why this is separate.
+window never raced and an eight-slice window raced about one run in five under load.
+The grid is not known at fel_fp32_setup, which is why this is separate.
 ```
 
 ```
@@ -3170,8 +3170,8 @@ rotated, fel_slip_struct%accuslip, as the root attribute slippageResidual in
 fundamental wavelengths, signed. It is the one piece of the field's state that the
 record itself does not hold: the rotation index is folded into the time order the file
 is written in, and this remainder decides when the next rotation falls. A restart that
-starts it at zero rotates on a different schedule from the run it continues
-(FINDINGS 7.93). The value is written as it stands and is never reduced into
+starts it at zero rotates on a different schedule from the run it continues. The
+value is written as it stands and is never reduced into
 [0, n_wavelength), since the threshold is 0.8 n_wavelength and a residual after a
 rotation is negative as often as not.
 ```
@@ -4441,8 +4441,7 @@ Slippage is an index rotation of the slice ring, exact and free of interpolation
 which holds only when the spacing is a whole number of wavelengths. n_wavelength is
 that whole number, and it is carried as an integer from here to every consumer:
 recovering it by dividing a spacing in metres by a wavelength gives 12 to the last
-bit rather than 12, which the device's exact bucket arithmetic then refuses
-(FINDINGS 7.52).
+bit rather than 12, which the device's exact bucket arithmetic then refuses.
 
 The window is stated as a length or as a slice count, never both. current states a
 flat current directly, which is Genesis's &beam current: with a window it is a flat
@@ -6117,7 +6116,7 @@ The step, per substep delta (Strang split, second order):
      on the record the kick read before the unitary diffraction), so the ledger closes
      to the physical spontaneous-emission term and rounding, by construction. With the
      source added after the diffraction the two sides carried different cross terms,
-     first order in the substep's diffraction phase (FINDINGS 7.86). Period-averaging the
+     first order in the substep's diffraction phase. Period-averaging the
      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
      emerges from the figure-8).
   3. half magnetic push.
@@ -6153,7 +6152,7 @@ starts inside the first record step rather than at the walk's element entry, bec
 the entry handoff moves z and the chart conversion has to see the moved value, and it
 ends inside the last one for the same reason. The quantities that do not depend on the
 particle are built here in FP64 and uploaded once a substep, which is the hoist
-FINDINGS 7.37 records. With fp32_check on, the device takes the instrument's twin role
+doc/performance.md prices. With fp32_check on, the device takes the instrument's twin role
 instead and the FP64 path below runs untouched.
 ```
 
@@ -6238,7 +6237,7 @@ kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec-unaveraged.
 The four quantities that depend on s and not on the particle arrive as arguments:
 the envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK
 stage shares them, so the caller evaluates them once per stage rather than once per
-particle per stage (FINDINGS 7.37). Taking them as arguments rather than computing
+particle per stage. Taking them as arguments rather than computing
 them here is what makes that structural: this routine can no longer be the place a
 per-particle transcendental hides.
 ```

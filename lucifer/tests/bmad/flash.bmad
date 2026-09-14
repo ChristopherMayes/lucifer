@@ -27,7 +27,7 @@ parameter[e_tot] = 8.0333e8
 ! stated beta = 10 m with alpha = 0 until 2026-09-06, which is not that solution: the
 ! beam beat through the line at a mismatch of 2.3, its rms size swinging from 27 to
 ! 256 um, and every measurement made on this probe before that date was made on the
-! beating beam (FINDINGS 7.56).
+! beating beam.
 beginning[beta_a]  = 7.02965
 beginning[alpha_a] = -0.467079
 beginning[beta_b]  = 13.39578

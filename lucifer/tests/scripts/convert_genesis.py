@@ -179,7 +179,7 @@ def write_openpmd_beam(path, groups, spacing):
     # tracker's own writer puts it. openPMD sums the two, so a reader that does not walk
     # particlePatches still gets the whole bunch, and a converted file and a native one
     # mean the same thing. Dropping it on both sides is what made a bunch read one slice
-    # long (FINDINGS 7.64).
+    # long.
     #
     # The two are written as they are, with no subtraction between them: the lag is what
     # Bmad's reader turns into vec(5), and moving any of the placement into it would move

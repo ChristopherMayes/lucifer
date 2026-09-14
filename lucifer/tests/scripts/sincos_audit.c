@@ -14,8 +14,8 @@
 
    The shim this would replace was admitted at one ulp on 2e-6 of arguments. Anything
    proposing to replace it is measured against that number, not against the idea that
-   arithmetic beats a library call. FINDINGS 7.38 records the decision, and
-   doc/performance.md carries the table.
+   arithmetic beats a library call. doc/performance.md records the decision and
+   carries the table.
 
    Not built by the library. Build it when the question comes up again:
 

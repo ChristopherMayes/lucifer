@@ -43,7 +43,7 @@
 // caller owns and lucifer_device.h states. What sets that mode's recorded levels
 // is the transform pair rather than its own kernels: an FP32 pair loses about
 // 1.3e-7 of the field's energy every time it runs, and this mode runs it nsub
-// times a record step where the averaged mode runs it once (FINDINGS 7.72).
+// times a record step where the averaged mode runs it once.
 //
 // The shader structs below are mirrored in host C++ immediately after the MSL
 // string, and luc_dev_step_par is mirrored again in fel_device_mod.f90. Editing
@@ -88,7 +88,7 @@ inline float2 cmul (float2 a, float2 b){ return float2(a.x*b.x - a.y*b.y, a.x*b.
 // fel_fp32_mod's anint(x / (256 spacing(x))) * 256 spacing(x). The step has to come
 // from the exponent alone. Taking it as a fixed fraction of |x| makes x/step the same
 // integer for every x and the hook returns its argument unchanged, which is what this
-// once did (FINDINGS 7.71).
+// once did.
 inline float coarsen256 (float x){
     if (!(fabs(x) > 0.0f)) return x;
     int ex;
@@ -455,8 +455,8 @@ kernel void deposit (device atomic_uint* S [[buffer(0)]],
 // divergence from FP64 doc/validation.md records.
 //
 // Three quantities do not depend on the particle and are computed in FP64 on the
-// host, once a substep rather than once a particle, which is the hoist FINDINGS
-// 7.37 records:
+// host, once a substep rather than once a particle, which is the hoist
+// doc/performance.md prices:
 //
 //   FQ    the envelope g, its slope gp, and cos(ku s), sin(ku s) at the four RK
 //         stage positions of each half push. Eight float4 a substep.
@@ -525,7 +525,7 @@ inline void ubfield (constant UnavgPar& P, float x, float y, float4 fq,
 // line: gamma/u_s - 1/beta0 is a difference of two numbers that are both one to
 // within 1.3e-8, so in single precision it is exactly zero and the slippage is
 // gone. The identity 1/ra - 1/rb = (a - b)/(ra rb (ra + rb)) moves the
-// cancellation into a difference of two small like quantities (FINDINGS 7.69).
+// cancellation into a difference of two small like quantities.
 inline U5 uode (constant UnavgPar& P, U5 y, float4 fq, float goff){
     float gam = P.gam0 + goff;
     float bx, by, bz;
@@ -1989,7 +1989,7 @@ int luc_dev_unavg_step (const luc_dev_unavg_par *par, const float *fq,
             // The slice's own source add and diffract, four passes, the first landing the
             // substep's source on the record the kick read and the rest the transform
             // kernels unchanged: field = IFFT(FFT(field + 2 src) exp(K2 dsub))/N^2, the
-            // order the CPU's step takes (fel_unaveraged_mod, FINDINGS 7.86).
+            // order the CPU's step takes (fel_unaveraged_mod).
             e = p->pass(LUC_DEV_PASS_SOLVE);
             [e setComputePipelineState:p->pRowAF];
             [e setBuffer:p->bField offset:0 atIndex:0];

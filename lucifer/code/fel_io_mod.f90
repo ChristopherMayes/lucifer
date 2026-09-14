@@ -208,8 +208,8 @@ end subroutine fel_frame_attributes
 ! fundamental wavelengths, signed. It is the one piece of the field's state that the
 ! record itself does not hold: the rotation index is folded into the time order the file
 ! is written in, and this remainder decides when the next rotation falls. A restart that
-! starts it at zero rotates on a different schedule from the run it continues
-! (FINDINGS 7.93). The value is written as it stands and is never reduced into
+! starts it at zero rotates on a different schedule from the run it continues. The
+! value is written as it stands and is never reduced into
 ! [0, n_wavelength), since the threshold is 0.8 n_wavelength and a residual after a
 ! rotation is negative as often as not.
 !
@@ -694,7 +694,7 @@ call out_io (s_blank$, r_name, trim(line))
 
 ! The mode against the wide-angle emission of the point beamlets, from the records the
 ! run already took (doc/startup-noise.md). The share is reported and not estimated: a
-! formula fitted on one machine was 40 times low on another (FINDINGS 7.54), while the
+! formula fitted on one machine was 40 times low on another, while the
 ! split itself held on all three.
 
 call fel_stats_convergence (stats, cvg)

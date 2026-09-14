@@ -304,7 +304,7 @@ def main():
     #     the record the step advances is the substep's midpoint field, and it was named
     #     for the plane half a substep behind it, so the particles worked against a field
     #     offset by a half-substep diffraction and the exit plane was handed the same
-    #     offset (FINDINGS 7.91). With the half-step carries at the segment's ends the
+    #     offset. With the half-step carries at the segment's ends the
     #     observed order between successive resolutions must sit near two.
     print("--- the split's order, fixed grid, 100 um seed:")
     spps = (20, 40, 80, 160)

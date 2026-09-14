@@ -331,8 +331,8 @@ end subroutine fel_fp32_setup
 ! slice loop's OMP parallel do, so the loop cannot be what first touches it. Allocating
 ! it there on first use let two threads find it unallocated at the same moment and both
 ! allocate it, which stops a bounds-checked build with no message on stdout. A one-slice
-! window never raced and an eight-slice window raced about one run in five under load
-! (FINDINGS 7.61). The grid is not known at fel_fp32_setup, which is why this is separate.
+! window never raced and an eight-slice window raced about one run in five under load.
+! The grid is not known at fel_fp32_setup, which is why this is separate.
 !
 ! Input:
 !   fp32 -- fel_fp32_struct: The instrument, after fel_fp32_setup.

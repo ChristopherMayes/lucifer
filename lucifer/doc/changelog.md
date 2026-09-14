@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Changed: no file this program ships references the design repository's numbered findings.
+  Seventy-three references stood in twenty-seven files, in routine headers, comments, check scripts, the
+  manual pages and this changelog's own entries, and the repository they point at is not distributed with
+  this program, so each one dangled for a reader of this tree. Every sentence keeps the fact it stated and
+  loses the pointer, three now name `doc/performance.md`, which prices the hoist they cited, and past
+  entries here lose the citation while keeping their text. The program-structure check walks the shipped
+  tree and fails on a reference, so the decision of 2026-08-30 now holds by measurement rather than by
+  habit.
+
 - 2026-09-13 Fixed: a restart started the field's slippage accumulator at zero, so its rotations fell
   on a different schedule from the run it continued, from the first threshold crossing after the boundary.
   No dump carried the residual, and the one restart check ran steady state, where slippage is a no-op.
@@ -16,7 +25,7 @@ and it is written at the merge.
   rotated, and the reader restores it. A file without it continues from zero and says so, and a value
   whose magnitude reaches `n_wavelength` is refused. The program-structure check gains a time-dependent
   restart across half a slice of residual, held to 1e-10 and measured 1.8e-12 in the field, with a
-  stripped copy differing by 0.59 at the second step after the boundary (FINDINGS 7.93). No recorded
+  stripped copy differing by 0.59 at the second step after the boundary. No recorded
   digit moved: the tiers import converted Genesis4 fields, which carry no residual and never did.
 - 2026-09-13 Changed: the two benchmark passes of a keystone no longer run their tier blocks at the same
   moment. `run_fel_benchmark.sh` takes `--tiers-marker` and `--wait-tiers`, and `tests/test_keystone.py`
@@ -535,8 +544,7 @@ and it is written at the merge.
   whole charge, and a frame cut to a slice range places those slices exactly where the whole window does.
   The round trip now also names the three records a restart may move, the element, the path length and
   the arrival time, and holds the placement across it. The placement lives inside an absolute time, so a
-  double carries it to 6.5e-6 of a slice spacing and particlePatches stays the exact partition
-  (FINDINGS 7.64).
+  double carries it to 6.5e-6 of a slice spacing and particlePatches stays the exact partition.
 
 - 2026-09-07 Added: the frame series can be cut to a slice range, and the field's reductions are
   written per record. global%dump_slice_first and dump_slice_last name the slices a frame carries, in
@@ -609,8 +617,7 @@ and it is written at the merge.
   cheaper two-transform one priced at the filtered default's rate. Every row is inside the factor of two
   the estimate is held to. The phases mode of run_perf_benchmark.sh states slicing%n_wavelength and checks
   the slice count the run built: an unstated spacing is derived from the beam and the gain, which on this
-  line is 38 wavelengths rather than 3, so the profile had been measuring 8 slices where it reports 96
-  (FINDINGS 7.63).
+  line is 38 wavelengths rather than 3, so the profile had been measuring 8 slices where it reports 96.
 
 - 2026-09-07 Added: a run states its cost and its convergence standing before it tracks. The header gains
   three lines. Work counts the integration steps over the line, the macroparticles in the window, their
@@ -658,7 +665,7 @@ and it is written at the merge.
   from 0.30 to 1.54 and settles nothing, while the exit bunching is higher with migration in all four
   seeds, by a factor of 1.41 +- 0.30. The source-filter section gains a check on where the filter
   reaches, run rather than read off the line the run prints, and it found a coherent-source run arming
-  the per-element filter with no edge set and moving its exit power by 3.3e-9 (FINDINGS 7.60).
+  the per-element filter with no edge set and moving its exit power by 3.3e-9.
 
 - 2026-09-07 Fixed: the FP32 lockstep instrument allocated its field record on first use inside the
   per-slice loop, which carries an OpenMP parallel do, so two threads could pass the allocation test
@@ -667,7 +674,7 @@ and it is written at the merge.
   the window rather than a slice, so fel_fp32_field_prep now allocates it before the loop and the
   per-slice routine writes only its own page. The FP32 check prints a failed run's stderr beside its
   stdout, since a compiler runtime error is written there and two keystones reported a run that
-  stopped after its banner with nothing to read (FINDINGS 7.61).
+  stopped after its banner with nothing to read.
 
 - 2026-09-06 Added: the slice spacing and the integration step are derived from the gain, and the
   default window holds the line's slippage. A deck that states no slicing%n_wavelength gets the whole
@@ -689,7 +696,7 @@ and it is written at the merge.
   the charge where a fixed number of sigmas does not. A loaded bunch spans its own particles and gets
   no slippage added, a loaded window being data rather than a choice. No example moves, since every
   time-dependent deck states its own window and spacing. The second machine's numbers are re-recorded
-  at the derived step (FINDINGS 7.59).
+  at the derived step.
 
 - 2026-09-06 Changed: an FEL segment is a wiggler or undulator carrying Bmad's fel_method attribute,
   which replaces the two FEL tracking methods. tracking_method names how one particle crosses an
@@ -725,8 +732,7 @@ and it is written at the merge.
   the saturation point from 27.1 to 21.6 m. The filter's default holds as it did, removing 171 times
   the wide-angle power rather than 165 and raising the mode power 19 percent rather than 6. The
   four-machine tables take the new rows, the range of ratios the default is measured over becomes 1.14
-  to 1.86, and the coefficient of the angle rule is unchanged at 6.8 with its threshold at 46
-  (FINDINGS 7.57).
+  to 1.86, and the coefficient of the angle rule is unchanged at 6.8 with its threshold at 46.
 
 - 2026-09-06 Changed: the branch takes Bmad main at 20260904-1, 158 commits since the last common
   point. The two FEL tracking methods, the wiggler-averaged and the unaveraged, and the openPMD
@@ -757,7 +763,7 @@ and it is written at the merge.
   which none of the four reaches and no hard X-ray line is built to: the default is measured over the
   range machines occupy. The condition on the in-cone startup comparison is settled with it, since
   over the four the measured ratio rises with the first segment's length in gain lengths, from 0.81 at
-  1.2 to 2.6 at 5.8 (FINDINGS 7.56). tests/scripts/startup_noise.py gains --machine lcls and a
+  1.2 to 2.6 at 5.8. tests/scripts/startup_noise.py gains --machine lcls and a
   per-machine long window, since twelve wavelengths per slice do not reach the slippage at 1.5
   Angstrom.
 
@@ -778,7 +784,7 @@ and it is written at the merge.
   count at 127 since the beam size cancels, rounded up to a power of two on the device. Both are
   printed with their origin. The derivation reproduces the grids chosen by hand on the FLASH probe
   and on FLASH1, and on the Aramis benchmark it gives 127 points over 192 um against the examples'
-  255 over 200, which lowers the wide-angle ratio of the `sase` deck from 21 to 5.4 (FINDINGS 7.55).
+  255 over 200, which lowers the wide-angle ratio of the `sase` deck from 21 to 5.4.
   The header's Radiation line now reports the grid the run built rather than the one the deck
   stated, which a run starting from a field file did not have.
 
@@ -798,7 +804,7 @@ and it is written at the merge.
   measurement behind it. Two of the SASE convergence page's numbers do not carry to it: the estimate
   of the wide-angle share is 40 times low, and the agreement of the in-cone startup power with the
   spontaneous emission holds only where the first segment is short in gain lengths, 2.2 on Aramis
-  against 5.8 here (FINDINGS 7.54). The page gains the third machine's table, tests/scripts/startup_noise.py
+  against 5.8 here. The page gains the third machine's table, tests/scripts/startup_noise.py
   gains --machine flash1 and the undulator coupling factor that a planar device needs, and
   tests/bmad/flash.bmad says in its header that it is a probe at FLASH's scales and not FLASH.
 
@@ -901,11 +907,11 @@ and it is written at the merge.
   two polarizations stays refused, for the device as for the CPU. The field-set types moved to
   fel_field_mod so the device seam can take the set as ff(:): passing ffield(:)%wf, a component
   section of a pointer array whose elements hold allocatable arrays, made the compiler pack a
-  temporary and deep-free it on return, a heap abort with no Fortran message (FINDINGS 7.46).
+  temporary and deep-free it on return, a heap abort with no Fortran message.
   The device twin judges every member: phasor, source and field rows are the worst over members,
   the footer adds each member's own worst, and every member's source and field rows are
   normalized by the fundamental's field, since a quiet-start harmonic's own norm is FP64 roundoff
-  on the CPU (FINDINGS 7.47). Measured on the debug build: harmonic lockstep phasor_h3 6.6e-8
+  on the CPU. Measured on the debug build: harmonic lockstep phasor_h3 6.6e-8
   steady and 2.0e-7 time dependent, three times the fundamental's phase error as h = 3 predicts;
   production P3 against the CPU 6.0e-4 on a strongly bunched beam and 3.4e-6 on a shot-noise
   window. The one-step Bessel identity P3/P1 is 4.4e-6 in FP32 against 2.7e-14 on the CPU.
@@ -1079,7 +1085,7 @@ and it is written at the merge.
   argument, 10 ulp at 1e5 and 2681 at 1e8, and the argument carries the common phase accumulating
   along the line, so a longer line moves toward that with nothing to detect it. Measured gain 3.2%
   of an averaged run at 2048 particles per slice. Refused, and the audit is committed so the next
-  reader starts from the number. FINDINGS 7.38.
+  reader starts from the number.
 
 - 2026-09-02 Changed: the unaveraged mode's undulator field no longer evaluates transcendentals per
   particle. `fel_unavg_bfield` took a position `s` and computed the ramp envelope, its slope,
@@ -1088,8 +1094,7 @@ and it is written at the merge.
   arguments built once per push by `unavg_field_quartet`, and the routine no longer takes `s`. The
   unaveraged step is 14.8% faster at 2048 particles per slice and 27.6% at 16384, libm samples fall
   from 6936 to 1221, and every result is bit-identical: the stage positions are the expressions
-  `unavg_push` evaluated inline, in the same order, so every value is the same bits it was. FINDINGS
-  7.37.
+  `unavg_push` evaluated inline, in the same order, so every value is the same bits it was.
 
 - 2026-09-02 Fixed: `doc/performance.md` labelled a profile category "libm sin and cos" where it had
   summed every libm transcendental, `exp` and `cexp` and the shared reduction helper included. `sin`
@@ -1282,8 +1287,8 @@ and it is written at the merge.
   The manual's stats section names the specification as the normative home, and the
   validator's docstring cites it by its path in the tree.
 
-- 2026-08-30 Changed: Committed prose cites committed artifacts only. Every
-  `FINDINGS.md n.m` and design-brief reference is gone from the manual, the README, the
+- 2026-08-30 Changed: Committed prose cites committed artifacts only. Every numbered
+  finding and design-brief reference is gone from the manual, the README, the
   code comments and the scripts, with the load-bearing lesson inlined where it earned its
   line and the pointer dropped otherwise. `changelog.md` is append-only history, so past
   entries stand as written. The manual's citation-convention paragraph, which announced
@@ -1340,7 +1345,7 @@ and it is written at the merge.
   leaving an arrival-time separation of `slice_spacing/c` with no beta in it. So
   `t_slice` is `-ct_slice/c` exactly, where it read `-s_slice/(beta0*c)` and was wrong by
   3.9e-9. Nothing read `coords/` back, which is why nothing caught it, and no tier digit
-  can move. FINDINGS 7.32.
+  can move.
 
 - 2026-08-28 Changed: The slice axis is the slice NUMBER, with three positions as
   variables on it, which is the treatment `coords/record` already had. `ct_slice` is the
@@ -1383,7 +1388,7 @@ and it is written at the merge.
   names the case.
 
 - 2026-08-27 Fixed: `stats.h5`'s `meta/` group was three ways wrong at once, and is
-  rebuilt at `@file_format_version` 2.2 (FINDINGS 7.31). **The 64 kB attribute cap.**
+  rebuilt at `@file_format_version` 2.2. **The 64 kB attribute cap.**
   HDF5 caps a single attribute at 64 kB (measured: the largest that writes is 65495
   bytes, where a scalar string dataset took 3 MB), the echoed namelist is already 12 kB
   and a real lattice text 37 kB, and a failure only warned. A lattice under twice a real

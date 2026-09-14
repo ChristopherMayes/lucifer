@@ -270,7 +270,7 @@ restart reads it back and continues on the writer's schedule. A file without it,
 every field file written before the attribute existed and every converted Genesis4 dump,
 continues from zero, and that is a continuation from a whole-slice boundary and not an
 exact one. A value the tracker could not have written, one whose magnitude reaches
-`n_wavelength` or is not finite, is refused rather than read as absent (FINDINGS 7.93).
+`n_wavelength` or is not finite, is refused rather than read as absent.
 
 `global%dump_slice_first` and `global%dump_slice_last` cut the frames to a range of the
 window. The beam file's patch count is then the range and the field file carries that many

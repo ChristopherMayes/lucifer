@@ -46,7 +46,7 @@
 !      on the record the kick read before the unitary diffraction), so the ledger closes
 !      to the physical spontaneous-emission term and rounding, by construction. With the
 !      source added after the diffraction the two sides carried different cross terms,
-!      first order in the substep's diffraction phase (FINDINGS 7.86). Period-averaging the
+!      first order in the substep's diffraction phase. Period-averaging the
 !      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
 !      emerges from the figure-8).
 !   3. half magnetic push.
@@ -82,7 +82,7 @@
 ! the entry handoff moves z and the chart conversion has to see the moved value, and it
 ! ends inside the last one for the same reason. The quantities that do not depend on the
 ! particle are built here in FP64 and uploaded once a substep, which is the hoist
-! FINDINGS 7.37 records. With fp32_check on, the device takes the instrument's twin role
+! doc/performance.md prices. With fp32_check on, the device takes the instrument's twin role
 ! instead and the FP64 path below runs untouched.
 !-
 
@@ -237,7 +237,7 @@ end function fel_unavg_envelope
 ! The four quantities that depend on s and not on the particle arrive as arguments:
 ! the envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK
 ! stage shares them, so the caller evaluates them once per stage rather than once per
-! particle per stage (FINDINGS 7.37). Taking them as arguments rather than computing
+! particle per stage. Taking them as arguments rather than computing
 ! them here is what makes that structural: this routine can no longer be the place a
 ! per-particle transcendental hides.
 !
@@ -439,7 +439,7 @@ if (first) then
   ! the particles worked against a field half a substep from where they stood and the
   ! exit plane was handed a field half a substep past it, first order in the substep
   ! at both, and the mode's convergence was first order for a diffracting field where
-  ! the split is second order (FINDINGS 7.91).
+  ! the split is second order.
 
   call unavg_field_to_midpoint (0.5_rp, err)
   if (err) return
@@ -622,9 +622,9 @@ do is = 1, nslice
     ! adding after, E' = D E + 2 src, charges the beam against E while the record gains
     ! the cross term against D E, and the difference, 4 Re<(D - I) E, dE>, is first
     ! order in the substep's diffraction phase: 1.2 percent of the turnover at 20
-    ! substeps a period on a seed of 100 um waist, halving with the substep (FINDINGS
-    ! 7.86). The stored record is then the substep's midpoint field, which is the same
-    ! Strang split read at the other half step, and the device's solve does the same.
+    ! substeps a period on a seed of 100 um waist, halving with the substep. The stored
+    ! record is then the substep's midpoint field, which is the same Strang split read at
+    ! the other half step, and the device's solve does the same.
 
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
     if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
@@ -724,7 +724,7 @@ contains
 
 ! One record step on the device. The quantities that do not depend on the particle are
 ! built here in FP64 and uploaded once a substep rather than once a particle, which is
-! the hoist FINDINGS 7.37 records, and everything else is the kernels'. What the device
+! the hoist doc/performance.md prices, and everything else is the kernels'. What the device
 ! does not carry the caller has refused at setup, so nothing here falls back.
 
 subroutine unavg_device_step (uerr)
