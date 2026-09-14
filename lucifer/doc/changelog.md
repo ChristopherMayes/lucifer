@@ -9,6 +9,14 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Added: a restart across a Bmad short-range element wake holds, on the element and through a
+  wake a superimposed marker has split onto a lord. The program-structure check takes both sides of the
+  kick, a checkpoint before the wake element and one at its end, reading the passage that applies it from
+  the runs as the first frame that departs from a wake-off history. That history runs from the same initial
+  state, never from a wake-on dump, and the wake's own effect is the scale: it moves the energies by 4.0e-4
+  and each restart reproduces that to 1.3e-9 of it on the element and 3.3e-13 through the lord, ids,
+  populations and membership identical at every frame. A continuation that applies the kick twice, or omits
+  it, reproduces 1.00 of the effect and fails. Long-range wakes stay refused.
 - 2026-09-14 Added: a restart across migration and the chamber wake holds. Each row of the migration
   file gains the smallest distance in phase any examined particle had to a slice boundary at that event,
   the dropped particles included, and the footer prints the escaped energy at full precision. The

@@ -34,7 +34,13 @@ the tracking window.
      charge and refreshed at every later event, and moves, dropped charge and escaped
      energy since the checkpoint agree at full precision. A separate case shifts the
      restarted phases past the smallest margin and shows one decision flip.
-  8. A restart across a slippage residual: the window check above is steady state,
+  8. A restart across a Bmad element wake: checkpoints immediately before and after the
+     passage that applies the kick, which the check reads from the runs rather than
+     assuming, once on the element itself and once on a wake a superimposed marker has
+     split onto a lord. Each is judged against a wake-off history run from the same
+     initial state, and the wake's own effect is the scale: a kick omitted or applied
+     twice would move it by order one.
+  9. A restart across a slippage residual: the window check above is steady state,
      where slippage is a no-op, so a time-dependent pair follows it. The continuous run
      dumps at a pipe whose accumulated slip leaves half a slice of residual, the dump's
      slippageResidual attribute carries it, and the restart must reproduce the
@@ -754,6 +760,151 @@ def main():
           note=f"[margin {m_min:.3e} rad at s = {s_min:.3f}; below: identical {outcome['below'][0]}, "
                f"field {outcome['below'][1]:.1e}, events {outcome['below'][2]}; above: identical {outcome['above'][0]}, "
                f"field {outcome['above'][1]:.1e}, events {outcome['above'][2]}. This case establishes no equivalence]")
+
+    # ------------------------------------------------------------------
+    print("== a restart across a Bmad element wake ==")
+
+    # An element wake acts once per passage through the whole window: the concatenation
+    # adds each particle's slice offset to its longitudinal coordinate at its own entry
+    # beta, Bmad kicks that bunch, and the split subtracts the offsets back. All of it is
+    # scratch of one passage, so a checkpoint at an element end carries what the next
+    # passage needs. What a restart has to get right is the placement: a checkpoint before
+    # the wake element must apply the kick, and one after it must not apply it again, the
+    # dump already holding it. Both checkpoints are judged against a wake-off history run
+    # from the same initial state and never from a wake-on dump, which holds the kick that
+    # no continuation can undo, and the wake's own effect is the scale the agreement is
+    # measured on: a kick omitted or applied twice moves that effect by order one, where
+    # the beam's total energy would hide it.
+
+    ew_wake = (", sr_wake = {amp_scale = 1, scale_with_length = T, "
+               "longitudinal = {1e17, 0, 0, 0.25, none}}")
+
+    def ew_lat(wake, lord):
+        mk = "\nMK: marker, superimpose, ref = PW" if lord else ""
+        return (LAT2.replace("D: pipe, l = 0.30", f"PW: pipe, l = 0.30{wake}{mk}")
+                    .replace("SEG: line = (UND, D, UND2)", "SEG: line = (UND, PW, UND2)"))
+
+    def ew_frames(root):
+        """{s: (field file, element name)} over a run's frame series."""
+        out = {}
+        for f in sorted(wd.glob(f"{root}-0*.wf.h5")):
+            with h5py.File(f) as h5:
+                name = np.atleast_1d(h5.attrs["elementName"])[0]
+                out[round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)] = (
+                    f, name.decode() if isinstance(name, bytes) else str(name))
+        return out
+
+    ew_beam = """  beam_init%n_particle = 1024
+  beam_init%bunch_charge = 2.401661485427e-14
+  beam_init%distribution_type(3) = "RAN_GAUSS"
+  beam_init%sig_z = 1.0e-9
+  beam_init%sig_pz = 8.804506566858e-5
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+"""
+    # One starting state for both cases: the run to the first undulator's end is the same
+    # line either way, and its field is ramped slice by slice as the residual case does.
+    (wd / "ew_n.bmad").write_text(ew_lat("", False))
+    rs_run("ewprep", rs_nml.format(lat="ew_n.bmad", root="ewprep",
+           extra='  slicing%window_length = 4.8e-9\n  global%track_end = "UND"\n',
+           beam=ew_beam, field=gen_field))
+    shutil.copy(wd / "ewprep-final.wf.h5", wd / "ewramp.wf.h5")
+    with h5py.File(wd / "ewramp.wf.h5", "r+") as h5:
+        m = h5[fieldio.MESH_PATH]
+        u = m["x"][...]
+        m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
+        if "slippageResidual" in h5.attrs:
+            del h5.attrs["slippageResidual"]
+    ew_imp = dict(beam='  beam_file = "ewprep-final.beam.h5"\n', field='  field_file = "ewramp.wf.h5"\n')
+
+    for lord, what in ((False, "on the element itself"), (True, "resolved through a split lord")):
+        tag = "lw" if lord else "ew"
+        (wd / f"{tag}_w.bmad").write_text(ew_lat(ew_wake, lord))
+        (wd / f"{tag}_n.bmad").write_text(ew_lat("", lord))
+        dumps = '  global%dump_beam_at = "UND,PW*"\n  global%dump_field_at = "UND,PW*"\n  global%dump_at_comb = T\n'
+        rs_run(f"{tag}on", rs_nml.format(lat=f"{tag}_w.bmad", root=f"{tag}on", extra=dumps, **ew_imp))
+        rs_run(f"{tag}off", rs_nml.format(lat=f"{tag}_n.bmad", root=f"{tag}off", extra=dumps, **ew_imp))
+
+        # Which passage applies the kick is read from the runs rather than assumed: the
+        # first frame whose beam differs from the wake-off history names the element,
+        # which for a split lord is the slave holding the lord's midpoint.
+        fon, foff = ew_frames(f"{tag}on"), ew_frames(f"{tag}off")
+        shared = sorted(set(fon) & set(foff))
+        applied_at = None
+        for s in shared:
+            bo = beam_by_id(str(fon[s][0]).replace(".wf.h5", ".beam.h5"))
+            bf = beam_by_id(str(foff[s][0]).replace(".wf.h5", ".beam.h5"))
+            d = float(np.max(np.abs(bo["pz"] - bf["pz"]))) / max(float(np.max(np.abs(bf["pz"]))), 1e-300)
+            if d > 1e-12:
+                applied_at = (s, fon[s][1], d)
+                break
+        after = {"PW": "UND2", "PW#1": "PW#2"}.get(applied_at[1] if applied_at else "", "UND2")
+        check(f"the wake {what} acts once, and the passage that applies it is read from the run",
+              applied_at is not None and applied_at[2] > 1e-6,
+              note=f"[first change at s = {applied_at[0]} m in {applied_at[1]}, "
+                   f"relative energy change {applied_at[2]:.2e}; the continuation restarts at {after}]")
+        apply_ele = applied_at[1]
+
+        def ew_restart(root, src, start, wake):
+            text = rs_nml.format(lat=f"{tag}_{'w' if wake else 'n'}.bmad", root=root,
+                                 extra=f'  global%track_start = "{start}"\n  global%dump_at_comb = T\n',
+                                 beam=f'  beam_file = "{src}.beam.h5"\n',
+                                 field=f'  field_file = "{src}.wf.h5"\n')
+            rs_run(root, text)
+
+        ew_restart(f"{tag}rA", f"{tag}on-at1-UND", apply_ele, True)
+        ew_restart(f"{tag}rB", f"{tag}on-at2-{apply_ele}", after, True)
+        ew_restart(f"{tag}rOff", f"{tag}off-at1-UND", apply_ele, False)
+
+        for label, root in ((f"before the wake, restarting at {apply_ele}", f"{tag}rA"),
+                            (f"after the wake, restarting at {after}", f"{tag}rB")):
+            fr = ew_frames(root)
+            common = sorted(set(fon) & set(fr))
+            exact = True
+            w_field = w_pz = w_theta = 0.0
+            effect = w_effect = 0.0
+            pz_scale = 1.0
+            for s in common:
+                bo = beam_by_id(str(fon[s][0]).replace(".wf.h5", ".beam.h5"))
+                br = beam_by_id(str(fr[s][0]).replace(".wf.h5", ".beam.h5"))
+                bf = beam_by_id(str(foff[s][0]).replace(".wf.h5", ".beam.h5"))
+                same = (np.array_equal(bo["id"], br["id"]) and np.array_equal(bo["pops"], br["pops"])
+                        and np.array_equal(bo["sl"], br["sl"]))
+                exact = exact and same
+                uo = fieldio.read_field(fon[s][0])["u"]
+                ur = fieldio.read_field(fr[s][0])["u"]
+                w_field = max(w_field, float(np.max(np.abs(uo - ur))) / max(float(np.max(np.abs(uo))), 1e-300))
+                if same:
+                    scale = max(float(np.max(np.abs(bo["pz"]))), 1e-300)
+                    w_pz = max(w_pz, float(np.max(np.abs(bo["pz"] - br["pz"]))) / scale)
+                    w_theta = max(w_theta, float(np.max(np.abs(bo["t"] - br["t"]))) * KS_C)
+                    # Both in energy units, and divided only at the end: at a frame
+                    # before the kick the effect is zero, and a per-frame ratio there
+                    # says nothing.
+                    d_cont = bo["pz"] - bf["pz"]
+                    d_rest = br["pz"] - bf["pz"]
+                    effect = max(effect, float(np.max(np.abs(d_cont))))
+                    w_effect = max(w_effect, float(np.max(np.abs(d_cont - d_rest))))
+                    pz_scale = scale
+            rel_effect = effect / pz_scale
+            reproduced = w_effect / max(effect, 1e-300)
+            check(f"a checkpoint {label}: the kick is neither omitted nor applied twice",
+                  exact and rel_effect > 1e-6 and reproduced <= 1e-6 and w_pz <= 1e-10
+                  and w_field <= 1e-10 and w_theta <= 1e-10,
+                  note=f"[{len(common)} frames; identical {exact}; the wake moves the energies by "
+                       f"{rel_effect:.2e} and the restart reproduces that to {reproduced:.2e} of it; "
+                       f"field {w_field:.1e}, energy {w_pz:.1e}, phase {w_theta:.1e} rad vs 1e-10]")
+
+        fr = ew_frames(f"{tag}rOff")
+        common = sorted(set(foff) & set(fr))
+        w_off = 0.0
+        for s in common:
+            bf = beam_by_id(str(foff[s][0]).replace(".wf.h5", ".beam.h5"))
+            bo = beam_by_id(str(fr[s][0]).replace(".wf.h5", ".beam.h5"))
+            w_off = max(w_off, float(np.max(np.abs(bf["pz"] - bo["pz"]))) / max(float(np.max(np.abs(bf["pz"]))), 1e-300))
+        check(f"the wake-off history restarted from its own checkpoint reproduces itself ({what})",
+              w_off <= 1e-10, note=f"[{len(common)} frames; worst energy {w_off:.2e} vs 1e-10]")
+
 
 
     # ------------------------------------------------------------------
