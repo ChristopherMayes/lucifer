@@ -9,6 +9,15 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-13 Fixed: a restart started the field's slippage accumulator at zero, so its rotations fell
+  on a different schedule from the run it continued, from the first threshold crossing after the boundary.
+  No dump carried the residual, and the one restart check ran steady state, where slippage is a no-op.
+  Every field file now carries `slippageResidual`, the signed slip in fundamental wavelengths not yet
+  rotated, and the reader restores it. A file without it continues from zero and says so, and a value
+  whose magnitude reaches `n_wavelength` is refused. The program-structure check gains a time-dependent
+  restart across half a slice of residual, held to 1e-10 and measured 1.8e-12 in the field, with a
+  stripped copy differing by 0.59 at the second step after the boundary (FINDINGS 7.93). No recorded
+  digit moved: the tiers import converted Genesis4 fields, which carry no residual and never did.
 - 2026-09-13 Changed: the two benchmark passes of a keystone no longer run their tier blocks at the same
   moment. `run_fel_benchmark.sh` takes `--tiers-marker` and `--wait-tiers`, and `tests/test_keystone.py`
   sends the debug pass through the block first while the production pass holds at its own and runs its

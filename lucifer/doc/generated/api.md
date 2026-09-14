@@ -3159,6 +3159,32 @@ Output:
   err_flag  -- logical: Set True if the file could not be stamped. False otherwise.
 ```
 
+(api-fel-write-slippage-residual)=
+### `fel_write_slippage_residual`
+
+*Subroutine* `(file_name, accuslip, err_flag)`
+
+```
+Routine to stamp a field file with the slippage the record has accumulated and not yet
+rotated, fel_slip_struct%accuslip, as the root attribute slippageResidual in
+fundamental wavelengths, signed. It is the one piece of the field's state that the
+record itself does not hold: the rotation index is folded into the time order the file
+is written in, and this remainder decides when the next rotation falls. A restart that
+starts it at zero rotates on a different schedule from the run it continues
+(FINDINGS 7.93). The value is written as it stands and is never reduced into
+[0, n_wavelength), since the threshold is 0.8 n_wavelength and a residual after a
+rotation is negative as often as not.
+```
+
+```
+Input:
+  file_name -- character(*): The field file, already written.
+  accuslip  -- real(rp): The record's accumulated slippage [fundamental wavelengths].
+
+Output:
+  err_flag  -- logical: Set True if the attribute could not be written. False otherwise.
+```
+
 (api-fel-dump-frame)=
 ### `fel_dump_frame`
 

@@ -18,6 +18,7 @@ use fel_input_mod
 use fel_timer_mod
 use fel_cost_mod
 use wavefront_openpmd_mod
+use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
 ! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read in
 ! fel_write_meta, which is the only place this module reaches into the parser.
 use bmad_parser_struct, only: bp_com
@@ -200,6 +201,48 @@ end subroutine fel_frame_attributes
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_write_slippage_residual (file_name, accuslip, err_flag)
+!
+! Routine to stamp a field file with the slippage the record has accumulated and not yet
+! rotated, fel_slip_struct%accuslip, as the root attribute slippageResidual in
+! fundamental wavelengths, signed. It is the one piece of the field's state that the
+! record itself does not hold: the rotation index is folded into the time order the file
+! is written in, and this remainder decides when the next rotation falls. A restart that
+! starts it at zero rotates on a different schedule from the run it continues
+! (FINDINGS 7.93). The value is written as it stands and is never reduced into
+! [0, n_wavelength), since the threshold is 0.8 n_wavelength and a residual after a
+! rotation is negative as often as not.
+!
+! Input:
+!   file_name -- character(*): The field file, already written.
+!   accuslip  -- real(rp): The record's accumulated slippage [fundamental wavelengths].
+!
+! Output:
+!   err_flag  -- logical: Set True if the attribute could not be written. False otherwise.
+!-
+
+subroutine fel_write_slippage_residual (file_name, accuslip, err_flag)
+
+integer(hid_t) f_id
+integer h5_err
+real(rp) accuslip
+logical err_flag, err
+character(*) file_name
+
+!
+
+err_flag = .true.
+call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
+call hdf5_write_attribute_real (f_id, 'slippageResidual', accuslip, err)
+call h5fclose_f (f_id, h5_err)
+err_flag = err
+
+end subroutine fel_write_slippage_residual
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_dump_frame (run, ie, at_end, err_flag)
 !
 ! Routine to write one frame of the series global%dump_at_comb asks for: the beam and
@@ -327,6 +370,8 @@ do ihh = 1, run%n_harm
   endif
   call fel_frame_attributes (trim(prefix) // trim(hsuf) // '.wf.h5', run, ie, eerr)
   if (eerr) return
+  call fel_write_slippage_residual (trim(prefix) // trim(hsuf) // '.wf.h5', ffield(ihh)%slip%accuslip, eerr)
+  if (eerr) return
 enddo
 
 err_flag = .false.
@@ -387,6 +432,8 @@ do ihh = 1, n_harm
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
 
   call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
+  if (eerr) return
+  call fel_write_slippage_residual (prefix // trim(hsuf) // '.wf.h5', ffield(ihh)%slip%accuslip, eerr)
   if (eerr) return
 enddo
 
@@ -848,9 +895,11 @@ subroutine fel_read_openpmd_into_field (run, fname, ihh, err_flag)
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
+type (hdf5_info_struct) info
+integer(hid_t) f_id
 character(*) fname
-integer ihh
-real(rp) e_photon
+integer ihh, h5_err
+real(rp) e_photon, residual
 logical rerr, err_flag
 character(*), parameter :: r_name = 'fel_read_openpmd_into_field'
 
@@ -871,6 +920,36 @@ endif
 ffield(ihh)%wf%dz = fbeam%slice_spacing
 ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength authority (the 1e-12
                                                ! beam/field consistency check's spirit).
+
+! The slippage the record had accumulated and not yet rotated when it was written,
+! which the record itself does not hold (fel_write_slippage_residual). A file that
+! carries it continues on the writer's rotation schedule. A file without it, which is
+! every field file written before the attribute existed and every converted Genesis
+! dump, continues from zero, and that is a continuation from a whole-slice boundary
+! rather than an exact one. A value the tracker could not have written is refused, not
+! taken as absent: the residual is bounded by the threshold, so its magnitude never
+! reaches n_wavelength.
+
+call hdf5_open_file (fname, 'READ', f_id, rerr, .false.)
+if (rerr) return
+info = hdf5_attribute_info (f_id, 'slippageResidual', rerr, .false.)
+if (rerr) then
+  call h5fclose_f (f_id, h5_err)
+  call out_io (s_info$, r_name, 'The field file carries no slippage residual, so the record continues from a whole-slice boundary.')
+else
+  call hdf5_read_attribute_real (f_id, 'slippageResidual', residual, rerr, .true.)
+  call h5fclose_f (f_id, h5_err)
+  if (rerr) return
+  if (.not. ieee_is_finite(residual) .or. (fbeam%n_wavelength >= 1 .and. abs(residual) >= fbeam%n_wavelength)) then
+    call out_io (s_error$, r_name, 'THE FIELD FILE''S slippageResidual IS NOT A VALUE THIS TRACKER WRITES: \es12.4\ ', &
+                 'ITS MAGNITUDE MUST STAY BELOW n_wavelength = \i0\. THE FILE: ' // trim(fname), &
+                 r_array = [residual], i_array = [fbeam%n_wavelength])
+    return
+  endif
+  ffield(ihh)%slip%accuslip = residual
+  call out_io (s_info$, r_name, 'The field file carries a slippage residual of \es12.4\ wavelengths, restored.', &
+               r_array = [residual])
+endif
 
 err_flag = .false.
 

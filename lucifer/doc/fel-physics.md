@@ -772,6 +772,16 @@ always receives the same $+1$, even with no trailing interlude at all. That is a
 Genesis4 quirk kept deliberately, since guarding it leaves the record one rotation
 short.
 
+$S$ travels with the record. A field dump is written in time order, which folds `first`
+into the file, and it carries $S$ as the attribute `slippageResidual`, in fundamental
+wavelengths and signed, since after a rotation $S$ is negative as often as not. A restart
+restores it, so its rotations fall where the continuous run's would. Started at zero
+instead, the restart's every later crossing of the threshold moves by the lost $S$: the
+two schedules may reach the same rotation count again, and the field has meanwhile been
+coupled to different slices, which later agreement does not undo. A file without the
+attribute continues from zero, and a value whose magnitude reaches `n_wavelength` is
+refused ([validation](validation.md), FINDINGS 7.93).
+
 :::{admonition} Provenance
 :class: note
 `Control::applySlippage` reduced to one shared-memory node (the MPI ring exchange

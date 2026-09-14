@@ -261,6 +261,17 @@ is the frame's own `s` and `timeOffset` is the reference time there plus the sli
 offset, so a reader that takes the position from the particles and one that takes it from
 the file see the same frame.
 
+Every field file this program writes, frames and the element-end and final dumps alike,
+also carries `slippageResidual`: the slippage the record had accumulated and not yet
+rotated, in fundamental wavelengths, signed. The record's rotation index is folded into
+the time order the file is written in, and this residual is the one piece of the field's
+state the record itself does not hold, since it decides when the next rotation falls. A
+restart reads it back and continues on the writer's schedule. A file without it, which is
+every field file written before the attribute existed and every converted Genesis4 dump,
+continues from zero, and that is a continuation from a whole-slice boundary and not an
+exact one. A value the tracker could not have written, one whose magnitude reaches
+`n_wavelength` or is not finite, is refused rather than read as absent (FINDINGS 7.93).
+
 `global%dump_slice_first` and `global%dump_slice_last` cut the frames to a range of the
 window. The beam file's patch count is then the range and the field file carries that many
 slices, with `sliceFirst` and `sliceLast` saying which. The field's mesh keeps its place:
