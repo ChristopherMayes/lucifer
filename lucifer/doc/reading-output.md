@@ -272,6 +272,17 @@ continues from zero, and that is a continuation from a whole-slice boundary and 
 exact one. A value the tracker could not have written, one whose magnitude reaches
 `n_wavelength` or is not finite, is refused rather than read as absent.
 
+Two records exist for comparing a continued run with the run it continues. Each row of
+`<out_root>.migration.txt` ends with the smallest distance in phase, in radians, that any
+particle examined at that event had to a slice boundary, the particles dropped off the
+window included, since a frame written after the event no longer holds them. A particle
+nearer a boundary than the error in its reconstructed phase decides its slice differently
+on either side of a restart, so that column is what a restart comparison has to clear at
+every event, against the phase error the continuation has propagated there rather than
+the file's bound alone. The footer's escaped energy is printed at full precision, since
+a comparison differences it against the same total at a checkpoint and six digits could
+not reach the floor ([validation](validation.md)).
+
 `global%dump_slice_first` and `global%dump_slice_last` cut the frames to a range of the
 window. The beam file's patch count is then the range and the field file carries that many
 slices, with `sliceFirst` and `sliceLast` saying which. The field's mesh keeps its place:

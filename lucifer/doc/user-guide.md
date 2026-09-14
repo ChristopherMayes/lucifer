@@ -282,7 +282,7 @@ precision:
 | `<out_root>.diag.txt` | The per-record Genesis4-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
 | `<out_root>.import.txt` | The load record: the per-slice current profile, with the bunch's analysis moments from the resampler or the per-slice counts and first moments from the keep mode. Written at load time, so it exists under `load_only = T` |
-| `<out_root>.migration.txt` | Slice migration: one row per event (s, particles moved, charge dropped, phase-continuity residual) plus the run summary |
+| `<out_root>.migration.txt` | Slice migration: one row per event (s, particles moved, charge dropped, phase-continuity residual, the smallest phase distance any examined particle had to a slice boundary) plus the run summary |
 
 This is Tao's division of labour. `show ele` is for people, `show value` and pytao are
 for precision. It is why the validation suite reads files rather than scraping the

@@ -667,7 +667,7 @@ subroutine fel_write_footer (run)
 
 type (fel_run_struct), target :: run
 type (fel_stats_struct), pointer :: stats
-character(300) line
+character(400) line
 character(*), parameter :: r_name = 'lucifer'
 type (fel_convergence_struct) cvg
 integer ir, ih, n_listed, is, n_thin, n_shown, nbl
@@ -807,7 +807,9 @@ endif
 if (run%ffield(1)%slip%timerun) then
   line = ' Escaped    '
   do ih = 1, run%n_harm
-    write (line, '(2a, i0, a, es12.5, a)') trim(line), ' h', run%ffield(ih)%harm, ' ', &
+    ! Full precision, since a restart comparison differences this against the same total
+    ! at a checkpoint (doc/validation.md), and six digits cannot reach its floor.
+    write (line, '(2a, i0, a, es24.16, a)') trim(line), ' h', run%ffield(ih)%harm, ' ', &
           run%ffield(ih)%slip%u_escaped, ' J'
     if (ih < run%n_harm) line = trim(line) // ','
   enddo

@@ -1625,18 +1625,25 @@ end subroutine fel_split_slices
 !                        particles, at their phase when dropped. Lets the caller verify
 !                        exact phase continuity including drops:
 !                        S_before = S_after + S_dropped to rounding.
+!   margin           -- real(rp): The smallest distance in phase [rad], over every particle
+!                        examined, from theta to the nearest slice boundary k*slen. A
+!                        particle nearer a boundary than the error in its reconstructed
+!                        phase decides its slice differently on either side of a restart,
+!                        so this is what a restart comparison has to clear. The particles
+!                        dropped off the window count, since a frame written after the
+!                        event no longer holds them. Huge when no particle was examined.
 !   err_flag         -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, err_flag)
+subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl, sd
-real(rp) ks, charge_dropped, drop_re, drop_im
+real(rp) ks, charge_dropped, drop_re, drop_im, margin
 integer n_moved
 logical err_flag
 
-real(rp) p0_mc, slen, theta, beta, z_new
+real(rp) p0_mc, slen, theta, beta, z_new, frac
 integer sample
 integer ia, ib, il, nslice, atar, idest
 character(*), parameter :: r_name = 'fel_migrate_slices'
@@ -1648,6 +1655,7 @@ n_moved = 0
 charge_dropped = 0
 drop_re = 0
 drop_im = 0
+margin = huge(1.0_rp)
 
 nslice = size(beam%slice)
 if (nslice < 2) then
@@ -1667,6 +1675,8 @@ do ia = 1, nslice
     beta = fel_beta_of(p0_mc, sl%pz(ib))
     theta = beam%phi0 + ks * sl%z(ib) / beta
     atar = int(floor(theta / slen))
+    frac = theta / slen - atar
+    margin = min(margin, min(frac, 1 - frac) * slen)
 
     if (atar == 0) then
       ib = ib + 1

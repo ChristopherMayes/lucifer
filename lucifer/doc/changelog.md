@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Added: a restart across migration and the chamber wake holds. Each row of the migration
+  file gains the smallest distance in phase any examined particle had to a slice boundary at that event,
+  the dropped particles included, and the footer prints the escaped energy at full precision. The
+  program-structure check runs a beam that migrates and drops through three undulators, checkpoints at
+  the first pipe after 1569 moves, and requires every later decision to clear its margin by 100 times the
+  phase error the continuation propagated (measured 1.5e9 times and more), then exact identity of ids,
+  populations and membership at 62 frames, every later event matched by position and moves, and the
+  moves, dropped charge and escaped energy since the checkpoint equal at full precision. With the chamber
+  wake on, the loss table in force at the checkpoint is rebuilt from the surviving charge and refreshed at
+  every later event, to the digit. A phase shift of 0.9 of the smallest margin flips no decision and 1.1
+  of it flips one. Bmad element wakes across a restart are not covered.
 - 2026-09-13 Changed: no file this program ships references the design repository's numbered findings.
   Seventy-three references stood in twenty-seven files, in routine headers, comments, check scripts, the
   manual pages and this changelog's own entries, and the repository they point at is not distributed with

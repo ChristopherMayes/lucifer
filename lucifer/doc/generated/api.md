@@ -769,6 +769,13 @@ Output:
                        particles, at their phase when dropped. Lets the caller verify
                        exact phase continuity including drops:
                        S_before = S_after + S_dropped to rounding.
+  margin           -- real(rp): The smallest distance in phase [rad], over every particle
+                       examined, from theta to the nearest slice boundary k*slen. A
+                       particle nearer a boundary than the error in its reconstructed
+                       phase decides its slice differently on either side of a restart,
+                       so this is what a restart comparison has to clear. The particles
+                       dropped off the window count, since a frame written after the
+                       event no longer holds them. Huge when no particle was examined.
   err_flag         -- logical: Set True on error, False otherwise.
 ```
 

@@ -167,7 +167,8 @@ b_dev_max = 0
 if (migrate) then
   open (newunit = iu_mig, file = trim(out_root) // '.migration.txt', action = 'write')
   write (iu_mig, '(a)') '# Slice migration, one row per event. Machine-readable; stdout is not.'
-  write (iu_mig, '(a)') '#          s [m]        moved      charge_dropped [C]     phasor_deviation'
+  write (iu_mig, '(a)') '#          s [m]        moved      charge_dropped [C]     phasor_deviation' // &
+                        '        min_margin [rad]'
 endif
 
 ! Progress goes to stdout, throttled by wall clock (slow modes print a steady trickle,
@@ -665,7 +666,7 @@ end subroutine apply_bmad_wake_kick
 
 subroutine do_migrate ()
 
-real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum, dev
+real(rp) chd, sb_re, sb_im, sa_re, sa_im, d_re, d_im, wsum, dev, mrg
 integer nm
 
 if (.not. migrate) return
@@ -686,7 +687,7 @@ endif
 
 if (migrate_check) call whole_beam_phasor (sb_re, sb_im, wsum)
 
-call fel_migrate_slices (fbeam, ks, nm, chd, d_re, d_im, err)
+call fel_migrate_slices (fbeam, ks, nm, chd, d_re, d_im, mrg, err)
 if (err) then
   err_flag = .true.;  return
 endif
@@ -717,8 +718,12 @@ endif
 ! window ends and where, plus the phase-continuity residual. A file, not stdout, because
 ! this is data (doc/user-guide.md).
 
+! The margin is the smallest phase distance any examined particle had to a slice
+! boundary at this decision, the particles dropped included, which no frame written after
+! the event can show. A restart comparison reads it (doc/validation.md).
+
 if (nm > 0 .or. chd > 0) then
-  write (iu_mig, '(es22.14, i12, 2es24.15e3)') z_now, nm, chd, dev
+  write (iu_mig, '(es22.14, i12, 3es24.15e3)') z_now, nm, chd, dev, mrg
 endif
 call fel_toc (fel_t_migration$)
 

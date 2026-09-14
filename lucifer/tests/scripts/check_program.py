@@ -26,7 +26,15 @@ the tracking window.
      run's mid-line dumps at D.
   6. Committed prose cites committed artifacts: no file this program ships references
      the design repository's numbered findings, which a reader of this tree cannot follow.
-  7. A restart across a slippage residual: the window check above is steady state,
+  7. A restart across migration and the chamber wake: a beam that migrates and drops
+     through three undulators, checkpointed after two events with a residual. Every later
+     decision clears its recorded margin by 100x the phase error the continuation has
+     propagated, and then ids, populations and membership are identical at every frame,
+     events match by position and moves, the wake table is rebuilt from the surviving
+     charge and refreshed at every later event, and moves, dropped charge and escaped
+     energy since the checkpoint agree at full precision. A separate case shifts the
+     restarted phases past the smallest margin and shows one decision flip.
+  8. A restart across a slippage residual: the window check above is steady state,
      where slippage is a no-op, so a time-dependent pair follows it. The continuous run
      dumps at a pipe whose accumulated slip leaves half a slice of residual, the dump's
      slippageResidual attribute carries it, and the restart must reproduce the
@@ -396,9 +404,13 @@ def main():
             rec = lambda k: g[k][...] if g[k].shape else np.full(n, g[k][()])
             ids = rec("id")
             order = np.argsort(ids)
+            pops = np.atleast_1d(g["particlePatches/numParticles"][...])
+            off = np.atleast_1d(g["particlePatches/numParticlesOffset"][...])
+            slice_of = np.zeros(n, int)
+            for k, (o0, c) in enumerate(zip(off, pops)):
+                slice_of[o0:o0 + c] = k
             return dict(id=ids[order], w=rec("weight")[order], t=rec("time")[order],
-                        pz=rec("totalMomentum")[order],
-                        pops=np.atleast_1d(g["particlePatches/numParticles"][...]))
+                        pz=rec("totalMomentum")[order], sl=slice_of[order], pops=pops)
 
     def compare_runs(full, other):
         """Worst relative differences over the frames the two runs share, and the s of the
@@ -533,6 +545,215 @@ def main():
                 beam='  beam_file = "rshfull-at2-D.beam.h5"\n', field='  field_file = "rsbad.wf.h5"\n'),
                 expect_fail=True, fragment="slippageResidual")
     check("a residual of 7 wavelengths at 4 a slice is refused, and the message names slippageResidual", ok)
+
+    # ------------------------------------------------------------------
+    print("== a restart across migration, then with the chamber wake ==")
+
+    # The residual case above migrates nothing. Here the beam migrates and drops through
+    # three undulators, the checkpoint is the first pipe's end, after two events, and the
+    # continuation holds three more. Migration derives a destination from the whole
+    # phase, phi0 + ks z/beta, floored over the window's 2 pi n_wavelength, and the dump
+    # folds exactly that phase into the file's time, so a decision carries across a
+    # restart unless a particle sits nearer a boundary than the error in its
+    # reconstructed phase. The migration file records that margin per event, over every
+    # particle examined and the dropped ones included, which no frame after the event can
+    # show. The margin is measured against the phase error the continuation has actually
+    # propagated to the frame before each event, read by id, and not against the file's
+    # bound alone. With the margin cleared, exact identity is required: one particle in
+    # another slice changes the current every wake is built from, and one drop changes the
+    # source charge. A separate case shifts every restarted phase by a little less and a
+    # little more than the smallest recorded margin: the first flips nothing, the second
+    # flips a decision, which is what the margin means, and it establishes nothing about
+    # equivalence.
+
+    mw_lat = LAT2.replace("SEG: line = (UND, D, UND2)",
+                          "UND3: UND\nD2: pipe, l = 0.30\nSEG: line = (UND, D, UND2, D2, UND3)")
+    (wd / "mw.bmad").write_text(mw_lat)
+    mw_beam = """  beam_init%n_particle = 1024
+  beam_init%bunch_charge = 2.401661485427e-14
+  beam_init%distribution_type(3) = "RAN_GAUSS"
+  beam_init%sig_z = 1.0e-9
+  beam_init%sig_pz = 5.282703940115e-03
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+"""
+    wake_extra = """  chamber_wake%on = T
+  chamber_wake%radius = 2.5e-3
+  chamber_wake%conductivity = 5.813e7
+  chamber_wake%relaxation = 8.1e-6
+  chamber_wake%gap = 0.5e-3
+  chamber_wake%lgap = 0.015
+  chamber_wake%hrough = 100e-9
+  chamber_wake%lrough = 100e-6
+"""
+    mig_extra = "  global%migrate = T\n  global%migrate_check = T\n"
+    KS_C = 2 * np.pi / LAMBDA0 * 2.99792458e8      # phase per second of the file's time
+
+    def mig_events(root):
+        """[(s, moved, dropped charge, margin)] per event, and the summary totals."""
+        rows, moved, dropped = [], None, None
+        for ln in (wd / f"{root}.migration.txt").read_text().splitlines():
+            if ln.startswith("#") or not ln.strip():
+                continue
+            f = ln.split()
+            if f[0] == "moved":
+                moved = int(f[1])
+            elif f[0] == "charge_dropped_total":
+                dropped = float(f[1])
+            elif f[0] == "worst_bunching_deviation":
+                pass
+            else:
+                rows.append((float(f[0]), int(f[1]), float(f[2]), float(f[4])))
+        return rows, moved, dropped
+
+    def wake_table(root):
+        """[(z, eloss array)] per z-stamped block of <root>.wake.txt."""
+        blocks, z, vals = [], None, []
+        for ln in (wd / f"{root}.wake.txt").read_text().splitlines():
+            m = re.match(r"# z =\s+(\S+)", ln)
+            if m:
+                if z is not None:
+                    blocks.append((z, np.array(vals)))
+                z, vals = float(m.group(1)), []
+            elif ln.strip() and not ln.startswith("#"):
+                vals.append(float(ln.split()[1]))
+        if z is not None:
+            blocks.append((z, np.array(vals)))
+        return blocks
+
+    def identity_and_floor(full, other):
+        """Exact identity of ids, populations and membership over the shared frames, the
+        field's worst relative difference, and the largest absolute phase difference [rad]
+        by id at each shared s."""
+        ff, fo = frames_by_s(full), frames_by_s(other)
+        common = sorted(set(ff) & set(fo))
+        exact = True
+        w_field = w_pz = 0.0
+        dtheta = {}
+        for s in common:
+            bf = beam_by_id(str(ff[s]).replace(".wf.h5", ".beam.h5"))
+            bo = beam_by_id(str(fo[s]).replace(".wf.h5", ".beam.h5"))
+            same = (np.array_equal(bf["id"], bo["id"]) and np.array_equal(bf["pops"], bo["pops"])
+                    and np.array_equal(bf["sl"], bo["sl"]))
+            exact = exact and same
+            uf = fieldio.read_field(ff[s])["u"]
+            uo = fieldio.read_field(fo[s])["u"]
+            w_field = max(w_field, float(np.max(np.abs(uf - uo))) / max(float(np.max(np.abs(uf))), 1e-300))
+            if same:
+                dtheta[s] = float(np.max(np.abs(bf["t"] - bo["t"]))) * KS_C
+                w_pz = max(w_pz, float(np.max(np.abs(bf["pz"] - bo["pz"]))) / max(float(np.max(np.abs(bf["pz"]))), 1e-300))
+        return exact, w_field, w_pz, dtheta, common
+
+    (wd / "mw.bmad").write_text(mw_lat)
+    rs_run("mwprep", rs_nml.format(lat="mw.bmad", root="mwprep",
+           extra=mig_extra + '  slicing%window_length = 4.8e-9\n  global%track_end = "UND"\n',
+           beam=mw_beam, field=gen_field))
+    shutil.copy(wd / "mwprep-final.wf.h5", wd / "mwramp.wf.h5")
+    with h5py.File(wd / "mwramp.wf.h5", "r+") as h5:
+        m = h5[fieldio.MESH_PATH]
+        u = m["x"][...]
+        m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
+        if "slippageResidual" in h5.attrs:
+            del h5.attrs["slippageResidual"]
+    mw_imp = dict(beam='  beam_file = "mwprep-final.beam.h5"\n', field='  field_file = "mwramp.wf.h5"\n')
+    s_ckpt = 0.75
+
+    for tag, wake, what in (("mwm", "", "migration alone"), ("mww", wake_extra, "with the chamber wake")):
+        full, toD, rest = f"{tag}full", f"{tag}toD", f"{tag}rest"
+        rs_run(full, rs_nml.format(lat="mw.bmad", root=full,
+               extra=mig_extra + wake + '  global%dump_beam_at = "D"\n  global%dump_field_at = "D"\n  global%dump_at_comb = T\n', **mw_imp))
+        rs_run(toD, rs_nml.format(lat="mw.bmad", root=toD, extra=mig_extra + wake + '  global%track_end = "D"\n', **mw_imp))
+        rs_run(rest, rs_nml.format(lat="mw.bmad", root=rest,
+               extra=mig_extra + wake + '  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
+               beam=f'  beam_file = "{full}-at2-D.beam.h5"\n', field=f'  field_file = "{full}-at2-D.wf.h5"\n'))
+        resid = residual_of(wd / f"{full}-at2-D.wf.h5")
+        ev_full, mv_full, dr_full = mig_events(full)
+        ev_toD, mv_toD, dr_toD = mig_events(toD)
+        ev_rest, mv_rest, dr_rest = mig_events(rest)
+        before = [e for e in ev_full if e[0] <= s_ckpt + 1e-9]
+        after = [e for e in ev_full if e[0] > s_ckpt + 1e-9]
+        check(f"{what}: the checkpoint follows actual moves and drops and carries a residual",
+              len(before) >= 1 and sum(e[1] for e in before) > 0 and sum(e[2] for e in before) > 0
+              and resid is not None and 0.5 < abs(resid) < 3.2,
+              note=f"[{sum(e[1] for e in before)} moves and {sum(e[2] for e in before):.3e} C dropped before "
+                   f"s = {s_ckpt}; slippageResidual {resid}]")
+
+        exact, w_field, w_pz, dtheta, common = identity_and_floor(full, rest)
+        # The margin at every later event against the phase error propagated to the frame
+        # before it. The event count is the element ends of the continuation, so no
+        # decision went unrecorded.
+        n_ends_after = 3
+        margins_ok = len(ev_rest) == n_ends_after and len(after) == n_ends_after
+        worst_ratio = float("inf")
+        for s_ev, _, _, mg in ev_rest:
+            prev = max((x for x in common if x < s_ev - 1e-9), default=None)
+            err = dtheta.get(prev, float("nan"))
+            ratio = mg / err if err and err > 0 else float("inf")
+            worst_ratio = min(worst_ratio, ratio)
+            margins_ok = margins_ok and err == err and mg > 100 * err
+        check(f"{what}: every later decision clears its margin by 100x the propagated phase error",
+              margins_ok,
+              note=f"[{len(ev_rest)} events after the checkpoint, margins "
+                   f"{', '.join(f'{e[3]:.1e}' for e in ev_rest)} rad against propagated errors "
+                   f"{', '.join(f'{dtheta.get(max((x for x in common if x < e[0] - 1e-9), default=None), float(chr(110)+chr(97)+chr(110))):.1e}' for e in ev_rest)} rad; smallest ratio {worst_ratio:.1e}]")
+        check(f"{what}: identity of ids, populations and membership at every frame, field and energy at the floor",
+              exact and w_field <= 1e-10 and w_pz <= 1e-10,
+              note=f"[{len(common)} frames; identical {exact}; field {w_field:.2e}, energy {w_pz:.2e}, "
+                   f"phase {max(dtheta.values()) if dtheta else float(chr(110)+chr(97)+chr(110)):.2e} rad vs 1e-10]")
+        events_ok = ([(round(e[0], 9), e[1]) for e in after] == [(round(e[0], 9), e[1]) for e in ev_rest]
+                     and all(abs(a[2] - r[2]) <= 1e-10 * max(abs(a[2]), 1e-300) for a, r in zip(after, ev_rest)))
+        check(f"{what}: every later migration event matches, position and moves exactly, dropped charge at the floor",
+              events_ok, note=f"[{[(round(e[0], 3), e[1]) for e in ev_rest]}]")
+        e_full, e_toD, e_rest = escaped_of(full), escaped_of(toD), escaped_of(rest)
+        inc = e_full - e_toD
+        check(f"{what}: since the checkpoint, moves exact, dropped charge and escaped energy at the floor",
+              mv_full - mv_toD == mv_rest
+              and abs((dr_full - dr_toD) - dr_rest) <= 1e-10 * max(abs(dr_rest), 1e-300)
+              and abs(inc - e_rest) <= 1e-10 * max(abs(inc), 1e-300),
+              note=f"[moves {mv_full - mv_toD} vs {mv_rest}; dropped {dr_full - dr_toD:.6e} vs {dr_rest:.6e} C; "
+                   f"escaped {inc:.6e} vs {e_rest:.6e} J, differing by {abs(inc - e_rest):.1e}]")
+
+        if wake:
+            bf_, br_ = wake_table(full), wake_table(rest)
+            in_force = [b for b in bf_ if b[0] <= s_ckpt + 1e-9][-1]
+            d0 = float(np.max(np.abs(in_force[1] - br_[0][1]))) / max(float(np.max(np.abs(in_force[1]))), 1e-300)
+            later_f = [b for b in bf_ if b[0] > s_ckpt + 1e-9]
+            later_r = br_[1:]
+            pos_ok = [round(b[0], 9) for b in later_f] == [round(b[0], 9) for b in later_r]
+            d_later = max((float(np.max(np.abs(a[1] - r[1]))) / max(float(np.max(np.abs(a[1]))), 1e-300)
+                           for a, r in zip(later_f, later_r)), default=0.0)
+            check("the restart rebuilds the wake table in force at the checkpoint from the surviving charge",
+                  d0 <= 1e-10, note=f"[rel {d0:.2e} vs 1e-10; block at z = {in_force[0]:.3f} m]")
+            check("the wake refreshes after every later move or drop: events by count and position, then block by block",
+                  pos_ok and len(later_f) == n_ends_after and d_later <= 1e-10,
+                  note=f"[{len(later_r)} refreshes at z = {[round(b[0], 3) for b in later_r]}; worst rel {d_later:.2e}]")
+
+    # Boundary sensitivity, on the migration-alone case: shift every restarted phase by a
+    # little less and a little more than the smallest margin any later event recorded.
+    ev_rest, _, _ = mig_events("mwmrest")
+    m_min = min(e[3] for e in ev_rest)
+    s_min = [e[0] for e in ev_rest if e[3] == m_min][0]
+    outcome = {}
+    for side, factor in (("below", 0.9), ("above", 1.1)):
+        delta = factor * m_min
+        root = f"mwsens_{side}"
+        shutil.copy(wd / "mwmfull-at2-D.beam.h5", wd / f"{root}.beam.h5")
+        with h5py.File(wd / f"{root}.beam.h5", "r+") as h5:
+            name = sorted(h5["data"].keys())[0]
+            g = h5[f"data/{name}/particles"]
+            g = g[sorted(g.keys())[0]]
+            g["time"][...] = g["time"][...] - delta / KS_C
+        rs_run(root, rs_nml.format(lat="mw.bmad", root=root,
+               extra=mig_extra + '  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
+               beam=f'  beam_file = "{root}.beam.h5"\n', field='  field_file = "mwmfull-at2-D.wf.h5"\n'))
+        exact, w_field, _, _, common = identity_and_floor("mwmfull", root)
+        ev, _, _ = mig_events(root)
+        outcome[side] = (exact, w_field, [(round(e[0], 3), e[1]) for e in ev])
+    check("boundary sensitivity: a phase shift below the smallest recorded margin flips no decision, one above flips one",
+          outcome["below"][0] and not outcome["above"][0],
+          note=f"[margin {m_min:.3e} rad at s = {s_min:.3f}; below: identical {outcome['below'][0]}, "
+               f"field {outcome['below'][1]:.1e}, events {outcome['below'][2]}; above: identical {outcome['above'][0]}, "
+               f"field {outcome['above'][1]:.1e}, events {outcome['above'][2]}. This case establishes no equivalence]")
 
 
     # ------------------------------------------------------------------
