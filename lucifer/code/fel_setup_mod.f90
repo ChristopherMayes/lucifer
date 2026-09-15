@@ -1286,6 +1286,28 @@ if (run%i_start > run%i_end) then
   err_flag = .true.;  return
 endif
 
+! A continuation starts where its checkpoint stopped. The checkpoint names the element
+! the run had completed and the position, and the window must open at the element after
+! it, at that position: opened earlier, the walk repeats what the frames already hold, a
+! wake kick or a segment's conversions among it, and opened later it omits them. The two
+! frames agreed on the position when they were read, so the beam's is the one checked.
+
+if (run%global%continuation) then
+  if (.not. run%ckpt%loaded) then
+    call out_io (s_error$, r_name, 'CONTINUATION WITHOUT A CHECKPOINT READ. PLEASE REPORT THIS!')
+    err_flag = .true.;  return
+  endif
+  if (abs(branch%ele(run%i_start - 1)%s - run%ckpt%s) > 1.0e-9_rp .or. &
+      trim(branch%ele(run%i_start - 1)%name) /= trim(run%ckpt%ele_name)) then
+    call out_io (s_error$, r_name, 'THE CONTINUATION POINT DOES NOT FOLLOW THE CHECKPOINT. THE CHECKPOINT WAS WRITTEN', &
+         'AT s = \es16.8\ m AFTER ELEMENT ' // trim(run%ckpt%ele_name) // ' (INDEX \i0\ ), AND THE WALK OPENS', &
+         'AT s = \es16.8\ m AFTER ELEMENT ' // trim(branch%ele(run%i_start - 1)%name) // ' (INDEX \i0\ ).', &
+         'POSSIBLE SOLUTION: SET track_start TO THE ELEMENT RIGHT AFTER THE CHECKPOINT''S.', &
+         r_array = [run%ckpt%s, branch%ele(run%i_start - 1)%s], i_array = [run%ckpt%ix_ele, run%i_start - 1])
+    err_flag = .true.;  return
+  endif
+endif
+
 ! The slices a frame carries. The default pair is the whole window, and -1 as the last
 ! reads as the last slice so a range needs one convention and not two. The dumps that a
 ! run restarts from are whole whatever this says, so the range is refused only against

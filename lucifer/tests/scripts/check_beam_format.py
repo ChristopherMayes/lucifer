@@ -128,6 +128,12 @@ def datasets(fn):
     out = {}
 
     def take(name, obj):
+        # The checkpoint group is the tracker's own split of the phase, phi0 beside each z,
+        # and an initialization refolds it with phi0 at zero, so the group's z is the
+        # records' time again and not the writer's z. The standard records are the round
+        # trip. The group is compared by the program-structure check's continuations.
+        if name.startswith("lucifer"):
+            return
         if isinstance(obj, h5py.Dataset) and obj.shape:
             out[name] = obj[...]
         elif isinstance(obj, h5py.Group) and "value" in obj.attrs and "shape" in obj.attrs:

@@ -1079,7 +1079,7 @@ endif
 
 if (dump_field_here(ie)) then
   write (fname, '(2a, i0, 2a)') trim(out_root), '-at', ie, '-', trim(ele%name)
-  call fel_dump_field_set (run, trim(fname), eerr)
+  call fel_dump_field_set (run, trim(fname), eerr, ix_done = ie)
   if (eerr) then
     err_flag = .true.;  return
   endif

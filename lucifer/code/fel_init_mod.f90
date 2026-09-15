@@ -155,6 +155,11 @@ if ((beam_file == '') .neqv. (field_file(1) == '')) then
   call out_io (s_error$, r_name, 'GIVE BOTH BEAM_FILE AND FIELD_FILE, OR NEITHER (TO GENERATE).')
   err_flag = .true.;  return
 endif
+if (run%global%continuation .and. beam_file == '') then
+  call out_io (s_error$, r_name, 'global%continuation NEEDS beam_file AND field_file,', &
+                                 'THE CHECKPOINT PAIR THE RUN CONTINUES FROM.')
+  err_flag = .true.;  return
+endif
 if (field_file(1) == '' .and. any(field_file(2:) /= '')) then
   call out_io (s_error$, r_name, 'HARMONIC FIELD FILES NEED THE FUNDAMENTAL IN FIELD_FILE(1).')
   err_flag = .true.;  return
@@ -196,7 +201,8 @@ if (beam_file /= '') then
   if (window_length > 0 .and. window_sample > 0) &
                               n_win = nint(window_length / (window_sample * lambda0))
   call fel_read_openpmd_beam (fbeam, beam_file, gamma0, n_win, lambda0, &
-                              window_sample * lambda0, branch%ele(0), err)
+                              window_sample * lambda0, branch%ele(0), err, &
+                              continuation = run%global%continuation, ckpt = run%ckpt)
   if (err) then
     err_flag = .true.;  return
   endif

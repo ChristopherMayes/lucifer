@@ -53,6 +53,7 @@ module fel_beam_mod
 
 use bmad
 use hdf5_interface
+use fel_h5_mod
 
 implicit none
 
@@ -122,6 +123,27 @@ type fel_beam_struct
                                    !   the unaveraged tracker is mid-region and px is the
                                    !   full kinetic momentum. Asserted at region edges: a
                                    !   hard-edge handoff injects K/gamma of spurious px.
+end type
+
+! The layout of the checkpoint group, the root group lucifer of a beam and a field frame
+! written at an eligible boundary (fel_write_checkpoint_group). A continuation requires
+! this string exactly and refuses any other.
+
+character(*), parameter :: fel_checkpoint_format$ = 'lucifer-checkpoint 1.0'
+
+!+
+! Struct fel_checkpoint_struct
+!
+! Where a checkpoint was written, read from its group by fel_read_openpmd_beam in the
+! continuation mode and kept so the field file and the tracking window are checked
+! against it (fel_read_openpmd_into_field, fel_setup_schedule).
+!-
+
+type fel_checkpoint_struct
+  logical :: loaded = .false.          ! A checkpoint group was read.
+  real(rp) :: s = 0                    ! Position both frames were written at [m].
+  integer :: ix_ele = -1               ! Index of the element the checkpoint completed.
+  character(40) :: ele_name = ''       ! That element's name.
 end type
 
 !+
@@ -333,7 +355,7 @@ end function fel_theta
 !------------------------------------------------------------------------------
 !+
 ! Subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing,
-!                                                                beamlet_size, ele, err_flag)
+!                                                    ele, err_flag, continuation, ckpt)
 !
 ! Routine to read an openPMD-beamphysics particle file written by
 ! fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
@@ -349,29 +371,45 @@ end function fel_theta
 ! one4one is not read either. The flag asserts that every macroparticle carries one
 ! electron, so the weights decide it.
 !
+! The reference phase starts at zero and each particle's z is the folded lag the file's
+! time gives back, which is an initialization: a fresh run from the standard records. A
+! continuation asks for the state the run had instead, phi0 and every z from the file's
+! checkpoint group (fel_write_checkpoint_group), and refuses a file without a complete
+! group that agrees with the records, since a fallback to the fold would hide the loss
+! the group exists to close. The mode is the caller's to state and is never inferred
+! from the file.
+!
 ! Input:
-!   file_name   -- character(*): File to read.
-!   gamma0      -- real(rp): Reference gamma for the run, from the lattice.
-!   n_slice     -- integer: Slices the deck's window has, or -1 to take the file's.
-!   ele         -- ele_struct: Element to convert the coordinates against.
-!   wavelength  -- real(rp): Radiation wavelength [m], from the deck.
-!   spacing     -- real(rp): Slice spacing [m], from the deck.
-!   beamlet_size       -- integer: Beamlet size, from the deck. A dump does not carry it.
+!   file_name    -- character(*): File to read.
+!   gamma0       -- real(rp): Reference gamma for the run, from the lattice.
+!   n_slice      -- integer: Slices the deck's window has, or -1 to take the file's.
+!   wavelength   -- real(rp): Radiation wavelength [m], from the deck.
+!   spacing      -- real(rp): Slice spacing [m], from the deck.
+!   ele          -- ele_struct: Element to convert the coordinates against.
+!   continuation -- logical, optional: Rebuild phi0 and z from the checkpoint group,
+!                     refusing a file that has no complete one? Default is False, an
+!                     initialization, which ignores the group and says so when it is there.
 !
 ! Output:
 !   beam        -- fel_beam_struct: Beam read from the file.
 !   err_flag    -- logical: Set True on error, False otherwise.
+!   ckpt        -- fel_checkpoint_struct, optional: Where the checkpoint was written, for a
+!                    continuation. Left as it was for an initialization.
 !-
 
-subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, ele, err_flag)
+subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing, ele, err_flag, &
+                                  continuation, ckpt)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
+type (fel_checkpoint_struct), optional :: ckpt
+integer(hid_t) f_id, g_id                    ! The checkpoint group's file, for the helpers below.
 integer is, ip, np, nb, n_slice, n_win
 real(rp) gamma0, q_file, wavelength, spacing, t0_ref, t0_p
 logical err_flag, err
+logical, optional :: continuation
 character(*) file_name
 character(*), parameter :: r_name = 'fel_read_openpmd_beam'
 
@@ -384,38 +422,10 @@ if (gamma0 <= 1) then
   return
 endif
 
-! p0c is the one stored reference, and phi0 restarts at zero since the particle lag
-! lives in z. The wavelength and spacing are the deck's: a dump carries the beam, not
-! the run's parameters.
-
-! The chart the file's momenta are in. Absent means a file written before the attribute
-! existed, and every such file is an element-boundary dump in the averaged chart, so its
-! absence is read as averaged, stated as a documented assumption and not proof. A file
-! that names the quiver chart, a frame written inside an unaveraged segment, is refused:
-! its px carries the undulator quiver, and tracking it as averaged is silently wrong
-! (doc/reading-output.md). Interior continuation, which would restore the chart, the
-! segment position and the ramp state, is separate work.
-block
-  integer(hid_t) fb_id
-  integer hb_err
-  type (hdf5_info_struct) cinfo
-  character(40) chart
-  logical cerr
-  call hdf5_open_file (file_name, 'READ', fb_id, cerr, .false.)
-  if (cerr) return
-  cinfo = hdf5_attribute_info (fb_id, 'momentumChart', cerr, .false.)
-  if (.not. cerr) then
-    call hdf5_read_attribute_string (fb_id, 'momentumChart', chart, cerr, .false.)
-    if (.not. cerr .and. trim(chart) == 'quiver') then
-      call h5fclose_f (fb_id, hb_err)
-      call out_io (s_error$, r_name, 'BEAM FILE IS IN THE QUIVER CHART: ' // trim(file_name), &
-             'ITS px CARRIES THE UNDULATOR QUIVER, WHICH THIS TRACKER CANNOT LOAD AS AVERAGED.', &
-             'IT IS A FRAME WRITTEN INSIDE AN UNAVERAGED SEGMENT. RESTART FROM AN ELEMENT BOUNDARY.')
-      return
-    endif
-  endif
-  call h5fclose_f (fb_id, hb_err)
-end block
+! p0c is the one stored reference. phi0 starts at zero here, the particle lag living in
+! z, and a continuation replaces both from the checkpoint group once the slices are
+! built. The wavelength and spacing are the deck's: a dump carries the beam, not the
+! run's parameters.
 
 beam%p0c = sqrt(gamma0**2 - 1) * m_electron
 beam%phi0 = 0
@@ -479,6 +489,16 @@ do is = 1, n_win
   if (err) return
 enddo
 
+! The replay state. A continuation rebuilds the split the run had, phi0 and each
+! particle's z, from the group lucifer, and the group is checked against the records it
+! rides beside before anything is taken from it: the format string, every member, the
+! partition, the order of the ids, and each coordinate against the folded time it was
+! written from. A group attached to the wrong particles passes every structural check,
+! which is what the last of those is for.
+
+call read_checkpoint_group (err)
+if (err) return
+
 ! one4one is not stored: the flag asserts that every macroparticle carries exactly one
 ! electron, so the weights say it.
 
@@ -517,6 +537,223 @@ end block
 
 err_flag = .false.
 
+!------------------------------------------------------------------------------
+! The checkpoint group, read after the slices are built from the records.
+
+contains
+
+subroutine read_checkpoint_group (gerr)
+
+type (hdf5_info_struct) info
+real(rp) phi0_c, s_c, p0_mc, dz_fold, worst, tol
+real(rp), allocatable :: zz(:)
+integer, allocatable :: ids(:), counts(:)
+integer is, ip, k, n, ix_c, h5_err
+logical gerr, err, exists, cont
+character(60) fmt_str
+character(40) name_c
+
+! The fold's rounding, the scale a coordinate is checked against. The folded lag is
+! z + beta phi0 lambda/2pi, near 1e-8 m on the check lines, and it goes through the
+! time record and back at 1e-16 of itself, so the round trip moves a coordinate by
+! 1e-24 m and a permuted coordinate by a fraction of a wavelength. A billionth of a
+! wavelength sits four orders above the first and eight below the second.
+
+gerr = .true.
+cont = logic_option(.false., continuation)
+tol = 1.0e-9_rp * wavelength
+
+call hdf5_open_file (file_name, 'READ', f_id, err, .false.)
+if (err) return
+exists = hdf5_exists (f_id, 'lucifer', err, .false.)
+
+if (.not. cont) then
+  if (exists) call out_io (s_info$, r_name, 'The beam file carries a checkpoint group, ignored: ' // &
+       'global%continuation is off, so the run starts from the standard records with phi0 at zero.')
+  call h5fclose_f (f_id, h5_err)
+  gerr = .false.
+  return
+endif
+
+if (.not. exists) then
+  call h5fclose_f (f_id, h5_err)
+  call out_io (s_error$, r_name, 'CONTINUATION FROM A BEAM FILE WITH NO CHECKPOINT GROUP: ' // &
+       trim(file_name), &
+       'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
+       'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
+       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
+  return
+endif
+
+g_id = hdf5_open_group (f_id, 'lucifer', err, .true.)
+if (err) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+
+! Every member, before any value is used.
+
+if (member_missing('checkpointFormat', .true.) .or. member_missing('phi0', .true.) .or. &
+    member_missing('sPosition', .true.) .or. member_missing('elementIndex', .true.) .or. &
+    member_missing('elementName', .true.) .or. member_missing('sliceCount', .false.) .or. &
+    member_missing('id', .false.) .or. member_missing('z', .false.)) then
+  call close_both ();  return
+endif
+
+fmt_str = ''          ! The reads fill the characters they have and leave the rest.
+name_c = ''
+call hdf5_read_attribute_string (g_id, 'checkpointFormat', fmt_str, err, .true.)
+if (err) then
+  call close_both ();  return
+endif
+if (trim(fmt_str) /= fel_checkpoint_format$) then
+  call close_both ()
+  call printable (fmt_str)
+  call out_io (s_error$, r_name, 'CHECKPOINT VERSION NOT KNOWN TO THIS TRACKER: "' // trim(fmt_str) // '".', &
+       'THIS TRACKER READS "' // fel_checkpoint_format$ // '". THE FILE: ' // trim(file_name))
+  return
+endif
+
+! The partition: one count per slice, the same counts the records' patches gave.
+
+n = sum(beam%slice(:)%n)
+info = hdf5_object_info (g_id, 'sliceCount', err, .true.)
+if (err .or. info%data_dim(1) /= n_win) then
+  call close_both ()
+  call out_io (s_error$, r_name, 'CHECKPOINT PARTITION DOES NOT MATCH THE RECORDS: sliceCount HAS \i0\ ' // &
+       'ENTRIES AND THE FILE \i0\ PATCHES.', 'THE FILE: ' // trim(file_name), &
+       i_array = [int(info%data_dim(1)), n_win])
+  return
+endif
+allocate (counts(n_win), ids(n), zz(n))
+call hdf5_read_dataset_int (g_id, 'sliceCount', counts, err)
+if (err) then
+  call close_both ();  return
+endif
+if (any(counts /= beam%slice(:)%n)) then
+  call close_both ()
+  is = first_mismatch(counts)
+  call out_io (s_error$, r_name, 'CHECKPOINT PARTITION DOES NOT MATCH THE RECORDS: SLICE \i0\ HOLDS \i0\ ' // &
+       'PARTICLES IN THE GROUP AND \i0\ IN THE PATCHES.', 'THE FILE: ' // trim(file_name), &
+       i_array = [is, counts(is), beam%slice(is)%n])
+  return
+endif
+
+info = hdf5_object_info (g_id, 'id', err, .true.)
+if (.not. err .and. info%data_dim(1) == n) info = hdf5_object_info (g_id, 'z', err, .true.)
+if (err .or. info%data_dim(1) /= n) then
+  call close_both ()
+  call out_io (s_error$, r_name, 'CHECKPOINT PARTITION DOES NOT MATCH THE RECORDS: id OR z HAS \i0\ ' // &
+       'ENTRIES AND THE RECORDS \i0\ PARTICLES.', 'THE FILE: ' // trim(file_name), &
+       i_array = [int(info%data_dim(1)), n])
+  return
+endif
+call hdf5_read_dataset_int (g_id, 'id', ids, err)
+if (.not. err) call hdf5_read_dataset_real (g_id, 'z', zz, err)
+if (.not. err) call hdf5_read_attribute_real (g_id, 'phi0', phi0_c, err, .true.)
+if (.not. err) call hdf5_read_attribute_real (g_id, 'sPosition', s_c, err, .true.)
+if (.not. err) call hdf5_read_attribute_int (g_id, 'elementIndex', ix_c, err, .true.)
+if (.not. err) call hdf5_read_attribute_string (g_id, 'elementName', name_c, err, .true.)
+call close_both ()
+if (err) return
+
+! The order, then the coordinates against the fold they were written through.
+
+p0_mc = fel_p0_mc(beam)
+k = 0
+worst = 0
+do is = 1, n_win
+  sl => beam%slice(is)
+  do ip = 1, sl%n
+    k = k + 1
+    if (ids(k) /= sl%id(ip)) then
+      call out_io (s_error$, r_name, 'CHECKPOINT ORDER DOES NOT MATCH THE RECORDS: ' // &
+           'PARTICLE \i0\ OF SLICE \i0\ IS id \i0\ IN THE GROUP AND \i0\ IN THE RECORDS.', &
+           'THE FILE: ' // trim(file_name), &
+           i_array = [ip, is, ids(k), sl%id(ip)])
+      return
+    endif
+    dz_fold = fel_beta_of(p0_mc, sl%pz(ip)) * phi0_c * wavelength / twopi
+    worst = max(worst, abs(sl%z(ip) - (zz(k) + dz_fold)))
+  enddo
+enddo
+if (worst > tol) then
+  call out_io (s_error$, r_name, 'CHECKPOINT COORDINATES DISAGREE WITH THE RECORDS: A z IN THE GROUP, ' // &
+       'FOLDED WITH THE GROUP''S phi0, IS \es10.2\ m FROM THE RECORD''S,', &
+       'AGAINST \es10.2\ m ALLOWED FOR THE FOLD''S ROUNDING.', &
+       'THE FILE: ' // trim(file_name), r_array = [worst, tol])
+  return
+endif
+
+! Taken, now that the group is shown to be this beam's.
+
+beam%phi0 = phi0_c
+k = 0
+do is = 1, n_win
+  sl => beam%slice(is)
+  sl%z(1:sl%n) = zz(k+1:k+sl%n)
+  k = k + sl%n
+enddo
+if (present(ckpt)) then
+  ckpt%loaded = .true.
+  ckpt%s = s_c
+  ckpt%ix_ele = ix_c
+  ckpt%ele_name = name_c
+endif
+call out_io (s_info$, r_name, 'The beam file carries a checkpoint at s = \es14.6\ m after element ' // &
+     trim(name_c) // ': phi0 = \es14.6\ rad and every z restored, the fold agreeing to \es9.2\ m.', &
+     r_array = [s_c, phi0_c, worst])
+gerr = .false.
+
+end subroutine read_checkpoint_group
+
+!------------------------------------------------------------------------------
+
+function member_missing (name, is_attr) result (missing)
+type (hdf5_info_struct) minfo
+logical missing, is_attr, merr
+character(*) name
+if (is_attr) then
+  minfo = hdf5_attribute_info (g_id, name, merr, .false.)
+  missing = merr
+else
+  missing = .not. hdf5_exists (g_id, name, merr, .false.)
+endif
+if (missing) call out_io (s_error$, r_name, 'CHECKPOINT MEMBER MISSING: ' // name // '. THE GROUP IS ' // &
+                          'INCOMPLETE AND NOTHING IS TAKEN FROM IT. THE FILE: ' // trim(file_name))
+end function member_missing
+
+!------------------------------------------------------------------------------
+
+function first_mismatch (counts) result (is_m)
+integer counts(:), is_m
+do is_m = 1, size(counts)
+  if (counts(is_m) /= beam%slice(is_m)%n) return
+enddo
+end function first_mismatch
+
+!------------------------------------------------------------------------------
+
+subroutine close_both ()
+integer c_err
+call H5Gclose_f (g_id, c_err)
+call h5fclose_f (f_id, c_err)
+end subroutine close_both
+
+!------------------------------------------------------------------------------
+! A string read from a file another writer made can carry bytes that are not text, EG a
+! variable-length attribute read through the fixed-length path. The message shows them
+! as question marks rather than as raw bytes.
+
+subroutine printable (str)
+integer i, ic
+character(*) str
+do i = 1, len(str)
+  ic = iachar(str(i:i))
+  if (ic < 32 .or. ic > 126) str(i:i) = '?'
+enddo
+end subroutine printable
+
 end subroutine fel_read_openpmd_beam
 
 !------------------------------------------------------------------------------
@@ -543,8 +780,10 @@ end subroutine fel_read_openpmd_beam
 !   ele         -- ele_struct: Element the beam sits at, for the coord_struct conversion.
 !   file_name   -- character(*): File to create.
 !   is1, is2    -- integer, optional: The slice range to write. Default the whole window.
-!   chart_named -- logical, optional: The file names the beam's chart, so an unaveraged
-!                    beam is written rather than refused. Default False.
+!   kinetic_ok  -- logical, optional: The caller writes a frame from inside an unaveraged
+!                    segment, whose px is the kinetic momentum and not the averaged
+!                    tracker's, and accepts it, so the beam is written rather than refused.
+!                    Default False.
 !   s_pos       -- real(rp), optional: Where along ele the beam sits, for a frame taken
 !                    inside an element (fel_slice_to_bunch). Default the upstream end.
 !
@@ -552,7 +791,7 @@ end subroutine fel_read_openpmd_beam
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, chart_named, s_pos)
+subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, kinetic_ok, s_pos)
 
 type (fel_beam_struct), target :: beam
 type (fel_slice_struct), pointer :: sl
@@ -562,7 +801,7 @@ real(rp), optional :: s_pos
 integer is, nb, nslice, i1, i2
 integer, optional :: is1, is2
 logical err_flag, err
-logical, optional :: chart_named
+logical, optional :: kinetic_ok
 character(*) file_name
 character(*), parameter :: r_name = 'fel_write_openpmd_beam'
 
@@ -590,7 +829,7 @@ call reallocate_beam (beam_b, i2 - i1 + 1)
 
 do is = i1, i2
   call fel_slice_to_bunch (beam, beam%slice(is), ele, beam_b%bunch(is - i1 + 1), err, &
-                           fold_phi0 = .true., ix_slice = is, chart_named = chart_named, &
+                           fold_phi0 = .true., ix_slice = is, kinetic_ok = kinetic_ok, &
                            s_pos = s_pos)
   if (err) return
 enddo
@@ -604,16 +843,6 @@ nb = i2 - i1 + 1
 call hdf5_write_beam (file_name, beam_b%bunch(1:nb), .false., err, as_patches = .true.)
 if (err) return
 
-! The chart the momenta are in, as a root attribute, so a reader knows before tracking
-! whether px carries the undulator quiver. An element-boundary dump is in the averaged
-! chart, and a frame written inside an unaveraged segment is in the quiver chart: the
-! label distinguishes them where felMethod cannot, since felMethod names the element's
-! tracking method and an element-end frame reads unaveraged with the chart already handed
-! back. fel_read_openpmd_beam refuses a quiver-chart file, which averaged physics and the
-! seam cannot track (fel_assert_averaged_chart).
-call fel_write_momentum_chart (file_name, beam%quiver_in_px, err)
-if (err) return
-
 err_flag = .false.
 
 end subroutine fel_write_openpmd_beam
@@ -622,38 +851,93 @@ end subroutine fel_write_openpmd_beam
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_write_momentum_chart (file_name, quiver_in_px, err_flag)
+! Subroutine fel_write_checkpoint_group (file_name, s_ckpt, ix_done, ele_name, err_flag, beam)
 !
-! Routine to stamp a beam file with the chart its momenta are in, the root attribute
-! momentumChart, 'quiver' when px carries the undulator quiver and 'averaged' otherwise.
-! It records the physical chart, which felMethod cannot, so a reader refuses a quiver-chart
-! file rather than tracking it as averaged (doc/reading-output.md).
+! Routine to add the group lucifer to a beam or field frame written at an eligible
+! boundary (fel_checkpoint_eligible): the tracker's replay state, beside the standard
+! openPMD records and changing none of them. The group's attributes say where the frame
+! was taken, sPosition with the elementIndex and elementName of the element the run had
+! completed, and checkpointFormat names this layout. With beam present the group also
+! carries the reference phase phi0 and, per particle in the records' order, the id and
+! the longitudinal coordinate z as the tracker holds it, copied and not recomputed, with
+! the count of every slice.
+!
+! The standard records fold phi0 into each particle's time (fel_slice_to_bunch), which
+! is exact for a reader of the file and not for a continuation of the run: the fold
+! rebuilds an equal phase at another magnitude, so the deposit phase of a high-gain
+! segment differs by phi0 times the machine epsilon, and the gain amplifies that to
+! 6.5e-8 (doc/validation.md). A continuation reads phi0 and z from here instead and holds
+! the split the run had, to the bit.
 !
 ! Input:
-!   file_name     -- character(*): The beam file, already written.
-!   quiver_in_px  -- logical: The beam's momentum-convention flag.
+!   file_name -- character(*): The frame, already written and closed.
+!   s_ckpt    -- real(rp): The boundary's position [m].
+!   ix_done   -- integer: Index of the element the run had completed there.
+!   ele_name  -- character(*): That element's name.
+!   beam      -- fel_beam_struct, optional: The beam, for a beam frame. Omitted for a
+!                  field frame, whose group carries the position alone.
 !
 ! Output:
-!   err_flag      -- logical: Set True if the attribute could not be written.
+!   err_flag  -- logical: Set True if the group could not be written. False otherwise.
 !-
 
-subroutine fel_write_momentum_chart (file_name, quiver_in_px, err_flag)
+subroutine fel_write_checkpoint_group (file_name, s_ckpt, ix_done, ele_name, err_flag, beam)
 
-integer(hid_t) f_id
-integer h5_err
-logical quiver_in_px, err_flag, err
-character(*) file_name
+type (fel_beam_struct), optional, target :: beam
+type (fel_slice_struct), pointer :: sl
+integer(hid_t) f_id, g_id
+real(rp) s_ckpt
+real(rp), allocatable :: zz(:)
+integer ix_done, is, ip, n, h5_err
+integer, allocatable :: ids(:), counts(:)
+logical err_flag, err, bad
+character(*) file_name, ele_name
 
 !
 
 err_flag = .true.
 call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
-call hdf5_write_attribute_string (f_id, 'momentumChart', &
-                                  merge('quiver  ', 'averaged', quiver_in_px), err)
-call h5fclose_f (f_id, h5_err)
-err_flag = err
+call H5Gcreate_f (f_id, 'lucifer', g_id, h5_err)
+if (h5_err < 0) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
 
-end subroutine fel_write_momentum_chart
+bad = .false.
+call hdf5_write_attribute_string (g_id, 'checkpointFormat', fel_checkpoint_format$, err);  bad = bad .or. err
+call hdf5_write_attribute_real (g_id, 'sPosition', s_ckpt, err);                            bad = bad .or. err
+call hdf5_write_attribute_int (g_id, 'elementIndex', ix_done, err);                         bad = bad .or. err
+call hdf5_write_attribute_string (g_id, 'elementName', trim(ele_name), err);                bad = bad .or. err
+
+! The particles in the records' order, slice by slice, so a reader checks the ids against
+! the records before it takes a coordinate.
+
+if (present(beam)) then
+  n = sum(beam%slice(:)%n)
+  allocate (zz(n), ids(n), counts(size(beam%slice)))
+  ip = 0
+  do is = 1, size(beam%slice)
+    sl => beam%slice(is)
+    counts(is) = sl%n
+    zz(ip+1:ip+sl%n) = sl%z(1:sl%n)
+    ids(ip+1:ip+sl%n) = sl%id(1:sl%n)
+    ip = ip + sl%n
+  enddo
+  call hdf5_write_attribute_real (g_id, 'phi0', beam%phi0, err);  bad = bad .or. err
+  call fel_h5_int (g_id, 'sliceCount', '1', 'particles per slice', &
+        'Particles in each slice of the window, in window order: the records'' patches.', '', counts, bad)
+  call fel_h5_int (g_id, 'id', '1', 'particle id', &
+        'The particle labels in the records'' order, which z follows.', '', ids, bad)
+  call fel_h5_real (g_id, 'z', 'm', 'longitudinal coordinate', &
+        'Each particle''s z as the tracker holds it, -beta c (t - t_ref), before the phi0 fold.', &
+        '', zz, bad)
+endif
+
+call H5Gclose_f (g_id, h5_err)
+call h5fclose_f (f_id, h5_err)
+err_flag = bad
+
+end subroutine fel_write_checkpoint_group
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -1285,7 +1569,7 @@ end function fel_m_ind
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named, s_pos)
+! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)
 !
 ! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
 ! stored coordinates are coord_struct's. The element's p0c must match the beam's
@@ -1297,17 +1581,21 @@ end function fel_m_ind
 !
 !   theta_j = phi0 + ks * z_j / beta_j,
 !
-! and a beam file carries the lag, since that is what a time coordinate is. A reader
-! restarts phi0 at zero (there is nowhere in either dump format to put a run's reference
-! phase), so a dump written from z_j alone comes back with every theta short by phi0. The
+! and a beam file carries the lag, since that is what a time coordinate is. The standard
+! records have no place for a run's reference phase, so a reader of them starts phi0 at
+! zero, and a dump written from z_j alone comes back with every theta short by phi0. The
 ! beam's phase against the field's phase is what the next segment's gain is made of, and
 ! the field is dumped with its absolute phase, so that shift is a real change of state:
 ! measured 2.1e-2 on the windowed-composition check, which restarts mid-line.
 !
 ! So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks, which
-! makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact. Genesis
-! stores theta itself and its reader does the same fold, and convert_genesis.py maps a
-! Genesis theta to the same time, so the two formats agree on what a dump means.
+! makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact for what
+! the file states. Genesis stores theta itself and its reader does the same fold, and
+! convert_genesis.py maps a Genesis theta to the same time, so the two formats agree on
+! what a dump means. Exact for the file is not exact for the run: the fold rebuilds an
+! equal phase at another magnitude, off by phi0 times the machine epsilon, and a high-gain
+! segment amplifies that. A continuation therefore takes phi0 and z_j themselves from the
+! checkpoint group (fel_write_checkpoint_group) and leaves these records to their readers.
 !
 ! ix_slice places the slice in the bunch, and is for a dump as well. vec(5) is the lag
 ! inside the slice and says nothing about which slice that is, so a bunch written from it
@@ -1330,9 +1618,9 @@ end function fel_m_ind
 !                    Omitted, the slice is placed at the reference, which is what tracking
 !                    wants: the seam hands one slice to a Bmad element and its own lag is
 !                    the whole of its z.
-!   chart_named -- logical, optional: The caller writes a file that names the chart the
-!                    beam is in, so an unaveraged beam is converted rather than refused.
-!                    Default False.
+!   kinetic_ok  -- logical, optional: The caller writes a frame from inside an unaveraged
+!                    segment and accepts the kinetic px it holds, so the beam is converted
+!                    rather than refused. Default False.
 !   s_pos       -- real(rp), optional: Where along ele the coords are initialized, for a
 !                    frame taken inside an element. The particle s and reference time are
 !                    then the frame's own, interpolated between the element's faces as
@@ -1344,7 +1632,7 @@ end function fel_m_ind
 !   err_flag    -- logical: Set True on error, False otherwise.
 !-
 
-subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named, s_pos)
+subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)
 
 type (fel_beam_struct) beam
 type (fel_slice_struct) sl
@@ -1355,7 +1643,7 @@ real(rp), optional :: s_pos
 integer ip, loc
 integer, optional :: ix_slice
 logical err_flag
-logical, optional :: fold_phi0, chart_named
+logical, optional :: fold_phi0, kinetic_ok
 character(*), parameter :: r_name = 'fel_slice_to_bunch'
 
 !
@@ -1365,11 +1653,12 @@ err_flag = .true.
 ! The conversion itself is the same six numbers whichever chart the beam is in. What
 ! differs is what the caller does next. A caller that hands the bunch to Bmad's tracking
 ! needs the averaged convention, and that is the default here, so a caller that says
-! nothing gets the refusal. A caller writing the bunch to a file that names the chart it
-! holds needs no such thing: the quiver is the beam's real transverse momentum, and a
-! reader that knows which chart it is reading can use it (fel-physics.md sec-unaveraged).
+! nothing gets the refusal. A caller writing a frame from inside an unaveraged segment
+! needs no such thing: the kinetic px is the particle's real transverse momentum, which is
+! what an openPMD momentum record means, and only a continuation would misread it, which
+! no frame from inside a segment is (fel-physics.md sec-unaveraged, doc/reading-output.md).
 
-if (.not. logic_option(.false., chart_named)) then
+if (.not. logic_option(.false., kinetic_ok)) then
   call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
   if (err_flag) return
 endif

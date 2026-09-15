@@ -148,6 +148,14 @@ type fel_global_struct
   ! Full lattice, so a windowed run composes exactly with the full run: [1,k] then
   ! [k+1,end] from its dumps reproduces [1,end] bit for bit.
   character(60) :: track_start = '', track_end = ''
+  ! What beam_file and field_file are for. Off, an initialization: a fresh run from
+  ! sliced inputs, prepared or ramped, read from the standard records alone, phi0 and the
+  ! slippage residual starting at zero, and a checkpoint group in either file ignored. On,
+  ! a continuation: both files must be the frames of one eligible boundary and carry the
+  ! checkpoint group (fel_write_checkpoint_group), the reader rebuilds phi0, every z and
+  ! the residual from them, and track_start must open the walk at the element after the
+  ! one the checkpoint completed. The mode is never inferred from what the files carry.
+  logical :: continuation = .false.
   ! The comb (Bmad's bunch_track_struct%ds_save name and semantics, Tao's
   ! comb_ds_save): the minimum z advance between per-record stats rows.
   !   < 0: no per-record rows at all (element ends, dumps and the final state remain).
@@ -371,6 +379,7 @@ type fel_run_struct
   logical, allocatable :: sc_here(:)
   logical, allocatable :: dump_beam_here(:), dump_field_here(:)
   integer :: i_start = 1, i_end = 0        ! The resolved tracking window [elements].
+  type (fel_checkpoint_struct) :: ckpt     ! Where a continuation's checkpoint was written.
   integer :: dump_is1 = 1, dump_is2 = 0    ! The resolved frame slice range [slices].
   ! Run facts.
   real(rp) :: gamma0 = 0                   ! From the lattice e_tot.

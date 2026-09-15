@@ -266,21 +266,58 @@ also carries `slippageResidual`: the slippage the record had accumulated and not
 rotated, in fundamental wavelengths, signed. The record's rotation index is folded into
 the time order the file is written in, and this residual is the one piece of the field's
 state the record itself does not hold, since it decides when the next rotation falls. A
-restart reads it back and continues on the writer's schedule. A file without it, which is
-every field file written before the attribute existed and every converted Genesis4 dump,
-continues from zero, and that is a continuation from a whole-slice boundary and not an
-exact one. A value the tracker could not have written, one whose magnitude reaches
-`n_wavelength` or is not finite, is refused rather than read as absent.
+continuation reads it back and continues on the writer's schedule, and refuses a file
+without it. An initialization starts the record from zero whatever the file carries, and
+says so when the file carried one. A value the tracker could not have written, one whose
+magnitude reaches `n_wavelength` or is not finite, is refused in either mode rather than
+read as absent.
 
-A beam file also carries `momentumChart`, a root attribute reading `averaged` or `quiver`,
-the chart its momenta are in. An element-boundary dump is `averaged`: the unaveraged
-segment hands the averaged convention back at its ends, so the momenta are the averaged
-chart's even where `felMethod` reads unaveraged, and the label cannot tell the two apart.
-A frame written inside an unaveraged segment is `quiver`, its px carrying the undulator
-quiver. The reader refuses a `quiver` file, since tracking quiver momenta as averaged is
-silently wrong, and continuing from inside a segment would need the segment position and
-the ramp state besides. An absent attribute is read as `averaged`, a documented assumption
-and not proof: every file written before the attribute existed is an element-boundary dump.
+## Checkpoints and the two loading modes
+
+`beam_file` and `field_file` load a beam already in slices and a field, for one of two
+purposes the deck states with `global%continuation`. The mode is never inferred from what
+the files carry.
+
+Off, the default, is an initialization: a fresh run from sliced inputs, a prepared beam or
+a ramped field among them. The reader takes the standard openPMD records alone, `phi0`
+starts at zero with each particle's lag folded back out of its time, the slippage residual
+starts at zero, and a checkpoint group in either file is ignored, with a line saying so.
+
+On is a continuation of an interrupted run, and both files must be the two frames of one
+checkpoint. A checkpoint is written at an eligible boundary: an element end outside every
+undulator, or the physical end of one, with the beam in the averaged chart. A frame from
+inside an element is written like any other frame and is not a checkpoint, and neither
+would a frame from the end of a super_slave inside a cut undulator be, though a lattice
+with one is refused at setup today. At a checkpoint the beam and field files each carry
+the root group `lucifer`:
+
+| member | on | what |
+|---|---|---|
+| `checkpointFormat` | both | `lucifer-checkpoint 1.0`. A continuation requires this string exactly |
+| `sPosition`, `elementIndex`, `elementName` | both | Where the frame was taken: the position and the element the run had completed |
+| `phi0` | beam | The reference phase [rad] |
+| `sliceCount` | beam | Particles in each slice, in window order, the records' patches |
+| `id` | beam | The particle labels in the records' order, which `z` follows |
+| `z` | beam | Each particle's longitudinal coordinate [m] as the tracker holds it, before the `phi0` fold |
+
+The group exists because the standard records fold `phi0` into each particle's time,
+which is exact for a reader of the file and not for a continuation of the run: the fold
+rebuilds an equal phase at another magnitude, so the deposit phase differs by `phi0` times
+the machine epsilon, near 1e-13, and a high-gain segment amplifies that to 6.5e-8 from an
+entry state bit-identical in every record ([validation](validation.md)). A continuation
+takes `phi0` and every `z` from the group instead and holds the split the run had, to the
+bit. Before anything is taken the group is checked against the records it rides beside:
+the format string, every member, the slice counts against the patches, the ids in the
+records' order, and each `z` folded with the group's `phi0` against the record's time,
+within a billionth of a wavelength, four orders above the fold's rounding and eight below
+a permuted coordinate. The field file must carry `slippageResidual` and a group whose
+position and element are the beam file's, and `track_start` must open the walk at the
+element right after the one the checkpoint completed, at its position, so no boundary
+operation is repeated or omitted. Anything less is refused before tracking, and the
+message names the condition: no group, an unknown version, a missing member, a partition
+or order that does not match, coordinates that disagree, no residual, two positions, or
+a continuation point that does not follow. There is no fallback from one mode to the
+other. `beam_init%position_file`, a bunch to slice, is a separate path and unchanged.
 
 Two records exist for comparing a continued run with the run it continues. Each row of
 `<out_root>.migration.txt` ends with the smallest distance in phase, in radians, that any
@@ -393,14 +430,16 @@ partition, and the placement is for reading the bunch rather than for arithmetic
 
 The reference phase is folded into the file's time coordinate. The chart splits a
 particle's ponderomotive phase into a per-beam reference and a per-particle lag,
-`theta_j = phi0 + ks z_j / beta_j`, and no dump format has anywhere to put `phi0`, so
-every reader restarts it at zero. A dump therefore writes the lag the whole phase
-implies, which makes the file's time `-theta_j/(ks c)` and a restart exact. This is not
-bookkeeping: the beam's phase against the field's phase is what the next segment's gain
-is made of, and without the fold a mid-line restart lands 2.1e-2 away on the
-windowed-composition check. Genesis4 stores `theta` itself and its reader does the same
-fold, and the converter maps a Genesis4 `theta` to the same time, so the two formats mean
-the same thing.
+`theta_j = phi0 + ks z_j / beta_j`, and the standard records have no place for `phi0`, so
+a reader of them starts it at zero. A dump therefore writes the lag the whole phase
+implies, which makes the file's time `-theta_j/(ks c)` and the file's statement of the
+phase exact. This is not bookkeeping: the beam's phase against the field's phase is what
+the next segment's gain is made of, and without the fold a mid-line restart lands 2.1e-2
+away on the windowed-composition check. Genesis4 stores `theta` itself and its reader does
+the same fold, and the converter maps a Genesis4 `theta` to the same time, so the two
+formats mean the same thing. A continuation of the run does not read the phase back
+through the fold: it takes `phi0` and each `z` from the checkpoint group above, since the
+fold's rounding, exact for the file, is amplified by a high-gain segment.
 
 Measured (check_beam_format.py, the harness's beam-format section):
 

@@ -141,7 +141,7 @@ endif
 if (run%global%write_initial .or. run%global%load_only) then
   ! Both dumps go through the same writers as the final ones, so the initial state is a
   ! file the tracker can read straight back.
-  call fel_dump_field_set (run, trim(run%global%out_root) // '-initial', err)
+  call fel_dump_field_set (run, trim(run%global%out_root) // '-initial', err, ix_done = run%i_start - 1)
   if (err) stop 1
   call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_start), trim(run%global%out_root) // '-initial', err)
   if (err) stop 1
@@ -169,7 +169,7 @@ call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_r
                     s_pos = run%lat%branch(0)%ele(run%i_end)%s)
 if (err) stop 1
 
-call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err)
+call fel_dump_field_set (run, trim(run%global%out_root) // '-final', err, ix_done = run%i_end)
 if (err) stop 1
 
 call fel_finalize_diagnostics (run, err)

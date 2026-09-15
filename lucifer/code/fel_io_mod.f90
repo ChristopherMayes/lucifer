@@ -46,8 +46,10 @@ contains
 !   ele       -- ele_struct: Element the beam sits at.
 !   prefix    -- character(*): Filename prefix. Format suffixes are appended.
 !   s_pos     -- real(rp), optional: Where along ele the beam sits. A dump at an element's
-!                  end passes ele%s, so the particle records carry the downstream face.
-!                  Omitted, the beam sits at the upstream face, which is the initial dump.
+!                  end passes ele%s, so the particle records carry the downstream face and
+!                  ele is the element completed. Omitted, the beam sits at the upstream
+!                  face, which is the initial dump, and the element completed is the one
+!                  before ele.
 !
 ! Output:
 !   err_flag  -- logical: Set True if a file could not be written. False otherwise.
@@ -57,7 +59,9 @@ subroutine fel_dump_beam (run, ele, prefix, err_flag, s_pos)
 
 type (fel_run_struct), target :: run
 type (ele_struct) ele
+type (ele_struct), pointer :: done
 real(rp), optional :: s_pos
+integer ix_done
 character(*) prefix
 logical err_flag
 logical eerr
@@ -69,9 +73,90 @@ err_flag = .true.
 call fel_write_openpmd_beam (run%fbeam, ele, prefix // '.beam.h5', eerr, s_pos = s_pos)
 if (eerr) return
 
+! The checkpoint group, where this boundary is one a continuation may start from.
+
+ix_done = ele%ix_ele
+if (.not. present(s_pos)) ix_done = ele%ix_ele - 1
+if (fel_checkpoint_eligible(run, ix_done)) then
+  done => run%lat%branch(0)%ele(ix_done)
+  call fel_write_checkpoint_group (prefix // '.beam.h5', done%s, ix_done, done%name, eerr, run%fbeam)
+  if (eerr) return
+endif
+
 err_flag = .false.
 
 end subroutine fel_dump_beam
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_checkpoint_eligible (run, ix_done) result (ok)
+!
+! Routine to say whether the boundary at the end of element ix_done is one a continuation
+! may start from, so that the frames written there carry the checkpoint group
+! (fel_write_checkpoint_group). The boundary is eligible outside every undulator and at
+! the physical end of one, with the beam in the averaged chart. A sliced endpoint inside
+! an undulator, where a superimposed element has cut one physical device into
+! super_slaves, is not a completed handoff: the averaged tracker's px there is the slow
+! momentum inside a field that has not ended, and the unaveraged tracker's ramp has
+! closed on a plane the device does not end at. The frame is written whatever the answer.
+! Only the group is withheld, and a continuation from that frame is refused.
+!
+! Note: A lattice with a cut undulator is refused at setup today, its slaves referring to
+! their lord for the field model (fel_assert_wiggler_sane), so the slave branch below
+! guards a boundary no run reaches yet.
+!
+! Input:
+!   run      -- fel_run_struct: Run state.
+!   ix_done  -- integer: Index of the element completed at the boundary, 0 for the entry face.
+!
+! Output:
+!   ok       -- logical: True if a checkpoint is written at this boundary.
+!-
+
+function fel_checkpoint_eligible (run, ix_done) result (ok)
+
+type (fel_run_struct), target :: run
+type (branch_struct), pointer :: branch
+type (ele_struct), pointer :: ele, lord
+real(rp) s_b, s1, s2, tol
+integer ix_done, je, il
+logical ok
+
+!
+
+ok = .false.
+if (run%fbeam%quiver_in_px) return
+branch => run%lat%branch(0)
+if (ix_done < 0 .or. ix_done > branch%n_ele_track) return
+s_b = branch%ele(ix_done)%s
+
+! A boundary strictly inside an undulator's physical extent. The extent of a slave is
+! its lord's, since the lord is the device and the slaves are how a superposition cut
+! it. The tolerance is a length no lattice resolves.
+
+tol = 1.0e-9_rp
+do je = 1, branch%n_ele_track
+  if (.not. run%is_fel(je)) cycle
+  ele => branch%ele(je)
+  s1 = ele%s_start
+  s2 = ele%s
+  if (ele%slave_status == super_slave$) then
+    do il = 1, ele%n_lord
+      lord => pointer_to_lord(ele, il)
+      if (lord%key /= ele%key) cycle
+      s1 = lord%s_start
+      s2 = lord%s
+      exit
+    enddo
+  endif
+  if (s_b > s1 + tol .and. s_b < s2 - tol) return
+enddo
+
+ok = .true.
+
+end function fel_checkpoint_eligible
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -275,7 +360,7 @@ type (wavefront_struct) wf_sub
 complex(wf_rp), allocatable :: eslab(:,:,:)
 real(rp) s_frame
 integer ie, ihh, first_was, ifr
-logical at_end, err_flag, eerr, whole
+logical at_end, err_flag, eerr, whole, ckpt
 character(200) prefix
 character(8) hsuf
 
@@ -287,24 +372,32 @@ ffield => run%ffield
 write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
 
 ! A frame is written wherever the comb falls, which inside an unaveraged segment is a
-! place where px still carries the quiver. fel_frame_attributes names the chart on the
-! file below, felMethod beside the element and the undulator, so the frame is readable as
-! what it is and the conversion is told so. The beam dump of fel_dump_beam names no chart
-! and keeps the refusal, which costs nothing today: dump_beam_at resolves through Bmad's
-! locator and so lands on element boundaries, where the chart is averaged either way.
+! place where px is the kinetic momentum rather than the averaged tracker's: the frame is
+! written as it is, since that is what an openPMD momentum record means, and fel_dump_beam,
+! whose dumps land on element boundaries, keeps the refusal. A frame at an element end that
+! carries the whole window is a checkpoint where the boundary is eligible
+! (fel_checkpoint_eligible), and gets the group on both of its files. Every other frame
+! is written without it and a continuation from it is refused.
 
 s_frame = run%z_now
 if (at_end .and. ie >= 1) s_frame = run%lat%branch(0)%ele(ie)%s
+whole = (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice)
+ckpt = at_end .and. whole
+if (ckpt) ckpt = fel_checkpoint_eligible(run, ie)
 call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
                              trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2, &
-                             chart_named = .true., s_pos = s_frame)
+                             kinetic_ok = .true., s_pos = s_frame)
 if (eerr) return
 call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
 if (eerr) return
+if (ckpt) then
+  call fel_write_checkpoint_group (trim(prefix) // '.beam.h5', run%lat%branch(0)%ele(ie)%s, ie, &
+                                   run%lat%branch(0)%ele(ie)%name, eerr, run%fbeam)
+  if (eerr) return
+endif
 
 do ihh = 1, run%n_harm
   first_was = ffield(ihh)%slip%first
-  whole = (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice)
   hsuf = ''
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
 
@@ -372,6 +465,11 @@ do ihh = 1, run%n_harm
   if (eerr) return
   call fel_write_slippage_residual (trim(prefix) // trim(hsuf) // '.wf.h5', ffield(ihh)%slip%accuslip, eerr)
   if (eerr) return
+  if (ckpt) then
+    call fel_write_checkpoint_group (trim(prefix) // trim(hsuf) // '.wf.h5', run%lat%branch(0)%ele(ie)%s, ie, &
+                                     run%lat%branch(0)%ele(ie)%name, eerr)
+    if (eerr) return
+  endif
 enddo
 
 err_flag = .false.
@@ -394,20 +492,25 @@ end subroutine fel_dump_frame
 ! Input:
 !   run       -- fel_run_struct: Run state with the field set to dump.
 !   prefix    -- character(*): Filename prefix. Format-specific suffixes are appended.
+!   ix_done   -- integer, optional: Index of the element the dump completes, so the files
+!                  carry the checkpoint group where that boundary is eligible
+!                  (fel_checkpoint_eligible). Omitted, no group is written.
 !
 ! Output:
 !   run       -- fel_run_struct: Field records unrotated to time order (slip%first = 0).
 !   err_flag  -- logical: Set True if a file could not be written. False otherwise.
 !-
 
-subroutine fel_dump_field_set (run, prefix, err_flag)
+subroutine fel_dump_field_set (run, prefix, err_flag, ix_done)
 
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
+type (ele_struct), pointer :: done
 character(*) prefix
 logical err_flag
 integer ihh
-logical eerr
+integer, optional :: ix_done
+logical eerr, ckpt
 character(8) hsuf
 real(rp), pointer :: z_now
 integer n_harm
@@ -419,6 +522,9 @@ err_flag = .true.
 ffield => run%ffield
 z_now => run%z_now
 n_harm = run%n_harm
+ckpt = present(ix_done)
+if (ckpt) ckpt = fel_checkpoint_eligible(run, ix_done)
+if (ckpt) done => run%lat%branch(0)%ele(ix_done)
 
 do ihh = 1, n_harm
   if (ffield(ihh)%slip%first /= 0) then
@@ -435,6 +541,10 @@ do ihh = 1, n_harm
   if (eerr) return
   call fel_write_slippage_residual (prefix // trim(hsuf) // '.wf.h5', ffield(ihh)%slip%accuslip, eerr)
   if (eerr) return
+  if (ckpt) then
+    call fel_write_checkpoint_group (prefix // trim(hsuf) // '.wf.h5', done%s, ix_done, done%name, eerr)
+    if (eerr) return
+  endif
 enddo
 
 err_flag = .false.
@@ -898,11 +1008,13 @@ type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
 type (hdf5_info_struct) info
-integer(hid_t) f_id
+integer(hid_t) f_id, g_id
 character(*) fname
-integer ihh, h5_err
-real(rp) e_photon, residual
-logical rerr, err_flag
+integer ihh, ihc, h5_err
+real(rp) e_photon, residual, s_c
+logical rerr, err_flag, has_res
+character(60) fmt_str
+character(40) name_c
 character(*), parameter :: r_name = 'fel_read_openpmd_into_field'
 
 !
@@ -923,35 +1035,105 @@ ffield(ihh)%wf%dz = fbeam%slice_spacing
 ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength authority (the 1e-12
                                                ! beam/field consistency check's spirit).
 
-! The slippage the record had accumulated and not yet rotated when it was written,
-! which the record itself does not hold (fel_write_slippage_residual). A file that
-! carries it continues on the writer's rotation schedule. A file without it, which is
-! every field file written before the attribute existed and every converted Genesis
-! dump, continues from zero, and that is a continuation from a whole-slice boundary
-! rather than an exact one. A value the tracker could not have written is refused, not
-! taken as absent: the residual is bounded by the threshold, so its magnitude never
-! reaches n_wavelength.
+! The slippage the record had accumulated and not yet rotated when it was written, which
+! the record itself does not hold (fel_write_slippage_residual), and the checkpoint group
+! saying where the frame was taken. A continuation requires both, and requires the
+! position and element to be the beam file's, since a beam and a field from two
+! boundaries are two states and not one. An initialization takes neither: the record
+! starts from a whole-slice boundary, and a file that carried a residual is told so, so a
+! stale residual never enters a fresh run by being present. A residual the tracker could
+! not have written is refused in either mode rather than read as absent: its magnitude
+! never reaches n_wavelength, since the threshold is 0.8 of it.
 
 call hdf5_open_file (fname, 'READ', f_id, rerr, .false.)
 if (rerr) return
 info = hdf5_attribute_info (f_id, 'slippageResidual', rerr, .false.)
-if (rerr) then
-  call h5fclose_f (f_id, h5_err)
-  call out_io (s_info$, r_name, 'The field file carries no slippage residual, so the record continues from a whole-slice boundary.')
-else
+has_res = .not. rerr
+residual = 0
+if (has_res) then
   call hdf5_read_attribute_real (f_id, 'slippageResidual', residual, rerr, .true.)
-  call h5fclose_f (f_id, h5_err)
-  if (rerr) return
+  if (rerr) then
+    call h5fclose_f (f_id, h5_err)
+    return
+  endif
   if (.not. ieee_is_finite(residual) .or. (fbeam%n_wavelength >= 1 .and. abs(residual) >= fbeam%n_wavelength)) then
+    call h5fclose_f (f_id, h5_err)
     call out_io (s_error$, r_name, 'THE FIELD FILE''S slippageResidual IS NOT A VALUE THIS TRACKER WRITES: \es12.4\ ', &
                  'ITS MAGNITUDE MUST STAY BELOW n_wavelength = \i0\. THE FILE: ' // trim(fname), &
                  r_array = [residual], i_array = [fbeam%n_wavelength])
     return
   endif
-  ffield(ihh)%slip%accuslip = residual
-  call out_io (s_info$, r_name, 'The field file carries a slippage residual of \es12.4\ wavelengths, restored.', &
-               r_array = [residual])
 endif
+
+if (.not. run%global%continuation) then
+  call h5fclose_f (f_id, h5_err)
+  if (has_res) then
+    call out_io (s_info$, r_name, 'The field file carries a slippage residual of \es12.4\ wavelengths, ' // &
+                 'ignored: global%continuation is off, so the record starts from a whole-slice boundary.', &
+                 r_array = [residual])
+  else
+    call out_io (s_info$, r_name, 'The field file carries no slippage residual, so the record starts from a ' // &
+                 'whole-slice boundary.')
+  endif
+  err_flag = .false.
+  return
+endif
+
+if (.not. has_res) then
+  call h5fclose_f (f_id, h5_err)
+  call out_io (s_error$, r_name, 'CONTINUATION FROM A FIELD FILE WITH NO slippageResidual: ' // trim(fname), &
+               'THE RESIDUAL IS PART OF THE FIELD''S STATE, AND A CONTINUATION TAKES NOTHING FROM A FILE THAT LACKS IT.')
+  return
+endif
+
+if (.not. hdf5_exists(f_id, 'lucifer', rerr, .false.)) then
+  call h5fclose_f (f_id, h5_err)
+  call out_io (s_error$, r_name, 'CONTINUATION FROM A FIELD FILE WITH NO CHECKPOINT GROUP: ' // trim(fname), &
+       'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
+       'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
+       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
+  return
+endif
+g_id = hdf5_open_group (f_id, 'lucifer', rerr, .true.)
+if (rerr) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+fmt_str = ''          ! The reads fill the characters they have and leave the rest.
+name_c = ''
+call hdf5_read_attribute_string (g_id, 'checkpointFormat', fmt_str, rerr, .true.)
+if (.not. rerr) call hdf5_read_attribute_real (g_id, 'sPosition', s_c, rerr, .true.)
+if (.not. rerr) call hdf5_read_attribute_string (g_id, 'elementName', name_c, rerr, .true.)
+call H5Gclose_f (g_id, h5_err)
+call h5fclose_f (f_id, h5_err)
+if (rerr) then
+  call out_io (s_error$, r_name, 'CHECKPOINT MEMBER MISSING FROM THE FIELD FILE''S GROUP: ' // trim(fname), &
+               'THE GROUP IS INCOMPLETE AND NOTHING IS TAKEN FROM IT.')
+  return
+endif
+if (trim(fmt_str) /= fel_checkpoint_format$) then
+  do ihc = 1, len(fmt_str)          ! Bytes that are not text print as question marks.
+    if (iachar(fmt_str(ihc:ihc)) < 32 .or. iachar(fmt_str(ihc:ihc)) > 126) fmt_str(ihc:ihc) = '?'
+  enddo
+  call out_io (s_error$, r_name, 'CHECKPOINT VERSION NOT KNOWN TO THIS TRACKER: "' // trim(fmt_str) // '".', &
+       'THIS TRACKER READS "' // fel_checkpoint_format$ // '". THE FILE: ' // trim(fname))
+  return
+endif
+if (.not. run%ckpt%loaded) then
+  call out_io (s_error$, r_name, 'THE FIELD FILE WAS READ BEFORE THE BEAM FILE''S CHECKPOINT. PLEASE REPORT THIS!')
+  return
+endif
+if (abs(s_c - run%ckpt%s) > 1.0e-9_rp .or. trim(name_c) /= trim(run%ckpt%ele_name)) then
+  call out_io (s_error$, r_name, 'CHECKPOINT POSITIONS DISAGREE: THE BEAM FILE WAS WRITTEN AT s = \es16.8\ m ' // &
+       'AFTER ELEMENT ' // trim(run%ckpt%ele_name) // ',', &
+       'AND THE FIELD FILE AT s = \es16.8\ m AFTER ELEMENT ' // trim(name_c) // '. A CONTINUATION TAKES', &
+       'ONE BOUNDARY''S PAIR OF FRAMES. THE FIELD FILE: ' // trim(fname), r_array = [run%ckpt%s, s_c])
+  return
+endif
+
+ffield(ihh)%slip%accuslip = residual
+call out_io (s_info$, r_name, 'The field file carries a slippage residual of \es12.4\ wavelengths, restored, ' // &
+             'and its checkpoint agrees with the beam file''s.', r_array = [residual])
 
 err_flag = .false.
 
@@ -1672,6 +1854,9 @@ call fel_h5_int (g_id, 'unaveraged_ramp_periods', '1', 'ramp periods', &
       '', run%global%unaveraged_ramp_periods, merr)
 call fel_h5_flag (g_id, 'write_diag', 'write diag', &
       'Write the Genesis-comparison text diag file.', run%global%write_diag, merr)
+call fel_h5_flag (g_id, 'continuation', 'continuation', &
+      'beam_file and field_file are a checkpoint pair the run continues from, not an initialization.', &
+      run%global%continuation, merr)
 call fel_h5_flag (g_id, 'write_initial', 'write initial', &
       'Dump the initial state before tracking.', run%global%write_initial, merr)
 call fel_h5_flag (g_id, 'load_only', 'load only', &

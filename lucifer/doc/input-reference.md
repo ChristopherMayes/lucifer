@@ -45,6 +45,7 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 | `global%source_filter_width` | `0.05` | The filter's sigmoid width as a fraction of its edge. Small is a sharp edge |
 | `global%source_filter_mutate` | `F` | The filter check's self-test: filter the field instead of the source |
 | `global%track_start` | `""` | Element locator bounding the walk below. Blank is the whole line |
+| `global%continuation` | `F` | `beam_file` and `field_file` are one checkpoint pair the run continues from. Off, they initialize a fresh run ([](#param-global-continuation)) |
 | `global%track_end` | `""` | Element locator bounding the walk above. Blank is the whole line |
 | `global%ran_seed` | `12345` | The one random seed, governing generation, resampling and noise |
 | `global%reference_run` | `F` | Permit a lattice with no FEL element, so Bmad tracks every element |
@@ -83,6 +84,9 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 **`global%device_dep_mutate`** shifts the deposit's fixed-point scale by that many bits and changes nothing else, which is how `check_device` measures what the quantum contributes to the deposit's error rather than bounding it away ([](validation.md#val-device)). Zero in every run but that check. A shift down coarsens the quantum and is refused once it would leave the fixed point no finer than the float accumulation it replaced.
 
 (param-global-track-start)=
+(param-global-continuation)=
+**`global%continuation`** declares what `beam_file` and `field_file` are for, and nothing is inferred from the files. Off, an initialization: a fresh run from sliced inputs, read from the standard openPMD records, the reference phase and the slippage residual starting at zero, a checkpoint group present in either file reported and ignored. On, a continuation of an interrupted run: both files must be the two frames of one checkpoint, written at an eligible boundary and carrying the group `lucifer`, and `track_start` must open the walk at the element right after the one the checkpoint completed. The reader refuses anything less before tracking, naming the condition. The group's contents and the refusals are in [](reading-output.md).
+
 **`global%track_start`** and **`global%track_end`** bound the walk, using Bmad's element-locator syntax. The schedule (slippage, autophasing, break geometry) is always built on the full lattice, so a windowed run composes exactly with the full one: the first span followed by the second, started from the first's dumps, reproduces the one-shot run. The measured level is in [](validation.md#val-the-programs-own-identities).
 
 (param-global-fp32-check)=

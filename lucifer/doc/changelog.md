@@ -9,6 +9,26 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Added: checkpoints, and the two loading modes. A dump or element-end frame written at an
+  eligible boundary, an element end outside every undulator or the physical end of one with the beam in the
+  averaged chart, carries the group `lucifer` on both files: the reference phase and every particle's z as
+  the tracker holds them, in the records' order with the ids and slice counts, and the position and
+  element the frames were written at, beside the standard openPMD records and changing none of them.
+  `global%continuation` declares what `beam_file` and `field_file` are for. Off, an initialization as
+  before, except that the slippage residual now starts at zero whatever the field file carries, and a
+  group or residual present is reported and ignored. On, a continuation: the reader requires the group
+  on both files, its format string, every member, slice counts matching the patches, ids in the records'
+  order, each z agreeing with its folded time within a billionth of a wavelength, the residual, one
+  position for the pair, and a `track_start` opening at the element after the one the checkpoint
+  completed, and refuses anything less before tracking, naming the condition. The continuation before
+  an unaveraged segment, which the folded records alone carried to 6.5e-8, rebuilds phi0, every z and
+  the residual to the bit before any advance and holds at 1.5e-14 in the field, energies and phases equal to
+  the bit, over 82 frames. `momentumChart`, added
+  earlier the same day, is withdrawn: it labelled the tracker's internal convention onto a standard
+  record whose momenta are kinetic, and the interior-frame refusal now rests on the group's absence.
+  The program-structure check loads one checkpoint both ways, refuses nine malformed or misplaced
+  continuations, and every restart it runs declares itself. An undulator a superimposed element has cut
+  is refused at setup with a message naming the slave, where it was called a fieldmap before.
 - 2026-09-14 Added: a restart across an unaveraged segment boundary, and a refusal of a restart from
   inside one. A beam file gains `momentumChart`, the chart its momenta are in, `averaged` at an element
   boundary and `quiver` for a frame inside an unaveraged segment, since `felMethod` names the element's
@@ -19,7 +39,7 @@ and it is written at the merge.
   the floor: its entry field and beam are bit-identical by id, yet it diverges to 6.5e-8 because the phi0
   fold rebuilds the reference phase at a different magnitude and the segment's gain amplifies the phi0
   times epsilon difference. That is the fold's cost, recorded as a demonstration and not a relaxed
-  tolerance; carrying the phase and the local lag losslessly is separate work.
+  tolerance. Carrying the phase and the local lag losslessly is separate work.
 - 2026-09-14 Added: a restart across a Bmad short-range element wake holds, on the element and through a
   wake a superimposed marker has split onto a lord. The program-structure check takes both sides of the
   kick, a checkpoint before the wake element and one at its end, reading the passage that applies it from

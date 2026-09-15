@@ -263,7 +263,11 @@ comb (Bmad's `ds_save` semantics with one deliberate difference: an element end 
 always a record, whatever the comb, which is what lets the file carry one record axis
 and a mask instead of a second axis. Default 0 = every record).
 `global%track_start`/`track_end` bound the walk over a schedule always
-built on the full lattice (windowed runs compose exactly). `stats.h5` carries `meta/`
+built on the full lattice (windowed runs compose exactly). `global%continuation = T`
+declares that `beam_file` and `field_file` are the two frames of one checkpoint and the
+run continues from it, `track_start` opening at the element after the one the checkpoint
+completed. Off, the same files initialize a fresh run from their standard records
+([reading-output](reading-output.md)). `stats.h5` carries `meta/`
 provenance (the resolved input echo, which lattice, a timestamp and the Bmad version) as
 datasets, and `global%record_environment` adds the user name and working directory for a
 lab notebook, off by default because a stats file travels.
@@ -278,7 +282,7 @@ precision:
 | File | What |
 |---|---|
 | `<out_root>.stats.h5` | The run: per-record beam, field and Twiss data, the lattice table, and the axes and parameters to read them by. Self-describing (see [`reading-output.md`](reading-output.md)) |
-| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis4 dump can. `lucifer/tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
+| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis4 dump can. At an eligible boundary both carry the `lucifer` checkpoint group a continuation reads (`global%continuation = T`). `lucifer/tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
 | `<out_root>.diag.txt` | The per-record Genesis4-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
 | `<out_root>.import.txt` | The load record: the per-slice current profile, with the bunch's analysis moments from the resampler or the per-slice counts and first moments from the keep mode. Written at load time, so it exists under `load_only = T` |

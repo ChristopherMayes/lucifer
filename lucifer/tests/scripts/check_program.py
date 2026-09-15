@@ -40,21 +40,24 @@ the tracking window.
      split onto a lord. Each is judged against a wake-off history run from the same
      initial state, and the wake's own effect is the scale: a kick omitted or applied
      twice would move it by order one.
-  9. A restart across an unaveraged segment boundary: the entry and exit conversions are
-     scratch of the segment, so an element-boundary dump carries the averaged chart and
-     the plane field. A restart after the segment holds at the floor. One before it shows
-     the phi0 fold's cost to a high-gain segment, its entry state bit-identical yet its
-     continuation amplified (goal 98 resolves it). A frame inside the segment is in the
-     quiver chart, which the beam file records and the reader refuses.
- 10. A restart across a slippage residual: the window check above is steady state,
+  9. A continuation across an unaveraged segment boundary: the entry and exit
+     conversions are scratch of the segment, so an element-boundary dump carries the
+     averaged chart and the plane field, and continuations from both boundaries hold at
+     the floor. The one before the segment holds because the checkpoint group carries
+     phi0 and every z as the tracker holds them, rebuilt bit for bit before any advance,
+     where the folded records alone left the entry state bit-identical yet the
+     continuation amplified to 6.5e-8. Frames from inside the segment, from inside an
+     averaged undulator and from a sliced endpoint inside one carry no group and are
+     refused, as are an incomplete or inconsistent group and a continuation point that
+     does not follow the checkpoint. The same checkpoint loaded as an initialization
+     folds the records and starts the residual at zero.
+ 10. A continuation across a slippage residual: the window check above is steady state,
      where slippage is a no-op, so a time-dependent pair follows it. The continuous run
      dumps at a pipe whose accumulated slip leaves half a slice of residual, the dump's
-     slippageResidual attribute carries it, and the restart must reproduce the
+     slippageResidual attribute carries it, and the continuation must reproduce the
      continuous run's frames, field slice by slice and particles by id, to the same
-     floor. A restart from the dump with the attribute stripped rotates on its own
-     schedule and differs from the second step of the second undulator, a pipe leaving a
-     residual near zero makes that difference vanish, and an impossible residual is
-     refused.
+     floor. A continuation from the dump with the attribute stripped is refused, and so
+     is an impossible residual.
 
 Run by the benchmark harness; exits nonzero on failure. Self-referenced (no Genesis).
 """
@@ -163,7 +166,9 @@ def check(name, ok, note=""):
 
 
 def run(cmd, wd, threads="4"):
-    return subprocess.run(cmd, cwd=wd, capture_output=True, text=True,
+    # A refusal that quotes a malformed file can carry bytes that are not text, and the
+    # check reads the message rather than dying on it.
+    return subprocess.run(cmd, cwd=wd, capture_output=True, text=True, errors="replace",
                           env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
 
 
@@ -325,7 +330,7 @@ def main():
 
     # B = [after D, end] from A's finals: composes to the full run's finals.
     run_nml(exe, wd, "wb", two.format(root="wb",
-            extra='  global%track_start = "UND2"\n', bextra="""  beam_file = "wa-final.beam.h5"
+            extra='  global%continuation = T\n  global%track_start = "UND2"\n', bextra="""  beam_file = "wa-final.beam.h5"
 """).replace("&fel_wavefront_init\n", """&fel_wavefront_init
   field_file = "wa-final.wf.h5"
 """))
@@ -363,9 +368,9 @@ def main():
     # deterministic seed ramped slice by slice so a rotation in the wrong place shows,
     # and the beam and field both imported so no loader noise enters. The residual at
     # the boundary is read from the dump's own slippageResidual attribute. Two pipes: one
-    # leaves half a slice of residual, the other leaves a residual near zero, and a
-    # restart from a dump stripped of the attribute (a legacy file) tells the two apart,
-    # which is the demonstration that the residual is the cause.
+    # leaves half a slice of residual, the other leaves a residual near zero. A
+    # continuation from a dump stripped of the attribute is refused: the residual is part
+    # of the field's state, and a continuation takes nothing from a file that lacks it.
 
     rs_nml = """&fel_params
   lat_file = "{lat}"
@@ -496,25 +501,26 @@ def main():
     for pipe, tag, kind in ((0.30, "rsh", "half a slice"), (0.35, "rsz", "near zero")):
         lat = f"rs_{tag}.bmad"
         (wd / lat).write_text(rs_lat(pipe))
-        full, rest, legacy, toD = f"{tag}full", f"{tag}rest", f"{tag}leg", f"{tag}toD"
+        full, rest, bare, toD = f"{tag}full", f"{tag}rest", f"{tag}bare", f"{tag}toD"
         rs_run(full, rs_nml.format(lat=lat, root=full,
                extra='  global%dump_beam_at = "D"\n  global%dump_field_at = "D"\n  global%dump_at_comb = T\n', **imp))
         rs_run(toD, rs_nml.format(lat=lat, root=toD, extra='  global%track_end = "D"\n', **imp))
         dump_b, dump_f = f"{full}-at2-D.beam.h5", f"{full}-at2-D.wf.h5"
         resid = residual_of(wd / dump_f)
-        # The restart carrying the residual, and the legacy restart with it stripped.
+        # The continuation carrying the residual, and one from the same dump with the
+        # residual stripped, which is what a file written before the attribute existed is.
         rs_run(rest, rs_nml.format(lat=lat, root=rest,
-               extra='  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
+               extra='  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
                beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{dump_f}"\n'))
-        shutil.copy(wd / dump_f, wd / f"{tag}legacy.wf.h5")
-        with h5py.File(wd / f"{tag}legacy.wf.h5", "r+") as h5:
+        shutil.copy(wd / dump_f, wd / f"{tag}bare.wf.h5")
+        with h5py.File(wd / f"{tag}bare.wf.h5", "r+") as h5:
             del h5.attrs["slippageResidual"]
-        rs_run(legacy, rs_nml.format(lat=lat, root=legacy,
-               extra='  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
-               beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{tag}legacy.wf.h5"\n'))
+        stripped = rs_run(bare, rs_nml.format(lat=lat, root=bare,
+               extra='  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
+               beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{tag}bare.wf.h5"\n'),
+               expect_fail=True, fragment="NO slippageResidual")
 
         w_rest, n_rest, ids_r, pops_r, first_r = compare_runs(full, rest)
-        w_leg, n_leg, ids_l, pops_l, first_l = compare_runs(full, legacy)
         worst_rest = max(w_rest.values())
         if kind == "half a slice":
             check(f"the dump at the pipe carries a residual of half a slice ({pipe} m pipe)",
@@ -524,23 +530,13 @@ def main():
             check(f"the dump at the pipe carries a residual near zero ({pipe} m pipe)",
                   resid is not None and abs(resid) < 1e-3,
                   note=f"[slippageResidual {resid} wavelengths, pipe slip is whole]")
-        check(f"restart carrying the residual == continuous, {kind}: field, phase, energy, weight, "
+        check(f"continuation carrying the residual == continuous, {kind}: field, phase, energy, weight, "
               f"power at {n_rest} frames", worst_rest <= 1e-10 and ids_r and pops_r,
               note=f"[worst rel {worst_rest:.2e} vs 1e-10; ids and populations identical: "
                    f"{ids_r and pops_r}; field {w_rest['field']:.1e} theta {w_rest['theta']:.1e} "
                    f"pz {w_rest['pz']:.1e} power {w_rest['power']:.1e}]")
-        if kind == "half a slice":
-            check("a legacy restart, the residual stripped, rotates on its own schedule: the field "
-                  "differs from the second step of the second undulator",
-                  first_l is not None and abs(first_l - (0.45 + pipe + 0.030)) < 1e-6
-                  and w_leg["field"] > 1e-2,
-                  note=f"[first divergence at s = {first_l} m, expected {0.45 + pipe + 0.030:.3f}; "
-                       f"worst field {w_leg['field']:.2e}, theta {w_leg['theta']:.1e}, pz {w_leg['pz']:.1e}]")
-        else:
-            check("a legacy restart at a near-zero residual agrees, which is why the steady-state "
-                  "and whole-slice checks never saw the loss",
-                  max(w_leg.values()) <= 1e-10 and ids_l and pops_l,
-                  note=f"[worst rel {max(w_leg.values()):.2e} vs 1e-10]")
+        check(f"a continuation from the dump with the residual stripped is refused, {kind}, and the "
+              "message names slippageResidual", stripped)
         e_full, e_toD, e_rest = escaped_of(full), escaped_of(toD), escaped_of(rest)
         check(f"escaped energy: the continuous run's increment past the pipe == the restart's total, "
               f"{kind}", abs((e_full - e_toD) - e_rest) <= 1e-5 * e_full,
@@ -676,7 +672,7 @@ def main():
                extra=mig_extra + wake + '  global%dump_beam_at = "D"\n  global%dump_field_at = "D"\n  global%dump_at_comb = T\n', **mw_imp))
         rs_run(toD, rs_nml.format(lat="mw.bmad", root=toD, extra=mig_extra + wake + '  global%track_end = "D"\n', **mw_imp))
         rs_run(rest, rs_nml.format(lat="mw.bmad", root=rest,
-               extra=mig_extra + wake + '  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
+               extra=mig_extra + wake + '  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
                beam=f'  beam_file = "{full}-at2-D.beam.h5"\n', field=f'  field_file = "{full}-at2-D.wf.h5"\n'))
         resid = residual_of(wd / f"{full}-at2-D.wf.h5")
         ev_full, mv_full, dr_full = mig_events(full)
@@ -741,7 +737,9 @@ def main():
                   note=f"[{len(later_r)} refreshes at z = {[round(b[0], 3) for b in later_r]}; worst rel {d_later:.2e}]")
 
     # Boundary sensitivity, on the migration-alone case: shift every restarted phase by a
-    # little less and a little more than the smallest margin any later event recorded.
+    # little less and a little more than the smallest margin any later event recorded. The
+    # shift goes into the records' time and into the group's phi0 alike, so the checkpoint
+    # stays consistent with its records and the shift is the whole of what changes.
     ev_rest, _, _ = mig_events("mwmrest")
     m_min = min(e[3] for e in ev_rest)
     s_min = [e[0] for e in ev_rest if e[3] == m_min][0]
@@ -755,8 +753,10 @@ def main():
             g = h5[f"data/{name}/particles"]
             g = g[sorted(g.keys())[0]]
             g["time"][...] = g["time"][...] - delta / KS_C
+            ck = h5["lucifer"]
+            ck.attrs.modify("phi0", np.atleast_1d(ck.attrs["phi0"]) + delta)
         rs_run(root, rs_nml.format(lat="mw.bmad", root=root,
-               extra=mig_extra + '  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
+               extra=mig_extra + '  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
                beam=f'  beam_file = "{root}.beam.h5"\n', field='  field_file = "mwmfull-at2-D.wf.h5"\n'))
         exact, w_field, _, _, common = identity_and_floor("mwmfull", root)
         ev, _, _ = mig_events(root)
@@ -844,7 +844,9 @@ def main():
             if d > 1e-12:
                 applied_at = (s, fon[s][1], d)
                 break
-        after = {"PW": "UND2", "PW#1": "PW#2"}.get(applied_at[1] if applied_at else "", "UND2")
+        # The continuation opens at the element right after the one the checkpoint completed,
+        # which for the split lord is the superimposed marker between its two slaves.
+        after = {"PW": "UND2", "PW#1": "MK"}.get(applied_at[1] if applied_at else "", "UND2")
         check(f"the wake {what} acts once, and the passage that applies it is read from the run",
               applied_at is not None and applied_at[2] > 1e-6,
               note=f"[first change at s = {applied_at[0]} m in {applied_at[1]}, "
@@ -853,7 +855,7 @@ def main():
 
         def ew_restart(root, src, start, wake):
             text = rs_nml.format(lat=f"{tag}_{'w' if wake else 'n'}.bmad", root=root,
-                                 extra=f'  global%track_start = "{start}"\n  global%dump_at_comb = T\n',
+                                 extra=f'  global%continuation = T\n  global%track_start = "{start}"\n  global%dump_at_comb = T\n',
                                  beam=f'  beam_file = "{src}.beam.h5"\n',
                                  field=f'  field_file = "{src}.wf.h5"\n')
             rs_run(root, text)
@@ -914,23 +916,26 @@ def main():
 
 
     # ------------------------------------------------------------------
-    print("== a restart across an unaveraged segment boundary ==")
+    print("== a continuation across an unaveraged segment boundary ==")
 
     # An unaveraged segment converts on entry and exit: it asserts the averaged chart,
-    # marks the quiver into px, jumps the ramp phase and carries the entry field a half
-    # substep to the midpoint the record advances, and undoes all of it at the last step.
-    # None of that outlives the segment, so an element-boundary dump holds the field on
-    # its plane and the particles in the averaged chart, and a restart there runs the
-    # conversions once. A frame written inside the segment holds a plane field beside
-    # quiver-carrying particles, which the reader now refuses (fel_read_openpmd_beam,
-    # doc/reading-output.md). Two boundaries are taken. The one at the segment's end
-    # restarts through the trailing averaged segment and holds at the floor. The one
-    # before it restarts through the unaveraged segment, and there the fold the dump uses
-    # for the reference phase, exact for external readers, costs a high-gain segment: the
-    # continuous run enters carrying phi0 at hundreds of radians with a small local lag,
-    # the reader rebuilds an equal phase at a different magnitude, and the gain amplifies
-    # the phi0*eps difference. That before-segment continuation is a demonstration of the
-    # fold's cost, not a restart at the floor; goal 98 resolves it with lossless metadata.
+    # marks that px is now the kinetic momentum, jumps the ramp phase and carries the
+    # entry field a half substep to the midpoint the record advances, and undoes all of
+    # it at the last step. None of that outlives the segment, so an element-boundary dump
+    # holds the field on its plane and the particles in the averaged chart, and a
+    # continuation there runs the conversions once. Both boundaries are taken, before and
+    # after the segment, and both hold at the floor. The one before it did not until the
+    # checkpoint group existed: the standard records fold phi0 into each particle's time,
+    # the reader rebuilt an equal phase at another magnitude, off by phi0 times the machine
+    # epsilon, and the segment's gain amplified that to 6.5e-8 from an entry state
+    # bit-identical in every record (doc/validation.md). The group carries phi0 and each z
+    # as the tracker holds them, and the continuation rebuilds the split to the bit before
+    # any conversion or advance, which is checked first, so a later disagreement could only
+    # be amplification. A frame from inside the segment, from inside an averaged undulator
+    # or from a sliced endpoint inside one carries no group and is refused, as is every
+    # incomplete or inconsistent group and a continuation point that does not follow the
+    # checkpoint. The same checkpoint loaded without the switch is an initialization: the
+    # records are folded and the residual starts at zero.
 
     uv_lat = """no_digested
 parameter[geometry] = open
@@ -949,6 +954,11 @@ SEG: line = (UNDA, P1, UNDB, P1, UNDA)
 use, SEG
 """
     (wd / "uvsand.bmad").write_text(uv_lat)
+    # The same line with the first undulator cut in two by a superimposed marker, so a dump
+    # at the cut is a sliced endpoint inside a physical undulator.
+    (wd / "uvsplit.bmad").write_text(uv_lat.replace("UNDB: UNDA, fel_method = unaveraged\n",
+                                                    "UNDB: UNDA, fel_method = unaveraged\nUNDS: UNDA\nMK: marker, superimpose, ref = UNDS\n")
+                                           .replace("SEG: line = (UNDA, P1, UNDB, P1, UNDA)", "SEG: line = (UNDS, P1, UNDB, P1, UNDA)"))
     uv_beam = """  beam_init%n_particle = 1024
   beam_init%bunch_charge = 2.401661485427e-14
   beam_init%distribution_type(3) = "RAN_GAUSS"
@@ -957,6 +967,7 @@ use, SEG
   beam_init%a_norm_emit = 4e-7
   beam_init%b_norm_emit = 4e-7
 """
+    CONT = '  global%continuation = T\n'
 
     def uv_frames(root):
         out = {}
@@ -980,14 +991,38 @@ use, SEG
             return {"time": rec("time")[o], "id": ids[o], "pz": rec("totalMomentum")[o],
                     "x": rec("position/x")[o], "y": rec("position/y")[o]}
 
-    def chart_of(path):
+    def group_of(path):
+        """The checkpoint group's members, or None where the frame carries none."""
         with h5py.File(path) as h5:
-            v = h5.attrs.get("momentumChart")
-            if v is None:
+            g = h5.get("lucifer")
+            if g is None:
                 return None
-            v = np.atleast_1d(v)[0]
-            return v.decode() if isinstance(v, bytes) else str(v)
+            return {"phi0": float(np.atleast_1d(g.attrs["phi0"])[0]),
+                    "s": float(np.atleast_1d(g.attrs["sPosition"])[0]),
+                    "z": g["z"][...], "id": g["id"][...], "counts": g["sliceCount"][...]}
 
+    def floor_of(full, other):
+        """Shared frames by position: identity of ids, populations and membership, and the
+        worst field, energy and phase differences by id."""
+        fon, fr = uv_frames(full), uv_frames(other)
+        common = sorted(set(fon) & set(fr))
+        exact = True
+        w_field = w_pz = w_theta = 0.0
+        for sc in common:
+            bo = beam_by_id(str(fon[sc]).replace(".wf.h5", ".beam.h5"))
+            br = beam_by_id(str(fr[sc]).replace(".wf.h5", ".beam.h5"))
+            same = (np.array_equal(bo["id"], br["id"]) and np.array_equal(bo["pops"], br["pops"])
+                    and np.array_equal(bo["sl"], br["sl"]))
+            exact = exact and same
+            w_field = max(w_field, float(np.max(np.abs(raw_field(fon[sc]) - raw_field(fr[sc])))) / max(float(np.max(np.abs(raw_field(fon[sc])))), 1e-300))
+            if same:
+                w_pz = max(w_pz, float(np.max(np.abs(bo["pz"] - br["pz"]))) / max(float(np.max(np.abs(bo["pz"]))), 1e-300))
+                w_theta = max(w_theta, float(np.max(np.abs(bo["t"] - br["t"]))) * KS_C)
+        return len(common), exact, w_field, w_pz, w_theta
+
+    # The prepared inputs, an initialization as before: the beam from one run's final
+    # dump and its field ramped slice by slice with the residual stripped, neither a
+    # checkpoint pair.
     rs_run("uvprep", rs_nml.format(lat="uvsand.bmad", root="uvprep",
            extra='  slicing%window_length = 4.8e-9\n  global%track_end = "UNDA##1"\n',
            beam=uv_beam, field=gen_field))
@@ -1004,60 +1039,130 @@ use, SEG
            extra='  global%dump_beam_at = "P1,UNDB"\n  global%dump_field_at = "P1,UNDB"\n  global%dump_at_comb = T\n', **uv_imp))
     r_before = residual_of(wd / "uvfull-at2-P1.wf.h5")
     r_after = residual_of(wd / "uvfull-at3-UNDB.wf.h5")
-    check("both unaveraged-boundary checkpoints carry a residual off a whole-slice boundary",
+    check("both unaveraged-boundary checkpoints carry a residual off a whole-slice boundary, and the "
+          "prepared inputs initialized as before",
           r_before is not None and 0.5 < abs(r_before) < 3.2 and r_after is not None and 0.5 < abs(r_after) < 3.2,
           note=f"[before {r_before}, after {r_after}, of 4 a slice]")
 
-    interior = max((s for s, f in uv_frames("uvfull").items()
-                    if 0.81 + 1e-9 < s < 1.41 - 1e-9), default=None)
-    interior_f = uv_frames("uvfull")[interior]
-    check("the momentum chart is recorded and distinguishes the boundary from the interior",
-          chart_of(wd / "uvfull-at3-UNDB.beam.h5") == "averaged"
-          and chart_of(str(interior_f).replace(".wf.h5", ".beam.h5")) == "quiver",
-          note=f"[segment end 'averaged', interior frame at s={interior} 'quiver']")
+    fon = uv_frames("uvfull")
+    ckb = group_of(wd / "uvfull-at2-P1.beam.h5")
+    cka = group_of(wd / "uvfull-at3-UNDB.beam.h5")
+    interior_b = max((sc for sc in fon if 0.81 + 1e-9 < sc < 1.41 - 1e-9), default=None)
+    interior_a = max((sc for sc in fon if 1e-9 < sc < 0.6 - 1e-9), default=None)
+    n_grp = sum(1 for sc in fon if group_of(str(fon[sc]).replace(".wf.h5", ".beam.h5")) is not None)
+    check("the checkpoint group rides the boundary dumps and the element-end frames, and no interior frame",
+          ckb is not None and cka is not None and n_grp == 6
+          and group_of(str(fon[interior_b]).replace(".wf.h5", ".beam.h5")) is None
+          and group_of(str(fon[interior_a]).replace(".wf.h5", ".beam.h5")) is None,
+          note=f"[{n_grp} of {len(fon)} frames carry it: the entry face and five element ends; "
+               f"none at s = {interior_a} (averaged) or s = {interior_b} (unaveraged)]")
 
     rs_run("uvrafter", rs_nml.format(lat="uvsand.bmad", root="uvrafter",
-           extra='  global%track_start = "P1##2"\n  global%dump_at_comb = T\n',
+           extra=CONT + '  global%track_start = "P1##2"\n  global%dump_at_comb = T\n',
            beam='  beam_file = "uvfull-at3-UNDB.beam.h5"\n', field='  field_file = "uvfull-at3-UNDB.wf.h5"\n'))
-    fon = uv_frames("uvfull")
-    fr = uv_frames("uvrafter")
-    common = sorted(set(fon) & set(fr))
-    exact = True
-    w_field = w_pz = w_theta = 0.0
-    for sc in common:
-        bo = beam_by_id(str(fon[sc]).replace(".wf.h5", ".beam.h5"))
-        br = beam_by_id(str(fr[sc]).replace(".wf.h5", ".beam.h5"))
-        same = (np.array_equal(bo["id"], br["id"]) and np.array_equal(bo["pops"], br["pops"])
-                and np.array_equal(bo["sl"], br["sl"]))
-        exact = exact and same
-        w_field = max(w_field, float(np.max(np.abs(raw_field(fon[sc]) - raw_field(fr[sc])))) / max(float(np.max(np.abs(raw_field(fon[sc])))), 1e-300))
-        if same:
-            w_pz = max(w_pz, float(np.max(np.abs(bo["pz"] - br["pz"]))) / max(float(np.max(np.abs(bo["pz"]))), 1e-300))
-            w_theta = max(w_theta, float(np.max(np.abs(bo["t"] - br["t"]))) * KS_C)
-    check("restart after the segment: field and particles at the floor through the averaged segment",
-          exact and w_field <= 1e-10 and w_pz <= 1e-10 and w_theta <= 1e-10,
-          note=f"[{len(common)} frames; identical {exact}; field {w_field:.1e}, energy {w_pz:.1e}, phase {w_theta:.1e} rad vs 1e-10]")
+    n_a, exact_a, wf_a, wp_a, wt_a = floor_of("uvfull", "uvrafter")
+    check("continuation after the segment: field and particles at the floor through the averaged segment",
+          exact_a and wf_a <= 1e-10 and wp_a <= 1e-10 and wt_a <= 1e-10,
+          note=f"[{n_a} frames; identical {exact_a}; field {wf_a:.1e}, energy {wp_a:.1e}, phase {wt_a:.1e} rad vs 1e-10]")
 
-    entry = round(0.81, 9)
-    d_field_entry = float(np.max(np.abs(raw_field(wd / "uvfull-at2-P1.wf.h5") - raw_field(fon[entry]))))
-    be = raw_beam(str(wd / "uvfull-at2-P1.beam.h5"))
-    bc = raw_beam(str(fon[entry]).replace(".wf.h5", ".beam.h5"))
-    d_beam_entry = max(float(np.max(np.abs(be[k] - bc[k]))) for k in ("time", "pz", "x", "y"))
+    # Before the segment. The internal state first: the continuation's first frame is
+    # written before any entrance conversion or advance, and its group and records are
+    # the checkpoint's to the bit, so whatever follows is the segment's doing.
     rs_run("uvrbefore", rs_nml.format(lat="uvsand.bmad", root="uvrbefore",
-           extra='  global%track_start = "UNDB"\n  global%dump_at_comb = T\n',
+           extra=CONT + '  global%track_start = "UNDB"\n  global%dump_at_comb = T\n',
            beam='  beam_file = "uvfull-at2-P1.beam.h5"\n', field='  field_file = "uvfull-at2-P1.wf.h5"\n'))
     frb = uv_frames("uvrbefore")
-    commonb = sorted(set(fon) & set(frb))
-    w_field_b = max(float(np.max(np.abs(raw_field(fon[sc]) - raw_field(frb[sc])))) / max(float(np.max(np.abs(raw_field(fon[sc])))), 1e-300) for sc in commonb)
-    check("restart before the segment: the entry field and beam are bit-identical, yet the fold's phase amplifies through the segment (goal 98 resolves it)",
-          d_field_entry == 0.0 and d_beam_entry == 0.0 and w_field_b > 1e-9,
-          note=f"[entry field diff {d_field_entry:.1e}, beam diff {d_beam_entry:.1e}; divergence through the segment {w_field_b:.1e}, above the 1e-10 floor by the fold's phi0*eps]")
+    entry = round(0.81, 9)
+    g0 = group_of(str(frb[entry]).replace(".wf.h5", ".beam.h5"))
+    same_state = (g0 is not None and g0["phi0"] == ckb["phi0"] and np.array_equal(g0["z"], ckb["z"])
+                  and np.array_equal(g0["id"], ckb["id"]) and np.array_equal(g0["counts"], ckb["counts"]))
+    same_resid = residual_of(frb[entry]) == r_before
+    be = raw_beam(str(wd / "uvfull-at2-P1.beam.h5"))
+    bc = raw_beam(str(frb[entry]).replace(".wf.h5", ".beam.h5"))
+    same_records = all(np.array_equal(be[k], bc[k]) for k in ("time", "id", "pz", "x", "y"))
+    same_field = float(np.max(np.abs(raw_field(wd / "uvfull-at2-P1.wf.h5") - raw_field(frb[entry])))) == 0.0
+    check("continuation before the segment: phi0, every z, the residual, the records and the field are the "
+          "checkpoint's bit for bit before any conversion or advance",
+          same_state and same_resid and same_records and same_field,
+          note=f"[phi0 {ckb['phi0']:.9f} rad over {len(ckb['z'])} particles; group {same_state}, residual {same_resid}, "
+               f"records {same_records}, field {same_field}]")
+    n_b, exact_b, wf_b, wp_b, wt_b = floor_of("uvfull", "uvrbefore")
+    check("continuation before the segment: field and particles at the floor through the unaveraged segment "
+          "and the averaged one after it",
+          exact_b and wf_b <= 1e-10 and wp_b <= 1e-10 and wt_b <= 1e-10,
+          note=f"[{n_b} frames; identical {exact_b}; field {wf_b:.1e}, energy {wp_b:.1e}, phase {wt_b:.1e} rad vs 1e-10; "
+               f"the folded records alone reached 6.5e-8 here]")
 
-    ir = rs_run("uvrinterior", rs_nml.format(lat="uvsand.bmad", root="uvrinterior",
-           extra='  global%track_start = "UNDB"\n',
-           beam=f'  beam_file = "{pathlib.Path(str(interior_f).replace(".wf.h5", ".beam.h5")).name}"\n',
-           field=f'  field_file = "{interior_f.name}"\n'), expect_fail=True, fragment="QUIVER CHART")
-    check("a restart from a frame inside the segment is refused, its beam in the quiver chart", ir)
+    # The same checkpoint loaded the other way, an initialization, stopped after its
+    # initial dump: the records are folded, phi0 and the residual start at zero.
+    rs_run("uvinit", rs_nml.format(lat="uvsand.bmad", root="uvinit",
+           extra='  global%track_start = "UNDB"\n  global%load_only = T\n  global%write_initial = T\n',
+           beam='  beam_file = "uvfull-at2-P1.beam.h5"\n', field='  field_file = "uvfull-at2-P1.wf.h5"\n'))
+    gi = group_of(wd / "uvinit-initial.beam.h5")
+    ri = residual_of(wd / "uvinit-initial.wf.h5")
+    dz_init = float(np.max(np.abs(gi["z"] - ckb["z"]))) if gi is not None else -1.0
+    check("one checkpoint loaded both ways: the initialization folds the records with phi0 and the residual at "
+          "zero, the continuation restores both exactly, so the declaration controls the loading",
+          gi is not None and gi["phi0"] == 0.0 and dz_init > 0 and ri == 0.0 and same_state and same_resid,
+          note=f"[initialization: phi0 0, every z moved by up to {dz_init:.2e} m, residual 0; "
+               f"continuation: phi0 {ckb['phi0']:.6f} rad, residual {r_before} wavelengths]")
+
+    # Refusals, each naming its condition.
+    def refused(root, beam, field, start, fragment, lat="uvsand.bmad"):
+        return rs_run(root, rs_nml.format(lat=lat, root=root,
+                      extra=CONT + f'  global%track_start = "{start}"\n',
+                      beam=f'  beam_file = "{beam}"\n', field=f'  field_file = "{field}"\n'),
+                      expect_fail=True, fragment=fragment)
+
+    def variant(name, src, edit):
+        shutil.copy(wd / src, wd / name)
+        with h5py.File(wd / name, "r+") as h5:
+            edit(h5)
+        return name
+
+    fb = str(fon[interior_b]).replace(".wf.h5", ".beam.h5")
+    check("a continuation from a frame inside the unaveraged segment is refused, no group",
+          refused("uvr_inu", pathlib.Path(fb).name, fon[interior_b].name, "P1##2", "NO CHECKPOINT GROUP"))
+    fa = str(fon[interior_a]).replace(".wf.h5", ".beam.h5")
+    check("a continuation from a frame inside an averaged undulator is refused, no group",
+          refused("uvr_ina", pathlib.Path(fa).name, fon[interior_a].name, "P1##1", "NO CHECKPOINT GROUP"))
+
+    # A superimposed element cannot cut an undulator this tracker tracks: the slaves refer
+    # to their lord for the field model, and the FEL element assertion refuses the lattice
+    # at setup. So no frame from a sliced endpoint inside an undulator exists to continue
+    # from, and fel_checkpoint_eligible's guard against that boundary waits for the day one
+    # does.
+    split_refused = rs_run("uvsplit", rs_nml.format(lat="uvsplit.bmad", root="uvsplit",
+           extra='  global%track_end = "UNDS#2"\n  global%dump_beam_at = "UNDS#1"\n  global%dump_field_at = "UNDS#1"\n', **uv_imp),
+           expect_fail=True, fragment="SUPER_SLAVE")
+    check("an undulator cut by a superimposed marker is refused at setup, so no sliced endpoint inside one is "
+          "ever dumped", split_refused,
+          note="[UNDS cut at its middle: its slaves refer to the lord for the field model, and the message names the slave]")
+
+    def del_z(h5): del h5["lucifer/z"]
+    def del_group(h5): del h5["lucifer"]
+    def del_resid(h5): del h5.attrs["slippageResidual"]
+    def permute(h5): h5["lucifer/z"][...] = h5["lucifer/z"][...][::-1]
+    def bad_version(h5): h5["lucifer"].attrs["checkpointFormat"] = np.bytes_("lucifer-checkpoint 9.9")
+    check("a checkpoint with a member removed is refused",
+          refused("uvr_member", variant("uvck_noz.beam.h5", "uvfull-at2-P1.beam.h5", del_z), "uvfull-at2-P1.wf.h5",
+                  "UNDB", "CHECKPOINT MEMBER MISSING: z"))
+    check("a checkpoint with the group removed is refused",
+          refused("uvr_group", variant("uvck_nogrp.beam.h5", "uvfull-at2-P1.beam.h5", del_group), "uvfull-at2-P1.wf.h5",
+                  "UNDB", "NO CHECKPOINT GROUP"))
+    check("a checkpoint whose field file lacks the residual is refused",
+          refused("uvr_resid", "uvfull-at2-P1.beam.h5", variant("uvck_nores.wf.h5", "uvfull-at2-P1.wf.h5", del_resid),
+                  "UNDB", "NO slippageResidual"))
+    check("a beam frame and a field frame from two positions are refused",
+          refused("uvr_pos", "uvfull-at2-P1.beam.h5", "uvfull-at3-UNDB.wf.h5", "UNDB", "CHECKPOINT POSITIONS DISAGREE"))
+    check("a checkpoint whose coordinates are permuted against its records is refused",
+          refused("uvr_perm", variant("uvck_perm.beam.h5", "uvfull-at2-P1.beam.h5", permute), "uvfull-at2-P1.wf.h5",
+                  "UNDB", "CHECKPOINT COORDINATES DISAGREE"))
+    check("a checkpoint of a version this tracker does not know is refused",
+          refused("uvr_ver", variant("uvck_ver.beam.h5", "uvfull-at2-P1.beam.h5", bad_version), "uvfull-at2-P1.wf.h5",
+                  "UNDB", "CHECKPOINT VERSION NOT KNOWN"))
+    check("a continuation point one element past the checkpoint's is refused",
+          refused("uvr_start", "uvfull-at2-P1.beam.h5", "uvfull-at2-P1.wf.h5", "P1##2", "CONTINUATION POINT DOES NOT FOLLOW"))
 
     # ------------------------------------------------------------------
     print("== committed prose cites committed artifacts ==")

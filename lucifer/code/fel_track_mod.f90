@@ -292,6 +292,18 @@ character(*), parameter :: r_name = 'fel_assert_wiggler_sane'
 ! used here: its deliberate integer-divide traceback bomb does not trap on arm64 and
 ! its final bare stop exits 0. The stops below stay.
 
+! A superimposed element cuts an undulator into super_slaves whose field_calc refers to
+! the lord, and nothing here reads the lord: the undulator's parameters, its method and
+! its ramps are the element's own. Such a lattice is refused before any frame is written,
+! so no dump from a sliced endpoint inside an undulator exists today
+! (fel_checkpoint_eligible guards that boundary for the day one does).
+
+if (ele%slave_status == super_slave$ .or. ele%field_calc == refer_to_lords$) then
+  call out_io (s_fatal$, r_name, 'FEL ELEMENT IS A SUPER_SLAVE, ITS FIELD REFERRED TO ITS LORD: ' // trim(ele%name), &
+                                 'A SUPERIMPOSED ELEMENT CANNOT CUT AN UNDULATOR THIS TRACKER TRACKS.', &
+                                 'POSSIBLE SOLUTION: PLACE THE SUPERIMPOSED ELEMENT BETWEEN UNDULATORS.')
+  stop 1
+endif
 if (ele%field_calc /= planar_model$ .and. ele%field_calc /= helical_model$) then
   call out_io (s_fatal$, r_name, 'FEL ELEMENT FIELD_CALC MUST BE PLANAR_MODEL OR HELICAL_MODEL', &
                                  '(A FIELDMAP GETS NO FOCUSING HERE): ' // trim(ele%name))

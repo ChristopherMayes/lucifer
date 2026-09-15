@@ -85,6 +85,17 @@ The whole beam: slices, the normalization reference, the common phase, and the d
 metadata.
 ```
 
+(api-fel-checkpoint-struct)=
+### `fel_checkpoint_struct`
+
+*Struct*
+
+```
+Where a checkpoint was written, read from its group by fel_read_openpmd_beam in the
+continuation mode and kept so the field file and the tracking window are checked
+against it (fel_read_openpmd_into_field, fel_setup_schedule).
+```
+
 (api-fel-slice-diag-struct)=
 ### `fel_slice_diag_struct`
 
@@ -233,7 +244,7 @@ Output:
 *Subroutine* `(beam, file_name, gamma0, n_slice, wavelength, spacing,`
 
 ```
-                                                               beamlet_size, ele, err_flag)
+                                                   ele, err_flag, continuation, ckpt)
 
 Routine to read an openPMD-beamphysics particle file written by
 fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
@@ -248,21 +259,33 @@ slices it by load_mode instead of assuming a slicing it does not carry.
 
 one4one is not read either. The flag asserts that every macroparticle carries one
 electron, so the weights decide it.
+
+The reference phase starts at zero and each particle's z is the folded lag the file's
+time gives back, which is an initialization: a fresh run from the standard records. A
+continuation asks for the state the run had instead, phi0 and every z from the file's
+checkpoint group (fel_write_checkpoint_group), and refuses a file without a complete
+group that agrees with the records, since a fallback to the fold would hide the loss
+the group exists to close. The mode is the caller's to state and is never inferred
+from the file.
 ```
 
 ```
 Input:
-  file_name   -- character(*): File to read.
-  gamma0      -- real(rp): Reference gamma for the run, from the lattice.
-  n_slice     -- integer: Slices the deck's window has, or -1 to take the file's.
-  ele         -- ele_struct: Element to convert the coordinates against.
-  wavelength  -- real(rp): Radiation wavelength [m], from the deck.
-  spacing     -- real(rp): Slice spacing [m], from the deck.
-  beamlet_size       -- integer: Beamlet size, from the deck. A dump does not carry it.
+  file_name    -- character(*): File to read.
+  gamma0       -- real(rp): Reference gamma for the run, from the lattice.
+  n_slice      -- integer: Slices the deck's window has, or -1 to take the file's.
+  wavelength   -- real(rp): Radiation wavelength [m], from the deck.
+  spacing      -- real(rp): Slice spacing [m], from the deck.
+  ele          -- ele_struct: Element to convert the coordinates against.
+  continuation -- logical, optional: Rebuild phi0 and z from the checkpoint group,
+                    refusing a file that has no complete one? Default is False, an
+                    initialization, which ignores the group and says so when it is there.
 
 Output:
   beam        -- fel_beam_struct: Beam read from the file.
   err_flag    -- logical: Set True on error, False otherwise.
+  ckpt        -- fel_checkpoint_struct, optional: Where the checkpoint was written, for a
+                   continuation. Left as it was for an initialization.
 ```
 
 (api-fel-write-openpmd-beam)=
@@ -292,8 +315,10 @@ Input:
   ele         -- ele_struct: Element the beam sits at, for the coord_struct conversion.
   file_name   -- character(*): File to create.
   is1, is2    -- integer, optional: The slice range to write. Default the whole window.
-  chart_named -- logical, optional: The file names the beam's chart, so an unaveraged
-                   beam is written rather than refused. Default False.
+  kinetic_ok  -- logical, optional: The caller writes a frame from inside an unaveraged
+                   segment, whose px is the kinetic momentum and not the averaged
+                   tracker's, and accepts it, so the beam is written rather than refused.
+                   Default False.
   s_pos       -- real(rp), optional: Where along ele the beam sits, for a frame taken
                    inside an element (fel_slice_to_bunch). Default the upstream end.
 
@@ -301,25 +326,40 @@ Output:
   err_flag    -- logical: Set True on error, False otherwise.
 ```
 
-(api-fel-write-momentum-chart)=
-### `fel_write_momentum_chart`
+(api-fel-write-checkpoint-group)=
+### `fel_write_checkpoint_group`
 
-*Subroutine* `(file_name, quiver_in_px, err_flag)`
+*Subroutine* `(file_name, s_ckpt, ix_done, ele_name, err_flag, beam)`
 
 ```
-Routine to stamp a beam file with the chart its momenta are in, the root attribute
-momentumChart, 'quiver' when px carries the undulator quiver and 'averaged' otherwise.
-It records the physical chart, which felMethod cannot, so a reader refuses a quiver-chart
-file rather than tracking it as averaged (doc/reading-output.md).
+Routine to add the group lucifer to a beam or field frame written at an eligible
+boundary (fel_checkpoint_eligible): the tracker's replay state, beside the standard
+openPMD records and changing none of them. The group's attributes say where the frame
+was taken, sPosition with the elementIndex and elementName of the element the run had
+completed, and checkpointFormat names this layout. With beam present the group also
+carries the reference phase phi0 and, per particle in the records' order, the id and
+the longitudinal coordinate z as the tracker holds it, copied and not recomputed, with
+the count of every slice.
+
+The standard records fold phi0 into each particle's time (fel_slice_to_bunch), which
+is exact for a reader of the file and not for a continuation of the run: the fold
+rebuilds an equal phase at another magnitude, so the deposit phase of a high-gain
+segment differs by phi0 times the machine epsilon, and the gain amplifies that to
+6.5e-8 (doc/validation.md). A continuation reads phi0 and z from here instead and holds
+the split the run had, to the bit.
 ```
 
 ```
 Input:
-  file_name     -- character(*): The beam file, already written.
-  quiver_in_px  -- logical: The beam's momentum-convention flag.
+  file_name -- character(*): The frame, already written and closed.
+  s_ckpt    -- real(rp): The boundary's position [m].
+  ix_done   -- integer: Index of the element the run had completed there.
+  ele_name  -- character(*): That element's name.
+  beam      -- fel_beam_struct, optional: The beam, for a beam frame. Omitted for a
+                 field frame, whose group carries the position alone.
 
 Output:
-  err_flag      -- logical: Set True if the attribute could not be written.
+  err_flag  -- logical: Set True if the group could not be written. False otherwise.
 ```
 
 (api-fel-assign-ids)=
@@ -588,7 +628,7 @@ Output:
 (api-fel-slice-to-bunch)=
 ### `fel_slice_to_bunch`
 
-*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, chart_named, s_pos)`
+*Subroutine* `(beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)`
 
 ```
 Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
@@ -601,17 +641,21 @@ phase into a per-beam reference and a per-particle lag,
 
   theta_j = phi0 + ks * z_j / beta_j,
 
-and a beam file carries the lag, since that is what a time coordinate is. A reader
-restarts phi0 at zero (there is nowhere in either dump format to put a run's reference
-phase), so a dump written from z_j alone comes back with every theta short by phi0. The
+and a beam file carries the lag, since that is what a time coordinate is. The standard
+records have no place for a run's reference phase, so a reader of them starts phi0 at
+zero, and a dump written from z_j alone comes back with every theta short by phi0. The
 beam's phase against the field's phase is what the next segment's gain is made of, and
 the field is dumped with its absolute phase, so that shift is a real change of state:
 measured 2.1e-2 on the windowed-composition check, which restarts mid-line.
 
 So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks, which
-makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact. Genesis
-stores theta itself and its reader does the same fold, and convert_genesis.py maps a
-Genesis theta to the same time, so the two formats agree on what a dump means.
+makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact for what
+the file states. Genesis stores theta itself and its reader does the same fold, and
+convert_genesis.py maps a Genesis theta to the same time, so the two formats agree on
+what a dump means. Exact for the file is not exact for the run: the fold rebuilds an
+equal phase at another magnitude, off by phi0 times the machine epsilon, and a high-gain
+segment amplifies that. A continuation therefore takes phi0 and z_j themselves from the
+checkpoint group (fel_write_checkpoint_group) and leaves these records to their readers.
 
 ix_slice places the slice in the bunch, and is for a dump as well. vec(5) is the lag
 inside the slice and says nothing about which slice that is, so a bunch written from it
@@ -636,9 +680,9 @@ Input:
                    Omitted, the slice is placed at the reference, which is what tracking
                    wants: the seam hands one slice to a Bmad element and its own lag is
                    the whole of its z.
-  chart_named -- logical, optional: The caller writes a file that names the chart the
-                   beam is in, so an unaveraged beam is converted rather than refused.
-                   Default False.
+  kinetic_ok  -- logical, optional: The caller writes a frame from inside an unaveraged
+                   segment and accepts the kinetic px it holds, so the beam is converted
+                   rather than refused. Default False.
   s_pos       -- real(rp), optional: Where along ele the coords are initialized, for a
                    frame taken inside an element. The particle s and reference time are
                    then the frame's own, interpolated between the element's faces as
@@ -3152,11 +3196,43 @@ Input:
   ele       -- ele_struct: Element the beam sits at.
   prefix    -- character(*): Filename prefix. Format suffixes are appended.
   s_pos     -- real(rp), optional: Where along ele the beam sits. A dump at an element's
-                 end passes ele%s, so the particle records carry the downstream face.
-                 Omitted, the beam sits at the upstream face, which is the initial dump.
+                 end passes ele%s, so the particle records carry the downstream face and
+                 ele is the element completed. Omitted, the beam sits at the upstream
+                 face, which is the initial dump, and the element completed is the one
+                 before ele.
 
 Output:
   err_flag  -- logical: Set True if a file could not be written. False otherwise.
+```
+
+(api-fel-checkpoint-eligible)=
+### `fel_checkpoint_eligible`
+
+*Function* `(run, ix_done) result (ok)`
+
+```
+Routine to say whether the boundary at the end of element ix_done is one a continuation
+may start from, so that the frames written there carry the checkpoint group
+(fel_write_checkpoint_group). The boundary is eligible outside every undulator and at
+the physical end of one, with the beam in the averaged chart. A sliced endpoint inside
+an undulator, where a superimposed element has cut one physical device into
+super_slaves, is not a completed handoff: the averaged tracker's px there is the slow
+momentum inside a field that has not ended, and the unaveraged tracker's ramp has
+closed on a plane the device does not end at. The frame is written whatever the answer.
+Only the group is withheld, and a continuation from that frame is refused.
+
+Note: A lattice with a cut undulator is refused at setup today, its slaves referring to
+their lord for the field model (fel_assert_wiggler_sane), so the slave branch below
+guards a boundary no run reaches yet.
+```
+
+```
+Input:
+  run      -- fel_run_struct: Run state.
+  ix_done  -- integer: Index of the element completed at the boundary, 0 for the entry face.
+
+Output:
+  ok       -- logical: True if a checkpoint is written at this boundary.
 ```
 
 (api-fel-frame-attributes)=
@@ -3261,6 +3337,9 @@ The fields move in lockstep, but the cshift must run per record.
 Input:
   run       -- fel_run_struct: Run state with the field set to dump.
   prefix    -- character(*): Filename prefix. Format-specific suffixes are appended.
+  ix_done   -- integer, optional: Index of the element the dump completes, so the files
+                 carry the checkpoint group where that boundary is eligible
+                 (fel_checkpoint_eligible). Omitted, no group is written.
 
 Output:
   run       -- fel_run_struct: Field records unrotated to time order (slip%first = 0).
