@@ -539,9 +539,10 @@ use, QL
     def frame_where(f):
         """Where a frame says it was written, and the quiver in the mean of its px."""
         with h5py.File(f) as h5:
-            if "sElement" not in h5.attrs:
+            fr = h5.get("lucifer/frame")
+            if fr is None or "sElement" not in fr.attrs:
                 return None
-            s_ele = float(np.atleast_1d(h5.attrs["sElement"])[0])
+            s_ele = float(np.atleast_1d(fr.attrs["sElement"])[0])
             g = h5["data"]
             g = g[sorted(g.keys())[0]]["particles"]
             g = g[sorted(g.keys())[0]]
@@ -612,12 +613,11 @@ use, QL
     refused("a continuation from the guiding-centre frame, for the checkpoint it lacks", code, out,
             "NO CHECKPOINT GROUP")
 
-    # A file that says nothing about a device is an external bunch, and their absence is
-    # that assumption rather than proof of a boundary.
+    # A file that says nothing about a device is an external bunch, and the absence of the
+    # group lucifer is that assumption rather than proof of a boundary.
     shutil.copy(at_crest, wd / "qf_ext.beam.h5")
     with h5py.File(wd / "qf_ext.beam.h5", "r+") as h5:
-        for k in ("sElement", "elementLength", "elementName", "aw", "ku", "felMethod"):
-            del h5.attrs[k]
+        del h5["lucifer"]
     run(exe, wd, "qf_ext", qbase.format(root="qf_ext",
         extra='  beam_file = "qf_ext.beam.h5"\n  field_file = "qf-final.wf.h5"\n'
               "  load_only = T\n  write_initial = T\n"))

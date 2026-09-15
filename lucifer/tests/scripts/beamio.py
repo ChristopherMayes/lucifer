@@ -219,7 +219,10 @@ def _read_openpmd(path, wavelength, spacing=None):
     return out
 
 
-def unquiver(path, slices, wavelength, representation=None):
+FRAME_FORMAT = "lucifer-frames 2.0"
+
+
+def unquiver(path, slices, wavelength):
     """A frame's slices with the undulator quiver taken back off, the guiding centre the
     averaged map tracks.
 
@@ -234,35 +237,33 @@ def unquiver(path, slices, wavelength, representation=None):
     frame the writer did not convert, one from a break, one this mode wrote with the orbit
     already in it, and one at an element face, where the device's field has ended.
 
-    Vintage decides the rest. A frame at frameFormat 1.1 or later is the orbit by
-    construction. An interior .beam.h5 of an averaged element at 1.0 may hold the guiding
-    centre, from before the reconstruction became automatic, or the orbit, from after, and
-    the two cannot be told apart from their contents, so the caller states which through
-    representation = "orbit" or "guidingCentre", or the call raises.
+    The frame's attributes are read from its group lucifer/frame, and an interior frame
+    at any frameFormat but FRAME_FORMAT raises rather than being read under a layout this
+    inverse does not know.
     """
     if is_guiding_centre(path):
         return slices
     with h5py.File(path) as h5:
-        method = _attr(h5, "felMethod") if "felMethod" in h5.attrs else b""
+        fr = h5.get("lucifer/frame")
+        if fr is None or "aw" not in fr.attrs:
+            return slices
+        method = _attr(fr, "felMethod") if "felMethod" in fr.attrs else b""
         if isinstance(method, bytes):
             method = method.decode()
-        if "aw" not in h5.attrs or str(method) == "Unaveraged":
+        if str(method) == "Unaveraged":
             return slices
-        fmt = _attr(h5, "frameFormat") if "frameFormat" in h5.attrs else b""
+        fmt = _attr(fr, "frameFormat") if "frameFormat" in fr.attrs else b""
         fmt = fmt.decode() if isinstance(fmt, bytes) else str(fmt)
-        aw, ku = float(_attr(h5, "aw")), float(_attr(h5, "ku"))
-        tilt, helical = float(_attr(h5, "tilt")), int(_attr(h5, "helical")) == 1
-        s_ele, l_ele = float(_attr(h5, "sElement")), float(_attr(h5, "elementLength"))
-        l_ramp = float(_attr(h5, "rampPeriods")) * 2 * np.pi / ku
+        aw, ku = float(_attr(fr, "aw")), float(_attr(fr, "ku"))
+        tilt, helical = float(_attr(fr, "tilt")), int(_attr(fr, "helical")) == 1
+        s_ele, l_ele = float(_attr(fr, "sElement")), float(_attr(fr, "elementLength"))
+        l_ramp = float(_attr(fr, "rampPeriods")) * 2 * np.pi / ku
     if s_ele <= 0 or s_ele >= l_ele:
         return slices
-    if _frame_version(fmt) < (1, 1):
-        if representation == "guidingCentre":
-            return slices
-        if representation != "orbit":
-            raise ValueError(f"{pathlib.Path(path).name} is an interior frame of an averaged "
-                             f"undulator at {fmt or 'no frameFormat'}, which may hold the guiding "
-                             "centre or the orbit: pass representation='orbit' or 'guidingCentre'")
+    if fmt != FRAME_FORMAT:
+        raise ValueError(f"{pathlib.Path(path).name} is an interior frame of an averaged "
+                         f"undulator at {fmt or 'no frameFormat'}, and this inverse reads "
+                         f"{FRAME_FORMAT}")
 
     g, a_cos, a_sin, b_cos = _quiver_integrals(s_ele, l_ele, l_ramp, ku)
     a0 = aw if helical else np.sqrt(2.0) * aw
@@ -305,14 +306,6 @@ def unquiver(path, slices, wavelength, representation=None):
         d["theta"] = sl["theta"] + 2 * np.pi / wavelength * dtau
         out.append(d)
     return out
-
-
-def _frame_version(fmt):
-    """(major, minor) of a frameFormat string such as 'lucifer-frames 1.1', (0, 0) if none."""
-    try:
-        return tuple(int(v) for v in fmt.split()[-1].split("."))
-    except (ValueError, IndexError):
-        return (0, 0)
 
 
 def _quiver_envelope(t, l_ele, l_ramp):

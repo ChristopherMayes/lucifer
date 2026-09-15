@@ -245,13 +245,19 @@ import glob, h5py
 frames = sorted(glob.glob("run-[0-9]*.beam.h5"))
 beam = ParticleGroup(frames[3])
 with h5py.File(frames[3]) as h:
-    s, aw, ku = h.attrs["sPosition"], h.attrs["aw"], h.attrs["ku"]
+    fr = h["lucifer/frame"].attrs
+    s, aw, ku = fr["sPosition"], fr["aw"], fr["ku"]
 ```
 
 The series is `run-%06T.beam.h5` as an openPMD pattern, which is what a reader that takes
 one wants.
 
-Each file says where it was taken. `frameFormat` names the layout, and `sPosition`,
+Each file says where it was taken, in the group `lucifer/frame`. Everything this program
+adds to a file of its own sits under the root group `lucifer`, in a subgroup named for its
+role, `frame`, `field` or `checkpoint`: openPMD keeps all it governs under `basePath`,
+`/data`, so a reader following the standard never looks there, and the file root carries
+the standard's declarations alone. On `lucifer/frame`, `frameFormat` names the layout,
+`lucifer-frames 2.0`, and `sPosition`,
 `elementName`, `elementIndex`, `phi0`, `sliceFirst` and `sliceLast` are on every frame. A
 frame inside an FEL element also carries `felMethod` with `aw`, `ku`, `tilt`, `helical`,
 and the device's geometry: `sElement`, where the frame sits from the element's upstream
@@ -270,7 +276,8 @@ offset, so a reader that takes the position from the particles and one that take
 the file see the same frame.
 
 Every field file this program writes, frames and the element-end and final dumps alike,
-also carries `slippageResidual` ([`avg-final.wf.h5`](generated/layouts.md#layout-avg-final-wf-h5)):
+also carries `slippageResidual` on its group `lucifer/field`
+([`avg-final.wf.h5`](generated/layouts.md#layout-avg-final-wf-h5)):
 the slippage the record had accumulated and not yet
 rotated, in fundamental wavelengths, signed. The record's rotation index is folded into
 the time order the file is written in, and this residual is the one piece of the field's
@@ -298,12 +305,14 @@ undulator, or the physical end of one, with the beam in the averaged chart. A fr
 inside an element is written like any other frame and is not a checkpoint, and neither
 would a frame from the end of a super_slave inside a cut undulator be, though a lattice
 with one is refused at setup today. At a checkpoint the beam and field files each carry
-the root group `lucifer`, printed on [`avg-final.beam.h5`](generated/layouts.md#layout-avg-final-beam-h5)
-and [`avg-final.wf.h5`](generated/layouts.md#layout-avg-final-wf-h5):
+the group `lucifer/checkpoint`, printed on [`avg-final.beam.h5`](generated/layouts.md#layout-avg-final-beam-h5)
+and [`avg-final.wf.h5`](generated/layouts.md#layout-avg-final-wf-h5). A file is a checkpoint
+when that subgroup exists with its format string, and for no other reason: the root group
+`lucifer` is on every frame and every field file, so its presence says nothing.
 
 | member | on | what |
 |---|---|---|
-| `checkpointFormat` | both | `lucifer-checkpoint 1.0`. A continuation requires this string exactly |
+| `checkpointFormat` | both | `lucifer-checkpoint 2.0`. A continuation requires this string exactly |
 | `sPosition`, `elementIndex`, `elementName` | both | Where the frame was taken: the position and the element the run had completed |
 | `phi0` | beam | The reference phase [rad] |
 | `sliceCount` | beam | Particles in each slice, in window order, the records' patches |
@@ -375,7 +384,7 @@ with no openPMD particle species in it. Its root group
 `sliceCount` per slice of the range and, per particle in slice order, `x`, `px`, `y`, `py`,
 `z`, `pz`, `weight` and `id` in the packed chart's own units ([the chart](fel-physics.md#sec-chart)):
 `px` is $P_x/p_0$ as the map holds it and `z` is $-\beta c\,(t - t_{\mathrm{ref}})$ with no
-reference phase folded in. The frame attributes below are on its root as on every frame. A
+reference phase folded in. The frame attributes are in its `lucifer/frame` as on every frame. A
 reduction over these records matches the statistics row the same beam produced, with no
 conversion between them, and `beamio.read_slices` returns a `.gc.h5` in the same arrays it
 returns for a `.beam.h5`, `theta` as $\varphi_0 + k_s z/\beta$. A standard reader does not
@@ -403,13 +412,13 @@ attributes, and returns a `.gc.h5` or any frame the writer did not convert uncha
 `lucifer` described below, the replay state a continuation reads. Neither an exported orbit
 nor a `.gc.h5` is one, and a run does not start from either: see the two loading modes.
 
-**Vintage.** `frameFormat` on every frame is `lucifer-frames 1.1` from 2026-09-14. At that
-version a `.beam.h5` holds the orbit wherever it was taken. Before it, an interior
-`.beam.h5` of an averaged undulator held the guiding centre in standard records, and for
-one day the orbit, and the two cannot be told apart from their contents, so
-`beamio.unquiver` refuses to guess at a frame at 1.0: the caller states
-`representation="orbit"` or `"guidingCentre"`, or the call raises. `felMethod` on the frame
-says which mode wrote it.
+**Versions.** `frameFormat` on `lucifer/frame` is `lucifer-frames 2.0` and
+`checkpointFormat` on `lucifer/checkpoint` is `lucifer-checkpoint 2.0`, from 2026-09-15,
+when this program's metadata left the file root. Every reader takes these locations and
+these strings and nothing else: the continuation reader refuses another string, and
+`beamio.unquiver` raises at an interior frame carrying one. Files written under an earlier
+layout are unsupported and are regenerated when needed. `felMethod` on the frame says
+which mode wrote it.
 
 **Following a particle between frames.** Every macroparticle carries a label in openPMD's
 `id` record, unique over the window and unchanged for the life of the run. Migration

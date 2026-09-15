@@ -446,7 +446,7 @@ def main():
     inside = 0
     for fr in sorted(wd.glob("uv_sandfr-[0-9]*.wf.h5")):
         with h5py.File(fr) as h5:
-            z = float(np.ravel(h5.attrs["sPosition"])[0])
+            z = float(np.ravel(h5["lucifer/frame"].attrs["sPosition"])[0])
         inside += int(0.81 + 1e-9 < z < 1.41 - 1e-9)
     same = all(dumps_identical(wd / f"uv_sandfr-final.{k}.h5", wd / f"uv_sand-final.{k}.h5")
                for k in ("beam", "wf"))
@@ -598,8 +598,8 @@ use, QLINE
         out = {}
         for f in sorted(wd.glob(f"{root}-0*.beam.h5")):
             with h5py.File(f) as h5:
-                s_f = round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)
-                phi0 = float(np.atleast_1d(h5.attrs["phi0"])[0])
+                s_f = round(float(np.atleast_1d(h5["lucifer/frame"].attrs["sPosition"])[0]), 9)
+                phi0 = float(np.atleast_1d(h5["lucifer/frame"].attrs["phi0"])[0])
                 n0 = sorted(h5["data"].keys())[0]
                 gp = h5[f"data/{n0}/particles"]
                 ids = gp[sorted(gp.keys())[0]]["id"][...]
@@ -664,8 +664,8 @@ use, QLINE
         back = {k: 0.0 for k in ("x", "px", "y", "py", "z", "pz")}
         for f in sorted(wd.glob(f"{tag}a-0*.beam.h5")):
             with h5py.File(f) as h5:
-                s_f = round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)
-                phi0 = float(np.atleast_1d(h5.attrs["phi0"])[0])
+                s_f = round(float(np.atleast_1d(h5["lucifer/frame"].attrs["sPosition"])[0]), 9)
+                phi0 = float(np.atleast_1d(h5["lucifer/frame"].attrs["phi0"])[0])
             if s_f not in body and s_f not in ramp:
                 continue
             gc = beamio.unquiver(f, beamio.read_slices(f, LAMBDA1, LAMBDA1), LAMBDA1)[0]
@@ -690,8 +690,8 @@ use, QLINE
 
         if not helical and not tilt:
             # The same frame's .gc.h5 is the guiding centre with no inverse at all, and the
-            # inverse of the exported .beam.h5 lands on it. A frame of the 1.0 vintage may
-            # hold either representation, so the inverse refuses to guess at one.
+            # inverse of the exported .beam.h5 lands on it. The inverse reads one frameFormat
+            # and raises at any other string rather than reading a layout it does not know.
             f_o = sorted(wd.glob(f"{tag}a-0*.beam.h5"))[len(body) // 2 + Q_NSTEP * 2]
             f_g = pathlib.Path(str(f_o).replace(".beam.h5", ".gc.h5"))
             gc = beamio.read_slices(f_g, LAMBDA1, LAMBDA1)[0]
@@ -704,17 +704,14 @@ use, QLINE
             old = wd / "uv_q_old.beam.h5"
             shutil.copy(f_o, old)
             with h5py.File(old, "r+") as h5:
-                h5.attrs["frameFormat"] = np.bytes_("lucifer-frames 1.0")
+                h5["lucifer/frame"].attrs["frameFormat"] = np.bytes_("lucifer-frames 1.1")
             try:
                 beamio.unquiver(old, beamio.read_slices(old, LAMBDA1, LAMBDA1), LAMBDA1)
                 guessed = 1.0
             except ValueError:
                 guessed = 0.0
-            stated = beamio.unquiver(old, beamio.read_slices(old, LAMBDA1, LAMBDA1), LAMBDA1,
-                                     representation="orbit")[0]
-            check("quiver: an interior frame of the 1.0 vintage is not guessed at, and is inverted once its "
-                  "representation is stated (0 = yes)",
-                  guessed + float(np.max(np.abs(stated["x"] - inv["x"])) > 0), 0.5)
+            check("quiver: an interior frame at another frameFormat raises rather than being inverted (0 = yes)",
+                  guessed, 0.5)
 
             # The conversion is the writer's own copy: a run with the series on holds the
             # state a run without it holds, to the bit.

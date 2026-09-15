@@ -105,7 +105,7 @@ files is HDF5's own tool, which shows what the printer does and the values besid
 
 ```
 h5dump -H run-000005.beam.h5           # the hierarchy, datatypes and attributes, no data
-h5dump -a /lucifer/checkpointFormat run-final.beam.h5
+h5dump -a /lucifer/checkpoint/checkpointFormat run-final.beam.h5
 ```
 
 The page covers the files the writers produce. The files a check forges to provoke a

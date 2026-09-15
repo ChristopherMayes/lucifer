@@ -410,7 +410,7 @@ def main():
         out = {}
         for f in sorted(wd.glob(f"{root}-0*.wf.h5")):
             with h5py.File(f) as h5:
-                out[round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)] = f
+                out[round(float(np.atleast_1d(h5["lucifer/frame"].attrs["sPosition"])[0]), 9)] = f
         return out
 
     def beam_by_id(path):
@@ -500,7 +500,8 @@ def main():
 
     def residual_of(path):
         with h5py.File(path) as h5:
-            return float(np.atleast_1d(h5.attrs["slippageResidual"])[0]) if "slippageResidual" in h5.attrs else None
+            return (float(np.atleast_1d(h5["lucifer/field"].attrs["slippageResidual"])[0])
+                    if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs else None)
 
     # The starting state: one seeded run through the first undulator, its final dumps
     # taken as the imported beam and, ramped, the imported field.
@@ -513,8 +514,8 @@ def main():
         m = h5[fieldio.MESH_PATH]
         u = m["x"][...]
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
-        if "slippageResidual" in h5.attrs:
-            del h5.attrs["slippageResidual"]      # the seed starts every run from zero
+        if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
+            del h5["lucifer/field"].attrs["slippageResidual"]      # the seed starts every run from zero
     imp = dict(beam='  beam_file = "rsprep-final.beam.h5"\n', field='  field_file = "rsramp.wf.h5"\n')
 
     for pipe, tag, kind in ((0.30, "rsh", "half a slice"), (0.35, "rsz", "near zero")):
@@ -533,7 +534,7 @@ def main():
                beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{dump_f}"\n'))
         shutil.copy(wd / dump_f, wd / f"{tag}bare.wf.h5")
         with h5py.File(wd / f"{tag}bare.wf.h5", "r+") as h5:
-            del h5.attrs["slippageResidual"]
+            del h5["lucifer/field"].attrs["slippageResidual"]
         stripped = rs_run(bare, rs_nml.format(lat=lat, root=bare,
                extra='  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
                beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{tag}bare.wf.h5"\n'),
@@ -566,7 +567,7 @@ def main():
     # can never reach n_wavelength, since the threshold is 0.8 of it.
     shutil.copy(wd / "rshfull-at2-D.wf.h5", wd / "rsbad.wf.h5")
     with h5py.File(wd / "rsbad.wf.h5", "r+") as h5:
-        h5.attrs["slippageResidual"] = np.array([7.0])
+        h5["lucifer/field"].attrs["slippageResidual"] = np.array([7.0])
     ok = rs_run("rsbad", rs_nml.format(lat="rs_rsh.bmad", root="rsbad",
                 extra='  global%track_start = "UND2"\n',
                 beam='  beam_file = "rshfull-at2-D.beam.h5"\n', field='  field_file = "rsbad.wf.h5"\n'),
@@ -679,8 +680,8 @@ def main():
         m = h5[fieldio.MESH_PATH]
         u = m["x"][...]
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
-        if "slippageResidual" in h5.attrs:
-            del h5.attrs["slippageResidual"]
+        if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
+            del h5["lucifer/field"].attrs["slippageResidual"]
     mw_imp = dict(beam='  beam_file = "mwprep-final.beam.h5"\n', field='  field_file = "mwramp.wf.h5"\n')
     s_ckpt = 0.75
 
@@ -771,7 +772,7 @@ def main():
             g = h5[f"data/{name}/particles"]
             g = g[sorted(g.keys())[0]]
             g["time"][...] = g["time"][...] - delta / KS_C
-            ck = h5["lucifer"]
+            ck = h5["lucifer/checkpoint"]
             ck.attrs.modify("phi0", np.atleast_1d(ck.attrs["phi0"]) + delta)
         rs_run(root, rs_nml.format(lat="mw.bmad", root=root,
                extra=mig_extra + '  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
@@ -813,8 +814,8 @@ def main():
         out = {}
         for f in sorted(wd.glob(f"{root}-0*.wf.h5")):
             with h5py.File(f) as h5:
-                name = np.atleast_1d(h5.attrs["elementName"])[0]
-                out[round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)] = (
+                name = np.atleast_1d(h5["lucifer/frame"].attrs["elementName"])[0]
+                out[round(float(np.atleast_1d(h5["lucifer/frame"].attrs["sPosition"])[0]), 9)] = (
                     f, name.decode() if isinstance(name, bytes) else str(name))
         return out
 
@@ -837,8 +838,8 @@ def main():
         m = h5[fieldio.MESH_PATH]
         u = m["x"][...]
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
-        if "slippageResidual" in h5.attrs:
-            del h5.attrs["slippageResidual"]
+        if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
+            del h5["lucifer/field"].attrs["slippageResidual"]
     ew_imp = dict(beam='  beam_file = "ewprep-final.beam.h5"\n', field='  field_file = "ewramp.wf.h5"\n')
 
     for lord, what in ((False, "on the element itself"), (True, "resolved through a split lord")):
@@ -991,7 +992,7 @@ use, SEG
         out = {}
         for f in sorted(wd.glob(f"{root}-0*.wf.h5")):
             with h5py.File(f) as h5:
-                out[round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)] = f
+                out[round(float(np.atleast_1d(h5["lucifer/frame"].attrs["sPosition"])[0]), 9)] = f
         return out
 
     def raw_field(path):
@@ -1016,7 +1017,7 @@ use, SEG
         if not pathlib.Path(path).exists():
             return None
         with h5py.File(path) as h5:
-            g = h5.get("lucifer")
+            g = h5.get("lucifer/checkpoint")
             if g is None:
                 return None
             return {"phi0": float(np.atleast_1d(g.attrs["phi0"])[0]),
@@ -1053,8 +1054,8 @@ use, SEG
         m = h5[fieldio.MESH_PATH]
         u = m["x"][...]
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
-        if "slippageResidual" in h5.attrs:
-            del h5.attrs["slippageResidual"]
+        if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
+            del h5["lucifer/field"].attrs["slippageResidual"]
     uv_imp = dict(beam='  beam_file = "uvprep-final.beam.h5"\n', field='  field_file = "uvramp.wf.h5"\n')
 
     rs_run("uvfull", rs_nml.format(lat="uvsand.bmad", root="uvfull",
@@ -1174,11 +1175,11 @@ use, SEG
           "ever dumped", split_refused,
           note="[UNDS cut at its middle: its slaves refer to the lord for the field model, and the message names the slave]")
 
-    def del_z(h5): del h5["lucifer/z"]
-    def del_group(h5): del h5["lucifer"]
-    def del_resid(h5): del h5.attrs["slippageResidual"]
-    def permute(h5): h5["lucifer/z"][...] = h5["lucifer/z"][...][::-1]
-    def bad_version(h5): h5["lucifer"].attrs["checkpointFormat"] = np.bytes_("lucifer-checkpoint 9.9")
+    def del_z(h5): del h5["lucifer/checkpoint/z"]
+    def del_group(h5): del h5["lucifer/checkpoint"]
+    def del_resid(h5): del h5["lucifer/field"].attrs["slippageResidual"]
+    def permute(h5): h5["lucifer/checkpoint/z"][...] = h5["lucifer/checkpoint/z"][...][::-1]
+    def bad_version(h5): h5["lucifer/checkpoint"].attrs["checkpointFormat"] = np.bytes_("lucifer-checkpoint 9.9")
     check("a checkpoint with a member removed is refused",
           refused("uvr_member", variant("uvck_noz.beam.h5", "uvfull-at2-P1.beam.h5", del_z), "uvfull-at2-P1.wf.h5",
                   "UNDB", "CHECKPOINT MEMBER MISSING: z"))

@@ -346,7 +346,7 @@ def interludes(exe, wd):
     zs = []
     for fr in frames:
         with h5py.File(fr) as f:
-            zs.append(float(np.ravel(f.attrs["sPosition"])[0]))
+            zs.append(float(np.ravel(f["lucifer/frame"].attrs["sPosition"])[0]))
     zs = np.array(zs)
     check("interlude: the frames carry the rows' own s", np.abs(zs - p[:, 0]).max(), 1e-9)
     nin = int(((zs > 0.5 + 1e-9) & (zs < 0.9 - 1e-9)).sum())
@@ -470,7 +470,7 @@ def interludes(exe, wd):
             el = it["particles/electron"]
             def value(rec):
                 return float(np.ravel(rec.attrs["value"] if "value" in rec.attrs else rec[()])[0])
-            worst_s = max(worst_s, abs(value(el["sPosition"]) - float(np.ravel(f.attrs["sPosition"])[0])))
+            worst_s = max(worst_s, abs(value(el["sPosition"]) - float(np.ravel(f["lucifer/frame"].attrs["sPosition"])[0])))
             worst_t = max(worst_t, abs(value(el["timeOffset"]) - float(np.ravel(it.attrs["time"])[0])))
     check("frames: the particle sPosition is the frame's own [m]", worst_s, 1e-12)
     check("frames: the particle timeOffset is the iteration's time [s]", worst_t, 1e-18)
@@ -1062,16 +1062,16 @@ def main():
     bad_attr = 0
     for i, f in enumerate(frames):
         with h5py.File(f) as h:
-            got = h.attrs["elementName"]
+            got = h["lucifer/frame"].attrs["elementName"]
             got = got.decode() if isinstance(got, bytes) else str(got)
-            spos = float(np.ravel(h.attrs["sPosition"])[0])
+            spos = float(np.ravel(h["lucifer/frame"].attrs["sPosition"])[0])
         if got.strip() != names[i] or abs(spos - s_rec[i]) > 1e-9:
             bad_attr += 1
     check("frames: each frame names the element and s the stats row carries", bad_attr, 0.5)
 
     # An FEL frame carries the undulator a reader rebuilds the wiggle from.
     with h5py.File(frames[-1]) as h:
-        has_und = all(k in h.attrs for k in ("aw", "ku", "helical", "tilt", "felMethod"))
+        has_und = all(k in h["lucifer/frame"].attrs for k in ("aw", "ku", "helical", "tilt", "felMethod"))
     check("frames: an FEL frame carries aw, ku and the method (0 = yes)",
           0.0 if has_und else 1.0, 0.5)
 
@@ -1113,7 +1113,7 @@ def main():
     if len(ua_frames) > 1:
         def px_mean(f):
             with h5py.File(f) as h:
-                m = h.attrs.get("felMethod", b"")
+                m = h["lucifer/frame"].attrs.get("felMethod", b"")
                 m = m.decode() if isinstance(m, bytes) else str(m)
                 g = h["data"]; it = g[list(g.keys())[0]]
                 pg = it["particles"]; b0 = pg[list(pg.keys())[0]]
@@ -1145,8 +1145,8 @@ def main():
     inside = 0
     for i, f in enumerate(frames):
         with h5py.File(f) as h:
-            spos = float(np.ravel(h.attrs["sPosition"])[0])
-            nm = h.attrs["elementName"]
+            spos = float(np.ravel(h["lucifer/frame"].attrs["sPosition"])[0])
+            nm = h["lucifer/frame"].attrs["elementName"]
             nm = (nm.decode() if isinstance(nm, bytes) else str(nm)).strip()
         if nm == "UND" and 0.0 < spos < 3.99:
             inside += 1
@@ -1228,8 +1228,8 @@ def main():
     with h5py.File(rgf[-1]) as h:
         it = list(h["data"])[0]
         npatch = h[f"data/{it}/particles/electron/particlePatches/numParticles"].shape[0]
-        s1 = int(np.ravel(h.attrs["sliceFirst"])[0])
-        s2 = int(np.ravel(h.attrs["sliceLast"])[0])
+        s1 = int(np.ravel(h["lucifer/frame"].attrs["sliceFirst"])[0])
+        s2 = int(np.ravel(h["lucifer/frame"].attrs["sliceLast"])[0])
     with h5py.File(rgw[-1]) as h:
         it = list(h["data"])[0]
         nsf = h[f"data/{it}/meshes/electricField/x"].shape[0]

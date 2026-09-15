@@ -9,6 +9,18 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-15 Changed: everything this program adds to a file of its own now sits under the root group
+  `lucifer`, in a subgroup named for its role. `lucifer/frame` carries the frame attributes that had
+  been on the file root, 17 of them beside the writer's seven, with `frameFormat` at `lucifer-frames 2.0`.
+  `lucifer/field` carries `slippageResidual` on every field file. `lucifer/checkpoint` carries the
+  checkpoint's members as they were, with `checkpointFormat` at `lucifer-checkpoint 2.0`. openPMD keeps
+  all it governs under `basePath`, so a reader following the standard never looks there, and the file
+  root now carries the standard's declarations alone. A file is a checkpoint when `lucifer/checkpoint`
+  exists with its string, and for no other reason. Every reader takes the new locations and strings and
+  nothing else, the continuation's validations unchanged, and `beamio.unquiver` raises at any other
+  `frameFormat` in place of the representation argument it took for frames at 1.0. Files of the earlier
+  layout are unsupported and are regenerated when needed. No record or value moved: the layouts page
+  shows the attributes leaving the root and every dataset line standing.
 - 2026-09-15 Added: a generated page, HDF5 file layouts (`doc/generated/layouts.md`), prints the
   hierarchy of eight representative files the program writes: an averaged interior frame's `.gc.h5`
   and its exported `.beam.h5`, an unaveraged interior frame, a frame at an undulator's end and the

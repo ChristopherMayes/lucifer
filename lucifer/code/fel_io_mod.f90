@@ -173,8 +173,10 @@ end function fel_checkpoint_eligible
 ! than being looked up in a lattice the reader may not have. A frame taken in a break
 ! carries the element and no undulator numbers.
 !
-! The attributes go on the root of a file the writers have already closed, so no writer's
-! layout changes and every kind of file is stamped the same way.
+! The attributes go under lucifer/frame (fel_private_group) in a file the writers have
+! already closed, so no writer's layout changes, every kind of file is stamped the same
+! way, and the root keeps the standard's declarations. The iteration's time is the
+! standard's own and goes where the standard puts it.
 !
 ! Input:
 !   file_name -- character(*): An openPMD file the writers have finished.
@@ -192,7 +194,7 @@ type (fel_und_struct), pointer :: und
 type (branch_struct), pointer :: branch
 type (hdf5_info_struct) obj_info
 type (floor_position_struct) fl
-integer(hid_t) f_id, d_id, it_id
+integer(hid_t) f_id, g_id, d_id, it_id
 integer ie, h5_err
 real(rp) t_ref, ds_ele
 logical err_flag, err
@@ -206,17 +208,21 @@ err_flag = .true.
 branch => run%lat%branch(0)
 
 call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
+g_id = fel_private_group (f_id, 'frame', .true., err)
+if (err) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
 
-! 1.1: a .beam.h5 at this version holds the orbit wherever it was taken, the guiding centre
-! having moved to the .gc.h5, so a reader can tell a frame of this vintage from one written
-! when an averaged undulator's interior .beam.h5 held either.
-call hdf5_write_attribute_string (f_id, 'frameFormat', 'lucifer-frames 1.1', err)
-call hdf5_write_attribute_real (f_id, 'sPosition', run%z_now, err)
-call hdf5_write_attribute_string (f_id, 'elementName', trim(branch%ele(ie)%name), err)
-call hdf5_write_attribute_int (f_id, 'elementIndex', ie, err)
-call hdf5_write_attribute_real (f_id, 'phi0', run%fbeam%phi0, err)
-call hdf5_write_attribute_int (f_id, 'sliceFirst', run%dump_is1, err)
-call hdf5_write_attribute_int (f_id, 'sliceLast', run%dump_is2, err)
+! 2.0: the attributes sit under lucifer/frame, and a .beam.h5 at this version holds the
+! orbit wherever it was taken, the guiding centre having its own file, the .gc.h5.
+call hdf5_write_attribute_string (g_id, 'frameFormat', fel_frame_format$, err)
+call hdf5_write_attribute_real (g_id, 'sPosition', run%z_now, err)
+call hdf5_write_attribute_string (g_id, 'elementName', trim(branch%ele(ie)%name), err)
+call hdf5_write_attribute_int (g_id, 'elementIndex', ie, err)
+call hdf5_write_attribute_real (g_id, 'phi0', run%fbeam%phi0, err)
+call hdf5_write_attribute_int (g_id, 'sliceFirst', run%dump_is1, err)
+call hdf5_write_attribute_int (g_id, 'sliceLast', run%dump_is2, err)
 
 ! Where the frame sits in the lab. s is a curvilinear coordinate, so a scene holding a
 ! line with a bend needs the floor to place the frame and the grid transverse to it. The
@@ -226,8 +232,8 @@ call hdf5_write_attribute_int (f_id, 'sliceLast', run%dump_is2, err)
 
 fl = coords_curvilinear_to_floor ([0.0_rp, 0.0_rp, run%z_now], branch, err)
 if (.not. err) then
-  call hdf5_write_attribute_real (f_id, 'floorPosition', [fl%r(1), fl%r(2), fl%r(3)], err)
-  call hdf5_write_attribute_real (f_id, 'floorAngles', [fl%theta, fl%phi, fl%psi], err)
+  call hdf5_write_attribute_real (g_id, 'floorPosition', [fl%r(1), fl%r(2), fl%r(3)], err)
+  call hdf5_write_attribute_real (g_id, 'floorAngles', [fl%theta, fl%phi, fl%psi], err)
 endif
 
 ! openPMD orders a series by the iteration's time and has no notion of s, so the frame
@@ -268,28 +274,29 @@ endif
 ! has a name and a position and no method and no undulator, which is what it is.
 
 if (ie >= 1) then
-  call hdf5_write_attribute_string (f_id, 'felMethod', &
+  call hdf5_write_attribute_string (g_id, 'felMethod', &
         trim(fel_method_name(max(1, min(3, run%fel_mode(ie))))), err)
 
   ! The undulator, where there is one. A break has an element and no aw.
 
   if (run%is_fel(ie)) then
     und => run%und_of(ie)
-    call hdf5_write_attribute_real (f_id, 'aw', und%aw, err)
-    call hdf5_write_attribute_real (f_id, 'ku', und%ku, err)
-    call hdf5_write_attribute_real (f_id, 'tilt', und%tilt, err)
-    call hdf5_write_attribute_int (f_id, 'helical', merge(1, 0, und%helical), err)
+    call hdf5_write_attribute_real (g_id, 'aw', und%aw, err)
+    call hdf5_write_attribute_real (g_id, 'ku', und%ku, err)
+    call hdf5_write_attribute_real (g_id, 'tilt', und%tilt, err)
+    call hdf5_write_attribute_int (g_id, 'helical', merge(1, 0, und%helical), err)
 
     ! The rest of what rebuilding the orbit takes: where the frame sits in the device, and
     ! how long the device and its ramped ends are. A reader that walks a frame series has
     ! the lattice's geometry from the frames alone (doc/reading-output.md).
 
-    call hdf5_write_attribute_real (f_id, 'sElement', run%z_now - branch%ele(ie)%s_start, err)
-    call hdf5_write_attribute_real (f_id, 'elementLength', branch%ele(ie)%value(l$), err)
-    call hdf5_write_attribute_real (f_id, 'rampPeriods', run%fel_ramp(ie), err)
+    call hdf5_write_attribute_real (g_id, 'sElement', run%z_now - branch%ele(ie)%s_start, err)
+    call hdf5_write_attribute_real (g_id, 'elementLength', branch%ele(ie)%value(l$), err)
+    call hdf5_write_attribute_real (g_id, 'rampPeriods', run%fel_ramp(ie), err)
   endif
 endif
 
+call H5Gclose_f (g_id, h5_err)
 call h5fclose_f (f_id, h5_err)
 err_flag = .false.
 
@@ -302,8 +309,8 @@ end subroutine fel_frame_attributes
 ! Subroutine fel_write_slippage_residual (file_name, accuslip, err_flag)
 !
 ! Routine to stamp a field file with the slippage the record has accumulated and not yet
-! rotated, fel_slip_struct%accuslip, as the root attribute slippageResidual in
-! fundamental wavelengths, signed. It is the one piece of the field's state that the
+! rotated, fel_slip_struct%accuslip, as the attribute slippageResidual of the group
+! lucifer/field (fel_private_group), in fundamental wavelengths, signed. It is the one piece of the field's state that the
 ! record itself does not hold: the rotation index is folded into the time order the file
 ! is written in, and this remainder decides when the next rotation falls. A restart that
 ! starts it at zero rotates on a different schedule from the run it continues. The
@@ -321,7 +328,7 @@ end subroutine fel_frame_attributes
 
 subroutine fel_write_slippage_residual (file_name, accuslip, err_flag)
 
-integer(hid_t) f_id
+integer(hid_t) f_id, g_id
 integer h5_err
 real(rp) accuslip
 logical err_flag, err
@@ -331,7 +338,13 @@ character(*) file_name
 
 err_flag = .true.
 call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
-call hdf5_write_attribute_real (f_id, 'slippageResidual', accuslip, err)
+g_id = fel_private_group (f_id, 'field', .true., err)
+if (err) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+call hdf5_write_attribute_real (g_id, 'slippageResidual', accuslip, err)
+call H5Gclose_f (g_id, h5_err)
 call h5fclose_f (f_id, h5_err)
 err_flag = err
 
@@ -1094,15 +1107,24 @@ ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength authority (the 1
 
 call hdf5_open_file (fname, 'READ', f_id, rerr, .false.)
 if (rerr) return
-info = hdf5_attribute_info (f_id, 'slippageResidual', rerr, .false.)
-has_res = .not. rerr
+g_id = fel_private_group (f_id, 'field', .false., rerr)
+if (rerr) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+has_res = .false.
 residual = 0
-if (has_res) then
-  call hdf5_read_attribute_real (f_id, 'slippageResidual', residual, rerr, .true.)
-  if (rerr) then
+if (g_id >= 0) then
+  info = hdf5_attribute_info (g_id, 'slippageResidual', rerr, .false.)
+  has_res = .not. rerr
+  if (has_res) call hdf5_read_attribute_real (g_id, 'slippageResidual', residual, rerr, .true.)
+  call H5Gclose_f (g_id, h5_err)
+  if (has_res .and. rerr) then
     call h5fclose_f (f_id, h5_err)
     return
   endif
+endif
+if (has_res) then
   if (.not. ieee_is_finite(residual) .or. (fbeam%n_wavelength >= 1 .and. abs(residual) >= fbeam%n_wavelength)) then
     call h5fclose_f (f_id, h5_err)
     call out_io (s_error$, r_name, 'THE FIELD FILE''S slippageResidual IS NOT A VALUE THIS TRACKER WRITES: \es12.4\ ', &
@@ -1133,17 +1155,17 @@ if (.not. has_res) then
   return
 endif
 
-if (.not. hdf5_exists(f_id, 'lucifer', rerr, .false.)) then
+g_id = fel_private_group (f_id, 'checkpoint', .false., rerr)
+if (rerr) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+if (g_id < 0) then
   call h5fclose_f (f_id, h5_err)
   call out_io (s_error$, r_name, 'CONTINUATION FROM A FIELD FILE WITH NO CHECKPOINT GROUP: ' // trim(fname), &
        'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
        'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
        'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
-  return
-endif
-g_id = hdf5_open_group (f_id, 'lucifer', rerr, .true.)
-if (rerr) then
-  call h5fclose_f (f_id, h5_err)
   return
 endif
 fmt_str = ''          ! The reads fill the characters they have and leave the rest.

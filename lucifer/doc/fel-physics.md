@@ -773,7 +773,7 @@ Genesis4 quirk kept deliberately, since guarding it leaves the record one rotati
 short.
 
 $S$ travels with the record. A field dump is written in time order, which folds `first`
-into the file, and it carries $S$ as the attribute `slippageResidual`, in fundamental
+into the file, and it carries $S$ as the attribute `slippageResidual` of its group `lucifer/field`, in fundamental
 wavelengths and signed, since after a rotation $S$ is negative as often as not. A restart
 restores it, so its rotations fall where the continuous run's would. Started at zero
 instead, the restart's every later crossing of the threshold moves by the lost $S$: the

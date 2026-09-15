@@ -125,11 +125,18 @@ type fel_beam_struct
                                    !   hard-edge handoff injects K/gamma of spurious px.
 end type
 
-! The layout of the checkpoint group, the root group lucifer of a beam and a field frame
-! written at an eligible boundary (fel_write_checkpoint_group). A continuation requires
-! this string exactly and refuses any other.
+! This program's own metadata sits under the root group lucifer, in a subgroup named for
+! its role (fel_private_group): frame for where a frame was taken (fel_frame_attributes),
+! field for the slippage residual (fel_write_slippage_residual), and checkpoint for the
+! replay state (fel_write_checkpoint_group). openPMD puts everything it governs under
+! basePath, so a reader following the standard never looks here, and the file root keeps
+! the standard's declarations alone. A file is a checkpoint when lucifer/checkpoint exists
+! with this string, and for no other reason: lucifer itself is on every frame and every
+! field file. A continuation requires the string exactly and refuses any other.
 
-character(*), parameter :: fel_checkpoint_format$ = 'lucifer-checkpoint 1.0'
+character(*), parameter :: fel_private_root$ = 'lucifer'
+character(*), parameter :: fel_checkpoint_format$ = 'lucifer-checkpoint 2.0'
+character(*), parameter :: fel_frame_format$ = 'lucifer-frames 2.0'
 
 ! The layout of the guiding-centre diagnostic file an averaged undulator's interior frame
 ! writes (fel_write_guiding_centre), a file of its own with no openPMD particle record.
@@ -495,7 +502,7 @@ do is = 1, n_win
 enddo
 
 ! The replay state. A continuation rebuilds the split the run had, phi0 and each
-! particle's z, from the group lucifer, and the group is checked against the records it
+! particle's z, from the group lucifer/checkpoint, and the group is checked against the records it
 ! rides beside before anything is taken from it: the format string, every member, the
 ! partition, the order of the ids, and each coordinate against the folded time it was
 ! written from. A group attached to the wrong particles passes every structural check,
@@ -570,11 +577,19 @@ tol = 1.0e-9_rp * wavelength
 
 call hdf5_open_file (file_name, 'READ', f_id, err, .false.)
 if (err) return
-exists = hdf5_exists (f_id, 'lucifer', err, .false.)
+g_id = fel_private_group (f_id, 'checkpoint', .false., err)
+if (err) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+exists = (g_id >= 0)
 
 if (.not. cont) then
-  if (exists) call out_io (s_info$, r_name, 'The beam file carries a checkpoint group, ignored: ' // &
-       'global%continuation is off, so the run starts from the standard records with phi0 at zero.')
+  if (exists) then
+    call out_io (s_info$, r_name, 'The beam file carries a checkpoint group, ignored: ' // &
+         'global%continuation is off, so the run starts from the standard records with phi0 at zero.')
+    call H5Gclose_f (g_id, h5_err)
+  endif
   call h5fclose_f (f_id, h5_err)
   gerr = .false.
   return
@@ -583,12 +598,6 @@ endif
 if (.not. exists) then
   call h5fclose_f (f_id, h5_err)
   call fel_say_no_checkpoint (file_name, r_name)
-  return
-endif
-
-g_id = hdf5_open_group (f_id, 'lucifer', err, .true.)
-if (err) then
-  call h5fclose_f (f_id, h5_err)
   return
 endif
 
@@ -796,7 +805,7 @@ end subroutine fel_read_openpmd_beam
 subroutine fel_assert_not_interior_frame (file_name, which, err_flag)
 
 type (hdf5_info_struct) info
-integer(hid_t) f_id
+integer(hid_t) f_id, g_id
 integer h5_err
 real(rp) s_ele, l_ele
 logical err_flag, err
@@ -813,16 +822,24 @@ err_flag = .false.
 call hdf5_open_file (file_name, 'READ', f_id, err, .false.)
 if (err) return                      ! Not a file this reader opens. Others say so.
 
-info = hdf5_attribute_info (f_id, 'sElement', err, .false.)
-if (err) then                        ! No device on the file, so nothing to place it in.
+g_id = fel_private_group (f_id, 'frame', .false., err)
+if (err .or. g_id < 0) then          ! No frame group: an external bunch, which loads as before.
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+
+info = hdf5_attribute_info (g_id, 'sElement', err, .false.)
+if (err) then                        ! No device on the frame, so nothing to place it in.
+  call H5Gclose_f (g_id, h5_err)
   call h5fclose_f (f_id, h5_err)
   return
 endif
 
 name_ele = ''
-call hdf5_read_attribute_real (f_id, 'sElement', s_ele, err, .true.)
-if (.not. err) call hdf5_read_attribute_real (f_id, 'elementLength', l_ele, err, .true.)
-if (.not. err) call hdf5_read_attribute_string (f_id, 'elementName', name_ele, err, .false.)
+call hdf5_read_attribute_real (g_id, 'sElement', s_ele, err, .true.)
+if (.not. err) call hdf5_read_attribute_real (g_id, 'elementLength', l_ele, err, .true.)
+if (.not. err) call hdf5_read_attribute_string (g_id, 'elementName', name_ele, err, .false.)
+call H5Gclose_f (g_id, h5_err)
 call h5fclose_f (f_id, h5_err)
 if (err) return
 
@@ -952,7 +969,7 @@ end subroutine fel_write_guiding_centre
 
 subroutine fel_assert_checkpoint_present (file_name, err_flag)
 
-integer(hid_t) f_id
+integer(hid_t) f_id, g_id
 integer h5_err
 logical err_flag, err, exists
 character(*) file_name
@@ -963,7 +980,9 @@ character(*), parameter :: r_name = 'fel_assert_checkpoint_present'
 err_flag = .false.
 call hdf5_open_file (file_name, 'READ', f_id, err, .false.)
 if (err) return                      ! Not a file this reader opens. Others say so.
-exists = hdf5_exists (f_id, 'lucifer', err, .false.)
+g_id = fel_private_group (f_id, 'checkpoint', .false., err)
+exists = (g_id >= 0)
+if (exists) call H5Gclose_f (g_id, h5_err)
 call h5fclose_f (f_id, h5_err)
 if (exists) return
 err_flag = .true.
@@ -1092,7 +1111,7 @@ end subroutine fel_write_openpmd_beam
 !+
 ! Subroutine fel_write_checkpoint_group (file_name, s_ckpt, ix_done, ele_name, err_flag, beam)
 !
-! Routine to add the group lucifer to a beam or field frame written at an eligible
+! Routine to add the group lucifer/checkpoint to a beam or field frame written at an eligible
 ! boundary (fel_checkpoint_eligible): the tracker's replay state, beside the standard
 ! openPMD records and changing none of them. The group's attributes say where the frame
 ! was taken, sPosition with the elementIndex and elementName of the element the run had
@@ -1136,8 +1155,8 @@ character(*) file_name, ele_name
 
 err_flag = .true.
 call hdf5_open_file (file_name, 'APPEND', f_id, err);  if (err) return
-call H5Gcreate_f (f_id, 'lucifer', g_id, h5_err)
-if (h5_err < 0) then
+g_id = fel_private_group (f_id, 'checkpoint', .true., err)
+if (err) then
   call h5fclose_f (f_id, h5_err)
   return
 endif
@@ -1177,6 +1196,71 @@ call h5fclose_f (f_id, h5_err)
 err_flag = bad
 
 end subroutine fel_write_checkpoint_group
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_private_group (f_id, sub, create, err_flag) result (g_id)
+!
+! Routine to open a subgroup of this program's own root group lucifer, the place for every
+! attribute and dataset openPMD has no name for: frame, field or checkpoint. The standard
+! puts all it governs under basePath, so a reader following it never looks here, and the
+! root of a file keeps the standard's declarations alone. Whether the subgroup's absence
+! means anything is the caller's question: a file is a checkpoint when checkpoint exists
+! with its format string, and an external bunch has no frame group at all.
+!
+! Input:
+!   f_id     -- integer(hid_t): The open file.
+!   sub      -- character(*): The subgroup: 'frame', 'field' or 'checkpoint'.
+!   create   -- logical: If True, lucifer and the subgroup are created where absent. If
+!                 False, an absent subgroup returns g_id = -1 with err_flag False.
+!
+! Output:
+!   g_id     -- integer(hid_t): The subgroup, which the caller closes. -1 if absent or on error.
+!   err_flag -- logical: Set True on an HDF5 error. False otherwise, an absent subgroup included.
+!-
+
+function fel_private_group (f_id, sub, create, err_flag) result (g_id)
+
+integer(hid_t) f_id, g_id, l_id
+integer h5_err
+logical create, err_flag, err
+character(*) sub
+
+!
+
+g_id = -1
+err_flag = .false.
+
+if (hdf5_exists(f_id, fel_private_root$, err, .false.)) then
+  l_id = hdf5_open_group (f_id, fel_private_root$, err, .true.)
+  if (err) then
+    err_flag = .true.
+    return
+  endif
+elseif (create) then
+  call H5Gcreate_f (f_id, fel_private_root$, l_id, h5_err)
+  if (h5_err < 0) then
+    err_flag = .true.
+    return
+  endif
+else
+  return
+endif
+
+if (hdf5_exists(l_id, sub, err, .false.)) then
+  g_id = hdf5_open_group (l_id, sub, err, .true.)
+  err_flag = err
+elseif (create) then
+  call H5Gcreate_f (l_id, sub, g_id, h5_err)
+  err_flag = (h5_err < 0)
+endif
+if (err_flag) g_id = -1
+
+call H5Gclose_f (l_id, h5_err)
+
+end function fel_private_group
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

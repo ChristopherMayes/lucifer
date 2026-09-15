@@ -520,11 +520,11 @@ def unaveraged(args, wd, exe):
         def read(path):
             with h5py.File(path) as h:
                 it = list(h["data"])[0]
-                m = h.attrs.get("felMethod")
+                m = h["lucifer/frame"].attrs.get("felMethod")
                 m = np.ravel(m)[0] if m is not None else None
                 if isinstance(m, bytes):
                     m = m.decode()
-                return (float(np.ravel(h.attrs["sPosition"])[0]), m,
+                return (float(np.ravel(h["lucifer/frame"].attrs["sPosition"])[0]), m,
                         float(np.mean(h[f"data/{it}/particles/electron/momentum/x"])))
 
         d = [read(f) for f in fd]

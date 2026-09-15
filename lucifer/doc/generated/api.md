@@ -431,7 +431,7 @@ Output:
 *Subroutine* `(file_name, s_ckpt, ix_done, ele_name, err_flag, beam)`
 
 ```
-Routine to add the group lucifer to a beam or field frame written at an eligible
+Routine to add the group lucifer/checkpoint to a beam or field frame written at an eligible
 boundary (fel_checkpoint_eligible): the tracker's replay state, beside the standard
 openPMD records and changing none of them. The group's attributes say where the frame
 was taken, sPosition with the elementIndex and elementName of the element the run had
@@ -459,6 +459,32 @@ Input:
 
 Output:
   err_flag  -- logical: Set True if the group could not be written. False otherwise.
+```
+
+(api-fel-private-group)=
+### `fel_private_group`
+
+*Function* `(f_id, sub, create, err_flag) result (g_id)`
+
+```
+Routine to open a subgroup of this program's own root group lucifer, the place for every
+attribute and dataset openPMD has no name for: frame, field or checkpoint. The standard
+puts all it governs under basePath, so a reader following it never looks here, and the
+root of a file keeps the standard's declarations alone. Whether the subgroup's absence
+means anything is the caller's question: a file is a checkpoint when checkpoint exists
+with its format string, and an external bunch has no frame group at all.
+```
+
+```
+Input:
+  f_id     -- integer(hid_t): The open file.
+  sub      -- character(*): The subgroup: 'frame', 'field' or 'checkpoint'.
+  create   -- logical: If True, lucifer and the subgroup are created where absent. If
+                False, an absent subgroup returns g_id = -1 with err_flag False.
+
+Output:
+  g_id     -- integer(hid_t): The subgroup, which the caller closes. -1 if absent or on error.
+  err_flag -- logical: Set True on an HDF5 error. False otherwise, an absent subgroup included.
 ```
 
 (api-fel-assign-ids)=
@@ -3349,8 +3375,10 @@ device's own numbers (doc/reading-output.md), which is why those ride the file r
 than being looked up in a lattice the reader may not have. A frame taken in a break
 carries the element and no undulator numbers.
 
-The attributes go on the root of a file the writers have already closed, so no writer's
-layout changes and every kind of file is stamped the same way.
+The attributes go under lucifer/frame (fel_private_group) in a file the writers have
+already closed, so no writer's layout changes, every kind of file is stamped the same
+way, and the root keeps the standard's declarations. The iteration's time is the
+standard's own and goes where the standard puts it.
 ```
 
 ```
@@ -3370,8 +3398,8 @@ Output:
 
 ```
 Routine to stamp a field file with the slippage the record has accumulated and not yet
-rotated, fel_slip_struct%accuslip, as the root attribute slippageResidual in
-fundamental wavelengths, signed. It is the one piece of the field's state that the
+rotated, fel_slip_struct%accuslip, as the attribute slippageResidual of the group
+lucifer/field (fel_private_group), in fundamental wavelengths, signed. It is the one piece of the field's state that the
 record itself does not hold: the rotation index is folded into the time order the file
 is written in, and this remainder decides when the next rotation falls. A restart that
 starts it at zero rotates on a different schedule from the run it continues. The
