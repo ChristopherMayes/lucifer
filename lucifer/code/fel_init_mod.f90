@@ -184,6 +184,17 @@ if (beam_file /= '') then
     err_flag = .true.;  return
   endif
 
+  ! Where the file was written, for an initialization. A continuation asks a different
+  ! question of the same file and answers it below, on the checkpoint it needs, so this
+  ! refusal is the initialization's alone.
+
+  if (.not. run%global%continuation) then
+    call fel_assert_not_interior_frame (beam_file, 'BEAM_FILE', err)
+    if (err) then
+      err_flag = .true.;  return
+    endif
+  endif
+
   ! An openPMD beam file carries the slice partition and not the radiation it was sliced
   ! on, so the deck states the window. Refused rather than defaulted: a wrong wavelength
   ! rescales every phase in the run.
@@ -779,6 +790,18 @@ err_i = .false.
 if (beam_init%position_file == '' .and. beam_init%n_particle < 1) then
   call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE MUST BE POSITIVE.')
   err_i = .true.;  return
+endif
+
+! A bunch file is read before it is anything else, so where it was written is asked here,
+! ahead of the read and of every slicing path below it. A frame of one slice reaches this
+! path: the patch-count refusal further down catches a windowed dump, and a steady-state
+! frame has the single patch that refusal lets by.
+
+if (beam_init%position_file /= '') then
+  if (file_is_openpmd(beam_init%position_file)) then
+    call fel_assert_not_interior_frame (beam_init%position_file, 'BEAM_INIT%POSITION_FILE', err_i)
+    if (err_i) return
+  endif
 endif
 
 ! Bmad's file read keeps only the first beam_init%n_particle particles when it is set,

@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Added: a frame written inside an undulator is refused as a run's initial beam, on both
+  loading paths. Its records are standard and its momenta are the orbit's, and what a run would need
+  beside them is the segment's own state, which no file holds. `fel_assert_not_interior_frame` reads
+  where the frame says it was written, `sElement` against `elementLength`, and never its momenta: the
+  quiver crosses zero twice a period, and the check refuses a frame at that phase, one at the crest, and
+  one with the quiver taken back off by the reader's inverse, whose recovery of the chart restores no
+  segment state. `beam_file` refuses before it reads the file and `beam_init%position_file` before the
+  bunch is sliced, which a steady-state frame of one patch reaches. A frame at an element face still
+  initializes a run, its records identical through the load but the four that place a beam, a file with
+  no such record is an external bunch and loads as before, and a continuation keeps its own refusal on
+  the checkpoint it needs. The flat-namelist helper the checks use gains `continuation`.
 - 2026-09-14 Added: the quiver an interior frame carries. An openPMD momentum record is the instantaneous
   kinetic momentum, and the averaged map stores the guiding centre, so `fel_restore_quiver` restores the
   quiver to a beam frame written inside an averaged undulator, on the writer's own copy: the local vector

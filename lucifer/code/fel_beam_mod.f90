@@ -758,6 +758,88 @@ end subroutine fel_read_openpmd_beam
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_assert_not_interior_frame (file_name, which, err_flag)
+!
+! Routine to refuse a beam file written inside an undulator as a run's initial beam. A
+! frame taken there carries the instantaneous kinetic orbit, which is what an openPMD
+! momentum record means and what an exchange file should hold (doc/reading-output.md).
+! It is not a place a run can start from. The averaged map would read the quiver as
+! betatron momentum, the K/gamma a hard-edge handoff injects, and the unaveraged mode
+! would need the segment position and the ramp state no file holds.
+!
+! The test is where the frame was taken and never what its momenta look like: the quiver
+! crosses zero twice a period, and a frame at that phase is no more loadable than one at
+! the crest. It is the same for a frame either method wrote.
+!
+! A frame of an FEL element records sElement and elementLength (fel_frame_attributes). A
+! file carrying neither is an external bunch, a frame from a break, or an ordinary dump,
+! and loads as before: their absence is that assumption and not proof of a boundary.
+!
+! Today an element's faces are the device's, since a superimposed element cannot cut an
+! undulator this tracker tracks (fel_assert_wiggler_sane). A device tracked in pieces
+! would need the writer to stamp the boundary rather than this reader to infer it.
+!
+! A continuation is a different question, answered where it is asked: it needs a
+! checkpoint and refuses a frame that carries none, wherever the frame was taken.
+!
+! Input:
+!   file_name -- character(*): The file the deck names.
+!   which     -- character(*): The input naming it, for the message.
+!
+! Output:
+!   err_flag  -- logical: Set True if the file was written inside a device, False otherwise.
+!-
+
+subroutine fel_assert_not_interior_frame (file_name, which, err_flag)
+
+type (hdf5_info_struct) info
+integer(hid_t) f_id
+integer h5_err
+real(rp) s_ele, l_ele
+logical err_flag, err
+character(*) file_name, which
+character(40) name_ele
+character(*), parameter :: r_name = 'fel_assert_not_interior_frame'
+! A length no lattice resolves, the one the checkpoint's eligibility uses: the walk
+! reaches an element's end by accumulation and can miss it in the last bit.
+real(rp), parameter :: tol = 1.0e-9_rp
+
+!
+
+err_flag = .false.
+call hdf5_open_file (file_name, 'READ', f_id, err, .false.)
+if (err) return                      ! Not a file this reader opens. Others say so.
+
+info = hdf5_attribute_info (f_id, 'sElement', err, .false.)
+if (err) then                        ! No device on the file, so nothing to place it in.
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+
+name_ele = ''
+call hdf5_read_attribute_real (f_id, 'sElement', s_ele, err, .true.)
+if (.not. err) call hdf5_read_attribute_real (f_id, 'elementLength', l_ele, err, .true.)
+if (.not. err) call hdf5_read_attribute_string (f_id, 'elementName', name_ele, err, .false.)
+call h5fclose_f (f_id, h5_err)
+if (err) return
+
+if (s_ele <= tol .or. s_ele >= l_ele - tol) return     ! A face, which is a place to start.
+
+err_flag = .true.
+call out_io (s_error$, r_name, trim(which) // ' NAMES A FRAME WRITTEN INSIDE AN UNDULATOR,', &
+      'WHICH IS NOT A PLACE A RUN STARTS: ' // trim(file_name), &
+      'IT SITS \es12.4\ m INTO ' // trim(name_ele) // ', A DEVICE \es12.4\ m LONG. ITS RECORDS', &
+      'ARE STANDARD AND ITS MOMENTA ARE THE ORBIT''S, WHICH IS WHAT A FRAME IS FOR. WHAT A RUN', &
+      'WOULD NEED BESIDE THEM IS THE SEGMENT''S OWN STATE, AND NO FILE HOLDS IT.', &
+      'POSSIBLE SOLUTION: START FROM A FRAME AT AN ELEMENT BOUNDARY, OR FROM A DUMP.', &
+      r_array = [s_ele, l_ele])
+
+end subroutine fel_assert_not_interior_frame
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 !+
 ! Subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag)
 !

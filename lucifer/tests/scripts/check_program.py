@@ -1123,6 +1123,17 @@ use, SEG
     fb = str(fon[interior_b]).replace(".wf.h5", ".beam.h5")
     check("a continuation from a frame inside the unaveraged segment is refused, no group",
           refused("uvr_inu", pathlib.Path(fb).name, fon[interior_b].name, "P1##2", "NO CHECKPOINT GROUP"))
+
+    # The same frame as an initialization, which is a different question with a different
+    # answer: a frame from inside a device is not a place a run starts, and this mode wrote
+    # this one, so the refusal reads where it was taken and not which method took it.
+    init_inu = rs_run("uvi_inu", rs_nml.format(lat="uvsand.bmad", root="uvi_inu",
+                      extra='  global%track_start = "P1##2"\n  global%load_only = T\n',
+                      beam=f'  beam_file = "{pathlib.Path(fb).name}"\n',
+                      field=f'  field_file = "{fon[interior_b].name}"\n'),
+                      expect_fail=True, fragment="NOT A PLACE A RUN STARTS")
+    check("and as an initialization it is refused for where it was taken, this mode having written it",
+          init_inu)
     fa = str(fon[interior_a]).replace(".wf.h5", ".beam.h5")
     check("a continuation from a frame inside an averaged undulator is refused, no group",
           refused("uvr_ina", pathlib.Path(fa).name, fon[interior_a].name, "P1##1", "NO CHECKPOINT GROUP"))

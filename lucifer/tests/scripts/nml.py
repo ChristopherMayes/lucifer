@@ -16,7 +16,7 @@ PARAMS_LOOSE = {"lat_file", "chamber_wake%write_kernels"}
 PARAMS_GLOBAL = {
     "out_root", "interlude_model", "transport_model", "write_diag", "write_initial",
     "load_only", "keep_escaped_field", "dump_beam_at", "dump_field_at", "dump_at_comb", "dump_slice_first", "dump_slice_last", "dump_reduced",
-    "ran_seed",
+    "ran_seed", "continuation",
     "migrate", "migrate_check", "reference_run", "comb_ds_save", "interlude_ds_step",
     "track_start", "track_end",
     "source_model", "source_filter", "source_filter_xcut", "source_filter_ycut",

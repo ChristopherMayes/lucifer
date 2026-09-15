@@ -288,6 +288,44 @@ Output:
                    continuation. Left as it was for an initialization.
 ```
 
+(api-fel-assert-not-interior-frame)=
+### `fel_assert_not_interior_frame`
+
+*Subroutine* `(file_name, which, err_flag)`
+
+```
+Routine to refuse a beam file written inside an undulator as a run's initial beam. A
+frame taken there carries the instantaneous kinetic orbit, which is what an openPMD
+momentum record means and what an exchange file should hold (doc/reading-output.md).
+It is not a place a run can start from. The averaged map would read the quiver as
+betatron momentum, the K/gamma a hard-edge handoff injects, and the unaveraged mode
+would need the segment position and the ramp state no file holds.
+
+The test is where the frame was taken and never what its momenta look like: the quiver
+crosses zero twice a period, and a frame at that phase is no more loadable than one at
+the crest. It is the same for a frame either method wrote.
+
+A frame of an FEL element records sElement and elementLength (fel_frame_attributes). A
+file carrying neither is an external bunch, a frame from a break, or an ordinary dump,
+and loads as before: their absence is that assumption and not proof of a boundary.
+
+Today an element's faces are the device's, since a superimposed element cannot cut an
+undulator this tracker tracks (fel_assert_wiggler_sane). A device tracked in pieces
+would need the writer to stamp the boundary rather than this reader to infer it.
+
+A continuation is a different question, answered where it is asked: it needs a
+checkpoint and refuses a frame that carries none, wherever the frame was taken.
+```
+
+```
+Input:
+  file_name -- character(*): The file the deck names.
+  which     -- character(*): The input naming it, for the message.
+
+Output:
+  err_flag  -- logical: Set True if the file was written inside a device, False otherwise.
+```
+
 (api-fel-write-openpmd-beam)=
 ### `fel_write_openpmd_beam`
 

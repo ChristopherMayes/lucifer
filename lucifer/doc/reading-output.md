@@ -322,6 +322,18 @@ or order that does not match, coordinates that disagree, no residual, two positi
 a continuation point that does not follow. There is no fallback from one mode to the
 other. `beam_init%position_file`, a bunch to slice, is a separate path and unchanged.
 
+Neither mode starts a run from a frame written inside an undulator. Its records are
+standard and its momenta are the orbit's, which is what a frame is for, and what a run
+would need beside them is the segment's own state: where in the device the beam sits and
+what the field's ramp is doing there, which no file holds. Both paths refuse such a frame
+by its own record of where it was written, `sElement` against `elementLength`, and never
+by its momenta, since the quiver crosses zero twice a period and a frame at that phase is
+no more loadable than one at the crest. A frame at an element face initializes a run as
+any dump does. A file carrying no `sElement` is an external bunch or a dump from outside a
+device and loads as before, that absence being the assumption and not proof of a boundary.
+Taking the quiver back off with `beamio.unquiver` does not make an interior frame loadable
+either: it recovers the chart, not the segment's state.
+
 Two records exist for comparing a continued run with the run it continues. Each row of
 `<out_root>.migration.txt` ends with the smallest distance in phase, in radians, that any
 particle examined at that event had to a slice boundary, the particles dropped off the
@@ -456,6 +468,8 @@ Measured (check_beam_format.py, the harness's beam-format section):
 | per-slice counts restored with an empty slice in the window | identical |
 | one patch per slice, empty ones included | identical |
 | four refusals (nonuniform weights to Genesis4, not openPMD, patch count, no charge) | message matched |
+| three more (an interior frame on either loading path, and with the quiver taken back off) | message matched |
+| a frame at a device's face initializes, records identical but the four that place a beam | identical |
 
 The chart, not the file, is what could cost a digit here: openPMD stores absolute
 momenta and a time where this code keeps `px`, `py` and a lag, so those pass through

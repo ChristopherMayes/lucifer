@@ -41,6 +41,15 @@ nothing about this program.
    converter), a file whose patch count disagrees with the window the deck states, and a
    file that carries no charge.
 
+9. Where a frame was written decides whether a run can start from it. A frame taken inside
+   an undulator holds the instantaneous orbit, which is what an exchange file should hold
+   and not a state a run starts from, so both loading paths refuse it by its own record of
+   the position and never by its momenta: the quiver crosses zero twice a period and the
+   check takes a frame at that phase as well as one at the crest. A frame at an element
+   face still initializes a run, and its records come back through it as in 1. A file with
+   no such record is an external bunch and loads as before. A continuation is a different
+   question and keeps its own refusal, on the checkpoint it needs.
+
 Usage: check_beam_format.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis.bmad. Exit 0 only if all pass.
 """
@@ -479,6 +488,144 @@ def main():
         worst = max(abs(C_LIGHT * (to_r[k] - to_f[k + 3])) / SPACING for k in range(len(to_r)))
         check("a frame cut to a range places its slices where the whole window does",
               worst, 1e-4)
+
+    # ------------------------------------------------------------------
+    # Where a frame was written, against what its momenta look like.
+
+    print("== a frame is a starting point only at a face ==")
+
+    # The device steps at a quarter period, so the series samples the quiver's phase four
+    # times a period and a frame lands on a zero of it as well as on a crest. Steady state,
+    # so every frame is one patch and reaches the bunch path too.
+    lam_w, l_und, l_ramp = 0.015, 0.30, 0.03
+    (wd / "qframe.bmad").write_text(f"""no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+QU: wiggler, l = {l_und}, l_period = {lam_w}, field_calc = planar_model, &
+    b_max = sqrt(2) * 0.84853 * (twopi / {lam_w}) * m_electron / c_light, &
+    fel_method = averaged, ds_step = {lam_w / 4}
+QD: pipe, l = 0.1
+QL: line = (QU, QD, QU)
+use, QL
+""")
+    qbase = """! flat keys; routed into the three groups by nml.to_groups
+  lat_file = "qframe.bmad"
+  out_root = "{root}"
+  source_filter = F
+  lambda0 = 1e-10
+  beam_init%n_particle = 256
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 0
+  grid_n_pts = 32
+  grid_half_width = 2e-4
+  ran_seed = 4242
+{extra}&end
+"""
+    run(exe, wd, "qf", qbase.format(root="qf", extra="  dump_at_comb = T\n"))
+
+    def frame_where(f):
+        """Where a frame says it was written, and the quiver in the mean of its px."""
+        with h5py.File(f) as h5:
+            if "sElement" not in h5.attrs:
+                return None
+            s_ele = float(np.atleast_1d(h5.attrs["sElement"])[0])
+            g = h5["data"]
+            g = g[sorted(g.keys())[0]]["particles"]
+            g = g[sorted(g.keys())[0]]
+            p0c = float(np.atleast_1d(g["totalMomentumOffset"].attrs["value"])[0])
+            return s_ele, float(np.mean(g["momentum"]["x"][...])) / p0c
+
+    body, faces = {}, []
+    for f in sorted(wd.glob("qf-0*.beam.h5")):
+        w = frame_where(f)
+        if w is None:
+            continue
+        if l_ramp + 1e-9 < w[0] < l_und - l_ramp - 1e-9:
+            body[f] = w
+        elif abs(w[0] - l_und) < 1e-9:
+            faces.append(f)
+    at_zero = min(body, key=lambda f: abs(np.cos(2 * np.pi * body[f][0] / lam_w)))
+    at_crest = max(body, key=lambda f: abs(np.cos(2 * np.pi * body[f][0] / lam_w)))
+    boundary = faces[0]
+
+    # The two paths, by location. The crest frame goes to the dump path and the zero to the
+    # bunch path, and neither refusal reads a momentum.
+    code, out = run(exe, wd, "qf_bf", qbase.format(root="qf_bf",
+                    extra=f'  beam_file = "{at_crest.name}"\n  field_file = "qf-final.wf.h5"\n'
+                          "  load_only = T\n"), expect_fail=True)
+    refused(f"beam_file, a frame {body[at_crest][0]:.5f} m into the device at the quiver's crest "
+            f"(mean px {body[at_crest][1]:.2e} of p0)", code, out, "NOT A PLACE A RUN STARTS")
+    code, out = run(exe, wd, "qf_pf", qbase.format(root="qf_pf",
+                    extra=f'  beam_init%position_file = "{at_zero.name}"\n'
+                          "  load_only = T\n"), expect_fail=True)
+    refused(f"beam_init%position_file, a frame {body[at_zero][0]:.5f} m in where the momentum "
+            f"quiver crosses zero (mean px {body[at_zero][1]:.2e} of p0)", code, out,
+            "NOT A PLACE A RUN STARTS")
+
+    # The guiding centre recovered from the same frame is still not a starting point: the
+    # inverse restores the chart and not the segment state, so the file's own record of
+    # where it was written is what answers, as it does above.
+    shutil.copy(at_crest, wd / "qf_gc.beam.h5")
+    sl = beamio.unquiver(at_crest, beamio.read_slices(at_crest, 1e-10, 1e-10), 1e-10)[0]
+    with h5py.File(wd / "qf_gc.beam.h5", "r+") as h5:
+        g = h5["data"]
+        g = g[sorted(g.keys())[0]]["particles"]
+        g = g[sorted(g.keys())[0]]
+        g["position"]["x"][...] = sl["x"]
+        g["position"]["y"][...] = sl["y"]
+        g["momentum"]["x"][...] = sl["px"] * beamio.M_ELECTRON
+        g["momentum"]["y"][...] = sl["py"] * beamio.M_ELECTRON
+        g["time"][...] = -sl["theta"] * 1e-10 / (2 * np.pi * beamio.C_LIGHT)
+    code, out = run(exe, wd, "qf_gcr", qbase.format(root="qf_gcr",
+                    extra='  beam_file = "qf_gc.beam.h5"\n  field_file = "qf-final.wf.h5"\n'
+                          "  load_only = T\n"), expect_fail=True)
+    refused("beam_file, the same frame with the quiver taken back off", code, out,
+            "NOT A PLACE A RUN STARTS")
+
+    # A file that says nothing about a device is an external bunch, and their absence is
+    # that assumption rather than proof of a boundary.
+    shutil.copy(at_crest, wd / "qf_ext.beam.h5")
+    with h5py.File(wd / "qf_ext.beam.h5", "r+") as h5:
+        for k in ("sElement", "elementLength", "elementName", "aw", "ku", "felMethod"):
+            del h5.attrs[k]
+    run(exe, wd, "qf_ext", qbase.format(root="qf_ext",
+        extra='  beam_file = "qf_ext.beam.h5"\n  field_file = "qf-final.wf.h5"\n'
+              "  load_only = T\n  write_initial = T\n"))
+    print("--- an external bunch, the same records with no device on them, loads: ok")
+
+    # A face is a starting point, and its records come back through it as in 1.
+    run(exe, wd, "qf_ok", qbase.format(root="qf_ok",
+        extra=f'  beam_file = "{boundary.name}"\n  field_file = "qf-final.wf.h5"\n'
+              "  load_only = T\n  write_initial = T\n"))
+    b1, b2 = datasets(boundary), datasets(wd / "qf_ok-initial.beam.h5")
+    # The same three records as the round trip above, and a fourth of the same kind: the
+    # frame sits at a device's downstream face and the run it starts places the beam at an
+    # upstream one, which is what sPosition says in meters and this says as a face.
+    place = WHERE + ["data/00001/particles/electron/locationInElement"]
+    same = sorted(b1) == sorted(b2) and all(np.array_equal(b1[k], b2[k]) for k in b1 if k not in place)
+    check("a frame at the device's end initializes, every record identical but the four that place a beam",
+          0.0 if same else 1.0, 0.5)
+
+    # And a continuation from that same face still holds, on the checkpoint it needs.
+    run(exe, wd, "qf_cont", qbase.format(root="qf_cont",
+        extra=f'  beam_file = "{boundary.name}"\n'
+              f'  field_file = "{boundary.name.replace(".beam.h5", ".wf.h5")}"\n'
+              '  continuation = T\n  track_start = "QD"\n'))
+    pa = beamio.read_slices(wd / "qf-final.beam.h5", 1e-10, 1e-10)[0]
+    pb = beamio.read_slices(wd / "qf_cont-final.beam.h5", 1e-10, 1e-10)[0]
+    worst = max(float(np.max(np.abs(pa[k] - pb[k])) / max(float(np.max(np.abs(pa[k]))), 1e-300))
+                for k in ("x", "y", "px", "py", "gamma", "theta"))
+    check("a continuation from that face composes with the run it continues", worst, 1e-10)
 
     print("checks: " + ("FAIL" if FAILED else "PASS"))
     sys.exit(1 if FAILED else 0)
