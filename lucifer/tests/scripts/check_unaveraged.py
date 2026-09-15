@@ -240,6 +240,35 @@ def fc_closed(h):
     return AW * abs(jv(h0, xi) - jv(h1, xi))
 
 
+Q_L = 0.12            # the quiver probe's undulator: 8 periods, 2-period ramps at each end
+Q_NSTEP = 8           # records a period, so a frame series samples 8 phases of the quiver
+Q_RAMP = 2
+P0_MC = math.sqrt(GAMMA0**2 - 1)
+
+QUIVER = """! flat keys; routed into the three groups by nml.to_groups
+  lat_file = "{lat}"
+  out_root = "{root}"
+  source_filter = F
+  lambda0 = 1e-10
+  beam_init%n_particle = 128
+  beam_init%bunch_charge = 1.000692285594e-15
+  beam_init%sig_z = 0
+  beam_init%sig_pz = 8.804506566858e-05
+  beam_init%a_norm_emit = 4e-7
+  beam_init%b_norm_emit = 4e-7
+  beamlet_size = 8
+  seed_power = 0
+  grid_n_pts = 32
+  grid_half_width = 2e-4
+  ran_seed = 4242
+  unaveraged_steps_per_period = 40
+  unaveraged_ramp_periods = 2
+  dump_at_comb = {frames}
+  write_initial = T
+&end
+"""
+
+
 def emit(p):
     x, px = p["x"], p["px"]
     vx = x - x.mean(); vp = px - px.mean()
@@ -525,6 +554,143 @@ def main():
         lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
         .replace("&end", '  global%fp32_check = "freerun"\n&end'),
         "DOES NOT COVER THE UNAVERAGED MODE")
+
+
+    # 8. The quiver a frame carries. An openPMD momentum record is the instantaneous
+    # kinetic momentum, and the averaged map stores the guiding centre, so a frame written
+    # inside an undulator has the quiver restored by the writer (fel_restore_quiver,
+    # fel-physics.md sec-quiverdump). This mode is the reference: the same device tracked
+    # here resolves the orbit itself. The runs are dark and share a beam, so the two differ
+    # by the averaging alone, and the comb takes 8 frames a period so the series samples 8
+    # phases of the quiver. The residual that indicts the conversion is the part that
+    # oscillates with the undulator phase: the smooth drift of the two integrators is not
+    # it. What the tolerance is for is a wrong constant, not the averaging order: a missing
+    # sqrt(2) in the planar amplitude leaves 0.29 of the quiver behind and a quarter-period
+    # phase origin 1.0 of it, where the worst measured here is 1e-4 of it.
+
+    def quiver_lat(name, helical, tilt):
+        """The device tracked averaged, and the wrapper that tracks the same one here."""
+        peak = "" if helical else "sqrt(2) * "
+        tstr = f", tilt = {tilt}" if tilt else ""
+        (wd / f"{name}.bmad").write_text(f"""no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = {GAMMA0} * m_electron
+beginning[beta_a] = 8.53711
+beginning[alpha_a] = -0.703306
+beginning[beta_b] = 17.3899
+beginning[alpha_b] = 1.40348
+QU: wiggler, l = {Q_L}, l_period = {LAMBDA_W}, &
+    field_calc = {'helical_model' if helical else 'planar_model'}, &
+    b_max = {peak}{AW} * (twopi / {LAMBDA_W}) * m_electron / c_light, &
+    fel_method = averaged, ds_step = {LAMBDA_W / Q_NSTEP}{tstr}
+QLINE: line = (QU)
+use, QLINE
+""")
+        return f"{name}.bmad", unavg_wrapper(wd, f"{name}.bmad")
+
+    def q_frames(root):
+        """{s: the frame's records, particles in id order} over a run's series."""
+        out = {}
+        for f in sorted(wd.glob(f"{root}-0*.beam.h5")):
+            with h5py.File(f) as h5:
+                s_f = round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)
+                phi0 = float(np.atleast_1d(h5.attrs["phi0"])[0])
+                n0 = sorted(h5["data"].keys())[0]
+                gp = h5[f"data/{n0}/particles"]
+                ids = gp[sorted(gp.keys())[0]]["id"][...]
+            par = beamio.read_slices(f, LAMBDA1, LAMBDA1)[0]
+            o = np.argsort(ids)
+            out[s_f] = {k: par[k][o] for k in ("x", "y", "px", "py", "gamma", "theta", "weight")}
+            out[s_f]["phi0"] = phi0
+        return out
+
+    def oscillating(fa, fu, key, ss):
+        """The residual's part that oscillates with the undulator phase, over one period at
+        a time, and the quiver's own amplitude there. Both in the record's own units."""
+        d = np.array([fa[s][key] - fu[s][key] for s in ss])
+        q = np.array([fu[s][key] for s in ss])
+        worst = amp = 0.0
+        for i in range(0, len(ss) - Q_NSTEP + 1, Q_NSTEP):
+            w = d[i:i + Q_NSTEP]
+            worst = max(worst, float(np.max(np.abs(w - w.mean(axis=0)))))
+            qq = q[i:i + Q_NSTEP]
+            amp = max(amp, float(np.max(qq.max(axis=0) - qq.min(axis=0)) / 2))
+        return worst, amp
+
+    l_ramp = Q_RAMP * LAMBDA_W
+    for name, helical, tilt in (("planar", False, 0.0), ("helical", True, 0.0),
+                                ("planar tilted", False, 0.4)):
+        tag = "uv_q" + name.split()[0][0] + ("t" if tilt else "")
+        base, wrap = quiver_lat(f"q_{tag}", helical, tilt)
+        run(exe, wd, tag + "a", QUIVER.format(lat=base, root=tag + "a", frames="T"))
+        run(exe, wd, tag + "u", QUIVER.format(lat=wrap, root=tag + "u", frames="T"))
+        check(f"quiver ({name}): the two runs start from the same beam (0 = yes)",
+              0.0 if dumps_identical(wd / f"{tag}a-initial.beam.h5",
+                                     wd / f"{tag}u-initial.beam.h5") else 1.0, 0.5)
+
+        fa, fu = q_frames(tag + "a"), q_frames(tag + "u")
+        shared = sorted(set(fa) & set(fu))
+        body = [s for s in shared if l_ramp + 1e-9 < s < Q_L - l_ramp - 1e-9]
+        ramp = [s for s in shared if 1e-9 < s < l_ramp - 1e-9]
+        worst_rel, note = 0.0, []
+        for where, ss, keys in (("body", body, ("x", "px", "theta")), ("ramp", ramp, ("x", "px"))):
+            for key in keys:
+                res, amp = oscillating(fa, fu, key, ss)
+                worst_rel = max(worst_rel, res / amp)
+                note.append(f"{where} {key} {res:.1e} of {amp:.1e}")
+        check(f"quiver ({name}): the restored orbit is this mode's, to a fraction of the quiver",
+              worst_rel, 1e-3, note="[" + ", ".join(note) + " (m, u, rad)]")
+
+        # Inside a ramp the two devices differ in phase as well: this mode jumps the ramp's
+        # phase at the segment's first step and the deficit then accrues through the ramp,
+        # so the difference opens at the entrance and closes by the ramp's end. It is not
+        # the orbit's, and the conversion leaves it alone (fel-physics.md sec-quiverdump).
+        d_ramp = [float(np.max(np.abs(fa[s_f]["theta"] - fu[s_f]["theta"]))) for s_f in ramp]
+        d_body = float(np.max(np.abs(fa[body[0]]["theta"] - fu[body[0]]["theta"])))
+        check(f"quiver ({name}): the ramp's phase transient opens at the entrance and closes by its end [rad]",
+              d_body, 1e-2, note=f"[{max(d_ramp):.2f} rad at the entrance, {d_ramp[-1]:.4f} at the last ramp "
+                                 f"frame, {d_body:.4f} through the body, on a quiver of "
+                                 f"{oscillating(fa, fu, 'theta', body)[1]:.2f} rad]")
+
+        # The inverse, against the run's own record of the state it tracked: the stats
+        # centroid is taken from the live beam, before the writer's copy is converted.
+        with h5py.File(wd / f"{tag}a.stats.h5") as h5:
+            s_rec, cen = h5["coords/s"][...], h5["beam/slice/centroid"][...]
+        back = {k: 0.0 for k in ("x", "px", "y", "py", "z", "pz")}
+        for f in sorted(wd.glob(f"{tag}a-0*.beam.h5")):
+            with h5py.File(f) as h5:
+                s_f = round(float(np.atleast_1d(h5.attrs["sPosition"])[0]), 9)
+                phi0 = float(np.atleast_1d(h5.attrs["phi0"])[0])
+            if s_f not in body and s_f not in ramp:
+                continue
+            gc = beamio.unquiver(f, beamio.read_slices(f, LAMBDA1, LAMBDA1), LAMBDA1)[0]
+            wgt, gam = gc["weight"], gc["gamma"]
+            beta = np.sqrt(1 - 1 / gam**2)
+            p_mc = np.sqrt(gam**2 - 1)
+            got = {"x": gc["x"], "y": gc["y"], "px": gc["px"] / P0_MC, "py": gc["py"] / P0_MC,
+                   "z": beta * (gc["theta"] - phi0) * LAMBDA1 / (2 * math.pi),
+                   "pz": (p_mc - P0_MC) / P0_MC}
+            irec = int(np.argmin(np.abs(s_rec - s_f)))
+            for i, k in enumerate(("x", "px", "y", "py", "z", "pz")):
+                back[k] = max(back[k], abs(float(np.average(got[k], weights=wgt)) - float(cen[irec, 0, i])))
+        _, amp_x = oscillating(fa, fu, "x", body)
+        # beamio.unquiver is the page's inverse, reading the device's numbers from the
+        # frame's own attributes. A planar roll-off depends on the wiggle frame's y, which
+        # the quiver does not move, and a helical one moves with r, which the inverse's
+        # second pass answers, so all three land on the rounding floor.
+        check(f"quiver ({name}): the page's inverse returns the guiding centre the run tracked [m]",
+              back["x"], 1e-16,
+              note=f"[x {back['x']:.1e} m on a quiver of {amp_x:.1e} m, px {back['px']:.1e}, "
+                   f"z {back['z']:.1e} m, pz {back['pz']:.1e}]")
+
+        if not helical and not tilt:
+            # The conversion is the writer's own copy: a run with the series on holds the
+            # state a run without it holds, to the bit.
+            run(exe, wd, tag + "n", QUIVER.format(lat=base, root=tag + "n", frames="F"))
+            check("quiver: the frame series does not move the run it observes (0 = yes)",
+                  0.0 if dumps_identical(wd / f"{tag}a-final.beam.h5",
+                                         wd / f"{tag}n-final.beam.h5") else 1.0, 0.5)
 
     if FAILED:
         print("unaveraged checks: FAIL")

@@ -180,12 +180,12 @@ One slice, 16384 particles, `ngrid` 129, serial (the mode's parallelism is over 
 | substep RK4 (`unavg_push`, `unavg_ode`) | 17.6% | 35.3% |
 | undulator field, this code's own arithmetic | 8.9% | 27.7% |
 | FFT transform and `fel_field_diffract` | 13.0% | 17.8% |
-| ramp envelope (`fel_unavg_envelope`) | 4.8% | 0.0% |
+| ramp envelope (`fel_und_envelope`) | 4.8% | 0.0% |
 | deposit, this code's own arithmetic | 1.2% | 1.9% |
 | everything else | 2.4% | 1.8% |
 | total samples | 13302 | 7964 |
 
-Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics and `fel_unavg_envelope` called two more, all four per particle per RK stage, when the argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all: the s-independence is structural rather than a comment.
+Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics and `fel_und_envelope` called two more, all four per particle per RK stage, when the argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all: the s-independence is structural rather than a comment.
 
 The share row hides how much moved, because the denominator moved too. In absolute samples libm fell from 6936 to 1221, which is 82% of the transcendental work gone, and the step's wall clock fell by the amounts in the next table.
 

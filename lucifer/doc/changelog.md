@@ -9,6 +9,25 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Added: the quiver an interior frame carries. An openPMD momentum record is the instantaneous
+  kinetic momentum, and the averaged map stores the guiding centre, so `fel_restore_quiver` restores the
+  quiver to a beam frame written inside an averaged undulator, on the writer's own copy: the local vector
+  potential into the momentum, its integral from the element's upstream face into the position, and the lag
+  that transverse momentum pays for, every term derived in the manual. The device is the ramped one the
+  unaveraged mode models, one envelope authority for both (`fel_und_envelope`), so each term vanishes at an
+  element face and the frames a continuation reads are untouched. The unaveraged mode is the reference: on a
+  dark undulator tracked both ways from one beam, the part of the residual that oscillates with the undulator
+  phase is 8e-8 of the quiver planar, 1.6e-5 tilted and 9.5e-5 helical, where a missing sqrt(2) would leave
+  0.29 of it. The reader's inverse returns the guiding centre to 1.1e-20 m planar on a 2.5e-7 m quiver.
+  A frame gains `sElement`, `elementLength` and `rampPeriods` beside `aw`, `ku`, `tilt` and `helical`, so a
+  reader has the device's geometry from the frames alone, and `beamio.unquiver` takes the quiver back off a
+  frame with them, leaving a frame the writer did not convert unchanged. That inverse returns the guiding
+  centre to 1.1e-20 m on a 2.5e-7 m quiver, taking its pass twice so a helical device's roll-off, which moves
+  with the quiver, costs fourth order rather than second. The diagnostics check compares the
+  two modes' frames by their centroid momentum, which now agree to 3.5e-6 where the old check asserted they
+  differ, and takes the quiver off before reading a frame's bunching against the stats row's, which is the
+  guiding centre's: with it left on the two are of different quantities and differ by 4.4e-4.
+  `doc/reading-output.md` states the convention and drops the recipe it used to give a reader.
 - 2026-09-14 Added: checkpoints, and the two loading modes. A dump or element-end frame written at an
   eligible boundary, an element end outside every undulator or the physical end of one with the beam in the
   averaged chart, carries the group `lucifer` on both files: the reference phase and every particle's z as

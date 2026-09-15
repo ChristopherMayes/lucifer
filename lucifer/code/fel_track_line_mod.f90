@@ -885,7 +885,7 @@ if (fel_mode(ie) == unaveraged$) then
   intg2 = 0
   do ipr = 1, run%ustate%nsub
     s0 = (run%ustate%s - und%dz) + (ipr - 0.5_rp) * run%ustate%dsub
-    g_env = fel_unavg_envelope(run%ustate, s0, gp_env)
+    g_env = fel_und_envelope(run%ustate%l, run%ustate%l_ramp, s0, gp_env)
     intg2 = intg2 + g_env**2 * run%ustate%dsub
   enddo
 else

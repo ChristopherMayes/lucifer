@@ -248,8 +248,11 @@ one wants.
 
 Each file says where it was taken. `frameFormat` names the layout, and `sPosition`,
 `elementName`, `elementIndex`, `phi0`, `sliceFirst` and `sliceLast` are on every frame. A
-frame inside an FEL element also carries `felMethod` with `aw`, `ku`, `tilt` and
-`helical`. `floorPosition` and `floorAngles` place the frame in the lab: `s` is a
+frame inside an FEL element also carries `felMethod` with `aw`, `ku`, `tilt`, `helical`,
+and the device's geometry: `sElement`, where the frame sits from the element's upstream
+face, `elementLength`, and `rampPeriods`, the periods its field ramps over at each end.
+Those six are what taking the quiver back off a frame needs, so a reader that walks a
+series has it from the frames alone. `floorPosition` and `floorAngles` place the frame in the lab: `s` is a
 curvilinear coordinate, so a scene holding a line with a bend needs the floor, and it is
 taken at the frame's own position rather than the element's end. The iteration's `time` is
 Bmad's reference time there, which is what orders a series for a reader that knows openPMD
@@ -338,20 +341,21 @@ so a reader that walks the standard attributes puts the cut field where the whol
 would sit, beside the cut beam whose `timeOffset` keeps each slice's own placement.
 Everything else is unchanged, so a reader places a sub-window frame by its own attributes.
 
-**The wiggle is not in an averaged frame, and the frame carries what rebuilds it.** The
-averaged mode integrates over the undulator period, so a particle's stored `x` is the
-guiding centre and not the physical orbit. A reader that wants the orbit adds the quiver
-back, for a planar device
-
-$$x \to x + \frac{a_w}{\gamma k_u}\cos(k_u s), \qquad
-  x' \to x' - \frac{a_w}{\gamma}\sin(k_u s)$$
-
-with `aw`, `ku` and `s` from the frame's own attributes, and the analogous pair in `y`
-for a helical device, where `helical` is 1. This is postprocessing and the tracker never
-does it: the averaged equations are written for the guiding centre and adding the quiver
-to the state would change the physics rather than the picture. The unaveraged mode
-resolves the motion itself, so its frames carry the physical orbit already and nothing is
-added. `felMethod` on the frame says which mode wrote it.
+**Every particle record is the instantaneous orbit.** An openPMD momentum record is the
+kinetic momentum, and Bmad's writer builds the longitudinal component from the transverse
+ones on that assumption, so that is what a frame states. The unaveraged mode resolves the
+motion itself and its frames carry the orbit already. The averaged mode integrates over the
+undulator period, so what it tracks is the guiding centre, and the writer restores the
+quiver to a frame written inside an undulator: the local vector potential into the
+momentum, its integral from the element's upstream face into the position, and the lag
+that transverse momentum pays for. The device is the one the unaveraged mode models, its
+ramped ends included, so every term vanishes at an element face, where a frame is the
+state the run tracked and a continuation reads. The conversion and its inverse are derived
+in [the manual](fel-physics.md#sec-quiverdump), with their measured levels in
+[validation](validation.md), and `beamio.unquiver` is that inverse: it returns a frame's
+slices as the guiding centre, and returns a frame the writer did not convert unchanged. Only the writer's own copy is converted, so a run with the
+series on holds the state a run without it holds, to the bit. `felMethod` on the frame
+says which mode wrote it.
 
 **Following a particle between frames.** Every macroparticle carries a label in openPMD's
 `id` record, unique over the window and unchanged for the life of the run. Migration

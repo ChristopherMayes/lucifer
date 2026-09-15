@@ -52,6 +52,7 @@ from nml import to_groups
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
 from read_stats import read_stats, same_data  # noqa: E402
+import beamio  # noqa: E402
 from beamio import read_slices  # noqa: E402
 
 import validate_bmad_stats  # noqa: E402  The standard's own conformance checker.
@@ -1100,9 +1101,14 @@ def main():
         check("frames: every unaveraged frame names its chart", bad_name, 0.5)
         swing_u = max(abs(v) for _, v in named)
         swing_a = max(abs(v) for _, v in avg)
-        check("frames: the unaveraged chart carries the quiver in the mean of px",
-              0.0 if swing_u > 20 * swing_a else 1.0, 0.5,
-              note=f"[unaveraged {swing_u:.2e}, averaged {swing_a:.2e} eV/c]")
+        # Both modes' frames carry the quiver: this one resolves it, and the averaged
+        # map's frames have it restored by the writer, since an openPMD momentum record is
+        # the instantaneous kinetic momentum (doc/reading-output.md). So the two runs'
+        # centroid momentum agrees, which is the same conversion check_unaveraged.py makes
+        # particle by particle, here on a four-element line.
+        check("frames: both modes carry the quiver in the mean of px, to the same swing",
+              abs(swing_u / swing_a - 1), 1e-3,
+              note=f"[unaveraged {swing_u:.4e}, averaged {swing_a:.4e} eV/c]")
 
     # Restarting from a frame needs no check of its own. A frame at an element end is
     # dataset-identical to that element's dump, which the check above measures, and
@@ -1141,10 +1147,13 @@ def main():
 
     # Bunching per slice, from the frame's own particles. read_slices does the documented
     # reconstruction, theta = -ks c t, which is where the reference phase the writer
-    # folded into the time coordinate comes back.
+    # folded into the time coordinate comes back. The row is the guiding centre the map
+    # tracks and the frame is the instantaneous orbit, so the quiver comes back off first
+    # (beamio.unquiver): with it left on, the phase the quiver imposes moves the bunching
+    # by 4.4e-4 and the two numbers are of different quantities.
     worst_b = 0.0
     for i, f in enumerate(idf):
-        sl = read_slices(f, wavelength=1e-10, spacing=spacing)
+        sl = beamio.unquiver(f, read_slices(f, wavelength=1e-10, spacing=spacing), 1e-10)
         for isl, s in enumerate(sl):
             if s["n"] == 0:
                 continue

@@ -178,48 +178,6 @@ end subroutine fel_unavg_setup
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Function fel_unavg_envelope (ustate, s, gp) result (g)
-!
-! The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
-! flat 1, sin^2 down over the last l_ramp. Amplitude and slope are continuous (the
-! slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
-! the hard-edge mutation configuration. The handoff check exists to catch it.
-!
-! Input:
-!   ustate -- fel_unavg_struct: Ramp geometry.
-!   s      -- real(rp): Position inside the segment [m].
-!
-! Output:
-!   gp     -- real(rp): The envelope derivative dg/ds [1/m].
-!   g      -- real(rp): The field envelope g(s) (sin^2 ramps, 1 in the body).
-!-
-
-function fel_unavg_envelope (ustate, s, gp) result (g)
-
-type (fel_unavg_struct) ustate
-real(rp) s, g, gp, arg
-
-!
-
-g = 1;  gp = 0
-if (ustate%l_ramp <= 0) return
-
-if (s < ustate%l_ramp) then
-  arg = pi * s / (2 * ustate%l_ramp)
-  g = sin(arg)**2
-  gp = (pi / ustate%l_ramp) * sin(arg) * cos(arg)
-elseif (s > ustate%l - ustate%l_ramp) then
-  arg = pi * (ustate%l - s) / (2 * ustate%l_ramp)
-  g = sin(arg)**2
-  gp = -(pi / ustate%l_ramp) * sin(arg) * cos(arg)
-endif
-
-end function fel_unavg_envelope
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
 ! Subroutine fel_unavg_bfield (und, ustate, x, y, s, bx, by, bz)
 !
 ! The normalized magnetostatic field b = e*B/(m_e c) = curl(a) [1/m] at s into the
@@ -244,7 +202,7 @@ end function fel_unavg_envelope
 ! Input:
 !   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
 !   x, y       -- real(rp): Transverse position [m].
-!   g, gp      -- real(rp): The ramp envelope and its slope at this s (fel_unavg_envelope).
+!   g, gp      -- real(rp): The ramp envelope and its slope at this s (fel_und_envelope).
 !   c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
 !
 ! Output:
@@ -951,7 +909,7 @@ do j = 1, 4
     fq(:,3) = fq(:,2)
     cycle
   endif
-  g = fel_unavg_envelope(ustate, s_st(j), gp)
+  g = fel_und_envelope(ustate%l, ustate%l_ramp, s_st(j), gp)
   fq(1,j) = g
   fq(2,j) = gp
   fq(3,j) = cos(und%ku * s_st(j))

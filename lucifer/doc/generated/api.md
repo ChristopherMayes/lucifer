@@ -3244,10 +3244,11 @@ Output:
 Routine to stamp a dump with where it was taken.
 
 A frame is read on its own, so it has to say where along the line it is and what the
-beam was moving through. The averaged mode integrates the quiver away, and a reader
-that wants the physical orbit rebuilds it from aw, ku and s (doc/reading-output.md),
-which is why those ride the file rather than being looked up in a lattice the reader
-may not have. A frame taken in a break carries the element and no undulator numbers.
+beam was moving through. The particle records hold the instantaneous orbit, and a reader
+that wants the guiding centre the averaged map tracks takes the quiver back off with the
+device's own numbers (doc/reading-output.md), which is why those ride the file rather
+than being looked up in a lattice the reader may not have. A frame taken in a break
+carries the element and no undulator numbers.
 
 The attributes go on the root of a file the writers have already closed, so neither
 writer's layout changes and both kinds of file are stamped the same way.
@@ -5445,6 +5446,82 @@ Output:
            ponderomotive phase).
 ```
 
+(api-fel-und-envelope)=
+### `fel_und_envelope`
+
+*Function* `(l, l_ramp, s, gp) result (g)`
+
+```
+The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
+flat 1, sin^2 down over the last l_ramp. Amplitude and slope are continuous (the
+slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
+the hard-edge mutation configuration. The handoff check exists to catch it.
+
+One authority for the device's ends: the unaveraged mode integrates through this
+envelope, and fel_restore_quiver rebuilds the orbit of the same device with it.
+```
+
+```
+Input:
+  l      -- real(rp): Segment length [m].
+  l_ramp -- real(rp): Ramp length at each end [m]. Zero is a hard edge.
+  s      -- real(rp): Position inside the segment [m].
+
+Output:
+  gp     -- real(rp): The envelope derivative dg/ds [1/m].
+  g      -- real(rp): The field envelope g(s) (sin^2 ramps, 1 in the body).
+```
+
+(api-fel-restore-quiver)=
+### `fel_restore_quiver`
+
+*Subroutine* `(und, beam, l_ele, ramp_periods, s_ele)`
+
+```
+Routine to restore the undulator quiver to a beam the averaged map has tracked, so that
+a frame written inside a segment holds the instantaneous orbit an openPMD momentum
+record means rather than the guiding centre the map carries. Every term is derived in
+fel-physics.md sec-pardump, which also states the inverse. The caller passes its own copy
+of the beam: the walk's beam keeps the guiding centre, which is what the map integrates
+and what a checkpoint stores.
+
+Near the axis the magnetic push is du_perp/ds = d(a_perp)/ds, so the kinetic momentum is
+the stored one plus the local potential, and the position and the lag follow by
+integrating it from the upstream face. The device is the one the unaveraged mode models,
+its ends included (fel_und_envelope): the averaged map's state is the adiabatic
+invariant those ramped ends hand it, so its guiding centre is that device's. Each
+integral vanishes at both faces, where a frame is left as it stands.
+
+What is restored is the quiver's oscillation. The ramp also holds the mean square of the
+transverse momentum below the aw^2 the averaged map carries everywhere, which is a
+difference between the two devices rather than a part of the orbit, so it is left alone
+and the frame series stays continuous at the faces (doc/validation.md).
+```
+
+```
+Input:
+  und           -- fel_und_struct: The undulator the beam sits in.
+  beam          -- fel_beam_struct: The beam, in the averaged chart.
+  l_ele         -- real(rp): The element's length [m].
+  ramp_periods  -- real(rp): Periods the device's field ramps over at each end.
+  s_ele         -- real(rp): Where the frame sits, from the upstream face [m].
+
+Output:
+  beam          -- fel_beam_struct: The same beam on the instantaneous orbit.
+```
+
+(api-phase-integrals)=
+### `phase_integrals`
+
+*Subroutine* `(a_cos, a_sin, b_cos)`
+
+```
+The three integrals of the envelope against the undulator phase, Simpson's rule at 256
+points a period. They are three scalars per frame and not per particle, the ramp is
+what makes them worth integrating rather than expanding, and each vanishes at both
+faces so the frame series is continuous there.
+```
+
 (api-fel-track-und-step)=
 ### `fel_track_und_step`
 
@@ -6301,28 +6378,6 @@ Output:
   err_flag         -- logical: Set True if there is an error. False otherwise.
 ```
 
-(api-fel-unavg-envelope)=
-### `fel_unavg_envelope`
-
-*Function* `(ustate, s, gp) result (g)`
-
-```
-The undulator amplitude envelope at s into the segment: sin^2 up over l_ramp,
-flat 1, sin^2 down over the last l_ramp. Amplitude and slope are continuous (the
-slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
-the hard-edge mutation configuration. The handoff check exists to catch it.
-```
-
-```
-Input:
-  ustate -- fel_unavg_struct: Ramp geometry.
-  s      -- real(rp): Position inside the segment [m].
-
-Output:
-  gp     -- real(rp): The envelope derivative dg/ds [1/m].
-  g      -- real(rp): The field envelope g(s) (sin^2 ramps, 1 in the body).
-```
-
 (api-fel-unavg-bfield)=
 ### `fel_unavg_bfield`
 
@@ -6353,7 +6408,7 @@ per-particle transcendental hides.
 Input:
   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
   x, y       -- real(rp): Transverse position [m].
-  g, gp      -- real(rp): The ramp envelope and its slope at this s (fel_unavg_envelope).
+  g, gp      -- real(rp): The ramp envelope and its slope at this s (fel_und_envelope).
   c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
 
 Output:

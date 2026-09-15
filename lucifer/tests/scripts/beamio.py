@@ -174,3 +174,98 @@ def _read_openpmd(path, wavelength, spacing=None):
                             current=float(w[s].sum()) * C_LIGHT / spacing,
                             **({} if pz is None else dict(pz=pz[s]))))
     return out
+
+
+def unquiver(path, slices, wavelength):
+    """A frame's slices with the undulator quiver taken back off, the guiding centre the
+    averaged map tracks.
+
+    The writer restores the quiver to a frame written inside an averaged undulator, since
+    an openPMD momentum record is the instantaneous kinetic momentum
+    (fel-physics.md sec-quiverdump). This is that conversion's inverse, in the order the
+    page states: the momenta first, which depend on the position in the device and the
+    roll-off alone, then the longitudinal momentum from the recovered average, then the
+    position and the lag.
+
+    A frame the writer did not convert comes back unchanged: one from a break, which has
+    no undulator numbers, one this mode wrote, which carried the orbit already, and one at
+    an element face, where the device's field has ended.
+    """
+    with h5py.File(path) as h5:
+        method = _attr(h5, "felMethod") if "felMethod" in h5.attrs else b""
+        if isinstance(method, bytes):
+            method = method.decode()
+        if "aw" not in h5.attrs or str(method) == "Unaveraged":
+            return slices
+        aw, ku = float(_attr(h5, "aw")), float(_attr(h5, "ku"))
+        tilt, helical = float(_attr(h5, "tilt")), int(_attr(h5, "helical")) == 1
+        s_ele, l_ele = float(_attr(h5, "sElement")), float(_attr(h5, "elementLength"))
+        l_ramp = float(_attr(h5, "rampPeriods")) * 2 * np.pi / ku
+    if s_ele <= 0 or s_ele >= l_ele:
+        return slices
+
+    g, a_cos, a_sin, b_cos = _quiver_integrals(s_ele, l_ele, l_ramp, ku)
+    a0 = aw if helical else np.sqrt(2.0) * aw
+    ct, st = np.cos(tilt), np.sin(tilt)
+    kx, ky = (ku * ku / 2, ku * ku / 2) if helical else (0.0, ku * ku)
+    out = []
+    for sl in slices:
+        if sl["n"] == 0:
+            out.append(sl)
+            continue
+        d = dict(sl)
+        # The writer took the roll-off at the guiding centre, so the inverse iterates it:
+        # the first pass reads it off the record's own position and the second off the
+        # position that pass recovered. A planar device needs no second pass, its roll-off
+        # depending on the wiggle frame's y, which the quiver does not move. A helical one
+        # does, and the pass takes the inverse from second order in the quiver to fourth.
+        xg, yg = sl["x"], sl["y"]
+        for _ in range(2):
+            xl, yl = ct * xg + st * yg, -st * xg + ct * yg
+            awloc = 1 + 0.5 * (kx * xl * xl + ky * yl * yl)
+            amp = a0 * awloc
+            ux, uy = ct * sl["px"] + st * sl["py"], -st * sl["px"] + ct * sl["py"]
+            ux = ux - amp * g * np.cos(ku * s_ele)
+            if helical:
+                uy = uy - amp * g * np.sin(ku * s_ele)
+            us = np.sqrt(sl["gamma"] ** 2 - 1 - ux * ux - uy * uy - (aw * awloc) ** 2)
+            dxl = amp / us * a_cos
+            dyl = amp / us * a_sin if helical else np.zeros_like(dxl)
+            xg = sl["x"] - (ct * dxl - st * dyl)
+            yg = sl["y"] - (st * dxl + ct * dyl)
+        if helical:
+            dtau = sl["gamma"] / (2 * us ** 3) * 2 * amp * (ux * a_cos + uy * a_sin)
+        else:
+            dtau = sl["gamma"] / (2 * us ** 3) * (2 * ux * amp * a_cos + (aw * awloc) ** 2 * b_cos)
+        d["x"], d["y"] = xg, yg
+        d["px"] = ct * ux - st * uy
+        d["py"] = st * ux + ct * uy
+        # theta = phi0 + ks z / beta and the writer took beta * dtau off z, so the lag
+        # comes off the phase as ks * dtau, with no beta left in it.
+        d["theta"] = sl["theta"] + 2 * np.pi / wavelength * dtau
+        out.append(d)
+    return out
+
+
+def _quiver_envelope(t, l_ele, l_ramp):
+    """The device's amplitude envelope, the reader's side of fel_und_envelope."""
+    g = np.ones_like(t)
+    if l_ramp > 0:
+        m = t < l_ramp;            g[m] = np.sin(np.pi * t[m] / (2 * l_ramp)) ** 2
+        m = t > l_ele - l_ramp;    g[m] = np.sin(np.pi * (l_ele - t[m]) / (2 * l_ramp)) ** 2
+    return g
+
+
+def _quiver_integrals(s_ele, l_ele, l_ramp, ku):
+    """g at s and the three phase integrals from the upstream face, Simpson at the step the
+    writer uses. The ramp is what makes them worth integrating rather than expanding."""
+    lam_u = 2 * np.pi / ku
+    n = max(64, 2 * int(round(128 * s_ele / lam_u)))
+    t = np.linspace(0.0, s_ele, n + 1)
+    w = np.ones(n + 1); w[1:-1:2] = 4; w[2:-1:2] = 2
+    g = _quiver_envelope(t, l_ele, l_ramp)
+    h = s_ele / n
+    return (float(_quiver_envelope(np.array([s_ele]), l_ele, l_ramp)[0]),
+            h / 3 * float(np.dot(w, g * np.cos(ku * t))),
+            h / 3 * float(np.dot(w, g * np.sin(ku * t))),
+            h / 3 * float(np.dot(w, g * g * np.cos(2 * ku * t))))

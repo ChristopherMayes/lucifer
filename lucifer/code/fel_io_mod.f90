@@ -167,10 +167,11 @@ end function fel_checkpoint_eligible
 ! Routine to stamp a dump with where it was taken.
 !
 ! A frame is read on its own, so it has to say where along the line it is and what the
-! beam was moving through. The averaged mode integrates the quiver away, and a reader
-! that wants the physical orbit rebuilds it from aw, ku and s (doc/reading-output.md),
-! which is why those ride the file rather than being looked up in a lattice the reader
-! may not have. A frame taken in a break carries the element and no undulator numbers.
+! beam was moving through. The particle records hold the instantaneous orbit, and a reader
+! that wants the guiding centre the averaged map tracks takes the quiver back off with the
+! device's own numbers (doc/reading-output.md), which is why those ride the file rather
+! than being looked up in a lattice the reader may not have. A frame taken in a break
+! carries the element and no undulator numbers.
 !
 ! The attributes go on the root of a file the writers have already closed, so neither
 ! writer's layout changes and both kinds of file are stamped the same way.
@@ -274,6 +275,14 @@ if (ie >= 1) then
     call hdf5_write_attribute_real (f_id, 'ku', und%ku, err)
     call hdf5_write_attribute_real (f_id, 'tilt', und%tilt, err)
     call hdf5_write_attribute_int (f_id, 'helical', merge(1, 0, und%helical), err)
+
+    ! The rest of what rebuilding the orbit takes: where the frame sits in the device, and
+    ! how long the device and its ramped ends are. A reader that walks a frame series has
+    ! the lattice's geometry from the frames alone (doc/reading-output.md).
+
+    call hdf5_write_attribute_real (f_id, 'sElement', run%z_now - branch%ele(ie)%s_start, err)
+    call hdf5_write_attribute_real (f_id, 'elementLength', branch%ele(ie)%value(l$), err)
+    call hdf5_write_attribute_real (f_id, 'rampPeriods', run%fel_ramp(ie), err)
   endif
 endif
 
@@ -356,11 +365,13 @@ subroutine fel_dump_frame (run, ie, at_end, err_flag)
 
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
+type (fel_beam_struct), pointer :: fbeam
+type (fel_beam_struct), target :: bq
 type (wavefront_struct) wf_sub
 complex(wf_rp), allocatable :: eslab(:,:,:)
 real(rp) s_frame
 integer ie, ihh, first_was, ifr
-logical at_end, err_flag, eerr, whole, ckpt
+logical at_end, err_flag, eerr, whole, ckpt, quiver
 character(200) prefix
 character(8) hsuf
 
@@ -384,7 +395,25 @@ if (at_end .and. ie >= 1) s_frame = run%lat%branch(0)%ele(ie)%s
 whole = (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice)
 ckpt = at_end .and. whole
 if (ckpt) ckpt = fel_checkpoint_eligible(run, ie)
-call fel_write_openpmd_beam (run%fbeam, run%lat%branch(0)%ele(ie), &
+
+! Inside an averaged undulator the beam is the guiding centre the map integrates, and a
+! momentum record is the instantaneous orbit, so the quiver is restored on a copy
+! (fel_restore_quiver). The walk's own beam is never touched: a diagnostic that moved the
+! state it observes would steer the run. A frame at an element face is left as it stands,
+! the device's field having ended there, which is also what a checkpoint must hold.
+
+quiver = .false.
+if (ie >= 1 .and. .not. at_end) quiver = run%is_fel(ie) .and. run%fel_mode(ie) /= unaveraged$
+if (quiver) then
+  bq = run%fbeam
+  call fel_restore_quiver (run%und_of(ie), bq, run%lat%branch(0)%ele(ie)%value(l$), run%fel_ramp(ie), &
+                           run%z_now - run%lat%branch(0)%ele(ie)%s_start)
+  fbeam => bq
+else
+  fbeam => run%fbeam
+endif
+
+call fel_write_openpmd_beam (fbeam, run%lat%branch(0)%ele(ie), &
                              trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2, &
                              kinetic_ok = .true., s_pos = s_frame)
 if (eerr) return
