@@ -7,7 +7,7 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 (val-the-keystone-rule)=
 ## The keystone rule
 
-Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. From the `bmad-ecosystem` root, with the interpreter of the `bmad-fel-validate` environment:
+Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule: a moved line there is a change to the files this program writes, to explain, review, regenerate and stage, and neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. From the `bmad-ecosystem` root, with the interpreter of the `bmad-fel-validate` environment:
 
 ```
 BUILD_PRODUCTION=N ./util/conda_compile      # debug
@@ -15,7 +15,7 @@ BUILD_PRODUCTION=N ./util/conda_compile      # debug
 python3 -m pytest lucifer/tests/test_keystone.py -v
 ```
 
-The suite launches the five jobs at once, each from an absolute working directory into its own log under a fresh artifact directory it names, and keeps every outcome, a launch that failed and a job that timed out included. Five tests read those outcomes, one each, and a sixth regenerates the three page sets and requires the Markdown diff to be empty, verifying for itself that all five passed before it runs a generator, so it cannot pass on a partial run and does not lean on test order. Selecting one test still runs all five jobs, xdist is refused, and a job past its hour is killed as a process group. The five jobs are the ones below, unchanged, and the suite launches them where a retyped recipe twice launched a benchmark from a directory an earlier command had moved into, ran four jobs of five, and reported a complete keystone from a one-line log.
+The suite launches the five jobs at once, each from an absolute working directory into its own log under a fresh artifact directory it names, and keeps every outcome, a launch that failed and a job that timed out included. Five tests read those outcomes, one each, and a sixth regenerates the four page sets and requires the Markdown diff to be empty, verifying for itself that all five passed before it runs a generator, so it cannot pass on a partial run and does not lean on test order. Selecting one test still runs all five jobs, xdist is refused, and a job past its hour is killed as a process group. The five jobs are the ones below, unchanged, and the suite launches them where a retyped recipe twice launched a benchmark from a directory an earlier command had moved into, ran four jobs of five, and reported a complete keystone from a one-line log.
 
 ```
 ./lucifer/tests/run_fel_benchmark.sh --results <art>/fel-debug.txt --work-dir <art>/wd-dbg
@@ -31,7 +31,7 @@ The five run at once because they share only a source tree they read: separate w
 | step | cached | cold |
 |---|---|---|
 | both benchmark passes, regression, wavefront and examples, concurrent | 458 s | 551 s |
-| the regeneration below | 1 s | 1 s |
+| the regeneration below | 2 s | 2 s |
 | total | 7.7 min | 9.2 min |
 | the same work in sequence, before this arrangement | 25 min | 25 min |
 
@@ -76,7 +76,7 @@ The critical path is now the debug pass, at 523 to 529 s of a 523 to 529 s keyst
 
 Every section runs in every keystone. Nothing is behind a flag, and there is no shorter mode to reach for, which is deliberate: a cheap run that checks less is the thing a keystone exists to prevent.
 
-Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module, so treat these four commands as one step, which the suite's regeneration test does.
+Then regenerate the documentation that is generated, and require no diff. Both halves are the check, and running the diff alone is a trap: it then asks only whether someone hand-edited a generated file, and a page that no longer describes the code passes it. Two pages drifted for several commits under exactly that mistake, one of them missing a whole module, so treat these five commands as one step, which the suite's regeneration test does.
 
 Regenerate then diff checks that the committed generated pages agree with what the current sources generate. It does not detect a page hand-edited in the working tree: the regeneration overwrites the edit, and the diff then compares the regenerated page with the committed one, which agree. The keystone removes such an edit and leaves the tree consistent. What the step does catch is a committed page whose source has moved, or a source that changed without its page being regenerated and committed. A word moved in a routine header fails the diff, which prints the page.
 
@@ -90,8 +90,27 @@ python3 lucifer/tests/scripts/report_api.py \
         --code lucifer/code --code lucifer/program --out lucifer/doc/generated/api.md
 python3 lucifer/tests/scripts/report_examples.py \
         --examples lucifer/examples --out lucifer/doc/generated/examples
+python3 lucifer/tests/scripts/report_layouts.py \
+        --exe production/bin/lucifer --out lucifer/doc/generated/layouts.md --log /tmp/layouts.log
 git diff --exit-code -- 'lucifer/doc/generated/*.md' 'lucifer/doc/generated/examples/*.md'
 ```
+
+The layouts generator runs four small decks with the executable it is handed, in a scratch
+directory of its own, and prints the hierarchy of eight of the files they wrote: every
+group, dataset, link and attribute, with no dataset values, and the values of two
+attributes left out by name, `date` and `softwareVersion`. It writes the page whole after
+every fixture ran, so a failed fixture fails the regeneration test, keeps its log beside
+the jobs' logs, and leaves the committed page as it was. The independent view of the same
+files is HDF5's own tool, which shows what the printer does and the values besides:
+
+```
+h5dump -H run-000005.beam.h5           # the hierarchy, datatypes and attributes, no data
+h5dump -a /lucifer/checkpointFormat run-final.beam.h5
+```
+
+The page covers the files the writers produce. The files a check forges to provoke a
+refusal, a stripped residual or a missing checkpoint member among them, are the check's own
+and are not printed.
 
 The measured levels in this document are written by the harness that measured them, so
 a moved digit is a failing command rather than a discrepancy someone has to notice while

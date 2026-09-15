@@ -9,6 +9,16 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-15 Added: a generated page, HDF5 file layouts (`doc/generated/layouts.md`), prints the
+  hierarchy of eight representative files the program writes: an averaged interior frame's `.gc.h5`
+  and its exported `.beam.h5`, an unaveraged interior frame, a frame at an undulator's end and the
+  final dump at the zero-length marker after it, the checkpoint pair, a two-polarization field frame
+  over three slices of six, and a keep-mode dump with two empty patches. `report_layouts.py` runs
+  four decks with the production executable inside the keystone's regeneration test, as its fourth
+  generator, and prints every group, dataset, link and attribute with its datatype, shape and value,
+  a floating value at six significant figures, dataset values never, and the values of `date` and
+  `softwareVersion` left out by name. A moved line on that page is a change to the files to review
+  and regenerate, under the rule doc/validation.md states beside the tiers'. The generator ran in 0.6 s.
 - 2026-09-14 Changed: inside an averaged undulator a frame's particles go to `<out_root>-<record>.gc.h5`,
   the coordinates the map evolves in a file of their own with no openPMD particle record, and the frame's
   `.beam.h5` is written there only with `global%dump_orbit = T`, its records the orbit `fel_restore_quiver`

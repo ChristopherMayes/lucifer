@@ -38,6 +38,7 @@ project:
         - file: generated/examples/coherent_source.md
         - file: generated/examples/saturation_demo.md
     - file: generated/api.md
+    - file: generated/layouts.md
     - file: changelog.md
 site:
   template: book-theme

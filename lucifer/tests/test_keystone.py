@@ -3,7 +3,7 @@
 Five jobs run once, at the same time, each from an absolute working directory with its
 own log, and every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the three page sets and requires the Markdown diff to be empty, and it
+regenerates the four page sets and requires the Markdown diff to be empty, and it
 verifies for itself that every one of the five outcomes is present and successful
 before it runs a generator, so it does not lean on test order and cannot pass on a
 partial run. Nothing here builds: both trees are prerequisites and are checked before
@@ -21,7 +21,7 @@ What the contract means in practice:
 - xdist is refused (conftest.py beside this file). A session fixture runs once per
   worker, so a parallel run would launch the five jobs several times over, into the
   same work directories.
-- The regeneration test writes into the tree: the three generated page sets under
+- The regeneration test writes into the tree: the four generated page sets under
   lucifer/doc/generated. That is the keystone's own contract, and a clean tree is what
   an empty diff then proves.
 - A job that runs past its timeout is killed as a process group. Each job is started in
@@ -241,7 +241,7 @@ def test_job(keystone: Keystone, name: str) -> None:
 
 
 def test_regeneration(keystone: Keystone) -> None:
-    """Regenerate the three page sets and require no diff, after all five jobs passed.
+    """Regenerate the four page sets and require no diff, after all five jobs passed.
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
@@ -259,6 +259,11 @@ def test_regeneration(keystone: Keystone) -> None:
          "--code", str(ROOT / "lucifer" / "program"), "--out", str(GENERATED / "api.md")),
         (str(SCRIPTS / "report_examples.py"), "--examples", str(ROOT / "lucifer" / "examples"),
          "--out", str(GENERATED / "examples")),
+        # The layouts page runs its own fixtures with the production executable. A failed
+        # fixture fails this test, keeps its log in the artifact directory and leaves the
+        # committed page as it was, since the generator writes the page whole or not at all.
+        (str(SCRIPTS / "report_layouts.py"), "--exe", str(PRODUCTION_EXE),
+         "--out", str(GENERATED / "layouts.md"), "--log", str(art / "layouts.log")),
     )
     for gen in generators:
         r = subprocess.run([sys.executable, *gen], cwd=str(ROOT), capture_output=True, text=True)

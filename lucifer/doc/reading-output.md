@@ -230,7 +230,12 @@ takes a row ([](input-reference.md#param-global-dump-at-comb)). The files are
 `<out_root>-<record>.beam.h5` and `<out_root>-<record>.wf.h5`, the record zero padded to
 six digits, which is openPMD's fileBased series. The index is the stats record's, so
 frame `n` and row `n` of the statistics file are the same position and can be plotted on
-one axis. `comb_ds_save` sets the spacing.
+one axis. `comb_ds_save` sets the spacing. The generated [HDF5 file layouts](generated/layouts.md)
+page prints the hierarchy of each kind of file this program writes, from files a run of the
+executable wrote: a frame's beam file at an element's end is
+[`avg-000005.beam.h5`](generated/layouts.md#layout-avg-000005-beam-h5) and a field frame is
+[`crop-000002.wf.h5`](generated/layouts.md#layout-crop-000002-wf-h5), which is written over
+three slices of six with two polarizations.
 
 ```python
 from pmd_beamphysics import ParticleGroup
@@ -265,7 +270,8 @@ offset, so a reader that takes the position from the particles and one that take
 the file see the same frame.
 
 Every field file this program writes, frames and the element-end and final dumps alike,
-also carries `slippageResidual`: the slippage the record had accumulated and not yet
+also carries `slippageResidual` ([`avg-final.wf.h5`](generated/layouts.md#layout-avg-final-wf-h5)):
+the slippage the record had accumulated and not yet
 rotated, in fundamental wavelengths, signed. The record's rotation index is folded into
 the time order the file is written in, and this residual is the one piece of the field's
 state the record itself does not hold, since it decides when the next rotation falls. A
@@ -292,7 +298,8 @@ undulator, or the physical end of one, with the beam in the averaged chart. A fr
 inside an element is written like any other frame and is not a checkpoint, and neither
 would a frame from the end of a super_slave inside a cut undulator be, though a lattice
 with one is refused at setup today. At a checkpoint the beam and field files each carry
-the root group `lucifer`:
+the root group `lucifer`, printed on [`avg-final.beam.h5`](generated/layouts.md#layout-avg-final-beam-h5)
+and [`avg-final.wf.h5`](generated/layouts.md#layout-avg-final-wf-h5):
 
 | member | on | what |
 |---|---|---|
@@ -362,7 +369,8 @@ purposes, and they do not share a record.
 and the averaged map does not hold one: it integrates the guiding centre, whose transverse
 momentum is the slow part with the quiver's mean square carried in the longitudinal motion.
 So a frame written inside an averaged undulator puts its particles in a file of its own,
-`<out_root>-<record>.gc.h5`, with no openPMD particle species in it. Its root group
+`<out_root>-<record>.gc.h5` ([`avg-000002.gc.h5`](generated/layouts.md#layout-avg-000002-gc-h5)),
+with no openPMD particle species in it. Its root group
 `guidingCentre` carries `format` (`lucifer-guiding-centre 1.0`), `phi0` and `p0c`, then
 `sliceCount` per slice of the range and, per particle in slice order, `x`, `px`, `y`, `py`,
 `z`, `pz`, `weight` and `id` in the packed chart's own units ([the chart](fel-physics.md#sec-chart)):
@@ -375,10 +383,12 @@ open this file, which is the point: there is nothing in it for one to misread.
 
 *Kinetic exchange.* Every `.beam.h5` this program writes holds the instantaneous orbit,
 and needs no label to say so. The unaveraged mode resolves the motion, so its frames carry
-the orbit already. An element-face frame and every dump carry it because the device's
+the orbit already ([`unavg-000002.beam.h5`](generated/layouts.md#layout-unavg-000002-beam-h5)).
+An element-face frame and every dump carry it because the device's
 field has ended there and the guiding centre and the orbit coincide. Inside an averaged
-undulator a `.beam.h5` is written only when the deck asks with `global%dump_orbit = T`,
-its records the orbit `fel_restore_quiver` rebuilds from the guiding centre: the local
+undulator a `.beam.h5` is written only when the deck asks with `global%dump_orbit = T`
+([`avg-000002.beam.h5`](generated/layouts.md#layout-avg-000002-beam-h5), the export of the
+`.gc.h5` above), its records the orbit `fel_restore_quiver` rebuilds from the guiding centre: the local
 vector potential into the momentum, its integral from the element's upstream face into the
 position, and the lag that transverse momentum pays for, for the ramped device the
 unaveraged mode models. The reconstruction and its inverse are derived in
@@ -449,7 +459,8 @@ charge in the message.
 
 The slice partition is `particlePatches`, the standard's own partition of a species
 record: one patch per slice, in window order, and an empty slice is a patch of no
-particles. So the patch count IS the window, and the file needs no attributes of this
+particles ([`keep-final.beam.h5`](generated/layouts.md#layout-keep-final-beam-h5) holds
+six patches, two of them empty). So the patch count IS the window, and the file needs no attributes of this
 code's invention to describe it. What openPMD has no place for comes from the deck
 instead: the wavelength, the slice spacing (`lambda0` and `slicing%n_wavelength`) and the
 beamlet size (`beamlet_size`). Reading a dump without `lambda0` is refused rather than
