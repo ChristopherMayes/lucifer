@@ -81,6 +81,7 @@ from read_stats import read_stats, same_data
 FAILED = False
 
 LAMBDA0 = 1e-10          # the wavelength both decks below state
+KS_C = 2 * np.pi / LAMBDA0 * 2.99792458e8      # phase per second of the file's time
 
 # What the citation check below walks: the text this program ships.
 SOURCE_SUFFIXES = {".f90", ".mm", ".h", ".c", ".py", ".sh", ".md", ".bmad", ".lat", ".in",
@@ -413,6 +414,24 @@ def main():
         return out
 
     def beam_by_id(path):
+        # Inside an averaged undulator the particle frame is the .gc.h5, the map's own
+        # chart, and the comparison reads it as such: the time record it stands in for is
+        # -theta/(ks c) with theta = phi0 + ks z / beta, the phase the tracker used.
+        gc = pathlib.Path(str(path).replace(".beam.h5", ".gc.h5"))
+        if not pathlib.Path(path).exists() and gc.exists():
+            with h5py.File(gc) as h5:
+                g = h5["guidingCentre"]
+                p0c = float(np.atleast_1d(g.attrs["p0c"])[0])
+                phi0 = float(np.atleast_1d(g.attrs["phi0"])[0])
+                counts = np.atleast_1d(g["sliceCount"][...]).astype(int)
+                ids, w, z, pz = (np.atleast_1d(g[k][...]) for k in ("id", "weight", "z", "pz"))
+            p_mc = p0c / 0.51099895069e6 * (1 + pz)
+            beta = p_mc / np.sqrt(p_mc**2 + 1)
+            theta = phi0 + 2 * np.pi / LAMBDA0 * z / beta
+            slice_of = np.repeat(np.arange(len(counts)), counts)
+            order = np.argsort(ids)
+            return dict(id=ids[order], w=w[order], t=(-theta / KS_C)[order],
+                        pz=(pz * p0c)[order], sl=slice_of[order], pops=counts)
         with h5py.File(path) as h5:
             name = sorted(h5["data"].keys())[0]
             sp = h5[f"data/{name}/particles"]
@@ -595,7 +614,6 @@ def main():
   chamber_wake%lrough = 100e-6
 """
     mig_extra = "  global%migrate = T\n  global%migrate_check = T\n"
-    KS_C = 2 * np.pi / LAMBDA0 * 2.99792458e8      # phase per second of the file's time
 
     def mig_events(root):
         """[(s, moved, dropped charge, margin)] per event, and the summary totals."""
@@ -992,7 +1010,11 @@ use, SEG
                     "x": rec("position/x")[o], "y": rec("position/y")[o]}
 
     def group_of(path):
-        """The checkpoint group's members, or None where the frame carries none."""
+        """The checkpoint group's members, or None where the frame carries none. An interior
+        frame of an averaged undulator has no .beam.h5 at all, its particles being in the
+        .gc.h5, which carries no group either."""
+        if not pathlib.Path(path).exists():
+            return None
         with h5py.File(path) as h5:
             g = h5.get("lucifer")
             if g is None:
@@ -1134,7 +1156,9 @@ use, SEG
                       expect_fail=True, fragment="NOT A PLACE A RUN STARTS")
     check("and as an initialization it is refused for where it was taken, this mode having written it",
           init_inu)
-    fa = str(fon[interior_a]).replace(".wf.h5", ".beam.h5")
+    # Inside an averaged undulator the frame's particles are the .gc.h5, and a continuation
+    # from it is refused for the checkpoint it lacks before it is told what format it is.
+    fa = str(fon[interior_a]).replace(".wf.h5", ".gc.h5")
     check("a continuation from a frame inside an averaged undulator is refused, no group",
           refused("uvr_ina", pathlib.Path(fa).name, fon[interior_a].name, "P1##1", "NO CHECKPOINT GROUP"))
 

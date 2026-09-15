@@ -177,6 +177,14 @@ WKT_WAKE = """WKT: pipe, l = 0, sr_wake = {amp_scale = 1, scale_with_length = T,
 WKT_NONE = """WKT: pipe, l = 0"""
 
 
+def particle_frames(wd, root):
+    """The particle frame of every record of a series, in record order: a .beam.h5 at an
+    element face, in a break and in an unaveraged segment, and a .gc.h5 inside an averaged
+    undulator, the map's own chart in a file of its own (doc/reading-output.md)."""
+    files = list(wd.glob(f"{root}-[0-9]*.beam.h5")) + list(wd.glob(f"{root}-[0-9]*.gc.h5"))
+    return sorted(files, key=lambda p: int(p.name.split("-")[-1].split(".")[0]))
+
+
 def h5_identical(fa, fb):
     """Whether two HDF5 files hold the same data, meta/ excluded.
 
@@ -332,7 +340,7 @@ def interludes(exe, wd):
     # Frames along the interlude, which is what the knob is for.
     run(exe, wd, "int_f", INT_NML.format(lat="intlat.bmad", root="int_f",
         extra="  global%interlude_ds_step = 0.04\n  global%dump_at_comb = T\n"))
-    frames = sorted(wd.glob("int_f-[0-9]*.beam.h5"))
+    frames = particle_frames(wd, "int_f")
     check("interlude: one frame per stats row with the pieces on",
           abs(len(frames) - len(p)), 0.5, note=f"[{len(frames)} frames, {len(p)} rows]")
     zs = []
@@ -452,8 +460,11 @@ def interludes(exe, wd):
     # coords at the containing element's upstream face whatever the frame's position, so
     # a frame inside a piece carried the element's start in sPosition and its entry time
     # in timeOffset while the file's own attributes said the frame's position.
+    # A .gc.h5 has no placement record to check: its position is the root attribute alone.
     worst_s, worst_t = 0.0, 0.0
     for fr in frames:
+        if fr.suffix == ".h5" and fr.name.endswith(".gc.h5"):
+            continue
         with h5py.File(fr) as f:
             it = f["data"][sorted(f["data"])[0]]
             el = it["particles/electron"]
@@ -982,13 +993,21 @@ def main():
 
     fr_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
                 '  global%migrate = T\n  global%dump_beam_at = "UND"\n')
-    r = run(exe, wd, "fr", FRAME_NML.format(root="fr", extra=fr_extra), threads="4")
+    # With the orbit export on, so an interior frame writes its .beam.h5 beside the .gc.h5
+    # it always writes, and every record has a standard particle frame to count and to
+    # compare with the unaveraged run's below.
+    r = run(exe, wd, "fr", FRAME_NML.format(root="fr", extra=fr_extra + "  global%dump_orbit = T\n"),
+            threads="4")
     frames = sorted(wd.glob("fr-[0-9]*.beam.h5"))
+    gframes = sorted(wd.glob("fr-[0-9]*.gc.h5"))
     wframes = sorted(wd.glob("fr-[0-9]*.wf.h5"))
     with read_stats(wd / "fr.stats.h5") as st:
         nrec = len(st.s)
-    check("frames: one beam frame per stats record", abs(len(frames) - nrec), 0.5,
+        n_interior = int(np.sum((~np.asarray(st.at_end).astype(bool)) & (np.asarray(st.s) > 0)))
+    check("frames: one beam frame per stats record, the export on", abs(len(frames) - nrec), 0.5,
           note=f"[{len(frames)} frames, {nrec} records]")
+    check("frames: one guiding-centre frame per interior record of the undulator",
+          abs(len(gframes) - n_interior), 0.5, note=f"[{len(gframes)} against {n_interior}]")
     check("frames: one field frame per stats record", abs(len(wframes) - nrec), 0.5)
 
     # The cost line counts them before the run, from the schedule alone.
@@ -1006,9 +1025,13 @@ def main():
     # Labels: unique inside a frame, and no label appears that was not there before.
     def labels(path):
         with h5py.File(path) as h:
-            g = h[f"data/{list(h['data'])[0]}/particles/electron"]
-            ids = g["id"][()]
-            npart = g["particlePatches/numParticles"][()]
+            if "guidingCentre" in h:
+                ids = h["guidingCentre/id"][()]
+                npart = h["guidingCentre/sliceCount"][()]
+            else:
+                g = h[f"data/{list(h['data'])[0]}/particles/electron"]
+                ids = g["id"][()]
+                npart = g["particlePatches/numParticles"][()]
             slot, k = {}, 0
             for islice, cnt in enumerate(npart):
                 for _ in range(int(cnt)):
@@ -1055,7 +1078,7 @@ def main():
     # A run that writes frames must be the run that does not. The instrument may not
     # steer what it observes, which is why the field's rotation is put back.
     run(exe, wd, "nofr", FRAME_NML.format(root="nofr",
-        extra='  global%comb_ds_save = 1.0\n  global%migrate = T\n'), threads="4")
+        extra='  global%comb_ds_save = 1.0\n  global%migrate = T\n  global%dump_orbit = T\n'), threads="4")
     check("frames: the run is identical to the same run without them (0 = yes)",
           0.0 if h5_identical(wd / "fr.stats.h5", wd / "nofr.stats.h5") else 1.0, 0.5)
 
@@ -1101,11 +1124,11 @@ def main():
         check("frames: every unaveraged frame names its chart", bad_name, 0.5)
         swing_u = max(abs(v) for _, v in named)
         swing_a = max(abs(v) for _, v in avg)
-        # Both modes' frames carry the quiver: this one resolves it, and the averaged
-        # map's frames have it restored by the writer, since an openPMD momentum record is
-        # the instantaneous kinetic momentum (doc/reading-output.md). So the two runs'
-        # centroid momentum agrees, which is the same conversion check_unaveraged.py makes
-        # particle by particle, here on a four-element line.
+        # Both runs' .beam.h5 frames carry the quiver: this one resolves it, and the
+        # averaged run wrote its interior .beam.h5 with the orbit export on, its records the
+        # orbit the writer rebuilds (doc/reading-output.md). So the two runs' centroid
+        # momentum agrees, the same conversion check_unaveraged.py measures particle by
+        # particle, here on a four-element line.
         check("frames: both modes carry the quiver in the mean of px, to the same swing",
               abs(swing_u / swing_a - 1), 1e-3,
               note=f"[unaveraged {swing_u:.4e}, averaged {swing_a:.4e} eV/c]")
@@ -1137,7 +1160,7 @@ def main():
     rr_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
                 '  global%dump_reduced = T\n')
     run(exe, wd, "id", FRAME_NML.format(root="id", extra=rr_extra), threads="4")
-    idf = sorted(wd.glob("id-[0-9]*.beam.h5"))
+    idf = particle_frames(wd, "id")
     idw = sorted(wd.glob("id-[0-9]*.wf.h5"))
 
     with read_stats(wd / "id.stats.h5") as st:
@@ -1145,15 +1168,14 @@ def main():
         p_row = np.asarray(st["field/total/power"]).copy()
         spacing = float(np.ravel(st.run["slice_spacing"])[0])
 
-    # Bunching per slice, from the frame's own particles. read_slices does the documented
-    # reconstruction, theta = -ks c t, which is where the reference phase the writer
-    # folded into the time coordinate comes back. The row is the guiding centre the map
-    # tracks and the frame is the instantaneous orbit, so the quiver comes back off first
-    # (beamio.unquiver): with it left on, the phase the quiver imposes moves the bunching
-    # by 4.4e-4 and the two numbers are of different quantities.
+    # Bunching per slice, from the frame's own particles, with no conversion between the
+    # frame and the row. Inside the undulator the frame is the .gc.h5, the map's own chart,
+    # and at a face the .beam.h5, where the guiding centre and the orbit coincide. The
+    # orbit export would put the quiver's phase into the particles and move the bunching by
+    # 4.4e-4, which is a different quantity from the row's, and it is off here.
     worst_b = 0.0
     for i, f in enumerate(idf):
-        sl = beamio.unquiver(f, read_slices(f, wavelength=1e-10, spacing=spacing), 1e-10)
+        sl = read_slices(f, wavelength=1e-10, spacing=spacing)
         for isl, s in enumerate(sl):
             if s["n"] == 0:
                 continue
@@ -1218,6 +1240,10 @@ def main():
         off_all = np.ravel(h[f"data/{it}/meshes/electricField"].attrs["gridGlobalOffset"])
     check("range: the beam frame's patch count is the range", abs(npatch - 3), 0.5,
           note=f"[slices {s1} to {s2}, {npatch} patches]")
+    rgg = sorted(wd.glob("rg-[0-9]*.gc.h5"))
+    with h5py.File(rgg[-1]) as h:
+        ngc = h["guidingCentre/sliceCount"].shape[0]
+    check("range: the guiding-centre frame carries the range's slices", abs(ngc - 3), 0.5)
     check("range: the field frame carries the range's slices", abs(nsf - 3), 0.5)
     # The cut field keeps its place. Its mesh once started at zero whatever the range, so a
     # standard reader put the cut field at the head of the window while the cut beam's

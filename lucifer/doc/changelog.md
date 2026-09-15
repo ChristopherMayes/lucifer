@@ -9,6 +9,19 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-14 Changed: inside an averaged undulator a frame's particles go to `<out_root>-<record>.gc.h5`,
+  the coordinates the map evolves in a file of their own with no openPMD particle record, and the frame's
+  `.beam.h5` is written there only with `global%dump_orbit = T`, its records the orbit `fel_restore_quiver`
+  rebuilds. The reconstruction had gone into every interior frame by default, and that put the quiver's
+  phase between a frame and its statistics row (4.4e-4 in the bunching until inverted), supplied a device
+  model the averaged state does not carry, and left every openPMD reader taking a guiding centre as
+  kinetic had the default been the other way. Now a reduction over the `.gc.h5` matches its row to
+  1.8e-17 with no inverse, every `.beam.h5` this program writes is kinetic with no label to say so, and
+  `frameFormat` moves to `lucifer-frames 1.1` so a reader can tell a frame of this vintage from one written
+  when an interior `.beam.h5` held either representation: `beamio.unquiver` inverts a frame at 1.1 and
+  refuses to guess at one at 1.0 unless the caller states its representation. `beamio.read_slices` reads a
+  `.gc.h5`. A `.gc.h5` is refused as a starting point by location, in that refusal's own text, and as a
+  continuation for the checkpoint it lacks, before either is told it is not openPMD.
 - 2026-09-14 Added: a frame written inside an undulator is refused as a run's initial beam, on both
   loading paths. Its records are standard and its momenta are the orbit's, and what a run would need
   beside them is the segment's own state, which no file holds. `fel_assert_not_interior_frame` reads

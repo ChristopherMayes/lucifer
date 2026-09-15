@@ -177,22 +177,27 @@ if (beam_file /= '' .and. (beam_init%position_file /= '' .or. resample%use_beam_
 endif
 
 if (beam_file /= '') then
+
+  ! Where the file was written, or what it lacks, before what format it is in: a frame
+  ! from inside a device is refused for the place it was taken whatever its layout, the
+  ! guiding-centre diagnostic among them, and a continuation for the checkpoint it lacks,
+  ! so neither is told to convert a Genesis dump. A continuation asks the one question
+  ! and an initialization the other.
+
+  if (run%global%continuation) then
+    call fel_assert_checkpoint_present (beam_file, err)
+  else
+    call fel_assert_not_interior_frame (beam_file, 'BEAM_FILE', err)
+  endif
+  if (err) then
+    err_flag = .true.;  return
+  endif
+
   if (.not. file_is_openpmd(beam_file)) then
     call out_io (s_error$, r_name, 'BEAM FILE IS NOT openPMD: ' // trim(beam_file), &
                  'THIS TRACKER READS openPMD ONLY. CONVERT A GENESIS DUMP FIRST:', &
                  '  lucifer/tests/scripts/convert_genesis.py to-openpmd <in.par.h5> <out.beam.h5>')
     err_flag = .true.;  return
-  endif
-
-  ! Where the file was written, for an initialization. A continuation asks a different
-  ! question of the same file and answers it below, on the checkpoint it needs, so this
-  ! refusal is the initialization's alone.
-
-  if (.not. run%global%continuation) then
-    call fel_assert_not_interior_frame (beam_file, 'BEAM_FILE', err)
-    if (err) then
-      err_flag = .true.;  return
-    endif
   endif
 
   ! An openPMD beam file carries the slice partition and not the radiation it was sliced
@@ -798,10 +803,8 @@ endif
 ! frame has the single patch that refusal lets by.
 
 if (beam_init%position_file /= '') then
-  if (file_is_openpmd(beam_init%position_file)) then
-    call fel_assert_not_interior_frame (beam_init%position_file, 'BEAM_INIT%POSITION_FILE', err_i)
-    if (err_i) return
-  endif
+  call fel_assert_not_interior_frame (beam_init%position_file, 'BEAM_INIT%POSITION_FILE', err_i)
+  if (err_i) return
 endif
 
 ! Bmad's file read keeps only the first beam_init%n_particle particles when it is set,

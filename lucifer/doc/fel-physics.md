@@ -1026,9 +1026,13 @@ An openPMD momentum record is the instantaneous kinetic momentum: Bmad's
 `hdf5_write_beam` builds the longitudinal component from the transverse ones on that
 assumption. The averaged map integrates the period-averaged motion, so what it stores is
 the guiding centre, and a frame written inside an undulator would state a momentum the
-particle does not have. The writer restores the quiver first, from the same near-axis
-potential [](#sec-unaveraged) integrates. Element-end frames are left alone: each term
-below vanishes at a face.
+particle does not have. So inside an undulator the map's own coordinates go to a file of
+their own with no openPMD record in it ([reading-output](reading-output.md)), and a
+`.beam.h5` is written there only when a deck asks for the export, its records rebuilt as
+below from the same near-axis potential [](#sec-unaveraged) integrates. The reconstruction
+is the export's and not the default's: it supplies a device model and an entrance history
+the averaged state does not carry. Element-end frames are left alone: each term below
+vanishes at a face.
 
 The potential does the work. Near the axis the magnetic push of
 Eq. [](#eq-unavgode) is $du_x/ds = b_y = \partial a_x/\partial s$, so

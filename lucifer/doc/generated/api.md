@@ -326,6 +326,67 @@ Output:
   err_flag  -- logical: Set True if the file was written inside a device, False otherwise.
 ```
 
+(api-fel-write-guiding-centre)=
+### `fel_write_guiding_centre`
+
+*Subroutine* `(beam, file_name, is1, is2, err_flag)`
+
+```
+Routine to write the beam as the averaged map holds it, the packed chart, into a file of
+its own with no openPMD particle record in it: the diagnostic frame of an averaged
+undulator's interior (doc/reading-output.md). The map integrates the guiding centre, and
+an openPMD momentum record means the instantaneous kinetic momentum, so the two must not
+share a record: a standard reader would take one for the other with nothing to tell it
+otherwise. A reduction over these records matches the statistics row the same beam
+produced, with no conversion in between.
+
+The group guidingCentre carries its format string, phi0 and p0c, the particle count of
+each slice of the range, and per particle in slice order x, px, y, py, z, pz, the weight
+and the id, in the chart's own units (fel-physics.md sec-chart). The frame's attributes
+go on the root as on every frame (fel_frame_attributes).
+```
+
+```
+Input:
+  beam      -- fel_beam_struct: Beam to write.
+  file_name -- character(*): File to create.
+  is1, is2  -- integer: The slice range to write.
+
+Output:
+  err_flag  -- logical: Set True on error, False otherwise.
+```
+
+(api-fel-assert-checkpoint-present)=
+### `fel_assert_checkpoint_present`
+
+*Subroutine* `(file_name, err_flag)`
+
+```
+Routine to refuse a continuation from a file that carries no checkpoint group, before
+anything else is asked of the file. fel_read_openpmd_beam makes the same refusal once the
+records are read, and this one comes first so that a file which is not an openPMD beam
+at all, a guiding-centre diagnostic frame among them, is refused for the checkpoint it
+lacks rather than told to convert a Genesis dump.
+```
+
+```
+Input:
+  file_name -- character(*): The file the deck names as beam_file.
+
+Output:
+  err_flag  -- logical: Set True if the file opens and holds no checkpoint group.
+```
+
+(api-fel-say-no-checkpoint)=
+### `fel_say_no_checkpoint`
+
+*Subroutine* `(file_name, r_name)`
+
+```
+The one text for a continuation from a file with no checkpoint group, printed by the two
+places that find one (fel_assert_checkpoint_present, fel_read_openpmd_beam).
+```
+
 (api-fel-write-openpmd-beam)=
 ### `fel_write_openpmd_beam`
 
@@ -3288,8 +3349,8 @@ device's own numbers (doc/reading-output.md), which is why those ride the file r
 than being looked up in a lattice the reader may not have. A frame taken in a break
 carries the element and no undulator numbers.
 
-The attributes go on the root of a file the writers have already closed, so neither
-writer's layout changes and both kinds of file are stamped the same way.
+The attributes go on the root of a file the writers have already closed, so no writer's
+layout changes and every kind of file is stamped the same way.
 ```
 
 ```
@@ -3337,7 +3398,9 @@ Output:
 Routine to write one frame of the series global%dump_at_comb asks for: the beam and
 the field set at this comb position, through the same writers the element-end dumps
 use, named <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
-the stats row this frame sits on. A frame and its row therefore share one index.
+the stats row this frame sits on. A frame and its row therefore share one index. Inside
+an averaged undulator the beam frame is <out_root>-<record>.gc.h5 instead, the map's own
+chart in a file of its own, and the .beam.h5 only with global%dump_orbit.
 
 The field's records are rotated to time order to be written and rotated back, so the
 run continues from the state it had. fel_dump_field_set leaves them unrotated, which

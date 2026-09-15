@@ -107,6 +107,7 @@ A flat `&fel_track_params` group is refused, with each parameter mapped to the g
 | `global%dump_beam_at` | `""` | Element locators for mid-run beam dumps |
 | `global%dump_field_at` | `""` | Element locators for mid-run field dumps |
 | `global%dump_at_comb` | `F` | Write the beam and the field at every comb position as a frame series ([](#param-global-dump-at-comb)) |
+| `global%dump_orbit` | `F` | Inside an averaged undulator, also write the frame's `.beam.h5`, its records the orbit rebuilt from the guiding centre the `.gc.h5` holds ([](reading-output.md)) |
 | `global%dump_slice_first` | `1` | First slice a frame carries, in window order |
 | `global%dump_slice_last` | `-1` | Last slice a frame carries. `-1` is the last slice of the window |
 | `global%dump_reduced` | `F` | Write the field's intensity projections per record into the stats file ([](#param-global-dump-reduced)) |

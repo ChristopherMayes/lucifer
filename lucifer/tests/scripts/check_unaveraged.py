@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import math
 import pathlib
+import shutil
 import subprocess
 import sys
 
@@ -264,6 +265,7 @@ QUIVER = """! flat keys; routed into the three groups by nml.to_groups
   unaveraged_steps_per_period = 40
   unaveraged_ramp_periods = 2
   dump_at_comb = {frames}
+  dump_orbit = T
   write_initial = T
 &end
 """
@@ -556,10 +558,12 @@ def main():
         "DOES NOT COVER THE UNAVERAGED MODE")
 
 
-    # 8. The quiver a frame carries. An openPMD momentum record is the instantaneous
-    # kinetic momentum, and the averaged map stores the guiding centre, so a frame written
-    # inside an undulator has the quiver restored by the writer (fel_restore_quiver,
-    # fel-physics.md sec-quiverdump). This mode is the reference: the same device tracked
+    # 8. The quiver an exported frame carries. An openPMD momentum record is the
+    # instantaneous kinetic momentum, and the averaged map stores the guiding centre, so
+    # the writer keeps the two apart: the guiding centre goes to a frame's .gc.h5, and the
+    # .beam.h5 inside an undulator is written only with global%dump_orbit, its records
+    # the orbit fel_restore_quiver rebuilds (fel-physics.md sec-quiverdump). These runs
+    # ask for it, and this is that reconstruction's validation. This mode is the reference: the same device tracked
     # here resolves the orbit itself. The runs are dark and share a beam, so the two differ
     # by the averaging alone, and the comb takes 8 frames a period so the series samples 8
     # phases of the quiver. The residual that indicts the conversion is the part that
@@ -685,6 +689,33 @@ use, QLINE
                    f"z {back['z']:.1e} m, pz {back['pz']:.1e}]")
 
         if not helical and not tilt:
+            # The same frame's .gc.h5 is the guiding centre with no inverse at all, and the
+            # inverse of the exported .beam.h5 lands on it. A frame of the 1.0 vintage may
+            # hold either representation, so the inverse refuses to guess at one.
+            f_o = sorted(wd.glob(f"{tag}a-0*.beam.h5"))[len(body) // 2 + Q_NSTEP * 2]
+            f_g = pathlib.Path(str(f_o).replace(".beam.h5", ".gc.h5"))
+            gc = beamio.read_slices(f_g, LAMBDA1, LAMBDA1)[0]
+            inv = beamio.unquiver(f_o, beamio.read_slices(f_o, LAMBDA1, LAMBDA1), LAMBDA1)[0]
+            check("quiver: the export's inverse lands on the frame's own guiding-centre file [m]",
+                  float(np.max(np.abs(inv["x"] - gc["x"]))), 1e-16,
+                  note=f"[x {np.max(np.abs(inv['x'] - gc['x'])):.1e} m, px {np.max(np.abs(inv['px'] - gc['px'])):.1e}, "
+                       f"theta {np.max(np.abs(inv['theta'] - gc['theta'])):.1e} rad; unquiver leaves the .gc.h5 "
+                       f"itself alone: {beamio.unquiver(f_g, [gc], LAMBDA1)[0] is gc}]")
+            old = wd / "uv_q_old.beam.h5"
+            shutil.copy(f_o, old)
+            with h5py.File(old, "r+") as h5:
+                h5.attrs["frameFormat"] = np.bytes_("lucifer-frames 1.0")
+            try:
+                beamio.unquiver(old, beamio.read_slices(old, LAMBDA1, LAMBDA1), LAMBDA1)
+                guessed = 1.0
+            except ValueError:
+                guessed = 0.0
+            stated = beamio.unquiver(old, beamio.read_slices(old, LAMBDA1, LAMBDA1), LAMBDA1,
+                                     representation="orbit")[0]
+            check("quiver: an interior frame of the 1.0 vintage is not guessed at, and is inverted once its "
+                  "representation is stated (0 = yes)",
+                  guessed + float(np.max(np.abs(stated["x"] - inv["x"])) > 0), 0.5)
+
             # The conversion is the writer's own copy: a run with the series on holds the
             # state a run without it holds, to the bit.
             run(exe, wd, tag + "n", QUIVER.format(lat=base, root=tag + "n", frames="F"))

@@ -131,6 +131,11 @@ end type
 
 character(*), parameter :: fel_checkpoint_format$ = 'lucifer-checkpoint 1.0'
 
+! The layout of the guiding-centre diagnostic file an averaged undulator's interior frame
+! writes (fel_write_guiding_centre), a file of its own with no openPMD particle record.
+
+character(*), parameter :: fel_guiding_centre_format$ = 'lucifer-guiding-centre 1.0'
+
 !+
 ! Struct fel_checkpoint_struct
 !
@@ -577,11 +582,7 @@ endif
 
 if (.not. exists) then
   call h5fclose_f (f_id, h5_err)
-  call out_io (s_error$, r_name, 'CONTINUATION FROM A BEAM FILE WITH NO CHECKPOINT GROUP: ' // &
-       trim(file_name), &
-       'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
-       'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
-       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
+  call fel_say_no_checkpoint (file_name, r_name)
   return
 endif
 
@@ -837,6 +838,162 @@ call out_io (s_error$, r_name, trim(which) // ' NAMES A FRAME WRITTEN INSIDE AN 
       r_array = [s_ele, l_ele])
 
 end subroutine fel_assert_not_interior_frame
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_write_guiding_centre (beam, file_name, is1, is2, err_flag)
+!
+! Routine to write the beam as the averaged map holds it, the packed chart, into a file of
+! its own with no openPMD particle record in it: the diagnostic frame of an averaged
+! undulator's interior (doc/reading-output.md). The map integrates the guiding centre, and
+! an openPMD momentum record means the instantaneous kinetic momentum, so the two must not
+! share a record: a standard reader would take one for the other with nothing to tell it
+! otherwise. A reduction over these records matches the statistics row the same beam
+! produced, with no conversion in between.
+!
+! The group guidingCentre carries its format string, phi0 and p0c, the particle count of
+! each slice of the range, and per particle in slice order x, px, y, py, z, pz, the weight
+! and the id, in the chart's own units (fel-physics.md sec-chart). The frame's attributes
+! go on the root as on every frame (fel_frame_attributes).
+!
+! Input:
+!   beam      -- fel_beam_struct: Beam to write.
+!   file_name -- character(*): File to create.
+!   is1, is2  -- integer: The slice range to write.
+!
+! Output:
+!   err_flag  -- logical: Set True on error, False otherwise.
+!-
+
+subroutine fel_write_guiding_centre (beam, file_name, is1, is2, err_flag)
+
+type (fel_beam_struct), target :: beam
+type (fel_slice_struct), pointer :: sl
+integer(hid_t) f_id, g_id
+integer is1, is2, is, ip, n, h5_err
+integer, allocatable :: counts(:), ids(:)
+real(rp), allocatable :: x(:), px(:), y(:), py(:), z(:), pz(:), w(:)
+logical err_flag, err, bad
+character(*) file_name
+
+!
+
+err_flag = .true.
+n = sum(beam%slice(is1:is2)%n)
+allocate (counts(is2 - is1 + 1), ids(n), x(n), px(n), y(n), py(n), z(n), pz(n), w(n))
+
+ip = 0
+do is = is1, is2
+  sl => beam%slice(is)
+  counts(is - is1 + 1) = sl%n
+  x(ip+1:ip+sl%n)  = sl%x(1:sl%n)
+  px(ip+1:ip+sl%n) = sl%px(1:sl%n)
+  y(ip+1:ip+sl%n)  = sl%y(1:sl%n)
+  py(ip+1:ip+sl%n) = sl%py(1:sl%n)
+  z(ip+1:ip+sl%n)  = sl%z(1:sl%n)
+  pz(ip+1:ip+sl%n) = sl%pz(1:sl%n)
+  w(ip+1:ip+sl%n)  = sl%weight(1:sl%n)
+  ids(ip+1:ip+sl%n) = sl%id(1:sl%n)
+  ip = ip + sl%n
+enddo
+
+call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
+call H5Gcreate_f (f_id, 'guidingCentre', g_id, h5_err)
+if (h5_err < 0) then
+  call h5fclose_f (f_id, h5_err)
+  return
+endif
+
+bad = .false.
+call hdf5_write_attribute_string (g_id, 'format', fel_guiding_centre_format$, err);  bad = bad .or. err
+call hdf5_write_attribute_real (g_id, 'phi0', beam%phi0, err);                      bad = bad .or. err
+call hdf5_write_attribute_real (g_id, 'p0c', beam%p0c, err);                        bad = bad .or. err
+call fel_h5_int (g_id, 'sliceCount', '1', 'particles per slice', &
+      'Particles in each slice of the range, in window order.', '', counts, bad)
+call fel_h5_real (g_id, 'x', 'm', 'x', 'Horizontal position of the guiding centre.', '', x, bad)
+call fel_h5_real (g_id, 'px', '1', 'px', &
+      'Horizontal momentum over p0 as the averaged map holds it, the quiver''s mean square in its ' // &
+      'longitudinal motion and the quiver itself not here.', '', px, bad)
+call fel_h5_real (g_id, 'y', 'm', 'y', 'Vertical position of the guiding centre.', '', y, bad)
+call fel_h5_real (g_id, 'py', '1', 'py', 'Vertical momentum over p0 as the averaged map holds it.', '', py, bad)
+call fel_h5_real (g_id, 'z', 'm', 'z', &
+      'Longitudinal coordinate -beta c (t - t_ref), the reference phase phi0 not folded in.', '', z, bad)
+call fel_h5_real (g_id, 'pz', '1', 'pz', 'Momentum deviation (p - p0)/p0.', '', pz, bad)
+call fel_h5_real (g_id, 'weight', 'C', 'weight', 'Macroparticle charge.', '', w, bad)
+call fel_h5_int (g_id, 'id', '1', 'particle id', 'The label that follows a macroparticle through the run.', &
+      '', ids, bad)
+
+call H5Gclose_f (g_id, h5_err)
+call h5fclose_f (f_id, h5_err)
+err_flag = bad
+
+end subroutine fel_write_guiding_centre
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_assert_checkpoint_present (file_name, err_flag)
+!
+! Routine to refuse a continuation from a file that carries no checkpoint group, before
+! anything else is asked of the file. fel_read_openpmd_beam makes the same refusal once the
+! records are read, and this one comes first so that a file which is not an openPMD beam
+! at all, a guiding-centre diagnostic frame among them, is refused for the checkpoint it
+! lacks rather than told to convert a Genesis dump.
+!
+! Input:
+!   file_name -- character(*): The file the deck names as beam_file.
+!
+! Output:
+!   err_flag  -- logical: Set True if the file opens and holds no checkpoint group.
+!-
+
+subroutine fel_assert_checkpoint_present (file_name, err_flag)
+
+integer(hid_t) f_id
+integer h5_err
+logical err_flag, err, exists
+character(*) file_name
+character(*), parameter :: r_name = 'fel_assert_checkpoint_present'
+
+!
+
+err_flag = .false.
+call hdf5_open_file (file_name, 'READ', f_id, err, .false.)
+if (err) return                      ! Not a file this reader opens. Others say so.
+exists = hdf5_exists (f_id, 'lucifer', err, .false.)
+call h5fclose_f (f_id, h5_err)
+if (exists) return
+err_flag = .true.
+call fel_say_no_checkpoint (file_name, r_name)
+
+end subroutine fel_assert_checkpoint_present
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine fel_say_no_checkpoint (file_name, r_name)
+!
+! The one text for a continuation from a file with no checkpoint group, printed by the two
+! places that find one (fel_assert_checkpoint_present, fel_read_openpmd_beam).
+!-
+
+subroutine fel_say_no_checkpoint (file_name, r_name)
+
+character(*) file_name, r_name
+
+!
+
+call out_io (s_error$, r_name, 'CONTINUATION FROM A BEAM FILE WITH NO CHECKPOINT GROUP: ' // &
+     trim(file_name), &
+     'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
+     'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
+     'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
+
+end subroutine fel_say_no_checkpoint
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

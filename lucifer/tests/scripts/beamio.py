@@ -98,12 +98,55 @@ def read_slices(path, wavelength=None, spacing=None):
     a value that disagrees with the file is an error rather than a silent preference.
     """
     path = pathlib.Path(path)
+    if is_guiding_centre(path):
+        if wavelength is None:
+            raise ValueError(f"{path.name} is a guiding-centre frame and does not carry the "
+                             "wavelength: pass wavelength= (the deck's lambda0)")
+        return _read_guiding_centre(path, wavelength, spacing)
     if is_openpmd(path):
         if wavelength is None:
             raise ValueError(f"{path.name} is openPMD and does not carry the wavelength: "
                              "pass wavelength= (the deck's lambda0)")
         return _read_openpmd(path, wavelength, spacing)
     return _read_genesis(path, wavelength)
+
+
+def is_guiding_centre(path):
+    """Whether the file is the diagnostic frame an averaged undulator's interior writes,
+    the map's own chart in a file of its own (doc/reading-output.md)."""
+    with h5py.File(path) as h5:
+        return "guidingCentre" in h5
+
+
+def _read_guiding_centre(path, wavelength, spacing=None):
+    """The packed chart as the tracker held it, in the arrays the other readers return.
+    The momenta come back in gamma*beta units through the file's own p0c, gamma from pz,
+    and theta as phi0 + ks z / beta, which is the phase the tracker used with no fold in
+    between. No conversion is applied: these are the coordinates the map evolved."""
+    ks = 2 * np.pi / wavelength
+    with h5py.File(path) as h5:
+        g = h5["guidingCentre"]
+        p0c = float(np.atleast_1d(g.attrs["p0c"])[0])
+        phi0 = float(np.atleast_1d(g.attrs["phi0"])[0])
+        counts = np.atleast_1d(g["sliceCount"][...]).astype(int)
+        cols = {k: np.atleast_1d(g[k][...]) for k in ("x", "px", "y", "py", "z", "pz", "weight", "id")}
+    p0_mc = p0c / M_ELECTRON
+    if spacing is None:
+        spacing = wavelength
+    out, off = [], 0
+    for n in counts:
+        n = int(n)
+        sl = slice(off, off + n)
+        p_mc = p0_mc * (1 + cols["pz"][sl])
+        gamma = np.sqrt(p_mc ** 2 + 1)
+        beta = p_mc / gamma
+        out.append(dict(n=n, x=cols["x"][sl], y=cols["y"][sl],
+                        px=cols["px"][sl] * p0_mc, py=cols["py"][sl] * p0_mc,
+                        gamma=gamma, theta=phi0 + ks * cols["z"][sl] / beta,
+                        weight=cols["weight"][sl], pz=cols["pz"][sl], id=cols["id"][sl],
+                        current=float(cols["weight"][sl].sum()) * C_LIGHT / spacing))
+        off += n
+    return out
 
 
 def _read_genesis(path, wavelength=None):
@@ -176,33 +219,50 @@ def _read_openpmd(path, wavelength, spacing=None):
     return out
 
 
-def unquiver(path, slices, wavelength):
+def unquiver(path, slices, wavelength, representation=None):
     """A frame's slices with the undulator quiver taken back off, the guiding centre the
     averaged map tracks.
 
-    The writer restores the quiver to a frame written inside an averaged undulator, since
-    an openPMD momentum record is the instantaneous kinetic momentum
-    (fel-physics.md sec-quiverdump). This is that conversion's inverse, in the order the
-    page states: the momenta first, which depend on the position in the device and the
-    roll-off alone, then the longitudinal momentum from the recovered average, then the
-    position and the lag.
+    The writer rebuilds the orbit into a .beam.h5 written inside an averaged undulator when
+    a deck asks for the export, since an openPMD momentum record is the instantaneous
+    kinetic momentum (fel-physics.md sec-quiverdump). This is that conversion's inverse, in
+    the order the page states: the momenta first, which depend on the position in the
+    device and the roll-off alone, then the longitudinal momentum from the recovered
+    average, then the position and the lag.
 
-    A frame the writer did not convert comes back unchanged: one from a break, which has
-    no undulator numbers, one this mode wrote, which carried the orbit already, and one at
-    an element face, where the device's field has ended.
+    A frame that holds the guiding centre already comes back unchanged: a .gc.h5, and a
+    frame the writer did not convert, one from a break, one this mode wrote with the orbit
+    already in it, and one at an element face, where the device's field has ended.
+
+    Vintage decides the rest. A frame at frameFormat 1.1 or later is the orbit by
+    construction. An interior .beam.h5 of an averaged element at 1.0 may hold the guiding
+    centre, from before the reconstruction became automatic, or the orbit, from after, and
+    the two cannot be told apart from their contents, so the caller states which through
+    representation = "orbit" or "guidingCentre", or the call raises.
     """
+    if is_guiding_centre(path):
+        return slices
     with h5py.File(path) as h5:
         method = _attr(h5, "felMethod") if "felMethod" in h5.attrs else b""
         if isinstance(method, bytes):
             method = method.decode()
         if "aw" not in h5.attrs or str(method) == "Unaveraged":
             return slices
+        fmt = _attr(h5, "frameFormat") if "frameFormat" in h5.attrs else b""
+        fmt = fmt.decode() if isinstance(fmt, bytes) else str(fmt)
         aw, ku = float(_attr(h5, "aw")), float(_attr(h5, "ku"))
         tilt, helical = float(_attr(h5, "tilt")), int(_attr(h5, "helical")) == 1
         s_ele, l_ele = float(_attr(h5, "sElement")), float(_attr(h5, "elementLength"))
         l_ramp = float(_attr(h5, "rampPeriods")) * 2 * np.pi / ku
     if s_ele <= 0 or s_ele >= l_ele:
         return slices
+    if _frame_version(fmt) < (1, 1):
+        if representation == "guidingCentre":
+            return slices
+        if representation != "orbit":
+            raise ValueError(f"{pathlib.Path(path).name} is an interior frame of an averaged "
+                             f"undulator at {fmt or 'no frameFormat'}, which may hold the guiding "
+                             "centre or the orbit: pass representation='orbit' or 'guidingCentre'")
 
     g, a_cos, a_sin, b_cos = _quiver_integrals(s_ele, l_ele, l_ramp, ku)
     a0 = aw if helical else np.sqrt(2.0) * aw
@@ -245,6 +305,14 @@ def unquiver(path, slices, wavelength):
         d["theta"] = sl["theta"] + 2 * np.pi / wavelength * dtau
         out.append(d)
     return out
+
+
+def _frame_version(fmt):
+    """(major, minor) of a frameFormat string such as 'lucifer-frames 1.1', (0, 0) if none."""
+    try:
+        return tuple(int(v) for v in fmt.split()[-1].split("."))
+    except (ValueError, IndexError):
+        return (0, 0)
 
 
 def _quiver_envelope(t, l_ele, l_ramp):
