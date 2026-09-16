@@ -262,7 +262,7 @@ the standard's declarations alone. On `lucifer/frame`, `frameFormat` names the l
 frame inside an FEL element also carries `felMethod` with `aw`, `ku`, `tilt`, `helical`,
 and the device's geometry: `sElement`, where the frame sits from the element's upstream
 face, `elementLength`, and `rampPeriods`, the periods its field ramps over at each end.
-Those six are what taking the quiver back off a frame needs, so a reader that walks a
+Those six say which device and which method produced the records, so a reader that walks a
 series has it from the frames alone. `floorPosition` and `floorAngles` place the frame in the lab: `s` is a
 curvilinear coordinate, so a scene holding a line with a bend needs the floor, and it is
 taken at the frame's own position rather than the element's end. The iteration's `time` is
@@ -338,19 +338,14 @@ or order that does not match, coordinates that disagree, no residual, two positi
 a continuation point that does not follow. There is no fallback from one mode to the
 other. `beam_init%position_file`, a bunch to slice, is a separate path and unchanged.
 
-Neither mode starts a run from a frame written inside an undulator. Its records are
-standard and its momenta are the orbit's, which is what a frame is for, and what a run
-would need beside them is the segment's own state: where in the device the beam sits and
-what the field's ramp is doing there, which no file holds. Both paths refuse such a frame
-by its own record of where it was written, `sElement` against `elementLength`, and never
-by its momenta, since the quiver crosses zero twice a period and a frame at that phase is
-no more loadable than one at the crest. A frame at an element face initializes a run as
-any dump does. A file carrying no `sElement` is an external bunch or a dump from outside a
-device and loads as before, that absence being the assumption and not proof of a boundary.
-Taking the quiver back off with `beamio.unquiver` does not make an interior frame loadable
-either: it recovers the chart, not the segment's state. Nor does the `.gc.h5`, which holds
-the guiding centre outright: a run does not start from inside a device in either
-representation, and the refusal reads the location on both.
+Neither mode starts a run from a frame written inside an undulator. Its records are the
+coordinates the tracker held there, an ordinary particle record, and what a run would need
+beside them is the segment's own state: where in the device the beam sits and what the
+field's ramp is doing there, which no file holds. Both paths refuse such a frame by its own
+record of where it was written, `sElement` against `elementLength`, and never by its
+momenta. A frame at an element face initializes a run as any dump does. A file carrying no
+`lucifer/frame` is an external bunch or a dump from outside a device and loads as before,
+that absence being the assumption and not proof of a boundary.
 
 Two records exist for comparing a continued run with the run it continues. Each row of
 `<out_root>.migration.txt` ends with the smallest distance in phase, in radians, that any
@@ -371,54 +366,31 @@ so a reader that walks the standard attributes puts the cut field where the whol
 would sit, beside the cut beam whose `timeOffset` keeps each slice's own placement.
 Everything else is unchanged, so a reader places a sub-window frame by its own attributes.
 
-**Three purposes, three files.** A particle file this program writes serves one of three
-purposes, and they do not share a record.
-
-*Native diagnostics.* An openPMD momentum record means the instantaneous kinetic momentum,
-and the averaged map does not hold one: it integrates the guiding centre, whose transverse
-momentum is the slow part with the quiver's mean square carried in the longitudinal motion.
-So a frame written inside an averaged undulator puts its particles in a file of its own,
-`<out_root>-<record>.gc.h5` ([`avg-000002.gc.h5`](generated/layouts.md#layout-avg-000002-gc-h5)),
-with no openPMD particle species in it. Its root group
-`guidingCentre` carries `format` (`lucifer-guiding-centre 1.0`), `phi0` and `p0c`, then
-`sliceCount` per slice of the range and, per particle in slice order, `x`, `px`, `y`, `py`,
-`z`, `pz`, `weight` and `id` in the packed chart's own units ([the chart](fel-physics.md#sec-chart)):
-`px` is $P_x/p_0$ as the map holds it and `z` is $-\beta c\,(t - t_{\mathrm{ref}})$ with no
-reference phase folded in. The frame attributes are in its `lucifer/frame` as on every frame. A
-reduction over these records matches the statistics row the same beam produced, with no
-conversion between them, and `beamio.read_slices` returns a `.gc.h5` in the same arrays it
-returns for a `.beam.h5`, `theta` as $\varphi_0 + k_s z/\beta$. A standard reader does not
-open this file, which is the point: there is nothing in it for one to misread.
-
-*Kinetic exchange.* Every `.beam.h5` this program writes holds the instantaneous orbit,
-and needs no label to say so. The unaveraged mode resolves the motion, so its frames carry
-the orbit already ([`unavg-000002.beam.h5`](generated/layouts.md#layout-unavg-000002-beam-h5)).
-An element-face frame and every dump carry it because the device's
-field has ended there and the guiding centre and the orbit coincide. Inside an averaged
-undulator a `.beam.h5` is written only when the deck asks with `global%dump_orbit = T`
-([`avg-000002.beam.h5`](generated/layouts.md#layout-avg-000002-beam-h5), the export of the
-`.gc.h5` above), its records the orbit `fel_restore_quiver` rebuilds from the guiding centre: the local
-vector potential into the momentum, its integral from the element's upstream face into the
-position, and the lag that transverse momentum pays for, for the ramped device the
-unaveraged mode models. The reconstruction and its inverse are derived in
-[the manual](fel-physics.md#sec-quiverdump), with their measured levels and their two limits
-in [validation](validation.md): it supplies a device model and an entrance history the
-averaged state does not carry, and its trajectory is not an unaveraged one inside a ramp.
-Only the writer's own copy is converted, so a run with the export on holds the state a
-run without it holds, to the bit. `beamio.unquiver` is the inverse, on the frame's own
-attributes, and returns a `.gc.h5` or any frame the writer did not convert unchanged.
+**What a frame's particles are.** A particle frame contains the coordinates produced by
+the selected tracking method, written through the same openPMD path as every dump, with
+the reference phase folded into each particle's time as always and nothing reconstructed.
+Period-averaged tracking integrates the period-averaged motion, so its frames omit the fast
+undulator oscillation: inside an averaged undulator a frame holds the coordinates the map
+evolves ([`avg-000002.beam.h5`](generated/layouts.md#layout-avg-000002-beam-h5)), as a dump
+between the periods of a wiggler split into elements would. Unaveraged tracking resolves
+the oscillation, so its frames carry it
+([`unavg-000002.beam.h5`](generated/layouts.md#layout-unavg-000002-beam-h5)). `felMethod` on
+`lucifer/frame` says which method wrote a frame. A reduction over a frame's records is the
+reduction the statistics row holds, with no conversion between them: the per-slice bunching
+agrees within 2e-12 and the transverse centroid at the rounding of a weighted mean
+([validation](validation.md)). The
+walk's own beam is written as it stands, so a run with frames on is the run with them off,
+to the bit.
 
 *Checkpoints.* A dump or element-face frame at an eligible boundary also carries the group
-`lucifer` described below, the replay state a continuation reads. Neither an exported orbit
-nor a `.gc.h5` is one, and a run does not start from either: see the two loading modes.
+`lucifer/checkpoint` described below, the replay state a continuation reads. A frame from
+inside a device is not one, and a run does not start from it: see the two loading modes.
 
-**Versions.** `frameFormat` on `lucifer/frame` is `lucifer-frames 2.0` and
-`checkpointFormat` on `lucifer/checkpoint` is `lucifer-checkpoint 2.0`, from 2026-09-15,
-when this program's metadata left the file root. Every reader takes these locations and
-these strings and nothing else: the continuation reader refuses another string, and
-`beamio.unquiver` raises at an interior frame carrying one. Files written under an earlier
-layout are unsupported and are regenerated when needed. `felMethod` on the frame says
-which mode wrote it.
+**Versions.** `frameFormat` on `lucifer/frame` is `lucifer-frames 3.0` and
+`checkpointFormat` on `lucifer/checkpoint` is `lucifer-checkpoint 2.0`, from 2026-09-15.
+Every reader takes these locations and these strings and nothing else, and the continuation
+reader refuses another string. Files written under an earlier layout are unsupported and
+are regenerated when needed.
 
 **Following a particle between frames.** Every macroparticle carries a label in openPMD's
 `id` record, unique over the window and unchanged for the life of the run. Migration

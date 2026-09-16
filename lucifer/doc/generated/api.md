@@ -295,15 +295,14 @@ Output:
 
 ```
 Routine to refuse a beam file written inside an undulator as a run's initial beam. A
-frame taken there carries the instantaneous kinetic orbit, which is what an openPMD
-momentum record means and what an exchange file should hold (doc/reading-output.md).
-It is not a place a run can start from. The averaged map would read the quiver as
-betatron momentum, the K/gamma a hard-edge handoff injects, and the unaveraged mode
-would need the segment position and the ramp state no file holds.
+frame taken there holds the coordinates the selected tracking method produced, an
+ordinary particle record (doc/reading-output.md), and it is not a place a run can start
+from: the averaged map would take the frame as an entrance and hand it the K/gamma a
+hard-edge handoff injects, and the unaveraged mode would need the segment position and
+the ramp state no file holds.
 
-The test is where the frame was taken and never what its momenta look like: the quiver
-crosses zero twice a period, and a frame at that phase is no more loadable than one at
-the crest. It is the same for a frame either method wrote.
+The test is where the frame was taken and never what its momenta look like. It is the
+same for a frame either method wrote.
 
 A frame of an FEL element records sElement and elementLength (fel_frame_attributes). A
 file carrying neither is an external bunch, a frame from a break, or an ordinary dump,
@@ -326,36 +325,6 @@ Output:
   err_flag  -- logical: Set True if the file was written inside a device, False otherwise.
 ```
 
-(api-fel-write-guiding-centre)=
-### `fel_write_guiding_centre`
-
-*Subroutine* `(beam, file_name, is1, is2, err_flag)`
-
-```
-Routine to write the beam as the averaged map holds it, the packed chart, into a file of
-its own with no openPMD particle record in it: the diagnostic frame of an averaged
-undulator's interior (doc/reading-output.md). The map integrates the guiding centre, and
-an openPMD momentum record means the instantaneous kinetic momentum, so the two must not
-share a record: a standard reader would take one for the other with nothing to tell it
-otherwise. A reduction over these records matches the statistics row the same beam
-produced, with no conversion in between.
-
-The group guidingCentre carries its format string, phi0 and p0c, the particle count of
-each slice of the range, and per particle in slice order x, px, y, py, z, pz, the weight
-and the id, in the chart's own units (fel-physics.md sec-chart). The frame's attributes
-go on the root as on every frame (fel_frame_attributes).
-```
-
-```
-Input:
-  beam      -- fel_beam_struct: Beam to write.
-  file_name -- character(*): File to create.
-  is1, is2  -- integer: The slice range to write.
-
-Output:
-  err_flag  -- logical: Set True on error, False otherwise.
-```
-
 (api-fel-assert-checkpoint-present)=
 ### `fel_assert_checkpoint_present`
 
@@ -365,8 +334,7 @@ Output:
 Routine to refuse a continuation from a file that carries no checkpoint group, before
 anything else is asked of the file. fel_read_openpmd_beam makes the same refusal once the
 records are read, and this one comes first so that a file which is not an openPMD beam
-at all, a guiding-centre diagnostic frame among them, is refused for the checkpoint it
-lacks rather than told to convert a Genesis dump.
+at all is refused for the checkpoint it lacks rather than told to convert a Genesis dump.
 ```
 
 ```
@@ -3369,11 +3337,11 @@ Output:
 Routine to stamp a dump with where it was taken.
 
 A frame is read on its own, so it has to say where along the line it is and what the
-beam was moving through. The particle records hold the instantaneous orbit, and a reader
-that wants the guiding centre the averaged map tracks takes the quiver back off with the
-device's own numbers (doc/reading-output.md), which is why those ride the file rather
-than being looked up in a lattice the reader may not have. A frame taken in a break
-carries the element and no undulator numbers.
+beam was moving through. The particle records are the coordinates the selected tracking
+method produced there, the period-averaged map's without the fast oscillation and the
+unaveraged mode's with it resolved (doc/reading-output.md), so the method and the
+device's numbers ride the file rather than being looked up in a lattice the reader may
+not have. A frame taken in a break carries the element and no undulator numbers.
 
 The attributes go under lucifer/frame (fel_private_group) in a file the writers have
 already closed, so no writer's layout changes, every kind of file is stamped the same
@@ -3426,9 +3394,9 @@ Output:
 Routine to write one frame of the series global%dump_at_comb asks for: the beam and
 the field set at this comb position, through the same writers the element-end dumps
 use, named <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
-the stats row this frame sits on. A frame and its row therefore share one index. Inside
-an averaged undulator the beam frame is <out_root>-<record>.gc.h5 instead, the map's own
-chart in a file of its own, and the .beam.h5 only with global%dump_orbit.
+the stats row this frame sits on. A frame and its row therefore share one index. The
+beam frame holds the coordinates the selected tracking method produced there, inside an
+averaged undulator as anywhere else, with nothing reconstructed.
 
 The field's records are rotated to time order to be written and rotated back, so the
 run continues from the state it had. fel_dump_field_set leaves them unrotated, which
@@ -5587,7 +5555,7 @@ slope gp feeds the ramp-induced field terms in fel_unavg_bfield). l_ramp = 0 is
 the hard-edge mutation configuration. The handoff check exists to catch it.
 
 One authority for the device's ends: the unaveraged mode integrates through this
-envelope, and fel_restore_quiver rebuilds the orbit of the same device with it.
+envelope.
 ```
 
 ```
@@ -5599,56 +5567,6 @@ Input:
 Output:
   gp     -- real(rp): The envelope derivative dg/ds [1/m].
   g      -- real(rp): The field envelope g(s) (sin^2 ramps, 1 in the body).
-```
-
-(api-fel-restore-quiver)=
-### `fel_restore_quiver`
-
-*Subroutine* `(und, beam, l_ele, ramp_periods, s_ele)`
-
-```
-Routine to restore the undulator quiver to a beam the averaged map has tracked, so that
-a frame written inside a segment holds the instantaneous orbit an openPMD momentum
-record means rather than the guiding centre the map carries. Every term is derived in
-fel-physics.md sec-pardump, which also states the inverse. The caller passes its own copy
-of the beam: the walk's beam keeps the guiding centre, which is what the map integrates
-and what a checkpoint stores.
-
-Near the axis the magnetic push is du_perp/ds = d(a_perp)/ds, so the kinetic momentum is
-the stored one plus the local potential, and the position and the lag follow by
-integrating it from the upstream face. The device is the one the unaveraged mode models,
-its ends included (fel_und_envelope): the averaged map's state is the adiabatic
-invariant those ramped ends hand it, so its guiding centre is that device's. Each
-integral vanishes at both faces, where a frame is left as it stands.
-
-What is restored is the quiver's oscillation. The ramp also holds the mean square of the
-transverse momentum below the aw^2 the averaged map carries everywhere, which is a
-difference between the two devices rather than a part of the orbit, so it is left alone
-and the frame series stays continuous at the faces (doc/validation.md).
-```
-
-```
-Input:
-  und           -- fel_und_struct: The undulator the beam sits in.
-  beam          -- fel_beam_struct: The beam, in the averaged chart.
-  l_ele         -- real(rp): The element's length [m].
-  ramp_periods  -- real(rp): Periods the device's field ramps over at each end.
-  s_ele         -- real(rp): Where the frame sits, from the upstream face [m].
-
-Output:
-  beam          -- fel_beam_struct: The same beam on the instantaneous orbit.
-```
-
-(api-phase-integrals)=
-### `phase_integrals`
-
-*Subroutine* `(a_cos, a_sin, b_cos)`
-
-```
-The three integrals of the envelope against the undulator phase, Simpson's rule at 256
-points a period. They are three scalars per frame and not per particle, the ramp is
-what makes them worth integrating rather than expanding, and each vanishes at both
-faces so the frame series is continuous there.
 ```
 
 (api-fel-track-und-step)=

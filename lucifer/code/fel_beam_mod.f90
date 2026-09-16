@@ -136,12 +136,7 @@ end type
 
 character(*), parameter :: fel_private_root$ = 'lucifer'
 character(*), parameter :: fel_checkpoint_format$ = 'lucifer-checkpoint 2.0'
-character(*), parameter :: fel_frame_format$ = 'lucifer-frames 2.0'
-
-! The layout of the guiding-centre diagnostic file an averaged undulator's interior frame
-! writes (fel_write_guiding_centre), a file of its own with no openPMD particle record.
-
-character(*), parameter :: fel_guiding_centre_format$ = 'lucifer-guiding-centre 1.0'
+character(*), parameter :: fel_frame_format$ = 'lucifer-frames 3.0'
 
 !+
 ! Struct fel_checkpoint_struct
@@ -773,15 +768,14 @@ end subroutine fel_read_openpmd_beam
 ! Subroutine fel_assert_not_interior_frame (file_name, which, err_flag)
 !
 ! Routine to refuse a beam file written inside an undulator as a run's initial beam. A
-! frame taken there carries the instantaneous kinetic orbit, which is what an openPMD
-! momentum record means and what an exchange file should hold (doc/reading-output.md).
-! It is not a place a run can start from. The averaged map would read the quiver as
-! betatron momentum, the K/gamma a hard-edge handoff injects, and the unaveraged mode
-! would need the segment position and the ramp state no file holds.
+! frame taken there holds the coordinates the selected tracking method produced, an
+! ordinary particle record (doc/reading-output.md), and it is not a place a run can start
+! from: the averaged map would take the frame as an entrance and hand it the K/gamma a
+! hard-edge handoff injects, and the unaveraged mode would need the segment position and
+! the ramp state no file holds.
 !
-! The test is where the frame was taken and never what its momenta look like: the quiver
-! crosses zero twice a period, and a frame at that phase is no more loadable than one at
-! the crest. It is the same for a frame either method wrote.
+! The test is where the frame was taken and never what its momenta look like. It is the
+! same for a frame either method wrote.
 !
 ! A frame of an FEL element records sElement and elementLength (fel_frame_attributes). A
 ! file carrying neither is an external bunch, a frame from a break, or an ordinary dump,
@@ -849,104 +843,13 @@ err_flag = .true.
 call out_io (s_error$, r_name, trim(which) // ' NAMES A FRAME WRITTEN INSIDE AN UNDULATOR,', &
       'WHICH IS NOT A PLACE A RUN STARTS: ' // trim(file_name), &
       'IT SITS \es12.4\ m INTO ' // trim(name_ele) // ', A DEVICE \es12.4\ m LONG. ITS RECORDS', &
-      'ARE STANDARD AND ITS MOMENTA ARE THE ORBIT''S, WHICH IS WHAT A FRAME IS FOR. WHAT A RUN', &
-      'WOULD NEED BESIDE THEM IS THE SEGMENT''S OWN STATE, AND NO FILE HOLDS IT.', &
+      'ARE THE COORDINATES THE TRACKER HELD THERE. WHAT A RUN WOULD NEED BESIDE THEM IS THE', &
+      'SEGMENT''S OWN STATE, WHERE IN THE DEVICE THE BEAM SITS AND WHAT THE FIELD''S RAMP IS', &
+      'DOING THERE, AND NO FILE HOLDS IT.', &
       'POSSIBLE SOLUTION: START FROM A FRAME AT AN ELEMENT BOUNDARY, OR FROM A DUMP.', &
       r_array = [s_ele, l_ele])
 
 end subroutine fel_assert_not_interior_frame
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine fel_write_guiding_centre (beam, file_name, is1, is2, err_flag)
-!
-! Routine to write the beam as the averaged map holds it, the packed chart, into a file of
-! its own with no openPMD particle record in it: the diagnostic frame of an averaged
-! undulator's interior (doc/reading-output.md). The map integrates the guiding centre, and
-! an openPMD momentum record means the instantaneous kinetic momentum, so the two must not
-! share a record: a standard reader would take one for the other with nothing to tell it
-! otherwise. A reduction over these records matches the statistics row the same beam
-! produced, with no conversion in between.
-!
-! The group guidingCentre carries its format string, phi0 and p0c, the particle count of
-! each slice of the range, and per particle in slice order x, px, y, py, z, pz, the weight
-! and the id, in the chart's own units (fel-physics.md sec-chart). The frame's attributes
-! go on the root as on every frame (fel_frame_attributes).
-!
-! Input:
-!   beam      -- fel_beam_struct: Beam to write.
-!   file_name -- character(*): File to create.
-!   is1, is2  -- integer: The slice range to write.
-!
-! Output:
-!   err_flag  -- logical: Set True on error, False otherwise.
-!-
-
-subroutine fel_write_guiding_centre (beam, file_name, is1, is2, err_flag)
-
-type (fel_beam_struct), target :: beam
-type (fel_slice_struct), pointer :: sl
-integer(hid_t) f_id, g_id
-integer is1, is2, is, ip, n, h5_err
-integer, allocatable :: counts(:), ids(:)
-real(rp), allocatable :: x(:), px(:), y(:), py(:), z(:), pz(:), w(:)
-logical err_flag, err, bad
-character(*) file_name
-
-!
-
-err_flag = .true.
-n = sum(beam%slice(is1:is2)%n)
-allocate (counts(is2 - is1 + 1), ids(n), x(n), px(n), y(n), py(n), z(n), pz(n), w(n))
-
-ip = 0
-do is = is1, is2
-  sl => beam%slice(is)
-  counts(is - is1 + 1) = sl%n
-  x(ip+1:ip+sl%n)  = sl%x(1:sl%n)
-  px(ip+1:ip+sl%n) = sl%px(1:sl%n)
-  y(ip+1:ip+sl%n)  = sl%y(1:sl%n)
-  py(ip+1:ip+sl%n) = sl%py(1:sl%n)
-  z(ip+1:ip+sl%n)  = sl%z(1:sl%n)
-  pz(ip+1:ip+sl%n) = sl%pz(1:sl%n)
-  w(ip+1:ip+sl%n)  = sl%weight(1:sl%n)
-  ids(ip+1:ip+sl%n) = sl%id(1:sl%n)
-  ip = ip + sl%n
-enddo
-
-call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
-call H5Gcreate_f (f_id, 'guidingCentre', g_id, h5_err)
-if (h5_err < 0) then
-  call h5fclose_f (f_id, h5_err)
-  return
-endif
-
-bad = .false.
-call hdf5_write_attribute_string (g_id, 'format', fel_guiding_centre_format$, err);  bad = bad .or. err
-call hdf5_write_attribute_real (g_id, 'phi0', beam%phi0, err);                      bad = bad .or. err
-call hdf5_write_attribute_real (g_id, 'p0c', beam%p0c, err);                        bad = bad .or. err
-call fel_h5_int (g_id, 'sliceCount', '1', 'particles per slice', &
-      'Particles in each slice of the range, in window order.', '', counts, bad)
-call fel_h5_real (g_id, 'x', 'm', 'x', 'Horizontal position of the guiding centre.', '', x, bad)
-call fel_h5_real (g_id, 'px', '1', 'px', &
-      'Horizontal momentum over p0 as the averaged map holds it, the quiver''s mean square in its ' // &
-      'longitudinal motion and the quiver itself not here.', '', px, bad)
-call fel_h5_real (g_id, 'y', 'm', 'y', 'Vertical position of the guiding centre.', '', y, bad)
-call fel_h5_real (g_id, 'py', '1', 'py', 'Vertical momentum over p0 as the averaged map holds it.', '', py, bad)
-call fel_h5_real (g_id, 'z', 'm', 'z', &
-      'Longitudinal coordinate -beta c (t - t_ref), the reference phase phi0 not folded in.', '', z, bad)
-call fel_h5_real (g_id, 'pz', '1', 'pz', 'Momentum deviation (p - p0)/p0.', '', pz, bad)
-call fel_h5_real (g_id, 'weight', 'C', 'weight', 'Macroparticle charge.', '', w, bad)
-call fel_h5_int (g_id, 'id', '1', 'particle id', 'The label that follows a macroparticle through the run.', &
-      '', ids, bad)
-
-call H5Gclose_f (g_id, h5_err)
-call h5fclose_f (f_id, h5_err)
-err_flag = bad
-
-end subroutine fel_write_guiding_centre
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -957,8 +860,7 @@ end subroutine fel_write_guiding_centre
 ! Routine to refuse a continuation from a file that carries no checkpoint group, before
 ! anything else is asked of the file. fel_read_openpmd_beam makes the same refusal once the
 ! records are read, and this one comes first so that a file which is not an openPMD beam
-! at all, a guiding-centre diagnostic frame among them, is refused for the checkpoint it
-! lacks rather than told to convert a Genesis dump.
+! at all is refused for the checkpoint it lacks rather than told to convert a Genesis dump.
 !
 ! Input:
 !   file_name -- character(*): The file the deck names as beam_file.

@@ -179,10 +179,9 @@ endif
 if (beam_file /= '') then
 
   ! Where the file was written, or what it lacks, before what format it is in: a frame
-  ! from inside a device is refused for the place it was taken whatever its layout, the
-  ! guiding-centre diagnostic among them, and a continuation for the checkpoint it lacks,
-  ! so neither is told to convert a Genesis dump. A continuation asks the one question
-  ! and an initialization the other.
+  ! from inside a device is refused for the place it was taken whatever its layout, and a
+  ! continuation for the checkpoint it lacks, so neither is told to convert a Genesis
+  ! dump. A continuation asks the one question and an initialization the other.
 
   if (run%global%continuation) then
     call fel_assert_checkpoint_present (beam_file, err)

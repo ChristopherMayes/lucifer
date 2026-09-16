@@ -167,11 +167,11 @@ end function fel_checkpoint_eligible
 ! Routine to stamp a dump with where it was taken.
 !
 ! A frame is read on its own, so it has to say where along the line it is and what the
-! beam was moving through. The particle records hold the instantaneous orbit, and a reader
-! that wants the guiding centre the averaged map tracks takes the quiver back off with the
-! device's own numbers (doc/reading-output.md), which is why those ride the file rather
-! than being looked up in a lattice the reader may not have. A frame taken in a break
-! carries the element and no undulator numbers.
+! beam was moving through. The particle records are the coordinates the selected tracking
+! method produced there, the period-averaged map's without the fast oscillation and the
+! unaveraged mode's with it resolved (doc/reading-output.md), so the method and the
+! device's numbers ride the file rather than being looked up in a lattice the reader may
+! not have. A frame taken in a break carries the element and no undulator numbers.
 !
 ! The attributes go under lucifer/frame (fel_private_group) in a file the writers have
 ! already closed, so no writer's layout changes, every kind of file is stamped the same
@@ -214,8 +214,8 @@ if (err) then
   return
 endif
 
-! 2.0: the attributes sit under lucifer/frame, and a .beam.h5 at this version holds the
-! orbit wherever it was taken, the guiding centre having its own file, the .gc.h5.
+! 3.0: the attributes sit under lucifer/frame, and a .beam.h5 at this version holds the
+! coordinates the selected tracking method produced, wherever it was taken.
 call hdf5_write_attribute_string (g_id, 'frameFormat', fel_frame_format$, err)
 call hdf5_write_attribute_real (g_id, 'sPosition', run%z_now, err)
 call hdf5_write_attribute_string (g_id, 'elementName', trim(branch%ele(ie)%name), err)
@@ -254,7 +254,7 @@ endif
 
 d_id = -1
 if (hdf5_exists(f_id, 'data', err, .false.)) d_id = hdf5_open_group (f_id, 'data', err, .true.)
-if (d_id >= 0 .and. .not. err) then       ! A .gc.h5 has no iteration group to stamp.
+if (d_id >= 0 .and. .not. err) then
   if (hdf5_group_n_links(d_id, err) == 1) then
     call hdf5_get_object_by_index (d_id, 0, it_name, obj_info, err)
     if (.not. err) then
@@ -359,9 +359,9 @@ end subroutine fel_write_slippage_residual
 ! Routine to write one frame of the series global%dump_at_comb asks for: the beam and
 ! the field set at this comb position, through the same writers the element-end dumps
 ! use, named <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
-! the stats row this frame sits on. A frame and its row therefore share one index. Inside
-! an averaged undulator the beam frame is <out_root>-<record>.gc.h5 instead, the map's own
-! chart in a file of its own, and the .beam.h5 only with global%dump_orbit.
+! the stats row this frame sits on. A frame and its row therefore share one index. The
+! beam frame holds the coordinates the selected tracking method produced there, inside an
+! averaged undulator as anywhere else, with nothing reconstructed.
 !
 ! The field's records are rotated to time order to be written and rotated back, so the
 ! run continues from the state it had. fel_dump_field_set leaves them unrotated, which
@@ -385,12 +385,11 @@ subroutine fel_dump_frame (run, ie, at_end, err_flag)
 type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
-type (fel_beam_struct), target :: bq
 type (wavefront_struct) wf_sub
 complex(wf_rp), allocatable :: eslab(:,:,:)
 real(rp) s_frame
 integer ie, ihh, first_was, ifr
-logical at_end, err_flag, eerr, whole, ckpt, interior
+logical at_end, err_flag, eerr, whole, ckpt
 character(200) prefix
 character(8) hsuf
 
@@ -401,13 +400,14 @@ ffield => run%ffield
 
 write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
 
-! A frame is written wherever the comb falls, which inside an unaveraged segment is a
-! place where px is the kinetic momentum rather than the averaged tracker's: the frame is
-! written as it is, since that is what an openPMD momentum record means, and fel_dump_beam,
-! whose dumps land on element boundaries, keeps the refusal. A frame at an element end that
-! carries the whole window is a checkpoint where the boundary is eligible
-! (fel_checkpoint_eligible), and gets the group on both of its files. Every other frame
-! is written without it and a continuation from it is refused.
+! A frame is written wherever the comb falls, as the beam stands there: inside an
+! unaveraged segment px is the resolved kinetic momentum and inside an averaged one the
+! map's period-averaged momentum, and the frame carries whichever the selected method
+! produced, with nothing reconstructed. fel_dump_beam, whose dumps land on element
+! boundaries, keeps the chart assertion. A frame at an element end that carries the whole
+! window is a checkpoint where the boundary is eligible (fel_checkpoint_eligible), and
+! gets the group on both of its files. Every other frame is written without it and a
+! continuation from it is refused.
 
 s_frame = run%z_now
 if (at_end .and. ie >= 1) s_frame = run%lat%branch(0)%ele(ie)%s
@@ -415,45 +415,21 @@ whole = (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice)
 ckpt = at_end .and. whole
 if (ckpt) ckpt = fel_checkpoint_eligible(run, ie)
 
-! Inside an averaged undulator the beam is the guiding centre the map integrates, and an
-! openPMD momentum record means the instantaneous orbit, so the two do not share a record.
-! The frame's particles go to a diagnostic file of their own, the .gc.h5, which a standard
-! reader does not open and a reduction over which matches the statistics row directly. The
-! .beam.h5 is written there only when the deck asks for the export (global%dump_orbit),
-! its records the orbit fel_restore_quiver rebuilds on a copy: the walk's own beam is never
-! touched, since a diagnostic that moved the state it observes would steer the run. A frame
-! at an element face is left as it stands, the device's field having ended there, which is
-! also what a checkpoint must hold.
+! The walk's own beam is written as it stands and never touched: a diagnostic that moved
+! the state it observes would steer the run, so a run with frames on is the run with them
+! off, to the bit.
 
-interior = .false.
-if (ie >= 1 .and. .not. at_end) interior = run%is_fel(ie) .and. run%fel_mode(ie) /= unaveraged$
-if (interior) then
-  call fel_write_guiding_centre (run%fbeam, trim(prefix) // '.gc.h5', run%dump_is1, run%dump_is2, eerr)
+fbeam => run%fbeam
+call fel_write_openpmd_beam (fbeam, run%lat%branch(0)%ele(ie), &
+                             trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2, &
+                             kinetic_ok = .true., s_pos = s_frame)
+if (eerr) return
+call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
+if (eerr) return
+if (ckpt) then
+  call fel_write_checkpoint_group (trim(prefix) // '.beam.h5', run%lat%branch(0)%ele(ie)%s, ie, &
+                                   run%lat%branch(0)%ele(ie)%name, eerr, run%fbeam)
   if (eerr) return
-  call fel_frame_attributes (trim(prefix) // '.gc.h5', run, ie, eerr)
-  if (eerr) return
-endif
-
-if (.not. interior .or. run%global%dump_orbit) then
-  if (interior) then
-    bq = run%fbeam
-    call fel_restore_quiver (run%und_of(ie), bq, run%lat%branch(0)%ele(ie)%value(l$), run%fel_ramp(ie), &
-                             run%z_now - run%lat%branch(0)%ele(ie)%s_start)
-    fbeam => bq
-  else
-    fbeam => run%fbeam
-  endif
-  call fel_write_openpmd_beam (fbeam, run%lat%branch(0)%ele(ie), &
-                               trim(prefix) // '.beam.h5', eerr, run%dump_is1, run%dump_is2, &
-                               kinetic_ok = .true., s_pos = s_frame)
-  if (eerr) return
-  call fel_frame_attributes (trim(prefix) // '.beam.h5', run, ie, eerr)
-  if (eerr) return
-  if (ckpt) then
-    call fel_write_checkpoint_group (trim(prefix) // '.beam.h5', run%lat%branch(0)%ele(ie)%s, ie, &
-                                     run%lat%branch(0)%ele(ie)%name, eerr, run%fbeam)
-    if (eerr) return
-  endif
 endif
 
 do ihh = 1, run%n_harm
@@ -1926,9 +1902,6 @@ call fel_h5_flag (g_id, 'write_diag', 'write diag', &
 call fel_h5_flag (g_id, 'continuation', 'continuation', &
       'beam_file and field_file are a checkpoint pair the run continues from, not an initialization.', &
       run%global%continuation, merr)
-call fel_h5_flag (g_id, 'dump_orbit', 'dump orbit', &
-      'Also write the standard beam frame inside averaged undulators, its records the reconstructed orbit.', &
-      run%global%dump_orbit, merr)
 call fel_h5_flag (g_id, 'write_initial', 'write initial', &
       'Dump the initial state before tracking.', run%global%write_initial, merr)
 call fel_h5_flag (g_id, 'load_only', 'load only', &

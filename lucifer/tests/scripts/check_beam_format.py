@@ -42,10 +42,10 @@ nothing about this program.
    file that carries no charge.
 
 9. Where a frame was written decides whether a run can start from it. A frame taken inside
-   an undulator holds the coordinates the map evolves in its .gc.h5 and, with the orbit
-   export on, the instantaneous orbit in its .beam.h5, and neither is a state a run starts
-   from, so both loading paths refuse either by its own record of the position and never
-   by its momenta: the quiver crosses zero twice a period and the check takes a frame at
+   an undulator holds the coordinates the selected tracking method produced there, which
+   is not a state a run starts from, so both loading paths refuse it by its own record of
+   the position and never by its momenta: the averaged map's px crosses zero twice a
+   period along the orbit and the check takes a frame at
    that phase as well as one at the crest. A frame at an element
    face still initializes a run, and its records come back through it as in 1. A file with
    no such record is an external bunch and loads as before. A continuation is a different
@@ -495,7 +495,7 @@ def main():
 
     print("== a frame is a starting point only at a face ==")
 
-    # The device steps at a quarter period, so the series samples the quiver's phase four
+    # The device steps at a quarter period, so the series samples the undulator phase four
     # times a period and a frame lands on a zero of it as well as on a crest. Steady state,
     # so every frame is one patch and reaches the bunch path too.
     lam_w, l_und, l_ramp = 0.015, 0.30, 0.03
@@ -532,12 +532,10 @@ use, QL
   ran_seed = 4242
 {extra}&end
 """
-    # The orbit export is on, so every interior frame has a .beam.h5 to feed the refusals
-    # beside the .gc.h5 it writes in any case.
-    run(exe, wd, "qf", qbase.format(root="qf", extra="  dump_at_comb = T\n  dump_orbit = T\n"))
+    run(exe, wd, "qf", qbase.format(root="qf", extra="  dump_at_comb = T\n"))
 
     def frame_where(f):
-        """Where a frame says it was written, and the quiver in the mean of its px."""
+        """Where a frame says it was written, and the mean of its px over p0."""
         with h5py.File(f) as h5:
             fr = h5.get("lucifer/frame")
             if fr is None or "sElement" not in fr.attrs:
@@ -567,51 +565,14 @@ use, QL
     code, out = run(exe, wd, "qf_bf", qbase.format(root="qf_bf",
                     extra=f'  beam_file = "{at_crest.name}"\n  field_file = "qf-final.wf.h5"\n'
                           "  load_only = T\n"), expect_fail=True)
-    refused(f"beam_file, a frame {body[at_crest][0]:.5f} m into the device at the quiver's crest "
-            f"(mean px {body[at_crest][1]:.2e} of p0)", code, out, "NOT A PLACE A RUN STARTS")
+    refused(f"beam_file, a frame {body[at_crest][0]:.5f} m into the device at a crest of the "
+            f"undulator phase (mean px {body[at_crest][1]:.2e} of p0)", code, out, "NOT A PLACE A RUN STARTS")
     code, out = run(exe, wd, "qf_pf", qbase.format(root="qf_pf",
                     extra=f'  beam_init%position_file = "{at_zero.name}"\n'
                           "  load_only = T\n"), expect_fail=True)
-    refused(f"beam_init%position_file, a frame {body[at_zero][0]:.5f} m in where the momentum "
-            f"quiver crosses zero (mean px {body[at_zero][1]:.2e} of p0)", code, out,
+    refused(f"beam_init%position_file, a frame {body[at_zero][0]:.5f} m in where the undulator "
+            f"phase crosses zero (mean px {body[at_zero][1]:.2e} of p0)", code, out,
             "NOT A PLACE A RUN STARTS")
-
-    # The guiding centre recovered from the same frame is still not a starting point: the
-    # inverse restores the chart and not the segment state, so the file's own record of
-    # where it was written is what answers, as it does above.
-    shutil.copy(at_crest, wd / "qf_gc.beam.h5")
-    sl = beamio.unquiver(at_crest, beamio.read_slices(at_crest, 1e-10, 1e-10), 1e-10)[0]
-    with h5py.File(wd / "qf_gc.beam.h5", "r+") as h5:
-        g = h5["data"]
-        g = g[sorted(g.keys())[0]]["particles"]
-        g = g[sorted(g.keys())[0]]
-        g["position"]["x"][...] = sl["x"]
-        g["position"]["y"][...] = sl["y"]
-        g["momentum"]["x"][...] = sl["px"] * beamio.M_ELECTRON
-        g["momentum"]["y"][...] = sl["py"] * beamio.M_ELECTRON
-        g["time"][...] = -sl["theta"] * 1e-10 / (2 * np.pi * beamio.C_LIGHT)
-    code, out = run(exe, wd, "qf_gcr", qbase.format(root="qf_gcr",
-                    extra='  beam_file = "qf_gc.beam.h5"\n  field_file = "qf-final.wf.h5"\n'
-                          "  load_only = T\n"), expect_fail=True)
-    refused("beam_file, the same frame with the quiver taken back off", code, out,
-            "NOT A PLACE A RUN STARTS")
-
-    # The guiding-centre frame from the same place is refused in the same words, on both
-    # paths, and a continuation from it fails on the checkpoint it lacks, in that refusal's
-    # own words rather than being told it is not openPMD.
-    gc = at_crest.name.replace(".beam.h5", ".gc.h5")
-    code, out = run(exe, wd, "qf_gcb", qbase.format(root="qf_gcb",
-                    extra=f'  beam_file = "{gc}"\n  field_file = "qf-final.wf.h5"\n  load_only = T\n'),
-                    expect_fail=True)
-    refused("beam_file, the guiding-centre frame from the same place", code, out, "NOT A PLACE A RUN STARTS")
-    code, out = run(exe, wd, "qf_gcp", qbase.format(root="qf_gcp",
-                    extra=f'  beam_init%position_file = "{gc}"\n  load_only = T\n'), expect_fail=True)
-    refused("beam_init%position_file, the guiding-centre frame", code, out, "NOT A PLACE A RUN STARTS")
-    code, out = run(exe, wd, "qf_gcc", qbase.format(root="qf_gcc",
-                    extra=f'  beam_file = "{gc}"\n  field_file = "qf-final.wf.h5"\n'
-                          '  continuation = T\n  track_start = "QD"\n'), expect_fail=True)
-    refused("a continuation from the guiding-centre frame, for the checkpoint it lacks", code, out,
-            "NO CHECKPOINT GROUP")
 
     # A file that says nothing about a device is an external bunch, and the absence of the
     # group lucifer is that assumption rather than proof of a boundary.

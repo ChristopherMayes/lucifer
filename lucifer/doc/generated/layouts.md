@@ -11,12 +11,11 @@ The hierarchy of each representative file this program writes, printed from the 
 
 ## Contents
 
-- [`avg-000002.gc.h5`](#layout-avg-000002-gc-h5): interior frame of an averaged undulator, the coordinates the map evolves
-- [`avg-000002.beam.h5`](#layout-avg-000002-beam-h5): the same record exported as the orbit
+- [`avg-000002.beam.h5`](#layout-avg-000002-beam-h5): interior frame of an averaged undulator, the coordinates the map evolves
 - [`avg-000005.beam.h5`](#layout-avg-000005-beam-h5): frame at the end of QU, the whole window, at the same s as the final dump
 - [`avg-final.beam.h5`](#layout-avg-final-beam-h5): final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair
 - [`avg-final.wf.h5`](#layout-avg-final-wf-h5): final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair
-- [`unavg-000002.beam.h5`](#layout-unavg-000002-beam-h5): interior frame of an unaveraged undulator
+- [`unavg-000002.beam.h5`](#layout-unavg-000002-beam-h5): interior frame of an unaveraged undulator, the oscillation resolved
 - [`crop-000002.wf.h5`](#layout-crop-000002-wf-h5): field frame of both polarizations over three of six slices
 - [`keep-final.beam.h5`](#layout-keep-final-beam-h5): final dump of several patches, two of them empty
 
@@ -26,92 +25,15 @@ Each file below comes from one of four runs of the executable the regeneration t
 
 | Run | Settings | Files and their roles |
 |---|---|---|
-| `avg` | averaged QU, `dump_at_comb = T`, `dump_orbit = T`, the whole window, z on a grid | [`avg-000002.gc.h5`](#layout-avg-000002-gc-h5) (diagnostic), [`avg-000002.beam.h5`](#layout-avg-000002-beam-h5) (exchange), [`avg-000005.beam.h5`](#layout-avg-000005-beam-h5) (exchange, checkpoint), [`avg-final.beam.h5`](#layout-avg-final-beam-h5) (exchange, checkpoint), [`avg-final.wf.h5`](#layout-avg-final-wf-h5) (exchange, checkpoint) |
-| `unavg` | unaveraged QU, 40 steps per period, a two-period ramp, `dump_at_comb = T` | [`unavg-000002.beam.h5`](#layout-unavg-000002-beam-h5) (exchange) |
-| `crop` | averaged QU with `tilt = 0.4`, `dump_at_comb = T`, `dump_slice_first = 2`, `dump_slice_last = 4` | [`crop-000002.wf.h5`](#layout-crop-000002-wf-h5) (diagnostic) |
-| `keep` | averaged QU, `load_mode = "keep"`, `sig_z = 1.0e-10` in a six-slice window | [`keep-final.beam.h5`](#layout-keep-final-beam-h5) (exchange, checkpoint) |
-
-(layout-avg-000002-gc-h5)=
-## avg-000002.gc.h5
-
-Run `avg`: interior frame of an averaged undulator, the coordinates the map evolves. Role: diagnostic.
-
-```text
-/                     group
-  guidingCentre/      group
-    @format           string fixed(27) ascii ()   "lucifer-guiding-centre 1.0"
-    @p0c              float64 little-endian (1,)  [5.80383e+09]
-    @phi0             float64 little-endian (1,)  [2.63017]
-    id                dataset                     (384,) int32 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(56) ascii ()   "The label that follows a macroparticle through the run."
-      @long_name      string fixed(12) ascii ()   "particle id"
-      @unit           string fixed(2) ascii ()    "1"
-    px                dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(142) ascii ()  "Horizontal momentum over p0 as the averaged map holds it, the quiver's mean square in its longitudinal motion and the quiver itself not here."
-      @long_name      string fixed(3) ascii ()    "px"
-      @unit           string fixed(2) ascii ()    "1"
-    py                dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(56) ascii ()   "Vertical momentum over p0 as the averaged map holds it."
-      @long_name      string fixed(3) ascii ()    "py"
-      @unit           string fixed(2) ascii ()    "1"
-    pz                dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(32) ascii ()   "Momentum deviation (p - p0)/p0."
-      @long_name      string fixed(3) ascii ()    "pz"
-      @unit           string fixed(2) ascii ()    "1"
-    sliceCount        dataset                     (6,) int32 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(55) ascii ()   "Particles in each slice of the range, in window order."
-      @long_name      string fixed(20) ascii ()   "particles per slice"
-      @unit           string fixed(2) ascii ()    "1"
-    weight            dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(22) ascii ()   "Macroparticle charge."
-      @long_name      string fixed(7) ascii ()    "weight"
-      @unit           string fixed(2) ascii ()    "C"
-    x                 dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(43) ascii ()   "Horizontal position of the guiding centre."
-      @long_name      string fixed(2) ascii ()    "x"
-      @unit           string fixed(2) ascii ()    "m"
-    y                 dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(41) ascii ()   "Vertical position of the guiding centre."
-      @long_name      string fixed(2) ascii ()    "y"
-      @unit           string fixed(2) ascii ()    "m"
-    z                 dataset                     (384,) float64 little-endian, contiguous
-      @axes           string fixed(5) ascii ()    "none"
-      @description    string fixed(85) ascii ()   "Longitudinal coordinate -beta c (t - t_ref), the reference phase phi0 not folded in."
-      @long_name      string fixed(2) ascii ()    "z"
-      @unit           string fixed(2) ascii ()    "m"
-  lucifer/            group
-    frame/            group
-      @aw             float64 little-endian (1,)  [0.84853]
-      @elementIndex   int32 little-endian (1,)    [1]
-      @elementLength  float64 little-endian (1,)  [0.06]
-      @elementName    string fixed(3) ascii ()    "QU"
-      @felMethod      string fixed(9) ascii ()    "Averaged"
-      @floorAngles    float64 little-endian (3,)  [0, 0, 0]
-      @floorPosition  float64 little-endian (3,)  [0, 0, 0.015]
-      @frameFormat    string fixed(19) ascii ()   "lucifer-frames 2.0"
-      @helical        int32 little-endian (1,)    [0]
-      @ku             float64 little-endian (1,)  [418.879]
-      @phi0           float64 little-endian (1,)  [2.63017]
-      @rampPeriods    float64 little-endian (1,)  [2]
-      @sElement       float64 little-endian (1,)  [0.015]
-      @sPosition      float64 little-endian (1,)  [0.015]
-      @sliceFirst     int32 little-endian (1,)    [1]
-      @sliceLast      int32 little-endian (1,)    [6]
-      @tilt           float64 little-endian (1,)  [0]
-```
+| `avg` | averaged QU, `dump_at_comb = T`, the whole window, z on a grid | [`avg-000002.beam.h5`](#layout-avg-000002-beam-h5) (frame), [`avg-000005.beam.h5`](#layout-avg-000005-beam-h5) (frame, checkpoint), [`avg-final.beam.h5`](#layout-avg-final-beam-h5) (dump, checkpoint), [`avg-final.wf.h5`](#layout-avg-final-wf-h5) (dump, checkpoint) |
+| `unavg` | unaveraged QU, 40 steps per period, a two-period ramp, `dump_at_comb = T` | [`unavg-000002.beam.h5`](#layout-unavg-000002-beam-h5) (frame) |
+| `crop` | averaged QU with `tilt = 0.4`, `dump_at_comb = T`, `dump_slice_first = 2`, `dump_slice_last = 4` | [`crop-000002.wf.h5`](#layout-crop-000002-wf-h5) (frame) |
+| `keep` | averaged QU, `load_mode = "keep"`, `sig_z = 1.0e-10` in a six-slice window | [`keep-final.beam.h5`](#layout-keep-final-beam-h5) (dump, checkpoint) |
 
 (layout-avg-000002-beam-h5)=
 ## avg-000002.beam.h5
 
-Run `avg`: the same record exported as the orbit. Role: exchange.
+Run `avg`: interior frame of an averaged undulator, the coordinates the map evolves. Role: frame.
 
 ```text
 /                               group
@@ -165,8 +87,8 @@ Run `avg`: the same record exported as the orbit. Role: exchange.
           momentum/             group
             x                   dataset                     (384,) float64 little-endian, contiguous
               @localName        string fixed(9) ascii ()    "px * p0c"
-              @maxValue         float64 little-endian (1,)  [346735]
-              @minValue         float64 little-endian (1,)  [278769]
+              @maxValue         float64 little-endian (1,)  [40122.6]
+              @minValue         float64 little-endian (1,)  [-27848.1]
               @unitDimension    float64 little-endian (7,)  [1, 1, -1, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
@@ -237,8 +159,8 @@ Run `avg`: the same record exported as the orbit. Role: exchange.
           position/             group
             x                   dataset                     (384,) float64 little-endian, contiguous
               @localName        string fixed(2) ascii ()    "x"
-              @maxValue         float64 little-endian (1,)  [5.42918e-05]
-              @minValue         float64 little-endian (1,)  [-3.90571e-05]
+              @maxValue         float64 little-endian (1,)  [5.42582e-05]
+              @minValue         float64 little-endian (1,)  [-3.90907e-05]
               @unitDimension    float64 little-endian (7,)  [1, 0, 0, 0, 0, 0, 0]
               @unitSI           float64 little-endian (1,)  [1]
               @unitSymbol       string fixed(2) ascii ()    "m"
@@ -287,8 +209,8 @@ Run `avg`: the same record exported as the orbit. Role: exchange.
               @value            float64 little-endian (1,)  [0]
           time                  dataset                     (384,) float64 little-endian, contiguous
             @localName          string fixed(10) ascii ()   "t - t_ref"
-            @maxValue           float64 little-endian (1,)  [-7.46332e-22]
-            @minValue           float64 little-endian (1,)  [-3.30351e-19]
+            @maxValue           float64 little-endian (1,)  [-1.88429e-21]
+            @minValue           float64 little-endian (1,)  [-3.30922e-19]
             @unitDimension      float64 little-endian (7,)  [0, 0, 1, 0, 0, 0, 0]
             @unitSI             float64 little-endian (1,)  [1]
             @unitSymbol         string fixed(4) ascii ()    "sec"
@@ -329,7 +251,7 @@ Run `avg`: the same record exported as the orbit. Role: exchange.
       @felMethod                string fixed(9) ascii ()    "Averaged"
       @floorAngles              float64 little-endian (3,)  [0, 0, 0]
       @floorPosition            float64 little-endian (3,)  [0, 0, 0.015]
-      @frameFormat              string fixed(19) ascii ()   "lucifer-frames 2.0"
+      @frameFormat              string fixed(19) ascii ()   "lucifer-frames 3.0"
       @helical                  int32 little-endian (1,)    [0]
       @ku                       float64 little-endian (1,)  [418.879]
       @phi0                     float64 little-endian (1,)  [2.63017]
@@ -344,7 +266,7 @@ Run `avg`: the same record exported as the orbit. Role: exchange.
 (layout-avg-000005-beam-h5)=
 ## avg-000005.beam.h5
 
-Run `avg`: frame at the end of QU, the whole window, at the same s as the final dump. Role: exchange, checkpoint.
+Run `avg`: frame at the end of QU, the whole window, at the same s as the final dump. Role: frame, checkpoint.
 
 ```text
 /                               group
@@ -583,7 +505,7 @@ Run `avg`: frame at the end of QU, the whole window, at the same s as the final 
       @felMethod                string fixed(9) ascii ()    "Averaged"
       @floorAngles              float64 little-endian (3,)  [0, 0, 0]
       @floorPosition            float64 little-endian (3,)  [0, 0, 0.06]
-      @frameFormat              string fixed(19) ascii ()   "lucifer-frames 2.0"
+      @frameFormat              string fixed(19) ascii ()   "lucifer-frames 3.0"
       @helical                  int32 little-endian (1,)    [0]
       @ku                       float64 little-endian (1,)  [418.879]
       @phi0                     float64 little-endian (1,)  [10.5207]
@@ -598,7 +520,7 @@ Run `avg`: frame at the end of QU, the whole window, at the same s as the final 
 (layout-avg-final-beam-h5)=
 ## avg-final.beam.h5
 
-Run `avg`: final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair. Role: exchange, checkpoint.
+Run `avg`: final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair. Role: dump, checkpoint.
 
 ```text
 /                               group
@@ -832,7 +754,7 @@ Run `avg`: final dump at the zero-length END marker Bmad appends to the line, th
 (layout-avg-final-wf-h5)=
 ## avg-final.wf.h5
 
-Run `avg`: final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair. Role: exchange, checkpoint.
+Run `avg`: final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair. Role: dump, checkpoint.
 
 ```text
 /                             group
@@ -880,7 +802,7 @@ Run `avg`: final dump at the zero-length END marker Bmad appends to the line, th
 (layout-unavg-000002-beam-h5)=
 ## unavg-000002.beam.h5
 
-Run `unavg`: interior frame of an unaveraged undulator. Role: exchange.
+Run `unavg`: interior frame of an unaveraged undulator, the oscillation resolved. Role: frame.
 
 ```text
 /                               group
@@ -1098,7 +1020,7 @@ Run `unavg`: interior frame of an unaveraged undulator. Role: exchange.
       @felMethod                string fixed(11) ascii ()   "Unaveraged"
       @floorAngles              float64 little-endian (3,)  [0, 0, 0]
       @floorPosition            float64 little-endian (3,)  [0, 0, 0.015]
-      @frameFormat              string fixed(19) ascii ()   "lucifer-frames 2.0"
+      @frameFormat              string fixed(19) ascii ()   "lucifer-frames 3.0"
       @helical                  int32 little-endian (1,)    [0]
       @ku                       float64 little-endian (1,)  [418.879]
       @phi0                     float64 little-endian (1,)  [2.63017]
@@ -1113,7 +1035,7 @@ Run `unavg`: interior frame of an unaveraged undulator. Role: exchange.
 (layout-crop-000002-wf-h5)=
 ## crop-000002.wf.h5
 
-Run `crop`: field frame of both polarizations over three of six slices. Role: diagnostic.
+Run `crop`: field frame of both polarizations over three of six slices. Role: frame.
 
 ```text
 /                             group
@@ -1165,7 +1087,7 @@ Run `crop`: field frame of both polarizations over three of six slices. Role: di
       @felMethod              string fixed(9) ascii ()     "Averaged"
       @floorAngles            float64 little-endian (3,)   [0, 0, 0]
       @floorPosition          float64 little-endian (3,)   [0, 0, 0.015]
-      @frameFormat            string fixed(19) ascii ()    "lucifer-frames 2.0"
+      @frameFormat            string fixed(19) ascii ()    "lucifer-frames 3.0"
       @helical                int32 little-endian (1,)     [0]
       @ku                     float64 little-endian (1,)   [418.879]
       @phi0                   float64 little-endian (1,)   [2.63017]
@@ -1180,7 +1102,7 @@ Run `crop`: field frame of both polarizations over three of six slices. Role: di
 (layout-keep-final-beam-h5)=
 ## keep-final.beam.h5
 
-Run `keep`: final dump of several patches, two of them empty. Role: exchange, checkpoint.
+Run `keep`: final dump of several patches, two of them empty. Role: dump, checkpoint.
 
 ```text
 /                               group

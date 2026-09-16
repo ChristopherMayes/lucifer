@@ -894,7 +894,7 @@ def cause_frames(wd, root, cut):
     cache.write_text(json.dumps(rows))
     for p in files:
         p.unlink()
-    for p in list(wd.glob(f"{root}-[0-9]*.beam.h5")) + list(wd.glob(f"{root}-[0-9]*.gc.h5")):
+    for p in wd.glob(f"{root}-[0-9]*.beam.h5"):
         p.unlink()
     return rows
 

@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-09-15 Changed: a particle frame holds the coordinates the selected tracking method produced,
+  written through the openPMD path as every dump is, inside an averaged undulator as anywhere else, with
+  nothing reconstructed. Period-averaged tracking omits the fast undulator oscillation and unaveraged
+  tracking resolves it, and `felMethod` on the frame says which. The `.gc.h5`, its format string and its
+  readers are gone, and so are `fel_restore_quiver`, `global%dump_orbit` and `beamio.unquiver`: a frame
+  between periods is the map's own state, as a dump between the periods of a wiggler split into elements
+  would be, and the statistics file is the cross-check, the per-slice bunching from a frame agreeing with
+  its row at 2e-12 with no conversion. `frameFormat` moves to `lucifer-frames 3.0` since an interior
+  record's content changed. The location refusal keeps its text's fragment and now says a run needs the
+  segment's own state, which no file holds, and nothing of momenta or orbits. Files of the earlier layout
+  are unsupported and are regenerated when needed.
 - 2026-09-15 Changed: everything this program adds to a file of its own now sits under the root group
   `lucifer`, in a subgroup named for its role. `lucifer/frame` carries the frame attributes that had
   been on the file root, 17 of them beside the writer's seven, with `frameFormat` at `lucifer-frames 2.0`.

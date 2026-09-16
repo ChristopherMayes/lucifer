@@ -94,15 +94,14 @@ GRID_Z = """  beam_init%sig_z = 0
 FIXTURES = (
     dict(root="avg",
          lattice=UNDULATOR.format(method="averaged", extra="") + "\nQL: line = (QU)\nuse, QL\n",
-         params="  global%dump_at_comb = T\n  global%dump_orbit = T\n",
+         params="  global%dump_at_comb = T\n",
          beam=GRID_Z,
-         settings="averaged QU, `dump_at_comb = T`, `dump_orbit = T`, the whole window, z on a grid",
+         settings="averaged QU, `dump_at_comb = T`, the whole window, z on a grid",
          files=(
-             ("avg-000002.gc.h5", "interior frame of an averaged undulator, the coordinates the map evolves", "diagnostic"),
-             ("avg-000002.beam.h5", "the same record exported as the orbit", "exchange"),
-             ("avg-000005.beam.h5", "frame at the end of QU, the whole window, at the same s as the final dump", "exchange, checkpoint"),
-             ("avg-final.beam.h5", "final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair", "exchange, checkpoint"),
-             ("avg-final.wf.h5", "final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair", "exchange, checkpoint"),
+             ("avg-000002.beam.h5", "interior frame of an averaged undulator, the coordinates the map evolves", "frame"),
+             ("avg-000005.beam.h5", "frame at the end of QU, the whole window, at the same s as the final dump", "frame, checkpoint"),
+             ("avg-final.beam.h5", "final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair", "dump, checkpoint"),
+             ("avg-final.wf.h5", "final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair", "dump, checkpoint"),
          )),
     dict(root="unavg",
          lattice=UNDULATOR.format(method="unaveraged", extra="") + "\nQL: line = (QU)\nuse, QL\n",
@@ -110,7 +109,7 @@ FIXTURES = (
          beam=GRID_Z,
          settings="unaveraged QU, 40 steps per period, a two-period ramp, `dump_at_comb = T`",
          files=(
-             ("unavg-000002.beam.h5", "interior frame of an unaveraged undulator", "exchange"),
+             ("unavg-000002.beam.h5", "interior frame of an unaveraged undulator, the oscillation resolved", "frame"),
          )),
     dict(root="crop",
          lattice=UNDULATOR.format(method="averaged", extra=", tilt = 0.4") + "\nQL: line = (QU)\nuse, QL\n",
@@ -118,7 +117,7 @@ FIXTURES = (
          beam=GRID_Z,
          settings="averaged QU with `tilt = 0.4`, `dump_at_comb = T`, `dump_slice_first = 2`, `dump_slice_last = 4`",
          files=(
-             ("crop-000002.wf.h5", "field frame of both polarizations over three of six slices", "diagnostic"),
+             ("crop-000002.wf.h5", "field frame of both polarizations over three of six slices", "frame"),
          )),
     dict(root="keep",
          lattice=UNDULATOR.format(method="averaged", extra="") + "\nQL: line = (QU)\nuse, QL\n",
@@ -126,7 +125,7 @@ FIXTURES = (
          beam="  load_mode = \"keep\"\n  beam_init%sig_z = 1.0e-10\n",
          settings="averaged QU, `load_mode = \"keep\"`, `sig_z = 1.0e-10` in a six-slice window",
          files=(
-             ("keep-final.beam.h5", "final dump of several patches, two of them empty", "exchange, checkpoint"),
+             ("keep-final.beam.h5", "final dump of several patches, two of them empty", "dump, checkpoint"),
          )),
 )
 

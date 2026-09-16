@@ -183,13 +183,6 @@ type fel_global_struct
   ! ends. The comb already schedules the stats rows, so a frame and its row share an
   ! index (doc/reading-output.md).
   logical :: dump_at_comb = .false.
-  ! Inside an averaged undulator a frame's particles go to <out_root>-<record>.gc.h5, the
-  ! coordinates the map integrates in a file of their own with no openPMD particle record,
-  ! since an openPMD momentum means the instantaneous kinetic momentum and the map's px is
-  ! the guiding centre's. On, the frame's .beam.h5 is written as well, its records the
-  ! orbit fel_restore_quiver rebuilds, for a reader that wants standard kinetic records
-  ! inside the device and accepts the device model that rebuilds them (doc/reading-output.md).
-  logical :: dump_orbit = .false.
   ! The slices a frame carries, in window order. The default pair is the whole window,
   ! and a range cuts the series where a view wants only part of the bunch: a sample = 1
   ! run has thousands of slices and a whole-window field frame is gigabytes. The
