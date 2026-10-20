@@ -411,8 +411,8 @@ fel_mode = 0;  fel_spp = 0;  fel_ramp = 0
 do je = 1, branch%n_ele_track
   w => branch%ele(je)
   if (.not. (w%key == wiggler$ .or. w%key == undulator$)) cycle
-  select case (w%fel_method)
-  case (averaged$, unaveraged$);  fel_mode(je) = w%fel_method
+  select case (nint(w%value(fel_method$)))
+  case (averaged$, unaveraged$);  fel_mode(je) = nint(w%value(fel_method$))
   case default;                   cycle
   end select
 

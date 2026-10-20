@@ -9,6 +9,19 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-10-20 Changed: Lucifer builds against the Bmad release `20261018-0`, commit `2b4db998d`, the
+  first carrying the two Bmad changes it needs, the `fel_method` element attribute and openPMD particle
+  patches in beam files, both merged upstream from this branch. The branch's own copies of those changes
+  and every other edit to a Bmad file go, upstream's versions taking their place, so the branch changes
+  nothing outside `lucifer/` but its two workflows, which GitHub reads at the repository root. The FEL
+  element loop reads the switch from `ele%value(fel_method$)` as upstream stores it, `fel_h5_mod` writes
+  its rank-4 dataset through the HDF5 Lite API, and `convert_genesis.py` marks its patch group with
+  `patchesAreBunches = 1` and pads each extent as upstream's writer does, since upstream's reader takes an
+  unmarked patch group as one bunch. Lucifer is now built as a Bmad user program, after the distribution,
+  through `Master.cmake`, by `lucifer/util/conda_compile`, and the harness takes its four locations, the
+  Lucifer source, the Bmad source, and the two binary directories, from the layout or from `BMAD_DIR`,
+  `LUCIFER_DEBUG_BIN` and `LUCIFER_PRODUCTION_BIN`, so a Lucifer tree outside the Bmad checkout builds and
+  passes the keystone. Every recorded digit held through the merge.
 - 2026-09-15 Changed: a particle frame holds the coordinates the selected tracking method produced,
   written through the openPMD path as every dump is, inside an averaged undulator as anywhere else, with
   nothing reconstructed. Period-averaged tracking omits the fast undulator oscillation and unaveraged

@@ -170,6 +170,15 @@ jobs:
             echo "util/dist_build_debug exited $status"
             exit "$status"
           fi
+          # Lucifer is a Bmad user program and is built after the distribution, through
+          # Master.cmake with the environment dist_source_me set, into debug/ beside its
+          # source, which here is the checkout root.
+          (cd lucifer && mkd)
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "mkd in lucifer/ exited $status"
+            exit "$status"
+          fi
           ls -l debug/bin/lucifer debug/bin/lucifer_smoke_test debug/bin/wavefront_drift_test
 
       # Which backend this build carries, from lucifer's own banner. This is the line the

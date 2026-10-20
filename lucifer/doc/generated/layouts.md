@@ -107,6 +107,7 @@ Run `avg`: interior frame of an averaged undulator, the coordinates the map evol
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
           particlePatches/      group
+            @patchesAreBunches  int32 little-endian (1,)    [1]
             extent/             group
               x                 dataset                     (6,) float64 little-endian, contiguous
                 @localName      string fixed(2) ascii ()    "x"
@@ -340,6 +341,7 @@ Run `avg`: frame at the end of QU, the whole window, at the same s as the final 
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
           particlePatches/      group
+            @patchesAreBunches  int32 little-endian (1,)    [1]
             extent/             group
               x                 dataset                     (6,) float64 little-endian, contiguous
                 @localName      string fixed(2) ascii ()    "x"
@@ -592,6 +594,7 @@ Run `avg`: final dump at the zero-length END marker Bmad appends to the line, th
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
           particlePatches/      group
+            @patchesAreBunches  int32 little-endian (1,)    [1]
             extent/             group
               x                 dataset                     (6,) float64 little-endian, contiguous
                 @localName      string fixed(2) ascii ()    "x"
@@ -876,6 +879,7 @@ Run `unavg`: interior frame of an unaveraged undulator, the oscillation resolved
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
           particlePatches/      group
+            @patchesAreBunches  int32 little-endian (1,)    [1]
             extent/             group
               x                 dataset                     (6,) float64 little-endian, contiguous
                 @localName      string fixed(2) ascii ()    "x"
@@ -1174,6 +1178,7 @@ Run `keep`: final dump of several patches, two of them empty. Role: dump, checkp
               @unitSI           float64 little-endian (1,)  [5.34429e-28]
               @unitSymbol       string fixed(5) ascii ()    "eV/c"
           particlePatches/      group
+            @patchesAreBunches  int32 little-endian (1,)    [1]
             extent/             group
               x                 dataset                     (6,) float64 little-endian, contiguous
                 @localName      string fixed(2) ascii ()    "x"

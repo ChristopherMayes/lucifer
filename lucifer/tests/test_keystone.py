@@ -53,14 +53,25 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
-DEBUG_EXE = ROOT / "debug" / "bin" / "lucifer"
-PRODUCTION_EXE = ROOT / "production" / "bin" / "lucifer"
-BENCHMARK = ROOT / "lucifer" / "tests" / "run_fel_benchmark.sh"
-WAVEFRONT = ROOT / "lucifer" / "wavefront" / "tests" / "run_validation.sh"
-EXAMPLES = ROOT / "lucifer" / "examples" / "run_examples.sh"
-SCRIPTS = ROOT / "lucifer" / "tests" / "scripts"
-GENERATED = ROOT / "lucifer" / "doc" / "generated"
+# Four locations, each with a default that is today's layout, so a Lucifer source tree
+# inside the Bmad checkout runs with nothing set. The Lucifer source is this file's tree.
+# The Bmad source, which carries the regression suite and its debug binaries, is
+# BMAD_DIR, else DIST_BASE_DIR as util/dist_source_me exports it, else the parent of the
+# Lucifer source. Master.cmake places a project's binaries in debug/ and production/
+# beside the project's source, so Lucifer's two binary directories default to the tree
+# beside this one, in the Bmad checkout and out of it alike, and LUCIFER_DEBUG_BIN and
+# LUCIFER_PRODUCTION_BIN name them elsewhere.
+LUCIFER = pathlib.Path(__file__).resolve().parents[1]
+BMAD = pathlib.Path(os.environ.get("BMAD_DIR") or os.environ.get("DIST_BASE_DIR") or LUCIFER.parent).resolve()
+DEBUG_BIN = pathlib.Path(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER.parent / "debug" / "bin").resolve()
+PRODUCTION_BIN = pathlib.Path(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER.parent / "production" / "bin").resolve()
+DEBUG_EXE = DEBUG_BIN / "lucifer"
+PRODUCTION_EXE = PRODUCTION_BIN / "lucifer"
+BENCHMARK = LUCIFER / "tests" / "run_fel_benchmark.sh"
+WAVEFRONT = LUCIFER / "wavefront" / "tests" / "run_validation.sh"
+EXAMPLES = LUCIFER / "examples" / "run_examples.sh"
+SCRIPTS = LUCIFER / "tests" / "scripts"
+GENERATED = LUCIFER / "doc" / "generated"
 
 # One hour a job. The keystone takes nine minutes cold, so a job still running at an
 # hour has hung, and the group is killed rather than waited on.
@@ -138,14 +149,14 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
     return (
         Job("debug", (str(BENCHMARK), "--results", str(art / "fel-debug.txt"),
                       "--work-dir", str(art / "wd-dbg"), "--cpus", str(cores),
-                      "--tiers-marker", tiers), ROOT, lock),
+                      "--tiers-marker", tiers), LUCIFER, lock),
         Job("production", (str(BENCHMARK), "--exe", str(PRODUCTION_EXE),
                            "--results", str(art / "fel-prod.txt"),
                            "--work-dir", str(art / "wd-prd"), "--cpus", str(cores),
-                           "--wait-tiers", tiers), ROOT, lock),
+                           "--wait-tiers", tiers), LUCIFER, lock),
         Job("regression", (sys.executable, "-m", "pytest", "test_fortran.py",
-                           f"--bmad-bin={ROOT / 'debug' / 'bin'}"), ROOT / "regression_tests"),
-        Job("wavefront", (str(WAVEFRONT),), ROOT),
+                           f"--bmad-bin={BMAD / 'debug' / 'bin'}"), BMAD / "regression_tests"),
+        Job("wavefront", (str(WAVEFRONT),), LUCIFER),
         # Two workers for the examples, this job's whole allocation while the five run
         # together. With the check sections concurrent the passes finish sooner, and at
         # one worker the examples finished last, 592 s of a 592 s keystone (2026-09-13).
@@ -153,7 +164,7 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
         # measured while the sections still ran in sequence, slowed the passes by more
         # than they saved (doc/validation.md). A standalone run of run_examples.sh takes
         # its own default instead.
-        Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "2"), ROOT),
+        Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "2"), LUCIFER),
     )
 
 
@@ -196,7 +207,11 @@ def preflight() -> None:
     missing = [str(p) for p in (DEBUG_EXE, PRODUCTION_EXE) if not os.access(p, os.X_OK)]
     if missing:
         pytest.fail("both builds are prerequisites and the suite never builds; missing: "
-                    + ", ".join(missing))
+                    + ", ".join(missing) + " (LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name "
+                    "the binary directories where they are not beside the Lucifer source)")
+    if not (BMAD / "regression_tests" / "test_fortran.py").is_file() or not (BMAD / "debug" / "bin").is_dir():
+        pytest.fail(f"no Bmad source with its regression suite and a debug build at {BMAD} "
+                    "(BMAD_DIR names the Bmad checkout where it is not the Lucifer source's parent)")
     missing = [str(p) for p in (BENCHMARK, WAVEFRONT, EXAMPLES) if not os.access(p, os.X_OK)]
     if missing:
         pytest.fail("keystone scripts not executable: " + ", ".join(missing))
@@ -215,7 +230,7 @@ def keystone() -> Keystone:
     art = pathlib.Path(chosen).resolve() if chosen else \
         pathlib.Path(tempfile.mkdtemp(prefix="lucifer-keystone-"))
     art.mkdir(parents=True, exist_ok=True)
-    print(f"\nkeystone: five jobs from {ROOT}, artifacts in {art}")
+    print(f"\nkeystone: five jobs, Lucifer {LUCIFER}, Bmad {BMAD}, artifacts in {art}")
     outcomes: dict[str, Outcome] = {}
     with ThreadPoolExecutor(max_workers=len(JOB_NAMES)) as pool:
         futures = {j.name: pool.submit(run_job, j, art / f"{j.name}.log") for j in jobs(art)}
@@ -255,9 +270,9 @@ def test_regeneration(keystone: Keystone) -> None:
     generators = (
         (str(SCRIPTS / "report_validation.py"), "--debug", str(art / "fel-debug.txt"),
          "--production", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation-measured.md")),
-        (str(SCRIPTS / "report_api.py"), "--code", str(ROOT / "lucifer" / "code"),
-         "--code", str(ROOT / "lucifer" / "program"), "--out", str(GENERATED / "api.md")),
-        (str(SCRIPTS / "report_examples.py"), "--examples", str(ROOT / "lucifer" / "examples"),
+        (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "code"),
+         "--code", str(LUCIFER / "program"), "--out", str(GENERATED / "api.md")),
+        (str(SCRIPTS / "report_examples.py"), "--examples", str(LUCIFER / "examples"),
          "--out", str(GENERATED / "examples")),
         # The layouts page runs its own fixtures with the production executable. A failed
         # fixture fails this test, keeps its log in the artifact directory and leaves the
@@ -266,12 +281,12 @@ def test_regeneration(keystone: Keystone) -> None:
          "--out", str(GENERATED / "layouts.md"), "--log", str(art / "layouts.log")),
     )
     for gen in generators:
-        r = subprocess.run([sys.executable, *gen], cwd=str(ROOT), capture_output=True, text=True)
+        r = subprocess.run([sys.executable, *gen], cwd=str(LUCIFER), capture_output=True, text=True)
         assert r.returncode == 0, f"{pathlib.Path(gen[0]).name} exited {r.returncode}\n{r.stdout[-2000:]}\n{r.stderr[-2000:]}"
     # The Markdown only. The figures are committed and a plotting library upgrade
     # rewrites them all with no physics moving (doc/validation.md).
     r = subprocess.run(["git", "diff", "--exit-code", "--stat", "--",
-                        "lucifer/doc/generated/*.md", "lucifer/doc/generated/examples/*.md"],
-                       cwd=str(ROOT), capture_output=True, text=True)
+                        "doc/generated/*.md", "doc/generated/examples/*.md"],
+                       cwd=str(LUCIFER), capture_output=True, text=True)
     assert r.returncode == 0, ("a generated page moved after regeneration; a moved digit is a bug, "
                                "not a new baseline:\n" + r.stdout)

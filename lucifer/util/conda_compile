@@ -1,30 +1,35 @@
 #!/bin/bash
 #
-# Build Bmad against a conda environment, which is the one route through the distribution
-# build system that resolves the dependencies rather than requiring them to be built.
+# Build Bmad against a conda environment, then build Lucifer against that Bmad.
+#
+# Lucifer is a Bmad user program: its CMakeLists.txt includes Bmad's Master.cmake, which
+# compiles it against the Bmad distribution's libraries and modules and places its
+# binaries in debug/ and production/ beside the Lucifer source, inside the Bmad checkout
+# or out of it. The Bmad source is BMAD_DIR, or the parent of this tree when that holds
+# a Bmad checkout, and Bmad's own build goes through its distribution scripts with the
+# conda preferences below, the one route through that build system that resolves the
+# dependencies rather than requiring them to be built.
 #
 # Create the environment once, then build:
 #
-#   conda env create -n bmad-build -f .github/bmad-build-env.yaml
-#   ./util/conda_compile
+#   conda env create -n bmad-build -f <bmad>/.github/bmad-build-env.yaml
+#   lucifer/util/conda_compile                    # production: Bmad, then Lucifer
+#   BUILD_PRODUCTION=N lucifer/util/conda_compile # debug, the build to develop against
+#   BUILD_BMAD=N lucifer/util/conda_compile       # Lucifer alone, Bmad already built
 #
-# BUILD_PRODUCTION=N selects util/dist_build_debug, which is the right build while
-# developing:
-#
-#   BUILD_PRODUCTION=N ./util/conda_compile
-#
-# Preferences go in the heredoc below, not in util/dist_prefs: this script restores that file
-# from origin/main on every run and appends to it, so any edit to it is discarded.
+# Preferences go in the heredoc below, not in Bmad's util/dist_prefs: this script restores
+# that file from origin/main on every run and appends to it, so any edit to it is discarded.
 
 set -e
 
-# Everything below is relative to the repository root, so go there. Derived from this
-# script's own location rather than from the working directory, so it can be run from
-# anywhere.
-
-cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-set +e
+# The Bmad root is read into a name of this script's own: dist_source_me exports BMAD_DIR
+# for Bmad's own purposes and would otherwise overwrite the one given here.
+LUCIFER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BMAD_ROOT="${BMAD_DIR:-$(cd "$LUCIFER_DIR/.." && pwd)}"
+if [[ ! -f "$BMAD_ROOT/util/dist_source_me" ]]; then
+  echo "Error: no Bmad distribution at $BMAD_ROOT (set BMAD_DIR to the Bmad checkout)" >&2
+  exit 1
+fi
 
 if ! command -v conda &>/dev/null; then
   echo "Error: conda binary not found"
@@ -35,9 +40,6 @@ CONDA_ROOT=$(conda info --base)
 source "$CONDA_ROOT/etc/profile.d/conda.sh"
 
 conda activate bmad-build
-
-
-
 
 export LDFLAGS="$LDFLAGS -Wl,-no_compact_unwind"
 
@@ -55,13 +57,20 @@ export HDF5_ROOT="$CONDA_PREFIX"
 
 echo "** CONDA PREFIX IS: $CONDA_PREFIX"
 echo "** HDF5_ROOT IS:    $HDF5_ROOT"
+echo "** BMAD ROOT IS:    $BMAD_ROOT"
+echo "** LUCIFER_DIR IS:  $LUCIFER_DIR"
 
 BUILD_PRODUCTION=${BUILD_PRODUCTION=Y}
-ARTIFACT_FOLDER="production"
+BUILD_BMAD=${BUILD_BMAD=Y}
+
+# Everything the distribution scripts do is relative to the Bmad root, and dist_source_me
+# takes the working directory as that root.
+
+cd "$BMAD_ROOT"
 
 git checkout origin/main -- util/dist_prefs
 
-cat <<EOF >>util/dist_prefs
+cat <<PREFS >>util/dist_prefs
 export DIST_F90_REQUEST="gfortran"
 export ACC_PLOT_PACKAGE="pgplot"
 export ACC_PLOT_DISPLAY_TYPE="X"
@@ -78,25 +87,38 @@ export ACC_CONDA_BUILD="Y"
 export ACC_CONDA_BUILD_TESTS="Y"
 export ACC_CONDA_PATH="$CONDA_PREFIX"
 export ACC_USE_MACPORTS="N"
-EOF
+PREFS
 
 echo "**** Invoking dist_source_me"
+set +e
 source util/dist_source_me
+set -e
 
-cp $CONDA_PREFIX/share/gnuconfig/config.* .
+# The packages' configure scripts want current config.guess and config.sub, which the
+# conda environment ships. They are copied in for the build and removed after, so the
+# Bmad tree is left as it was.
 
-# build production if BUILD_PRODUCTION is set to Y
-if [[ "$BUILD_PRODUCTION" == "Y" ]]; then
-  echo "**** Invoking dist_build_production"
-  util/dist_build_production
-else
-  echo "**** Invoking dist_build_debug"
-  util/dist_build_debug
+cp "$CONDA_PREFIX"/share/gnuconfig/config.* .
+trap "rm -f '$BMAD_ROOT/config.guess' '$BMAD_ROOT/config.sub'" EXIT
+
+if [[ "$BUILD_BMAD" == "Y" ]]; then
+  if [[ "$BUILD_PRODUCTION" == "Y" ]]; then
+    echo "**** Invoking dist_build_production"
+    util/dist_build_production
+  else
+    echo "**** Invoking dist_build_debug"
+    util/dist_build_debug
+  fi
 fi
 
-# --- Optional: build code_examples (not included in main build) ---
-# export LIBRARY_PATH=$CONDA_PREFIX/lib
-# cd code_examples/production
-# cmake ..
-# make plot_continuous_color-exe
+# Lucifer, through Master.cmake with the environment dist_source_me set. mk builds
+# production and mkd debug, into debug/ and production/ beside the Lucifer source.
 
+cd "$LUCIFER_DIR"
+if [[ "$BUILD_PRODUCTION" == "Y" ]]; then
+  echo "**** Building Lucifer, production"
+  mk
+else
+  echo "**** Building Lucifer, debug"
+  mkd
+fi

@@ -69,7 +69,16 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Where things are. The Lucifer source is this script's tree. Master.cmake places a
+# project's binaries in debug/ and production/ beside the project's source, so the two
+# binary directories default to the tree beside this one, in the Bmad checkout and out of
+# it alike, and LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
+LUCIFER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEBUG_BIN="${LUCIFER_DEBUG_BIN:-$LUCIFER_DIR/../debug/bin}"
+PRODUCTION_BIN="${LUCIFER_PRODUCTION_BIN:-$LUCIFER_DIR/../production/bin}"
+# The Bmad source, for Tao: BMAD_DIR, else DIST_BASE_DIR as util/dist_source_me exports it,
+# else the parent of the Lucifer source.
+BMAD_SRC="${BMAD_DIR:-${DIST_BASE_DIR:-$LUCIFER_DIR/..}}"
 
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
 # searched first on purpose: an unrelated environment on PATH would supply a different
@@ -116,12 +125,12 @@ if [[ ! -x "$GENESIS" ]]; then
 fi
 
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/debug/bin/lucifer" "$BMAD_ROOT/production/bin/lucifer"; do
+  for candidate in "$DEBUG_BIN/lucifer" "$PRODUCTION_BIN/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: lucifer not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
+  echo "Error: lucifer not found. Build with: BUILD_PRODUCTION=N $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
 
@@ -134,7 +143,7 @@ if [[ -z "$PYTHON" ]]; then
 fi
 if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   echo "Error: Python not found. Create the environment:" >&2
-  echo "  conda env create -f $BMAD_ROOT/lucifer/wavefront/tests/environment.yml" >&2
+  echo "  conda env create -f $LUCIFER_DIR/wavefront/tests/environment.yml" >&2
   exit 1
 fi
 
@@ -142,7 +151,7 @@ fi
 # so it is located here rather than left to each script's own default.
 
 if [[ -z "$BEAMPHYSICS" ]]; then
-  for candidate in "${OPENPMD_BEAMPHYSICS:-}" "$BMAD_ROOT/../openPMD-beamphysics"; do
+  for candidate in "${OPENPMD_BEAMPHYSICS:-}" "$LUCIFER_DIR/../../openPMD-beamphysics"; do
     if [[ -d "$candidate/beamphysics/wavefront" ]]; then
       BEAMPHYSICS="$(cd "$candidate" && pwd)"
       break
@@ -900,10 +909,10 @@ sec_input_reference () {
 # regeneration (tests/test_keystone.py), which then requires an empty diff.
 
 sec_examples () {
-  local pages="$BMAD_ROOT/lucifer/doc/generated/examples" f differ=0
+  local pages="$LUCIFER_DIR/doc/generated/examples" f differ=0
   echo "--- examples conformance (the feature matrix, the directories, the pages) -----"
   "$PYTHON" "$SCRIPT_DIR/scripts/report_examples.py" \
-       --examples "$BMAD_ROOT/lucifer/examples" --out "$1/pages" > /dev/null \
+       --examples "$LUCIFER_DIR/examples" --out "$1/pages" > /dev/null \
     || { echo "FAIL: the example pages could not be generated" >&2; return 1; }
   for f in "$1"/pages/*.md; do
     if ! cmp -s "$f" "$pages/$(basename "$f")"; then
@@ -934,10 +943,18 @@ sec_program_structure () {
 }
 
 sec_tao_lattices () {
-  local tao="${EXE%lucifer}tao"
+  # Tao beside the tracker, which is where the distribution build puts both, else in the
+  # Bmad tree's bin of the tracker's own build type, where a Lucifer source outside the
+  # Bmad checkout finds it.
+  local tao="" candidate
+  local kind="production"
+  [[ "$EXE" == */debug/* ]] && kind="debug"
+  for candidate in "${EXE%lucifer}tao" "$BMAD_SRC/$kind/bin/tao" "$BMAD_SRC/debug/bin/tao" "$BMAD_SRC/production/bin/tao"; do
+    if [[ -x "$candidate" ]]; then tao="$candidate"; break; fi
+  done
   echo "--- Tao loads every committed lattice --------------------------------------"
-  if [[ ! -x "$tao" ]]; then
-    echo "FAIL: tao not found beside the tracker at $tao" >&2
+  if [[ -z "$tao" ]]; then
+    echo "FAIL: tao not found beside the tracker at ${EXE%lucifer}tao nor in $BMAD_SRC/{debug,production}/bin" >&2
     return 1
   fi
   "$PYTHON" "$SCRIPT_DIR/scripts/check_tao_lattices.py" --tao "$tao" \

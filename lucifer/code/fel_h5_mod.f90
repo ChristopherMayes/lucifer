@@ -38,6 +38,8 @@
 module fel_h5_mod
 
 use hdf5_interface
+use h5lt
+use hdf5
 use, intrinsic :: iso_c_binding
 
 implicit none
@@ -229,14 +231,17 @@ end subroutine fel_h5_real_rank3
 subroutine fel_h5_real_rank4 (id, name, unit, label, descrip, axes, val, error)
 
 integer(hid_t) id
+integer(hsize_t) dims(4)
+integer h5_err
 real(rp) val(:,:,:,:)
-logical error, err
+logical error
 character(*) name, unit, label, descrip, axes
 
-!
+! Bmad's dataset writer stops at rank 3, so this one goes to the HDF5 Lite API directly.
 
-call hdf5_write_dataset_real (id, name, val, err)
-error = error .or. err
+dims = shape(val)
+call H5LTmake_dataset_double_f (id, name, 4, dims, val, h5_err)
+error = error .or. (h5_err < 0)
 call annotate (id, name, unit, label, descrip, axes, error)
 
 end subroutine fel_h5_real_rank4

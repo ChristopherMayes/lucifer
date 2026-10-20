@@ -381,6 +381,62 @@ def main():
           0.0 if patch_count(wd / "bfe-final.beam.h5") == len(c0) else 1.0, 0.5)
 
     # ------------------------------------------------------------------
+    # A Genesis dump converted to openPMD is the tiers' starting beam, and Bmad's reader
+    # restores one bunch per patch only under the patchesAreBunches mark: an unmarked patch
+    # group is another writer's partition and reads as one bunch. The converter writes the
+    # mark and pads each extent as Bmad's writer does, so the upper bound strictly encloses
+    # the patch's particles, a singleton or an all-zero z included. The same beam with its
+    # empty slice goes out as a Genesis dump, comes back through the converter, and is loaded.
+    print("== a converted Genesis dump reads as its slices ==")
+
+    as_genesis(wd, "bfe-final.beam.h5", "bfe-conv.par.h5")
+    r = subprocess.run([sys.executable,
+                        str(pathlib.Path(__file__).resolve().parent / "convert_genesis.py"),
+                        "to-openpmd", "bfe-conv.par.h5", "bfe-conv.beam.h5"]
+                       + (["--pyrepo", a.pyrepo] if a.pyrepo else []),
+                       cwd=wd, capture_output=True, text=True)
+    check("the converter runs (exit 0)", float(r.returncode), 0.5)
+    with h5py.File(wd / "bfe-conv.beam.h5") as h5:
+        it = sorted(h5["data"].keys())[0]       # the converter numbers its iteration 1, not 00001
+        sp = h5[f"data/{it}/particles/electron"]
+        pp = sp["particlePatches"]
+        mark = int(np.atleast_1d(pp.attrs.get("patchesAreBunches", 0))[0])
+        n_pat = np.atleast_1d(pp["numParticles"][...]).astype(int)
+        off = np.atleast_1d(pp["numParticlesOffset"][...]).astype(int)
+        pos = {c: np.asarray(sp["position"][c][...] if isinstance(sp["position"][c], h5py.Dataset)
+                             else np.full(int(n_pat.sum()), float(sp["position"][c].attrs["value"][0])))
+               for c in ("x", "y", "z")}
+        lo = {c: np.atleast_1d(pp["offset"][c][...]) for c in ("x", "y", "z")}
+        ex = {c: np.atleast_1d(pp["extent"][c][...]) for c in ("x", "y", "z")}
+    check("the patch group carries patchesAreBunches = 1", abs(mark - 1), 0.5)
+    check("one patch per Genesis slice, the empty one a zero-count patch",
+          0.0 if list(n_pat) == c0 else 1.0, 0.5)
+    outside = 0
+    for k, n in enumerate(n_pat):
+        for c in ("x", "y", "z"):
+            seg = pos[c][off[k]:off[k] + n]
+            if n and not (lo[c][k] <= seg.min() and seg.max() < lo[c][k] + ex[c][k]):
+                outside += 1
+            if ex[c][k] <= 0:
+                outside += 1
+    check("every patch's bounds strictly enclose its particles, every extent positive", outside, 0.5)
+
+    # Loaded by the tracker, which reads the file through Bmad's reader: the slices come
+    # back as the window, counts and order as the dump had them.
+    run(exe, wd, "bfc", restart("bfc", "bfe-conv.beam.h5", "bfe-final.wf.h5"))
+    c2 = slice_counts(wd / "bfc-initial.beam.h5")
+    check("Bmad's reader returns one bunch per slice of the converted file", 0.0 if c2 == c0 else 1.0, 0.5)
+    s_src = beamio.read_slices(wd / "bfe-conv.beam.h5", LAMBDA0, SPACING)
+    s_got = beamio.read_slices(wd / "bfc-initial.beam.h5", LAMBDA0, SPACING)
+    worst = 0.0
+    for sa, sb in zip(s_src, s_got):
+        if sa["n"] == 0:
+            continue
+        for key in ("x", "y", "px", "py"):
+            worst = max(worst, float(np.max(np.abs(np.asarray(sa[key]) - np.asarray(sb[key])))))
+    check("the particles come back in the converted file's order, slice by slice [m or gamma beta]", worst, 1e-12)
+
+    # ------------------------------------------------------------------
     print("== refusals ==")
 
     # Not openPMD: a Genesis dump, which the message must name the converter for.

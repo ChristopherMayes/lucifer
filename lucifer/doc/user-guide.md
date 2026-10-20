@@ -4,13 +4,38 @@ Everything needed to get from a checkout to a tracked FEL run. The parameter-by-
 
 ## Building
 
-Lucifer builds as part of Bmad's normal distribution build. No step here is specific to
-it: the binary lands in `production/bin/lucifer`, or `debug/bin/lucifer` for a debug
-build, alongside every other Bmad program.
+Lucifer is a Bmad user program, built against a Bmad distribution rather than as part of
+one. The Bmad it builds against is the `bmad-sim/bmad-ecosystem` release `20261018-0`,
+commit `2b4db998d`, the first release carrying the two Bmad changes Lucifer needs: the
+`fel_method` element attribute and openPMD particle patches in the beam files. An older
+Bmad refuses the lattices and reads a multi-slice beam file as one bunch.
+
+Its `CMakeLists.txt` includes Bmad's `Master.cmake`, which compiles it against the
+distribution's libraries and modules and places its binaries in `debug/` and `production/`
+beside the Lucifer source: inside a Bmad checkout that is the checkout's own `debug/bin`
+and `production/bin`, and outside one it is the directory next to the source. One script
+builds Bmad and then Lucifer, with the conda preferences the recorded levels were measured
+under:
+
+```
+conda env create -n bmad-build -f <bmad>/.github/bmad-build-env.yaml   # once
+BUILD_PRODUCTION=N lucifer/util/conda_compile      # debug, the build to develop against
+lucifer/util/conda_compile                         # production
+BUILD_BMAD=N lucifer/util/conda_compile            # Lucifer alone, Bmad already built
+```
+
+The Bmad source is `BMAD_DIR`, or the parent of the Lucifer source when that holds a Bmad
+checkout. By hand, the same build is `source <bmad>/util/dist_source_me` from the Bmad
+root and then `mk` or `mkd` in the Lucifer directory.
 
 Running the validation harness needs one thing beyond the binary, a Python environment
 with numpy, h5py and pytest, described by `lucifer/wavefront/tests/environment.yml`. The
-exact commands the harness runs are in [`validation.md`](validation.md).
+harness takes four locations, each defaulting to the layout above: the Lucifer source,
+which is the scripts' own tree, the Bmad source with its regression suite (`BMAD_DIR`), and
+the two binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). Outside the Bmad
+checkout, `OPENPMD_BEAMPHYSICS` names the openPMD-beamphysics checkout as well, whose
+default is a sibling of the Bmad checkout. The exact
+commands the harness runs are in [`validation.md`](validation.md).
 
 ## The two FEL methods
 

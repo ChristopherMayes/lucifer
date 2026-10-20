@@ -238,6 +238,9 @@ def write_openpmd_beam(path, groups, spacing):
         # Bmad's reader takes these through its openPMD dataset reader, which expects the
         # unit attributes every openPMD record carries.
         pp = sp.create_group("particlePatches")
+        # Bmad restores one bunch per patch only under this mark; without it a patch
+        # group is another writer's partition and the species is read as one bunch.
+        pp.attrs["patchesAreBunches"] = np.array([1], dtype=np.int32)
         off = np.concatenate([[0], np.cumsum(n_pat)[:-1]]).astype(np.int32)
         for name_, vals in (("numParticles", np.asarray(n_pat, dtype=np.int32)),
                             ("numParticlesOffset", off)):
@@ -247,12 +250,16 @@ def write_openpmd_beam(path, groups, spacing):
             d.attrs["unitSymbol"] = np.bytes_(b"")
             d.attrs["localName"] = np.bytes_(name_.encode())
         lo, hi = pp.create_group("offset"), pp.create_group("extent")
+        # The extent is padded as Bmad's writer pads it, so the upper bound strictly
+        # encloses the patch's particles, a singleton or an all-zero z included.
+        eps = np.finfo(float).eps
         for comp, vals in (("x", x), ("y", y), ("z", np.zeros(n_tot))):
             b_lo, b_ex = [], []
             for k, n in enumerate(n_pat):
                 seg = vals[off[k]:off[k] + n]
-                b_lo.append(float(seg.min()) if n else 0.0)
-                b_ex.append(float(seg.max() - seg.min()) if n else 0.0)
+                s_lo, s_hi = (float(seg.min()), float(seg.max())) if n else (0.0, 0.0)
+                b_lo.append(s_lo)
+                b_ex.append(s_hi - s_lo + 8 * eps * max(1.0, abs(s_lo), abs(s_hi)))
             _pmd_dataset(lo, comp, b_lo, 1.0, UNIT_M, comp)
             _pmd_dataset(hi, comp, b_ex, 1.0, UNIT_M, comp)
 

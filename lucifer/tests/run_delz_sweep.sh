@@ -21,7 +21,13 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Where things are. The Lucifer source is this script's tree. Master.cmake places a
+# project's binaries in debug/ and production/ beside the project's source, so the two
+# binary directories default to the tree beside this one, in the Bmad checkout and out of
+# it alike, and LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
+LUCIFER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEBUG_BIN="${LUCIFER_DEBUG_BIN:-$LUCIFER_DIR/../debug/bin}"
+PRODUCTION_BIN="${LUCIFER_PRODUCTION_BIN:-$LUCIFER_DIR/../production/bin}"
 
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
 # searched first on purpose: an unrelated environment on PATH would supply a different
@@ -54,12 +60,12 @@ if [[ ! -x "$GENESIS" ]]; then
 fi
 
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/debug/bin/lucifer" "$BMAD_ROOT/production/bin/lucifer"; do
+  for candidate in "$DEBUG_BIN/lucifer" "$PRODUCTION_BIN/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: lucifer not found. Build with: cd $BMAD_ROOT && BUILD_PRODUCTION=N ./util/conda_compile" >&2
+  echo "Error: lucifer not found. Build with: BUILD_PRODUCTION=N $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
 

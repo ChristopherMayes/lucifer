@@ -25,8 +25,14 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-FIG_DIR="$BMAD_ROOT/lucifer/doc/generated/examples"
+# Where things are. The Lucifer source is this script's tree. Master.cmake places a
+# project's binaries in debug/ and production/ beside the project's source, so the two
+# binary directories default to the tree beside this one, in the Bmad checkout and out of
+# it alike, and LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
+LUCIFER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEBUG_BIN="${LUCIFER_DEBUG_BIN:-$LUCIFER_DIR/../debug/bin}"
+PRODUCTION_BIN="${LUCIFER_PRODUCTION_BIN:-$LUCIFER_DIR/../production/bin}"
+FIG_DIR="$LUCIFER_DIR/doc/generated/examples"
 
 EXE=""
 PYTHON=""
@@ -56,12 +62,12 @@ fi
 
 # Production by default: these timings are the ones the READMEs quote.
 if [[ -z "$EXE" ]]; then
-  for candidate in "$BMAD_ROOT/production/bin/lucifer" "$BMAD_ROOT/debug/bin/lucifer"; do
+  for candidate in "$PRODUCTION_BIN/lucifer" "$DEBUG_BIN/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
 if [[ -z "$EXE" || ! -x "$EXE" ]]; then
-  echo "Error: lucifer not found. Build with: cd $BMAD_ROOT && ./util/conda_compile" >&2
+  echo "Error: lucifer not found. Build with: $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
 
@@ -74,7 +80,7 @@ if [[ -z "$PYTHON" ]]; then
 fi
 if [[ $FIGURES -eq 1 && ( -z "$PYTHON" || ! -x "$PYTHON" ) ]]; then
   echo "Error: Python not found, and the figures need h5py and matplotlib." >&2
-  echo "  Create it with: conda env create -f $BMAD_ROOT/lucifer/wavefront/tests/environment.yml" >&2
+  echo "  Create it with: conda env create -f $LUCIFER_DIR/wavefront/tests/environment.yml" >&2
   echo "  Or run with --no-figures to only check that the examples run." >&2
   exit 1
 fi
@@ -117,7 +123,7 @@ if [[ "$JOBS" -eq 0 ]]; then
   [[ $JOBS -gt 3 ]] && JOBS=3
 fi
 
-cd "$BMAD_ROOT/lucifer/examples" || exit 1
+cd "$LUCIFER_DIR/examples" || exit 1
 mkdir -p "$FIG_DIR"
 
 STATE="$(mktemp -d "${TMPDIR:-/tmp}/run_examples.XXXXXX")"

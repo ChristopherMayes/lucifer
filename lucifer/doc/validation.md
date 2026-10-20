@@ -10,10 +10,21 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule: a moved line there is a change to the files this program writes, to explain, review, regenerate and stage, and neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. From the `bmad-ecosystem` root, with the interpreter of the `bmad-fel-validate` environment:
 
 ```
-BUILD_PRODUCTION=N ./util/conda_compile      # debug
-./util/conda_compile                         # production
+BUILD_PRODUCTION=N lucifer/util/conda_compile      # debug: Bmad, then Lucifer
+lucifer/util/conda_compile                         # production
 python3 -m pytest lucifer/tests/test_keystone.py -v
 ```
+
+The build script builds the Bmad distribution and then Lucifer against it, through
+Bmad's `Master.cmake`, which places Lucifer's binaries in `debug/` and `production/`
+beside the Lucifer source ([building](user-guide.md#building)). The suite takes four
+locations, each defaulting to that layout inside a Bmad checkout: the Lucifer source,
+which is its own tree, the Bmad source with its regression suite and debug binaries
+(`BMAD_DIR`, else `DIST_BASE_DIR`, else the Lucifer source's parent), and the two Lucifer
+binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). A Lucifer source tree
+outside the Bmad checkout runs the same suite with `BMAD_DIR` set, and with
+`OPENPMD_BEAMPHYSICS` naming the openPMD-beamphysics checkout, whose default is a sibling
+of the Bmad checkout.
 
 The suite launches the five jobs at once, each from an absolute working directory into its own log under a fresh artifact directory it names, and keeps every outcome, a launch that failed and a job that timed out included. Five tests read those outcomes, one each, and a sixth regenerates the four page sets and requires the Markdown diff to be empty, verifying for itself that all five passed before it runs a generator, so it cannot pass on a partial run and does not lean on test order. Selecting one test still runs all five jobs, xdist is refused, and a job past its hour is killed as a process group. The five jobs are the ones below, unchanged, and the suite launches them where a retyped recipe twice launched a benchmark from a directory an earlier command had moved into, ran four jobs of five, and reported a complete keystone from a one-line log.
 
@@ -21,7 +32,7 @@ The suite launches the five jobs at once, each from an absolute working director
 ./lucifer/tests/run_fel_benchmark.sh --results <art>/fel-debug.txt --work-dir <art>/wd-dbg
 ./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer \
         --results <art>/fel-prod.txt --work-dir <art>/wd-prd
-(cd regression_tests && pytest test_fortran.py --bmad-bin=$PWD/../debug/bin)
+(cd $BMAD_DIR/regression_tests && pytest test_fortran.py --bmad-bin=$BMAD_DIR/debug/bin)
 ./lucifer/wavefront/tests/run_validation.sh
 ./lucifer/examples/run_examples.sh --no-figures
 ```
