@@ -25,8 +25,11 @@ BUILD_BMAD=N lucifer/util/conda_compile            # Lucifer alone, Bmad already
 ```
 
 The Bmad source is `BMAD_DIR`, or the parent of the Lucifer source when that holds a Bmad
-checkout. By hand, the same build is `source <bmad>/util/dist_source_me` from the Bmad
-root and then `mk` or `mkd` in the Lucifer directory.
+checkout. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over
+with a note, since `dist_source_me` uses that name as a loop variable and leaves it at
+the checkout's `util/` once sourced. By hand, the same build is `source
+<bmad>/util/dist_source_me` from the Bmad root and then `mk` or `mkd` in the Lucifer
+directory.
 
 Running the validation harness needs one thing beyond the binary, a Python environment
 with numpy, h5py and pytest, described by `lucifer/wavefront/tests/environment.yml`. The
@@ -34,7 +37,9 @@ harness takes four locations, each defaulting to the layout above: the Lucifer s
 which is the scripts' own tree, the Bmad source with its regression suite (`BMAD_DIR`), and
 the two binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). Outside the Bmad
 checkout, `OPENPMD_BEAMPHYSICS` names the openPMD-beamphysics checkout as well, whose
-default is a sibling of the Bmad checkout. The exact
+default is a sibling of the Bmad checkout. A relative value is taken against the
+directory a script was started in. The benchmark records the build its `--build` option
+declares, debug or production, and never reads it off a directory name. The exact
 commands the harness runs are in [`validation.md`](validation.md).
 
 ## The two FEL methods

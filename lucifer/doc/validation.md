@@ -24,13 +24,19 @@ which is its own tree, the Bmad source with its regression suite and debug binar
 binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). A Lucifer source tree
 outside the Bmad checkout runs the same suite with `BMAD_DIR` set, and with
 `OPENPMD_BEAMPHYSICS` naming the openPMD-beamphysics checkout, whose default is a sibling
-of the Bmad checkout.
+of the Bmad checkout. A relative value is taken against the directory the suite was
+started in, and every job is handed the resolved absolute values, since the jobs run from
+the Lucifer source. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is
+passed over with a note, since `dist_source_me` uses that name as a loop variable and
+leaves it at the checkout's `util/` once sourced. The shell scripts take the same rule
+from `util/locations.sh`, which they source.
 
 The suite launches the five jobs at once, each from an absolute working directory into its own log under a fresh artifact directory it names, and keeps every outcome, a launch that failed and a job that timed out included. Five tests read those outcomes, one each, and a sixth regenerates the four page sets and requires the Markdown diff to be empty, verifying for itself that all five passed before it runs a generator, so it cannot pass on a partial run and does not lean on test order. Selecting one test still runs all five jobs, xdist is refused, and a job past its hour is killed as a process group. The five jobs are the ones below, unchanged, and the suite launches them where a retyped recipe twice launched a benchmark from a directory an earlier command had moved into, ran four jobs of five, and reported a complete keystone from a one-line log.
 
 ```
-./lucifer/tests/run_fel_benchmark.sh --results <art>/fel-debug.txt --work-dir <art>/wd-dbg
-./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer \
+./lucifer/tests/run_fel_benchmark.sh --exe $PWD/debug/bin/lucifer --build debug \
+        --results <art>/fel-debug.txt --work-dir <art>/wd-dbg
+./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer --build production \
         --results <art>/fel-prod.txt --work-dir <art>/wd-prd
 (cd $BMAD_DIR/regression_tests && pytest test_fortran.py --bmad-bin=$BMAD_DIR/debug/bin)
 ./lucifer/wavefront/tests/run_validation.sh

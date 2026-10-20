@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-10-20 Changed: the harness locations hold under any spelling. The benchmark records the build its
+  `--build` option declares, debug or production, which `--results` now requires, where it read the flavor
+  off the binary's directory name and wrote `unknown` for a directory named otherwise, which the table
+  generator then refused after the whole run. The keystone suite resolves a relative `BMAD_DIR`,
+  `LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN` or `OPENPMD_BEAMPHYSICS` against the directory it was
+  started in and hands every job the absolute values, where a relative one passed its preflight and
+  failed in the job, which runs from the Lucifer source. A `BMAD_DIR` naming a directory with no
+  `util/dist_source_me` is passed over with a note, since `dist_source_me` uses that name as a loop
+  variable and leaves it at the checkout's `util/` once sourced. The shell scripts take the rule from
+  `util/locations.sh`, which they source, and each makes its executable absolute before changing
+  directory.
 - 2026-10-20 Changed: Lucifer builds against the Bmad release `20261018-0`, commit `2b4db998d`, the
   first carrying the two Bmad changes it needs, the `fel_method` element attribute and openPMD particle
   patches in beam files, both merged upstream from this branch. The branch's own copies of those changes

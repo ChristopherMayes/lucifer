@@ -22,12 +22,13 @@
 
 set -e
 
-# The Bmad root is read into a name of this script's own: dist_source_me exports BMAD_DIR
-# for Bmad's own purposes and would otherwise overwrite the one given here.
-LUCIFER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BMAD_ROOT="${BMAD_DIR:-$(cd "$LUCIFER_DIR/.." && pwd)}"
-if [[ ! -f "$BMAD_ROOT/util/dist_source_me" ]]; then
-  echo "Error: no Bmad distribution at $BMAD_ROOT (set BMAD_DIR to the Bmad checkout)" >&2
+# The Bmad root, by the shared rule (locations.sh), into a name of this script's own:
+# dist_source_me uses BMAD_DIR as a loop variable and would otherwise overwrite the one
+# given here.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/locations.sh"
+BMAD_ROOT="$BMAD_SRC"
+if [[ -z "$BMAD_ROOT" ]]; then
+  echo "Error: no Bmad checkout found (set BMAD_DIR to one, which holds util/dist_source_me)" >&2
   exit 1
 fi
 

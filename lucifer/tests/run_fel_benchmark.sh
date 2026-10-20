@@ -33,7 +33,12 @@
 #
 # Options:
 #   --genesis <path>    genesis4 binary. Default: $GENESIS4, else genesis4 on PATH.
-#   --exe <path>        lucifer binary. Default: debug then production.
+#   --exe <path>        lucifer binary. Default: the --build flavor's, else debug then
+#                       production.
+#   --build <flavor>    debug or production: the build that ran, which the results file
+#                       records and the Tao search tries first. Required with --results,
+#                       since a results file naming no flavor cannot write the generated
+#                       table, and never read off the binary's directory name.
 #   --python <path>     Python interpreter. Default: the bmad-fel-validate conda env.
 #   --work-dir <path>   Where to run. Default: a temporary directory (kept on failure).
 #   --beamphysics <p>   openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
@@ -69,17 +74,9 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Where things are. The Lucifer source is this script's tree. Master.cmake places a
-# project's binaries in debug/ and production/ beside the project's source, so the two
-# binary directories default to the tree beside this one, in the Bmad checkout and out of
-# it alike, and LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
-LUCIFER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEBUG_BIN="${LUCIFER_DEBUG_BIN:-$LUCIFER_DIR/../debug/bin}"
-PRODUCTION_BIN="${LUCIFER_PRODUCTION_BIN:-$LUCIFER_DIR/../production/bin}"
-# The Bmad source, for Tao: BMAD_DIR, else DIST_BASE_DIR as util/dist_source_me exports it,
-# else the parent of the Lucifer source.
-BMAD_SRC="${BMAD_DIR:-${DIST_BASE_DIR:-$LUCIFER_DIR/..}}"
-
+# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
+# defaults and the variables that name them elsewhere (util/locations.sh).
+source "$SCRIPT_DIR/../util/locations.sh"
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
 # searched first on purpose: an unrelated environment on PATH would supply a different
 # build, and the comparison levels are tied to the build that produced them.
@@ -91,6 +88,7 @@ if [[ -z "$GENESIS" ]]; then
   done
 fi
 EXE=""
+BUILD=""
 PYTHON=""
 WORK_DIR=""
 BEAMPHYSICS=""
@@ -103,6 +101,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --genesis)  GENESIS="$2";  shift 2 ;;
     --exe)      EXE="$2";      shift 2 ;;
+    --build)    BUILD="$2";    shift 2 ;;
     --python)   PYTHON="$2";   shift 2 ;;
     --work-dir) WORK_DIR="$2"; shift 2 ;;
     --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
@@ -110,7 +109,7 @@ while [[ $# -gt 0 ]]; do
     --cpus)     CPUS="$2";     shift 2 ;;
     --tiers-marker) TIERS_MARKER="$2"; shift 2 ;;
     --wait-tiers)   WAIT_TIERS="$2";   shift 2 ;;
-    -h|--help)  sed -n '2,46p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,53p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -124,8 +123,22 @@ if [[ ! -x "$GENESIS" ]]; then
   exit 1
 fi
 
+case "$BUILD" in
+  ""|debug|production) ;;
+  *) echo "Error: --build takes debug or production, got '$BUILD'" >&2; exit 2 ;;
+esac
+if [[ -n "$RESULTS" && -z "$BUILD" ]]; then
+  echo "Error: --results needs --build debug or --build production, which the results file records" >&2
+  exit 2
+fi
+
 if [[ -z "$EXE" ]]; then
-  for candidate in "$DEBUG_BIN/lucifer" "$PRODUCTION_BIN/lucifer"; do
+  case "$BUILD" in
+    debug)      candidates=("$DEBUG_BIN/lucifer") ;;
+    production) candidates=("$PRODUCTION_BIN/lucifer") ;;
+    *)          candidates=("$DEBUG_BIN/lucifer" "$PRODUCTION_BIN/lucifer") ;;
+  esac
+  for candidate in "${candidates[@]}"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
   done
 fi
@@ -133,6 +146,8 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Error: lucifer not found. Build with: BUILD_PRODUCTION=N $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
+# Absolute from here on: the run changes into its work directory.
+EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
 if [[ -z "$PYTHON" ]]; then
   for candidate in "${LUCIFER_PYTHON:-}" \
@@ -229,16 +244,12 @@ echo "  cores:       $CPUS for the check sections, $SECTION_WORKERS at once"
 echo
 
 # The results file is for doc generation, so it records what is reproducible: which
-# build flavor ran, which sections passed, and each tier's level. No timing, no path,
-# no host: those would make the generated documentation differ between runs.
+# build ran, as --build declared it, which sections passed, and each tier's level. No
+# timing, no path, no host: those would make the generated documentation differ between
+# runs.
 if [[ -n "$RESULTS" ]]; then
-  case "$EXE" in
-    */debug/bin/*)      BUILD_FLAVOR=debug ;;
-    */production/bin/*) BUILD_FLAVOR=production ;;
-    *)                  BUILD_FLAVOR=unknown ;;
-  esac
   : > "$RESULTS"
-  echo "build|$BUILD_FLAVOR" >> "$RESULTS"
+  echo "build|$BUILD" >> "$RESULTS"
 fi
 
 # Inputs are grouped by consumer and configuration (genesis4/<config>/*.in with the
@@ -944,17 +955,19 @@ sec_program_structure () {
 
 sec_tao_lattices () {
   # Tao beside the tracker, which is where the distribution build puts both, else in the
-  # Bmad tree's bin of the tracker's own build type, where a Lucifer source outside the
-  # Bmad checkout finds it.
+  # Bmad checkout's bin of the declared build first, where a Lucifer source outside the
+  # checkout finds it.
   local tao="" candidate
-  local kind="production"
-  [[ "$EXE" == */debug/* ]] && kind="debug"
-  for candidate in "${EXE%lucifer}tao" "$BMAD_SRC/$kind/bin/tao" "$BMAD_SRC/debug/bin/tao" "$BMAD_SRC/production/bin/tao"; do
+  local kinds=(debug production)
+  [[ "$BUILD" == production ]] && kinds=(production debug)
+  local candidates=("${EXE%lucifer}tao")
+  [[ -n "$BMAD_SRC" ]] && candidates+=("$BMAD_SRC/${kinds[0]}/bin/tao" "$BMAD_SRC/${kinds[1]}/bin/tao")
+  for candidate in "${candidates[@]}"; do
     if [[ -x "$candidate" ]]; then tao="$candidate"; break; fi
   done
   echo "--- Tao loads every committed lattice --------------------------------------"
   if [[ -z "$tao" ]]; then
-    echo "FAIL: tao not found beside the tracker at ${EXE%lucifer}tao nor in $BMAD_SRC/{debug,production}/bin" >&2
+    echo "FAIL: tao not found beside the tracker at ${EXE%lucifer}tao nor in ${BMAD_SRC:-<no Bmad checkout, set BMAD_DIR>}/{debug,production}/bin" >&2
     return 1
   fi
   "$PYTHON" "$SCRIPT_DIR/scripts/check_tao_lattices.py" --tao "$tao" \

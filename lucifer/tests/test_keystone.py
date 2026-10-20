@@ -9,8 +9,8 @@ before it runs a generator, so it does not lean on test order and cannot pass on
 partial run. Nothing here builds: both trees are prerequisites and are checked before
 any job launches, since a benchmark reads the source tree throughout.
 
-    BUILD_PRODUCTION=N ./util/conda_compile
-    ./util/conda_compile
+    BUILD_PRODUCTION=N lucifer/util/conda_compile
+    lucifer/util/conda_compile
     <bmad-fel-validate python> -m pytest lucifer/tests/test_keystone.py -v
 
 What the contract means in practice:
@@ -54,17 +54,49 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 # Four locations, each with a default that is today's layout, so a Lucifer source tree
-# inside the Bmad checkout runs with nothing set. The Lucifer source is this file's tree.
-# The Bmad source, which carries the regression suite and its debug binaries, is
-# BMAD_DIR, else DIST_BASE_DIR as util/dist_source_me exports it, else the parent of the
-# Lucifer source. Master.cmake places a project's binaries in debug/ and production/
-# beside the project's source, so Lucifer's two binary directories default to the tree
-# beside this one, in the Bmad checkout and out of it alike, and LUCIFER_DEBUG_BIN and
-# LUCIFER_PRODUCTION_BIN name them elsewhere.
+# inside the Bmad checkout runs with nothing set (the same rule as util/locations.sh, which
+# the shell scripts source). The Lucifer source is this file's tree. The Bmad source,
+# which carries the regression suite and its debug binaries, is BMAD_DIR, else
+# DIST_BASE_DIR as util/dist_source_me exports it, else the parent of the Lucifer
+# source. Master.cmake places a project's binaries in debug/ and production/ beside the
+# project's source, so Lucifer's two binary directories default to the tree beside this
+# one, in the Bmad checkout and out of it alike, and LUCIFER_DEBUG_BIN and
+# LUCIFER_PRODUCTION_BIN name them elsewhere. A relative value is taken against the
+# directory pytest was started in, and every job is handed the absolute values, since
+# the jobs run from the Lucifer source and a relative path would mean something else
+# there.
 LUCIFER = pathlib.Path(__file__).resolve().parents[1]
-BMAD = pathlib.Path(os.environ.get("BMAD_DIR") or os.environ.get("DIST_BASE_DIR") or LUCIFER.parent).resolve()
-DEBUG_BIN = pathlib.Path(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER.parent / "debug" / "bin").resolve()
-PRODUCTION_BIN = pathlib.Path(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER.parent / "production" / "bin").resolve()
+
+
+def bmad_source() -> tuple[pathlib.Path, list[str]]:
+    """The Bmad checkout, and the notes on any variable passed over.
+
+    A variable naming a directory with no util/dist_source_me is passed over, since
+    dist_source_me uses BMAD_DIR as a loop variable and leaves it at the checkout's
+    util/ once sourced; DIST_BASE_DIR, which it exports, then still names the checkout.
+    """
+    notes = []
+    for var in ("BMAD_DIR", "DIST_BASE_DIR"):
+        value = os.environ.get(var)
+        if not value:
+            continue
+        path = pathlib.Path(os.path.abspath(value))
+        if (path / "util" / "dist_source_me").is_file():
+            return path, notes
+        notes.append(f"{var}={value} holds no util/dist_source_me and is passed over")
+    return LUCIFER.parent, notes
+
+
+BMAD, BMAD_NOTES = bmad_source()
+DEBUG_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER.parent / "debug" / "bin"))
+PRODUCTION_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER.parent / "production" / "bin"))
+# What every job is handed: each value as it was given, made absolute, with no symbolic
+# link followed. The openPMD-beamphysics checkout has its default in the scripts, so it
+# is passed through only where set.
+LOCATIONS = {"BMAD_DIR": str(BMAD),
+             "LUCIFER_DEBUG_BIN": str(DEBUG_BIN), "LUCIFER_PRODUCTION_BIN": str(PRODUCTION_BIN)}
+if os.environ.get("OPENPMD_BEAMPHYSICS"):
+    LOCATIONS["OPENPMD_BEAMPHYSICS"] = os.path.abspath(os.environ["OPENPMD_BEAMPHYSICS"])
 DEBUG_EXE = DEBUG_BIN / "lucifer"
 PRODUCTION_EXE = PRODUCTION_BIN / "lucifer"
 BENCHMARK = LUCIFER / "tests" / "run_fel_benchmark.sh"
@@ -147,10 +179,11 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
     # its own block until that marker appears and runs the rest of its work meanwhile.
     tiers = str(art / "tiers-debug.done")
     return (
-        Job("debug", (str(BENCHMARK), "--results", str(art / "fel-debug.txt"),
+        Job("debug", (str(BENCHMARK), "--exe", str(DEBUG_EXE), "--build", "debug",
+                      "--results", str(art / "fel-debug.txt"),
                       "--work-dir", str(art / "wd-dbg"), "--cpus", str(cores),
                       "--tiers-marker", tiers), LUCIFER, lock),
-        Job("production", (str(BENCHMARK), "--exe", str(PRODUCTION_EXE),
+        Job("production", (str(BENCHMARK), "--exe", str(PRODUCTION_EXE), "--build", "production",
                            "--results", str(art / "fel-prod.txt"),
                            "--work-dir", str(art / "wd-prd"), "--cpus", str(cores),
                            "--wait-tiers", tiers), LUCIFER, lock),
@@ -172,7 +205,7 @@ def run_job(job: Job, log: pathlib.Path) -> Outcome:
     """Run one job to its return code, or to a recorded failure, never to an exception."""
     out = Outcome(job.name, log)
     t0 = time.monotonic()
-    env = dict(os.environ, **dict(job.env))
+    env = dict(os.environ, **LOCATIONS, **dict(job.env))
     try:
         with open(log, "w") as lf:
             proc = subprocess.Popen(list(job.argv), cwd=str(job.cwd), env=env,
@@ -231,6 +264,8 @@ def keystone() -> Keystone:
         pathlib.Path(tempfile.mkdtemp(prefix="lucifer-keystone-"))
     art.mkdir(parents=True, exist_ok=True)
     print(f"\nkeystone: five jobs, Lucifer {LUCIFER}, Bmad {BMAD}, artifacts in {art}")
+    for note in BMAD_NOTES:
+        print(f"keystone: {note}")
     outcomes: dict[str, Outcome] = {}
     with ThreadPoolExecutor(max_workers=len(JOB_NAMES)) as pool:
         futures = {j.name: pool.submit(run_job, j, art / f"{j.name}.log") for j in jobs(art)}

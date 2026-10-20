@@ -50,13 +50,9 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Where things are. The Lucifer source is this script's tree. Master.cmake places a
-# project's binaries in debug/ and production/ beside the project's source, so the two
-# binary directories default to the tree beside this one, in the Bmad checkout and out of
-# it alike, and LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
-LUCIFER_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-DEBUG_BIN="${LUCIFER_DEBUG_BIN:-$LUCIFER_DIR/../debug/bin}"
-PRODUCTION_BIN="${LUCIFER_PRODUCTION_BIN:-$LUCIFER_DIR/../production/bin}"
+# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
+# defaults and the variables that name them elsewhere (util/locations.sh).
+source "$SCRIPT_DIR/../../util/locations.sh"
 
 BEAMPHYSICS=""
 PYTHON=""
@@ -92,6 +88,8 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Or point at it with --exe <path>." >&2
   exit 1
 fi
+# Absolute from here on: the run changes directory.
+EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
 # Locate openPMD-beamphysics.
 
