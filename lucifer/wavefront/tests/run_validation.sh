@@ -29,7 +29,7 @@
 # Prerequisites:
 #
 #   1. Bmad built, so that debug/bin/wavefront_drift_test (or production/bin) exists:
-#        BUILD_PRODUCTION=N ./util/conda_compile       # from the bmad-ecosystem root
+#        BUILD_PRODUCTION=N lucifer/util/conda_compile  # from the bmad-ecosystem root
 #
 #   2. The Python environment defined alongside this script:
 #        conda env create -f environment.yml

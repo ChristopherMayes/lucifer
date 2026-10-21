@@ -17,7 +17,7 @@
 # Prerequisites:
 #
 #   1. Bmad built, so debug/bin/lucifer (or production/bin) exists:
-#        BUILD_PRODUCTION=N ./util/conda_compile        # from the bmad-ecosystem root
+#        BUILD_PRODUCTION=N lucifer/util/conda_compile   # from the bmad-ecosystem root
 #
 #   2. A genesis4 binary (CPU is fine). Default location below. Override with --genesis.
 #      Built per the Genesis repository's instructions. The benchmark needs FFTW support
@@ -966,6 +966,7 @@ sec_tao_lattices () {
 sec_diagnostics () {
   echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
+        --genesis "$GENESIS" \
     || { echo "FAIL: diagnostic checks; outputs kept in: $1" >&2; return 1; }
 }
 

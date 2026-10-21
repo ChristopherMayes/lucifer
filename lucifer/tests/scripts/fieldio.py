@@ -8,7 +8,10 @@ codes slice by slice, so the reading of both belongs in one place rather than in
 script.
 
 What comes back: the field as (nslice, ny, nx) complex V/m, with the grid spacings, the
-wavelength and the dump's position along the lattice. Both formats are read with h5py
+wavelength, the coordinate of the first slice within the pulse (zmin: Genesis's
+refposition, openPMD's gridGlobalOffset along z) and, for openPMD, the plane's position
+along the lattice (s_position: zCoordinate, which the Genesis format has no record of,
+so it comes back None there). Both formats are read with h5py
 alone, which keeps this an independent reader of our own writer: nothing here shares a
 line with the Fortran that produced the file.
 
@@ -61,7 +64,7 @@ def components(path):
 def read_field(path, component="x", nslice=None):
     """
     A field dump as a dict: u (nslice, ny, nx) complex V/m, dx, dy, dz [m], wavelength [m],
-    s_position [m], and components, the polarizations the file carries.
+    zmin [m], s_position [m] or None, and components, the polarizations the file carries.
 
     nslice, when given, is required to match the file's slice count. A caller that knows
     what it asked the tracker for gets the mismatch named here rather than a silently
@@ -92,7 +95,7 @@ def _read_genesis(path, component):
         return dict(u=u * np.sqrt(2 * MU0_C) / dx, dx=dx, dy=dx,
                     dz=float(h5["slicespacing"][0]),
                     wavelength=float(h5["wavelength"][0]),
-                    s_position=float(h5["refposition"][0]), components=("x",))
+                    zmin=float(h5["refposition"][0]), s_position=None, components=("x",))
 
 
 def _read_openpmd(path, component):
@@ -105,9 +108,11 @@ def _read_openpmd(path, component):
         # Stored (z, y, x), which is what a caller wants slice by slice, so no transpose.
         u = np.asarray(m[component][...], dtype=complex)
         spacing = np.atleast_1d(m.attrs["gridSpacing"]).astype(float)
+        offset = np.atleast_1d(m.attrs["gridGlobalOffset"]).astype(float)
         e_photon = float(np.atleast_1d(m.attrs["photonEnergy"])[0])
         return dict(u=u, dx=spacing[2], dy=spacing[1], dz=spacing[0],
                     wavelength=H_PLANCK_EVS * C_LIGHT * E_CHARGE / e_photon,
+                    zmin=offset[0],
                     s_position=float(np.atleast_1d(m.attrs["zCoordinate"])[0]),
                     components=components)
 

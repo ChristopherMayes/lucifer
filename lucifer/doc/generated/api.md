@@ -3543,7 +3543,11 @@ Routine to drain the slippage bank: each transmitted slice streams to
 its wavefront_params (the full 4x4 at bank time: exactly what the analytic
 free-space propagation of pulse statistics needs) and its transmission z. Genesis
 field-file conventions (dfl units) are used so existing tooling reads the file.
-The root datasets land at finalize.
+
+During the run the groups are numbered in transmission order, slice k being the k-th
+to leave, which is the reverse of Genesis's order: light leaves at the head, so the
+first to leave is the furthest ahead. fel_order_bank renumbers them at finalize and
+the root datasets land then, so the finished file is a Genesis field file.
 ```
 
 ```
@@ -3555,6 +3559,30 @@ Output:
   run       -- fel_run_struct: Banked params appended to run%bank_z / run%bank_pms.
                  run%n_banked(ihh) and run%esc_id(ihh) updated.
   err_flag  -- logical: Set True on a write error. False otherwise.
+```
+
+(api-fel-order-bank)=
+### `fel_order_bank`
+
+*Subroutine* `(run, ihh, err_flag)`
+
+```
+Routine to renumber the escaped file's slice groups into Genesis's order, where
+slice i sits at refposition + (i-1) slicespacing. fel_drain_bank numbers them in
+transmission order as they leave, and light leaves at the window's head, so the
+k-th to leave is the (n_banked - k + 1)-th in increasing coordinate. Each group
+moves whole, its field planes, wavefront_params and z_transmit with it. Done once,
+at finalize, when n_banked is known. run%bank_z and run%bank_pms stay in
+transmission order.
+```
+
+```
+Input:
+  run       -- fel_run_struct: Run state. run%esc_id(ihh) is the open escaped file.
+  ihh       -- integer: Field-set index.
+
+Output:
+  err_flag  -- logical: Set True on an HDF5 error. False otherwise.
 ```
 
 (api-fel-escaped-file-name)=
@@ -3588,8 +3616,15 @@ exit plane. For the pulse, each banked slice is read back, free-space propagated
 z_end - z_transmit (transmitted light is fixed information, and undulator vacuum is
 free space for light with no beam under it), and concatenated above the live
 window. Earliest-transmitted light is furthest ahead, so banked slice k lands at
-pulse index nslice + (run%n_banked - k + 1). The caller has already unrotated the
-live window (the final-dump cshift).
+pulse index nslice + (run%n_banked - k + 1), which is also its number in the
+finished escaped file (fel_order_bank). The caller has already unrotated the live
+window (the final-dump cshift).
+
+refposition in both files is what Genesis means by it, the in-bunch coordinate of
+the file's slice 1 (readFieldHDF5 places slice i at refposition + (i-1) slicespacing):
+0 for the pulse, whose slice 1 is the live window's tail, and nslice times the
+slice spacing for the escaped file, whose slice 1 is the slot just past the window's
+head. Neither is the beamline position, which is the openPMD files' zCoordinate.
 ```
 
 ```
@@ -3610,7 +3645,9 @@ Output:
 Routine to write one component of the full exit-plane pulse (Genesis's format holds
 one per file): the live window's slices, then each banked slice read back from the
 escaped file and free-space propagated over z_end - z_transmit. Shared by the -x
-and -y files.
+and -y files. The escaped file is in Genesis's order by now (fel_order_bank), so its
+slice i lands at pulse slice nslice + i, and the transmission z of that slice is
+run%bank_z(n_banked - i + 1), which stays in transmission order.
 ```
 
 ```
@@ -5212,6 +5249,18 @@ fundamental-wavelength units (one window, lockstep rotation). The harm argument 
 fixes the escape bank's slice light-time for a harmonic field.
 ```
 
+(api-set-field-position)=
+### `set_field_position`
+
+*Subroutine* `()`
+
+```
+Routine to set every field's s_position to z_now. The field's beamline position is
+the lattice's, which the walk owns: wavefront_drift advances s_position by the
+optical path it propagated, and through a geometry break that is the chord, not the
+arc the lattice position advances by.
+```
+
 ## `fel_track_mod.f90`
 
 (api-fel-track-mod)=
@@ -5424,7 +5473,7 @@ fel_field_index(slip, is, nslice) is the field at time window position is.
 (api-fel-apply-slippage)=
 ### `fel_apply_slippage`
 
-*Subroutine* `(slip, wf, slippage, bank, harm)`
+*Subroutine* `(slip, wf, slippage, bank, harm, err_flag)`
 
 ```
 Routine to account the slippage of one step and rotate the field record when it
@@ -5442,6 +5491,10 @@ direction reversed.
 The caller owns the schedule (per-step undulator slippage and the drift autophasing
 of Lattice::calcSlippage) and calls this after the field step, Gencore's step 5.
 A steady-state record (timerun false) is left untouched, exactly as Genesis's.
+
+Note: A slice transmitted backward leaves at the tail, and the escaped file and the
+pulse file place banked light ahead of the window only, so backward slippage with a
+bank present is refused rather than banked out of place.
 ```
 
 ```
@@ -5449,9 +5502,12 @@ Input:
   slip        -- fel_slip_struct: Slippage state of this field record.
   wf          -- wavefront_struct: The field record.
   slippage    -- real(rp): Slippage of this step [radiation wavelengths].
+  bank        -- fel_bank_struct, optional: Receives the transmitted planes when present.
+  harm        -- integer, optional: Harmonic number of this field. Default is 1.
 
 Output:
   slip, wf    -- Updated state and rotated record.
+  err_flag    -- logical, optional: Set True on the refusal above. False otherwise.
 ```
 
 (api-fel-device-apply-slippage)=
@@ -6629,9 +6685,13 @@ parallelising over slices wants. The Python class uses the same (nx, ny, nz) sha
 in C order, so there its slices are strided.
 
 Grid convention, matching the Python class: the transverse grids are centered on zero,
-with x running from -(nx-1)*dx/2 to +(nx-1)*dx/2, and likewise for y and z. There is no
-separate origin offset. The one absolute position carried is ref_position, which locates
-the pulse along the lattice.
+with x running from -(nx-1)*dx/2 to +(nx-1)*dx/2, and likewise for y. The slice axis
+runs from the tail at iz = 1 to the head at iz = nz, and a whole window's first slice
+sits at z = 0. There is no separate origin offset. The one absolute position carried is
+s_position, the beamline position of the plane, which is openPMD's zCoordinate.
+Genesis's refposition is a different quantity, the in-bunch coordinate of a file's
+first slice, and this structure does not carry it: a writer of that format states it
+from the window (fel_io_mod).
 ```
 
 (api-wavefront-struct)=
@@ -6670,7 +6730,7 @@ twiss_valid pattern).
 (api-wavefront-init)=
 ### `wavefront_init`
 
-*Subroutine* `(wf, nx, ny, nz, dx, dy, dz, wavelength, polarization, ref_position)`
+*Subroutine* `(wf, nx, ny, nz, dx, dy, dz, wavelength, polarization, s_position)`
 
 ```
 Routine to allocate the field arrays of a wavefront and set its grid parameters.
@@ -6684,8 +6744,7 @@ Input:
   wavelength    -- real(rp): Central wavelength [m]. Must be positive.
   polarization  -- character(*), optional: Which components to allocate. One of 'x',
                      'y' or 'xy'. Default is 'x'.
-  ref_position  -- real(rp), optional: Pulse reference position along the lattice [m].
-                     Default is 0.
+  s_position    -- real(rp), optional: Beamline position of the plane [m]. Default is 0.
 
 Output:
   wf            -- wavefront_struct: Initialized wavefront.
@@ -6987,15 +7046,17 @@ Input:
                    implemented here. Passing one is an error rather than being silently
                    ignored.
 
-ref_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate
-and is co-moving, so the kernel leaves it alone and ref_position is the only place a
+s_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate
+and is co-moving, so the kernel leaves it alone and s_position is the only place a
 propagation along the beamline can be recorded. openPMD-beamphysics splits the two the
-same way, and its drift advances s_position, which is what a Genesis dump's
-refposition holds. Operations that do not move the pulse down the line (crop, pad, a
-lens phase) leave it alone.
+same way, and its drift advances s_position too. Operations that do not move the pulse
+down the line (crop, pad, a lens phase) leave it alone. Note: z_drift is the optical
+path. Through a geometry break the light goes the chord while the lattice position
+advances by the arc, so the FEL walk, which knows the lattice, sets s_position itself
+after each piece (fel_track_line_mod).
 
 Output:
-  wf          -- wavefront_struct: Propagated wavefront, ref_position advanced.
+  wf          -- wavefront_struct: Propagated wavefront, s_position advanced.
   err_flag    -- logical, optional: Set True on error, False otherwise.
 ```
 
@@ -7295,19 +7356,20 @@ Output:
 (api-wavefront-write-openpmd)=
 ### `wavefront_write_openpmd`
 
-*Subroutine* `(wf, file_name, s_pos, err_flag)`
+*Subroutine* `(wf, file_name, err_flag, z_offset)`
 
 ```
 Routine to write one wavefront as an openPMD EXT_Wavefront file, using the layout
 described in the module header. The field is in V/m already (temporalDomain 'time'),
-so unitSI = 1 throughout.
+so unitSI = 1 throughout. zCoordinate is wf%s_position, the plane's beamline
+position, taken from the wavefront so that the file cannot disagree with the
+structure it came from.
 ```
 
 ```
 Input:
   wf         -- wavefront_struct: The field. Ey written when allocated.
   file_name  -- character(*): Output file.
-  s_pos      -- real(rp): Lattice position of the dump plane [m] (zCoordinate).
   z_offset   -- real(rp), optional: Where the first record sits along the window [m],
                   gridGlobalOffset's z. A field cut to a slice range passes the first
                   slice's z, so the mesh lands where the whole window's would have put

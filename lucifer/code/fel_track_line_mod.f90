@@ -182,6 +182,7 @@ prog_header_done = .false.
 lat_length = branch%ele(branch%n_ele_track)%s
 
 z_now = branch%ele(run%i_start - 1)%s      ! 0 for a full run, else the window's entry face.
+call set_field_position ()
 ie = run%i_start - 1                      ! The element this record sits at: the entry face,
                                           !   which is element 0 for a full run. The element
                                           !   loop has not started, so ie is not set yet, and
@@ -312,6 +313,7 @@ do ie = run%i_start, run%i_end
       endif
 
       z_now = z_now + und%dz
+      call set_field_position ()
       if (istep == und%nstep) then
         call apply_slippage_banked (und%dz * und_slip_step + ele_slip(ie))
         if (err_flag) return
@@ -526,6 +528,7 @@ do ie = run%i_start, run%i_end
       else
         z_now = z_ele0 + i_piece * (ele%value(l$) / n_piece)
       endif
+      call set_field_position ()
       call apply_slippage_banked (ele_slip(ie) / n_piece)
       if (err_flag) return
 
@@ -572,6 +575,7 @@ do ie = run%i_start, run%i_end
       err_flag = .true.;  return
     endif
     z_now = z_now + ele%value(l$)
+    call set_field_position ()
     call apply_slippage_banked (ele_slip(ie))
     if (err_flag) return
 
@@ -1125,7 +1129,10 @@ call fel_tic (fel_t_slippage$)
 if (keep_escaped_field) then
   do ihh = 1, n_harm
     call fel_apply_slippage (ffield(ihh)%slip, ffield(ihh)%wf, slippage, ffield(ihh)%bank, &
-                             ffield(ihh)%harm)
+                             ffield(ihh)%harm, err_b)
+    if (err_b) then
+      err_flag = .true.;  return
+    endif
     call fel_drain_bank (run, ihh, err_b)
     if (err_b) then
       err_flag = .true.;  return
@@ -1139,6 +1146,28 @@ endif
 call fel_toc (fel_t_slippage$)
 
 end subroutine apply_slippage_banked
+
+!------------------------------------------------------------------------------
+!+
+! Subroutine set_field_position ()
+!
+! Routine to set every field's s_position to z_now. The field's beamline position is
+! the lattice's, which the walk owns: wavefront_drift advances s_position by the
+! optical path it propagated, and through a geometry break that is the chord, not the
+! arc the lattice position advances by.
+!-
+
+subroutine set_field_position ()
+
+integer ihh
+
+!
+
+do ihh = 1, n_harm
+  ffield(ihh)%wf%s_position = z_now
+enddo
+
+end subroutine set_field_position
 
 end subroutine track_fel_line
 

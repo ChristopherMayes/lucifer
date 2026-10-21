@@ -99,16 +99,17 @@ end function file_is_openpmd
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine wavefront_write_openpmd (wf, file_name, s_pos, err_flag)
+! Subroutine wavefront_write_openpmd (wf, file_name, err_flag, z_offset)
 !
 ! Routine to write one wavefront as an openPMD EXT_Wavefront file, using the layout
 ! described in the module header. The field is in V/m already (temporalDomain 'time'),
-! so unitSI = 1 throughout.
+! so unitSI = 1 throughout. zCoordinate is wf%s_position, the plane's beamline
+! position, taken from the wavefront so that the file cannot disagree with the
+! structure it came from.
 !
 ! Input:
 !   wf         -- wavefront_struct: The field. Ey written when allocated.
 !   file_name  -- character(*): Output file.
-!   s_pos      -- real(rp): Lattice position of the dump plane [m] (zCoordinate).
 !   z_offset   -- real(rp), optional: Where the first record sits along the window [m],
 !                   gridGlobalOffset's z. A field cut to a slice range passes the first
 !                   slice's z, so the mesh lands where the whole window's would have put
@@ -118,11 +119,11 @@ end function file_is_openpmd
 !   err_flag   -- logical: Set True on error, False otherwise.
 !-
 
-subroutine wavefront_write_openpmd (wf, file_name, s_pos, err_flag, z_offset)
+subroutine wavefront_write_openpmd (wf, file_name, err_flag, z_offset)
 
 type (wavefront_struct), target :: wf
 character(*) file_name
-real(rp) s_pos, gmax_x, gmax_y, e_photon
+real(rp) gmax_x, gmax_y, e_photon
 real(rp), optional :: z_offset
 integer(hid_t) f_id, it_id, m_id, complex_t
 integer h5_err, i
@@ -181,7 +182,7 @@ call hdf5_write_attribute_real (m_id, 'timeOffset', 0.0_rp, err)
 call hdf5_write_attribute_real (m_id, 'photonEnergy', e_photon, err)
 call hdf5_write_attribute_string (m_id, 'temporalDomain', 'time', err)
 call hdf5_write_attribute_string (m_id, 'spatialDomain', 'r', err)
-call hdf5_write_attribute_real (m_id, 'zCoordinate', s_pos, err)
+call hdf5_write_attribute_real (m_id, 'zCoordinate', wf%s_position, err)
 
 call pmd_init_compound_complex (complex_t)
 
@@ -320,7 +321,7 @@ if (err) then
   call out_io (s_error$, r_name, 'REQUIRED ATTRIBUTE zCoordinate MISSING IN ' // trim(file_name))
   return
 endif
-wf%ref_position = rval
+wf%s_position = rval
 
 call hdf5_read_attribute_string (m_id, 'axisLabels', labels, err, .false.)
 if (err) then

@@ -32,6 +32,13 @@ escaped-field bank, held by cross-identities rather than reference files --
      carry, the stats file is exact-sized against the rows written, the header states
      the pieces before it tracks, a wake-carrying element is not cut, and the
      transcribed Genesis interlude refuses the knob.
+ 11. refposition in the two Genesis-format files means what Genesis means, the
+     in-bunch coordinate of slice 1 in Genesis's order: 0 for the pulse file and the
+     window length for the escaped file, unmoved by a drift along the lattice, the
+     escaped file's slices numbered tail to head, openPMD-beamphysics reading the
+     pulse at zmin 0 with the live slices equal to the final field, and Genesis
+     itself importing the pulse and re-dumping it slice by slice with the same
+     refposition. That last one is the external reader a round trip cannot replace.
 
 Run by the benchmark harness; exits nonzero on failure.
 """
@@ -39,6 +46,7 @@ Run by the benchmark harness; exits nonzero on failure.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import subprocess
@@ -54,6 +62,7 @@ from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON 
 from read_stats import read_stats, same_data  # noqa: E402
 import beamio  # noqa: E402
 from beamio import read_slices  # noqa: E402
+import fieldio  # noqa: E402
 
 import validate_bmad_stats  # noqa: E402  The standard's own conformance checker.
 
@@ -470,11 +479,132 @@ def interludes(exe, wd):
     check("frames: the particle sPosition is the frame's own [m]", worst_s, 1e-12)
     check("frames: the particle timeOffset is the iteration's time [s]", worst_t, 1e-18)
 
+# refposition in the two Genesis-format files. Genesis's reader places slice i of a field
+# file at refposition + (i-1) slicespacing (readFieldHDF5.cpp), so refposition is the
+# in-bunch coordinate of slice 1, and the files this program writes say that: 0 for the
+# pulse, whose slice 1 is the live window's tail, and the window length for the escaped
+# file, whose slice 1 is the slot just past the head. The run below has an interlude, so
+# the field was drifted along the lattice before the files were written, which is what
+# once reached refposition as a lattice position.
+
+REF_LAT = """no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 15
+beginning[beta_b] = 15
+UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model,
+     b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light,
+     fel_method = averaged, ds_step = 0.015
+P1: pipe, l = 0.40
+SEG: line = (UND, P1, UND)
+use, SEG
+"""
+
+GEN_LAT_REF = """UND: undulator = { lambdau=0.015000, nwig=30, aw=0.84853, helical=True};
+SEG: line={UND};
+"""
+
+# Genesis imports the pulse file and writes it back with no tracking. &importfield sets
+# the time window from the file (its refposition, slicecount and slicespacing), and
+# &write dumps every slice of that window.
+GEN_IMPORT_REF = """&setup
+rootname=gref
+lattice=ref.lat
+beamline=SEG
+lambda0=1e-10
+gamma0=11357.82
+delz=0.015
+shotnoise=0
+nbins = 8
+&end
+
+&importfield
+file = {pulse}
+&end
+
+&write
+field = GREF-copy
+&end
+"""
+
+
+def refposition_checks(exe, genesis, wd):
+    """refposition in the pulse and escaped files, held against Genesis's own reader."""
+    from beamphysics.wavefront import Wavefront
+
+    print("--- refposition in the Genesis-format files:")
+    (wd / "ref_int.bmad").write_text(REF_LAT)
+    run(exe, wd, "dgi", NML.format(lat="ref_int.bmad", root="dgi", extra=""))
+
+    def roots(root):
+        with h5py.File(wd / f"{root}-pulse.fld.h5") as h5:
+            p_ref = float(h5["refposition"][0])
+            p_n = int(h5["slicecount"][0])
+            dz = float(h5["slicespacing"][0])
+        with h5py.File(wd / f"{root}-escaped.fld.h5") as h5:
+            b_ref = float(h5["refposition"][0])
+            b_n = int(h5["slicecount"][0])
+            zt = np.array([h5[f"slice{k:06d}/z_transmit"][0] for k in range(1, b_n + 1)])
+        return p_ref, p_n, dz, b_ref, b_n, zt
+
+    p_ref, p_n, dz, b_ref, b_n, zt = roots("dgi")
+    p_ref0, _, _, b_ref0, _, _ = roots("dg")
+    nlive = p_n - b_n
+    check("refposition: the pulse file's is 0 [m]", abs(p_ref), 1e-18)
+    check("refposition: the escaped file's is the window length n_slice * slicespacing [m]",
+          abs(b_ref - nlive * dz), 1e-18, note=f"[{b_ref:.3e}, {nlive} live slices]")
+    check("refposition: both unmoved by the interlude's drift [m]",
+          max(abs(p_ref - p_ref0), abs(b_ref - b_ref0)), 1e-18)
+    # Tail to head: the escaped file's slice 1 left last, and the furthest ahead left first.
+    check("refposition: the escaped file's z_transmit falls with its slice number (1 = yes)",
+          0.0 if np.all(np.diff(zt) <= 0) and zt[0] > zt[-1] else 1.0, 0.5,
+          note=f"[{b_n} banked, z_transmit {zt[0]:.3f} to {zt[-1]:.3f} m]")
+
+    # openPMD-beamphysics reads the pulse as Genesis would: its first slice at zmin 0, and
+    # the live slices are the final openPMD field, slice by slice. Measured 1.6e-16: its
+    # Z0 and Bmad's agree, and the dfl scale round-trips in double.
+    w = Wavefront.from_genesis4(str(wd / "dgi-pulse.fld.h5"))
+    fin = fieldio.read_field(wd / "dgi-final.wf.h5")
+    live = np.transpose(w.Ex[:, :, :nlive], (2, 1, 0))
+    rel = float(np.max(np.abs(live - fin["u"])) / np.max(np.abs(fin["u"])))
+    check("refposition: Wavefront.from_genesis4 puts the pulse's first slice at zmin 0 [m]",
+          abs(float(w.zmin)), 1e-18)
+    check("refposition: the pulse's live slices are the final field, slice by slice, rel", rel, 1e-8)
+    # Its banked slices are the escaped file's in order. Free-space propagation conserves
+    # each slice's energy and the slices differ in it, so energy in order is the test.
+    bank = fieldio.read_field(wd / "dgi-escaped.fld.h5")
+    e_b = fieldio.field_power(bank["u"], bank["dx"], bank["dy"])
+    e_w = fieldio.field_power(np.transpose(w.Ex[:, :, nlive:], (2, 1, 0)), w.dx, w.dy)
+    lit = e_b > 1e-6 * e_b.max()
+    check("refposition: pulse slice n_slice + i carries the energy of escaped slice i, rel",
+          float(np.max(np.abs(e_w[lit] / e_b[lit] - 1))), 1e-8, note=f"[{lit.sum()} of {b_n} slices lit]")
+
+    # Genesis itself: import the pulse and write it back. The re-dump places every slice
+    # where the pulse said, with the pulse's own refposition.
+    (wd / "ref.lat").write_text(GEN_LAT_REF)
+    (wd / "gref.in").write_text(GEN_IMPORT_REF.format(pulse="dgi-pulse.fld.h5"))
+    r = subprocess.run([str(genesis), "gref.in"], cwd=wd, capture_output=True, text=True,
+                       env=dict(os.environ, FI_PROVIDER="tcp"))
+    if r.returncode != 0:
+        print(f"FAIL: genesis import of the pulse file:\n{r.stdout[-1500:]}\n{r.stderr[-500:]}")
+        sys.exit(1)
+    pul = fieldio.read_field(wd / "dgi-pulse.fld.h5")
+    cp = fieldio.read_field(wd / "GREF-copy.fld.h5")
+    check("refposition: Genesis imports the pulse and re-dumps the same slice count",
+          abs(cp["u"].shape[0] - pul["u"].shape[0]), 0.5, note=f"[{pul['u'].shape[0]} slices]")
+    if cp["u"].shape == pul["u"].shape:
+        check("refposition: Genesis's re-dump is the pulse, slice by slice, rel",
+              float(np.max(np.abs(cp["u"] - pul["u"])) / np.max(np.abs(pul["u"]))), 1e-12)
+    check("refposition: and carries the pulse's own refposition [m]", abs(cp["zmin"] - pul["zmin"]), 1e-18)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", required=True)
     ap.add_argument("--latdir", required=True)
     ap.add_argument("--workdir", required=True)
+    ap.add_argument("--genesis", required=True, help="genesis4 binary, for the import of the pulse file")
     args = ap.parse_args()
 
     exe = pathlib.Path(args.exe).resolve()
@@ -819,10 +949,11 @@ def main():
             cx_num.append(cx); cy_num.append(cy)
             sxx_num.append((I * (ax[None, :] - cx) ** 2).sum() / w)
             syy_num.append((I * (ax[:, None] - cy) ** 2).sum() / w)
-    # Pulse index nlive+j holds banked slice nb-j+1: reverse into transmission order.
-    sxx_num = np.array(sxx_num)[::-1]
-    syy_num = np.array(syy_num)[::-1]
-    w_num = np.array(w_num)[::-1]
+    # Pulse index nlive+i holds escaped slice i: both files are in Genesis's order,
+    # tail to head, and so is zt, read from the escaped file above.
+    sxx_num = np.array(sxx_num)
+    syy_num = np.array(syy_num)
+    w_num = np.array(w_num)
 
     z_end = led[-1, 0]  # Ledger rows end at the segment exit for this one-element line.
     dz = z_end - zt
@@ -851,7 +982,7 @@ def main():
                                       np.vstack([sig_l.reshape(-1, 16), sig_b.reshape(-1, 16)]),
                                       np.concatenate([en_l, en_b]))
     # Numerical pooling over the same banked slices from the pulse file:
-    cen_n = np.stack([np.array(cx_num)[::-1], np.zeros(nb), np.array(cy_num)[::-1], np.zeros(nb)], axis=1)
+    cen_n = np.stack([np.array(cx_num), np.zeros(nb), np.array(cy_num), np.zeros(nb)], axis=1)
     sig_n = np.zeros((nb, 4, 4))
     sig_n[:, 0, 0] = sxx_num;  sig_n[:, 2, 2] = syy_num
     en_n = w_num * (en_b.sum() / max(w_num.sum(), 1e-300))   # Same total, per-slice proportional.
@@ -1239,6 +1370,7 @@ def main():
           0.0 if (r4.returncode != 0 and "INSIDE THE WINDOW" in (r4.stdout + r4.stderr)) else 1.0, 0.5)
 
     interludes(exe, wd)
+    refposition_checks(exe, pathlib.Path(args.genesis).resolve(), wd)
 
     if FAILED:
         print("diagnostic checks: FAIL")

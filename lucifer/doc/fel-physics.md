@@ -1690,9 +1690,13 @@ window's decimation) with its `wavefront_params` and transmission $z$. These two
 diagnostic files keep Genesis4 field conventions rather than openPMD, since the
 per-slice `wavefront_params` and transmission $z$ beside each plane have no home
 in the wavefront extension. They are diagnostics: nothing reads them back as state. At
-finalize each is propagated to the exit plane by the `exp(K2\,dz)` kernel and
+finalize the escaped file's slices are renumbered into Genesis4's order, tail to head,
+so its slice 1 is the slot just past the window's head and its `refposition` is the
+window length, then each is propagated to the exit plane by the `exp(K2\,dz)` kernel and
 the full pulse is written (`<out_root>-pulse.fld.h5`, live window + banked, the
-earliest-transmitted light furthest ahead). Whole-pulse statistics never propagate
+earliest-transmitted light furthest ahead, `refposition` 0). `refposition` is the
+in-bunch coordinate of a file's slice 1, which is what Genesis4 reads it as, and never
+the lattice position. Whole-pulse statistics never propagate
 numerically: free-space propagation is an ABCD map on `sigma(4,4)`, so
 $\sigma_x^2(z) = \sigma_x^2 + 2z\,\sigma_{x\theta} + z^2\sigma_\theta^2$ per
 banked slice, exact.

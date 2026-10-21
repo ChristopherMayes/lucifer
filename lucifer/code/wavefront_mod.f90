@@ -22,9 +22,13 @@
 ! in C order, so there its slices are strided.
 !
 ! Grid convention, matching the Python class: the transverse grids are centered on zero,
-! with x running from -(nx-1)*dx/2 to +(nx-1)*dx/2, and likewise for y and z. There is no
-! separate origin offset. The one absolute position carried is ref_position, which locates
-! the pulse along the lattice.
+! with x running from -(nx-1)*dx/2 to +(nx-1)*dx/2, and likewise for y. The slice axis
+! runs from the tail at iz = 1 to the head at iz = nz, and a whole window's first slice
+! sits at z = 0. There is no separate origin offset. The one absolute position carried is
+! s_position, the beamline position of the plane, which is openPMD's zCoordinate.
+! Genesis's refposition is a different quantity, the in-bunch coordinate of a file's
+! first slice, and this structure does not carry it: a writer of that format states it
+! from the window (fel_io_mod).
 !-
 
 module wavefront_mod
@@ -82,12 +86,12 @@ type wavefront_struct
   real(rp) :: dy = 1                         ! Transverse grid spacing in y [m].
   real(rp) :: dz = 1                         ! Slice spacing [m].
   real(rp) :: wavelength = 1                 ! Central wavelength [m].
-  real(rp) :: ref_position = 0               ! Position of the pulse reference point along
-                                             !   the lattice [m]. This is Genesis's
-                                             !   refposition, whose job is keeping an
-                                             !   imported field file and an imported beam
-                                             !   file aligned in a start to end run. It is
-                                             !   carried, not used, by this module.
+  real(rp) :: s_position = 0                 ! Beamline position of the plane [m]:
+                                             !   openPMD's zCoordinate. wavefront_drift
+                                             !   advances it by the drift, and the FEL walk
+                                             !   sets it to the lattice position it holds.
+                                             !   Never Genesis's refposition, which is a
+                                             !   coordinate within the pulse.
 end type
 
 !+
@@ -154,7 +158,7 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine wavefront_init (wf, nx, ny, nz, dx, dy, dz, wavelength, polarization, ref_position)
+! Subroutine wavefront_init (wf, nx, ny, nz, dx, dy, dz, wavelength, polarization, s_position)
 !
 ! Routine to allocate the field arrays of a wavefront and set its grid parameters.
 ! The allocated components are zeroed.
@@ -165,19 +169,18 @@ contains
 !   wavelength    -- real(rp): Central wavelength [m]. Must be positive.
 !   polarization  -- character(*), optional: Which components to allocate. One of 'x',
 !                      'y' or 'xy'. Default is 'x'.
-!   ref_position  -- real(rp), optional: Pulse reference position along the lattice [m].
-!                      Default is 0.
+!   s_position    -- real(rp), optional: Beamline position of the plane [m]. Default is 0.
 !
 ! Output:
 !   wf            -- wavefront_struct: Initialized wavefront.
 !-
 
-subroutine wavefront_init (wf, nx, ny, nz, dx, dy, dz, wavelength, polarization, ref_position)
+subroutine wavefront_init (wf, nx, ny, nz, dx, dy, dz, wavelength, polarization, s_position)
 
 type (wavefront_struct) wf
 integer nx, ny, nz
 real(rp) dx, dy, dz, wavelength
-real(rp), optional :: ref_position
+real(rp), optional :: s_position
 character(*), optional :: polarization
 character(*), parameter :: r_name = 'wavefront_init'
 character(4) pol
@@ -208,7 +211,7 @@ wf%dx = dx
 wf%dy = dy
 wf%dz = dz
 wf%wavelength = wavelength
-wf%ref_position = real_option(0.0_rp, ref_position)
+wf%s_position = real_option(0.0_rp, s_position)
 
 end subroutine wavefront_init
 
@@ -708,15 +711,17 @@ end subroutine wavefront_transverse_moments
 !                    implemented here. Passing one is an error rather than being silently
 !                    ignored.
 !
-! ref_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate
-! and is co-moving, so the kernel leaves it alone and ref_position is the only place a
+! s_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate
+! and is co-moving, so the kernel leaves it alone and s_position is the only place a
 ! propagation along the beamline can be recorded. openPMD-beamphysics splits the two the
-! same way, and its drift advances s_position, which is what a Genesis dump's
-! refposition holds. Operations that do not move the pulse down the line (crop, pad, a
-! lens phase) leave it alone.
+! same way, and its drift advances s_position too. Operations that do not move the pulse
+! down the line (crop, pad, a lens phase) leave it alone. Note: z_drift is the optical
+! path. Through a geometry break the light goes the chord while the lattice position
+! advances by the arc, so the FEL walk, which knows the lattice, sets s_position itself
+! after each piece (fel_track_line_mod).
 !
 ! Output:
-!   wf          -- wavefront_struct: Propagated wavefront, ref_position advanced.
+!   wf          -- wavefront_struct: Propagated wavefront, s_position advanced.
 !   err_flag    -- logical, optional: Set True on error, False otherwise.
 !-
 
@@ -802,7 +807,7 @@ do i_pol = 1, 2
   if (any_err) return
 enddo
 
-wf%ref_position = wf%ref_position + z_drift
+wf%s_position = wf%s_position + z_drift
 
 if (present(err_flag)) err_flag = .false.
 

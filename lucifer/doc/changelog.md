@@ -9,6 +9,19 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-10-21 Fixed: `refposition` in the two Genesis4-format field files, `-escaped.fld.h5` and `-pulse.fld.h5`,
+  carried the wavefront's `ref_position`, a sum of the optical paths the field had been drifted along
+  interludes, where Genesis4 reads `refposition` as the window start and places slice `i` at
+  `refposition + (i - 1) * slicespacing`. Genesis4 importing a pulse file beside the exported beam, whose
+  `refposition` is 0, would have placed the light metres from the electrons. The pulse file now writes 0,
+  the live window's tail, and the escaped file writes the window length, the slot just past the head. The
+  escaped file's slices were numbered in the order they left, head first, the reverse of Genesis4's order,
+  and are renumbered tail to head at finalize, each with its `z_transmit` and `wavefront_params`. The
+  wavefront's field is now `s_position`, the beamline position openPMD's `zCoordinate` carries, which the
+  FEL walk sets to its lattice position after every piece and the openPMD writer takes from the wavefront
+  rather than an argument. Backward slippage with `keep_escaped_field = T` is refused, since a slice
+  transmitted from the tail has no place ahead of the window. The diagnostics section checks all of it
+  against Genesis4's own import of the pulse file. Every recorded digit held.
 - 2026-10-21 Changed: openPMD-beamphysics is a package installed in the validation environment, at
   0.16.3 or later, the first release carrying `Wavefront.from_openpmd` and `write_openpmd`.
   `wavefront/tests/environment.yml` states that minimum and is the one place a version is stated. The

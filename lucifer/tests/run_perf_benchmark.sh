@@ -362,7 +362,7 @@ echo "  workdir:     $WORK_DIR"
 if [[ $DEBUG_EXE_WARNING -eq 1 ]]; then
   echo
   echo "  WARNING: using a DEBUG lucifer. Its timings are not comparable to a"
-  echo "  release Genesis build; compile production (./util/conda_compile) for real numbers."
+  echo "  release Genesis build; compile production (lucifer/util/conda_compile) for real numbers."
 fi
 echo
 

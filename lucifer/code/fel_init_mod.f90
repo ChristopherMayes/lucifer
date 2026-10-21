@@ -1321,7 +1321,7 @@ endif
 
 do ih = 2, n_harm
   call wavefront_init (ffield(ih)%wf, size(wf%Ex,1), size(wf%Ex,2), size(wf%Ex,3), &
-                       wf%dx, wf%dy, wf%dz, wf%wavelength / ffield(ih)%harm, 'x', wf%ref_position)
+                       wf%dx, wf%dy, wf%dz, wf%wavelength / ffield(ih)%harm, 'x', wf%s_position)
 enddo
 
 do is = 2, 9

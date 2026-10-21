@@ -45,7 +45,7 @@ fi
 
 for f in "$BUILD_MAKE" "$FLAGS_MAKE"; do
   if [[ ! -f "$f" ]]; then
-    echo "Error: $f is missing. Build production first: ./util/conda_compile" >&2
+    echo "Error: $f is missing. Build production first: lucifer/util/conda_compile" >&2
     exit 1
   fi
 done

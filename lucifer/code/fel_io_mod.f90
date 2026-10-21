@@ -473,7 +473,7 @@ do ihh = 1, run%n_harm
         call move_alloc (eslab, wf_sub%Ey)
       endif
     endif
-    call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', run%z_now, eerr, &
+    call wavefront_write_openpmd (wf_sub, trim(prefix) // trim(hsuf) // '.wf.h5', eerr, &
                                   z_offset = (run%dump_is1 - 1) * ffield(ihh)%wf%dz)
     if (eerr) return
   else
@@ -488,8 +488,7 @@ do ihh = 1, run%n_harm
       if (allocated(ffield(ihh)%wf%Ey)) &
           ffield(ihh)%wf%Ey = cshift(ffield(ihh)%wf%Ey, shift = first_was, dim = 3)
     endif
-    call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', &
-                                  run%z_now, eerr)
+    call wavefront_write_openpmd (ffield(ihh)%wf, trim(prefix) // trim(hsuf) // '.wf.h5', eerr)
     if (first_was /= 0) then      ! Back to the rotation the walk carries, whatever the write did.
       ffield(ihh)%wf%Ex = cshift(ffield(ihh)%wf%Ex, shift = -first_was, dim = 3)
       if (allocated(ffield(ihh)%wf%Ey)) &
@@ -573,7 +572,7 @@ do ihh = 1, n_harm
   hsuf = ''
   if (ffield(ihh)%harm /= 1) write (hsuf, '(a, i0)') '-h', ffield(ihh)%harm
 
-  call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', z_now, eerr)
+  call wavefront_write_openpmd (ffield(ihh)%wf, prefix // trim(hsuf) // '.wf.h5', eerr)
   if (eerr) return
   call fel_write_slippage_residual (prefix // trim(hsuf) // '.wf.h5', ffield(ihh)%slip%accuslip, eerr)
   if (eerr) return
@@ -1266,7 +1265,11 @@ end subroutine fel_import_harmonic_field
 ! its wavefront_params (the full 4x4 at bank time: exactly what the analytic
 ! free-space propagation of pulse statistics needs) and its transmission z. Genesis
 ! field-file conventions (dfl units) are used so existing tooling reads the file.
-! The root datasets land at finalize.
+!
+! During the run the groups are numbered in transmission order, slice k being the k-th
+! to leave, which is the reverse of Genesis's order: light leaves at the head, so the
+! first to leave is the furthest ahead. fel_order_bank renumbers them at finalize and
+! the root datasets land then, so the finished file is a Genesis field file.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state. run%ffield(ihh)%bank holds the slices to drain.
@@ -1374,6 +1377,61 @@ end subroutine fel_drain_bank
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_order_bank (run, ihh, err_flag)
+!
+! Routine to renumber the escaped file's slice groups into Genesis's order, where
+! slice i sits at refposition + (i-1) slicespacing. fel_drain_bank numbers them in
+! transmission order as they leave, and light leaves at the window's head, so the
+! k-th to leave is the (n_banked - k + 1)-th in increasing coordinate. Each group
+! moves whole, its field planes, wavefront_params and z_transmit with it. Done once,
+! at finalize, when n_banked is known. run%bank_z and run%bank_pms stay in
+! transmission order.
+!
+! Input:
+!   run       -- fel_run_struct: Run state. run%esc_id(ihh) is the open escaped file.
+!   ihh       -- integer: Field-set index.
+!
+! Output:
+!   err_flag  -- logical: Set True on an HDF5 error. False otherwise.
+!-
+
+subroutine fel_order_bank (run, ihh, err_flag)
+
+type (fel_run_struct), target :: run
+integer ihh, k, n, h5e
+logical err_flag
+character(20) gname, tname
+
+!
+
+err_flag = .true.
+n = run%n_banked(ihh)
+
+! Two passes, through names no slice ever carries, since a direct move would land on a
+! group that still exists.
+
+do k = 1, n
+  write (gname, '(a, i0.6)') 'slice', k
+  write (tname, '(a, i0.6)') 'leaving', k
+  call H5Lmove_f (run%esc_id(ihh), trim(gname), run%esc_id(ihh), trim(tname), h5e)
+  if (h5e < 0) return
+enddo
+
+do k = 1, n
+  write (tname, '(a, i0.6)') 'leaving', k
+  write (gname, '(a, i0.6)') 'slice', n - k + 1
+  call H5Lmove_f (run%esc_id(ihh), trim(tname), run%esc_id(ihh), trim(gname), h5e)
+  if (h5e < 0) return
+enddo
+
+err_flag = .false.
+
+end subroutine fel_order_bank
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Function fel_escaped_file_name (run, ihh) result (fname)
 !
 ! Routine to construct the escaped-field file name of field ihh. The fundamental
@@ -1418,8 +1476,15 @@ end function fel_escaped_file_name
 ! z_end - z_transmit (transmitted light is fixed information, and undulator vacuum is
 ! free space for light with no beam under it), and concatenated above the live
 ! window. Earliest-transmitted light is furthest ahead, so banked slice k lands at
-! pulse index nslice + (run%n_banked - k + 1). The caller has already unrotated the
-! live window (the final-dump cshift).
+! pulse index nslice + (run%n_banked - k + 1), which is also its number in the
+! finished escaped file (fel_order_bank). The caller has already unrotated the live
+! window (the final-dump cshift).
+!
+! refposition in both files is what Genesis means by it, the in-bunch coordinate of
+! the file's slice 1 (readFieldHDF5 places slice i at refposition + (i-1) slicespacing):
+! 0 for the pulse, whose slice 1 is the live window's tail, and nslice times the
+! slice spacing for the escaped file, whose slice 1 is the slot just past the window's
+! head. Neither is the beamline position, which is the openPMD files' zCoordinate.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state at the end of tracking.
@@ -1476,9 +1541,11 @@ do ihh = 1, n_harm
   nx = size(ffield(ihh)%wf%Ex, 1)
 
   if (run%esc_id(ihh) /= 0) then
+    call fel_order_bank (run, ihh, ferr)
+    if (ferr) return
     call hdf5_write_dataset_int  (run%esc_id(ihh), 'gridpoints',   [nx],                        ferr)
     call hdf5_write_dataset_real (run%esc_id(ihh), 'gridsize',     [ffield(ihh)%wf%dx],         ferr)
-    call hdf5_write_dataset_real (run%esc_id(ihh), 'refposition',  [ffield(ihh)%wf%ref_position], ferr)
+    call hdf5_write_dataset_real (run%esc_id(ihh), 'refposition',  [nslice * fbeam%slice_spacing], ferr)
     call hdf5_write_dataset_real (run%esc_id(ihh), 'wavelength',   [ffield(ihh)%wf%wavelength], ferr)
     call hdf5_write_dataset_int  (run%esc_id(ihh), 'slicecount',   [run%n_banked(ihh)],             ferr)
     call hdf5_write_dataset_real (run%esc_id(ihh), 'slicespacing', [fbeam%slice_spacing],       ferr)
@@ -1521,7 +1588,9 @@ end subroutine fel_finalize_diagnostics
 ! Routine to write one component of the full exit-plane pulse (Genesis's format holds
 ! one per file): the live window's slices, then each banked slice read back from the
 ! escaped file and free-space propagated over z_end - z_transmit. Shared by the -x
-! and -y files.
+! and -y files. The escaped file is in Genesis's order by now (fel_order_bank), so its
+! slice i lands at pulse slice nslice + i, and the transmission z of that slice is
+! run%bank_z(n_banked - i + 1), which stays in transmission order.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state.
@@ -1571,7 +1640,7 @@ endif
 call hdf5_open_file (trim(fname), 'WRITE', p_id, ferr);  if (ferr) return
 call hdf5_write_dataset_int  (p_id, 'gridpoints',   [nx],                       ferr)
 call hdf5_write_dataset_real (p_id, 'gridsize',     [wfl%dx],                   ferr)
-call hdf5_write_dataset_real (p_id, 'refposition',  [wfl%ref_position],         ferr)
+call hdf5_write_dataset_real (p_id, 'refposition',  [0.0_rp],                   ferr)
 call hdf5_write_dataset_real (p_id, 'wavelength',   [wfl%wavelength],           ferr)
 call hdf5_write_dataset_int  (p_id, 'slicecount',   [nslice + run%n_banked(ihh)],   ferr)
 call hdf5_write_dataset_real (p_id, 'slicespacing', [fbeam%slice_spacing],      ferr)
@@ -1612,9 +1681,9 @@ if (run%n_banked(ihh) > 0) then
     call H5Gclose_f (g_id, h5e)
     wf1%Ex(:,:,1) = reshape(cmplx(re_w, im_w, wf_rp), [nx, nx]) / dfl_scale
 
-    call wavefront_drift (wf1, z_now - run%bank_z(k, ihh), ferr);  if (ferr) return
+    call wavefront_drift (wf1, z_now - run%bank_z(run%n_banked(ihh) - k + 1, ihh), ferr);  if (ferr) return
 
-    write (gname, '(a, i0.6)') 'slice', nslice + (run%n_banked(ihh) - k + 1)
+    write (gname, '(a, i0.6)') 'slice', nslice + k
     call H5Gcreate_f (p_id, trim(gname), g_id, h5e)
     work = dfl_scale * reshape(real(wf1%Ex(:,:,1), rp), [nx*nx])
     call hdf5_write_dataset_real (g_id, 'field-real', work, ferr);  if (ferr) return

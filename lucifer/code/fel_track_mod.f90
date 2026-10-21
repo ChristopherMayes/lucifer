@@ -415,7 +415,7 @@ end function fel_field_index
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_apply_slippage (slip, wf, slippage, bank, harm)
+! Subroutine fel_apply_slippage (slip, wf, slippage, bank, harm, err_flag)
 !
 ! Routine to account the slippage of one step and rotate the field record when it
 ! crosses a slice boundary. Transcribed from Control::applySlippage (fel-physics.md
@@ -433,22 +433,31 @@ end function fel_field_index
 ! of Lattice::calcSlippage) and calls this after the field step, Gencore's step 5.
 ! A steady-state record (timerun false) is left untouched, exactly as Genesis's.
 !
+! Note: A slice transmitted backward leaves at the tail, and the escaped file and the
+! pulse file place banked light ahead of the window only, so backward slippage with a
+! bank present is refused rather than banked out of place.
+!
 ! Input:
 !   slip        -- fel_slip_struct: Slippage state of this field record.
 !   wf          -- wavefront_struct: The field record.
 !   slippage    -- real(rp): Slippage of this step [radiation wavelengths].
+!   bank        -- fel_bank_struct, optional: Receives the transmitted planes when present.
+!   harm        -- integer, optional: Harmonic number of this field. Default is 1.
 !
 ! Output:
 !   slip, wf    -- Updated state and rotated record.
+!   err_flag    -- logical, optional: Set True on the refusal above. False otherwise.
 !-
 
-subroutine fel_apply_slippage (slip, wf, slippage, bank, harm)
+subroutine fel_apply_slippage (slip, wf, slippage, bank, harm, err_flag)
 
 type (fel_slip_struct) slip
 type (wavefront_struct) wf
 type (fel_bank_struct), optional :: bank
 integer, optional :: harm
+logical, optional :: err_flag
 real(rp) slippage, t_slice
+character(*), parameter :: r_name = 'fel_apply_slippage'
 complex(wf_rp), allocatable :: grow(:,:,:)
 integer nslice, last, direction
 
@@ -465,8 +474,12 @@ if (present(harm)) then
   if (harm /= 1) t_slice = t_slice * harm
 endif
 
+if (present(err_flag)) err_flag = .true.
 if (present(bank)) bank%n = 0
-if (.not. slip%timerun) return
+if (.not. slip%timerun) then
+  if (present(err_flag)) err_flag = .false.
+  return
+endif
 
 slip%accuslip = slip%accuslip + slippage
 nslice = size(wf%Ex, 3)
@@ -474,6 +487,13 @@ nslice = size(wf%Ex, 3)
 do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   direction = 1
   if (slip%accuslip < 0) direction = -1
+  if (direction < 0 .and. present(bank)) then
+    call out_io (s_error$, r_name, 'BACKWARD SLIPPAGE WITH KEEP_ESCAPED_FIELD = T.', &
+                                   'A SLICE TRANSMITTED FROM THE TAIL HAS NO PLACE AHEAD OF THE WINDOW', &
+                                   'IN THE ESCAPED AND PULSE FILES.', &
+                                   'POSSIBLE SOLUTION: SET KEEP_ESCAPED_FIELD = F.')
+    return
+  endif
   slip%accuslip = slip%accuslip - slip%sample * direction
 
   ! The transmitted slice: the last of the record in time order for forward slippage,
@@ -527,6 +547,8 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   slip%first = last
   if (direction < 0) slip%first = mod(last + 1, nslice)
 enddo
+
+if (present(err_flag)) err_flag = .false.
 
 end subroutine fel_apply_slippage
 

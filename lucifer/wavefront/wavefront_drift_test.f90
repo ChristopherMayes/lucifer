@@ -96,7 +96,7 @@ print '(a, a)',         '  Input file:            ', trim(in_file)
 print '(a, 3i7)',       '  Grid (nx, ny, nz):     ', n_grid
 print '(a, 3es16.8)',   '  dx, dy, dz [m]:        ', wf%dx, wf%dy, wf%dz
 print '(a, es16.8)',    '  Wavelength [m]:        ', wf%wavelength
-print '(a, es16.8)',    '  Ref position [m]:      ', wf%ref_position
+print '(a, es16.8)',    '  s_position [m]:        ', wf%s_position
 print '(a, es16.8)',    '  Drift [m]:             ', z_drift
 
 call wavefront_transverse_moments (wf, mean_x0, mean_y0, sigma_x0, sigma_y0)
@@ -139,11 +139,11 @@ if (d_ex /= 0) then
   stop 1
 endif
 
-call wavefront_write_openpmd (wf, out_file, wf%ref_position, err)
+call wavefront_write_openpmd (wf, out_file, err)
 if (err) stop 1
 
 print '(a, a)',         '  Output file:           ', trim(out_file)
-print '(a, es16.8)',    '  Ref position out [m]:  ', wf%ref_position
+print '(a, es16.8)',    '  s_position out [m]:    ', wf%s_position
 
 ! Machine readable lines for validate_drift.py, which recomputes each of these from the
 ! output file and checks it. Without this the Fortran side of the mirrored quantities

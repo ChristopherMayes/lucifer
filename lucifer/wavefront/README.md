@@ -27,7 +27,7 @@ that a later FEL tracker will carry, and the transport step it will use outside 
 ```
 cd <bmad-ecosystem>
 conda env create -n bmad-build -f .github/bmad-build-env.yaml   # once
-BUILD_PRODUCTION=N ./util/conda_compile
+BUILD_PRODUCTION=N lucifer/util/conda_compile
 
 conda env create -f lucifer/wavefront/tests/environment.yml        # once
 ./lucifer/wavefront/tests/run_validation.sh

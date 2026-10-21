@@ -128,7 +128,7 @@ keeps Genesis4 field conventions since those two records have no home in the wav
 extension) and reconstructs the full pulse at the exit plane (`-pulse.fld.h5`) by free-space propagation at
 finalize, because transmitted light is fixed information and never re-interacts, so
 whole-pulse statistics use the ABCD map on the banked moment matrices and never
-propagate numerically.
+propagate numerically. Both files are Genesis4 field files in Genesis4's order: slice `i` sits at `refposition + (i - 1) * slicespacing`, numbered from the tail. The pulse file's slice 1 is the live window's tail and its `refposition` is 0. The escaped file's slice 1 is the slot just past the window's head, so its `refposition` is the window length, `n_slice * slicespacing`, and its last slice is the earliest light to leave. Each slice's `z_transmit` says where along the lattice it left. `refposition` is a coordinate within the pulse and never the lattice position, which is the openPMD files' `zCoordinate`.
 
 `meta/` says which lattice and which input, and deliberately not more. Everything in it
 is a dataset rather than an attribute, because HDF5 caps one attribute at 64 kB (the
