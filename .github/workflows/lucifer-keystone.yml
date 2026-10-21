@@ -112,12 +112,16 @@ jobs:
 
       # Two packages the build needs on Linux and not on macOS. The distribution's own
       # conda-build.yml appends the same two, and the file is the distribution's, so the
-      # append happens here in the runner rather than in the clone's tree.
+      # append happens here in the runner rather than in the clone's tree. The file is
+      # copied into the workspace first: setup-miniconda reads environment-file relative to
+      # the workspace even when given an absolute path, and an absolute path under the
+      # runner's temporary directory failed as the workspace path joined to it.
       - name: Include the Linux-only build requirements
         shell: bash
         run: |
-          echo '  - libacl' >> "$RUNNER_TEMP/bmad/.github/bmad-build-env.yaml"
-          echo '  - libgomp' >> "$RUNNER_TEMP/bmad/.github/bmad-build-env.yaml"
+          cp "$RUNNER_TEMP/bmad/.github/bmad-build-env.yaml" bmad-build-env.yaml
+          echo '  - libacl' >> bmad-build-env.yaml
+          echo '  - libgomp' >> bmad-build-env.yaml
 
       - name: Install the build environment
         uses: conda-incubator/setup-miniconda@v3
@@ -126,7 +130,7 @@ jobs:
           use-mamba: true
           activate-environment: bmad-build
           channels: conda-forge
-          environment-file: ${{ runner.temp }}/bmad/.github/bmad-build-env.yaml
+          environment-file: bmad-build-env.yaml
           python-version: "3.12"
           conda-remove-defaults: true
 
