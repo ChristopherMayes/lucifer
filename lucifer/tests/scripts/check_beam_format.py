@@ -200,8 +200,6 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     p.add_argument("--exe", required=True)
     p.add_argument("--workdir", required=True)
-    p.add_argument("--pyrepo", help="openPMD-beamphysics checkout. "
-                   "Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     a = p.parse_args()
     wd = pathlib.Path(a.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -392,8 +390,7 @@ def main():
     as_genesis(wd, "bfe-final.beam.h5", "bfe-conv.par.h5")
     r = subprocess.run([sys.executable,
                         str(pathlib.Path(__file__).resolve().parent / "convert_genesis.py"),
-                        "to-openpmd", "bfe-conv.par.h5", "bfe-conv.beam.h5"]
-                       + (["--pyrepo", a.pyrepo] if a.pyrepo else []),
+                        "to-openpmd", "bfe-conv.par.h5", "bfe-conv.beam.h5"],
                        cwd=wd, capture_output=True, text=True)
     check("the converter runs (exit 0)", float(r.returncode), 0.5)
     with h5py.File(wd / "bfe-conv.beam.h5") as h5:
@@ -487,7 +484,7 @@ def main():
     # placing a picture and is not the exact partition, which stays particlePatches.
 
     print("== the file as openPMD, read by a reader that knows nothing of this program ==")
-    convert_genesis._beamphysics(a.pyrepo)
+    convert_genesis._beamphysics()
     from beamphysics import ParticleGroup
 
     C_LIGHT = 2.99792458e8

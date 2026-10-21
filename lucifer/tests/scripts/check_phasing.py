@@ -386,9 +386,6 @@ def main():
     ap.add_argument("workdir")
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--pyrepo",
-                    help="openPMD-beamphysics checkout, for the dump conversion. "
-                         "Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -449,7 +446,7 @@ def main():
     # reading its own, so both codes still start from the same particles and field.
     for src, dst in (("PSP-initial.par.h5", "PSP-initial.beam.h5"),
                      ("PSP-initial.fld.h5", "PSP-initial.wf.h5")):
-        convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
+        convert_genesis.to_openpmd(wd / src, wd / dst)
 
     def gen_ps(k):
         (wd / f"ps{k}.lat").write_text(GEN_LAT_PS.format(phi=f"{2 * np.pi * k / 8:.12e}"))

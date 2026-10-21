@@ -30,7 +30,6 @@ commands cover both. Exit 0 only on success.
 from __future__ import annotations
 
 import argparse
-import os
 import pathlib
 import sys
 
@@ -64,36 +63,30 @@ def is_particles(path):
 # Genesis particles in
 
 
-def _beamphysics(pyrepo=None):
-    """Make openPMD-beamphysics importable, and say plainly when it is not.
+def _beamphysics():
+    """openPMD-beamphysics from this interpreter's environment, with a plain message when
+    it is absent.
 
-    Installed is the normal case and needs nothing. A checkout is the other case, since
-    the wavefront I/O this uses is not in a release yet, and it is named explicitly:
-    --pyrepo, or $OPENPMD_BEAMPHYSICS. There is no default path, because a path that
-    works on one machine is a silent failure on every other one.
+    The package is installed into the validation environment, a development version
+    included, and whatever version that environment holds is used. The environment file
+    (wavefront/tests/environment.yml) states the minimum.
     """
     import importlib
-    repo = pyrepo or os.environ.get("OPENPMD_BEAMPHYSICS")
-    if repo:
-        repo = str(pathlib.Path(repo).expanduser())
-        if repo not in sys.path:
-            sys.path.insert(0, repo)
     try:
         return importlib.import_module("beamphysics")
     except ImportError as exc:
         raise SystemExit(
-            "openPMD-beamphysics is not importable: " + str(exc) + "\n"
-            "Install it, or name a checkout with --pyrepo <path> or "
-            "$OPENPMD_BEAMPHYSICS.")
+            f"openPMD-beamphysics is not installed in the environment of {sys.executable}: "
+            f"{exc}\nInstall it from wavefront/tests/environment.yml.")
 
 
-def read_genesis_par(path, pyrepo=None):
+def read_genesis_par(path):
     """Per-slice ParticleGroups from a Genesis .par.h5, empty slices as None.
 
     The physics conversion is openPMD-beamphysics's: theta and gamma to a time and a
     momentum, the slice current to per-particle weights.
     """
-    ParticleGroup = _beamphysics(pyrepo).ParticleGroup
+    ParticleGroup = _beamphysics().ParticleGroup
 
     with h5py.File(path) as h5:
         nslice = int(h5["slicecount"][0])
@@ -319,8 +312,8 @@ def write_genesis_par(path, slices, wavelength, spacing, refposition=0.0,
 # Fields, both ways, entirely upstream
 
 
-def convert_field(src, dst, pyrepo=None):
-    _beamphysics(pyrepo)
+def convert_field(src, dst):
+    _beamphysics()
     from beamphysics.wavefront import Wavefront
 
     if is_openpmd(src):
@@ -331,15 +324,15 @@ def convert_field(src, dst, pyrepo=None):
 
 # ----------------------------------------------------------------------------------
 
-def to_openpmd(src, dst, pyrepo=None):
+def to_openpmd(src, dst):
     """Convert one Genesis file, particles or field, to openPMD. The importable form of
     the to-openpmd command, for the check scripts that run Genesis themselves."""
     src, dst = pathlib.Path(src), pathlib.Path(dst)
     if is_particles(src):
-        groups, scalars = read_genesis_par(src, pyrepo)
+        groups, scalars = read_genesis_par(src)
         write_openpmd_beam(dst, groups, scalars["spacing"])
     else:
-        convert_field(src, dst, pyrepo)
+        convert_field(src, dst)
     return dst
 
 
@@ -350,7 +343,6 @@ def main():
     p.add_argument("dst", nargs="?")
     p.add_argument("--wavelength", type=float, default=0.0)
     p.add_argument("--sample", type=int, default=1)
-    p.add_argument("--pyrepo", help="openPMD-beamphysics checkout. Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     a = p.parse_args()
     src = pathlib.Path(a.src)
 
@@ -359,12 +351,12 @@ def main():
 
     dst = pathlib.Path(a.dst)
     if not is_particles(src):
-        convert_field(src, dst, a.pyrepo)
+        convert_field(src, dst)
         print(f"field: {src.name} -> {dst.name}")
         return 0
 
     if a.command == "to-openpmd":
-        groups, scalars = read_genesis_par(src, a.pyrepo)
+        groups, scalars = read_genesis_par(src)
         write_openpmd_beam(dst, groups, scalars["spacing"])
         print(f"particles: {src.name} -> {dst.name}, {len(groups)} patches")
         return 0
@@ -393,8 +385,8 @@ def round_trip(src, a):
     with tempfile.TemporaryDirectory() as d:
         d = pathlib.Path(d)
         if not is_particles(src):
-            convert_field(src, d / "mid.wf.h5", a.pyrepo)
-            convert_field(d / "mid.wf.h5", d / "back.fld.h5", a.pyrepo)
+            convert_field(src, d / "mid.wf.h5")
+            convert_field(d / "mid.wf.h5", d / "back.fld.h5")
             worst = 0.0
             with h5py.File(src) as A, h5py.File(d / "back.fld.h5") as B:
                 names, back = [], []
@@ -418,7 +410,7 @@ def round_trip(src, a):
         with h5py.File(src) as h5:
             lam = float(h5["slicelength"][0])
             spacing = float(h5["slicespacing"][0])
-        groups, scalars = read_genesis_par(src, a.pyrepo)
+        groups, scalars = read_genesis_par(src)
         write_openpmd_beam(d / "mid.beam.h5", groups, spacing)
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
         import beamio

@@ -39,7 +39,7 @@ and a JSON file of every number go to --out. This script is run on demand and ne
 the benchmark harness.
 
 Usage:
-  startup_noise.py --exe <lucifer> --genesis <genesis4> --pyrepo <openPMD-beamphysics>
+  startup_noise.py --exe <lucifer> --genesis <genesis4>
                    --examples <lucifer/examples> --latdir <lucifer/tests> --workdir <dir>
                    --out <doc/generated/startup-noise> [--device metal|off] [--only a,b,...]
                    [--machine aramis|flash|flash1]
@@ -786,8 +786,8 @@ def exp_genesis(rn, args, results):
             for pair in ((f"{root}-initial.par.h5", f"{root}-initial.beam.h5"),
                          (f"{root}-initial.fld.h5", f"{root}-initial.wf.h5")):
                 if not (rn.wd / pair[1]).exists():
-                    subprocess.run([sys.executable, str(convert), "to-openpmd", *pair,
-                                    "--pyrepo", args.pyrepo], cwd=rn.wd, check=True,
+                    subprocess.run([sys.executable, str(convert), "to-openpmd", *pair],
+                                   cwd=rn.wd, check=True,
                                    stdout=subprocess.DEVNULL)
             lroot = f"L{ng}"
             rn.run(lroot, LUCIFER_FROM_GENESIS.format(root=lroot, gen=root), env_threads=args.cpu_threads)
@@ -1323,7 +1323,6 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--pyrepo", required=True)
     ap.add_argument("--examples", required=True, help="lucifer/examples, for aramis.bmad")
     ap.add_argument("--latdir", required=True, help="lucifer/tests, for the Genesis lattice and deck")
     ap.add_argument("--workdir", required=True)

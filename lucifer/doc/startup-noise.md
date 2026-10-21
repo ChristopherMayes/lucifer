@@ -14,7 +14,7 @@ The sections below describe the model and the prior work, then the method, prese
 The analysis was carried out with the script [startup_noise.py](../tests/scripts/startup_noise.py), which runs the simulations, draws the figures and writes every number quoted here to [startup-noise.json](generated/startup-noise/startup-noise.json). Both files are part of this documentation:
 
 ```
-python3 startup_noise.py --exe <lucifer> --genesis <genesis4> --pyrepo <openPMD-beamphysics> \
+python3 startup_noise.py --exe <lucifer> --genesis <genesis4> \
         --examples <lucifer/examples> --latdir <lucifer/tests> --workdir <dir> --out <dir>
 ```
 

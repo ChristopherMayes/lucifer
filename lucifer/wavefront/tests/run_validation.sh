@@ -34,11 +34,9 @@
 #   2. The Python environment defined alongside this script:
 #        conda env create -f environment.yml
 #
-#   3. An openPMD-beamphysics checkout. Found automatically if it sits beside the
-#      bmad-ecosystem checkout. Otherwise pass --beamphysics <path>.
+#   3. openPMD-beamphysics, installed in that environment from the same file.
 #
 # Options:
-#   --beamphysics <path>  openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
 #   --python <path>       Python interpreter. Default: the bmad-fel-validate conda env.
 #   --exe <path>          wavefront_drift_test binary. Default: debug then production.
 #   --work-dir <path>     Where to put the HDF5 files. Default: a temporary directory.
@@ -54,7 +52,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # defaults and the variables that name them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../../util/locations.sh"
 
-BEAMPHYSICS=""
 PYTHON=""
 EXE=""
 WORK_DIR=""
@@ -63,13 +60,12 @@ QUICK=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
     --python)      PYTHON="$2";      shift 2 ;;
     --exe)         EXE="$2";         shift 2 ;;
     --work-dir)    WORK_DIR="$2";    shift 2 ;;
     --tolerance)   TOLERANCE="$2";   shift 2 ;;
     --quick)       QUICK=1;          shift 1 ;;
-    -h|--help)     sed -n '2,50p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)     sed -n '2,46p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -91,23 +87,6 @@ fi
 # Absolute from here on: the run changes directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
-# Locate openPMD-beamphysics.
-
-if [[ -z "$BEAMPHYSICS" ]]; then
-  for candidate in "${OPENPMD_BEAMPHYSICS:-}" "$LUCIFER_DIR/../../openPMD-beamphysics"; do
-    if [[ -d "$candidate/beamphysics/wavefront" ]]; then
-      BEAMPHYSICS="$(cd "$candidate" && pwd)"
-      break
-    fi
-  done
-fi
-
-if [[ -z "$BEAMPHYSICS" || ! -d "$BEAMPHYSICS/beamphysics/wavefront" ]]; then
-  echo "Error: openPMD-beamphysics checkout not found (looked for beamphysics/wavefront)." >&2
-  echo "Pass it with --beamphysics <path>." >&2
-  exit 1
-fi
-
 # Locate Python.
 
 if [[ -z "$PYTHON" ]]; then
@@ -125,6 +104,16 @@ if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
+# openPMD-beamphysics, from this interpreter's environment, a development version
+# included. The version and the path it came from are printed for the log, and no version
+# is checked here: the environment file states the minimum.
+if ! BEAMPHYSICS="$("$PYTHON" -c 'import os, beamphysics; print(beamphysics.__version__, os.path.dirname(beamphysics.__file__))' 2>&1)"; then
+  echo "Error: openPMD-beamphysics is not installed in the environment of $PYTHON:" >&2
+  echo "  ${BEAMPHYSICS##*$'\n'}" >&2
+  echo "Install it: conda env update -n bmad-fel-validate -f $LUCIFER_DIR/wavefront/tests/environment.yml" >&2
+  exit 1
+fi
+
 # Work directory.
 
 CLEAN_WORK_DIR=0
@@ -138,8 +127,6 @@ cleanup() {
   if [[ "$CLEAN_WORK_DIR" == "1" ]]; then rm -rf "$WORK_DIR"; fi
 }
 trap cleanup EXIT
-
-export PYTHONPATH="$BEAMPHYSICS${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "=============================================================================="
 echo "Wavefront free-space drift validation"

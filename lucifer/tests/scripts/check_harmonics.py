@@ -30,8 +30,8 @@ Harmonic field-set and openPMD wavefront checks (fel-physics.md sec-field-set):
      which carries no photon energy to match on.
 
 Run by the benchmark harness. Exits nonzero on failure. Needs the genesis4 binary
-(--genesis) for section 2, and a beamphysics checkout carrying
-beamphysics/wavefront/openpmd.py (--pyrepo) for the openPMD checks of section 1.
+(--genesis) for section 2, and openPMD-beamphysics installed in this interpreter's
+environment for the openPMD checks of section 1.
 """
 
 from __future__ import annotations
@@ -285,8 +285,6 @@ def main():
     ap.add_argument("workdir")
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--pyrepo", help="openPMD-beamphysics checkout. "
-                    "Default: $OPENPMD_BEAMPHYSICS, or the installed package.")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
     wd.mkdir(parents=True, exist_ok=True)
@@ -312,7 +310,7 @@ def main():
     # both codes still track the same beam and the same field.
     for src, dst in (("H3-initial.par.h5", "H3-initial.beam.h5"),
                      ("H3-initial.fld.h5", "H3-initial.wf.h5")):
-        convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
+        convert_genesis.to_openpmd(wd / src, wd / dst)
 
     run(exe, wd, "h3bmad", NML_IMPORT.format(lat="planar.bmad", root="h3bmad",
         beam="H3-initial.beam.h5", field="H3-initial.wf.h5", extra=""))
@@ -348,7 +346,7 @@ def main():
     # The Genesis view of each dump, through the converter: the second reading of the same
     # field that the complex comparison below needs.
     for fn in ("h3both-final.wf.h5", "h3both-final-h3.wf.h5"):
-        convert_genesis.to_openpmd(wd / fn, wd / fn.replace(".wf.h5", ".fld.h5"), args.pyrepo)
+        convert_genesis.to_openpmd(wd / fn, wd / fn.replace(".wf.h5", ".fld.h5"))
 
     for fn, lam in (("h3both-final.wf.h5", 1e-10), ("h3both-final-h3.wf.h5", 1e-10 / 3)):
         with h5py.File(wd / fn) as f:
@@ -398,14 +396,8 @@ def main():
 
     # The Python Wavefront class, via its own Genesis path, agrees on the energy.
 
-    sys.path.insert(0, args.pyrepo)
-    try:
-        from beamphysics.wavefront import Wavefront
-    except ImportError as exc:
-        print(f"FAIL: cannot import the Python Wavefront class from {args.pyrepo}: {exc}")
-        print("      The openPMD path needs a beamphysics carrying "
-              "beamphysics/wavefront/openpmd.py.")
-        sys.exit(1)
+    convert_genesis._beamphysics()
+    from beamphysics.wavefront import Wavefront
     wf_py = Wavefront.from_genesis4(str(wd / "h3both-final.fld.h5"))
     E_gen, dsp = dfl_to_vperm(wd / "h3both-final.fld.h5")
     u_here = power_of(E_gen, dsp) * 1e-10 / C_LIGHT   # SS: dz = wavelength

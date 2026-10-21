@@ -22,9 +22,9 @@ locations, each defaulting to that layout inside a Bmad checkout: the Lucifer so
 which is its own tree, the Bmad source with its regression suite and debug binaries
 (`BMAD_DIR`, else `DIST_BASE_DIR`, else the Lucifer source's parent), and the two Lucifer
 binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). A Lucifer source tree
-outside the Bmad checkout runs the same suite with `BMAD_DIR` set, and with
-`OPENPMD_BEAMPHYSICS` naming the openPMD-beamphysics checkout, whose default is a sibling
-of the Bmad checkout. A relative value is taken against the directory the suite was
+outside the Bmad checkout runs the same suite with `BMAD_DIR` set. openPMD-beamphysics is
+a package in the validation environment, 0.16.3 or later, and not a location. A relative
+value is taken against the directory the suite was
 started in, and every job is handed the resolved absolute values, since the jobs run from
 the Lucifer source. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is
 passed over with a note, since `dist_source_me` uses that name as a loop variable and
@@ -219,9 +219,8 @@ The harness runs Genesis4 six times (full line and single segment, steady state 
 dependent, plus the collective tiers), converts each chain's initial dumps to openPMD,
 which is the only format the tracker reads, runs the Bmad tracker for every tier and
 check, and prints the largest relative difference of each check. It fails loudly if the
-genesis4 binary is missing, and likewise without an openPMD-beamphysics checkout
-(`--beamphysics <path>`, a sibling of bmad-ecosystem by default), which is what performs
-the conversion. There is no comparison without either, so there is nothing to skip to. Genesis4 must be built with FFTW, since the
+genesis4 binary is missing, and likewise without openPMD-beamphysics installed in the
+validation environment, which is what performs the conversion. There is no comparison without either, so there is nothing to skip to. Genesis4 must be built with FFTW, since the
 benchmark runs with `fft_fieldsolver=true` (the Bmad tracker transcribes the FFT solver,
 and Genesis4's default ADI solver is out of scope).
 

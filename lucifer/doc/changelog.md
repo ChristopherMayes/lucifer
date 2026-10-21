@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-10-21 Changed: openPMD-beamphysics is a package installed in the validation environment, at
+  0.16.3 or later, the first release carrying `Wavefront.from_openpmd` and `write_openpmd`.
+  `wavefront/tests/environment.yml` states that minimum and is the one place a version is stated. The
+  scripts import whatever that environment holds and print its version and path before any section runs.
+  A development version is installed into the environment too. The `--beamphysics` and `--pyrepo`
+  options, `OPENPMD_BEAMPHYSICS`, the `PYTHONPATH` the wavefront validation set and the sibling-checkout
+  default are gone, and an interpreter without the package is refused with the install command. The
+  Linux CI job no longer clones the `openpmd-wavefront-rw` branch, which it refused at any tip but one
+  commit and which the merge upstream moved. The same job now passes `--build debug` with
+  `--results`, which the benchmark has required since 2026-10-20 and the job did not give. Every
+  recorded digit held.
 - 2026-10-20 Changed: the harness locations hold under any spelling. The benchmark records the build its
   `--build` option declares, debug or production, which `--results` now requires, where it read the flavor
   off the binary's directory name and wrote `unknown` for a directory named otherwise, which the table

@@ -204,27 +204,10 @@ jobs:
           # only in the harness's refusal. genesis4 exits non-zero when it is given no
           # input file, which is not a failure of this step.
           conda run -n bmad-fel-validate genesis4 2>&1 | head -3 || true
-
-      # The tracker reads openPMD only, so the Genesis reference dumps are converted at
-      # the boundary before any tier runs, and the field half of that conversion calls
-      # Wavefront.from_openpmd and write_openpmd. Those two live on this branch and not
-      # in the released package, so the branch is what gets cloned rather than a pip
-      # install. Upstreaming them retires this step.
-      - name: Clone openPMD-beamphysics at the pinned branch
-        shell: bash
-        run: |
-          git clone --branch openpmd-wavefront-rw --depth 1 \
-              https://github.com/ChristopherMayes/openPMD-beamphysics.git \
-              "$RUNNER_TEMP/openPMD-beamphysics"
-          # The conversion's recorded levels belong to one commit, so a moved branch tip
-          # is refused here rather than converting differently and passing.
-          want=cffc34b96bbe1cbd9fae0733a73733d599611142
-          got=$(git -C "$RUNNER_TEMP/openPMD-beamphysics" rev-parse HEAD)
-          echo "openPMD-beamphysics at $got"
-          if [ "$got" != "$want" ]; then
-            echo "the pinned commit is $want, and the branch tip is $got"
-            exit 1
-          fi
+          # openPMD-beamphysics comes from the same file, at the minimum it states or
+          # later. The harness prints the version and path again before its sections run.
+          conda run -n bmad-fel-validate python -c \
+              "import beamphysics; print('openPMD-beamphysics', beamphysics.__version__)"
 
       # The harness prints the reference version and the electron rest energy it carries,
       # every section's name and wall time, and every tier's level against its tolerance.
@@ -237,8 +220,7 @@ jobs:
           conda activate bmad-fel-validate
           set -e
           ./lucifer/tests/run_fel_benchmark.sh \
-              --exe "$PWD/debug/bin/lucifer" \
-              --beamphysics "$RUNNER_TEMP/openPMD-beamphysics" \
+              --exe "$PWD/debug/bin/lucifer" --build debug \
               --results "$RUNNER_TEMP/fel-debug.txt" \
               --work-dir "$RUNNER_TEMP/wd-dbg"
 
@@ -249,7 +231,6 @@ jobs:
           conda activate bmad-fel-validate
           set -e
           ./lucifer/wavefront/tests/run_validation.sh \
-              --beamphysics "$RUNNER_TEMP/openPMD-beamphysics" \
               --work-dir "$RUNNER_TEMP/wd-wf"
 
       # The results file records what ran, what skipped and why, and each tier's level.

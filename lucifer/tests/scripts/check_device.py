@@ -70,7 +70,7 @@ source's last bit or two, the reference backends' own documented behavior. The
 ceilings absorb it; the read-only proof compares FP64 outputs only.
 
 Usage: check_device.py --exe <lucifer> --workdir <dir> --latdir <tests/bmad>
-                       --genesis <genesis4> --pyrepo <openPMD-beamphysics>
+                       --genesis <genesis4>
 The workdir must hold aramis_1seg.bmad and aramis_1seg_unavg.bmad. Exit 0 only if
 all pass.
 """
@@ -317,7 +317,6 @@ def main():
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--latdir", required=True, help="tests/bmad, for crossed_probe.bmad")
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--pyrepo", help="openPMD-beamphysics checkout for the dump conversion")
     args = ap.parse_args()
     wd = pathlib.Path(args.workdir)
     exe = pathlib.Path(args.exe).resolve()
@@ -1275,7 +1274,7 @@ def genesis_harmonics(args, wd, exe):
         sys.exit(1)
     for src, dst in (("DEVG-initial.par.h5", "DEVG-initial.beam.h5"),
                      ("DEVG-initial.fld.h5", "DEVG-initial.wf.h5")):
-        convert_genesis.to_openpmd(wd / src, wd / dst, args.pyrepo)
+        convert_genesis.to_openpmd(wd / src, wd / dst)
     imp = ch.NML_IMPORT.replace('transport_model = "genesis"', 'transport_model = "bmad"')
     curves = {}
     for tag, extra in (("cpu", ""), ("dev", DEV)):

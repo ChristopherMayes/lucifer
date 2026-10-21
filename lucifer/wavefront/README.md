@@ -33,9 +33,9 @@ conda env create -f lucifer/wavefront/tests/environment.yml        # once
 ./lucifer/wavefront/tests/run_validation.sh
 ```
 
-The script finds the binary, the Python interpreter and the openPMD-beamphysics checkout on
-its own if they are in the usual places, and takes `--exe`, `--python` and `--beamphysics`
-if they are not. It exits nonzero unless every comparison passes.
+The script finds the binary and the Python interpreter on its own if they are in the usual
+places, and takes `--exe` and `--python` if they are not. openPMD-beamphysics comes from
+that interpreter's environment, which installs 0.16.3 or later. It exits nonzero unless every comparison passes.
 
 ## What the validation checks
 
@@ -107,13 +107,12 @@ intrinsic sums sequentially, with error growing as `N·eps`, which is 4.5e-12 he
 
 ### A finding about the Python writer
 
-`Wavefront.write_genesis4` writes `refposition` as int64 whenever the default argument is
-used, because the default is the Python int `0` and `np.asarray([0])` infers an integer type.
-Pass a float and it writes float64. Genesis4 writes this field as a double with a unit
-attribute of `"m"`, and reads it with `H5Dread` into `H5T_NATIVE_DOUBLE`, so the integer file
-is read correctly and nothing breaks. But a position in meters is being stored as an
-integer. This Fortran writer writes float64 deliberately. The harness reports the difference
-rather than failing on it. Worth fixing on the Python side.
+Releases of openPMD-beamphysics before 0.16.3 wrote `refposition` as int64 whenever the
+default argument was used, because the default was the Python int `0` and `np.asarray([0])`
+infers an integer type. Genesis4 writes this field as a double with a unit attribute of
+`"m"`, and reads it with `H5Dread` into `H5T_NATIVE_DOUBLE`, so the integer file was read
+correctly. From 0.16.3 the field is written from the grid and is float64, as this Fortran
+writer writes it.
 
 ## Design notes
 

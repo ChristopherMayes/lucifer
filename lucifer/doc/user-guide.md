@@ -32,12 +32,13 @@ the checkout's `util/` once sourced. By hand, the same build is `source
 directory.
 
 Running the validation harness needs one thing beyond the binary, a Python environment
-with numpy, h5py and pytest, described by `lucifer/wavefront/tests/environment.yml`. The
-harness takes four locations, each defaulting to the layout above: the Lucifer source,
-which is the scripts' own tree, the Bmad source with its regression suite (`BMAD_DIR`), and
-the two binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). Outside the Bmad
-checkout, `OPENPMD_BEAMPHYSICS` names the openPMD-beamphysics checkout as well, whose
-default is a sibling of the Bmad checkout. A relative value is taken against the
+with numpy, h5py, pytest and openPMD-beamphysics 0.16.3 or later, described by
+`lucifer/wavefront/tests/environment.yml`. The scripts use whatever version that
+environment holds and print it. A development version of openPMD-beamphysics is installed
+into the environment as well. The harness takes four locations, each defaulting to the
+layout above: the Lucifer source, which is the scripts' own tree, the Bmad source with its
+regression suite (`BMAD_DIR`), and the two binary directories (`LUCIFER_DEBUG_BIN`,
+`LUCIFER_PRODUCTION_BIN`). A relative value is taken against the
 directory a script was started in. The benchmark records the build its `--build` option
 declares, debug or production, and never reads it off a directory name. The exact
 commands the harness runs are in [`validation.md`](validation.md).

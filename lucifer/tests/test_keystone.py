@@ -91,12 +91,10 @@ BMAD, BMAD_NOTES = bmad_source()
 DEBUG_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER.parent / "debug" / "bin"))
 PRODUCTION_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER.parent / "production" / "bin"))
 # What every job is handed: each value as it was given, made absolute, with no symbolic
-# link followed. The openPMD-beamphysics checkout has its default in the scripts, so it
-# is passed through only where set.
+# link followed. openPMD-beamphysics is not a location: it is a package installed in the
+# interpreter's environment, which every job inherits.
 LOCATIONS = {"BMAD_DIR": str(BMAD),
              "LUCIFER_DEBUG_BIN": str(DEBUG_BIN), "LUCIFER_PRODUCTION_BIN": str(PRODUCTION_BIN)}
-if os.environ.get("OPENPMD_BEAMPHYSICS"):
-    LOCATIONS["OPENPMD_BEAMPHYSICS"] = os.path.abspath(os.environ["OPENPMD_BEAMPHYSICS"])
 DEBUG_EXE = DEBUG_BIN / "lucifer"
 PRODUCTION_EXE = PRODUCTION_BIN / "lucifer"
 BENCHMARK = LUCIFER / "tests" / "run_fel_benchmark.sh"

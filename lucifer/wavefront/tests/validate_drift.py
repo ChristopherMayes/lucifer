@@ -2,8 +2,8 @@
 """
 Python half of the Fortran against Python free-space drift comparison.
 
-Run through run_validation.sh, which builds the Fortran side, sets PYTHONPATH to an
-openPMD-beamphysics checkout and calls this script twice:
+Run through run_validation.sh, which calls this script twice with the interpreter of
+the validation environment, where openPMD-beamphysics is installed:
 
     validate_drift.py write   <input.h5>  --nx ... --ny ... --nz ... --wavelength ...
     validate_drift.py compare <input.h5> <fortran_out.h5> --z ...

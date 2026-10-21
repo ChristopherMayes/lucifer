@@ -26,10 +26,9 @@
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
 #      (conda env create -f ../wavefront/tests/environment.yml).
 #
-#   4. An openPMD-beamphysics checkout carrying beamphysics/wavefront/openpmd.py, at
-#      ../openPMD-beamphysics by default. It converts the Genesis reference dumps at the
-#      boundary, and the harmonics section round-trips the wavefront files through that
-#      class in both directions. Both refuse if the checkout is missing.
+#   4. openPMD-beamphysics, installed in the same environment from that file. It
+#      converts the Genesis reference dumps at the boundary, and the harmonics section
+#      round-trips the wavefront files through its Wavefront class in both directions.
 #
 # Options:
 #   --genesis <path>    genesis4 binary. Default: $GENESIS4, else genesis4 on PATH.
@@ -41,7 +40,6 @@
 #                       table, and never read off the binary's directory name.
 #   --python <path>     Python interpreter. Default: the bmad-fel-validate conda env.
 #   --work-dir <path>   Where to run. Default: a temporary directory (kept on failure).
-#   --beamphysics <p>   openPMD-beamphysics checkout. Default: sibling of bmad-ecosystem.
 #   --results <path>    Write a machine-readable results file (tiers, check sections,
 #                       build flavor) for doc generation. Default: none written.
 #   --tiers-marker <p>  Create this file when the tier block is done. Default: none.
@@ -91,7 +89,6 @@ EXE=""
 BUILD=""
 PYTHON=""
 WORK_DIR=""
-BEAMPHYSICS=""
 RESULTS=""
 CPUS=""
 TIERS_MARKER=""
@@ -104,12 +101,11 @@ while [[ $# -gt 0 ]]; do
     --build)    BUILD="$2";    shift 2 ;;
     --python)   PYTHON="$2";   shift 2 ;;
     --work-dir) WORK_DIR="$2"; shift 2 ;;
-    --beamphysics) BEAMPHYSICS="$2"; shift 2 ;;
     --results)  RESULTS="$2";  shift 2 ;;
     --cpus)     CPUS="$2";     shift 2 ;;
     --tiers-marker) TIERS_MARKER="$2"; shift 2 ;;
     --wait-tiers)   WAIT_TIERS="$2";   shift 2 ;;
-    -h|--help)  sed -n '2,53p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,51p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -162,20 +158,13 @@ if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-# openPMD-beamphysics. The boundary conversion of the Genesis reference dumps needs it,
-# so it is located here rather than left to each script's own default.
-
-if [[ -z "$BEAMPHYSICS" ]]; then
-  for candidate in "${OPENPMD_BEAMPHYSICS:-}" "$LUCIFER_DIR/../../openPMD-beamphysics"; do
-    if [[ -d "$candidate/beamphysics/wavefront" ]]; then
-      BEAMPHYSICS="$(cd "$candidate" && pwd)"
-      break
-    fi
-  done
-fi
-if [[ -z "$BEAMPHYSICS" || ! -d "$BEAMPHYSICS/beamphysics/wavefront" ]]; then
-  echo "Error: openPMD-beamphysics checkout not found (looked for beamphysics/wavefront)." >&2
-  echo "Pass it with --beamphysics <path>." >&2
+# openPMD-beamphysics, from this interpreter's environment, a development version
+# included. The version and the path it came from are printed for the log, and no version
+# is checked here: the environment file states the minimum.
+if ! BEAMPHYSICS="$("$PYTHON" -c 'import os, beamphysics; print(beamphysics.__version__, os.path.dirname(beamphysics.__file__))' 2>&1)"; then
+  echo "Error: openPMD-beamphysics is not installed in the environment of $PYTHON:" >&2
+  echo "  ${BEAMPHYSICS##*$'\n'}" >&2
+  echo "Install it: conda env update -n bmad-fel-validate -f $LUCIFER_DIR/wavefront/tests/environment.yml" >&2
   exit 1
 fi
 
@@ -381,8 +370,7 @@ echo "--- convert the reference dumps to openPMD (the tracker reads openPMD only
 for root in Aramis AramisTD AramisTDSASE AramisTDSASEF; do
   for pair in "$root-initial.par.h5 $root-initial.beam.h5" \
               "$root-initial.fld.h5 $root-initial.wf.h5"; do
-    if ! "$PYTHON" "$SCRIPT_DIR/scripts/convert_genesis.py" to-openpmd $pair \
-            --pyrepo "$BEAMPHYSICS"; then
+    if ! "$PYTHON" "$SCRIPT_DIR/scripts/convert_genesis.py" to-openpmd $pair; then
       echo "FAIL: could not convert $pair" >&2
       exit 1
     fi
@@ -849,7 +837,7 @@ sec_device () {
   echo "--- backend: $backend"
   "$PYTHON" "$SCRIPT_DIR/scripts/with_lock.py" "$DEVICE_LOCK" \
       "$PYTHON" "$SCRIPT_DIR/scripts/check_device.py" --exe "$EXE" --workdir "$1" \
-      --latdir "$SCRIPT_DIR/bmad" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS" \
+      --latdir "$SCRIPT_DIR/bmad" --genesis "$GENESIS" \
     || { echo "FAIL: device backend checks; outputs kept in: $1" >&2; return 1; }
 }
 
@@ -884,19 +872,19 @@ sec_two_polarization () {
 
 sec_beam_format () {
   echo "--- particle dump format checks (openPMD and Genesis .par) ---------------------"
-  "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$1" --pyrepo "$BEAMPHYSICS" \
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_beam_format.py" --exe "$EXE" --workdir "$1" \
     || { echo "FAIL: beam-format checks; outputs kept in: $1" >&2; return 1; }
 }
 
 sec_harmonics () {
   echo "--- harmonic field-set + openPMD wavefront checks ------------------------------"
-  "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$1" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS" \
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_harmonics.py" "$1" --exe "$EXE" --genesis "$GENESIS" \
     || { echo "FAIL: harmonic/openPMD checks; outputs kept in: $1" >&2; return 1; }
 }
 
 sec_phasing () {
   echo "--- phasing checks (autophase, z_offset knob, absolute mode, chicanes) ---------"
-  "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$1" --exe "$EXE" --genesis "$GENESIS" --pyrepo "$BEAMPHYSICS" \
+  "$PYTHON" "$SCRIPT_DIR/scripts/check_phasing.py" "$1" --exe "$EXE" --genesis "$GENESIS" \
     || { echo "FAIL: phasing checks; outputs kept in: $1" >&2; return 1; }
 }
 
