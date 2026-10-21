@@ -16,14 +16,19 @@
 # lucifer/examples/saturation_demo/README.md.
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]
-#                  [--python <path>] [--work-dir <path>]
+#                  [--python <path>] [--work-dir <path>] [--show-locations]
 # Outputs land in ./output (or --work-dir). The summary report: output/sat-demo-report.pdf.
+# --show-locations prints every location the run would use, absolute, checks from a
+# scratch directory that the executable, the interpreter and the helper scripts are
+# there, and exits before anything runs.
 
 set -o pipefail
 
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BMAD_ROOT="$(cd "$DEMO_DIR/../../.." && pwd)"
-SCRIPTS="$BMAD_ROOT/lucifer/tests/scripts"
+# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
+# defaults and the variables that name them elsewhere (util/locations.sh).
+source "$DEMO_DIR/../../util/locations.sh"
+SCRIPTS="$LUCIFER_DIR/tests/scripts"
 
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
 # searched first on purpose: an unrelated environment on PATH would supply a different
@@ -35,7 +40,7 @@ if [[ -z "$GENESIS" ]]; then
     if [[ -x "$candidate" ]]; then GENESIS="$candidate"; break; fi
   done
 fi
-EXE="";  PYTHON="";  MPIRUN="";  WORKERS=""
+EXE="";  PYTHON="";  MPIRUN="";  WORKERS="";  SHOW=0
 WORK_DIR="$DEMO_DIR/output"
 
 while [[ $# -gt 0 ]]; do
@@ -46,7 +51,8 @@ while [[ $# -gt 0 ]]; do
     --work-dir) WORK_DIR="$2"; shift 2 ;;
     --workers)  WORKERS="$2";  shift 2 ;;
     --mpirun)   MPIRUN="$2";   shift 2 ;;
-    -h|--help)  sed -n '2,21p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --show-locations) SHOW=1;  shift 1 ;;
+    -h|--help)  sed -n '2,24p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -57,27 +63,48 @@ if [[ -z "$WORKERS" ]]; then
 fi
 [[ -z "$WORKERS" || "$WORKERS" -lt 2 ]] && { echo "Error: pass --workers N." >&2; exit 1; }
 if (( 96 % WORKERS != 0 )); then
-  echo "note: 96 slices not divisible by $WORKERS workers; Genesis will pad its window."
+  echo "note: 96 slices not divisible by $WORKERS workers. Genesis will pad its window."
 fi
 
-[[ -x "$GENESIS" ]] || { echo "Error: genesis4 not found at $GENESIS (use --genesis)." >&2; exit 1; }
+# Every path is made absolute here, against the directory the script was started in,
+# because the run changes into the work directory before it launches anything.
+[[ -n "$GENESIS" ]] && GENESIS="$(lucifer_abs "$GENESIS")"
+[[ -n "$MPIRUN" ]] && MPIRUN="$(lucifer_abs "$MPIRUN")"
+[[ -n "$EXE" ]] && EXE="$(lucifer_abs "$EXE")"
+[[ -n "$PYTHON" ]] && PYTHON="$(lucifer_abs "$PYTHON")"
+WORK_DIR="$(lucifer_abs "$WORK_DIR")"
 
-# rpath-matched launcher (a PATH mpirun from the wrong MPI aborts the binary on sight).
-if [[ -z "$MPIRUN" && "$(uname)" == "Darwin" ]]; then
+[[ $SHOW -eq 1 || -x "$GENESIS" ]] || { echo "Error: genesis4 not found at $GENESIS (use --genesis)." >&2; exit 1; }
+
+# The launcher of the MPI genesis4 was built against: a PATH mpirun from another MPI
+# aborts the binary on sight, and an unrelated environment on PATH supplies exactly that.
+# A conda genesis4 has its environment's launcher beside it, as mpirun with or without an
+# mpiexec, so that is looked for first. Then the binary's LC_RPATH, with conda's
+# @loader_path resolved against the binary's own directory, and PATH last.
+if [[ -z "$MPIRUN" && -x "$GENESIS" ]]; then
+  gdir="$(dirname "$GENESIS")"
+  for c in "$gdir/mpiexec" "$gdir/mpirun"; do
+    [[ -x "$c" ]] && { MPIRUN="$c"; break; }
+  done
+fi
+if [[ -z "$MPIRUN" && -x "$GENESIS" && "$(uname)" == "Darwin" ]]; then
   while read -r rpath; do
-    [[ -x "$rpath/../bin/mpiexec" ]] && { MPIRUN="$rpath/../bin/mpiexec"; break; }
+    rpath="${rpath/@loader_path/$(dirname "$GENESIS")}"
+    for c in "$rpath/../bin/mpiexec" "$rpath/../bin/mpirun"; do
+      [[ -x "$c" ]] && { MPIRUN="$c"; break 2; }
+    done
   done < <(otool -l "$GENESIS" 2>/dev/null | awk '/LC_RPATH/ {found=1} found && /path / {print $2; found=0}')
 fi
 [[ -z "$MPIRUN" ]] && MPIRUN="$(command -v mpiexec || command -v mpirun)"
-[[ -x "$MPIRUN" ]] || { echo "Error: no MPI launcher (use --mpirun)." >&2; exit 1; }
+[[ $SHOW -eq 1 || -x "$MPIRUN" ]] || { echo "Error: no MPI launcher (use --mpirun)." >&2; exit 1; }
 
 if [[ -z "$EXE" ]]; then
-  for c in "$BMAD_ROOT/production/bin/lucifer" "$BMAD_ROOT/debug/bin/lucifer"; do
+  for c in "$PRODUCTION_BIN/lucifer" "$DEBUG_BIN/lucifer"; do
     [[ -x "$c" ]] && { EXE="$c"; break; }
   done
 fi
-[[ -x "$EXE" ]] || { echo "Error: lucifer not found; build with util/conda_compile." >&2; exit 1; }
-[[ "$EXE" == *"/debug/"* ]] && echo "WARNING: debug lucifer; timings not comparable to a release Genesis."
+[[ -x "$EXE" ]] || { echo "Error: lucifer not found. Build with lucifer/util/conda_compile." >&2; exit 1; }
+[[ "$EXE" == "$DEBUG_BIN/"* ]] && echo "WARNING: debug lucifer. Timings are not comparable to a release Genesis."
 
 if [[ -z "$PYTHON" ]]; then
   for c in "${LUCIFER_PYTHON:-}" \
@@ -87,6 +114,38 @@ if [[ -z "$PYTHON" ]]; then
   done
 fi
 [[ -x "$PYTHON" ]] || { echo "Error: python (numpy+h5py+matplotlib) not found." >&2; exit 1; }
+
+# The locations alone. The check runs from a scratch directory, so a path that held only
+# relative to where the script started is caught the way the real run would hit it, and
+# the real work directory is not created. genesis4 and the MPI launcher are reported and
+# not required, since this answers where the run's files are and not whether it can run.
+if [[ $SHOW -eq 1 ]]; then
+  echo "saturation demo locations:"
+  for pair in "demo:$DEMO_DIR" "source:$LUCIFER_DIR" "scripts:$SCRIPTS" \
+              "lucifer:$EXE" "python:$PYTHON" "genesis4:${GENESIS:-<not found>}" \
+              "mpi launcher:${MPIRUN:-<not found>}" "work dir:$WORK_DIR"; do
+    printf '  %-15s %s\n' "${pair%%:*}" "${pair#*:}"
+  done
+  scratch="$(mktemp -d "${TMPDIR:-/tmp}/sat_locations.XXXXXX")"
+  cd "$scratch" || exit 1
+  missing=0
+  for f in "$EXE" "$PYTHON"; do
+    [[ -x "$f" ]] || { echo "  missing after changing directory: $f"; missing=1; }
+  done
+  for f in "$SCRIPTS/report_fel_saturation.py" "$DEMO_DIR/check_agreement.py" \
+           "$DEMO_DIR/Aramis.lat" "$DEMO_DIR/aramis.bmad" "$DEMO_DIR/sat_unavg.bmad" \
+           "$DEMO_DIR/sat-prep.in" "$DEMO_DIR/sat-genesis.in" \
+           "$DEMO_DIR/lucifer-avg.in" "$DEMO_DIR/lucifer-unavg.in"; do
+    [[ -f "$f" ]] || { echo "  missing after changing directory: $f"; missing=1; }
+  done
+  cd / && rm -rf "$scratch"
+  if [[ $missing -ne 0 ]]; then
+    echo "saturation demo locations: FAIL"
+    exit 1
+  fi
+  echo "saturation demo locations: all present from $scratch"
+  exit 0
+fi
 
 mkdir -p "$WORK_DIR"
 cp "$DEMO_DIR"/Aramis.lat "$DEMO_DIR"/aramis.bmad "$DEMO_DIR"/sat_unavg.bmad \

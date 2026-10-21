@@ -12,7 +12,8 @@
 # check covers the Markdown only.
 #
 # saturation_demo is not run here. It needs the genesis4 binary and its own clock, and it
-# has run.sh for that.
+# has run.sh for that. Where run.sh finds its files is checked here, through its
+# --show-locations option and from a directory outside both checkouts.
 #
 # Usage:
 #
@@ -258,9 +259,42 @@ while [[ $idir -lt ${#DIRS[@]} ]]; do
   idir=$((idir + 1))
 done
 
+# The saturation demo's locations, from a directory outside both checkouts. The binary
+# directories are named under names the defaults never produce, through the two
+# variables and relative to that directory, and the executable is given once as a
+# relative path and once left to the variables. run.sh makes each absolute and checks it
+# from a scratch directory of its own, so a path that held only relative to where it
+# started fails here the way the real run would.
+
+echo "------------------------------------------------------------------------------"
+echo " saturation_demo: locations from outside both checkouts (no physics runs)"
+loc="$(mktemp -d "${TMPDIR:-/tmp}/sat_launch.XXXXXX")"
+mkdir -p "$loc/build"
+ln -s "$(dirname "$EXE")" "$loc/build/opt-bin"
+ln -s "$(dirname "$EXE")" "$loc/build/dbg-bin"
+for exe_arg in "--exe build/opt-bin/lucifer" ""; do
+  # shellcheck disable=SC2086
+  out="$(cd "$loc" && LUCIFER_DEBUG_BIN=build/dbg-bin LUCIFER_PRODUCTION_BIN=build/opt-bin \
+         "$LUCIFER_DIR/examples/saturation_demo/run.sh" --show-locations --workers 2 \
+         --python "$PYTHON" --work-dir out $exe_arg 2>&1)"
+  rc=$?
+  got="$(printf '%s\n' "$out" | awk '$1 == "lucifer" {print $2}')"
+  wdir="$(printf '%s\n' "$out" | awk '$1 == "work" && $2 == "dir" {print $3}')"
+  how="${exe_arg:-from LUCIFER_PRODUCTION_BIN}"
+  if [[ $rc -eq 0 && "$got" == "$loc/build/opt-bin/lucifer" && "$wdir" == "$loc/out" ]]; then
+    echo "   ok    executable $how resolves to $got"
+  else
+    echo "   FAIL  executable $how: exit $rc, lucifer '$got', work dir '$wdir'"
+    printf '%s\n' "$out" | sed 's/^/         /'
+    FAILED=1
+  fi
+done
+rm -rf "$loc"
+
 echo "------------------------------------------------------------------------------"
 if [[ $FAILED -ne 0 ]]; then
-  echo " FAIL: an example did not run, or its figure was not written."
+  echo " FAIL: an example did not run, its figure was not written, or the saturation demo's"
+  echo "       locations did not resolve."
   exit 1
 fi
 if [[ $FIGURES -eq 1 ]]; then

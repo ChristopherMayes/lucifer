@@ -243,6 +243,15 @@ def preflight() -> None:
     if not (BMAD / "regression_tests" / "test_fortran.py").is_file() or not (BMAD / "debug" / "bin").is_dir():
         pytest.fail(f"no Bmad source with its regression suite and a debug build at {BMAD} "
                     "(BMAD_DIR names the Bmad checkout where it is not the Lucifer source's parent)")
+    # The release comparison's own cases, then the Bmad found against lucifer/BMAD_RELEASE,
+    # the same routine the build script and the Linux CI job call.
+    check = LUCIFER / "util" / "bmad_release_check"
+    for arg in ("--self-test", str(BMAD)):
+        r = subprocess.run([str(check), arg], capture_output=True, text=True)
+        for line in r.stdout.splitlines():
+            print(f"keystone: {line}")
+        if r.returncode != 0:
+            pytest.fail(f"bmad_release_check {arg} refused:\n{r.stdout}{r.stderr}")
     missing = [str(p) for p in (BENCHMARK, WAVEFRONT, EXAMPLES) if not os.access(p, os.X_OK)]
     if missing:
         pytest.fail("keystone scripts not executable: " + ", ".join(missing))

@@ -23,6 +23,12 @@
 # reference a library it was not linked against. The recording machine keeps those two
 # environments apart for exactly that reason.
 #
+# Bmad is not this repository's. It comes from a shallow clone of bmad-sim/bmad-ecosystem
+# at the release lucifer/BMAD_RELEASE declares, checked by lucifer/util/bmad_release_check
+# before anything is built, and nothing but lucifer/ and the workflows is read from this
+# checkout. The declared release is a minimum, so a green run certifies that release and
+# no later one.
+#
 # What this varies and what it does not, so the coverage is not overstated. It varies the
 # operating system, the C library, the allocator and every dependency build, and it runs
 # the tiers and the check sections, which nothing outside this laptop has ever run. It
@@ -89,14 +95,29 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # The declared Bmad release, at its tag, outside this checkout. The check prints the
+      # clone's release beside the declared minimum and refuses a clone below it. BMAD_DIR
+      # reaches every later step through GITHUB_ENV, which is how the harness finds the
+      # Bmad source, its Tao and its regression suite.
+      - name: Clone the declared Bmad release
+        shell: bash
+        run: |
+          set -e
+          tag="$(head -n 1 lucifer/BMAD_RELEASE | tr -d '[:space:]')"
+          git clone --depth 1 --branch "$tag" \
+              https://github.com/bmad-sim/bmad-ecosystem.git "$RUNNER_TEMP/bmad"
+          echo "Bmad clone: tag $tag, commit $(git -C "$RUNNER_TEMP/bmad" rev-parse HEAD)"
+          lucifer/util/bmad_release_check "$RUNNER_TEMP/bmad"
+          echo "BMAD_DIR=$RUNNER_TEMP/bmad" >> "$GITHUB_ENV"
+
       # Two packages the build needs on Linux and not on macOS. The distribution's own
       # conda-build.yml appends the same two, and the file is the distribution's, so the
-      # append happens here in the runner rather than in the tree.
+      # append happens here in the runner rather than in the clone's tree.
       - name: Include the Linux-only build requirements
         shell: bash
         run: |
-          echo '  - libacl' >> .github/bmad-build-env.yaml
-          echo '  - libgomp' >> .github/bmad-build-env.yaml
+          echo '  - libacl' >> "$RUNNER_TEMP/bmad/.github/bmad-build-env.yaml"
+          echo '  - libgomp' >> "$RUNNER_TEMP/bmad/.github/bmad-build-env.yaml"
 
       - name: Install the build environment
         uses: conda-incubator/setup-miniconda@v3
@@ -105,14 +126,15 @@ jobs:
           use-mamba: true
           activate-environment: bmad-build
           channels: conda-forge
-          environment-file: .github/bmad-build-env.yaml
+          environment-file: ${{ runner.temp }}/bmad/.github/bmad-build-env.yaml
           python-version: "3.12"
           conda-remove-defaults: true
 
-      # The preferences are the ones util/conda_compile writes on the recording machine,
-      # less two macOS-only lines: that script restores util/dist_prefs from origin/main,
-      # which a shallow checkout of one branch does not have, and it passes a linker flag
-      # the GNU linker rejects. HDF5_ROOT pins the library to this environment, the same
+      # The preferences are the ones lucifer/util/conda_compile writes on the recording
+      # machine, less two macOS-only lines: that script restores util/dist_prefs from
+      # origin/main, which a shallow clone of one tag does not have, and it passes a
+      # linker flag the GNU linker rejects. So the steps are written out here, against the
+      # clone, and the release check they would have run ran in the clone step above. HDF5_ROOT pins the library to this environment, the same
       # reason conda_compile sets it: CMake's FindHDF5 otherwise prefers whichever h5fc
       # is first on PATH, and a mismatch across a major version can compile and link.
       #
@@ -144,6 +166,10 @@ jobs:
           set +e
           conda activate bmad-build
           export HDF5_ROOT="$CONDA_PREFIX"
+          # A name of this step's own for the clone, since dist_source_me overwrites
+          # BMAD_DIR, and it takes the working directory as the Bmad root.
+          bmad_root="$RUNNER_TEMP/bmad"
+          cd "$bmad_root" || exit 1
           cat <<PREFS >> util/dist_prefs
           export DIST_F90_REQUEST="gfortran"
           export ACC_PLOT_PACKAGE="pgplot"
@@ -172,14 +198,16 @@ jobs:
           fi
           # Lucifer is a Bmad user program and is built after the distribution, through
           # Master.cmake with the environment dist_source_me set, into debug/ beside its
-          # source, which here is the checkout root.
-          (cd lucifer && mkd)
+          # source, which here is this checkout's root and not the clone.
+          (cd "$GITHUB_WORKSPACE/lucifer" && mkd)
           status=$?
           if [ "$status" -ne 0 ]; then
             echo "mkd in lucifer/ exited $status"
             exit "$status"
           fi
-          ls -l debug/bin/lucifer debug/bin/lucifer_smoke_test debug/bin/wavefront_drift_test
+          cd "$GITHUB_WORKSPACE" || exit 1
+          ls -l debug/bin/lucifer debug/bin/lucifer_smoke_test debug/bin/wavefront_drift_test \
+                "$bmad_root/debug/bin/tao"
 
       # Which backend this build carries, from lucifer's own banner. This is the line the
       # harness reads to decide whether the device section can run, so having it in the

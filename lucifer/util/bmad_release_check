@@ -1,0 +1,115 @@
+#!/bin/bash
+#
+# Check that a Bmad checkout is at least the release Lucifer declares.
+#
+#   bmad_release_check <bmad root>    # the checkout against lucifer/BMAD_RELEASE
+#   bmad_release_check --self-test    # the comparison against fixed cases
+#
+# The declared release is a minimum, the one line of lucifer/BMAD_RELEASE. The checkout's
+# release is bmad_version_date in bmad/modules/bmad_version_mod.f90, the string Bmad's
+# release process stamps there and the tracker prints at startup. A release is a date and
+# a revision counter, YYYYMMDD-N, and the counter is not padded, so 20261018-10 sorts
+# below 20261018-2 as a string. The date and the revision are compared as numbers. A value
+# missing or not of that form is refused, on either side.
+#
+# The build script calls this as soon as it knows the Bmad root, before it builds anything
+# or touches util/dist_prefs, and the Linux CI job calls it on the release it clones.
+#
+# Exit status: 0 when the checkout is at the minimum or later, 1 when it is below it or a
+# value is missing or malformed, 2 on a usage error.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DECLARED_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/BMAD_RELEASE"
+
+release_valid () {   # <release>
+  [[ "$1" =~ ^[0-9]{8}-[0-9]+$ ]]
+}
+
+# Prints -1, 0 or 1 as the first release is below, equal to or above the second. Both must
+# be valid. The 10# prefix keeps a leading zero from reading as octal.
+release_cmp () {   # <release a> <release b>
+  local da="${1%%-*}" ra="${1#*-}" db="${2%%-*}" rb="${2#*-}"
+  if (( 10#$da != 10#$db )); then
+    if (( 10#$da < 10#$db )); then echo -1; else echo 1; fi
+  elif (( 10#$ra != 10#$rb )); then
+    if (( 10#$ra < 10#$rb )); then echo -1; else echo 1; fi
+  else
+    echo 0
+  fi
+}
+
+self_test () {
+  local n=0 bad=0 a b want got s
+  # Ordered pairs and the comparison they must give. The two -10 cases are the ones a
+  # string comparison gets wrong.
+  while read -r a b want; do
+    n=$((n + 1))
+    got="$(release_cmp "$a" "$b")"
+    if [[ "$got" != "$want" ]]; then
+      echo "FAIL: $a against $b gave $got, expected $want"
+      bad=$((bad + 1))
+    fi
+  done <<'CASES'
+20261018-0 20261018-0 0
+20261018-1 20261018-0 1
+20261018-0 20261018-1 -1
+20261018-10 20261018-2 1
+20261018-2 20261018-10 -1
+20261017-9 20261018-0 -1
+20261019-0 20261018-12 1
+20261018-007 20261018-7 0
+CASES
+  for s in 20261018-0 20261018-10 20261018-123; do
+    n=$((n + 1))
+    if ! release_valid "$s"; then echo "FAIL: '$s' refused as malformed"; bad=$((bad + 1)); fi
+  done
+  for s in '' 20261018 2026101-0 20261018- 20261018-1a ' 20261018-0' v20261018-0 20261018_0 '20261018-0 '; do
+    n=$((n + 1))
+    if release_valid "$s"; then echo "FAIL: '$s' accepted"; bad=$((bad + 1)); fi
+  done
+  if [[ $bad -ne 0 ]]; then
+    echo "bmad_release_check self-test: $bad of $n cases failed"
+    return 1
+  fi
+  echo "bmad_release_check self-test: $n cases pass"
+}
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: bmad_release_check <bmad root> | --self-test" >&2
+  exit 2
+fi
+if [[ "$1" == "--self-test" ]]; then
+  self_test
+  exit $?
+fi
+
+root="$1"
+declared=""
+[[ -f "$DECLARED_FILE" ]] && declared="$(head -n 1 "$DECLARED_FILE" | tr -d '[:space:]')"
+version_file="$root/bmad/modules/bmad_version_mod.f90"
+found=""
+[[ -f "$version_file" ]] && \
+  found="$(sed -n 's/.*bmad_version_date *= *"\([^"]*\)".*/\1/p' "$version_file" | head -n 1)"
+
+echo "Bmad release at $root: ${found:-<none>}"
+echo "Lucifer needs Bmad ${declared:-<none>} or later ($DECLARED_FILE)"
+
+if ! release_valid "$declared"; then
+  echo "Error: the declared minimum '${declared}' in $DECLARED_FILE is missing or not of the form YYYYMMDD-N." >&2
+  exit 1
+fi
+if [[ ! -f "$version_file" ]]; then
+  echo "Error: no $version_file, so $root is not a Bmad checkout." >&2
+  exit 1
+fi
+if ! release_valid "$found"; then
+  echo "Error: bmad_version_date '${found}' in $version_file is missing or not of the form YYYYMMDD-N." >&2
+  exit 1
+fi
+if [[ "$(release_cmp "$found" "$declared")" == "-1" ]]; then
+  echo "Error: the Bmad at $root is release $found, below the minimum $declared." >&2
+  echo "Check out release $declared or later: git -C $root checkout $declared" >&2
+  exit 1
+fi

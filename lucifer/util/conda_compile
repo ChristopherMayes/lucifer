@@ -32,6 +32,12 @@ if [[ -z "$BMAD_ROOT" ]]; then
   exit 1
 fi
 
+# The checkout must be at least the release Lucifer declares (lucifer/BMAD_RELEASE). This
+# runs before anything is built or util/dist_prefs is touched, BUILD_BMAD=N included, so a
+# refused checkout is left exactly as it was found.
+
+"$LUCIFER_DIR/util/bmad_release_check" "$BMAD_ROOT" || exit 1
+
 if ! command -v conda &>/dev/null; then
   echo "Error: conda binary not found"
   exit 1

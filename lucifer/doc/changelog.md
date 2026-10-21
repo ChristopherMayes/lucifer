@@ -9,6 +9,17 @@ Development history of the FEL tracker on the `lucifer-dev` branch, newest first
 This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
 and it is written at the merge.
 
+- 2026-10-21 Changed: the Bmad release Lucifer needs is declared in `lucifer/BMAD_RELEASE`, a minimum,
+  currently `20261018-0`, where it was a sentence in the user guide that nothing read.
+  `lucifer/util/bmad_release_check` compares a checkout's `bmad_version_date` with it, the date and the
+  unpadded revision as numbers, since `20261018-10` sorts below `20261018-2` as a string, and refuses a
+  checkout below it or a value missing or malformed on either side. The build script runs it before it
+  builds anything or touches `util/dist_prefs`, the keystone suite's preflight runs it with its self-test,
+  and the Linux CI job runs it on a shallow clone of `bmad-sim/bmad-ecosystem` at the declared tag, which
+  it now builds and validates against in place of the checkout it runs in. The saturation demo takes its
+  locations from `util/locations.sh`, makes every path absolute before it changes directory, takes the MPI
+  launcher beside genesis4 before any on PATH, and has a `--show-locations` option that
+  `run_examples.sh` exercises from a directory outside both checkouts. Every recorded digit held.
 - 2026-10-21 Fixed: `refposition` in the two Genesis4-format field files, `-escaped.fld.h5` and `-pulse.fld.h5`,
   carried the wavefront's `ref_position`, a sum of the optical paths the field had been drifted along
   interludes, where Genesis4 reads `refposition` as the window start and places slice `i` at

@@ -5,10 +5,14 @@ Everything needed to get from a checkout to a tracked FEL run. The parameter-by-
 ## Building
 
 Lucifer is a Bmad user program, built against a Bmad distribution rather than as part of
-one. The Bmad it builds against is the `bmad-sim/bmad-ecosystem` release `20261018-0`,
-commit `2b4db998d`, the first release carrying the two Bmad changes Lucifer needs: the
-`fel_method` element attribute and openPMD particle patches in the beam files. An older
-Bmad refuses the lattices and reads a multi-slice beam file as one bunch.
+one. The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in
+`lucifer/BMAD_RELEASE`, currently `20261018-0`, the first release carrying the two Bmad
+changes Lucifer needs: the `fel_method` element attribute and openPMD particle patches in
+the beam files. An older Bmad refuses the lattices and reads a multi-slice beam file as one
+bunch. `lucifer/util/bmad_release_check <bmad root>` compares a checkout's
+`bmad_version_date` with that minimum, the date and the revision as numbers, and the build
+script runs it before it builds anything, refusing an older checkout. The tracker prints
+the Bmad version it was built against at startup and records it in the stats file.
 
 Its `CMakeLists.txt` includes Bmad's `Master.cmake`, which compiles it against the
 distribution's libraries and modules and places its binaries in `debug/` and `production/`

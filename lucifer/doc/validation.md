@@ -17,7 +17,12 @@ python3 -m pytest lucifer/tests/test_keystone.py -v
 
 The build script builds the Bmad distribution and then Lucifer against it, through
 Bmad's `Master.cmake`, which places Lucifer's binaries in `debug/` and `production/`
-beside the Lucifer source ([building](user-guide.md#building)). The suite takes four
+beside the Lucifer source ([building](user-guide.md#building)). The Bmad release is a
+minimum, declared in `lucifer/BMAD_RELEASE`. The build script and the suite's preflight
+both run `lucifer/util/bmad_release_check` against the checkout, and the preflight runs
+its self-test first. The Linux CI job clones `bmad-sim/bmad-ecosystem` at the declared
+release, runs the same check on the clone, and builds Lucifer against it with `BMAD_DIR`
+set, so a green run there certifies that release and no later one. The suite takes four
 locations, each defaulting to that layout inside a Bmad checkout: the Lucifer source,
 which is its own tree, the Bmad source with its regression suite and debug binaries
 (`BMAD_DIR`, else `DIST_BASE_DIR`, else the Lucifer source's parent), and the two Lucifer
