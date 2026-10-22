@@ -10,10 +10,12 @@ the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as 
 of that history. The entries before that date describe that branch.
 
 - 2026-10-23 Changed: the twelve documentation pages other than this one and the twenty example READMEs
-  carry one line per paragraph and read in Bmad's register. They carry 4,567 sentences at a median of 17
+  carry one line per paragraph and read in Bmad's register. They carry 4,584 sentences at a median of 17
   words where they carried 3,374 at 21, none over 40 words where 463 were, no prose semicolon where
   there were 26, and no date, since a measurement keeps its machine and configuration and this page
-  holds the dates. Every number, code span, formula, label, link, heading and table cell is as it was,
+  holds the dates. Every sentence has a subject and a finite verb, where about 350 stood as fragments
+  such as "Measured on this input: ..." and "Refused at parse time: ...". Every number, code span,
+  formula, label, link, heading and table cell is as it was,
   by `tests/scripts/check_prose_only.py`, except where a page disagreed with the code. About sixty
   statements did, among them the checks each script runs, the device's source-filter grid, the FEL
   element's refusals, the default window's one-electron rule, the slippage residual under a
