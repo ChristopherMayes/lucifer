@@ -1,12 +1,12 @@
 !+
 ! Module fel_input_mod
 !
-! The namelist layer of the FEL tracker, quarantined the way Tao quarantines its
-! tao_init_* files: three groups, all read from one input file, each filling the
-! structs of fel_struct directly (Tao's &tao_params pattern: set global%out_root,
-! bmad_com%radiation_damping_on, chamber_wake%radius, space_charge%nz, beam_init%n_particle,
-! wavefront_init%lambda0 by component). This module is itself library: an embedding
-! program may reuse the parsing, or skip it and fill the structs in code.
+! The namelist layer of the FEL tracker, kept apart the way Tao keeps its tao_init_*
+! files. There are three groups, all read from one input file. Each group fills the
+! structs of fel_struct directly, as Tao's &tao_params does. EG: global%out_root,
+! bmad_com%radiation_damping_on, chamber_wake%radius, space_charge%nz, beam_init%n_particle
+! and wavefront_init%lambda0 are set by component. This module is library code. An
+! embedding program may use the parsing, or skip it and fill the structs in code.
 !
 !   &fel_params          lat_file, global, bmad_com, space_charge_com, wake, sc,
 !                        chamber_wake%write_kernels
@@ -17,8 +17,8 @@
 !   &fel_wavefront_init  wavefront_init, field_file
 !
 ! A group that is absent keeps its defaults. A group that is present must parse.
-! The retired flat &fel_track_params group is refused: the error lists each
-! parameter found in it and the group it moved to.
+! The retired flat &fel_track_params group is refused, and the error names the three
+! groups that replace it.
 !-
 
 module fel_input_mod
@@ -33,17 +33,18 @@ contains
 !+
 ! Subroutine fel_read_input (param_file, run, err_flag)
 !
-! Read the three namelist groups of param_file into run's input structs. bmad_com and
-! space_charge_com are set directly by the namelist (they are Bmad's own globals).
+! Routine to read the three namelist groups of param_file into the input structs of run.
+! The namelist sets bmad_com and space_charge_com directly, since they are Bmad's own
+! globals.
 !
 ! Input:
-!   param_file   -- character(*): the input file.
+!   param_file   -- character(*): The input file.
 !
 ! Output:
-!   run                -- fel_run_struct: input structs filled (global, winit,
-!                           wake_init, sc_init, beam_init, imp, bparam, lat_file,
-!                           field_file). Nothing else is touched.
-!   err_flag           -- logical: set on any parse error or on the retired group.
+!   run          -- fel_run_struct: Input structs filled (global, winit, wake_init,
+!                     sc_init, beam_init, imp, bparam, lat_file, field_file). Nothing else
+!                     is touched.
+!   err_flag     -- logical: Set on any parse error or on a retired input name.
 !-
 
 subroutine fel_read_input (param_file, run, err_flag)
@@ -115,7 +116,8 @@ if (ios /= 0) then
   return
 endif
 
-! Each group is optional (absent = defaults) but must parse when present.
+! Each group is optional, and an absent group keeps its defaults. A group that is
+! present must parse.
 
 if (group_present(iu, 'fel_params')) then
   rewind (iu)
@@ -181,18 +183,18 @@ end subroutine fel_read_input
 !+
 ! Subroutine fel_write_resolved_input (run, iu)
 !
-! Write run's resolved inputs (every default made explicit) as the three
-! namelist groups, to an open unit. The stats file's Meta/ provenance echo
-! (Genesis parity: its Meta group embeds the entire input file). An embedding
-! program may also use it to persist a configuration built in code.
+! Routine to write the resolved inputs of run, every default made explicit, as the
+! three namelist groups to an open unit. This is the provenance echo in the Meta/ group
+! of the stats file, as Genesis's Meta group embeds the whole input file. An embedding
+! program may also use it to save a configuration built in code.
 !
 ! Input:
 !   run -- fel_run_struct: The run state after parsing (resolved values).
 !   iu  -- integer: Open unit to write the namelist echo to.
 !
 ! Output:
-!   None beyond the write: the three groups, every value resolved, in namelist
-!   syntax (the Meta/input_echo content).
+!   None beyond the write: the three groups, every value resolved, in namelist syntax
+!   (the Meta/input_echo content).
 !-
 
 subroutine fel_write_resolved_input (run, iu)
@@ -253,13 +255,13 @@ end subroutine fel_write_resolved_input
 !+
 ! Function group_present (iu, group_name) result (found)
 !
-! Is the namelist group &group_name present in the (open) file? A textual scan
-! (the standard gives no portable "group absent" iostat), tolerant of leading blanks
-! and case.
+! Routine to find whether the namelist group &group_name is in the open file. The scan is
+! textual, since the standard gives no portable iostat for an absent group. Leading
+! blanks and case are ignored.
 !
 ! Input:
 !   iu         -- integer: Open unit positioned at the file start.
-!   group_name -- character(*): Namelist group name to look for (with the &).
+!   group_name -- character(*): Namelist group name to look for, without the &.
 !
 ! Output:
 !   found      -- logical: True when the group appears in the file.
@@ -297,16 +299,17 @@ end function group_present
 !+
 ! Function has_retired_group (param_file) result (found)
 !
-! Refuse retired input names, each with the name that replaced it, so migration is a
-! mechanical edit of the input file. Two are refused: the flat &fel_track_params group,
-! and the window parameters that moved out of wavefront_init into slicing.
+! Routine to refuse retired input names, each with the name that replaced it. So
+! migration is a mechanical edit of the input file. Refused are the flat
+! &fel_track_params group, the window parameters that moved from wavefront_init to
+! slicing, dist_file and use_beam_init.
 !
 ! Input:
 !   param_file -- character(*): Input file name.
 !
 ! Output:
-!   found      -- logical: True when a retired name is present (the caller then refuses,
-!                   the message naming what replaced it).
+!   found      -- logical: True when a retired name is present. The caller then refuses
+!                   the run, and the message names what replaced it.
 !-
 
 function has_retired_group (param_file) result (found)
@@ -318,10 +321,10 @@ integer iu, ios
 character(400) line
 character(*), parameter :: r_name = 'fel_read_input'
 
-! A textual scan, because Fortran ignores an unknown namelist group in silence and a
-! retired component of a live group is a parse error whose message names the component
-! and not what to do about it. A deck written against either would otherwise run on
-! defaults or stop without advice.
+! The scan is textual. Fortran ignores an unknown namelist group in silence. A retired
+! component of a live group is a parse error, and its message names the component but
+! not what to do. A deck written against either would otherwise run on defaults or stop
+! without advice.
 
 found = .false.
 open (newunit = iu, file = param_file, status = 'old', action = 'read', iostat = ios)
@@ -340,8 +343,8 @@ do
     exit
   endif
 
-  ! The window is the FEL interaction's, not the field's, so it left wavefront_init for
-  ! slicing when the wavelengths per slice became the integer it always was.
+  ! The window belongs to the FEL interaction and not to the field. So it moved from
+  ! wavefront_init to slicing when the wavelengths per slice became an integer.
 
   if (index(line, 'wavefront_init%window_sample') /= 0) then
     found = .true.
@@ -356,8 +359,8 @@ do
     exit
   endif
 
-  ! A bunch to slice is beam_init's, read or generated, and Bmad's own position_file
-  ! reads it. The flag that resampled a generated bunch is the resampler's own knob.
+  ! A bunch to slice belongs to beam_init, read or generated, and Bmad's position_file
+  ! reads it. The flag that resampled a generated bunch is now resample%use_beam_init.
 
   if (index(line, 'dist_file') /= 0 .and. index(line, 'resample%') == 0) then
     found = .true.

@@ -16,20 +16,18 @@ set (SRC_DIRS
   code
 )
 
-# The FEL step's particle path is transcendental-bound (perf goal 2026-08-21):
-# -O3 + the paired-sincos shim together take the per-particle-step cost from 152
-# to ~108 ns (neither pays alone). This is a NAMED VALUE CHANGE at the 1-ulp level
-# (gfortran's sin/cos intrinsics differ from libm's by 1 ulp on ~2e-6 of arguments,
-# and -O3 re-contracts FP): every benchmark tier re-measured and re-recorded.
+# -O3 with the paired-sincos shim takes the FEL step's particle path from 152 to about
+# 108 ns a particle-step. Neither pays alone (validation.md, "The particle-path cost").
+# The change is at the 1-ulp level. gfortran's sin/cos intrinsics differ from libm's by
+# 1 ulp on about 2e-6 of arguments, and -O3 re-contracts floating point.
 set_source_files_properties(code/fel_track_mod.f90 PROPERTIES COMPILE_OPTIONS "-O3")
 
 # The FP32 field twin (code/fel_fp32_mod.f90) transforms with FFTW's single-precision
-# interface. Not every toolchain carries it: the conda environment does, and the
-# off-site distribution's from-source FFTW is double precision only, where an
-# unconditional -lfftw3f fails to link. Detected here rather than assumed, and this
-# runs before Master.cmake, so the search path is composed the way that file composes
-# its own link directories. Without the library nothing links against it and
-# fp32_check refuses it; every other path is untouched.
+# interface. Not every toolchain carries it. The conda environment does. A from-source
+# FFTW in the distribution is double precision only, and there an unconditional -lfftw3f
+# fails to link. So the library is searched for here. This runs before Master.cmake, so
+# the search path is composed the way that file composes its link directories.
+# Without the library nothing links against it and fp32_check is refused.
 
 find_library (LUCIFER_FFTW3F_LIBRARY NAMES fftw3f
   PATHS
@@ -54,12 +52,11 @@ else ()
 endif ()
 
 # The device seam (device/lucifer_device.h). The Metal backend is ARC-managed
-# Objective-C++ against the Metal framework, so it needs a Clang-family toolchain and
-# not merely macOS: this build system may hand OBJCXX to a GNU compiler, which
-# rejects -fobjc-arc outright. Decided here, used after Master.cmake has made the
-# target. Forcing a different compiler for the one file is deliberately not attempted:
-# two C++ runtimes in one binary is the failure the reference backend's own manual
-# records against a hijacked HDF5 wrapper.
+# Objective-C++ against the Metal framework. So it needs a Clang-family toolchain, and
+# macOS alone is not enough: this build system may hand OBJCXX to a GNU compiler, which
+# rejects -fobjc-arc. The backend is chosen here and used after Master.cmake makes the
+# target. A different compiler is *not* forced for the one file, since that would put
+# two C++ runtimes in one binary.
 
 set (LUCIFER_DEVICE_BACKEND stub)
 if (APPLE)
@@ -80,11 +77,11 @@ set (EXE_SPECS
 
 include($ENV{ACC_BUILD_SYSTEM}/Master.cmake)
 
-# Exactly one implementation of the device seam joins the library, per the decision
-# made above. A build that cannot carry the Metal backend takes the stub, so the same
-# tree builds everywhere and a deck asking for a device then gets an error rather than
-# a quiet CPU fallback. device/ is deliberately outside SRC_DIRS: Master.cmake globs
-# whole directories, and these two files must never both compile.
+# Exactly one implementation of the device seam joins the library. A build that cannot
+# carry the Metal backend takes the stub. So the same tree builds everywhere, and a deck
+# that asks for a device gets an error instead of a quiet CPU fallback. device/ is kept
+# out of SRC_DIRS: Master.cmake globs whole directories, and these two files must never
+# both compile.
 
 if (LUCIFER_DEVICE_BACKEND STREQUAL metal)
   set (CMAKE_OBJCXX_STANDARD 17)

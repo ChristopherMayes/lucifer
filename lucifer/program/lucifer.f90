@@ -4,32 +4,35 @@
 ! FEL tracker validated against Genesis 1.3 Version 4.
 !
 ! The documentation is in lucifer/doc/:
-!   fel-physics.md      The physics: every equation the code integrates, each piece's
-!                        Genesis provenance, and which check pins it.
+!   fel-physics.md       The physics: every equation the code integrates, its Genesis
+!                         provenance, and the check that pins it.
 !   input-reference.md   Every namelist parameter: default, meaning, and what refuses it.
-!                        The normative reference. This header is a summary only.
-!   user-guide.md        Building, describing a run, running it, the output inventory.
+!                         This is the normative reference. This header is a summary.
+!   user-guide.md        Building, describing a run, running it, and the output files.
 !   reading-output.md    What the output files hold and how to read them.
-!   validation.md        The keystone rule, the tier table, and the measured levels.
-!   performance.md       Where a run spends its time, measured, with the machine named.
+!   validation.md        What is checked against Genesis, how, and the recorded results.
+!   performance.md       Where a run spends its time, on a named machine.
 !
-! The program reads three namelist groups from one input file, each setting structs
-! directly (Tao's &tao_params pattern). Defaults live in the struct declarations.
+! The program reads three namelist groups from one input file. Each group sets structs
+! directly, as Tao's &tao_params does. Defaults are in the struct declarations.
 !
-!   &fel_params           lat_file, the global%... run switches, Bmad's own bmad_com and
-!                         space_charge_com, and the chamber_wake%/space_charge% collective descriptions.
+!   &fel_params           lat_file, the global%... run switches, Bmad's bmad_com and
+!                         space_charge_com, and the chamber_wake% and space_charge%
+!                         collective descriptions.
 !   &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
-!                         source and output files, and the beam-side check knobs.
-!   &fel_wavefront_init   wavefront_init%... radiation starting condition (the field
-!                         record is the time window, so the window lives here) and the
-!                         field_file imports.
+!                         source and output files, and the beam-side check settings.
+!   &fel_wavefront_init   wavefront_init%... radiation starting condition and the
+!                         field_file imports. The field record is the time window, so the
+!                         window is set here.
 !
-! Three ways in, all through the same input file: a pair of Genesis dumps (both codes
-! then track from bitwise-identical initial conditions), a self-generated quiet start
-! from beam_init, or an imported particle distribution. Time dependence follows from the
-! starting state alone: a multi-slice window makes a time-dependent run, a single slice
-! the steady state, no separate switch. The retired flat &fel_track_params group is
-! refused, each parameter mapped to its new home.
+! There are three ways in, all through the same input file:
+!   A pair of Genesis dumps. Both codes then track from bitwise-identical initial conditions.
+!   A quiet start generated from beam_init.
+!   An imported particle distribution.
+! Time dependence follows from the starting state alone. A multi-slice window makes a
+! time-dependent run, and a single slice makes the steady state. There is no separate
+! switch. The retired flat &fel_track_params group is refused, and the message names
+! the three groups that replace it.
 !
 ! Usage:
 !   lucifer <input_file>
@@ -50,11 +53,11 @@ use, intrinsic :: iso_fortran_env, only: output_unit
 
 implicit none
 
-! The driver is read-parse-call (doc/user-guide.md): the namelist layer fills the
-! input structs, the library builds and walks the run, and every library error
-! Returns here. This is the one place that stops. The check instruments
-! (split_weights, swap_beam_xy, gen_test_weights, resample_split_weights,
-! chamber_wake%write_kernels) ride along in the input structs and act inside init/setup.
+! The driver is read-parse-call (doc/user-guide.md). The namelist layer fills the input
+! structs, and the library builds and walks the run. Every library error returns here.
+! This is the one place that stops. The check instruments (split_weights, swap_beam_xy,
+! gen_test_weights, resample_split_weights, chamber_wake%write_kernels) are carried in
+! the input structs and act inside init and setup.
 
 type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k
@@ -66,11 +69,11 @@ character(*), parameter :: r_name = 'lucifer'
 
 !
 
-! The one argument is the input file. Its name is the caller's choice, and lucifer.in is
-! the convention the examples follow rather than a name looked for here.
+! The one argument is the input file. The examples name it lucifer.in by convention.
+! No name is looked for here.
 
-! The run clock starts before anything is read, so the footer's run total covers the
-! whole process and the work outside the walk reads off as the difference.
+! The run clock starts before anything is read. So the footer's run total covers the
+! whole process, and the work outside the walk is the difference.
 
 call fel_timer_reset()
 
@@ -85,20 +88,20 @@ if (n_arg /= 1) then
         'The examples name theirs lucifer.in by convention, which is a convention    ', &
         'rather than a default looked for here. lucifer/doc/ documents every         ', &
         'parameter, every output file and the lattice attributes.                    '])
-  ! Separate from the block above because a character array constructor needs every
-  ! element the same length, and the version string's length is not this file's to know.
+  ! Separate from the block above. A character array constructor needs every element the
+  ! same length, and the length of the version string is not known here.
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
-  ! What global%device can be set to in this build, which otherwise takes a run to
-  ! discover: the backend is a build-time and machine-time property, and the reason a
-  ! build has none names the toolchain requirement rather than the platform. A test
-  ! harness reads this line to decide whether the device checks can run at all.
+  ! Print what global%device can be set to in this build. The backend is a property of
+  ! the build and the machine. Where there is none, the reason names the toolchain
+  ! requirement and not the platform. A test harness reads this line to decide whether
+  ! the device checks can run.
   call fel_device_query (dev_usable, dev_name, dev_reason)
   if (dev_usable) then
     call out_io (s_blank$, r_name, 'Device backend: metal, on ' // trim(dev_name))
   else
     call out_io (s_blank$, r_name, 'Device backend: none. ' // trim(dev_reason))
   endif
-  ! Flushed before the stop, or the runtime's own STOP line reaches the terminal first
+  ! Flush before the stop. Otherwise the runtime's STOP line can reach the terminal first
   ! and the usage text appears to follow the exit.
   flush (output_unit)
   stop 1
@@ -122,10 +125,10 @@ if (err) stop 1
 
 call fel_write_header (run)
 
-! Check instrument: export the transcribed single-particle wake kernels for
-! cross-validation against Genesis (fel-physics.md sec-wakes). The kernels are built by
-! fel_setup_schedule's fel_wake_init. Note: The s = 0 entries carry the Bane
-! self-slice half factor.
+! Check instrument: write the transcribed single-particle wake kernels for comparison
+! with Genesis (fel-physics.md sec-wakes). fel_wake_init, called from
+! fel_setup_schedule, builds the kernels.
+! Note: The s = 0 entries carry the Bane self-slice half factor.
 
 if (run%chamber_wake%write_kernels /= '' .and. run%coll%wake%on) then
   open (newunit = iu_k, file = trim(run%chamber_wake%write_kernels), action = 'write')
@@ -139,17 +142,17 @@ if (run%chamber_wake%write_kernels /= '' .and. run%coll%wake%on) then
 endif
 
 if (run%global%write_initial .or. run%global%load_only) then
-  ! Both dumps go through the same writers as the final ones, so the initial state is a
-  ! file the tracker can read straight back.
+  ! Both dumps use the same writers as the final ones. So the initial state is a file the
+  ! tracker can read back.
   call fel_dump_field_set (run, trim(run%global%out_root) // '-initial', err, ix_done = run%i_start - 1)
   if (err) stop 1
   call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_start), trim(run%global%out_root) // '-initial', err)
   if (err) stop 1
 endif
 
-! The pre-run. The header above has already printed everything the run derived and
-! everything it will cost, so a deck can be priced and its load read before any of the
-! tracking is paid for (doc/user-guide.md).
+! The pre-run. The header above has printed everything the run derives and everything
+! it will cost. So the cost and the load of a deck can be read before any tracking is
+! done (doc/user-guide.md).
 
 if (run%global%load_only) then
   call out_io (s_info$, r_name, 'load_only is set. The header above is the pre-run: what the deck ' // &
@@ -161,9 +164,9 @@ endif
 call track_fel_line (run, err)
 if (err) stop 1
 
-! Final dumps. The field records are unrotated to time order first (position is of
-! the time window holds record slice 1 + mod(is-1+first, nslice)), which is what
-! Genesis's field writer does on the fly (fel-physics.md sec-slippage).
+! Final dumps. The field records are first unrotated to time order: position is of the
+! time window holds record slice 1 + mod(is-1+first, nslice). Genesis's field writer
+! does the same on the fly (fel-physics.md sec-slippage).
 
 call fel_dump_beam (run, run%lat%branch(0)%ele(run%i_end), trim(run%global%out_root) // '-final', err, &
                     s_pos = run%lat%branch(0)%ele(run%i_end)%s)

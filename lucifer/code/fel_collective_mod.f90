@@ -1,35 +1,35 @@
 !+
 ! Module fel_collective_mod
 !
-! In-undulator collective effects for the FEL tracker: wakefields applied as a
-! per-slice energy-loss rate, and longitudinal space charge entering the pendulum
-! equation as a per-particle ez. Physics, Genesis provenance, and validation:
+! In-undulator collective effects for the FEL tracker: wakefields applied as a per-slice
+! energy-loss rate, and longitudinal space charge entering the pendulum equation as a
+! per-particle ez. Physics, Genesis provenance and validation are in
 ! lucifer/doc/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
 !
 ! Placement in the step: the wake's gamma decrement lands between the longitudinal
 ! advance and the second transverse half step. ez is computed per slice before the RK
 ! loop and held fixed through the stages, entering dgamma/dz as -ez. Both act in every
-! element, interludes included -- the chamber does not end where the undulator does.
+! element, interludes included, since the chamber does not end where the undulator does.
 !
-! fel_resistive_wall_wake is kept a clean, separable routine by decision: it is a
-! future port target into Bmad proper as a wake source, and nothing in it knows about
-! the FEL. Space charge is transcribed for consistency with Genesis (directly
-! testable), behind this module's interface BY DECISION: Bmad's slice space-charge
-! method is suspected the better model long-term, and a Bmad-slice implementation of
-! fel_shortrange_ez / fel_longrange_esc is an explicit future task.
+! fel_resistive_wall_wake knows nothing about the FEL (see its header). Space charge is
+! transcribed from Genesis, so it can be tested against Genesis directly. It sits behind
+! this module's interface, since Bmad's slice space-charge method may be the better
+! long-term model. A Bmad-slice implementation of fel_shortrange_ez and
+! fel_longrange_esc is a planned task.
 !
-! Weights: every particle enters the sources with its own charge. The short-range
-! source term scales per particle as c*w_j/slice_spacing where Genesis has
-! current/npart (identical for uniform weights), and the long-range and wake current
-! profiles are the weighted slice currents. Thread safety: fel_shortrange_ez uses
-! per-call locals only (callable from the parallel slice loop). The wake update is
-! serial at the caller's barrier.
+! Weights: every particle enters the sources with its own charge. The short-range source
+! term scales per particle as c*w_j/slice_spacing where Genesis has current/npart. The
+! two are identical for uniform weights. The long-range and wake current profiles are
+! the weighted slice currents.
 !
-! Constants are Bmad's. The Genesis-comparison floors this creates are tabulated in
-! the manual (sec-numerics) and doc/validation.md.
+! Thread safety: fel_shortrange_ez uses per-call locals only, so it can be called from
+! the parallel slice loop. The wake update is serial at the caller's barrier.
 !
-! Deliberately absent: Genesis's transient wake option (&wake transient/ztrans), the
-! incoherent-synchrotron module, harmonics beyond what the solver provides, MPI.
+! Constants are Bmad's. The Genesis-comparison floors this creates are tabulated in the
+! manual (sec-numerics) and in doc/validation.md.
+!
+! Not implemented: Genesis's transient wake option (&wake transient/ztrans), the
+! incoherent-synchrotron module, harmonics beyond what the solver provides, and MPI.
 !-
 
 module fel_collective_mod
@@ -43,9 +43,9 @@ implicit none
 !
 ! Wake configuration and state: the single-particle kernels at wavelength resolution
 ! over the full window, the external loss, and the per-slice eloss they produce. The
-! kernels are built once. The convolution is hoisted when currents cannot change and
-! recomputed at the caller's migration stride when they can (the hoist's premise
-! predates migration).
+! kernels are built once. The convolution is hoisted when currents cannot change. When
+! they can, it is recomputed at the caller's migration stride, since the hoist's premise
+! predates migration.
 !-
 
 type fel_wake_struct
@@ -55,7 +55,7 @@ type fel_wake_struct
   real(rp) :: radius = 2.5e-3_rp   ! Chamber radius, or half gap if flat [m].
   real(rp) :: conductivity = 0     ! DC conductivity [1/(Ohm m)]. 0: no resistive wake.
   real(rp) :: relaxation = 0       ! AC relaxation distance c*tau [m].
-  logical :: roundpipe = .true.    ! Round chamber; false: flat (parallel plates).
+  logical :: roundpipe = .true.    ! Round chamber. False: flat (parallel plates).
   character(8) :: material = ''    ! 'CU' or 'AL' shortcut for conductivity+relaxation.
   real(rp) :: gap = 0              ! Undulator gap [m]. 0: no geometric wake.
   real(rp) :: lgap = 1             ! Period of the gaps [m].
@@ -76,16 +76,17 @@ end type
 ! call (thread safe). This carries only the run facts.
 !-
 
-! The space-charge solver's numbers, as an input group. There is deliberately no gate
-! here: whether space charge runs is the element's own space_charge_method, so an input
+! The space-charge solver's numbers, as an input group. There is no on/off switch here.
+! The element's own space_charge_method sets whether space charge runs. So an input
 ! struct cannot claim one thing while the run does another.
 
 type fel_space_charge_input_struct
   ! Which space-charge implementation runs. 'genesis' is the transcribed solver, which
-  ! works per slice on a radial grid, and it is the default on merit: it carries the
-  ! microbunching harmonics and the longitudinal-gamma correction that Bmad's own slice
-  ! model does not, and its path is the one the comparison tier measures. Bmad's method
-  ! is a candidate second value, so this is a field rather than an assumption.
+  ! works per slice on a radial grid. It is the default on merit. It carries the
+  ! microbunching harmonics and the longitudinal-gamma correction that Bmad's slice
+  ! model does not. It is also the path the Genesis comparison checks
+  ! (lucifer/doc/validation.md). Bmad's method is a candidate second value, so this is a
+  ! field and not an assumption.
   character(16) :: model = 'genesis'
   real(rp) :: rmax = 0             ! Radial grid extent scale [m]. Grows adaptively as Genesis's.
   integer :: ngrid = 100           ! Radial grid points.
@@ -94,8 +95,8 @@ type fel_space_charge_input_struct
   logical :: longrange = .false.   ! The whole-window longESC term.
 end type
 
-! The working copy the solvers read. Same numbers plus the gate, which the walk sets from
-! the element it is standing in and no input can reach.
+! The working copy the solvers read: the same numbers plus the active flag. The walk sets
+! the flag from the element it is in, and no input can reach it.
 
 type fel_space_charge_struct
   logical :: active = .false.      ! This element's space_charge_method asked for it.
@@ -110,9 +111,9 @@ end type
 !+
 ! Struct fel_collective_struct
 !
-! Everything collective the step needs, in one bag: wake state and space-charge
-! configuration, plus the per-slice longESC scratch the step refreshes. Default
-! constructed = everything off = every existing check bit-identical.
+! Everything collective the step needs: wake state and space-charge configuration, plus
+! the per-slice longESC scratch the step refreshes. Default construction turns
+! everything off and leaves every existing check bit-identical.
 !-
 
 type fel_collective_struct
@@ -129,19 +130,20 @@ contains
 !+
 ! Subroutine fel_resistive_wall_wake (radius, conductivity, relaxation, roundpipe, ns, ds, wake)
 !
-! The single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV per meter per
-! electron (negative = loss), from the numerical impedance of Bane & Stupakov
-! SLAC-PUB-10707 (fel-physics.md sec-wakes), transcribed from
-! Wake::singleWakeResistive with Genesis's exact numerics: k in [0, 100/s0] on 1000
-! intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3), flat x-integral on [0,15] with 20000
-! points, trapezoid half weights at every endpoint. Kept separable: this routine is
-! the future port target into Bmad proper as a wake source, and nothing in it knows
-! about the FEL.
+! Routine to compute the single-particle resistive-wall wake w(i*ds), i = 0..ns-1, in eV
+! per meter per electron (negative = loss). It uses the numerical impedance of Bane &
+! Stupakov SLAC-PUB-10707 (fel-physics.md sec-wakes), transcribed from
+! Wake::singleWakeResistive with Genesis's exact numerics:
+!   k in [0, 100/s0] on 1000 intervals, s0 = (2 a^2/(Z0 sigma0))^(1/3).
+!   Flat x-integral on [0,15] with 20000 points.
+!   Trapezoid half weights at every endpoint.
+! The routine is kept separate and knows nothing about the FEL, so it can later move into
+! Bmad as a wake source.
 !
 ! Input:
 !   radius       -- real(rp): Chamber radius (round) or half-gap (flat) [m].
 !   conductivity -- real(rp): Wall conductivity [1/(Ohm m)].
-!   relaxation   -- real(rp): AC relaxation time [s] (0 = DC).
+!   relaxation   -- real(rp): AC relaxation distance c*tau [m] (0 = DC).
 !   roundpipe    -- logical: Round chamber (True) or parallel plates (False).
 !   ns           -- integer: Number of kernel samples.
 !   ds           -- real(rp): Kernel sample spacing [m].
@@ -196,7 +198,7 @@ do j = 0, nk
     do jq = 0, nq - 1
       x = dx * jq
       den = cmplx(cosh(x), 0.0_rp, rp) * (cosh(x) / zeta - cmplx(0.0_rp, k * a * sinhc(x), rp))
-      if (den /= den) cycle                         ! NaN guard, as the original.
+      if (den /= den) cycle                         ! NaN guard, as in Genesis.
       if (jq == 0 .or. jq == nq - 1) then
         accz = accz + 0.5_rp * (z0 / (twopi * a)) / den
       else
@@ -242,9 +244,9 @@ end subroutine fel_resistive_wall_wake
 !+
 ! Subroutine fel_wake_init (wake, nslice, sample, wavelength, err_flag)
 !
-! Build the single-particle kernels over the window at wavelength resolution
-! (Wake::init): material shortcuts, the three kernels, the self-loading half weight on
-! the s = 0 bin (fel-physics.md sec-wakes).
+! Routine to build the single-particle kernels over the window at wavelength resolution
+! (Wake::init): the material shortcuts, the three kernels, and the self-loading half
+! weight on the s = 0 bin (fel-physics.md sec-wakes).
 !
 ! Input:
 !   wake       -- fel_wake_struct: The wake description (radius, materials, roughness).
@@ -368,13 +370,15 @@ end subroutine fel_wake_init
 !+
 ! Subroutine fel_wake_update (wake, beam)
 !
-! The convolution of Collective::update, one shared-memory node: interpolate the
-! per-slice currents to wavelength resolution (zero-padded past the head), convert to
-! electrons per bin and the derivative for the geometric term, then for each slice sum
-! causally from the evaluation point toward the head (a trailing slice collects the
-! wakes of the charge ahead of it), averaging over the sample steps within the slice.
-! Serial by design: the caller holds the barrier. Call once when currents cannot change
-! (Genesis's hoisting), and at the migration stride when they can.
+! Routine to compute the convolution of Collective::update on one shared-memory node. It
+! interpolates the per-slice currents to wavelength resolution, zero-padded past the
+! head. It converts them to electrons per bin, and takes the derivative for the
+! geometric term. Then for each slice it sums causally from the evaluation point toward
+! the head, so a trailing slice collects the wakes of the charge ahead of it. The sum is
+! averaged over the sample steps within the slice.
+!
+! The routine is serial, since the caller holds the barrier. Call it once when currents
+! cannot change (Genesis's hoisting), and at the migration stride when they can.
 !
 ! Input:
 !   wake -- fel_wake_struct: Built kernels.
@@ -440,12 +444,12 @@ end subroutine fel_wake_update
 !+
 ! Subroutine fel_wake_apply (wake, beam, delz)
 !
-! Collective::apply in this port's chart: every particle of slice ic loses
-! eloss(ic)*delz/m_electron of gamma. Genesis changes gamma and leaves theta untouched.
-! Here theta is derived, theta = phi0 + ks*z/beta, so z rescales by beta_new/beta_old
-! to hold the phase fixed through the kick (the same bookkeeping fel_advance does at
-! its exit). Parallel-safe per slice (pure per-slice arithmetic). The caller may place
-! it inside the slice loop or outside.
+! Routine to apply Collective::apply in this port's chart. Every particle of slice ic
+! loses eloss(ic)*delz/m_electron of gamma. Genesis changes gamma and leaves theta
+! untouched. Here theta is derived, theta = phi0 + ks*z/beta, so z rescales by
+! beta_new/beta_old to hold the phase fixed through the kick. fel_advance does the same
+! at its exit. Each slice is independent, so the caller may place this inside the slice
+! loop or outside.
 !
 ! Input:
 !   wake -- fel_wake_struct: %eloss per slice.
@@ -478,9 +482,9 @@ end subroutine fel_wake_apply
 !+
 ! Subroutine fel_wake_apply_slice (wake, beam, ic, delz)
 !
-! One slice's share of fel_wake_apply, per-slice pure so it can sit inside the parallel
-! slice loop at Genesis's position in the step (between the longitudinal advance and the
-! second transverse half).
+! Routine to apply one slice's share of fel_wake_apply. It touches one slice only, so it
+! can sit inside the parallel slice loop at Genesis's position in the step: between the
+! longitudinal advance and the second transverse half step.
 !
 ! Input:
 !   wake -- fel_wake_struct: %eloss per slice.
@@ -532,10 +536,11 @@ end subroutine fel_wake_apply_slice
 !+
 ! Subroutine fel_longrange_esc (ef, beam, gamma0, aw, long_esc)
 !
-! EFieldSolver::longRange, one node: the per-slice long-range space-charge field from
-! the whole-window weighted current and rms-size profiles, in Genesis's longESC units
-! (eV/m). The caller converts at use exactly as Genesis does (fel-physics.md
-! sec-spacecharge): the per-particle ODE ez is fel_shortrange_ez(ip) - long_esc(is)/m_electron.
+! Routine to compute EFieldSolver::longRange on one node: the per-slice long-range
+! space-charge field from the whole-window weighted current and rms-size profiles. The
+! units are Genesis's longESC units (eV/m). The caller converts at use as Genesis does
+! (fel-physics.md sec-spacecharge). The per-particle ODE ez is
+! fel_shortrange_ez(ip) - long_esc(is)/m_electron.
 !
 ! Input:
 !   ef       -- fel_space_charge_struct: Space-charge configuration.
@@ -568,11 +573,12 @@ gamma = gamma0 / sqrt(1 + aw**2)
 allocate (fcur(nslice), fsize(nslice))
 
 ! Weighted current and transverse size per slice. Genesis's getSize is the product of
-! the rms sizes, sigma_x*sigma_y: an effective area scale, not a variance sum
-! (transcribed wrong once, caught by the SC tier at 1.7e-1, sec-spacecharge). Weighted
-! moments where Genesis counts particles: identical for uniform weights, correct
-! otherwise. A slice of zero width keeps its zero: the kernel below has a finite limit
-! there and takes it, where the original's guard put a square metre of area in its place.
+! the rms sizes, sigma_x*sigma_y: an effective area scale, and not a variance sum
+! (sec-spacecharge). A variance sum here is a transcription error that the space-charge
+! comparison catches (lucifer/doc/validation.md). Weighted moments replace Genesis's
+! particle counts. They are identical for uniform weights and correct otherwise. A
+! slice of zero width keeps its zero. The kernel below has a finite limit there and
+! takes it, where Genesis's guard put a square metre of area in its place.
 
 do i = 1, nslice
   sl => beam%slice(i)
@@ -599,16 +605,17 @@ scl = beam%slice_spacing / pi / c_light / 2 / eps_0_vac
 !
 !   (1 - |d| / sqrt(d^2 + A)) / A,   A = sigma_x sigma_y,  d = (j - i) spacing gamma,
 !
-! which is written here as 1 / (sqrt(d^2 + A) (sqrt(d^2 + A) + |d|)), the same quantity
-! with the subtraction rationalized away. The two are equal in arithmetic and not in
-! floating point: the first loses every significant digit when A is small against d^2,
-! and its A in the denominator has nothing to cancel against when A reaches zero. The
-! second is the limit itself, 1 / 2 d^2, for a slice of zero width, which is a slice
-! whose charge sits at one transverse point. A slice can reach that state in a run,
-! since migration moves particles one at a time and can leave one behind. The self term
-! carries no field, and a slice with no charge sends none, and both are skipped before
-! the kernel is formed rather than multiplied by zero after: at d = 0 or A = 0 the
-! rationalized form is a division by zero, and zero times a NaN is a NaN.
+! written here as 1 / (sqrt(d^2 + A) (sqrt(d^2 + A) + |d|)), the same quantity with the
+! subtraction rationalized away. The two are equal in arithmetic and not in floating
+! point. The first loses every significant digit when A is small against d^2, and its A
+! in the denominator has nothing to cancel against when A reaches zero. The second is
+! the limit itself, 1 / 2 d^2, for a slice of zero width: a slice whose charge sits at
+! one transverse point. A run can reach that state, since migration moves particles one
+! at a time and can leave one behind (lucifer/doc/validation.md).
+!
+! The self term carries no field, and a slice with no charge sends none. Both are
+! skipped before the kernel is formed, and not multiplied by zero after. At d = 0 or
+! A = 0 the rationalized form divides by zero, and zero times a NaN is a NaN.
 
 do i = 1, nslice
   efld = 0
@@ -631,23 +638,23 @@ end subroutine fel_longrange_esc
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_shortrange_ez (ef, beam, sl, gz2, ks, ez)
+! Subroutine fel_shortrange_ez (ef, beam, sl, gz2, ks, ez, err_flag)
 !
-! EFieldSolver::shortRange for one slice: center and radially bin the particles
-! (analyseBeam), build the radial Laplace operator (constructLaplaceOperator), and for
-! every azimuthal mode m = -nphi..nphi and longitudinal harmonic l = 1..nz solve the
-! tridiagonal system for the harmonic potential, accumulating per particle
-! ez(ip) += 2*Re(e^{im phi} e^{il theta} u(r_ip)). Units of m_e c^2 per meter, entering
-! dgamma/dz as -ez.
+! Routine to compute EFieldSolver::shortRange for one slice. It centers and radially
+! bins the particles (analyseBeam) and builds the radial Laplace operator
+! (constructLaplaceOperator). Then for every azimuthal mode m = -nphi..nphi and
+! longitudinal harmonic l = 1..nz it solves the tridiagonal system for the harmonic
+! potential, accumulating per particle ez(ip) += 2*Re(e^{im phi} e^{il theta} u(r_ip)).
+! The units are m_e c^2 per meter, entering dgamma/dz as -ez.
 !
-! Weighted: the source term carries c*w_j/slice_spacing where Genesis has
-! current/npart. Thread safe: locals only, callable from the parallel slice loop. The
-! adaptive rmax growth is per call (a local), matching the physics without mutating
-! shared state. Genesis grows a member and keeps it grown, a difference that only
-! affects which slices trigger the growth message.
+! Weighted: the source term carries c*w_j/slice_spacing where Genesis has current/npart.
+! Thread safe: locals only, so it can be called from the parallel slice loop. The
+! adaptive rmax growth is per call (a local), which matches the physics without changing
+! shared state. Genesis grows a member and keeps it grown. The difference affects only
+! which slices trigger the growth message.
 !
-! This is the interface a Bmad-slice space-charge implementation can later fill
-! (module header). Callers depend on (beam, slice, gz2, ks) -> ez only.
+! This is the interface a Bmad-slice space-charge implementation can later fill (module
+! header). Callers depend on (beam, slice, gz2, ks) -> ez only.
 !
 ! Input:
 !   ef    -- fel_space_charge_struct: Space-charge configuration (grid, harmonics).
@@ -659,7 +666,7 @@ end subroutine fel_longrange_esc
 ! Output:
 !   ez(:)    -- real(rp): Short-range space-charge Ez at each particle [eV/m scale].
 !   err_flag -- logical: Set True when the solve is refused, False otherwise. A refused
-!                 solve leaves ez zero and stops the run: the caller must not integrate
+!                 solve leaves ez zero and stops the run. The caller must not integrate
 !                 from a force it did not compute.
 !-
 
@@ -686,7 +693,7 @@ err_flag = .false.
 if (.not. ef%active .or. ef%nz < 1 .or. np < 1) return
 
 ! A slice carrying no charge has no source, and its field is zero however its particles
-! are placed. Returning here rather than through the solve keeps the grid out of a
+! are placed. Returning here, and not through the solve, keeps the grid out of a
 ! degenerate state it has no reason to enter.
 
 if (sum(sl%weight(1:np)) <= 0) return
@@ -701,13 +708,12 @@ allocate (csrc(ngrid), clow(ngrid), cmid(ngrid), cupp(ngrid), celm(ngrid), gam_w
 !
 ! The centroid is charge weighted, since everything built on it is: the radial bins, the
 ! azimuthal basis and the source each particle deposits with its own weight. Genesis
-! gives every macroparticle the same charge, so its unweighted mean is its weighted one
-! and the transcription does not distinguish them. This port's weights differ within a
-! slice -- a loaded beam keeps its file's charges, a beamlet's copies share one, and
-! migration moves particles one at a time -- and with the unweighted mean, splitting one
-! particle into colocated copies of the same total charge moved the origin and changed
-! the field at every physical point. A slice carrying no charge has no source and no
-! centroid to find, so the origin stays at zero there and every ez comes out zero.
+! gives every macroparticle the same charge, so its unweighted mean is its weighted one.
+! This port's weights differ within a slice. A loaded beam keeps its file's charges, a
+! beamlet's copies share one, and migration moves particles one at a time. With the
+! unweighted mean, splitting one particle into colocated copies of the same total
+! charge moved the origin and changed the field at every physical point. A slice with
+! no charge has no centroid, so the origin stays at zero there and every ez is zero.
 
 wtot = sum(sl%weight(1:np))
 if (wtot > 0) then
@@ -730,14 +736,14 @@ rmax_l = ef%rmax
 if (rbound > rmax_l) rmax_l = rbound * 1.5_rp
 
 ! The radial scale the bins and the cell volumes are built on. space_charge%rmax is a
-! floor under it and the slice's own extent raises it, so the scale is positive for any
-! slice with transverse size. A slice whose charge sits at one transverse point has none
-! to offer, and there is no scale to derive: the cell volumes go as dr^2, so the field of
-! such a slice grows without bound as the grid closes on it. That is a real force and not
-! a zero, since particles at one transverse point but different ponderomotive phases push
-! each other, so the run is refused rather than given a zero or an invented length.
-! Migration reaches this state by moving particles out of a slice until one is left, so
-! it is refused here, where the state arises, and not only at setup.
+! floor under it and the slice's own extent raises it. So the scale is positive for any
+! slice with transverse size. A slice whose charge sits at one transverse point has no
+! scale to derive. The cell volumes go as dr^2, so the field of such a slice grows
+! without bound as the grid closes on it. That is a real force and not a zero, since
+! particles at one transverse point but different ponderomotive phases push each other.
+! So the run is refused, and is not given a zero or an invented length. Migration
+! reaches this state by moving particles out of a slice until one is left. So it is
+! refused here, where the state arises, and not only at setup.
 
 if (rmax_l <= 0) then
   call out_io (s_error$, r_name, 'THE SHORT-RANGE SPACE-CHARGE SOLVE HAS NO RADIAL SCALE: THIS SLICE''S', &
@@ -764,11 +770,11 @@ do ip = 1, np
   if (idxr(ip) > ngrid) idxr(ip) = ngrid
 enddo
 
-! The ponderomotive phase, the source weight, and the harmonic phasors e^{il theta}
-! are all (m, l)-invariant: computed once per particle here, not 2*(2*nphi+1)*nz
-! times inside the mode loops. (Genesis reads a stored theta coordinate there for
-! free. This port's theta is derived, so it is cached.) The source side uses the
-! phasors' exact conjugates.
+! The ponderomotive phase, the source weight and the harmonic phasors e^{il theta} are
+! all (m, l)-invariant. They are computed once per particle here, and not
+! 2*(2*nphi+1)*nz times inside the mode loops. Genesis reads a stored theta coordinate
+! there at no cost. This port's theta is derived, so it is cached. The source side uses
+! the phasors' exact conjugates.
 
 do ip = 1, np
   theta_p(ip) = fel_theta(beam, sl, ip, ks)

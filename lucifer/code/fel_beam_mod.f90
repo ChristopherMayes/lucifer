@@ -1,11 +1,11 @@
 !+
 ! Module fel_beam_mod
 !
-! This module holds the packed particle representation for FEL tracking, its openPMD
-! particle dump I/O, its conversion to and from Bmad's coord_struct at element boundaries,
-! and the per-slice beam diagnostics.
+! Packed particle representation for FEL tracking, with its openPMD particle dump I/O,
+! its conversion to and from Bmad's coord_struct at element boundaries, and the
+! per-slice beam diagnostics.
 !
-! Coordinates: Bmad's, exactly. Each slice carries structure-of-arrays copies of
+! The coordinates are Bmad's. Each slice carries structure-of-arrays copies of
 ! coord_struct%vec(1:6) plus a weight:
 !
 !   x, y      [m]
@@ -14,39 +14,38 @@
 !   pz        (p - p0)/p0
 !   weight    macroparticle charge [C], mapping to coord_struct%charge
 !
-! so conversion at the seam is a plain copy. (z, pz) is the conjugate pair of Bmad's
-! s-based Hamiltonian. The normalization reference is stored once, as p0c [eV] -- Bmad's
-! own convention, asserted against each element's p0c at conversion time. The equivalent
-! quantities Genesis works in are derived, never stored: p0/(m_e c) from fel_p0_mc and
-! the reference gamma from fel_gamma0. (Genesis carries its reference gamma, gammaref, as
-! an independent run parameter, and importing a dump defines p0c from it. Deriving gamma
-! back from p0c reproduces gammaref to ~1 ulp, far below the 8e-7 constants floor of any
-! Genesis comparison.)
+! So conversion at an element boundary is a plain copy. (z, pz) is the conjugate pair of
+! Bmad's s-based Hamiltonian. The normalization reference is stored once, as p0c [eV], as
+! in Bmad. It is checked against each element's p0c at conversion. The quantities Genesis
+! works in are derived and never stored: p0/(m_e c) from fel_p0_mc and the reference
+! gamma from fel_gamma0. Genesis carries its reference gamma, gammaref, as an independent
+! run parameter, and importing a dump defines p0c from it. Deriving gamma back from p0c
+! reproduces gammaref to about 1 ulp. That is far below the 8e-7 constants floor of any
+! Genesis comparison.
 !
-! The ponderomotive phase is derived, not stored. Genesis's per-particle theta is the sum
-! of a common reference advance (the undulator's ku term, and the drift slippage term
-! ks/(2 gamma0^2)) and a particle-specific lag. The common part lives in one scalar per
-! beam, phi0, maintained by the tracker. The particle part is the Bmad z:
+! The ponderomotive phase is derived and not stored. Genesis's per-particle theta is the
+! sum of a common reference advance and a particle-specific lag. The common advance is
+! the undulator's ku term plus the drift slippage term ks/(2 gamma0^2). It is one scalar
+! per beam, phi0, kept by the tracker. The particle part is the Bmad z:
 !
 !   theta_j = phi0 - ks * tau_j,     tau_j = -z_j / beta_j = c*(t_j - t_ref)
 !
-! This reference-offset split is the FP32-safe formulation, and it removes the theta-wrap
-! hazard outright: z does not wrap, so there is no theta-wrap-plus-slice-index update to
-! get wrong at slice migration. The slice index is derived from z when needed. (A future
-! single precision GPU struct still needs per-slice re-referencing of z, since the phase
-! needs ~1e-6 rad across ~1e5 wavelengths of bunch. That is a choice deferred to the
-! device struct.)
+! This reference-offset split is safe in FP32 and removes the theta-wrap hazard. z does
+! not wrap, so there is no theta-wrap and slice-index update to get wrong at slice
+! migration. The slice index is derived from z when needed.
+! Note: A single precision GPU struct still needs z re-referenced per slice, since the
+! phase needs about 1e-6 rad across about 1e5 wavelengths of bunch. That choice belongs
+! to the device struct.
 !
-! Weights are carried from day one: every reduction here and in
-! fel_track_mod is weighted. Slice current is derived as I = c * sum(w) / slice_spacing, and
-! N_eff = (sum w)^2 / sum w^2 is a per-slice diagnostic. A uniform-weight beam reproduces
-! Genesis, which the benchmark checks.
+! Weights are carried throughout. Every reduction here and in fel_track_mod is weighted.
+! The slice current is I = c * sum(w) / slice_spacing, and N_eff = (sum w)^2 / sum w^2 is
+! a per-slice diagnostic. A uniform-weight beam reproduces Genesis.
 !
-! Why packed arrays at all: the FEL step advances every particle every internal step, and
-! coord_struct is ~224 bytes against the ~56 needed. coord_struct appears only at element
-! boundaries. The arrays are allocated to a capacity that may exceed the fill count n.
-! Slice migration can then move particles without per-step reallocation (fel-physics.md
-! sec-migration).
+! The arrays are packed because the FEL step advances every particle every internal
+! step, and coord_struct is about 224 bytes against the 56 needed. coord_struct appears
+! only at element boundaries. The arrays are allocated to a capacity that may exceed the
+! fill count n. So slice migration can move particles without reallocating each step
+! (fel-physics.md sec-migration).
 !-
 
 module fel_beam_mod
@@ -58,11 +57,10 @@ use fel_h5_mod
 implicit none
 
 ! All physical constants come from sim_utils (m_electron, c_light, mu_0_vac). Genesis
-! carries its own values (EG an impedance of free space truncated to 376.73 where
-! mu_0_vac*c_light is 376.7303...). During the original transcription validation this
-! module transcribed them to get transcription-level agreement. That validation is banked
-! (lucifer/doc/validation.md). The code now uses Bmad's constants, and the ~8e-7 relative
-! difference against Genesis is the accepted comparison floor.
+! carries its own values. EG: an impedance of free space truncated to 376.73 where
+! mu_0_vac*c_light is 376.7303... The transcription was first validated with Genesis's
+! values (lucifer/doc/validation.md). With Bmad's constants the relative difference
+! against Genesis is about 8e-7, and that is the floor of any comparison.
 
 !+
 ! Struct fel_slice_struct
@@ -79,16 +77,16 @@ type fel_slice_struct
   real(rp), allocatable :: z(:)        ! -beta*c*(t - t_ref) [m]
   real(rp), allocatable :: pz(:)       ! (p - p0)/p0
   real(rp), allocatable :: weight(:)   ! Macroparticle charge [C]
-  ! A label that follows the macroparticle, unique over the window and unchanged by
-  ! migration, so a frame series can be read as trajectories rather than as snapshots
-  ! (doc/reading-output.md). Written as openPMD's id record through coord_struct%ix_user.
+  ! A label that follows the macroparticle. It is unique over the window and unchanged by
+  ! migration, so a frame series can be read as trajectories (doc/reading-output.md).
+  ! Written as openPMD's id record through coord_struct%ix_user.
   integer, allocatable :: id(:)
   integer :: n = 0                     ! Fill count.
   ! Independent transverse samples at load: (sum_g W_g)^2 / sum_g W_g^2 over the groups
-  ! of particles sharing their transverse coordinates, which is the beamlet count for
-  ! uniform beamlets and N_eff for a load with no copies. The coherent source sizes its
-  ! Gaussianity test by it. A load-time count: migration moves particles between slices
-  ! and does not update it, which that soft use tolerates.
+  ! of particles that share transverse coordinates. This is the beamlet count for uniform
+  ! beamlets, and N_eff for a load with no copies. The coherent source sizes its
+  ! Gaussianity test by it. It is counted at load. Migration moves particles between
+  ! slices and does not update it, which that use tolerates.
   real(rp) :: m_ind = 1
 end type
 
@@ -107,32 +105,31 @@ type fel_beam_struct
   real(rp) :: phi0 = 0             ! Common ponderomotive reference phase [rad].
   real(rp) :: wavelength = 0       ! Radiation wavelength [m]. From the deck: no dump carries it.
   real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. From the deck likewise.
-  integer :: n_wavelength = 1      ! Wavelengths per slice, slice_spacing / wavelength as the
-                                   !   integer it is. Slippage rotates the slice ring by one
-                                   !   index per n_wavelength undulator periods, exactly, and
-                                   !   that holds only for a whole number. Carried rather than
-                                   !   re-derived: dividing the two reals gives 12 to the last
-                                   !   bit rather than 12.
+  integer :: n_wavelength = 1      ! Wavelengths per slice: slice_spacing / wavelength as an
+                                   !   integer. Slippage rotates the slice ring by one index
+                                   !   per n_wavelength undulator periods, which needs a whole
+                                   !   number. Carried, since the quotient of the two reals
+                                   !   can miss 12 in the last bit.
   real(rp) :: s0 = 0               ! Start of the time window [m].
   integer :: beamlet_size = 0      ! Beamlet size at generation. Carried for dump round trips.
   logical :: one4one = .false.     ! Genesis one4one flag. Carried for dump round trips.
-  logical :: quiver_in_px = .false. ! Momentum convention flag (fel-physics.md
-                                   !   sec-unaveraged): False = stored px excludes the
-                                   !   undulator quiver (the averaged chart, and the only
-                                   !   convention any averaged/seam code accepts). True =
-                                   !   the unaveraged tracker is mid-region and px is the
-                                   !   full kinetic momentum. Asserted at region edges: a
-                                   !   hard-edge handoff injects K/gamma of spurious px.
+  logical :: quiver_in_px = .false. ! Momentum convention (fel-physics.md sec-unaveraged).
+                                   !   False: stored px excludes the undulator quiver. This
+                                   !   is the averaged chart, and the only convention the
+                                   !   averaged code accepts. True: the unaveraged tracker
+                                   !   is mid-region and px is the full kinetic momentum.
+                                   !   Checked at region edges, since a hard-edge handoff
+                                   !   injects K/gamma of spurious px.
 end type
 
-! This program's own metadata sits under the root group lucifer, in a subgroup named for
-! its role (fel_private_group): frame for where a frame was taken (fel_frame_attributes),
+! This program's metadata sits under the root group lucifer, in a subgroup named for its
+! role (fel_private_group): frame for where a frame was taken (fel_frame_attributes),
 ! field for the slippage residual (fel_write_slippage_residual), and checkpoint for the
 ! replay state (fel_write_checkpoint_group). openPMD puts everything it governs under
-! basePath, so a reader following the standard never looks here, and the file root keeps
-! the standard's declarations alone. A file is a checkpoint when lucifer/checkpoint exists
-! with this string, and for no other reason: lucifer itself is on every frame and every
-! field file. A continuation requires the string exactly and refuses any other.
+! basePath. So a reader following the standard never looks here, and the file root keeps
+! only the standard's declarations. A file is a checkpoint only when lucifer/checkpoint
+! exists with this string. The lucifer group itself is on every frame and field file.
+! A continuation requires the string exactly and refuses any other.
 
 character(*), parameter :: fel_private_root$ = 'lucifer'
 character(*), parameter :: fel_checkpoint_format$ = 'lucifer-checkpoint 2.0'
@@ -141,9 +138,9 @@ character(*), parameter :: fel_frame_format$ = 'lucifer-frames 3.0'
 !+
 ! Struct fel_checkpoint_struct
 !
-! Where a checkpoint was written, read from its group by fel_read_openpmd_beam in the
-! continuation mode and kept so the field file and the tracking window are checked
-! against it (fel_read_openpmd_into_field, fel_setup_schedule).
+! Where a checkpoint was written. fel_read_openpmd_beam reads it from the checkpoint
+! group in continuation mode. The field file and the tracking window are checked against
+! it (fel_read_openpmd_into_field, fel_setup_schedule).
 !-
 
 type fel_checkpoint_struct
@@ -157,15 +154,15 @@ end type
 ! Struct fel_slice_diag_struct
 !
 ! Per-slice beam diagnostics at one output position: the quantities of Genesis's
-! DiagBeam::calc, weighted, under Bmad-style names and normalizations. mean_/sigma_
-! follow the convention of wavefront_transverse_moments. gamma is the Lorentz factor,
-! named as such because Bmad's 'energy' is the total energy in eV, which none of these
-! are. The Genesis output dataset each one compares against is noted.
+! DiagBeam::calc, weighted, under Bmad-style names and normalizations. mean_ and sigma_
+! follow the convention of wavefront_transverse_moments. gamma is the Lorentz factor.
+! Bmad's 'energy' is the total energy in eV, which none of these are. Each entry notes
+! the Genesis output dataset it compares against.
 !
-! Scope, by decision: this struct is the Genesis-comparison instrument and stays limited
-! to quantities a Genesis output can check. Production moment diagnostics (mean vector,
-! sigma matrix, emittances) go through Bmad's bunch_params_struct at the seam, where
-! calc_bunch_params already owns the definitions.
+! This struct is the Genesis-comparison instrument. It holds only quantities a Genesis
+! output can check. Production moment diagnostics (mean vector, sigma matrix,
+! emittances) go through Bmad's bunch_params_struct, where calc_bunch_params owns the
+! definitions.
 !-
 
 type fel_slice_diag_struct
@@ -244,8 +241,8 @@ end function
 !
 ! Routine to return the dimensionless reference momentum p0/(m_e c) = p0c/m_electron,
 ! derived from the beam's one stored reference p0c. Bmad px times this is Genesis px.
-! Hoist this out of particle loops. It is one division, but there is no reason to pay
-! it per particle.
+! Hoist this out of particle loops. It is one division and need not be done per
+! particle.
 !
 ! Input:
 !   beam    -- fel_beam_struct: The beam.
@@ -268,7 +265,7 @@ end function
 !
 ! Routine to return the gamma of the reference momentum (Genesis's gammaref), derived
 ! from the beam's one stored reference p0c. Hoist this out of particle loops. It is one
-! sqrt, but there is no reason to pay it per particle.
+! sqrt and need not be done per particle.
 !
 ! Input:
 !   beam    -- fel_beam_struct: The beam.
@@ -289,11 +286,11 @@ end function
 !+
 ! Subroutine fel_assert_averaged_chart (beam, where_str, err_flag)
 !
-! Routine to refuse when the beam's stored px still carries the undulator quiver
-! (the unaveraged tracker left its region without restoring the averaged convention).
-! Every averaged-physics or seam entry point calls this: a hard-edge handoff injects
-! spurious transverse momentum of order K/gamma -- comparable to the beam divergence --
-! and presents downstream as unexplained emittance growth (fel-physics.md
+! Routine to refuse a beam whose stored px still carries the undulator quiver. That
+! happens when the unaveraged tracker leaves its region without restoring the averaged
+! convention. Every averaged-physics or seam entry point calls this. A hard-edge handoff
+! injects spurious transverse momentum of order K/gamma, comparable to the beam
+! divergence. Downstream it shows as unexplained emittance growth (fel-physics.md
 ! sec-unaveraged).
 !
 ! Input:
@@ -364,26 +361,26 @@ end function fel_theta
 ! Subroutine fel_read_openpmd_beam (beam, file_name, gamma0, n_slice, wavelength, spacing,
 !                                                    ele, err_flag, continuation, ckpt)
 !
-! Routine to read an openPMD-beamphysics particle file written by
-! fel_write_openpmd_beam back into a packed beam, weights included. The inverse of that
-! routine: one particlePatch per slice, in window order, empty patches included.
+! Routine to read an openPMD-beamphysics particle file written by fel_write_openpmd_beam
+! back into a packed beam, weights included. This is the inverse of that routine: one
+! particlePatch per slice, in window order, empty patches included.
 !
-! n_slice is the window the deck asked for, and the file must agree: a dump carries one
-! patch per slice, so a different patch count means the deck and the file describe
-! different runs, and that is refused. Pass -1 when the deck states no window,
-! which is the usual case for a restart, and the file's patch count defines it. A bunch
-! that is not a sliced window belongs on the bunch path (beam_init%position_file), which
-! slices it by load_mode instead of assuming a slicing it does not carry.
+! n_slice is the window the deck asked for, and the file must agree. A dump carries one
+! patch per slice. So a different patch count means the deck and the file describe
+! different runs, and the run is refused. Pass -1 when the deck states no window, the
+! usual case for a restart, and the file's patch count defines it. A bunch that is not a
+! sliced window belongs on the bunch path (beam_init%position_file). That path slices it
+! by load_mode instead of assuming a slicing the bunch does not carry.
 !
-! one4one is not read either. The flag asserts that every macroparticle carries one
+! Neither beamlet_size nor one4one is read. one4one says every macroparticle carries one
 ! electron, so the weights decide it.
 !
-! The reference phase starts at zero and each particle's z is the folded lag the file's
-! time gives back, which is an initialization: a fresh run from the standard records. A
-! continuation asks for the state the run had instead, phi0 and every z from the file's
-! checkpoint group (fel_write_checkpoint_group), and refuses a file without a complete
-! group that agrees with the records, since a fallback to the fold would hide the loss
-! the group exists to close. The mode is the caller's to state and is never inferred
+! The reference phase starts at zero, and each particle's z is the folded lag the file's
+! time gives back. This is an initialization: a fresh run from the standard records. A
+! continuation instead asks for the state the run had: phi0 and every z from the file's
+! checkpoint group (fel_write_checkpoint_group). A continuation refuses a file without a
+! complete group that agrees with the records, since a fallback to the fold would hide
+! the loss the group exists to close. The caller states the mode. It is never inferred
 ! from the file.
 !
 ! Input:
@@ -429,10 +426,10 @@ if (gamma0 <= 1) then
   return
 endif
 
-! p0c is the one stored reference. phi0 starts at zero here, the particle lag living in
-! z, and a continuation replaces both from the checkpoint group once the slices are
-! built. The wavelength and spacing are the deck's: a dump carries the beam, not the
-! run's parameters.
+! p0c is the one stored reference. phi0 starts at zero here, with the particle lag in z.
+! A continuation replaces both from the checkpoint group once the slices are built. The
+! wavelength and spacing are the deck's, since a dump carries the beam and not the run's
+! parameters.
 
 beam%p0c = sqrt(gamma0**2 - 1) * m_electron
 beam%phi0 = 0
@@ -440,7 +437,7 @@ beam%wavelength = wavelength
 beam%slice_spacing = spacing
 beam%n_wavelength = fel_n_wavelength(spacing, wavelength, err)
 if (err) return
-beam%beamlet_size = 0        ! Not carried by any dump format; the slices count their own.
+beam%beamlet_size = 0        ! No dump format carries it. Each slice counts its own.
 beam%s0 = 0
 
 call hdf5_read_beam (file_name, beam_b, err, ele)
@@ -468,11 +465,11 @@ do is = 1, n_win
   beam%slice(is)%n = np
   if (np == 0) cycle
 
-  ! A patch is one slice, so its particles share one placement: the file's timeOffset is
-  ! the reference time plus that slice's own offset, and the lag it does not contain is
-  ! the time record, which is what vec(5) came back from. A patch whose placements
-  ! disagree describes particles from different slices in one slice, and averaging them
-  ! would move charge along the bunch without saying so.
+  ! A patch is one slice, so its particles share one placement. The file's timeOffset is
+  ! the reference time plus the slice's own offset. The lag it does not contain is the
+  ! time record, which vec(5) came back from. A patch whose placements disagree puts
+  ! particles from different slices in one slice. Averaging them would move charge along
+  ! the bunch without notice.
 
   t0_ref = beam_b%bunch(is)%particle(1)%t + &
            beam_b%bunch(is)%particle(1)%vec(5) / (beam_b%bunch(is)%particle(1)%beta * c_light)
@@ -480,7 +477,7 @@ do is = 1, n_win
     t0_p = beam_b%bunch(is)%particle(ip)%t + &
            beam_b%bunch(is)%particle(ip)%vec(5) / (beam_b%bunch(is)%particle(ip)%beta * c_light)
     ! The scale is one slice step in time, which is what the placement distinguishes. The
-    ! offset itself is no scale at all: a single-slice window places its one slice at zero.
+    ! offset itself cannot be the scale: a single-slice window places its one slice at zero.
 
     if (abs(t0_p - t0_ref) > 1e-6_rp * spacing / c_light) then
       call out_io (s_error$, r_name, 'PARTICLE \i0\ OF SLICE \i0\ CARRIES A DIFFERENT ' // &
@@ -497,17 +494,16 @@ do is = 1, n_win
 enddo
 
 ! The replay state. A continuation rebuilds the split the run had, phi0 and each
-! particle's z, from the group lucifer/checkpoint, and the group is checked against the records it
-! rides beside before anything is taken from it: the format string, every member, the
-! partition, the order of the ids, and each coordinate against the folded time it was
-! written from. A group attached to the wrong particles passes every structural check,
-! which is what the last of those is for.
+! particle's z, from the group lucifer/checkpoint. The group is checked against the
+! records beside it before anything is taken from it: the format string, every member,
+! the partition, the order of the ids, and each coordinate against the folded time it
+! was written from. A group attached to the wrong particles passes every structural
+! check, and the last check is for that case.
 
 call read_checkpoint_group (err)
 if (err) return
 
-! one4one is not stored: the flag asserts that every macroparticle carries exactly one
-! electron, so the weights say it.
+! one4one: every weight is one electron charge.
 
 beam%one4one = .true.
 do is = 1, n_win
@@ -528,9 +524,9 @@ if (q_file <= 0) then
   return
 endif
 
-! No dump format says how the slices were loaded, so each slice counts its own
-! independent transverse samples from the coordinates it carries: copies made by a
-! loader share theirs to the bit, and nothing else does.
+! No dump format says how the slices were loaded. So each slice counts its independent
+! transverse samples from its own coordinates. Copies made by a loader share theirs to
+! the bit, and nothing else does.
 
 block
   integer, allocatable :: group(:)
@@ -560,11 +556,11 @@ logical gerr, err, exists, cont
 character(60) fmt_str
 character(40) name_c
 
-! The fold's rounding, the scale a coordinate is checked against. The folded lag is
-! z + beta phi0 lambda/2pi, near 1e-8 m on the check lines, and it goes through the
-! time record and back at 1e-16 of itself, so the round trip moves a coordinate by
-! 1e-24 m and a permuted coordinate by a fraction of a wavelength. A billionth of a
-! wavelength sits four orders above the first and eight below the second.
+! The fold's rounding sets the scale a coordinate is checked against. The folded lag is
+! z + beta phi0 lambda/2pi, near 1e-8 m on the check lines. Its trip through the time
+! record and back is good to 1e-16 of itself. So the round trip moves a coordinate by
+! 1e-24 m, and a permuted coordinate moves by a fraction of a wavelength. A billionth of
+! a wavelength is four orders above the first and eight below the second.
 
 gerr = .true.
 cont = logic_option(.false., continuation)
@@ -690,7 +686,7 @@ if (worst > tol) then
   return
 endif
 
-! Taken, now that the group is shown to be this beam's.
+! The group is shown to be this beam's, so take it.
 
 beam%phi0 = phi0_c
 k = 0
@@ -769,24 +765,24 @@ end subroutine fel_read_openpmd_beam
 !
 ! Routine to refuse a beam file written inside an undulator as a run's initial beam. A
 ! frame taken there holds the coordinates the selected tracking method produced, an
-! ordinary particle record (doc/reading-output.md), and it is not a place a run can start
-! from: the averaged map would take the frame as an entrance and hand it the K/gamma a
-! hard-edge handoff injects, and the unaveraged mode would need the segment position and
-! the ramp state no file holds.
+! ordinary particle record (doc/reading-output.md). A run cannot start from it. The
+! averaged map would take the frame as an entrance and give it the K/gamma a hard-edge
+! handoff injects. The unaveraged mode would need the segment position and the ramp
+! state, which no file holds.
 !
-! The test is where the frame was taken and never what its momenta look like. It is the
+! The test is where the frame was taken, and never what its momenta look like. It is the
 ! same for a frame either method wrote.
 !
 ! A frame of an FEL element records sElement and elementLength (fel_frame_attributes). A
 ! file carrying neither is an external bunch, a frame from a break, or an ordinary dump,
-! and loads as before: their absence is that assumption and not proof of a boundary.
+! and loads as before. Their absence is that assumption and not proof of a boundary.
 !
-! Today an element's faces are the device's, since a superimposed element cannot cut an
+! Note: An element's faces are the device's, since a superimposed element cannot cut an
 ! undulator this tracker tracks (fel_assert_wiggler_sane). A device tracked in pieces
-! would need the writer to stamp the boundary rather than this reader to infer it.
+! would need the writer to stamp the boundary, rather than this reader to infer it.
 !
-! A continuation is a different question, answered where it is asked: it needs a
-! checkpoint and refuses a frame that carries none, wherever the frame was taken.
+! A continuation is a different question, answered where it is asked. It needs a
+! checkpoint, and refuses a frame that carries none wherever the frame was taken.
 !
 ! Input:
 !   file_name -- character(*): The file the deck names.
@@ -806,7 +802,7 @@ logical err_flag, err
 character(*) file_name, which
 character(40) name_ele
 character(*), parameter :: r_name = 'fel_assert_not_interior_frame'
-! A length no lattice resolves, the one the checkpoint's eligibility uses: the walk
+! A length no lattice resolves, the same one the checkpoint's eligibility uses. The walk
 ! reaches an element's end by accumulation and can miss it in the last bit.
 real(rp), parameter :: tol = 1.0e-9_rp
 
@@ -857,10 +853,11 @@ end subroutine fel_assert_not_interior_frame
 !+
 ! Subroutine fel_assert_checkpoint_present (file_name, err_flag)
 !
-! Routine to refuse a continuation from a file that carries no checkpoint group, before
-! anything else is asked of the file. fel_read_openpmd_beam makes the same refusal once the
-! records are read, and this one comes first so that a file which is not an openPMD beam
-! at all is refused for the checkpoint it lacks rather than told to convert a Genesis dump.
+! Routine to refuse a continuation from a file with no checkpoint group, before anything
+! else is asked of the file. fel_read_openpmd_beam makes the same refusal once the
+! records are read. This one comes first, so a file that is not an openPMD beam at all is
+! refused for the checkpoint it lacks. Otherwise it would be told to convert a Genesis
+! dump.
 !
 ! Input:
 !   file_name -- character(*): The file the deck names as beam_file.
@@ -898,8 +895,9 @@ end subroutine fel_assert_checkpoint_present
 !+
 ! Subroutine fel_say_no_checkpoint (file_name, r_name)
 !
-! The one text for a continuation from a file with no checkpoint group, printed by the two
-! places that find one (fel_assert_checkpoint_present, fel_read_openpmd_beam).
+! Routine to print the one message for a continuation from a file with no checkpoint
+! group. Both places that find one call it (fel_assert_checkpoint_present,
+! fel_read_openpmd_beam).
 !-
 
 subroutine fel_say_no_checkpoint (file_name, r_name)
@@ -919,33 +917,33 @@ end subroutine fel_say_no_checkpoint
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag)
+! Subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, kinetic_ok, s_pos)
 !
 ! Routine to write a packed beam as an openPMD-beamphysics particle file, one bunch per
-! slice through Bmad's own hdf5_write_beam. Unlike a Genesis dump this carries the
-! Per-particle weight, as openPMD's macro-charge, so a weighted beam survives the round
+! slice through Bmad's hdf5_write_beam. Unlike a Genesis dump the file carries the
+! per-particle weight, as openPMD's macro-charge. So a weighted beam survives the round
 ! trip.
 !
-! One slice per openPMD particlePatch, in window order, so an empty slice is a
-! zero-count patch rather than a gap. The patch count is the window, and nothing else
-! about the window is written: the wavelength, spacing and beamlet size belong to the
-! deck, and one4one follows from the weights.
+! Each slice is one openPMD particlePatch, in window order, so an empty slice is a
+! zero-count patch and not a gap. The patch count is the window. Nothing else about the
+! window is written: the wavelength, spacing and beamlet size belong to the deck, and
+! one4one follows from the weights.
 !
-! The reference phase is folded into each particle's time coordinate (fel_slice_to_bunch's
-! fold_phi0), so the file states the whole ponderomotive phase and a reader that restarts
-! phi0 at zero gets the state back exactly. Read that header before changing this call.
+! The reference phase is folded into each particle's time coordinate (fold_phi0 in
+! fel_slice_to_bunch). So the file states the whole ponderomotive phase, and a reader
+! that restarts phi0 at zero gets the state back exactly. Read the header of
+! fel_slice_to_bunch before changing this call.
 !
 ! Input:
 !   beam        -- fel_beam_struct: Beam to write.
 !   ele         -- ele_struct: Element the beam sits at, for the coord_struct conversion.
 !   file_name   -- character(*): File to create.
-!   is1, is2    -- integer, optional: The slice range to write. Default the whole window.
-!   kinetic_ok  -- logical, optional: The caller writes a frame from inside an unaveraged
-!                    segment, whose px is the kinetic momentum and not the averaged
-!                    tracker's, and accepts it, so the beam is written rather than refused.
-!                    Default False.
+!   is1, is2    -- integer, optional: The slice range to write. Default is the whole window.
+!   kinetic_ok  -- logical, optional: Accept a frame from inside an unaveraged segment,
+!                    whose px is the kinetic momentum and not the averaged tracker's? The
+!                    beam is then written and not refused. Default is False.
 !   s_pos       -- real(rp), optional: Where along ele the beam sits, for a frame taken
-!                    inside an element (fel_slice_to_bunch). Default the upstream end.
+!                    inside an element (fel_slice_to_bunch). Default is the upstream end.
 !
 ! Output:
 !   err_flag    -- logical: Set True on error, False otherwise.
@@ -970,8 +968,8 @@ character(*), parameter :: r_name = 'fel_write_openpmd_beam'
 err_flag = .true.
 nslice = size(beam%slice)
 
-! The slices to write. A frame series may carry a range of the window and nothing else
-! does, so the patch count is the range's length and the file says which range it is.
+! The slices to write. Only a frame series carries a range of the window. Then the patch
+! count is the range's length, and the file says which range it is.
 
 i1 = integer_option(1, is1)
 i2 = integer_option(nslice, is2)
@@ -982,8 +980,8 @@ if (sum(beam%slice(i1:i2)%n) == 0) then
   return
 endif
 
-! Every slice becomes a patch, empty ones included: the patch count is the window, or
-! the range where one was asked for.
+! Every slice becomes a patch, empty ones included. The patch count is the window, or the
+! range asked for.
 
 call reallocate_beam (beam_b, i2 - i1 + 1)
 
@@ -995,10 +993,7 @@ do is = i1, i2
 enddo
 nb = i2 - i1 + 1
 
-! The patches are the window: one per slice, in order, empty ones as zero-count
-! patches. Nothing else about the window goes in the file. The wavelength, the slice
-! spacing and the beamlet size are what the deck states, so storing them here would be
-! a second copy of a truth the run already has, and one4one is what the weights say.
+! One patch per slice, in window order. Nothing else about the window is written.
 
 call hdf5_write_beam (file_name, beam_b%bunch(1:nb), .false., err, as_patches = .true.)
 if (err) return
@@ -1013,21 +1008,21 @@ end subroutine fel_write_openpmd_beam
 !+
 ! Subroutine fel_write_checkpoint_group (file_name, s_ckpt, ix_done, ele_name, err_flag, beam)
 !
-! Routine to add the group lucifer/checkpoint to a beam or field frame written at an eligible
-! boundary (fel_checkpoint_eligible): the tracker's replay state, beside the standard
-! openPMD records and changing none of them. The group's attributes say where the frame
-! was taken, sPosition with the elementIndex and elementName of the element the run had
-! completed, and checkpointFormat names this layout. With beam present the group also
-! carries the reference phase phi0 and, per particle in the records' order, the id and
-! the longitudinal coordinate z as the tracker holds it, copied and not recomputed, with
-! the count of every slice.
+! Routine to add the group lucifer/checkpoint to a beam or field frame written at an
+! eligible boundary (fel_checkpoint_eligible). The group is the tracker's replay state.
+! It sits beside the standard openPMD records and changes none of them. Its attributes
+! say where the frame was taken: sPosition, and the elementIndex and elementName of the
+! element the run had completed. checkpointFormat names this layout. With beam present
+! the group also carries the reference phase phi0 and the count of every slice. Per
+! particle, in the records' order, it carries the id and the longitudinal coordinate z
+! as the tracker holds it, copied and not recomputed.
 !
-! The standard records fold phi0 into each particle's time (fel_slice_to_bunch), which
-! is exact for a reader of the file and not for a continuation of the run: the fold
-! rebuilds an equal phase at another magnitude, so the deposit phase of a high-gain
-! segment differs by phi0 times the machine epsilon, and the gain amplifies that to
-! 6.5e-8 (doc/validation.md). A continuation reads phi0 and z from here instead and holds
-! the split the run had, to the bit.
+! The standard records fold phi0 into each particle's time (fel_slice_to_bunch). That is
+! exact for a reader of the file and not for a continuation of the run. The fold rebuilds
+! an equal phase at another magnitude. So the deposit phase of a high-gain segment
+! differs by phi0 times the machine epsilon, and the gain amplifies that to 6.5e-8
+! (doc/validation.md). A continuation reads phi0 and z from here instead, and holds the
+! split the run had to the bit.
 !
 ! Input:
 !   file_name -- character(*): The frame, already written and closed.
@@ -1069,8 +1064,8 @@ call hdf5_write_attribute_real (g_id, 'sPosition', s_ckpt, err);                
 call hdf5_write_attribute_int (g_id, 'elementIndex', ix_done, err);                         bad = bad .or. err
 call hdf5_write_attribute_string (g_id, 'elementName', trim(ele_name), err);                bad = bad .or. err
 
-! The particles in the records' order, slice by slice, so a reader checks the ids against
-! the records before it takes a coordinate.
+! The particles in the records' order, slice by slice. So a reader checks the ids
+! against the records before it takes a coordinate.
 
 if (present(beam)) then
   n = sum(beam%slice(:)%n)
@@ -1105,12 +1100,12 @@ end subroutine fel_write_checkpoint_group
 !+
 ! Function fel_private_group (f_id, sub, create, err_flag) result (g_id)
 !
-! Routine to open a subgroup of this program's own root group lucifer, the place for every
+! Routine to open a subgroup of this program's root group lucifer, the place for every
 ! attribute and dataset openPMD has no name for: frame, field or checkpoint. The standard
-! puts all it governs under basePath, so a reader following it never looks here, and the
-! root of a file keeps the standard's declarations alone. Whether the subgroup's absence
-! means anything is the caller's question: a file is a checkpoint when checkpoint exists
-! with its format string, and an external bunch has no frame group at all.
+! puts all it governs under basePath. So a reader following it never looks here, and the
+! root of a file keeps only the standard's declarations. The caller decides what an
+! absent subgroup means. A file is a checkpoint when checkpoint exists with its format
+! string, and an external bunch has no frame group at all.
 !
 ! Input:
 !   f_id     -- integer(hid_t): The open file.
@@ -1172,12 +1167,11 @@ end function fel_private_group
 !
 ! Routine to label every macroparticle that has no label yet, in window order.
 !
-! A label follows its macroparticle for the rest of the run: migration carries it to the
-! next slice and the dumps write it, so a frame series reads as trajectories rather than
-! as snapshots. A beam read from a dump arrives with its labels already set and keeps
-! them, and anything the loader added beside them (a split-weight copy, a resampled
-! beamlet) is numbered after the largest one the file carried. Labels are unique over
-! the window and are not otherwise interpreted.
+! A label follows its macroparticle for the rest of the run. Migration carries it to the
+! next slice and the dumps write it. So a frame series reads as trajectories rather than
+! as snapshots. A beam read from a dump keeps the labels it carries. Anything the loader
+! adds beside them (a split-weight copy, a resampled beamlet) is numbered after the
+! largest label in the file. Labels are unique over the window and have no other meaning.
 !
 ! Input:
 !   beam -- fel_beam_struct: The loaded beam.
@@ -1259,25 +1253,29 @@ end subroutine fel_slice_reallocate
 !+
 ! Subroutine fel_fawley_noise (theta, weight, n, beamlet_size, n_clamp)
 !
-! Routine to impose Fawley-style shot noise on a quiet-loaded slice, transcribed from
-! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights. Each
-! beamlet's amplitude draws on its REAL electron count, the beamlet's charge over e
-! (Genesis's slice-uniform ne/mpart for uniform weights). This makes <|b(h)|^2> =
-! 1/N_lambda exact for any cross-beamlet weight distribution (fel-physics.md
-! sec-noise). Weights must be uniform within a beamlet (the quiet cancellation is per
-! beamlet). The first particle's weight speaks for its beamlet. Genesis's silent
-! nbl < 1 clamp is kept but counted into n_clamp for the caller to report. Kicks
-! accumulate from the unperturbed phases, exactly as Genesis's work array does: two
-! ran_uniform draws per (harmonic, beamlet), in Genesis's loop order. The routine is
-! shared by the built-in loader and the distribution import, so the two stay one
-! implementation.
+! Routine to impose Fawley-style shot noise on a quiet-loaded slice. Transcribed from
+! Genesis's ShotNoise::applyShotNoise and generalized to per-particle weights.
+!
+! Each beamlet's amplitude draws on its *real* electron count, the beamlet's charge over
+! e. For uniform weights this is Genesis's slice-uniform ne/mpart. It makes
+! <|b(h)|^2> = 1/N_lambda exact for any cross-beamlet weight distribution
+! (fel-physics.md sec-noise). Kicks accumulate from the unperturbed phases, as Genesis's
+! work array does: two ran_uniform draws per (harmonic, beamlet), in Genesis's loop
+! order. The built-in loader and the distribution import share this routine, so the two
+! stay one implementation.
+!
+! Note: Weights must be uniform within a beamlet, since the quiet cancellation is per
+! beamlet. The first particle's weight speaks for its beamlet.
+!
+! Note: Genesis's silent nbl < 1 clamp is kept, and counted into n_clamp for the caller
+! to report.
 !
 ! Input:
 !   theta(:)    -- real(rp): Quiet-loaded ponderomotive phases [rad], beamlet-contiguous.
 !   weight(:)   -- real(rp): Macroparticle charges [C], uniform within each beamlet.
-!   n           -- integer: Number of particles in the slice (a multiple of beamlet_size).
-!   beamlet_size       -- integer: Beamlet size.
-!   n_clamp     -- integer: Running count of nbl < 1 clamps, accumulated across calls.
+!   n            -- integer: Number of particles in the slice (a multiple of beamlet_size).
+!   beamlet_size -- integer: Beamlet size.
+!   n_clamp      -- integer: Running count of nbl < 1 clamps, accumulated across calls.
 !
 ! Output:
 !   theta(:)    -- real(rp): Phases with the noise kicks added.
@@ -1331,11 +1329,11 @@ end subroutine fel_fawley_noise
 ! Subroutine fel_group_noise (theta, weight, n, group, n_group, nharm, n_clamp)
 !
 ! Routine to impose physical shot noise on a load whose groups are not contiguous
-! beamlets (fel-physics.md sec-noise). The algorithm is fel_fawley_noise's: for each
-! harmonic and each group, one amplitude drawn on the group's real electron count and one
-! phase, and every member's phase shifted by it. What differs is only how the members are
-! found. fel_fawley_noise stays as it is for the beamlets the loader makes, since its draw
-! order is what every recorded level was measured against.
+! beamlets (fel-physics.md sec-noise). The algorithm is that of fel_fawley_noise. For
+! each harmonic and each group, one amplitude is drawn on the group's real electron
+! count, and one phase. Every member's phase is shifted by it. Only how the members are
+! found differs. fel_fawley_noise is kept for the beamlets the loader makes, since the
+! recorded validation levels depend on its draw order (lucifer/doc/validation.md).
 !
 ! Input:
 !   theta(:)   -- real(rp): Ponderomotive phases.
@@ -1368,9 +1366,9 @@ do ip = 1, n
   wgroup(group(ip)) = wgroup(group(ip)) + weight(ip)
 enddo
 
-! Draws first, in Genesis's order (harmonic outer, group inner, phase then amplitude),
-! then one pass over the particles per harmonic. Same draws as fel_fawley_noise for
-! contiguous beamlets, applied through an index instead of a stride.
+! Draws first, in Genesis's order: harmonic outer, group inner, phase then amplitude.
+! Then one pass over the particles per harmonic. For contiguous beamlets the draws are
+! those of fel_fawley_noise, applied through an index instead of a stride.
 
 do ih = 0, nharm - 1
   do ig = 1, n_group
@@ -1435,26 +1433,29 @@ end function beamlet_groups
 ! Routine to impose physical shot noise on one slice's load, whatever made it
 ! (fel-physics.md sec-noise). Two things happen in order.
 !
-! The floor is measured first: max over h of |b(h)|^2 times N_lambda, the load's own
-! bunching against the physical level, swept over every harmonic the beamlets are declared
-! to resolve. A load whose floor is not far below one cannot carry imposed noise, since the
-! two would add and the startup level would be silently wrong, so such a load is refused
-! with the value in the message. The threshold is a hundredth of the target.
+! First the floor is computed: max over h of |b(h)|^2 times N_lambda. This is the load's
+! own bunching against the physical level, swept over every harmonic the beamlets are
+! declared to resolve. A load whose floor is not far below one cannot carry imposed
+! noise. The two would add, and the startup level would be silently wrong. So such a
+! load is refused, with the value in the message. The threshold is a hundredth of the
+! target.
 !
 ! Then the groups over which independent phasors are drawn are found, by the first rule
-! that applies: the beamlets, when this loader made them (quiet_start); else particles
-! sharing their transverse coordinates to the bit, which is what copies from any loader
-! look like; else the occupants of a deposit cell of the field grid, the finest structure
-! the source term can see. The beamlet case calls fel_fawley_noise unchanged, so every
-! recorded level stands. The others call fel_group_noise, which draws in the same order
-! through an index.
+! that applies:
+!   1. The beamlets, when this loader made them (quiet_start).
+!   2. Particles that share their transverse coordinates to the bit, as copies from any
+!      loader do.
+!   3. The occupants of a deposit cell of the field grid, the finest structure the source
+!      term can see.
+! The beamlet case calls fel_fawley_noise unchanged, so every recorded level stands. The
+! others call fel_group_noise, which draws in the same order through an index.
 !
 ! Input:
 !   sl              -- fel_slice_struct: The slice, for its coordinates and weights.
 !   theta(:)        -- real(rp): The load's ponderomotive phases.
 !   n               -- integer: Particle count.
 !   quiet_start     -- logical: This loader made contiguous beamlets of beamlet_size.
-!   beamlet_size    -- integer: Copies per beamlet; also sets the harmonics resolved.
+!   beamlet_size    -- integer: Copies per beamlet. Also sets the harmonics resolved.
 !   grid_half_width -- real(rp): The field grid's half width [m], for the cell rule.
 !   grid_n_pts      -- integer: The field grid's points per side, for the cell rule.
 !   islice          -- integer: Slice index, for the message.
@@ -1463,7 +1464,7 @@ end function beamlet_groups
 !   theta(:)        -- real(rp): Phases with the noise imposed.
 !   n_clamp         -- integer: Incremented per group whose electron count was under one.
 !   rule            -- integer: Which grouping was used: 1 beamlets, 2 copies, 3 cells.
-!   floor_n_lambda  -- real(rp): The measured floor times N_lambda, for the caller's report.
+!   floor_n_lambda  -- real(rp): The floor times N_lambda, for the caller's report.
 !   err_flag        -- logical: Set True if the load is too loud to carry noise.
 !-
 
@@ -1571,8 +1572,8 @@ end subroutine fel_impose_noise
 !+
 ! Subroutine fel_report_noise (rule, floor_n_lambda, nslice)
 !
-! Routine to print, once per load, which grouping the shot noise was imposed on and the
-! worst quiet floor measured before it. A user who did not make the beamlets has no other
+! Routine to print, once per load, which grouping the shot noise was imposed on, and the
+! worst quiet floor found before it. A user who did not make the beamlets has no other
 ! way to know what the noise was drawn on.
 !
 ! Input:
@@ -1608,13 +1609,13 @@ end subroutine fel_report_noise
 !+
 ! Function fel_quiet_floor (theta, weight, n, hmax) result (floor_b2)
 !
-! Routine to measure how quiet a load is before noise is imposed on it: the largest
+! Routine to compute how quiet a load is before noise is imposed on it: the largest
 ! |b(h)|^2 over h = 1..hmax, weighted, with b(h) = sum w e^{i h theta} / sum w. Times
-! N_lambda this is the load's own bunching against the physical level of 1, and a load
-! whose floor is not far below that cannot carry imposed noise, since the two would add
-! (fel-physics.md sec-noise). The sweep runs over every harmonic the load is declared to
-! resolve, not only the imposed ones: an unquiet pattern can park its floor on a harmonic
-! the imposition never touches and still corrupt the dynamics.
+! N_lambda this is the load's own bunching against the physical level of 1. A load whose
+! floor is not far below that cannot carry imposed noise, since the two would add
+! (fel-physics.md sec-noise). The sweep covers every harmonic the load is declared to
+! resolve, and not only the imposed ones. An unquiet pattern can park its floor on a
+! harmonic the imposition never touches and still corrupt the dynamics.
 !
 ! Input:
 !   theta(:)  -- real(rp): Ponderomotive phases.
@@ -1656,11 +1657,11 @@ end function fel_quiet_floor
 !+
 ! Subroutine fel_transverse_groups (sl, group, n_group)
 !
-! Routine to group a slice's particles by their transverse coordinates, exactly: two
-! particles are in one group when x, px, y, py and pz all agree to the bit, which is what
-! copies made by a loader look like and what nothing else does. The groups are the
-! independent transverse samples of the slice, and they are what shot noise is imposed
-! on when the loader did not make the beamlets itself.
+! Routine to group a slice's particles by their transverse coordinates, exactly. Two
+! particles are in one group when x, px, y, py and pz all agree to the bit. Copies made
+! by a loader look like that, and nothing else does. The groups are the independent
+! transverse samples of the slice. Shot noise is imposed on them when the loader did not
+! make the beamlets itself.
 !
 ! Input:
 !   sl        -- fel_slice_struct: The slice.
@@ -1687,9 +1688,10 @@ allocate (group(n), perm(n))
 n_group = 0
 if (n < 1) return
 
-! Sort an index by the five coordinates, then a linear pass finds equal runs. The sort
-! is an insertion sort by blocks of a merge, written out here since sim_utils sorts one
-! real key and the key here is five. n log n on a slice's particles, once, at load.
+! Sort an index by the five coordinates, then a linear pass finds equal runs. The sort is
+! an insertion sort by blocks of a merge. It is written out here since sim_utils sorts
+! on one real key and the key here is five. The cost is n log n on a slice's particles,
+! once, at load.
 
 do i = 1, n
   perm(i) = i
@@ -1796,39 +1798,42 @@ end function fel_m_ind
 !+
 ! Subroutine fel_slice_to_bunch (beam, sl, ele, bunch, err_flag, fold_phi0, ix_slice, kinetic_ok, s_pos)
 !
-! Routine to convert a packed slice to a Bmad bunch_struct: plain copies, since the
-! stored coordinates are coord_struct's. The element's p0c must match the beam's
-! normalization. A mismatch is refused, not rescaled, since nothing on this path
+! Routine to convert a packed slice to a Bmad bunch_struct. The copies are plain, since
+! the stored coordinates are coord_struct's. The element's p0c must match the beam's
+! normalization. A mismatch is refused and not rescaled, since nothing on this path
 ! changes the reference momentum.
 !
-! fold_phi0 is for A dump and nothing else. The chart splits a particle's ponderomotive
-! phase into a per-beam reference and a per-particle lag,
+! fold_phi0 is for a dump and nothing else. The chart splits a particle's ponderomotive
+! phase into a per-beam reference and a per-particle lag:
 !
-!   theta_j = phi0 + ks * z_j / beta_j,
+!   theta_j = phi0 + ks * z_j / beta_j
 !
-! and a beam file carries the lag, since that is what a time coordinate is. The standard
-! records have no place for a run's reference phase, so a reader of them starts phi0 at
+! A beam file carries the lag, since that is what a time coordinate is. The standard
+! records have no place for a run's reference phase. So a reader of them starts phi0 at
 ! zero, and a dump written from z_j alone comes back with every theta short by phi0. The
-! beam's phase against the field's phase is what the next segment's gain is made of, and
-! the field is dumped with its absolute phase, so that shift is a real change of state:
-! measured 2.1e-2 on the windowed-composition check, which restarts mid-line.
+! next segment's gain is made of the beam's phase against the field's. The field is
+! dumped with its absolute phase, so that shift is a real change of state. Without the
+! fold a mid-line restart lands 2.1e-2 away on the windowed-composition check
+! (doc/reading-output.md).
 !
-! So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks, which
-! makes the file's time coordinate -theta_j / (ks c) and a phi0 = 0 reader exact for what
-! the file states. Genesis stores theta itself and its reader does the same fold, and
+! So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks. That
+! makes the file's time coordinate -theta_j / (ks c), and a phi0 = 0 reader exact for
+! what the file states. Genesis stores theta itself and its reader does the same fold.
 ! convert_genesis.py maps a Genesis theta to the same time, so the two formats agree on
-! what a dump means. Exact for the file is not exact for the run: the fold rebuilds an
-! equal phase at another magnitude, off by phi0 times the machine epsilon, and a high-gain
-! segment amplifies that. A continuation therefore takes phi0 and z_j themselves from the
-! checkpoint group (fel_write_checkpoint_group) and leaves these records to their readers.
+! what a dump means.
+!
+! Note: Exact for the file is not exact for the run. The fold rebuilds an equal phase at
+! another magnitude, off by phi0 times the machine epsilon, and a high-gain segment
+! amplifies that. So a continuation takes phi0 and z_j themselves from the checkpoint
+! group (fel_write_checkpoint_group), and leaves these records to their readers.
 !
 ! ix_slice places the slice in the bunch, and is for a dump as well. vec(5) is the lag
-! inside the slice and says nothing about which slice that is, so a bunch written from it
-! alone piles every slice on one: openPMD's time and timeOffset sum to a particle's time,
-! and with the placement in neither, a reader that does not walk particlePatches sees a
-! bunch one slice long. The slice's own offset therefore goes on p%t, which is what
-! timeOffset carries, leaving vec(5) and so the file's time record untouched. Their sum is
-! the position along the bunch. Keeping the two apart is what the offset field is for: a
+! inside the slice and says nothing about which slice that is. So a bunch written from
+! vec(5) alone piles every slice on one. openPMD's time and timeOffset sum to a
+! particle's time. With the placement in neither, a reader that does not walk
+! particlePatches sees a bunch one slice long. So the slice's own offset goes on p%t,
+! which timeOffset carries, and vec(5) and the file's time record are untouched. Their
+! sum is the position along the bunch. The offset field exists to keep the two apart. A
 ! global time would drown the lag, which is a part in 1e8 of it here, and would drown it
 ! completely in single precision.
 !
@@ -1836,21 +1841,22 @@ end function fel_m_ind
 !   beam        -- fel_beam_struct: The beam (for p0c, phi0 and the chart assertion).
 !   sl          -- fel_slice_struct: Slice to convert.
 !   ele         -- ele_struct: Element at whose upstream end the coords are initialized.
-!   fold_phi0   -- logical, optional: Fold the reference phase into the lag, for a dump.
-!                    Default False, which is what tracking wants.
-!   ix_slice    -- integer, optional: The slice's index in the window, which places it in
-!                    time as -(ix_slice - 1) * slice_spacing / c (BMAD-STATS-EXT-FEL F3).
-!                    Omitted, the slice is placed at the reference, which is what tracking
-!                    wants: the seam hands one slice to a Bmad element and its own lag is
-!                    the whole of its z.
-!   kinetic_ok  -- logical, optional: The caller writes a frame from inside an unaveraged
-!                    segment and accepts the kinetic px it holds, so the beam is converted
-!                    rather than refused. Default False.
+!   fold_phi0   -- logical, optional: Fold the reference phase into the lag, for a dump?
+!                    Default is False, which tracking wants.
+!   ix_slice    -- integer, optional: The slice's index in the window. It places the slice
+!                    in time at -(ix_slice - 1) * slice_spacing / c (BMAD-STATS-EXT-FEL F3).
+!                    If omitted, the slice is placed at the reference, which tracking wants.
+!                    The seam hands one slice to a Bmad element, and its own lag is the whole
+!                    of its z.
+!   kinetic_ok  -- logical, optional: Accept the kinetic px of a frame from inside an
+!                    unaveraged segment? The beam is then converted and not refused.
+!                    Default is False.
 !   s_pos       -- real(rp), optional: Where along ele the coords are initialized, for a
 !                    frame taken inside an element. The particle s and reference time are
 !                    then the frame's own, interpolated between the element's faces as
-!                    fel_frame_attributes interpolates the iteration's time. Omitted, the
-!                    coords sit at the upstream end, which is what tracking wants.
+!                    fel_frame_attributes interpolates the iteration's time. If omitted,
+!                    the coords sit at the upstream end, which tracking wants.
+!
 !
 ! Output:
 !   bunch       -- bunch_struct: The slice as a Bmad bunch.
@@ -1875,13 +1881,13 @@ character(*), parameter :: r_name = 'fel_slice_to_bunch'
 
 err_flag = .true.
 
-! The conversion itself is the same six numbers whichever chart the beam is in. What
-! differs is what the caller does next. A caller that hands the bunch to Bmad's tracking
-! needs the averaged convention, and that is the default here, so a caller that says
-! nothing gets the refusal. A caller writing a frame from inside an unaveraged segment
-! needs no such thing: the kinetic px is the particle's real transverse momentum, which is
-! what an openPMD momentum record means, and only a continuation would misread it, which
-! no frame from inside a segment is (fel-physics.md sec-unaveraged, doc/reading-output.md).
+! The conversion is the same six numbers in either chart. What differs is what the
+! caller does next. A caller that hands the bunch to Bmad's tracking needs the averaged
+! convention. That is the default here, so a caller that says nothing gets the refusal.
+! A caller writing a frame from inside an unaveraged segment does not. The kinetic px is
+! the particle's real transverse momentum, which is what an openPMD momentum record
+! means. Only a continuation would misread it, and no frame from inside a segment is one
+! (fel-physics.md sec-unaveraged, doc/reading-output.md).
 
 if (.not. logic_option(.false., kinetic_ok)) then
   call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
@@ -1905,16 +1911,16 @@ dz_phi0 = 0
 if (logic_option(.false., fold_phi0)) dz_phi0 = beam%phi0 * beam%wavelength / twopi
 
 ! Where this slice sits in the bunch, in time, negative toward the window head (F3). It
-! rides p%t and so timeOffset, never vec(5), so the file's time record is the lag alone.
+! goes on p%t and so timeOffset, never vec(5), so the file's time record is the lag alone.
 
 t_place = 0
 if (present(ix_slice)) t_place = -(ix_slice - 1) * beam%slice_spacing / c_light
 
 ! Where along the element the particles are. A bunch handed to Bmad's tracking enters at
 ! the element's upstream face. A frame is taken wherever the comb falls, and its s and
-! reference time are the frame's own: init_coord interpolates the reference time between
-! the element's faces at s_pos, the same line fel_frame_attributes stamps on the
-! iteration, so the particle records and the file's attributes say one position.
+! reference time are the frame's own. init_coord interpolates the reference time between
+! the element's faces at s_pos, on the same line fel_frame_attributes stamps on the
+! iteration. So the particle records and the file's attributes give one position.
 
 loc = upstream_end$
 if (present(s_pos)) then
@@ -1929,8 +1935,8 @@ do ip = 1, sl%n
   ! z -> beta*theta/ks when folding: beta*phi0/ks added to the lag. See the header.
   if (dz_phi0 /= 0) vec(5) = vec(5) + fel_beta_of(p0_mc, sl%pz(ip)) * dz_phi0
 
-  ! init_coord derives beta, t and state consistently. shift_vec6 exists for elements
-  ! whose reference momentum changes and must not touch vec(6) here.
+  ! init_coord derives beta, t and state consistently. shift_vec6 is for elements whose
+  ! reference momentum changes, and must not touch vec(6) here.
   call init_coord (bunch%particle(ip), vec, ele, loc, electron$, shift_vec6 = .false., s_pos = s_pos)
   bunch%particle(ip)%charge = sl%weight(ip)
   bunch%particle(ip)%ix_user = sl%id(ip)
@@ -1950,9 +1956,9 @@ end subroutine fel_slice_to_bunch
 !+
 ! Subroutine fel_bunch_to_slice (bunch, ele, sl, err_flag)
 !
-! Routine to copy a tracked Bmad bunch back into the packed slice. Plain copies. The
-! phase bookkeeping is one phi0 update per element, done by the caller
-! (fel_phi0_advance), not here, because it is per beam and not per particle.
+! Routine to copy a tracked Bmad bunch back into the packed slice. The copies are plain.
+! The phase bookkeeping is one phi0 update per element, done by the caller
+! (fel_phi0_advance), since it is per beam and not per particle.
 !
 ! Input:
 !   bunch       -- bunch_struct: Tracked bunch. Every particle must be alive.
@@ -2004,23 +2010,24 @@ end subroutine fel_bunch_to_slice
 !+
 ! Subroutine fel_concat_slices (beam, ele, bunch, beta0, err_flag)
 !
-! Routine to concatenate all slices into one bunch_struct in global window coordinates,
-! so Bmad's whole-bunch machinery (the sr wake) sees the beam head to tail:
+! Routine to concatenate all slices into one bunch_struct in global window coordinates.
+! So Bmad's whole-bunch machinery (the sr wake) sees the beam head to tail:
 !
 !   z_global = z_local + beta * (islice-1) * slice_spacing
 !
-! Higher slice index is the window head (larger Bmad z). The direction and the formula
-! are not new conventions. fel_migrate_slices documents "positive theta drift moves
-! toward higher slice index, the head", and shifts a mover's z by exactly
-! -atar*beta*slice_spacing (which makes z_global the migration invariant).
+! A higher slice index is the window head (larger Bmad z). The direction and the formula
+! are the ones already in use. fel_migrate_slices moves a particle with positive theta
+! drift toward higher slice index, the head. It shifts a mover's z by exactly
+! -atar*beta*slice_spacing, which makes z_global the migration invariant.
 ! fel_wake_update's convolution collects current(is+i) from higher indices, the wake
 ! trailing its source. (An earlier specification guessed the opposite sign. The
-! causality check and these two authorities pinned it.)
+! causality check and these two routines pinned it.)
 !
 ! beta0 records each particle's entry beta, slice-major in bunch order, for the exact
-! inverse in fel_split_slices. Particles are stored slice-major (slice 1 first), and
-! nothing downstream may permute bunch%particle storage. Bmad's wake routines order
-! through the bunch%ix_z index array, never by moving particles, so the split can
+! inverse in fel_split_slices. Particles are stored slice-major (slice 1 first).
+!
+! Note: Nothing downstream may permute bunch%particle storage. Bmad's wake routines
+! order through the bunch%ix_z index array and never move particles. So the split can
 ! address segments by position.
 !
 ! Input:
@@ -2098,16 +2105,17 @@ end subroutine fel_concat_slices
 ! Subroutine fel_split_slices (bunch, ele, beam, beta0, hold_theta, err_flag)
 !
 ! Routine to split a concatenated bunch back into the beam's slices: the exact inverse
-! of fel_concat_slices. Each particle's stored entry offset beta0*(islice-1)*slice_spacing
-! is subtracted from vec(5) and the segment copied back into its slice. Slice membership
-! is by storage position (slice-major), which Bmad's wake routines never permute.
+! of fel_concat_slices. Each particle's entry offset beta0*(islice-1)*slice_spacing is
+! subtracted from vec(5), and the segment is copied back into its slice. Slice
+! membership is by storage position (slice-major), which Bmad's wake routines never
+! permute.
 !
-! hold_theta: rescale the restored z by beta_new/beta_old, so the derived phase
+! hold_theta rescales the restored z by beta_new/beta_old. So the derived phase
 ! theta = phi0 + ks*z/beta is untouched by an energy kick. This is Genesis's convention
-! for wake energy loss (fel_wake_apply_slice does the same), used when the caller applied
-! a pure kick with no transport (the in-wiggler wake). A track1_bunch passage uses
-! hold_theta = false: there the element transported vec(5) in Bmad's own chart and the
-! restored z is the tracked z.
+! for wake energy loss, and fel_wake_apply_slice does the same. It is used when the
+! caller applied a pure kick with no transport (the in-wiggler wake). A track1_bunch
+! passage uses hold_theta = false. There the element transported vec(5) in Bmad's own
+! chart, and the restored z is the tracked z.
 !
 ! Input:
 !   bunch       -- bunch_struct: Whole-window bunch after the passage. All alive.
@@ -2172,36 +2180,34 @@ end subroutine fel_split_slices
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, err_flag)
+! Subroutine fel_migrate_slices (beam, ks, n_moved, charge_dropped, drop_re, drop_im, margin, err_flag)
 !
 ! Routine to move particles between slices when their ponderomotive phase leaves the
-! slice window: the weighted generalization of Genesis's one4one-only Sorting::localSort
-! (fel-physics.md sec-migration). This port can offer it for any beam because each
-! particle carries its own charge -- weights and migration are the same feature.
+! slice window. This is the weighted generalization of Genesis's one4one-only
+! Sorting::localSort (fel-physics.md sec-migration). It works for any beam because each
+! particle carries its own charge.
 !
-! The criterion is Genesis's, in this code's chart: the derived phase
-! theta = phi0 + ks*z/beta is Genesis's bounded theta, the slice window is
-! [0, slen) with slen = ks*slice_spacing = 2*pi*sample, and
-! atar = floor(theta/slen) is the relative destination (localSort's exact formula:
-! positive theta drift moves toward higher slice index, the head of the window). A
-! mover's z shifts by exactly -atar*beta*slice_spacing, which changes theta by
-! -atar*2*pi*sample. For integer sample the phase seen by every deposition and
-! diagnostic is continuous across the move to rounding -- no wrap protocol, the
-! unwrapped-z coordinate choice (module header) paying off. sample is asserted integer
-! for that reason.
+! The criterion is Genesis's, in this code's chart. The derived phase
+! theta = phi0 + ks*z/beta is Genesis's bounded theta. The slice window is [0, slen)
+! with slen = ks*slice_spacing = 2*pi*sample. atar = floor(theta/slen) is the relative
+! destination. This is localSort's exact formula: positive theta drift moves toward
+! higher slice index, the head of the window. A mover's z shifts by exactly
+! -atar*beta*slice_spacing, which changes theta by -atar*2*pi*sample. For integer sample
+! the phase seen by every deposition and diagnostic is continuous across the move to
+! rounding. So no wrap protocol is needed, since z is unwrapped (module header). sample
+! is an integer for that reason.
 !
 ! Removal is Genesis's swap-with-last, and the while-loop re-examines the swapped-in
-! particle exactly as localSort does. A particle appended to a higher slice is
-! re-examined when the scan reaches that slice (its adjusted theta then lies inside the
-! window, so it stays). One appended to a lower slice waits for the next call, as in
-! Genesis. Particles whose destination lies beyond the window are dropped with their
-! Charge counted into charge_dropped. Genesis discards them silently at the world
-! edges (sec-migration). The accounting is this port's deviation, chosen so
-! conservation is checkable.
+! particle as localSort does. A particle appended to a higher slice is re-examined when
+! the scan reaches that slice. Its adjusted theta then lies inside the window, so it
+! stays. One appended to a lower slice waits for the next call, as in Genesis. Particles
+! whose destination lies beyond the window are dropped, and their charge is counted into
+! charge_dropped. Genesis discards them silently at the world edges (sec-migration).
+! The accounting is this port's own, so conservation can be checked.
 !
-! Serial by design: called between the parallel regions at the caller's stride, so
-! thread-count independence is untouched. Single-slice beams return immediately (a
-! steady-state slice is periodic, so migration has no meaning).
+! The routine is serial. It is called between the parallel regions at the caller's
+! stride, so the result does not depend on the thread count. A single-slice beam returns
+! at once, since a steady-state slice is periodic and migration has no meaning there.
 !
 ! Input:
 !   beam        -- fel_beam_struct: The beam.
@@ -2212,16 +2218,17 @@ end subroutine fel_split_slices
 !   n_moved          -- integer: Number of particles moved between slices (this call).
 !   charge_dropped   -- real(rp): Charge of particles dropped off the window ends [C].
 !   drop_re, drop_im -- real(rp): Weighted phasor sum(w*e^{i theta}) of the dropped
-!                        particles, at their phase when dropped. Lets the caller verify
+!                        particles, at their phase when dropped. Lets the caller check
 !                        exact phase continuity including drops:
 !                        S_before = S_after + S_dropped to rounding.
-!   margin           -- real(rp): The smallest distance in phase [rad], over every particle
-!                        examined, from theta to the nearest slice boundary k*slen. A
-!                        particle nearer a boundary than the error in its reconstructed
-!                        phase decides its slice differently on either side of a restart,
-!                        so this is what a restart comparison has to clear. The particles
-!                        dropped off the window count, since a frame written after the
-!                        event no longer holds them. Huge when no particle was examined.
+!   margin           -- real(rp): The smallest distance in phase [rad], over every
+!                        particle examined, from theta to the nearest slice boundary
+!                        k*slen. A particle nearer a boundary than the error in its
+!                        reconstructed phase decides its slice differently on either side
+!                        of a restart. So a restart comparison has to clear this margin.
+!                        Particles dropped off the window count, since a frame written
+!                        after the event no longer holds them. Huge when no particle was
+!                        examined.
 !   err_flag         -- logical: Set True on error, False otherwise.
 !-
 
@@ -2319,12 +2326,11 @@ end subroutine fel_migrate_slices
 !
 !   dphi0/ds = ku_like + ks*(1 - 1/beta0)
 !
-! where ku_like is the undulator wavenumber inside an undulator, or Genesis's drift
-! surrogate ks/(2*gamma0^2) in field-free regions, supplied by the caller
-! (fel-physics.md sec-chart), and beta0 is the reference beta from p0_mc. Combined with the
-! per-particle theta_j = phi0 - ks*tau_j this reproduces Genesis's
-! dtheta/ds = ks*(1 - 1/beta_z) + ku_like exactly, because
-! -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
+! where ku_like is the undulator wavenumber inside an undulator. In field-free regions it
+! is Genesis's drift surrogate ks/(2*gamma0^2). The caller supplies it (fel-physics.md
+! sec-chart). beta0 is the reference beta from p0_mc. With the per-particle
+! theta_j = phi0 - ks*tau_j this reproduces Genesis's dtheta/ds = ks*(1 - 1/beta_z) + ku_like
+! exactly, because -ks*dtau/ds = -ks*(1/beta_z - 1/beta0).
 !
 ! The 1 - 1/beta0 factor is formed cancellation-free:
 ! 1 - 1/beta0 = -1/(beta0*(gamma0b^2)*(1+beta0)) with gamma0b^2 = p0_mc^2 + 1.
@@ -2359,12 +2365,13 @@ end function fel_phi0_rate
 !
 ! Routine to recover the wavelengths per slice from a spacing in metres.
 !
-! The deck states this as an integer and the code carries it as one. A dump does not:
+! The deck states this as an integer and the code carries it as one. A dump does not.
 ! openPMD and Genesis's own format both record the spacing and not what it is a multiple
-! of, so a beam read from one recovers the integer here, once, and every consumer reads
-! it afterwards. A spacing that is not a whole number of wavelengths is refused: the
-! slice ring rotates by one index per slice of slippage, which is exact only then, and a
-! run that silently rounded would drift a fraction of a wavelength per slice.
+! of. So a beam read from a dump recovers the integer here, once, and every consumer
+! reads it afterwards. A spacing that is not a whole number of wavelengths is refused.
+! The slice ring rotates by one index per slice of slippage, which is exact only for a
+! whole number. A run that silently rounded would drift a fraction of a wavelength per
+! slice.
 !
 ! Input:
 !   spacing     -- real(rp): Slice spacing [m].
@@ -2410,12 +2417,12 @@ end function fel_n_wavelength
 !+
 ! Subroutine fel_slice_diag (beam, sl, ks, diag)
 !
-! Routine to compute the per-slice beam diagnostics, weighted. Genesis's DiagBeam::calc
-! definitions with 1/N generalized to w_j/sum(w) (two-pass variances by requirement:
-! fel-physics.md sec-numerics). Uniform weights reproduce Genesis exactly up to the
-! regrouped arithmetic. Positions and sizes are of x, y directly. mean_px, mean_py are
-! in Bmad's normalization P/p0 (multiply by fel_p0_mc for Genesis's gamma*beta). Adds
-! N_eff and the derived current.
+! Routine to compute the per-slice beam diagnostics, weighted. These are Genesis's
+! DiagBeam::calc definitions with 1/N generalized to w_j/sum(w). The variances are
+! two-pass (fel-physics.md sec-numerics). Uniform weights reproduce Genesis exactly up to
+! the regrouped arithmetic. Positions and sizes are of x and y directly. mean_px and
+! mean_py are in Bmad's normalization P/p0. Multiply by fel_p0_mc for Genesis's
+! gamma*beta. The routine also gives N_eff and the derived current.
 !
 ! Input:
 !   beam    -- fel_beam_struct: The beam (for phi0, p0c, and slice_spacing).
@@ -2469,10 +2476,10 @@ g1 = g1/wsum
 x1 = x1/wsum
 y1 = y1/wsum
 
-! Second pass for the variances (fel-physics.md sec-numerics): the one-pass <v^2> - <v>^2 form loses
-! sigma to cancellation once the mean is large against the spread. For gamma ~ 1e4
-! with sigma ~ 1e-3 the one-pass noise is of order sigma itself, seen as spurious
-! sigma_gamma jitter under uniform wake kicks before this was rewritten.
+! Second pass for the variances (fel-physics.md sec-numerics). The one-pass
+! <v^2> - <v>^2 form loses sigma to cancellation once the mean is large against the
+! spread. For gamma ~ 1e4 with sigma ~ 1e-3 the one-pass noise is of order sigma itself.
+! It showed as spurious sigma_gamma jitter under uniform wake kicks.
 
 do ip = 1, sl%n
   w = sl%weight(ip)

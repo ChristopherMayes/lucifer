@@ -1,39 +1,38 @@
 !+
 ! Module fel_import_mod
 !
-! This module is the importdistribution equivalent: it resamples a Bmad bunch_struct
-! (arbitrary times, arbitrary weights) into the evenly spaced, equal-population slices
-! the FEL step wants, by Genesis 1.3 v4's own method, transcribed from SDDSBeam.cpp
-! (the class name is historical: it reads plain HDF5).
-! Method, Genesis provenance, and validation: lucifer/doc/fel-physics.md
-! (sec-import). The only weighted generalization: the slice current is c*sum(w)/dslen
-! where Genesis counts particles (identical for uniform weights).
+! The importdistribution equivalent. This module resamples a Bmad bunch_struct, with
+! arbitrary times and weights, into the evenly spaced, equal-population slices the FEL
+! step needs. The method is Genesis 1.3 v4's own, transcribed from SDDSBeam.cpp. The
+! class name is historical: it reads plain HDF5. Method, Genesis provenance and
+! validation are in lucifer/doc/fel-physics.md (sec-import). The only weighted
+! generalization: the slice current is c*sum(w)/dslen where Genesis counts particles.
+! The two are identical for uniform weights.
 !
-! Longitudinal mapping: a bunch particle's window position is the port's own
-! tau = -z/beta = c*(t - t_ref), min-shifted to zero exactly as Genesis min-shifts its
-! file's s = -c*t, so both codes bin the identical particle set identically when the
+! Longitudinal mapping: a bunch particle's window position is this port's
+! tau = -z/beta = c*(t - t_ref). It is min-shifted to zero, as Genesis min-shifts its
+! file's s = -c*t. So both codes bin the same particle set the same way when the
 ! distribution file is written with t = -tau/c (sec-import).
 !
-! Genesis's match/center transforms are NOT ported, by decision: they exist because
-! Genesis lattices carry no optics, so an imported bunch must be rematched by hand. A
-! Bmad lattice carries its Twiss, and init_beam_distribution generates bunches matched
-! to the lattice element already. The transform would be a second way to say what
-! the lattice says. (An openPMD bunch that genuinely needs rematching is a Bmad
-! tracking problem upstream of the FEL, not an import option.) The bunch moments are
-! still measured, as an unweighted analysis in Genesis's analyse form. Unweighted
-! deliberately: coincident split-weight copies leave every moment bit-identical, which
-! the invariance check relies on.
+! Genesis's match and center transforms are *not* ported. They exist because Genesis
+! lattices carry no optics, so an imported bunch must be rematched by hand. A Bmad
+! lattice carries its Twiss, and init_beam_distribution already generates bunches
+! matched to the lattice element. The transform would be a second way to say what the
+! lattice says. (An openPMD bunch that needs rematching is a Bmad tracking problem
+! upstream of the FEL, and not an import option.) The bunch moments are still computed,
+! as an unweighted analysis in Genesis's analyse form. They are unweighted on purpose:
+! coincident split-weight copies then leave every moment bit-identical, which the
+! invariance check relies on.
 !
-! Genesis quirks found by reading and NOT transcribed as functional (sec-import): the
-! align/align_start/align_end parameters are parsed but never used in v4. The
-! shot_noise flag is read but never consulted: the import applies noise
-! unconditionally, skipping only zero-current slices. Both behaviors are kept as
-! Genesis has them (noise always on for nonzero current). one4one is out of scope:
-! per-particle weights supersede it.
+! Two Genesis quirks are *not* transcribed as functional (sec-import). The align,
+! align_start and align_end parameters are parsed but never used in v4. The shotnoise
+! flag is read but never consulted: Genesis applies the noise to every slice of nonzero
+! current. Here the noise follows shot_noise (fill_slice). one4one is out of scope,
+! since per-particle weights supersede it.
 !
-! The RNG is Bmad's (ran_uniform), NOT a transcription of Genesis's RandomU, so
+! The RNG is Bmad's (ran_uniform), and *not* a transcription of Genesis's RandomU. So
 ! everything the RNG touches is validated statistically. The current profile and the
-! analyse/match/center moments are RNG-free and check exactly.
+! analyse moments are RNG-free and check exactly.
 !-
 
 module fel_import_mod
@@ -45,7 +44,7 @@ implicit none
 !+
 ! Struct fel_resample_param_struct
 !
-! The &importdistribution knobs, named after Genesis's where one exists.
+! The &importdistribution settings, named after Genesis's where one exists.
 !-
 
 type fel_resample_param_struct
@@ -53,8 +52,8 @@ type fel_resample_param_struct
   integer :: n_particle_per_slice = 8192 ! Macroparticles per slice after resampling.
   integer :: beamlet_size = 4            ! Beamlet size of the quiet load.
   integer :: n_slice = 0                 ! 0: round(bunch_length/slice_spacing).
-  ! Validation-internal: resample a bunch Bmad generated from beam_init rather than one
-  ! read from a file, so the SDDSBeam transcription can be checked on a known bunch. A
+  ! For validation only: resample a bunch Bmad generated from beam_init, and not one read
+  ! from a file. So the SDDSBeam transcription can be checked on a known bunch. A
   ! generated bunch otherwise takes the analytic loader, which needs no resampling.
   logical :: use_beam_init = .false.
 end type
@@ -67,11 +66,12 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, fbeam, err_flag, moments_out)
+! Subroutine fel_import_bunch (bunch, gamma0, lambda0, slice_spacing, prm, quiet_start, shot_noise,
+!                              grid_half_width, grid_n_pts, fbeam, err_flag, moments_out)
 !
 ! Routine to resample a bunch_struct into FEL slices by the transcribed Genesis method
-! (module header). gamma0 is the FEL reference, resolved from the lattice by the caller
-! (it is also the filler energy for empty slices). lambda0 is the radiation wavelength,
+! (module header). gamma0 is the FEL reference, resolved from the lattice by the caller.
+! It is also the filler energy for empty slices. lambda0 is the radiation wavelength,
 ! and slice_spacing = sample*lambda0. The caller seeds Bmad's RNG.
 !
 ! Input:
@@ -79,7 +79,13 @@ contains
 !   gamma0          -- real(rp): FEL reference gamma. Sets fbeam%p0c.
 !   lambda0         -- real(rp): Radiation wavelength [m].
 !   slice_spacing   -- real(rp): Longitudinal slice spacing, sample*lambda0 [m].
-!   prm             -- fel_resample_param_struct: The &importdistribution knobs.
+!   prm             -- fel_resample_param_struct: The &importdistribution settings.
+!   quiet_start     -- logical: Give the copies of each beamlet evenly spaced phases?
+!                       If False, every phase is its own uniform draw.
+!   shot_noise      -- logical: Impose shot noise on the slices of nonzero current?
+!   grid_half_width -- real(rp): The field grid's half width [m], for the deposit-cell
+!                       grouping of fel_impose_noise.
+!   grid_n_pts      -- integer: The field grid's points per side, for the same grouping.
 !
 ! Output:
 !   fbeam           -- fel_beam_struct: The resampled packed beam.
@@ -133,9 +139,9 @@ if (prm%slice_width <= 0) then
 endif
 
 ! The bunch in Genesis's variables. tau = -z/beta = c*(t - t_ref), the same chart theta
-! derives from everywhere else in this port. Slopes xp = Px/P = vec(2)/(1+pz), an exact
-! round trip of the Genesis reconstruction px = xp*gamma (gamma*beta_x approx) through
-! this port's stored px = Px/p0.
+! derives from everywhere else in this port. The slopes are xp = Px/P = vec(2)/(1+pz).
+! That is an exact round trip of Genesis's reconstruction px = xp*gamma (approximately
+! gamma*beta_x) through this port's stored px = Px/p0.
 
 n = size(bunch%particle)
 nalive = count(bunch%particle%state == alive$)
@@ -160,10 +166,10 @@ do ip = 1, n
   wt(i) = cp%charge
 enddo
 
-! A bunch with no charge imports as a perfectly dark beam: every window current
-! zero, every weight zero, a run that tracks and produces nothing, silently. The
-! usual causes are an openPMD file without charge data and an unset
-! beam_init%bunch_charge. Refuse, and the error names both.
+! A bunch with no charge imports as a dark beam. Every window current and every weight
+! is zero, and the run tracks and produces nothing, silently. The usual causes are an
+! openPMD file without charge data and an unset beam_init%bunch_charge. The run is
+! refused, and the error names both.
 
 if (sum(wt) <= 0) then
   call out_io (s_error$, r_name, 'BUNCH HAS ZERO TOTAL CHARGE; NOTHING WOULD LASE.', &
@@ -181,8 +187,8 @@ endif
 nslice = prm%n_slice
 if (nslice < 1) nslice = max(1, nint(ttotal / slice_spacing))   ! Genesis's rule (sec-import).
 
-! The bunch moments, in Genesis's analyse form (unweighted, strict window bounds:
-! the two extreme particles are excluded, exactly as Genesis's eval defaults do).
+! The bunch moments, in Genesis's analyse form. They are unweighted, with strict window
+! bounds, so the two extreme particles are excluded as Genesis's eval defaults do.
 
 call analyse_window (s, gam, x, y, xp, yp, 0.0_rp, ttotal, &
                      gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
@@ -205,8 +211,9 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice))
 
-! The slice loop (fel-physics.md sec-import). Slice centers at
-! (islice-1)*slice_spacing. Candidates from the dslen window, strict inequalities.
+! The slice loop (fel-physics.md sec-import). Slice centers are at
+! (islice-1)*slice_spacing. Candidates come from the dslen window, with strict
+! inequalities.
 
 dslen = prm%slice_width * ttotal
 mpart = prm%n_particle_per_slice / prm%beamlet_size
@@ -233,11 +240,11 @@ do islice = 1, nslice
         cpx(ncand) = xp(i) * gam(i)    ! Genesis's slope-to-momentum conversion.
         cpy(ncand) = yp(i) * gam(i)
       else
-        ! Genesis copies every candidate then deletes at random (removeParticles:
-        ! overwrite a random index with the last, shrink). Deleting-by-random-index
-        ! from the full set is equivalent to reservoir-style replacement only if the
-        ! transcription keeps Genesis's exact rule, so transcribe the rule: append,
-        ! then delete. Appending needs storage: do it in two passes instead.
+        ! Genesis copies every candidate, then deletes at random (removeParticles:
+        ! overwrite a random index with the last, and shrink). That equals
+        ! reservoir-style replacement only if the transcription keeps Genesis's exact
+        ! rule. So the rule is transcribed: append, then delete. Appending needs storage,
+        ! so it is done in two passes instead.
         ncand = ncand + 1              ! Count only. Second pass below when oversized.
       endif
     endif
@@ -245,8 +252,7 @@ do islice = 1, nslice
   cur = cur * c_light / dslen                       ! c*sum(w)/dslen
 
   if (ncand > mpart) then
-    ! Second pass, transcribing removeParticles faithfully: gather all candidates,
-    ! then repeatedly overwrite a random index with the last and shrink.
+    ! Second pass, transcribing removeParticles (gather_and_remove).
     call gather_and_remove ()
   endif
 
@@ -268,9 +274,9 @@ contains
 !+
 ! Subroutine gather_and_remove ()
 !
-! Routine to gather every window candidate (needs its own storage: there can be far more
-! than npart), then apply Genesis's removeParticles: overwrite a random index with the
-! last and shrink until mpart remain.
+! Routine to gather every window candidate, then apply Genesis's removeParticles:
+! overwrite a random index with the last and shrink until mpart remain. The gather needs
+! its own storage, since there can be far more candidates than npart.
 !-
 
 subroutine gather_and_remove ()
@@ -308,9 +314,9 @@ end subroutine gather_and_remove
 !+
 ! Subroutine fill_slice ()
 !
-! Routine to bring the candidate set to mpart seeds (Genesis's addParticles when short),
-! refill theta, mirror into beamlet_size beamlet copies, impose the shot noise, and store the
-! slice.
+! Routine to bring the candidate set to mpart seeds, with Genesis's addParticles when
+! short. It then refills theta, mirrors each seed into beamlet_size copies, imposes the
+! shot noise and stores the slice.
 !-
 
 subroutine fill_slice ()
@@ -319,8 +325,8 @@ real(rp) g1, x1, y1, px1, py1, g2, x2, y2, px2, py2, scl, rmin, r, tmp, uu
 real(rp) gam_p, beta_p
 integer nd, nd0, k, j, n1, n2, i1, i2
 
-! addParticles (sec-import): empty -> one filler at the reference energy.
-! Singleton -> mirror it. Then interpolate up to mpart.
+! addParticles (sec-import): an empty set gets one filler at the reference energy. A
+! singleton is mirrored. Then interpolate up to mpart.
 
 nd = ncand
 if (nd == 0) then
@@ -333,8 +339,8 @@ if (nd == 1 .and. mpart > 1) then
 endif
 
 if (nd < mpart) then
-  ! Normalize the five coordinates to zero mean, unit rms (cold dimensions keep
-  ! scale 1, as Genesis's).
+  ! Normalize the five coordinates to zero mean and unit rms. Cold dimensions keep scale
+  ! 1, as in Genesis.
   g1 = sum(cg(1:nd))/nd;   g2 = sqrt(abs(sum(cg(1:nd)**2)/nd - g1**2))
   x1 = sum(cx(1:nd))/nd;   x2 = sqrt(abs(sum(cx(1:nd)**2)/nd - x1**2))
   y1 = sum(cy(1:nd))/nd;   y2 = sqrt(abs(sum(cy(1:nd)**2)/nd - y1**2))
@@ -390,10 +396,10 @@ if (nd < mpart) then
   cpy(1:nd) = cpy(1:nd)/py2 + py1
 endif
 
-! theta refilled completely new over one beamlet spacing (sec-import), then the
-! beamlet mirroring: seed i lands at beamlet_size consecutive indices. Without the quiet
-! start the copies keep their coordinates and every phase is its own uniform draw, which
-! is a load with macroparticle noise at every harmonic, as a real bunch's would be.
+! theta is refilled new over one beamlet spacing (sec-import). Then the beamlets are
+! mirrored: seed i lands at beamlet_size consecutive indices. Without the quiet start the
+! copies keep their coordinates and every phase is its own uniform draw. That load has
+! macroparticle noise at every harmonic, as a real bunch has.
 
 do k = 1, mpart
   call ran_uniform (uu)
@@ -415,9 +421,9 @@ if (.not. quiet_start) then
   enddo
 endif
 
-! Uniform per-slice weights from the window current (Genesis's dQ semantics), the
-! shared Fawley noise with ne = charge/e (skipped for empty slices, as Genesis's),
-! then the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
+! Uniform per-slice weights from the window current (Genesis's dQ semantics). Then the
+! shared Fawley noise with ne = charge/e, skipped for empty slices as in Genesis. Then
+! the stored chart: z = beta*theta/ks, px = (gamma*beta_x)/p0_mc.
 
 w_part = cur * slice_spacing / (c_light * prm%n_particle_per_slice)
 ne = anint(cur * slice_spacing / (e_charge * c_light))
@@ -427,9 +433,8 @@ call fel_slice_reallocate (sl, prm%n_particle_per_slice)
 sl%n = prm%n_particle_per_slice
 sl%weight(1:prm%n_particle_per_slice) = w_part
 
-! Noise where the deck asks for it. Genesis's importdistribution applied it whether or not
-! its shotnoise flag said so, a quirk this port carried until the load's two switches
-! became explicit; a deck that wants the noise now says shot_noise = T.
+! Noise where the deck asks for it. Genesis's importdistribution applies it whether or
+! not its shotnoise flag says so. This port applies it only with shot_noise = T.
 
 if (ne > 0 .and. shot_noise) then
   call fel_impose_noise (sl, theta(1:prm%n_particle_per_slice), prm%n_particle_per_slice, quiet_start, &
@@ -458,13 +463,14 @@ end subroutine fel_import_bunch
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay)
+! Subroutine analyse_window (s, gam, x, y, xp, yp, s0, s1, gavg, xavg, pxavg, yavg, pyavg,
+!                            ex, ey, bx, by, ax, ay)
 !
-! Routine to compute Genesis's analyse moments (fel-physics.md sec-import): Unweighted
-! means, variances and Twiss over the particles with s0 < s < s1, on the slopes.
-! Emittance ex = sqrt(|var_x*var_px - cov^2|)*gavg (a normalized emittance through the
-! mean energy), bx = var_x*gavg/ex, ax = -cov*gavg/ex. Unweighted deliberately. See
-! the module header.
+! Routine to compute Genesis's analyse moments (fel-physics.md sec-import): unweighted
+! means, variances and Twiss over the particles with s0 < s < s1, on the slopes. The
+! emittance is ex = sqrt(|var_x*var_px - cov^2|)*gavg, a normalized emittance through
+! the mean energy. bx = var_x*gavg/ex and ax = -cov*gavg/ex. The moments are unweighted
+! on purpose (module header).
 !
 ! Input:
 !   s(:)          -- real(rp): Window positions tau [m], min-shifted to zero.
@@ -537,12 +543,12 @@ end subroutine analyse_window
 !+
 ! Subroutine fel_write_genesis4_distribution (bunch, file_name, err_flag)
 !
-! Routine to write a bunch_struct as a Genesis 1.3 v4 distribution file (the
-! &importdistribution input, not a dump): flat datasets t [s], p [gamma*beta], x, y [m],
-! xp, yp [slopes], plus the total charge. t = -tau/c with tau = -z/beta, so Genesis's
-! s = -c*t reproduces this port's window position exactly and both codes bin the
-! identical particle set identically (fel-physics.md sec-import). Dead particles are
-! skipped.
+! Routine to write a bunch_struct as a Genesis 1.3 v4 distribution file. This is the
+! &importdistribution input, and not a dump. The file has flat datasets t [s],
+! p [gamma*beta], x, y [m], xp, yp [slopes], and the total charge. t = -tau/c with
+! tau = -z/beta, so Genesis's s = -c*t reproduces this port's window position exactly.
+! Both codes then bin the same particle set the same way (fel-physics.md sec-import).
+! Dead particles are skipped.
 !
 ! Input:
 !   bunch       -- bunch_struct: Bunch to write.
