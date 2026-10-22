@@ -209,9 +209,10 @@ def sentences(prose_lines):
     lowercase name such as openPMD."""
     out = []
     for line in prose_lines:
-        t = re.sub(r"`[^`]*`", "X", line)
-        t = re.sub(r"\$[^$]*\$", "X", t)
-        t = re.sub(r"\[\]\([^)]*\)", "X", t)
+        # A span stands in as one word that no abbreviation or initial rule can match.
+        t = re.sub(r"`[^`]*`", "span", line)
+        t = re.sub(r"\$[^$]*\$", "span", t)
+        t = re.sub(r"\[\]\([^)]*\)", "span", t)
         t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", t)
         t = re.sub(r"^\s*([-*]|\d+\.)\s+", "", t)
         t = t.replace("*", "")
