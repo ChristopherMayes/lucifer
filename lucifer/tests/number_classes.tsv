@@ -1,0 +1,156 @@
+page	token	context	class	note
+BMAD-STATS-EXT-FEL.md	1.3	on files and not part of this extension. They carry Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
+BMAD-STATS-SPEC.md	2119	ive in section 12). MUST, SHOULD and MAY are used as in RFC 2119. Open questions	citation	RFC 2119
+BMAD-STATS-SPEC.md	14	orced by a generic validator that knows no program (section 14).	other	a section number of the spec
+BMAD-STATS-SPEC.md	64	er an attribute. A single HDF5 attribute stops writing near 64 kB (measured: 654	standard	the HDF5 attribute size limit, 64 kB
+BMAD-STATS-SPEC.md	65495	A single HDF5 attribute stops writing near 64 kB (measured: 65495 bytes is the l	standard	the largest HDF5 attribute that writes, in bytes
+BMAD-STATS-SPEC.md	8601	d , sits at the root and holds datasets only (R27): an ISO 8601 timestamp, and t	citation	ISO 8601
+fel-physics.md	1.3	alidation harness ( ) checks each statement against Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
+fel-physics.md	3300	dy averaged over. At that default a FLASH-scale probe takes 3300 steps a segment	example	the FLASH probe's steps a segment at Bmad's default step
+fel-physics.md	55	ASH-scale probe takes 3300 steps a segment against FLASH1's 55. The unset state 	example	FLASH1's steps a segment
+fel-physics.md	266	hase jump. Their reduced coupling length costs 2% in per 266-period benchmark se	example	the benchmark segment's periods
+fel-physics.md	127	The point count is 127 whatever the beam is, since cancels between the two rules	standard	the derived point count before rounding, from 7 cells and 9 widths per sigma
+fel-physics.md	23.6	amis benchmark at a spacing of 12 wavelengths that angle is 23.6 µrad. The expon	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	2.25	t angle is 23.6 µrad. The exponent of the reported power is 2.25, 1.42 and 1.08 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	1.42	e is 23.6 µrad. The exponent of the reported power is 2.25, 1.42 and 1.08 over c	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	1.08	µrad. The exponent of the reported power is 2.25, 1.42 and 1.08 over cells of 6.	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	6.35	of the reported power is 2.25, 1.42 and 1.08 over cells of 6.35 to 0.78 µm, and 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	0.78	reported power is 2.25, 1.42 and 1.08 over cells of 6.35 to 0.78 µm, and the der	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	2.26	08 over cells of 6.35 to 0.78 µm, and the derived sum gives 2.26, 1.47 and 0.90 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	1.47	r cells of 6.35 to 0.78 µm, and the derived sum gives 2.26, 1.47 and 0.90 with n	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	0.90	f 6.35 to 0.78 µm, and the derived sum gives 2.26, 1.47 and 0.90 with nothing fi	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	14	With the artifact it removes the rim of the physical cone: 14 percent of the in-	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	28	power where the derived edge sits well inside the cone, and 28 to 30 percent whe	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	30	where the derived edge sits well inside the cone, and 28 to 30 percent where the	measured	a share of the in-cone power, no generated page
+fel-physics.md	14	that on every machine measured. In wall clock it costs 8 to 14 percent, the sour	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	60	first and the third are both converged, and the first costs 60 percent of the th	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	40	achines, since the estimate fitted on the first machine was 40 times low on the 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	6.8	he interaction. Their ratio goes as with a coefficient of 6.8 measured to 5 perc	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	1.14	our machines reaches that, and the measured ratios run from 1.14 to 1.86, so nei	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	1.86	ines reaches that, and the measured ratios run from 1.14 to 1.86, so neither ang	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	1.12	mber chosen for it. Smaller tolerances move the edge out by 1.12 at 0.2 and 1.36	standard	the edge factor at tolerance 0.2, from the margin formula
+fel-physics.md	1.36	it. Smaller tolerances move the edge out by 1.12 at 0.2 and 1.36 at 0.01. That h	standard	the edge factor at tolerance 0.01, from the margin formula
+fel-physics.md	1.2e-3	wo averaged segments around one unaveraged segment moves by 1.2e-3. A non-positi	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	0.73	e wide angles. Genesis4's own default of 1 puts the axis at 0.73. On the machine	standard	the sigmoid on axis at Genesis4's default width of 1
+fel-physics.md	129	The filter is transcribed from (the sigmoid table, lines 129-146), (the filtered	citation	Genesis4 source lines
+fel-physics.md	146	filter is transcribed from (the sigmoid table, lines 129-146), (the filtered bra	citation	Genesis4 source lines
+fel-physics.md	74	igmoid table, lines 129-146), (the filtered branch, lines 74-100) and (lines 158	citation	Genesis4 source lines
+fel-physics.md	158	29-146), (the filtered branch, lines 74-100) and (lines 158-170). Genesis4 added	citation	Genesis4 source lines
+fel-physics.md	170	46), (the filtered branch, lines 74-100) and (lines 158-170). Genesis4 added the	citation	Genesis4 source lines
+fel-physics.md	700	of the sigmoid alone. The exponent of Eq. [] is clamped at 700 here, which Genes	standard	the exponent clamp of the sigmoid
+fel-physics.md	0.84	fixup. The guarded version fails the time-dependent tier at 0.84 of the final fi	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	10707	( ) is the numerical impedance of Bane & Stupakov (SLAC-PUB-10707) with AC (Drud	citation	SLAC-PUB-10707
+fel-physics.md	20000	: on 1000 trapezoid intervals, , flat integral on with 20000 points. This routin	standard	Genesis4's integration points for the resistive-wall impedance
+fel-physics.md	30	ence proof of this physics) uses modal fields. The cost is 30 per step, measured	measured	a cost per step, no generated page
+fel-physics.md	30	ce measurement supports that floor, and the published 10 to 30 envelope corrobor	standard	the published envelope of 10 to 30 steps per period
+fel-physics.md	2.8	e pair the observed order between successive resolutions is 2.8 and 2.1 for the 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	2.1	he observed order between successive resolutions is 2.8 and 2.1 for the complex 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	65	s the field of the plane it is named for. The ledger closes 65 tighter than unde	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	3.3	p to the FFT Nyquist . At the benchmark parameters that is 3.3% of the analytic 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	30	published practices this mode shares with it are the 10 to 30 steps per period e	standard	the published envelope of 10 to 30 steps per period
+fel-physics.md	266	xact, emittance drift over the longest benchmark segment (266 periods, 5320 step	example	the benchmark segment's periods
+fel-physics.md	5320	ce drift over the longest benchmark segment (266 periods, 5320 steps).	example	the benchmark segment's steps
+fel-physics.md	25.8	segment gap by fractions of (one full turn of drift slip, 25.8 mm at the benchma	example	one carrier turn of drift slip at the benchmark
+fel-physics.md	32	*Step size.* The measured convergence (one shared 32-slice dump at , swept) is r	example	the 32-slice dump of the convergence check
+fel-physics.md	26	power holds to 3% up to six periods per step and misses by 26% at twelve. Two to	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	030703	urce deposit with Tanaka's coherent retrieval (PRAB **27**, 030703 (2024), imple	citation	PRAB 27, 030703 (2024)
+fel-physics.md	26	h from the order-0/1 Laguerre-Gauss sums (the paper's Eq. 26), charge-weighted a	citation	the paper's equation 26
+fel-physics.md	175	wo polarizations, and dark starts. A dark start measures a 175 startup deficit. 	measured	a level or a cost typed from a run, no generated page
+genesis4.md	89	tor layout segment. The step count over the benchmark is 12*89 undulator steps +	example	the benchmark line's undulator steps
+genesis4.md	36	he step count over the benchmark is 12*89 undulator steps + 36 interlude steps =	example	the benchmark line's interlude steps
+genesis4.md	1104	e benchmark is 12*89 undulator steps + 36 interlude steps = 1104.	example	the benchmark line's step count
+genesis4.md	77	`readBeamHDF5.cpp:68-77`	citation	Genesis4 source line
+genesis4.md	70	`GenTime.cpp:70`	citation	Genesis4 source line
+genesis4.md	191	`Lattice.cpp:191-193`	citation	Genesis4 source line
+genesis4.md	193	`Lattice.cpp:191-193`	citation	Genesis4 source line
+genesis4.md	329	`LatticeParser.cpp:329`	citation	Genesis4 source line
+genesis4.md	70	`writeFieldHDF5.cpp:70`	citation	Genesis4 source line
+genesis4.md	2.14e-7	up to v4.6.14 use for the electron rest energy, which is 2.14e-7 above the CODAT	standard	the relative difference of Genesis4's old eev from CODATA
+genesis4.md	4.28e-7	the difference reaches the field-normalization integrals as 4.28e-7. It loosens 	standard	twice the eev difference, as it reaches the intensity
+genesis4.md	90	rent core counts and the per-slice bunching could differ by 90 per cent. And the	measured	a level or a cost typed from a run, no generated page
+index.md	1.3	laser inside Bmad. Its physics is transcribed from Genesis 1.3 Version 4 (Genesi	citation	Genesis 1.3 Version 4
+input-reference.md	30	ergence check stands: [] tabulates the factor at 10, 20 and 30 steps per period.	example	the sweep of 10, 20 and 30 steps per period
+input-reference.md	6.8	`6.8/sqrt(z_R/L_g)`	measured	a level or a cost typed from a run, no generated page
+input-reference.md	1.12	aller tolerance moves the edge out by with , a factor of 1.12 at 0.2 and 1.36 at	standard	the edge factor at tolerance 0.2, from the margin formula
+input-reference.md	1.36	moves the edge out by with , a factor of 1.12 at 0.2 and 1.36 at 0.01. That hold	standard	the edge factor at tolerance 0.01, from the margin formula
+input-reference.md	2.6	boundaries the production path does not, measured at 1.2 to 2.6 times the device	measured	a level or a cost typed from a run, no generated page
+input-reference.md	157	ith it off ([]). The sample buffer holds 2048 passes, about 157 steps. A command	example	2048 passes of the sample buffer on the device deck
+input-reference.md	64	bank, and a transverse grid that is not a power of two from 64 to 1024. A build 	standard	the device grid range, 64 to 1024
+input-reference.md	1.3	er than the physics. The tiers that compare against Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
+input-reference.md	1.01	`max(1, int(1.01 * L / ds))`	standard	the factor in the step count formula
+input-reference.md	1.7	Lorentz factor, which at aw = 0.85 rms is worth a factor of 1.7 in the field's o	standard	the field factor at aw = 0.85, from the formula
+input-reference.md	0.25	Alternate beamlet weights of 0.25x and 1.75x, charge preserving, to exercise the	example	the alternating beamlet weights of the load check
+input-reference.md	1.75	Alternate beamlet weights of 0.25x and 1.75x, charge preserving, to exercise the	example	the alternating beamlet weights of the load check
+input-reference.md	127	in wavelength ([]). The two together fix the point count at 127 before rounding,	standard	the derived point count before rounding
+reading-output.md	1.3	The escaped-field bank and the reconstructed full pulse, Genesis 1.3 Version 4 (	citation	Genesis 1.3 Version 4
+reading-output.md	18	array and netCDF both refuse, and one array per quantity is 18 datasets where si	other	a dataset count of the file layout
+reading-output.md	108	y per quantity is 18 datasets where six groups per set were 108. They are subgro	other	a dataset count of the file layout
+reading-output.md	64	ather than an attribute, because HDF5 caps one attribute at 64 kB (the largest t	standard	the HDF5 attribute size limit, 64 kB
+reading-output.md	65495	aps one attribute at 64 kB (the largest that writes here is 65495 bytes, where a	standard	the largest HDF5 attribute that writes, in bytes
+reading-output.md	37	3 MB). The echoed namelist is 12 kB and a real lattice text 37 kB, and an attrib	measured	a level or a cost typed from a run, no generated page
+reading-output.md	4.6e-8	**4.6e-8**	measured	a level or a cost typed from a run, no generated page
+reading-output.md	6.7e-16	6.7e-16	measured	a level or a cost typed from a run, no generated page
+reading-output.md	267	analytic (moment-map) vs FFT-propagated rms at exit, 267 slices	example	the slice count of the diagnostics configuration
+reading-output.md	8.4e-3	**8.4e-3**	measured	a level or a cost typed from a run, no generated page
+reading-output.md	3.4e-3	3.4e-3	measured	a level or a cost typed from a run, no generated page
+reading-output.md	3e-16	3e-16	measured	a level or a cost typed from a run, no generated page
+reading-output.md	96	rints. The serial per-record diag sweeps this replaced (all 96 field planes and 	example	the 96-slice SASE example
+reading-output.md	96	r-record diag sweeps this replaced (all 96 field planes and 96 particle slices, 	example	the 96-slice SASE example
+reading-output.md	96	ole stats machinery. On the saturation demo's averaged run (96 slices x 2048 par	example	the 96-slice SASE example
+reading-output.md	36.5	s, 255^2 grid, 12 threads), the walk without statistics was 36.5 s and the run w	measured	a level or a cost typed from a run, no generated page
+reading-output.md	32	istics was 36.5 s and the run with full statistics is about 32 s, 12% faster net	measured	a level or a cost typed from a run, no generated page
+reading-output.md	131	every element end. That is 110 million particle visits on a 131-slice x 8192 cas	example	the 131-slice case
+reading-output.md	4.0e-12	on one thread. Against that particle sum the pool agrees to 4.0e-12 worst relati	measured	a level or a cost typed from a run, no generated page
+reading-output.md	5.0e-11	ery whole-window quantity on the diagnostics config, and to 5.0e-11 over 48 elem	measured	a level or a cost typed from a run, no generated page
+reading-output.md	48	dow quantity on the diagnostics config, and to 5.0e-11 over 48 element ends of t	example	the element ends of the SASE example
+reading-output.md	96	gnostics config, and to 5.0e-11 over 48 element ends of the 96-slice SASE exampl	example	the 96-slice SASE example
+reading-output.md	28.2	mple. The cost was measured too: the SASE example went from 28.2 s to 26.7 s. A 	measured	a level or a cost typed from a run, no generated page
+reading-output.md	26.7	cost was measured too: the SASE example went from 28.2 s to 26.7 s. A 131-slice 	measured	a level or a cost typed from a run, no generated page
+reading-output.md	131	easured too: the SASE example went from 28.2 s to 26.7 s. A 131-slice x 8192, 10	example	the 131-slice case
+reading-output.md	103	ASE example went from 28.2 s to 26.7 s. A 131-slice x 8192, 103-element case wen	example	the 103-element case
+reading-output.md	137.7	s to 26.7 s. A 131-slice x 8192, 103-element case went from 137.7 s to 126.9 s w	measured	a level or a cost typed from a run, no generated page
+reading-output.md	126.9	. A 131-slice x 8192, 103-element case went from 137.7 s to 126.9 s with core ut	measured	a level or a cost typed from a run, no generated page
+reading-output.md	931	ase went from 137.7 s to 126.9 s with core utilization from 931% to 1048%, since	measured	a level or a cost typed from a run, no generated page
+reading-output.md	1048	from 137.7 s to 126.9 s with core utilization from 931% to 1048%, since the seri	measured	a level or a cost typed from a run, no generated page
+reading-output.md	16.5	n from 931% to 1048%, since the serial block it removed was 16.5% of that run's 	measured	a level or a cost typed from a run, no generated page
+reading-output.md	1e-15	nfiguration the harness runs, the element-end rows moved by 1e-15 to 1e-13 on mo	measured	a level or a cost typed from a run, no generated page
+reading-output.md	2.7e-9	figs. The moments themselves (centroid, sigma) are worst at 2.7e-9, and a tail r	measured	a level or a cost typed from a run, no generated page
+reading-output.md	1.1e-7	(centroid, sigma) are worst at 2.7e-9, and a tail reaching 1.1e-7 is confined to	measured	a level or a cost typed from a run, no generated page
+reading-output.md	4e-6	erse moments nearly vanish) the z cross terms agree only to 4e-6 relative while 	measured	a level or a cost typed from a run, no generated page
+reading-output.md	1e-29	z cross terms agree only to 4e-6 relative while agreeing to 1e-29 absolute, whic	measured	a level or a cost typed from a run, no generated page
+reading-output.md	96	end by the same routines, angle moments not needed. On the 96-slice SASE example	example	the 96-slice SASE example
+reading-output.md	131	The cost of the modes was measured on a 131-slice x 8192, 103-element case (12 t	example	the 131-slice case
+reading-output.md	103	The cost of the modes was measured on a 131-slice x 8192, 103-element case (12 t	example	the 103-element case
+reading-output.md	124	a 131-slice x 8192, 103-element case (12 threads). costs 124 s and 9.0 MB (eleme	measured	a level or a cost typed from a run, no generated page
+reading-output.md	133	nds only, no per-record rows). A large positive value costs 133 s and 15.7 MB, a	measured	a level or a cost typed from a run, no generated page
+reading-output.md	15.7	no per-record rows). A large positive value costs 133 s and 15.7 MB, a record at	measured	a level or a cost typed from a run, no generated page
+reading-output.md	132	t ends always record when the comb is not negative. costs 132 s and 35.4 MB. The	measured	a level or a cost typed from a run, no generated page
+reading-output.md	35.4	ays record when the comb is not negative. costs 132 s and 35.4 MB. The per-recor	measured	a level or a cost typed from a run, no generated page
+reading-output.md	86	35.4 MB. The per-record sweep is not the cost driver, since 86 records and 338 r	measured	a level or a cost typed from a run, no generated page
+reading-output.md	338	r-record sweep is not the cost driver, since 86 records and 338 records time the	measured	a level or a cost typed from a run, no generated page
+reading-output.md	64	imit is that the stats accumulate in memory and write once (64 MB on the demo). 	measured	a level or a cost typed from a run, no generated page
+reading-output.md	6.5e-8	ilon, near 1e-13, and a high-gain segment amplifies that to 6.5e-8 from an entry	measured	a level or a cost typed from a run, no generated page
+reading-output.md	1e8	The two are kept apart on purpose. The lag is a part in 1e8 of the arrival time 	measured	a level or a cost typed from a run, no generated page
+reading-output.md	6.5e-6	bsolute time, so a double resolves it to about five digits, 6.5e-6 of a slice sp	measured	a level or a cost typed from a run, no generated page
+reading-output.md	2.1e-2	n is made of, and without the fold a mid-line restart lands 2.1e-2 away on the w	measured	a level or a cost typed from a run, no generated page
+user-guide.md	30	Direct RK4 integration through the analytic undulator field: no averaging, no re	standard	the envelope of 10 to 30 steps per period
+user-guide.md	32	Genesis4 decks: the time-dependent pair, 32 slices with shot noise	example	the 32-slice time-dependent line
+user-guide.md	2.8e-11	h Genesis4's constants transcribed, that cost puts tier1 at 2.8e-11 where the Ge	measured	a level or a cost typed from a run, no generated page
+user-guide.md	2.5e-12	2.8e-11 where the Genesis4-coordinate representation sat at 2.5e-12. The particl	measured	a level or a cost typed from a run, no generated page
+user-guide.md	376.7303	s impedance constant is truncated, 376.73 against the exact 376.7303..., so the 	standard	the vacuum impedance, exact
+user-guide.md	8.3e-7	3 against the exact 376.7303..., so the two codes differ by 8.3e-7 relative befo	standard	the relative difference of the truncated impedance
+user-guide.md	0.84	is4 does not have loses one final rotation, a difference of 0.84 in the final fi	measured	a level or a cost typed from a run, no generated page
+user-guide.md	3.4e-12	earlier namelist-driven run to a max relative difference of 3.4e-12, zero at z =	measured	a level or a cost typed from a run, no generated page
+user-guide.md	32	els are priced, measured over the full time-dependent line (32 slices, 90 record	example	the 32-slice time-dependent line
+user-guide.md	90	ced, measured over the full time-dependent line (32 slices, 90 records). Power d	example	the records of the time-dependent line
+user-guide.md	3.0e-7	90 records). Power differs by 5.0e-5 max (exit total power 3.0e-7), on-axis inte	measured	a level or a cost typed from a run, no generated page
+user-guide.md	7.3e-4	by 5.0e-5 max (exit total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.	measured	a level or a cost typed from a run, no generated page
+user-guide.md	6.7e-6	t total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.7e-6 and wrapped b	measured	a level or a cost typed from a run, no generated page
+user-guide.md	+3.8	sizes 6.7e-6 and wrapped bunching phase 1.3e-2 rad max, for +3.8% runtime. That 	measured	a level or a cost typed from a run, no generated page
+user-guide.md	0.4	st two cells' undulators a second element definition with 0.4% lower, bit-identi	measured	a level or a cost typed from a run, no generated page
+user-guide.md	12.7	t-identical to the untapered run until the taper starts and 12.7x its exit power	measured	a level or a cost typed from a run, no generated page
+user-guide.md	4.230	`4.230 kW`	measured	a level or a cost typed from a run, no generated page
+user-guide.md	761.499	`761.499 MW`	measured	a level or a cost typed from a run, no generated page
+user-guide.md	792.7	steady-state example with the filter on, 0.2 percent of the 792.7 MW exit power 	measured	a level or a cost typed from a run, no generated page
+user-guide.md	0.08	0.2 percent of the 792.7 MW exit power is that emission and 0.08 percent of the 	measured	a level or a cost typed from a run, no generated page
+user-guide.md	1.56	92.7 MW exit power is that emission and 0.08 percent of the 1.56 GW at saturatio	measured	a level or a cost typed from a run, no generated page

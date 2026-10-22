@@ -1,0 +1,18 @@
+value	name	where
+0.3	source filter ratio warning band, lower	fel_setup_mod.f90, the th_mode/th_rho warning
+3	source filter ratio warning band, upper	fel_setup_mod.f90, the th_mode/th_rho warning
+0.99	sigmoid on axis below which a filter width is refused	fel_setup_mod.f90
+10	floor of unaveraged_steps_per_period	fel_setup_mod.f90
+0.8	slippage threshold in n_wavelength	fel_track_mod.f90, fel_io_mod.f90
+46	z_R/L_g above which the rho angle wins the filter edge	fel_setup_mod.f90, doc/startup-noise.md
+4	diffraction angles of the mode in the protected angle	fel_track_mod.f90
+20	wiggler step of l_period/20 from Bmad's bookkeeper	attribute_bookkeeper.f90
+0.2	bmad_com%default_ds_step in metres	Bmad
+510998.95069	electron rest energy in eV, CODATA 2022, Bmad's m_electron	Bmad, Genesis4 4.6.15
+510999.06	electron rest energy Genesis4 used to v4.6.14	Genesis4
+376.73	vacuum impedance as Genesis4 truncates it	Genesis4 writeFieldHDF5.cpp
+2.99792458e8	speed of light in m/s	physics
+1.0	BMAD-STATS-SPEC version	doc/BMAD-STATS-SPEC.md
+3.0	lucifer-frames format version	fel_beam_mod.f90
+4.6.15	Genesis4 reference release	tests
+20261018	Bmad release Lucifer builds against	lucifer/BMAD_RELEASE
