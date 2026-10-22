@@ -142,10 +142,11 @@ def read_accept(path: str | None):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        m = re.match(r"^(\w+)\s+([-+])\s+(.*)$", line)
+        # The token may be empty, as a removed table row's empty cell is.
+        m = re.match(r"^(\w+)\s+([-+])(?:\s+(.*))?$", line)
         if not m:
             raise SystemExit(f"{path}: cannot read accept line: {raw}")
-        accepted[(m.group(1), m.group(2), " ".join(m.group(3).split()))] += 1
+        accepted[(m.group(1), m.group(2), " ".join((m.group(3) or "").split()))] += 1
     return accepted
 
 
