@@ -144,8 +144,16 @@ DIRS=()
 for dir in */; do
   dir="${dir%/}"
   [[ "$dir" == "saturation_demo" ]] && continue
+  # lucifer.in first, then the rest in byte order. A directory's decks can depend on each
+  # other: import's lucifer_from_file.in reads the bunch its lucifer.in writes. The glob's
+  # own order follows the locale's collation, under which lucifer_from_file.in sorts ahead
+  # of lucifer.in, and that went unseen while an earlier run's bunch file sat in the tree.
   shopt -s nullglob
-  decks=("$dir"/lucifer*.in)
+  decks=()
+  [[ -f "$dir/lucifer.in" ]] && decks=("$dir/lucifer.in")
+  while IFS= read -r d; do
+    decks+=("$d")
+  done < <(LC_ALL=C ls -1 "$dir"/lucifer*.in 2>/dev/null | LC_ALL=C sort | grep -vx "$dir/lucifer.in")
   shopt -u nullglob
   if [[ ${#decks[@]} -eq 0 ]]; then
     echo "Error: $dir has no lucifer*.in deck." >&2

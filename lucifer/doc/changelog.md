@@ -9,6 +9,11 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-21 Fixed: `run_examples.sh` ran a directory's decks in the shell glob's order, which follows the
+  locale's collation, and under `en_US.UTF-8` the import example's `lucifer_from_file.in` sorts ahead of
+  `lucifer.in`, whose bunch file it reads. It failed with `hdf5_open_file` in every fresh checkout, and
+  passed elsewhere only because a bunch file from an earlier run sat in the ignored outputs. Each
+  directory now runs `lucifer.in` first and the rest in byte order.
 - 2026-10-21 Changed: Lucifer lives in a repository of its own, `ChristopherMayes/lucifer`,
   carrying the history of every commit that built it. It builds against a Bmad checkout that
   `BMAD_DIR` names, at or after the release in `lucifer/BMAD_RELEASE`, where it had been built
