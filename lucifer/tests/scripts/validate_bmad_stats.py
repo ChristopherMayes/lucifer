@@ -3,14 +3,14 @@
 
     python3 validate_bmad_stats.py run.stats.h5 [more.h5 ...]
 
-Knows NO program and NO extension: everything here is checkable from the spec alone,
+Knows no program and no extension. Everything here is checkable from the spec alone,
 which is the property being checked (spec R42). numpy and h5py only.
 
 Findings are reported at three levels. MUST failures mean the file does not conform.
 SHOULD findings are recommendations. INFO lines report what could not be checked
-generically, so silence is never mistaken for coverage: the validator can verify that
-a declared join key resolves (R18), not that every join key is declared; it cannot see
-whether R26's strings are really the code's enums, whether R28's NaN means
+generically, so silence is never mistaken for coverage. For example, the validator can
+verify that a declared join key resolves (R18), and not that every join key is declared.
+It cannot see whether R26's strings are really the code's enums, whether R28's NaN means
 not-computed, or whether R34's input trees are complete. Those belong in the writing
 program's own harness.
 
@@ -27,12 +27,12 @@ import h5py
 import numpy as np
 
 # The group kinds this core document defines structure for. A kind outside this set is
-# legal if declared in @kinds (extensions add their own); its structure is not checked.
+# legal if declared in @kinds (extensions add their own). Its structure is not checked.
 CORE_KINDS = {"axis", "input", "run", "table", "provenance", "derived"}
 
 DATASET_ATTRS = ("unit", "long_name", "description", "axes")
 LIST_ATTRS = ("components", "derived_from", "extensions", "kinds")
-ATTR_CAP = 60000   # bytes; the hard HDF5 limit measured at 65495 (spec R27).
+ATTR_CAP = 60000   # Bytes. The largest HDF5 attribute that writes is 65495 bytes (spec R27).
 
 
 def text(v):

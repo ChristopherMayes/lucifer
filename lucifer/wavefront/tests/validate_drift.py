@@ -19,15 +19,15 @@ HDF5 index ordering, or a sign error in the kernel's negative wavenumbers all le
 symmetric field unchanged. The test field is therefore offset from the axis, elliptical,
 tilted, and different in every slice.
 
-The input carries BOTH transverse polarizations, with a different field in each. One
-openPMD file holds both as components of the electricField record, which is what the
-Genesis4 format could not do, so the two-component path through the Fortran reader,
-the propagator and the Fortran writer is compared against Python here rather than only
-against itself. Giving Ey its own centroid, size and tilt is what makes a swap of the
-two components visible.
+The input carries both transverse polarizations, with a different field in each. One
+openPMD file holds both as components of the electricField record, which the Genesis4
+format could not do. So the two-component path through the Fortran reader, the
+propagator and the Fortran writer is compared against Python here, rather than only
+against itself. Ey has its own centroid, size and tilt, so a swap of the two components
+is visible.
 
-Two conventions the Fortran side fixes, and this script matches so that the whole loop
-is information preserving. The transverse grid is centered on the axis. The slice axis
+The Fortran side fixes two conventions, and this script matches them so that the whole
+loop preserves information. The transverse grid is centered on the axis. The slice axis
 starts at zero, so the head of the radiation window is z = 0 rather than the window
 being centered. Both reach the file as gridGlobalOffset, which openPMD defines as the
 position of the first cell.
@@ -141,7 +141,7 @@ def build_wavefront(nx: int, ny: int, nz: int, dx: float, dy: float, dz: float,
 def file_layout(path: str) -> dict[str, tuple]:
     """
     Walk an HDF5 file and return {name: (kind, shape)} for every object in it, where kind is
-    'group' or the NumPy dtype kind character of a dataset.
+    'group' for a group and the dtype as a string for a dataset.
 
     The dtype is recorded in full so that width differences can be reported, but see
     compare_file for which differences are treated as failures.
@@ -192,10 +192,10 @@ def _attrs_agree(got, want, tol):
     """
     Whether two attribute values carry the same content.
 
-    Two differences are content preserving and are accepted here rather than reported.
+    Two differences preserve content and are accepted here rather than reported.
     Bmad's HDF5 helpers write every scalar attribute as a length-1 array, where h5py
-    writes a true scalar, so both sides are flattened before comparison; every openPMD
-    reader involved, ours and openPMD-beamphysics', reads through np.atleast_1d. And a
+    writes a true scalar. So both sides are flattened before comparison. Every openPMD
+    reader involved, ours and openPMD-beamphysics', reads through np.atleast_1d. Also, a
     string reaches the file as fixed length from Fortran and as variable length from
     h5py, which HDF5 hands back as the same text either way.
     """
@@ -218,11 +218,11 @@ def compare_file(fortran_file: str, reference_file: str) -> bool:
 
     This is not redundant with the field comparison. openPMD states the grid spacing, the
     grid offset, the axis order, the photon energy and the position along the lattice in
-    attributes, and a reader that finds them missing or wrong cannot reconstruct the field
-    it is looking at however exact the numbers in the datasets are. The field comparison
-    reads both files with the same reader, which papers over exactly that: a wrong
-    gridSpacing on both sides cancels. So the metadata is checked against an independent
-    writer here, name by name and value by value.
+    attributes. A reader that finds them missing or wrong cannot reconstruct the field,
+    however exact the numbers in the datasets are. The field comparison reads both files
+    with the same reader, which hides exactly that: a wrong gridSpacing on both sides
+    cancels. So the metadata is checked here against an independent writer, name by name
+    and value by value.
 
     A dtype difference is reported unless _TYPE_DIFF_ALLOWED explains it.
     """
@@ -298,21 +298,21 @@ def compare_file(fortran_file: str, reference_file: str) -> bool:
 
 
 # Dataset types that may differ between the Fortran writer and Wavefront.write_openpmd
-# without that being an incompatibility. The complex compound is the only one: HDF5 has
-# no native complex type, so both writers build a two-field compound, and h5py presents
-# either as complex128 on read while reporting the field names it was built from.
+# without that being an incompatibility. None is allowed at present. The complex compound
+# needs no entry: HDF5 has no native complex type, so both writers build a two-field
+# compound, and h5py presents either as complex128 on read.
 _TYPE_DIFF_ALLOWED: dict[str, str] = {}
 
 # Attributes not compared, and why. All three are written by Bmad's shared openPMD dataset
-# writer, which stamps the unit record of every dataset it creates, and none is written by
-# openPMD-beamphysics on a mesh component. They carry no part of the field or its geometry,
-# an openPMD reader passes over an attribute it does not know, and the required unitSI sits
-# beside them and IS compared.
+# writer, which stamps the unit record of every dataset it creates. openPMD-beamphysics
+# writes none of them on a mesh component. They carry no part of the field or its
+# geometry, and an openPMD reader passes over an attribute it does not know. The required
+# unitSI sits beside them and is compared.
 #
 #   localName       the descriptive name Bmad gives the dataset, here 'x' or 'y'
 #   unitSymbol      'V/m', the same statement unitDimension makes in exponents
 #   unitDimension   the component's dimensions. The record carries the authoritative
-#                   copy, which is compared; this one repeats it.
+#                   copy, which is compared. This one repeats it.
 #
 # The allowance is on a component and nowhere else, so the record's own unitDimension is
 # still compared name by name and value by value.
@@ -330,8 +330,8 @@ def _skipped(obj_name, attr_name):
     return obj_name.startswith(MESH_PATH + "/") and attr_name in _COMPONENT_EXTRA
 
 # Attributes compared to something other than round-off, with the cause. photonEnergy is
-# the only one: it is where the two Planck constants land, since each side writes the energy
-# its own wavelength implies. See BMAD_WAVELENGTH_RATIO.
+# the only one. The two Planck constants land there, since each side writes the energy its
+# own wavelength implies. See BMAD_WAVELENGTH_RATIO.
 _ATTR_TOL = {
     "photonEnergy": (PLANCK_TOL, "Bmad and scipy carry different Planck constants"),
 }
@@ -358,7 +358,7 @@ def report(name: str, a: np.ndarray, b: np.ndarray) -> float:
     Peak normalization rather than elementwise relative error is the meaningful measure
     here. The field spans many orders of magnitude across the grid, and the round-off
     floor of an FFT based propagator is set by the largest value in the transform, not by
-    the local one; an elementwise ratio in the far tail measures nothing but that floor
+    the local one. An elementwise ratio in the far tail measures nothing but that floor
     divided by a number near zero.
     """
     if a is None or b is None:

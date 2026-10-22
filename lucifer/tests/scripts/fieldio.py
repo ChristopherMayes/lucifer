@@ -22,7 +22,7 @@ quantity, while Genesis carries a dimensionless amplitude dfl in sqrt(W) with
 
 which scales with the grid spacing, so it is not a change of units alone. This module
 converts the Genesis side, leaving every comparison in V/m. Any common factor cancels in a
-relative difference, so the choice of which side to convert cannot move a measurement; the
+relative difference, so the choice of which side to convert cannot move a result. The
 choice of Z0 can, at the 1e-9 level of the two codes' impedances, and Bmad's is used here.
 
 A polarization note. One openPMD file holds both transverse components as components x and
@@ -118,6 +118,6 @@ def _read_openpmd(path, component):
 
 
 def field_power(u, dx, dy):
-    """Radiated power per slice [W] from the field in V/m: |E|^2 dx dy summed over the grid."""
+    """Radiated power per slice [W] from the field in V/m: |E|^2 dx dy / (2 Z0) summed over the grid."""
     axes = tuple(range(1, u.ndim))
     return (np.abs(u) ** 2).sum(axis=axes) * dx * dy / (2 * MU0_C)

@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Overlay the Bmad FEL tracker and Genesis 1.3 Version 4 outputs of one benchmark tier:
-the visual companion to compare_fel.py's numbers. Reads the tracker's diag file and
-Genesis's .out.h5 (the slice count comes from the Genesis file, so steady-state and
-time-dependent tiers both work unannounced) and writes a four-panel figure:
+Overlay the Bmad FEL tracker and Genesis 1.3 Version 4 outputs of one benchmark tier,
+as a figure beside compare_fel.py's numbers. Reads the tracker's diag file and
+Genesis's .out.h5 and writes a four-panel figure. The slice count comes from the
+Genesis file, so steady-state and time-dependent tiers both work with no option.
 
-  1. Total power vs z, both codes overlaid (log). Agreement here is the headline.
-  2. The elementwise relative power difference vs z (max and median over slices) --
-     the same quantity compare_fel.py checks, resolved along the line.
+  1. Total power vs z, both codes overlaid (log).
+  2. The elementwise relative power difference vs z (max and median over slices).
+     This is the quantity compare_fel.py checks, resolved along the line.
   3. Final-record power per slice, both codes: the SASE spectrum across the time
-     window (or two dots for steady state).
+     window (or one point a code for steady state).
   4. Slice-averaged bunching vs z, both codes overlaid.
 
-With --fld <bmad .wf.h5> <genesis .fld.h5>, a second figure overlays the finAL field:
+With --fld <bmad .wf.h5> <genesis .fld.h5>, a second figure overlays the final field:
 on-axis lineouts of amplitude and unwrapped phase, plus the transverse profile of the
-complex difference -- the panel that shows what a phase-dominated tier difference
-(tier1_unavg's 6.9e-2) actually looks like.
+complex difference. That panel shows what a phase-dominated tier difference looks like,
+such as tier1_unavg's (doc/validation.md, val-validation-from-one-command).
 
 Usage:
   plot_fel_compare.py <bmad diag.txt> <genesis .out.h5> [-o out.png]
@@ -41,8 +41,8 @@ from compare_fel import load_fortran_diag, load_genesis_out, load_fld  # noqa: E
 
 def plot_field_overlay(fld_f, fld_g, name, plt):
     """The final-field figure: on-axis amplitude and unwrapped-phase lineouts of both
-    codes, and the transverse map of |E_bmad - E_genesis| (peak normalized) -- the
-    quantity a phase-dominated tier number is made of."""
+    codes, and the transverse map of |E_bmad - E_genesis| (peak normalized). That map is
+    the quantity a phase-dominated tier number is made of."""
     uf, ug = load_fld(fld_f), load_fld(fld_g)
     if uf.ndim == 3:                     # time dependent: take the peak-power slice
         i = int(np.argmax([(abs(u)**2).sum() for u in ug]))
@@ -128,7 +128,7 @@ def main():
     a = ax[0, 0]
     a.semilogy(z, np.maximum(total_g, 1e-30), color="0.25", lw=2.4, label="Genesis4")
     a.semilogy(z, np.maximum(total_f, 1e-30), color="tab:orange", lw=1.2, label="Bmad")
-    # A dark start's z = 0 record is exactly zero. Don't let it stretch the axis.
+    # A dark start's z = 0 record is exactly zero. Do not let it stretch the axis.
     pos = total_g[total_g > 0]
     if len(pos):
         a.set_ylim(bottom=max(pos.min() * 0.3, total_g.max() * 1e-14),

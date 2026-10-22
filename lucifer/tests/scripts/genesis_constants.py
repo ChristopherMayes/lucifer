@@ -3,14 +3,15 @@
 Report which electron rest energy a genesis4 binary was compiled with.
 
 Genesis releases up to v4.6.14 use eev = 510999.06, which is 2.14e-7 above the CODATA
-value. Master carries 510998.95069 (CODATA 2022), which is also Bmad's m_electron. The
-field unit is linear in eev, so the difference reaches the comparison as 4.28e-7 in
-intensity and loosens the transcription tiers by several percent of their own value.
+value. Genesis master and v4.6.15 carry 510998.95069 (CODATA 2022), which is also
+Bmad's m_electron. The field unit is linear in eev, so the difference reaches the
+comparison as 4.28e-7 in intensity. That loosens the transcription tiers by several
+percent of their own value.
 
-That is invisible in a run: every tier still passes its tolerance. What it moves is the
-recorded level, so the reference binary is worth identifying before a level is recorded
-against it. The constant is read straight out of the binary, since it is compiled in and
-the banner does not carry it.
+A run does not show the difference, since every tier still passes its tolerance. The
+difference moves the recorded level, so the reference binary is identified before a
+level is recorded against it. The constant is read straight out of the binary, since it
+is compiled in and the banner does not carry it.
 
 Usage:
 

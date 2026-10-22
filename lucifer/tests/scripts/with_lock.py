@@ -3,14 +3,14 @@
     with_lock.py <lockfile> <command> [args...]
 
 The lock is an exclusive flock on the named file, taken before the command starts and
-held until it ends. The kernel releases it when the process dies, however it dies, so a
-killed run leaves no stale lock behind, which a lock directory would. The command's
-stdin, stdout and stderr are inherited, and its exit status is returned.
+held until it ends. The kernel releases the lock when the process dies, however it
+dies, so a killed run leaves no stale lock behind. A lock directory would. The
+command's stdin, stdout and stderr are inherited, and its exit status is returned.
 
 The benchmark's device section runs under this. The two build passes of a keystone run
-at once, and the device is one resource across both, so their device sections take
-turns while their CPU sections carry on (doc/validation.md). The wait, when there was
-one, is printed so the cost of taking turns is a measured number.
+at once, and the device is one resource across both. So their device sections take
+turns while their CPU sections carry on (doc/validation.md, val-the-keystone-rule). A
+wait longer than 1 s is printed, so the cost of taking turns can be read from the log.
 """
 
 import fcntl

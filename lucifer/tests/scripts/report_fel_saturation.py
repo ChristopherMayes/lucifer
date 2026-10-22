@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-The saturation demo's automated summary report (PDF). Reads everything from the demo's
-work directory -- the Genesis .out.h5, both Bmad diag/stats files, the unaveraged
-energy ledger, and the /usr/bin/time files -- recomputes the agreement checks, and
-writes a multi-page PDF in which every figure carries the paragraph that explains how
-to read it. The energy accounting gets its own page, as labeled decompositions and a
-books-close overlay instead of overlapping curves.
+The saturation demo's summary report (PDF). Reads everything from the demo's work
+directory: the Genesis .out.h5, both Bmad diag/stats files, the unaveraged energy
+ledger, and the /usr/bin/time files. Recomputes the agreement checks and writes a
+multi-page PDF in which every figure carries the paragraph that explains how to read
+it. The energy accounting gets its own page, as labeled decompositions and an overlay
+of the energy balance along z, instead of overlapping curves.
 
 Usage:  report_fel_saturation.py <workdir> [-o report.pdf]
 
@@ -308,7 +308,7 @@ def energy_page(pdf, d, checks):
     a1.set_xlim(0, max(given.values()) * 1.55)
     a1.set_title("Energy accounting at the exit", loc="left", weight="bold")
 
-    # -- Panel 2: the unaveraged books closing along z. ----------------------------
+    # -- Panel 2: the unaveraged energy balance along z. ---------------------------
     zl = led[:, 1 - 1]
     given_z = -(led[:, 1] - led[0, 1])
     account_z = (led[:, 2] - led[0, 2]) + led[:, 4] - led[:, 5]

@@ -2,14 +2,14 @@
 """
 Generate doc/generated/validation-measured.md from benchmark results files.
 
-The measured levels in the documentation are written by the harness that measured them,
-not maintained by hand. Run the benchmark on each build with --results, then point this
-script at both files.
+The levels in the documentation are written by the harness that produces them, and not
+by hand. Run the benchmark on each build with --results, then point this script at both
+files.
 
-The output is deterministic: same results in, same bytes out. Nothing time dependent,
-machine dependent or path dependent is written, because the keystone regenerates this
-file and requires the diff to be empty. A timestamp would fail that check on every run
-and the check would be abandoned, which is how generated documentation goes stale.
+The output is deterministic: the same results in give the same bytes out. Nothing time
+dependent, machine dependent or path dependent is written, because the keystone suite
+regenerates this file and requires the diff to be empty. A timestamp would fail that
+check on every run.
 
 Usage:
 
@@ -21,10 +21,10 @@ The results files are written by run_fel_benchmark.sh --results, one record per 
   section|<name>|<outcome>[|<reason>]
   tier|<key>|<level>|<outcome>|<description>
 
-A results file whose sections did not all run is refused. The device section skips on a
-build with no usable backend, which is what a Linux CI runner is, and the table written
-from such a file would name one section fewer while claiming to list them all. The
-generated table therefore comes from a full local run on both builds.
+A results file with a section recorded as anything but pass is refused. The device
+section skips on a build with no usable backend, as on a Linux CI runner. A table
+written from such a file would name one section fewer while claiming to list them all.
+So the generated table comes from a full local run on both builds.
 """
 
 import argparse

@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
 Reconstruct a Bmad bunch_params_struct-shaped dict from any (record, slice) of the
-tracker's stats file <out_root>.stats.h5 -- the per-record beam datasets (centroid,
-sigma, charge_live, n_particle_live) are sufficient statistics, and this module is
-the proof by construction: at element ends its output must reproduce the twiss the
-tracker stored from Bmad's own calc_bunch_params (the harness holds that). The moments
+tracker's stats file <out_root>.stats.h5. The per-record beam datasets (centroid,
+sigma, charge_live, n_particle_live) are sufficient statistics, and this module shows
+it by construction. At element ends its output must reproduce the twiss the tracker
+stored from Bmad's own calc_bunch_params, and the harness checks that. The moments
 themselves are stored once, per record, so there is nothing there to compare against.
 
 The formulas are transcribed from Bmad's calc_emittances_and_twiss_from_sigma_matrix
 (beam_utils.f90): projected x/y/z twiss with dispersion removed via sigma(i,6)
 columns, and the normal-mode a/b/c emittances as the imaginary parts of the
-eigenvalues of sigma.S (Wolski Eq. 32; numpy does the eigensystem). Full normal-mode
-beta functions need Wolski's N matrix and are Bmad's job, not this script's --
-projected twiss plus normal-mode emittances is what the reconstruction covers.
+eigenvalues of sigma.S (Wolski Eq. 32, with numpy doing the eigensystem). Full
+normal-mode beta functions need Wolski's N matrix and are left to Bmad. The
+reconstruction covers projected twiss plus normal-mode emittances.
 
 Fixed Bmad units throughout, matching the file. norm_emit uses
 f_emit = p0c*(1 + <pz>)/m_e c^2 with the file's stored p0c.
 
 Also provides the wavefront-side pooling helper: pulse-level moments from per-slice
 wavefront_params (energy-weighted mean of slice sigmas plus the variance of slice
-centroids) -- pulse values are derived, never stored; the file stays raw.
+centroids). Pulse values are derived and never stored. The file holds only the slices.
 
 Usage as a module:
   from bunch_params_from_stats import bunch_params_at, pool_wavefront
@@ -42,8 +42,8 @@ M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
 def _projected(sig, i, j, with_dispersion=True):
     """Bmad's projected_twiss_calc for the plane with position index i, momentum j
-    (0-based); dispersion removed via the pz column (index 5). The z plane passes
-    with_dispersion=False -- Bmad hands it zero dispersion columns by construction."""
+    (0-based), with dispersion removed via the pz column (index 5). The z plane passes
+    with_dispersion=False, since Bmad hands it zero dispersion columns by construction."""
     tw = {}
     s66 = sig[5, 5]
     d_i = sig[i, 5] if with_dispersion else 0.0
@@ -94,11 +94,11 @@ def bunch_params_from_moments(centroid, sigma36, charge_live, n_live, p0c):
     if abs(sig[4, 4]) < cut or abs(sig[5, 5]) < cut:
         dim = 4
     ev = np.linalg.eigvals(sig[:dim, :dim] @ S[:dim, :dim])
-    emits = np.sort(np.abs(ev.imag))[::-1]     # Pairs +-i emit; take distinct values.
+    emits = np.sort(np.abs(ev.imag))[::-1]     # Pairs +-i emit. Take distinct values.
     emits = emits[::2]                         # One per conjugate pair.
-    # note: mode labels here are magnitude-descending. Bmad's mat_eigen identifies
-    # modes by eigenvector structure, so a/b/c may be permuted relative to Bmad;
-    # the harness compares the normal-mode emittances as a sorted set.
+    # Note: Mode labels here are in descending magnitude. Bmad's mat_eigen identifies
+    # modes by eigenvector structure, so a/b/c may be permuted relative to Bmad. The
+    # harness compares the normal-mode emittances as a sorted set.
     for k, name in enumerate(("a", "b", "c")):
         e = float(emits[k]) if k < len(emits) else 0.0
         bp[name] = {"emit": e, "norm_emit": f_emit * e}

@@ -47,8 +47,8 @@ def record(g, name):
 
 
 def read_bunch(path):
-    """Every record in SI: x, y [m]; px, py, pz [kg m/s, EV_C per eV/c]; t [s, against the
-    file's reference]; w [C]. p0c is the reference momentum in eV/c."""
+    """Every record in SI: x, y [m], px, py, pz [kg m/s, EV_C per eV/c], t [s, against the
+    file's reference] and w [C]. p0c is the reference momentum in eV/c."""
     with h5py.File(path) as f:
         g = species_group(f)
         out = dict(x=record(g, "position/x"), y=record(g, "position/y"),
@@ -109,12 +109,13 @@ def slice_index(s, spacing):
 
 def copies(b, n_copy, wavelength, spacing, jitter=0.0, shift=None, rng=None):
     """
-    Every particle as n_copy copies at weight / n_copy, phases spread over one wavelength
-    and kept inside the particle's own slice, so the bunch is quiet below n_copy the way
-    the loader's own beamlets are, but made outside it. jitter perturbs the transverse
-    coordinates of every copy by that many metres, so no two share them exactly. shift
-    moves every copy singly by a uniform fraction of a wavelength, which is the mutation
-    that breaks the cancellation.
+    Every particle as n_copy copies at weight / n_copy, with phases spread over one
+    wavelength and kept inside the particle's own slice. The bunch is then quiet below
+    n_copy, as the loader's own beamlets are, but made outside the loader. jitter moves
+    the transverse coordinates of every copy by a uniform amount of up to that many
+    metres, so no two copies share them exactly. shift moves every copy singly by a
+    uniform random fraction, up to shift, of a wavelength. That is the mutation that
+    breaks the cancellation.
     """
     rng = rng or np.random.default_rng(1)
     s = arrival(b)

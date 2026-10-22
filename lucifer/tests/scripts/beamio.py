@@ -2,34 +2,34 @@
 """
 Read a Lucifer particle dump into per-slice arrays, in either format.
 
-The two formats carry the same beam in different charts, so the checks should not each
-learn both. Genesis .par.h5 stores (x, y, px, py, theta, gamma) per slice with one
-current, and openPMD .beam.h5 stores position, momentum, time and a per-particle
-weight, with one particlePatch per slice and nothing else describing the window.
+The two formats carry the same beam in different coordinates, so the checks should not
+each learn both. Genesis .par.h5 stores (x, y, px, py, theta, gamma) per slice with one
+current. openPMD .beam.h5 stores position, momentum, time and a per-particle weight,
+with one particlePatch per slice and nothing else describing the window.
 
-What comes back per slice: x, y [m], px, py [gamma*beta, Genesis's units, which
-openPMD reaches through the file's own p0c], gamma, theta [rad], weight [C],
-current [A], and n. Empty slices come back with n = 0 and empty arrays.
+What comes back per slice: x, y [m], px, py [gamma*beta, Genesis's units, which the
+openPMD path gets by dividing the file's momentum by mc^2], gamma, theta [rad],
+weight [C], current [A], and n. Empty slices come back with n = 0 and empty arrays.
 
 An openPMD dump adds pz, the Bmad energy deviation (p - p0)/p0, exactly as the file
 states it. gamma is the same quantity through gamma = sqrt((p0(1+pz)/mc)^2 + 1), which
-costs an ulp of gamma, and a check that differences energies between two runs pays that
-ulp against a difference many orders smaller: a wake kick of 3e-8 in pz read back
-through gamma agrees to 1.2e-8 rather than to rounding. Such a check should read pz. A
-Genesis dump states gamma alone and carries no reference momentum, so pz is not
-available there and the key is absent. Nor is it available from an openPMD file written
+costs an ulp of gamma. A check that differences energies between two runs pays that ulp
+against a difference many orders smaller. For example, a wake kick of 3e-8 in pz read
+back through gamma agrees to 1.2e-8 rather than to rounding. Such a check should read
+pz. A Genesis dump states gamma alone and carries no reference momentum, so pz is not
+available there and the key is absent. Nor is pz available from an openPMD file written
 against the lattice's reference rather than its own, which is what the converter writes.
 
-One caveat, about the wavelength. An openPMD dump does not carry it, since it belongs to
-the run rather than to the beam. theta scales with it, so a caller reading an openPMD file
-must say which wavelength its deck used. A Genesis file states its own and the argument is
-then a cross-check.
+Note: An openPMD dump does not carry the wavelength, since the wavelength belongs to the
+run rather than to the beam. theta scales with it, so a caller reading an openPMD file
+must say which wavelength its deck used. A Genesis file states its own, and the
+argument is then a cross-check.
 
 theta is the absolute ponderomotive phase on both paths. Neither format has a place for a
-run's reference phase phi0 and every reader restarts it at zero, so each writer folds it
-into what it stores: Genesis stores theta itself, and an openPMD beam file stores the lag
-theta implies, time = -theta/(ks c). The two therefore mean the same thing here, and a
-dump is a restart point that reproduces the beam's phase against the field's.
+run's reference phase phi0, and every reader restarts it at zero. So each writer folds
+phi0 into what it stores. Genesis stores theta itself. An openPMD beam file stores the
+lag theta implies, time = -theta/(ks c). The two mean the same thing here, and a dump is
+a restart point that reproduces the beam's phase against the field's.
 """
 
 from __future__ import annotations
@@ -119,8 +119,8 @@ def _read_genesis(path, wavelength=None):
             g = h5[f"slice{i:06d}"]
             n = g["gamma"].shape[0]
             current = float(g["current"][0])
-            # The format has no per-particle weight: it carries one current, which the
-            # reader divides out uniformly. That is the whole reason for .beam.h5.
+            # The format has no per-particle weight. It carries one current, which the
+            # reader divides out uniformly. The .beam.h5 format exists to carry the weight.
             w = np.full(n, current * spacing / (C_LIGHT * n)) if n else np.zeros(0)
             out.append(dict(n=n, x=g["x"][...], y=g["y"][...],
                             px=g["px"][...], py=g["py"][...],
@@ -147,9 +147,9 @@ def _read_openpmd(path, wavelength, spacing=None):
 
         # Two shapes of the same beam. Bmad's writer states a reference momentum, so the
         # energy comes back as the deviation the tracker keeps. A file written against the
-        # lattice's reference states none, which is deliberate (the converter leaves the
-        # run's one reference to the lattice), and then only the total momentum is
-        # available: gamma follows from it and pz has no reference to be measured against.
+        # lattice's reference states none, by design (the converter leaves the run's one
+        # reference to the lattice). Then only the total momentum is available. gamma
+        # follows from it, and pz has no reference to be taken against.
         pz = None
         if "totalMomentum" in g:
             p0c = _record(g, "totalMomentumOffset", n_tot)

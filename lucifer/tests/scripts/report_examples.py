@@ -8,17 +8,17 @@ rather than transcribed, so a deck shown in the documentation cannot drift from 
 that runs: editing the deck and regenerating is the only way to change the page.
 
 The output is deterministic. Nothing time dependent, machine dependent or path dependent
-is written, because the keystone regenerates these files and requires the diff to be
-empty. Figures are referenced, never read: PNG bytes vary with the plotting library, so
-run_examples.sh owns them and check_examples.py asserts only that each one exists.
+is written, because the keystone suite regenerates these files and requires the diff to
+be empty. Figures are referenced, never read. PNG bytes vary with the plotting library,
+so run_examples.sh writes them and check_examples.py asserts only that each one exists.
 
 Usage:
 
   report_examples.py --examples <dir> --out <dir>
 
 Every relative link in a README is rewritten for the page's new depth, and any link form
-this script does not recognize is an error rather than a guess. A silent rewrite that
-produced a dead link would be worse than no page.
+this script does not recognize is an error rather than a guess. A wrong rewrite would
+leave a dead link on the page with no message.
 """
 
 import argparse
@@ -26,7 +26,7 @@ import re
 import sys
 from pathlib import Path
 
-# Input files worth showing on a page, in the order they appear. A run's own deck first,
+# Input files shown on a page, in the order they appear. A run's own deck first,
 # then the reference code's decks, then the lattices.
 DECK_GLOBS = ("lucifer.in", "lucifer[-_]*.in", "sat-*.in")
 LATTICE_GLOBS = ("*.bmad", "*.lat")

@@ -13,14 +13,14 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st.coord("plane")            # ('x', 'y', 'z'), the projected planes
     st.dim_coords("beam/slice/sigma")   # the coordinate of each dimension, in order
     st.ele_name                  # (nz,) element name per record, gathered through ix_ele
-    st.run["p0c"]                # what the run produced; st.params["global"]["ran_seed"] is what the user set
+    st.run["p0c"]                # what the run produced. st.params["global"]["ran_seed"] is an input
 
 The file describes itself (fel-physics.md sec-stats), so this reader hard-codes almost nothing.
 Every dataset carries @unit, @long_name, @description and @axes, and every name in @axes
-resolves to a coords/ dataset, so this class only exposes them: there are no unit
-conversions here, no reshapes and no table of names, which is why a file that grows a
-field/y group or a field/harm5 group needs no change here. Reading a value means reading
-a value, and dim_coords labels a dimension without guessing from its length.
+resolves to a coords/ dataset. This class only exposes them. There are no unit
+conversions here, no reshapes and no table of names, so a file that grows a field/y
+group or a field/harm5 group needs no change here. Reading a value returns the value
+as stored, and dim_coords labels a dimension without guessing from its length.
 
 Two conveniences on top, both derived rather than stored, and both marked as such:
 `ele_name` gathers lattice/name through coords/ix_ele, and `at_end` is the mask as a
@@ -29,9 +29,8 @@ bool. The file keeps one source of truth for each.
 Units are documentation. The values are already SI and eV, so nothing here scales by
 @unit, and neither should a caller.
 
-The version is refused. This is internal development, so the format moves
-without compatibility machinery: a file this reader does not know is an error rather
-than a guess.
+A version not in KNOWN_VERSIONS is refused. The reader carries no compatibility code
+for other versions, so a file it does not know is an error rather than a guess.
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ import h5py
 import numpy as np
 
 # The format versions this reader understands. No older ones: see the module docstring.
-# 1.0 is bmad-stats with the fel extension, the planned reset from lucifer-stats 2.x.
+# 1.0 is bmad-stats with the FEL extension, which replaced lucifer-stats 2.x.
 KNOWN_VERSIONS = ("1.0",)
 
 
@@ -64,8 +63,8 @@ class Stats:
                              f"reader knows {', '.join(KNOWN_VERSIONS)}")
 
         # The four documentation attributes of every dataset, and the two of every
-        # group, by path. Collected in one walk: this IS the units table, and it is what
-        # makes the reader generic.
+        # group, by path, collected in one walk. This is the units table, and it makes
+        # the reader generic.
         self.units: dict[str, str] = {}
         self.long_name: dict[str, str] = {}
         self.description: dict[str, str] = {}
@@ -92,8 +91,8 @@ class Stats:
         self.axis_names = tuple(k for k in self._h5["coords"]
                                 if self.axes.get(f"coords/{k}") == (k,))
 
-        # run/ holds what the run produced, params/ what the user set: one subgroup
-        # per honored input struct, so params is a dict of dicts.
+        # run/ holds what the run produced. params/ holds the inputs, one subgroup per
+        # honored input struct, so params is a dict of dicts.
         self.run = _scalars(self._h5["run"]) if "run" in self._h5 else {}
         self.params = {}
         if "params" in self._h5:
@@ -135,14 +134,14 @@ class Stats:
         return val
 
     def dim_coords(self, path):
-        """The coordinate of each dimension of `path`, in order. This is the whole point
-        of @axes: a (nz, ns, 6, 6) array says which 6 is which without a rule."""
+        """The coordinate of each dimension of `path`, in order. @axes exists for this:
+        a (nz, ns, 6, 6) array says which 6 is which without a rule."""
         return tuple(self.coord(ax) for ax in self.axes[path])
 
     @property
     def record(self):
-        """(nz,) the record axis. The axis: coords/s repeats where two records land on
-        one plane, so s indexes nothing."""
+        """(nz,) the record axis. This is the axis, since coords/s repeats where two
+        records land on one plane and so s indexes nothing."""
         return self["coords/record"]
 
     @property
@@ -164,7 +163,7 @@ class Stats:
     def ct_slice(self):
         """(ns,) light-travel distance of each slice ahead of the reference [m].
 
-        exact and free of beta, and the coordinate slippage counts in: one slice is
+        Exact and free of beta. Slippage counts in this coordinate: one slice is
         n_wavelength wavelengths of it. See t_slice and z_slice.
         """
         return self["coords/ct_slice"]
@@ -243,8 +242,8 @@ class Stats:
     @property
     def meta(self):
         """The provenance group as a dict. Datasets, not attributes, so an echoed
-        namelist of any size fits: see the manual on HDF5's 64 kB attribute cap. NOT a
-        reproducibility record, and meta/lattice_source says so itself."""
+        namelist of any size fits: see the manual on HDF5's 64 kB attribute cap. This is
+        *not* a reproducibility record, and meta/lattice_source says so itself."""
         out = {}
         for key, dset in self._h5["meta"].items():
             val = np.atleast_1d(dset[()])[0]

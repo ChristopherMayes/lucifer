@@ -1,10 +1,10 @@
 """A small process pool for a check script's independent scan points.
 
 The check scripts run their scan points as separate tracker (or genesis4)
-processes, historically one after another. The points are independent, so
-running a few at once changes NO physics, NO configuration and NO tolerance --
-only wall time. Each job callable launches one process and blocks on it;
-threads suffice because the work happens in the child process.
+processes. The points are independent, so running a few at once changes only the
+wall time. The physics, the configuration and the tolerances do not change. Each
+job callable launches one process and blocks on it. Threads suffice because the
+work happens in the child process.
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ def run_all(jobs, threads_per_job=4):
 
     The worker count is the caller's core allowance over threads_per_job, the OMP
     thread count each child runs with. The allowance is LUCIFER_CPU_BUDGET when the
-    caller set it, which the benchmark does for every check section from its own
-    share, so several sections at once cannot each take the whole machine. Unset,
-    which is a script run by hand, the allowance is the machine. The first failure
-    propagates (a job that calls sys.exit raises SystemExit out of its future) after
-    all jobs were launched.
+    caller set it. The benchmark sets it for every check section from the pass's own
+    share, so several sections at once cannot each take the whole machine. Unset, as
+    in a script run by hand, the allowance is the machine's core count. All jobs are
+    launched first. Then the first failure in list order propagates (a job that calls
+    sys.exit raises SystemExit out of its future).
     """
     jobs = list(jobs)
     if not jobs:

@@ -1,13 +1,13 @@
 """The keystone as one pytest suite (doc/validation.md, val-the-keystone-rule).
 
-Five jobs run once, at the same time, each from an absolute working directory with its
-own log, and every outcome is kept: a zero return, a nonzero return, a launch that
+Five jobs run once, at the same time. Each runs from an absolute working directory with
+its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the four page sets and requires the Markdown diff to be empty, and it
-verifies for itself that every one of the five outcomes is present and successful
-before it runs a generator, so it does not lean on test order and cannot pass on a
-partial run. Nothing here builds: both trees are prerequisites and are checked before
-any job launches, since a benchmark reads the source tree throughout.
+regenerates the four page sets and requires the Markdown diff to be empty. Before it
+runs a generator, the sixth test verifies for itself that all five outcomes are present
+and successful. So it does not lean on test order and cannot pass on a partial run.
+Nothing here builds. Both trees are prerequisites and are checked before any job
+launches, since a benchmark reads the source tree throughout.
 
     BUILD_PRODUCTION=N lucifer/util/conda_compile
     lucifer/util/conda_compile
@@ -15,27 +15,27 @@ any job launches, since a benchmark reads the source tree throughout.
 
 What the contract means in practice:
 
-- Selecting one job test still runs all five jobs. The fixture is session scoped and the
-  keystone is whole or it is nothing, so the cost of the smallest selection is the cost
-  of the keystone.
+- Selecting one job test still runs all five jobs. The fixture is session scoped, so
+  the smallest selection costs a whole keystone.
 - xdist is refused (conftest.py beside this file). A session fixture runs once per
   worker, so a parallel run would launch the five jobs several times over, into the
   same work directories.
 - The regeneration test writes into the tree: the four generated page sets under
-  lucifer/doc/generated. That is the keystone's own contract, and a clean tree is what
-  an empty diff then proves.
+  lucifer/doc/generated. The keystone writes them by design. An empty diff then shows
+  that the committed pages agree with what the sources generate.
 - A job that runs past its timeout is killed as a process group. Each job is started in
   its own session, so the group is the shell wrapper and everything it launched, the
   tracker binaries and the check scripts included. A timeout on the wrapper alone would
   leave those running against the work directory of the next keystone.
-- The artifacts of a session, the five logs, the two results files and the two work
-  directories, live under one fresh directory named in the session header, or under
-  KEYSTONE_ARTIFACTS when that is set. They are kept, since a failure is read from them.
+- The artifacts of a session (the five logs, the two results files and the two work
+  directories) live under one fresh directory named in the session header. Where
+  KEYSTONE_ARTIFACTS is set they live there instead. They are kept, since a failure is
+  read from them.
 
-The five check scripts are unchanged. This file launches them the way the recorded
-recipe did and replaces the retyping of that recipe, which twice launched a benchmark
-from a directory an earlier command had moved into, ran four jobs of five, and
-reported a complete keystone from a one-line log.
+The five check scripts are unchanged. This file launches them as the recipe in
+doc/validation.md does. A retyped recipe twice launched a benchmark from a directory an
+earlier command had moved into, ran four jobs of five, and reported a complete keystone
+from a one-line log. This file replaces the retyping.
 """
 
 from __future__ import annotations
@@ -53,27 +53,28 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-# Four locations, each with a default that is today's layout, so a Lucifer source tree
-# inside the Bmad checkout runs with nothing set (the same rule as util/locations.sh, which
-# the shell scripts source). The Lucifer source is this file's tree. The Bmad source,
-# which carries the regression suite and its debug binaries, is BMAD_DIR, else
-# DIST_BASE_DIR as util/dist_source_me exports it, else the parent of the Lucifer
-# source. Master.cmake places a project's binaries in debug/ and production/ beside the
-# project's source, so Lucifer's two binary directories default to the tree beside this
-# one, in the Bmad checkout and out of it alike, and LUCIFER_DEBUG_BIN and
-# LUCIFER_PRODUCTION_BIN name them elsewhere. A relative value is taken against the
-# directory pytest was started in, and every job is handed the absolute values, since
-# the jobs run from the Lucifer source and a relative path would mean something else
-# there.
+# Four locations. Each defaults to the layout of a Lucifer source tree inside the Bmad
+# checkout, which then runs with nothing set. This is the rule of util/locations.sh,
+# which the shell scripts source.
+#   The Lucifer source is this file's tree.
+#   The Bmad source, with the regression suite and its debug binaries, is BMAD_DIR,
+#     else DIST_BASE_DIR as util/dist_source_me exports it, else the Lucifer source's parent.
+#   The two binary directories default to debug/ and production/ beside the Lucifer
+#     source, where Master.cmake places a project's binaries. That holds in the Bmad
+#     checkout and out of it. LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
+# A relative value is taken against the directory pytest was started in. Every job is
+# handed the absolute values, since the jobs run from the Lucifer source and a relative
+# path would mean something else there.
 LUCIFER = pathlib.Path(__file__).resolve().parents[1]
 
 
 def bmad_source() -> tuple[pathlib.Path, list[str]]:
     """The Bmad checkout, and the notes on any variable passed over.
 
-    A variable naming a directory with no util/dist_source_me is passed over, since
-    dist_source_me uses BMAD_DIR as a loop variable and leaves it at the checkout's
-    util/ once sourced; DIST_BASE_DIR, which it exports, then still names the checkout.
+    A variable naming a directory with no util/dist_source_me is passed over. The
+    reason: dist_source_me uses BMAD_DIR as a loop variable and leaves it at the
+    checkout's util/ once sourced. DIST_BASE_DIR, which it exports, still names the
+    checkout.
     """
     notes = []
     for var in ("BMAD_DIR", "DIST_BASE_DIR"):
@@ -91,7 +92,7 @@ BMAD, BMAD_NOTES = bmad_source()
 DEBUG_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER.parent / "debug" / "bin"))
 PRODUCTION_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER.parent / "production" / "bin"))
 # What every job is handed: each value as it was given, made absolute, with no symbolic
-# link followed. openPMD-beamphysics is not a location: it is a package installed in the
+# link followed. openPMD-beamphysics is not a location. It is a package installed in the
 # interpreter's environment, which every job inherits.
 LOCATIONS = {"BMAD_DIR": str(BMAD),
              "LUCIFER_DEBUG_BIN": str(DEBUG_BIN), "LUCIFER_PRODUCTION_BIN": str(PRODUCTION_BIN)}
@@ -104,7 +105,7 @@ SCRIPTS = LUCIFER / "tests" / "scripts"
 GENERATED = LUCIFER / "doc" / "generated"
 
 # One hour a job. The keystone takes nine minutes cold, so a job still running at an
-# hour has hung, and the group is killed rather than waited on.
+# hour has hung. Its process group is then killed rather than waited on.
 TIMEOUT_S = 3600
 
 JOB_NAMES = ("debug", "production", "regression", "wavefront", "examples")
@@ -141,8 +142,8 @@ class Keystone:
 
 
 def performance_cores() -> int:
-    """The cores the static allocation below divides: the performance cores on a Mac,
-    the logical cores elsewhere."""
+    """The cores the static allocation in jobs() divides. These are the performance
+    cores on a Mac and the logical cores elsewhere."""
     for args in (["sysctl", "-n", "hw.perflevel0.physicalcpu"], ["sysctl", "-n", "hw.ncpu"]):
         try:
             n = int(subprocess.run(args, capture_output=True, text=True, check=True).stdout)
@@ -154,27 +155,27 @@ def performance_cores() -> int:
 
 
 def jobs(art: pathlib.Path) -> tuple[Job, ...]:
-    """The five jobs as the recorded recipe launches them, with this session's artifacts.
+    """The five jobs as the recipe in doc/validation.md launches them, with this session's artifacts.
 
     The static allocation. The machine's performance cores are divided once, here, and
-    every job spends what it is handed and no more. Each benchmark pass is handed the
-    whole count in --cpus, so its check sections run cores/4 at once with cores over
-    that count for the pools inside them (run_fel_benchmark.sh), and the two passes'
-    device sections share one lock, since the device is one resource. The examples
-    take two workers. The regression suite and the wavefront validation take one
-    process each. The sum at the widest is two passes at the full count, two example
-    runs at the thread count their runtime chooses, and two more processes, which is
-    above the core count: the count is a measured choice (doc/validation.md). On 12
-    performance cores on 2026-09-13 the keystone took 592 s with the examples at one
-    worker, which then finished last, and 573 s at two, against 689 to 696 s with the
-    check sections in sequence.
+    every job spends what it is handed and no more.
+      Each benchmark pass is handed the whole count in --cpus. Its check sections run
+        cores/4 at once, and each section's pools take the cores over that number
+        (run_fel_benchmark.sh).
+      The two passes' device sections share one lock, since the device is one resource.
+      The examples take two workers.
+      The regression suite and the wavefront validation take one process each.
+    The sum at the widest is two passes at the full count, two example runs at the
+    thread count their runtime chooses, and two more processes. That sum is above the
+    core count by choice. doc/validation.md (val-the-keystone-rule) records the wall
+    times that set it.
     """
     cores = performance_cores()
     lock = (("LUCIFER_DEVICE_LOCK", str(art / "device.lock")),)
-    # The two passes reach their tier blocks together, and eleven single-thread
-    # processes each is twenty-two on twelve cores. The debug pass, which finishes
-    # last, runs its tiers first and says so in a marker; the production pass holds
-    # its own block until that marker appears and runs the rest of its work meanwhile.
+    # The two passes reach their tier blocks together. Eleven single-thread processes a
+    # pass make twenty-two on twelve cores. The debug pass, which finishes last, runs
+    # its tiers first and then writes a marker. The production pass holds its own tier
+    # block until that marker appears and runs the rest of its work meanwhile.
     tiers = str(art / "tiers-debug.done")
     return (
         Job("debug", (str(BENCHMARK), "--exe", str(DEBUG_EXE), "--build", "debug",
@@ -189,12 +190,10 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
                            f"--bmad-bin={BMAD / 'debug' / 'bin'}"), BMAD / "regression_tests"),
         Job("wavefront", (str(WAVEFRONT),), LUCIFER),
         # Two workers for the examples, this job's whole allocation while the five run
-        # together. With the check sections concurrent the passes finish sooner, and at
-        # one worker the examples finished last, 592 s of a 592 s keystone (2026-09-13).
-        # At two the keystone took 573 s and the debug pass finished last. Three workers,
-        # measured while the sections still ran in sequence, slowed the passes by more
-        # than they saved (doc/validation.md). A standalone run of run_examples.sh takes
-        # its own default instead.
+        # together. At one worker the examples job finishes last. At two the debug pass
+        # finishes last. Three workers slowed the benchmark passes by more than they
+        # saved. doc/validation.md (val-the-keystone-rule) records the wall times. A
+        # standalone run of run_examples.sh takes its own default instead.
         Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "2"), LUCIFER),
     )
 
@@ -212,7 +211,7 @@ def run_job(job: Job, log: pathlib.Path) -> Outcome:
             try:
                 out.returncode = proc.wait(timeout=job.timeout)
             except subprocess.TimeoutExpired:
-                # The wrapper's whole group, not the wrapper alone.
+                # Kill the wrapper's whole process group, and not the wrapper alone.
                 try:
                     os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                 except ProcessLookupError:
@@ -264,7 +263,11 @@ def preflight() -> None:
 
 @pytest.fixture(scope="session")
 def keystone() -> Keystone:
-    """Launch the five jobs at once and keep every outcome. Not a success gate."""
+    """Launch the five jobs at once and keep every outcome.
+
+    A failed job does not fail the fixture. The tests read the outcomes. A failed
+    preflight does fail it, before any job launches.
+    """
     preflight()
     chosen = os.environ.get("KEYSTONE_ARTIFACTS")
     art = pathlib.Path(chosen).resolve() if chosen else \
@@ -279,7 +282,7 @@ def keystone() -> Keystone:
         for name, fut in futures.items():
             try:
                 outcomes[name] = fut.result()
-            except Exception as exc:                   # run_job does not raise; belt and braces
+            except Exception as exc:                   # run_job does not raise. A pool fault lands here.
                 outcomes[name] = Outcome(name, art / f"{name}.log",
                                          error=f"runner failed: {type(exc).__name__}: {exc}")
     for name in JOB_NAMES:
@@ -302,7 +305,7 @@ def test_regeneration(keystone: Keystone) -> None:
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
-    this test; it never skips it.
+    this test. It never skips it.
     """
     bad = [n for n in JOB_NAMES if not keystone.outcomes.get(n, Outcome(n, pathlib.Path())).passed]
     if bad:

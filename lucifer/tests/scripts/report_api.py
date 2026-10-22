@@ -5,7 +5,7 @@ Generate doc/generated/api.md from the source's own routine headers.
 Bmad documents a routine in a `!+ ... !-` block above it, and util/getf reads exactly
 that convention. This script reads the same blocks out of the FEL sources, so the API
 reference is the code's own headers rather than a second description that can drift from
-them. Nothing here is written by hand, and the keystone regenerates the file and
+them. Nothing here is written by hand. The keystone suite regenerates the file and
 requires an empty diff.
 
 Deterministic by construction: files in sorted order, entries in source order, no
