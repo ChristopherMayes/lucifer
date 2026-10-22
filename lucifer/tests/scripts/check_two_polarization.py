@@ -1,31 +1,40 @@
 #!/usr/bin/env python3
 """
-Two-polarization checks (fel-physics.md sec-field vector convention): the radiation carries
-(Ex, Ey) when any FEL element is tilted, and an x-planar set followed by a y-planar
-set does the right thing. Held by symmetries and physics, not reference files:
+Two-polarization checks (fel-physics.md, sec-field, the vector convention). The
+radiation carries (Ex, Ey) when any FEL element is tilted, and an x-planar set followed
+by a y-planar set must behave correctly. Symmetries and physics hold the checks, and no
+reference file is involved:
 
-  1. Rotation identity: an all-y line (every element tilt = pi/2; symmetric probe --
-     round beam, no quads) fed the x/y-SWAPPED beam (the driver's swap_beam_xy check
-     instrument: the RNG draws its planes sequentially, so the generated beam itself
-     is never swap-symmetric) must reproduce the all-x line fed the original beam:
-     total power identical, sizes swapped. Both FEL modes. The only asymmetry left is
-     cos(pi/2) = 6e-17, so the level is near machine precision.
-  2. Crossed undulator (x-set then y-set): the x field only diffracts through the
-     y set -- its polarization-resolved dump power must match the same line with the
-     y set replaced by an equal drift (pure-diffraction reference) -- while the y
-     field grows from the x-set's microbunching (bunching is longitudinal and
-     polarization-blind: the crossed-polarized afterburner), far above its dark
-     floor. Both FEL modes, and the two modes agree at a priced level.
-  3. Ledger: the unaveraged TD closure holds on the crossed line (kick/deposit are
-     exact duals per component).
-  4. Thread identity: 1 vs 8 threads byte-identical on the crossed unaveraged run.
-  5. Helical re-anchor: a helical run forced onto the two-polarization path (a
-     y-polarized zero-power seed makes Ey live) reproduces the scalar-path run's
-     diag -- measured level (the vector path evaluates the same physics through
-     differently-ordered arithmetic).
-  6. Refusals: tilt on a helical element; tilt with the transcribed-Genesis maps.
+  1. Rotation identity. An all-y line has every element at tilt = pi/2, and the probe is
+     symmetric, with a round beam and no quads. The all-y line is fed the x/y-swapped
+     beam from the driver's swap_beam_xy check instrument. The RNG draws its planes in
+     sequence, so the generated beam itself is never swap-symmetric. The all-y line must
+     reproduce the all-x line fed the original beam: total power identical, sizes
+     swapped. Both FEL modes run. In the averaged mode the only asymmetry left is
+     cos(pi/2) = 6e-17, so the level is near machine precision. The unaveraged mode is
+     held at 1e-5, since its vector path carries a betatron-current radiation that the
+     scalar path omits.
+  2. Crossed undulator, an x set then a y set. The x field only diffracts through the y
+     set, so its polarization-resolved dump power must match the same line with the y
+     set replaced by an equal drift, a pure-diffraction reference. The y field grows
+     from the microbunching of the x set, far above its dark floor. Bunching is
+     longitudinal and blind to polarization: this is the crossed-polarized afterburner.
+     Both FEL modes run, and the two modes must agree within 0.5 in |ln| of the y power.
+  3. Ledger. The unaveraged time-dependent closure holds on the crossed line, since
+     kick and deposit are exact duals per component.
+  4. Thread identity. 1 and 8 threads are byte-identical on the crossed unaveraged run.
+  5. Helical re-anchor. A helical run is forced onto the two-polarization path by a
+     y-polarized seed of negligible power, which makes Ey live. The run must reproduce
+     the scalar-path run's diag to TOL_HEL. The vector path evaluates the same physics
+     through arithmetic in a different order.
+     Handedness. A cold beam is driven by the scalar seed and by each circular pair of
+     the same intensity. In both modes the pair (1, +i) must reproduce the scalar seed's
+     energy modulation, and the pair (1, -i) must leave the beam unmodulated.
+  6. Refusals. Tilt on a helical element. Tilt with the transcribed-Genesis maps.
+  7. An imported field carrying Ey decides the run's planes, with or without the seed's
+     polarization in the deck.
 
-Run by the benchmark harness; exits nonzero on failure.
+Run by the benchmark harness. Exits nonzero on failure.
 """
 
 from __future__ import annotations
@@ -45,7 +54,7 @@ import fieldio
 from nml import to_groups
 
 FAILED = False
-TOL_HEL = 1e-12  # measured 7.2e-15: the scalar envelope IS the co-rotating pair
+TOL_HEL = 1e-12  # The scalar envelope is the co-rotating pair. The two paths differ by 7.2e-15.
 
 NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
@@ -77,10 +86,10 @@ UV = "wiggler::*[FEL_METHOD] = unaveraged\n"
 
 
 def ss(nml):
-    """Steady-state variant: single slice, no slippage, no escape -- the clean frame
-    for the rotation and crossed-undulator physics (an 8-slice TD window loses the
-    whole field to slippage over this line; measured, which is why these checks are
-    SS while the ledger/thread checks stay TD)."""
+    """Steady-state variant: a single slice, no slippage and no escape. This is the clean
+    frame for the rotation and crossed-undulator physics. An 8-slice time-dependent window
+    loses the whole field to slippage over this line, so these checks run in steady state
+    while the ledger and thread checks stay time dependent."""
     out = nml.replace('  beam_init%distribution_type(3) = "GRID"\n', "")
     out = out.replace("  beam_init%grid(3)%x_min = -4e-10\n", "")
     out = out.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
@@ -171,11 +180,12 @@ def main():
         pwr = np.abs(dx_[:n, :, 2] - dy_[:n, :, 2]).max() / dx_[:n, :, 2].max()
         sw = max(np.abs(dx_[-1, :, 8] / dy_[-1, :, 9] - 1).max(),
                  np.abs(dx_[-1, :, 9] / dy_[-1, :, 8] - 1).max())
-        # Averaged: machine precision (both runs use the pol-projected coupling).
-        # Unaveraged: the x-run takes the scalar path (deposits only the wiggle-
-        # direction current, by convention) while the y-run takes the vector path,
-        # which also carries the tiny betatron-current radiation -- a real model
-        # refinement of the vector path, measured 4.1e-6 here, tolerated not hidden.
+        # Averaged: machine precision, since both runs use the polarization-projected
+        # coupling. Unaveraged: the x-run takes the scalar path, which by convention
+        # deposits only the current in the wiggle direction. The y-run takes the vector
+        # path, which also carries the tiny betatron-current radiation. That is a model
+        # refinement of the vector path. The difference is 4.1e-6 here, and the tolerance
+        # of 1e-5 admits it.
         tol_p = 1e-8 if mode == "averaged" else 1e-5
         check(f"rotation, {mode}: power |x-run - y-run| / max, all records", pwr, tol_p)
         check(f"rotation, {mode}: beam-size swap identity at exit", sw, 1e-8)
@@ -199,7 +209,7 @@ def main():
     lnr = abs(np.log(lnr_modes["averaged"][1] / lnr_modes["unaveraged"][1]))
     check("crossed: averaged vs unaveraged y-power, |ln ratio| (priced)", lnr, 0.5)
 
-    # 3. Ledger on a TD crossed unaveraged run (slippage + escape live).
+    # 3. Ledger on a time-dependent crossed unaveraged run, with slippage and escape live.
     run(exe, wd, "p2t_uv", NML.format(lat="p2_c_uv.bmad", root="p2t_uv",
                                       extra="  keep_escaped_field = T\n"))
     led = np.loadtxt(wd / "p2t_uv.ledger.txt")
@@ -208,19 +218,19 @@ def main():
     check("crossed: unaveraged TD ledger closure, both components",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
 
-    # 4. Thread identity on the TD crossed unaveraged run.
+    # 4. Thread identity on the time-dependent crossed unaveraged run.
     run(exe, wd, "p2t_uv1", NML.format(lat="p2_c_uv.bmad", root="p2t_uv1",
                                        extra="  keep_escaped_field = T\n"), threads="1")
     same = all((wd / f"p2t_uv{s}").read_bytes() == (wd / f"p2t_uv1{s}").read_bytes()
                for s in (".diag.txt", ".ledger.txt"))
     check("crossed: 1-thread vs 8-thread byte-identical (1 = yes)", 0.0 if same else 1.0, 0.5)
 
-    # 5. Helical re-anchor: scalar path vs the vector path, on real physics -- a dark
-    #    TD run with physical shot noise (a quiet start's dark power is the numerical
-    #    floor, meaningless to compare). The helical quiver's spontaneous radiation is
-    #    purely co-rotating, which the scalar envelope holds whole and the vector path
-    #    splits into (Ex, Ey). The total power must agree. Ey is forced live by a
-    #    negligible y seed (1e-30 W).
+    # 5. Helical re-anchor: the scalar path against the vector path, on real physics.
+    #    This is a dark time-dependent run with physical shot noise. A quiet start's
+    #    dark power is the numerical floor and means nothing to compare. The helical
+    #    quiver's spontaneous radiation is purely co-rotating. The scalar envelope holds
+    #    it whole and the vector path splits it into (Ex, Ey). The total power must
+    #    agree. A negligible y seed, 1e-30 W, forces Ey live.
     (wd / "p2_hel.bmad").write_text("call, file = spont_probe.bmad\n")
     run(exe, wd, "p2h_v0", NML.format(lat="p2_hel.bmad", root="p2h_v0",
                                       extra="  seed_polarization = 'y'\n").replace(
@@ -233,13 +243,13 @@ def main():
     check("helical re-anchor: vector vs scalar path, shot-noise power", hel, TOL_HEL,
           note="(co-rotating radiation, two representations)")
 
-    # 5b. Handedness. A total power cannot tell the two circular polarizations apart,
-    #     and the averaged vector once carried the counter-rotating pair while the
-    #     unaveraged Lorentz force selected the co-rotating one, so a seed drove one mode
-    #     and not the other. A cold, nearly chargeless beam is driven by a uniform seed
-    #     as the scalar envelope and as each circular pair of the same total intensity,
-    #     and the rms energy modulation at the exit says which pair the mode couples to.
-    #     Both modes must prefer (1, +i), and each must reproduce its scalar seed with it.
+    # 5b. Handedness. A total power cannot tell the two circular polarizations apart.
+    #     The averaged vector once carried the counter-rotating pair while the unaveraged
+    #     Lorentz force selected the co-rotating one, so a seed drove one mode and not
+    #     the other. A cold, nearly chargeless beam is driven by a uniform seed as the
+    #     scalar envelope and as each circular pair of the same total intensity. The rms
+    #     energy modulation at the exit says which pair the mode couples to. Both modes
+    #     must prefer (1, +i), and each must reproduce its scalar seed with it.
     print("--- helical handedness (seeded, cold, both modes):")
     (wd / "p2_hel_uv.bmad").write_text("call, file = spont_probe.bmad\n" + UV)
     #     The seed is strong and the beam cold enough that the modulation is the seed's:
@@ -279,9 +289,9 @@ def main():
               abs(sig["plus"] - sig["scalar"]) / sig["scalar"], 1e-6,
               note=f"({sig['plus']:.4f} vs {sig['scalar']:.4f} eV)")
         # The counter-rotating pair still drives the electron at the beat of the two
-        # rotations, which averages to nothing over whole periods and leaves a residue
-        # from the ramps: 1e-3 of the modulation in the unaveraged mode here, 4e-6 in the
-        # averaged mode, which carries no beat at all. Two orders under the modulation.
+        # rotations. The beat averages to nothing over whole periods and leaves a residue
+        # from the ramps: 1e-3 of the modulation in the unaveraged mode here, and 4e-6 in
+        # the averaged mode, which carries no beat at all. Both are under the 1e-2 level.
         check(f"handedness, {mode}: the pair (1, -i) leaves the beam unmodulated",
               sig["minus"] / sig["scalar"], 1e-2, note=f"({sig['minus']:.3e} eV)")
 
@@ -289,7 +299,7 @@ def main():
     (wd / "p2_hel_tilt.bmad").write_text("call, file = spont_probe.bmad\nUNDS[tilt] = 0.3\n")
     ok1 = refuse(exe, wd, "p2f1", NML.format(lat="p2_hel_tilt.bmad", root="p2f1", extra=""),
                  "TILT ON A HELICAL FEL ELEMENT")
-    # The transcribed maps are a run switch now, so the refusal is asked for in the deck.
+    # The transcribed maps are a run switch, transport_model, so the deck asks for them.
     (wd / "p2_tr_tilt.bmad").write_text(
         "call, file = crossed_probe.bmad\nuse, CROSSED\n")
     ok2 = refuse(exe, wd, "p2f2", NML.format(lat="p2_tr_tilt.bmad", root="p2f2",
@@ -297,13 +307,13 @@ def main():
     check("refusal: tilt on helical (1 = yes)", 0.0 if ok1 else 1.0, 0.5)
     check("refusal: tilt with transcribed maps (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
 
-    # 7. An imported vector field decides the run's planes. The state was set at lattice
-    #    setup from the seed's polarization and the tilts, and a file carrying Ey under a
-    #    deck that said nothing left it at one plane: the stats and the device allocated
-    #    one and the first record wrote past it, an array bound in the debug build and a
-    #    bus error in the production one. The source writes a y-seeded eight-slice field
-    #    on the untilted helical line, and the restart from it omits the seed's
-    #    polarization, against the control that states it.
+    # 7. An imported vector field decides the run's planes. When the state was set at
+    #    lattice setup from the seed's polarization and the tilts alone, a file carrying
+    #    Ey under a deck that stated no polarization left the run at one plane. The stats
+    #    and the device allocated one plane and the first record wrote past it: an array
+    #    bound in the debug build and a bus error in the production one. The source here
+    #    writes a y-seeded eight-slice field on the untilted helical line. The restart
+    #    from it omits the seed's polarization, against the control that states it.
     print("--- an imported vector field sets the polarization state (TD, helical):")
     run(exe, wd, "p2i_src", NML.format(lat="p2_hel.bmad", root="p2i_src",
                                        extra="  seed_polarization = 'y'\n  write_initial = T\n"

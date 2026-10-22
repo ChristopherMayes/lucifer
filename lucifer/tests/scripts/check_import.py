@@ -1,32 +1,41 @@
 #!/usr/bin/env python3
 """
-Distribution-import checks: the bunch_struct -> FEL slices resampler,
-transcribed from Genesis's SDDSBeam.cpp, validated along the RNG boundary.
+Distribution-import checks: the resampler from a bunch_struct into FEL slices,
+transcribed from Genesis's SDDSBeam.cpp and checked along the RNG boundary.
 
-The driver generates a bunch from Bmad's beam_init_struct (a nm-scale Gaussian test
-bunch -- sized to the FEL time window's economics, not to a physical accelerator
-bunch), writes it as a Genesis DISTRIBUTION file (t = -tau/c, so both codes bin the
-identical particle set identically), imports it through the transcribed resampler, and
-Genesis imports the same file through &importdistribution. Then:
+The driver generates a bunch from Bmad's beam_init_struct. The bunch is a Gaussian test
+bunch of nm scale, sized to what the FEL time window can afford rather than to a
+physical accelerator bunch. The driver writes the bunch as a Genesis DISTRIBUTION file
+with t = -tau/c, so both codes bin the identical particle set identically. Lucifer
+imports the file through the transcribed resampler, and Genesis imports the same file
+through &importdistribution. Then:
 
-exact (RNG-free), tolerance at roundoff:
-  current   The per-slice current profile, ours vs Genesis's beam dump. Window
-            membership and the weighted sum contain no random numbers.
-  moments   The generated bunch carries the specified emittance (matched generation
-            comes from init_beam_distribution and the lattice Twiss; there is no
-            match transform in the import).
-  split     Coincident w/3 + 2w/3 copies of every bunch particle before import leave
-            the moments (unweighted, over coincident copies) and the current profile
-            (weighted sums) unchanged.
-  threads   The same seed at 1 and 8 threads gives byte-identical diag output (the
-            import runs serially before tracking).
+exact, with no RNG, at a tolerance of roundoff except where stated:
+  current   The per-slice current profile, Lucifer's against Genesis's beam dump.
+            Window membership and the weighted sum contain no random numbers.
+  moments   The generated bunch carries the specified emittance, within 10 percent.
+            The matched generation comes from init_beam_distribution and the lattice
+            Twiss, and the import has no match transform.
+  split     Coincident w/3 + 2w/3 copies of every bunch particle before the import
+            leave the moments unchanged, unweighted over the coincident copies. The
+            current profile, a weighted sum, is unchanged too.
+  openPMD   The same bunch written by hdf5_write_beam and read back through
+            beam_init%position_file reproduces the moments and the current profile.
+  refusal   A bunch with zero total charge is refused.
+  threads   The same seed at 1 and 8 threads gives byte-identical diag output, since
+            the import runs serially before tracking.
+  quiet     The quiet-loaded current of the same Gaussian description matches the
+            analytic Gaussian profile.
 
-statistical (the resampling and loading RNG):
-  twiss     Per-slice Twiss/emittance measured from the imported dump must recover
-            the lattice Twiss and the beam_init emittance, central slices, ~percent.
-  startup   Dark-start SASE power after one segment, ours vs Genesis's, each code
-            resampling with its own RNG from the same file: mean over seeds and
-            slices within |ln ratio| < 0.30 (the check_sase_startup check, reused).
+statistical, through the resampling and loading RNG:
+  twiss     The per-slice Twiss and emittance of the imported dump, averaged over the
+            central slices, must recover the lattice Twiss and the beam_init emittance
+            within 5 percent in beta and emittance and 10 percent in alpha.
+  startup   Dark-start SASE power after one segment, Lucifer's against Genesis's, each
+            code resampling with its own RNG from the same file. The mean over seeds
+            and slices must hold |ln ratio| < 0.30, the check of check_sase_startup.
+  cross     The imported current matches the analytic Gaussian, in rms over the live
+            slices.
 
 Usage: check_import.py --exe <lucifer> --genesis <genesis4> --workdir <dir> [--seeds N]
 The workdir must hold Aramis-1seg.lat and aramis_1seg.bmad. Exit 0 on pass.
@@ -49,8 +58,9 @@ from nml import to_groups
 
 import pool
 
-# The test bunch: Gaussian, peak current ~3 kA at sigma_z = 1.2 nm (charge 30.1 fC),
-# Benchmark1-SASE energy and emittance. The window: 24 slices of 3 wavelengths.
+# The test bunch is Gaussian, with a peak current of about 3 kA at sigma_z = 1.2 nm and a
+# charge of 30.1 fC, at the Benchmark1-SASE energy and emittance. The window is 24 slices
+# of 3 wavelengths.
 LAMBDA0 = 1e-10
 SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
@@ -59,9 +69,9 @@ SLEN = NSLICE * SAMPLE * LAMBDA0
 GAMMA0 = 11357.82
 NORM_EMIT = 4e-7
 SIG_PZ = 1 / GAMMA0            # gen_delgam = 1 in fractional momentum
-# The lattices carry the matched FODO Twiss in their beginning statements;
-# init_beam_distribution generates matched bunches from them (no match transform
-# exists in the import -- a Bmad lattice IS the optics specification).
+# The lattices carry the matched FODO Twiss in their beginning statements, and
+# init_beam_distribution generates matched bunches from them. The import has no match
+# transform, since a Bmad lattice is the optics specification.
 LATTICE_TWISS = dict(betax=8.53711, alphax=-0.703306, betay=17.3899, alphay=1.40348)
 
 NML = """! flat keys; routed into the three groups by nml.to_groups
@@ -171,9 +181,9 @@ def write_nml(path, root, seed, extra="", source=BEAM_INIT_SOURCE):
 
 
 def read_import_file(wd, root):
-    """The RNG-free instruments the exactness checks read -- the analysis moments and the
-    per-slice current profile -- from <out_root>.import.txt. Program stdout is for humans
-    and is deliberately not parsed (doc/user-guide.md)."""
+    """The RNG-free quantities the exact checks read, the analysis moments and the
+    per-slice current profile, from <out_root>.import.txt. Program stdout is for people
+    to read and is not parsed (doc/user-guide.md)."""
     path = pathlib.Path(wd) / (root + ".import.txt")
     moments = None
     currents = []
@@ -189,10 +199,9 @@ def read_import_file(wd, root):
     return moments, np.array(currents)
 
 
-# Both formats appear here: the tracker's dumps are openPMD and Genesis's are its own, and
-# beamio reads either. It is told the window, which an openPMD dump does not carry and a
-# Genesis dump states, so for a Genesis file the arguments are a cross-check on what the
-# deck asked for.
+# Both formats appear here. The tracker's dumps are openPMD, Genesis's are its own, and
+# beamio reads either. beamio is told the window, which an openPMD dump does not carry and
+# a Genesis dump states. For a Genesis file the arguments check what the deck asked for.
 
 
 def load_dump_currents(fn):
@@ -227,22 +236,22 @@ def main():
 
     ok = True
 
-    # ---- The RNG-free runs: generate, write the shared file, import, dump, stop.
+    # ---- The RNG-free runs: generate, write the shared file, import, dump and stop.
     write_nml(w/"imp_ref.nml", "impref", 1000,
               extra='  write_genesis_dist = "impdist.h5"\n'
                     '  write_openpmd_file = "impopmd.h5"\n  load_only = T\n')
     run([args.exe, "imp_ref.nml"], w/"imp_ref.log", env=env1)
     mom_ref, cur_ref = read_import_file(w, "impref")
 
-    # moments sanity: the bunch is generated matched to the lattice Twiss by
-    # init_beam_distribution. The measured whole-bunch moments must carry the spec.
+    # moments: init_beam_distribution generates the bunch matched to the lattice Twiss.
+    # The whole-bunch moments must carry the specified emittance, within 10 percent.
     ex, ey = mom_ref[5], mom_ref[6]
     print(f"bunch moments: normalized emittance ex = {ex:.6e}, ey = {ey:.6e} (spec {NORM_EMIT:.1e})")
     if not (0.9*NORM_EMIT < ex < 1.1*NORM_EMIT and 0.9*NORM_EMIT < ey < 1.1*NORM_EMIT):
         print("FAIL: generated bunch does not carry the specified emittance")
         ok = False
 
-    # current: ours vs Genesis's import of the same file, roundoff.
+    # current: Lucifer's import against Genesis's import of the same file, to roundoff.
     (w/"imp_gen_write.in").write_text(GENESIS_WRITE_DECK.format(
         root="impgw", dist="impdist.h5", lambda0=LAMBDA0, gamma0=GAMMA0,
         slen=SLEN, sample=SAMPLE))
@@ -273,9 +282,9 @@ def main():
         print("FAIL: split-weight invariance broken")
         ok = False
 
-    # openPMD round trip: the same bunch written by Bmad's hdf5_write_beam and read
-    # back through beam_init%position_file must reproduce the RNG-free outputs to
-    # file precision -- the import's second input path, exercised end to end.
+    # openPMD round trip: the same bunch written by Bmad's hdf5_write_beam and read back
+    # through beam_init%position_file must reproduce the RNG-free outputs to file
+    # precision. This runs the import's second input path end to end.
     write_nml(w/"imp_opmd.nml", "impopmd", 1000,
               extra='  load_only = T\n',
               source='  beam_init%position_file = "impopmd.h5"\n  beam_init%n_particle = 2048\n'
@@ -289,8 +298,8 @@ def main():
         print("FAIL: openPMD round trip does not reproduce the bunch")
         ok = False
 
-    # zero-charge refusal: a chargeless bunch (openPMD without charge data, unset
-    # beam_init%bunch_charge) must be refused, not imported as a dark beam.
+    # zero-charge refusal: a chargeless bunch, as from openPMD without charge data and an
+    # unset beam_init%bunch_charge, must be refused and not imported as a dark beam.
     write_nml(w/"imp_dark.nml", "impdark", 1000, extra='  load_only = T\n',
               source=BEAM_INIT_SOURCE.replace("bunch_charge = 3.01e-14", "bunch_charge = 0"))
     with open(w/"imp_dark.log", "w") as fh:
@@ -302,10 +311,10 @@ def main():
     else:
         print("zero-charge refusal: refused")
 
-    # twiss (statistical): the imported dump's central slices recover the targets.
-    # Statistics note: each slice has npart/beamlet_size = 256 independent phase-space seeds,
-    # so a single slice's Twiss carries ~1/sqrt(256) = 6% noise and a max over slices
-    # would check on order statistics. Check on the mean over central slices instead.
+    # twiss, statistical: the central slices of the imported dump recover the targets.
+    # Each slice has npart/beamlet_size = 256 independent phase-space seeds, so a single
+    # slice's Twiss carries about 1/sqrt(256) = 6% noise. A max over slices would check
+    # order statistics, so the check is on the mean over the central slices.
     slices, cur = load_dump_slices(w/"impref-initial.beam.h5")
     central = [i for i in range(len(slices)) if cur[i] > 0.5*cur.max()]
     berr, aerr, eerr = [], [], []
@@ -327,7 +336,8 @@ def main():
         print("FAIL: imported slices do not recover the specified optics")
         ok = False
 
-    # threads (exact): same seed, 1 vs 8 threads, tracked this time. Diag byte-equal.
+    # threads, exact: the same seed at 1 and 8 threads, tracked this time. The diag files
+    # must be byte-equal.
     write_nml(w/"imp_t1.nml", "impt1", 1000)
     write_nml(w/"imp_t8.nml", "impt8", 1000)
     run([args.exe, "imp_t1.nml"], w/"imp_t1.log", env=env1)
@@ -340,9 +350,10 @@ def main():
         print("FAIL: import + tracking not thread-count independent")
         ok = False
 
-    # startup (statistical): both codes resample the same file with their own RNG.
-    # Each seed's pair is a chain (our run writes the dist file its genesis twin
-    # imports). The chains are independent across seeds and go through the pool.
+    # startup, statistical: both codes resample the same file with their own RNG. Each
+    # seed's pair is a chain, since the Lucifer run writes the distribution file its
+    # Genesis twin imports. The chains are independent across seeds and go through the
+    # pool.
     def seed_chain(k):
         seed = 2000 + 17*k
         dist = f"impdist_s{k}.h5"
@@ -360,7 +371,7 @@ def main():
         ours.append(final_powers(w/f"imps{k}.diag.txt", NSLICE))
         with h5py.File(w/f"impg{k}.out.h5") as h5:
             theirs.append(h5["Field/power"][-1, :])
-    # Compare over slices that carry beam in both (the Gaussian tail slices are dark).
+    # Compare over slices that carry beam in both codes. The Gaussian tail slices are dark.
     po = np.concatenate(ours); pg = np.concatenate(theirs)
     m = (po > 0) & (pg > 0)
     lr = math.log(po[m].mean() / pg[m].mean())
@@ -370,15 +381,15 @@ def main():
         print("FAIL: startup power after import disagrees between the codes")
         ok = False
 
-    # ---- Cross-path equivalence through the beam_init interface: the same
-    # Gaussian description, quiet-loaded directly (analytic per-slice evaluation) and
-    # imported (real particles resampled). The quiet-load must match the analytic
-    # Gaussian profile exactly -- this is also the sqrt(2pi) mutation check on the
-    # driver's current derivation -- and the import must match it statistically.
+    # ---- Cross-path equivalence through the beam_init interface. The same Gaussian
+    # description is quiet-loaded directly, by analytic per-slice evaluation, and
+    # imported, with real particles resampled. The quiet load must match the analytic
+    # Gaussian profile exactly, and a dropped sqrt(2pi) in the driver's current
+    # derivation fails here. The import must match the profile statistically.
     # The window is stated, so the bunch is centered in it and the comparison below is
-    # against the Gaussian at the window's own center. The default window would hold the
-    # line's slippage as well and place the bunch low, which is a different geometry and
-    # not what this check measures: it measures the current derivation.
+    # against the Gaussian at the window's own center. The default window would also hold
+    # the line's slippage and place the bunch low. That is a different geometry, and this
+    # check measures the current derivation.
     (w/"imp_xq.nml").write_text(to_groups(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
         sample=SAMPLE, nslice=NSLICE, extra=f'  load_only = T\n  n_slice = {NSLICE}\n',
         source="""  beam_init%n_particle = 512
@@ -400,11 +411,12 @@ def main():
     if dev_q > 1e-12:
         print("FAIL: the quiet-load's derived current is not the described Gaussian")
         ok = False
-    # The import's profile (cur_ref, measured earlier from the same description):
-    # its own slice centers, bunch center fitted (the import min-shifts positions, and
-    # resample%n_slice truncates the +4 sigma tail, so the fit is over a clipped profile --
-    # rms over the live slices is the honest statistic. The mutations this check exists
-    # to catch, a dropped sqrt(2pi) or dslen-for-spacing, sit at 0.65-1.5 of peak).
+    # The import's profile is cur_ref, read earlier from the same description, on its
+    # own slice centers with the bunch center fitted. The import min-shifts positions,
+    # and resample%n_slice truncates the +4 sigma tail, so the fit is over a clipped
+    # profile and rms over the live slices is the statistic that applies. The mutations
+    # this check exists to catch, a dropped sqrt(2pi) or dslen in place of the spacing,
+    # sit at 0.65-1.5 of peak.
     si = np.arange(len(cur_ref)) * sp
     c0 = (cur_ref * si).sum() / cur_ref.sum()
     ana_i = q_charge * 2.99792458e8 / (math.sqrt(2*math.pi) * sig_z) * np.exp(-(si - c0)**2 / (2*sig_z**2))

@@ -1,41 +1,42 @@
 #!/usr/bin/env python3
 """
-Phasing checks (fel-physics.md sec-phasing): how the beam-field phase behaves between
-undulator segments, held by symmetries, closed forms and Genesis itself.
+Phasing checks (fel-physics.md, sec-phasing): how the phase between beam and field
+behaves between undulator segments, held by symmetries, closed forms and Genesis itself.
 
-  1. Re-anchor baseline (relative mode, the default): scanning an inter-segment gap
+  1. Re-anchor baseline, in relative mode, the default. Scanning an inter-segment gap
      by fractions of 2 gamma^2 lambda leaves the bunching phase entering the next
-     segment flat -- the transcription of Genesis's drift autophasing (measured flat
-     on Genesis itself the same way; the residual is a slow adiabatic trend).
-  2. The Z_OFFSET knob: displacing the downstream wiggler by delta (standard Bmad
-     misalignment, anchor at the nominal position) shifts that phase by exactly
-     -2 pi delta / (2 gamma^2 lambda) -- the analytic drift slip rate, no fit.
-  3. Cross-mode identity: in absolute mode (bmad_com[absolute_time_tracking] = T in
-     the lattice, honored through Bmad's own resolver) the same phase arrives via the
-     real gap length instead: the absolute-mode gap scan must reproduce the relative-
-     mode knob scan point by point.
-  4. Phase-shifter parity vs Genesis4: Genesis scans PHASESHIFTER phi (which needs
-     finite length to register -- a zero-length one silently does nothing); we scan
-     z_offset with delta = phi * 2 gamma^2 lambda / (2 pi). Same physical scan; the
-     bunching-phase curves must agree point by point. This anchors the sign
-     convention ("delay goes backwards") against Genesis's own element.
-  5. Chicane: a four-bend closed bump between segments (Bmad seam tracks the beam;
-     the radiation drifts the chord from ele%floor). Relative mode drops the
-     geometric fraction (Genesis's "chicane is always autophasing"); absolute mode
-     ramps with the bend angle at the slope an independent geometric computation of
-     d(arc - chord)/d(angle) predicts -- itself cross-checked against the textbook
-     small-angle path lengthening theta^2 (2 L_bend/3 + L_drift). The unaveraged
-     ledger closes across a chicane sandwich.
-  6. Time-dependent chicane: the window rotations the geometric delay buys (the
-     steady-state sections above never exercise them -- slippage is a no-op with one
-     slice). A delay of a few wavelengths must bank exactly floor(delay/lambda) more
-     escaped slices than the straight-line twin of the same arc length, and the run
+     segment flat. This is the transcription of Genesis's drift autophasing, and
+     Genesis is flat under the same scan. The residual is a slow adiabatic trend.
+  2. The z_offset knob. Displacing the downstream wiggler by delta, a standard Bmad
+     misalignment anchored at the nominal position, shifts that phase by exactly
+     -2 pi delta / (2 gamma^2 lambda). That is the analytic drift slip rate, with no fit.
+  3. Cross-mode identity. In absolute mode, bmad_com[absolute_time_tracking] = T in the
+     lattice and honored through Bmad's own resolver, the same phase arrives through the
+     real gap length instead. The absolute-mode gap scan must reproduce the
+     relative-mode knob scan point by point.
+  4. Phase-shifter parity against Genesis4. Genesis scans the PHASESHIFTER phi. The
+     PHASESHIFTER needs a finite length to register, since a zero-length one silently
+     does nothing. Lucifer scans z_offset with delta = phi * 2 gamma^2 lambda / (2 pi).
+     The physical scan is the same, and the bunching-phase curves must agree point by
+     point. This anchors the sign convention, "delay goes backwards", against
+     Genesis's own element.
+  5. Chicane. A four-bend closed bump sits between segments. The Bmad seam tracks the
+     beam, and the radiation drifts the chord taken from ele%floor. Relative mode drops
+     the geometric fraction, as in Genesis, where a chicane is always autophasing.
+     Absolute mode ramps with the bend angle at the slope of d(arc - chord)/d(angle)
+     from an independent geometric computation. That computation is checked in turn
+     against the textbook small-angle path lengthening theta^2 (2 L_bend/3 + L_drift).
+     The unaveraged ledger closes across a chicane sandwich.
+  6. Time-dependent chicane: the window rotations that the geometric delay produces.
+     The steady-state sections above never exercise them, since slippage does nothing
+     with one slice. A delay of a few wavelengths must bank exactly floor(delay/lambda)
+     more escaped slices than the straight-line twin of the same arc length. The run
      must be byte-identical at 1 and 8 threads.
-  7. Refusals: a non-closed-bump break; a bend under the genesis-model
-     interludes; a z_offset exceeding its upstream break; a z_offset on the first
-     element (no break to displace into).
+  7. Refusals. A break that is not a closed bump. A bend under the genesis-model
+     interludes. A z_offset exceeding its upstream break. A z_offset on the first
+     element, which has no break to displace into.
 
-Run by the benchmark harness; exits nonzero on failure. Needs genesis4 for section 4.
+Run by the benchmark harness. Exits nonzero on failure. Needs genesis4 for section 4.
 """
 
 from __future__ import annotations
@@ -59,17 +60,19 @@ FAILED = False
 TWO_G2L = 2 * 11357.82**2 * 1e-10       # 2 gamma^2 lambda: one full turn of gap phase.
 LAM = 1e-10
 
-TOL_FLAT = 5e-3          # measured 1.5e-3 span: the re-anchor baseline's adiabatic trend.
-TOL_KNOB = 5e-3          # measured 1.5e-3: knob ramp vs the exact analytic slope.
-TOL_XMODE = 5e-3         # measured 1.2e-3: absolute gap scan vs relative knob scan.
-TOL_PARITY = 1e-6        # measured 1.9e-8 from shared dumps: knob curve vs PHASESHIFTER.
-TOL_CHIC_SLOPE = 2e-3    # measured 6.8e-4: absolute chicane ramp vs the geometric slope
-                         #   (583 wavelengths of delay at the base angle).
-TOL_LEDGER = 1e-4        # measured 4.0e-6: unaveraged ledger closure across the chicane.
-TOL_CF = 1e-6            # measured 6.4e-8: the 2D trace vs the small-angle closed form.
-TOL_POWER = 1e-6         # measured 9.3e-9 from shared dumps: exit power vs phi, our knob
-                         #   vs Genesis's shifter (1.4e-4 on independently loaded beams --
-                         #   that measures the loaders, so this tier shares the start).
+# Each comment gives the level the check reads. doc/validation.md
+# (val-phasing-between-segments-measured) records the levels.
+TOL_FLAT = 5e-3          # The adiabatic trend of the re-anchor baseline spans 1.5e-3.
+TOL_KNOB = 5e-3          # Knob ramp against the exact analytic slope: 1.5e-3.
+TOL_XMODE = 5e-3         # Absolute gap scan against relative knob scan: 1.2e-3.
+TOL_PARITY = 1e-6        # Knob curve against PHASESHIFTER, from shared dumps: 1.9e-8.
+TOL_CHIC_SLOPE = 2e-3    # Absolute chicane ramp against the geometric slope: 6.8e-4,
+                         #   with 583 wavelengths of delay at the base angle.
+TOL_LEDGER = 1e-4        # Unaveraged ledger closure across the chicane: 4.0e-6.
+TOL_CF = 1e-6            # The 2D trace against the small-angle closed form: 6.4e-8.
+TOL_POWER = 1e-6         # Exit power against phi, the knob against Genesis's shifter, from
+                         #   shared dumps: 9.3e-9. Independently loaded beams read 1.4e-4,
+                         #   which measures the loaders, so this check shares the start.
 
 LAT2SEG = """no_digested
 parameter[geometry] = open
@@ -90,10 +93,10 @@ use, SEG
 
 # The grids here are odd on purpose, as in check_harmonics and for the same reason. This
 # check compares a phase curve against Genesis at 1e-6, and Genesis propagates the field
-# on half-integer wavenumbers when ngrid is even. Lucifer's kernel is
-# correct now, so the comparison has to run where the reference is right. At 128 and 64
-# the two checks below read 1.0e-6 and 1.0e-5 against a 1e-6 level. Convert them once
-# Genesis is fixed upstream.
+# on half-integer wavenumbers when ngrid is even. Lucifer's kernel is correct at both
+# parities, so the comparison has to run where the reference is right. At 128 and 64 the
+# two checks below read 1.0e-6 and 1.0e-5 against a 1e-6 level. Convert them once Genesis
+# is fixed upstream. doc/validation.md (val-the-transverse-grid) has the account.
 
 LATCHIC = """no_digested
 parameter[geometry] = open
@@ -280,8 +283,9 @@ fft_fieldsolver = true
 &end
 """
 
-# lambda0 and nbins are the deck's: an openPMD beam file carries the slice partition and
-# not the radiation it was sliced on. Both match GEN_PREP, which writes the shared dumps.
+# lambda0 and beamlet_size come from this namelist. An openPMD beam file carries the slice
+# partition and not the radiation it was sliced on. Both match GEN_PREP, which writes the
+# shared dumps.
 NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{tag}.bmad"
   out_root = "{tag}"
@@ -356,12 +360,12 @@ def escaped_count(wd, tag):
 
 
 def chicane_delay(ang):
-    """arc - chord of the four-bend closed bump, exact 2D geometry, independently of
-    the walk's floor arithmetic: bends of arc length lb and bend angle +a,-a,-a,+a
-    with drifts ld between (and the outer DD pieces adding straight length only)."""
+    """arc - chord of the four-bend closed bump, from exact 2D geometry and independent
+    of the walk's floor arithmetic. The bends have arc length lb and bend angles +a, -a,
+    -a, +a, with drifts ld between. The outer DD pieces add straight length only."""
     lb, ld = 0.05, 0.025
-    # Trace the reference: (x, z, angle). Bend of angle a: chord lb*sin(a/2)/(a/2) at
-    # heading (angle_in + a/2). Drift: ld at current heading.
+    # Trace the reference as (x, z, angle). A bend of angle a is a chord of
+    # lb*sin(a/2)/(a/2) at heading (angle_in + a/2). A drift is ld at the current heading.
     x = z = th = 0.0
     arc = 0.0
     for piece, a in (("b", ang), ("d", 0), ("b", -ang), ("d", 0), ("b", -ang), ("d", 0), ("b", ang)):
@@ -397,8 +401,8 @@ def main():
     # ------------------------------------------------------------------
     print("== re-anchor baseline + z_offset knob + cross-mode identity ==")
 
-    # The scan points are independent processes. The pool runs them a few at a
-    # time (same configurations, same thread counts, same tolerances).
+    # The scan points are independent processes. The pool runs them a few at a time,
+    # with the same configurations, thread counts and tolerances.
     jobs = []
     for k in range(NSCAN):
         f = k / 8
@@ -429,10 +433,10 @@ def main():
     # ------------------------------------------------------------------
     print("== phase-shifter parity vs Genesis4 (SHARED initial dumps) ==")
 
-    # Both codes start from the same particles and field: Genesis writes the dumps
-    # once (the loaders are independently written, so comparing power on
-    # independently generated beams would measure the loaders, not the phasing --
-    # measured at 1.4e-4 that way, against a 2.2e-2 power swing).
+    # Both codes start from the same particles and field, from dumps Genesis writes once.
+    # The two loaders are written independently. Power compared on independently
+    # generated beams measures the loaders rather than the phasing, at 1.4e-4 against a
+    # 2.2e-2 power swing.
 
     (wd / "ps0.lat").write_text(GEN_LAT_PS.format(phi="0"))
     (wd / "psp.in").write_text(GEN_PREP)
@@ -485,8 +489,8 @@ def main():
           float(np.max(np.abs(wrap(d_knob2 - d_gen)))), TOL_PARITY,
           note="[delta = phi 2 gamma^2 lambda / 2pi]")
 
-    # The phase must reach the physics identically, not just the bookkeeping: exit
-    # power against phi, code vs code, from the shared start.
+    # The phase must reach the physics identically, and not just the bookkeeping: exit
+    # power against phi, code against code, from the shared start.
 
     gp = np.array(gen_pw);  kp = np.array(knob_pw2)
     check("exit power vs phi: our knob == Genesis shifter (max rel)",
@@ -496,7 +500,7 @@ def main():
     # ------------------------------------------------------------------
     print("== chicane: relative flat, absolute at the geometric slope, ledger ==")
     a0 = 1e-3
-    da = LAM / 8 / (2 * a0 * 0.058)     # ~lam/8 of delay per step at the true L_eff scale
+    da = LAM / 8 / (2 * a0 * 0.058)     # About lam/8 of delay a step, L_eff = 2 L_b/3 + L_d.
     jobs = []
     for k in range(NSCAN):
         a = a0 + k * da
@@ -521,14 +525,14 @@ def main():
           note=f"[delay(a0) = {delays[0]:.3e} m = {delays[0]/LAM:.0f} wavelengths]")
 
     # The 2D trace itself against the textbook small-angle path lengthening
-    # theta^2 (2 L_bend/3 + L_drift): two independent derivations of the same delay.
+    # theta^2 (2 L_bend/3 + L_drift). These are two independent derivations of one delay.
 
     cf = np.array([a0 + k * da for k in range(NSCAN)]) ** 2 * (2 * 0.05 / 3 + 0.025)
     check("2D trace vs the small-angle closed form", float(np.max(np.abs(np.array(delays) / cf - 1))),
           TOL_CF)
 
-    # The unaveraged ledger closes across a chicane sandwich (energy bookkeeping
-    # survives the seam detour, and the ledger's columns cover the unaveraged segments).
+    # The unaveraged ledger closes across a chicane sandwich. The energy bookkeeping
+    # survives the seam detour, and the ledger's columns cover the unaveraged segments.
     # The cled run itself went through the pool above.
     led = np.loadtxt(wd / "cled.ledger.txt")
     closure = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
@@ -537,19 +541,18 @@ def main():
           float(np.max(np.abs(closure - closure[0])) / turnover), TOL_LEDGER)
 
     # ------------------------------------------------------------------
-    # The window rotations the geometric delay buys. Steady state never exercises
-    # them (slippage is a no-op with one slice), so this runs time dependent with a
-    # bend angle tuned for a few wavelengths of delay: the chicane must bank exactly
-    # floor(delay/lambda) more escaped slices than its straight-line twin of the same
-    # arc length, and the run must be thread-invariant.
+    # The window rotations that the geometric delay produces. Steady state never
+    # exercises them, since slippage does nothing with one slice. This runs time
+    # dependent with a bend angle tuned for a few wavelengths of delay. The chicane must
+    # bank exactly floor(delay/lambda) more escaped slices than its straight-line twin of
+    # the same arc length, and the run must not depend on the thread count.
 
     print("== time-dependent chicane: window rotations and threads ==")
 
-    # Delays chosen MID-INTERVAL (x.5 wavelengths), never on an integer: a target of
-    # exactly 3.000 lambda sits on the floor boundary, where the 6e-8 difference
-    # between the exact trace and the small-angle form decides between 2 and 3 (the
-    # boundary was located: 2.99 -> 2, 3.01 -> 3, which is itself an independent
-    # confirmation of the walk's floor geometry against the trace at this scale).
+    # The delays sit mid-interval, at x.5 wavelengths, never on an integer. A target of
+    # exactly 3.000 lambda sits on the floor boundary, where the 6e-8 difference between
+    # the exact trace and the small-angle form decides between 2 and 3. validation.md
+    # (val-phasing-between-segments-measured) records where that boundary falls.
 
     a_td = float(np.sqrt(3.5 * LAM / (2 * 0.05 / 3 + 0.025)))
     jobs = [lambda: run(exe, wd, "tds", LATSTRAIGHT.format(absline="", modeline=""),

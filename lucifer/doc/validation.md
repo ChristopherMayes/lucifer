@@ -926,6 +926,11 @@ Measured (check_phasing.py, the harness's phasing section):
 | TD chicane 1 vs 8 threads | byte-identical |
 | four refusals (open bump, genesis-model bend, oversize z_offset, first-element z_offset) | message matched |
 
+The time-dependent chicane's targets sit mid-interval, at 3.5, 6.5 and 10.5 wavelengths of
+delay. At exactly 3.000 wavelengths the 6e-8 difference between the exact trace and the
+small-angle form decides between 2 and 3 banked slices. A delay of 2.99 wavelengths banks 2
+slices and one of 3.01 banks 3, which places the walk's floor where the trace puts it.
+
 (val-spontaneous-emission-the-two)=
 ## Spontaneous emission: the two FEL modes against Bmad's own radiation
 

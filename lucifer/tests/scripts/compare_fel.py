@@ -1,80 +1,91 @@
 #!/usr/bin/env python3
 """
-Compare the Bmad FEL tracker (lucifer) against Genesis 1.3 Version 4, over the
-Benchmark1-SASE configuration: steady state and time dependent with slippage. Run through
-run_fel_benchmark.sh, which produces all the inputs; this script only reads and compares.
+Compare the Bmad FEL tracker, Lucifer, against Genesis 1.3 Version 4 on the
+Benchmark1-SASE configuration, in steady state and time dependent with slippage.
+run_fel_benchmark.sh produces every input. This script only reads and compares.
 
-Three tiers, each with its own tolerance sized to what it measures. The comparison
-floor is set by fundamental constants: the tracker uses Bmad's (Z0 = mu_0*c =
-376.7303...), Genesis carries a truncated impedance (376.73, 8.3e-7 relative), and that
-difference enters the coupling and compounds through gain. Transcribing Genesis's own constants
-agreed at transcription
-level (tier1 2.8e-11, tier2_genesis 5.9e-8, recorded in doc/validation.md); after that
-validation was banked the code moved to Bmad constants by decision, and the tiers now
-measure against the constants floor.
+Each tier has its own tolerance, sized to what the tier measures. The fundamental
+constants set the floor of the comparison. The tracker uses Bmad's impedance,
+Z0 = mu_0*c = 376.7303..., and Genesis carries a truncated one, 376.73, which is 8.3e-7
+relative. That difference enters the coupling and compounds through gain. With Genesis's
+own constants transcribed, tier1 agreed at 2.8e-11 and tier2_genesis at 5.9e-8, as
+doc/validation.md records (val-validation-from-one-command). The tracker uses Bmad's
+constants, so the tiers measure against the constants floor.
 
-  tier1         One undulator segment, no interludes. Isolates the FEL core: push,
-                deposition, field solve. Observed ~2e-6 (final field), consistent with
-                the impedance difference at one segment's growth.
+The steady-state tiers:
 
-  tier2_genesis The full 6-FODO line with the transcribed Genesis interlude model.
-                Observed ~2e-5, the constants difference compounded through full gain.
+  tier1         One undulator segment and no interludes. This isolates the FEL core:
+                push, deposition and field solve. The final field differs by about 2e-6,
+                consistent with the impedance difference over one segment's growth.
 
-  tier2_bmad    The full line with the seam: Bmad tracks the interludes, wavefront_drift
-                moves the field, theta advances by the exact mapping from Bmad's z. This
-                differs from Genesis by a real transport model difference -- Genesis
-                samples the path length term px^2+py^2 once at quad mid-element
-                (TrackBeam half step, then the theta step, then the second half), Bmad
-                integrates it exactly through the quad map -- measured at ~2e-3 rad of
-                bunching phase per quadrupole and ~1.3e-2 of power at saturation. The
-                tier exists to demonstrate the seam works; its tolerance brackets the
-                measured model difference to catch regressions, and tier2_genesis is
-                what prices the difference.
+  tier1_unavg   tier1 with the unaveraged dynamics. The model differs from Genesis's, so
+                this tier holds the distance to Genesis and shows a drift.
+                check_unaveraged.py checks the mode itself.
+
+  tier2_genesis The full 6-FODO line with the transcribed Genesis interlude model. The
+                difference is about 2e-5, the constants difference compounded through
+                full gain.
+
+  tier2_bmad    The full line with the seam. Bmad tracks the interludes, wavefront_drift
+                moves the field, and theta advances by the exact mapping from Bmad's z.
+                The transport model differs from Genesis's. Genesis samples the path
+                length term px^2+py^2 once at the middle of a quad (TrackBeam half step,
+                then the theta step, then the second half). Bmad integrates the term
+                exactly through the quad map. The difference is about 2e-3 rad of
+                bunching phase per quadrupole and about 1.3e-2 of power at saturation.
+                This tier shows the seam works. Its tolerance brackets the model
+                difference to catch a regression, and tier2_genesis sizes the difference.
 
 Each tier compares the per-record power and bunching curves, and the final field and
-particle dumps element by element. Particle ordering is preserved by both codes (no
-sorting happens in steady state), so the dumps compare particle by particle.
+particle dumps element by element. Neither code sorts the particles without one4one, so
+the dumps compare particle by particle.
 
 The two codes write different formats and nothing is converted on disk to compare them.
 The tracker writes openPMD: a .beam.h5 particle file carrying one patch per slice, and a
 .wf.h5 field file in V/m. Genesis writes its own .par.h5 and .fld.h5. beamio and fieldio
 read either format into the same arrays in memory, scaling Genesis's field amplitude to
-V/m on the way in, and the comparison happens there. The window the tracker's beam file
-does not state, the wavelength and the slice spacing, comes from the Genesis dump it is
-being compared against.
+V/m on the way in, and the comparison happens there. The tracker's beam file does not
+state the window: the wavelength and the slice spacing. The window comes from the Genesis
+dump the beam file is compared against.
 
-A fourth check compares Fortran against itself: tier1 rerun with every particle split
-into two coincident copies of weights w/3 and 2w/3 (split_weights = T). Collective
-observables are linear in the weights, so the curves and the final field must be
-unchanged to round-off. This is the only test of the weighted code paths with nonuniform
-weights -- the Genesis dump format carries no weights, so every Genesis comparison sees
-the uniform case, where a bug like using one particle's weight for all is invisible.
+The weight_split check compares the Fortran against itself: tier1 rerun with every
+particle split into two coincident copies of weights w/3 and 2w/3 (split_weights = T).
+Collective observables are linear in the weights, so the curves and the final field must
+be unchanged to round-off. This tests the weighted code paths with nonuniform weights.
+The Genesis dump format carries no weights, so every Genesis comparison sees the uniform
+case, where a bug like using one particle's weight for all is invisible.
 
-Three time-dependent tiers mirror the steady-state ones over 32 slices with slippage
-active (Aramis-td.in: sample = 3, shot noise on, both codes starting from the same
-multi-slice dumps):
+The time-dependent tiers run with slippage active, both codes starting from the same
+multi-slice dumps. Aramis-td.in sets 32 slices, sample = 3 and shot noise on:
 
-  td1           One undulator segment: the FEL core plus slippage -- accumulation,
-                threshold, rotation, zero fill, the unguarded end-of-lattice
-                autophasing. Constants-floor agreement expected.
+  td1           One undulator segment: the FEL core plus slippage. That is,
+                accumulation, threshold, rotation, zero fill and the unguarded
+                end-of-lattice autophasing. The agreement is at the constants floor.
 
-  td2_genesis   The full line, transcribed Genesis interludes: adds the drift
-                autophasing schedule through twelve undulator/interlude alternations.
+  td2_genesis   The full line with the transcribed Genesis interludes. This adds the drift
+                autophasing schedule through twelve undulator and interlude alternations.
 
   td2_bmad      The full line through the Bmad seam: the transport model difference of
                 tier2_bmad, now with slippage interleaved.
 
-  tdsase        The full line, dark start (power = 0), shot noise on: pure SASE, both
-                codes tracking the identical noisy beam and identical zero field from
-                shared dumps (Aramis-td-sase.in). The one combination the seeded TD
-                tiers and the statistical startup check leave uncovered -- the whole
-                startup-from-noise path, compared deterministically and elementwise.
-                Transcribed interludes, so the check sits at the constants floor.
-                plot_fel_compare.py overlays the two codes' curves for any tier.
+  tdsase        The full line from a dark start (power = 0) with shot noise on, which is
+                pure SASE. Both codes track the identical noisy beam and the identical zero
+                field from shared dumps (Aramis-td-sase.in). The seeded time-dependent
+                tiers and the statistical startup check leave this combination uncovered:
+                the whole startup-from-noise path, compared deterministically, element by
+                element. The interludes are transcribed, so the check sits at the
+                constants floor.
 
-Per-slice curves compare as full (nrecords, nslice) arrays in time-window order; final
-field and particle dumps compare every slice. The power denominator is floored at 1e-9
-of the global peak so a freshly slipped-in vacuum slice cannot divide by zero.
+  tdsc          One segment, time dependent, with space charge on, short range and long
+                range (Aramis-td-sc.in).
+
+  tdwk          One segment, time dependent, with all wake kernels on (Aramis-td-wake.in).
+
+plot_fel_compare.py overlays the two codes' curves for any tier.
+
+Per-slice curves compare as full (nrecords, nslice) arrays in time-window order. The
+final field and particle dumps compare every slice. The power denominator is floored at
+1e-9 of the global peak so a freshly slipped-in vacuum slice cannot divide by zero.
 """
 
 from __future__ import annotations
@@ -116,10 +127,10 @@ def load_fortran_diag(fn, nslice=1):
     """
     The Fortran diag file: one row per slice per record, columns
     z, slice, power, on_axis, bunching, bunching_phase, mean_energy [eV],
-    sigma_energy [eV], sigma_x, sigma_y. Steady state (nslice=1) returns 1D curves;
-    time dependent returns (nrecords, nslice) arrays, slices in time-window order,
-    matching the Genesis .out.h5 layout. The energy column converts to gamma here
-    (Genesis's Beam/energy is gamma; the diag carries Bmad-convention eV).
+    sigma_energy [eV], sigma_x, sigma_y. Steady state (nslice=1) returns 1D curves.
+    Time dependent returns (nrecords, nslice) arrays, slices in time-window order,
+    matching the Genesis .out.h5 layout. The energy column converts to gamma here, since
+    Genesis's Beam/energy is gamma and the diag carries eV in the Bmad convention.
     """
     M_ELECTRON = 0.51099895069e6
     d = np.loadtxt(fn)
@@ -186,12 +197,13 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
 
     worst = 0.0
 
-    # Curves: elementwise relative for power (it spans decades and every point matters),
-    # peak normalized for bunching (near zero at the quiet start, where elementwise
-    # relative measures nothing but the quiet loading noise floor). In time-dependent
-    # runs the power comparison is per slice per record. The denominator is floored at
-    # 1e-9 of the global peak so a freshly slipped-in vacuum slice cannot divide by an
-    # exact zero (inactive in steady state).
+    # Power compares elementwise relative, since power spans decades and every point
+    # matters. Bunching compares peak normalized. Bunching is near zero at the quiet
+    # start, where an elementwise relative difference measures only the noise floor of
+    # the quiet loading. In time-dependent runs the power comparison is per slice per
+    # record. The denominator is floored at 1e-9 of the global peak so a freshly
+    # slipped-in vacuum slice cannot divide by an exact zero. The floor is inactive in
+    # steady state.
     den = np.maximum(np.abs(g["power"][:n]), 1e-9 * np.abs(g["power"][:n]).max())
     rel_power = (np.abs(f["power"][:n] - g["power"][:n]) / den).max()
     rel_bunch = np.abs(f["bunching"][:n] - g["bunching"][:n]).max() / np.abs(g["bunching"][:n]).max()
@@ -206,10 +218,10 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
     worst = max(worst, rel_fld)
     print(f"  final field                     peak normalized     = {rel_fld:.3e}")
 
-    # Final particle dump, particle by particle, all slices. gamma relative to itself,
-    # transverse peak normalized. These are checked. The window comes from the Genesis dump,
-    # since an openPMD beam file states the slice partition but not the wavelength it was
-    # sliced on: that belongs to the run.
+    # Final particle dump, particle by particle, all slices. gamma is relative to itself
+    # and the transverse coordinates are peak normalized. These are checked. The window
+    # comes from the Genesis dump, since an openPMD beam file states the slice partition
+    # but not the wavelength it was sliced on. The wavelength belongs to the run.
     window = beamio.genesis_window(genesis_par)
     pf, pg = load_par(fortran_par, nslice, window), load_par(genesis_par, nslice)
     scales = {"gamma": np.abs(pg["gamma"]).max(),
@@ -222,16 +234,16 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
         parts.append(f"{k} {r:.1e}")
     print(f"  final particles                 per-particle        = " + ", ".join(parts))
 
-    # theta is reported but NOT checked. It is the phase of a particle in its ponderomotive
-    # bucket, and at saturation neighboring trajectories separate exponentially, so the
-    # worst-particle theta difference measures the Lyapunov amplification of whatever
-    # difference exists, not the size of that difference (chaotic growth is not a usable
-    # comparison metric). The distribution tells the story: the median is
-    # the typical particle, the max is the separatrix tail. theta's collective effect IS
-    # checked, through the bunching curve and the final field above.
+    # theta is reported but *not* checked. theta is the phase of a particle in its
+    # ponderomotive bucket. At saturation neighboring trajectories separate exponentially,
+    # so the worst-particle theta difference measures the Lyapunov amplification of a
+    # difference rather than its size. Chaotic growth is not a usable comparison metric.
+    # The median is the typical particle and the max is the separatrix tail. The
+    # collective effect of theta is checked, through the bunching curve and the final
+    # field above.
     #
     # These are absolute phases on both sides. Neither dump format has a place for the
-    # run's reference phase, so each code folds it into what it writes: Genesis stores
+    # run's reference phase, so each code folds it into what it writes. Genesis stores
     # theta itself, and an openPMD beam file stores the lag that theta implies.
     dth = pf["theta"] - pg["theta"]
     print(f"  final theta (not checked; see comment)  max {np.abs(dth).max():.1e}, "
@@ -246,7 +258,7 @@ def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
 
 def compare_split(name, diag_a, diag_b, fld_a, fld_b, tolerance):
     """
-    Fortran vs Fortran: split-weight run against the unsplit run.
+    Fortran against Fortran: the split-weight run against the unsplit run.
     """
     print(f"--- {name} " + "-" * (74 - len(name)))
     a, b = load_fortran_diag(diag_a), load_fortran_diag(diag_b)
@@ -272,22 +284,23 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("workdir", help="Directory holding all run outputs")
     p.add_argument("--tol-tier1", type=float, default=1.0e-4)
-    # The unaveraged tier is a priced model difference, not a transcription check: sin^2
-    # end ramps vs Genesis's hard edges, no period averaging, RK4-vs-RK4 of different
-    # equations. The self-referenced physics checks (check_unaveraged.py) pin the mode's
-    # correctness. This tier pins its distance to Genesis so drift is visible.
-    p.add_argument("--tol-tier1-unavg", type=float, default=1.5e-1)  # measured 6.9e-2
+    # The unaveraged tier holds a model difference from Genesis: sin^2 end ramps against
+    # Genesis's hard edges, no period averaging, and RK4 against RK4 of different
+    # equations. check_unaveraged.py checks the mode against its own physics. This tier
+    # holds the mode's distance to Genesis so a drift shows. The difference is 6.9e-2.
+    p.add_argument("--tol-tier1-unavg", type=float, default=1.5e-1)
     p.add_argument("--tol-tier2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-tier2-bmad", type=float, default=1.0e-1)
     p.add_argument("--tol-split", type=float, default=1.0e-10)
     p.add_argument("--tol-td1", type=float, default=1.0e-4)
     p.add_argument("--tol-td2-genesis", type=float, default=1.0e-3)
     p.add_argument("--tol-td2-bmad", type=float, default=1.0e-1)
-    # Pure SASE: dark start, so the whole curve is startup-from-noise. Same transcribed
-    # interlude model and constants floor as td2_genesis.
+    # Pure SASE starts dark, so the whole curve is startup from noise. The interlude model
+    # is transcribed and the floor is the constants floor, as for td2_genesis.
     p.add_argument("--tol-tdsase", type=float, default=1.0e-3)
-    # Collective tiers: the sc floor is Genesis's truncated epsilon_0 in longRange
-    # (8.85e-12, 4.7e-4 relative, measured 2.4e-4). The wake tier measured 8.7e-7.
+    # The space-charge floor is Genesis's truncated epsilon_0 in longRange, 8.85e-12,
+    # which is 4.7e-4 relative. The wake tier sits at the impedance floor.
+    # doc/validation.md (val-validation-from-one-command) records both levels.
     p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
     p.add_argument("--tol-tdwk", type=float, default=1.0e-4)
     p.add_argument("--results", help="Append tier levels here for doc generation")
@@ -378,7 +391,7 @@ def main():
     print("exactly. tier2_genesis proves it: same code, Genesis's interlude model, and")
     print("the difference collapses by six orders of magnitude. See doc/validation.md.")
     print()
-    # The results file feeds doc generation. Levels are written at the same six
+    # The results file feeds the generated pages. Levels are written at the six
     # significant figures the summary prints, so the generated table and the summary
     # cannot disagree.
     if args.results:

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Checks for the particle dump format (fel-physics.md sec-import). Most claims here are a
-round trip against the beam that was written. A round trip proves that this program agrees
-with itself, which is not the same as proving the file says what it means: a convention
-that is wrong and self-consistent survives every one of them, and one did.
-Section 8 therefore reads a dump with openPMD-beamphysics, which knows the standard and
-nothing about this program.
+Checks of the particle dump format (fel-physics.md, sec-import).
+
+Most claims here are a round trip against the beam that was written. A round trip shows
+that this program agrees with itself. It does not show that the file says what it
+means: a wrong convention that is self-consistent survives every round trip. Section 8
+therefore reads a dump with openPMD-beamphysics, which knows the standard and nothing
+about this program.
 
 1. The file round trip is exact. A run writes .beam.h5, a second run reads it back and
    writes it again, and every dataset of the two files must be bit-identical. This is the
@@ -14,17 +15,16 @@ nothing about this program.
 2. The state round trip. The file stores absolute momenta and a time where the tracker
    keeps packed (px, py) and a lag, so those pass through P/p0 and -beta*c*dt on the way
    out and back, while x and y are untouched. The state is read out here through the
-   converter, in Genesis's chart, which is the only other view of the beam there is now:
-   theta and gamma instead of a time and a momentum. Every column comes back exact on this
-   configuration, so the levels are bounds on what the chart could cost rather than
-   expected values: which coordinate pays is fixed, whether it pays is configuration
-   dependent.
+   converter, in Genesis's chart, the one other view of the beam the harness has: theta
+   and gamma instead of a time and a momentum. Every column comes back exact on this
+   configuration, so the levels bound what the chart could cost and are not expected
+   values. Which coordinate pays is fixed. Whether it pays depends on the configuration.
 
 3. The phase survives. A dump carries the particle lag, and a reader restarts the
    reference phase phi0 at zero, so the writer folds phi0 into the lag. theta must
-   therefore come back with NO offset at all, constant or otherwise. Without the fold the
-   restarted beam sits at a different phase against the field, which is a real change of
-   state and not a bookkeeping one: 2.1e-2 on the windowed-composition check.
+   therefore come back with *no* offset at all, constant or otherwise. Without the fold
+   the restarted beam sits at a different phase against the field. That is a real change
+   of state and not a bookkeeping one: 2.1e-2 on the windowed-composition check.
 
 4. Weights survive, which the Genesis format cannot do. The split-weight instrument makes
    every particle two coincident copies of w/3 and 2w/3, so the file's weight record is a
@@ -33,23 +33,36 @@ nothing about this program.
    current per slice and a read-back would silently return a uniform beam.
 
 5. An empty slice survives. Every slice is a particlePatch, in window order, and an empty
-   slice is a patch of no particles, so the patch list IS the window. A heavy migration run
-   (sig_pz = 0.15) empties a slice; the restored beam must have the same per-slice counts,
-   empty slice included, and the file must hold one patch per slice.
+   slice is a patch of no particles, so the patch list is the window. A heavy migration
+   run, sig_pz = 0.15, empties a slice. The restored beam must have the same per-slice
+   counts, empty slice included, and the file must hold one patch per slice.
 
-6. Refusals: a beam file that is not openPMD (the message names the
-   converter), a file whose patch count disagrees with the window the deck states, and a
-   file that carries no charge.
+6. Refusals. A beam file that is not openPMD, where the message names the converter. A
+   file whose patch count disagrees with the window the deck states. A file that carries
+   no charge.
+
+7. A converted Genesis dump reads as its slices. The converter writes the
+   patchesAreBunches mark and pads each patch extent as Bmad's writer does, and Bmad's
+   reader returns one bunch per slice, in the dump's order.
+
+8. openPMD-beamphysics reads a dump. The slice placement rides timeOffset, so
+   consecutive slices sit one spacing apart and the bunch spans its window. The reader
+   sees every particle and the whole charge. A frame cut to a slice range places its
+   slices where the whole window does.
 
 9. Where a frame was written decides whether a run can start from it. A frame taken inside
-   an undulator holds the coordinates the selected tracking method produced there, which
-   is not a state a run starts from, so both loading paths refuse it by its own record of
-   the position and never by its momenta: the averaged map's px crosses zero twice a
-   period along the orbit and the check takes a frame at
-   that phase as well as one at the crest. A frame at an element
-   face still initializes a run, and its records come back through it as in 1. A file with
-   no such record is an external bunch and loads as before. A continuation is a different
-   question and keeps its own refusal, on the checkpoint it needs.
+   an undulator holds the coordinates the selected tracking method produced there. That
+   is not a state a run starts from, so both loading paths refuse the frame by its own
+   record of the position and never by its momenta. The averaged map's px crosses zero
+   twice a period along the orbit, and the check takes a frame at that phase as well as
+   one at the crest. A frame at an element face still initializes a run, and its records
+   come back through it as in 1. A file with no such record is an external bunch and
+   loads as before. A continuation is a different question and keeps its own refusal, on
+   the checkpoint it needs.
+
+The field file is also read as an import. Samples with a unitSI factor and a grid with a
+gridUnitSI factor must read as the plain file, a y component shaped unlike x is refused,
+and the source filter acts on an imported field whose deck states no grid.
 
 Usage: check_beam_format.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis.bmad. Exit 0 only if all pass.
@@ -130,18 +143,17 @@ def refused(label, code, out, phrase):
 def datasets(fn):
     """Every record of an openPMD particle file, by path, constant ones expanded.
 
-    A constant record is a group carrying value and shape rather than a dataset, and
-    collecting only shaped datasets makes those invisible. timeOffset was one until it
-    began carrying the slice placement, so this round trip compared everything in the
-    file except the one record it had no eyes for.
+    A constant record is a group carrying value and shape rather than a dataset.
+    Collecting only shaped datasets would leave those out of the comparison, and
+    timeOffset is one such record when every particle shares it.
     """
     out = {}
 
     def take(name, obj):
-        # The checkpoint group is the tracker's own split of the phase, phi0 beside each z,
-        # and an initialization refolds it with phi0 at zero, so the group's z is the
-        # records' time again and not the writer's z. The standard records are the round
-        # trip. The group is compared by the program-structure check's continuations.
+        # The checkpoint group is the tracker's own split of the phase, phi0 beside each z.
+        # An initialization refolds it with phi0 at zero, so the group's z is the records'
+        # time again and not the writer's z. The standard records are the round trip. The
+        # continuations of the program-structure check compare the group.
         if name.startswith("lucifer"):
             return
         if isinstance(obj, h5py.Dataset) and obj.shape:
@@ -165,8 +177,8 @@ def weights(fn):
 
 
 def as_genesis(wd, src, dst):
-    """The same beam in Genesis's chart, through the converter: the second view of the
-    state a check can compare against."""
+    """The same beam in Genesis's chart, through the converter. This is the second view
+    of the state that a check can compare against."""
     slices = beamio.read_slices(wd / src, LAMBDA0, SPACING)
     convert_genesis.write_genesis_par(wd / dst, slices, LAMBDA0, SPACING)
     return wd / dst
@@ -189,7 +201,7 @@ def patch_count(fn):
 
 def restart(root, source, field, extra=""):
     """A load_only run that reads `source` and re-dumps its initial state. The driver
-    requires a field beside a beam, so the source run's own field dump comes along."""
+    requires a field beside a beam, so the source run's own field dump is read too."""
     return BASE.format(root=root, sig_pz="5.282703940115e-03",
                        extra=f'  beam_file = "{source}"\n  field_file = "{field}"\n'
                              f"  load_only = T\n  write_initial = T\n{extra}")
@@ -214,11 +226,10 @@ def main():
 
     a1, a2 = datasets(wd / "bf1-final.beam.h5"), datasets(wd / "bfp-initial.beam.h5")
 
-    # Three records say where the beam is rather than what it is, and a restart that
-    # re-emits it at the start of the line rather than at the plane it was dumped from is
-    # entitled to move all three: the element it sits in, the path length there, and the
-    # arrival time. They were invisible to this check until constant records were
-    # expanded, which is how timeOffset came to carry the slice placement unexamined.
+    # Three records say where the beam is rather than what it is. A restart that
+    # re-emits the beam at the start of the line rather than at the plane it was dumped
+    # from may move all three: the element it sits in, the path length there, and the
+    # arrival time.
     #
     # What must survive is the placement, which is timeOffset measured against its own
     # head. It survives to a few ulps of the absolute time rather than bit for bit, since
@@ -235,11 +246,11 @@ def main():
           float(np.max(np.abs(pa - pb))) / (SPACING / 2.99792458e8), 1e-4)
 
     # ------------------------------------------------------------------
-    # The field file read as an import. Three things a file written elsewhere may do
-    # that this writer never does: state its samples in a unit other than V/m with
-    # unitSI carrying the factor, state its grid with gridUnitSI carrying the factor,
-    # and carry a y component shaped unlike x. The first two must read as the file
-    # this writer would have written for the same field, and the third is refused
+    # The field file read as an import. A file written elsewhere may do three things
+    # that this writer never does. It may state its samples in a unit other than V/m
+    # with unitSI carrying the factor. It may state its grid with gridUnitSI carrying
+    # the factor. It may carry a y component shaped unlike x. The first two must read as
+    # the file this writer would have written for the same field. The third is refused
     # before the buffer is written past.
 
     print("== the field file as an import ==")
@@ -299,10 +310,10 @@ def main():
     refused("a y component shaped unlike x", code, out, "COMPONENT y IS SHAPED")
 
     # The source filter on an imported field. Its angle is converted to a cutoff on the
-    # grid, and the conversion once came from the grid the deck stated, which a deck that
-    # imports its field need not state: the cutoff was then infinite and every mode
-    # passed while the header named the angle asked for. The conversion comes from the
-    # field's own spacing now, so a deck without the grid keys filters as one with them.
+    # grid, and the conversion comes from the field's own spacing, so a deck without the
+    # grid keys filters as one with them. A deck that imports its field need not state
+    # the grid. Taken from the deck's grid, the cutoff was infinite and every mode passed
+    # while the header named the angle asked for.
     nogrid = BASE.replace("  grid_n_pts = 64\n", "").replace("  grid_half_width = 2e-4\n", "")
     load = ('  beam_file = "bf1-final.beam.h5"\n  field_file = "bf1-final.wf.h5"\n'
             '  global%track_end = "UND##1"\n  source_filter = T\n')
@@ -332,7 +343,7 @@ def main():
         scale = np.max(np.abs(u)) or 1.0
         check(f"restart, {key}", float(np.max(np.abs(u - v))) / scale, level)
 
-    # theta with the reference phase folded in: no offset, not even a constant one.
+    # theta with the reference phase folded in: no offset, and not even a constant one.
     u, v = par_field(g0, "theta"), par_field(g1, "theta")
     check("restart, theta absolute [rad]", float(np.max(np.abs(u - v))), 1e-9)
     check("restart, theta offset spread [rad]", float(np.ptp(u - v)), 1e-9)
@@ -379,12 +390,12 @@ def main():
           0.0 if patch_count(wd / "bfe-final.beam.h5") == len(c0) else 1.0, 0.5)
 
     # ------------------------------------------------------------------
-    # A Genesis dump converted to openPMD is the tiers' starting beam, and Bmad's reader
-    # restores one bunch per patch only under the patchesAreBunches mark: an unmarked patch
+    # 7. A Genesis dump converted to openPMD is the tiers' starting beam. Bmad's reader
+    # restores one bunch per patch only under the patchesAreBunches mark. An unmarked patch
     # group is another writer's partition and reads as one bunch. The converter writes the
     # mark and pads each extent as Bmad's writer does, so the upper bound strictly encloses
     # the patch's particles, a singleton or an all-zero z included. The same beam with its
-    # empty slice goes out as a Genesis dump, comes back through the converter, and is loaded.
+    # empty slice goes out as a Genesis dump, comes back through the converter, and loads.
     print("== a converted Genesis dump reads as its slices ==")
 
     as_genesis(wd, "bfe-final.beam.h5", "bfe-conv.par.h5")
@@ -418,8 +429,8 @@ def main():
                 outside += 1
     check("every patch's bounds strictly enclose its particles, every extent positive", outside, 0.5)
 
-    # Loaded by the tracker, which reads the file through Bmad's reader: the slices come
-    # back as the window, counts and order as the dump had them.
+    # The tracker loads the file through Bmad's reader. The slices come back as the
+    # window, with the counts and order the dump had.
     run(exe, wd, "bfc", restart("bfc", "bfe-conv.beam.h5", "bfe-final.wf.h5"))
     c2 = slice_counts(wd / "bfc-initial.beam.h5")
     check("Bmad's reader returns one bunch per slice of the converted file", 0.0 if c2 == c0 else 1.0, 0.5)
@@ -451,7 +462,7 @@ def main():
                             extra="  window_length = 4.5e-9\n"), expect_fail=True)
     refused("patch count against the deck's window", code, out, "PARTICLE PATCHES BUT THE DECK")
 
-    # A file with no charge: every weight zeroed, which would track and radiate nothing.
+    # A file with no charge, every weight zeroed, would track and radiate nothing.
     shutil.copy(wd / "bf1-final.beam.h5", wd / "noq.beam.h5")
     with h5py.File(wd / "noq.beam.h5", "r+") as h5:
         g = h5["data/00001/particles/electron"]
@@ -467,21 +478,21 @@ def main():
 
     # 8. The file read by a reader that shares none of this program's conventions.
     # particlePatches partitions the window and a general reader does not walk it, so the
-    # placement of a slice in the bunch has to be in the particle data. It is: openPMD's
-    # time and timeOffset sum to a particle's time, the lag rides time and the slice's own
-    # offset rides timeOffset. Dropped, every slice lands on one and the bunch reads one
-    # slice long.
+    # placement of a slice in the bunch has to be in the particle data. openPMD's time and
+    # timeOffset sum to a particle's time. The lag rides time and the slice's own offset
+    # rides timeOffset. Without the offset every slice lands on one place and the bunch
+    # reads one slice long.
     #
     # The placement is checked on the per-patch offset and not on the spread of t. With
     # migration off a particle whose phase leaves its slice keeps going, so the lag is not
     # bounded by the slice width and the spread of t is a property of the physics. The
     # offset is a property of the format.
     #
-    # The level is 1e-4 and it is a floor of the standard's own arithmetic, not of this
-    # writer. timeOffset is an absolute time, and the ratio of a beamline's arrival time
-    # to one slice spacing is 3e10 here, so a double leaves about five digits for the
-    # slice structure: the ulp at t_ref is 6.5e-6 of a slice step. That is ample for
-    # placing a picture and is not the exact partition, which stays particlePatches.
+    # The level is 1e-4, a floor of the standard's own arithmetic and not of this writer.
+    # timeOffset is an absolute time, and the ratio of a beamline's arrival time to one
+    # slice spacing is 3e10 here, so a double leaves about five digits for the slice
+    # structure. The ulp at t_ref is 6.5e-6 of a slice step. That is enough to place the
+    # slices in a plot. The exact partition stays in particlePatches.
 
     print("== the file as openPMD, read by a reader that knows nothing of this program ==")
     convert_genesis._beamphysics()
@@ -549,8 +560,8 @@ def main():
     print("== a frame is a starting point only at a face ==")
 
     # The device steps at a quarter period, so the series samples the undulator phase four
-    # times a period and a frame lands on a zero of it as well as on a crest. Steady state,
-    # so every frame is one patch and reaches the bunch path too.
+    # times a period, and a frame lands on a zero of it as well as on a crest. The run is
+    # steady state, so every frame is one patch and reaches the bunch path too.
     lam_w, l_und, l_ramp = 0.015, 0.30, 0.03
     (wd / "qframe.bmad").write_text(f"""no_digested
 parameter[geometry] = open
@@ -627,8 +638,8 @@ use, QL
             f"phase crosses zero (mean px {body[at_zero][1]:.2e} of p0)", code, out,
             "NOT A PLACE A RUN STARTS")
 
-    # A file that says nothing about a device is an external bunch, and the absence of the
-    # group lucifer is that assumption rather than proof of a boundary.
+    # A file that says nothing about a device is an external bunch. The absence of the
+    # group lucifer is that assumption and not a proof of a boundary.
     shutil.copy(at_crest, wd / "qf_ext.beam.h5")
     with h5py.File(wd / "qf_ext.beam.h5", "r+") as h5:
         del h5["lucifer"]
@@ -642,9 +653,9 @@ use, QL
         extra=f'  beam_file = "{boundary.name}"\n  field_file = "qf-final.wf.h5"\n'
               "  load_only = T\n  write_initial = T\n"))
     b1, b2 = datasets(boundary), datasets(wd / "qf_ok-initial.beam.h5")
-    # The same three records as the round trip above, and a fourth of the same kind: the
+    # The same three records as the round trip above, and a fourth of the same kind. The
     # frame sits at a device's downstream face and the run it starts places the beam at an
-    # upstream one, which is what sPosition says in meters and this says as a face.
+    # upstream one. sPosition says that in meters and locationInElement says it as a face.
     place = WHERE + ["data/00001/particles/electron/locationInElement"]
     same = sorted(b1) == sorted(b2) and all(np.array_equal(b1[k], b2[k]) for k in b1 if k not in place)
     check("a frame at the device's end initializes, every record identical but the four that place a beam",

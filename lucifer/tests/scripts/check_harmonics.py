@@ -1,33 +1,35 @@
 #!/usr/bin/env python3
 """
-Harmonic field-set and openPMD wavefront checks (fel-physics.md sec-field-set):
+Checks of the harmonic field set and the openPMD wavefront (fel-physics.md,
+sec-field-set):
 
-  1. openPMD round trip: a run's field dump must carry every required attribute of
-     the standard (verified against the spec text's names and values here,
-     independently of the Fortran writer), its complex values must agree with the
-     converter's Genesis view of the same field, and the Fortran reader must
-     reproduce it exactly: re-importing the .wf.h5 and re-dumping must be
+  1. openPMD round trip. A run's field dump must carry every required attribute of
+     the standard. The names and values are checked here against the text of the
+     standard, independently of the Fortran writer. The complex values must agree
+     with the converter's Genesis view of the same field. The Fortran reader must
+     reproduce the dump exactly: re-importing the .wf.h5 and re-dumping it must be
      dataset-identical to the file that was read. The Python Wavefront class reads
      the converted Genesis file through its own path and must agree on the field
-     energy, reads the harmonic .wf.h5 to the same complex values, round-trips its
-     own writer exactly, and what its writer produces must come back through the
-     Fortran reader unchanged.
-  2. Harmonic tier vs Genesis4: a planar steady-state segment (the benchmark's
-     gamma, wavelength and rms aw -- planar so fc(3) is alive), both codes tracking
-     the same Genesis-written starting state with a dark third-harmonic field:
-     fundamental and third-harmonic power curves compared per record.
-  3. Deposit closed form: from the tier's bunched exit beam, a two-step dark restart
-     radiates P_h proportional to (fc(h) |b_h|)^2 -- the ratio P3/P1 against the
-     Bessel closed form with b_h measured directly from the dumped particles. No
-     gain, no diffraction to speak of: this pins the harmonic deposit normalization
-     independently of Genesis.
-  4. Thread identity: 1 vs 8 threads byte-identical on a time-dependent harmonic run
-     (diag byte-equal, harmonic dumps dataset-equal).
-  5. Refusals: harmonics not anchored on the fundamental; harmonic
-     fields with an unaveraged element; harmonic fields with two live polarizations;
-     an openPMD import declaring the frequency domain; a harmonic import whose
-     photonEnergy matches no field of the run; a Genesis-format harmonic import,
-     which carries no photon energy to match on.
+     energy. The class reads the harmonic .wf.h5 to the same complex values and
+     round-trips its own writer exactly. What its writer produces must come back
+     through the Fortran reader unchanged.
+  2. Harmonic tier against Genesis4. A planar steady-state segment has the
+     benchmark's gamma, wavelength and rms aw. The segment is planar so that fc(3)
+     is nonzero. Both codes track the same Genesis-written starting state with a
+     dark third-harmonic field, and the fundamental and third-harmonic power curves
+     compare per record.
+  3. Deposit closed form. The bunched exit beam of a hard-seeded buncher restarts dark
+     for one step and radiates P_h proportional to (fc(h) |b_h|)^2. The ratio P3/P1 is
+     checked against the Bessel closed form with b_h taken directly from the dumped
+     particles. There is no gain and no diffraction to speak of, so this pins the
+     normalization of the harmonic deposit independently of Genesis.
+  4. Thread identity. 1 and 8 threads are byte-identical on a time-dependent
+     harmonic run: the diag byte-equal and the harmonic dumps dataset-equal.
+  5. Refusals. Harmonics not anchored on the fundamental. Harmonic fields with an
+     unaveraged element. Harmonic fields with two live polarizations. An openPMD
+     import declaring the frequency domain. A harmonic import whose photonEnergy
+     matches no field of the run. A Genesis-format harmonic import, which carries no
+     photon energy to match on.
 
 Run by the benchmark harness. Exits nonzero on failure. Needs the genesis4 binary
 (--genesis) for section 2, and openPMD-beamphysics installed in this interpreter's
@@ -61,12 +63,13 @@ H_PLANCK_EVS = 4.135667696e-15
 E_CHARGE = 1.602176634e-19
 C_LIGHT = 2.99792458e8
 
-# Tolerances: measured first (values in comments), then set.
-TOL_RT_FORMATS = 1e-13       # measured 4e-16 with Bmad's own mu_0: dfl double rounding.
-TOL_PY_ENERGY = 1e-9         # measured 1.2e-12: Python class energy via its Genesis path.
-TOL_TIER_P1 = 1e-6           # measured 5.3e-8: fundamental power vs Genesis (planar SS).
-TOL_TIER_P3 = 1e-3           # measured 1.3e-4: third-harmonic power vs Genesis (dark growth).
-TOL_DEPOSIT = 1e-12          # measured 3.3e-16: one-step P3/P1 vs the exact deposit sum.
+# Each comment gives the level the check reads. doc/validation.md
+# (val-harmonic-fields-and-the) records the levels.
+TOL_RT_FORMATS = 1e-13       # Double rounding of the dfl, with Bmad's own mu_0, is 4e-16.
+TOL_PY_ENERGY = 1e-9         # Python class energy through its Genesis path is 1.2e-12.
+TOL_TIER_P1 = 1e-6           # Fundamental power against Genesis, planar, steady state: 5.3e-8.
+TOL_TIER_P3 = 1e-3           # Third-harmonic power against Genesis, dark growth: 1.3e-4.
+TOL_DEPOSIT = 1e-12          # One-step P3/P1 against the exact deposit sum is 3.3e-16.
 
 GENESIS_DECK = """&setup
 rootname=H3
@@ -138,9 +141,9 @@ SEGP: line = (UNDP)
 use, SEGP
 """
 
-# lambda0 and nbins are the deck's now: an openPMD beam file carries the slice partition
-# and not the radiation it was sliced on, nor the beamlet size. Both match the Genesis deck
-# above, which is where the imported state comes from.
+# lambda0 and beamlet_size come from this namelist. An openPMD beam file carries the slice
+# partition, and not the radiation it was sliced on nor the beamlet size. Both match the
+# Genesis deck above, where the imported state comes from.
 NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
@@ -155,13 +158,13 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-# The grids here are odd, and deliberately, where the rest of the harness runs powers of
-# two. Genesis propagates the transverse field on wavenumbers that are whole multiples of
-# dk only when ngrid is odd. On an even ngrid its FieldSolverFFT carries every mode half a
-# step out. Lucifer used to carry the same offset and the two agreed by
-# sharing it. Lucifer's kernel is now correct, so a power comparison this tight against
-# Genesis has to run where Genesis is right, which is an odd grid. Moving these to 64 and
-# 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed upstream.
+# The grids here are odd on purpose, where the rest of the harness runs powers of two.
+# Genesis propagates the transverse field on wavenumbers that are whole multiples of dk
+# only when ngrid is odd. On an even ngrid its FieldSolverFFT carries every mode half a
+# step out. Lucifer's kernel is correct at both parities, so a power comparison this tight
+# against Genesis has to run where Genesis is right, which is an odd grid. Moving these to
+# 64 and 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed
+# upstream. doc/validation.md (val-the-transverse-grid) has the account.
 
 NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
@@ -296,7 +299,8 @@ def main():
     (wd / "mid.bmad").write_text(BMAD_LAT.format(length="1.98"))
 
     # ------------------------------------------------------------------
-    # 2 first (its dumps feed 1 and 3): the harmonic tier vs Genesis.
+    # Section 2 runs first, since its dumps feed sections 1 and 3: the harmonic tier
+    # against Genesis.
 
     print("== harmonic tier vs Genesis4 (planar SS, harm 1 + dark harm 3) ==")
     (wd / "H3.in").write_text(GENESIS_DECK)
@@ -327,8 +331,8 @@ def main():
     n = min(len(zg), len(zb))
     if not np.allclose(zg[:n], zb[:n], atol=1e-9):
         print("FAIL: z grids disagree between the codes"); sys.exit(1)
-    # Relative on the curve maxima, skipping the seed-dominated first steps for P3
-    # (a dark field's first records sit at the numerical floor).
+    # Relative to the curve maxima. P3 skips the seed-dominated first steps, since the
+    # first records of a dark field sit at the numerical floor.
     m1 = float(np.max(np.abs(p1b[:n] - p1g[:n])) / np.max(p1g[:n]))
     lo = n // 8
     m3 = float(np.max(np.abs(p3b[lo:n] - p3g[lo:n])) / np.max(p3g[:n]))
@@ -337,14 +341,14 @@ def main():
           note=f"[P3 exit {p3b[n-1]:.3e} W]")
 
     # ------------------------------------------------------------------
-    # 1. openPMD round trip, on the tier's Bmad run re-dumped in both formats.
+    # 1. openPMD round trip, on the tier's Bmad run, re-dumped in both formats.
 
     print("== openPMD EXT_Wavefront round trip ==")
     run(exe, wd, "h3both", NML_IMPORT.format(lat="planar.bmad", root="h3both",
         beam="H3-initial.beam.h5", field="H3-initial.wf.h5", extra=""))
 
-    # The Genesis view of each dump, through the converter: the second reading of the same
-    # field that the complex comparison below needs.
+    # The Genesis view of each dump, through the converter. The complex comparison below
+    # needs this second reading of the same field.
     for fn in ("h3both-final.wf.h5", "h3both-final-h3.wf.h5"):
         convert_genesis.to_openpmd(wd / fn, wd / fn.replace(".wf.h5", ".fld.h5"))
 
@@ -384,8 +388,8 @@ def main():
         d = float(np.max(np.abs(E_gen - E_pmd)) / np.max(np.abs(E_gen)))
         check(f"the converter's Genesis view agrees complex-wise ({fn})", d, TOL_RT_FORMATS)
 
-    # Fortran read-back: import the .wf.h5, write_initial + load_only re-dumps it. The
-    # field datasets must be identical to the file that was read.
+    # Fortran read-back: import the .wf.h5, and write_initial with load_only re-dumps it.
+    # The field datasets must be identical to the file that was read.
 
     run(exe, wd, "h3rt", NML_IMPORT.format(lat="planar.bmad", root="h3rt",
         beam="h3both-final.beam.h5", field="h3both-final.wf.h5",
@@ -394,7 +398,7 @@ def main():
           0.0 if fields_identical(wd / "h3rt-initial.wf.h5", wd / "h3both-final.wf.h5") else 1.0,
           0.5)
 
-    # The Python Wavefront class, via its own Genesis path, agrees on the energy.
+    # The Python Wavefront class, through its own Genesis path, must agree on the energy.
 
     convert_genesis._beamphysics()
     from beamphysics.wavefront import Wavefront
@@ -404,10 +408,10 @@ def main():
     d = abs(wf_py.energy - u_here) / u_here
     check("Python Wavefront class energy (its Genesis path)", d, TOL_PY_ENERGY)
 
-    # The Python class's own openPMD path (upstream): its reader must recover the
-    # Genesis dump's complex values from the harmonic .wf.h5 through its own axis
-    # handling, its writer must round-trip through its reader exactly, and the
-    # Fortran reader must accept what it writes.
+    # The Python class's own openPMD path, from openPMD-beamphysics. Its reader must
+    # recover the Genesis dump's complex values from the harmonic .wf.h5 through its own
+    # axis handling. Its writer must round-trip through its reader exactly. The Fortran
+    # reader must accept what it writes.
 
     wf_h = Wavefront.from_openpmd(wd / "h3both-final-h3.wf.h5")
     E_gen, dsp = dfl_to_vperm(wd / "h3both-final-h3.fld.h5")
@@ -419,9 +423,9 @@ def main():
           and wf_h.wavelength == wf_rt.wavelength)
     check("Python openPMD write/read round trip exact", 0.0 if ok else 1.0, 0.5)
 
-    # Python writer to Fortran reader: rewrite both fields of the run through the
-    # Python class, import that pair, and re-dump Genesis-format. The fundamental
-    # must come back dataset-identical to the run's own Genesis dump.
+    # Python writer to Fortran reader. Both fields of the run are rewritten through the
+    # Python class. The rewritten fundamental is imported with the run's beam and
+    # re-dumped as openPMD. It must come back dataset-identical to the run's own dump.
 
     for src, dst in (("h3both-final.wf.h5", "pyw-final.wf.h5"),
                      ("h3both-final-h3.wf.h5", "pyw-final-h3.wf.h5")):
@@ -439,8 +443,9 @@ def main():
 
     print("== harmonic deposit vs the Bessel closed form ==")
 
-    # A hard-seeded Bmad-only buncher: 1 GW over ~2 m drives the pendulum nonlinear,
-    # so b3 is real (the tier's 4 m from 5 kW leaves b1 ~ 1e-3 and b3 in the noise).
+    # A hard-seeded buncher, run by Lucifer alone. 1 GW over about 2 m drives the
+    # pendulum nonlinear, so b3 is well above the noise. The tier's 4 m from 5 kW leaves
+    # b1 near 1e-3 and b3 in the noise.
 
     buncher = NML_TD.format(lat="mid.bmad", root="h3bunch", extra="")
     buncher = buncher.replace('  beam_init%distribution_type(3) = "GRID"\n', "")
@@ -459,11 +464,11 @@ def main():
     with h5py.File(wd / "dark.wf.h5", "r+") as h5:
         h5[fieldio.MESH_PATH + "/x"][...] = 0.0
 
-    # one step, dark start: the field at exit is exactly twice the source deposit of
-    # the post-advance particles (a zero field diffracts to zero before the add), and
-    # a one-step run's final particle dump is exactly the state the deposit read. So
-    # the exit powers are predictable from the dump by the deposit sum itself -- the
-    # Bessel fc(h) and the harmonic phase h*theta, with no evolution approximation.
+    # One step from a dark start. The field at exit is exactly twice the source deposit
+    # of the post-advance particles, since a zero field diffracts to zero before the add.
+    # A one-step run's final particle dump is exactly the state the deposit read. So the
+    # exit powers follow from the dump by the deposit sum itself, with the Bessel fc(h)
+    # and the harmonic phase h*theta and no approximation of the evolution.
 
     run(exe, wd, "h3dep", NML_IMPORT.format(lat="short.bmad", root="h3dep",
         beam="h3bunch-final.beam.h5", field="dark.wf.h5", extra=""))

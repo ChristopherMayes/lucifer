@@ -2,8 +2,8 @@
 """
 Convert particle and field files between Genesis 1.3 v4 and openPMD.
 
-The tracker speaks openPMD only. Genesis conversion lives here so the format knowledge
-sits in one place, outside the physics.
+The tracker reads and writes openPMD only. The Genesis conversion is here so the
+knowledge of the format sits in one place, outside the physics.
 
 Four directions. Fields both ways and Genesis particles inward are openPMD-beamphysics
 calls: that library owns those conversions and this script does not repeat them. The
@@ -23,8 +23,8 @@ Usage:
                                                               [--sample <n>]
   convert_genesis.py round-trip <genesis file>      # convert out and back, compare
 
-The kind of file (particles or field) is detected from its contents, so the same two
-commands cover both. Exit 0 only on success.
+The kind of file, particles or field, is detected from its contents, so each command
+covers both. Exit 0 only on success.
 """
 
 from __future__ import annotations
@@ -51,7 +51,8 @@ def is_openpmd(path):
 
 
 def is_particles(path):
-    """Genesis particle dumps have slice groups with a gamma record; fields have none."""
+    """An openPMD file holds particles when its first iteration has a particles group.
+    Genesis particle dumps have slice groups with a gamma record. Fields have none."""
     with h5py.File(path) as h5:
         if "openPMD" in h5.attrs:
             it = h5["data"][sorted(h5["data"].keys())[0]]
@@ -171,10 +172,9 @@ def write_openpmd_beam(path, groups, spacing):
     # The slice offset that came out of the lag goes into timeOffset, which is where the
     # tracker's own writer puts it. openPMD sums the two, so a reader that does not walk
     # particlePatches still gets the whole bunch, and a converted file and a native one
-    # mean the same thing. Dropping it on both sides is what made a bunch read one slice
-    # long.
+    # mean the same thing. Without the offset a bunch reads one slice long.
     #
-    # The two are written as they are, with no subtraction between them: the lag is what
+    # The two are written as they are, with no subtraction between them. The lag is what
     # Bmad's reader turns into vec(5), and moving any of the placement into it would move
     # the beam the comparison tiers import.
     t_place = np.zeros(n_tot)
@@ -215,8 +215,8 @@ def write_openpmd_beam(path, groups, spacing):
         # No totalMomentum and no totalMomentumOffset. Without them Bmad's reader takes
         # the momentum from the three absolute components and references it to the
         # lattice's p0c, which is the run's one reference. Writing a reference here would
-        # invent a second one, and a beam's mean momentum is not the lattice's: doing that
-        # shifted gamma by 5.1e-4 in the first version of this converter.
+        # invent a second one, and a beam's mean momentum is not the lattice's. Referencing
+        # to the beam's mean momentum shifts gamma by 5.1e-4.
 
         _pmd_dataset(sp, "time", t_lag, 1.0, UNIT_SEC, "t - t_ref")
         _pmd_dataset(sp, "timeOffset", t_place, 1.0, UNIT_SEC, "t_ref")
@@ -231,7 +231,7 @@ def write_openpmd_beam(path, groups, spacing):
         # Bmad's reader takes these through its openPMD dataset reader, which expects the
         # unit attributes every openPMD record carries.
         pp = sp.create_group("particlePatches")
-        # Bmad restores one bunch per patch only under this mark; without it a patch
+        # Bmad restores one bunch per patch only under this mark. Without the mark a patch
         # group is another writer's partition and the species is read as one bunch.
         pp.attrs["patchesAreBunches"] = np.array([1], dtype=np.int32)
         off = np.concatenate([[0], np.cumsum(n_pat)[:-1]]).astype(np.int32)
@@ -372,7 +372,7 @@ def main():
     try:
         write_genesis_par(dst, slices, a.wavelength, a.sample * a.wavelength)
     except ValueError as exc:
-        # A refusal, not a crash: the message names the slice and the spread.
+        # The ValueError is a refusal and the message names the slice and the spread.
         print(f"FAIL: {exc}")
         return 1
     print(f"particles: {src.name} -> {dst.name}, {len(slices)} slices")
