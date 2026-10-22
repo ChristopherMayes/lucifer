@@ -4,19 +4,19 @@
 ! openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
 ! Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
 ! The standard document is authoritative for this format. This module and the
-! harness's h5py reader validate against its text independently.
+! harness's h5py reader are each checked against its text.
 !
-! Layout decisions (see the physics manual, fel-physics.md sec-field-set):
+! Layout (also see fel-physics.md sec-field-set):
 !
 !   /                        openPMD "2.0.0", openPMDextension "Wavefront",
 !                            basePath "/data/%T/", meshesPath "meshes/",
 !                            iterationEncoding "groupBased", iterationFormat "/data/%T/"
-!   /data/1/                 one iteration per file; time = 0, dt = 0, timeUnitSI = 1
+!   /data/1/                 One iteration per file. time = 0, dt = 0, timeUnitSI = 1.
 !   /data/1/meshes/electricField
-!                            the one mesh record. Attributes on the mesh record (the
-!                            extension's heading. Its body says "series", and the
-!                            contradiction is resolved here in the record's favor:
-!                            photonEnergy is a property of one field):
+!                            The one mesh record. The extension's heading puts its
+!                            attributes on the mesh record, and its body says "series".
+!                            The record is used, since photonEnergy is a property of one
+!                            field. The attributes:
 !                            geometry 'cartesian', axisLabels ['z','y','x'],
 !                            gridSpacing [dz,dy,dx], gridGlobalOffset [z0,-gmax,-gmax]
 !                            (z0 is 0 for a whole window and the first slice's z for a
@@ -25,20 +25,20 @@
 !                            unitDimension (1,1,-3,-1,0,0,0) (V/m),
 !                            timeOffset 0, photonEnergy [J], temporalDomain 'time',
 !                            spatialDomain 'r', zCoordinate [m].
-!   .../electricField/x      complex compound {r,i} dataset, which h5py reads natively.
+!   .../electricField/x      Complex compound {r,i} dataset, which h5py reads natively.
 !                            Component attributes: unitSI 1 and position [0,0,0], the
 !                            sample's offset within its cell in units of gridSpacing.
-!   .../electricField/y      present only when the wavefront carries Ey. Both transverse
-!                            polarizations live in one file as components, the
-!                            improvement over the Genesis format's one-per-file. The z
-!                            component is never written: a paraxial code has none, and
-!                            an absent component is ordinary openPMD.
+!   .../electricField/y      Present only when the wavefront carries Ey. Both transverse
+!                            polarizations are components in one file. The Genesis
+!                            format writes one per file. The z component is never
+!                            written: a paraxial code has none, and an absent component
+!                            is ordinary openPMD.
 !
-! The dataset is stored exactly as the Fortran (nx, ny, nslice) array, which the HDF5
-! Fortran API records as a C-order (nslice, ny, nx) dataspace: zero-copy, and
-! numpy-natural for per-slice access. axisLabels declare that stored order. The slice
-! axis is the one labeled z (third in the logical x,y,z reading). Slices are
-! simultaneous, so they are a mesh axis, never the openPMD iteration.
+! The dataset is stored exactly as the Fortran (nx, ny, nslice) array. The HDF5 Fortran
+! API records that as a C-order (nslice, ny, nx) dataspace. This needs no copy and gives
+! numpy per-slice access directly. axisLabels declare that stored order. The slice axis
+! is the one labeled z (third in the logical x,y,z reading). Slices are simultaneous, so
+! they are a mesh axis and never the openPMD iteration.
 !
 ! Reading implements exactly what writing produces and refuses the rest:
 ! temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
@@ -64,8 +64,8 @@ contains
 !+
 ! Function file_is_openpmd (file_name) result (is_pmd)
 !
-! Routine to test whether a file is an openPMD file. This is what the import path refuses
-! on, and it holds for any openPMD file, particles as well as fields: an openPMD file
+! Routine to test whether a file is an openPMD file. The import path refuses a file on
+! this test. It holds for any openPMD file, particles as well as fields. An openPMD file
 ! carries the required root attribute "openPMD", and a Genesis dump of either kind has
 ! none.
 !
@@ -101,19 +101,18 @@ end function file_is_openpmd
 !+
 ! Subroutine wavefront_write_openpmd (wf, file_name, err_flag, z_offset)
 !
-! Routine to write one wavefront as an openPMD EXT_Wavefront file, using the layout
-! described in the module header. The field is in V/m already (temporalDomain 'time'),
-! so unitSI = 1 throughout. zCoordinate is wf%s_position, the plane's beamline
-! position, taken from the wavefront so that the file cannot disagree with the
-! structure it came from.
+! Routine to write one wavefront as an openPMD EXT_Wavefront file, in the layout of the
+! module header. The field is already in V/m (temporalDomain 'time'), so unitSI = 1
+! throughout. zCoordinate is wf%s_position, the plane's beamline position. It is taken
+! from the wavefront so the file cannot disagree with the structure it came from.
 !
 ! Input:
 !   wf         -- wavefront_struct: The field. Ey written when allocated.
 !   file_name  -- character(*): Output file.
 !   z_offset   -- real(rp), optional: Where the first record sits along the window [m],
-!                   gridGlobalOffset's z. A field cut to a slice range passes the first
-!                   slice's z, so the mesh lands where the whole window's would have put
-!                   those slices. Default 0, the whole window.
+!                   the z of gridGlobalOffset. A field cut to a slice range passes the
+!                   first slice's z. The mesh then lands where the whole window would
+!                   have put those slices. Default 0, the whole window.
 !
 ! Output:
 !   err_flag   -- logical: Set True on error, False otherwise.
@@ -216,13 +215,13 @@ contains
 !
 ! Routine to write the required openPMD component attribute "position" on one
 ! polarisation component dataset. The value is the sample's offset within its cell in
-! units of gridSpacing, and a wavefront's samples sit on the cell corners, so it is zero
-! on all three axes.
+! units of gridSpacing. A wavefront's samples sit on the cell corners, so it is zero on
+! all three axes.
 !
-! The attribute goes on the dataset, which is why this takes the dataset name and hands it
-! to the H5LT call that writes through a parent: the plain attribute writers take an object
-! id, and passing a path as the attribute name puts a slash-laden attribute on the root
-! group instead. Caught by the validation's file comparison against the Python writer.
+! Note: The attribute goes on the dataset. So this routine takes the dataset name and
+! hands it to the H5LT call that writes through a parent. The plain attribute writers
+! take an object id. Passing them a path as the attribute name puts an attribute with
+! slashes in its name on the root group instead.
 !-
 
 subroutine write_position (name)
@@ -243,9 +242,9 @@ end subroutine wavefront_write_openpmd
 !+
 ! Subroutine wavefront_read_openpmd (wf, file_name, err_flag, photon_energy)
 !
-! Routine to read an openPMD EXT_Wavefront file written to the module header's layout.
-! Everything this reader cannot represent is refused: a frequency-domain or
-! k-space field, an axis order other than (z,y,x), a missing required attribute.
+! Routine to read an openPMD EXT_Wavefront file in the layout of the module header.
+! Anything this reader cannot represent is refused: a frequency-domain or k-space
+! field, an axis order other than (z,y,x), a missing required attribute.
 !
 ! photon_energy is returned so the caller can match the file to the field set entry
 ! whose harmonic it carries. wf%wavelength is derived from it.
@@ -344,8 +343,8 @@ if (err) then
   call out_io (s_error$, r_name, 'REQUIRED ATTRIBUTE gridSpacing MISSING IN ' // trim(file_name))
   return
 endif
-! openPMD states the grid in its own units and the SI factor beside them, and a file
-! written elsewhere is entitled to use that: the spacing is what the factor makes it.
+! openPMD states the grid in its own units with the SI factor beside them. A file
+! written elsewhere may use units other than metres, so the spacing is scaled by it.
 
 call hdf5_read_attribute_real (m_id, 'gridUnitSI', gunit, err, .false.)
 if (err) then
@@ -360,14 +359,13 @@ spacing = spacing * gunit
 wf%dz = spacing(1);  wf%dy = spacing(2);  wf%dx = spacing(3)
 wf%wavelength = h_planck * c_light * e_charge / photon_energy
 
-call hdf5_read_attribute_real (m_id, 'gridGlobalOffset', offset, err, .false.)   ! Read, unused:
-                                            ! the walk's grid is centered by convention.
+call hdf5_read_attribute_real (m_id, 'gridGlobalOffset', offset, err, .false.)   ! Read but unused.
+                                            ! The walk's grid is centered by convention.
 
-! The components. Dataset dims come back in Fortran order (nx, ny, nz), the same API
-! symmetry the writer used. The buffer is allocated from x's dims and both components
-! are read into buffers of that shape, so y must be shaped as x is: an HDF5 read has no
-! bound of its own, and a larger y once wrote past the end of the buffer, which the
-! debug build caught and the production build did not.
+! The components. Dataset dims come back in Fortran order (nx, ny, nz), by the same API
+! symmetry the writer used. Both components are read into buffers of the shape of x.
+! An HDF5 read has no bound of its own, so y must be shaped as x is. A larger y would
+! write past the end of the buffer.
 
 info = hdf5_object_info (m_id, 'x', err, .true.);  if (err) return
 ndim = int(info%data_dim(1:3))

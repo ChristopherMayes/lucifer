@@ -1,13 +1,12 @@
 !+
 ! Module fel_setup_mod
 !
-! The lattice walk-in of the FEL tracker: hooks and lattice attributes, the parse,
-! element recognition with its refusals, the harmonics/field-set validation, the
-! collective configuration, the slippage/autophasing schedule, geometry breaks and
-! the diagnostics setup. Split as fel_setup_lattice (needs only the inputs) and
-! fel_setup_schedule (needs the built starting state). Library contract: errors
-! return through err_flag, and nothing here stops. All terminal output goes through
-! out_io.
+! Setup of the FEL tracker from its lattice: the hooks and lattice attributes, the parse,
+! element recognition with its refusals, the harmonics and field-set validation, the
+! collective configuration, the slippage and autophasing schedule, geometry breaks and
+! the diagnostics setup. fel_setup_lattice needs only the inputs. fel_setup_schedule
+! needs the built starting state. Errors return through err_flag, and nothing here
+! stops. All terminal output goes through out_io.
 !-
 
 module fel_setup_mod
@@ -17,8 +16,8 @@ use fel_io_mod
 
 implicit none
 
-! The lattice-attribute registration is process-global and idempotent: registered
-! once, reused by every later run in the same process (the re-entrancy contract).
+! The lattice-attribute registration is process-global and idempotent. It is done once
+! and reused by every later run in the same process.
 
 contains
 
@@ -28,11 +27,10 @@ contains
 !+
 ! Subroutine fel_setup_lattice (run, err_flag)
 !
-! Routine to turn the parsed inputs into a recognized lattice: the tracking hooks
-! and FEL lattice attributes (registered once per process), the parse itself,
-! element recognition and its refusals (setup_fel_elements), the harmonics-request
-! validation and the field-set allocation. Errors return through err_flag, and nothing
-! here stops (the library contract).
+! Routine to turn the parsed inputs into a recognized lattice. This covers the tracking
+! hooks and FEL lattice attributes (registered once per process), the parse, element
+! recognition and its refusals (setup_fel_elements), the harmonics validation and the
+! field-set allocation. Errors return through err_flag, and nothing here stops.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state carrying the parsed namelist inputs and the lattice
@@ -76,9 +74,9 @@ migrate = run%global%migrate
 reference_run = run%global%reference_run
 harmonics = run%winit%harmonics
 
-! (The FEL tracking mode is a lattice attribute. Its refusals live in
-! setup_fel_elements, and the unaveraged-vs-collective refusal follows setup, once
-! any_unavg is known.)
+! The FEL tracking mode is a lattice attribute. Its refusals are in setup_fel_elements.
+! The refusal of collective effects in the unaveraged mode follows setup, once any_unavg
+! is known.
 
 if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
   call out_io (s_error$, r_name, 'INTERLUDE_MODEL MUST BE "bmad" OR "genesis", GOT: ' // trim(interlude_model))
@@ -97,10 +95,10 @@ if (run%global%unaveraged_steps_per_period < 10) then
   err_flag = .true.;  return
 endif
 
-! The interlude step cuts an interlude into pieces with Bmad's element_slice_iterator,
-! which the seam model's own track1_bunch call takes whole. The transcribed Genesis
-! interlude is validated by transcription fidelity and its step is Genesis's own, so
-! cutting it would leave it something else.
+! The interlude step cuts an interlude into pieces with Bmad's element_slice_iterator.
+! The seam model's own track1_bunch call takes each piece whole. The transcribed Genesis
+! interlude is validated by transcription fidelity, and its step is Genesis's own.
+! Cutting it would make it something else.
 
 if (run%global%interlude_ds_step > 0 .and. run%global%interlude_model /= 'bmad') then
   call out_io (s_error$, r_name, 'INTERLUDE_DS_STEP CUTS THE SEAM INTERLUDE AND INTERLUDE_MODEL IS "' // &
@@ -116,8 +114,8 @@ if (run%global%unaveraged_ramp_periods < -1) then
   err_flag = .true.;  return
 endif
 
-! (bmad_com%radiation_damping_on / %radiation_fluctuations_on come straight from the
-! &fel_params namelist: Bmad's own switches, exposed directly as Tao exposes them.)
+! bmad_com%radiation_damping_on and %radiation_fluctuations_on come straight from the
+! &fel_params namelist. They are Bmad's own switches, exposed directly as Tao exposes them.
 
 if (bmad_com%radiation_fluctuations_on .and. migrate) then
   call out_io (s_error$, r_name, 'RADIATION_FLUCTUATIONS DRAWS ONE KICK PER BEAMLET (THE QUIET START', &
@@ -125,32 +123,32 @@ if (bmad_com%radiation_fluctuations_on .and. migrate) then
   err_flag = .true.;  return
 endif
 
-! Read the lattice and the starting state: a pair of openPMD dumps (the shared-start
-! benchmark methodology, where the reference code's dumps are converted at the harness
-! boundary), or a self-generated steady-state condition when both file names are blank.
+! Read the lattice and the starting state. The state is a pair of openPMD dumps, or a
+! self-generated steady-state condition when both file names are blank. The dumps are the
+! shared-start benchmark method, where the reference code's dumps are converted at the
+! harness boundary.
 !
-! An FEL element carries fel_method and whatever tracking_method it says, which is
-! bmad_standard, so Bmad's own periodic-wiggler kernel gives it its reference time and
-! its transport everywhere outside this driver's FEL walk. The custom hooks below are
-! for a wiggler whose tracking_method is custom, which names some other program's
-! tracking: Bmad calls through both pointers and jumps through a null one if either is
-! unset, so both are supplied and both track the element as the wiggler it is.
+! An FEL element carries fel_method and its own tracking_method, which is bmad_standard.
+! So Bmad's own periodic-wiggler kernel gives it its reference time and its transport
+! everywhere outside the FEL walk of this program. The custom hooks below are for a
+! wiggler whose tracking_method is custom, which names some other program's tracking.
+! Bmad calls through both pointers and jumps through a null one if either is unset. So
+! both are supplied, and both track the element as the wiggler it is.
 
-! Both hooks are needed: mat6_calc_method resolves to custom too (auto follows the
-! tracking method), and make_mat6 calls through a null make_mat6_custom_ptr otherwise.
+! Both hooks are needed. mat6_calc_method resolves to custom too (auto follows the
+! tracking method), and make_mat6 otherwise calls through a null make_mat6_custom_ptr.
 
 track1_custom_ptr => fel_ele_as_wiggler
 make_mat6_custom_ptr => fel_mat6_as_wiggler
 
-! err_flag matters: bmad_parser reports attribute errors (e.g. a wake on an element
-! type that cannot carry one) and returns. Without the check the run continues on a
-! partial lattice, found when an example's drift wakes silently never attached.
+! err_flag matters. bmad_parser reports attribute errors (EG: a wake on an element type
+! that cannot carry one) and returns. Without the check the run continues on a partial
+! lattice, and a wake that failed to attach is silently absent.
 !
-! exit_on_error is cleared first, because a fatal parse error otherwise reaches
-! err_exit, which bombs for a traceback and then stops. That stop carries status zero,
-! so a refused lattice looked like a successful run to anything reading exit codes. With
-! the flag cleared, bmad_parser returns and the library contract holds: nothing here
-! stops, the caller decides.
+! exit_on_error is cleared first. Otherwise a fatal parse error reaches err_exit, which
+! bombs for a traceback and then stops with status zero. A refused lattice then looks
+! like a successful run to anything reading exit codes. With the flag cleared,
+! bmad_parser returns and the caller decides. Nothing here stops.
 
 global_com%exit_on_error = .false.
 call bmad_parser (lat_file, lat, err_flag = err)
@@ -175,9 +173,9 @@ if (err_flag) return
 call derive_slicing_and_step ()   ! Needs the FEL elements, and runs before the beam is sliced.
 if (err_flag) return
 
-! The field set (fel-physics.md sec-field-set). Validate the harmonics request, then allocate
-! the set and point the fundamental aliases at entry 1 before any field construction:
-! every construction path below builds the fundamental through wf.
+! The field set (fel-physics.md sec-field-set). Validate the harmonics request. Then
+! allocate the set and point the fundamental aliases at entry 1 before any field
+! construction, since every construction path builds the fundamental through wf.
 
 n_harm = count(harmonics /= 0)
 run%n_harm = n_harm
@@ -200,12 +198,12 @@ do ih = 2, 9
   endif
 enddo
 ! The load has to carry the harmonic it is asked to start. The quiet start leaves no
-! bunching below harmonic beamlet_size, and fel_fawley_noise then imposes the physical
-! level on harmonics 1 through (beamlet_size - 1)/2. A harmonic field above that starts
-! from a load with no noise at its own frequency, so its SASE has nothing to grow from
-! and the run would report a number with no startup behind it. The refusal names the
-! beamlet size that would carry it, 2h + 1. A seeded harmonic needs no such noise, so
-! the check applies where shot noise is asked for.
+! bunching below harmonic beamlet_size. fel_fawley_noise then imposes the physical level
+! on harmonics 1 through (beamlet_size - 1)/2. A harmonic field above that starts from a
+! load with no noise at its own frequency. Its SASE has nothing to grow from, and the run
+! would report a number with no startup behind it. The refusal names the beamlet size
+! that would carry it, 2h + 1. A seeded harmonic needs no such noise, so the check
+! applies only where shot noise is asked for.
 
 if (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size - 1) / 2) then
   call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
@@ -225,12 +223,11 @@ endif
 call fel_refuse_two_pol_combinations (run, err_flag)   ! Made again after a field import.
 if (err_flag) return
 
-! The source model (fel-physics.md sec-coherent-source): validated, then stamped onto every
-! FEL element. v1 scope refusals: the coherent source carries the
-! Fundamental of one polarization, and it cannot live inside the unaveraged mode,
-! which is the independent check (variance reduction inside the explicit-everything
-! mode). Even harmonics are invalid
-! in the method itself -- F(z,0) = 0 -- and odd ones are a named follow-on.
+! The source model (fel-physics.md sec-coherent-source), validated and then stamped onto
+! every FEL element. The coherent source carries the fundamental of one polarization. It
+! is refused inside the unaveraged mode, which is its independent check (variance
+! reduction inside the mode that resolves everything explicitly). Even harmonics are
+! invalid in the method itself, since F(z,0) = 0. Odd ones are not yet implemented.
 
 select case (run%global%source_model)
 case ('deposit')
@@ -247,12 +244,12 @@ case ('coherent')
   endif
   if (run%winit%seed_power <= 0 .and. run%field_file(1) == '') then
 
-    ! Measured, not assumed (check_coherent's SASE experiment): the coherent source
-    ! understates dark-start startup by ~175x on the reference configuration.
-    ! Spontaneous, spatially-incoherent emission dominates SASE startup and is
-    ! exactly what the coherent model drops. The slice bunch factor's physical noise
-    ! (Fawley, <|B|^2> N_lambda = 1) is present but is not the dominant seed.
-    ! Refused. Seeded runs are fully supported.
+    ! The coherent source understates dark-start startup by about 175x on the reference
+    ! configuration (fel-physics.md sec-coherent-source). Spontaneous, spatially
+    ! incoherent emission dominates SASE startup, and the coherent model drops exactly
+    ! that. The physical noise of the slice bunch factor (Fawley, <|B|^2> N_lambda = 1)
+    ! is present but is not the dominant seed. So a dark start is refused. Seeded runs
+    ! are supported.
 
     call out_io (s_error$, r_name, 'SOURCE_MODEL = "coherent" WITH A DARK START IS REFUSED: THE', &
                  'COHERENT SOURCE DROPS THE SPATIALLY-INCOHERENT SPONTANEOUS EMISSION THAT', &
@@ -268,23 +265,24 @@ case default
 end select
 
 ! The source filter (fel-physics.md sec-source-filter), validated and stamped onto every
-! FEL element the same way. It multiplies the transformed source, which the unaveraged
-! mode does not build (it deposits from the resolved motion) and which the coherent source
-! has already replaced by an analytic Gaussian carrying no wide-angle content. Neither is
-! refused. The filter reaches the elements that build a source to filter and does nothing
-! where there is none, as transport_model reaches the averaged elements only: it is on by
-! default, so a deck that asks for the unaveraged mode has not asked for the filter and
-! must not be stopped by it. A mixed line filters its averaged elements and leaves the
-! unaveraged one alone, which is what the per-element filter state already does. Both
-! cases say so at setup, since a switch that quietly does nothing is worth a line.
+! FEL element the same way. It multiplies the transformed source. The unaveraged mode
+! builds no such source (it deposits from the resolved motion), and the coherent source
+! has replaced it by an analytic Gaussian with no wide-angle content. Neither case is
+! refused. The filter reaches the elements that build a source and does nothing where
+! there is none, as transport_model reaches the averaged elements only. The filter is on
+! by default, so a deck that asks for the unaveraged mode has not asked for the filter
+! and must not be stopped by it. A mixed line filters its averaged elements and leaves
+! the unaveraged ones alone, through the per-element filter state. Both cases are
+! reported at setup, so a switch that does nothing says so.
+!
 ! Genesis turns its own filter off for a non-positive cut or width, since those are
 ! divisors and a width of zero has no sigmoid (initSourceFilter, FieldSolverFFT.cpp:158-170).
-! A run that asked for a filter it can have and silently did not get it is worse than one
-! that stops, so those still refuse.
+! Here those are refused. A run that asked for a filter it can have and silently did not
+! get it is worse than one that stops.
 
 ! The coherent source is turned off ahead of the block below rather than inside it. The
 ! block arms the per-element filter state, and the edge is derived further down under the
-! same switch, so a run that fell through to the arming would filter with no edge set.
+! same switch. So a run that fell through to the arming would filter with no edge set.
 
 if (run%global%source_filter .and. run%global%source_model == 'coherent') then
   call out_io (s_info$, r_name, 'The source filter is off for this run: the coherent source is ' // &
@@ -303,12 +301,12 @@ if (run%global%source_filter) then
     err_flag = .true.;  return
   endif
 
-  ! The tolerance fixes the amplitude the sigmoid has to pass at the angle it protects, and
-  ! both ends of its range are singular in the margin (fel_filter_margin). At zero the
-  ! logarithm of the tolerance diverges. At one the margin runs to positive infinity and the
-  ! edge collapses onto the axis, so a caller testing only the margin's sign would take it.
-  ! Checked here, before anything takes a logarithm, and whether or not the derived path
-  ! will use it.
+  ! The tolerance fixes the amplitude the sigmoid has to pass at the angle it protects.
+  ! Both ends of its range are singular in the margin (fel_filter_margin). At zero the
+  ! logarithm of the tolerance diverges. At one the margin runs to positive infinity and
+  ! the edge collapses onto the axis, so a caller testing only the sign of the margin
+  ! would accept it. Checked here, before anything takes a logarithm, whether or not the
+  ! derived path will use it.
 
   if (run%global%source_filter_tolerance <= 0 .or. run%global%source_filter_tolerance >= 1) then
     call out_io (s_error$, r_name, 'SOURCE_FILTER_TOLERANCE MUST LIE STRICTLY BETWEEN ' // &
@@ -319,14 +317,13 @@ if (run%global%source_filter) then
   endif
 
   ! The width is a fraction of the edge, so the sigmoid on axis is 1/(1 + exp(-1/width)).
-  ! Genesis4's own default of 1 puts that at 0.73, which attenuates the coherent source as
-  ! much as the wide angles: measured, it halves the physical in-cone startup power and
-  ! delays saturation by five to nine metres, with nothing in the output saying so
-  ! (doc/startup-noise.md). A filter meant to remove wide angles keeps the axis, so a
-  ! transmission under 0.99 is refused with the width that would pass. The
-  ! validation-internal cuts lift the guard, since placing the edge where Genesis4 places
-  ! it means taking its width too, and that comparison is the one thing the soft sigmoid
-  ! is still for.
+  ! Genesis4's own default of 1 puts that at 0.73. That attenuates the coherent source as
+  ! much as the wide angles. It halves the physical in-cone startup power and delays
+  ! saturation by five to nine metres, with nothing in the output saying so
+  ! (fel-physics.md sec-source-filter). A filter meant to remove wide angles keeps the
+  ! axis. So a transmission under 0.99 is refused, with the width that would pass. The
+  ! validation-only cuts lift the guard. Placing the edge where Genesis4 places it means
+  ! taking its width too, and that comparison is the one use left for the soft sigmoid.
 
   if (run%global%source_filter_xcut == 0 .and. run%global%source_filter_ycut == 0 .and. &
       1 / (1 + exp(-1 / run%global%source_filter_width)) < 0.99_rp) then
@@ -379,14 +376,16 @@ contains
 ! Subroutine setup_fel_elements ()
 !
 ! Routine to recognize FEL segments and derive their FEL parameters from lattice
-! attributes (Bmad's kx roll-off attribute is not yet mapped and must be zero). An FEL
-! segment is a wiggler/undulator tracked by an FEL method: Bmad's own
-! semantics for program-supplied tracking, which this driver is. The wiggler sanity
-! assertions are enforced: a wiggler with zero b_max or l_period would silently get
-! factor = 0 in Bmad's own kernel (no resonance, no error), and a fieldmap field_calc
-! gets osc_amplitude without focusing. Both are refused. The stored k1x/k1y
-! wiggler attributes are deliberately NOT read: their helical sign disagrees with the
-! tracking locals. Nothing here cross-uses them.
+! attributes. Bmad's kx roll-off attribute is not yet mapped and must be zero. An FEL
+! segment is a wiggler or undulator tracked by an FEL method, which is Bmad's own
+! meaning for program-supplied tracking.
+!
+! The wiggler sanity assertions are enforced. A wiggler with zero b_max or l_period
+! would silently get factor = 0 in Bmad's own kernel (no resonance, no error). A
+! fieldmap field_calc gets osc_amplitude without focusing. Both are refused.
+!
+! Note: The stored k1x and k1y wiggler attributes are *not* read. Their helical sign
+! disagrees with the tracking locals.
 !-
 
 subroutine setup_fel_elements ()
@@ -404,7 +403,7 @@ is_fel = .false.
 fel_mode = 0;  fel_spp = 0;  fel_ramp = 0
 
 ! The mode is the element's fel_method, which Bmad carries as it carries
-! space_charge_method: Averaged or Unaveraged names the multiparticle physics, and the
+! space_charge_method. Averaged or Unaveraged names the multiparticle physics, and the
 ! element's tracking_method still names how one particle crosses it. A wiggler whose
 ! fel_method is Off is not this program's element and is left to the seam.
 
@@ -420,11 +419,10 @@ do je = 1, branch%n_ele_track
   fel_ramp(je) = run%global%unaveraged_ramp_periods
   if (fel_ramp(je) == -1) fel_ramp(je) = 0
 
-  ! The wiggler sanity assertions live in fel_assert_wiggler_sane, one authority. It is
-  ! called from the track1/mat6 hooks (where they fire first, during the parse) and
-  ! again here. Keeping a second copy inline was tried and rejected: redundant
-  ! assertions mask the removal of either copy, which defeats mutation testing of the
-  ! refusal checks.
+  ! The wiggler sanity assertions are in fel_assert_wiggler_sane, the one place they are
+  ! made. It is called from the track1 and mat6 hooks, where it fires first during the
+  ! parse, and again here. There is no second copy inline. A redundant copy would hide
+  ! the removal of the other from the tests of the refusals.
 
   call fel_assert_wiggler_sane (w)
 
@@ -433,7 +431,7 @@ do je = 1, branch%n_ele_track
 
   ! aw (rms, Genesis's convention) from the peak field:
   ! K = c*b_max/(k_u * m_e c^2), exactly and independent of the reference energy.
-  ! Helical aw = K, planar aw = K/sqrt(2). Focusing split: Genesis's defaults by
+  ! Helical aw = K, planar aw = K/sqrt(2). The focusing split is Genesis's default by
   ! helicity, scaled by ku^2 as Genesis's unroll does (fel-physics.md sec-element).
 
   kk = c_light * w%value(b_max$) / (kw * m_electron)
@@ -450,9 +448,10 @@ do je = 1, branch%n_ele_track
     und_of(je)%ky = kw**2
   endif
 
-  ! Tilt: the wiggle-plane rotation, planar only. A tilted helical is a no-op that
-  ! reads as confusion, refused. The transcribed-Genesis maps know no tilt, refused.
-  ! The polarization 2-vector on (Ex, Ey): planar (cos t, sin t); helical (1,-i)/sqrt2.
+  ! Tilt is the wiggle-plane rotation, planar only. A tilted helical element is a no-op
+  ! that reads as a mistake, so it is refused. The transcribed-Genesis maps know no tilt,
+  ! so a tilt there is refused too. The polarization 2-vector on (Ex, Ey) is
+  ! (cos t, sin t) for a planar element and (1, +i)/sqrt(2) for a helical one.
 
   und_of(je)%tilt = w%value(tilt_tot$)
   if (und_of(je)%tilt /= 0) then
@@ -469,15 +468,15 @@ do je = 1, branch%n_ele_track
   endif
   und_of(je)%cos_t = cos(und_of(je)%tilt)
   und_of(je)%sin_t = sin(und_of(je)%tilt)
-  ! The helical element's light is circular, and its handedness follows from the
-  ! motion and the carrier convention. The helical potential a = a0 (cos k_u s, sin k_u s)
-  ! turns the transverse velocity counterclockwise along s, the same sense as Bmad's
-  ! helical_model field, and a component's physical field is Re[-i Ehat_c e^{i Psi}] with
-  ! the carrier Psi decreasing in time, so the pair that rotates with the electron is
-  ! (1, +i)/sqrt(2): E_eff = conj(pol).E = (Ehat_x - i Ehat_y)/sqrt(2), the co-rotating
-  ! combination the unaveraged mode's Lorentz force selects on its own. The first version
-  ! carried (1, -i), the counter-rotating pair, and a seed of that handedness drove the
-  ! averaged element while the unaveraged one ignored it.
+  ! The helical element's light is circular, and its handedness follows from the motion
+  ! and the carrier convention. The helical potential a = a0 (cos k_u s, sin k_u s) turns
+  ! the transverse velocity counterclockwise along s, the same sense as Bmad's
+  ! helical_model field. A component's physical field is Re[-i Ehat_c e^{i Psi}], with the
+  ! carrier Psi decreasing in time. So the pair that rotates with the electron is
+  ! (1, +i)/sqrt(2): E_eff = conj(pol).E = (Ehat_x - i Ehat_y)/sqrt(2). That is the
+  ! co-rotating combination the unaveraged mode's Lorentz force selects on its own.
+  ! Note: (1, -i) is the counter-rotating pair. With it, a seed of that handedness drove
+  ! the averaged element while the unaveraged one ignored it.
 
   if (und_of(je)%helical) then
     und_of(je)%pol = [cmplx(1.0_rp, 0.0_rp, rp), cmplx(0.0_rp, 1.0_rp, rp)] / sqrt(2.0_rp)
@@ -512,14 +511,15 @@ end subroutine setup_fel_elements
 !
 ! Routine to derive the transverse grid from the beam where the deck states none
 ! (doc/startup-noise.md, Recommendations). The rms beam size comes from the emittances
-! the deck states and the matched Twiss the lattice states, averaged over the FEL
+! the deck states and the matched Twiss the lattice states. It is averaged over the FEL
 ! elements by length, since that is the beta the mode sees. Cells are then a seventh of
-! it and the half width nine of it, and the point count follows from whichever half
-! width is in force, rounded up to a power of two. The rounding only ever refines, more
-! points over one half width being smaller cells, and it leaves the count the same on
-! every backend, so a derived deck runs on the device and on the CPU at one grid. A stated value is never overridden, and the other is derived
-! against it, so a deck that fixes the cell size gets the containment it needs and one
-! that fixes the point count gets the resolution.
+! it and the half width nine of it. The point count follows from whichever half width is
+! in force, rounded up to a power of two. The rounding only refines, since more points
+! over one half width are smaller cells. It also gives the same count on every backend,
+! so a derived deck runs on the device and on the CPU at one grid. A stated value is
+! never overridden, and the other is derived against it. So a deck that fixes the cell
+! size gets the containment it needs, and one that fixes the point count gets the
+! resolution.
 !
 ! Nothing is derived without an emittance to derive from. A run that loads its beam from
 ! a dump has none, and the refusals that already ask for the grid still ask.
@@ -566,11 +566,11 @@ end subroutine derive_grid
 !+
 ! Function described_beam_size () result (sig)
 !
-! The rms transverse size of the beam the deck describes, from the emittances it states
-! and the matched Twiss the lattice states, averaged over the FEL elements by length
-! since that is the beta the mode sees. The quadratic mean of the two planes, one size
-! for a round description. Zero where there is nothing to derive from, which a run that
-! loads its beam from a dump has, and the refusals that already ask still ask.
+! Routine to return the rms transverse size of the beam the deck describes. It uses the
+! emittances the deck states and the matched Twiss the lattice states, averaged over the
+! FEL elements by length, since that is the beta the mode sees. The size is the quadratic
+! mean of the two planes, one size for a round description. It is zero where there is
+! nothing to derive from, as for a run that loads its beam from a dump.
 !
 ! Output:
 !   sig -- real(rp): The rms size [m], or zero.
@@ -589,8 +589,8 @@ eps_a = run%beam_init%a_norm_emit / run%gamma0
 eps_b = run%beam_init%b_norm_emit / run%gamma0
 if (eps_a <= 0 .or. eps_b <= 0) return
 
-! A lattice whose Twiss was never propagated leaves these at zero, and the beginning
-! element is then the one truth there is.
+! A lattice whose Twiss was never propagated leaves these at zero. The beginning element
+! is then the only source.
 
 beta_a = 0;  beta_b = 0;  wt = 0
 do je = 1, branch%n_ele_track
@@ -616,12 +616,13 @@ end function described_beam_size
 !+
 ! Function described_pierce () result (rho)
 !
-! The one-dimensional Pierce parameter of the beam the deck describes, at the first FEL
-! element, in Genesis's form: rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2), with the
-! undulator's own coupling, which already carries aw. This is the same expression the
-! source filter's edge uses (fel_filter_angles), computed from the description rather
-! than from the built beam, because the slice spacing has to be known before the beam is
-! sliced at it.
+! Routine to return the one-dimensional Pierce parameter of the beam the deck describes,
+! at the first FEL element, in Genesis's form:
+!   rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2)
+! fc is the undulator's own coupling, which already carries aw. The source filter's edge
+! uses the same expression (fel_filter_angles). Here it is computed from the description
+! rather than from the built beam, because the slice spacing must be known before the
+! beam is sliced at it.
 !
 ! The peak current is the deck's own: a stated flat current, else the Gaussian peak
 ! Q c / (sqrt(2 pi) sig_z), else the flat extent, else the steady state's whole charge in
@@ -690,17 +691,17 @@ end function described_pierce
 ! deck states neither (fel-physics.md sec-window and sec-element).
 !
 ! The spacing is the whole number of wavelengths in a quarter of the cooperation length
-! lambda/(4 pi rho), which is four slices per cooperation length, the resolution FLASH1's
-! pulse energy converged at. It is derived only for a time-dependent description. In the
-! steady state the spacing is not a resolution at all: the whole charge sits in the one
+! lambda/(4 pi rho). That is four slices per cooperation length, the resolution at which
+! FLASH1's pulse energy converged. It is derived only for a time-dependent description.
+! In the steady state the spacing is not a resolution: the whole charge sits in the one
 ! slice, so the spacing sets the current, and a derived one would rewrite the beam.
 !
 ! The step is a twentieth of the one-dimensional gain length lambda_u/(4 pi sqrt(3) rho),
 ! rounded down to whole periods and at least one. Bmad's bookkeeper gives any wiggler
 ! with a period a step of l_period/20 when the deck states neither ds_step nor num_steps,
-! and fills num_steps from it, which resolves the wiggle the averaged model has already
+! and fills num_steps from it. That resolves the wiggle the averaged model has already
 ! averaged over. The derived step replaces it. The unset state is that exact quotient,
-! since the bookkeeper leaves nothing else to read, so an element whose step is
+! since the bookkeeper leaves nothing else to read. So an element whose step is
 ! l_period/20 by the deck's own choice is derived over. Any other stated step is kept.
 !-
 
@@ -715,11 +716,11 @@ logical td
 
 rho = described_pierce ()
 
-! The spacing. It is derived only for a time-dependent description this program sizes
-! itself: in the steady state the whole charge sits in the one slice, so the spacing
-! states the current rather than a resolution, and a run that loads its beam has no
-! description to derive from. Both of those keep the one wavelength that was the default
-! before anything was derived, and the spacing is never left unset.
+! The spacing is derived only for a time-dependent description this program sizes
+! itself. In the steady state the whole charge sits in the one slice, so the spacing
+! sets the current and not a resolution. A run that loads its beam has no description
+! to derive from. Both keep a spacing of one wavelength, and the spacing is never left
+! unset.
 
 if (run%slicing%n_wavelength <= 0) then
   td = (run%beam_init%sig_z > 0 .or. &
@@ -782,8 +783,8 @@ end subroutine fel_setup_lattice
 !
 ! Routine to build everything that needs both the lattice and the built starting state:
 ! the collective configuration and wake kernels, the wake-window and unaveraged-collective
-! refusals, the slippage/autophasing schedule, the geometry breaks (chicanes), and the
-! diagnostics setup (dump locators and the exact record/element-end counts). Errors
+! refusals, the slippage and autophasing schedule, the geometry breaks (chicanes), and the
+! diagnostics setup (dump locators and the exact record and element-end counts). Errors
 ! return through err_flag, and nothing here stops.
 !
 ! Input:
@@ -877,11 +878,11 @@ if (run%space_charge%model /= 'genesis') then
   err_flag = .true.;  return
 endif
 
-! The solver's grid, checked where it is stated rather than where it is used. Each of
-! these described a solve that cannot run and ran anyway, returning an exact zero with
-! nothing said: a radial grid of one point has no width between its points, and an
-! azimuthal range whose upper bound is below its lower one iterates over no modes at all.
-! A deck that asks for space charge and gets none is the failure this refuses.
+! The solver's grid is checked where it is stated rather than where it is used. Each of
+! these describes a solve that cannot run. Unchecked, it runs anyway and returns an exact
+! zero with nothing said. A radial grid of one point has no width between its points. An
+! azimuthal range whose upper bound is below its lower one iterates over no modes. A deck
+! that asks for space charge and gets none is the failure this refuses.
 
 if (sc_ngrid < 2) then
   call out_io (s_error$, r_name, 'SPACE_CHARGE%NGRID IS THE RADIAL GRID''S POINT COUNT AND NEEDS AT ' // &
@@ -911,7 +912,7 @@ if (sc_rmax < 0) then
 endif
 
 ! The solver's numbers are run-level. Whether it runs in a given element is that
-! element's own space_charge_method, resolved into run%sc_here below: nothing here
+! element's own space_charge_method, resolved into run%sc_here below. Nothing here
 ! decides, so a stats file cannot record a configuration the run did not use.
 
 coll%efield%rmax = sc_rmax
@@ -923,11 +924,11 @@ coll%efield%model = run%space_charge%model
 coll%efield%active = .false.    ! Set per element by the walk, from run%sc_here.
 
 if (sc_nz < 1 .and. .not. sc_longrange .and. bmad_com%csr_and_space_charge_on) then
-  ! Neither term is configured, so slice would compute an exact zero at full cost. That
-  ! is a deck saying two things at once, and the useful answer is which one it meant.
-  ! Only when the master switch is on: with it off, a lattice that carries slice for its
-  ! own reasons is being run without space charge deliberately, and demanding solver
-  ! numbers for a solver that will not run would be hostile.
+  ! Neither term is configured, so slice would compute an exact zero at full cost. The
+  ! deck says two things at once, and the useful answer is which one it meant. This
+  ! applies only when the master switch is on. With it off, a lattice that carries slice
+  ! for its own reasons is run without space charge on purpose. Demanding numbers for a
+  ! solver that will not run would then serve no one.
   do je = 1, branch%n_ele_track
     if (branch%ele(je)%space_charge_method /= slice$) cycle
     call out_io (s_error$, r_name, &
@@ -938,8 +939,8 @@ if (sc_nz < 1 .and. .not. sc_longrange .and. bmad_com%csr_and_space_charge_on) t
   enddo
 endif
 
-! Per element: the attribute says whether, Bmad's master switch says whether at all, and
-! an FEL element refuses the methods whose solvers need a field this walk does not have.
+! Per element, the attribute says whether and Bmad's master switch says whether at all.
+! An FEL element refuses the methods whose solvers need a field this walk does not have.
 
 allocate (run%sc_here(branch%n_ele_track))
 run%sc_here = .false.
@@ -947,12 +948,13 @@ n_sc = 0
 
 do je = 1, branch%n_ele_track
 
-  ! A Bmad-seam interlude tracks one slice's bunch at a time through track1_bunch, whose
-  ! own space-charge and CSR paths want the centroid orbit of the whole beam, which this
-  ! walk does not carry. Bmad then prints that the centroid must be supplied and returns
-  ! the bunch untracked with no error flag set, so a drift carrying the attribute lost its
-  ! transport and the run reported success. The slice-binned solve runs inside FEL elements
-  ! and the transcribed Genesis interlude, which applies it itself. Refuse the combination.
+  ! A Bmad-seam interlude tracks one slice's bunch at a time through track1_bunch. Its own
+  ! space-charge and CSR paths want the centroid orbit of the whole beam, which this walk
+  ! does not carry. Bmad then prints that the centroid must be supplied and returns the
+  ! bunch untracked with no error flag set. So a drift carrying the attribute would lose
+  ! its transport while the run reported success. The slice-binned solve runs inside FEL
+  ! elements and in the transcribed Genesis interlude, which applies it itself. So the
+  ! combination is refused.
 
   if (.not. run%is_fel(je) .and. bmad_com%csr_and_space_charge_on .and. &
       run%global%interlude_model == 'bmad') then
@@ -985,8 +987,8 @@ do je = 1, branch%n_ele_track
   end select
 enddo
 
-! Loud rather than refusing: the master switch exists to disable space charge across a
-! lattice without editing it, so the combination is legitimate and only silence is not.
+! Reported rather than refused. The master switch exists to disable space charge across a
+! lattice without editing it. So the combination is legitimate, and only silence is not.
 
 if (.not. bmad_com%csr_and_space_charge_on) then
   n_ask = count(branch%ele(1:branch%n_ele_track)%space_charge_method == slice$)
@@ -1026,10 +1028,10 @@ if (wake_on) then
   open (newunit = run%iu_wake, file = trim(out_root) // '.wake.txt', action = 'write')
   call fel_write_wake_block (run, 0.0_rp)
 
-  ! The single-particle kernels, written for cross-validation: the same physical
-  ! wake fed to Bmad's z_long machinery must reproduce these kernels'
-  ! convolution. Note the s = 0 entries carry the Bane self-slice half factor
-  ! (fel_wake_init halves them). A plain W(z) table wants the unhalved value.
+  ! The single-particle kernels, written for cross-validation. The same physical wake fed
+  ! to Bmad's z_long machinery must reproduce the convolution of these kernels.
+  ! Note: The s = 0 entries carry the Bane self-slice half factor (fel_wake_init halves
+  ! them). A plain W(z) table wants the unhalved value.
 
   if (run%chamber_wake%write_kernels /= '') then
     block
@@ -1046,10 +1048,9 @@ if (wake_on) then
   endif
 endif
 
-! The source filter's edge (fel-physics.md sec-source-filter). The angle is the knob and
-! the grid-relative cut is what the kernel builds from, so the conversion happens here,
-! where the beam that sets the angle and the grid that receives it both exist. Half the
-! grid's Nyquist frequency is the angle lambda/(4 dx), which is what xcut = 1 means.
+! The source filter's edge (fel-physics.md sec-source-filter). The angle is the setting,
+! and the grid-relative cut is what the kernel builds from. So the conversion happens
+! here, where the beam that sets the angle and the grid that receives it both exist.
 
 if (any(is_fel)) then
   block
@@ -1057,17 +1058,16 @@ if (any(is_fel)) then
     character(24) origin
     integer ie_first
 
-    ! Genesis normalizes the shifted grid index by ngrid, so its x = 1 is the index ngrid
+    ! Genesis normalizes the shifted grid index by ngrid. So its x = 1 is the index ngrid
     ! itself, twice the Nyquist index, and xcut = 1 places the sigmoid's edge at the angle
     ! lambda/dx, off the grid. An edge at the angle theta is therefore xcut = theta dx /
-    ! lambda. A first version of this line had lambda/(4 dx) and every edge landed four
-    ! times wider than its name, which the Aramis benchmark hid and a second machine
-    ! caught. On the generated path the grid comes from the input, the
-    ! numbers the field was built from, and the conversion holds for every member of the
-    ! field set. A field read from field_file has the file's grid, whatever the deck
-    ! states or leaves at zero, so the conversion is taken from the field itself: taken
-    ! from the deck it was zero when the deck stated no grid, every cutoff was infinite,
-    ! and the filter passed every mode while the header named the angle asked for.
+    ! lambda. Note: lambda/(4 dx) per unit xcut puts every edge four times wider than its
+    ! name. On the generated path the grid comes from the input, the numbers the field was
+    ! built from, and the conversion holds for every member of the field set. A field read
+    ! from field_file has the file's grid, whatever the deck states or leaves at zero. So
+    ! the conversion is taken from the field itself. Taken from the deck it would be zero
+    ! when the deck states no grid. Every cutoff would then be infinite, and the filter
+    ! would pass every mode while the header named the angle asked for.
 
     ie_first = findloc(is_fel, .true., dim = 1)
     if (run%field_file(1) /= '') then
@@ -1078,9 +1078,9 @@ if (any(is_fel)) then
 
     call fel_filter_angles (fbeam, run%und_of(ie_first), fbeam%wavelength, th_mode, th_rho)
 
-    ! The angle the stats split reports, whether or not the filter is on: it is the angle
-    ! that separates the mode from the wide-angle emission of the point beamlets, and a
-    ! run wants to see that separation most when it is not filtering.
+    ! The angle the stats split reports, whether or not the filter is on. It separates the
+    ! mode from the wide-angle emission of the point beamlets. A run wants to see that
+    ! separation most when it is not filtering.
 
     run%split_angle = max(th_mode, th_rho)
     run%split_origin = 'the mode angle'
@@ -1115,12 +1115,12 @@ if (any(is_fel)) then
       else
 
         ! The larger of the two angles is the one protected, since cutting into the mode
-        ! loses real radiation while leaving artifact in only weakens the filter. Where
-        ! the edge then goes is a separate question, and the tolerance answers it: the
+        ! loses real radiation while leaving artifact in only weakens the filter. Where the
+        ! edge then goes is a separate question, and the tolerance answers it. The
         ! sigmoid's half-amplitude point on the protected angle passes a quarter of the
-        ! intensity there, which is a filter taking three quarters of the source at the
-        ! very angle it was told to keep. The edge is moved out until the transmission
-        ! across that angle is what the tolerance allows.
+        ! intensity there. That filter takes three quarters of the source at the angle it
+        ! was told to keep. So the edge is moved out until the transmission across that
+        ! angle is what the tolerance allows.
 
         th_p = max(th_mode, th_rho)
         margin = fel_filter_margin (run%global%source_filter_tolerance, &
@@ -1138,9 +1138,9 @@ if (any(is_fel)) then
         origin = run%split_origin
       endif
 
-      ! Their ratio goes as sqrt(z_R/L_g), 15 on the Aramis benchmark and near 1 on a
-      ! diffraction-dominated machine, and a case far outside that range is unlike the one
-      ! the default was measured on (doc/startup-noise.md).
+      ! The ratio of the two angles goes as 1/sqrt(z_R/L_g). The default holds over ratios
+      ! of 1.14 to 1.86 on four machines (doc/startup-noise.md). A ratio outside 0.3 to 3
+      ! is far from that range and draws a warning.
 
       ratio = 0
       if (th_rho > 0) ratio = th_mode / th_rho
@@ -1189,8 +1189,8 @@ if (err_flag) return
 run%any_unavg = any(fel_mode == unaveraged$ .and. is_fel)
 
 ! The collective terms are not wired into the unaveraged step (fel-physics.md
-! sec-unaveraged), and a mixed line would apply them in some segments and silently
-! drop them in others. Refuse.
+! sec-unaveraged). A mixed line would apply them in some segments and silently drop
+! them in others. So the combination is refused.
 
 if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
   call out_io (s_error$, r_name, 'WAKES/SPACE CHARGE ARE NOT WIRED INTO THE UNAVERAGED MODE', &
@@ -1203,12 +1203,12 @@ endif
 ! The rest of the schedule: drift autophasing. Interludes accumulate Lz, and the last
 ! interlude before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
 ! (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
-! (Lattice.cpp:191-193) is unguarded in Genesis: the last element always gets
+! (Lattice.cpp:191-193) is unguarded in Genesis. The last element always gets
 ! floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at all
-! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is:
-! omitting that +1 leaves the field record one rotation short at the very end, found the
-! hard way against the single-segment time-dependent run. (Citations kept at the lines:
-! this quirk's exactness matters here, at the call site. Manual sec-slippage.)
+! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is.
+! Omitting that +1 leaves the field record one rotation short at the very end. The
+! citations stay at the call site, since the exactness of this quirk matters here
+! (fel-physics.md sec-slippage).
 
 allocate (run%ele_slip(branch%n_ele_track))
 allocate (run%fel_zoff(branch%n_ele_track), run%light_corr(branch%n_ele_track))
@@ -1230,11 +1230,11 @@ do ie = 1, branch%n_ele_track
     endif
 
     ! The off-phase knob (fel-physics.md sec-phasing): the wiggler's own z_offset, standard
-    ! Bmad misalignment (girder-composed _tot form). Anchored at the nominal position:
-    ! the entry phase shifts by the displaced upstream break, the exit unshifts for the
-    ! displaced downstream one, so everything downstream stays anchored. The knob must
-    ! fit inside its breaks -- a z_offset that walks the element out of its gap is
-    ! geometry, not phasing.
+    ! Bmad misalignment (girder-composed _tot form). It is anchored at the nominal
+    ! position. The entry phase shifts by the displaced upstream break, and the exit
+    ! unshifts for the displaced downstream one, so everything downstream stays anchored.
+    ! The knob must fit inside its breaks. A z_offset that walks the element out of its
+    ! gap changes the geometry and is refused.
 
     fel_zoff(ie) = ele%value(z_offset_tot$)
     if (fel_zoff(ie) /= 0 .and. prev_ie > 0 .and. abs(fel_zoff(ie)) >= Lz .and. Lz > 0) then
@@ -1265,10 +1265,10 @@ if (err_flag) return
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
 
-! The tracking window (global%track_start/track_end: Tao's names, with Genesis zstop
-! parity). Resolved through Bmad's own locator. The schedule above was built on the
-! full lattice, so a windowed run composes exactly with the full one. The walk
-! simply covers [i_start, i_end], and no end-of-lattice fixup moves.
+! The tracking window: global%track_start and track_end, with Tao's names and the role of
+! Genesis's zstop. It is resolved through Bmad's own locator. The schedule above was
+! built on the full lattice, so a windowed run composes exactly with the full one. The
+! walk covers [i_start, i_end], and no end-of-lattice fixup moves.
 
 run%i_start = 1
 run%i_end = branch%n_ele_track
@@ -1286,11 +1286,11 @@ if (run%i_start > run%i_end) then
   err_flag = .true.;  return
 endif
 
-! A continuation starts where its checkpoint stopped. The checkpoint names the element
-! the run had completed and the position, and the window must open at the element after
-! it, at that position: opened earlier, the walk repeats what the frames already hold, a
-! wake kick or a segment's conversions among it, and opened later it omits them. The two
-! frames agreed on the position when they were read, so the beam's is the one checked.
+! A continuation starts where its checkpoint stopped. The checkpoint names the element the
+! run had completed and the position. The window must open at the element after it, at
+! that position. Opened earlier, the walk repeats what the frames already hold, a wake
+! kick or a segment's conversions among it. Opened later, it omits them. The two frames
+! agreed on the position when they were read, so the beam's is the one checked.
 
 if (run%global%continuation) then
   if (.not. run%ckpt%loaded) then
@@ -1308,10 +1308,10 @@ if (run%global%continuation) then
   endif
 endif
 
-! The slices a frame carries. The default pair is the whole window, and -1 as the last
-! reads as the last slice so a range needs one convention and not two. The dumps that a
-! run restarts from are whole whatever this says, so the range is refused only against
-! the window it is a range of.
+! The slices a frame carries. The default pair is the whole window. -1 as the last reads
+! as the last slice, so a range needs one convention and not two. The dumps a run
+! restarts from are whole whatever this says. So the range is refused only against the
+! window it is a range of.
 
 run%dump_is1 = run%global%dump_slice_first
 run%dump_is2 = run%global%dump_slice_last
@@ -1333,11 +1333,11 @@ if (err_flag) return
 
 ! The FP32 lockstep instrument. It carries a twin for each advance, so a lattice of
 ! either mode or of both is instrumented, each segment by the twin that mirrors it. The
-! unaveraged twin prices that mode's particle path, where its reformulations live, and a
-! field row of its own. doc/validation.md records both.
+! unaveraged twin covers that mode's particle path, where its reformulations live, and
+! adds a field row of its own. doc/validation.md records both.
 !
-! Freerun compounds a single-precision state across steps and the unaveraged twin does
-! not carry one, so that combination is refused rather than reported as a lockstep.
+! Freerun compounds a single-precision state across steps, and the unaveraged twin does
+! not carry one. So that combination is refused rather than reported as a lockstep.
 
 if (run%global%fp32_check == 'freerun' .and. run%any_unavg) then
   call out_io (s_error$, r_name, 'FP32_CHECK = "freerun" DOES NOT COVER THE UNAVERAGED MODE.', &
@@ -1349,15 +1349,15 @@ call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, ru
                      fel_p0_mc(fbeam) / fel_gamma0(fbeam) * fbeam%slice_spacing, trim(out_root), err_flag)
 if (err_flag) return
 
-! The device backend. Everything its kernels do not cover is refused here --
-! an unsupported configuration stops the run and never quietly takes the CPU path.
-! Element wakes are refused at the element (only the walk sees them), and the grid
-! refusal, naming the nearest supported size, comes back from the backend itself.
-! The field set is covered whole: every harmonic member and both polarization planes
-! ride the device, and their combination is refused above for the CPU and the device
-! alike. Slice migration is covered without a kernel: it runs on the host at an
-! element's last step after the walk reads the beam back (do_migrate), and the next
-! element re-uploads into a rectangle grown to the new largest fill.
+! The device backend. Everything its kernels do not cover is refused here. An
+! unsupported configuration stops the run and never takes the CPU path instead. Element
+! wakes are refused at the element, since only the walk sees them. The grid refusal,
+! naming the nearest supported size, comes back from the backend itself. The field set
+! is covered whole: every harmonic member and both polarization planes run on the device.
+! Their combination is refused above for the CPU and the device alike. Slice migration
+! needs no kernel. It runs on the host at an element's last step after the walk reads
+! the beam back (do_migrate). The next element re-uploads into a rectangle grown to the
+! new largest fill.
 
 if (run%global%device /= '' .and. run%global%device /= 'off') then
   if (run%global%source_model == 'coherent') then
@@ -1443,13 +1443,15 @@ end subroutine resolve_window_ele
 ! Subroutine check_wake_window ()
 !
 ! Routine to check the Bmad element wakes against the time window. Element sr wakes act
-! across the whole window (fel-physics.md sec-seamwake): all slices concatenate into one bunch
-! in global window coordinates and Bmad's wake machinery applies unmodified. What is
-! checked here: lr (multi-bunch) wakes are not supported. A pseudomode wake
-! whose z_max is shorter than the window would have Bmad kill the bunch mid-run. A
-! z_long table narrower than the window would overflow its binning grid the same way.
-! Runs after the beam is built (the window length is the subject). setup_fel_elements
-! runs before it (two_pol must precede the field).
+! across the whole window (fel-physics.md sec-seamwake). All slices concatenate into one
+! bunch in global window coordinates, and Bmad's wake machinery applies unmodified.
+! The checks:
+!   lr (multi-bunch) wakes are not supported.
+!   A pseudomode wake whose z_max is shorter than the window would have Bmad kill the
+!     bunch mid-run.
+!   A z_long table narrower than the window would overflow its binning grid.
+! This runs after the beam is built, since the window length is the subject.
+! setup_fel_elements runs before it, since two_pol must precede the field.
 !-
 
 subroutine check_wake_window ()
@@ -1488,16 +1490,16 @@ end subroutine check_wake_window
 !+
 ! Subroutine setup_break_geometry ()
 !
-! Routine to set up chicane breaks (fel-physics.md sec-phasing): a break whose elements bend the
-! reference (sbends, patches) detours the beam while the radiation goes straight. The
-! light's path is the chord between the flanking undulator faces, from ele%floor,
-! never the reference arc that vec(5) is measured against. The arc-minus-chord
-! delay is charged as whole-wavelength window rotations (Genesis's chicane
-! semantics: "always autophasing") on the break's last element, which also takes
-! the light-path drift correction. Absolute mode adds the delay's carrier phase in
-! the walk. Only a closed bump keeps the light on the next undulator's axis.
-! Anything else is refused, as is any geometry element under the
-! genesis-model interludes (Genesis's drift/quad set cannot represent it).
+! Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
+! bend the reference (sbends, patches) detours the beam while the radiation goes
+! straight. The light's path is the chord between the flanking undulator faces, from
+! ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
+! delay is charged as whole-wavelength window rotations on the break's last element
+! (Genesis's chicane semantics: "always autophasing"). That element also takes the
+! light-path drift correction. Absolute mode adds the delay's carrier phase in the walk.
+! Only a closed bump keeps the light on the next undulator's axis, and anything else is
+! refused. So is any geometry element under the genesis-model interludes, since
+! Genesis's drift and quad set cannot represent it.
 !-
 
 subroutine setup_break_geometry ()
@@ -1584,10 +1586,10 @@ end subroutine close_geometry_break
 !+
 ! Subroutine setup_diagnostics ()
 !
-! Routine to set up the diagnostics (fel-physics.md sec-stats): resolve the dump-at lists through
-! Bmad's own lat_ele_locator (class::name syntax for free) and precompute the exact
-! record and element-end counts by replaying the walk's skip rule, so the stats arrays
-! are sized once, never grown. An entry matching nothing is refused.
+! Routine to set up the diagnostics (fel-physics.md sec-stats). The dump-at lists are
+! resolved through Bmad's own lat_ele_locator, which gives class::name syntax. The exact
+! record and element-end counts are precomputed by replaying the walk's skip rule, so the
+! stats arrays are sized once and never grown. An entry matching nothing is refused.
 !-
 
 subroutine setup_diagnostics ()
@@ -1629,9 +1631,9 @@ do i = 1, size(dump_field_at)
   enddo
 enddo
 
-! The record count replays the walk's skip rule, its window, its z arithmetic and
-! the comb rule (fel_comb_take, the one authority), so the stats arrays are
-! exact-sized in every mode -- never grown, never padded.
+! The record count replays the walk's skip rule, its window, its z arithmetic and the
+! comb rule (fel_comb_take). So the stats arrays are sized exactly in every mode, and are
+! never grown or padded.
 
 comb_r = run%global%comb_ds_save
 z_r = branch%ele(run%i_start - 1)%s
@@ -1655,7 +1657,7 @@ do i = run%i_start, run%i_end
     enddo
   else
 
-    ! The interlude's pieces, through fel_interlude_pieces, which the walk reads too. The
+    ! The interlude pieces come from fel_interlude_pieces, which the walk reads too. An
     ! element short-range wake refuses the cut in the walk, so it refuses here. The z
     ! arithmetic is the walk's own in both branches, so the two reach the same positions
     ! bit for bit.

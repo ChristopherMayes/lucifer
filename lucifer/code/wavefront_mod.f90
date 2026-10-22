@@ -17,17 +17,17 @@
 ! wavefront_openpmd_mod.
 !
 ! Index order. Fortran is column major, so Ex(:,:,iz) (one longitudinal slice) is
-! contiguous. That is simultaneously what a per-slice 2D FFTW plan wants and what
-! parallelising over slices wants. The Python class uses the same (nx, ny, nz) shape but
-! in C order, so there its slices are strided.
+! contiguous. That is what a per-slice 2D FFTW plan wants, and what parallelising over
+! slices wants. The Python class uses the same (nx, ny, nz) shape but in C order, so
+! there its slices are strided.
 !
 ! Grid convention, matching the Python class: the transverse grids are centered on zero,
 ! with x running from -(nx-1)*dx/2 to +(nx-1)*dx/2, and likewise for y. The slice axis
-! runs from the tail at iz = 1 to the head at iz = nz, and a whole window's first slice
-! sits at z = 0. There is no separate origin offset. The one absolute position carried is
+! runs from the tail at iz = 1 to the head at iz = nz. A whole window's first slice sits
+! at z = 0. There is no separate origin offset. The one absolute position carried is
 ! s_position, the beamline position of the plane, which is openPMD's zCoordinate.
 ! Genesis's refposition is a different quantity, the in-bunch coordinate of a file's
-! first slice, and this structure does not carry it: a writer of that format states it
+! first slice. This structure does not carry it. A writer of that format computes it
 ! from the window (fel_io_mod).
 !-
 
@@ -42,31 +42,29 @@ implicit none
 
 ! Kind of the complex field arrays.
 !
-! This is the single point of control for the field precision: every field array, and
-! every routine argument carrying field values, is declared complex(wf_rp). Changing this
+! This is the one point of control for the field precision. Every field array, and every
+! routine argument carrying field values, is declared complex(wf_rp). Changing this
 ! parameter changes the representation everywhere without touching a call site.
 !
-! It is rp (double) now. Single precision is reserved for a future GPU path, and flipping
-! this parameter is not by itself enough to get there: the plan cache below binds the
-! double precision FFTW entry points, and its work buffer is declared complex(wf_rp), so a
-! single precision field fails to compile at fftw_execute_dft with a type mismatch. That
-! is deliberate. Transforming a single precision field in double precision would be a
-! silent fallback, and a loud compile error is the correct way to be told that the fftwf_*
-! entry points still have to be bound.
+! Note: wf_rp is rp (double). Changing it alone does not give a single precision path.
+! The plan cache below binds the double precision FFTW entry points, and its work buffer
+! is complex(wf_rp). So a single precision field fails to compile at fftw_execute_dft
+! with a type mismatch. That is intended. Transforming a single precision field in double
+! precision would be a silent fallback. The compile error says that the fftwf_* entry
+! points still have to be bound.
 
 integer, parameter :: wf_rp = rp
 
-! Transform directions for wavefront_fft2. Same sign convention as FFTW and as numpy.fft:
-! forward carries exp(-i k x) and is unnormalized, backward carries exp(+i k x) and is
-! unnormalized. Neither direction applies the 1/(nx*ny) factor. The caller does.
+! Transform directions for wavefront_fft2. The sign convention is that of FFTW and
+! numpy.fft. Forward carries exp(-i k x) and backward carries exp(+i k x). Neither
+! direction applies the 1/(nx*ny) factor. The caller does.
 !
-! Worth knowing when reading the validation results. Interchanging these two values does not
-! change what wavefront_drift computes, and no test could be written that would notice. The
-! backward transform is the forward transform with k negated, and the propagation kernel
-! depends on kx^2 + ky^2 and so is even in k, so substituting k -> -k in the sum over k
-! recovers the original expression term for term. The composition forward, multiply by the
-! kernel, backward is therefore invariant under the interchange. The individual signs would
-! matter for any operator whose kernel is not even in k.
+! Note: Interchanging these two values does not change what wavefront_drift computes, and
+! no test can detect it. The backward transform is the forward transform with k negated.
+! The propagation kernel depends on kx^2 + ky^2 and so is even in k. Substituting k -> -k
+! in the sum over k recovers the original expression term for term. So the composition
+! forward, multiply by the kernel, backward is invariant under the interchange. The
+! individual signs matter for any operator whose kernel is not even in k.
 
 integer, parameter :: wf_fft_forward$ = -1, wf_fft_backward$ = 1
 
@@ -74,9 +72,9 @@ integer, parameter :: wf_fft_forward$ = -1, wf_fft_backward$ = 1
 ! Struct wavefront_struct
 !
 ! Ex, Ey are allocated independently. An unallocated component means that polarisation
-! component is absent, which is how the Python class's Ex = None is represented. At least
+! component is absent. That is how the Python class's Ex = None is represented. At least
 ! one of the two must be allocated for the wavefront to be usable. wavefront_check tests
-! that along with the rest of the Python class's __post_init__ validation.
+! that, along with the rest of the Python class's __post_init__ validation.
 !-
 
 type wavefront_struct
@@ -97,19 +95,19 @@ end type
 !+
 ! Struct wavefront_params_struct
 !
-! Summary statistics of one field slice, the field analog of Bmad's bunch_params_struct
-! and named to match it: centroid and sigma are the intensity-weighted first and second
-! Wigner moments over the transverse phase space (x, theta_x, y, theta_y), so sizes come
-! out as sqrt(sigma(1,1)) in both structs and free-space propagation is the ABCD map on
-! sigma (sigma_x^2(z) is quadratic in z, which is how banked slices are folded into
-! pulse statistics without numerical propagation). emit = sqrt(det of a plane's 2x2 block) is
+! Summary statistics of one field slice. The field analog of Bmad's bunch_params_struct,
+! and named to match it. centroid and sigma are the intensity-weighted first and second
+! Wigner moments over the transverse phase space (x, theta_x, y, theta_y). So sizes are
+! sqrt(sigma(1,1)) in both structs, and free-space propagation is the ABCD map on sigma.
+! sigma_x^2(z) is quadratic in z. That is how banked slices are folded into pulse
+! statistics without numerical propagation. emit = sqrt(det of a plane's 2x2 block) is
 ! the field-quality analog (= M^2 lambda/4pi). Pulse-level values are pooled from slice
-! instances downstream (energy-weighted mean of sigmas plus variance of centroids),
-! never stored. Fixed Bmad units.
+! instances downstream (energy-weighted mean of sigmas plus variance of centroids) and
+! are never stored. Units are fixed Bmad units.
 !
 ! The theta rows of sigma cost FFT-side sums, so they are filled only where needed
-! (element ends, bank time). angle_moments_valid says whether they were (the
-! twiss_valid pattern).
+! (element ends, bank time). angle_moments_valid says whether they were, as twiss_valid
+! does.
 !-
 
 type wavefront_params_struct
@@ -125,25 +123,24 @@ end type
 
 ! Cached FFTW plan state for wavefront_fft2, private to the module, one cache per thread.
 !
-! Following bmad/space_charge/fft_interface_mod.f90: plans are created once per transverse
-! grid size and reused. Two differences from that routine. First, the work buffer here is
-! allocated by fftw_alloc_complex and transforms are executed on it rather than on the
-! caller's array, so the plan always sees the alignment it was created with. FFTW's
-! new-array execute rule makes executing a plan on a differently aligned array undefined.
-! Second, the cache is threadprivate: every OpenMP thread carries its own plans and work
-! buffer, so wavefront_fft2 is callable from a parallel loop over slices, which is how
-! wavefront_drift and the FEL field solve use it. The cost is one planner run and one
-! nx*ny buffer per thread, paid once per grid size.
+! This follows bmad/space_charge/fft_interface_mod.f90: plans are created once per
+! transverse grid size and reused. There are two differences. First, the work buffer is
+! allocated by fftw_alloc_complex, and transforms run on it rather than on the caller's
+! array. So the plan always sees the alignment it was created with. FFTW's new-array
+! execute rule makes executing a plan on a differently aligned array undefined.
+! Second, the cache is threadprivate. Every OpenMP thread carries its own plans and work
+! buffer, so wavefront_fft2 can be called from a parallel loop over slices.
+! wavefront_drift and the FEL field solve call it that way. The cost is one planner run
+! and one nx*ny buffer per thread, once per grid size.
 !
-! On the critical section inside wavefront_fft2: it guards FFTW's rule that plan creation
-! is not reentrant, and nothing else. The FFTW planner is globally serialised no matter
-! how many per-thread buffers exist. Plan execution is thread safe by FFTW's own
-! guarantee, and each execution here touches only the calling thread's buffer.
+! The critical section inside wavefront_fft2_plan guards FFTW's rule that plan creation
+! is not reentrant, and nothing else. The FFTW planner is globally serialised however
+! many per-thread buffers exist. Plan execution is thread safe by FFTW's own guarantee,
+! and each execution here touches only the calling thread's buffer.
 
-! The transform itself is deliberately single threaded. The parallelisation axis for a
-! wavefront is the slice index, not the transverse transform, so fftw_plan_with_nthreads is
-! not called here: threading a small 2D transform underneath a parallel loop over slices
-! would only oversubscribe.
+! The transform itself is single threaded. The parallel axis for a wavefront is the slice
+! index, not the transverse transform. So fftw_plan_with_nthreads is not called.
+! Threading a small 2D transform under a parallel loop over slices would oversubscribe.
 
 type(C_PTR), private, save :: wf_plan_fwd = C_NULL_PTR
 type(C_PTR), private, save :: wf_plan_bwd = C_NULL_PTR
@@ -221,9 +218,9 @@ end subroutine wavefront_init
 !+
 ! Subroutine wavefront_check (wf, err_flag)
 !
-! Routine to validate a wavefront. This is the Fortran counterpart of the Python class's
-! __post_init__: at least one field component must be present, the two components must
-! have the same shape if both are present, and dx, dy, dz and wavelength must be positive.
+! Routine to validate a wavefront, the Fortran counterpart of the Python class's
+! __post_init__. At least one field component must be present. The two components must
+! have the same shape if both are present. dx, dy, dz and wavelength must be positive.
 !
 ! Input:
 !   wf        -- wavefront_struct: Wavefront to check.
@@ -473,11 +470,11 @@ end function wavefront_zvec
 !+
 ! Function wavefront_fft_wavenumber_vec (n_pt, d_pt) result (k_vec)
 !
-! Routine to return the transverse wavenumbers in FFT storage order, that is, in the order
+! Routine to return the transverse wavenumbers in FFT storage order. That is, in the order
 ! the values come out of a forward transform: zero frequency first, ascending positive
 ! frequencies, then the negative frequencies ascending to just below zero. This is
-! twopi * numpy.fft.fftfreq(n_pt, d = d_pt), and no fftshift is applied or wanted since a
-! propagation kernel built from these is used between a forward and a backward transform.
+! twopi * numpy.fft.fftfreq(n_pt, d = d_pt). No fftshift is applied, since a propagation
+! kernel built from these is used between a forward and a backward transform.
 !
 ! Input:
 !   n_pt        -- integer: Number of points.
@@ -547,9 +544,9 @@ end function wavefront_intensity
 !
 ! Routine to return the total field energy eps_0/2 * Integral |E|^2 dx dy dz [J].
 !
-! Note this is conserved exactly by wavefront_drift, since the propagation kernel has unit
-! modulus everywhere and the transform pair is unitary up to the 1/(nx*ny) factor. It is
-! therefore a useful invariant to watch.
+! Note: The energy is conserved exactly by wavefront_drift. The propagation kernel has unit
+! modulus everywhere, and the transform pair is unitary up to the 1/(nx*ny) factor. So
+! the energy is a useful invariant to watch.
 !
 ! Input:
 !   wf      -- wavefront_struct: Wavefront.
@@ -631,9 +628,9 @@ end function wavefront_power
 ! wavefront, summed over all slices. Mirrors the Python class's mean_x, mean_y, sigma_x
 ! and sigma_y.
 !
-! These give an independent analytic check on wavefront_drift: a Gaussian of waist size
-! sigma0 at the waist has sigma(z) = sqrt(sigma0^2 + (z * wavelength / (fourpi * sigma0))^2)
-! after drifting a distance z.
+! These give an independent analytic check on wavefront_drift. A Gaussian of waist size
+! sigma0, drifted a distance z from its waist, has
+!   sigma(z) = sqrt(sigma0^2 + (z * wavelength / (fourpi * sigma0))^2)
 !
 ! Input:
 !   wf        -- wavefront_struct: Wavefront.
@@ -669,10 +666,10 @@ endif
 mean_x = sum(wt_x * xvec) / wt_sum
 mean_y = sum(wt_y * yvec) / wt_sum
 
-! Two pass variance rather than <x^2> - <x>^2. The one pass form differences two numbers of
-! similar size whenever the centroid is large against the width, which is the normal
-! situation for an off-axis beam, and loses most of its significant figures doing it. This
-! is also the form mean_variance_calc uses in openPMD-beamphysics.
+! Two pass variance rather than <x^2> - <x>^2. The one pass form differences two numbers
+! of similar size when the centroid is large against the width. That is normal for an
+! off-axis beam, and the one pass form then loses most of its significant figures.
+! mean_variance_calc in openPMD-beamphysics uses the same two pass form.
 
 sigma_x = sqrt(sum(wt_x * (xvec - mean_x)**2) / wt_sum)
 sigma_y = sqrt(sum(wt_y * (yvec - mean_y)**2) / wt_sum)
@@ -693,32 +690,32 @@ end subroutine wavefront_transverse_moments
 !   E(kx, ky) -> E(kx, ky) * exp(-i * z_drift * wavelength * (kx^2 + ky^2) / fourpi)
 !
 ! The exponent is -i * z_drift * (kx^2 + ky^2) / (2 * k0) written in terms of the
-! wavelength, wavelength / fourpi being 1 / (2 * k0). This is spectrally exact and
-! unconditionally stable: it is not a finite difference step and there is no accuracy to
-! be gained by subdividing z_drift. It is the same kernel as Genesis's FieldSolverFFT and
-! as drift_wavefront_basic in openPMD-beamphysics.
+! wavelength, since wavelength / fourpi = 1 / (2 * k0). This is spectrally exact and
+! unconditionally stable. It is not a finite difference step, and subdividing z_drift
+! gains no accuracy. It is the same kernel as Genesis's FieldSolverFFT and as
+! drift_wavefront_basic in openPMD-beamphysics.
 !
-! The transverse boundary is periodic, since that is what a discrete Fourier transform
-! imposes and no apodisation is applied. Field reaching the transverse edge of the grid
-! wraps around and re-enters. Over a long drift the grid must therefore be large enough to
-! contain the field, or padded until it is.
+! The transverse boundary is periodic, since a discrete Fourier transform imposes that and
+! no apodisation is applied. Field reaching the transverse edge of the grid wraps around
+! and re-enters. Over a long drift the grid must be large enough to contain the field, or
+! be padded until it is.
+!
+! s_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate and
+! is co-moving. So the kernel leaves it alone, and s_position is the only place a
+! propagation along the beamline is recorded. openPMD-beamphysics splits the two the same
+! way, and its drift advances s_position too. Operations that do not move the pulse down
+! the line (crop, pad, a lens phase) leave s_position alone.
+!
+! Note: z_drift is the optical path. Through a geometry break the light goes the chord
+! while the lattice position advances by the arc. So the FEL walk, which knows the
+! lattice, sets s_position itself after each piece (fel_track_line_mod).
 !
 ! Input:
 !   wf          -- wavefront_struct: Wavefront to propagate.
 !   z_drift     -- real(rp): Drift distance [m]. May be negative.
-!   curvature   -- real(rp), optional: Accepted only as zero. Default is 0. A nonzero curvature selects
-!                    quadratic phase rescaling with an expanding grid, which is not
-!                    implemented here. Passing one is an error rather than being silently
-!                    ignored.
-!
-! s_position advances by z_drift. The mesh's own z axis is the intra-pulse coordinate
-! and is co-moving, so the kernel leaves it alone and s_position is the only place a
-! propagation along the beamline can be recorded. openPMD-beamphysics splits the two the
-! same way, and its drift advances s_position too. Operations that do not move the pulse
-! down the line (crop, pad, a lens phase) leave it alone. Note: z_drift is the optical
-! path. Through a geometry break the light goes the chord while the lattice position
-! advances by the arc, so the FEL walk, which knows the lattice, sets s_position itself
-! after each piece (fel_track_line_mod).
+!   curvature   -- real(rp), optional: Accepted only as zero. Default is 0. A nonzero
+!                    curvature selects quadratic phase rescaling with an expanding grid,
+!                    which is not implemented here. Passing one is an error.
 !
 ! Output:
 !   wf          -- wavefront_struct: Propagated wavefront, s_position advanced.
@@ -754,9 +751,8 @@ if (present(curvature)) then
   endif
 endif
 
-! Note err_flag stays true from here until the transforms have actually finished. Clearing it
-! early and then returning out of the loop below on a failed transform would report success on
-! failure.
+! Note: err_flag stays true until the transforms have finished. Clearing it early and then
+! returning from the loop below on a failed transform would report success on failure.
 
 if (z_drift == 0) then
   if (present(err_flag)) err_flag = .false.
@@ -768,18 +764,19 @@ nx = n_grid(1); ny = n_grid(2); nz = n_grid(3)
 
 kernel = wavefront_drift_kernel(wf, z_drift)
 
-! Apply slice by slice. Both polarisation components see the same kernel: the paraxial
-! operator does not couple Ex and Ey in free space.
+! Apply slice by slice. Both polarisation components see the same kernel, since the
+! paraxial operator does not couple Ex and Ey in free space.
 !
-! Parallel over slices, the same shape as the FEL field solve (fel_field_step): every
-! slice touches only its own plane, the kernel is read-only, and the FFTW plan cache is
-! threadprivate, so the arithmetic per slice is independent of which thread runs it and
-! of how many there are. It matters: a time-dependent line spends one of these calls
-! per field-free element, and at production slice counts the serial version was the
-! largest single serial block in the walk (a 590-slice, 256-point case measured ~0.5 s
-! per element on one core). wavefront_fft2_plan_threads warms every thread's plans from
-! the serial context first: FFTW's planner is not reentrant, and creating a plan
-! inside this loop would race with the transforms.
+! Parallel over slices, as in the FEL field solve (fel_field_step). Every slice touches
+! only its own plane, the kernel is read-only, and the FFTW plan cache is threadprivate.
+! So the arithmetic per slice does not depend on which thread runs it or on how many
+! there are. A time-dependent line makes one of these calls per field-free element.
+! At production slice counts a serial loop here is the largest serial block of the walk
+! (doc/performance.md perf-thread-scaling).
+!
+! wavefront_fft2_plan_threads warms every thread's plans from the serial context first.
+! FFTW's planner is not reentrant, and creating a plan inside this loop would race with
+! the transforms.
 
 call wavefront_fft2_plan_threads (nx, ny, err);  if (err) return
 
@@ -823,12 +820,11 @@ end subroutine wavefront_drift
 !
 !   exp(-i * z_drift * wavelength * (kx^2 + ky^2) / fourpi)
 !
-! in FFT storage order, so that it can be applied between a forward and a backward
-! transform with no fftshift.
+! in FFT storage order, so it can be applied between a forward and a backward transform
+! with no fftshift.
 !
-! The arithmetic here is deliberately written in the same association order as
-! drift_wavefront_basic in openPMD-beamphysics, so that the two implementations differ by
-! round-off rather than by grouping.
+! The arithmetic is written in the same association order as drift_wavefront_basic in
+! openPMD-beamphysics. So the two implementations differ by round-off and not by grouping.
 !
 ! Input:
 !   wf              -- wavefront_struct: Supplies nx, ny, dx, dy and wavelength.
@@ -872,33 +868,32 @@ end function wavefront_drift_kernel
 !+
 ! Subroutine wavefront_drift_reference (wf, z_drift, err_flag)
 !
-! Reference implementation of wavefront_drift that shares no code with it.
+! Routine to propagate a wavefront as wavefront_drift does, sharing no code with it.
 !
-! This exists as a validation instrument, not as a propagator anyone should use: it costs
+! This is a validation reference and not a propagator for use. It costs
 ! O(nx*ny*(nx+ny)) per slice against the FFT's O(nx*ny*log(nx*ny)). It builds its own
-! propagation kernel and performs its own transform, so it is independent both of
+! propagation kernel and performs its own transform. So it is independent of
 ! wavefront_drift_kernel and of every FFTW convention: the dimension order handed to
-! fftw_plan_dft_2d, the sign attached to each direction, the normalization factor, and the
+! fftw_plan_dft_2d, the sign of each direction, the normalization factor, and the
 ! alignment rules for executing a cached plan on a differently allocated array.
 !
-! Why that independence is worth the code. The comparison against openPMD-beamphysics goes
-! through the Genesis4 file format, which requires nx = ny and dx = dy. On a square grid
-! with equal spacings the propagation kernel is symmetric under interchanging the two
-! transverse axes, so that comparison cannot see a transposed transform, nor an
-! interchanged dx and dy, however asymmetric the test field is. Both were confirmed by
-! mutation to pass the Python comparison at round-off. Only a rectangular grid with unequal
-! spacings can see them, and only this routine can supply a reference on one.
+! The comparison against openPMD-beamphysics goes through the Genesis4 file format, which
+! requires nx = ny and dx = dy. On a square grid with equal spacings the propagation
+! kernel is symmetric under interchanging the two transverse axes. So that comparison
+! cannot see a transposed transform, nor an interchanged dx and dy, however asymmetric
+! the test field is. Both errors pass the Python comparison at round-off. Only a
+! rectangular grid with unequal spacings can see them, and only this routine supplies a
+! reference on one.
 !
-! The kernel below is deliberately written in a different but equivalent form from
-! wavefront_drift_kernel: the wavenumbers are formed inline rather than through
+! The kernel below is written in a different but equivalent form from
+! wavefront_drift_kernel. The wavenumbers are formed inline rather than through
 ! wavefront_fft_wavenumber_vec, and the coefficient is 1/(2*k0) rather than
-! wavelength/fourpi. That is what makes the comparison a check on the arithmetic and not
-! merely on the transform. The two therefore differ by round-off in the phase as well as in
-! the transform.
+! wavelength/fourpi. So the comparison checks the arithmetic as well as the transform.
+! The two differ by round-off in the phase as well as in the transform.
 !
-! Being a direct sum, this routine also accumulates round-off as O(n) rather than the FFT's
-! O(log n), so it is the less accurate of the two. Expect agreement near 1e-14 rather than
-! 1e-16, and do not read the residual as an error in wavefront_drift.
+! Note: A direct sum accumulates round-off as O(n) rather than the FFT's O(log n), so
+! this routine is the less accurate of the two. Expect agreement near 1e-14 rather than
+! 1e-16. The residual is not an error in wavefront_drift.
 !
 ! Input:
 !   wf          -- wavefront_struct: Wavefront to propagate.
@@ -927,8 +922,8 @@ if (present(err_flag)) err_flag = .true.
 call wavefront_check (wf, err);  if (err) return
 
 ! As in wavefront_drift, err_flag is cleared only once the work is done. Nothing below can
-! fail today, since the direct sum has no fallible call in it, but clearing it up here is the
-! shape that reports success on failure the moment one is added.
+! fail, since the direct sum has no fallible call. Clearing it early would report success
+! on failure once one is added.
 
 if (z_drift == 0) then
   if (present(err_flag)) err_flag = .false.
@@ -938,7 +933,7 @@ endif
 n_grid = wavefront_shape(wf)
 nx = n_grid(1); ny = n_grid(2); nz = n_grid(3)
 
-! Kernel, built here rather than shared. See the note above on why.
+! The kernel is built here rather than shared (see the header).
 
 k0 = twopi / wf%wavelength
 allocate (kernel(nx, ny), slice(nx, ny))
@@ -1005,8 +1000,8 @@ end subroutine wavefront_drift_reference
 !
 !   out(k) = Sum_j dat(j) * exp(direction * i * twopi * (j-1) * (k-1) / n)
 !
-! with direction = wf_fft_forward$ giving the negative exponent, matching FFTW and
-! numpy.fft. Used only by wavefront_drift_reference. See the discussion there.
+! direction = wf_fft_forward$ gives the negative exponent, matching FFTW and numpy.fft.
+! Used only by wavefront_drift_reference. See the discussion there.
 !
 ! Input:
 !   dat(:)      -- complex(wf_rp): Data to transform.
@@ -1030,9 +1025,9 @@ n_pt = size(dat)
 n8 = n_pt
 allocate (out(n_pt))
 
-! The index product is reduced modulo n before being turned into an angle. That keeps the
-! angle inside one turn, which both avoids a needless argument reduction in cos and sin and
-! keeps the product from overflowing a default integer at large n.
+! The index product is reduced modulo n before it becomes an angle. That keeps the angle
+! inside one turn, so cos and sin need no argument reduction. The 8-byte product also
+! cannot overflow at large n as a default integer would.
 
 do k = 1, n_pt
   out(k) = 0
@@ -1052,20 +1047,20 @@ end function wavefront_dft_1d
 !
 ! Routine to apply an unnormalized in-place 2D complex FFT to dat using a cached FFTW plan.
 !
-! Neither direction applies a normalization factor, so a forward followed by a backward
-! transform multiplies the data by nx*ny. This matches FFTW and matches numpy.fft.fft2.
-! numpy's ifft2 differs from wf_fft_backward$ only by that factor.
+! Neither direction applies a normalization factor. So a forward followed by a backward
+! transform multiplies the data by nx*ny. This matches FFTW and numpy.fft.fft2. numpy's
+! ifft2 differs from wf_fft_backward$ only by that factor.
 !
 ! Plans are created once per grid size and cached per thread, following
 ! bmad/space_charge/fft_interface_mod.f90. The transform is executed on an internal
-! fftw_alloc_complex buffer rather than on dat, because a plan may only be executed on an
-! array with the alignment it was created with. dat is copied in and out.
+! fftw_alloc_complex buffer rather than on dat. A plan may only be executed on an array
+! with the alignment it was created with. dat is copied in and out.
 !
-! Thread safe: the plan cache and its work buffer are threadprivate, so concurrent calls
-! from a parallel loop over slices each use their own. Callers running transforms in a
-! parallel loop MUST warm every thread's cache first (wavefront_fft2_plan_threads).
-! A lazy first-call plan would run the planner concurrently with other threads' transform
-! execution, which FFTW does not promise to be safe. See wavefront_fft2_plan's note.
+! Note: The plan cache and its work buffer are threadprivate, so concurrent calls from a
+! parallel loop over slices each use their own. A caller running transforms in a parallel
+! loop must first warm every thread's cache with wavefront_fft2_plan_threads. A lazy
+! first-call plan would run the planner concurrently with other threads' transforms,
+! which FFTW does not promise to be safe. Also see wavefront_fft2_plan.
 !
 ! Input:
 !   dat(:,:)    -- complex(wf_rp): Data to transform.
@@ -1110,12 +1105,12 @@ endif
 
 wf_buf = dat
 
-! Passing the same array as both in and out is FFTW's documented way to ask for an in-place
-! transform, and is what bmad/space_charge/fft_interface_mod.f90 does. gfortran with -Wall
-! warns about it, because the fftw3.f03 interface declares both dummies intent(out) and
-! aliasing those would be nonconforming for a normal Fortran procedure. It is bind(C) with
-! assumed-size dummies, so the arguments are passed by address with no copy in or copy out,
-! and there is nothing to go wrong. Bmad's own build does not enable that warning.
+! Passing the same array as both in and out is FFTW's documented way to ask for an
+! in-place transform, as bmad/space_charge/fft_interface_mod.f90 does. gfortran -Wall
+! warns about it, because the fftw3.f03 interface declares both dummies intent(out).
+! Aliasing those would be nonconforming for a normal Fortran procedure. This one is
+! bind(C) with assumed-size dummies, so the arguments are passed by address with no copy
+! in or out, and the aliasing is safe. Bmad's own build does not enable that warning.
 
 if (direction == wf_fft_forward$) then
   call fftw_execute_dft (wf_plan_fwd, wf_buf, wf_buf)
@@ -1135,19 +1130,19 @@ end subroutine wavefront_fft2
 !+
 ! Subroutine wavefront_fft2_plan (nx, ny, cache_ok)
 !
-! Routine to fill the calling thread's plan cache for an nx by ny transform (a no-op when
-! it already holds this size). The critical section guards one specific thing: FFTW's rule
-! that only fftw_execute is reentrant. The planner is globally serialised even though
+! Routine to fill the calling thread's plan cache for an nx by ny transform. Nothing is
+! done when the cache already holds this size. The critical section guards FFTW's rule
+! that only fftw_execute is reentrant. So the planner is globally serialised, even though
 ! every thread builds into its own threadprivate cache.
 !
-! That same rule is why wavefront_fft2_plan_threads exists: a thread that plans lazily on
-! its first transform does so while other threads are already executing transforms, and
-! planner activity concurrent with execution sits outside FFTW's thread-safety promise --
-! observed as run-to-run ulp-level differences in the planes of the last-planning threads.
-! Callers about to run transforms in a parallel loop must warm every thread's cache first.
+! The same rule is why wavefront_fft2_plan_threads exists. A thread that plans lazily on
+! its first transform does so while other threads are executing transforms. Planner
+! activity concurrent with execution is outside FFTW's thread-safety promise. It makes
+! the planes of the last threads to plan differ at the ulp level from run to run. A
+! caller about to run transforms in a parallel loop must warm every thread's cache first.
 !
-! Failures are recorded in wf_cache_nx and reported by the caller rather than signalled
-! from inside the section, since branching out of a critical construct is not allowed.
+! A failure is recorded in wf_cache_nx and reported by the caller, rather than signalled
+! from inside the section. Branching out of a critical construct is not allowed.
 !
 ! Input:
 !   nx, ny      -- integer: Transform size.
@@ -1176,28 +1171,27 @@ if (nx /= wf_cache_nx .or. ny /= wf_cache_ny) then
   wf_buf_cptr = C_NULL_PTR
   wf_buf => null()
 
-  ! Mark the cache invalid up front, so that any failure below leaves it invalid rather than
-  ! half built. It is set to the real size only once every piece has been obtained.
+  ! Mark the cache invalid first, so a failure below leaves it invalid rather than half
+  ! built. It is set to the real size only once every piece is obtained.
   wf_cache_nx = 0; wf_cache_ny = 0
 
-  ! fftw_alloc_complex and fftw_plan_dft_2d both return null on failure, and a null plan
-  ! reaching fftw_execute_dft is a crash rather than a diagnosable error.
+  ! fftw_alloc_complex and fftw_plan_dft_2d both return null on failure. A null plan
+  ! reaching fftw_execute_dft crashes rather than giving a diagnosable error.
   wf_buf_cptr = fftw_alloc_complex(int(nx, C_SIZE_T) * int(ny, C_SIZE_T))
 
   if (C_ASSOCIATED(wf_buf_cptr)) then
     call C_F_POINTER (wf_buf_cptr, wf_buf, [nx, ny])
 
-    ! Note the reversed dimension order: fftw_plan_dft_2d takes the slowest varying
-    ! dimension first, and in a Fortran (nx, ny) array that is ny. Getting this backwards is
-    ! invisible on a square grid, which is why wavefront_drift_reference exists.
+    ! Note the reversed dimension order. fftw_plan_dft_2d takes the slowest varying
+    ! dimension first, and in a Fortran (nx, ny) array that is ny. Getting this backwards
+    ! is invisible on a square grid, which is why wavefront_drift_reference exists.
     !
-    ! FFTW_ESTIMATE, not FFTW_MEASURE, and deliberately: Measure picks the algorithm by
-    ! Timing candidate transforms, so two runs of the same binary can pick differently and
-    ! every transform thereafter differs at the ulp level -- observed as rare whole-run
-    ! flips of the field diagnostics under the harness's byte-identity checks. ESTIMATE's
-    ! choice is a pure function of the problem, so results are reproducible run to run,
-    ! thread count to thread count, and against the banked reference files. The transform-
-    ! speed difference is the price, and determinism is worth more here than FFT speed.
+    ! FFTW_ESTIMATE is used and not FFTW_MEASURE. FFTW_MEASURE picks the algorithm by
+    ! timing candidate transforms, so two runs of the same binary can pick differently. Every
+    ! transform after that differs at the ulp level, enough to change a run's field
+    ! diagnostics byte for byte. ESTIMATE's choice is a pure function of the problem. So
+    ! results reproduce from run to run, from one thread count to another, and against the
+    ! banked reference files. Reproducibility matters more here than FFT speed.
     wf_plan_fwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_FORWARD,  FFTW_ESTIMATE)
     wf_plan_bwd = fftw_plan_dft_2d(ny, nx, wf_buf, wf_buf, FFTW_BACKWARD, FFTW_ESTIMATE)
 
@@ -1219,10 +1213,10 @@ end subroutine wavefront_fft2_plan
 !+
 ! Subroutine wavefront_fft2_plan_threads (nx, ny, err_flag)
 !
-! Routine to fill every OpenMP thread's plan cache for an nx by ny transform, so that no
-! planner runs concurrently with transform execution afterwards (see wavefront_fft2_plan's
-! note: only fftw_execute is reentrant). Call serially, before any parallel loop that
-! executes transforms of this size. A no-op when every thread already holds this size.
+! Routine to fill every OpenMP thread's plan cache for an nx by ny transform. No planner
+! then runs concurrently with transform execution, since only fftw_execute is reentrant
+! (also see wavefront_fft2_plan). Call it serially, before any parallel loop that executes
+! transforms of this size. Nothing is done when every thread already holds this size.
 !
 ! Input:
 !   nx, ny      -- integer: Transform size.
@@ -1264,10 +1258,10 @@ end subroutine wavefront_fft2_plan_threads
 ! Subroutine wavefront_fft_free ()
 !
 ! Routine to destroy the cached FFTW plans and free the work buffer of the calling
-! Thread. The cache is threadprivate, so a serial call after parallel work leaves the
+! thread. The cache is threadprivate. So a serial call after parallel work leaves the
 ! worker threads' caches allocated until program end. Freeing those would need a call
-! from inside a parallel region. Not needed for correctness. Useful for making a
-! single-threaded leak check clean.
+! from inside a parallel region. Not needed for correctness. It makes a single-threaded
+! leak check clean.
 !-
 
 subroutine wavefront_fft_free ()
@@ -1293,27 +1287,31 @@ end subroutine wavefront_fft_free
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag)
+! Subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag, &
+!                                                                        theta_cut, power_inside)
 !
 ! Routine to compute the wavefront_params of one transverse field plane (one slice).
 !
 ! Spatial moments come from the intensity |E|^2 in one grid pass. The theta moments use
-! the spectral representation: with theta = k_perp/ks, <theta^2> comes from |FFT(E)|^2
-! and the cross moment from <x theta>_sym = Im INT conj(E) x dE/dx / (ks INT |E|^2) with
-! the derivative evaluated spectrally: one forward and two inverse FFTs, which is why
-! angle moments are computed only where needed (with_angles, the angle_moments_valid
-! pattern). Grid k ordering matches the field solver's kernel (fftshift index mapping).
+! the spectral representation, with theta = k_perp/ks. <theta^2> comes from |FFT(E)|^2.
+! The cross moment is <x theta>_sym = Im INT conj(E) x dE/dx / (ks INT |E|^2), with the
+! derivative evaluated spectrally. That takes one forward and two inverse FFTs. So angle
+! moments are computed only where needed (with_angles, recorded by angle_moments_valid).
+! The grid k ordering matches the field solver's kernel (fftshift index mapping).
 !
 ! Input:
-!   plane(:,:)   -- complex(wf_rp): One field slice [V/m].
-!   dx           -- real(rp): Transverse grid spacing [m] (square grid).
-!   wavelength   -- real(rp): Radiation wavelength [m].
-!   dz_slice     -- real(rp): Slice spacing [m] (energy = power * dz_slice/c).
-!   with_angles  -- logical: Fill the theta rows of sigma (costs 3 FFTs).
+!   plane(:,:)    -- complex(wf_rp): One field slice [V/m].
+!   dx            -- real(rp): Transverse grid spacing [m] (square grid).
+!   wavelength    -- real(rp): Radiation wavelength [m].
+!   dz_slice      -- real(rp): Slice spacing [m] (energy = power * dz_slice/c).
+!   with_angles   -- logical: Fill the theta rows of sigma? Costs 3 FFTs.
+!   theta_cut     -- real(rp), optional: Angular radius [rad] for power_inside.
 !
 ! Output:
-!   pms          -- wavefront_params_struct: The moments. pms%s is NOT set here.
-!   err_flag     -- logical: Set True on error (FFT failure), False otherwise.
+!   pms           -- wavefront_params_struct: The moments. pms%s is *not* set here.
+!   err_flag      -- logical: Set True on error (FFT failure), False otherwise.
+!   power_inside  -- real(rp), optional: Power [W] within theta_cut of the axis. NaN when
+!                      with_angles is False or the plane carries no power.
 !-
 
 subroutine wavefront_params_of_plane (plane, dx, wavelength, dz_slice, pms, with_angles, err_flag, &
@@ -1340,10 +1338,10 @@ pms = wavefront_params_struct()
 nx = size(plane, 1);  ny = size(plane, 2)
 ks = twopi / wavelength
 
-! Intensity moments, one pass, separable: the inner loop only accumulates row and
-! column intensity sums (the vectorizable part). The 1-D moments follow. Coordinates
-! are grid-centered, matching the solver. This runs per slice per record, so its cost
-! is the stats file's overhead. Keep it lean.
+! Intensity moments in one separable pass. The inner loop only accumulates row and
+! column intensity sums, which vectorizes. The 1-D moments follow. Coordinates are
+! grid-centered, matching the solver. This runs per slice per record, so its cost is the
+! overhead of the stats file. Keep it lean.
 
 shift = -0.5_rp * (nx - 1)
 block
@@ -1384,11 +1382,11 @@ if (wsum > 0) then
   pms%sigma(3,3) = syy / wsum - pms%centroid(3)**2
 endif
 
-! Not computed is NaN, not zero: zero is a legal value for a centroid and for a
-! covariance entry, so a consumer cannot tell it from an answer. angle_moments_valid
-! says which case this is, and now the numbers say it too. A NaN also propagates through
-! whatever a consumer does with it, where Bmad's real_garbage$ sentinel would quietly
-! plot as a number.
+! Angle moments not computed are set to NaN rather than zero. Zero is a legal value for a
+! centroid and for a covariance entry, so a consumer could not tell it from an answer.
+! angle_moments_valid says which case this is, and the NaN says it in the numbers too.
+! A NaN also propagates through whatever a consumer does with it. Bmad's real_garbage$
+! sentinel would plot as a number.
 
 if (.not. with_angles .or. wsum <= 0) then
   nan = ieee_value(1.0_rp, ieee_quiet_nan)
@@ -1412,10 +1410,10 @@ call wavefront_fft2 (ft, wf_fft_forward$, err);  if (err) return
 dk = twopi / (nx * dx)
 stx = 0;  sty = 0;  stxx = 0;  styy = 0
 
-! The power inside an angular radius rides this transform rather than paying for one of
-! its own. It is the quantity doc/startup-noise.md splits on: inside it lies the radiation
-! that can couple to the mode, outside it the wide-angle emission of the point beamlets,
-! which is most of an unseeded run's power at grids and loads in common use.
+! The power inside an angular radius is summed on this transform rather than on one of its
+! own. It is the quantity doc/startup-noise.md splits on. Inside it lies the radiation
+! that can couple to the mode. Outside it lies the wide-angle emission of the point
+! beamlets, which is most of an unseeded run's power at the grids and loads in common use.
 
 s_in = 0
 cut2 = 0
@@ -1443,8 +1441,8 @@ pms%centroid(4) = sty / (scl * ks)
 pms%sigma(2,2) = stxx / (scl * ks**2) - pms%centroid(2)**2
 pms%sigma(4,4) = styy / (scl * ks**2) - pms%centroid(4)**2
 
-! Parseval again: sum|ft|^2 over a region, divided by nx*ny, is the |E|^2 sum that region
-! carries, and the same dx^2/(2 Z0) makes it a power.
+! Parseval again: sum|ft|^2 over a region, divided by nx*ny, is the |E|^2 sum of that
+! region. The same dx^2/(2 Z0) makes it a power.
 
 if (present(power_inside)) power_inside = s_in / (real(nx, rp) * real(ny, rp)) &
                                           * dx**2 / (2 * (mu_0_vac * c_light))

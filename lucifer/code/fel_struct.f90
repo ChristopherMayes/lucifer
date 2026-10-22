@@ -1,12 +1,12 @@
 !+
 ! Module fel_struct
 !
-! The input and run-state structures of the FEL tracker, laid out the way Tao lays out
-! tao_struct: every user-visible input struct in one file, defaults in the declarations,
-! and one assembled-state struct (fel_run_struct) that the library passes explicitly.
+! Input and run-state structures of the FEL tracker, laid out as Tao lays out tao_struct.
+! Every user-visible input struct is in this file, with its defaults in the declarations.
+! One assembled-state struct, fel_run_struct, is passed explicitly by the library.
 !
-! The input structs are namelist-safe (no allocatable or pointer components), so an
-! input file sets them directly, Tao-style:
+! The input structs have no allocatable or pointer components. So an input file sets
+! them directly through a namelist, as in Tao:
 !
 !   &fel_params
 !     lat_file = "line.bmad"
@@ -24,14 +24,13 @@
 !     wavefront_init%grid_n_pts = 255
 !   /
 !
-! (bmad_com and space_charge_com are Bmad's own globals, exposed directly as Tao's
-! &tao_params exposes them. The parsing lives in fel_input_mod, which an embedding
-! program may reuse or skip by filling the structs itself.)
+! bmad_com and space_charge_com are Bmad's own globals, exposed directly as Tao's
+! &tao_params exposes them. The parsing is in fel_input_mod. An embedding program may
+! use it or fill the structs itself.
 !
-! One deliberate deviation from Tao: no module-level singleton. Tao's super-universe s
-! serves its command loop. A library wants explicit state, and an oscillator or scan
-! driver wants several passes over one state. fel_run_struct passes as an argument
-! everywhere.
+! Unlike Tao, there is no module-level singleton. Tao's super-universe s serves its
+! command loop. A library wants explicit state, and an oscillator or scan driver wants
+! several passes over one state. So fel_run_struct is passed as an argument everywhere.
 !-
 
 module fel_struct
@@ -46,28 +45,28 @@ implicit none
 !+
 ! Struct fel_slicing_struct
 !
-! The longitudinal discretization of the run, exposed in &fel_params as slicing%. One
-! window, one definition: the beam's slices and the field's z samples are the same
-! partition, so it belongs to neither the beam nor the field and sits beside them.
+! Longitudinal discretization of the run, set in &fel_params as slicing%. The beam's
+! slices and the field's z samples are one partition. So the window belongs to neither
+! the beam nor the field and sits beside them.
 !
-! Slippage is an index rotation of the slice ring, exact and free of interpolation,
-! which holds only when the spacing is a whole number of wavelengths. n_wavelength is
-! that whole number, and it is carried as an integer from here to every consumer:
-! recovering it by dividing a spacing in metres by a wavelength gives 12 to the last
-! bit rather than 12, which the device's exact bucket arithmetic then refuses.
+! Slippage is an index rotation of the slice ring, with no interpolation. The rotation is
+! exact only when the slice spacing is a whole number of wavelengths. n_wavelength is
+! that whole number, and it is carried as an integer to every consumer. Dividing a
+! spacing in metres by a wavelength gives 12 to within the last bit, and not 12. The
+! device's exact bucket arithmetic refuses that.
 !
-! The window is stated as a length or as a slice count, never both. current states a
-! flat current directly, which is Genesis's &beam current: with a window it is a flat
-! time-dependent run, and with none it is the steady state of one slice, so no separate
-! steady-state switch exists. Unset, the current comes from the bunch's own z structure.
+! The window is set as a length or as a slice count, never both. current sets a flat
+! current directly, as Genesis's &beam current does. With a window this is a flat
+! time-dependent run. With no window it is the steady state of one slice, so there is no
+! separate steady-state switch. Unset, the current comes from the bunch's z structure.
 !-
 
 type fel_slicing_struct
   real(rp) :: window_length = 0      ! Time window [m]. 0 = from the bunch, or one slice.
-  integer :: n_wavelength = 0        ! Wavelengths per slice (Genesis's sample). Integer by
-                                     !   construction: slippage rotates the ring by one.
-                                     !   0 derives it from the gain, and is 1 in the steady
-                                     !   state, where the spacing states the current.
+  integer :: n_wavelength = 0        ! Wavelengths per slice (Genesis's sample). An integer:
+                                     !   slippage rotates the ring by one. 0 derives it from
+                                     !   the gain. It is 1 in the steady state, where the
+                                     !   spacing sets the current.
   integer :: n_slice = 0             ! 0 = from window_length. Both set is refused.
   real(rp) :: current = 0            ! Flat current [A]. 0 = from the bunch's z structure.
 end type
@@ -75,122 +74,120 @@ end type
 !+
 ! Struct fel_global_struct
 !
-! The run-level switches and names, exposed in &fel_params as global%... (the
-! tao_global_struct analog). Everything here is about one run of the tracker. The
-! physics description lives in the lattice, beam_init and wavefront_init.
+! Run-level switches and names, set in &fel_params as global%. The analog of
+! tao_global_struct. Everything here concerns one run of the tracker. The physics is
+! described by the lattice, beam_init and wavefront_init.
 !-
 
 type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
   character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
-  ! Transverse transport inside averaged FEL elements: 'bmad' is Bmad's own periodic-wiggler
-  ! kernel, the production model, and 'genesis' is Genesis4's maps verbatim. The second is
-  ! validation-internal: the comparison tiers need transcription-level transport, so it is a
-  ! run switch rather than a tracking method, and no production run sets it.
+  ! Transverse transport inside averaged FEL elements. 'bmad' is Bmad's own periodic-wiggler
+  ! kernel, the production model. 'genesis' is Genesis4's maps verbatim, for validation
+  ! only: the comparisons against Genesis4 need its transport. So it is a run switch rather
+  ! than a tracking method, and no production run sets it.
   character(16) :: transport_model = 'bmad'
-  ! The unaveraged model's two numbers. They were per-element attributes registered by
-  ! this program, which every other Bmad program then refused to parse, so they are run
-  ! switches selected uniformly. Averaged and unaveraged elements still mix per element,
-  ! through the fel_method attribute Bmad carries.
+  ! The two numbers of the unaveraged model. They were per-element attributes registered
+  ! by this program, and every other Bmad program then refused to parse the lattice. So
+  ! they are run switches, the same for every element. Averaged and unaveraged elements
+  ! still mix per element through Bmad's fel_method attribute.
   ! Steps per undulator period. Below 10 the push does not converge (fel-physics.md
-  ! sec-unaveraged), so a smaller number is refused rather than rounded up.
+  ! sec-unaveraged). A smaller number is refused rather than rounded up.
   integer :: unaveraged_steps_per_period = 20
-  ! Periods over which the field ramps at each end. 0 is not a hard edge: a silent hard
-  ! edge reintroduces the handoff phase jump by omission, so the hard edge is asked for
-  ! with -1 and 0 keeps the default of 2.
+  ! Periods over which the field ramps at each end. 0 keeps the default of 2 and -1 asks
+  ! for a hard edge. A hard edge reintroduces the handoff phase jump, so it is never the
+  ! result of leaving the setting at 0.
   integer :: unaveraged_ramp_periods = 2
   ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
-  ! per-particle scatter (bit-for-bit unchanged). 'coherent' is the
-  ! SIMPLEX-hybrid coherent-Gaussian source (Tanaka, PRAB 27, 030703 (2024)): the
-  ! spatially incoherent artifact is dropped, the slice bunch factor B(s) keeps the
-  ! physical shot noise, and the transverse shape is a guarded Gaussian.
+  ! per-particle scatter. 'coherent' is the SIMPLEX-hybrid coherent-Gaussian source
+  ! (Tanaka, PRAB 27, 030703 (2024)). It drops the spatially incoherent artifact, keeps
+  ! the physical shot noise in the slice bunch factor B(s), and makes the transverse shape
+  ! a guarded Gaussian.
   character(16) :: source_model = 'deposit'
   ! The angular filter on the source term (fel-physics.md sec-convergence), transcribed
-  ! from Genesis4's source_filter, which release 4.6.12 added with its FFT solver. The
+  ! from Genesis4's source_filter, added in release 4.6.12 with its FFT solver. The
   ! transformed source is multiplied by a sigmoid in normalized transverse spatial
-  ! frequency before it reaches the field, so the wide-angle emission of the point-like
-  ! beamlets is suppressed while the field itself propagates untouched. On by default:
-  ! it is measured on four machines, and what it removes is emission no physical beam
-  ! radiates. Turn it off to compare against a code that has no such filter, which is
-  ! what the comparison tiers do.
+  ! frequency before it reaches the field. This suppresses the wide-angle emission of the
+  ! point-like beamlets, and the field's own propagation is untouched. On by default
+  ! because what it removes is emission no physical beam radiates (the four-machine
+  ! results are in fel-physics.md sec-source-filter). Turn it off to compare against a
+  ! code that has no such filter.
   logical :: source_filter = .true.
   ! The sigmoid's edge as an angle [rad]. Unset, the run derives it from the beam and the
-  ! gain: the larger of four mode diffraction angles and the angle at which the resonant
-  ! wavelength red-shifts by rho, printed with both and with which one won. Cutting into
-  ! the mode loses real radiation while leaving artifact in only weakens the filter, so
-  ! the default errs wide. Setting the angle bypasses source_filter_tolerance below.
+  ! gain. It is the larger of four mode diffraction angles and the angle at which the
+  ! resonant wavelength red-shifts by rho. The run prints both and which one won.
+  ! Cutting into the mode loses real radiation, while leaving artifact in only weakens
+  ! the filter. So the default errs wide. Setting the angle bypasses
+  ! source_filter_tolerance.
   real(rp) :: source_filter_angle = 0
-  ! The largest fraction of source intensity the filter may take anywhere inside the
-  ! protected angle, which is the larger of the two derived angles. The edge is then
-  ! placed outside that angle by however much the sigmoid's width needs to hold the
-  ! transmission. A half-amplitude edge sitting on the protected angle passes a quarter
-  ! of the intensity there, so 0.75 is the loss the placement used before this input
-  ! existed implies, and it reproduces that edge to the bit. Strictly between 0 and 1.
+  ! The largest fraction of source intensity the filter may remove anywhere inside the
+  ! protected angle, the larger of the two derived angles. The edge is placed outside
+  ! that angle by as much as the sigmoid's width needs to hold this. A half-amplitude
+  ! edge on the protected angle passes a quarter of the intensity there. So 0.75 puts
+  ! the half-amplitude point on the protected angle, to the bit. Strictly between 0 and 1.
   real(rp) :: source_filter_tolerance = 0.75_rp
-  ! The sigmoid's edge in Genesis4's own units, xcut and ycut: the shifted grid index over
-  ! ngrid, so 1 is twice the Nyquist index and the angle xcut lambda/dx. Validation-internal:
-  ! they place the edge where Genesis4 places it, and a run that sets them and the angle
-  ! together is refused. An angle is independent of the grid and these are not.
+  ! The sigmoid's edge in Genesis4's own units, xcut and ycut: the shifted grid index
+  ! over ngrid. So 1 is twice the Nyquist index, and the angle is xcut lambda/dx. For
+  ! validation only: they place the edge where Genesis4 places it. An angle is
+  ! independent of the grid and these are not. Setting them with the angle is refused.
   real(rp) :: source_filter_xcut = 0
   real(rp) :: source_filter_ycut = 0
   ! The sigmoid's width as a fraction of its edge, Genesis4's sigmoid. Small is a sharp
-  ! edge. Genesis4's own default of 1 leaves the sigmoid at 0.73 on axis, which attenuates
-  ! the coherent source as much as the wide angles and measurably delays saturation.
+  ! edge. Genesis4's own default of 1 leaves the sigmoid at 0.73 on axis. That attenuates
+  ! the coherent source as much as the wide angles and delays saturation
+  ! (fel-physics.md sec-source-filter).
   real(rp) :: source_filter_width = 0.05
-  ! The filter check's self-test, the fp32_mutate pattern: apply the sigmoid to the
-  ! propagated field instead of to the source. Both suppress wide angles, so a run still
-  ! completes and still looks reasonable, and only the comparison against Genesis4 says
-  ! which one the code did.
+  ! Self-test of the filter check, as fp32_mutate is for the FP32 check: apply the
+  ! sigmoid to the propagated field instead of to the source. Both suppress wide angles,
+  ! so the run still completes and looks reasonable. Only the comparison against
+  ! Genesis4 says which one the code did.
   logical :: source_filter_mutate = .false.
-  ! The tracking window, Tao's names (tao_beam_init carries track_start/track_end) and
-  ! Genesis's zstop parity: element locators (lat_ele_locator syntax). Blank = the whole
-  ! line. The schedule (slippage, autophasing, break geometry) is always built on the
-  ! Full lattice, so a windowed run composes exactly with the full run: [1,k] then
-  ! [k+1,end] from its dumps reproduces [1,end] bit for bit.
+  ! The tracking window as element locators (lat_ele_locator syntax). The names are Tao's
+  ! (tao_beam_init carries track_start and track_end), and the role is Genesis's zstop.
+  ! Blank is the whole line. The schedule (slippage, autophasing, break geometry) is always
+  ! built on the full lattice. So a windowed run composes exactly with the full run:
+  ! [1,k] and then [k+1,end] from its dumps reproduce [1,end] bit for bit.
   character(60) :: track_start = '', track_end = ''
-  ! What beam_file and field_file are for. Off, an initialization: a fresh run from
-  ! sliced inputs, prepared or ramped, read from the standard records alone, phi0 and the
-  ! slippage residual starting at zero, and a checkpoint group in either file ignored. On,
-  ! a continuation: both files must be the frames of one eligible boundary and carry the
-  ! checkpoint group (fel_write_checkpoint_group), the reader rebuilds phi0, every z and
-  ! the residual from them, and track_start must open the walk at the element after the
+  ! What beam_file and field_file are for. Off, they initialize a fresh run from sliced
+  ! inputs, prepared or ramped. Only the standard records are read, phi0 and the slippage
+  ! residual start at zero, and a checkpoint group in either file is ignored.
+  ! On, they continue a run. Both files must be frames of one eligible boundary and carry
+  ! the checkpoint group (fel_write_checkpoint_group). The reader rebuilds phi0, every z
+  ! and the residual from them. track_start must open the walk at the element after the
   ! one the checkpoint completed. The mode is never inferred from what the files carry.
   logical :: continuation = .false.
-  ! The comb (Bmad's bunch_track_struct%ds_save name and semantics, Tao's
-  ! comb_ds_save): the minimum z advance between per-record stats rows.
-  !   < 0: no per-record rows at all (element ends, dumps and the final state remain).
-  !   = 0: a row at every record position (the default here: the per-record arrays are
-  !        the primary stats contract, where Tao's comb is an optional extra. The one
-  !        deliberate deviation from Tao's -1 default, with identical semantics).
-  !   > 0: a row when z has advanced comb_ds_save past the last row, and element ends always.
+  ! The comb, with the name and meaning of Bmad's bunch_track_struct%ds_save and Tao's
+  ! comb_ds_save: the minimum z advance between per-record stats rows.
+  !   < 0: No per-record rows. Element ends, dumps and the final state remain.
+  !   = 0: A row at every record position. This is the default here, since the per-record
+  !        arrays are the primary stats output. Tao's default is -1, with the same meaning.
+  !   > 0: A row when z has advanced comb_ds_save past the last row. Element ends always.
   real(rp) :: comb_ds_save = 0
-  ! The interlude step. Tao's comb carries two halves: save_a_bunch_step selects among
-  ! the positions a tracker already reaches, and tao_lattice_calc_mod's beam-track loop
-  ! cuts an element into n_slice pieces with element_slice_iterator where the tracker
-  ! would otherwise cross it in one map. comb_ds_save above is the first half. This is
-  ! the second, and it is its own knob rather than the comb's for two reasons: the comb
-  ! defaults to zero here where Tao's defaults to -1, so it names no length to cut by,
-  ! and the comb must not change what the tracking does. Zero, the default, tracks an
-  ! interlude whole, which is what every run did before this knob existed.
-  !   <= 0: one piece, the element.
-  !   >  0: pieces of about this length [m], so stats rows and frames land inside a
-  !         drift the way they already land inside a wiggler.
+  ! The interlude step. Tao's comb has two halves. save_a_bunch_step selects among the
+  ! positions a tracker already reaches. tao_lattice_calc_mod's beam-track loop cuts an
+  ! element into n_slice pieces with element_slice_iterator, where the tracker would
+  ! otherwise cross it in one map. comb_ds_save above is the first half and this is the
+  ! second. It is a setting of its own for two reasons. The comb defaults to zero here,
+  ! so it names no length to cut by. And the comb must not change what the tracking does.
+  ! The default of zero tracks an interlude whole.
+  !   <= 0: One piece, the element.
+  !   >  0: Pieces of about this length [m]. Stats rows and frames then land inside a
+  !         drift as they already land inside a wiggler.
   real(rp) :: interlude_ds_step = 0
   character(60) :: dump_beam_at(40) = ''     ! Element locators for mid-run beam dumps.
   character(60) :: dump_field_at(40) = ''    ! Element locators for mid-run field dumps.
-  ! Write the beam and the field at every comb position as a frame series, for a
-  ! visualization that wants z resolution inside the undulators rather than at their
-  ! ends. The comb already schedules the stats rows, so a frame and its row share an
-  ! index (doc/reading-output.md).
+  ! Write the beam and the field at every comb position as a frame series. This gives a
+  ! visualization z resolution inside the undulators and not only at their ends. A frame
+  ! and its stats row share an index (doc/reading-output.md).
   logical :: dump_at_comb = .false.
-  ! The slices a frame carries, in window order. The default pair is the whole window,
-  ! and a range cuts the series where a view wants only part of the bunch: a sample = 1
-  ! run has thousands of slices and a whole-window field frame is gigabytes. The
-  ! element-end, initial and final dumps are unaffected, being restart points.
+  ! The slices a frame carries, in window order. The default pair is the whole window.
+  ! A range keeps part of the bunch: a sample = 1 run has thousands of slices, and a
+  ! whole-window field frame is gigabytes. The element-end, initial and final dumps are
+  ! restart points and are unaffected.
   integer :: dump_slice_first = 1
   integer :: dump_slice_last = -1            ! -1 is the last slice of the window.
-  ! The field's own reductions, per record, into the stats file: the projections a
-  ! picture is drawn from, written once rather than recomputed from raw frames.
+  ! Write the field's own reductions per record into the stats file. These are the
+  ! projections a picture is drawn from, computed once rather than from raw frames.
   logical :: dump_reduced = .false.
   integer :: ran_seed = 12345                ! The one RNG seed (generation, import, noise).
   logical :: write_diag = .false.            ! The Genesis-comparison text diag file (large).
@@ -200,30 +197,29 @@ type fel_global_struct
   logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
-  ! Provenance detail in stats.h5's meta/ group. Off by default because a stats file is
-  ! meant to travel: attached to a paper, mailed to a collaborator, posted beside a
-  ! figure. On, meta/ also records the user name and the working directory, which is
-  ! useful in a lab notebook and a leak outside one. Genesis records them always. Parity
-  ! is not a reason to leak.
+  ! Provenance detail in the meta/ group of stats.h5. On, meta/ also records the login
+  ! name and the working directory. That is useful in a lab notebook and a leak outside
+  ! one. Off by default because a stats file travels: with a paper, to a collaborator,
+  ! beside a figure. Genesis always records them.
   logical :: record_environment = .false.
-  ! The FP32 lockstep instrument (fel_fp32_mod): 'off', 'lockstep' (the FP32 twin
-  ! rebuilt from FP64 every step) or 'freerun' (its longitudinal state carries, so the
-  ! compounding rate is measured). A check instrument, not a production mode.
+  ! The FP32 lockstep check (fel_fp32_mod): 'off', 'lockstep' or 'freerun'. With
+  ! 'lockstep' the FP32 twin is rebuilt from FP64 every step. With 'freerun' its
+  ! longitudinal state carries, so the error compounds and its rate shows. For checks
+  ! only. No production run sets it.
   character(16) :: fp32_check = 'off'
-  logical :: fp32_mutate = .false.     ! The instrument's self-test: coarsen the residual.
-  ! The device backend (fel_device_mod): 'off', or 'metal' for the Apple Silicon
-  ! backend on a build that carries it. Alone it runs the averaged FEL step resident
-  ! on the device; combined with fp32_check the device takes the lockstep twin's role
-  ! and the FP64 run is untouched. Everything the backend does not cover is refused
-  ! at setup or first use, never quietly run on the CPU instead.
+  logical :: fp32_mutate = .false.     ! The check's self-test: coarsen the residual.
+  ! The device backend (fel_device_mod): 'off', or 'metal' for the Apple Silicon backend
+  ! on a build that carries it. Alone, it runs the averaged FEL step resident on the
+  ! device. With fp32_check set, the device takes the lockstep twin's role and the FP64
+  ! run is untouched. Anything the backend does not cover is refused at setup or first
+  ! use. It is never run on the CPU instead.
   character(16) :: device = 'off'
-  ! Per-pass device timing (lucifer_device.h). The backend's own busy seconds are one
-  ! command buffer, which holds every step between two host touches, so they cannot say
-  ! what a pass costs. On, each pass of a step is encoded into its own compute encoder
-  ! carrying a timestamp attachment, which is what stage-boundary counter sampling can
-  ! measure, and the run reports the seconds per pass. That costs encoder boundaries the
-  ! production path does not pay, so it is off by default and a price is measured with it
-  ! off (doc/performance.md perf-device).
+  ! Per-pass device timing (lucifer_device.h). The backend's own busy seconds cover one
+  ! command buffer, which holds every step between two host touches. So they cannot give
+  ! the time of one pass. On, each pass of a step is encoded into its own compute encoder
+  ! with a timestamp attachment, which stage-boundary counter sampling can read. The run
+  ! then reports the seconds per pass. The extra encoder boundaries slow the run, so this
+  ! is off by default and timings are taken with it off (doc/performance.md perf-device).
   logical :: device_timing = .false.
   integer :: device_dep_mutate = 0     ! Shift the deposit's fixed-point scale, in bits.
 end type
@@ -231,18 +227,18 @@ end type
 !+
 ! Struct wavefront_init_struct
 !
-! The radiation starting condition, the beam_init_struct analog (&fel_wavefront_init).
-! A wavefront is an optical object: a transverse grid, a wavelength, a longitudinal
-! spacing and nothing else longitudinal. The time window that sets that spacing is the
-! FEL interaction's, not the field's, and lives in fel_slicing_struct. harmonics requests
-! the field set. field_file imports override the seed.
+! The radiation starting condition (&fel_wavefront_init), the analog of beam_init_struct.
+! A wavefront is an optical object: a transverse grid, a wavelength and a longitudinal
+! spacing, and nothing else longitudinal. The time window that sets that spacing belongs
+! to the FEL interaction and lives in fel_slicing_struct. harmonics requests the field
+! set. A field_file import overrides the seed.
 !-
 
 type wavefront_init_struct
   real(rp) :: lambda0 = 0            ! Resonant wavelength [m]. Required for generation.
-  ! The transverse grid (Genesis ngrid and dgrid). Zero means derive it from the beam
-  ! at setup, by fel_cells_per_sigma$ and fel_widths_per_sigma$ below. One may be set
-  ! and the other derived against it.
+  ! The transverse grid (Genesis ngrid and dgrid). Zero derives it from the beam at
+  ! setup, with fel_cells_per_sigma$ and fel_widths_per_sigma$ below. One may be set and
+  ! the other derived against it.
   integer :: grid_n_pts = 0          ! Transverse grid points per side.
   real(rp) :: grid_half_width = 0    ! Transverse half width [m].
   real(rp) :: seed_power = 0         ! Gaussian seed power [W]. 0 = dark start.
@@ -253,12 +249,12 @@ type wavefront_init_struct
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
 end type
 
-! The transverse grid derived from the beam when the deck states none
+! The transverse grid derived from the beam when the deck sets none
 ! (doc/startup-noise.md, Recommendations). Cells of a seventh of the rms beam size
-! resolve the beam and the mode, and finer cells raise the wide-angle emission of the
-! point beamlets without moving the mode power. A half width of nine beam sizes contains
-! the mode, and the half width does not enter above that. Both were measured on three
-! machines a hundred times apart in wavelength.
+! resolve the beam and the mode. Finer cells raise the wide-angle emission of the point
+! beamlets without moving the mode power. A half width of nine beam sizes contains the
+! mode, and above that the half width does not enter. fel-physics.md sec-field gives
+! both constants on three machines a hundred times apart in wavelength.
 
 real(rp), parameter :: fel_cells_per_sigma$ = 7
 real(rp), parameter :: fel_widths_per_sigma$ = 9
@@ -266,16 +262,16 @@ real(rp), parameter :: fel_widths_per_sigma$ = 9
 !+
 ! Struct fel_chamber_wake_init_struct
 !
-! The chamber-wake description (&fel_params chamber_wake%...), Genesis &wake names. A plain
-! mirror of fel_wake_struct's configuration fields (that struct carries allocatable
-! state, which a namelist object cannot). fel_setup copies these in.
+! The chamber-wake description (&fel_params chamber_wake%), with Genesis &wake names. A
+! plain mirror of the configuration fields of fel_wake_struct. That struct carries
+! allocatable state, which a namelist object cannot. fel_setup copies these in.
 !-
 
 type fel_chamber_wake_init_struct
   logical :: on = .false.
-  ! Which chamber-wake implementation runs. 'genesis' is the transcribed solver at
-  ! slice granularity, convolving the kernels with the weighted slice currents. The
-  ! field exists so a second implementation arrives as a value, not a rework.
+  ! Which chamber-wake implementation runs. 'genesis' is the transcribed solver at slice
+  ! granularity. It convolves the kernels with the weighted slice currents. A second
+  ! implementation would be a new value of this setting.
   character(16) :: model = 'genesis'
   real(rp) :: loss = 0             ! External loss [eV/m].
   real(rp) :: radius = 2.5e-3_rp   ! Chamber radius, or half gap if flat [m].
@@ -291,15 +287,15 @@ type fel_chamber_wake_init_struct
   character(400) :: write_kernels = ''
 end type
 
-! (Space charge needs no init mirror: fel_space_charge_struct is already pure scalars and
-! reads directly in &fel_params as space_charge%... .)
+! Space charge needs no init mirror. fel_space_charge_struct is pure scalars and is read
+! directly in &fel_params as space_charge%.
 
 !+
 ! Struct fel_beam_init_param_struct
 !
-! The beam-side scalars of &fel_beam_init that sit beside Bmad's beam_init (which
-! describes the bunch itself) and imp (the resampler): source/output files, the
-! quiet-start knobs, and the check instruments the validation harness sets.
+! The beam-side scalars of &fel_beam_init. They sit beside Bmad's beam_init, which
+! describes the bunch, and imp, the resampler. They are the source and output files,
+! the quiet-start settings and the check instruments the validation harness sets.
 !-
 
 type fel_beam_init_param_struct
@@ -307,22 +303,24 @@ type fel_beam_init_param_struct
   character(400) :: write_genesis_dist = ''  ! Write the bunch as a Genesis4 distribution file.
   character(400) :: write_openpmd_file = ''  ! Write the bunch as openPMD-beamphysics.
   ! How a bunch becomes slices (fel-physics.md sec-loading). The bunch is beam_init's,
-  ! generated or read through beam_init%position_file, and is binned by arrival time into
-  ! slicing's slices. "sample" draws the same number of beamlets in every slice from what
-  ! fell into it, weights from the slice charge, so the current follows the bunch: Genesis's
-  ! &beam with &profile and its importdistribution in one, with beam_init%n_particle the
-  ! count per slice after phase copies. "keep" keeps every real particle as a beamlet of
-  ! beamlet_size copies at weight/beamlet_size, counts following the charge, so a
-  ! start-to-end bunch's correlations survive whole.
+  ! generated or read through beam_init%position_file. It is binned by arrival time into
+  ! the slices of slicing.
+  ! "sample" draws the same number of beamlets in every slice from what fell into it,
+  ! weighted by the slice charge, so the current follows the bunch. This is Genesis's
+  ! &beam with &profile and its importdistribution in one. beam_init%n_particle is the
+  ! count per slice after phase copies.
+  ! "keep" keeps every real particle as a beamlet of beamlet_size copies at
+  ! weight/beamlet_size. The counts follow the charge, so the correlations of a
+  ! start-to-end bunch survive whole.
   character(16) :: load_mode = 'sample'
-  ! The two switches of the load. quiet_start makes it quiet: beamlets of copies with phases
-  ! spread over 2 pi about each particle's own, so the load has no bunching at any harmonic
-  ! below beamlet_size. shot_noise then imposes the physical level on whatever load there
-  ! is, by independent phasors per group. Off both, the beam is taken as it came.
+  ! The two switches of the load. quiet_start makes beamlets of copies with phases spread
+  ! over 2 pi about each particle's own. The load then has no bunching at any harmonic
+  ! below beamlet_size. shot_noise imposes the physical level on whatever load there is,
+  ! by independent phasors per group. With both off the beam is taken as it came.
   logical :: quiet_start = .true.
   integer :: beamlet_size = 8             ! Copies per beamlet. A loading parameter only.
   logical :: shot_noise = .false.         ! Impose physical shot noise on the load.
-  ! Check instruments (the validation harness's knobs, not physics inputs):
+  ! Check instruments, set by the validation harness. They are not physics inputs.
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.
   logical :: gen_test_weights = .false.   ! Alternate beamlet weights 0.25x/1.75x.
@@ -333,10 +331,10 @@ end type
 ! Struct fel_run_struct
 !
 ! The assembled state of one run: the parsed lattice, the beam, the field set, the
-! collective-effects state, the schedule the setup pass computed, the diagnostics
-! state, and copies of every input struct (so the resolved inputs are one object:
-! the Meta/ provenance echo and any embedding caller read them from here). Passed
-! explicitly, no singleton.
+! collective-effects state, the setup schedule and the diagnostics state. It also holds
+! a copy of every input struct, so the resolved inputs are one object. The Meta/
+! provenance echo and any embedding caller read them from here. Passed explicitly, with
+! no singleton.
 !-
 
 type fel_run_struct
@@ -362,10 +360,10 @@ type fel_run_struct
   type (fel_unavg_struct) :: ustate
   ! The schedule (fel_setup): per tracked element.
   type (fel_und_struct), allocatable :: und_of(:)
-  ! The angle at which the stats split the field power, whether or not the filter is on:
-  ! the larger of four mode diffraction angles and the rho angle, derived from the beam
-  ! and the first FEL element (fel-physics.md sec-source-filter). Inside it lies what can
-  ! couple to the mode, outside it the wide-angle emission of the point beamlets.
+  ! The angle at which the stats split the field power, whether or not the filter is on.
+  ! It is the larger of four mode diffraction angles and the rho angle, derived from the
+  ! beam and the first FEL element (fel-physics.md sec-source-filter). Inside it lies what
+  ! can couple to the mode. Outside it lies the wide-angle emission of the point beamlets.
   real(rp) :: split_angle = 0
   character(24) :: split_origin = ''       ! Where split_angle came from, for the report.
   integer, allocatable :: fel_mode(:), fel_spp(:)
@@ -374,8 +372,8 @@ type fel_run_struct
   real(rp), allocatable :: fel_zoff(:)     ! The z_offset off-phase knob per element [m].
   real(rp), allocatable :: light_corr(:)   ! Chord-vs-arc correction on a break's last element [m].
   logical, allocatable :: is_fel(:)
-  ! Space charge, per element: ele%space_charge_method = slice, and Bmad's master switch
-  ! bmad_com%csr_and_space_charge_on, resolved once at setup so the walk reads a fact.
+  ! Space charge per element: ele%space_charge_method = slice and Bmad's master switch
+  ! bmad_com%csr_and_space_charge_on, resolved once at setup for the walk to read.
   logical, allocatable :: sc_here(:)
   logical, allocatable :: dump_beam_here(:), dump_field_here(:)
   integer :: i_start = 1, i_end = 0        ! The resolved tracking window [elements].
@@ -397,8 +395,8 @@ type fel_run_struct
   type (fel_slice_diag_struct), allocatable :: bdiag_arr(:)
   real(rp), allocatable :: fpow_arr(:), fonax_arr(:)
   real(rp), allocatable :: e_rad_slice(:), rad_kick(:,:)
-  ! The interlude's pieces, counted by the record-count precompute that already replays
-  ! the walk, so the pre-run header states them without a second loop and a second rule.
+  ! The interlude pieces, counted by the record-count precompute that replays the walk.
+  ! The pre-run header reports them without a second loop or a second rule.
   integer :: n_int_piece = 0            ! Pieces the interludes will take.
   integer :: n_int_ele = 0              ! Interlude elements that take more than one.
   integer :: nrec_stats = 0, nend_stats = 0
@@ -420,21 +418,21 @@ contains
 !+
 ! Function fel_si_str (value, unit) result (str)
 !
-! Routine to format a value for a human: an SI prefix chosen so the mantissa lands in
-! [1, 1000), three decimals, and the whole thing right-justified to a fixed width so a
-! column of them lines up (4.230 kW and 105.000 GW under each other). This is display
-! only -- stdout is for humans and the files carry full precision (doc/user-guide.md).
+! Routine to format a value for display. The SI prefix is chosen so the mantissa lies in
+! [1, 1000), with three decimals. The result is right-justified to a fixed width, so a
+! column of values lines up (4.230 kW above 105.000 GW). This is display only. Stdout is
+! for humans, and the files carry full precision (doc/user-guide.md).
 !
-! Values outside the prefix range, and exact zero, fall back to es10.3 with the bare
-! unit rather than inventing a prefix.
+! Values outside the prefix range print in es11.3 with the bare unit. Exact zero prints
+! as 0.000 with the bare unit.
 !
 ! Input:
 !   value -- real(rp): The value, in the unit's own base (W, J, m, ...).
 !   unit  -- character(*): The unit symbol, appended after the prefix.
 !
 ! Output:
-!   str   -- character(14): The formatted value, right-justified so a column of them
-!              lines up. Callers wanting it inline use trim(adjustl(...)).
+!   str   -- character(14): The formatted value, right-justified. Callers wanting it
+!              inline use trim(adjustl(...)).
 !-
 
 function fel_si_str (value, unit) result (str)
@@ -445,9 +443,9 @@ character(14) str
 character(14) num
 integer ip
 
-! The table spans yocto to peta, which covers everything this program reports: a wake
+! The table spans yocto to peta. That covers everything this program reports: a wake
 ! run's pulse energy is attojoules and a saturated pulse is millijoules. Index 9 is the
-! bare unit. Outside the table, and for exact zero, no prefix is invented.
+! bare unit.
 
 character(1), parameter :: pfx(14) = &
       ['y', 'z', 'a', 'f', 'p', 'n', 'u', 'm', ' ', 'k', 'M', 'G', 'T', 'P']
@@ -478,20 +476,21 @@ end function fel_si_str
 !+
 ! Function fel_comb_take (comb_ds_save, z, z_last, at_end) result (take)
 !
-! The comb rule, in one place: Bmad's bunch_track_struct%ds_save semantics, with one
-! deliberate difference (save_a_bunch_step's guards, and Tao's comb_ds_save note
-! "< 0 => No comb calculated"):
-!   comb < 0: element ends only;
-!   comb = 0: a row at every record position;
-!   comb > 0: a row when z has advanced comb_ds_save past the last row.
-! An element end is always a row, whatever the comb. That is the difference, and it is
-! what lets the stats file carry one record axis with a boolean mask (coords/
-! at_element_end) instead of a second axis and a duplicated copy of every element-end
-! quantity. Bmad's comb < 0 drops the comb, and here that leaves the element ends,
-! which are the positions the evaluated bunch_params live on.
-! z_last updates when the row is taken. The walk consults this rule live and the
-! setup's nrec precompute replays it with the same z arithmetic, so the stats
-! arrays are exact-sized in every mode.
+! Routine to apply the comb rule. The rule is Bmad's bunch_track_struct%ds_save, with
+! save_a_bunch_step's guards and Tao's comb_ds_save note "< 0 => No comb calculated":
+!   comb < 0: Element ends only.
+!   comb = 0: A row at every record position.
+!   comb > 0: A row when z has advanced comb_ds_save past the last row.
+!
+! Note: There is one difference from Bmad. An element end is always a row, whatever the
+! comb. This lets the stats file carry one record axis with a boolean mask
+! (coords/at_element_end), instead of a second axis and a copy of every element-end
+! quantity. Where Bmad's comb < 0 drops the comb, here the element ends remain. They are
+! the positions the evaluated bunch_params live on.
+!
+! z_last is updated when the row is taken. The walk calls this routine live. The setup's
+! nrec precompute replays it with the same z arithmetic, so the stats arrays are sized
+! exactly in every mode.
 !
 ! Input:
 !   comb_ds_save -- real(rp): The comb setting (see above).
@@ -528,13 +527,13 @@ end function fel_comb_take
 !+
 ! Function fel_interlude_pieces (ds_step, length) result (n_piece)
 !
-! Routine to say how many pieces an interlude element is tracked in, the one authority
-! for it: the walk cuts the element this many ways and the setup's record-count
-! precompute replays the same count, so the stats arrays stay exact-sized.
+! Routine to return the number of pieces an interlude element is tracked in. The walk
+! cuts the element this many ways. The setup's record-count precompute replays the same
+! count, so the stats arrays stay exactly sized.
 !
-! The expression is Tao's own (tao_lattice_calc_mod's beam-track loop), including the
-! 1.01 factor, which keeps an element of exactly n whole steps from rounding down to
-! n-1 pieces.
+! The expression is Tao's own, from the beam-track loop of tao_lattice_calc_mod,
+! including the 1.01 factor. The factor keeps an element of exactly n whole steps from
+! rounding down to n-1 pieces.
 !
 ! Input:
 !   ds_step -- real(rp): global%interlude_ds_step. Zero or negative gives one piece.
@@ -563,15 +562,15 @@ end function fel_interlude_pieces
 !+
 ! Function fel_interlude_wake (ele) result (wake_src)
 !
-! Routine to say which element's short-range wake acts on an interlude, the one
-! authority for it: the walk routes a wake-carrying element through the whole-window
-! path and refuses to cut it into pieces, and the setup's record-count precompute
-! replays both decisions, so the two must agree or the stats arrays are mis-sized.
+! Routine to return the element whose short-range wake acts on an interlude. The walk
+! routes a wake-carrying element through the whole-window path and refuses to cut it into
+! pieces. The setup's record-count precompute replays both decisions. The two must agree
+! or the stats arrays are mis-sized.
 !
 ! Bmad's own resolver, pointer_to_wake_ele, finds the wake on the element or on exactly
 ! one slave of a split lord. With bmad_com%sr_wakes_on off, track1_bunch applies no
 ! wake, so no element carries one here. A zero-length element whose wake scales with
-! its length (Bmad's default) kicks by identically zero and carries none either. A
+! its length (Bmad's default) kicks by exactly zero and carries none either. A
 ! long-range wake has no scale_with_length and acts at zero length, so it is kept.
 !
 ! Input:
@@ -611,15 +610,15 @@ end function fel_interlude_wake
 !+
 ! Function fel_element_inert (ele, wake_src) result (inert)
 !
-! Routine to say whether the walk skips an element, the one authority for it, read by
-! the walk and by the setup's record-count precompute alike.
+! Routine to say whether the walk skips an element. The walk and the setup's
+! record-count precompute both use it.
 !
-! Only a zero-length element is a candidate, and only one that cannot act. A thin
-! kicker, a multipole, a patch, a zero-length cavity or any other element whose key
-! carries a map is tracked whatever its length: Bmad tracks it, and skipping it dropped
-! its kick with no message. What is skipped is a marker, drift, pipe, instrument or
-! monitor of zero length with no kick, no multipole, no aperture and no wake that can
-! act, which Bmad tracks as the identity.
+! Only a zero-length element that cannot act is skipped. A thin kicker, a multipole, a
+! patch, a zero-length cavity or any other element whose key carries a map is tracked
+! whatever its length. Bmad tracks it, and skipping it would drop its kick with no
+! message. A marker, drift, pipe, instrument or monitor of zero length is skipped when
+! it has no kick, no multipole, no aperture and no wake that can act. Bmad tracks such
+! an element as the identity.
 !
 ! Input:
 !   ele      -- ele_struct: The element.
@@ -663,10 +662,10 @@ end function fel_element_inert
 !+
 ! Subroutine fel_refuse_two_pol_combinations (run, err_flag)
 !
-! Routine to refuse the combinations that two live polarizations are not validated
-! with, the one authority for them. run%two_pol is decided twice: at lattice setup
-! from the seed's polarization and the elements' tilts, and again when a field file
-! turns out to carry both planes, so the refusals are made at both points from here.
+! Routine to refuse the combinations that two live polarizations are not validated with.
+! run%two_pol is decided twice. It is set at lattice setup from the seed's polarization
+! and the element tilts. It is set again when a field file carries both planes. The
+! refusals are made at both points by this routine.
 !
 ! Input:
 !   run      -- fel_run_struct: Run state with %two_pol, %n_harm and %global set.
