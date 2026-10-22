@@ -1,13 +1,13 @@
 !+
 ! Module fel_field_mod
 !
-! The field set's types: one radiation field of the walk's set with its own slippage
-! state and escape bank. They sit in a module of their own so that both the tracker
-! (fel_track_mod) and the device seam (fel_device_mod) can take the set as an array
-! of fel_field_struct, since passing a component section such as ffield(:)%wf, a
-! wavefront with allocatable arrays inside, makes the compiler pack a temporary and
-! deep-free it on return. fel_track_mod re-exports these types, so its users see them
-! as before.
+! Types for the field set. Each field of the set carries its own slippage state and
+! escape bank.
+!
+! The types have a module of their own so fel_track_mod and fel_device_mod can both take
+! the set as an array of fel_field_struct. Passing a component section instead, such as
+! ffield(:)%wf, makes the compiler pack a temporary of allocatable arrays and deep-free
+! it on return. fel_track_mod re-exports these types.
 !-
 
 module fel_field_mod
@@ -19,10 +19,11 @@ implicit none
 !+
 ! Struct fel_slip_struct
 !
-! The slippage state of one field record: Genesis's Field::first and Field::accuslip,
-! plus the two run facts they are meaningless without. One per wavefront. The default is
-! the steady state: timerun false makes fel_apply_slippage a no-op (as Genesis's)
-! and first = 0 makes fel_field_index the identity.
+! Slippage state of one field record: Genesis's Field::first and Field::accuslip, and
+! the two run facts they need. One per wavefront.
+!
+! The default is steady state. With timerun false, fel_apply_slippage does nothing, as
+! in Genesis, and with first = 0, fel_field_index is the identity.
 !-
 
 type fel_slip_struct
@@ -31,20 +32,21 @@ type fel_slip_struct
   real(rp) :: accuslip = 0      ! Accumulated slippage [radiation wavelengths] (Field::accuslip).
   integer :: sample = 1         ! Wavelengths per slice (Control::sample), the beam's
                                 !   n_wavelength. An integer by construction.
-  real(rp) :: u_escaped = 0     ! Energy [J] transmitted out of the window by slippage
-                                ! (summed over every zero-filled slice). The TD energy
-                                ! ledger's escape column, so E_beam + U_window + U_escaped
-                                ! closes in a wake-free run.
+  real(rp) :: u_escaped = 0     ! Energy [J] slippage carried out of the window, summed
+                                !   over every zero-filled slice. The ledger's escape
+                                !   column: E_beam + U_window + U_escaped closes without
+                                !   wakes.
 end type
 
 !+
 ! Struct fel_bank_struct
 !
-! Scratch carrier for the field slices one fel_apply_slippage call transmits out of the
-! window: the caller passes it when it wants the light itself, not just its banked
-! energy (keep_escaped_field). Reset and refilled per call. The caller drains it
-! immediately (streams to file), so peak memory is a handful of grid planes -- one per
-! rotation of the call, ~1 inside undulators, ~10 over an interlude.
+! Scratch carrier for the slices one fel_apply_slippage call carries out of the window.
+! The caller passes it for the light itself (keep_escaped_field), and not only its
+! energy. It is reset and refilled each call.
+!
+! The caller drains it at once to file, so it holds one grid plane per rotation of the
+! call: about 1 inside an undulator and about 10 over an interlude.
 !-
 
 type fel_bank_struct
@@ -56,15 +58,15 @@ end type
 !+
 ! Struct fel_field_struct
 !
-! One radiation field of the walk's field set: the harmonic number, the wavefront
-! record, and that field's own slippage state and escape bank. The walk carries an
-! ordered set of these (Genesis's vector<Field*>), with the fundamental always
-! entry 1. The ponderomotive phase, the phi0 advance and the slippage schedule are
-! all defined against the fundamental. A harmonic field couples through fc(h) and the
-! phase h*theta and diffracts at its own wavelength. A single-entry set is the
-! pre-harmonic walk, bit for bit. wf%wavelength = fundamental wavelength / harm. Every
-! field shares the time window, so the slippage state advances in fundamental-wavelength
-! units for all of them (Genesis's one Control::sample) and the records rotate in
+! One radiation field of the walk's field set: its harmonic number, its wavefront and
+! its own slippage state and escape bank. The walk carries an ordered set of these, as
+! Genesis carries vector<Field*>, and the fundamental is always entry 1.
+!
+! The ponderomotive phase, the phi0 advance and the slippage schedule are all defined
+! against the fundamental. A harmonic field couples through fc(h) and the phase
+! h*theta, and diffracts at its own wavelength: wf%wavelength = fundamental / harm.
+! Every field shares the time window. So the slippage state of every field advances in
+! fundamental wavelengths, Genesis's one Control::sample, and the records rotate in
 ! lockstep.
 !-
 
