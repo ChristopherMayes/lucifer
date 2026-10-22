@@ -2,7 +2,7 @@
 
 Version 1.0, in force for this writer, with open questions pending. This document is normative for any writer claiming `@file_format = 'bmad-stats'`. It is versioned by its own number, independently of any program. Lucifer is the reference writer, as `bmad-stats 1.0` plus the `fel` extension (BMAD-STATS-EXT-FEL.md).
 
-Rules are numbered R1, R2, ... so markup can point at them, and the numbers are append-only: a rule keeps its number forever, so late additions sit out of sequence (R43 and R44 live in section 12). MUST, SHOULD and MAY are used as in RFC 2119. Open questions are collected at the end as O1, O2, ...
+Rules are numbered R1, R2, ... so markup can point at them. The numbers are append-only: a rule keeps its number forever, so late additions sit out of sequence (R43 and R44 live in section 12). MUST, SHOULD and MAY are used as in RFC 2119. Open questions are collected at the end as O1, O2, ...
 
 ## 1. Purpose and scope
 
@@ -10,7 +10,7 @@ This standard covers the statistics and diagnostics a tracking program produces 
 
 It deliberately does *not* cover particle dumps or field meshes. Those are openPMD's job, and the two standards carry opposite unit conventions (R21), so one file never carries both.
 
-The design goal in one sentence: a reader guesses nothing. Every dimension, unit, meaning and relationship is stated in the file, and the machine-checkable part of that claim is enforced by a generic validator that knows no program (section 14).
+The aim: a reader guesses nothing. Every dimension, unit, meaning and relationship is stated in the file. The machine-checkable part of that claim is enforced by a generic validator that knows no program (section 14).
 
 ## 2. Definitions
 
@@ -19,7 +19,7 @@ The datasets of a file share dimensions: many run over the same records, the sam
 - **axis**: a named dimension that datasets share (`record`, `slice`, `bmad`). Every dimension of every dataset names its axis in `@axes` (R11).
 - **coordinate**: the one dataset that defines an axis by listing what lies along it: the record numbers, the slice numbers, the six phase-space names. Axes and coordinates are one to one (R15).
 - **variable on an axis**: a dataset giving one more per-entry quantity of an axis without defining it: the path length at each record, the lattice element holding each record, the unit of each phase-space entry. An axis has one coordinate and any number of variables.
-- **`coords/`**: the group holding every coordinate and every variable, once each (section 6). The name is netCDF's, not Bmad's: see the terminology note below.
+- **`coords/`**: the group holding every coordinate and every variable, once each (section 6). The name is netCDF's and not Bmad's: see the terminology note below.
 - **label axis**: an axis whose coordinate is a string array (`bmad`, `plane`), used for the trailing dimensions of vectors and matrices so no reader guesses a dimension from its length.
 - **join key**: an integer variable whose values index another axis (R18).
 - **mask**: a boolean variable selecting another axis's entries, in order (R19).
@@ -53,7 +53,7 @@ Terminology note. "Coordinate" is used here in netCDF's coordinate-variable sens
 
 ## 6. Axes and coordinates: the coords/ group
 
-`coords/` is a data tree's table of dimensions. It holds no physics results. It holds what the results are indexed by: one coordinate per axis plus the variables attached to each axis, once each, so a reader has one place to look and every name in every `@axes` has one place to resolve. From a real FEL file, the three roles marked:
+`coords/` is a data tree's table of dimensions. It holds no physics results. It holds what the results are indexed by: one coordinate per axis plus the variables attached to each axis, once each. A reader then has one place to look, and every name in every `@axes` has one place to resolve. From a real FEL file, the three roles marked:
 
 ```
 coords/record          0 1 2 ...          axis      the record number
@@ -82,7 +82,7 @@ coords/plane           x y z              axis      the projected twiss planes
 
 - **R21.** Values are stored in fixed units: m, rad, s, eV, C, A, J, W, T, and `'1'` for a dimensionless quantity. `@unit` is documentation. A reader MUST NOT scale by it. This is the opposite of openPMD's `unitSI`, which is a factor to apply, and the two conventions MUST NOT appear in one file.
 - **R22.** Counts and ratios carry `@unit = '1'`.
-- **R23.** A dataset whose entries carry different units (a phase-space vector, a sigma matrix) MUST declare `@unit_of_axis` naming the label axis whose `coords/<axis>_unit` carries the per-entry units, and `@unit_power`, a true scalar integer: 1 for a first moment, 2 for a second. The human `@unit` string stays for display and is not parseable by design.
+- **R23.** A dataset whose entries carry different units (a phase-space vector, a sigma matrix) MUST declare `@unit_of_axis` naming the label axis whose `coords/<axis>_unit` carries the per-entry units, and `@unit_power`, a true scalar integer. That integer is 1 for a first moment and 2 for a second. The human `@unit` string stays for display and is not parseable by design.
 
 ## 8. Types, shape, arity
 
@@ -98,7 +98,7 @@ coords/plane           x y z              axis      the projected twiss planes
 
 ## 10. Structs
 
-- **R30.** A group mirroring a Fortran derived type MUST carry `@struct = '<type_name>'` and use the type's component names verbatim, so the mapping to the code is exact and machine-readable. It maps names, not completeness: a writer stores the components it computed (R43).
+- **R30.** A group mirroring a Fortran derived type MUST carry `@struct = '<type_name>'` and use the type's component names verbatim, so the mapping to the code is exact and machine-readable. It maps names and not completeness: a writer stores the components it computed (R43).
 - **R31.** A quantity varying over a set is one dataset over a label axis, never N datasets with suffixed names.
 - **R32.** Two decompositions of one thing are two axes (projected planes `x, y, z` against normal modes `a, b, c`), because a mean across them is meaningless and one axis invites it.
 
@@ -108,7 +108,7 @@ coords/plane           x y z              axis      the projected twiss planes
 - **R34.** `params/`, kind `input`: one subgroup per input structure the program honors, each also kind `input` and carrying `@struct` (R30), holding the resolved values of every honored component, after defaults. Components the program refuses are not written: recording a knob that did nothing would be a lie about the run. A reader never needs a defaults table, and two runs diff by their inputs alone. For a Bmad program that is typically `params/bmad_com/`, `params/space_charge_com/`, `params/beam_init/`, and the program's own globals.
 - **R35.** `run/`, kind `run`: the scalars a run produces, separated from `params/` because a reader must know what the user controlled apart from what came out: the reference momentum, species, axis lengths kept as bookkeeping cross-checks. Not `derived` in R38's sense, since their inputs are the particles and the lattice rather than other datasets here.
 - **R36.** `lattice/`, kind `table`: when the program tracks a lattice, one row per tracked element on an `ele` axis, element 0 included. Minimum columns `name`, `key`, `s_start`, `s_end`. A writer SHOULD add what a layout plot needs. Per-element attributes MAY be one dataset per non-default attribute. It is *not* a lattice serialization and MUST NOT claim to be one. (O4.)
-- **R37.** `meta/`, kind `provenance`, at the root: datasets only (R27), an ISO 8601 timestamp, and the writer's version. It MUST NOT record user identity or machine-local paths unless the run explicitly opts in, because a stats file is meant to travel, and it MUST NOT claim completeness it lacks: a top-level input text says it is the top-level text.
+- **R37.** `meta/`, kind `provenance`, at the root: datasets only (R27), an ISO 8601 timestamp, and the writer's version. It MUST NOT record user identity or machine-local paths unless the run explicitly opts in, because a stats file is meant to travel. It MUST NOT claim completeness it lacks: a top-level input text says it is the top-level text.
 
 ## 12. Derived data and sufficiency
 
@@ -117,7 +117,7 @@ Within this file, the primary data are what the program computed from particles:
 - **R38.** Data that is a pure function of other data in the tree declares `@derived_from`, a string array of the sibling names it derives from. A group may declare it once for everything it holds, keeping its own kind (`twiss`), and a group whose whole identity is the derivation (`field/total`) has kind `derived`, which then requires the declaration. Two readers depend on the declaration: one summing children must not double count, and one re-deriving must know what is independent information. Scalar context from `params/` and `run/` (a spacing, a reference momentum) is ambient and is not named: `@derived_from` lists the axis-carrying inputs, and the formula belongs in `@description`.
 - **R39.** A parent whose children are summable components MUST declare `@components`, a string array, and MAY declare further child lists (`@harmonics`).
 - **R43.** Sufficiency layers. A writer MUST store the primary statistics it computed and MAY store derived conveniences beside them, marked per R38. Derived data MAY live on a sparser axis than its inputs (element ends against every record), because the primary layer makes any point reconstructible offline. A writer that computes only moments conforms.
-- **R44.** Stored derived data is the reference implementation's answer, which is the reason to store it at all: the normal-mode labels a, b, c are identified by eigenvector structure, a convention no reader should reimplement by guesswork, and independent eigensolvers agree only to their common floor, where the projected planes are exact algebra. The writer's harness SHOULD verify the round trip, re-deriving from the stored primary layer and comparing against the stored derived layer, matching mode sets rather than mode labels.
+- **R44.** Stored derived data is the reference implementation's answer, which is the reason to store it at all. The normal-mode labels a, b, c are identified by eigenvector structure, a convention no reader should reimplement by guesswork. Independent eigensolvers agree only to their common floor, where the projected planes are exact algebra. The writer's harness SHOULD verify the round trip, re-deriving from the stored primary layer and comparing against the stored derived layer, matching mode sets rather than mode labels.
 
 ## 13. Extensions
 
@@ -126,11 +126,11 @@ Within this file, the primary data are what the program computed from particles:
 
 ## 14. Conformance
 
-- **R42.** A file conforms when `validate_bmad_stats.py` reports no MUST failure. The validator is part of this standard, knows no program and no extension, and checks everything generically checkable. Some MUSTs are writer-side honesty the validator cannot see: that every join key and mask is declared (it can only verify declared ones resolve), that R26's strings really are the code's enums, that R28's NaN means not-computed, and that R34's trees are complete. Those belong in each writing program's own test harness, beside the physics checks.
+- **R42.** A file conforms when `validate_bmad_stats.py` reports no MUST failure. The validator is part of this standard, knows no program and no extension, and checks everything generically checkable. Some MUSTs are writer-side honesty the validator cannot see. It can only verify that a declared join key or mask resolves, and not that every one is declared. It cannot see that R26's strings really are the code's enums, that R28's NaN means not-computed, or that R34's trees are complete. Those belong in each writing program's own test harness, beside the physics checks.
 
 ## 15. Relation to openPMD
 
-Complementary, not competing. Particles and field meshes go to openPMD, whose `unitSI` convention is load-bearing there and banned here (R21). The base-plus- extensions structure of this document is deliberately parallel to openPMD's, because this ecosystem's readers already know that model.
+Complementary and not competing. Particles and field meshes go to openPMD, whose `unitSI` convention is load-bearing there and banned here (R21). The base-plus-extensions structure of this document is deliberately parallel to openPMD's, because this ecosystem's readers already know that model.
 
 ## 16. Worked example
 
