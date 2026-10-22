@@ -1,34 +1,29 @@
 #!/usr/bin/env python3
 """
-Coherent-source checks (fel-physics.md sec-coherent-source; Tanaka PRAB 27, 030703 (2024),
-implemented from the paper -- the SIMPLEX hybrid: their source, our field).
+Checks of the coherent source (fel-physics.md, sec-coherent-source), implemented from
+Tanaka, PRAB 27, 030703 (2024): SIMPLEX's coherent source driving Lucifer's field.
 
-  1. Keystone: source_model is defaulted -- the deposit path -- everywhere else in the
-     harness, so the benchmark's own tiers hold the default-path contract. Here: a
-     coherent run exists and runs clean on the reference configuration.
-  2. Limit identity (the model's measured bias, not zero): coherent vs deposit at
-     large M on the seeded 6 GeV segment -- the |ln P| curve difference is the
-     coherent-Gaussian model's intrinsic error in the lethargy regime, measured
-     2.0e-2, checked at 5e-2. The regime is deliberate: lethargy/absorption is the
-     energy exchange where the low-M artifact bites hardest.
-  3. The claim (variance reduction): at M = 128 the plain deposit fakes gain
-     (measured ln +0.41 on a curve that truly absorbs -- the per-cell shot-noise
-     artifact of the survey's 5.1), while the coherent source at the same M stays
-     within the model bias of the large-M reference (measured 0.05). Both measured
-     here, both checked: the artifact must exceed 0.2, the coherent error stay
-     under 0.1.
-  4. Moments extension: an offset + tilted (but Gaussian) beam, imported via an
-     openPMD file this check writes, runs coherent and tracks its own deposit twin
-     (same tolerance as 2); a DOUBLE-HORN beam is refused by the
-     significance guard (excess kurtosis against sqrt(24/m_ind)).
-  5. Dark start refused: measured ~175x startup deficit (spontaneous,
-     spatially-incoherent emission dominates SASE startup; the coherent model drops
-     it by construction), so the model refuses a dark start rather than reporting a
-     startup it cannot represent. B(s) does carry the physical Fawley noise, but it
-     is not the dominant seed at startup.
-  6. Threads: a coherent run is bit-identical at 1 and 8 threads.
+  1. Every other check in the harness leaves source_model at its default, the deposit,
+     so the benchmark's tiers hold that path. Here a coherent run on the reference
+     configuration runs clean.
+  2. Limit identity. At large M on the seeded 6 GeV segment, the coherent and deposit
+     |ln P| curves differ by the coherent Gaussian's own error in the lethargy regime,
+     the regime where the low-M artifact is largest. The bias is 2.0e-2, checked at 5e-2.
+  3. Variance reduction. At M = 128 the plain deposit fakes gain, ln P of +0.41 on a
+     curve that absorbs, while the coherent source stays within the model bias of the
+     large-M reference, at 0.05. The artifact must exceed 0.2 and the coherent error
+     stay under 0.1. validation.md (val-the-coherent-source-simplex) records both.
+  4. Moments extension. An offset and tilted Gaussian beam, written here as openPMD and
+     imported, runs coherent and tracks its own deposit twin at the tolerance of 2. A
+     double-horn beam is refused by the significance guard, the excess kurtosis
+     against sqrt(24/m_ind).
+  5. A dark start is refused. The coherent model drops the spontaneous, spatially
+     incoherent emission that dominates SASE startup, and its startup comes out about
+     175 times low. B(s) carries the physical Fawley noise, but that noise is not the
+     dominant seed at startup.
+  6. A coherent run is bit-identical at 1 and 8 threads.
 
-Run by the benchmark harness; exits nonzero on failure. Self-referenced (no Genesis).
+Run by the benchmark harness. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations
@@ -46,9 +41,9 @@ from read_stats import read_stats
 
 FAILED = False
 
-TOL_LIMIT = 5e-2      # measured 2.0e-2: the coherent-Gaussian model bias (lethargy).
-TOL_CLAIM_COH = 0.1   # measured 0.05: coherent at M=128 vs the M=8192 reference.
-MIN_CLAIM_DEP = 0.2   # measured 0.41: the deposit's fake gain at M=128 (must exceed).
+TOL_LIMIT = 5e-2      # The coherent Gaussian's bias in lethargy is 2.0e-2.
+TOL_CLAIM_COH = 0.1   # Coherent at M = 128 against the M = 8192 reference is 0.05.
+MIN_CLAIM_DEP = 0.2   # The deposit's fake gain at M = 128 is 0.41 and must exceed this.
 
 LAT = """no_digested
 parameter[geometry] = open
@@ -178,18 +173,18 @@ def main():
     # ------------------------------------------------------------------
     print("== the moments extension (offset + tilted admitted; double horn refused) ==")
 
-    # An offset, x-y-tilted Gaussian bunch written as openPMD and imported by both
-    # source models: the coherent run must track its own deposit twin. The import
-    # runs in the resampler's validated regime (a time-dependent window of many
-    # slices, resample%n_slice = 0 auto) -- the single-slice corner produces degenerate
-    # transverse sampling (a separate finding, noted in the brief). beamlet_size = 4 keeps
-    # the guard's independent-sample estimate honest for the horn to trip on.
+    # An offset Gaussian bunch, tilted in x-y, is written as openPMD and imported by both
+    # source models, and the coherent run must track its own deposit twin. The import
+    # runs where the resampler is validated, a time-dependent window of many slices
+    # with resample%n_slice = 0 so the count is derived. A single slice samples the
+    # beam degenerately in x and y. beamlet_size = 4 keeps the guard's estimate of
+    # independent samples honest, so the double horn trips it.
 
-    # A short undulator (0.9 m) and sample = 20 keep the seed in the window: at
-    # sample = 1 the slippage (3 wavelengths per step here) flushes the seed out
-    # within a few steps and the comparison degenerates into the dark-start case
-    # (the deposit's inflated spontaneous emission vs the coherent model's none --
-    # measured as an apparent 5.9 |ln| disagreement before this was understood).
+    # A short undulator, 0.9 m, and sample = 20 keep the seed in the window. At
+    # sample = 1 the slippage, 3 wavelengths a step here, flushes the seed out within a
+    # few steps and the comparison becomes the dark-start case: the deposit's inflated
+    # spontaneous emission against none from the coherent model, an apparent |ln P|
+    # disagreement of 5.9.
 
     (wd / "cohshort.bmad").write_text(LAT.replace("l = 3.96,", "l = 0.90,"))
     IMP = ('  beam_init%position_file = "beam0.h5"\n  beam_init%n_particle = 2048\n  beamlet_size = 4\n'
@@ -210,12 +205,11 @@ def main():
         run(exe, wd, root, 2048, coh, sig_z='4e-9', bextra=IMP, pextra=WIN, lat="cohshort.bmad")
     _, md = curve(wd, "mdep")
     _, mc = curve(wd, "mcoh")
-    # Measured 8.9e-2: the SS model bias (1.9e-2) plus the residual emission
-    # difference from the 3 slices of window slippage this TD config still has
-    # (the deposit refills slipped-in slices with its inflated spontaneous
-    # emission, and the coherent source, correctly, does not). Without the centering
-    # extension the Gaussian would sit 0.87 sigma off the beam and the error
-    # would be O(1) -- that is what this check pins.
+    # The twins differ by 8.9e-2: the steady-state model bias of 1.9e-2 plus the
+    # emission over the 3 slices this window still slips. The deposit refills a
+    # slipped-in slice with its inflated spontaneous emission and the coherent source
+    # does not. Without the centering of the moments extension the Gaussian would sit
+    # 0.87 sigma off the beam and the error would be of order 1, which this check pins.
     check("offset+tilted beam: coherent tracks its deposit twin",
           float(np.max(np.abs(np.log(mc / md)))), 2e-1)
 
@@ -233,11 +227,10 @@ def main():
     # ------------------------------------------------------------------
     print("== dark start refused (the measured startup deficit) ==")
 
-    # measured on this configuration: the coherent dark start came out ~175x low
-    # (deposit 1311 W vs coherent 7.5 W at the same seeds) -- spontaneous,
-    # spatially-incoherent emission dominates SASE startup and the coherent model
-    # drops it by construction, so a dark start is refused rather than reported as a
-    # startup this model cannot represent.
+    # On this configuration a coherent dark start comes out about 175 times low, 7.5 W
+    # against 1311 W from the deposit at the same seeds. The coherent model drops the
+    # spontaneous, spatially incoherent emission that dominates SASE startup, so a dark
+    # start is refused rather than reported as a startup the model cannot represent.
 
     ok = run(exe, wd, "sdark", 2048, True, sase=True, expect_fail="DARK START")
     print(f"--- coherent + dark start refused: {'ok' if ok else '** FAIL **'}")
