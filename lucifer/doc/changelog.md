@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-22 Fixed: `check_unaveraged.py` ran the unaveraged mode with `fp32_check = "freerun"` and
+  discarded whether the run was refused, so a run that went ahead passed. The check now requires the run
+  to fail with its message, `DOES NOT COVER THE UNAVERAGED MODE`, and fails when it does not, as a
+  fragment the program never prints shows.
 - 2026-10-22 Changed: the comments and docstrings of the Python checks, the keystone suite, the readers,
   the report generators and the two example scripts say what each block does and why, as the Fortran's
   do. Every tolerance keeps the number that sets it and names the page that holds it. How a number was

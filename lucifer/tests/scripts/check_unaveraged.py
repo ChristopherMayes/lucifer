@@ -542,11 +542,13 @@ def main():
           0.0 if same_led else 1.0, 0.5)
 
     # freerun compounds a single-precision state across steps and this twin carries none,
-    # so the mode refuses it. The run is made here, but its refusal is not asserted.
-    run_expect_refusal(exe, wd, "uv_twfree", GAIN.format(root="uv_twfree",
+    # so the mode refuses it, with its own message.
+    refused = run_expect_refusal(exe, wd, "uv_twfree", GAIN.format(root="uv_twfree",
         lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
         .replace("&end", '  global%fp32_check = "freerun"\n&end'),
         "DOES NOT COVER THE UNAVERAGED MODE")
+    check("twin: freerun refused in the unaveraged mode (0 = yes)",
+          0.0 if refused else 1.0, 0.5)
 
 
     if FAILED:
