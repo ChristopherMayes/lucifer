@@ -15,6 +15,14 @@ language says they are:
             continued onto the next line with & carries its quote state there.
   C         /* ... */ across lines, and // to the end of a line, outside strings.
   CMake     # to the end of a line, outside a quoted string.
+  Python    # comments as the tokenizer finds them, and docstrings: the first
+            statement of a module, class or function when it is a string. The code
+            compared is the syntax tree with the docstrings removed, so a change to any
+            statement, literal or message fails.
+
+A docstring is also a value at run time. A script that hands a line of its docstring
+to argparse, as __doc__.split("\n")[1] does, must still find a line there that is not
+blank, and each such line is printed so it can be read.
 
 The second form counts, per file and in total: lines, comment lines, comment lines
 that narrate (a date, the user, a keystone, a tier, a check section, a mutation, a
@@ -28,10 +36,13 @@ Exit status is nonzero when a file's code differs from <rev>.
 from __future__ import annotations
 
 import argparse
+import ast
+import io
 import pathlib
 import re
 import subprocess
 import sys
+import tokenize
 
 WIDTH = 110
 
@@ -54,6 +65,8 @@ def kind(path: str) -> str:
         return "fortran"
     if p.suffix.lower() in (".c", ".h", ".cpp", ".mm"):
         return "c"
+    if p.suffix.lower() == ".py":
+        return "python"
     return "cmake"
 
 
@@ -140,8 +153,73 @@ def split_cmake(text: str):
     return code, comments
 
 
+DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def docstring_nodes(tree):
+    """The string statements that are docstrings, outermost first."""
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, DOCSTRING_OWNERS) and node.body:
+            first = node.body[0]
+            if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                    and isinstance(first.value.value, str)):
+                found.append(first)
+    return found
+
+
+def python_code(text: str):
+    """The syntax tree of a Python source with its docstrings removed, one line per node."""
+    tree = ast.parse(text)
+    drop = {id(n) for n in docstring_nodes(tree)}
+    for node in ast.walk(tree):
+        if isinstance(node, DOCSTRING_OWNERS):
+            node.body = [n for n in node.body if id(n) not in drop] or [ast.Pass()]
+    return ast.dump(tree, indent=1, include_attributes=False).splitlines()
+
+
+def split_python(text: str):
+    comments = [tok.string[1:] for tok in tokenize.generate_tokens(io.StringIO(text).readline)
+                if tok.type == tokenize.COMMENT]
+    for node in docstring_nodes(ast.parse(text)):
+        comments.extend(node.value.value.splitlines() or [""])
+    return python_code(text), comments
+
+
+def python_comment_rows(text: str):
+    """Row numbers, from 1, of the lines holding a comment or part of a docstring."""
+    rows = {tok.start[0] for tok in tokenize.generate_tokens(io.StringIO(text).readline)
+            if tok.type == tokenize.COMMENT}
+    for node in docstring_nodes(ast.parse(text)):
+        rows.update(range(node.lineno, node.end_lineno + 1))
+    return rows
+
+
+# The ways a script takes one line of its docstring, and the line each takes.
+DOC_USES = {
+    r'__doc__\.split\("\\n"\)\[(\d+)\]': lambda d, k: d.split("\n")[k],
+    r"__doc__\.splitlines\(\)\[(\d+)\]": lambda d, k: d.splitlines()[k],
+    r'__doc__\.strip\(\)\.split\("\\n"\)\[(\d+)\]': lambda d, k: d.strip().split("\n")[k],
+}
+
+
+def doc_lines_used(path: str, text: str):
+    """(expression, line or None) for each docstring line the script reads at run time."""
+    doc = ast.get_docstring(ast.parse(text), clean=False)
+    used = []
+    for pat, take in DOC_USES.items():
+        for m in re.finditer(pat, text):
+            try:
+                line = take(doc, int(m.group(1))) if doc is not None else None
+            except IndexError:
+                line = None
+            used.append((m.group(0), line))
+    return used
+
+
 def split(path: str, text: str):
-    return {"fortran": split_fortran, "c": split_c, "cmake": split_cmake}[kind(path)](text)
+    return {"fortran": split_fortran, "c": split_c, "cmake": split_cmake,
+            "python": split_python}[kind(path)](text)
 
 
 def normalized(path: str, text: str):
@@ -160,10 +238,23 @@ def at_rev(rev: str, path: str) -> str:
 def compare(rev: str, paths) -> int:
     bad = 0
     for path in paths:
+        text = pathlib.Path(path).read_text()
         before = normalized(path, at_rev(rev, path))
-        after = normalized(path, pathlib.Path(path).read_text())
+        after = normalized(path, text)
+        if kind(path) == "python":
+            blank = False
+            for expr, line in doc_lines_used(path, text):
+                if line is None or not line.strip():
+                    blank = True
+                    print(f"FAIL  {path}: {expr} is blank or missing")
+                else:
+                    print(f"      {path}: {expr} is {line.strip()!r}")
+            if blank:
+                bad += 1
+                continue
         if before == after:
-            print(f"ok    {path}: code identical to {rev}, {len(after)} code lines")
+            unit = "syntax tree lines" if kind(path) == "python" else "code lines"
+            print(f"ok    {path}: code identical to {rev}, {len(after)} {unit}")
             continue
         bad += 1
         print(f"FAIL  {path}: code differs from {rev}")
@@ -187,7 +278,11 @@ def counts(paths) -> None:
         lines = text.splitlines()
         _, comments = split(path, text)
         # A long statement is code. Only a line that carries a comment counts as wide.
-        wide = sum(1 for line in lines if len(line) > WIDTH and split(path, line)[1])
+        if kind(path) == "python":
+            rows = python_comment_rows(text)
+            wide = sum(1 for k, line in enumerate(lines, 1) if len(line) > WIDTH and k in rows)
+        else:
+            wide = sum(1 for line in lines if len(line) > WIDTH and split(path, line)[1])
         row = {"lines": len(lines), "comm": len(comments),
                "semi": sum(1 for c in comments if ";" in c), "wide": wide}
         for k, pat in NARRATION.items():
