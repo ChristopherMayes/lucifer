@@ -5,29 +5,34 @@ Plot the standard diagnostics of a lucifer run from its stats file.
     python plot_fel.py run.stats.h5              # writes run.png
     python plot_fel.py run.stats.h5 -o gain.png --show
 
-The stats file (fel-physics.md sec-stats) describes itself: every dataset carries its unit and
-the axes it runs over, so this script reads named datasets through read_stats and does
-no conversions at all -- no text files, no reshapes, no unit juggling. Ten panels against s:
+The stats file (fel-physics.md, sec-stats) describes itself. Every dataset carries its
+unit and the axes it runs over, so this script reads named datasets through read_stats
+and does no conversions: no text files, no reshapes and no unit changes. Ten panels are
+plotted against s:
 
-  radiation power and window field energy (log and linear -- the log pair shows the
-  exponential gain regime, the linear pair shows where the energy actually is);
-  bunching |b|; beam energy change and rms spread (MeV -- Bmad's convention: energy is
-  eV, never gamma); rms beam sizes and rms field sizes (the field sizes come from the
-  wavefront_params sigma(4,4) -- watch gain guiding pull the light onto the beam);
-  beam normalized emittances (projected, dispersion removed, the bunch_params
-  convention) and the field "emittance" sqrt(det sigma_plane) = M^2 lambda/4pi at the
-  records where the FFT-costed angle moments were taken (element ends).
+  - Radiation power and window field energy, each on a log and a linear scale. The log
+    pair shows the exponential gain regime, and the linear pair shows where the energy
+    is. Where the file carries the mode split, the power panel also shows the power
+    inside split_angle.
+  - Bunching |b|.
+  - Beam energy change and rms spread, in MeV. Bmad's convention is energy in eV, never
+    gamma.
+  - rms beam sizes and rms field sizes. The field sizes come from the wavefront_params
+    sigma(4,4). Gain guiding shows as the field size pulled onto the beam.
+  - Beam normalized emittances (projected, dispersion removed, the bunch_params
+    convention), and the field "emittance" sqrt(det sigma_plane) = M^2 lambda/4pi at
+    the records where the FFT-costed angle moments were taken (element ends).
 
-Works on steady-state and time-dependent runs alike: with more than one slice, thin
-gray lines show every slice and the bold line the total (power, energy) or the slice
-average (everything else). When the run carries two polarizations (any tilted FEL
-element; the file then has a field/y group beside field/x) an eleventh panel splits the power
-by polarization -- on a crossed line that panel is the afterburner story. When it
-carries harmonic fields (namelist harmonics; field/harm<h> groups, each with its own
-total) a panel plots each
-harmonic's power against the fundamental's.
+The script works on steady-state and time-dependent runs alike. With more than one
+slice, thin gray lines show every slice, and the bold line shows the total (power,
+energy) or the slice average (everything else). When the run carries two polarizations
+(any tilted FEL element, so that the file has a field/y group beside field/x), an
+eleventh panel splits the power by polarization. On a crossed line that panel shows the
+afterburner. When the run carries harmonic fields (namelist harmonics, with
+field/harm<h> groups each carrying its own total), a panel plots each harmonic's power
+against the fundamental's.
 
-Needs numpy, h5py and matplotlib (the bmad-fel-validate environment has all three).
+Needs numpy, h5py and matplotlib. The bmad-fel-validate environment has all three.
 """
 
 from __future__ import annotations
@@ -47,20 +52,20 @@ import matplotlib.pyplot as plt
 
 M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
-# Fixed series colors (validated categorical palette, assigned in order, never
-# cycled). Per-slice context lines are neutral gray so identity stays with the
-# bold aggregate.
+# Fixed series colors from a categorical palette, assigned in order and never cycled.
+# Per-slice context lines are neutral gray, so the color stays with the bold aggregate.
 BLUE, ORANGE, GRAY = "#2a78d6", "#eb6834", "#b0afa9"
 INK, INK2 = "#0b0b0b", "#52514e"
 
 
 def load(fn):
-    """Everything the panels need, straight out of the file through read_stats.
+    """Everything the panels need, read from the file through read_stats.
 
-    There are no conversions and no reshapes here: the file states its own shapes and
-    units (fel-physics.md sec-stats), so this is a gather of named datasets. field/total is the
-    sum over polarizations of the fundamental and field/x is the x component, whether
-    or not a y component exists, so no branch changes what a name means."""
+    There are no conversions and no reshapes here. The file states its own shapes and
+    units (fel-physics.md, sec-stats), so this is a gather of named datasets.
+    field/total is the sum over polarizations of the fundamental, and field/x is the x
+    component whether or not a y component exists, so no branch changes what a name
+    means."""
     st = read_stats(fn)
     q = {
         "s": st.s, "p0c": float(st.run["p0c"]),
@@ -79,16 +84,17 @@ def load(fn):
         "f_valid": st["field/x/angle_moments_valid"].astype(bool),
         "power_x": st["field/x/power"],
     }
-    # The mode split (fel-physics.md sec-source-filter): the power within split_angle of
-    # the axis, at the records that took the field angle moments. Its complement is the
-    # wide-angle emission of the point beamlets, which is most of an unseeded run's power
-    # at grids and loads in common use, so a power curve without it can mislead.
+    # The mode split (fel-physics.md, sec-source-filter) is the power within split_angle
+    # of the axis, at the records that took the field angle moments. Its complement is
+    # the wide-angle emission of the point beamlets. That emission is most of an
+    # unseeded run's power at the grids and loads in common use, so a power curve
+    # without the split can mislead.
     if "field/total/power_inside_angle" in st:
         q["power_in"] = st["field/total/power_inside_angle"]
         q["split_angle"] = float(np.ravel(st["field/total/split_angle"])[0])
     if "y" in st.components:
         q["power_y"] = st["field/y/power"]
-    # Harmonics: each group carries its own total, since a detector separates colors
+    # Harmonics. Each group carries its own total, since a detector separates colors
     # and nothing sums across wavelengths.
     q["harmonics"] = {h: st[f"field/harm{h}/total/power"] for h in st.harmonics}
     st.close()
@@ -101,8 +107,8 @@ def beam_energy_ev(q):
 
 
 def norm_emit(q, i, j):
-    """Projected normalized emittance per (record, slice), dispersion removed --
-    the bunch_params convention (Bmad's projected_twiss_calc)."""
+    """Projected normalized emittance per (record, slice), with dispersion removed.
+    This is the bunch_params convention (Bmad's projected_twiss_calc)."""
     s = q["sigma"]
     s66 = s[:, :, 5, 5]
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -165,9 +171,9 @@ def main():
                                   sharex=True)
 
     # Radiation power and window field energy, log then linear. The multi-slice
-    # aggregate is a sum: total power is what a detector sees, and the window energy
-    # is the honest SASE growth curve (per-slice power churns as light slips through
-    # and out of the window, while the energy integrates it).
+    # aggregate is a sum. Total power is what a detector sees. The window energy is the
+    # SASE growth curve to read, since per-slice power churns as light slips through
+    # and out of the window while the energy integrates it.
     for key, quant, ylab in (("power", "power", "radiation power (W)"),
                              ("energy", "energy", "field energy (J)")):
         label = "total" if nslice > 1 else None
@@ -207,10 +213,10 @@ def main():
     axd["gamma"].set_ylabel("beam energy (MeV)")
     axd["gamma"].legend(**above)
 
-    # Transverse rms sizes: beam from the 6x6, field from the wavefront 4x4 --
-    # gain guiding is the field-size curve bending toward the beam-size curve.
-    # The envelope band, centroid + rel over the window: the extremes are order
-    # statistics the file stores, not a sigma multiple.
+    # Transverse rms sizes: the beam's from the 6x6 and the field's from the wavefront
+    # 4x4. Gain guiding shows as the field-size curve bending toward the beam-size
+    # curve. The envelope band is centroid + rel over the window. Its extremes are
+    # order statistics the file stores rather than a multiple of sigma.
     with np.errstate(all="ignore"):
         env_hi = 1e6 * np.nanmax(q["centroid"][:, :, 0] + q["rel_max"][:, :, 0], axis=1)
         env_lo = 1e6 * np.nanmin(q["centroid"][:, :, 0] + q["rel_min"][:, :, 0], axis=1)
@@ -248,8 +254,8 @@ def main():
     axd["bemit"].set_xlabel("s (m)")
     axd["femit"].set_xlabel("s (m)")
 
-    # The polarization split (two live components only): x and y power against s. On a
-    # crossed line this is the afterburner -- the x set amplifies Ex and bunches the
+    # The polarization split, for two live components only: x and y power against s.
+    # On a crossed line this is the afterburner. The x set amplifies Ex and bunches the
     # beam, then the tilted set radiates Ey from that bunching while Ex only diffracts.
     if two_pol:
         A = axd["pol"]
@@ -262,9 +268,9 @@ def main():
         axd["bemit"].set_xlabel("")
         axd["femit"].set_xlabel("")
 
-    # Harmonic power (harmonic field-set runs): each harmonic against the
-    # fundamental, on the fundamental's log scale -- harmonic lasing reads directly
-    # off the vertical gaps.
+    # Harmonic power, for runs with a harmonic field set: each harmonic against the
+    # fundamental, on the fundamental's log scale. Harmonic lasing reads directly off
+    # the vertical gaps.
     if q["harmonics"]:
         A = axd["harm"]
         A.semilogy(s, np.maximum(q["power"][:len(s)].sum(axis=1), 1e-30),

@@ -11,7 +11,8 @@ that quietly loses its example reads exactly like one that never had it. Six ass
   2. No matrix row invents a feature: a row either carries a bullet's lead phrase or
      names something the Features prose says.
   3. Every directory a matrix row points at exists. A row with no link at all is
-     allowed only in the two documented prose forms below.
+     allowed only in the two documented prose forms below. A planned row has no
+     directory yet and says what it waits on.
   4. Every example directory carries a README and a deck, with lucifer.in the primary
      name wherever a reader rather than a runner picks the deck.
   5. Every deck fenced into a generated page is byte-identical to the file on disk,
@@ -33,9 +34,9 @@ import re
 import sys
 from pathlib import Path
 
-# A Shown-by cell with no directory link is allowed only where the feature genuinely has
-# no directory. Both forms are spelled out here so that a third one cannot appear by
-# accident: adding to this list is a decision, not an oversight.
+# A Shown-by cell with no directory link is allowed only where the feature has no
+# directory. Both forms are spelled out here so that a third one cannot appear by
+# accident. A third form is added to this list or not at all.
 PROSE_CELLS = ("Demonstrated inline, below", "Every example writes one")
 
 FENCE = re.compile(r"^### `([^`]+)`\n\n```[a-z]*\n(.*?)\n```", re.S | re.M)
@@ -180,8 +181,9 @@ def main():
                     problems.append(f"generated page {page.name} has no example directory")
                     continue
                 # A page requires a figure exactly when it references one, so the two
-                # statements cannot disagree. A page with no figure is a deliberate
-                # choice report_examples.py records, not an omission to detect here.
+                # statements cannot disagree. A page with no figure is a choice that
+                # report_examples.py records, and this check does not treat it as an
+                # omission.
                 for fig_name in FIGURE.findall(text):
                     if not (pages / fig_name).is_file():
                         problems.append(f"generated page {page.name} references "

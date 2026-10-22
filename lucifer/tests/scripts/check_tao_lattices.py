@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Every committed lattice loads in Tao.
+Every lattice in the tree loads in Tao.
 
 An FEL segment is a wiggler or undulator carrying Bmad's fel_method attribute, and its
 tracking_method stays bmad_standard, so a Lucifer lattice is an ordinary Bmad lattice that
-any Bmad program reads. This check holds that: it runs Tao over every committed lattice
-and requires a zero exit with no error line. A lattice Tao cannot load fails the benchmark.
+any Bmad program reads. This check holds that. It runs Tao over every lattice under
+tests/bmad and examples that names a line, and requires a zero exit with no error line.
+A lattice Tao cannot load fails the benchmark.
 
 The tree under tests/bmad and examples is copied into the work directory with its layout
 intact, since a wrapper reaches its base by relative path, and so that no digested file
@@ -27,7 +28,7 @@ import sys
 # pointed at the lattices that name one.
 RE_USE = re.compile(r'^\s*use\s*,', re.MULTILINE | re.IGNORECASE)
 
-# Written by a run rather than by hand, so outside the committed set.
+# Written by a run rather than by hand, so outside the set checked.
 SKIP_DIRS = {'output'}
 
 # A fragment by design: its own header says the wrappers define ANG before calling it, so

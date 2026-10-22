@@ -1,65 +1,66 @@
 #!/usr/bin/env python3
 """
-Program-structure checks (doc/user-guide.md): the library contract, the comb, and
-the tracking window.
+Checks of the program's structure (doc/user-guide.md): the library contract, the comb,
+and the tracking window.
 
-  1. Library: lucifer_smoke_test drives the tracker with NO namelist anywhere -- structs
-     filled in code -- and runs twice in one process. Pass 1 must reproduce a
-     namelist-driven run of the same configuration dataset-identically (the library
-     IS the program), and pass 2 must reproduce pass 1 bit-for-bit (re-entrancy:
-     twice in one process = two processes).
-  2. Library errors return: lucifer_smoke_test on an unreadable lattice must print its
-     proof-of-return line and exit with its own code 2 -- the library returned, the
-     program decided (no exit inside the library).
-  3. Retired group: the flat &fel_track_params is refused. Fortran ignores an
-     unknown namelist group in silence, so without the refusal a stale deck would run
-     on defaults.
-  4. The comb (global%comb_ds_save, Bmad's ds_save semantics verbatim): a comb > 0
+  1. Library. lucifer_smoke_test drives the tracker with *no* namelist anywhere, its
+     structs filled in code, and runs twice in one process. Pass 1 must reproduce a
+     namelist-driven run of the same configuration dataset-identically, since the
+     library is the program. Pass 2 must reproduce pass 1 bit-for-bit. That is,
+     twice in one process equals two processes.
+  2. Library errors return. lucifer_smoke_test on an unreadable lattice must print its
+     proof-of-return line and exit with its own code 2. The library returns and the
+     program decides, with no exit inside the library.
+  3. Retired group. The flat &fel_track_params is refused. Fortran ignores an unknown
+     namelist group in silence, so without the refusal a stale deck would run on
+     defaults.
+  4. The comb (global%comb_ds_save, with Bmad's ds_save semantics verbatim). A comb > 0
      run's per-record rows must be exactly the every-record run's rows at the comb
-     positions (subset, dataset-equal), element ends always present; comb < 0 keeps
-     NO per-record rows (element-end arrays and dumps remain); the precomputed nrec
-     is exact in every mode (the arrays are sized once, never grown).
-  5. The window (global%track_start/track_end, Tao's names): the schedule is built
-     on the full lattice, so a windowed run composes exactly -- run A = [start, D]
-     dumps its final state; run B = [after D, end] imports it; B's finals must be
+     positions, a dataset-equal subset, with the element ends always present. comb < 0
+     keeps *no* per-record rows, and the element-end arrays and dumps remain. The
+     precomputed nrec is exact in every mode, since the arrays are sized once and
+     never grown.
+  5. The window (global%track_start and track_end, Tao's names). The schedule is built
+     on the full lattice, so a windowed run composes exactly. Run A = [start, D] dumps
+     its final state, and run B = [after D, end] imports it. B's finals must be
      dataset-identical to the one-shot full run's finals, and A's finals to the full
      run's mid-line dumps at D.
-  6. Committed prose cites committed artifacts: no file this program ships references
-     the design repository's numbered findings, which a reader of this tree cannot follow.
-  7. A restart across migration and the chamber wake: a beam that migrates and drops
-     through three undulators, checkpointed after two events with a residual. Every later
+  6. Shipped text cites only what ships. No file this program ships references the
+     design repository's numbered findings, which a reader of this tree cannot follow.
+  7. A restart across migration and the chamber wake. A beam migrates and drops through
+     three undulators and is checkpointed after two events with a residual. Every later
      decision clears its recorded margin by 100x the phase error the continuation has
-     propagated, and then ids, populations and membership are identical at every frame,
+     propagated. Then ids, populations and membership are identical at every frame,
      events match by position and moves, the wake table is rebuilt from the surviving
      charge and refreshed at every later event, and moves, dropped charge and escaped
      energy since the checkpoint agree at full precision. A separate case shifts the
      restarted phases past the smallest margin and shows one decision flip.
-  8. A restart across a Bmad element wake: checkpoints immediately before and after the
-     passage that applies the kick, which the check reads from the runs rather than
-     assuming, once on the element itself and once on a wake a superimposed marker has
-     split onto a lord. Each is judged against a wake-off history run from the same
-     initial state, and the wake's own effect is the scale: a kick omitted or applied
-     twice would move it by order one.
-  9. A continuation across an unaveraged segment boundary: the entry and exit
+  8. A restart across a Bmad element wake. Checkpoints sit immediately before and after
+     the passage that applies the kick, which the check reads from the runs rather than
+     assuming. The case runs once on the element itself and once on a wake that a
+     superimposed marker has split onto a lord. Each is judged against a wake-off
+     history run from the same initial state, and the wake's own effect is the scale: a
+     kick omitted or applied twice would move it by order one.
+  9. A continuation across an unaveraged segment boundary. The entry and exit
      conversions are scratch of the segment, so an element-boundary dump carries the
      averaged chart and the plane field, and continuations from both boundaries hold at
      the floor. The one before the segment holds because the checkpoint group carries
-     phi0 and every z as the tracker holds them, rebuilt bit for bit before any advance,
-     where the folded records alone left the entry state bit-identical yet the
-     continuation amplified to 6.5e-8. Frames from inside the segment, from inside an
-     averaged undulator and from a sliced endpoint inside one carry no group and are
-     refused, as are an incomplete or inconsistent group and a continuation point that
-     does not follow the checkpoint. The same checkpoint loaded as an initialization
-     folds the records and starts the residual at zero.
- 10. A continuation across a slippage residual: the window check above is steady state,
+     phi0 and every z as the tracker holds them, rebuilt bit for bit before any advance.
+     From the folded records alone, an entry state bit-identical in every record
+     amplifies to 6.5e-8 through the segment. Frames from inside the segment, from
+     inside an averaged undulator and from a sliced endpoint inside one carry no group
+     and are refused. So are an incomplete or inconsistent group and a continuation
+     point that does not follow the checkpoint. The same checkpoint loaded as an
+     initialization folds the records and starts the residual at zero.
+ 10. A continuation across a slippage residual. The window check above is steady state,
      where slippage is a no-op, so a time-dependent pair follows it. The continuous run
-     dumps at a pipe whose accumulated slip leaves half a slice of residual, the dump's
-     slippageResidual attribute carries it, and the continuation must reproduce the
+     dumps at a pipe whose accumulated slip leaves half a slice of residual, and the
+     dump's slippageResidual attribute carries it. The continuation must reproduce the
      continuous run's frames, field slice by slice and particles by id, to the same
      floor. A continuation from the dump with the attribute stripped is refused, and so
      is an impossible residual.
 
-Run by the benchmark harness; exits nonzero on failure. Self-referenced (no Genesis).
+Run by the benchmark harness. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations
@@ -182,10 +183,9 @@ def run_nml(exe, wd, root, nml_text):
 
 
 def h5_identical(fa, fb):
-    # meta/ is excluded, deliberately. Provenance is datasets rather than attributes,
-    # for HDF5's 64 kB attribute cap (fel-physics.md sec-meta), and meta/timestamp differs
-    # between any two runs by construction. Nothing in meta/ is physics. Before the
-    # move, the exclusion existed only by the accident of being attributes.
+    # meta/ is excluded. Provenance is held in datasets, since HDF5 caps an attribute at
+    # 64 kB (fel-physics.md, sec-meta), and meta/timestamp differs between any two runs.
+    # Nothing in meta/ is physics.
     with h5py.File(fa) as a, h5py.File(fb) as b:
         na, nb = [], []
         keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith("meta/")
@@ -270,11 +270,11 @@ def main():
                  stats_of(wd / "cbn.stats.h5")
 
     # First, what the comparison below rests on. The record number is the axis and s is
-    # a variable on it (fel-physics.md sec-stats), so matching rows BY s is only legitimate while
-    # s does not repeat, and it can: a zero-length element that applies a wake kick sits
-    # at the plane the element before it ended on. Every repeat must therefore straddle
-    # an element boundary. A repeat inside one element would be a defect in the walk, and
-    # every s-keyed comparison in this file would then silently pick the wrong row.
+    # a variable on it (fel-physics.md, sec-stats). Matching rows by s holds only while s
+    # does not repeat, and s can repeat: a zero-length element that applies a wake kick
+    # sits at the plane where the element before it ended. Every repeat must therefore
+    # straddle an element boundary. A repeat inside one element would be a defect in the
+    # walk, and every s-keyed comparison in this file would then pick the wrong row.
     ds = np.diff(s0["s"])
     dup = np.flatnonzero(ds == 0)
     ok = bool(np.all(ds >= 0))
@@ -282,38 +282,38 @@ def main():
     check("the record axis: s non-decreasing, every repeat at an element boundary", ok,
           note=f"[{len(dup)} repeats in {len(s0['s'])} rows over 3 elements]")
 
-    # comb > 0: the rows are a subset of the every-record run's rows, dataset-equal
-    # at the matching s. Element ends always present (here: the final record).
+    # comb > 0: the rows are a subset of the every-record run's rows, dataset-equal at
+    # the matching s. The element ends are always present, here the final record.
     idx = np.searchsorted(s0["s"], sp["s"])
     ok = bool(np.array_equal(s0["s"][idx], sp["s"]))
     ok = ok and np.array_equal(s0["power"][idx, :], sp["power"])
     ok = ok and np.array_equal(s0["bunching"][idx, :], sp["bunching"])
     ok = ok and sp["s"][-1] == s0["s"][-1]
-    # the spacing rule itself: consecutive rows at least comb apart (ends exempt).
+    # The spacing rule itself: consecutive rows at least comb apart, the ends exempt.
     ok = ok and bool(np.all(np.diff(sp["s"][:-1]) >= 0.05 - 1e-12))
     check("comb > 0: rows == every-record rows at the comb positions (subset)", ok,
           note=f"[{len(sp['s'])} of {len(s0['s'])} rows]")
 
     # comb < 0: the element ends, and nothing else. Bmad's comb semantics drop the comb
-    # there; this tracker always keeps the element ends, because the stats file carries
-    # one record axis and marks the ends inside it (fel-physics.md sec-stats). So a comb < 0 run
-    # is a file whose every record is an element end, at the same positions the
-    # every-record run put them.
+    # there. This tracker always keeps the element ends, because the stats file carries
+    # one record axis and marks the ends inside it (fel-physics.md, sec-stats). So a
+    # comb < 0 run is a file whose every record is an element end, at the positions where
+    # the every-record run put them.
     ok = bool(np.all(sn["at_end"])) and len(sn["s"]) == int(s0["at_end"].sum())
     ok = ok and bool(np.array_equal(sn["s"], s0["s"][s0["at_end"]]))
     ok = ok and bool(np.array_equal(sn["power"], s0["power"][s0["at_end"]]))
     check("comb < 0: the rows are exactly the element ends", ok,
           note=f"[{len(sn['s'])} rows, all element ends]")
 
-    # nrec exact: the arrays are sized by the same rule the walk replays -- full,
-    # never padded (h5 dataset lengths are nrec).
+    # nrec is exact. The arrays are sized by the same rule the walk replays, full and
+    # never padded, so the HDF5 dataset lengths are nrec.
     ok = len(s0["s"]) == 31 and len(sn["s"]) == int(s0["at_end"].sum())
     check("nrec exact in every mode (sized once, never grown)", ok,
           note=f"[comb0 {len(s0['s'])} rows = 30 steps + initial, "
                f"comb<0 {len(sn['s'])} ends]")
 
-    # The keystone locally: comb 0 (the default) is bit-for-bit the pre-comb run --
-    # cb0 above ran with the default (no comb key at all) and fed every comparison.
+    # Comb 0 is the default, and it writes what a run wrote before the comb existed, to
+    # the bit. cb0 above ran with no comb key at all and fed every comparison.
 
     # ------------------------------------------------------------------
     print("== the tracking window (global%track_start/track_end) ==")
@@ -335,11 +335,11 @@ def main():
 """).replace("&fel_wavefront_init\n", """&fel_wavefront_init
   field_file = "wa-final.wf.h5"
 """))
-    # B's state passed through the dump format once more than the full run (a pack and an
-    # unpack of every coordinate), so the composition sits at the dump round-trip's
-    # conversion floor, not at zero: measured 2.6e-13 rad in theta, 3e-14 of the field
-    # scale, 7e-18 in px (the walk itself is bit-for-bit -- check A above IS exact, both
-    # sides dumping the same in-memory state).
+    # B's state passes through the dump format once more than the full run's, a pack and
+    # an unpack of every coordinate. The composition therefore sits at the conversion
+    # floor of the dump round trip rather than at zero: 2.6e-13 rad in theta, 3e-14 of
+    # the field scale and 7e-18 in px. The walk itself is bit-for-bit. Check A above is
+    # exact, since both sides dump the same in-memory state.
     #
     # theta is the sharpest column here. A dump carries the particle lag and the reader
     # restarts the reference phase at zero, so a restart reproduces the absolute phase only
@@ -364,14 +364,15 @@ def main():
     # The composition check above runs steady state, where slippage is a no-op, so it
     # cannot see the one piece of the field's state a dump did not carry: the slip the
     # record has accumulated and not yet rotated, fel_slip_struct%accuslip. A restart
-    # that started it at zero rotated on a different schedule from the run it continued.
-    # Two undulators with a pipe between, four wavelengths a slice, a
-    # deterministic seed ramped slice by slice so a rotation in the wrong place shows,
-    # and the beam and field both imported so no loader noise enters. The residual at
-    # the boundary is read from the dump's own slippageResidual attribute. Two pipes: one
-    # leaves half a slice of residual, the other leaves a residual near zero. A
-    # continuation from a dump stripped of the attribute is refused: the residual is part
-    # of the field's state, and a continuation takes nothing from a file that lacks it.
+    # that started it at zero would rotate on a different schedule from the run it
+    # continues. The case has two undulators with a pipe between and four wavelengths a
+    # slice. The seed is deterministic and ramped slice by slice, so a rotation in the
+    # wrong place shows. The beam and field are both imported, so no loader noise enters.
+    # The residual at the boundary is read from the dump's own slippageResidual
+    # attribute. One pipe leaves half a slice of residual and the other leaves a residual
+    # near zero. A continuation from a dump stripped of the attribute is refused: the
+    # residual is part of the field's state, and a continuation takes nothing from a
+    # file that lacks it.
 
     rs_nml = """&fel_params
   lat_file = "{lat}"
@@ -510,7 +511,7 @@ def main():
         dump_b, dump_f = f"{full}-at2-D.beam.h5", f"{full}-at2-D.wf.h5"
         resid = residual_of(wd / dump_f)
         # The continuation carrying the residual, and one from the same dump with the
-        # residual stripped, which is what a file written before the attribute existed is.
+        # residual stripped, as in a file written without the attribute.
         rs_run(rest, rs_nml.format(lat=lat, root=rest,
                extra='  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
                beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{dump_f}"\n'))
@@ -560,21 +561,21 @@ def main():
     print("== a restart across migration, then with the chamber wake ==")
 
     # The residual case above migrates nothing. Here the beam migrates and drops through
-    # three undulators, the checkpoint is the first pipe's end, after two events, and the
-    # continuation holds three more. Migration derives a destination from the whole
-    # phase, phi0 + ks z/beta, floored over the window's 2 pi n_wavelength, and the dump
+    # three undulators. The checkpoint is the first pipe's end, after two events, and
+    # the continuation holds three more. Migration derives a destination from the whole
+    # phase, phi0 + ks z/beta, floored over the window's 2 pi n_wavelength. The dump
     # folds exactly that phase into the file's time, so a decision carries across a
     # restart unless a particle sits nearer a boundary than the error in its
     # reconstructed phase. The migration file records that margin per event, over every
-    # particle examined and the dropped ones included, which no frame after the event can
-    # show. The margin is measured against the phase error the continuation has actually
+    # particle examined with the dropped ones included, which no frame after the event
+    # can show. The margin is compared against the phase error the continuation has
     # propagated to the frame before each event, read by id, and not against the file's
     # bound alone. With the margin cleared, exact identity is required: one particle in
-    # another slice changes the current every wake is built from, and one drop changes the
-    # source charge. A separate case shifts every restarted phase by a little less and a
-    # little more than the smallest recorded margin: the first flips nothing, the second
-    # flips a decision, which is what the margin means, and it establishes nothing about
-    # equivalence.
+    # another slice changes the current every wake is built from, and one drop changes
+    # the source charge. A separate case shifts every restarted phase by a little less
+    # and a little more than the smallest recorded margin. The first shift flips
+    # nothing and the second flips a decision, which is what the margin means. That case
+    # establishes nothing about equivalence.
 
     mw_lat = LAT2.replace("SEG: line = (UND, D, UND2)",
                           "UND3: UND\nD2: pipe, l = 0.30\nSEG: line = (UND, D, UND2, D2, UND3)")
@@ -779,8 +780,8 @@ def main():
     # the wake element must apply the kick, and one after it must not apply it again, the
     # dump already holding it. Both checkpoints are judged against a wake-off history run
     # from the same initial state and never from a wake-on dump, which holds the kick that
-    # no continuation can undo, and the wake's own effect is the scale the agreement is
-    # measured on: a kick omitted or applied twice moves that effect by order one, where
+    # no continuation can undo. The wake's own effect is the scale the agreement is
+    # judged on: a kick omitted or applied twice moves that effect by order one, where
     # the beam's total energy would hide it.
 
     ew_wake = (", sr_wake = {amp_scale = 1, scale_with_length = T, "
@@ -925,18 +926,19 @@ def main():
     # it at the last step. None of that outlives the segment, so an element-boundary dump
     # holds the field on its plane and the particles in the averaged chart, and a
     # continuation there runs the conversions once. Both boundaries are taken, before and
-    # after the segment, and both hold at the floor. The one before it did not until the
-    # checkpoint group existed: the standard records fold phi0 into each particle's time,
-    # the reader rebuilt an equal phase at another magnitude, off by phi0 times the machine
-    # epsilon, and the segment's gain amplified that to 6.5e-8 from an entry state
-    # bit-identical in every record (doc/validation.md). The group carries phi0 and each z
-    # as the tracker holds them, and the continuation rebuilds the split to the bit before
-    # any conversion or advance, which is checked first, so a later disagreement could only
-    # be amplification. A frame from inside the segment, from inside an averaged undulator
-    # or from a sliced endpoint inside one carries no group and is refused, as is every
-    # incomplete or inconsistent group and a continuation point that does not follow the
-    # checkpoint. The same checkpoint loaded without the switch is an initialization: the
-    # records are folded and the residual starts at zero.
+    # after the segment, and both hold at the floor. The boundary before the segment
+    # needs the checkpoint group. The standard records fold phi0 into each particle's
+    # time, and a reader rebuilds an equal phase at another magnitude, off by phi0 times
+    # the machine epsilon. From an entry state bit-identical in every record, the
+    # segment's gain amplifies that to 6.5e-8 (doc/validation.md,
+    # val-the-programs-own-identities). The group carries phi0 and each z as the tracker
+    # holds them. The continuation rebuilds the split to the bit before any conversion or
+    # advance, which is checked first, so a later disagreement could only be
+    # amplification. A frame from inside the segment, from inside an averaged undulator
+    # or from a sliced endpoint inside one carries no group and is refused. So is every
+    # incomplete or inconsistent group, and a continuation point that does not follow
+    # the checkpoint. The same checkpoint loaded without the switch is an
+    # initialization: the records are folded and the residual starts at zero.
 
     uv_lat = """no_digested
 parameter[geometry] = open
@@ -1146,8 +1148,8 @@ use, SEG
     # A superimposed element cannot cut an undulator this tracker tracks: the slaves refer
     # to their lord for the field model, and the FEL element assertion refuses the lattice
     # at setup. So no frame from a sliced endpoint inside an undulator exists to continue
-    # from, and fel_checkpoint_eligible's guard against that boundary waits for the day one
-    # does.
+    # from. fel_checkpoint_eligible keeps its guard against that boundary for a lattice
+    # where one does.
     split_refused = rs_run("uvsplit", rs_nml.format(lat="uvsplit.bmad", root="uvsplit",
            extra='  global%track_end = "UNDS#2"\n  global%dump_beam_at = "UNDS#1"\n  global%dump_field_at = "UNDS#1"\n', **uv_imp),
            expect_fail=True, fragment="SUPER_SLAVE")

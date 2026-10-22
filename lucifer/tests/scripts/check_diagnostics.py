@@ -1,46 +1,56 @@
 #!/usr/bin/env python3
 """
-Diagnostic-output checks (fel-physics.md sec-stats): the stats file, dump-at elements, and the
-escaped-field bank, held by cross-identities rather than reference files --
+Checks of the diagnostic output (fel-physics.md, sec-stats): the stats file, the dump_at
+elements and the escaped-field bank. Each is held by an identity between two routes
+rather than by a reference file.
 
-  1. bunch_params reconstruction: bunch_params_from_stats.py applied to the per-record
+  0. The stats file against the bmad-stats standard's own validator, and the file's
+     description of itself: units, axes, the record axis, provenance, slice
+     coordinates, envelope extremes and the element join.
+  1. bunch_params reconstruction. bunch_params_from_stats.py applied to the per-record
      sufficient statistics must reproduce the calc_bunch_params values the tracker
-     stored at element ends (proves the per-record datasets are sufficient).
-  2. banked energy == the ledger's U_escaped column: same slices, independent
-     bookkeeping paths (drain-time wavefront_params vs the zero-fill energy sum).
-  3. analytic vs numerical propagation: each banked slice's rms size at the exit from
-     the free-space ABCD map on its bank-time moment matrix must match the rms of the
-     FFT-propagated slice in the pulse file (two independent routes).
-  4. pulse pooling: the pooled whole-pulse sigma from per-slice params must match the
-     directly computed moments of the concatenated pulse file.
-  5. thread invariance: every dataset of stats.h5, escaped and pulse files identical
-     at 1 vs 8 threads (dataset-level: HDF5 headers embed creation times).
-  6. refusal: a dump_beam_at entry matching no element is refused.
-  7. the pre-run: the header's work count, cost estimate and load standing, the footer's
-     thin-slice list on a deck loaded under the measured floor, load_only stopping after
-     the header, and the refusal of a harmonic the load carries no shot noise at.
-  8. the frame series (global%dump_at_comb): one frame per stats record, a frame at an
+     stored at element ends. This shows the per-record datasets are sufficient.
+  2. The banked energy equals the ledger's U_escaped column. The slices are the same and
+     the bookkeeping paths are independent: wavefront_params at drain time against the
+     zero-fill energy sum.
+  3. Analytic against numerical propagation. Each banked slice's rms size at the exit,
+     from the free-space ABCD map on its moment matrix at bank time, must match the rms
+     of the FFT-propagated slice in the pulse file.
+  4. Pulse pooling. The pooled whole-pulse sigma from per-slice params must match the
+     moments computed directly from the concatenated pulse file.
+  5. Thread invariance. Every dataset of the stats, escaped and pulse files is identical
+     at 1 and 8 threads. The comparison is by dataset, since HDF5 headers embed
+     creation times. Also zero-length wake elements of both polarities.
+  6. Refusal. A dump_beam_at entry that matches no element is refused.
+  7. The pre-run. The header's work count, cost estimate and load standing, the footer's
+     thin-slice list on a deck loaded under the measured floor, load_only stopping
+     after the header, and the refusal of a harmonic at which the load carries no shot
+     noise.
+  8. The frame series (global%dump_at_comb). One frame per stats record, a frame at an
      element end identical to that element's own dump, labels unique in every frame and
      following migration, the frame's attributes against the lattice, frames landing
      inside an element, and a run with frames identical to the same run without.
-  9. a frame against the stats row it sits on: per-slice bunching from the frame's own
-     particles, per-slice power from the field frame, and the reduced projections
-     integrating to the row's power. Plus a slice range cutting both files.
- 10. the interlude's own steps (global%interlude_ds_step): the knob at zero reproduces
-     the run that never named it byte for byte, cutting an element reproduces tracking
-     it whole, rows and frames land inside a quadrupole and a pipe at the s the rows
-     carry, the stats file is exact-sized against the rows written, the header states
-     the pieces before it tracks, a wake-carrying element is not cut, and the
+  9. A frame against the stats row it sits on. Per-slice bunching and transverse
+     centroid from the frame's own particles, per-slice power from the field frame, and
+     the reduced projections integrating to the row's power. Also a slice range
+     cutting both files.
+ 10. The interlude's own steps (global%interlude_ds_step). The knob at zero reproduces
+     the run that never named it byte for byte. Cutting an element reproduces tracking
+     it whole. Rows and frames land inside a quadrupole and a pipe at the s the rows
+     carry. The stats file is exact-sized against the rows written, and the header
+     states the pieces before it tracks. A wake-carrying element is not cut, space
+     charge on a seam interlude is refused, a zero-length kicker kicks, and the
      transcribed Genesis interlude refuses the knob.
- 11. refposition in the two Genesis-format files means what Genesis means, the
-     in-bunch coordinate of slice 1 in Genesis's order: 0 for the pulse file and the
-     window length for the escaped file, unmoved by a drift along the lattice, the
-     escaped file's slices numbered tail to head, openPMD-beamphysics reading the
-     pulse at zmin 0 with the live slices equal to the final field, and Genesis
-     itself importing the pulse and re-dumping it slice by slice with the same
-     refposition. That last one is the external reader a round trip cannot replace.
+ 11. refposition in the two Genesis-format files means what Genesis means: the in-bunch
+     coordinate of slice 1 in Genesis's order. That is 0 for the pulse file and the
+     window length for the escaped file, unmoved by a drift along the lattice. The
+     escaped file's slices are numbered tail to head. openPMD-beamphysics reads the
+     pulse at zmin 0 with the live slices equal to the final field. Genesis itself
+     imports the pulse and re-dumps it slice by slice with the same refposition. Genesis
+     is an external reader, and a round trip through this program's own reader cannot
+     stand in for it.
 
-Run by the benchmark harness; exits nonzero on failure.
+Run by the benchmark harness. Exits nonzero on failure.
 """
 
 from __future__ import annotations
@@ -100,11 +110,6 @@ WRAP = """call, file = aramis_1seg.bmad
 wiggler::*[FEL_METHOD] = unaveraged
 """
 
-# The pre-run deck. Averaged, seeded so it reaches saturation in one segment and costs
-# little, and loaded at 512 macroparticles in beamlets of 8. That is 64 beamlets, half
-# the floor the source filter's convergence was measured at, so the load standing and
-# the thin-slice list both have something to report.
-
 # The frame-series deck. A short segment, a coarse comb so the frame count stays small,
 # and migration on so labels have to follow particles between slices.
 
@@ -132,6 +137,11 @@ FRAME_NML = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
+# The pre-run deck. It is averaged, seeded so it reaches saturation in one segment at
+# little cost, and loaded at 512 macroparticles in beamlets of 8. That is 64 beamlets,
+# half the floor at which the source filter's convergence was measured, so the load
+# standing and the thin-slice list both have something to report.
+
 PRE_NML = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "aramis_1seg.bmad"
   out_root = "{root}"
@@ -156,14 +166,14 @@ PRE_NML = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-# Zero-length wake elements, both polarities, for check 7. A zero-length element carrying
-# an sr wake is a standard Bmad idiom and legitimate: a wake assigned over an element
-# range or a class lands on zero-length members as a matter of course. What differs is
-# whether the kick can act. scale_with_length = F means it does, and the element must be
-# tracked, take a record, and repeat coords/s at the plane the element before it ended
-# on. T means the kick is identically zero (wake_mod scales by l$), so the element is
-# skipped and the file must come out as though the wake were not there at all. WKT_NONE
-# replaces the T pipes with plain ones to make that comparison.
+# Zero-length wake elements of both polarities, for check 5a. A zero-length element
+# carrying an sr wake is a standard Bmad idiom: a wake assigned over an element range or
+# a class lands on zero-length members. What differs is whether the kick can act. With
+# scale_with_length = F the kick acts, and the element must be tracked, take a record,
+# and repeat coords/s at the plane where the element before it ended. With T the kick is
+# identically zero (wake_mod scales by l$), so the element is skipped and the file must
+# come out as though the wake were absent. WKT_NONE replaces the T pipes with plain ones
+# for that comparison.
 ZL_WAKE = """no_digested
 parameter[geometry] = open
 parameter[particle] = electron
@@ -193,15 +203,14 @@ def particle_frames(wd, root):
 
 
 def h5_identical(fa, fb):
-    """Whether two HDF5 files hold the same data, meta/ excluded.
+    """Whether two HDF5 files hold the same data, with meta/ excluded.
 
-    meta/ is excluded, deliberately. Provenance moved from attributes to datasets for
-    HDF5's 64 kB attribute cap (fel-physics.md sec-meta), and input_echo carries out_root while
-    timestamp carries the clock, so any two runs differ there by construction. Nothing in
-    meta/ is physics. Before the move the exclusion existed only by the accident of being
-    attributes, which is not something a reader of this check could have reasoned about.
+    meta/ holds provenance as datasets (fel-physics.md, sec-meta), since HDF5 caps an
+    attribute at 64 kB. input_echo carries out_root and timestamp carries the clock, so
+    any two runs differ in meta/. Nothing in meta/ is physics. Only datasets are
+    compared, so attributes do not enter.
 
-    same_data counts NaN as equal to NaN, which the stats file needs: see read_stats.
+    same_data counts NaN as equal to NaN, which the stats file needs. See read_stats.
     """
     with h5py.File(fa) as a, h5py.File(fb) as b:
         names_a, names_b = [], []
@@ -232,12 +241,12 @@ def run(exe, wd, name, text, threads="8"):
 
 
 
-# The interlude's own steps (global%interlude_ds_step). Tao's comb has two halves and
+# The interlude's own steps (global%interlude_ds_step). Tao's comb has two halves.
 # comb_ds_save is the first: save_a_bunch_step selects among positions a tracker already
-# reaches. This is the second, tao_lattice_calc_mod's n_slice branch, which cuts an
-# element that would otherwise be crossed in one map. The lattice is a wiggler, a
-# quadrupole whose fringes are live, a pipe and a wiggler, so a cut element of each kind
-# is exercised and the wigglers keep their own steps either way.
+# reaches. The interlude step is the second, tao_lattice_calc_mod's n_slice branch,
+# which cuts an element that would otherwise be crossed in one map. The lattice is a
+# wiggler, a quadrupole whose fringes are live, a pipe and a wiggler. A cut element of
+# each kind is exercised, and the wigglers keep their own steps either way.
 
 INT_LAT = """no_digested
 parameter[geometry] = open
@@ -281,15 +290,15 @@ INT_NML = """! flat keys; routed into the three groups by nml.to_groups
 
 def interludes(exe, wd):
     """
-    stats rows and frames along an interlude, and the guarantees the knob carries.
+    Stats rows and frames along an interlude, and what the knob guarantees.
 
-    The knob is off by default and off has to be the path every run took before it
-    existed, so the first check is byte identity against a deck that never names it.
-    The second is that cutting an element reproduces tracking it whole: the pieces come
-    from Bmad's element_slice_iterator, which is what keeps an element's fringes at its
-    own ends rather than giving every piece a pair. That construction is why the
-    iterator is used; on FEL beam sizes the difference it buys is below notice, and the
-    hand-split comparison here records that rather than asserting it.
+    The knob is off by default, and off must be the path of a deck that never names it.
+    The first check is byte identity against such a deck. The second is that cutting an
+    element reproduces tracking it whole. The pieces come from Bmad's
+    element_slice_iterator, which keeps an element's fringes at its own ends rather than
+    giving every piece a pair. On FEL beam sizes the fringe difference is below notice.
+    The hand-split lattice, whose every piece carries a fringe pair, checks that here
+    at 1e-9.
     """
     print("--- the interlude's own steps:")
     (wd / "intlat.bmad").write_text(INT_LAT)
@@ -313,8 +322,8 @@ def interludes(exe, wd):
     p = np.loadtxt(wd / "int_p.diag.txt")
     h = np.loadtxt(wd / "int_h.diag.txt")
 
-    # The pieces are tracking, not bookkeeping, so what they must not do is change the
-    # answer: the element's exit is the element's exit however many pieces crossed it.
+    # The pieces are tracked, so they must not change the answer. The element's exit is
+    # the same however many pieces cross it.
     check("interlude: cut into pieces, exit power against the whole element",
           abs(p[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
     check("interlude: cut into pieces, exit sigma_x against the whole element",
@@ -323,8 +332,9 @@ def interludes(exe, wd):
           "iterator buys is below notice here",
           abs(h[-1, 2] - w[-1, 2]) / w[-1, 2], 1e-9)
 
-    # Rows land inside the quadrupole and inside the pipe, where none did before. The
-    # element spans are 0.3 to 0.5 and 0.5 to 0.9 on this line.
+    # With the pieces on, rows land inside the quadrupole and inside the pipe. Tracked
+    # whole, neither has a row inside. The element spans are 0.3 to 0.5 m and 0.5 to
+    # 0.9 m on this line.
     def inside(rows, z0, z1):
         z = rows[:, 0]
         return int(((z > z0 + 1e-9) & (z < z1 - 1e-9)).sum())
@@ -335,8 +345,8 @@ def interludes(exe, wd):
     check("interlude: rows strictly inside the pipe, cut (9 expected)",
           abs(inside(p, 0.5, 0.9) - 9), 0.5, note=f"[{inside(p, 0.5, 0.9)}]")
 
-    # The record-count precompute replays the walk, so the stats file is exact-sized:
-    # a mismatch would mean the two disagree about where a row falls.
+    # The record-count precompute replays the walk, so the stats file is exact-sized. A
+    # mismatch would mean the two disagree about where a row falls.
     with h5py.File(wd / "int_p.stats.h5") as f:
         nrec = f["coords/s"].shape[0]
         step = float(np.ravel(f["params/global/interlude_ds_step"])[0])
@@ -373,14 +383,14 @@ def interludes(exe, wd):
     check("interlude: and says nothing where nothing is cut",
           0.0 if "Interlude" not in r.stdout else 1.0, 0.5)
 
-    # Refused. The element short-range wake is Bmad's own once-per-passage kick of the
-    # element's length, so a cut element would take one kick a piece: the walk declines
-    # to cut there, as Tao declines where CSR or space charge would see the cut. The
-    # transcribed Genesis interlude is validated by transcription fidelity and its step
-    # is the element, so the knob is refused outright with that model.
-    # A wake whose table is zero everywhere: the element carries one, which is what the
-    # walk keys on, and the physics is the no-wake run's, so the rows are the only thing
-    # that may differ.
+    # The refusals. Bmad applies an element's short-range wake once per passage, as one
+    # kick for the element's length, so a cut element would take one kick per piece. The
+    # walk does not cut such an element, as Tao does not cut where CSR or space charge
+    # would see the cut. The transcribed Genesis interlude is validated by transcription
+    # fidelity and steps by the element, so the knob is refused outright with that model.
+    # The wake below has a table that is zero everywhere. The element carries a wake,
+    # which is what the walk keys on, and the physics is the no-wake run's, so only the
+    # rows may differ.
     (wd / "intlatw.bmad").write_text(INT_LAT.replace(
         "P1: pipe, l = 0.40",
         "P1: pipe, l = 0.40, sr_wake = {scale_with_length = T, z_long = "
@@ -404,9 +414,9 @@ def interludes(exe, wd):
           0.0 if refused else 1.0, 0.5)
 
     # The switch off. With bmad_com%sr_wakes_on off the walk applies no wake and cuts the
-    # element like any other, and the setup's record-count precompute must make the same
-    # decision: it once counted the element whole while the walk cut it, and the run
-    # stopped at the stats writer with more records than the precomputed count.
+    # element like any other. The setup's record-count precompute must make the same
+    # decision. If the precompute counts the element whole while the walk cuts it, the
+    # run stops at the stats writer with more records than the precomputed count.
     wo = run(exe, wd, "int_wko", INT_NML.format(lat="intlatw.bmad", root="int_wko",
         extra="  global%interlude_ds_step = 0.04\n  bmad_com%sr_wakes_on = F\n"))
     wko = np.loadtxt(wd / "int_wko.diag.txt")
@@ -416,11 +426,12 @@ def interludes(exe, wd):
           abs(wko[-1, 2] - p[-1, 2]) / p[-1, 2], 1e-9)
 
     # Space charge on a Bmad-seam interlude is refused. The seam tracks one slice's bunch
-    # at a time through track1_bunch, whose own space-charge and CSR paths want the centroid
-    # orbit of the whole beam, and without it Bmad printed that it must be supplied and
-    # returned the bunch untracked with no error set: a 0.1 m drift carrying the attribute
-    # lost its transport and the run reported success. The deck configures a term so the
-    # refusal reached is this one and not the one for a solver with nothing to solve.
+    # at a time through track1_bunch, whose space-charge and CSR paths need the centroid
+    # orbit of the whole beam. Without it Bmad prints that the centroid must be supplied
+    # and returns the bunch untracked with no error set. A drift carrying the attribute
+    # then loses its transport while the run reports success. The deck configures a
+    # space-charge term, so the refusal reached is this one and not the one for a solver
+    # with nothing to solve.
     (wd / "intlat_sc.bmad").write_text(INT_LAT.replace(
         "P1: pipe, l = 0.40", "P1: pipe, l = 0.40, space_charge_method = slice"))
     (wd / "int_sc.nml").write_text(to_groups(INT_NML.format(lat="intlat_sc.bmad", root="int_sc",
@@ -435,12 +446,12 @@ def interludes(exe, wd):
           0.0 if "CENTROID MUST BE SUPPLIED" not in (rs.stdout + rs.stderr) else 1.0, 0.5)
 
     # A zero-length element that can act is tracked. The walk skips a zero-length element
-    # Bmad tracks as the identity, and once skipped every zero-length element without a
-    # wake, a thin kicker among them, whose kick then vanished with no message. The same
-    # kick through a kicker of finite length is the control, and a zero-length pipe in the
-    # kicker's place says how large the kick is against the beam's own centroid and is
-    # the one element of the three the walk still skips, so its stats file is one record
-    # shorter: a kicker is tracked whatever its kick, since its key carries a map.
+    # that Bmad tracks as the identity. A walk that skipped every zero-length element
+    # without a wake would drop a thin kicker's kick with no message. The same kick
+    # through a kicker of finite length is the control. A zero-length pipe in the
+    # kicker's place gives the beam's own centroid, which the kick is taken against. The
+    # pipe is the one element of the three that the walk skips, so its stats file is one
+    # record shorter. A kicker is tracked whatever its kick, since its key carries a map.
     for tag, hk in (("thin", "HK: hkicker, l = 0, kick = 1e-5"),
                     ("long", "HK: hkicker, l = 1e-6, kick = 1e-5"),
                     ("none", "HK: pipe, l = 0")):
@@ -463,10 +474,10 @@ def interludes(exe, wd):
     check("thin kicker: it takes a record, and the zero-length pipe is still skipped",
           abs((nrec["thin"] - nrec["none"]) - 1), 0.5, note=f"[{nrec['thin']} vs {nrec['none']}]")
 
-    # A frame's particle records say where the frame is. The beam writer initialized the
-    # coords at the containing element's upstream face whatever the frame's position, so
-    # a frame inside a piece carried the element's start in sPosition and its entry time
-    # in timeOffset while the file's own attributes said the frame's position.
+    # A frame's particle records say where the frame is: sPosition is the frame's s and
+    # timeOffset is the iteration's time. A writer that set the coords at the containing
+    # element's upstream face would give a frame inside a piece the element's start and
+    # entry time, while the file's own attributes gave the frame's position.
     worst_s, worst_t = 0.0, 0.0
     for fr in frames:
         with h5py.File(fr) as f:
@@ -484,8 +495,8 @@ def interludes(exe, wd):
 # in-bunch coordinate of slice 1, and the files this program writes say that: 0 for the
 # pulse, whose slice 1 is the live window's tail, and the window length for the escaped
 # file, whose slice 1 is the slot just past the head. The run below has an interlude, so
-# the field was drifted along the lattice before the files were written, which is what
-# once reached refposition as a lattice position.
+# the field is drifted along the lattice before the files are written. The check holds
+# refposition unmoved by that drift, so that it never carries a lattice position.
 
 REF_LAT = """no_digested
 parameter[geometry] = open
@@ -561,9 +572,9 @@ def refposition_checks(exe, genesis, wd):
           0.0 if np.all(np.diff(zt) <= 0) and zt[0] > zt[-1] else 1.0, 0.5,
           note=f"[{b_n} banked, z_transmit {zt[0]:.3f} to {zt[-1]:.3f} m]")
 
-    # openPMD-beamphysics reads the pulse as Genesis would: its first slice at zmin 0, and
-    # the live slices are the final openPMD field, slice by slice. Measured 1.6e-16: its
-    # Z0 and Bmad's agree, and the dfl scale round-trips in double.
+    # openPMD-beamphysics reads the pulse as Genesis would: its first slice is at zmin 0,
+    # and the live slices are the final openPMD field, slice by slice. The two agree to
+    # 1.6e-16, since its Z0 and Bmad's agree and the dfl scale round-trips in double.
     w = Wavefront.from_genesis4(str(wd / "dgi-pulse.fld.h5"))
     fin = fieldio.read_field(wd / "dgi-final.wf.h5")
     live = np.transpose(w.Ex[:, :, :nlive], (2, 1, 0))
@@ -616,10 +627,11 @@ def main():
 
     run(exe, wd, "dg", NML.format(lat="dg_wrap.bmad", root="dg", extra=""))
 
-    # 0. The acceptance test is the standard's own validator, which knows no program:
-    # a bmad-stats file conforms when it reports zero MUST failures, and everything it
-    # checks is checked from the spec alone. The named checks below hold what it cannot
-    # see: the physics identities and the declarations only this writer knows it owes.
+    # 0. The acceptance test is the standard's own validator, which knows no program. A
+    # bmad-stats file conforms when the validator reports zero MUST failures, and
+    # everything the validator checks comes from the spec alone. The named checks below
+    # hold what it cannot see: the physics identities, and the declarations only this
+    # writer knows it owes.
     rep = validate_bmad_stats.validate(wd / "dg.stats.h5")
     for level, where, msg in rep.rows:
         if level == "MUST":
@@ -631,9 +643,9 @@ def main():
     with read_stats(wd / "dg.stats.h5") as st:
         nslice = int(st.run["n_slice"])
 
-        # 0a. The file describes itself: a walk of every dataset, checking that it says
-        # what it is and what its dimensions run over. This is what makes a generic
-        # reader possible, so it is checked generically rather than name by name.
+        # 0a. The file describes itself. A walk of every dataset checks that each says
+        # what it is and what its dimensions run over. A generic reader depends on this,
+        # so it is checked generically rather than name by name.
         bad = []
         for name, unit, label, axes, descrip in st.units_table():
             if unit == '' or descrip == '' or label == '':
@@ -646,10 +658,11 @@ def main():
                    (f"; first problem {bad[0]}]" if bad else "]"))
 
         # 0a2. The acceptance test is a generic load: label every dimension of every
-        # dataset from @axes alone. It fails if a name does not resolve to a coordinate,
-        # if a dimension has no name, if a length disagrees with its coordinate, or if
-        # one dataset names an axis twice, which is what would force a reader to guess
-        # from a length or to dedupe by rule. Nothing here knows a dataset name.
+        # dataset from @axes alone. The load fails if a name does not resolve to a
+        # coordinate, if a dimension has no name, if a length disagrees with its
+        # coordinate, or if one dataset names an axis twice. Any of these would force a
+        # reader to guess from a length or to dedupe by rule. Nothing here knows a
+        # dataset name.
         bad = []
         for name, unit, label, axes, descrip in st.units_table():
             shape = st[name].shape
@@ -669,11 +682,11 @@ def main():
                    (f"; first problem {bad[0]}]" if bad else "]"))
 
         # 0a3. The record number is the axis, and s is a variable on it. s must be
-        # non-decreasing, and where it repeats the two records must sit in different
-        # elements, which is what a zero-length element applying a wake kick does: it
-        # records at the plane the element before it ended on. Two records at one plane
-        # inside one element would be a defect in the walk that this axis choice hides.
-        # The zero-length wake lattice below is what makes this fire on real duplicates.
+        # non-decreasing. Where s repeats, the two records must sit in different
+        # elements, which is what a zero-length element applying a wake kick gives: it
+        # records at the plane where the element before it ended. Two records at one
+        # plane inside one element would be a defect in the walk that this axis choice
+        # hides. The zero-length wake lattice of check 5a gives this a real duplicate.
         ds = np.diff(st.s)
         dup = np.flatnonzero(ds == 0)
         unexplained = [int(i) for i in dup if st.ix_ele[i] == st.ix_ele[i + 1]]
@@ -681,12 +694,11 @@ def main():
         check("stats: every repeated s straddles an element boundary", len(unexplained), 0.5,
               note=f"[{len(dup)} repeats in {len(st.s)} records]")
 
-        # 0a4. Provenance is data, not an attribute. HDF5 caps one attribute at 64 kB
-        # (measured: 65495 bytes is the largest that writes), and the echoed namelist is
-        # already 12 kB with a real lattice text at 37 kB, so meta/ as attributes was at
-        # half the cap with a warning for a failure path: the provenance would have gone
-        # missing silently. Every text in meta/ is a dataset now, and nothing anywhere in
-        # the file leans on the cap.
+        # 0a4. Provenance is held in datasets. HDF5 caps one attribute at 64 kB, and
+        # 65495 bytes is the largest that writes. The echoed namelist is 12 kB and a real
+        # lattice text 37 kB, so as attributes they would sit at half the cap, and a
+        # larger text would go missing with only a warning. Every text in meta/ is a
+        # dataset, and nothing in the file depends on the cap.
         meta = st.meta
         big = []
 
@@ -704,10 +716,10 @@ def main():
         check("stats: meta/ holds its texts as datasets", n_meta_attrs, 0.5,
               note=f"[{len(meta)} datasets, input_echo {len(meta['input_echo'])} bytes]")
 
-        # 0a5. And it does not overstate itself. dg tracks a wrapper lattice, so the
-        # parser opened two files and lattice_source holds only the outer one. Recording
-        # the count is what keeps that honest, and this run is the case that proves it:
-        # a reader of lattice_source alone would think it had the lattice.
+        # 0a5. The file does not overstate itself. dg tracks a wrapper lattice, so the
+        # parser opens two files and lattice_source holds only the outer one.
+        # n_lattice_files records the count, and this run is the case that needs it: a
+        # reader of lattice_source alone would think it had the whole lattice.
         check("stats: n_lattice_files reports the wrapper's second file",
               abs(int(meta["n_lattice_files"]) - 2), 0.5,
               note=f"[{meta['n_lattice_files']} files, source "
@@ -720,13 +732,13 @@ def main():
         check("stats: the default file carries no machine-local values", len(leaks), 0.5,
               note=f"[{', '.join(leaks) if leaks else 'clean'}]")
 
-        # 0a7. The slice coordinates are exact, and one of them is not. The grid is
-        # uniform in time: the migration invariant carries each particle's own beta, and
+        # 0a7. Two slice coordinates are exact and one is not. The grid is uniform in
+        # time: the migration invariant carries each particle's own beta, and
         # z = -beta*c*(t-t_ref), so at a grid point the beta cancels and the arrival-time
         # separation is ct_slice/c with no beta anywhere. t_slice must therefore be
-        # -ct_slice/c exactly, which it was not until 2.3 (it carried a spurious beta0,
-        # 3.9e-9). z_slice is the one that needs a reference, so it is only equal to
-        # beta0*ct_slice to the rounding of two ways of forming beta0.
+        # -ct_slice/c exactly. A spurious factor beta0 would put it off by 3.9e-9. z_slice
+        # needs a reference, so it equals beta0*ct_slice only to the rounding of two ways
+        # of forming beta0.
         c_light = 299792458.0
         p0c = float(st.run["p0c"])
         beta0 = p0c / np.sqrt(p0c**2 + M_ELECTRON**2)
@@ -739,10 +751,10 @@ def main():
         check("stats: the slice axis is the index", abs(len(st.slice) - nslice), 0.5,
               note=f"[{nslice} slices, positions ct_slice, t_slice, z_slice on it]")
 
-        # 0a8. The envelope data are the particles'. rel_max/rel_min are order
-        # statistics relative to the stored centroid, and the dump at the UND end holds
-        # the same particles the record saw, so the position entries must match to the
-        # bit: the file stores x verbatim, and IEEE subtraction of the same centroid is
+        # 0a8. The envelope data are the particles'. rel_max and rel_min are order
+        # statistics relative to the stored centroid. The dump at the UND end holds the
+        # same particles the record saw, so the position entries must match to the bit:
+        # the file stores x verbatim, and IEEE subtraction of the same centroid is
         # deterministic. The momentum entries cross the dump's unit round trip
         # (px*p0c on write, /p0c on read), so they get an ulp-scale tolerance.
         irec = int(np.flatnonzero(st.at_end)[0])
@@ -799,9 +811,9 @@ def main():
         check("stats: every record sits inside the element ix_ele names", outside, 0.5,
               note=f"[{len(st.s)} records against {len(s1)} lattice rows]")
 
-        # 1. Reconstruction at the element end (= the last record). The entry is an index
-        # into the group's own axis, looked up rather than assumed: that lookup is the
-        # only thing standing between a reader and a silent transposition. The projected
+        # 1. Reconstruction at the element end, which is the last record. The entry is an
+        # index into the group's own axis, looked up rather than assumed. That lookup is
+        # all that stands between a reader and a silent transposition. The projected
         # planes and the normal modes are separate groups over separate axes, because an
         # eigen-emittance and a projected emittance are different quantities.
         plane = {name: i for i, name in enumerate(st.coord("plane"))}
@@ -820,15 +832,15 @@ def main():
             mine = sorted(bp[m]["emit"] for m in ("a", "b", "c"))
             for s0, m0 in zip(modes, mine):
                 worst = max(worst, abs(m0 - s0) / max(abs(s0), 1e-30))
-        # Measured 4.6e-8 (numpy eig vs mat_eigen). The projected planes agree exactly.
+        # numpy's eig and mat_eigen differ by 4.6e-8. The projected planes agree exactly.
         check("stats: bunch_params reconstruction vs stored calc_bunch_params", worst, 1e-6)
 
         # 1b. The whole-window row is assembled from the per-slice moments by the
-        # pooled-covariance identity rather than summed over particles. Re-implement the
-        # identity here, independently, including the local-to-global z map: a shift of
-        # beta*(is-1)*spacing plus the pz shear that map carries because beta is the
-        # particle's own. Measured against the particle sum when this landed: 4.0e-12 on
-        # this config, 5.0e-11 on the 96-slice SASE example.
+        # pooled-covariance identity rather than summed over particles. The identity is
+        # re-implemented here, independently, with the local-to-global z map: a shift of
+        # beta*(is-1)*spacing, plus the pz shear the map carries because beta is the
+        # particle's own. Against the particle sum the row agrees to 4.0e-12 on this
+        # configuration and to 5.0e-11 on the 96-slice SASE example.
         spacing = float(st.run["slice_spacing"])
         p0_mc = float(st.run["p0c"]) / M_ELECTRON
         worst_pool = 0.0
@@ -873,26 +885,27 @@ def main():
             den = np.maximum(np.abs(st_s), np.abs(nobg))
             worst_nobg = max(worst_nobg, float(np.max(np.where(den > 0, np.abs(st_s - nobg) / np.where(den > 0, den, 1), 0.0))))
         check("stats: whole-window row vs the pooled-covariance identity", worst_pool, 1e-9)
-        # The check has teeth: dropping the between-group term (m_s - m)(m_s - m)^T --
-        # the term that makes the identity exact -- must be caught, not absorbed. It
-        # collapses sigma(5,5) from the window length squared to a slice length squared.
+        # Dropping the between-group term (m_s - m)(m_s - m)^T, which makes the identity
+        # exact, must be caught and not absorbed. Without the term sigma(5,5) collapses
+        # from the window length squared to a slice length squared.
         check("stats: the between-group term is load-bearing (0 = confirmed)",
               0.0 if worst_nobg > 1e-3 else 1.0, 0.5,
               note=f"[dropping it moves the row by {worst_nobg:.2e}]")
 
-        # 1c. The moments the element-end twiss rests on are the record's, not a second
-        # copy: beam/slice_twiss/centroid at an element end must be beam/slice/centroid
-        # at the record the mask selects. Exactly, since one is written from the other.
+        # 1c. The element-end twiss rests on the record's own moments. At an element end
+        # beam/slice_twiss/centroid and sigma must equal beam/slice/centroid and sigma at
+        # the record the mask selects. They agree exactly, since one is written from the
+        # other.
         worst_ef = float(np.max(np.abs(st["beam/slice/centroid"][st.at_end] -
                                       st["beam/slice_twiss/centroid"])))
         worst_ef = max(worst_ef, float(np.max(np.abs(st["beam/slice/sigma"][st.at_end] -
                                                     st["beam/slice_twiss/sigma"]))))
         check("stats: the element-end moments ARE the record's (abs)", worst_ef, 1e-30)
 
-        # And the field's theta moments are computed where the file says they are:
-        # (nz, ns) per slice, at every element end that has field, plus the initial
-        # record (the walk takes that one with angles so the starting state is
-        # complete). An empty slice has no moments to compute and says so.
+        # The field's theta moments are computed where the file says they are: (nz, ns)
+        # per slice, at every element end that has field, plus the initial record. The
+        # walk takes the initial record with angles so the starting state is complete.
+        # An empty slice has no moments to compute and says so.
         valid = st["field/x/angle_moments_valid"].astype(bool)
         has_field = st["field/x/power"] > 0
         rows = np.zeros(len(st.s), bool)
@@ -903,8 +916,8 @@ def main():
               int(np.sum(valid != want)), 0.5,
               note=f"[{int(valid.sum())} of {valid.size} slice-records]")
 
-        # NaN, not a zero that reads as an answer, everywhere else. This is what lets a
-        # consumer tell an empty slice's missing moments from a real measurement.
+        # Everywhere else the moments are NaN rather than a zero that reads as an answer.
+        # NaN lets a consumer tell an empty slice's missing moments from a real value.
         cen = st["field/x/centroid"]
         check("stats: theta moments are NaN where they were not computed",
               0.0 if np.all(np.isnan(cen[..., 1][~valid])) else 1.0, 0.5)
@@ -965,13 +978,15 @@ def main():
     m = w_num > 1e-6 * w_num.max()
     rel = np.abs(np.sqrt(sxx_num[m] / sxx_ana[m]) - 1)
     rel = np.maximum(rel, np.abs(np.sqrt(syy_num[m] / syy_ana[m]) - 1))
-    # Measured max 8.4e-3 (grid-edge wrap of the FFT route on divergent noise slices).
+    # The largest difference is 8.4e-3, from the grid-edge wrap of the FFT route on
+    # divergent noise slices.
     check("bank: analytic vs FFT-propagated rms at exit, max rel", rel.max(), 2e-2)
 
-    # 4. Pulse pooling: pooled per-slice params vs directly computed pulse moments.
-    #    Banked side: params propagated analytically to the exit. Live side: the last
-    #    stats record (angles valid there). Compare sigma_xx of the pooled result
-    #    against pooling the pulse file's numerically computed per-slice moments.
+    # 4. Pulse pooling: the pooled per-slice params against pulse moments computed
+    # directly. The banked side is the params propagated analytically to the exit. The
+    # live side is the last stats record, where the angles are valid. sigma_xx of the
+    # pooled result is compared against pooling the pulse file's numerically computed
+    # per-slice moments.
     cen_b = np.stack([pms[:, 0] + dz * pms[:, 1], pms[:, 1],
                       pms[:, 2] + dz * pms[:, 3], pms[:, 3]], axis=1)
     sig_b = np.zeros((nb, 4, 4))
@@ -981,7 +996,7 @@ def main():
     _, pooled_ana, _ = pool_wavefront(np.vstack([cen_l, cen_b]),
                                       np.vstack([sig_l.reshape(-1, 16), sig_b.reshape(-1, 16)]),
                                       np.concatenate([en_l, en_b]))
-    # Numerical pooling over the same banked slices from the pulse file:
+    # Numerical pooling over the same banked slices, from the pulse file.
     cen_n = np.stack([np.array(cx_num), np.zeros(nb), np.array(cy_num), np.zeros(nb)], axis=1)
     sig_n = np.zeros((nb, 4, 4))
     sig_n[:, 0, 0] = sxx_num;  sig_n[:, 2, 2] = syy_num
@@ -992,10 +1007,10 @@ def main():
     check("pulse: pooled sigma_xx analytic vs numerical routes, rel",
           abs(pooled_ana[0, 0] / pooled_num[0, 0] - 1), 2e-2)
 
-    # 5. Thread invariance: every dataset of all three files identical at 1 vs 8
-    #    threads. Dataset-level, not raw bytes: HDF5 object headers embed creation
-    #    times, so two files with bit-identical data differ as byte streams -- the
-    #    data is the invariance claim, the container metadata is not.
+    # 5. Thread invariance. Every dataset of the three files is identical at 1 and 8
+    # threads. The comparison is by dataset rather than by raw bytes, since HDF5 object
+    # headers embed creation times and two files with bit-identical data differ as byte
+    # streams. The invariance holds for the data and not for the container metadata.
     run(exe, wd, "dg1", NML.format(lat="dg_wrap.bmad", root="dg1", extra=""), threads="1")
 
     same = all(h5_identical(wd / f"dg{s}", wd / f"dg1{s}")
@@ -1003,12 +1018,12 @@ def main():
     check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes)",
           0.0 if same else 1.0, 0.5)
 
-    # 5a. Zero-length wake elements, both polarities. This is the lattice the repeated-s
-    # check was written for, and until it existed that check had only ever seen zero
-    # repeats, which is to say it was untested. WKF can kick, so it is tracked and its
-    # record lands on the plane UND ended at, repeating coords/s. The two WKT pipes
-    # cannot kick, so they are skipped and the file must be identical to one whose
-    # zero-length pipes carry no wake at all.
+    # 5a. Zero-length wake elements of both polarities. This lattice gives the
+    # repeated-s check of 0a3 a real repeat. On a lattice without one that check sees
+    # zero repeats and tests nothing. WKF can kick, so it is tracked and its record
+    # lands on the plane where UND ended, repeating coords/s. The two WKT pipes cannot
+    # kick, so they are skipped and the file must be identical to one whose zero-length
+    # pipes carry no wake at all.
     (wd / "zlw.bmad").write_text(ZL_WAKE.format(wkt=WKT_WAKE))
     (wd / "zlwn.bmad").write_text(ZL_WAKE.format(wkt=WKT_NONE))
     run(exe, wd, "zlw", NML.format(lat="zlw.bmad", root="zlw", extra=""), threads="4")
@@ -1038,7 +1053,7 @@ def main():
     check("provenance: global%record_environment restores user and cwd",
           abs(len(got) - 2), 0.5, note=f"[{', '.join(got) if got else 'neither'}]")
 
-    # 6. Refusal: dump list entry matching nothing.
+    # 6. Refusal of a dump list entry that matches nothing.
     (wd / "dg_bad.nml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_bad",
                                              extra='  dump_beam_at(2) = "NO_SUCH_ELEMENT"\n')))
     r = subprocess.run([str(exe), "dg_bad.nml"], cwd=wd, capture_output=True, text=True,
@@ -1050,8 +1065,8 @@ def main():
     # 7. The pre-run (doc/user-guide.md). The deck loads 512 macroparticles per slice in
     # beamlets of 8, which is 64 beamlets and half the measured floor, so the load
     # standing and the thin-slice list both have something to report. The count is
-    # arithmetic and is checked as arithmetic; the estimate is one machine's and is
-    # checked only for being present and positive.
+    # arithmetic and is checked as arithmetic. The estimate is one machine's, and is
+    # checked only for being present and positive and for naming the machine.
 
     r = run(exe, wd, "pre", PRE_NML.format(root="pre", extra=""), threads="4")
     out = r.stdout
@@ -1189,19 +1204,19 @@ def main():
     check("frames: an FEL frame carries aw, ku and the method (0 = yes)",
           0.0 if has_und else 1.0, 0.5)
 
-    # A run that writes frames must be the run that does not. The instrument may not
-    # steer what it observes, which is why the field's rotation is put back.
+    # A run that writes frames must equal the same run without them. Writing a frame
+    # must not change the state it records, which is why the field's rotation is put
+    # back.
     run(exe, wd, "nofr", FRAME_NML.format(root="nofr",
         extra='  global%comb_ds_save = 1.0\n  global%migrate = T\n'), threads="4")
     check("frames: the run is identical to the same run without them (0 = yes)",
           0.0 if h5_identical(wd / "fr.stats.h5", wd / "nofr.stats.h5") else 1.0, 0.5)
 
     # The unaveraged method, written and named. A frame inside an unaveraged segment is
-    # taken where px carries the resolved undulator oscillation, and the writer is allowed
-    # that chart because the frame names its method. The mode wrote no frames at all
-    # before: the chart assertion sat inside the slice-to-bunch conversion, so the whole
-    # segment interior refused, and dump_at_comb = F was the only way an unaveraged run
-    # could finish.
+    # taken where px carries the resolved undulator oscillation. The writer allows that
+    # chart because the frame names its method. A chart assertion inside the
+    # slice-to-bunch conversion would refuse the whole segment interior, and an
+    # unaveraged run could then finish only with dump_at_comb = F.
 
     (wd / "dg_unavg.bmad").write_text(WRAP)
     ua_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
@@ -1228,14 +1243,14 @@ def main():
         check("frames: every unaveraged frame names its method", bad_name, 0.5)
 
     # Restarting from a frame needs no check of its own. A frame at an element end is
-    # dataset-identical to that element's dump, which the check above measures, and
+    # dataset-identical to that element's dump, which the check above holds, and
     # check_program holds the windowed composition for those dumps. A frame taken inside
     # an element is not a restart point at all, since global%track_start names elements
     # and not positions.
     #
-    # What does need measuring is that frames land inside an element, which is the whole
-    # reason for the series: a comb that only fired at element ends would pass every
-    # check above and give a movie with one frame per undulator.
+    # What needs a check is that frames land inside an element, which is the reason for
+    # the series. A comb that fired only at element ends would pass every check above
+    # and give a movie with one frame per undulator.
     inside = 0
     for i, f in enumerate(frames):
         with h5py.File(f) as h:
@@ -1313,7 +1328,8 @@ def main():
         worst_p = max(worst_p, float(np.max(rel)))
     check("frame vs row: per-slice power from the field frame", worst_p, 1e-10)
 
-    # The reduced projections integrate to the row's power, which is F16's own identity.
+    # The reduced projections integrate to the row's power, the identity that F16 of
+    # BMAD-STATS-EXT-FEL.md states.
     with h5py.File(wd / "id.stats.h5") as h:
         gx = h["coords/grid_x"][()]
         gy = h["coords/grid_y"][()]
@@ -1352,9 +1368,9 @@ def main():
     check("range: the beam frame's patch count is the range", abs(npatch - 3), 0.5,
           note=f"[slices {s1} to {s2}, {npatch} patches]")
     check("range: the field frame carries the range's slices", abs(nsf - 3), 0.5)
-    # The cut field keeps its place. Its mesh once started at zero whatever the range, so a
-    # standard reader put the cut field at the head of the window while the cut beam's
-    # timeOffset kept each slice where it was.
+    # The cut field keeps its place. A mesh that started at zero whatever the range would
+    # put the cut field at the head of the window in a standard reader, while the cut
+    # beam's timeOffset kept each slice where it was.
     check("range: the cut field's mesh starts at its first slice's z [m]",
           abs(off_cut[0] - (off_all[0] + (s1 - 1) * dz_cut)), 1e-18,
           note=f"[{off_cut[0]:.3e} against {(s1 - 1) * dz_cut:.3e}]")

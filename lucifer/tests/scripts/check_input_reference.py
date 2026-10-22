@@ -10,6 +10,7 @@ check holds the two together in both directions:
      default the page states.
   2. Every component of those structs must be named somewhere on the page, so the
      reference cannot go quietly incomplete when a parameter is added.
+  3. Every input dataset the stats file writes must name a component of its struct.
 
 Bmad-owned structures (beam_init, bmad_com, space_charge_com) are exempt. Their
 defaults are Bmad's to state, and the page documents only which fields Lucifer honors.
@@ -31,8 +32,8 @@ STRUCTS = {
     "fel_chamber_wake_init_struct": ("fel_struct.f90",         "chamber_wake%"),
     "fel_beam_init_param_struct":  ("fel_struct.f90",          ""),
     "fel_resample_param_struct":   ("fel_import_mod.f90",      "resample%"),
-    # The input type, deliberately not the working one: the working copy carries the
-    # per-element gate, which no deck can set and the page must not document.
+    # The input type, and not the working one. The working copy carries the per-element
+    # flag active, which no deck can set and the page must not document.
     "fel_space_charge_input_struct": ("fel_collective_mod.f90", "space_charge%"),
 }
 
@@ -77,7 +78,7 @@ def parse_struct(text, name):
                 continue
             comp, val = mm.group(1), mm.group(2)
             if val is None:
-                # a continued array literal from the previous component, not a new one
+                # A continued array literal from the previous component, not a new one.
                 if re.match(r"^[\d.\s\[\]'-]+$", part):
                     continue
                 out[comp] = None
@@ -100,8 +101,8 @@ def main():
     checked = 0
 
     # The page states parameters in table rows: | `name` | `default` | meaning |
-    # Split on the pipes rather than pattern-matching the cells: a cell holding
-    # anything unexpected must land in the comparison, not slip past the regex.
+    # Split on the pipes rather than pattern-matching the cells. A cell holding
+    # anything unexpected must land in the comparison rather than slip past the regex.
     rows = {}
     for line in doc.split("\n"):
         if not line.strip().startswith("|"):
@@ -119,11 +120,11 @@ def main():
         for comp, default in decl.items():
             name = prefix + comp
             checked += 1
-            # (1) named on the page at all
+            # (1) Named on the page at all.
             if name not in rows and not re.search(r"`" + re.escape(name) + r"`", doc):
                 failed.append(f"{struct}: {name} is not named in the reference")
                 continue
-            # (2) if it has a table row, the stated default must match
+            # (2) If it has a table row, the stated default must match.
             if name in rows and default is not None:
                 stated = rows[name]
                 if stated in ("", "-", "(none)"):

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-The saturation demo's answer check: before any timing or figure means anything, the
-exit total powers must agree at the documented levels. Averaged vs Genesis carries the
-seam-transport difference (~4e-2 on the benchmark line; measured 4.9e-4 at saturation,
-where the power self-limits). The unaveraged mode additionally carries the shot-noise
-radiation channel it physically resolves and the averaged model does not track
-(this directory's README, "The measured result"): +0.6 ln at the exit, measured
-n-particle- and steps-per-period-independent. The check holds |ln| <= 1.0 -- an
+Check the saturation demo's answers before any timing or figure is read. The exit total
+powers must agree at the documented levels (this directory's README, "The measured
+result").
+
+The averaged mode against Genesis carries the seam-transport difference, about 4e-2 on
+the benchmark line and 4.9e-4 at saturation, where the power self-limits. The check
+holds that difference to a relative 0.15. The unaveraged mode also carries the
+shot-noise radiation channel that it resolves and the averaged model does not track.
+That channel puts the unaveraged exit power +0.6 in ln above Genesis, independent of
+the particle count and of the steps per period. The check holds |ln| <= 1.0, so an
 order-of-magnitude disagreement still fails the demo.
 
 Usage: check_agreement.py <genesis .out.h5> <avg diag> <unavg diag>
