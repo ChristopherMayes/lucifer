@@ -29,6 +29,7 @@ import sys
 import h5py
 import numpy as np
 
+from checkrec import record
 from nml import to_groups
 
 import pool
@@ -147,6 +148,8 @@ def main():
     print(f"    Genesis  <P>: {gp.mean():.4e} W   (slice spread {gp.std()/gp.mean():.2f})")
     print(f"    Bmad     <P>: {bp.mean():.4e} W   (slice spread {bp.std()/bp.mean():.2f})")
     print(f"    ln ratio: {np.log(ratio):+.3f}  (bound +-{bound})  {'ok' if ok else 'FAIL'}")
+    record("SASE startup, dark start, one segment: ln ratio", np.log(ratio), [-bound, bound],
+           "range", ok)
     print("sase startup cross-check:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

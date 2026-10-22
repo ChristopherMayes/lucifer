@@ -52,6 +52,7 @@ import numpy as np
 import beamio
 import convert_genesis
 import fieldio
+from checkrec import record
 from read_stats import read_stats
 from nml import to_groups
 from scipy.special import jv
@@ -199,6 +200,7 @@ def check(name, value, tol, note=""):
     global FAILED
     ok = value <= tol
     print(f"--- {name}: {value:.3e} (check {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
+    record(name, value, tol, "max", ok)
     if not ok:
         FAILED = True
 
@@ -329,7 +331,9 @@ def main():
         p3b = st["field/harm3/total/power"][:, 0]
 
     n = min(len(zg), len(zb))
-    if not np.allclose(zg[:n], zb[:n], atol=1e-9):
+    z_same = bool(np.allclose(zg[:n], zb[:n], atol=1e-9))
+    record("z grids agree between the codes", None, None, "bool", z_same)
+    if not z_same:
         print("FAIL: z grids disagree between the codes"); sys.exit(1)
     # Relative to the curve maxima. P3 skips the seed-dominated first steps, since the
     # first records of a dark field sit at the numerical floor.
@@ -358,29 +362,44 @@ def main():
                             ("basePath", b"/data/%T/"), ("meshesPath", b"meshes/"),
                             ("iterationEncoding", b"groupBased"),
                             ("iterationFormat", b"/data/%T/")):
-                if f.attrs[a] != want:
+                bad = f.attrs[a] != want
+                record(f"{fn} root attribute {a}", None, None, "bool", not bad)
+                if bad:
                     print(f"FAIL: {fn} root attribute {a} = {f.attrs[a]!r}, want {want!r}")
                     FAILED = True
             m = f["data/1/meshes/electricField"]
             need = {"geometry": b"cartesian", "temporalDomain": b"time", "spatialDomain": b"r"}
             for a, want in need.items():
-                if m.attrs[a] != want:
+                bad = m.attrs[a] != want
+                record(f"{fn} mesh attribute {a}", None, None, "bool", not bad)
+                if bad:
                     print(f"FAIL: {fn} mesh attribute {a} = {m.attrs[a]!r}, want {want!r}")
                     FAILED = True
             for a in ("axisLabels", "gridSpacing", "gridGlobalOffset", "gridUnitSI",
                       "gridUnitDimension", "unitDimension", "timeOffset", "photonEnergy",
                       "zCoordinate"):
-                if a not in m.attrs:
+                bad = a not in m.attrs
+                record(f"{fn} required mesh attribute {a} present", None, None, "bool", not bad)
+                if bad:
                     print(f"FAIL: {fn} required mesh attribute {a} MISSING")
                     FAILED = True
-            if list(m.attrs["axisLabels"]) != [b"z", b"y", b"x"]:
+            bad = list(m.attrs["axisLabels"]) != [b"z", b"y", b"x"]
+            record(f"{fn} axisLabels", None, None, "bool", not bad)
+            if bad:
                 print(f"FAIL: {fn} axisLabels {m.attrs['axisLabels']}"); FAILED = True
-            if list(m.attrs["unitDimension"]) != [1., 1., -3., -1., 0., 0., 0.]:
+            bad = list(m.attrs["unitDimension"]) != [1., 1., -3., -1., 0., 0., 0.]
+            record(f"{fn} unitDimension", None, None, "bool", not bad)
+            if bad:
                 print(f"FAIL: {fn} unitDimension is not the V/m exponents"); FAILED = True
             lam_file = H_PLANCK_EVS * C_LIGHT * E_CHARGE / float(m.attrs["photonEnergy"][0])
-            if abs(lam_file - lam) > 1e-6 * lam:
+            d_lam = abs(lam_file - lam)
+            bad = d_lam > 1e-6 * lam
+            record(f"{fn} photonEnergy wavelength", d_lam, 1e-6 * lam, "max", not bad)
+            if bad:
                 print(f"FAIL: {fn} photonEnergy wavelength {lam_file} vs {lam}"); FAILED = True
-            if "unitSI" not in m["x"].attrs or abs(float(m["x"].attrs["unitSI"][0]) - 1) > 0:
+            bad = "unitSI" not in m["x"].attrs or abs(float(m["x"].attrs["unitSI"][0]) - 1) > 0
+            record(f"{fn} component unitSI", None, None, "bool", not bad)
+            if bad:
                 print(f"FAIL: {fn} component unitSI missing or not 1"); FAILED = True
             E_pmd = m["x"][0]                      # native complex128, slice 1 (y, x)
 
@@ -501,6 +520,7 @@ def main():
                 base.replace("harmonics = 1, 3", "harmonics = 3").format(extra=""),
                 "HARMONICS(1) MUST BE 1")
     print(f"--- refusal harmonics without the fundamental: {'ok' if ok else '** FAIL **'}")
+    record("refusal harmonics without the fundamental", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     (wd / "planar_uv.bmad").write_text("call, file = planar.bmad\n"
@@ -509,6 +529,7 @@ def main():
                 NML_TD.format(lat="planar_uv.bmad", root="rf_unavg", extra=""),
                 "UNAVERAGED")
     print(f"--- refusal harmonics + unaveraged element: {'ok' if ok else '** FAIL **'}")
+    record("refusal harmonics + unaveraged element", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     ok = refuse(exe, wd, "rf_pol",
@@ -516,6 +537,7 @@ def main():
                               extra="  seed_polarization = 'y'\n"),
                 "TWO LIVE POLARIZATIONS")
     print(f"--- refusal harmonics + two polarizations: {'ok' if ok else '** FAIL **'}")
+    record("refusal harmonics + two polarizations", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     shutil.copy(wd / "h3both-final.wf.h5", wd / "freq.wf.h5")
@@ -527,6 +549,7 @@ def main():
                 beam="h3both-final.beam.h5", field="freq.wf.h5", extra=""),
                 "ONLY THE time DOMAIN")
     print(f"--- refusal frequency-domain openPMD import: {'ok' if ok else '** FAIL **'}")
+    record("refusal frequency-domain openPMD import", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     nomatch = NML_IMPORT.format(lat="planar.bmad", root="rf_match",
@@ -536,6 +559,7 @@ def main():
                               'field_file = "H3-initial.wf.h5", "h3both-final-h3.wf.h5"')
     ok = refuse(exe, wd, "rf_match", nomatch, "MATCHES NO FIELD")
     print(f"--- refusal harmonic import matching no field: {'ok' if ok else '** FAIL **'}")
+    record("refusal harmonic import matching no field", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     genharm = NML_IMPORT.format(lat="planar.bmad", root="rf_genh",
@@ -544,6 +568,7 @@ def main():
                               'field_file = "H3-initial.wf.h5", "h3both-final-h3.fld.h5"')
     ok = refuse(exe, wd, "rf_genh", genharm, "MUST BE openPMD")
     print(f"--- refusal Genesis-format harmonic import: {'ok' if ok else '** FAIL **'}")
+    record("refusal Genesis-format harmonic import", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     print("checks: " + ("FAIL" if FAILED else "PASS"))

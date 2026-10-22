@@ -36,6 +36,7 @@ import sys
 import h5py
 import numpy as np
 
+from checkrec import record
 from pool import run_all
 from read_stats import read_stats
 
@@ -101,6 +102,10 @@ def check(name, value, tol, note="", low=None):
     ok = value <= tol if low is None else (low <= value)
     lim = f"(check {tol:.0e})" if low is None else f"(must exceed {low:.0e})"
     print(f"--- {name}: {value:.3e} {lim} {note} {'ok' if ok else '** FAIL **'}")
+    if low is None:
+        record(name, value, tol, "max", ok)
+    else:
+        record(name, value, low, "min", ok)
     if not ok:
         FAILED = True
 
@@ -222,6 +227,7 @@ def main():
     ok = run(exe, wd, "mhorn", 2048, True, sig_z='4e-9', bextra=IMP, pextra=WIN, lat="cohshort.bmad",
              expect_fail="GAUSSIAN ENOUGH")
     print(f"--- double-horn beam refused (GAUSSIAN ENOUGH): {'ok' if ok else '** FAIL **'}")
+    record("double-horn beam refused (GAUSSIAN ENOUGH)", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     # ------------------------------------------------------------------
@@ -234,6 +240,7 @@ def main():
 
     ok = run(exe, wd, "sdark", 2048, True, sase=True, expect_fail="DARK START")
     print(f"--- coherent + dark start refused: {'ok' if ok else '** FAIL **'}")
+    record("coherent + dark start refused", None, None, "bool", ok)
     FAILED = FAILED or not ok
 
     # ------------------------------------------------------------------

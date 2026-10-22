@@ -81,6 +81,7 @@ import numpy as np
 
 import beamio
 import convert_genesis
+from checkrec import record
 from nml import to_groups
 
 FAILED = False
@@ -131,13 +132,19 @@ def check(label, value, level):
     ok = value <= level
     FAILED = FAILED or not ok
     print(f"--- {label}: {value:.3e} (check {level:.0e}) {'ok' if ok else '** FAIL **'}")
+    record(label, value, level, "max", ok)
 
 
-def refused(label, code, out, phrase):
+def refused(label, code, out, phrase, name=None):
     global FAILED
     ok = code != 0 and phrase in out
     FAILED = FAILED or not ok
     print(f"--- refusal {label}: {'ok' if ok else '** FAIL **'}")
+
+    # A label that carries a measured number is printed as it is. The record takes the
+    # name the caller gives instead, so the two builds' records pair by it.
+
+    record(f"refusal {name or label}", None, None, "bool", ok)
 
 
 def datasets(fn):
@@ -630,13 +637,15 @@ use, QL
                     extra=f'  beam_file = "{at_crest.name}"\n  field_file = "qf-final.wf.h5"\n'
                           "  load_only = T\n"), expect_fail=True)
     refused(f"beam_file, a frame {body[at_crest][0]:.5f} m into the device at a crest of the "
-            f"undulator phase (mean px {body[at_crest][1]:.2e} of p0)", code, out, "NOT A PLACE A RUN STARTS")
+            f"undulator phase (mean px {body[at_crest][1]:.2e} of p0)", code, out, "NOT A PLACE A RUN STARTS",
+            name="beam_file, a frame into the device at a crest of the undulator phase")
     code, out = run(exe, wd, "qf_pf", qbase.format(root="qf_pf",
                     extra=f'  beam_init%position_file = "{at_zero.name}"\n'
                           "  load_only = T\n"), expect_fail=True)
     refused(f"beam_init%position_file, a frame {body[at_zero][0]:.5f} m in where the undulator "
             f"phase crosses zero (mean px {body[at_zero][1]:.2e} of p0)", code, out,
-            "NOT A PLACE A RUN STARTS")
+            "NOT A PLACE A RUN STARTS",
+            name="beam_init%position_file, a frame into the device where the undulator phase crosses zero")
 
     # A file that says nothing about a device is an external bunch. The absence of the
     # group lucifer is that assumption and not a proof of a boundary.

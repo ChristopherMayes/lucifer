@@ -24,6 +24,8 @@ import shutil
 import subprocess
 import sys
 
+from checkrec import record
+
 # A wrapper sets attributes on a line it calls in and names no line of its own, so Tao is
 # pointed at the lattices that name one.
 RE_USE = re.compile(r'^\s*use\s*,', re.MULTILINE | re.IGNORECASE)
@@ -82,6 +84,7 @@ def main():
                 print(f'         {ln.strip()[:110]}')
 
     print(f'  Tao loaded {len(lats) - n_bad} of {len(lats)} committed lattices')
+    record('lattices Tao could not load', n_bad, 0, 'max', n_bad == 0)
     print(f'checks: {"PASS" if n_bad == 0 else "FAIL"}')
     return 1 if n_bad else 0
 

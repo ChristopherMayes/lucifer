@@ -54,6 +54,7 @@ import h5py
 import numpy as np
 
 import beamio
+from checkrec import record
 from nml import to_groups
 
 import pool
@@ -247,6 +248,12 @@ def main():
     # The whole-bunch moments must carry the specified emittance, within 10 percent.
     ex, ey = mom_ref[5], mom_ref[6]
     print(f"bunch moments: normalized emittance ex = {ex:.6e}, ey = {ey:.6e} (spec {NORM_EMIT:.1e})")
+
+    # A verdict of several terms is recorded one term at a time, each with its own result.
+    record("bunch moments: normalized emittance ex", ex, [0.9*NORM_EMIT, 1.1*NORM_EMIT], "range",
+           0.9*NORM_EMIT < ex < 1.1*NORM_EMIT)
+    record("bunch moments: normalized emittance ey", ey, [0.9*NORM_EMIT, 1.1*NORM_EMIT], "range",
+           0.9*NORM_EMIT < ey < 1.1*NORM_EMIT)
     if not (0.9*NORM_EMIT < ex < 1.1*NORM_EMIT and 0.9*NORM_EMIT < ey < 1.1*NORM_EMIT):
         print("FAIL: generated bunch does not carry the specified emittance")
         ok = False
@@ -258,6 +265,8 @@ def main():
     run([args.genesis, "imp_gen_write.in"], w/"imp_gen_write.log", env=env1)
     cur_gen = load_dump_currents(w/"impgw-imp.par.h5")
     cur_ours = load_dump_currents(w/"impref-initial.beam.h5")
+    record("current exactness: slice count", len(cur_ours), len(cur_gen), "equal",
+           len(cur_gen) == len(cur_ours))
     if len(cur_gen) != len(cur_ours):
         print(f"FAIL: slice counts differ (ours {len(cur_ours)}, genesis {len(cur_gen)})")
         ok = False
@@ -266,6 +275,7 @@ def main():
         rel = np.abs(cur_ours - cur_gen).max() / scale
         print(f"current exactness: {len(cur_gen)} slices, peak {cur_gen.max():.4e} A, "
               f"max |diff|/peak = {rel:.3e}")
+        record("current exactness", rel, 1e-10, "max", not (rel > 1e-10))
         if rel > 1e-10:
             print("FAIL: current profiles differ beyond roundoff")
             ok = False
@@ -278,6 +288,8 @@ def main():
     dm = np.abs(mom_s - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_s - cur_ref).max() / max(cur_ref.max(), 1e-30)
     print(f"split-weight invariance: moments {dm:.3e}, currents {dc:.3e}")
+    record("split-weight invariance: moments", dm, 1e-12, "max", not (dm > 1e-12))
+    record("split-weight invariance: currents", dc, 1e-12, "max", not (dc > 1e-12))
     if dm > 1e-12 or dc > 1e-12:
         print("FAIL: split-weight invariance broken")
         ok = False
@@ -294,6 +306,8 @@ def main():
     dm = np.abs(mom_o - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_o - cur_ref).max() / max(cur_ref.max(), 1e-30)
     print(f"openPMD round trip (write_openpmd_file -> beam_init%position_file): moments {dm:.3e}, currents {dc:.3e}")
+    record("openPMD round trip: moments", dm, 1e-10, "max", not (dm > 1e-10))
+    record("openPMD round trip: currents", dc, 1e-10, "max", not (dc > 1e-10))
     if dm > 1e-10 or dc > 1e-10:
         print("FAIL: openPMD round trip does not reproduce the bunch")
         ok = False
@@ -305,6 +319,8 @@ def main():
     with open(w/"imp_dark.log", "w") as fh:
         rr = subprocess.run([args.exe, "imp_dark.nml"], stdout=fh, stderr=subprocess.STDOUT, env=env1)
     dark_log = (w/"imp_dark.log").read_text()
+    refused = rr.returncode != 0 and "ZERO TOTAL CHARGE" in dark_log
+    record("zero-charge refusal", None, None, "bool", refused)
     if rr.returncode == 0 or "ZERO TOTAL CHARGE" not in dark_log:
         print(f"FAIL: zero-charge bunch not refused (exit {rr.returncode})")
         ok = False
@@ -332,6 +348,9 @@ def main():
     print(f"twiss recovery (mean over {len(central)} central slices x 2 planes): "
           f"beta {bm:.3f}, alpha {am:.3f}, emittance {em:.3f} "
           f"(per-slice spread ~{1/math.sqrt(256):.2f})")
+    record("twiss recovery: beta", bm, 0.05, "max", not (bm > 0.05))
+    record("twiss recovery: alpha", am, 0.10, "max", not (am > 0.10))
+    record("twiss recovery: emittance", em, 0.05, "max", not (em > 0.05))
     if bm > 0.05 or am > 0.10 or em > 0.05:
         print("FAIL: imported slices do not recover the specified optics")
         ok = False
@@ -346,6 +365,7 @@ def main():
     b8 = (w/"impt8.diag.txt").read_bytes()
     d1 = re.sub(rb"impt1", b"", b1); d8 = re.sub(rb"impt8", b"", b8)
     print(f"thread determinism: diag files {'byte-identical' if d1 == d8 else 'DIFFER'}")
+    record("thread determinism", None, None, "bool", d1 == d8)
     if d1 != d8:
         print("FAIL: import + tracking not thread-count independent")
         ok = False
@@ -377,6 +397,7 @@ def main():
     lr = math.log(po[m].mean() / pg[m].mean())
     print(f"startup power ({args.seeds} seeds x {NSLICE} slices, {m.sum()} live): "
           f"ln(P_bmad/P_genesis) = {lr:+.3f} (check 0.30)")
+    record("startup power", lr, [-0.30, 0.30], "range", not (abs(lr) > 0.30))
     if abs(lr) > 0.30:
         print("FAIL: startup power after import disagrees between the codes")
         ok = False
@@ -408,6 +429,8 @@ def main():
     ana = q_charge * 2.99792458e8 / (math.sqrt(2*math.pi) * sig_z) * np.exp(-s_i**2 / (2*sig_z**2))
     dev_q = np.abs(cur_q - ana).max() / ana.max()
     print(f"cross-path: quiet-load current vs analytic Gaussian: {dev_q:.2e} of peak (check 1e-12)")
+    record("cross-path: quiet-load current vs analytic Gaussian", dev_q, 1e-12, "max",
+           not (dev_q > 1e-12))
     if dev_q > 1e-12:
         print("FAIL: the quiet-load's derived current is not the described Gaussian")
         ok = False
@@ -424,6 +447,8 @@ def main():
     dev_i = math.sqrt((((cur_ref - ana_i) / ana_i.max())**2)[live].mean())
     print(f"cross-path: imported current vs the same Gaussian: rms {dev_i:.2e} of peak "
           f"over {live.sum()} live slices (check 7e-2, statistical; measured 4.9e-2)")
+    record("cross-path: imported current vs the same Gaussian", dev_i, 7e-2, "max",
+           not (dev_i > 7e-2))
     if dev_i > 7e-2:
         print("FAIL: import and quiet-load disagree about the described bunch")
         ok = False

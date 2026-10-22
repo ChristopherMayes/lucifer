@@ -34,6 +34,7 @@ import pathlib
 import subprocess
 import sys
 
+from checkrec import record
 from nml import to_groups
 
 FAILED = False
@@ -80,10 +81,15 @@ GUARD_FLOOR = 256.0
 RENORM_CEIL = 1.5
 
 
-def ok(label, value, check, good):
+def ok(label, value, check, good, num=None, bound=None, kind="bool"):
     global FAILED
     tag = "ok" if good else "FAIL"
     print(f"--- {label}: {value} (check {check})  {tag}")
+
+    # The printed value and check are strings. The record takes the number the caller
+    # compared and the bound it compared against, and kind "bool" where there is none.
+
+    record(label, num, bound, kind, good)
     if not good:
         FAILED = True
 
@@ -138,11 +144,14 @@ def main():
         extra='  global%fp32_check = "lockstep"\n'))
     s = summary(wd, "fp32ss")
     for q in ("pz", "theta", "phasor", "source", "field"):
-        ok(f"lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.0e}", s[q] <= CEIL[q])
+        ok(f"lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.0e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
     ok("lockstep steady guard ulps", f"{s['guard']:.3e}", f">= {GUARD_FLOOR:.0f}",
-       s["guard"] >= GUARD_FLOOR)
+       s["guard"] >= GUARD_FLOOR,
+       num=s["guard"], bound=GUARD_FLOOR, kind="min")
     ok("bucket renormalization round trip [ulp]", f"{s['renorm']:.2f}", f"<= {RENORM_CEIL}",
-       s["renorm"] <= RENORM_CEIL)
+       s["renorm"] <= RENORM_CEIL,
+       num=s["renorm"], bound=RENORM_CEIL, kind="max")
 
     # 2. Read-only: the instrumented run's FP64 output is the uninstrumented run's.
     run(args.exe, wd, "fp32_off.in", BASE.format(root="fp32off", extra=""))
@@ -154,9 +163,11 @@ def main():
         extra='  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
     m = summary(wd, "fp32mut")
     ok("mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
-       ">= 10x", m["theta"] >= 10 * s["theta"])
+       ">= 10x", m["theta"] >= 10 * s["theta"],
+       num=m["theta"], bound=10 * s["theta"], kind="min")
     ok("mutation moves worst_source", f"{m['source']:.3e} vs {s['source']:.3e}",
-       ">= 5x", m["source"] >= 5 * s["source"])
+       ">= 5x", m["source"] >= 5 * s["source"],
+       num=m["source"], bound=5 * s["source"], kind="min")
 
     # 4. Compounding: freerun must diverge past lockstep, and its end-to-end power
     # divergence on this gain-regime segment must lie in (0, 1e-2]. That number is the
@@ -165,9 +176,11 @@ def main():
         extra='  global%fp32_check = "freerun"\n'))
     f = summary(wd, "fp32fr")
     ok("freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
-       "> 1x", f["phasor"] > s["phasor"])
+       "> 1x", f["phasor"] > s["phasor"],
+       num=f["phasor"], bound=s["phasor"], kind="min")
     ok("freerun end-to-end power divergence recorded", f"{f['e2e_power']:.3e}",
-       "<= 1e-2 on the gain segment", 0 < f["e2e_power"] <= 1e-2)
+       "<= 1e-2 on the gain segment", 0 < f["e2e_power"] <= 1e-2,
+       num=f["e2e_power"], bound=[0, 1e-2], kind="range")
 
     # 5. Time dependence, and thread identity of the instrument's own stream.
     run(args.exe, wd, "fp32_td.in", BASE.format(root="fp32td",
@@ -175,9 +188,11 @@ def main():
     t8 = (wd / "fp32td.fp32.txt").read_bytes()
     t = summary(wd, "fp32td")
     for q in ("pz", "theta", "phasor", "source", "field"):
-        ok(f"lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.0e}", t[q] <= CEIL[q])
+        ok(f"lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.0e}", t[q] <= CEIL[q],
+           num=t[q], bound=CEIL[q], kind="max")
     ok("lockstep TD guard ulps", f"{t['guard']:.3e}", f">= {GUARD_FLOOR:.0f}",
-       t["guard"] >= GUARD_FLOOR)
+       t["guard"] >= GUARD_FLOOR,
+       num=t["guard"], bound=GUARD_FLOOR, kind="min")
     run(args.exe, wd, "fp32_td.in", BASE.format(root="fp32td",
         extra=TD_EXTRA + '  global%fp32_check = "lockstep"\n'), threads="1")
     same = t8 == (wd / "fp32td.fp32.txt").read_bytes()

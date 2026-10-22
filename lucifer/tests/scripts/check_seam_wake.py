@@ -50,6 +50,7 @@ import h5py
 import numpy as np
 
 import beamio
+from checkrec import record
 from nml import to_groups
 
 LAMBDA0 = 1e-10
@@ -209,6 +210,7 @@ def main():
         if abs(expect_mean) > 0:
             worst = max(worst, abs(got_mean - expect_mean) / abs(expect_mean))
     print(f"ramp closed-form (constant pseudomode, {nsl} slices): worst slice-mean rel err = {worst:.3e}")
+    record("ramp closed-form", worst, 1e-9, "max", not (worst > 1e-9))
     if worst > 1e-9:
         print("FAIL: constant-wake closed form violated (head/tail direction or charge wiring)")
         ok = False
@@ -240,6 +242,7 @@ def main():
         got = (A[i]["pz"] - B[i]["pz"]).mean()
         worst_l = max(worst_l, abs(got - expect) / abs(expect))
     print(f"lord resolution (wake on a superimposition-split pipe): worst rel err = {worst_l:.3e}")
+    record("lord resolution", worst_l, 1e-9, "max", not (worst_l > 1e-9))
     if worst_l > 1e-9:
         print("FAIL: a lord's wake was not applied exactly once across its slaves")
         ok = False
@@ -259,6 +262,7 @@ def main():
     for i in range(top_charged + 1, len(A)):
         bad = max(bad, np.abs(A[i]["gamma"] - B[i]["gamma"]).max())
     print(f"causality: charged slices <= {top_charged+1}; max |dgamma| ahead of them = {bad:.3e} (must be exactly 0)")
+    record("causality", bad, 0.0, "equal", bad == 0.0)
     if bad != 0.0:
         print("FAIL: wake kicked slices AHEAD of all charge (acausal or direction flipped)")
         ok = False
@@ -275,6 +279,8 @@ def main():
     ahead_active = np.abs(eloss[top_charged+1:]).max() if top_charged+1 < len(eloss) else 0.0
     behind_active = np.abs(eloss[:top_charged+1]).max()
     print(f"d8 direction cross-check: wake_on eloss ahead of charge {ahead_active:.3e}, at/behind {behind_active:.3e}")
+    record("d8 direction cross-check", ahead_active, 1e-12 * behind_active, "max",
+           behind_active > 0 and ahead_active < 1e-12 * behind_active)
     if not (behind_active > 0 and ahead_active < 1e-12 * behind_active):
         print("FAIL: the transcribed wake model does not mark the same affected mask")
         ok = False
@@ -346,6 +352,8 @@ def main():
     # of (particle spread inside a bin)/(kernel scale). With the table at dz ~ lambda0
     # and the kernel varying over ~um, that is ~1e-2 of the kick. Check at 5e-2.
     print(f"z_long vs first-principles particle convolution: worst charged-slice rel = {worst_m:.3e} (check 5e-2)")
+    record("z_long vs first-principles particle convolution", worst_m, 5e-2, "max",
+           not (worst_m > 5e-2))
     if worst_m > 5e-2:
         print("FAIL: Bmad z_long kick does not match the kernel convolution")
         ok = False
@@ -398,6 +406,8 @@ def main():
         if i in (1, nA//2, nA-2):
             print(f"  uniform slice {i+1}: rel diff {rel:.3e}, derived bound {bound:.3e}")
     print(f"resolved-beam cross-validation (z_long vs wake_on): worst rel/bound = {worst_excess:.3f} (check 1)")
+    record("resolved-beam cross-validation (z_long vs wake_on)", worst_excess, 1, "max",
+           not (worst_excess > 1))
     if worst_excess > 1:
         print("FAIL: the two wake implementations disagree beyond the derived boundary term")
         ok = False
@@ -423,6 +433,8 @@ def main():
     # size of the self term within a slice, ~q_slice/(2*Q_tot*npart) of the kick.
     # Check at 2e-9.
     print(f"split-weight invariance of the kick profile: {worst_s:.3e} (check 2e-9)")
+    record("split-weight invariance of the kick profile", worst_s, 2e-9, "max",
+           not (worst_s > 2e-9))
     if worst_s > 2e-9:
         print("FAIL: wake kick not invariant under coincident weight splitting")
         ok = False
@@ -433,6 +445,7 @@ def main():
     d1 = re.sub(rb"wca", b"", (w/"wca.diag.txt").read_bytes())
     d8 = re.sub(rb"wt8", b"", (w/"wt8.diag.txt").read_bytes())
     print(f"thread determinism with wake: diag {'byte-identical' if d1 == d8 else 'DIFFERS'}")
+    record("thread determinism with wake", None, None, "bool", d1 == d8)
     if d1 != d8:
         print("FAIL: wake path not thread-count independent")
         ok = False

@@ -53,6 +53,7 @@ import fieldio  # noqa: E402
 
 import beamio
 import bunchfile
+from checkrec import record
 from nml import to_groups
 
 E_CHARGE = 1.602176634e-19
@@ -171,11 +172,15 @@ def run_keep(exe, lat, workdir, seeds, label, source, quiet, want):
             print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
             sys.exit(1)
         if want not in r.stdout:
+            record(f"shot noise, {label} load: the noise reported on {want}", None, None, "bool", False)
             print(f"FAIL: {root} did not report the noise on {want!r}:\n{r.stdout[-2000:]}")
             sys.exit(1)
         vals = b2_samples(workdir / f"{root}-initial.beam.h5", (1, 2, 3))
         for k, h in enumerate((1, 2, 3)):
             samples[h].extend(vals[k::3])
+
+    # Every seed's message named the grouping, or the run exited above.
+    record(f"shot noise, {label} load: the noise reported on {want}", None, None, "bool", True)
     return samples
 
 
@@ -190,6 +195,7 @@ def judge(samples, label):
     ok = ok and good
     print(f"--- shot noise, {label}: <|b(h)|^2 * N_lambda> = {m:.4f} "
           f"(target 1 +- {bound:.3f}, {n} samples)  {'ok' if good else 'FAIL'}")
+    record(f"shot noise, {label}", m, [1 - bound, 1 + bound], "range", good)
     for h in (1, 2, 3):
         v = np.asarray(samples[h])
         mh = v.mean()
@@ -197,6 +203,7 @@ def judge(samples, label):
         goodh = abs(mh - 1) < bh
         ok = ok and goodh
         print(f"      harmonic {h}: {mh:.4f} (+- {bh:.3f})  {'ok' if goodh else 'FAIL'}")
+        record(f"shot noise, {label}, harmonic {h}", mh, [1 - bh, 1 + bh], "range", goodh)
     return ok
 
 
@@ -290,6 +297,7 @@ def split_check(exe, lat, workdir):
     print(f"--- mode split against the dump's far field: worst {worst:.3e} over "
           f"{int(live.sum())} slices, angle {angle:.3e} rad (check <= 1e-6)  "
           f"{'ok' if good else 'FAIL'}")
+    record("mode split against the dump's far field", worst, 1e-6, "max", good)
     return good
 
 

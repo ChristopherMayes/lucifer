@@ -134,6 +134,8 @@ def check_tables(dbg, prod):
         rows = by_section[s]
         if not rows:
             continue
+        # A label per table, so a page can point at one section's levels.
+        L.append(f"(val-levels-{s})=")
         L.append(f"### `{s}`")
         L.append("")
         L.append("| Check | Debug | Production | Bound |")

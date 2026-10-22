@@ -45,6 +45,7 @@ import numpy as np
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import beamio  # noqa: E402
 import bunchfile  # noqa: E402
+from checkrec import record  # noqa: E402
 
 LAMBDA0 = 1e-10
 SAMPLE = 3
@@ -123,12 +124,14 @@ def compare(a, b, tol, what):
     """Rows of the two records against each other, relative to each column's scale."""
     if a.shape != b.shape:
         print(f"FAIL: {what}: {a.shape[0]} slices against {b.shape[0]}")
+        record(f"{what}, slice count", a.shape[0], b.shape[0], "equal", False)
         return False
     scale = np.maximum(np.abs(b).max(axis=0), 1e-300)
     worst = float(np.max(np.abs(a - b) / scale))
     good = worst <= tol
     print(f"  {what}: worst relative difference {worst:.3e} over {a.shape[0]} slices "
           f"(check <= {tol:.0e})  {'ok' if good else 'FAIL'}")
+    record(what, worst, tol, "max", good)
     return good
 
 
@@ -151,6 +154,7 @@ def keep_exactness(exe, wd):
     good = dq <= 1e-12 and n_dump == 8 * len(b["x"])
     print(f"  the dump carries the bunch's charge: relative difference {dq:.3e}, "
           f"{n_dump} macroparticles for {len(b['x'])} particles  {'ok' if good else 'FAIL'}")
+    record("the dump carries the bunch's charge", dq, 1e-12, "max", good)
     ok = ok and good
 
     # Split weights: a third and two thirds, coincident, must record the same load.
@@ -215,6 +219,7 @@ def incone(exe, wd):
           f"{angle:.1e} rad at the end of the first undulator, summed over {p_in.shape[1]} records "
           f"(edge records carry {edge:.1e} of the peak), against {INCONE_TARGET:.3e} W: "
           f"relative {rel:.3f} (check <= 0.35)  {'ok' if good else 'FAIL'}")
+    record("in-cone startup, Gaussian bunch in sample mode", rel, 0.35, "max", good)
     return good
 
 
@@ -229,6 +234,7 @@ def refusals(exe, wd):
     good = rc != 0 and "NOT QUIET ENOUGH" in out and m is not None
     print(f"  refused, noise on the unquiet generator: {'ok' if good else 'MISSED'}"
           + (f", floor |b|^2 N_lambda = {float(m.group(1)):.2e}" if m else ""))
+    record("refused, noise on the unquiet generator", None, None, "bool", good)
     ok = ok and good
 
     # A bunch of copies made outside the loader loads with the noise on the copies.
@@ -242,6 +248,8 @@ def refusals(exe, wd):
     fl = re.search(r"worst quiet floor before imposing, \|b\|\^2 \* N_lambda:\s*([0-9.E+-]+)", out)
     print(f"  copies made outside the loader take the noise on the copies: {'ok' if good else 'FAIL'}"
           + (f", floor {float(fl.group(1)):.2e}" if fl else ""))
+    record("copies made outside the loader take the noise on the copies", None, None, "bool",
+           good)
     ok = ok and good
 
     # The same copies shifted singly are not quiet, and the message says by how much.
@@ -254,6 +262,7 @@ def refusals(exe, wd):
     good = rc != 0 and "NOT QUIET ENOUGH" in out and m is not None
     print(f"  refused, copies shifted singly: {'ok' if good else 'MISSED'}"
           + (f", floor |b|^2 N_lambda = {float(m.group(1)):.2e}" if m else ""))
+    record("refused, copies shifted singly", None, None, "bool", good)
     ok = ok and good
 
     # A slice dump is not a bunch.
@@ -261,6 +270,7 @@ def refusals(exe, wd):
                   '  load_mode = "keep"\n', pextra="  global%load_only = T\n")
     good = rc != 0 and "BEAM DUMP IN SLICES" in out
     print(f"  refused, a slice dump through beam_init%position_file: {'ok' if good else 'MISSED'}")
+    record("refused, a slice dump through beam_init%position_file", None, None, "bool", good)
     ok = ok and good
     return ok
 

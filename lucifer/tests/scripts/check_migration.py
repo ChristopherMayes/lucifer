@@ -46,6 +46,7 @@ import h5py
 import numpy as np
 
 import beamio
+from checkrec import record
 
 from nml import to_groups
 
@@ -164,10 +165,16 @@ def main():
     ok = ok and c_ok
     print(f"--- migration conservation: {moved} moves, {tot_drop:.3e} C dropped, "
           f"worst violation {worst:.2e} (tol 1e-10)  {'ok' if c_ok else 'FAIL'}")
+
+    # A verdict of several terms is recorded one term at a time, each with its own result.
+    record("migration conservation: moves", moved, 10000, "min", moved > 10000)
+    record("migration conservation: charge dropped", tot_drop, 0, "min", tot_drop > 0)
+    record("migration conservation: worst violation", worst, 1e-10, "max", worst < 1e-10)
     p_ok = bdev < 1e-10
     ok = ok and p_ok
     print(f"--- migration phase continuity: worst phasor deviation {bdev:.2e} "
           f"(tol 1e-10)  {'ok' if p_ok else 'FAIL'}")
+    record("migration phase continuity", bdev, 1e-10, "max", p_ok)
 
     # 3: window residency, the routine's postcondition. The final dump is written right
     # after the last migration, so every surviving particle's theta must lie in its slice
@@ -187,6 +194,7 @@ def main():
     ok = ok and w_ok
     print(f"--- migration window residency: {n_out} particles outside their window "
           f"in the final dump  {'ok' if w_ok else 'FAIL'}")
+    record("migration window residency", n_out, 0, "max", w_ok)
 
     # 4: no-op bit identity on a frozen-phase beam.
     for mig, root in (("F", "mignf"), ("T", "mignt")):
@@ -200,6 +208,9 @@ def main():
     ok = ok and n_ok
     print(f"--- migration no-op: {moved} moves, diag byte-equal {diag_eq}, "
           f"dumps dataset-equal {d_eq}  {'ok' if n_ok else 'FAIL'}")
+    record("migration no-op: moves", moved, 0, "max", moved == 0)
+    record("migration no-op: diag byte-equal", None, None, "bool", diag_eq)
+    record("migration no-op: dumps dataset-equal", None, None, "bool", d_eq)
 
     # 5: migration against the restored phase. A displaced element carries its
     # z_offset phase inside and gives it back at its last step. A migration there that
@@ -233,6 +244,15 @@ def main():
           f"{runs['zo1t']['moved']}, outside their window {runs['zo0t']['out']} and "
           f"{runs['zo1t']['out']}, theta against zero offset {dth:.2e} rad  "
           f"{'ok' if o_ok else 'FAIL'}")
+    for tag, r in runs.items():
+        record(f"migration with a full-turn z_offset: particles kept, {tag}", r["n"], 1024,
+               "equal", r["n"] == 1024)
+    for tag in ("zo0t", "zo1t"):
+        record(f"migration with a full-turn z_offset: moves, {tag}", runs[tag]["moved"], 0, "max",
+               runs[tag]["moved"] == 0)
+        record(f"migration with a full-turn z_offset: outside their window, {tag}",
+               runs[tag]["out"], 0, "max", runs[tag]["out"] == 0)
+    record("migration with a full-turn z_offset: theta against zero offset", dth, 1e-9, "max", same)
 
     print("migration checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

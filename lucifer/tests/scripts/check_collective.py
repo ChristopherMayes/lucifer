@@ -54,6 +54,7 @@ import sys
 import h5py
 import numpy as np
 
+from checkrec import record
 from nml import to_groups
 
 M_ELECTRON = 0.51099895069e6
@@ -368,11 +369,14 @@ def main():
     ok = ok and e_ok
     print(f"--- collective energy bookkeeping: max |d<E> - eloss*dz| = {err:.2e} eV"
           f" against kicks of {scale:.2e} eV  {'ok' if e_ok else 'FAIL'}")
+    record("collective energy bookkeeping", err, 1e-6 * scale + 1e-7 * M_ELECTRON, "max", e_ok)
     s_dev = np.abs(np.diff(se, axis=0)).max()
     s_ok = s_dev < 1e-8 * M_ELECTRON
     ok = ok and s_ok
     print(f"--- collective sigma_energy invariance under uniform kicks: {s_dev:.2e} eV  "
           f"{'ok' if s_ok else 'FAIL'}")
+    record("collective sigma_energy invariance under uniform kicks", s_dev, 1e-8 * M_ELECTRON,
+           "max", s_ok)
 
     # 2. Stale-wake structure: heavy migration must force recomputes that change eloss.
     run(exe, wd, "collm.nml", BASE.format(lat="aramis.bmad", root="collm",
@@ -384,6 +388,10 @@ def main():
     ok = ok and m_ok
     print(f"--- stale-wake structure: {len(blocks)} eloss blocks under heavy migration, "
           f"changed = {changed}  {'ok' if m_ok else 'FAIL'}")
+
+    # A verdict of several terms is recorded one term at a time, each with its own result.
+    record("stale-wake structure: eloss blocks", len(blocks), 2, "min", len(blocks) > 1)
+    record("stale-wake structure: blocks changed", None, None, "bool", changed)
 
     # 3. A stride that only drops. The source run writes the initial state at the detuned
     # wavelength, the dump is cut to its head slice, and the cut beam is loaded back with
@@ -415,6 +423,10 @@ def main():
     print(f"--- drop-only stride: {n_head} particles in the head slice, {len(drop_only)} stride(s) "
           f"dropped and moved nothing, {len(with_moves)} moved; {len(blocks_d)} eloss blocks "
           f"for {len(events)} stride(s), refreshed = {refreshed}  {'ok' if d_ok else 'FAIL'}")
+    record("drop-only stride: strides that dropped and moved nothing", len(drop_only), 1, "min",
+           len(drop_only) >= 1)
+    record("drop-only stride: strides that moved", len(with_moves), 0, "max", not with_moves)
+    record("drop-only stride: eloss blocks refreshed", None, None, "bool", refreshed)
 
     # 4. The charge representation. Replacing a particle by colocated copies whose
     # charges sum to the original's is the same physical beam described with more
@@ -465,6 +477,10 @@ def main():
         print(f"--- charge representation, space charge {tag}: one particle split 16 ways "
               f"{worst['sel']:.2e}, every particle split {worst['all']:.2e} "
               f"(tol 1e-12)  {'ok' if s_ok else 'FAIL'}")
+        record(f"charge representation, space charge {tag}: one particle split 16 ways",
+               worst["sel"], 1e-12, "max", worst["sel"] < 1e-12)
+        record(f"charge representation, space charge {tag}: every particle split",
+               worst["all"], 1e-12, "max", worst["all"] < 1e-12)
 
     # 5. The long-range kernel at a vanishing source width, against the closed form it
     # becomes there. A source slice contributes (1 - |d|/sqrt(d^2 + A)) / A with A its
@@ -513,6 +529,7 @@ def main():
     print(f"--- long-range kernel at zero width: a slice migration left one particle in, "
           f"its field on the three nearest slices against q / 4 pi eps0 d^2, worst "
           f"{worst:.2e} (tol 5e-2)  {'ok' if p_ok else 'FAIL'}")
+    record("long-range kernel at zero width", worst, 5e-2, "max", p_ok)
 
     # 6. What the short-range solve does with the states a run can reach. Its grid needs a
     # radial scale, and a slice whose charge sits at one transverse point offers none. The
@@ -552,6 +569,7 @@ def main():
     r_ok = refused
     print(f"--- short-range with no radial scale: refused (exit {r.returncode})  "
           f"{'ok' if r_ok else 'FAIL'}")
+    record("short-range with no radial scale: refused", None, None, "bool", refused)
 
     # The configuration domains, refused where they are stated.
     for tag, extra, phrase in (
@@ -564,6 +582,7 @@ def main():
         r_ok = r_ok and got
         print(f"--- {phrase.lower()} outside its domain: refused at setup  "
               f"{'ok' if got else 'FAIL'}")
+        record(f"{phrase.lower()} outside its domain: refused at setup", None, None, "bool", got)
 
     # Each case against itself with the solve off, so what is compared is this term's own
     # work and not the radiation the dark beam exchanges with its field either way.
@@ -594,6 +613,18 @@ def main():
           f"particle dE {d_one:.1e} eV and dsigma {s_one:.1e} eV, zero-charge slice dE "
           f"{d_nq:.1e} eV, colocated pair dsigma {s_two:.3e} eV against its mean "
           f"{d_two:.1e} eV  {'ok' if c_ok else 'FAIL'}")
+    record("a collapsed slice on a grid with a scale: lone particle dE", d_one, 1e-6, "max",
+           d_one < 1e-6)
+    record("a collapsed slice on a grid with a scale: lone particle dsigma", s_one, 1e-6, "max",
+           s_one < 1e-6)
+    record("a collapsed slice on a grid with a scale: zero-charge slice dE", d_nq, 1e-6, "max",
+           d_nq < 1e-6)
+    record("a collapsed slice on a grid with a scale: zero-charge slice dsigma", s_nq, 1e-6, "max",
+           s_nq < 1e-6)
+    record("a collapsed slice on a grid with a scale: colocated pair dsigma", s_two, 1e-3, "min",
+           s_two > 1e-3)
+    record("a collapsed slice on a grid with a scale: colocated pair dE against its dsigma", d_two,
+           5e-2 * s_two, "max", d_two < 5e-2 * s_two)
 
     print("collective checks:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

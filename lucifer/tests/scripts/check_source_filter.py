@@ -52,6 +52,7 @@ import h5py
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from checkrec import record  # noqa: E402
 from compare_fel import load_fortran_diag, load_genesis_out, load_nslice  # noqa: E402
 
 ROOT = "AramisTDSASEF"
@@ -173,6 +174,7 @@ def refusals(exe, wd):
         r = subprocess.run([exe, "sfref.nml"], cwd=wd, capture_output=True, text=True)
         good = r.returncode != 0 and want in r.stdout
         print(f"  refused, {what}: {'ok' if good else 'MISSED'}")
+        record(f"refused, {what}", None, None, "bool", good)
         ok = ok and good
     return ok
 
@@ -209,6 +211,7 @@ def containment(exe, wd):
     good = frac > 0.99
     print(f"  seed containment at the default edge {angle:.3e} rad: {frac:.5f} of the "
           f"power inside (check > 0.99)  {'ok' if good else 'FAIL'}")
+    record("seed containment at the default edge", frac, 0.99, "min", good)
     return good
 
 
@@ -275,6 +278,7 @@ def tolerance(exe, wd):
         print(f"  tolerance {what}: protected {th_p:.5e} rad, edge {edge:.5e} rad against "
               f"{want:.5e}, loss there {got_loss:.4f} against {tol}  "
               f"{'ok' if good else 'FAIL'}")
+        record(f"tolerance {what}", abs(edge - want), 2e-4 * want, "max", good)
         ok = ok and good
 
     # The reported split is the acceptance, so it must not follow the edge out. A scan of
@@ -289,6 +293,7 @@ def tolerance(exe, wd):
     good = spread <= 1e-9 * angles[0]
     print(f"  the reported split across that scan: {angles[0]:.5e} rad, spread "
           f"{spread:.1e}  {'ok' if good else 'FAIL'}")
+    record("the reported split across that scan", spread, 1e-9 * angles[0], "max", good)
     ok = ok and good
 
     # Both ends of the range are singular. At one the margin runs to positive infinity and
@@ -306,6 +311,7 @@ def tolerance(exe, wd):
         r = tolerance_run(exe, wd, extra)
         good = r.returncode != 0 and want in r.stdout
         print(f"  refused, {what}: {'ok' if good else 'MISSED'}")
+        record(f"refused, {what}", None, None, "bool", good)
         ok = ok and good
 
     # A tolerance below about 2.2e-16 rounds 1 - tolerance to one, so the amplitude rounds
@@ -326,6 +332,8 @@ def tolerance(exe, wd):
         good = abs(edge - want) <= 2e-4 * want
         print(f"  a tolerance of 1e-17 at a width of 0.01: edge {edge:.5e} rad against "
               f"{want:.5e}  {'ok' if good else 'FAIL'}")
+        record("a tolerance of 1e-17 at a width of 0.01", abs(edge - want), 2e-4 * want,
+               "max", good)
         ok = ok and good
 
     # A stated edge is a stated edge. Neither the angle nor the grid-relative cuts go
@@ -343,6 +351,7 @@ def tolerance(exe, wd):
         good = (r.returncode == 0 and "is bypassed" in r.stdout
                 and EDGE_LINE.search(r.stdout.replace("\n", " ")) is None)
         print(f"  the tolerance is bypassed by {what}: {'ok' if good else 'FAIL'}")
+        record(f"the tolerance is bypassed by {what}", None, None, "bool", good)
         ok = ok and good
 
     return ok
@@ -421,6 +430,7 @@ def scope(exe, wd):
         verb = "moves" if want_move else "is untouched"
         print(f"  the filter {verb} on {what}: exit power {p['T']:.6e} W on against "
               f"{p['F']:.6e} W off, relative {rel:.3e}  {'ok' if good else 'FAIL'}")
+        record(f"the filter {verb} on {what}", rel, 1e-9, "min" if want_move else "max", good)
         ok = ok and good
     return ok
 
@@ -451,6 +461,7 @@ def main():
     worst, exit_rel, gexit, fexit = level(diag, out, nslice)
     print(f"  filter on, xcut = 1: exit power {fexit:.6e} W against Genesis4 {gexit:.6e} W, "
           f"relative {exit_rel:.3e}, worst over records {worst:.3e}")
+    record("filter on, xcut = 1", worst, a.tol, "max", not (worst > a.tol))
     if worst > a.tol:
         print(f"FAIL: the filtered run differs from Genesis4 by {worst:.3e}, "
               f"above the tolerance {a.tol:.1e}", file=sys.stderr)
@@ -464,6 +475,8 @@ def main():
     w_off, rel_off, _, fexit_off = level(diag_off, out, nslice)
     print(f"  filter off against the filtered reference: exit power {fexit_off:.6e} W, "
           f"relative {rel_off:.3e}, worst {w_off:.3e}")
+    record("filter off against the filtered reference", w_off, a.tol, "min",
+           not (w_off <= a.tol))
     if w_off <= a.tol:
         print(f"FAIL: the unfiltered run also agrees with the filtered reference "
               f"({w_off:.3e}), so this check cannot see the filter", file=sys.stderr)
@@ -480,6 +493,7 @@ def main():
         verdict = "caught" if w > a.tol else "MISSED"
         print(f"  mutation, {what}: exit power {fe:.6e} W, relative {rel:.3e}, "
               f"worst {w:.3e}, {verdict}")
+        record(f"mutation, {what}", w, a.tol, "min", not (w <= a.tol))
         if w <= a.tol:
             print(f"FAIL: mutation ({what}) is inside the tolerance {a.tol:.1e}, "
                   f"so the check cannot fail", file=sys.stderr)

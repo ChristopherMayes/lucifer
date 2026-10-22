@@ -65,6 +65,7 @@ import sys
 import h5py
 import numpy as np
 
+from checkrec import record
 from nml import to_groups
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -226,6 +227,7 @@ def check(name, value, tol, note=""):
     global FAILED
     ok = value <= tol
     print(f"--- {name}: {value:.3e} (check {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
+    record(name, value, tol, "max", ok)
     if not ok:
         FAILED = True
 

@@ -34,6 +34,8 @@ import re
 import sys
 from pathlib import Path
 
+from checkrec import record
+
 # A Shown-by cell with no directory link is allowed only where the feature has no
 # directory. Both forms are spelled out here so that a third one cannot appear by
 # accident. A third form is added to this list or not at all.
@@ -205,6 +207,7 @@ def main():
           f"{n_fenced} fenced files verified")
     for msg in problems:
         print(f"  PROBLEM: {msg}")
+    record("examples conformance problems", len(problems), 0, "max", not problems)
     if problems:
         print(f"examples conformance: FAIL ({len(problems)} problem(s))")
         return 1

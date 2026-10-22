@@ -77,6 +77,7 @@ import numpy as np
 
 import beamio
 import fieldio
+from checkrec import record
 from read_stats import read_stats, same_data
 
 FAILED = False
@@ -163,6 +164,7 @@ OLD_STYLE = """&fel_track_params
 def check(name, ok, note=""):
     global FAILED
     print(f"--- {name}: {note} {'ok' if ok else '** FAIL **'}")
+    record(name, None, None, "bool", ok)
     if not ok:
         FAILED = True
 

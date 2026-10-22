@@ -50,6 +50,7 @@ import sys
 
 import numpy as np
 
+from checkrec import record
 from nml import to_groups
 
 import pool
@@ -114,6 +115,7 @@ def check(name, value, lo, hi, note=""):
     ok = lo <= value <= hi
     print(f"--- {name}: {value:.4e} (check {lo:.2e} .. {hi:.2e}) {note} "
           f"{'ok' if ok else '** FAIL **'}")
+    record(name, value, [lo, hi], "range", ok)
     if not ok:
         FAILED = True
 

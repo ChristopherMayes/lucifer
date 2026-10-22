@@ -51,6 +51,7 @@ import h5py
 import numpy as np
 
 import convert_genesis
+from checkrec import record
 from nml import to_groups
 
 import pool
@@ -312,6 +313,7 @@ def check(name, value, tol, note=""):
     global FAILED
     ok = value <= tol
     print(f"--- {name}: {value:.3e} (check {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
+    record(name, value, tol, "max", ok)
     if not ok:
         FAILED = True
 
@@ -607,6 +609,7 @@ def main():
     for name, ok in zip(("non-closed-bump break", "bend under genesis-model interludes",
                          "z_offset exceeding the break", "z_offset on the first element"), oks):
         print(f"--- refusal {name}: {'ok' if ok else '** FAIL **'}")
+        record(f"refusal {name}", None, None, "bool", ok)
         FAILED = FAILED or not ok
 
     print("checks: " + ("FAIL" if FAILED else "PASS"))

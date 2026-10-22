@@ -25,6 +25,8 @@ import re
 import sys
 from pathlib import Path
 
+from checkrec import record
+
 # struct name -> (source file, the prefix the page writes it under)
 STRUCTS = {
     "fel_global_struct":           ("fel_struct.f90",          "global%"),
@@ -166,6 +168,7 @@ def main():
         print(f"  FAIL: {f}")
     print(f"  input reference: {checked} fel-owned parameters checked, "
           f"{len(failed)} problems")
+    record("input reference problems", len(failed), 0, "max", not failed)
     print("checks: " + ("FAIL" if failed else "PASS"))
     return 1 if failed else 0
 

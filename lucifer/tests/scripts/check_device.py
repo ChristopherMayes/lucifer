@@ -99,6 +99,7 @@ import check_migration as cm
 import check_two_polarization as tp
 import convert_genesis
 import fieldio
+from checkrec import record
 from nml import to_groups
 from read_stats import read_stats
 
@@ -275,10 +276,15 @@ HARM_BASE = """! flat keys; routed into the three groups by nml.to_groups
 """
 
 
-def ok(label, value, check, good):
+def ok(label, value, check, good, num=None, bound=None, kind="bool"):
     global FAILED
     tag = "ok" if good else "FAIL"
     print(f"--- {label}: {value} (check {check})  {tag}")
+
+    # The printed value and check are strings. The record takes the number the caller
+    # compared and the bound it compared against, and kind "bool" where there is none.
+
+    record(label, num, bound, kind, good)
     if not good:
         FAILED = True
 
@@ -333,9 +339,11 @@ def main():
         extra=DEV + '  global%fp32_check = "lockstep"\n'))
     s = summary(wd, "devss")
     for q in CEIL:
-        ok(f"device lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+        ok(f"device lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
     ok("device lockstep steady guard [ticks]", f"{s['guard']:.3e}", f">= {GUARD_FLOOR:.0e}",
-       s["guard"] >= GUARD_FLOOR)
+       s["guard"] >= GUARD_FLOOR,
+       num=s["guard"], bound=GUARD_FLOOR, kind="min")
     ok("bucket wraps asserted exact on device", s.get("wrap", "absent"), "T", s.get("wrap") == "T")
 
     # 2. Read-only: the instrumented run's FP64 output is the uninstrumented run's.
@@ -349,9 +357,11 @@ def main():
         extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
     m = summary(wd, "devmut")
     ok("mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
-       ">= 10x", m["theta"] >= 10 * s["theta"])
+       ">= 10x", m["theta"] >= 10 * s["theta"],
+       num=m["theta"], bound=10 * s["theta"], kind="min")
     ok("mutation moves worst_source", f"{m['source']:.3e} vs {s['source']:.3e}",
-       ">= 5x", m["source"] >= 5 * s["source"])
+       ">= 5x", m["source"] >= 5 * s["source"],
+       num=m["source"], bound=5 * s["source"], kind="min")
 
     # 4. End to end, both roles. The freerun twin carries the resident state and
     # compounds. The production run replaces the CPU step outright. Both must land in
@@ -360,16 +370,19 @@ def main():
         extra=DEV + '  global%fp32_check = "freerun"\n'))
     f = summary(wd, "devfr")
     ok("device freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
-       "> 1x", f["phasor"] > s["phasor"])
+       "> 1x", f["phasor"] > s["phasor"],
+       num=f["phasor"], bound=s["phasor"], kind="min")
     ok("device freerun end-to-end power", f"{f['e2e_power']:.3e}",
-       f"in (0, {E2E_CEIL:.1e}]", 0 < f["e2e_power"] <= E2E_CEIL)
+       f"in (0, {E2E_CEIL:.1e}]", 0 < f["e2e_power"] <= E2E_CEIL,
+       num=f["e2e_power"], bound=[0, E2E_CEIL], kind="range")
 
     run(args.exe, wd, "dev_pr.in", BASE.format(root="devpr", extra=DEV))
     pc = diag_power(wd, "devoff", 1)
     pd = diag_power(wd, "devpr", 1)
     rel = abs(pd - pc) / pc
     ok("device production exit power vs CPU", f"{rel:.3e}",
-       f"in (0, {E2E_CEIL:.1e}]", 0 < rel <= E2E_CEIL)
+       f"in (0, {E2E_CEIL:.1e}]", 0 < rel <= E2E_CEIL,
+       num=rel, bound=[0, E2E_CEIL], kind="range")
 
     # 5. Time dependence: slippage rotates the resident record. Same ceilings,
     # same read-only proof, same production band, at 8 threads.
@@ -377,9 +390,11 @@ def main():
         extra=TD_EXTRA + DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devtd")
     for q in CEIL:
-        ok(f"device lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q])
+        ok(f"device lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
+           num=t[q], bound=CEIL[q], kind="max")
     ok("device lockstep TD guard [ticks]", f"{t['guard']:.3e}", f">= {GUARD_FLOOR:.0e}",
-       t["guard"] >= GUARD_FLOOR)
+       t["guard"] >= GUARD_FLOOR,
+       num=t["guard"], bound=GUARD_FLOOR, kind="min")
     run(args.exe, wd, "dev_tdoff.in", BASE.format(root="devtdoff", extra=TD_EXTRA), threads="8")
     same = (wd / "devtd.diag.txt").read_bytes() == (wd / "devtdoff.diag.txt").read_bytes()
     ok("TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
@@ -388,7 +403,8 @@ def main():
     pd = diag_power(wd, "devtdpr", 8)
     rel = abs(pd - pc) / pc
     ok("device production TD window power vs CPU", f"{rel:.3e}",
-       f"<= {E2E_CEIL:.1e}", rel <= E2E_CEIL)
+       f"<= {E2E_CEIL:.1e}", rel <= E2E_CEIL,
+       num=rel, bound=E2E_CEIL, kind="max")
 
     # 6. Refused, never a quiet CPU fallback.
     refusals = [
@@ -458,9 +474,11 @@ def unaveraged(args, wd, exe):
     s = summary(wd, "dvuss")
     for q in CEIL_U:
         ok(f"unaveraged lockstep steady worst_{q}", f"{s[q]:.3e}",
-           f"<= {CEIL_U[q]:.1e}", s[q] <= CEIL_U[q])
+           f"<= {CEIL_U[q]:.1e}", s[q] <= CEIL_U[q],
+           num=s[q], bound=CEIL_U[q], kind="max")
     ok("unaveraged lockstep steady guard [ticks]", f"{s['guard']:.3e}",
-       f">= {GUARD_FLOOR_U:.0e}", s["guard"] >= GUARD_FLOOR_U)
+       f">= {GUARD_FLOOR_U:.0e}", s["guard"] >= GUARD_FLOOR_U,
+       num=s["guard"], bound=GUARD_FLOOR_U, kind="min")
 
     # 2. Read-only. The FP64 run here carries neither the device nor the instrument, so
     # what is compared is the CPU's own unaveraged step with the twin beside it and
@@ -480,7 +498,8 @@ def unaveraged(args, wd, exe):
     m = summary(wd, "dvumut")
     for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
         ok(f"unaveraged mutation moves worst_{q}", f"{m[q]:.3e} vs {s[q]:.3e}",
-           f">= {factor}x", m[q] >= factor * s[q])
+           f">= {factor}x", m[q] >= factor * s[q],
+           num=m[q], bound=factor * s[q], kind="min")
 
     # 4. The production role, against the CPU's own unaveraged run.
     run(args.exe, wd, "dvu_pr.in", base.format(root="dvupr", extra=DEV))
@@ -488,7 +507,8 @@ def unaveraged(args, wd, exe):
     pd = diag_power(wd, "dvupr", 1)
     rel = abs(pd - pc) / pc
     ok("unaveraged production power vs CPU", f"{rel:.3e}", f"<= {U_E2E_CEIL:.1e}",
-       rel <= U_E2E_CEIL)
+       rel <= U_E2E_CEIL,
+       num=rel, bound=U_E2E_CEIL, kind="max")
 
     # 4b. The frame series with the device resident in this mode. The comb's positions
     # are where the resident state comes back to the host, so a frame is written from
@@ -503,10 +523,12 @@ def unaveraged(args, wd, exe):
     fc = sorted(wd.glob("dvufroff-[0-9]*.beam.h5"))
     ok("unaveraged frames on the device, count against the CPU",
        f"{len(fd)} against {len(fc)}", "equal and nonzero",
-       len(fd) == len(fc) and len(fd) > 0)
+       len(fd) == len(fc) and len(fd) > 0,
+       num=len(fd), bound=len(fc), kind="equal")
     ok("unaveraged field frames on the device, count against the CPU",
        f"{len(sorted(wd.glob('dvufr-[0-9]*.wf.h5')))} against {len(fd)}", "equal",
-       len(sorted(wd.glob("dvufr-[0-9]*.wf.h5"))) == len(fd))
+       len(sorted(wd.glob("dvufr-[0-9]*.wf.h5"))) == len(fd),
+       num=len(sorted(wd.glob("dvufr-[0-9]*.wf.h5"))), bound=len(fd), kind="equal")
 
     # The frames steer nothing. Inside the unaveraged segment the frame carries the
     # plane's field where the record holds the substep's midpoint field, so the writer
@@ -536,7 +558,8 @@ def unaveraged(args, wd, exe):
         c = [read(f) for f in fc]
         sdev = max(abs(a[0] - b[0]) for a, b in zip(d, c))
         ok("unaveraged frames on the device land at the CPU's own s", f"{sdev:.3e}",
-           "<= 1e-9", sdev <= 1e-9)
+           "<= 1e-9", sdev <= 1e-9,
+           num=sdev, bound=1e-9, kind="max")
 
         # A frame taken outside an FEL element carries no felMethod, which the frame at
         # the line's start is. Inside one, this mode's frames must name the chart they
@@ -551,11 +574,13 @@ def unaveraged(args, wd, exe):
         # rms does not. It reaches 1e5 eV/c mid-segment against 1e2 in the averaged chart.
         quiver = max(abs(a[2]) for a in inside) if inside else 0.0
         ok("unaveraged frames on the device carry the quiver in px", f"{quiver:.3e}",
-           "> 1e4", quiver > 1e4)
+           "> 1e4", quiver > 1e4,
+           num=quiver, bound=1e4, kind="min")
         scale = max(max(abs(b[2]) for b in c), 1e-300)
         rel = max(abs(a[2] - b[2]) for a, b in zip(d, c)) / scale
         ok("unaveraged frame px mean, device against CPU", f"{rel:.3e}",
-           f"<= {U_FRAME_CEIL:.1e}", rel <= U_FRAME_CEIL)
+           f"<= {U_FRAME_CEIL:.1e}", rel <= U_FRAME_CEIL,
+           num=rel, bound=U_FRAME_CEIL, kind="max")
 
     # 5. A time-dependent window: slippage rotates the resident record between record
     # steps and the ledger's banked terms cross the seam every record step.
@@ -564,7 +589,8 @@ def unaveraged(args, wd, exe):
     t = summary(wd, "dvutd")
     for q in CEIL_U:
         ok(f"unaveraged lockstep TD worst_{q}", f"{t[q]:.3e}",
-           f"<= {CEIL_U[q]:.1e}", t[q] <= CEIL_U[q])
+           f"<= {CEIL_U[q]:.1e}", t[q] <= CEIL_U[q],
+           num=t[q], bound=CEIL_U[q], kind="max")
     run(args.exe, wd, "dvu_tdoff.in", base.format(root="dvutdoff", extra=TD_EXTRA))
     same = (wd / "dvutd.diag.txt").read_bytes() == (wd / "dvutdoff.diag.txt").read_bytes()
     ok("unaveraged TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
@@ -573,7 +599,8 @@ def unaveraged(args, wd, exe):
     pd = diag_power(wd, "dvutdpr", 8)
     rel = abs(pd - pc) / pc
     ok("unaveraged production TD window power vs CPU", f"{rel:.3e}",
-       f"<= {U_E2E_CEIL:.1e}", rel <= U_E2E_CEIL)
+       f"<= {U_E2E_CEIL:.1e}", rel <= U_E2E_CEIL,
+       num=rel, bound=U_E2E_CEIL, kind="max")
 
     # 6. Two device runs of one unaveraged deck agree bit for bit. The deposit
     # accumulates in fixed point and the ledger's spontaneous term reduces without an
@@ -603,14 +630,17 @@ def unaveraged(args, wd, exe):
         mode = "unaveraged" if root.endswith("u") else "averaged"
         good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
         ok(f"FP32 transform pair energy loss, {mode} deck", f"{loss:.3e} a pair",
-           f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good)
+           f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good,
+           num=loss, bound=list(PAIR_LOSS), kind="range")
         m = PAIR_RE.search(r.stdout)
         counts = (int(m.group(1)), int(m.group(2))) if m else None
         ok(f"header counts the transform pairs, {mode} deck", counts, f"== {(npair, nsub)}",
-           counts == (npair, nsub))
+           counts == (npair, nsub),
+           num=counts, bound=[npair, nsub], kind="equal")
         ratio = float(m.group(3)) / loss if m else float("nan")
         ok(f"header projection over measured loss, {mode} deck", f"{ratio:.3f}",
-           f"in [{PROJ_BAND[0]}, {PROJ_BAND[1]}]", PROJ_BAND[0] <= ratio <= PROJ_BAND[1])
+           f"in [{PROJ_BAND[0]}, {PROJ_BAND[1]}]", PROJ_BAND[0] <= ratio <= PROJ_BAND[1],
+           num=ratio, bound=list(PROJ_BAND), kind="range")
 
     # 8. Two live polarizations. The mode needs no polarization vector: the two real
     # kinetic momenta work against and deposit into their own field components, so the
@@ -624,9 +654,11 @@ def unaveraged(args, wd, exe):
     t = summary(wd, "dvu2p")
     for q in CEIL_U:
         ok(f"two-plane unaveraged lockstep worst_{q}", f"{t[q]:.3e}", f"<= {CEIL_U[q]:.1e}",
-           t[q] <= CEIL_U[q])
+           t[q] <= CEIL_U[q],
+           num=t[q], bound=CEIL_U[q], kind="max")
     ok("two-plane unaveraged lockstep guard [ticks]", f"{t['guard']:.3e}",
-       f">= {GUARD_FLOOR_2P:.0e}", t["guard"] >= GUARD_FLOOR_2P)
+       f">= {GUARD_FLOOR_2P:.0e}", t["guard"] >= GUARD_FLOOR_2P,
+       num=t["guard"], bound=GUARD_FLOOR_2P, kind="min")
 
     run(args.exe, wd, "dvu_2poff.in", xb.format(root="dvu2poff", extra=""))
     same = (wd / "dvu2p.diag.txt").read_bytes() == (wd / "dvu2poff.diag.txt").read_bytes()
@@ -639,7 +671,8 @@ def unaveraged(args, wd, exe):
     m = summary(wd, "dvu2pm")
     for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
         ok(f"two-plane unaveraged mutation moves worst_{q}", f"{m[q]:.3e} vs {t[q]:.3e}",
-           f">= {factor}x", m[q] >= factor * t[q])
+           f">= {factor}x", m[q] >= factor * t[q],
+           num=m[q], bound=factor * t[q], kind="min")
 
     # The production role. Each plane is compared against its own CPU power, since a
     # total would hide a plane that went dark. A propagator that asks for a member the
@@ -654,7 +687,8 @@ def unaveraged(args, wd, exe):
         pd = tp.dump_power(wd, "dvu2ppr-final.wf.h5", comp)
         rel = abs(pd - pc) / max(pc, 1e-300)
         ok(f"two-plane unaveraged production power {comp} vs CPU", f"{rel:.3e}",
-           f"<= {ceil:.1e}", pc > 0 and rel <= ceil)
+           f"<= {ceil:.1e}", pc > 0 and rel <= ceil,
+           num=rel, bound=ceil, kind="max")
 
     # And with both planes: frames inside the segment carry both planes back onto the
     # plane, on a copy, and the run with frames ends where the run without them does.
@@ -679,7 +713,8 @@ def unaveraged(args, wd, exe):
     loss = (p0 - p1) / p0 / npair
     good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
     ok("FP32 transform pair energy loss, two-plane deck", f"{loss:.3e} a pair",
-       f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good)
+       f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good,
+       num=loss, bound=list(PAIR_LOSS), kind="range")
 
     # 9. The handedness the mode selects, on the device. A helical element radiates one
     # circular polarization and couples to it, and which one is the electron's own. A
@@ -722,10 +757,12 @@ def unavg_handedness(args, wd, exe):
         sig[tag] = float(tp.diag(wd, f"dvh{tag}")[-1, 0, 7])
     rel = abs(sig["plus"] - sig["scalar"]) / sig["scalar"]
     ok("handedness on the device: (1, +i) reproduces the scalar seed's energy modulation",
-       f"{rel:.3e} [{sig['plus']:.4f} vs {sig['scalar']:.4f} eV]", "<= 1.0e-5", rel <= 1.0e-5)
+       f"{rel:.3e} [{sig['plus']:.4f} vs {sig['scalar']:.4f} eV]", "<= 1.0e-5", rel <= 1.0e-5,
+       num=rel, bound=1.0e-5, kind="max")
     rel = sig["minus"] / sig["scalar"]
     ok("handedness on the device: (1, -i) leaves the beam unmodulated",
-       f"{rel:.3e} [{sig['minus']:.3e} eV]", "<= 1.0e-2", rel <= 1.0e-2)
+       f"{rel:.3e} [{sig['minus']:.3e} eV]", "<= 1.0e-2", rel <= 1.0e-2,
+       num=rel, bound=1.0e-2, kind="max")
 
 def source_filter(args, wd, exe):
     """
@@ -757,9 +794,11 @@ def source_filter(args, wd, exe):
     pc = diag_power(wd, "cpu_sf", nslice)
     pn = diag_power(wd, "dev_sfoff", nslice)
     ok("source filter, device vs CPU window power", f"{abs(pd - pc) / pc:.3e}",
-       f"<= {SF_E2E_CEIL:.1e}", abs(pd - pc) / pc <= SF_E2E_CEIL)
+       f"<= {SF_E2E_CEIL:.1e}", abs(pd - pc) / pc <= SF_E2E_CEIL,
+       num=abs(pd - pc) / pc, bound=SF_E2E_CEIL, kind="max")
     ok("source filter on the device removes wide-angle power", f"{pn / pd:.2f}x", "> 1.5",
-       pn / pd > 1.5)
+       pn / pd > 1.5,
+       num=pn / pd, bound=1.5, kind="min")
 
     r = run(args.exe, wd, "dev_sfm.in",
             BASE.format(root="dev_sfm", extra=DEV + TD_EXTRA +
@@ -784,10 +823,12 @@ def field_set(args, wd, exe):
     run(args.exe, wd, "devh_ss.in", hb.format(root="devhss", extra=DEV + '  global%fp32_check = "lockstep"\n'))
     s = summary(wd, "devhss")
     for q in CEIL:
-        ok(f"harmonic lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+        ok(f"harmonic lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
     for q in CEIL_H:
         ok(f"harmonic lockstep worst_{q} (per-member footer)", f"{s.get(q, float('nan')):.3e}",
-           f"<= {CEIL_H[q]:.1e}", q in s and s[q] <= CEIL_H[q])
+           f"<= {CEIL_H[q]:.1e}", q in s and s[q] <= CEIL_H[q],
+           num=s.get(q), bound=CEIL_H[q], kind="max")
     ok("harmonic footer carries the fundamental too", "phasor_h1" in s, "True", "phasor_h1" in s)
     run(args.exe, wd, "devh_off.in", hb.format(root="devhoff", extra=""))
     same = (wd / "devhss.diag.txt").read_bytes() == (wd / "devhoff.diag.txt").read_bytes()
@@ -796,20 +837,25 @@ def field_set(args, wd, exe):
         extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
     m = summary(wd, "devhmut")
     ok("harmonic mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
-       ">= 10x", m["theta"] >= 10 * s["theta"])
+       ">= 10x", m["theta"] >= 10 * s["theta"],
+       num=m["theta"], bound=10 * s["theta"], kind="min")
     ok("harmonic mutation moves worst_source_h3", f"{m['source_h3']:.3e} vs {s['source_h3']:.3e}",
-       ">= 5x", m["source_h3"] >= 5 * s["source_h3"])
+       ">= 5x", m["source_h3"] >= 5 * s["source_h3"],
+       num=m["source_h3"], bound=5 * s["source_h3"], kind="min")
     run(args.exe, wd, "devh_fr.in", hb.format(root="devhfr", extra=DEV + '  global%fp32_check = "freerun"\n'))
     f = summary(wd, "devhfr")
     ok("harmonic freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
-       "> 1x", f["phasor"] > s["phasor"])
+       "> 1x", f["phasor"] > s["phasor"],
+       num=f["phasor"], bound=s["phasor"], kind="min")
     run(args.exe, wd, "devh_pr.in", hb.format(root="devhpr", extra=DEV))
     c1, c3 = harm_powers(wd, "devhoff")
     d1, d3 = harm_powers(wd, "devhpr")
     ok("harmonic production P1 vs CPU (bunched beam)", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",
-       abs(d1 - c1) / c1 <= E2E_CEIL)
+       abs(d1 - c1) / c1 <= E2E_CEIL,
+       num=abs(d1 - c1) / c1, bound=E2E_CEIL, kind="max")
     ok("harmonic production P3 vs CPU (bunched beam)", f"{abs(d3-c3)/c3:.3e}", f"<= {H_E2E_CEIL:.1e}",
-       abs(d3 - c3) / c3 <= H_E2E_CEIL)
+       abs(d3 - c3) / c3 <= H_E2E_CEIL,
+       num=abs(d3 - c3) / c3, bound=H_E2E_CEIL, kind="max")
 
     # 7b. The Bessel identity in FP32: a one-step dark restart from the CPU buncher's
     # exit beam, P3/P1 against the closed form from the dumped particles.
@@ -828,7 +874,8 @@ def field_set(args, wd, exe):
     p1, p3 = harm_powers(wd, "devhdep")
     dv = abs(p3 / p1 / expect - 1)
     ok("device one-step deposit P3/P1 vs the Bessel closed form", f"{dv:.3e}", f"<= {BESSEL_CEIL:.1e}",
-       dv <= BESSEL_CEIL)
+       dv <= BESSEL_CEIL,
+       num=dv, bound=BESSEL_CEIL, kind="max")
 
     # 7c. Time dependence with the set: the harmonics check's time-dependent deck (8
     # slices, shot noise, dark third harmonic) at the device's grid, slippage rotating
@@ -840,10 +887,12 @@ def field_set(args, wd, exe):
         extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devhtd")
     for q in CEIL:
-        ok(f"harmonic lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q])
+        ok(f"harmonic lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
+           num=t[q], bound=CEIL[q], kind="max")
     for q in CEIL_H:
         ok(f"harmonic lockstep TD worst_{q}", f"{t.get(q, float('nan')):.3e}", f"<= {CEIL_H[q]:.1e}",
-           q in t and t[q] <= CEIL_H[q])
+           q in t and t[q] <= CEIL_H[q],
+           num=t.get(q), bound=CEIL_H[q], kind="max")
     r_off = run(args.exe, wd, "devh_tdoff.in", td.format(lat="dev_planar.bmad", root="devhtdoff", extra=""), threads="8")
     same = (wd / "devhtd.diag.txt").read_bytes() == (wd / "devhtdoff.diag.txt").read_bytes()
     ok("harmonic TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
@@ -862,13 +911,16 @@ def field_set(args, wd, exe):
             c, d = float(e_off.group(grp)), float(e_pr.group(grp))
             ok(f"harmonic production TD escaped energy {label} vs CPU",
                f"{abs(d-c)/c:.3e} [{d:.4e} vs {c:.4e} J]", f"<= {ceil:.1e}",
-               c > 0 and abs(d - c) / c <= ceil)
+               c > 0 and abs(d - c) / c <= ceil,
+               num=abs(d - c) / c, bound=ceil, kind="max")
     c1, c3 = harm_powers(wd, "devhtdoff", window=True)
     d1, d3 = harm_powers(wd, "devhtdpr", window=True)
     ok("harmonic production TD window P1 vs CPU", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",
-       abs(d1 - c1) / c1 <= E2E_CEIL)
+       abs(d1 - c1) / c1 <= E2E_CEIL,
+       num=abs(d1 - c1) / c1, bound=E2E_CEIL, kind="max")
     ok("harmonic production TD window P3 vs CPU (shot-noise b3)", f"{abs(d3-c3)/c3:.3e}",
-       f"<= {H_E2E_CEIL:.1e}", abs(d3 - c3) / c3 <= H_E2E_CEIL)
+       f"<= {H_E2E_CEIL:.1e}", abs(d3 - c3) / c3 <= H_E2E_CEIL,
+       num=abs(d3 - c3) / c3, bound=H_E2E_CEIL, kind="max")
 
     # 7d. One Genesis reference for both: check_harmonics' planar deck made time
     # dependent (8 slices, shot noise on, so the third harmonic's bunching is real on
@@ -889,7 +941,8 @@ def field_set(args, wd, exe):
     c1, c3 = harm_powers(wd, "devhqs")
     d1, d3 = harm_powers(wd, "devhqsdev")
     ok("quiet-start dark harmonic: fundamental P1 vs CPU", f"{abs(d1-c1)/c1:.3e}", f"<= {E2E_CEIL:.1e}",
-       abs(d1 - c1) / c1 <= E2E_CEIL)
+       abs(d1 - c1) / c1 <= E2E_CEIL,
+       num=abs(d1 - c1) / c1, bound=E2E_CEIL, kind="max")
     print(f"--- quiet-start dark harmonic: device P3 / CPU P3 = {d3/c3:.3e} "
           f"(CPU {c3:.3e} W, device {d3:.3e} W): the FP32 floor radiating, recorded")
 
@@ -905,7 +958,8 @@ def field_set(args, wd, exe):
         extra=DEV + '  global%fp32_check = "lockstep"\n'))
     s = summary(wd, "devpss")
     for q in CEIL:
-        ok(f"two-plane lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+        ok(f"two-plane lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
     run(args.exe, wd, "devp_off.in", pn.format(lat="devp_c.bmad", root="devpoff", extra=""))
     same = (wd / "devpss.diag.txt").read_bytes() == (wd / "devpoff.diag.txt").read_bytes()
     ok("two-plane FP64 diag byte-identical, device twin on vs off", same, "True", same)
@@ -913,9 +967,11 @@ def field_set(args, wd, exe):
         extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
     m = summary(wd, "devpmut")
     ok("two-plane mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
-       ">= 10x", m["theta"] >= 10 * s["theta"])
+       ">= 10x", m["theta"] >= 10 * s["theta"],
+       num=m["theta"], bound=10 * s["theta"], kind="min")
     ok("two-plane mutation moves worst_source", f"{m['source']:.3e} vs {s['source']:.3e}",
-       ">= 5x", m["source"] >= 5 * s["source"])
+       ">= 5x", m["source"] >= 5 * s["source"],
+       num=m["source"], bound=5 * s["source"], kind="min")
     run(args.exe, wd, "devp_pr.in", pn.format(lat="devp_c.bmad", root="devppr", extra=DEV))
     run(args.exe, wd, "devp_dr.in", pn.format(lat="devp_xd.bmad", root="devpdr", extra=DEV))
     px_c = tp.dump_power(wd, "devpoff-final.wf.h5", "x")
@@ -924,20 +980,25 @@ def field_set(args, wd, exe):
     py_d = tp.dump_power(wd, "devppr-final.wf.h5", "y")
     p_drift = tp.dump_power(wd, "devpdr-final.wf.h5", "x")
     ok("crossed production Px vs CPU", f"{abs(px_d-px_c)/px_c:.3e}", f"<= {E2E_CEIL:.1e}",
-       abs(px_d - px_c) / px_c <= E2E_CEIL)
+       abs(px_d - px_c) / px_c <= E2E_CEIL,
+       num=abs(px_d - px_c) / px_c, bound=E2E_CEIL, kind="max")
     ok("crossed production Py vs CPU", f"{abs(py_d-py_c)/py_c:.3e}", f"<= {PY_E2E_CEIL:.1e}",
-       abs(py_d - py_c) / py_c <= PY_E2E_CEIL)
+       abs(py_d - py_c) / py_c <= PY_E2E_CEIL,
+       num=abs(py_d - py_c) / py_c, bound=PY_E2E_CEIL, kind="max")
     iso = abs(np.log(px_d / p_drift))
     ok("crossed device: x-field isolation through the y set, |ln(Px/P_drift)|", f"{iso:.3e}",
-       f"<= {ISO_CEIL:.1e}", iso <= ISO_CEIL)
+       f"<= {ISO_CEIL:.1e}", iso <= ISO_CEIL,
+       num=iso, bound=ISO_CEIL, kind="max")
     ok("crossed device: afterburner floor, Py/Px", f"{py_d/px_d:.3e}", f">= {PYPX_FLOOR:.0e}",
-       py_d / px_d >= PYPX_FLOOR)
+       py_d / px_d >= PYPX_FLOOR,
+       num=py_d / px_d, bound=PYPX_FLOOR, kind="min")
     tdn = tp.NML
     run(args.exe, wd, "devp_td.in", tdn.format(lat="devp_c.bmad", root="devptd",
         extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devptd")
     for q in CEIL:
-        ok(f"two-plane lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q])
+        ok(f"two-plane lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
+           num=t[q], bound=CEIL[q], kind="max")
     run(args.exe, wd, "devp_tdoff.in", tdn.format(lat="devp_c.bmad", root="devptdoff", extra=""), threads="8")
     same = (wd / "devptd.diag.txt").read_bytes() == (wd / "devptdoff.diag.txt").read_bytes()
     ok("two-plane TD FP64 diag byte-identical, device twin on vs off", same, "True", same)
@@ -946,7 +1007,8 @@ def field_set(args, wd, exe):
         pc = tp.dump_power(wd, "devptdoff-final.wf.h5", comp)
         pd = tp.dump_power(wd, "devptdpr-final.wf.h5", comp)
         ok(f"crossed TD production P{comp} vs CPU (slippage live)", f"{abs(pd-pc)/pc:.3e}",
-           f"<= {band:.1e}", abs(pd - pc) / pc <= band)
+           f"<= {band:.1e}", abs(pd - pc) / pc <= band,
+           num=abs(pd - pc) / pc, bound=band, kind="max")
 
     migration(args, wd, exe)
     reproducible(args, wd, exe)
@@ -1052,16 +1114,19 @@ def precision(args, wd, exe):
         v = summary(wd, root)["source"]
         if before is None:
             ok(f"deposit accuracy, {name}", f"{v:.3e}",
-               f"<= {CEIL['source']:.1e}", v <= CEIL["source"])
+               f"<= {CEIL['source']:.1e}", v <= CEIL["source"],
+               num=v, bound=CEIL["source"], kind="max")
         else:
             ok(f"deposit accuracy, {name}", f"{v:.3e}",
                f"<= {CEIL['source']:.1e} and <= the float deposit's {before:.2e}",
-               v <= CEIL["source"] and v <= before * PRECISION_MARGIN)
+               v <= CEIL["source"] and v <= before * PRECISION_MARGIN,
+               num=v, bound=min(CEIL["source"], before * PRECISION_MARGIN), kind="max")
         m = BITS_RE.search(r.stdout)
         bits = int(m.group(1)) if m else -1
         ok(f"deposit quantum below the FP32 spacing of its bound, {name}",
            f"{bits} bits" if m else "the run printed no headroom",
-           f">= {PRECISION_BITS_MIN} bits", bits >= PRECISION_BITS_MIN)
+           f">= {PRECISION_BITS_MIN} bits", bits >= PRECISION_BITS_MIN,
+           num=bits, bound=PRECISION_BITS_MIN, kind="min")
 
 
 def quantization(args, wd, exe):
@@ -1096,7 +1161,8 @@ def quantization(args, wd, exe):
         ok(f"the source row with the quantum {abs(shift)} bits coarser",
            f"{v:.4e} against {base:.4e}, {v/base:.4f}x",
            f"unmoved to {QUANT_UNMOVED:.3f}x, so the row is not quantization",
-           v <= base * QUANT_UNMOVED)
+           v <= base * QUANT_UNMOVED,
+           num=v, bound=base * QUANT_UNMOVED, kind="max")
 
     root = "devqref"
     extra = (DEV + '  global%fp32_check = "lockstep"\n  beamlet_size = 8\n'
@@ -1156,7 +1222,8 @@ def reproducible(args, wd, exe):
         differ = [k for k in sorted(a) if same_keys and a[k] != b[k]]
         ok(f"two runs bit for bit, {what}: {len(a)} arrays compared",
            "identical" if same_keys and not differ else f"{len(differ)} differ: {differ[:3]}",
-           "every array identical", same_keys and not differ)
+           "every array identical", same_keys and not differ,
+           num=len(differ) if same_keys else None, bound=0, kind="max")
 
 
 def migration(args, wd, exe):
@@ -1187,18 +1254,23 @@ def migration(args, wd, exe):
     worst = max(abs(q_win[i] + sum(q for zd, q in drops if zd <= zr + 1e-9) - q0) / q0
                 for i, zr in enumerate(z))
     ok("migration on the device bites", f"{moved} moves, {sum(q for _, q in drops):.3e} C dropped",
-       "> 10000 moves and drops", moved > 10000 and sum(q for _, q in drops) > 0)
-    ok("migration conservation on the device, worst violation", f"{worst:.2e}", "< 1e-10", worst < 1e-10)
-    ok("migration phase continuity on the device, worst deviation", f"{bdev:.2e}", "< 1e-10", bdev < 1e-10)
+       "> 10000 moves and drops", moved > 10000 and sum(q for _, q in drops) > 0,
+       num=moved, bound=10000, kind="min")
+    ok("migration conservation on the device, worst violation", f"{worst:.2e}", "< 1e-10", worst < 1e-10,
+       num=worst, bound=1e-10, kind="max")
+    ok("migration phase continuity on the device, worst deviation", f"{bdev:.2e}", "< 1e-10", bdev < 1e-10,
+       num=bdev, bound=1e-10, kind="max")
     slen = 2 * np.pi * 3
     n_out = sum(int(np.sum((sl["theta"] < -1e-9) | (sl["theta"] >= slen + 1e-9)))
                 for sl in beamio.read_slices(wd / "devmd-final.beam.h5", 1e-10, 3e-10))
-    ok("migration window residency on the device", f"{n_out} outside", "0", n_out == 0)
+    ok("migration window residency on the device", f"{n_out} outside", "0", n_out == 0,
+       num=n_out, bound=0, kind="max")
     nslice = 16
     pc = diag_power(wd, "devmc", nslice)
     pd = diag_power(wd, "devmd", nslice)
     ok("heavy-migration window power, device vs CPU", f"{abs(pd-pc)/pc:.3e}", f"<= {MIG_E2E_CEIL:.1e}",
-       abs(pd - pc) / pc <= MIG_E2E_CEIL)
+       abs(pd - pc) / pc <= MIG_E2E_CEIL,
+       num=abs(pd - pc) / pc, bound=MIG_E2E_CEIL, kind="max")
     grown = "particle capacity grown" in r.stdout
     ok("a migrated slice outgrew the rectangle and the seam grew it", grown, "True", grown)
 
@@ -1208,7 +1280,8 @@ def migration(args, wd, exe):
         extra=DEV + '  global%fp32_check = "lockstep"\n', **heavy), threads="8")
     s = summary(wd, "devml")
     for q in CEIL:
-        ok(f"migrating lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q])
+        ok(f"migrating lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
+           num=s[q], bound=CEIL[q], kind="max")
     same = (wd / "devml.diag.txt").read_bytes() == (wd / "devmc.diag.txt").read_bytes()
     ok("migrating FP64 diag byte-identical, device twin on vs off", same, "True", same)
 
@@ -1224,7 +1297,8 @@ def migration(args, wd, exe):
     z1 = beam_z(wd / "devmf1-final.beam.h5")
     z2 = beam_z(wd / "devmf2-final.beam.h5")
     zt = beam_z(wd / "devmt-final.beam.h5")
-    ok("migration no-op on the device: moves", moved, "0", moved == 0)
+    ok("migration no-op on the device: moves", moved, "0", moved == 0,
+       num=moved, bound=0, kind="max")
     ok("two migrate = F device runs, final beam z", "identical" if np.array_equal(z1, z2)
        else f"{float(np.max(np.abs(z1 - z2))) / 3e-10:.2e} spacings",
        "identical", np.array_equal(z1, z2))
@@ -1306,8 +1380,10 @@ def genesis_harmonics(args, wd, exe):
     c1, c3 = level(*curves["cpu"])
     d1, d3 = level(*curves["dev"])
     print(f"--- Genesis TD harmonic reference at grid 64: CPU P1 {c1:.3e} P3 {c3:.3e} (the anchor)")
-    ok("device vs Genesis, TD planar with shot noise, P1", f"{d1:.3e}", f"<= {E2E_CEIL:.1e}", d1 <= E2E_CEIL)
-    ok("device vs Genesis, TD planar with shot noise, P3", f"{d3:.3e}", f"<= {H_E2E_CEIL:.1e}", d3 <= H_E2E_CEIL)
+    ok("device vs Genesis, TD planar with shot noise, P1", f"{d1:.3e}", f"<= {E2E_CEIL:.1e}", d1 <= E2E_CEIL,
+       num=d1, bound=E2E_CEIL, kind="max")
+    ok("device vs Genesis, TD planar with shot noise, P3", f"{d3:.3e}", f"<= {H_E2E_CEIL:.1e}", d3 <= H_E2E_CEIL,
+       num=d3, bound=H_E2E_CEIL, kind="max")
 
 
 if __name__ == "__main__":
