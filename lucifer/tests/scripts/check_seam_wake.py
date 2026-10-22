@@ -1,33 +1,36 @@
 #!/usr/bin/env python3
 """
-Seam-wake checks: Bmad element sr wakes applied across the whole time
-window, validated without Genesis (self-referenced and against the transcribed wake
-model). Every wake measurement is an A-B difference between a run with
-the wake and a bit-identical run without it, on a single one-step wiggler, so the FEL
-evolution cancels exactly and what remains IS the kick.
+Seam-wake checks: Bmad element sr wakes applied across the whole time window
+(validation.md, val-bmad-element-wakes-across). No Genesis run is involved. The checks
+are self-referenced or against the transcribed wake model, wake_on. Every wake figure is
+an A-B difference between a run with the wake and a bit-identical run without it, on a
+single one-step wiggler. The FEL evolution cancels exactly, so what remains is the kick.
 
 Checks:
 
-  ramp      Closed form, exact: a constant pseudomode (k = 0, phi = 0.25, damp = 0 --
-            Bmad's W(dz) = amp*exp(damp*dz)*sin(2pi*phi + k*dz), self = W(0)/2) on a
-            uniform cold beam gives Delta_pz(particle) = -(l*amp/p0c) * (Q_ahead +
-            Q_self_particle/2). Verified per particle to roundoff. This also pins the
-            head/tail direction: charge "ahead" must be the higher slice indices
-            (z_global = z_local + beta*(islice-1)*spacing), or the ramp is mirrored.
-  causality A short bunch at the window tail (low indices): the zero-charge probe
-            slices ahead of it must receive exactly zero kick, and the d8 wake model
-            (wake_on) on the same beam must mark the same "affected" mask in its
-            eloss profile -- two independent implementations agreeing on direction.
-  zlong     Same-element cross-validation: the transcribed resistive-wall kernel
-            (exported by chamber_wake%write_kernels) fed to Bmad's z_long machinery as a
-            causal table. Bmad's per-slice energy change must match a first-principles
-            numpy convolution of the same table with the actual particle distribution
-            (tight, method-identical), and the wake_on model's eloss (slice-density
-            convolution of the same kernel) prices the methodological difference --
-            reported, checked loosely at the derived level.
-  split     Split-weight invariance: w/3 + 2w/3 coincident copies leave the A-B kick
-            profile unchanged to roundoff (the wake is linear in charge).
-  threads   1 vs 8 threads with a wake element: byte-identical diag.
+  ramp      Closed form. A constant pseudomode (k = 0, phi = 0.25, damp = 0) on a
+            uniform cold beam. Bmad's wake is W(dz) = amp*exp(damp*dz)*sin(2pi*phi + k*dz)
+            with self = W(0)/2, so Delta_pz(particle) = -(l*amp/p0c) * (Q_ahead +
+            Q_self_particle/2). Each slice mean must match to 1e-9 relative. This also
+            pins the head/tail direction: the charge ahead must be at the higher slice
+            indices (z_global = z_local + beta*(islice-1)*spacing), or the ramp is mirrored.
+  lord      Lord resolution. The same constant wake on a pipe split into super_slaves by
+            a superimposed marker must apply exactly once, to the same closed form.
+  causality A short bunch at the window tail (low indices). The zero-charge probe slices
+            ahead of it must receive exactly zero kick. The transcribed wake model
+            (wake_on) on the same beam must mark the same affected mask in its eloss
+            profile, so two independent implementations agree on the direction.
+  zlong     Cross-validation on the same element. The transcribed resistive-wall kernel,
+            exported by chamber_wake%write_kernels, is fed to Bmad's z_long machinery as
+            a causal table. Bmad's energy change per slice must match a numpy
+            convolution of the same table with the particle distribution, at 5e-2. The
+            eloss of wake_on, a convolution of the same kernel with the slice density,
+            differs by method. On the short bunch that difference is reported only. On a
+            uniform beam it is checked against a derived bound per slice.
+  split     Split-weight invariance. Coincident copies of weight w/3 and 2w/3 leave the
+            A-B kick profile unchanged to 2e-9 of the largest kick, since the wake is
+            linear in charge.
+  threads   1 against 8 threads with a wake element: the diag must be byte-identical.
 
 Usage: check_seam_wake.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad. Exit 0 on pass.
@@ -58,12 +61,12 @@ P0C = P0_MC * 510998.95069           # eV
 E_CHARGE = 1.602176634e-19
 M_ELECTRON = 510998.95069
 L_ELE = 0.045                        # one-step wiggler
-AMP = 1e17                           # constant-wake amplitude [V/C/m]; sized so the
-                                     # kick (dgamma ~ 0.3) dwarfs the double-precision
-                                     # cancellation noise in gamma_A - gamma_B (~2e-12)
+AMP = 1e17                           # Constant-wake amplitude [V/C/m]. The kick,
+                                     # dgamma ~ 0.3, is far above the double-precision
+                                     # cancellation noise in gamma_A - gamma_B, ~2e-12.
 
-# A one-step wiggler: l = one ds_step, so the mid-element wake kick is the only thing
-# separating the A and B runs after the (bit-identical) single FEL step.
+# A one-step wiggler, l = one ds_step. The A and B runs take the same single FEL step,
+# bit for bit, so the wake kick at mid-element is the only difference between them.
 LAT_BASE = """call, file = aramis_1seg.bmad
 UNDW: UND, l = {l}, ds_step = {l}{wake}
 SEGW: line = (UNDW)
@@ -182,23 +185,25 @@ def main():
     nsl = len(A)
     q = np.array([b["q"] for b in B])
     # Closed form: Delta_pz = -(l*amp/p0c) * (sum of charge strictly ahead + half of
-    # charge at identical z). "Ahead" = higher slice index (and, within a slice, larger
-    # z -- for the quiet start all beamlet phases differ, so per-particle ordering
-    # inside the slice matters at the sub-slice level of the constant wake: for a
-    # constant wake W is z-independent, so only the ahead-charge sum matters and
-    # within-slice ordering contributes via each particle's own weight).
+    # charge at identical z). Ahead means a higher slice index, and within a slice a
+    # larger z. In a quiet start all beamlet phases differ, so the particles of a slice
+    # are ordered in z. A constant wake W does not depend on z, so only the sum of the
+    # charge ahead matters, and the order within a slice enters through each particle's
+    # own weight.
     f = L_ELE * AMP / P0C
     worst = 0.0
     for i in range(nsl):
-        # In pz, which the dump states directly. Recovering it from gamma instead would
-        # subtract two numbers near 11358 to get a kick of 3e-8, which costs eight digits
-        # of the very quantity under test: measured 1.2e-8 that way against rounding here.
+        # The kick is taken in pz, which the dump states directly. Recovering it from
+        # gamma would subtract two numbers near 11358 to get a kick of 3e-8, and that
+        # loses eight digits of the kick. The gamma route gives an error of 1.2e-8,
+        # where pz leaves only rounding.
         dpz = A[i]["pz"] - B[i]["pz"]
         q_ahead = q[i+1:].sum()
         w_part = q[i] / B[i]["npart"]
         # Within the slice every particle has a distinct z (quiet-start phases). For a
-        # constant wake each particle sees all in-slice particles ahead of it plus half
-        # itself. Mean over the slice: q_ahead + (q_i - w_part)/2 + w_part/2 = q_ahead + q_i/2.
+        # constant wake each particle sees the particles of its slice ahead of it plus
+        # half itself. Mean over the slice: q_ahead + (q_i - w_part)/2 + w_part/2
+        # = q_ahead + q_i/2.
         expect_mean = -f * (q_ahead + q[i]/2)
         got_mean = dpz.mean()
         if abs(expect_mean) > 0:
@@ -209,11 +214,11 @@ def main():
         ok = False
 
     # ---------------- lord resolution: the same constant wake on a pipe that a
-    # superimposed marker has split into super_slaves. The wake then lives on the
-    # lord (ele%wake is null on every tracked slave, pointer_to_wake_ele resolves it,
-    # applying once at the slave containing the lord's midpoint). Checking ele%wake
-    # directly was the hole this check closed: lord wakes fell through to the per-slice
-    # path. Closed form as in ramp, with the pipe's length in f.
+    # superimposed marker has split into super_slaves. The wake then lives on the lord.
+    # ele%wake is null on every tracked slave, and pointer_to_wake_ele resolves the
+    # wake, which applies once at the slave containing the lord's midpoint. A walk that
+    # read ele%wake directly would send the lord's wake to the per-slice path, and this
+    # check fails. The closed form is the one in ramp, with the pipe's length in f.
     L_PIPE = 0.1
     (w/"wl_lordw.bmad").write_text(
         LAT_BASE.format(l=L_ELE, wake="").replace("SEGW: line = (UNDW)",
@@ -257,7 +262,7 @@ def main():
     if bad != 0.0:
         print("FAIL: wake kicked slices AHEAD of all charge (acausal or direction flipped)")
         ok = False
-    # d8 direction cross-check: wake_on on the same beam marks the same mask.
+    # Direction cross-check: wake_on on the same beam must mark the same mask.
     (w/"wc_d8.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcd8", sample=SAMPLE,
         extra="  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n"))
     run(exe, "wc_d8.nml", "wcd8.log", w)
@@ -274,8 +279,9 @@ def main():
         print("FAIL: the transcribed wake model does not mark the same affected mask")
         ok = False
 
-    # ---------------- z_long cross-validation with the d8 resistive-wall kernel
-    # Export the kernel from a wake_on run (any beam, kernels are beam-independent).
+    # ---------------- z_long cross-validation with the resistive-wall kernel of wake_on
+    # Export the kernel from a wake_on run. Any beam serves, since the kernels do not
+    # depend on the beam.
     (w/"wz_k.nml").write_text(imp_nml(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
         extra='  load_only = T\n  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n'
               '  wake_relaxation = 8.1e-6\n  chamber_wake%write_kernels = "kern.txt"\n'))
@@ -289,7 +295,7 @@ def main():
     dz_t = s_k[1] - s_k[0]
     npad = len(s_k) // 2 + 2                        # extend past the window with zeros
     s_ext = np.concatenate([s_k, s_k[-1] + dz_t * np.arange(1, npad + 1)])
-    # Sign: the d8 kernels are stored signed as energy loss (wakeres < 0, applied as
+    # Sign: the wake_on kernels are stored signed as energy loss (wakeres < 0, applied as
     # dgamma = eloss*dz/m). Bmad's z_long table is positive-decelerating (vec6 -= conv).
     w_ext = np.concatenate([-w_res / E_CHARGE, np.zeros(npad)])
     z_tab = np.concatenate([-s_ext[::-1], s_ext[1:]])
@@ -302,9 +308,10 @@ def main():
     run(exe, "wz_a.nml", "wza.log", w)
     A = load_par(w, "wza")
     B = load_par(w, "wcb")                            # the no-wake twin from causality
-    # First principles: per-particle convolution of the same table with the actual
-    # particle distribution (positions from theta: z_global = theta/ks + (islice-1)*spacing
-    # -- theta = ks*z/beta and the table compares z differences at beta ~ 1e-8 accuracy).
+    # First principles: a convolution of the same table with the particle distribution,
+    # particle by particle. Positions come from theta, z_global = theta/ks +
+    # (islice-1)*spacing. Since theta = ks*z/beta, the table compares z differences to
+    # an accuracy of 1 - beta, about 1e-8.
     ks = 2 * math.pi / LAMBDA0
     zs, qs, gid = [], [], []
     for i, b in enumerate(B):
@@ -323,7 +330,7 @@ def main():
         mask = dzv <= 0
         contrib = (qs[mask] * interp_w(dzv[mask])).sum() - 0.5 * qs[j] * interp_w(0.0)
         dpz_ref[j] = -(L_ELE / P0C) * contrib
-    # Bmad's measured kick per slice mean vs the reference per slice mean.
+    # Bmad's kick as a slice mean against the reference slice mean.
     worst_m = 0.0
     scale = max(abs(dpz_ref.mean()), np.abs(dpz_ref).max())
     for i, (a, b) in enumerate(zip(A, B)):
@@ -342,7 +349,8 @@ def main():
     if worst_m > 5e-2:
         print("FAIL: Bmad z_long kick does not match the kernel convolution")
         ok = False
-    # Price the methodological difference vs the d8 slice-density model, reported:
+    # Report the difference in method against the slice-density model of wake_on.
+    # It is not checked.
     dg_d8 = eloss * L_ELE / M_ELECTRON               # eloss from the causality wake_on run
     for i, (a, b) in enumerate(zip(A, B)):
         if b["q"] < 0.05 * max(bb["q"] for bb in B):
@@ -352,11 +360,11 @@ def main():
               f"(methodological difference, reported not checked)")
 
     # On a resolved beam (uniform current, structure much wider than a slice) the two
-    # methods must converge: check their per-slice dgamma agreement on interior slices.
-    # Tolerance derivation: the remaining differences are the self-slice treatment
-    # (halved W(0) on slice sums vs particle-level pairs, ~1/(2*nslice) of the kick),
-    # slice-center vs particle-position binning (~(spacing/kernel scale)^2), and the
-    # once-per-element vs per-step application (identical here: one step). Check 5e-2.
+    # methods must agree, and their dgamma per slice is checked on the interior slices.
+    # The smaller differences are the self-slice treatment (halved W(0) on slice sums
+    # against pairs of particles, ~1/(2*nslice) of the kick), binning at the slice center
+    # against binning at the particle (~(spacing/kernel scale)^2), and once per element
+    # against once per step (identical here, with one step). The bound below carries them.
     (w/"wu_a.nml").write_text(gen_nml(lat="wl_zlong.bmad", root="wua", sample=SAMPLE, slen=slen, extra=""))
     run(exe, "wu_a.nml", "wua.log", w)
     (w/"wu_d8.nml").write_text(gen_nml(lat="wl_none.bmad", root="wud8", sample=SAMPLE, slen=slen,
@@ -370,14 +378,15 @@ def main():
         if len(parts) == 2 and not line.startswith("#"):
             eloss_u.append(float(parts[1]))
     eloss_u = np.array(eloss_u[:len(AU)])
-    # The dominant, derived difference: Genesis's wake model (Collective.cpp,
-    # transcribed in d8) represents the beam as a linearly interpolated current with a
-    # Zero pad past the head slice -- a trapezoidal density missing half a slice of
-    # charge at the head -- while the particle-level z_long sees the full charge. On
-    # this window the kernel is effectively constant (its scale, ~8 um, dwarfs the nm
-    # window), so slice i's kick collects (n - i + 1/2) slices of charge ahead+self and
-    # the head deficit predicts a fractional difference b_i = 0.5/(n - i + 0.5).
-    # Check each interior slice at 1.5*b_i + 2e-2 (margin for the interpolation shape).
+    # The dominant difference is derived. Genesis's wake model (Collective.cpp,
+    # transcribed as wake_on) represents the beam as a linearly interpolated current with
+    # a zero pad past the head slice. That is a trapezoidal density missing half a slice
+    # of charge at the head, while z_long sees the full charge of the particles. On this
+    # window the kernel is effectively constant, since its scale of ~8 um is far above
+    # the nm window. Slice i's kick collects (n - i + 1/2) slices of charge, ahead and
+    # self, and the head deficit predicts a fractional difference b_i = 0.5/(n - i + 0.5).
+    # Each interior slice is checked at 1.5*b_i + 2e-2, the margin for the shape of the
+    # interpolation.
     worst_excess = 0.0
     nA = len(AU)
     for i in range(1, nA - 1):
@@ -408,10 +417,11 @@ def main():
         d1 = (A1[i]["gamma"] - B1[i]["gamma"]).mean()
         d2 = (A2[i]["gamma"] - B2[i]["gamma"]).mean()
         worst_s = max(worst_s, abs(d1 - d2) / denom)
-    # Tolerance: the exact invariant is the CHARGE-weighted kick. The dump carries no
-    # weights, and the unweighted slice mean also moves because splitting
-    # changes the resampler's candidate pools (same currents, different draws) -- an
-    # in-slice self-term-scale effect, ~q_slice/(2*Q_tot*npart) of the kick. Check 2e-9.
+    # Tolerance: the exact invariant is the charge-weighted kick. The dump carries no
+    # weights, and the unweighted slice mean also moves, because splitting changes the
+    # resampler's candidate pools (same currents, different draws). The effect is the
+    # size of the self term within a slice, ~q_slice/(2*Q_tot*npart) of the kick.
+    # Check at 2e-9.
     print(f"split-weight invariance of the kick profile: {worst_s:.3e} (check 2e-9)")
     if worst_s > 2e-9:
         print("FAIL: wake kick not invariant under coincident weight splitting")

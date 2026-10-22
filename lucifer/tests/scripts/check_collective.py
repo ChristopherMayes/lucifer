@@ -1,28 +1,41 @@
 #!/usr/bin/env python3
 """
-Self-referenced checks for the collective terms (the Genesis-comparison
-tiers live in compare_fel.py).
+Self-referenced checks of the collective terms, the wakes and space charge.
+The tiers against Genesis are in compare_fel.py. validation.md
+(val-wakes-and-space-charge) records the levels.
 
 1. Energy bookkeeping. A dark, quiet, cold beam (no seed, no shot noise, negligible
    energy spread) tracked with all wake kernels on has exactly one energy channel: the
-   applied per-slice eloss. At every consecutive record pair, the measured
-   d<gamma> must equal eloss(slice)*dz/m_electron to the diagnostic's print resolution,
-   and sigma_gamma must stay constant (the kick is uniform within a slice).
+   applied eloss per slice. At every consecutive record pair, d<E> must equal
+   eloss(slice)*dz in eV to the print resolution of the diagnostic, 1e-6 of the largest
+   kick plus 1e-7 m_e c^2. sigma_E must stay within 1e-8 m_e c^2, since the kick is
+   uniform within a slice.
 
 2. Stale-wake structure. With migration on and a large energy spread, the current
-   profile changes, and the wake convolution must follow: <out_root>.wake.txt must hold
-   more than one z-stamped eloss block, and the blocks must differ. Removing the
-   migration-stride recompute (the stale-wake mutation) leaves one block and fails
-   loudly. The checker parses the driver's record of recomputes rather than
-   reimplementing the convolution.
+   profile changes, and the wake convolution must follow. <out_root>.wake.txt must hold
+   more than one z-stamped eloss block, and the blocks must differ. The mutation that
+   removes the recompute at a migration stride leaves one block and fails. The check
+   parses the driver's record of recomputes rather than reimplementing the convolution.
 
 3. A stride that only drops. A particle dropped off the window's end changes the
-   current profile as a move does, and the recompute once keyed on moves alone, so a
-   stride that dropped charge and moved nothing left the wake computed from charge no
-   longer there. The case is built rather than found: a cold beam confined to the head
-   slice by editing a dump, detuned so it slips out of the window and never into
-   another slice. Its migration record must show drops and no moves, and the wake
-   record must hold one block per such stride beyond the hoist.
+   current profile as a move does. A recompute keyed on moves alone would leave the
+   wake computed from charge no longer there after a stride that drops charge and moves
+   nothing. The case is built: a cold beam confined to the head slice by editing a dump,
+   detuned so it slips out of the window and never into another slice. Its migration
+   record must show drops and no moves. The wake record must hold one block per stride
+   beyond the first block, and each must differ from the first.
+
+4. The charge representation. One particle split into 16 colocated copies, and every
+   particle split in two, must leave the physical diagnostics within 1e-12 of the
+   unsplit run, with space charge on and off.
+
+5. The long-range kernel at zero width. A slice left with one particle must give the
+   three nearest slices the field of a point charge, q / (4 pi eps0 d^2), within 5e-2.
+
+6. The short-range solve on a collapsed slice. With no radial scale the run is refused,
+   and so are space_charge%nphi and space_charge%ngrid outside their domains. With a
+   scale, a lone particle and a slice with no charge take nothing from the solve, and a
+   colocated pair opens a spread with its mean held.
 
 Usage: check_collective.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad and aramis.bmad. Exit 0 only if all pass.
@@ -135,7 +148,7 @@ def split_particles(src, dst, parts, which=None):
                 d.attrs[key] = val
 
         # The charge each copy carries. The loop above has already repeated a shaped
-        # weight record; a constant one becomes shaped here, since the copies no longer
+        # weight record. A constant one becomes shaped here, since the copies no longer
         # carry what the rest of the beam carries.
         w = g["weight"]
         if isinstance(w, h5py.Dataset) and w.shape:
@@ -407,11 +420,11 @@ def main():
     # charges sum to the original's is the same physical beam described with more
     # macroparticles, so every field it makes and every kick it takes must be unchanged.
     # The short-range solve centers its radial bins and its azimuthal basis on the slice
-    # centroid, and that centroid was an unweighted mean where every source term is
-    # charge weighted: splitting one particle moved the origin and changed the field at
-    # every physical point. Splitting every particle equally leaves an unweighted mean
-    # where it was, which is why the harness's own beamlet loader could not see it, so
-    # the check splits one particle and keeps the all-particle case as the control.
+    # centroid, which must be charge weighted, as every source term is. With an
+    # unweighted centroid, splitting one particle moves the origin and changes the field
+    # at every physical point. Splitting every particle equally leaves an unweighted mean
+    # where it was and cannot tell the two apart. The check splits one particle and keeps
+    # the all-particle case as the control.
     sc_lat = (wd / "collsc.bmad")
     sc_lat.write_text("call, file = aramis_1seg.bmad\nwiggler::*[SPACE_CHARGE_METHOD] = slice\n")
     sc_on = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 2\n"
@@ -455,13 +468,13 @@ def main():
 
     # 5. The long-range kernel at a vanishing source width, against the closed form it
     # becomes there. A source slice contributes (1 - |d|/sqrt(d^2 + A)) / A with A its
-    # transverse area and d the boosted separation, and that has a finite limit as A goes
-    # to zero: 1 / 2 d^2, which carries the whole kernel to q / (4 pi eps0 d^2), the field
-    # of a point charge. Written with the subtraction it loses every digit once A is small
-    # against d^2 and divides by a zero A, and a guard put a square metre of area in its
-    # place, so the field of a slice whose charge sits at one transverse point came out
-    # orders too small. Migration reaches that state by moving particles out of a slice
-    # one at a time until one is left, which is the deck here.
+    # transverse area and d the boosted separation. That has a finite limit as A goes to
+    # zero, 1 / 2 d^2, which carries the whole kernel to q / (4 pi eps0 d^2), the field of
+    # a point charge. Written with the subtraction, the form loses every digit once A is
+    # small against d^2, and it divides by a zero A. A guard that puts a square metre of
+    # area in place of a zero A makes the field of a slice whose charge sits at one
+    # transverse point orders too small. Migration reaches that state by moving particles
+    # out of a slice one at a time until one is left, which is the deck here.
     #
     # The deck isolates the term: dark, so no gain, the chamber wake off and the radial
     # solve off, so a slice's mean energy moves only by the long-range term's work. The
@@ -502,11 +515,11 @@ def main():
           f"{worst:.2e} (tol 5e-2)  {'ok' if p_ok else 'FAIL'}")
 
     # 6. What the short-range solve does with the states a run can reach. Its grid needs a
-    # radial scale, and a slice whose charge sits at one transverse point offers none: the
+    # radial scale, and a slice whose charge sits at one transverse point offers none. The
     # cell volumes go as the cell width squared, so the field has no limit there. That is
     # not a zero. Particles at one transverse point and different ponderomotive phases
     # push each other, and only a lone particle feels nothing, its own harmonic sum
-    # cancelling. So the solve refuses where it has no scale, and where it has one it must
+    # cancelling. So the solve refuses where it has no scale. Where it has one, it must
     # give the lone particle nothing and the pair their mutual push.
     sr_only = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 2\n"
                "  space_charge%nphi = 1\n")
@@ -564,16 +577,16 @@ def main():
         got[tag] = (float((on[-1, 0, 6] - on[0, 0, 6]) - (off[-1, 0, 6] - off[0, 0, 6])),
                     float((on[-1, 0, 7] - on[0, 0, 7]) - (off[-1, 0, 7] - off[0, 0, 7])))
     # The collapsed slice is slice 1. A lone particle feels its own field and nothing
-    # else, and its harmonic sum cancels exactly; a slice with no charge has no source at
+    # else, and its harmonic sum cancels exactly. A slice with no charge has no source at
     # all. Neither moves in energy. Two colocated particles at different phases push each
     # other, equally and oppositely, so their mean holds while their spread opens.
     d_one, s_one = abs(got["one"][0]), abs(got["one"][1])
     d_nq, s_nq = abs(got["nq"][0]), abs(got["nq"][1])
     d_two, s_two = abs(got["two"][0]), abs(got["two"][1])
-    # The pair's mean is not exactly still: the two exchange energy, which moves their
+    # The pair's mean is not exactly still. The two exchange energy, which moves their
     # phases apart, so the push stops being exactly equal and opposite within the step.
-    # Measured it is a percent of the spread they open, which is the statement that this
-    # is a mutual force and not a common one.
+    # The mean moves by a percent of the spread the pair opens, checked at 5e-2, which
+    # says the force is mutual and not common (validation.md, val-wakes-and-space-charge).
     c_ok = (d_one < 1e-6 and s_one < 1e-6 and d_nq < 1e-6 and s_nq < 1e-6
             and s_two > 1e-3 and d_two < 5e-2 * s_two)
     ok = ok and r_ok and c_ok

@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
-"""FP32 lockstep checks (doc/performance.md): the single-precision particle path's
-divergence from the FP64 reference is a recorded number, the instrument cannot touch
-the FP64 physics, and the check can fail.
+"""Checks of the FP32 lockstep instrument (performance.md, and validation.md at
+val-fp32-lockstep). The divergence of the single-precision particle path from the FP64
+path is a recorded number, the instrument leaves the FP64 physics alone, and the check
+can fail.
 
-1. Lockstep levels. A steady one-segment run with fp32_check = "lockstep" must land
-   its worst per-quantity divergence inside the recorded ceilings, particle rows and
-   the field twin's source and post-solve rows alike, its residual guard must stay in
-   healthy ulps, and the bucket-renormalization round trip must be exact to one ulp.
+1. Lockstep levels. A steady one-segment run with fp32_check = "lockstep" must land its
+   worst divergence per quantity inside the recorded ceilings. This holds for the
+   particle rows and for the field twin's source and post-solve rows. The residual
+   guard must stay at or above 256 ulps, and the bucket renormalization round trip must
+   stay within 1.5 ulps.
 2. Read-only. The same deck with the instrument off must reproduce the instrumented
-   run's diag file byte for byte: the twin observes the FP64 path and never steers it.
-3. Falsifiable. fp32_mutate = T coarsens the FP32 residual by eight mantissa bits, and
-   the theta level and the field twin's source row must both move, so a wrong twin on
-   either side cannot hide behind a check that always passes.
-4. Compounding and the end-to-end number. freerun carries the FP32 longitudinal state
-   and the FP32 field across steps: the phasor must diverge past lockstep, and the
-   recorded end-to-end power divergence on this gain-regime segment is the yardstick a
-   device port will be judged against.
-5. Time dependence. An 8-slice shot-noise window holds the same ceilings, and the
-   instrument's stream is byte-identical at 1 and 8 threads (per-slice work only).
-6. Refused. The twin mirrors the fundamental-only collective-free advance, so
-   a wake run with the instrument on must refuse, not measure wrongly in silence.
+   run's diag file byte for byte. The twin observes the FP64 path and never steers it.
+3. Falsifiable. fp32_mutate = T coarsens the FP32 residual by eight mantissa bits. The
+   theta level must then grow by 10 times and the field twin's source row by 5 times,
+   so a wrong twin on either side fails the check.
+4. Compounding and the end-to-end number. Freerun carries the FP32 longitudinal state
+   and the FP32 field across steps. The phasor must diverge past lockstep, and the
+   end-to-end power divergence on this gain-regime segment must lie in (0, 1e-2]. That
+   number is the figure a device port is judged against.
+5. Time dependence. An 8-slice shot-noise window holds the same ceilings. The
+   instrument's stream is byte-identical at 1 and 8 threads, since its work is per slice.
+6. Refused. The twin mirrors the advance at the fundamental with no collective effects,
+   so a wake run with the instrument on must be refused rather than measured wrongly.
 
 Usage: check_fp32.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis_1seg.bmad. Exit 0 only if all pass.
@@ -68,9 +70,10 @@ TD_EXTRA = """  beam_init%bunch_charge = 1.601107656951e-14
   n_wavelength = 3
 """
 
-# The recorded ceilings, set at three times the measured levels of the cases below
-# (production and debug builds measure alike: the twin's arithmetic is its own).
-# Moving past one is a real change in the FP32 path's error, not noise.
+# The recorded ceilings are three times the levels of the cases below, which
+# validation.md (val-fp32-lockstep) records. The production and debug builds give the
+# same levels, since the twin's arithmetic is its own. A level past its ceiling means the
+# error of the FP32 path changed.
 
 CEIL = {"pz": 2e-6, "theta": 3e-4, "phasor": 3e-5, "source": 1e-4, "field": 1e-4}
 GUARD_FLOOR = 256.0
@@ -95,9 +98,9 @@ def run(exe, wd, name, text, threads="4", expect_fail=False):
         print(f"FAIL: {name} exited {r.returncode}:")
         print(r.stdout[-3000:])
 
-        # A runtime error from the compiler goes to stderr, not to out_io, and a run that
-        # stops there prints nothing on stdout after its banner. Printing only stdout left
-        # one such stop with no message at all to read.
+        # A runtime error from the compiler goes to stderr and not to out_io. A run that
+        # stops there prints nothing on stdout after its banner, so the tail of stderr is
+        # printed too.
 
         if r.stderr:
             print(f"--- {name} stderr:")
@@ -146,7 +149,7 @@ def main():
     same = (wd / "fp32ss.diag.txt").read_bytes() == (wd / "fp32off.diag.txt").read_bytes()
     ok("FP64 diag byte-identical, instrument on vs off", same, "True", same)
 
-    # 3. Falsifiable: the mutation must move the theta level and the field rows.
+    # 3. Falsifiable: the mutation must move the theta level and the field twin's source row.
     run(args.exe, wd, "fp32_mut.in", BASE.format(root="fp32mut",
         extra='  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
     m = summary(wd, "fp32mut")
@@ -155,8 +158,9 @@ def main():
     ok("mutation moves worst_source", f"{m['source']:.3e} vs {s['source']:.3e}",
        ">= 5x", m["source"] >= 5 * s["source"])
 
-    # 4. Compounding: freerun past lockstep, and the end-to-end number exists. The
-    # freerun end-to-end on this gain-regime segment is the device-port yardstick.
+    # 4. Compounding: freerun must diverge past lockstep, and its end-to-end power
+    # divergence on this gain-regime segment must lie in (0, 1e-2]. That number is the
+    # figure a device port is judged against.
     run(args.exe, wd, "fp32_fr.in", BASE.format(root="fp32fr",
         extra='  global%fp32_check = "freerun"\n'))
     f = summary(wd, "fp32fr")
@@ -179,7 +183,7 @@ def main():
     same = t8 == (wd / "fp32td.fp32.txt").read_bytes()
     ok("instrument stream byte-identical, 1 vs 8 threads", same, "True", same)
 
-    # 6. Refused outside the twin's coverage.
+    # 6. A wake run lies outside the twin's coverage and must be refused.
     r = run(args.exe, wd, "fp32_ref.in", BASE.format(root="fp32ref",
         extra='  global%fp32_check = "lockstep"\n  wake_on = T\n  wake_radius = 2.5e-3\n'
               '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n'),

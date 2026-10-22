@@ -1,40 +1,57 @@
 #!/usr/bin/env python3
 """
-Checks for the unaveraged mode (fel-physics.md sec-unaveraged). Self-referenced by design where the point is self-consistency (the
-energy ledger, ballistic conservation) and closed-form where the point is measuring
-the averaged mode's inputs (the coupling factor fc).
+Checks of the unaveraged mode (fel-physics.md, sec-unaveraged, and validation.md,
+val-the-unaveraged-mode-fc). The checks are self-referenced where the point is
+self-consistency (the energy ledger, ballistic conservation) and closed-form where the
+point is measuring the inputs of the averaged mode (the coupling factor fc).
 
 1. Energy ledger (check zero). A strong-seed helical probe: at every record,
-   E_beam + U_field must be conserved -- the radiation kick and the source deposit are
+   E_beam + U_field must be conserved. The radiation kick and the source deposit are
    independent transcriptions of one wave equation, and only their consistency makes
-   this hold. Check: max |d(E+U)| over the cumulative field-energy turnover.
+   this hold. Check: max |d(E+U)| over the cumulative field-energy turnover. A 100 um
+   seed, which diffracts within a substep, must close the same ledger at 20 and 40
+   substeps a period, and the split must be second order on a fixed grid.
 
-2. Ballistic: a dark run's magnetic push does no work, exactly (gamma only changes in
-   the radiation kick), and the emittance survives the RK4 push through the ramps.
-   This also checks the handoff: with the sin^2 ramps the quiver vanishes at the
-   segment ends, so the exit emittance equals the entry emittance; a hard-edge entry
-   (unaveraged_ramp_periods = -1, the explicit sentinel) fails the orbit instrument loudly.
+2. Ballistic. A dark run's magnetic push does no work, exactly, since gamma changes only
+   in the radiation kick. The emittance survives the RK4 push through the ramps. This
+   also checks the handoff. With the sin^2 ramps the quiver vanishes at the segment
+   ends, so the exit emittance equals the entry emittance and the orbit is unchanged.
+   A hard-edge entry (unaveraged_ramp_periods = -1, the explicit sentinel) fails the
+   orbit check.
 
 3. fc measured, both limits. Paired probes (12 and 20 periods, identical 2-period
    ramps): the difference of the two energy-modulation phasors
        F = (2/N) sum dgamma_j exp(+i theta0_j)
    isolates the flat region (ramps and their detuning cancel exactly), and
        fc_meas = |F_B - F_A| * beta0*gamma0*sqrt(2)*m_e / (|E0| * dL * sinc)
-   must match the closed forms: planar fc = aw*(J0(xi)-J1(xi)), xi = aw^2/(2(1+aw^2));
-   helical fc = aw. |E0| = sqrt(4 Z0 P / (pi w0^2)) is the Gaussian seed's on-axis
-   envelope; sinc corrects the (tiny) off-resonance detuning.
+   must match the closed forms at 5e-3: planar fc = aw*(J0(xi)-J1(xi)), with
+   xi = aw^2/(2(1+aw^2)), and helical fc = aw. |E0| = sqrt(4 Z0 P / (pi w0^2)) is the
+   Gaussian seed's on-axis envelope. sinc corrects the small off-resonance detuning.
 
 4. h = 3: the same planar pair run with lambda0 = lambda1/3 measures the third-harmonic
    coupling against fc3 = aw*|J1(xi3)-J2(xi3)|, xi3 = (3/2) aw^2/(1+aw^2). The load is
    quiet at h = 3 because the beamlet quiet start cancels every harmonic below nbins
-   (beamlet_size = 8 here) -- the recorded reason a quadrature load is not needed for this.
+   (beamlet_size = 8 here). That is why no quadrature load is needed for this.
 
-5. Convergence: fc at 10/20/30 steps per period, tabulated. This is what the floor of 10 rests on.
+5. Convergence: fc at 10, 20 and 30 steps per period, tabulated, with fc(30) within
+   5e-4 of fc(20). The floor of 10 steps per period rests on this.
 
-6. Gain curve: the benchmark single segment, seeded steady state, unaveraged vs
-   averaged from the same generated start. The exit ln power ratio prices the
-   integrator-structure difference (ramps + split + quiver diagnostics)
-   style: measured and bounded, not litigated.
+6. Gain curve: the benchmark single segment, seeded steady state, unaveraged against
+   averaged from the same generated start. The exit ln power ratio is the difference
+   in integrator structure (ramps, split, quiver diagnostics), bounded at 0.2.
+
+7. Mixed line: an averaged, unaveraged, averaged sandwich with pipe interludes. The
+   ledger must be confined to and conserved over the unaveraged segment, frames written
+   inside it must leave the run unchanged to the bit, a wake on it must be refused,
+   and the exit power is compared with the all-averaged twin at 5e-2.
+
+8. Threads: a time-dependent unaveraged run gives a byte-identical diag and ledger at
+   1 and 8 threads.
+
+9. The time-dependent ledger of that run closes over an open window, at 1e-3.
+
+10. The single-precision twin: its rows within their tolerances, and the FP64 stream
+    and the ledger byte-identical with the twin on and off.
 
 Usage: check_unaveraged.py --exe <lucifer> --latdir <tests/bmad> --workdir <dir>
 """
@@ -151,7 +168,7 @@ TDID = """! flat keys; routed into the three groups by nml.to_groups
 
 def unavg_wrapper(wd, base):
     """A wrapper lattice selecting the unaveraged mode. The mode is per element, so it is
-    a lattice attribute; its two numbers are uniform, so the run states them."""
+    a lattice attribute. Its two numbers are uniform, so the run states them."""
     name = f"w_{base.replace('.bmad','')}.bmad"
     (wd / name).write_text(
         f"call, file = {base}\n"
@@ -273,8 +290,8 @@ def main():
     turnover = np.abs(np.diff(led[:, 2])).sum()  # cumulative field-energy turnover |dU|
     ledger_dev = np.abs(etot - etot[0]).max() / max(turnover, 1e-300)
     # The /u_s deposit makes kick and source exact energy duals, so this closes at the
-    # gamma<->pz round-trip floor (measured 1.0e-5, it was 6.7e-4 with Genesis's
-    # averaged /gamma convention in the deposit).
+    # gamma<->pz round-trip floor, 1.0e-5. Genesis's averaged /gamma convention in the
+    # deposit gives 6.7e-4 (validation.md, val-the-unaveraged-mode-fc).
     check("energy ledger: max|d(E_beam+U_field)| / sum|dU|", ledger_dev, 1e-4)
     # Internal consistency: the kick-side column must equal the realized beam change.
     # The floor is the per-record gamma <-> pz round trip (~1 ulp of gamma per particle
@@ -285,11 +302,11 @@ def main():
           np.abs(kick_col - dE_beam).max() / max(np.abs(dE_beam).max(), 1e-300), 1e-4)
 
     # 1b. The ledger on a field that diffracts. The broad seed above diffracts little in a
-    #     substep, and a source added after the diffraction carried a cross term the kick
-    #     had not charged, first order in the substep's diffraction phase: 1.2 percent of
-    #     the turnover at 20 substeps a period on a 100 um waist, halving with the
-    #     substep. The source now lands on the record the kick read, so this closes at the
-    #     same floor as the broad seed at both resolutions, and no trend with the substep.
+    #     substep. A source added after the diffraction carries a cross term the kick has
+    #     not charged, first order in the substep's diffraction phase: 1.2 percent of the
+    #     turnover at 20 substeps a period on a 100 um waist, halving with the substep.
+    #     The source lands on the record the kick read, so this closes at the same floor
+    #     as the broad seed at both resolutions, with no trend in the substep.
     for spp in (20, 40):
         root = f"uv_ledgd{spp}"
         run(exe, wd, root, probe_nml(wd, lat="unavg_probe_helical_b.bmad", root=root,
@@ -300,15 +317,14 @@ def main():
         check(f"energy ledger, 100 um seed, {spp} substeps a period: max|d(E_beam+U_field)| / sum|dU|",
               np.abs(etot - etot[0]).max() / max(turnover, 1e-300), 1e-4)
 
-    # 1c. The order of the split, measured. The lattice, the beam and the transverse grid
-    #     are held and the substep is refined, and the error of each resolution against the
-    #     finest is read for the field, as a complex array, and for the particles' energies.
-    #     The split is second order, and it measured first order for a diffracting seed:
-    #     the record the step advances is the substep's midpoint field, and it was named
-    #     for the plane half a substep behind it, so the particles worked against a field
-    #     offset by a half-substep diffraction and the exit plane was handed the same
-    #     offset. With the half-step carries at the segment's ends the
-    #     observed order between successive resolutions must sit near two.
+    # 1c. The order of the split. The lattice, the beam and the transverse grid are held
+    #     and the substep is refined. The error of each resolution against the finest is
+    #     read for the field, as a complex array, and for the particles' energies. The
+    #     record the step advances is the substep's midpoint field, half a substep from
+    #     the plane. Without the half-step carries at the segment's ends, the particles
+    #     work against a field offset by a half-substep diffraction, the exit plane gets
+    #     the same offset, and the order for a diffracting seed is one. With the carries
+    #     the observed order between successive resolutions must sit near two.
     print("--- the split's order, fixed grid, 100 um seed:")
     spps = (20, 40, 80, 160)
     fld, gam = {}, {}
@@ -339,11 +355,11 @@ def main():
           float(np.abs(d1["gamma"] - d0["gamma"]).max() / GAMMA0), 1e-12)
     check("ballistic: |emit_x out/in - 1| (ramp handoff)",
           abs(emit(d1) / emit(d0) - 1), 1e-6)
-    # The coherent-quiver instruments. A hard-edge entry (unaveraged_ramp_periods = -1, the
-    # explicit test sentinel) starts the quiver about the wrong DC (pi = -a0 instead of 0), which
-    # integrates to a centroid displacement ~a0*L/gamma -- measured 3.2e-5 m against
-    # 1.9e-9 pristine, 19 sigma of this beam -- and a non-integer-period hard exit
-    # would also leave the coherent quiver ~a0 in <px>. Both watched.
+    # The coherent-quiver checks. A hard-edge entry (unaveraged_ramp_periods = -1, the
+    # explicit test sentinel) starts the quiver about the wrong DC (pi = -a0 instead of
+    # 0). That integrates to a centroid displacement ~a0*L/gamma, 3.2e-5 m against 1.9e-9
+    # with the ramps, 19 sigma of this beam. A hard exit at a non-integer number of
+    # periods would also leave the coherent quiver ~a0 in <px>. Both are checked.
     check("handoff: |<x>_out - <x>_in| (dark) [m]",
           abs(float(d1["x"].mean() - d0["x"].mean())), 1e-7)
     check("handoff: |<px>_out - <px>_in| (dark, gamma*beta units)",
@@ -366,7 +382,8 @@ def main():
         check(f"fc measured vs closed form, {pol} (h={h}): |ratio-1|  [{fm:.5f} vs {fx:.5f}]",
               abs(fm / fx - 1), 5e-3)
 
-    # 5. Convergence at 10/20/30 steps/period (planar pair), which the floor rests on.
+    # 5. Convergence at 10, 20 and 30 steps a period (planar pair). The floor of 10
+    # rests on it.
     print("--- step-size convergence (planar fc, steps/period):")
     fcs = {}
     for spp in (10, 30):
@@ -390,11 +407,11 @@ def main():
     check(f"gain curve: |ln(P_unavg/P_avg)| at segment exit  [{pu[-1]:.4e} vs {pa[-1]:.4e}]",
           lnr, 0.2, note="(priced integrator-structure difference)")
 
-    # 7. Mixed line (Stage A): averaged / unaveraged / averaged sandwich with pipe
-    # interludes. Completing at all exercises the convention-flag asserts at real
-    # internal boundaries. The ledger must be confined to and conserved over the
-    # unaveraged segment. A wake on that segment must refuse, and the exit
-    # power is priced against the all-averaged twin.
+    # 7. Mixed line: averaged / unaveraged / averaged sandwich with pipe interludes. A
+    # run that completes has passed the convention-flag asserts at real internal
+    # boundaries. The ledger must be confined to and conserved over the unaveraged
+    # segment. A wake on that segment must be refused, and the exit power is compared
+    # with the all-averaged twin.
     (wd / "sandwich_avg.bmad").write_text(
         "call, file = unavg_sandwich.bmad\n"
         "UNDB[FEL_METHOD] = averaged\n")
@@ -409,9 +426,9 @@ def main():
     check("sandwich: ledger max|d(E+U)| / sum|dU| on the middle segment",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
     # A diagnostic must not steer the run it observes, and a frame written inside the
-    # unaveraged segment is the one that could: the record there is the substep's midpoint
-    # field and the frame carries the plane's, so the writer diffracts. It does so on a
-    # copy. With frames every 0.1 m through the mixed line, six of them inside the
+    # unaveraged segment is the one that could. The record there is the substep's
+    # midpoint field and the frame carries the plane's, so the writer diffracts, on a
+    # copy. With frames every 0.1 m through the mixed line, five of them inside the
     # unaveraged segment, the final beam and field must be the frames-off run's to the bit.
     run(exe, wd, "uv_sandfr", GAIN.format(root="uv_sandfr", lat="unavg_sandwich.bmad").replace(
         "  write_diag = T\n", "  write_diag = T\n  global%dump_at_comb = T\n  global%comb_ds_save = 0.1\n"))
@@ -438,10 +455,10 @@ def main():
           0.0 if refused else 1.0, 0.5)
 
     # 8. Thread invariance: the parallel slice loop must be invisible. A multi-slice
-    # time-dependent unaveraged run (slippage active, so slices genuinely interleave
-    # through the field) at 1 thread and at 8 threads must produce byte-identical
-    # diagnostics AND ledger -- the same guarantee the averaged path carries
-    # (per-slice private state, fixed-order energy reduction).
+    # time-dependent unaveraged run (slippage active, so slices interleave through the
+    # field) at 1 thread and at 8 threads must produce byte-identical diagnostics and
+    # ledger. The averaged path carries the same guarantee (per-slice private state,
+    # fixed-order energy reduction).
     wl = unavg_wrapper(wd, "aramis_1seg.bmad")
     run(exe, wd, "uv_tid1", TDID.format(root="uv_tid1", lat=wl), threads="1")
     run(exe, wd, "uv_tid8", TDID.format(root="uv_tid8", lat=wl), threads="8")
@@ -450,31 +467,33 @@ def main():
     check("thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes)",
           0.0 if same else 1.0, 0.5)
 
-    # 9. The TIME-DEPENDENT ledger closure. The window is an open system -- slippage
-    # transmits the head slice's light out of the simulation -- and the deposit's own
+    # 9. The time-dependent ledger closure. The window is an open system, since slippage
+    # transmits the head slice's light out of the simulation. The deposit's own
     # |dE_src|^2 is the one field-energy term the kick/deposit duality does not charge
     # to the beam (physically: the substep's spontaneous emission). Both are banked as
-    # ledger columns, so the closing quantity is exact:
-    #     E_beam + U_window + U_escaped - U_spont = const.
+    # ledger columns, as is E_rad, the energy the beam radiates under bmad_com's
+    # radiation switches. So the closing quantity is exact:
+    #     E_beam + U_window + U_escaped - U_spont + E_rad = const.
     # Wakes would be a second, unbanked exit channel from the beam. They are refused in
-    # this mode, which is what entitles this check to exist.
+    # this mode, so the closure holds.
     led = np.loadtxt(wd / "uv_tid1.ledger.txt")
     etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
     turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
     check("TD ledger: max|d(E_beam+U_window+U_escaped-U_spont+E_rad)| / turnover",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
 
-    # 8. The single-precision twin (doc/validation.md, and this mode's section of
-    # fel_unaveraged_mod). Apple GPUs carry no FP64, so a device port of this mode needs
-    # a single-precision form of the advance with its divergence from FP64 measured
-    # first. The twin is that measurement, and the levels below are what it reads.
+    # 10. The single-precision twin (validation.md, val-unaveraged-fp32, and this mode's
+    # section of fel_unaveraged_mod). Apple GPUs carry no FP64, so a device port of this
+    # mode needs a single-precision form of the advance with its divergence from FP64
+    # measured first. The twin is that measurement, and the levels below are what it reads.
     #
-    # Four rows are asserted. The transverse pair and the energy price the reformulated
-    # charts. theta prices the phase, and it is the row the mode lives on: the slippage
-    # rate is a difference of two numbers that are both one to within 1.3e-8, so the
-    # naive single-precision form returns exactly zero and the phase is destroyed.
-    # Replacing the identity with that form takes this row from 1.3e-5 rad to 1.7 rad,
-    # which is the mutation record for it.
+    # Seven rows are asserted: the transverse pair, the transverse momentum pair, the
+    # energy, theta, the phasor, the ledger and the field. The transverse rows and the
+    # energy test the reformulated charts. theta tests the phase, and it is the row the
+    # mode lives on. The slippage rate is a difference of two numbers that are both one
+    # to within 1.3e-8, so the naive single-precision form returns exactly zero and the
+    # phase is destroyed. The mutation that replaces the identity with that form takes
+    # this row from 1.3e-5 rad to 1.7 rad.
     #
     # The instrument may not steer what it observes, so the FP64 stream and the ledger
     # are required byte-identical with the twin on against off. That is the same demand
@@ -523,7 +542,7 @@ def main():
           0.0 if same_led else 1.0, 0.5)
 
     # freerun compounds a single-precision state across steps and this twin carries none,
-    # so it is refused rather than reported as something it is not.
+    # so the mode refuses it. The run is made here, but its refusal is not asserted.
     run_expect_refusal(exe, wd, "uv_twfree", GAIN.format(root="uv_twfree",
         lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
         .replace("&end", '  global%fp32_check = "freerun"\n&end'),
