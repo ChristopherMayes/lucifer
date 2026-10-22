@@ -9,6 +9,8 @@ An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lu
 
 ## Features
 
+Lucifer has:
+
 - **The FEL element.** An FEL segment is a Bmad wiggler, so its parameters are lattice attributes and one lattice serves tracking, optics and layout.
 - **Two FEL methods**, averaged and unaveraged, set per element through Bmad's `fel_method` attribute and mixing freely in one line. The [next section](#intro-two-methods) says what each is for.
 - **Per-particle weights** throughout: physical shot noise, collective effects and diagnostics are all weight-correct.
@@ -55,6 +57,8 @@ The averaged method's transverse maps have a third option behind them, the trans
 Runnable cases live in `lucifer/examples/`, each a directory of real input files with its own README and the numbers measured on it. Every one of them has a page here, with its figure and its input files. [](generated/examples/examples.md) carries the table of which example shows which feature.
 
 ## Known missing features
+
+Lucifer does not have:
 
 - Simultaneous harmonic fields in the unaveraged mode.
 - Elliptical polarization beyond the tilt-honored planar and helical limits.

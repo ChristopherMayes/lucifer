@@ -3,7 +3,7 @@ title: References
 short_title: References
 ---
 
-What this code implements, and where each thing came from. Every entry names the source and the routine that carries it, so a reader can go from a paper to the transcription and back. The physics manual repeats these citations in place, section by section, with the equations beside them.
+This page lists what this code implements, and where each thing came from. Every entry names the source and the routine that carries it, so a reader can go from a paper to the transcription and back. The physics manual repeats these citations in place, section by section, with the equations beside them.
 
 ## The codes this one is measured against
 
@@ -40,7 +40,7 @@ What this code implements, and where each thing came from. Every entry names the
 
 ## Papers the SASE convergence page cites
 
-The sources of [](startup-noise.md#prior-work), each read for that page.
+These are the sources of [](startup-noise.md#prior-work), each read for that page.
 
 (ref-penman-mcneil)=
 **Shot noise in one dimension.** C. Penman and B. W. J. McNeil, [Opt. Commun. **90**, 82 (1992)](<https://doi.org/10.1016/0030-4018(92)90333-M>). The shot noise to impose on the electron phases as the initial condition of a simulation, from the Poisson statistics of the real electrons.

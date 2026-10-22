@@ -1,6 +1,6 @@
 # User guide: building, describing a run, and running it
 
-Everything needed to get from a checkout to a tracked FEL run. The parameter-by-parameter reference is [`input-reference.md`](input-reference.md). What the output files hold and how to read them is [`reading-output.md`](reading-output.md). The measured levels and how to reproduce them are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.md`](fel-physics.md).
+This page holds everything needed to get from a checkout to a tracked FEL run. The parameter-by-parameter reference is [`input-reference.md`](input-reference.md). What the output files hold and how to read them is [`reading-output.md`](reading-output.md). The measured levels and how to reproduce them are [`validation.md`](validation.md). The physics is the manual, [`fel-physics.md`](fel-physics.md).
 
 ## Building
 
@@ -38,7 +38,7 @@ The FEL method is Bmad's own `fel_method` attribute, set on the element as any a
 | `averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production method. |
 | `unaveraged` | Direct RK4 integration through the analytic undulator field: no averaging, no resonance approximation, fc and JJ nowhere in its inputs. A production method whose ~30x cost per step buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content in the current. It is also an independent check on the averaged method, since the two share no approximation. |
 
-A lattice writes them as it writes any attribute, `fel_method = unaveraged`, and class-settable as `wiggler::*[FEL_METHOD] = unaveraged`. The averaged method's maps have one more option behind them, `global%transport_model`, described in [`input-reference.md`](input-reference.md).
+A lattice writes them as it writes any attribute, `fel_method = unaveraged`, and a class statement sets them too, `wiggler::*[FEL_METHOD] = unaveraged`. The averaged method's maps have one more option behind them, `global%transport_model`, described in [`input-reference.md`](input-reference.md).
 
 ## Running
 
@@ -50,7 +50,7 @@ lucifer lucifer.in
 
 The name is an argument and any name works. `lucifer.in` is the convention the examples follow, so that a directory reads the same way twice, and it is not a default the program looks for. Running `lucifer` with no argument prints that much, the Bmad version it was built against and the device backend this build carries.
 
-The file vocabulary of a run, in four extensions:
+The file vocabulary of a run has four extensions:
 
 | Extension | Written by | What it is |
 |---|---|---|
@@ -111,7 +111,7 @@ The validation harness is a separate thing, described with its commands in [`val
 
 ## Architecture
 
-(Physics: manual [](fel-physics.md#sec-core), [](fel-physics.md#sec-chart), [](fel-physics.md#sec-field), [](fel-physics.md#sec-slippage).)
+The physics is in the manual: [](fel-physics.md#sec-core), [](fel-physics.md#sec-chart), [](fel-physics.md#sec-field) and [](fel-physics.md#sec-slippage).
 
 Inside FEL elements (wigglers tracked by an FEL method, described in the FEL element section), `fel_track_und_step` advances the coupled system in steps of the element's `ds_step`. That is Bmad's standard step attribute, which is Genesis4's `delz` living on the lattice like every other parameter, and the bookkeeper's `num_steps = round(l/ds_step)` is exactly Genesis4's unroll. The order is Genesis4's: transverse half step, RK4 advance of (theta, gamma) with the field gathered once per step, transverse half step, then source deposition and the `exp(K2 dz)` field solve. Bmad tracking is never used inside, since `symp_lie_bmad` resolves the wiggle motion the period-averaged map assumes away.
 
@@ -133,11 +133,11 @@ This reference-offset formulation is the FP32-safe one, and it removes the wrap 
 
 ## The FEL element: parameters live on the lattice
 
-(Physics: manual [](fel-physics.md#sec-element).)
+The physics is in the manual, [](fel-physics.md#sec-element).
 
 An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying `fel_method = averaged` or `unaveraged`, Bmad's own attribute for the two FEL methods, which this driver supplies through the same hook Bmad uses for `custom`. Recognition is by key and FEL method, never by name. A wiggler carrying `tracking_method = custom` is some other program's element, and this driver leaves it to the seam. There are no per-undulator namelist parameters. The FEL parameters derive from the element attributes:
 
-- `aw` (rms, Genesis4's convention) from the peak field: `K = c*b_max/(k_u*m_e c^2)`, exactly and independent of the reference energy. Helical `aw = K`, planar `aw = K/sqrt(2)`. The benchmark lattices write `b_max` as an expression in Bmad's own constants so it encodes `aw = 0.84853` exactly, and the round trip still differs by 1 ulp, measured below.
+- `aw` (rms, Genesis4's convention) from the peak field: `K = c*b_max/(k_u*m_e c^2)`, exactly and independent of the reference energy. Helical undulators have `aw = K`, and planar undulators have `aw = K/sqrt(2)`. The benchmark lattices write `b_max` as an expression in Bmad's own constants so it encodes `aw = 0.84853` exactly, and the round trip still differs by 1 ulp, measured below.
 - Helicity from `field_calc` (`helical_model` / `planar_model`), never from the stored `k1x`/`k1y` wiggler attributes, whose helical sign convention disagrees with Bmad's own tracking locals.
 - Genesis4's natural-focusing split from the helicity defaults (`kx = ky = 0.5*k_u^2` helical, `0`/`k_u^2` planar). Bmad's `kx` roll-off attribute is not yet mapped onto that split and must be zero.
 
@@ -145,7 +145,7 @@ Outside the driver's own FEL walk the element is just a periodic wiggler, tracke
 
 Three assertions guard silent failures where the driver claims the element, in the setup pass that reads `fel_method`. They refuse a missing `b_max`, where Bmad's own kernel would silently give `osc_amplitude = 0` (no field, no resonance, no error). They refuse a missing `l_period`, the same silence. And they refuse a fieldmap `field_calc`, which segfaults the parse-time reference tracking if allowed through. Any later is too late, since the missing-`b_max` lattice otherwise dies downstream on an unrelated generation message. The assertions live in one routine (`fel_assert_wiggler_sane`) and nowhere else, since a second copy would mask the removal of either under mutation testing. The same routine also refuses a super_slave undulator, a nonzero roll-off attribute, a tilt on a helical element and an integration step equal to Bmad's fallback for an unset one, which a wiggler with a period never carries. All three refusals are permanent harness checks.
 
-Anchored against the namelist-driven reference: the element-driven full time-dependent line reproduces the earlier namelist-driven run to a max relative difference of 3.4e-12, zero at z = 0 and growing with gain. That is the amplification of the 1-ulp `aw` difference between deriving `aw` through the `b_max` attribute round trip and reading it from input.
+The element-driven full time-dependent line is anchored against the namelist-driven reference: it reproduces the earlier namelist-driven run to a max relative difference of 3.4e-12, zero at z = 0 and growing with gain. That is the amplification of the 1-ulp `aw` difference between deriving `aw` through the `b_max` attribute round trip and reading it from input.
 
 The FEL mode is the element's `fel_method`, class-settable as `wiggler::*[FEL_METHOD] = unaveraged`, so averaged and unaveraged segments mix freely in one line. `averaged` uses the transverse maps of Bmad's own `bmad_standard` periodic-wiggler kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like end kicks, chromatic via `p0/p`). `unaveraged` is a production method whose cost buys the full quiver dynamics (see the manual's unaveraged-mode section).
 
@@ -172,7 +172,7 @@ The program's terminal output is formatted for reading and carries no contract b
 
 This is Tao's division of labour. `show ele` is for people, and `show value` and pytao are for precision. It is why the validation suite reads files rather than scraping the screen.
 
-What a run looks like: a framed block naming the configuration, a progress table, and a completion block listing what was written.
+A run looks like this: a framed block naming the configuration, a progress table, and a completion block listing what was written.
 
 ```
 ================================================================================
