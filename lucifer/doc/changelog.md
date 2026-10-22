@@ -9,6 +9,18 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: every check script records what each check measured, through
+  `tests/scripts/checkrec.py`, beside the line it prints, and the benchmark gathers the records into its
+  results file beside the section outcomes. `report_validation.py` renders one table per check section
+  from the two builds' records, 22 tables of 699 checks, each under a label `val-levels-<section>`, and
+  refuses a check recorded in one build and not the other. `validation.md` carries no digit a table
+  records: its prose says what each check is and why and points at the table, and fifteen hand-written
+  tables of levels went. Of the digits the page carried, 118 were stale against what the scripts measure
+  today, among them the unaveraged coupling factors at 3.1e-3 of the closed form where the page said
+  5.9e-4 and the device's source-filter agreement at 1.2e-5 where the page said 1.7e-4.
+  `tests/scripts/report_numbers.py` classifies every number on the pages as a default, a standard, a
+  tolerance, a measurement, a setting, a citation or a count, with the hand classifications in
+  `tests/number_classes.tsv`, and lists the measured numbers no generated page carries yet.
 - 2026-10-23 Changed: the twelve documentation pages other than this one and the twenty example READMEs
   carry one line per paragraph and read in Bmad's register. They carry 4,584 sentences at a median of 17
   words where they carried 3,374 at 21, none over 40 words where 463 were, no prose semicolon where
