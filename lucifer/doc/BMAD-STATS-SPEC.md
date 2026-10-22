@@ -1,6 +1,6 @@
 # bmad-stats: a self-describing HDF5 layout for accelerator statistics
 
-Version 1.0, in force for this writer, with open questions pending. This document is normative for any writer claiming `@file_format = 'bmad-stats'`. It is versioned by its own number, independently of any program. Lucifer is the reference writer, as `bmad-stats 1.0` plus the `fel` extension (BMAD-STATS-EXT-FEL.md).
+This is version 1.0, in force for this writer, with open questions pending. This document is normative for any writer claiming `@file_format = 'bmad-stats'`. It is versioned by its own number, independently of any program. Lucifer is the reference writer, as `bmad-stats 1.0` plus the `fel` extension (BMAD-STATS-EXT-FEL.md).
 
 Rules are numbered R1, R2, ... so markup can point at them. The numbers are append-only: a rule keeps its number forever, so late additions sit out of sequence (R43 and R44 live in section 12). MUST, SHOULD and MAY are used as in RFC 2119. Open questions are collected at the end as O1, O2, ...
 
@@ -10,24 +10,24 @@ This standard covers the statistics and diagnostics a tracking program produces 
 
 It deliberately does *not* cover particle dumps or field meshes. Those are openPMD's job, and the two standards carry opposite unit conventions (R21), so one file never carries both.
 
-The aim: a reader guesses nothing. Every dimension, unit, meaning and relationship is stated in the file. The machine-checkable part of that claim is enforced by a generic validator that knows no program (section 14).
+The aim is that a reader guesses nothing. Every dimension, unit, meaning and relationship is stated in the file. The machine-checkable part of that claim is enforced by a generic validator that knows no program (section 14).
 
 ## 2. Definitions
 
 The datasets of a file share dimensions: many run over the same records, the same slices, the same six phase-space entries. Everything in this standard hangs off naming those shared dimensions and stating, once each, what lies along them.
 
-- **axis**: a named dimension that datasets share (`record`, `slice`, `bmad`). Every dimension of every dataset names its axis in `@axes` (R11).
-- **coordinate**: the one dataset that defines an axis by listing what lies along it: the record numbers, the slice numbers, the six phase-space names. Axes and coordinates are one to one (R15).
-- **variable on an axis**: a dataset giving one more per-entry quantity of an axis without defining it: the path length at each record, the lattice element holding each record, the unit of each phase-space entry. An axis has one coordinate and any number of variables.
-- **`coords/`**: the group holding every coordinate and every variable, once each (section 6). The name is netCDF's and not Bmad's: see the terminology note below.
-- **label axis**: an axis whose coordinate is a string array (`bmad`, `plane`), used for the trailing dimensions of vectors and matrices so no reader guesses a dimension from its length.
-- **join key**: an integer variable whose values index another axis (R18).
-- **mask**: a boolean variable selecting another axis's entries, in order (R19).
-- **data tree**: a group holding one `coords/` and the data groups whose `@axes` resolve against it (section 4).
-- **kind**: the one-word class of a group, from the root's `@kinds` vocabulary.
-- **extension**: a named, separately documented addition to this core (section 13).
+- An **axis** is a named dimension that datasets share (`record`, `slice`, `bmad`). Every dimension of every dataset names its axis in `@axes` (R11).
+- A **coordinate** is the one dataset that defines an axis by listing what lies along it: the record numbers, the slice numbers, the six phase-space names. Axes and coordinates are one to one (R15).
+- A **variable on an axis** is a dataset giving one more per-entry quantity of an axis without defining it: the path length at each record, the lattice element holding each record, the unit of each phase-space entry. An axis has one coordinate and any number of variables.
+- **`coords/`** is the group holding every coordinate and every variable, once each (section 6). The name is netCDF's and not Bmad's: see the terminology note below.
+- A **label axis** is an axis whose coordinate is a string array (`bmad`, `plane`), used for the trailing dimensions of vectors and matrices so no reader guesses a dimension from its length.
+- A **join key** is an integer variable whose values index another axis (R18).
+- A **mask** is a boolean variable selecting another axis's entries, in order (R19).
+- A **data tree** is a group holding one `coords/` and the data groups whose `@axes` resolve against it (section 4).
+- A **kind** is the one-word class of a group, from the root's `@kinds` vocabulary.
+- An **extension** is a named, separately documented addition to this core (section 13).
 
-Terminology note. "Coordinate" is used here in netCDF's coordinate-variable sense, three decades of prior art for exactly this concept and what xarray exposes as `coords`. It *never* means phase-space coordinates in this document: phase-space values live in data groups (`beam/centroid`), and the phase-space names are the labels of the `bmad` axis. O7 records the alternative of renaming the group `axes/` to avoid the domain collision entirely.
+**Terminology note.** "Coordinate" is used here in netCDF's coordinate-variable sense, three decades of prior art for exactly this concept and what xarray exposes as `coords`. It *never* means phase-space coordinates in this document: phase-space values live in data groups (`beam/centroid`), and the phase-space names are the labels of the `bmad` axis. O7 records the alternative of renaming the group `axes/` to avoid the domain collision entirely.
 
 ## 3. File identity
 
@@ -41,7 +41,7 @@ Terminology note. "Coordinate" is used here in netCDF's coordinate-variable sens
 ## 4. The data tree
 
 - **R7.** The root group is itself a data tree. Every `@axes` name in a tree resolves against that tree's own `coords/`.
-- **R8.** A program tracking several branches or universes puts each additional tree under `branches/<name>/`, a complete data tree carrying `@universe` and `@branch` identity attributes. The root tree is the default branch. (O2.)
+- **R8.** A program tracking several branches or universes puts each additional tree under `branches/<name>/`, a complete data tree carrying `@universe` and `@branch` identity attributes. The root tree is the default branch. (See O2.)
 
 ## 5. The self-description contract
 
@@ -53,7 +53,7 @@ Terminology note. "Coordinate" is used here in netCDF's coordinate-variable sens
 
 ## 6. Axes and coordinates: the coords/ group
 
-`coords/` is a data tree's table of dimensions. It holds no physics results. It holds what the results are indexed by: one coordinate per axis plus the variables attached to each axis, once each. A reader then has one place to look, and every name in every `@axes` has one place to resolve. From a real FEL file, the three roles marked:
+`coords/` is a data tree's table of dimensions. It holds no physics results. It holds what the results are indexed by: one coordinate per axis plus the variables attached to each axis, once each. A reader then has one place to look, and every name in every `@axes` has one place to resolve. The listing below is from a real FEL file, with the three roles marked:
 
 ```
 coords/record          0 1 2 ...          axis      the record number
@@ -104,11 +104,11 @@ coords/plane           x y z              axis      the projected twiss planes
 
 ## 11. Core groups
 
-- **R33.** `coords/`: section 6.
-- **R34.** `params/`, kind `input`: one subgroup per input structure the program honors, each also kind `input` and carrying `@struct` (R30), holding the resolved values of every honored component, after defaults. Components the program refuses are not written: recording a knob that did nothing would be a lie about the run. A reader never needs a defaults table, and two runs diff by their inputs alone. For a Bmad program that is typically `params/bmad_com/`, `params/space_charge_com/`, `params/beam_init/`, and the program's own globals.
-- **R35.** `run/`, kind `run`: the scalars a run produces, separated from `params/` because a reader must know what the user controlled apart from what came out: the reference momentum, species, axis lengths kept as bookkeeping cross-checks. Not `derived` in R38's sense, since their inputs are the particles and the lattice rather than other datasets here.
-- **R36.** `lattice/`, kind `table`: when the program tracks a lattice, one row per tracked element on an `ele` axis, element 0 included. Minimum columns `name`, `key`, `s_start`, `s_end`. A writer SHOULD add what a layout plot needs. Per-element attributes MAY be one dataset per non-default attribute. It is *not* a lattice serialization and MUST NOT claim to be one. (O4.)
-- **R37.** `meta/`, kind `provenance`, at the root: datasets only (R27), an ISO 8601 timestamp, and the writer's version. It MUST NOT record user identity or machine-local paths unless the run explicitly opts in, because a stats file is meant to travel. It MUST NOT claim completeness it lacks: a top-level input text says it is the top-level text.
+- **R33.** `coords/` is described in section 6.
+- **R34.** `params/`, kind `input`, holds one subgroup per input structure the program honors, each also kind `input` and carrying `@struct` (R30), with the resolved values of every honored component, after defaults. Components the program refuses are not written: recording a knob that did nothing would be a lie about the run. A reader never needs a defaults table, and two runs diff by their inputs alone. For a Bmad program that is typically `params/bmad_com/`, `params/space_charge_com/`, `params/beam_init/`, and the program's own globals.
+- **R35.** `run/`, kind `run`, holds the scalars a run produces. It is separated from `params/` because a reader must know what the user controlled apart from what came out: the reference momentum, species, axis lengths kept as bookkeeping cross-checks. Its contents are not `derived` in R38's sense, since their inputs are the particles and the lattice rather than other datasets here.
+- **R36.** `lattice/`, kind `table`, holds one row per tracked element on an `ele` axis, element 0 included, when the program tracks a lattice. The minimum columns are `name`, `key`, `s_start`, `s_end`. A writer SHOULD add what a layout plot needs. Per-element attributes MAY be one dataset per non-default attribute. It is *not* a lattice serialization and MUST NOT claim to be one. (See O4.)
+- **R37.** `meta/`, kind `provenance`, sits at the root and holds datasets only (R27): an ISO 8601 timestamp, and the writer's version. It MUST NOT record user identity or machine-local paths unless the run explicitly opts in, because a stats file is meant to travel. It MUST NOT claim completeness it lacks: a top-level input text says it is the top-level text.
 
 ## 12. Derived data and sufficiency
 
@@ -116,12 +116,12 @@ Within this file, the primary data are what the program computed from particles:
 
 - **R38.** Data that is a pure function of other data in the tree declares `@derived_from`, a string array of the sibling names it derives from. A group may declare it once for everything it holds, keeping its own kind (`twiss`), and a group whose whole identity is the derivation (`field/total`) has kind `derived`, which then requires the declaration. Two readers depend on the declaration: one summing children must not double count, and one re-deriving must know what is independent information. Scalar context from `params/` and `run/` (a spacing, a reference momentum) is ambient and is not named: `@derived_from` lists the axis-carrying inputs, and the formula belongs in `@description`.
 - **R39.** A parent whose children are summable components MUST declare `@components`, a string array, and MAY declare further child lists (`@harmonics`).
-- **R43.** Sufficiency layers. A writer MUST store the primary statistics it computed and MAY store derived conveniences beside them, marked per R38. Derived data MAY live on a sparser axis than its inputs (element ends against every record), because the primary layer makes any point reconstructible offline. A writer that computes only moments conforms.
+- **R43.** Sufficiency is layered. A writer MUST store the primary statistics it computed and MAY store derived conveniences beside them, marked per R38. Derived data MAY live on a sparser axis than its inputs (element ends against every record), because the primary layer makes any point reconstructible offline. A writer that computes only moments conforms.
 - **R44.** Stored derived data is the reference implementation's answer, which is the reason to store it at all. The normal-mode labels a, b, c are identified by eigenvector structure, a convention no reader should reimplement by guesswork. Independent eigensolvers agree only to their common floor, where the projected planes are exact algebra. The writer's harness SHOULD verify the round trip, re-deriving from the stored primary layer and comparing against the stored derived layer, matching mode sets rather than mode labels.
 
 ## 13. Extensions
 
-- **R40.** An extension is named in `@extensions`, documented in its own `BMAD-STATS-EXT-<NAME>.md`, and carries its version in a root attribute the extension defines (`@fel_version`). (O3.)
+- **R40.** An extension is named in `@extensions`, documented in its own `BMAD-STATS-EXT-<NAME>.md`, and carries its version in a root attribute the extension defines (`@fel_version`). (See O3.)
 - **R41.** An extension adds groups, axes, kinds, `params/` structs and documented attributes. It MUST NOT alter core semantics, and everything it adds MUST satisfy R9 through R32, so a generic core load never breaks on an extension it has never heard of. That property is the point of the whole contract.
 
 ## 14. Conformance
@@ -130,7 +130,7 @@ Within this file, the primary data are what the program computed from particles:
 
 ## 15. Relation to openPMD
 
-Complementary and not competing. Particles and field meshes go to openPMD, whose `unitSI` convention is load-bearing there and banned here (R21). The base-plus-extensions structure of this document is deliberately parallel to openPMD's, because this ecosystem's readers already know that model.
+The two standards are complementary and not competing. Particles and field meshes go to openPMD, whose `unitSI` convention is load-bearing there and banned here (R21). The base-plus-extensions structure of this document is deliberately parallel to openPMD's, because this ecosystem's readers already know that model.
 
 ## 16. Worked example
 
@@ -152,11 +152,11 @@ Complementary and not competing. Particles and field meshes go to openPMD, whose
 
 ## 17. Open questions
 
-- **O1.** `@axes` as a comma string with a `none` sentinel (R11) or as a string array, accepting the Fortran zero-length hazard on scalars. Current draft: string, for the stack-corruption reason, one split per reader.
-- **O2.** Branch layout: root-as-default-tree plus `branches/` (current draft, zero churn for single-branch writers) against everything under `branches/` with a `main` link (one uniform shape, two loops for nobody).
-- **O3.** Extension versioning: a root attribute per extension (draft) or versioned entries in `@extensions` (`'fel-1.0'`).
-- **O4.** Whether `lattice/` is core or belongs to an accelerator extension. Draft: core, since every candidate writer tracks a lattice.
-- **O5.** Whether Bmad's name arrays (`key_name`, species names) become normative vocabularies of this standard or stay writer-defined strings.
-- **O6.** Whether extension-defined kinds should be namespaced (`fel:field`) or flat with first-come naming (draft: flat, the vocabulary is small).
-- **O7.** The group name. `coords/` follows netCDF and xarray, the right prior art for the concept, but collides with this domain's reading of "coordinates" as phase space. `axes/` has no collision and matches the `@axes` attribute it resolves, at the cost of holding variables that are not axes. Draft: `coords/`, with the section 2 terminology note. The rename is mechanical if the collision confuses in practice.
-- **O8.** Name-based `@axes` against HDF5's own Dimension Scales (H5DS), the format's native mechanism for exactly this and the base netCDF-4 is built on. Name-based resolution is one string attribute in Fortran, greppable in h5dump output, and trivial for the validator, where scales are object references. Scales would buy dimension display in HDF5 tools and, through h5netcdf, named dimensions in xarray with no custom loader. Draft: name-based is normative and a writer MAY attach dimension scales as well. Revisit if native xarray opening proves worth the machinery.
+- **O1.** `@axes` could be a comma string with a `none` sentinel (R11) or a string array, accepting the Fortran zero-length hazard on scalars. The current draft is the string, for the stack-corruption reason, at one split per reader.
+- **O2.** The branch layout could be root-as-default-tree plus `branches/` (the current draft, zero churn for single-branch writers) or everything under `branches/` with a `main` link (one uniform shape, two loops for nobody).
+- **O3.** Extension versioning could be a root attribute per extension (the draft) or versioned entries in `@extensions` (`'fel-1.0'`).
+- **O4.** `lattice/` could be core or could belong to an accelerator extension. The draft keeps it core, since every candidate writer tracks a lattice.
+- **O5.** Bmad's name arrays (`key_name`, species names) could become normative vocabularies of this standard or stay writer-defined strings.
+- **O6.** Extension-defined kinds could be namespaced (`fel:field`) or flat with first-come naming. The draft is flat, since the vocabulary is small.
+- **O7.** The group name is open. `coords/` follows netCDF and xarray, the right prior art for the concept, but collides with this domain's reading of "coordinates" as phase space. `axes/` has no collision and matches the `@axes` attribute it resolves, at the cost of holding variables that are not axes. The draft is `coords/`, with the section 2 terminology note. The rename is mechanical if the collision confuses in practice.
+- **O8.** Name-based `@axes` stands against HDF5's own Dimension Scales (H5DS), the format's native mechanism for exactly this and the base netCDF-4 is built on. Name-based resolution is one string attribute in Fortran, greppable in h5dump output, and trivial for the validator, where scales are object references. Scales would buy dimension display in HDF5 tools and, through h5netcdf, named dimensions in xarray with no custom loader. In the draft, name-based resolution is normative and a writer MAY attach dimension scales as well. Revisit if native xarray opening proves worth the machinery.
