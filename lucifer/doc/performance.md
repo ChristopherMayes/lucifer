@@ -76,7 +76,6 @@ The shares hold across a factor of 5.25 in slice count. The run row against the 
 
 Slippage is 0.4% of the walk and 0.1% at the larger size. [](validation.md#val-parallelism-openmp-over-slices) lists the slippage rotation among the serial operations between steps, and it is too small to cap the scaling. The field solve and the particle push are where the time is, and both are slice-parallel.
 
-(perf-the-particles-against-the-grid)=
 (perf-the-transform-length)=
 ## The transform length
 
