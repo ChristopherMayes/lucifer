@@ -67,64 +67,64 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| shot noise, uniform weights | 9.810097e-01 | same | 8.136610e-01 to 1.186339e+00 |
-| shot noise, uniform weights, harmonic 1 | 9.363298e-01 | same | 6.772514e-01 to 1.322749e+00 |
-| shot noise, uniform weights, harmonic 2 | 1.004840e+00 | same | 6.772514e-01 to 1.322749e+00 |
-| shot noise, uniform weights, harmonic 3 | 1.001859e+00 | same | 6.772514e-01 to 1.322749e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x) | 9.981714e-01 | same | 8.136610e-01 to 1.186339e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x), harmonic 1 | 9.333837e-01 | same | 6.772514e-01 to 1.322749e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x), harmonic 2 | 1.013799e+00 | same | 6.772514e-01 to 1.322749e+00 |
-| shot noise, nonuniform weights (0.25x/1.75x), harmonic 3 | 1.047332e+00 | same | 6.772514e-01 to 1.322749e+00 |
+| shot noise, uniform weights | 9.8101e-01 | same | 8.1366e-01 to 1.1863e+00 |
+| shot noise, uniform weights, harmonic 1 | 9.3633e-01 | same | 6.7725e-01 to 1.3227e+00 |
+| shot noise, uniform weights, harmonic 2 | 1.0048e+00 | same | 6.7725e-01 to 1.3227e+00 |
+| shot noise, uniform weights, harmonic 3 | 1.0019e+00 | same | 6.7725e-01 to 1.3227e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x) | 9.9817e-01 | same | 8.1366e-01 to 1.1863e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), harmonic 1 | 9.3338e-01 | same | 6.7725e-01 to 1.3227e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), harmonic 2 | 1.0138e+00 | same | 6.7725e-01 to 1.3227e+00 |
+| shot noise, nonuniform weights (0.25x/1.75x), harmonic 3 | 1.0473e+00 | same | 6.7725e-01 to 1.3227e+00 |
 | shot noise, keep load: the noise reported on the beamlets the loader made |  | same | holds |
-| shot noise, keep mode, beamlets of a generated bunch | 9.781115e-01 | same | 8.563788e-01 to 1.143621e+00 |
-| shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.019906e+00 | same | 7.512407e-01 to 1.248759e+00 |
-| shot noise, keep mode, beamlets of a generated bunch, harmonic 2 | 9.367184e-01 | same | 7.512407e-01 to 1.248759e+00 |
-| shot noise, keep mode, beamlets of a generated bunch, harmonic 3 | 9.777102e-01 | same | 7.512407e-01 to 1.248759e+00 |
+| shot noise, keep mode, beamlets of a generated bunch | 9.7811e-01 | same | 8.5638e-01 to 1.1436e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, harmonic 1 | 1.0199e+00 | same | 7.5124e-01 to 1.2488e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, harmonic 2 | 9.3672e-01 | same | 7.5124e-01 to 1.2488e+00 |
+| shot noise, keep mode, beamlets of a generated bunch, harmonic 3 | 9.7771e-01 | same | 7.5124e-01 to 1.2488e+00 |
 | shot noise, copies load: the noise reported on particles sharing their transverse coordinates |  | same | holds |
-| shot noise, copies made outside the loader | 9.836515e-01 | same | 7.515480e-01 to 1.248452e+00 |
-| shot noise, copies made outside the loader, harmonic 1 | 9.638164e-01 | same | 5.696685e-01 to 1.430331e+00 |
-| shot noise, copies made outside the loader, harmonic 2 | 1.021611e+00 | same | 5.696685e-01 to 1.430331e+00 |
-| shot noise, copies made outside the loader, harmonic 3 | 9.655271e-01 | same | 5.696685e-01 to 1.430331e+00 |
+| shot noise, copies made outside the loader | 9.8365e-01 | same | 7.5155e-01 to 1.2485e+00 |
+| shot noise, copies made outside the loader, harmonic 1 | 9.6382e-01 | same | 5.6967e-01 to 1.4303e+00 |
+| shot noise, copies made outside the loader, harmonic 2 | 1.0216e+00 | same | 5.6967e-01 to 1.4303e+00 |
+| shot noise, copies made outside the loader, harmonic 3 | 9.6553e-01 | same | 5.6967e-01 to 1.4303e+00 |
 | shot noise, cells load: the noise reported on the occupants of each deposit cell |  | same | holds |
-| shot noise, the occupants of each deposit cell | 9.699851e-01 | same | 7.515480e-01 to 1.248452e+00 |
-| shot noise, the occupants of each deposit cell, harmonic 1 | 1.053025e+00 | same | 5.696685e-01 to 1.430331e+00 |
-| shot noise, the occupants of each deposit cell, harmonic 2 | 9.486013e-01 | same | 5.696685e-01 to 1.430331e+00 |
-| shot noise, the occupants of each deposit cell, harmonic 3 | 9.083291e-01 | same | 5.696685e-01 to 1.430331e+00 |
-| mode split against the dump's far field | 2.245072e-16 | same | <= 1.000000e-06 |
+| shot noise, the occupants of each deposit cell | 9.6999e-01 | same | 7.5155e-01 to 1.2485e+00 |
+| shot noise, the occupants of each deposit cell, harmonic 1 | 1.0530e+00 | same | 5.6967e-01 to 1.4303e+00 |
+| shot noise, the occupants of each deposit cell, harmonic 2 | 9.4860e-01 | same | 5.6967e-01 to 1.4303e+00 |
+| shot noise, the occupants of each deposit cell, harmonic 3 | 9.0833e-01 | same | 5.6967e-01 to 1.4303e+00 |
+| mode split against the dump's far field | 2.2451e-16 | same | <= 1.0000e-06 |
 
 (val-levels-load)=
 ### `load`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| keep mode against the bunch, currents, counts and moments | 1.520151e-11 | same | <= 1.000000e-10 |
-| the dump carries the bunch's charge | 2.103629e-16 | same | <= 1.000000e-12 |
-| split weights against the unsplit load | 3.471935e-12 | same | <= 1.000000e-11 |
+| keep mode against the bunch, currents, counts and moments | 1.5202e-11 | same | <= 1.0000e-10 |
+| the dump carries the bunch's charge | 2.1036e-16 | same | <= 1.0000e-12 |
+| split weights against the unsplit load | 3.4719e-12 | same | <= 1.0000e-11 |
 | refused, noise on the unquiet generator |  | same | holds |
 | copies made outside the loader take the noise on the copies |  | same | holds |
 | refused, copies shifted singly |  | same | holds |
 | refused, a slice dump through beam_init%position_file |  | same | holds |
-| in-cone startup, Gaussian bunch in sample mode | 3.940030e-02 | same | <= 3.500000e-01 |
+| in-cone startup, Gaussian bunch in sample mode | 3.9400e-02 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| SASE startup, dark start, one segment: ln ratio | -7.751425e-03 | same | -3.000000e-01 to 3.000000e-01 |
+| SASE startup, dark start, one segment: ln ratio | -7.7514e-03 | same | -3.0000e-01 to 3.0000e-01 |
 
 (val-levels-seam-wake)=
 ### `seam-wake`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| ramp closed-form | 6.691894e-14 | same | <= 1.000000e-09 |
-| lord resolution | 1.049053e-13 | same | <= 1.000000e-09 |
-| causality | 0.000000e+00 | same | = 0.000000e+00 |
-| d8 direction cross-check | 0.000000e+00 | same | <= 1.811144e-10 |
-| z_long vs first-principles particle convolution | 2.390859e-07 | same | <= 5.000000e-02 |
-| resolved-beam cross-validation (z_long vs wake_on) | 5.494504e-01 | same | <= 1 |
-| split-weight invariance of the kick profile | 5.020673e-10 | same | <= 2.000000e-09 |
+| ramp closed-form | 6.6919e-14 | same | <= 1.0000e-09 |
+| lord resolution | 1.0491e-13 | same | <= 1.0000e-09 |
+| causality | 0.0000e+00 | same | = 0.0000e+00 |
+| d8 direction cross-check | 0.0000e+00 | same | <= 1.8111e-10 |
+| z_long vs first-principles particle convolution | 2.3909e-07 | same | <= 5.0000e-02 |
+| resolved-beam cross-validation (z_long vs wake_on) | 5.4945e-01 | same | <= 1 |
+| split-weight invariance of the kick profile | 5.0207e-10 | same | <= 2.0000e-09 |
 | thread determinism with wake |  | same | holds |
 
 (val-levels-import)=
@@ -132,22 +132,22 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| bunch moments: normalized emittance ex | 4.000114e-07 | same | 3.600000e-07 to 4.400000e-07 |
-| bunch moments: normalized emittance ey | 4.000010e-07 | same | 3.600000e-07 to 4.400000e-07 |
+| bunch moments: normalized emittance ex | 4.0001e-07 | same | 3.6000e-07 to 4.4000e-07 |
+| bunch moments: normalized emittance ey | 4.0000e-07 | same | 3.6000e-07 to 4.4000e-07 |
 | current exactness: slice count | 24 | same | = 24 |
-| current exactness | 8.293176e-13 | same | <= 1.000000e-10 |
-| split-weight invariance: moments | 1.761683e-15 | same | <= 1.000000e-12 |
-| split-weight invariance: currents | 7.365192e-14 | same | <= 1.000000e-12 |
-| openPMD round trip: moments | 4.388953e-28 | 1.563995e-19 | <= 1.000000e-10 |
-| openPMD round trip: currents | 0.000000e+00 | same | <= 1.000000e-10 |
+| current exactness | 8.2932e-13 | same | <= 1.0000e-10 |
+| split-weight invariance: moments | 1.7617e-15 | same | <= 1.0000e-12 |
+| split-weight invariance: currents | 7.3652e-14 | same | <= 1.0000e-12 |
+| openPMD round trip: moments | 4.3890e-28 | 1.5640e-19 | <= 1.0000e-10 |
+| openPMD round trip: currents | 0.0000e+00 | same | <= 1.0000e-10 |
 | zero-charge refusal |  | same | holds |
-| twiss recovery: beta | 7.618363e-03 | same | <= 5.000000e-02 |
-| twiss recovery: alpha | 1.039101e-02 | same | <= 1.000000e-01 |
-| twiss recovery: emittance | 1.413424e-02 | same | <= 5.000000e-02 |
+| twiss recovery: beta | 7.6184e-03 | same | <= 5.0000e-02 |
+| twiss recovery: alpha | 1.0391e-02 | same | <= 1.0000e-01 |
+| twiss recovery: emittance | 1.4134e-02 | same | <= 5.0000e-02 |
 | thread determinism |  | same | holds |
-| startup power | 3.718899e-02 | same | -3.000000e-01 to 3.000000e-01 |
-| cross-path: quiet-load current vs analytic Gaussian | 3.055463e-16 | 3.819329e-16 | <= 1.000000e-12 |
-| cross-path: imported current vs the same Gaussian | 4.857190e-02 | same | <= 7.000000e-02 |
+| startup power | 3.7189e-02 | same | -3.0000e-01 to 3.0000e-01 |
+| cross-path: quiet-load current vs analytic Gaussian | 3.0555e-16 | 3.8193e-16 | <= 1.0000e-12 |
+| cross-path: imported current vs the same Gaussian | 4.8572e-02 | same | <= 7.0000e-02 |
 
 (val-levels-migration)=
 ### `migration`
@@ -155,9 +155,9 @@ where the two builds agree to every printed digit.
 | Check | Debug | Production | Bound |
 |---|---|---|---|
 | migration conservation: moves | 74076 | same | >= 10000 |
-| migration conservation: charge dropped | 2.611279e-14 | same | >= 0 |
-| migration conservation: worst violation | 1.708016e-14 | same | <= 1.000000e-10 |
-| migration phase continuity | 7.809917e-15 | 7.144579e-15 | <= 1.000000e-10 |
+| migration conservation: charge dropped | 2.6113e-14 | same | >= 0 |
+| migration conservation: worst violation | 1.7080e-14 | same | <= 1.0000e-10 |
+| migration phase continuity | 7.8099e-15 | 7.1446e-15 | <= 1.0000e-10 |
 | migration window residency | 0 | same | <= 0 |
 | migration no-op: moves | 0 | same | <= 0 |
 | migration no-op: diag byte-equal |  | same | holds |
@@ -170,88 +170,88 @@ where the two builds agree to every printed digit.
 | migration with a full-turn z_offset: outside their window, zo0t | 0 | same | <= 0 |
 | migration with a full-turn z_offset: moves, zo1t | 0 | same | <= 0 |
 | migration with a full-turn z_offset: outside their window, zo1t | 0 | same | <= 0 |
-| migration with a full-turn z_offset: theta against zero offset | 1.170175e-13 | 1.172396e-13 | <= 1.000000e-09 |
+| migration with a full-turn z_offset: theta against zero offset | 1.1702e-13 | 1.1724e-13 | <= 1.0000e-09 |
 
 (val-levels-collective)=
 ### `collective`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| collective energy bookkeeping | 4.359744e-05 | same | <= 5.130257e-02 |
-| collective sigma_energy invariance under uniform kicks | 2.500718e-07 | 2.500706e-07 | <= 5.109990e-03 |
+| collective energy bookkeeping | 4.3597e-05 | same | <= 5.1303e-02 |
+| collective sigma_energy invariance under uniform kicks | 2.5007e-07 | same | <= 5.1100e-03 |
 | stale-wake structure: eloss blocks | 49 | same | >= 2 |
 | stale-wake structure: blocks changed |  | same | holds |
 | drop-only stride: strides that dropped and moved nothing | 1 | same | >= 1 |
 | drop-only stride: strides that moved | 0 | same | <= 0 |
 | drop-only stride: eloss blocks refreshed |  | same | holds |
-| charge representation, space charge on: one particle split 16 ways | 1.388931e-14 | 7.107051e-15 | <= 1.000000e-12 |
-| charge representation, space charge on: every particle split | 1.151498e-13 | 1.208745e-13 | <= 1.000000e-12 |
-| charge representation, space charge off: one particle split 16 ways | 1.395320e-14 | 1.003087e-14 | <= 1.000000e-12 |
-| charge representation, space charge off: every particle split | 1.203471e-13 | 9.121311e-14 | <= 1.000000e-12 |
-| long-range kernel at zero width | 9.910589e-04 | same | <= 5.000000e-02 |
+| charge representation, space charge on: one particle split 16 ways | 1.3889e-14 | 7.1071e-15 | <= 1.0000e-12 |
+| charge representation, space charge on: every particle split | 1.1515e-13 | 1.2087e-13 | <= 1.0000e-12 |
+| charge representation, space charge off: one particle split 16 ways | 1.3953e-14 | 1.0031e-14 | <= 1.0000e-12 |
+| charge representation, space charge off: every particle split | 1.2035e-13 | 9.1213e-14 | <= 1.0000e-12 |
+| long-range kernel at zero width | 9.9106e-04 | same | <= 5.0000e-02 |
 | short-range with no radial scale: refused |  | same | holds |
 | space_charge%nphi outside its domain: refused at setup |  | same | holds |
 | space_charge%ngrid outside its domain: refused at setup |  | same | holds |
-| a collapsed slice on a grid with a scale: lone particle dE | 0.000000e+00 | same | <= 1.000000e-06 |
-| a collapsed slice on a grid with a scale: lone particle dsigma | 0.000000e+00 | same | <= 1.000000e-06 |
-| a collapsed slice on a grid with a scale: zero-charge slice dE | 0.000000e+00 | same | <= 1.000000e-06 |
-| a collapsed slice on a grid with a scale: zero-charge slice dsigma | 0.000000e+00 | same | <= 1.000000e-06 |
-| a collapsed slice on a grid with a scale: colocated pair dsigma | 1.088669e+06 | same | >= 1.000000e-03 |
-| a collapsed slice on a grid with a scale: colocated pair dE against its dsigma | 1.133785e+04 | same | <= 5.443346e+04 |
+| a collapsed slice on a grid with a scale: lone particle dE | 0.0000e+00 | same | <= 1.0000e-06 |
+| a collapsed slice on a grid with a scale: lone particle dsigma | 0.0000e+00 | same | <= 1.0000e-06 |
+| a collapsed slice on a grid with a scale: zero-charge slice dE | 0.0000e+00 | same | <= 1.0000e-06 |
+| a collapsed slice on a grid with a scale: zero-charge slice dsigma | 0.0000e+00 | same | <= 1.0000e-06 |
+| a collapsed slice on a grid with a scale: colocated pair dsigma | 1.0887e+06 | same | >= 1.0000e-03 |
+| a collapsed slice on a grid with a scale: colocated pair dE against its dsigma | 1.1338e+04 | same | <= 5.4433e+04 |
 
 (val-levels-source-filter)=
 ### `source-filter`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| filter on, xcut = 1 | 2.177007e-06 | same | <= 1.000000e-04 |
-| filter off against the filtered reference | 1.283500e+00 | same | >= 1.000000e-04 |
-| mutation, the sigmoid on the field instead of the source | 1.283366e+00 | same | >= 1.000000e-04 |
-| mutation, the sigmoid's edge at twice the cut | 1.080833e-01 | same | >= 1.000000e-04 |
+| filter on, xcut = 1 | 2.1770e-06 | same | <= 1.0000e-04 |
+| filter off against the filtered reference | 1.2835e+00 | same | >= 1.0000e-04 |
+| mutation, the sigmoid on the field instead of the source | 1.2834e+00 | same | >= 1.0000e-04 |
+| mutation, the sigmoid's edge at twice the cut | 1.0808e-01 | same | >= 1.0000e-04 |
 | refused, a width that attenuates the axis |  | same | holds |
 | refused, the angle and the cut together |  | same | holds |
 | refused, a negative angle |  | same | holds |
-| tolerance left unset | 0.000000e+00 | same | <= 5.586220e-10 |
-| tolerance stated as 0.75 | 0.000000e+00 | same | <= 5.586220e-10 |
-| tolerance stated as 0.2 | 5.902252e-13 | same | <= 6.254439e-10 |
-| tolerance stated as 0.01 | 1.625854e-12 | same | <= 7.595537e-10 |
-| the reported split across that scan | 0.000000e+00 | same | <= 2.793110e-15 |
+| tolerance left unset | 0.0000e+00 | same | <= 5.5862e-10 |
+| tolerance stated as 0.75 | 0.0000e+00 | same | <= 5.5862e-10 |
+| tolerance stated as 0.2 | 5.9023e-13 | same | <= 6.2544e-10 |
+| tolerance stated as 0.01 | 1.6259e-12 | same | <= 7.5955e-10 |
+| the reported split across that scan | 0.0000e+00 | same | <= 2.7931e-15 |
 | refused, a tolerance of zero |  | same | holds |
 | refused, a tolerance of one |  | same | holds |
 | refused, a tolerance above one |  | same | holds |
 | refused, a negative tolerance |  | same | holds |
 | refused, a width too large for the tolerance |  | same | holds |
-| a tolerance of 1e-17 at a width of 0.01 | 1.749332e-12 | same | <= 9.285157e-10 |
+| a tolerance of 1e-17 at a width of 0.01 | 1.7493e-12 | same | <= 9.2852e-10 |
 | the tolerance is bypassed by a stated angle |  | same | holds |
 | the tolerance is bypassed by stated cuts |  | same | holds |
-| seed containment at the default edge | 9.999997e-01 | same | >= 9.900000e-01 |
-| the filter is untouched on an unaveraged line | 0.000000e+00 | same | <= 1.000000e-09 |
-| the filter is untouched on a coherent source | 0.000000e+00 | same | <= 1.000000e-09 |
-| the filter moves on a mixed line, two averaged segments of three | 1.153890e-03 | same | >= 1.000000e-09 |
+| seed containment at the default edge | 1.0000e+00 | same | >= 9.9000e-01 |
+| the filter is untouched on an unaveraged line | 0.0000e+00 | same | <= 1.0000e-09 |
+| the filter is untouched on a coherent source | 0.0000e+00 | same | <= 1.0000e-09 |
+| the filter moves on a mixed line, two averaged segments of three | 1.1539e-03 | same | >= 1.0000e-09 |
 
 (val-levels-fp32-lockstep)=
 ### `fp32-lockstep`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| lockstep steady worst_pz | 1.936800e-07 | same | <= 2.000000e-06 |
-| lockstep steady worst_theta | 9.083200e-06 | same | <= 3.000000e-04 |
-| lockstep steady worst_phasor | 7.702800e-08 | 7.452400e-08 | <= 3.000000e-05 |
-| lockstep steady worst_source | 1.274900e-05 | 1.274800e-05 | <= 1.000000e-04 |
-| lockstep steady worst_field | 1.275300e-05 | 1.275400e-05 | <= 1.000000e-04 |
-| lockstep steady guard ulps | 6.754800e+03 | same | >= 2.560000e+02 |
-| bucket renormalization round trip [ulp] | 1.000000e+00 | same | <= 1.500000e+00 |
+| lockstep steady worst_pz | 1.9368e-07 | same | <= 2.0000e-06 |
+| lockstep steady worst_theta | 9.0832e-06 | same | <= 3.0000e-04 |
+| lockstep steady worst_phasor | 7.7028e-08 | 7.4524e-08 | <= 3.0000e-05 |
+| lockstep steady worst_source | 1.2749e-05 | 1.2748e-05 | <= 1.0000e-04 |
+| lockstep steady worst_field | 1.2753e-05 | 1.2754e-05 | <= 1.0000e-04 |
+| lockstep steady guard ulps | 6.7548e+03 | same | >= 2.5600e+02 |
+| bucket renormalization round trip [ulp] | 1.0000e+00 | same | <= 1.5000e+00 |
 | FP64 diag byte-identical, instrument on vs off |  | same | holds |
-| mutation moves worst_theta | 1.165800e-04 | same | >= 9.083200e-05 |
-| mutation moves worst_source | 3.870400e-04 | 3.870500e-04 | >= 6.374500e-05 (debug), >= 6.374000e-05 (production) |
-| freerun compounds past lockstep (phasor) | 1.007000e-06 | 1.108000e-06 | >= 7.702800e-08 (debug), >= 7.452400e-08 (production) |
-| freerun end-to-end power divergence recorded | 7.371900e-04 | 6.930500e-04 | 0 to 1.000000e-02 |
-| lockstep TD worst_pz | 2.119600e-07 | same | <= 2.000000e-06 |
-| lockstep TD worst_theta | 9.308000e-06 | same | <= 3.000000e-04 |
-| lockstep TD worst_phasor | 1.520700e-07 | 1.514200e-07 | <= 3.000000e-05 |
-| lockstep TD worst_source | 5.245100e-06 | 5.239600e-06 | <= 1.000000e-04 |
-| lockstep TD worst_field | 5.256500e-06 | 5.250500e-06 | <= 1.000000e-04 |
-| lockstep TD guard ulps | 5.730100e+03 | same | >= 2.560000e+02 |
+| mutation moves worst_theta | 1.1658e-04 | same | >= 9.0832e-05 |
+| mutation moves worst_source | 3.8704e-04 | 3.8705e-04 | >= 6.3745e-05 (debug), >= 6.3740e-05 (production) |
+| freerun compounds past lockstep (phasor) | 1.0070e-06 | 1.1080e-06 | >= 7.7028e-08 (debug), >= 7.4524e-08 (production) |
+| freerun end-to-end power divergence recorded | 7.3719e-04 | 6.9305e-04 | 0 to 1.0000e-02 |
+| lockstep TD worst_pz | 2.1196e-07 | same | <= 2.0000e-06 |
+| lockstep TD worst_theta | 9.3080e-06 | same | <= 3.0000e-04 |
+| lockstep TD worst_phasor | 1.5207e-07 | 1.5142e-07 | <= 3.0000e-05 |
+| lockstep TD worst_source | 5.2451e-06 | 5.2396e-06 | <= 1.0000e-04 |
+| lockstep TD worst_field | 5.2565e-06 | 5.2505e-06 | <= 1.0000e-04 |
+| lockstep TD guard ulps | 5.7301e+03 | same | >= 2.5600e+02 |
 | instrument stream byte-identical, 1 vs 8 threads |  | same | holds |
 | wake with the instrument refused |  | same | holds |
 
@@ -260,338 +260,338 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| device lockstep steady worst_x | 1.474200e-07 | same | <= 1.000000e-06 |
-| device lockstep steady worst_px | 2.627400e-07 | same | <= 1.000000e-06 |
-| device lockstep steady worst_y | 1.662800e-07 | same | <= 1.000000e-06 |
-| device lockstep steady worst_py | 1.407000e-07 | same | <= 1.000000e-06 |
-| device lockstep steady worst_pz | 1.383600e-07 | same | <= 1.300000e-06 |
-| device lockstep steady worst_theta | 6.578600e-06 | same | <= 1.500000e-04 |
-| device lockstep steady worst_phasor | 7.528800e-08 | same | <= 2.200000e-05 |
-| device lockstep steady worst_source | 1.467300e-05 | same | <= 2.200000e-04 |
-| device lockstep steady worst_field | 1.466400e-05 | same | <= 2.200000e-04 |
-| device lockstep steady guard [ticks] | 8.806900e+06 | same | >= 1.000000e+06 |
+| device lockstep steady worst_x | 1.4742e-07 | same | <= 1.0000e-06 |
+| device lockstep steady worst_px | 2.6274e-07 | same | <= 1.0000e-06 |
+| device lockstep steady worst_y | 1.6628e-07 | same | <= 1.0000e-06 |
+| device lockstep steady worst_py | 1.4070e-07 | same | <= 1.0000e-06 |
+| device lockstep steady worst_pz | 1.3836e-07 | same | <= 1.3000e-06 |
+| device lockstep steady worst_theta | 6.5786e-06 | same | <= 1.5000e-04 |
+| device lockstep steady worst_phasor | 7.5288e-08 | same | <= 2.2000e-05 |
+| device lockstep steady worst_source | 1.4673e-05 | same | <= 2.2000e-04 |
+| device lockstep steady worst_field | 1.4664e-05 | same | <= 2.2000e-04 |
+| device lockstep steady guard [ticks] | 8.8069e+06 | same | >= 1.0000e+06 |
 | bucket wraps asserted exact on device |  | same | holds |
 | FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| mutation moves worst_theta | 4.686000e-03 | same | >= 6.578600e-05 |
-| mutation moves worst_source | 7.755700e-04 | same | >= 7.336500e-05 |
-| device freerun compounds past lockstep (phasor) | 9.917600e-07 | same | >= 7.528800e-08 |
-| device freerun end-to-end power | 6.092700e-04 | same | 0 to 1.600000e-03 |
-| device production exit power vs CPU | 6.092712e-04 | same | 0 to 1.600000e-03 |
-| device lockstep TD worst_x | 2.749900e-07 | same | <= 1.000000e-06 |
-| device lockstep TD worst_px | 2.643300e-07 | same | <= 1.000000e-06 |
-| device lockstep TD worst_y | 2.462600e-07 | same | <= 1.000000e-06 |
-| device lockstep TD worst_py | 2.373000e-07 | same | <= 1.000000e-06 |
-| device lockstep TD worst_pz | 1.394200e-07 | same | <= 1.300000e-06 |
-| device lockstep TD worst_theta | 6.765400e-06 | same | <= 1.500000e-04 |
-| device lockstep TD worst_phasor | 9.833400e-08 | same | <= 2.200000e-05 |
-| device lockstep TD worst_source | 6.361400e-06 | same | <= 2.200000e-04 |
-| device lockstep TD worst_field | 6.370600e-06 | same | <= 2.200000e-04 |
-| device lockstep TD guard [ticks] | 6.841100e+06 | same | >= 1.000000e+06 |
+| mutation moves worst_theta | 4.6860e-03 | same | >= 6.5786e-05 |
+| mutation moves worst_source | 7.7557e-04 | same | >= 7.3365e-05 |
+| device freerun compounds past lockstep (phasor) | 9.9176e-07 | same | >= 7.5288e-08 |
+| device freerun end-to-end power | 6.0927e-04 | same | 0 to 1.6000e-03 |
+| device production exit power vs CPU | 6.0927e-04 | same | 0 to 1.6000e-03 |
+| device lockstep TD worst_x | 2.7499e-07 | same | <= 1.0000e-06 |
+| device lockstep TD worst_px | 2.6433e-07 | same | <= 1.0000e-06 |
+| device lockstep TD worst_y | 2.4626e-07 | same | <= 1.0000e-06 |
+| device lockstep TD worst_py | 2.3730e-07 | same | <= 1.0000e-06 |
+| device lockstep TD worst_pz | 1.3942e-07 | same | <= 1.3000e-06 |
+| device lockstep TD worst_theta | 6.7654e-06 | same | <= 1.5000e-04 |
+| device lockstep TD worst_phasor | 9.8334e-08 | same | <= 2.2000e-05 |
+| device lockstep TD worst_source | 6.3614e-06 | same | <= 2.2000e-04 |
+| device lockstep TD worst_field | 6.3706e-06 | same | <= 2.2000e-04 |
+| device lockstep TD guard [ticks] | 6.8411e+06 | same | >= 1.0000e+06 |
 | TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| device production TD window power vs CPU | 1.494084e-05 | same | <= 1.600000e-03 |
+| device production TD window power vs CPU | 1.4941e-05 | same | <= 1.6000e-03 |
 | refused: does not cover wakes |  | same | holds |
 | refused: does not cover spontaneous radiation |  | same | holds |
 | refused: unrecognized device |  | same | holds |
 | refused: unsupported grid, nearest size named |  | same | holds |
-| harmonic lockstep worst_x | 1.173100e-07 | same | <= 1.000000e-06 |
-| harmonic lockstep worst_px | 4.197000e-08 | same | <= 1.000000e-06 |
-| harmonic lockstep worst_y | 1.874300e-07 | same | <= 1.000000e-06 |
-| harmonic lockstep worst_py | 2.551100e-07 | same | <= 1.000000e-06 |
-| harmonic lockstep worst_pz | 2.009900e-07 | same | <= 1.300000e-06 |
-| harmonic lockstep worst_theta | 6.865300e-06 | same | <= 1.500000e-04 |
-| harmonic lockstep worst_phasor | 1.286100e-07 | same | <= 2.200000e-05 |
-| harmonic lockstep worst_source | 1.239500e-08 | same | <= 2.200000e-04 |
-| harmonic lockstep worst_field | 2.042800e-07 | same | <= 2.200000e-04 |
-| harmonic lockstep worst_phasor_h3 (per-member footer) | 9.128700e-08 | 9.128800e-08 | <= 6.000000e-07 |
-| harmonic lockstep worst_source_h3 (per-member footer) | 3.444300e-09 | same | <= 8.000000e-06 |
-| harmonic lockstep worst_field_h3 (per-member footer) | 3.444900e-09 | same | <= 8.000000e-06 |
+| harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
+| harmonic lockstep worst_px | 4.1970e-08 | same | <= 1.0000e-06 |
+| harmonic lockstep worst_y | 1.8743e-07 | same | <= 1.0000e-06 |
+| harmonic lockstep worst_py | 2.5511e-07 | same | <= 1.0000e-06 |
+| harmonic lockstep worst_pz | 2.0099e-07 | same | <= 1.3000e-06 |
+| harmonic lockstep worst_theta | 6.8653e-06 | same | <= 1.5000e-04 |
+| harmonic lockstep worst_phasor | 1.2861e-07 | same | <= 2.2000e-05 |
+| harmonic lockstep worst_source | 1.2395e-08 | same | <= 2.2000e-04 |
+| harmonic lockstep worst_field | 2.0428e-07 | same | <= 2.2000e-04 |
+| harmonic lockstep worst_phasor_h3 (per-member footer) | 9.1287e-08 | 9.1288e-08 | <= 6.0000e-07 |
+| harmonic lockstep worst_source_h3 (per-member footer) | 3.4443e-09 | same | <= 8.0000e-06 |
+| harmonic lockstep worst_field_h3 (per-member footer) | 3.4449e-09 | same | <= 8.0000e-06 |
 | harmonic footer carries the fundamental too |  | same | holds |
 | harmonic FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| harmonic mutation moves worst_theta | 4.703600e-03 | same | >= 6.865300e-05 |
-| harmonic mutation moves worst_source_h3 | 6.487500e-07 | same | >= 1.722150e-08 |
-| harmonic freerun compounds past lockstep (phasor) | 3.172100e-06 | same | >= 1.286100e-07 |
-| harmonic production P1 vs CPU (bunched beam) | 1.926844e-06 | same | <= 1.600000e-03 |
-| harmonic production P3 vs CPU (bunched beam) | 6.788162e-04 | same | <= 1.800000e-03 |
-| device one-step deposit P3/P1 vs the Bessel closed form | 1.721174e-06 | same | <= 1.300000e-05 |
-| harmonic lockstep TD worst_x | 1.514300e-07 | same | <= 1.000000e-06 |
-| harmonic lockstep TD worst_px | 4.357800e-08 | same | <= 1.000000e-06 |
-| harmonic lockstep TD worst_y | 2.380900e-07 | same | <= 1.000000e-06 |
-| harmonic lockstep TD worst_py | 3.513700e-07 | same | <= 1.000000e-06 |
-| harmonic lockstep TD worst_pz | 1.546700e-07 | same | <= 1.300000e-06 |
-| harmonic lockstep TD worst_theta | 7.173700e-06 | same | <= 1.500000e-04 |
-| harmonic lockstep TD worst_phasor | 1.974700e-07 | same | <= 2.200000e-05 |
-| harmonic lockstep TD worst_source | 4.666600e-06 | same | <= 2.200000e-04 |
-| harmonic lockstep TD worst_field | 4.666600e-06 | same | <= 2.200000e-04 |
-| harmonic lockstep TD worst_phasor_h3 | 1.974700e-07 | same | <= 6.000000e-07 |
-| harmonic lockstep TD worst_source_h3 | 2.643000e-06 | same | <= 8.000000e-06 |
-| harmonic lockstep TD worst_field_h3 | 2.643000e-06 | same | <= 8.000000e-06 |
+| harmonic mutation moves worst_theta | 4.7036e-03 | same | >= 6.8653e-05 |
+| harmonic mutation moves worst_source_h3 | 6.4875e-07 | same | >= 1.7221e-08 |
+| harmonic freerun compounds past lockstep (phasor) | 3.1721e-06 | same | >= 1.2861e-07 |
+| harmonic production P1 vs CPU (bunched beam) | 1.9268e-06 | same | <= 1.6000e-03 |
+| harmonic production P3 vs CPU (bunched beam) | 6.7882e-04 | same | <= 1.8000e-03 |
+| device one-step deposit P3/P1 vs the Bessel closed form | 1.7212e-06 | same | <= 1.3000e-05 |
+| harmonic lockstep TD worst_x | 1.5143e-07 | same | <= 1.0000e-06 |
+| harmonic lockstep TD worst_px | 4.3578e-08 | same | <= 1.0000e-06 |
+| harmonic lockstep TD worst_y | 2.3809e-07 | same | <= 1.0000e-06 |
+| harmonic lockstep TD worst_py | 3.5137e-07 | same | <= 1.0000e-06 |
+| harmonic lockstep TD worst_pz | 1.5467e-07 | same | <= 1.3000e-06 |
+| harmonic lockstep TD worst_theta | 7.1737e-06 | same | <= 1.5000e-04 |
+| harmonic lockstep TD worst_phasor | 1.9747e-07 | same | <= 2.2000e-05 |
+| harmonic lockstep TD worst_source | 4.6666e-06 | same | <= 2.2000e-04 |
+| harmonic lockstep TD worst_field | 4.6666e-06 | same | <= 2.2000e-04 |
+| harmonic lockstep TD worst_phasor_h3 | 1.9747e-07 | same | <= 6.0000e-07 |
+| harmonic lockstep TD worst_source_h3 | 2.6430e-06 | same | <= 8.0000e-06 |
+| harmonic lockstep TD worst_field_h3 | 2.6430e-06 | same | <= 8.0000e-06 |
 | harmonic TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | harmonic TD footer states the escaped energy (CPU) |  | same | holds |
 | harmonic TD footer states the escaped energy (device) |  | same | holds |
-| harmonic production TD escaped energy h1 vs CPU | 6.156115e-07 | same | <= 1.600000e-03 |
-| harmonic production TD escaped energy h3 vs CPU | 1.174114e-05 | same | <= 1.800000e-03 |
-| harmonic production TD window P1 vs CPU | 3.332523e-06 | same | <= 1.600000e-03 |
-| harmonic production TD window P3 vs CPU (shot-noise b3) | 3.449271e-06 | same | <= 1.800000e-03 |
-| device vs Genesis, TD planar with shot noise, P1 | 6.310437e-05 | same | <= 1.600000e-03 |
-| device vs Genesis, TD planar with shot noise, P3 | 2.163734e-05 | same | <= 1.800000e-03 |
-| quiet-start dark harmonic: fundamental P1 vs CPU | 3.390767e-04 | same | <= 1.600000e-03 |
-| two-plane lockstep worst_x | 1.462100e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep worst_px | 1.511900e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep worst_y | 1.483400e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep worst_py | 1.448400e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep worst_pz | 1.340800e-07 | same | <= 1.300000e-06 |
-| two-plane lockstep worst_theta | 2.383800e-06 | same | <= 1.500000e-04 |
-| two-plane lockstep worst_phasor | 1.866900e-08 | same | <= 2.200000e-05 |
-| two-plane lockstep worst_source | 6.334800e-06 | same | <= 2.200000e-04 |
-| two-plane lockstep worst_field | 6.337400e-06 | same | <= 2.200000e-04 |
+| harmonic production TD escaped energy h1 vs CPU | 6.1561e-07 | same | <= 1.6000e-03 |
+| harmonic production TD escaped energy h3 vs CPU | 1.1741e-05 | same | <= 1.8000e-03 |
+| harmonic production TD window P1 vs CPU | 3.3325e-06 | same | <= 1.6000e-03 |
+| harmonic production TD window P3 vs CPU (shot-noise b3) | 3.4493e-06 | same | <= 1.8000e-03 |
+| device vs Genesis, TD planar with shot noise, P1 | 6.3104e-05 | same | <= 1.6000e-03 |
+| device vs Genesis, TD planar with shot noise, P3 | 2.1637e-05 | same | <= 1.8000e-03 |
+| quiet-start dark harmonic: fundamental P1 vs CPU | 3.3908e-04 | same | <= 1.6000e-03 |
+| two-plane lockstep worst_x | 1.4621e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep worst_px | 1.5119e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep worst_y | 1.4834e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep worst_py | 1.4484e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep worst_pz | 1.3408e-07 | same | <= 1.3000e-06 |
+| two-plane lockstep worst_theta | 2.3838e-06 | same | <= 1.5000e-04 |
+| two-plane lockstep worst_phasor | 1.8669e-08 | same | <= 2.2000e-05 |
+| two-plane lockstep worst_source | 6.3348e-06 | same | <= 2.2000e-04 |
+| two-plane lockstep worst_field | 6.3374e-06 | same | <= 2.2000e-04 |
 | two-plane FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| two-plane mutation moves worst_theta | 1.631900e-03 | same | >= 2.383800e-05 |
-| two-plane mutation moves worst_source | 1.129600e-03 | same | >= 3.167400e-05 |
-| crossed production Px vs CPU | 1.402952e-04 | same | <= 1.600000e-03 |
-| crossed production Py vs CPU | 3.777280e-03 | same | <= 1.300000e-02 |
-| crossed device: x-field isolation through the y set, \|ln(Px/P_drift)\| | 5.231387e-06 | same | <= 1.300000e-05 |
-| crossed device: afterburner floor, Py/Px | 8.824103e-03 | same | >= 5.000000e-03 |
-| two-plane lockstep TD worst_x | 1.705200e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep TD worst_px | 1.905700e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep TD worst_y | 1.586500e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep TD worst_py | 1.476500e-07 | same | <= 1.000000e-06 |
-| two-plane lockstep TD worst_pz | 1.531200e-07 | same | <= 1.300000e-06 |
-| two-plane lockstep TD worst_theta | 2.542000e-06 | same | <= 1.500000e-04 |
-| two-plane lockstep TD worst_phasor | 3.681300e-08 | same | <= 2.200000e-05 |
-| two-plane lockstep TD worst_source | 3.777500e-06 | same | <= 2.200000e-04 |
-| two-plane lockstep TD worst_field | 3.777500e-06 | same | <= 2.200000e-04 |
+| two-plane mutation moves worst_theta | 1.6319e-03 | same | >= 2.3838e-05 |
+| two-plane mutation moves worst_source | 1.1296e-03 | same | >= 3.1674e-05 |
+| crossed production Px vs CPU | 1.4030e-04 | same | <= 1.6000e-03 |
+| crossed production Py vs CPU | 3.7773e-03 | same | <= 1.3000e-02 |
+| crossed device: x-field isolation through the y set, \|ln(Px/P_drift)\| | 5.2314e-06 | same | <= 1.3000e-05 |
+| crossed device: afterburner floor, Py/Px | 8.8241e-03 | same | >= 5.0000e-03 |
+| two-plane lockstep TD worst_x | 1.7052e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep TD worst_px | 1.9057e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep TD worst_y | 1.5865e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep TD worst_py | 1.4765e-07 | same | <= 1.0000e-06 |
+| two-plane lockstep TD worst_pz | 1.5312e-07 | same | <= 1.3000e-06 |
+| two-plane lockstep TD worst_theta | 2.5420e-06 | same | <= 1.5000e-04 |
+| two-plane lockstep TD worst_phasor | 3.6813e-08 | same | <= 2.2000e-05 |
+| two-plane lockstep TD worst_source | 3.7775e-06 | same | <= 2.2000e-04 |
+| two-plane lockstep TD worst_field | 3.7775e-06 | same | <= 2.2000e-04 |
 | two-plane TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| crossed TD production Px vs CPU (slippage live) | 4.176153e-06 | same | <= 1.600000e-03 |
-| crossed TD production Py vs CPU (slippage live) | 4.102018e-06 | same | <= 1.600000e-03 |
+| crossed TD production Px vs CPU (slippage live) | 4.1762e-06 | same | <= 1.6000e-03 |
+| crossed TD production Py vs CPU (slippage live) | 4.1020e-06 | same | <= 1.6000e-03 |
 | migration on the device bites | 73877 | same | >= 10000 |
-| migration conservation on the device, worst violation | 1.602908e-14 | same | <= 1.000000e-10 |
-| migration phase continuity on the device, worst deviation | 5.370664e-15 | 4.723527e-15 | <= 1.000000e-10 |
+| migration conservation on the device, worst violation | 1.6029e-14 | same | <= 1.0000e-10 |
+| migration phase continuity on the device, worst deviation | 5.3707e-15 | 4.7235e-15 | <= 1.0000e-10 |
 | migration window residency on the device | 0 | same | <= 0 |
-| heavy-migration window power, device vs CPU | 3.710733e-04 | same | <= 3.000000e-03 |
+| heavy-migration window power, device vs CPU | 3.7107e-04 | same | <= 3.0000e-03 |
 | a migrated slice outgrew the rectangle and the seam grew it |  | same | holds |
-| migrating lockstep worst_x | 2.885600e-07 | same | <= 1.000000e-06 |
-| migrating lockstep worst_px | 2.682400e-07 | same | <= 1.000000e-06 |
-| migrating lockstep worst_y | 2.876800e-07 | same | <= 1.000000e-06 |
-| migrating lockstep worst_py | 2.636100e-07 | same | <= 1.000000e-06 |
-| migrating lockstep worst_pz | 2.024700e-07 | same | <= 1.300000e-06 |
-| migrating lockstep worst_theta | 7.306300e-06 | same | <= 1.500000e-04 |
-| migrating lockstep worst_phasor | 2.085900e-07 | same | <= 2.200000e-05 |
-| migrating lockstep worst_source | 7.920900e-06 | same | <= 2.200000e-04 |
-| migrating lockstep worst_field | 7.920900e-06 | same | <= 2.200000e-04 |
+| migrating lockstep worst_x | 2.8856e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_px | 2.6824e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_y | 2.8768e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_py | 2.6361e-07 | same | <= 1.0000e-06 |
+| migrating lockstep worst_pz | 2.0247e-07 | same | <= 1.3000e-06 |
+| migrating lockstep worst_theta | 7.3063e-06 | same | <= 1.5000e-04 |
+| migrating lockstep worst_phasor | 2.0859e-07 | same | <= 2.2000e-05 |
+| migrating lockstep worst_source | 7.9209e-06 | same | <= 2.2000e-04 |
+| migrating lockstep worst_field | 7.9209e-06 | same | <= 2.2000e-04 |
 | migrating FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
 | migration no-op on the device: migrate T vs F final beam z |  | same | holds |
 | two runs bit for bit, the filter on: 127 arrays compared | 0 | same | <= 0 |
 | two runs bit for bit, the filter off: 127 arrays compared | 0 | same | <= 0 |
-| deposit accuracy, cancelling phases | 1.467300e-05 | same | <= 1.537200e-05 |
+| deposit accuracy, cancelling phases | 1.4673e-05 | same | <= 1.5372e-05 |
 | deposit quantum below the FP32 spacing of its bound, cancelling phases | 37 | same | >= 24 |
-| deposit accuracy, unequal weights | 1.468100e-05 | same | <= 1.538250e-05 |
+| deposit accuracy, unequal weights | 1.4681e-05 | same | <= 1.5383e-05 |
 | deposit quantum below the FP32 spacing of its bound, unequal weights | 37 | same | >= 24 |
-| deposit accuracy, charge in few cells | 7.109700e-06 | same | <= 7.233450e-06 |
+| deposit accuracy, charge in few cells | 7.1097e-06 | same | <= 7.2335e-06 |
 | deposit quantum below the FP32 spacing of its bound, charge in few cells | 37 | same | >= 24 |
-| deposit accuracy, the largest load | 2.453300e-06 | same | <= 2.632350e-06 |
+| deposit accuracy, the largest load | 2.4533e-06 | same | <= 2.6323e-06 |
 | deposit quantum below the FP32 spacing of its bound, the largest load | 37 | same | >= 24 |
-| deposit accuracy, the performance load | 1.328000e-06 | same | <= 2.200000e-04 |
+| deposit accuracy, the performance load | 1.3280e-06 | same | <= 2.2000e-04 |
 | deposit quantum below the FP32 spacing of its bound, the performance load | 37 | same | >= 24 |
-| the source row with the quantum 24 bits coarser | 1.467300e-05 | same | <= 1.468767e-05 |
+| the source row with the quantum 24 bits coarser | 1.4673e-05 | same | <= 1.4688e-05 |
 | refused: a quantum 30 bits coarser, one past the floor |  | same | holds |
 | refused: harmonics together with two live polarizations |  | same | holds |
-| source filter, device vs CPU window power | 1.239430e-05 | same | <= 1.000000e-03 |
-| source filter on the device removes wide-angle power | 1.008257e+02 | same | >= 1.500000e+00 |
+| source filter, device vs CPU window power | 1.2394e-05 | same | <= 1.0000e-03 |
+| source filter on the device removes wide-angle power | 1.0083e+02 | same | >= 1.5000e+00 |
 | refused: source_filter_mutate on the device |  | same | holds |
-| unaveraged lockstep steady worst_x | 1.131700e-06 | same | <= 3.500000e-06 |
-| unaveraged lockstep steady worst_px | 6.152200e-06 | same | <= 2.500000e-05 |
-| unaveraged lockstep steady worst_y | 9.608900e-07 | same | <= 3.000000e-06 |
-| unaveraged lockstep steady worst_py | 6.377900e-06 | same | <= 2.100000e-05 |
-| unaveraged lockstep steady worst_pz | 2.151300e-06 | same | <= 6.500000e-06 |
-| unaveraged lockstep steady worst_theta | 3.366300e-06 | 3.364500e-06 | <= 1.100000e-05 |
-| unaveraged lockstep steady worst_phasor | 6.560100e-08 | 6.592700e-08 | <= 2.500000e-07 |
-| unaveraged lockstep steady worst_source | 6.682500e-05 | 6.247700e-05 | <= 5.000000e-03 |
-| unaveraged lockstep steady worst_field | 6.338100e-06 | 6.411000e-06 | <= 2.000000e-05 |
-| unaveraged lockstep steady guard [ticks] | 3.131900e+09 | same | >= 1.000000e+09 |
+| unaveraged lockstep steady worst_x | 1.1317e-06 | same | <= 3.5000e-06 |
+| unaveraged lockstep steady worst_px | 6.1522e-06 | same | <= 2.5000e-05 |
+| unaveraged lockstep steady worst_y | 9.6089e-07 | same | <= 3.0000e-06 |
+| unaveraged lockstep steady worst_py | 6.3779e-06 | same | <= 2.1000e-05 |
+| unaveraged lockstep steady worst_pz | 2.1513e-06 | same | <= 6.5000e-06 |
+| unaveraged lockstep steady worst_theta | 3.3663e-06 | 3.3645e-06 | <= 1.1000e-05 |
+| unaveraged lockstep steady worst_phasor | 6.5601e-08 | 6.5927e-08 | <= 2.5000e-07 |
+| unaveraged lockstep steady worst_source | 6.6825e-05 | 6.2477e-05 | <= 5.0000e-03 |
+| unaveraged lockstep steady worst_field | 6.3381e-06 | 6.4110e-06 | <= 2.0000e-05 |
+| unaveraged lockstep steady guard [ticks] | 3.1319e+09 | same | >= 1.0000e+09 |
 | unaveraged FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | unaveraged FP64 ledger byte-identical, device twin on vs off |  | same | holds |
-| unaveraged mutation moves worst_theta | 9.812200e-05 | 9.823600e-05 | >= 3.366300e-05 (debug), >= 3.364500e-05 (production) |
-| unaveraged mutation moves worst_phasor | 3.259700e-05 | same | >= 3.280050e-06 (debug), >= 3.296350e-06 (production) |
-| unaveraged mutation moves worst_field | 7.709100e-04 | 7.709200e-04 | >= 1.267620e-04 (debug), >= 1.282200e-04 (production) |
-| unaveraged production power vs CPU | 1.723914e-03 | 1.723026e-03 | <= 5.000000e-03 |
+| unaveraged mutation moves worst_theta | 9.8122e-05 | 9.8236e-05 | >= 3.3663e-05 (debug), >= 3.3645e-05 (production) |
+| unaveraged mutation moves worst_phasor | 3.2597e-05 | same | >= 3.2801e-06 (debug), >= 3.2964e-06 (production) |
+| unaveraged mutation moves worst_field | 7.7091e-04 | 7.7092e-04 | >= 1.2676e-04 (debug), >= 1.2822e-04 (production) |
+| unaveraged production power vs CPU | 1.7239e-03 | 1.7230e-03 | <= 5.0000e-03 |
 | unaveraged frames on the device, count against the CPU | 9 | same | = 9 |
 | unaveraged field frames on the device, count against the CPU | 9 | same | = 9 |
 | unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
 | unaveraged frames on against off, final beam and field identical (CPU) |  | same | holds |
-| unaveraged frames on the device land at the CPU's own s | 0.000000e+00 | same | <= 1.000000e-09 |
+| unaveraged frames on the device land at the CPU's own s | 0.0000e+00 | same | <= 1.0000e-09 |
 | unaveraged frames on the device name the chart they hold |  | same | holds |
-| unaveraged frames on the device carry the quiver in px | 4.204436e+05 | same | >= 1.000000e+04 |
-| unaveraged frame px mean, device against CPU | 1.892310e-07 | same | <= 1.000000e-05 |
-| unaveraged lockstep TD worst_x | 1.134200e-06 | same | <= 3.500000e-06 |
-| unaveraged lockstep TD worst_px | 8.294000e-06 | same | <= 2.500000e-05 |
-| unaveraged lockstep TD worst_y | 9.662300e-07 | same | <= 3.000000e-06 |
-| unaveraged lockstep TD worst_py | 6.860300e-06 | same | <= 2.100000e-05 |
-| unaveraged lockstep TD worst_pz | 1.904000e-06 | same | <= 6.500000e-06 |
-| unaveraged lockstep TD worst_theta | 3.662600e-06 | 3.662500e-06 | <= 1.100000e-05 |
-| unaveraged lockstep TD worst_phasor | 8.236900e-08 | 8.237100e-08 | <= 2.500000e-07 |
-| unaveraged lockstep TD worst_source | 1.707300e-03 | same | <= 5.000000e-03 |
-| unaveraged lockstep TD worst_field | 5.924200e-06 | 5.965900e-06 | <= 2.000000e-05 |
+| unaveraged frames on the device carry the quiver in px | 4.2044e+05 | same | >= 1.0000e+04 |
+| unaveraged frame px mean, device against CPU | 1.8923e-07 | same | <= 1.0000e-05 |
+| unaveraged lockstep TD worst_x | 1.1342e-06 | same | <= 3.5000e-06 |
+| unaveraged lockstep TD worst_px | 8.2940e-06 | same | <= 2.5000e-05 |
+| unaveraged lockstep TD worst_y | 9.6623e-07 | same | <= 3.0000e-06 |
+| unaveraged lockstep TD worst_py | 6.8603e-06 | same | <= 2.1000e-05 |
+| unaveraged lockstep TD worst_pz | 1.9040e-06 | same | <= 6.5000e-06 |
+| unaveraged lockstep TD worst_theta | 3.6626e-06 | 3.6625e-06 | <= 1.1000e-05 |
+| unaveraged lockstep TD worst_phasor | 8.2369e-08 | 8.2371e-08 | <= 2.5000e-07 |
+| unaveraged lockstep TD worst_source | 1.7073e-03 | same | <= 5.0000e-03 |
+| unaveraged lockstep TD worst_field | 5.9242e-06 | 5.9659e-06 | <= 2.0000e-05 |
 | unaveraged TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
-| unaveraged production TD window power vs CPU | 1.699694e-06 | 1.636072e-06 | <= 5.000000e-03 |
+| unaveraged production TD window power vs CPU | 1.6997e-06 | 1.6361e-06 | <= 5.0000e-03 |
 | two unaveraged device runs, diag and ledger identical |  | same | holds |
-| FP32 transform pair energy loss, unaveraged deck | 1.282637e-07 | 1.277154e-07 | 5.000000e-08 to 4.000000e-07 |
+| FP32 transform pair energy loss, unaveraged deck | 1.2826e-07 | 1.2772e-07 | 5.0000e-08 to 4.0000e-07 |
 | header counts the transform pairs, unaveraged deck | [5340, 5340] | same | = [5340, 5340] |
-| header projection over measured loss, unaveraged deck | 9.511654e-01 | 9.552492e-01 | 5.000000e-01 to 2.000000e+00 |
-| FP32 transform pair energy loss, averaged deck | 1.273301e-07 | same | 5.000000e-08 to 4.000000e-07 |
+| header projection over measured loss, unaveraged deck | 9.5117e-01 | 9.5525e-01 | 5.0000e-01 to 2.0000e+00 |
+| FP32 transform pair energy loss, averaged deck | 1.2733e-07 | same | 5.0000e-08 to 4.0000e-07 |
 | header counts the transform pairs, averaged deck | [89, 0] | same | = [89, 0] |
-| header projection over measured loss, averaged deck | 9.581397e-01 | same | 5.000000e-01 to 2.000000e+00 |
-| two-plane unaveraged lockstep worst_x | 1.937700e-06 | same | <= 3.500000e-06 |
-| two-plane unaveraged lockstep worst_px | 2.456700e-06 | same | <= 2.500000e-05 |
-| two-plane unaveraged lockstep worst_y | 2.247500e-06 | same | <= 3.000000e-06 |
-| two-plane unaveraged lockstep worst_py | 2.985200e-06 | same | <= 2.100000e-05 |
-| two-plane unaveraged lockstep worst_pz | 4.955300e-07 | same | <= 6.500000e-06 |
-| two-plane unaveraged lockstep worst_theta | 1.985500e-06 | same | <= 1.100000e-05 |
-| two-plane unaveraged lockstep worst_phasor | 1.651600e-08 | same | <= 2.500000e-07 |
-| two-plane unaveraged lockstep worst_source | 2.178600e-04 | same | <= 5.000000e-03 |
-| two-plane unaveraged lockstep worst_field | 2.005900e-06 | 2.027800e-06 | <= 2.000000e-05 |
-| two-plane unaveraged lockstep guard [ticks] | 1.117000e+08 | same | >= 1.000000e+07 |
+| header projection over measured loss, averaged deck | 9.5814e-01 | same | 5.0000e-01 to 2.0000e+00 |
+| two-plane unaveraged lockstep worst_x | 1.9377e-06 | same | <= 3.5000e-06 |
+| two-plane unaveraged lockstep worst_px | 2.4567e-06 | same | <= 2.5000e-05 |
+| two-plane unaveraged lockstep worst_y | 2.2475e-06 | same | <= 3.0000e-06 |
+| two-plane unaveraged lockstep worst_py | 2.9852e-06 | same | <= 2.1000e-05 |
+| two-plane unaveraged lockstep worst_pz | 4.9553e-07 | same | <= 6.5000e-06 |
+| two-plane unaveraged lockstep worst_theta | 1.9855e-06 | same | <= 1.1000e-05 |
+| two-plane unaveraged lockstep worst_phasor | 1.6516e-08 | same | <= 2.5000e-07 |
+| two-plane unaveraged lockstep worst_source | 2.1786e-04 | same | <= 5.0000e-03 |
+| two-plane unaveraged lockstep worst_field | 2.0059e-06 | 2.0278e-06 | <= 2.0000e-05 |
+| two-plane unaveraged lockstep guard [ticks] | 1.1170e+08 | same | >= 1.0000e+07 |
 | two-plane unaveraged FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | two-plane unaveraged FP64 ledger byte-identical, device twin on vs off |  | same | holds |
-| two-plane unaveraged mutation moves worst_theta | 9.737600e-05 | same | >= 1.985500e-05 |
-| two-plane unaveraged mutation moves worst_phasor | 3.150600e-05 | same | >= 8.258000e-07 |
-| two-plane unaveraged mutation moves worst_field | 2.172900e-04 | same | >= 4.011800e-05 (debug), >= 4.055600e-05 (production) |
-| two-plane unaveraged production power x vs CPU | 2.014193e-04 | 2.039746e-04 | <= 5.000000e-03 |
-| two-plane unaveraged production power y vs CPU | 2.980027e-02 | 2.979991e-02 | <= 1.000000e-01 |
+| two-plane unaveraged mutation moves worst_theta | 9.7376e-05 | same | >= 1.9855e-05 |
+| two-plane unaveraged mutation moves worst_phasor | 3.1506e-05 | same | >= 8.2580e-07 |
+| two-plane unaveraged mutation moves worst_field | 2.1729e-04 | same | >= 4.0118e-05 (debug), >= 4.0556e-05 (production) |
+| two-plane unaveraged production power x vs CPU | 2.0142e-04 | 2.0397e-04 | <= 5.0000e-03 |
+| two-plane unaveraged production power y vs CPU | 2.9800e-02 | same | <= 1.0000e-01 |
 | two-plane unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
-| FP32 transform pair energy loss, two-plane deck | 1.292258e-07 | 1.300125e-07 | 5.000000e-08 to 4.000000e-07 |
-| handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.729750e-07 | same | <= 1.000000e-05 |
-| handedness on the device: (1, -i) leaves the beam unmodulated | 1.005277e-03 | same | <= 1.000000e-02 |
+| FP32 transform pair energy loss, two-plane deck | 1.2923e-07 | 1.3001e-07 | 5.0000e-08 to 4.0000e-07 |
+| handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7298e-07 | same | <= 1.0000e-05 |
+| handedness on the device: (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
 
 (val-levels-unaveraged)=
 ### `unaveraged`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| energy ledger: max\|d(E_beam+U_field)\| / sum\|dU\| | 9.387853e-06 | 9.389669e-06 | <= 1.000000e-04 |
-| ledger internal: \|dE_kick - dE_beam\| / max\|dE\| | 1.249864e-05 | same | <= 1.000000e-04 |
-| energy ledger, 100 um seed, 20 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 3.685438e-06 | 3.685229e-06 | <= 1.000000e-04 |
-| energy ledger, 100 um seed, 40 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 2.374038e-06 | 2.374100e-06 | <= 1.000000e-04 |
-| order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7) | 5.992884e-01 | 5.992595e-01 | <= 1.000000e+00 |
-| order: particle energy, observed between 20 and 40 (2 expected, floor 1.7) | 4.258089e-01 | same | <= 1.000000e+00 |
-| ballistic: max\|dgamma\| (B does no work) | 4.804591e-16 | same | <= 1.000000e-12 |
-| ballistic: \|emit_x out/in - 1\| (ramp handoff) | 9.756729e-11 | 9.757439e-11 | <= 1.000000e-06 |
-| handoff: \|<x>_out - <x>_in\| (dark) [m] | 1.933882e-09 | same | <= 1.000000e-07 |
-| handoff: \|<px>_out - <px>_in\| (dark, gamma*beta units) | 3.635900e-14 | 3.642601e-14 | <= 1.000000e-06 |
-| fc measured vs closed form, planar (h=1): \|ratio-1\|  [0.74864 vs 0.75095] | 3.075575e-03 | same | <= 5.000000e-03 |
-| fc measured vs closed form, helical (h=1): \|ratio-1\|  [0.84592 vs 0.84853] | 3.078465e-03 | same | <= 5.000000e-03 |
-| fc measured vs closed form, planar_h3 (h=3): \|ratio-1\|  [0.21234 vs 0.21302] | 3.192981e-03 | same | <= 5.000000e-03 |
-| convergence: \|fc(30)/fc(20) - 1\| | 5.868253e-06 | same | <= 5.000000e-04 |
-| gain curve: \|ln(P_unavg/P_avg)\| at segment exit  [4.5627e+03 vs 4.5752e+03] | 2.743025e-03 | 2.745508e-03 | <= 2.000000e-01 |
-| sandwich: ledger rows confined to the unaveraged segment (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| sandwich: ledger max\|d(E+U)\| / sum\|dU\| on the middle segment | 1.458872e-04 | 1.458891e-04 | <= 1.000000e-03 |
-| sandwich: frames on against off, final beam and field identical to the bit (5 frames inside the unaveraged segment) (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| sandwich: frames landed inside the unaveraged segment (5 expected) | 0 | same | <= 5.000000e-01 |
-| sandwich: \|ln(P_mixed/P_averaged)\| at exit  [4.8492e+03 vs 4.8442e+03] | 1.042763e-03 | same | <= 5.000000e-02 |
-| sandwich: wake on the unaveraged segment refused (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| TD ledger: max\|d(E_beam+U_window+U_escaped-U_spont+E_rad)\| / turnover | 4.334129e-10 | 9.850043e-10 | <= 1.000000e-03 |
-| twin: worst transverse row | 9.982900e-07 | same | <= 1.000000e-05 |
-| twin: worst transverse momentum row | 7.642100e-06 | 7.108400e-06 | <= 1.000000e-04 |
-| twin: worst energy row | 2.113800e-06 | 2.105100e-06 | <= 1.000000e-04 |
-| twin: worst phase row [rad] | 9.686400e-06 | 9.919600e-06 | <= 1.000000e-03 |
-| twin: worst phasor row | 7.855700e-08 | 8.318800e-08 | <= 1.000000e-05 |
-| twin: worst ledger row, its energy against the FP64 step's | 1.555800e-05 | 1.556100e-05 | <= 1.000000e-04 |
-| twin: worst field row, after every substep of the record step | 6.114800e-06 | 6.169200e-06 | <= 5.000000e-05 |
-| twin: the FP64 stream is identical with it on against off (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| twin: the ledger is identical with it on against off (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| twin: freerun refused in the unaveraged mode (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
+| energy ledger: max\|d(E_beam+U_field)\| / sum\|dU\| | 9.3879e-06 | 9.3897e-06 | <= 1.0000e-04 |
+| ledger internal: \|dE_kick - dE_beam\| / max\|dE\| | 1.2499e-05 | same | <= 1.0000e-04 |
+| energy ledger, 100 um seed, 20 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 3.6854e-06 | 3.6852e-06 | <= 1.0000e-04 |
+| energy ledger, 100 um seed, 40 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 2.3740e-06 | 2.3741e-06 | <= 1.0000e-04 |
+| order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7) | 5.9929e-01 | 5.9926e-01 | <= 1.0000e+00 |
+| order: particle energy, observed between 20 and 40 (2 expected, floor 1.7) | 4.2581e-01 | same | <= 1.0000e+00 |
+| ballistic: max\|dgamma\| (B does no work) | 4.8046e-16 | same | <= 1.0000e-12 |
+| ballistic: \|emit_x out/in - 1\| (ramp handoff) | 9.7567e-11 | 9.7574e-11 | <= 1.0000e-06 |
+| handoff: \|<x>_out - <x>_in\| (dark) | 1.9339e-09 | same | <= 1.0000e-07 |
+| handoff: \|<px>_out - <px>_in\| (dark, gamma*beta units) | 3.6359e-14 | 3.6426e-14 | <= 1.0000e-06 |
+| fc measured vs closed form, planar (h=1): \|ratio-1\| | 3.0756e-03 | same | <= 5.0000e-03 |
+| fc measured vs closed form, helical (h=1): \|ratio-1\| | 3.0785e-03 | same | <= 5.0000e-03 |
+| fc measured vs closed form, planar_h3 (h=3): \|ratio-1\| | 3.1930e-03 | same | <= 5.0000e-03 |
+| convergence: \|fc(30)/fc(20) - 1\| | 5.8683e-06 | same | <= 5.0000e-04 |
+| gain curve: \|ln(P_unavg/P_avg)\| at segment exit | 2.7430e-03 | 2.7455e-03 | <= 2.0000e-01 |
+| sandwich: ledger rows confined to the unaveraged segment (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| sandwich: ledger max\|d(E+U)\| / sum\|dU\| on the middle segment | 1.4589e-04 | same | <= 1.0000e-03 |
+| sandwich: frames on against off, final beam and field identical to the bit (5 frames inside the unaveraged segment) (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| sandwich: frames landed inside the unaveraged segment (5 expected) | 0 | same | <= 5.0000e-01 |
+| sandwich: \|ln(P_mixed/P_averaged)\| at exit | 1.0428e-03 | same | <= 5.0000e-02 |
+| sandwich: wake on the unaveraged segment refused (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| TD ledger: max\|d(E_beam+U_window+U_escaped-U_spont+E_rad)\| / turnover | 4.3341e-10 | 9.8500e-10 | <= 1.0000e-03 |
+| twin: worst transverse row | 9.9829e-07 | same | <= 1.0000e-05 |
+| twin: worst transverse momentum row | 7.6421e-06 | 7.1084e-06 | <= 1.0000e-04 |
+| twin: worst energy row | 2.1138e-06 | 2.1051e-06 | <= 1.0000e-04 |
+| twin: worst phase row | 9.6864e-06 | 9.9196e-06 | <= 1.0000e-03 |
+| twin: worst phasor row | 7.8557e-08 | 8.3188e-08 | <= 1.0000e-05 |
+| twin: worst ledger row, its energy against the FP64 step's | 1.5558e-05 | 1.5561e-05 | <= 1.0000e-04 |
+| twin: worst field row, after every substep of the record step | 6.1148e-06 | 6.1692e-06 | <= 5.0000e-05 |
+| twin: the FP64 stream is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| twin: the ledger is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| twin: freerun refused in the unaveraged mode (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 
 (val-levels-spontaneous)=
 ### `spontaneous`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| Bmad runge_kutta + radiation vs analytic, \|ratio - 1\| | 1.049577e-04 | same | 0.000000e+00 to 5.000000e-03 |
-| Bmad runge_kutta, radiation OFF: \|d gamma\| (integrator conserves) | 0.000000e+00 | same | 0.000000e+00 to 1.000000e-09 |
-| averaged mode: beam debit / analytic (KMR does NOT charge the beam) | 4.415352e-04 | same | 0.000000e+00 to 2.000000e-02 |
-| unaveraged: captured fraction of the analytic rate at the reference grid | 3.316312e-02 | same | 1.000000e-02 to 8.000000e-02 |
-| unaveraged: acceptance SCALING, measured/predicted ratio over 16x solid angle | 1.078752e+00 | same | 5.000000e-01 to 2.000000e+00 |
-| damping: averaged mode vs analytic, \|ratio - 1\| | 4.438049e-04 | same | 0.000000e+00 to 5.000000e-03 |
-| damping: unaveraged mode vs the ramp+capture composite, \|ratio - 1\| | 2.104823e-06 | 2.104849e-06 | 0.000000e+00 to 2.000000e-02 |
-| fluctuations: averaged sigma growth vs analytic, \|ratio - 1\| | 1.346839e-02 | same | 0.000000e+00 to 5.000000e-02 |
-| fluctuations: unaveraged sigma growth vs analytic, \|ratio - 1\| | 1.789391e-02 | same | 0.000000e+00 to 5.000000e-02 |
-| fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.348458e-01 | same | 0.000000e+00 to 2.500000e-01 |
-| fluctuations: 1-thread vs 8-thread byte-identical (1 = yes) | 0.000000e+00 | same | 0.000000e+00 to 5.000000e-01 |
-| ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.912208e-12 | 5.265811e-12 | 0.000000e+00 to 1.000000e-03 |
+| Bmad runge_kutta + radiation vs analytic, \|ratio - 1\| | 1.0496e-04 | same | 0.0000e+00 to 5.0000e-03 |
+| Bmad runge_kutta, radiation OFF: \|d gamma\| (integrator conserves) | 0.0000e+00 | same | 0.0000e+00 to 1.0000e-09 |
+| averaged mode: beam debit / analytic (KMR does NOT charge the beam) | 4.4154e-04 | same | 0.0000e+00 to 2.0000e-02 |
+| unaveraged: captured fraction of the analytic rate at the reference grid | 3.3163e-02 | same | 1.0000e-02 to 8.0000e-02 |
+| unaveraged: acceptance SCALING, measured/predicted ratio over 16x solid angle | 1.0788e+00 | same | 5.0000e-01 to 2.0000e+00 |
+| damping: averaged mode vs analytic, \|ratio - 1\| | 4.4380e-04 | same | 0.0000e+00 to 5.0000e-03 |
+| damping: unaveraged mode vs the ramp+capture composite, \|ratio - 1\| | 2.1048e-06 | same | 0.0000e+00 to 2.0000e-02 |
+| fluctuations: averaged sigma growth vs analytic, \|ratio - 1\| | 1.3468e-02 | same | 0.0000e+00 to 5.0000e-02 |
+| fluctuations: unaveraged sigma growth vs analytic, \|ratio - 1\| | 1.7894e-02 | same | 0.0000e+00 to 5.0000e-02 |
+| fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.3485e-01 | same | 0.0000e+00 to 2.5000e-01 |
+| fluctuations: 1-thread vs 8-thread byte-identical (1 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
+| ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.9122e-12 | 5.2658e-12 | 0.0000e+00 to 1.0000e-03 |
 
 (val-levels-two-polarization)=
 ### `two-polarization`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.094781e-15 | 9.640468e-15 | <= 1.000000e-08 |
-| rotation, averaged: beam-size swap identity at exit | 2.220446e-16 | 0.000000e+00 | <= 1.000000e-08 |
-| rotation, unaveraged: power \|x-run - y-run\| / max, all records | 5.509112e-07 | 5.779209e-07 | <= 1.000000e-05 |
-| rotation, unaveraged: beam-size swap identity at exit | 2.220446e-16 | 4.440892e-16 | <= 1.000000e-08 |
-| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.554312e-15 | 1.110223e-15 | <= 5.000000e-02 |
-| crossed, averaged: afterburner floor, Px/Py (y must light up) | 1.137700e+02 | same | <= 2.000000e+02 |
-| crossed, unaveraged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 2.505181e-06 | 2.504804e-06 | <= 5.000000e-02 |
-| crossed, unaveraged: afterburner floor, Px/Py (y must light up) | 1.464415e+02 | 1.464419e+02 | <= 2.000000e+02 |
-| crossed: averaged vs unaveraged y-power, \|ln ratio\| (priced) | 2.513554e-01 | 2.513578e-01 | <= 5.000000e-01 |
-| crossed: unaveraged TD ledger closure, both components | 1.752778e-09 | 1.730870e-09 | <= 1.000000e-03 |
-| crossed: 1-thread vs 8-thread byte-identical (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| helical re-anchor: vector vs scalar path, shot-noise power | 1.595876e-14 | same | <= 1.000000e-12 |
-| handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.000000e+00 | same | <= 1.000000e-06 |
-| handedness, averaged: the pair (1, -i) leaves the beam unmodulated | 3.601011e-06 | same | <= 1.000000e-02 |
-| handedness, unaveraged: the pair (1, +i) reproduces the scalar seed's energy modulation | 2.520368e-08 | same | <= 1.000000e-06 |
-| handedness, unaveraged: the pair (1, -i) leaves the beam unmodulated | 1.005278e-03 | same | <= 1.000000e-02 |
-| refusal: tilt on helical (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| refusal: tilt with transcribed maps (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| import: the restart without the seed's polarization runs as the one with it (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| import: the y plane is carried to the end (Py/Px floor) | 1.000000e+00 | same | <= 1.000000e+03 |
+| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.0948e-15 | 9.6405e-15 | <= 1.0000e-08 |
+| rotation, averaged: beam-size swap identity at exit | 2.2204e-16 | 0.0000e+00 | <= 1.0000e-08 |
+| rotation, unaveraged: power \|x-run - y-run\| / max, all records | 5.5091e-07 | 5.7792e-07 | <= 1.0000e-05 |
+| rotation, unaveraged: beam-size swap identity at exit | 2.2204e-16 | 4.4409e-16 | <= 1.0000e-08 |
+| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.5543e-15 | 1.1102e-15 | <= 5.0000e-02 |
+| crossed, averaged: afterburner floor, Px/Py (y must light up) | 1.1377e+02 | same | <= 2.0000e+02 |
+| crossed, unaveraged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 2.5052e-06 | 2.5048e-06 | <= 5.0000e-02 |
+| crossed, unaveraged: afterburner floor, Px/Py (y must light up) | 1.4644e+02 | same | <= 2.0000e+02 |
+| crossed: averaged vs unaveraged y-power, \|ln ratio\| (priced) | 2.5136e-01 | same | <= 5.0000e-01 |
+| crossed: unaveraged TD ledger closure, both components | 1.7528e-09 | 1.7309e-09 | <= 1.0000e-03 |
+| crossed: 1-thread vs 8-thread byte-identical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| helical re-anchor: vector vs scalar path, shot-noise power | 1.5959e-14 | same | <= 1.0000e-12 |
+| handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
+| handedness, averaged: the pair (1, -i) leaves the beam unmodulated | 3.6010e-06 | same | <= 1.0000e-02 |
+| handedness, unaveraged: the pair (1, +i) reproduces the scalar seed's energy modulation | 2.5204e-08 | same | <= 1.0000e-06 |
+| handedness, unaveraged: the pair (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
+| refusal: tilt on helical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: tilt with transcribed maps (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| import: the restart without the seed's polarization runs as the one with it (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| import: the y plane is carried to the end (Py/Px floor) | 1.0000e+00 | same | <= 1.0000e+03 |
 
 (val-levels-beam-format)=
 ### `beam-format`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| file datasets bit-identical (write, read, write) | 0.000000e+00 | same | <= 5.000000e-01 |
-| the slice placement survives the round trip | 1.285437e-05 | same | <= 1.000000e-04 |
-| unitSI = 0.5 on doubled samples reads as the plain file (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| gridUnitSI = 2 on a halved spacing reads as the plain file (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
+| file datasets bit-identical (write, read, write) | 0.0000e+00 | same | <= 5.0000e-01 |
+| the slice placement survives the round trip | 1.2854e-05 | same | <= 1.0000e-04 |
+| unitSI = 0.5 on doubled samples reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| gridUnitSI = 2 on a halved spacing reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal a y component shaped unlike x |  | same | holds |
-| the filter angle acts on an imported field with no grid in the deck (relative move) | 1.020833e-06 | 1.018429e-06 | <= 1.000000e+00 |
-| and the deck with the grid keys filters as the deck without them | 0.000000e+00 | same | <= 1.000000e-09 |
-| restart, x | 0.000000e+00 | same | <= 1.000000e-16 |
-| restart, y | 0.000000e+00 | same | <= 1.000000e-16 |
-| restart, px | 0.000000e+00 | same | <= 1.000000e-15 |
-| restart, py | 0.000000e+00 | same | <= 1.000000e-15 |
-| restart, gamma | 0.000000e+00 | same | <= 1.000000e-15 |
-| restart, current | 0.000000e+00 | same | <= 1.000000e-16 |
-| restart, theta absolute [rad] | 0.000000e+00 | same | <= 1.000000e-09 |
-| restart, theta offset spread [rad] | 0.000000e+00 | same | <= 1.000000e-09 |
-| split weights are stored per particle | 0.000000e+00 | same | <= 5.000000e-01 |
-| split weights bit-identical through the round trip | 0.000000e+00 | same | <= 5.000000e-01 |
+| the filter angle acts on an imported field with no grid in the deck (relative move) | 1.0208e-06 | 1.0184e-06 | <= 1.0000e+00 |
+| and the deck with the grid keys filters as the deck without them | 0.0000e+00 | same | <= 1.0000e-09 |
+| restart, x | 0.0000e+00 | same | <= 1.0000e-16 |
+| restart, y | 0.0000e+00 | same | <= 1.0000e-16 |
+| restart, px | 0.0000e+00 | same | <= 1.0000e-15 |
+| restart, py | 0.0000e+00 | same | <= 1.0000e-15 |
+| restart, gamma | 0.0000e+00 | same | <= 1.0000e-15 |
+| restart, current | 0.0000e+00 | same | <= 1.0000e-16 |
+| restart, theta absolute [rad] | 0.0000e+00 | same | <= 1.0000e-09 |
+| restart, theta offset spread [rad] | 0.0000e+00 | same | <= 1.0000e-09 |
+| split weights are stored per particle | 0.0000e+00 | same | <= 5.0000e-01 |
+| split weights bit-identical through the round trip | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal nonuniform weights to Genesis format |  | same | holds |
-| the configuration actually empties a slice | 0.000000e+00 | same | <= 5.000000e-01 |
-| per-slice counts restored, empty slice included | 0.000000e+00 | same | <= 5.000000e-01 |
-| one patch per slice, empty ones included | 0.000000e+00 | same | <= 5.000000e-01 |
-| the converter runs (exit 0) | 0.000000e+00 | same | <= 5.000000e-01 |
-| the patch group carries patchesAreBunches = 1 | 0 | same | <= 5.000000e-01 |
-| one patch per Genesis slice, the empty one a zero-count patch | 0.000000e+00 | same | <= 5.000000e-01 |
-| every patch's bounds strictly enclose its particles, every extent positive | 0 | same | <= 5.000000e-01 |
-| Bmad's reader returns one bunch per slice of the converted file | 0.000000e+00 | same | <= 5.000000e-01 |
-| the particles come back in the converted file's order, slice by slice [m or gamma beta] | 1.734723e-18 | same | <= 1.000000e-12 |
+| the configuration actually empties a slice | 0.0000e+00 | same | <= 5.0000e-01 |
+| per-slice counts restored, empty slice included | 0.0000e+00 | same | <= 5.0000e-01 |
+| one patch per slice, empty ones included | 0.0000e+00 | same | <= 5.0000e-01 |
+| the converter runs (exit 0) | 0.0000e+00 | same | <= 5.0000e-01 |
+| the patch group carries patchesAreBunches = 1 | 0 | same | <= 5.0000e-01 |
+| one patch per Genesis slice, the empty one a zero-count patch | 0.0000e+00 | same | <= 5.0000e-01 |
+| every patch's bounds strictly enclose its particles, every extent positive | 0 | same | <= 5.0000e-01 |
+| Bmad's reader returns one bunch per slice of the converted file | 0.0000e+00 | same | <= 5.0000e-01 |
+| the particles come back in the converted file's order, slice by slice [m or gamma beta] | 1.7347e-18 | same | <= 1.0000e-12 |
 | refusal a beam file that is not openPMD |  | same | holds |
 | refusal patch count against the deck's window |  | same | holds |
 | refusal a file that carries no charge |  | same | holds |
-| consecutive slices sit one spacing apart in the file | 2.418528e-05 | same | <= 1.000000e-04 |
-| the bunch spans its window and not one slice | 5.027523e-07 | same | <= 1.000000e-04 |
-| the reader sees every particle | 0 | same | <= 5.000000e-01 |
-| the reader sees the whole charge | 3.941576e-16 | same | <= 1.000000e-12 |
-| a range carries the slices it asked for | 0 | same | <= 5.000000e-01 |
-| a frame cut to a range places its slices where the whole window does | 0.000000e+00 | same | <= 1.000000e-04 |
+| consecutive slices sit one spacing apart in the file | 2.4185e-05 | same | <= 1.0000e-04 |
+| the bunch spans its window and not one slice | 5.0275e-07 | same | <= 1.0000e-04 |
+| the reader sees every particle | 0 | same | <= 5.0000e-01 |
+| the reader sees the whole charge | 3.9416e-16 | same | <= 1.0000e-12 |
+| a range carries the slices it asked for | 0 | same | <= 5.0000e-01 |
+| a frame cut to a range places its slices where the whole window does | 0.0000e+00 | same | <= 1.0000e-04 |
 | refusal beam_file, a frame into the device at a crest of the undulator phase |  | same | holds |
 | refusal beam_init%position_file, a frame into the device where the undulator phase crosses zero |  | same | holds |
-| a frame at the device's end initializes, every record identical but the four that place a beam | 0.000000e+00 | same | <= 5.000000e-01 |
-| a continuation from that face composes with the run it continues | 5.101148e-19 | 6.529470e-17 | <= 1.000000e-10 |
+| a frame at the device's end initializes, every record identical but the four that place a beam | 0.0000e+00 | same | <= 5.0000e-01 |
+| a continuation from that face composes with the run it continues | 5.1011e-19 | 6.5295e-17 | <= 1.0000e-10 |
 
 (val-levels-harmonics)=
 ### `harmonics`
@@ -599,8 +599,8 @@ where the two builds agree to every printed digit.
 | Check | Debug | Production | Bound |
 |---|---|---|---|
 | z grids agree between the codes |  | same | holds |
-| tier P1 vs Genesis (planar SS) | 5.321102e-08 | 5.321092e-08 | <= 1.000000e-06 |
-| tier P3 vs Genesis (dark start, growth) | 1.274495e-04 | 1.274483e-04 | <= 1.000000e-03 |
+| tier P1 vs Genesis (planar SS) | 5.3211e-08 | same | <= 1.0000e-06 |
+| tier P3 vs Genesis (dark start, growth) | 1.2745e-04 | same | <= 1.0000e-03 |
 | h3both-final.wf.h5 root attribute openPMD |  | same | holds |
 | h3both-final.wf.h5 root attribute openPMDextension |  | same | holds |
 | h3both-final.wf.h5 root attribute basePath |  | same | holds |
@@ -621,9 +621,9 @@ where the two builds agree to every printed digit.
 | h3both-final.wf.h5 required mesh attribute zCoordinate present |  | same | holds |
 | h3both-final.wf.h5 axisLabels |  | same | holds |
 | h3both-final.wf.h5 unitDimension |  | same | holds |
-| h3both-final.wf.h5 photonEnergy wavelength | 1.292470e-26 | same | <= 1.000000e-16 |
+| h3both-final.wf.h5 photonEnergy wavelength | 1.2925e-26 | same | <= 1.0000e-16 |
 | h3both-final.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final.wf.h5) | 1.468777e-16 | same | <= 1.000000e-13 |
+| the converter's Genesis view agrees complex-wise (h3both-final.wf.h5) | 1.4688e-16 | same | <= 1.0000e-13 |
 | h3both-final-h3.wf.h5 root attribute openPMD |  | same | holds |
 | h3both-final-h3.wf.h5 root attribute openPMDextension |  | same | holds |
 | h3both-final-h3.wf.h5 root attribute basePath |  | same | holds |
@@ -644,16 +644,16 @@ where the two builds agree to every printed digit.
 | h3both-final-h3.wf.h5 required mesh attribute zCoordinate present |  | same | holds |
 | h3both-final-h3.wf.h5 axisLabels |  | same | holds |
 | h3both-final-h3.wf.h5 unitDimension |  | same | holds |
-| h3both-final-h3.wf.h5 photonEnergy wavelength | 0.000000e+00 | same | <= 3.333333e-17 |
+| h3both-final-h3.wf.h5 photonEnergy wavelength | 0.0000e+00 | same | <= 3.3333e-17 |
 | h3both-final-h3.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.437083e-16 | 1.594301e-16 | <= 1.000000e-13 |
-| Fortran openPMD read-back, re-dump dataset-identical | 0.000000e+00 | same | <= 5.000000e-01 |
-| Python Wavefront class energy (its Genesis path) | 1.193708e-12 | 1.193578e-12 | <= 1.000000e-09 |
-| Python openPMD reader (vs Genesis dump) | 1.437083e-16 | 1.594301e-16 | <= 1.000000e-13 |
-| Python openPMD write/read round trip exact | 0.000000e+00 | same | <= 5.000000e-01 |
-| Fortran reads the Python writer's file, re-dump identical | 0.000000e+00 | same | <= 5.000000e-01 |
-| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 1.099121e-14 | 2.364775e-14 | <= 1.000000e-12 |
-| 1 vs 8 threads byte/dataset-identical | 0.000000e+00 | same | <= 5.000000e-01 |
+| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.4371e-16 | 1.5943e-16 | <= 1.0000e-13 |
+| Fortran openPMD read-back, re-dump dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
+| Python Wavefront class energy (its Genesis path) | 1.1937e-12 | 1.1936e-12 | <= 1.0000e-09 |
+| Python openPMD reader (vs Genesis dump) | 1.4371e-16 | 1.5943e-16 | <= 1.0000e-13 |
+| Python openPMD write/read round trip exact | 0.0000e+00 | same | <= 5.0000e-01 |
+| Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
+| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 1.0991e-14 | 2.3648e-14 | <= 1.0000e-12 |
+| 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal harmonics without the fundamental |  | same | holds |
 | refusal harmonics + unaveraged element |  | same | holds |
 | refusal harmonics + two polarizations |  | same | holds |
@@ -666,17 +666,17 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| re-anchor baseline: gap scan flat (rad, span) | 1.510718e-03 | same | <= 5.000000e-03 |
-| z_offset knob vs -2pi delta/(2 gamma^2 lambda) | 1.474683e-03 | same | <= 5.000000e-03 |
-| cross-mode identity: absolute gap scan == knob scan | 1.178717e-03 | same | <= 5.000000e-03 |
-| our z_offset curve == Genesis PHASESHIFTER curve | 1.878764e-08 | 1.878765e-08 | <= 1.000000e-06 |
-| exit power vs phi: our knob == Genesis shifter (max rel) | 9.267227e-09 | same | <= 1.000000e-06 |
-| chicane, relative mode: geometric fraction dropped (flat, rad span) | 6.808286e-06 | 6.263259e-06 | <= 5.000000e-03 |
-| chicane, absolute mode vs independent geometry (rad) | 6.831179e-04 | 6.702747e-04 | <= 2.000000e-03 |
-| 2D trace vs the small-angle closed form | 6.436081e-08 | same | <= 1.000000e-06 |
-| unaveraged ledger closure across the chicane | 2.878504e-11 | 3.683418e-11 | <= 1.000000e-04 |
-| extra banked slices == floor(delay/lambda), three delays | 0.000000e+00 | same | <= 5.000000e-01 |
-| TD chicane 1 vs 8 threads byte/dataset-identical | 0.000000e+00 | same | <= 5.000000e-01 |
+| re-anchor baseline: gap scan flat (rad, span) | 1.5107e-03 | same | <= 5.0000e-03 |
+| z_offset knob vs -2pi delta/(2 gamma^2 lambda) | 1.4747e-03 | same | <= 5.0000e-03 |
+| cross-mode identity: absolute gap scan == knob scan | 1.1787e-03 | same | <= 5.0000e-03 |
+| our z_offset curve == Genesis PHASESHIFTER curve | 1.8788e-08 | same | <= 1.0000e-06 |
+| exit power vs phi: our knob == Genesis shifter (max rel) | 9.2672e-09 | same | <= 1.0000e-06 |
+| chicane, relative mode: geometric fraction dropped (flat, rad span) | 6.8083e-06 | 6.2633e-06 | <= 5.0000e-03 |
+| chicane, absolute mode vs independent geometry (rad) | 6.8312e-04 | 6.7027e-04 | <= 2.0000e-03 |
+| 2D trace vs the small-angle closed form | 6.4361e-08 | same | <= 1.0000e-06 |
+| unaveraged ledger closure across the chicane | 2.8785e-11 | 3.6834e-11 | <= 1.0000e-04 |
+| extra banked slices == floor(delay/lambda), three delays | 0.0000e+00 | same | <= 5.0000e-01 |
+| TD chicane 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal non-closed-bump break |  | same | holds |
 | refusal bend under genesis-model interludes |  | same | holds |
 | refusal z_offset exceeding the break |  | same | holds |
@@ -687,13 +687,13 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| limit identity: \|ln P\| curve, coherent vs deposit at M=8192 | 1.801967e-02 | same | <= 5.000000e-02 |
-| the artifact: plain deposit at M=128 fakes energy exchange | 3.914979e-01 | same | >= 2.000000e-01 |
-| the claim: coherent at M=128 stays at the model bias | 4.872797e-02 | same | <= 1.000000e-01 |
-| offset+tilted beam: coherent tracks its deposit twin | 6.055991e-02 | same | <= 2.000000e-01 |
+| limit identity: \|ln P\| curve, coherent vs deposit at M=8192 | 1.8020e-02 | same | <= 5.0000e-02 |
+| the artifact: plain deposit at M=128 fakes energy exchange | 3.9150e-01 | same | >= 2.0000e-01 |
+| the claim: coherent at M=128 stays at the model bias | 4.8728e-02 | same | <= 1.0000e-01 |
+| offset+tilted beam: coherent tracks its deposit twin | 6.0560e-02 | same | <= 2.0000e-01 |
 | double-horn beam refused (GAUSSIAN ENOUGH) |  | same | holds |
 | coherent + dark start refused |  | same | holds |
-| coherent run 1 vs 8 threads dataset-identical (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
+| coherent run 1 vs 8 threads dataset-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 
 (val-levels-input-reference)=
 ### `input-reference`
@@ -785,110 +785,110 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| bmad-stats: the generic validator reports zero MUST failures | 0 | same | <= 5.000000e-01 |
-| stats: every dataset carries unit, label, description and axes | 0 | same | <= 5.000000e-01 |
-| stats: every dimension of every dataset labels itself | 0 | same | <= 5.000000e-01 |
-| stats: s is non-decreasing along the record axis | 0 | same | <= 5.000000e-01 |
-| stats: every repeated s straddles an element boundary | 0 | same | <= 5.000000e-01 |
-| stats: no attribute is near HDF5's 64 kB cap | 0 | same | <= 5.000000e-01 |
-| stats: meta/ holds its texts as datasets | 0 | same | <= 5.000000e-01 |
-| stats: n_lattice_files reports the wrapper's second file | 0 | same | <= 5.000000e-01 |
-| stats: the default file carries no machine-local values | 0 | same | <= 5.000000e-01 |
-| stats: t_slice is -ct_slice/c exactly (abs) | 0.000000e+00 | same | <= 1.000000e-30 |
-| stats: z_slice is beta0*ct_slice | 2.220446e-16 | same | <= 1.000000e-15 |
-| stats: the slice axis is the index | 0 | same | <= 5.000000e-01 |
-| envelope: position extremes vs the dump's particles, exactly (abs) | 0.000000e+00 | same | <= 1.000000e-30 |
-| envelope: momentum extremes across the dump's unit round trip | 2.885957e-16 | 2.870599e-16 | <= 1.000000e-12 |
-| envelope: the t entry is the z entry through -dz/(beta0 c), exactly (abs) | 0.000000e+00 | same | <= 1.000000e-30 |
-| stats: at_element_end selects exactly the element ends | 0 | same | <= 5.000000e-01 |
-| stats: element-end arrays are aligned with the mask | 0 | same | <= 5.000000e-01 |
-| stats: every record sits inside the element ix_ele names | 0 | same | <= 5.000000e-01 |
-| stats: bunch_params reconstruction vs stored calc_bunch_params | 4.512058e-08 | 4.512059e-08 | <= 1.000000e-06 |
-| stats: whole-window row vs the pooled-covariance identity | 0.000000e+00 | 6.404141e-12 | <= 1.000000e-09 |
-| stats: the between-group term is load-bearing (0 = confirmed) | 0.000000e+00 | same | <= 5.000000e-01 |
-| stats: the element-end moments ARE the record's (abs) | 0.000000e+00 | same | <= 1.000000e-30 |
-| stats: angle moments valid exactly where they were computed | 0 | same | <= 5.000000e-01 |
-| stats: theta moments are NaN where they were not computed | 0.000000e+00 | same | <= 5.000000e-01 |
-| stats: and finite where they were | 0.000000e+00 | same | <= 5.000000e-01 |
-| bank: banked slice energies vs ledger U_escaped, rel | 6.883383e-15 | 7.993606e-15 | <= 1.000000e-12 |
-| bank: analytic vs FFT-propagated rms at exit, max rel | 9.294233e-03 | same | <= 2.000000e-02 |
-| pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.882312e-03 | same | <= 2.000000e-02 |
-| thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| zero-length wake: coords/s repeats where one CAN kick | 0.000000e+00 | same | <= 5.000000e-01 |
-| zero-length wake: and every repeat straddles an element boundary | 0 | same | <= 5.000000e-01 |
-| zero-length wake: s is still non-decreasing | 0 | same | <= 5.000000e-01 |
-| zero-length wake: one that CANNOT kick leaves the file unchanged (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| provenance: global%record_environment restores user and cwd | 0 | same | <= 5.000000e-01 |
-| refusal: unknown dump_beam_at element refused (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: the header states the work | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: particle-steps is the product of the two counts | 1.249315e-03 | same | <= 1.000000e-02 |
-| pre-run: the header estimates the walk and names the machine | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: the load standing reads under the measured floor | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: the beamlet size is stated by the harmonics it carries | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: the footer lists the thin slices | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: and names the remedy | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: the footer prints the clock beside the estimate | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: load_only gives the same header as the run does | 0.000000e+00 | same | <= 5.000000e-01 |
-| pre-run: load_only tracks nothing | 0.000000e+00 | same | <= 5.000000e-01 |
-| refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: one beam frame per stats record | 0 | same | <= 5.000000e-01 |
-| frames: one field frame per stats record | 0 | same | <= 5.000000e-01 |
-| frames: the header's count matches the files written | 0 | same | <= 5.000000e-01 |
-| frames: a frame at an element end equals that element's own dump (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: every label appears once in every frame | 0 | same | <= 5.000000e-01 |
-| frames: no label appears that the first frame did not carry | 0 | same | <= 5.000000e-01 |
-| frames: migration moved labels between slices, so the check has something to see | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: each frame names the element and s the stats row carries | 0 | same | <= 5.000000e-01 |
-| frames: an FEL frame carries aw, ku and the method (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: the run is identical to the same run without them (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: an unaveraged run writes them at all (exit 0) | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: the unaveraged run wrote a series | 0.000000e+00 | same | <= 5.000000e-01 |
-| frames: every unaveraged frame names its method | 0 | same | <= 5.000000e-01 |
-| frames: the series lands inside the undulator, not only at its ends | 0.000000e+00 | same | <= 5.000000e-01 |
-| frame vs row: per-slice bunching from the frame's particles | 4.784367e-15 | 3.431283e-15 | <= 2.000000e-12 |
-| frame vs row: per-slice transverse centroid from the frame's particles, no conversion | 2.710505e-20 | same | <= 1.000000e-14 |
-| frame vs row: per-slice power from the field frame | 6.665082e-16 | 7.775929e-16 | <= 1.000000e-10 |
-| frame vs row: the transverse projection integrates to the record's power | 3.857709e-15 | same | <= 1.000000e-10 |
-| frame vs row: the slice projection integrates to each slice's power | 4.281824e-15 | 4.113749e-15 | <= 1.000000e-10 |
-| range: the beam frame's patch count is the range | 0 | same | <= 5.000000e-01 |
-| range: the field frame carries the range's slices | 0 | same | <= 5.000000e-01 |
-| range: the cut field's mesh starts at its first slice's z [m] | 0.000000e+00 | same | <= 1.000000e-18 |
-| range: and its transverse origin is the whole window's [m] | 0.000000e+00 | same | <= 1.000000e-18 |
-| refusal: a slice range outside the window refused (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| interlude: the knob at zero is the run that never named it (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| interlude: cut into pieces, exit power against the whole element | 1.234140e-13 | 1.195915e-13 | <= 1.000000e-09 |
-| interlude: cut into pieces, exit sigma_x against the whole element | 5.960617e-16 | same | <= 1.000000e-09 |
-| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.665613e-14 | 8.336818e-14 | <= 1.000000e-09 |
-| interlude: rows strictly inside the quadrupole, whole (0 expected) | 0 | same | <= 5.000000e-01 |
-| interlude: rows strictly inside the quadrupole, cut (4 expected) | 0 | same | <= 5.000000e-01 |
-| interlude: rows strictly inside the pipe, cut (9 expected) | 0 | same | <= 5.000000e-01 |
-| interlude: the stats file holds exactly the rows the diag carries | 0 | same | <= 5.000000e-01 |
-| interlude: the stats file records the step it ran at | 0.000000e+00 | same | <= 1.000000e-12 |
-| interlude: one frame per stats row with the pieces on | 0 | same | <= 5.000000e-01 |
-| interlude: the frames carry the rows' own s | 0.000000e+00 | same | <= 1.000000e-09 |
-| interlude: frames strictly inside the pipe (9 expected) | 0 | same | <= 5.000000e-01 |
-| interlude: the header states the pieces before it tracks | 0.000000e+00 | same | <= 5.000000e-01 |
-| interlude: and says nothing where nothing is cut | 0.000000e+00 | same | <= 5.000000e-01 |
-| interlude: a wake-carrying element is not cut | 0 | same | <= 5.000000e-01 |
-| interlude: and the elements without a wake still are | 0 | same | <= 5.000000e-01 |
-| interlude: the zero wake left the physics alone, so only the rows differ | 6.917011e-15 | 1.274186e-15 | <= 1.000000e-09 |
-| interlude: refused with the transcribed Genesis interlude (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| interlude: with sr_wakes_on off the wake element is cut like any other | 0 | same | <= 5.000000e-01 |
-| interlude: and its physics is the whole-element run's | 0.000000e+00 | same | <= 1.000000e-09 |
-| interlude: space charge on a seam interlude is refused (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| interlude: and Bmad's own centroid message never printed (0 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| thin kicker: a zero-length kicker kicks (1e-5 expected) | 8.079410e-05 | same | <= 1.000000e-03 |
-| thin kicker: the same kick through a finite length agrees | 1.907333e-10 | same | <= 1.000000e-03 |
-| thin kicker: it takes a record, and the zero-length pipe is still skipped | 0 | same | <= 5.000000e-01 |
-| frames: the particle sPosition is the frame's own [m] | 8.881784e-16 | 1.110223e-15 | <= 1.000000e-12 |
-| frames: the particle timeOffset is the iteration's time [s] | 2.481542e-24 | 4.135903e-24 | <= 1.000000e-18 |
-| refposition: the pulse file's is 0 [m] | 0.000000e+00 | same | <= 1.000000e-18 |
-| refposition: the escaped file's is the window length n_slice * slicespacing [m] | 0.000000e+00 | same | <= 1.000000e-18 |
-| refposition: both unmoved by the interlude's drift [m] | 0.000000e+00 | same | <= 1.000000e-18 |
-| refposition: the escaped file's z_transmit falls with its slice number (1 = yes) | 0.000000e+00 | same | <= 5.000000e-01 |
-| refposition: Wavefront.from_genesis4 puts the pulse's first slice at zmin 0 [m] | 0.000000e+00 | same | <= 1.000000e-18 |
-| refposition: the pulse's live slices are the final field, slice by slice, rel | 1.551523e-16 | same | <= 1.000000e-08 |
-| refposition: pulse slice n_slice + i carries the energy of escaped slice i, rel | 1.498801e-14 | same | <= 1.000000e-08 |
-| refposition: Genesis imports the pulse and re-dumps the same slice count | 0 | same | <= 5.000000e-01 |
-| refposition: Genesis's re-dump is the pulse, slice by slice, rel | 2.020977e-16 | same | <= 1.000000e-12 |
-| refposition: and carries the pulse's own refposition [m] | 0.000000e+00 | same | <= 1.000000e-18 |
+| bmad-stats: the generic validator reports zero MUST failures | 0 | same | <= 5.0000e-01 |
+| stats: every dataset carries unit, label, description and axes | 0 | same | <= 5.0000e-01 |
+| stats: every dimension of every dataset labels itself | 0 | same | <= 5.0000e-01 |
+| stats: s is non-decreasing along the record axis | 0 | same | <= 5.0000e-01 |
+| stats: every repeated s straddles an element boundary | 0 | same | <= 5.0000e-01 |
+| stats: no attribute is near HDF5's 64 kB cap | 0 | same | <= 5.0000e-01 |
+| stats: meta/ holds its texts as datasets | 0 | same | <= 5.0000e-01 |
+| stats: n_lattice_files reports the wrapper's second file | 0 | same | <= 5.0000e-01 |
+| stats: the default file carries no machine-local values | 0 | same | <= 5.0000e-01 |
+| stats: t_slice is -ct_slice/c exactly (abs) | 0.0000e+00 | same | <= 1.0000e-30 |
+| stats: z_slice is beta0*ct_slice | 2.2204e-16 | same | <= 1.0000e-15 |
+| stats: the slice axis is the index | 0 | same | <= 5.0000e-01 |
+| envelope: position extremes vs the dump's particles, exactly (abs) | 0.0000e+00 | same | <= 1.0000e-30 |
+| envelope: momentum extremes across the dump's unit round trip | 2.8860e-16 | 2.8706e-16 | <= 1.0000e-12 |
+| envelope: the t entry is the z entry through -dz/(beta0 c), exactly (abs) | 0.0000e+00 | same | <= 1.0000e-30 |
+| stats: at_element_end selects exactly the element ends | 0 | same | <= 5.0000e-01 |
+| stats: element-end arrays are aligned with the mask | 0 | same | <= 5.0000e-01 |
+| stats: every record sits inside the element ix_ele names | 0 | same | <= 5.0000e-01 |
+| stats: bunch_params reconstruction vs stored calc_bunch_params | 4.5121e-08 | same | <= 1.0000e-06 |
+| stats: whole-window row vs the pooled-covariance identity | 0.0000e+00 | 6.4041e-12 | <= 1.0000e-09 |
+| stats: the between-group term is load-bearing (0 = confirmed) | 0.0000e+00 | same | <= 5.0000e-01 |
+| stats: the element-end moments ARE the record's (abs) | 0.0000e+00 | same | <= 1.0000e-30 |
+| stats: angle moments valid exactly where they were computed | 0 | same | <= 5.0000e-01 |
+| stats: theta moments are NaN where they were not computed | 0.0000e+00 | same | <= 5.0000e-01 |
+| stats: and finite where they were | 0.0000e+00 | same | <= 5.0000e-01 |
+| bank: banked slice energies vs ledger U_escaped, rel | 6.8834e-15 | 7.9936e-15 | <= 1.0000e-12 |
+| bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
+| pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.8823e-03 | same | <= 2.0000e-02 |
+| thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| zero-length wake: coords/s repeats where one CAN kick | 0.0000e+00 | same | <= 5.0000e-01 |
+| zero-length wake: and every repeat straddles an element boundary | 0 | same | <= 5.0000e-01 |
+| zero-length wake: s is still non-decreasing | 0 | same | <= 5.0000e-01 |
+| zero-length wake: one that CANNOT kick leaves the file unchanged (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| provenance: global%record_environment restores user and cwd | 0 | same | <= 5.0000e-01 |
+| refusal: unknown dump_beam_at element refused (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: the header states the work | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: particle-steps is the product of the two counts | 1.2493e-03 | same | <= 1.0000e-02 |
+| pre-run: the header estimates the walk and names the machine | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: the load standing reads under the measured floor | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: the beamlet size is stated by the harmonics it carries | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: the footer lists the thin slices | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: and names the remedy | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: the footer prints the clock beside the estimate | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: load_only gives the same header as the run does | 0.0000e+00 | same | <= 5.0000e-01 |
+| pre-run: load_only tracks nothing | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: one beam frame per stats record | 0 | same | <= 5.0000e-01 |
+| frames: one field frame per stats record | 0 | same | <= 5.0000e-01 |
+| frames: the header's count matches the files written | 0 | same | <= 5.0000e-01 |
+| frames: a frame at an element end equals that element's own dump (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: every label appears once in every frame | 0 | same | <= 5.0000e-01 |
+| frames: no label appears that the first frame did not carry | 0 | same | <= 5.0000e-01 |
+| frames: migration moved labels between slices, so the check has something to see | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: each frame names the element and s the stats row carries | 0 | same | <= 5.0000e-01 |
+| frames: an FEL frame carries aw, ku and the method (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: the run is identical to the same run without them (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: an unaveraged run writes them at all (exit 0) | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: the unaveraged run wrote a series | 0.0000e+00 | same | <= 5.0000e-01 |
+| frames: every unaveraged frame names its method | 0 | same | <= 5.0000e-01 |
+| frames: the series lands inside the undulator, not only at its ends | 0.0000e+00 | same | <= 5.0000e-01 |
+| frame vs row: per-slice bunching from the frame's particles | 4.7844e-15 | 3.4313e-15 | <= 2.0000e-12 |
+| frame vs row: per-slice transverse centroid from the frame's particles, no conversion | 2.7105e-20 | same | <= 1.0000e-14 |
+| frame vs row: per-slice power from the field frame | 6.6651e-16 | 7.7759e-16 | <= 1.0000e-10 |
+| frame vs row: the transverse projection integrates to the record's power | 3.8577e-15 | same | <= 1.0000e-10 |
+| frame vs row: the slice projection integrates to each slice's power | 4.2818e-15 | 4.1137e-15 | <= 1.0000e-10 |
+| range: the beam frame's patch count is the range | 0 | same | <= 5.0000e-01 |
+| range: the field frame carries the range's slices | 0 | same | <= 5.0000e-01 |
+| range: the cut field's mesh starts at its first slice's z [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| range: and its transverse origin is the whole window's [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| refusal: a slice range outside the window refused (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: the knob at zero is the run that never named it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: cut into pieces, exit power against the whole element | 1.2341e-13 | 1.1959e-13 | <= 1.0000e-09 |
+| interlude: cut into pieces, exit sigma_x against the whole element | 5.9606e-16 | same | <= 1.0000e-09 |
+| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.6656e-14 | 8.3368e-14 | <= 1.0000e-09 |
+| interlude: rows strictly inside the quadrupole, whole (0 expected) | 0 | same | <= 5.0000e-01 |
+| interlude: rows strictly inside the quadrupole, cut (4 expected) | 0 | same | <= 5.0000e-01 |
+| interlude: rows strictly inside the pipe, cut (9 expected) | 0 | same | <= 5.0000e-01 |
+| interlude: the stats file holds exactly the rows the diag carries | 0 | same | <= 5.0000e-01 |
+| interlude: the stats file records the step it ran at | 0.0000e+00 | same | <= 1.0000e-12 |
+| interlude: one frame per stats row with the pieces on | 0 | same | <= 5.0000e-01 |
+| interlude: the frames carry the rows' own s | 0.0000e+00 | same | <= 1.0000e-09 |
+| interlude: frames strictly inside the pipe (9 expected) | 0 | same | <= 5.0000e-01 |
+| interlude: the header states the pieces before it tracks | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: and says nothing where nothing is cut | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: a wake-carrying element is not cut | 0 | same | <= 5.0000e-01 |
+| interlude: and the elements without a wake still are | 0 | same | <= 5.0000e-01 |
+| interlude: the zero wake left the physics alone, so only the rows differ | 6.9170e-15 | 1.2742e-15 | <= 1.0000e-09 |
+| interlude: refused with the transcribed Genesis interlude (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: with sr_wakes_on off the wake element is cut like any other | 0 | same | <= 5.0000e-01 |
+| interlude: and its physics is the whole-element run's | 0.0000e+00 | same | <= 1.0000e-09 |
+| interlude: space charge on a seam interlude is refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| interlude: and Bmad's own centroid message never printed (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| thin kicker: a zero-length kicker kicks (1e-5 expected) | 8.0794e-05 | same | <= 1.0000e-03 |
+| thin kicker: the same kick through a finite length agrees | 1.9073e-10 | same | <= 1.0000e-03 |
+| thin kicker: it takes a record, and the zero-length pipe is still skipped | 0 | same | <= 5.0000e-01 |
+| frames: the particle sPosition is the frame's own [m] | 8.8818e-16 | 1.1102e-15 | <= 1.0000e-12 |
+| frames: the particle timeOffset is the iteration's time [s] | 2.4815e-24 | 4.1359e-24 | <= 1.0000e-18 |
+| refposition: the pulse file's is 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| refposition: the escaped file's is the window length n_slice * slicespacing [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| refposition: both unmoved by the interlude's drift [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| refposition: the escaped file's z_transmit falls with its slice number (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refposition: Wavefront.from_genesis4 puts the pulse's first slice at zmin 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| refposition: the pulse's live slices are the final field, slice by slice, rel | 1.5515e-16 | same | <= 1.0000e-08 |
+| refposition: pulse slice n_slice + i carries the energy of escaped slice i, rel | 1.4988e-14 | same | <= 1.0000e-08 |
+| refposition: Genesis imports the pulse and re-dumps the same slice count | 0 | same | <= 5.0000e-01 |
+| refposition: Genesis's re-dump is the pulse, slice by slice, rel | 2.0210e-16 | same | <= 1.0000e-12 |
+| refposition: and carries the pulse's own refposition [m] | 0.0000e+00 | same | <= 1.0000e-18 |

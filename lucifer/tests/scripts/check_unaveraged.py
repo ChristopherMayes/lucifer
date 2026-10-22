@@ -61,6 +61,7 @@ from __future__ import annotations
 import argparse
 import math
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -183,7 +184,9 @@ def check(name, value, tol, note=""):
     global FAILED
     ok = value <= tol
     print(f"--- {name}: {value:.3e} (check {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
-    record(name, value, tol, "max", ok)
+    # A name may end in a bracketed pair of measured values for the reader. The record's
+    # name leaves them out, since the generator pairs the two builds' records by name.
+    record(re.sub(r"\s*\[[^\]]*\]\s*$", "", name), value, tol, "max", ok)
     if not ok:
         FAILED = True
 

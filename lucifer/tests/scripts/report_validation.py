@@ -87,8 +87,10 @@ def read_results(path):
 
 
 def fmt(x):
-    """A value as the table prints it: six significant digits for a float, the integer
-    itself, yes or no for a truth value, and nothing for no value."""
+    """A value as the table prints it: five significant digits for a float, the integer
+    itself, yes or no for a truth value, and nothing for no value. Five digits is what a
+    check's level reproduces between two runs of one build. The tier levels keep their
+    seven, which they have held run after run."""
     if x is None:
         return ""
     if isinstance(x, bool):
@@ -96,7 +98,7 @@ def fmt(x):
     if isinstance(x, int):
         return str(x)
     if isinstance(x, float):
-        return f"{x:.6e}"
+        return f"{x:.4e}"
     if isinstance(x, list):
         return "[" + ", ".join(fmt(v) for v in x) + "]"
     return str(x)
