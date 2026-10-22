@@ -18,10 +18,7 @@ The tables below are also the calibration of the cost estimate every run prints 
 ./lucifer/tests/run_perf_benchmark.sh --phases
 ```
 
-Every table below whose deck states `ngrid` 255 was measured before the harness moved
-to power-of-two grids, and `run_perf_benchmark.sh` now states 256, so a fresh run reports
-walks about 1.17x those numbers on the large grid ([](#perf-the-transform-length)). The shares
-between phases are what those tables are for and they do not move with the grid.
+Every table below whose deck states `ngrid` 255 was measured before the harness moved to power-of-two grids, and `run_perf_benchmark.sh` now states 256, so a fresh run reports walks about 1.17x those numbers on the large grid ([](#perf-the-transform-length)). The shares between phases are what those tables are for and they do not move with the grid.
 
 No genesis4 and no MPI: the phases mode compares the code against itself, so it starts from the tracker's own shot-noise quiet start rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice and `--big-slices` the larger case.
 
@@ -83,13 +80,7 @@ Slippage is 0.4% of the walk and 0.1% at the larger size. [](validation.md#val-p
 (perf-the-transform-length)=
 ## The transform length
 
-Every deck in the harness runs a power-of-two transverse grid, so one deck runs on the
-CPU and on the Metal field solver unchanged, and the derived count rounds up to one
-([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is
-measured here rather than assumed. The `steady_state` example, one slice of 8192
-macroparticles over the full 57 m line, 12 threads, production build, varying only
-`grid_n_pts`. The 255 and 256 rows are six runs alternating between the two so that any
-drift falls on both, and the best of each is taken.
+Every deck in the harness runs a power-of-two transverse grid, so one deck runs on the CPU and on the Metal field solver unchanged, and the derived count rounds up to one ([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is measured here rather than assumed. The `steady_state` example, one slice of 8192 macroparticles over the full 57 m line, 12 threads, production build, varying only `grid_n_pts`. The 255 and 256 rows are six runs alternating between the two so that any drift falls on both, and the best of each is taken.
 
 | ngrid | factors | points | walk | seconds a point |
 |---|---|---|---|---|
@@ -99,13 +90,7 @@ drift falls on both, and the best of each is taken.
 | 256 | 2^8 | 65536 | 6.148 s | 9.38e-5 |
 | 257 | prime | 66049 | 8.046 s | 1.22e-4 |
 
-The power of two is the slower of the two large grids, at 1.17x the walk of 255 for 0.8
-percent more points. FFTW's mixed radix takes 3 x 5 x 17 better than it takes 2^8, and a
-power-of-two stride is where a two-dimensional transform's rows collide in the cache. A
-prime is worse than either, 1.56x against 255, which is the transform falling back to its
-general algorithm. What the grid convention buys is a deck that moves between the
-backends. On this machine it costs speed to get that, where a power of two is usually
-assumed to pay for itself.
+The power of two is the slower of the two large grids, at 1.17x the walk of 255 for 0.8 percent more points. FFTW's mixed radix takes 3 x 5 x 17 better than it takes 2^8, and a power-of-two stride is where a two-dimensional transform's rows collide in the cache. A prime is worse than either, 1.56x against 255, which is the transform falling back to its general algorithm. What the grid convention buys is a deck that moves between the backends. On this machine it costs speed to get that, where a power of two is usually assumed to pay for itself.
 
 ## The particles against the grid
 
@@ -388,15 +373,7 @@ The Metal backend ([](validation.md#val-device)) run against the CPU path on the
 | SASE window, 96 x 8192 | 3.92 s | 0.316 s | 0.196 s | 12.4x |
 | dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.037 s | 0.009 s | 0.9x |
 
-Where a step's device seconds go, per pass. `global%device_timing` encodes each pass into
-its own compute encoder carrying a timestamp attachment, which is what stage-boundary
-counter sampling can measure on an Apple GPU: dispatch-boundary sampling would time each
-dispatch inside one encoder and the M3 Max reports it absent. The full Aramis line, 12
-segments and 1068 steps, one slice, `ngrid` 256, the filter on and `comb_ds_save = -1`, so
-the readbacks fall at element ends and each element's steps batch into one command buffer.
-Best complete run of five, never a per-pass minimum, with the spread over the five beside
-it. The transverse map runs twice a step, and the filter and the solve are four dispatches
-each, so those lines sum more encoders than the others.
+Where a step's device seconds go, per pass. `global%device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU: dispatch-boundary sampling would time each dispatch inside one encoder and the M3 Max reports it absent. The full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, the filter on and `comb_ds_save = -1`, so the readbacks fall at element ends and each element's steps batch into one command buffer. Best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
 
 | particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -404,8 +381,7 @@ each, so those lines sum more encoders than the others.
 | 8192 | 0.875 s | 0.256 s | 0.0197 s | 0.0184 s | 0.0116 s | 0.0142 s | 0.0577 s | 0.0605 s | 0.1821 s | 27.7% |
 | 131072 | 1.800 s | 0.312 s | 0.0482 s | 0.0423 s | 0.0147 s | 0.0825 s | 0.0590 s | 0.0614 s | 0.3081 s | 7.1% |
 
-The instrument is not free, and its price is what says how far the table above can be
-read. The same three loads with the timing off against on, best of five:
+The instrument is not free, and its price is what says how far the table above can be read. The same three loads with the timing off against on, best of five:
 
 | particles a slice | walk off | walk on | busy off | busy on | busy |
 |---|---|---|---|---|---|
@@ -413,21 +389,9 @@ read. The same three loads with the timing off against on, best of five:
 | 8192 | 0.683 s | 0.882 s | 0.1240 s | 0.2580 s | 2.08x |
 | 131072 | 1.700 s | 1.800 s | 0.2740 s | 0.3170 s | 1.16x |
 
-So the absolute seconds in the per-pass table are the instrument's rather than a
-production run's, and at the two lighter loads the encoder boundaries cost about as much
-as the work. The shares survive that better than the seconds do, with one bias to keep in
-mind: a pass bears one boundary per encoder, so the deposit's one encoder a step carries
-less of the overhead than the filter's four or the solve's four, and the deposit's share
-is therefore a floor. Read that way the deposit is 7.7 percent of the six at 1024 and 8192
-particles a slice and 26.8 percent at 131072, where the overhead is smallest and the
-figure is firmest. The transform, filter and solve together are two thirds of a step at
-production loads, which is the same conclusion the load scan of [](#perf-device) reaches
-from the outside: the step is dominated by the grid and not by the particles until the
-load is very high.
+So the absolute seconds in the per-pass table are the instrument's rather than a production run's, and at the two lighter loads the encoder boundaries cost about as much as the work. The shares survive that better than the seconds do, with one bias to keep in mind: a pass bears one boundary per encoder, so the deposit's one encoder a step carries less of the overhead than the filter's four or the solve's four, and the deposit's share is therefore a floor. Read that way the deposit is 7.7 percent of the six at 1024 and 8192 particles a slice and 26.8 percent at 131072, where the overhead is smallest and the figure is firmest. The transform, filter and solve together are two thirds of a step at production loads, which is the same conclusion the load scan of [](#perf-device) reaches from the outside: the step is dominated by the grid and not by the particles until the load is very high.
 
-What the fixed-point deposit costs. The same three loads and the same deck as the two
-tables above, timing off on both sides so the instrument's own boundaries are out of it,
-best of five. The float deposit is the run before the accumulator changed.
+What the fixed-point deposit costs. The same three loads and the same deck as the two tables above, timing off on both sides so the instrument's own boundaries are out of it, best of five. The float deposit is the run before the accumulator changed.
 
 | particles a slice | busy, float | busy, fixed point | busy | walk, float | walk, fixed point | walk |
 |---|---|---|---|---|---|---|
@@ -435,14 +399,9 @@ best of five. The float deposit is the run before the accumulator changed.
 | 8192 | 0.1240 s | 0.1640 s | 1.32x | 0.683 s | 0.733 s | 1.07x |
 | 131072 | 0.2740 s | 0.3550 s | 1.30x | 1.700 s | 1.800 s | 1.06x |
 
-A quarter to a third more device time on those decks, and six to seven percent more wall
-clock, because a single slice leaves the step dominated by the host's dispatch rather than
-by the device: the backend is busy for only about a sixth of the walk there. That is the
-cheap end of the range and not a general figure, so the same comparison is made below on a
-window that keeps the device busy.
+A quarter to a third more device time on those decks, and six to seven percent more wall clock, because a single slice leaves the step dominated by the host's dispatch rather than by the device: the backend is busy for only about a sixth of the walk there. That is the cheap end of the range and not a general figure, so the same comparison is made below on a window that keeps the device busy.
 
-Where the device time goes after the change, on item 1's own deck and conditions, so that
-the passes can be compared against the table above rather than inferred.
+Where the device time goes after the change, on item 1's own deck and conditions, so that the passes can be compared against the table above rather than inferred.
 
 | particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -450,49 +409,27 @@ the passes can be compared against the table above rather than inferred.
 | 8192 | 0.891 s | 0.236 s | 0.0188 s | 0.0176 s | 0.0187 s | 0.0187 s | 0.0664 s | 0.0571 s | 0.1974 s | 3.8% |
 | 131072 | 1.898 s | 0.356 s | 0.0452 s | 0.0399 s | 0.0230 s | 0.1347 s | 0.0692 s | 0.0593 s | 0.3713 s | 3.4% |
 
-The two tables were taken in different sessions, so the passes the change does not touch
-are what says whether they can be compared at all. At 8192 and 131072 the transverse, push
-and solve lines sit at 0.94 to 0.97 of the earlier ones, close enough to read the rest;
-at 1024 they sit at 0.56 to 0.59 and its spread is 26 percent, so that row prices nothing.
-On the two rows that carry, the clear is 1.6x and the deposit 1.3x at 8192 and 1.6x at
-131072, and every other pass is unmoved. The deposit does two atomic adds a component
-where it did one, the clear writes twice the words, and the pass that converts reads four
-integers where it read two floats.
+The two tables were taken in different sessions, so the passes the change does not touch are what says whether they can be compared at all. At 8192 and 131072 the transverse, push and solve lines sit at 0.94 to 0.97 of the earlier ones, close enough to read the rest; at 1024 they sit at 0.56 to 0.59 and its spread is 26 percent, so that row prices nothing. On the two rows that carry, the clear is 1.6x and the deposit 1.3x at 8192 and 1.6x at 131072, and every other pass is unmoved. The deposit does two atomic adds a component where it did one, the clear writes twice the words, and the pass that converts reads four integers where it read two floats.
 
-What it costs where the device is the bottleneck. One Aramis segment, 96 slices at `ngrid`
-256 with shot noise and `comb_ds_save = -1`, which leaves the backend busy for about 68
-percent of the walk instead of a sixth. The two builds are the commit before the
-accumulator changed and the commit after, timing off on both, best of five after a
-discarded warm-up.
+What it costs where the device is the bottleneck. One Aramis segment, 96 slices at `ngrid` 256 with shot noise and `comb_ds_save = -1`, which leaves the backend busy for about 68 percent of the walk instead of a sixth. The two builds are the commit before the accumulator changed and the commit after, timing off on both, best of five after a discarded warm-up.
 
 | slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
 | 96 x 1024 | 0.329 s | 0.385 s | 1.17x | 0.226 s | 0.283 s | 1.25x |
 | 96 x 8192 | 0.357 s | 0.466 s | 1.31x | 0.244 s | 0.337 s | 1.38x |
 
-That was with the clear as it first stood, one word a thread, and on this window the clear
-was the largest single pass at 0.0863 s of 0.328 s busy, a quarter of all device time,
-since it writes 96 slices of 256 by 256 accumulators every step. It is a memory fill, so
-what it costs is the width of a store: four words a thread halves it, to 0.0427 s. The
-same widening on the float deposit is worth nothing, 0.99x and 1.01x on the walk, because
-that clear writes half the words and was never the bottleneck. The saving belongs to the
-fixed point's own bytes and is credited there.
+That was with the clear as it first stood, one word a thread, and on this window the clear was the largest single pass at 0.0863 s of 0.328 s busy, a quarter of all device time, since it writes 96 slices of 256 by 256 accumulators every step. It is a memory fill, so what it costs is the width of a store: four words a thread halves it, to 0.0427 s. The same widening on the float deposit is worth nothing, 0.99x and 1.01x on the walk, because that clear writes half the words and was never the bottleneck. The saving belongs to the fixed point's own bytes and is credited there.
 
-With the clear widened on both sides and the deposit's gamma guard in the kernel, six
-pairs alternating between the two builds so that drift falls on both:
+With the clear widened on both sides and the deposit's gamma guard in the kernel, six pairs alternating between the two builds so that drift falls on both:
 
 | slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
 | 96 x 1024 | 0.318 s | 0.348 s | 1.09x | 0.217 s | 0.239 s | 1.10x |
 | 96 x 8192 | 0.366 s | 0.405 s | 1.11x | 0.248 s | 0.293 s | 1.18x |
 
-So the wall-clock price is six to seven percent where the host's dispatch dominates and
-nine to eleven percent where the device does, and the share of the walk the backend holds
-is what sets which end a deck sits at. The kernel's gamma guard is inside those numbers
-and costs nothing the walk can resolve, one comparison and one branch a particle.
+So the wall-clock price is six to seven percent where the host's dispatch dominates and nine to eleven percent where the device does, and the share of the walk the backend holds is what sets which end a deck sits at. The kernel's gamma guard is inside those numbers and costs nothing the walk can resolve, one comparison and one branch a particle.
 
-What the price buys is in [](validation.md#val-device): two runs of one deck identical on
-every array of the statistics file, where 54 of 127 differed before.
+What the price buys is in [](validation.md#val-device): two runs of one deck identical on every array of the statistics file, where 54 of 127 differed before.
 
 (perf-device-unaveraged)=
 ## The unaveraged mode on the device

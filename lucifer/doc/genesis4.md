@@ -3,20 +3,13 @@ title: Lucifer and Genesis 1.3 Version 4 (Genesis4)
 short_title: Genesis4
 ---
 
-Lucifer's averaged physics was transcribed from Genesis4, and
-the benchmark tiers compare against it. This page is for a user who knows one code and
-wants the other: what physics the two share, what each has that the other does not, how
-a setting translates, and how a file moves between them.
+Lucifer's averaged physics was transcribed from Genesis4, and the benchmark tiers compare against it. This page is for a user who knows one code and wants the other: what physics the two share, what each has that the other does not, how a setting translates, and how a file moves between them.
 
-**Checked against Genesis4 release v4.6.15**, which is also the reference the comparison
-tiers run against. This page is the only one that tracks Genesis4, so it is the only one
-to revisit when Genesis4 changes. Everything else in this documentation describes Lucifer
-on its own terms.
+**Checked against Genesis4 release v4.6.15**, which is also the reference the comparison tiers run against. This page is the only one that tracks Genesis4, so it is the only one to revisit when Genesis4 changes. Everything else in this documentation describes Lucifer on its own terms.
 
 ## Shared physics
 
-These are the same model in both codes, transcribed routine by routine, and the
-comparison tiers hold them to the level [](validation.md) records.
+These are the same model in both codes, transcribed routine by routine, and the comparison tiers hold them to the level [](validation.md) records.
 
 | Method | Shared |
 |---|---|
@@ -50,9 +43,7 @@ Genesis4 has, and Lucifer does not:
 
 ## Translating settings
 
-Genesis4 is driven by namelists over its own lattice format. Lucifer is driven by three
-namelists over a Bmad lattice, with the FEL parameters living on the elements. The
-parameter reference is [](input-reference.md).
+Genesis4 is driven by namelists over its own lattice format. Lucifer is driven by three namelists over a Bmad lattice, with the FEL parameters living on the elements. The parameter reference is [](input-reference.md).
 
 | Genesis4 | Lucifer | Note |
 |---|---|---|
@@ -87,75 +78,30 @@ parameter reference is [](input-reference.md).
 
 ## Moving files between the codes
 
-`lucifer/tests/scripts/convert_genesis.py` holds all of the format knowledge, in both
-directions:
+`lucifer/tests/scripts/convert_genesis.py` holds all of the format knowledge, in both directions:
 
 ```
 python3 convert_genesis.py <in> <out>
 ```
 
-Fields convert both ways and Genesis4 particles convert inward through
-openPMD-beamphysics, which owns those conversions. The fourth direction, openPMD
-particles out to a Genesis4 `.par.h5`, is implemented here because no upstream
-implementation exists. That is what Genesis4's `&importbeam` reads, so it is how
-Genesis4 restarts from a state Lucifer produced.
+Fields convert both ways and Genesis4 particles convert inward through openPMD-beamphysics, which owns those conversions. The fourth direction, openPMD particles out to a Genesis4 `.par.h5`, is implemented here because no upstream implementation exists. That is what Genesis4's `&importbeam` reads, so it is how Genesis4 restarts from a state Lucifer produced.
 
-A file that is not openPMD is refused, with the conversion command in the
-message.
+A file that is not openPMD is refused, with the conversion command in the message.
 
 ## Facts about Genesis4 this work pinned down
 
-These are properties of Genesis4 that the transcription had to establish by reading the
-source, and they are recorded because they are not stated in its documentation. Each is
-true of the release named at the top of this page.
+These are properties of Genesis4 that the transcription had to establish by reading the source, and they are recorded because they are not stated in its documentation. Each is true of the release named at the top of this page.
 
-- Outside undulators Genesis4 does not subdivide into `delz` steps: each interlude element
-  is one integration step of the element's full length (`Lattice::unrollLattice` pushes
-  one entry per non-undulator layout segment). The step count over the benchmark is
-  12*89 undulator steps + 36 interlude steps = 1104.
-- In steady state `slippage` and `phaseshift` are no-ops: `Control::applySlippage`
-  returns immediately when not time dependent, and the phaseshift array is all zero
-  without phase shifter elements.
-- Time dependence follows from `&time` or from importing a multi-slice dump
-  (`readBeamHDF5.cpp:68-77` reconstructs the window from `slicespacing` and `slicecount`,
-  time on by default), with `nslice = round(slen/(sample*lambda0))` (`GenTime.cpp:70`).
-- The end-of-lattice autophasing is unguarded: the last step always gets
-  `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths of slippage, `+1` even with no trailing
-  drift (`Lattice.cpp:191-193`).
-- The field record's rotation never appears in Genesis4's outputs: `writeFieldHDF5` and
-  `DiagField::calc` both unrotate on the fly, so `.out.h5` per-slice arrays and `.fld.h5`
-  dumps are in time-window order, aligned with beam-slice indexing.
-- A helical undulator defaults to `kx = ky = 0.5` (`LatticeParser.cpp:329`), scaled by
-  `ku^2` in the unroll.
-- The `&importbeam` / `&importfield` namelists take full filenames and make the
-  shared-start methodology possible. `&write` before `&track` produces the dumps.
-- Genesis4's internal field unit: `dfl [sqrt(W)] = u * dgrid * eev / (ks * sqrt(vacimp))`
-  (`writeFieldHDF5.cpp:70`), with `vacimp = 376.73` truncated and `eev = 510998.95069`
-  (identical to Bmad's `m_electron`). Equivalently `u = E*ks/(sqrt(2)*eev)` with E in
-  V/m, the relation used to derive this tracker's physical-unit formulas.
-- Releases up to v4.6.14 use `eev = 510999.06` for the electron rest energy, which is
-  2.14e-7 above the CODATA 2022 value. From v4.6.15 the value is 510998.95069, which is
-  also Bmad's `m_electron`, so a comparison against the current release has no
-  electron-mass discrepancy at all while one against an older release has this one. The
-  field unit is linear in `eev`, so the difference reaches the field-normalization
-  integrals as 4.28e-7 and loosens the transcription tiers by several percent of their own
-  value without failing any of them. The levels recorded in [](validation.md) belong to a
-  reference that carries the CODATA value.
-- From v4.6.15 every stochastic stream is a pure function of the user seed, the global
-  slice index and a per-stream identifier, mixed with the splitmix64 finaliser, so a
-  slice's noise no longer depends on which MPI rank owns it. This project contributed
-  that change. Two consequences for a comparison. A result is now reproducible across
-  rank counts, where before a fixed seed gave different physics at different core counts
-  and per-slice bunching could differ by 90 per cent. And the realizations themselves
-  differ from every earlier release, because `ShotNoise` is re-keyed per slice instead of
-  drawn continuously and `RandomU::set`, which had an empty body, now re-keys as the
-  surrounding code always intended. Any level recorded against an earlier release is a
-  comparison against a different noise realization, not a tighter or looser one.
-- The quad transport is chromatic through per-particle `gammaz` with `foc^2 =
-  k1*gamma0/gammaz`. Bmad's equivalent scaling is `k1*p0/p`. The two differ by ~4e-9
-  relative at this energy (1 - beta0), far below the path-length-term difference.
+- Outside undulators Genesis4 does not subdivide into `delz` steps: each interlude element is one integration step of the element's full length (`Lattice::unrollLattice` pushes one entry per non-undulator layout segment). The step count over the benchmark is 12*89 undulator steps + 36 interlude steps = 1104.
+- In steady state `slippage` and `phaseshift` are no-ops: `Control::applySlippage` returns immediately when not time dependent, and the phaseshift array is all zero without phase shifter elements.
+- Time dependence follows from `&time` or from importing a multi-slice dump (`readBeamHDF5.cpp:68-77` reconstructs the window from `slicespacing` and `slicecount`, time on by default), with `nslice = round(slen/(sample*lambda0))` (`GenTime.cpp:70`).
+- The end-of-lattice autophasing is unguarded: the last step always gets `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths of slippage, `+1` even with no trailing drift (`Lattice.cpp:191-193`).
+- The field record's rotation never appears in Genesis4's outputs: `writeFieldHDF5` and `DiagField::calc` both unrotate on the fly, so `.out.h5` per-slice arrays and `.fld.h5` dumps are in time-window order, aligned with beam-slice indexing.
+- A helical undulator defaults to `kx = ky = 0.5` (`LatticeParser.cpp:329`), scaled by `ku^2` in the unroll.
+- The `&importbeam` / `&importfield` namelists take full filenames and make the shared-start methodology possible. `&write` before `&track` produces the dumps.
+- Genesis4's internal field unit: `dfl [sqrt(W)] = u * dgrid * eev / (ks * sqrt(vacimp))` (`writeFieldHDF5.cpp:70`), with `vacimp = 376.73` truncated and `eev = 510998.95069` (identical to Bmad's `m_electron`). Equivalently `u = E*ks/(sqrt(2)*eev)` with E in V/m, the relation used to derive this tracker's physical-unit formulas.
+- Releases up to v4.6.14 use `eev = 510999.06` for the electron rest energy, which is 2.14e-7 above the CODATA 2022 value. From v4.6.15 the value is 510998.95069, which is also Bmad's `m_electron`, so a comparison against the current release has no electron-mass discrepancy at all while one against an older release has this one. The field unit is linear in `eev`, so the difference reaches the field-normalization integrals as 4.28e-7 and loosens the transcription tiers by several percent of their own value without failing any of them. The levels recorded in [](validation.md) belong to a reference that carries the CODATA value.
+- From v4.6.15 every stochastic stream is a pure function of the user seed, the global slice index and a per-stream identifier, mixed with the splitmix64 finaliser, so a slice's noise no longer depends on which MPI rank owns it. This project contributed that change. Two consequences for a comparison. A result is now reproducible across rank counts, where before a fixed seed gave different physics at different core counts and per-slice bunching could differ by 90 per cent. And the realizations themselves differ from every earlier release, because `ShotNoise` is re-keyed per slice instead of drawn continuously and `RandomU::set`, which had an empty body, now re-keys as the surrounding code always intended. Any level recorded against an earlier release is a comparison against a different noise realization, not a tighter or looser one.
+- The quad transport is chromatic through per-particle `gammaz` with `foc^2 = k1*gamma0/gammaz`. Bmad's equivalent scaling is `k1*p0/p`. The two differ by ~4e-9 relative at this energy (1 - beta0), far below the path-length-term difference.
 
-Genesis4's truncated impedance constants set the floor of every transcription
-comparison, which is why nine of the eleven tiers agree at that floor rather than at
-round-off. [](validation.md) says which tiers those are and what the remaining two
-price.
+Genesis4's truncated impedance constants set the floor of every transcription comparison, which is why nine of the eleven tiers agree at that floor rather than at round-off. [](validation.md) says which tiers those are and what the remaining two price.

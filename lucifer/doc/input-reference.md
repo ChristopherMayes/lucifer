@@ -184,10 +184,7 @@ The three kernels, their numerical impedance and the causal convolution are in [
 
 ### Space charge: `space_charge%`
 
-Whether space charge acts is not in this group. It is the element's own
-`space_charge_method`, described with the other [lattice attributes](#lattice-attributes),
-and this group holds only the solver's numbers. A run with no element asking for it never
-reaches them.
+Whether space charge acts is not in this group. It is the element's own `space_charge_method`, described with the other [lattice attributes](#lattice-attributes), and this group holds only the solver's numbers. A run with no element asking for it never reaches them.
 
 | Parameter | Default | Meaning |
 |---|---|---|
@@ -227,9 +224,7 @@ Elements carrying Bmad `sr_wake` definitions, either pseudomodes or a tabular `z
 /
 ```
 
-One path loads the beam: a bunch from `beam_init%`, generated or read from a file, binned
-into the slices and loaded by `load_mode`, with `quiet_start` and `shot_noise` acting on
-every load ([](fel-physics.md#sec-loading)). `beam_file` starts from a dump instead.
+One path loads the beam: a bunch from `beam_init%`, generated or read from a file, binned into the slices and loaded by `load_mode`, with `quiet_start` and `shot_noise` acting on every load ([](fel-physics.md#sec-loading)). `beam_file` starts from a dump instead.
 
 ### Files and sources
 

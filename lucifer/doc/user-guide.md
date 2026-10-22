@@ -4,9 +4,7 @@ Everything needed to get from a checkout to a tracked FEL run. The parameter-by-
 
 ## Building
 
-Lucifer is a Bmad user program, built against a Bmad distribution rather than as part of
-one. Its repository holds Lucifer alone, and a Bmad checkout sits beside it, named by
-`BMAD_DIR`:
+Lucifer is a Bmad user program, built against a Bmad distribution rather than as part of one. Its repository holds Lucifer alone, and a Bmad checkout sits beside it, named by `BMAD_DIR`:
 
 ```
 git clone https://github.com/ChristopherMayes/lucifer.git
@@ -15,20 +13,9 @@ git -C bmad checkout "$(cat lucifer/lucifer/BMAD_RELEASE)"
 cd lucifer
 BMAD_DIR=../bmad BUILD_PRODUCTION=N lucifer/util/conda_compile   # debug: Bmad, then Lucifer
 ```
- The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in
-`lucifer/BMAD_RELEASE`, currently `20261018-0`, the first release carrying the two Bmad
-changes Lucifer needs: the `fel_method` element attribute and openPMD particle patches in
-the beam files. An older Bmad refuses the lattices and reads a multi-slice beam file as one
-bunch. `lucifer/util/bmad_release_check <bmad root>` compares a checkout's
-`bmad_version_date` with that minimum, the date and the revision as numbers, and the build
-script runs it before it builds anything, refusing an older checkout. The tracker prints
-the Bmad version it was built against at startup and records it in the stats file.
+ The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in `lucifer/BMAD_RELEASE`, currently `20261018-0`, the first release carrying the two Bmad changes Lucifer needs: the `fel_method` element attribute and openPMD particle patches in the beam files. An older Bmad refuses the lattices and reads a multi-slice beam file as one bunch. `lucifer/util/bmad_release_check <bmad root>` compares a checkout's `bmad_version_date` with that minimum, the date and the revision as numbers, and the build script runs it before it builds anything, refusing an older checkout. The tracker prints the Bmad version it was built against at startup and records it in the stats file.
 
-Its `CMakeLists.txt` includes Bmad's `Master.cmake`, which compiles it against the
-distribution's libraries and modules and places its binaries in `debug/` and `production/`
-beside the Lucifer source, which is the repository root. One script
-builds Bmad and then Lucifer, with the conda preferences the recorded levels were measured
-under:
+Its `CMakeLists.txt` includes Bmad's `Master.cmake`, which compiles it against the distribution's libraries and modules and places its binaries in `debug/` and `production/` beside the Lucifer source, which is the repository root. One script builds Bmad and then Lucifer, with the conda preferences the recorded levels were measured under:
 
 ```
 conda env create -n bmad-build -f <bmad>/.github/bmad-build-env.yaml   # once
@@ -37,24 +24,9 @@ lucifer/util/conda_compile                         # production
 BUILD_BMAD=N lucifer/util/conda_compile            # Lucifer alone, Bmad already built
 ```
 
-The Bmad source is `BMAD_DIR`, which a Lucifer clone needs since its parent holds no Bmad
-checkout. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over
-with a note, since `dist_source_me` uses that name as a loop variable and leaves it at
-the checkout's `util/` once sourced. By hand, the same build is `source
-<bmad>/util/dist_source_me` from the Bmad root and then `mk` or `mkd` in the Lucifer
-directory.
+The Bmad source is `BMAD_DIR`, which a Lucifer clone needs since its parent holds no Bmad checkout. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over with a note, since `dist_source_me` uses that name as a loop variable and leaves it at the checkout's `util/` once sourced. By hand, the same build is `source <bmad>/util/dist_source_me` from the Bmad root and then `mk` or `mkd` in the Lucifer directory.
 
-Running the validation harness needs one thing beyond the binary, a Python environment
-with numpy, h5py, pytest and openPMD-beamphysics 0.16.3 or later, described by
-`lucifer/wavefront/tests/environment.yml`. The scripts use whatever version that
-environment holds and print it. A development version of openPMD-beamphysics is installed
-into the environment as well. The harness takes four locations, each defaulting to the
-layout above: the Lucifer source, which is the scripts' own tree, the Bmad source with its
-regression suite (`BMAD_DIR`), and the two binary directories (`LUCIFER_DEBUG_BIN`,
-`LUCIFER_PRODUCTION_BIN`). A relative value is taken against the
-directory a script was started in. The benchmark records the build its `--build` option
-declares, debug or production, and never reads it off a directory name. The exact
-commands the harness runs are in [`validation.md`](validation.md).
+Running the validation harness needs one thing beyond the binary, a Python environment with numpy, h5py, pytest and openPMD-beamphysics 0.16.3 or later, described by `lucifer/wavefront/tests/environment.yml`. The scripts use whatever version that environment holds and print it. A development version of openPMD-beamphysics is installed into the environment as well. The harness takes four locations, each defaulting to the layout above: the Lucifer source, which is the scripts' own tree, the Bmad source with its regression suite (`BMAD_DIR`), and the two binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). A relative value is taken against the directory a script was started in. The benchmark records the build its `--build` option declares, debug or production, and never reads it off a directory name. The exact commands the harness runs are in [`validation.md`](validation.md).
 
 ## The two FEL methods
 
@@ -75,10 +47,7 @@ A run is one input file, which names the lattice:
 lucifer lucifer.in
 ```
 
-The name is an argument and any name works. `lucifer.in` is the convention the
-examples follow, so that a directory reads the same way twice, and it is not a default
-the program looks for. Running `lucifer` with no argument prints that much and the
-version it was built from.
+The name is an argument and any name works. `lucifer.in` is the convention the examples follow, so that a directory reads the same way twice, and it is not a default the program looks for. Running `lucifer` with no argument prints that much and the version it was built from.
 
 The file vocabulary of a run, in four extensions:
 
@@ -89,25 +58,21 @@ The file vocabulary of a run, in four extensions:
 | `.h5` | the run | HDF5, openPMD throughout: the statistics file, and the beam and field dumps |
 | `.txt` | the run | The named streams, one per subject: diag, ledger, import, migration, wake |
 
-What each written file holds is the output section below, and what to do with it is
-[`reading-output.md`](reading-output.md).
+What each written file holds is the output section below, and what to do with it is [`reading-output.md`](reading-output.md).
 
-The examples are the fastest way in. Each is a directory of real input files, a README
-with the numbers measured on it, and nothing else to fetch:
+The examples are the fastest way in. Each is a directory of real input files, a README with the numbers measured on it, and nothing else to fetch:
 
 ```
 cd lucifer/examples/steady_state && lucifer lucifer.in
 ```
 
-The one that needs Genesis4, and the only one with a runner, is the three-way
-saturation comparison:
+The one that needs Genesis4, and the only one with a runner, is the three-way saturation comparison:
 
 ```
 cd lucifer/examples/saturation_demo && ./run.sh
 ```
 
-The validation harness is a separate thing, described with its commands in
-[`validation.md`](validation.md).
+The validation harness is a separate thing, described with its commands in [`validation.md`](validation.md).
 
 ## Files
 
@@ -147,181 +112,53 @@ The validation harness is a separate thing, described with its commands in
 
 (Physics: manual [](fel-physics.md#sec-core), [](fel-physics.md#sec-chart), [](fel-physics.md#sec-field), [](fel-physics.md#sec-slippage).)
 
-Inside FEL elements (wigglers tracked by an FEL method, described in the FEL
-element section), `fel_track_und_step` advances the coupled system in steps of the
-element's `ds_step` (Bmad's standard step attribute, which is Genesis4's `delz` living on
-the lattice like every other parameter, and the bookkeeper's `num_steps =
-round(l/ds_step)` is exactly Genesis4's unroll), in Genesis4's exact order: transverse half step, RK4 advance of (theta, gamma) with
-the field gathered once per step, transverse half step, then source deposition and the
-`exp(K2 dz)` field solve. Bmad tracking is never used inside (the rule:
-`symp_lie_bmad` resolves the wiggle motion the period-averaged map assumes away).
+Inside FEL elements (wigglers tracked by an FEL method, described in the FEL element section), `fel_track_und_step` advances the coupled system in steps of the element's `ds_step` (Bmad's standard step attribute, which is Genesis4's `delz` living on the lattice like every other parameter, and the bookkeeper's `num_steps = round(l/ds_step)` is exactly Genesis4's unroll), in Genesis4's exact order: transverse half step, RK4 advance of (theta, gamma) with the field gathered once per step, transverse half step, then source deposition and the `exp(K2 dz)` field solve. Bmad tracking is never used inside (the rule: `symp_lie_bmad` resolves the wiggle motion the period-averaged map assumes away).
 
-Everywhere else (the seam) the packed slice converts to `coord_struct`s by plain
-copies, `track1_bunch` tracks them, and the field goes through `wavefront_drift`.
+Everywhere else (the seam) the packed slice converts to `coord_struct`s by plain copies, `track1_bunch` tracks them, and the field goes through `wavefront_drift`.
 
-**Coordinates.** The packed arrays store Bmad's `(x, px/p0, y, py/p0, z, pz)` plus a
-per-particle weight (macroparticle charge in Coulombs, mapping to `coord_struct%charge`).
-The ponderomotive phase is derived, not stored: Genesis4's per-particle theta splits into
-a common reference advance (one scalar per beam, `phi0`, advanced once per step) and
-the particle-specific lag carried by Bmad's z:
+**Coordinates.** The packed arrays store Bmad's `(x, px/p0, y, py/p0, z, pz)` plus a per-particle weight (macroparticle charge in Coulombs, mapping to `coord_struct%charge`). The ponderomotive phase is derived, not stored: Genesis4's per-particle theta splits into a common reference advance (one scalar per beam, `phi0`, advanced once per step) and the particle-specific lag carried by Bmad's z:
 
 ```
 theta_j = phi0 - ks*tau_j,    tau_j = -z_j/beta_j = c*(t_j - t_ref)
 ```
 
-This is the reference-offset formulation identified as the
-FP32-safe one, and it removes the wrap hazard outright: z does not wrap, so slice
-migration has no theta-wrap-plus-index update to get wrong. The longitudinal RK4 still
-runs in Genesis4's (theta, gamma) chart as per-step working variables. theta <-> z is an
-affine map, under which RK4 is exactly invariant, so the verbatim transcription survives.
-The per-step gamma <-> pz round trip costs ~1 ulp of gamma per step, which is what moved
-tier1 from 2.5e-12 to 2.8e-11 when this representation replaced the Genesis4-coordinate
-one. The particles live in the packed arrays at all times except inside `track1_bunch`.
-`coord_struct` never enters the FEL step loop.
+This is the reference-offset formulation identified as the FP32-safe one, and it removes the wrap hazard outright: z does not wrap, so slice migration has no theta-wrap-plus-index update to get wrong. The longitudinal RK4 still runs in Genesis4's (theta, gamma) chart as per-step working variables. theta <-> z is an affine map, under which RK4 is exactly invariant, so the verbatim transcription survives. The per-step gamma <-> pz round trip costs ~1 ulp of gamma per step, which is what moved tier1 from 2.5e-12 to 2.8e-11 when this representation replaced the Genesis4-coordinate one. The particles live in the packed arrays at all times except inside `track1_bunch`. `coord_struct` never enters the FEL step loop.
 
-**Weights.** Every reduction is weighted: the source deposition scales per particle as
-`c*w_j/slice_spacing` (Genesis4's `current/N` for uniform weights), bunching is
-`|sum w e^(i theta)|/sum w`, and `N_eff = (sum w)^2/sum w^2` is a per-slice diagnostic.
-The Genesis4 dump format carries no weights, so imports are uniform and a Genesis4
-comparison can only exercise the uniform case. The split-weight check below covers the
-rest.
+**Weights.** Every reduction is weighted: the source deposition scales per particle as `c*w_j/slice_spacing` (Genesis4's `current/N` for uniform weights), bunching is `|sum w e^(i theta)|/sum w`, and `N_eff = (sum w)^2/sum w^2` is a per-slice diagnostic. The Genesis4 dump format carries no weights, so imports are uniform and a Genesis4 comparison can only exercise the uniform case. The split-weight check below covers the rest.
 
-**Units and constants.** The field is in V/m throughout (the `wavefront_struct`
-convention) and all constants are Bmad's (`m_electron`, `mu_0_vac*c_light`). Expressed
-that way the formulas are simpler than Genesis4's internal-unit originals (power is
-`sum|E|^2*dA/(2*Z0)`, the coupling is `fc*conj(E)/(sqrt(2)*m_electron)`). Genesis4's
-impedance constant is truncated, 376.73 against the exact 376.7303..., so the two codes
-differ by 8.3e-7 relative before any physics runs. That difference is the floor of every
-Genesis4 comparison, and the checks are sized to it rather than to round-off.
+**Units and constants.** The field is in V/m throughout (the `wavefront_struct` convention) and all constants are Bmad's (`m_electron`, `mu_0_vac*c_light`). Expressed that way the formulas are simpler than Genesis4's internal-unit originals (power is `sum|E|^2*dA/(2*Z0)`, the coupling is `fc*conj(E)/(sqrt(2)*m_electron)`). Genesis4's impedance constant is truncated, 376.73 against the exact 376.7303..., so the two codes differ by 8.3e-7 relative before any physics runs. That difference is the floor of every Genesis4 comparison, and the checks are sized to it rather than to round-off.
 
-**Time dependence and slippage.** A multi-slice starting dump makes a time-dependent run,
-a single-slice dump the steady state. There is no separate switch, the same rule as
-Genesis4, whose imports carry the time window. Beam slice `is` couples to field slice
-`1 + mod(is-1+first, nslice)`: the field record is a circular buffer over the wavefront's
-slice index, rotated by slippage rather than moved, as Genesis4 does. Slippage accumulates at
-`dz*(1+aw^2)/(2*gamma0^2*lambda)` wavelengths per undulator step and rotates the record
-one slice whenever the accumulation exceeds `0.8*sample`, reduced to one shared-memory
-node, where the MPI ring exchange is the identity. The
-slice rotating out at the head of the time window is discarded and re-enters zeroed at
-the tail. Drifts autophase `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths onto the last
-interlude element before each undulator, and the end-of-lattice
-fixup is **unguarded in Genesis4** (`+1` even with no trailing drift at all), which
-costs one final rotation if transcribed with a guard Genesis4 does not have (found at
-0.84 of the final field). Everything reading the record in time order
-(the per-slice diagnostics, the final field dump) unrotates through `fel_field_index`,
-as Genesis4 does on the way out. Beam slices never rotate.
+**Time dependence and slippage.** A multi-slice starting dump makes a time-dependent run, a single-slice dump the steady state. There is no separate switch, the same rule as Genesis4, whose imports carry the time window. Beam slice `is` couples to field slice `1 + mod(is-1+first, nslice)`: the field record is a circular buffer over the wavefront's slice index, rotated by slippage rather than moved, as Genesis4 does. Slippage accumulates at `dz*(1+aw^2)/(2*gamma0^2*lambda)` wavelengths per undulator step and rotates the record one slice whenever the accumulation exceeds `0.8*sample`, reduced to one shared-memory node, where the MPI ring exchange is the identity. The slice rotating out at the head of the time window is discarded and re-enters zeroed at the tail. Drifts autophase `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths onto the last interlude element before each undulator, and the end-of-lattice fixup is **unguarded in Genesis4** (`+1` even with no trailing drift at all), which costs one final rotation if transcribed with a guard Genesis4 does not have (found at 0.84 of the final field). Everything reading the record in time order (the per-slice diagnostics, the final field dump) unrotates through `fel_field_index`, as Genesis4 does on the way out. Beam slices never rotate.
 
 ## The FEL element: parameters live on the lattice
 
 (Physics: manual [](fel-physics.md#sec-element).)
 
-An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying
-`fel_method = averaged` or `unaveraged`, Bmad's own attribute for the two FEL
-methods, which this driver supplies through the same hook Bmad uses for `custom`.
-Recognition is by key and FEL method, never by name, and a wiggler carrying
-`tracking_method = custom` is some other program's element: this driver leaves it to the
-seam. There are no per-undulator namelist parameters. The FEL parameters derive from the
-element attributes:
+An FEL segment is a real Bmad `wiggler` (or `undulator`) element carrying `fel_method = averaged` or `unaveraged`, Bmad's own attribute for the two FEL methods, which this driver supplies through the same hook Bmad uses for `custom`. Recognition is by key and FEL method, never by name, and a wiggler carrying `tracking_method = custom` is some other program's element: this driver leaves it to the seam. There are no per-undulator namelist parameters. The FEL parameters derive from the element attributes:
 
-- `aw` (rms, Genesis4's convention) from the peak field: `K = c*b_max/(k_u*m_e c^2)`,
-  exactly and independent of the reference energy. Helical `aw = K`, planar
-  `aw = K/sqrt(2)`. The benchmark lattices write `b_max` as an expression in Bmad's own
-  constants so it encodes `aw = 0.84853` exactly, and the round trip still differs by
-  1 ulp, measured below.
-- Helicity from `field_calc` (`helical_model` / `planar_model`), never from the stored
-  `k1x`/`k1y` wiggler attributes, whose helical sign convention disagrees with Bmad's
-  own tracking locals.
-- Genesis4's natural-focusing split from the helicity defaults (`kx = ky = 0.5*k_u^2`
-  helical, `0`/`k_u^2` planar). Bmad's `kx` roll-off
-  attribute is not yet mapped onto that split and must be zero.
+- `aw` (rms, Genesis4's convention) from the peak field: `K = c*b_max/(k_u*m_e c^2)`, exactly and independent of the reference energy. Helical `aw = K`, planar `aw = K/sqrt(2)`. The benchmark lattices write `b_max` as an expression in Bmad's own constants so it encodes `aw = 0.84853` exactly, and the round trip still differs by 1 ulp, measured below.
+- Helicity from `field_calc` (`helical_model` / `planar_model`), never from the stored `k1x`/`k1y` wiggler attributes, whose helical sign convention disagrees with Bmad's own tracking locals.
+- Genesis4's natural-focusing split from the helicity defaults (`kx = ky = 0.5*k_u^2` helical, `0`/`k_u^2` planar). Bmad's `kx` roll-off attribute is not yet mapped onto that split and must be zero.
 
-Outside the driver's own FEL walk the element is just a periodic wiggler, tracked by
-Bmad's standard kernel, because its `tracking_method` says `bmad_standard` and the FEL
-method rides alongside. The reference time acquires the resonant undulation delay from
-Bmad's own code and the transfer-matrix bookkeeping works, with nothing wired in.
-The driver still supplies `track1_custom_ptr` and `make_mat6_custom_ptr`, both
-delegating to `track_a_wiggler`, for a wiggler whose `tracking_method` is `custom` and
-so names some other program's tracking. Both are load-bearing when that happens, since
-`mat6_calc_method` resolves to custom alongside the tracking method and Bmad calls
-through a null `make_mat6_custom_ptr`, a jump to address zero, if a program sets only
-the tracking hook.
+Outside the driver's own FEL walk the element is just a periodic wiggler, tracked by Bmad's standard kernel, because its `tracking_method` says `bmad_standard` and the FEL method rides alongside. The reference time acquires the resonant undulation delay from Bmad's own code and the transfer-matrix bookkeeping works, with nothing wired in. The driver still supplies `track1_custom_ptr` and `make_mat6_custom_ptr`, both delegating to `track_a_wiggler`, for a wiggler whose `tracking_method` is `custom` and so names some other program's tracking. Both are load-bearing when that happens, since `mat6_calc_method` resolves to custom alongside the tracking method and Bmad calls through a null `make_mat6_custom_ptr`, a jump to address zero, if a program sets only the tracking hook.
 
-The 7.5 assertions are enforced where the driver claims the element, in the setup pass
-that reads `fel_method`, and refuse: a missing `b_max`
-(Bmad's own kernel would silently give `osc_amplitude = 0`: no field, no resonance, no
-error), a missing `l_period` (same silence), and a fieldmap `field_calc` (which
-segfaults the parse-time reference tracking if allowed through). Enforcing them any
-later is provably too late. The missing-`b_max` lattice otherwise dies downstream on
-an unrelated generation message. The assertions live in one routine
-(`fel_assert_wiggler_sane`). A second inline copy was tried and removed because
-redundant assertions mask the removal of either copy under mutation testing. All three
-refusals are permanent harness checks.
+The 7.5 assertions are enforced where the driver claims the element, in the setup pass that reads `fel_method`, and refuse: a missing `b_max` (Bmad's own kernel would silently give `osc_amplitude = 0`: no field, no resonance, no error), a missing `l_period` (same silence), and a fieldmap `field_calc` (which segfaults the parse-time reference tracking if allowed through). Enforcing them any later is provably too late. The missing-`b_max` lattice otherwise dies downstream on an unrelated generation message. The assertions live in one routine (`fel_assert_wiggler_sane`). A second inline copy was tried and removed because redundant assertions mask the removal of either copy under mutation testing. All three refusals are permanent harness checks.
 
-**Anchored against the namelist-driven reference:** the element-driven full TD line
-reproduces the last namelist-driven build's run to a max relative difference of
-3.4e-12, zero at z = 0 and growing with gain: exactly the amplification of the 1-ulp
-`aw` difference from deriving `aw` through the `b_max` attribute round trip rather than
-reading it from input.
+**Anchored against the namelist-driven reference:** the element-driven full TD line reproduces the last namelist-driven build's run to a max relative difference of 3.4e-12, zero at z = 0 and growing with gain: exactly the amplification of the 1-ulp `aw` difference from deriving `aw` through the `b_max` attribute round trip rather than reading it from input.
 
-**The FEL mode is the element's `fel_method`**, class-settable as
-`wiggler::*[FEL_METHOD] = unaveraged`, so averaged and unaveraged segments mix
-freely in one line. `averaged` uses the transverse maps of Bmad's own
-`bmad_standard` periodic-wiggler kernel, flattened per `ds_step` (`track_a_wiggler`'s
-matrix with the octupole-like end kicks, chromatic via `p0/p`). `unaveraged` is a
-production method whose cost buys the full quiver dynamics (see the manual's
-unaveraged-mode section).
+**The FEL mode is the element's `fel_method`**, class-settable as `wiggler::*[FEL_METHOD] = unaveraged`, so averaged and unaveraged segments mix freely in one line. `averaged` uses the transverse maps of Bmad's own `bmad_standard` periodic-wiggler kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like end kicks, chromatic via `p0/p`). `unaveraged` is a production method whose cost buys the full quiver dynamics (see the manual's unaveraged-mode section).
 
-Behind the averaged method there is one more choice, and it is a run switch rather than a
-method: `global%transport_model = "genesis"` replaces those maps with the
-transcribed-Genesis4 focusing (matrix from `aw`, `kx`, `ky`, chromatic via `gammaz`). It
-is validation-internal, since the Genesis4 tiers need transcription-level transport, and
-no production run sets it. The two averaged models are priced, measured over the
-full time-dependent line (32 slices, 90 records): power differs by 5.0e-5 max (exit
-total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching
-phase 1.3e-2 rad max, for +3.8% runtime. That is period-averaged Genesis4 focusing
-against Bmad's end-field treatment. The unaveraged mode's two numbers are run switches for the same reason:
-`global%unaveraged_steps_per_period` (20, below 10 refused) and
-`global%unaveraged_ramp_periods` (2). A true hard edge, the test configuration, is the
-explicit sentinel -1, because a silent hard edge would reintroduce the K/gamma handoff
-hazard.
+Behind the averaged method there is one more choice, and it is a run switch rather than a method: `global%transport_model = "genesis"` replaces those maps with the transcribed-Genesis4 focusing (matrix from `aw`, `kx`, `ky`, chromatic via `gammaz`). It is validation-internal, since the Genesis4 tiers need transcription-level transport, and no production run sets it. The two averaged models are priced, measured over the full time-dependent line (32 slices, 90 records): power differs by 5.0e-5 max (exit total power 3.0e-7), on-axis intensity 7.3e-4, spot sizes 6.7e-6, wrapped bunching phase 1.3e-2 rad max, for +3.8% runtime. That is period-averaged Genesis4 focusing against Bmad's end-field treatment. The unaveraged mode's two numbers are run switches for the same reason: `global%unaveraged_steps_per_period` (20, below 10 refused) and `global%unaveraged_ramp_periods` (2). A true hard edge, the test configuration, is the explicit sentinel -1, because a silent hard edge would reintroduce the K/gamma handoff hazard.
 
-The examples directory exercises the heterogeneity this buys: `examples/taper/` is the same
-line with the last two cells' undulators a second element definition with `b_max` 0.4%
-lower: bit-identical to the untapered run until the taper starts, 12.7x its exit
-power after (see `examples/README.md`).
+The examples directory exercises the heterogeneity this buys: `examples/taper/` is the same line with the last two cells' undulators a second element definition with `b_max` 0.4% lower: bit-identical to the untapered run until the taper starts, 12.7x its exit power after (see `examples/README.md`).
 
 ## Program structure
 
-The tracker is laid out the way Tao is laid out: the input structs in `fel_struct`
-(defaults in the declarations), the namelist layer quarantined in `fel_input_mod`
-(three groups in one file -- `&fel_params` with `global%...`, `bmad_com`,
-`space_charge_com`, `chamber_wake%`, `space_charge%`. `&fel_beam_init` with `beam_init%...`, `resample%...`
-and files. `&fel_wavefront_init` with `wavefront_init%...` and `field_file`), and the
-work in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` /
-`fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops --
-errors return and the driver decides, and `track_fel_line` is re-entrant (twice in
-one process is bit-identical to two processes. `tests/lucifer_smoke_test.f90` drives the
-library with no namelist anywhere). A flat `&fel_track_params` group is refused by
-name, with each parameter's current home in the message. `global%comb_ds_save` is the stats
-comb (Bmad's `ds_save` semantics with one deliberate difference: an element end is
-always a record, whatever the comb, which is what lets the file carry one record axis
-and a mask instead of a second axis. Default 0 = every record).
-`global%track_start`/`track_end` bound the walk over a schedule always
-built on the full lattice (windowed runs compose exactly). `global%continuation = T`
-declares that `beam_file` and `field_file` are the two frames of one checkpoint and the
-run continues from it, `track_start` opening at the element after the one the checkpoint
-completed. Off, the same files initialize a fresh run from their standard records
-([reading-output](reading-output.md)). `stats.h5` carries `meta/`
-provenance (the resolved input echo, which lattice, a timestamp and the Bmad version) as
-datasets, and `global%record_environment` adds the user name and working directory for a
-lab notebook, off by default because a stats file travels.
+The tracker is laid out the way Tao is laid out: the input structs in `fel_struct` (defaults in the declarations), the namelist layer quarantined in `fel_input_mod` (three groups in one file -- `&fel_params` with `global%...`, `bmad_com`, `space_charge_com`, `chamber_wake%`, `space_charge%`. `&fel_beam_init` with `beam_init%...`, `resample%...` and files. `&fel_wavefront_init` with `wavefront_init%...` and `field_file`), and the work in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` / `fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops -- errors return and the driver decides, and `track_fel_line` is re-entrant (twice in one process is bit-identical to two processes. `tests/lucifer_smoke_test.f90` drives the library with no namelist anywhere). A flat `&fel_track_params` group is refused by name, with each parameter's current home in the message. `global%comb_ds_save` is the stats comb (Bmad's `ds_save` semantics with one deliberate difference: an element end is always a record, whatever the comb, which is what lets the file carry one record axis and a mask instead of a second axis. Default 0 = every record). `global%track_start`/`track_end` bound the walk over a schedule always built on the full lattice (windowed runs compose exactly). `global%continuation = T` declares that `beam_file` and `field_file` are the two frames of one checkpoint and the run continues from it, `track_start` opening at the element after the one the checkpoint completed. Off, the same files initialize a fresh run from their standard records ([reading-output](reading-output.md)). `stats.h5` carries `meta/` provenance (the resolved input echo, which lattice, a timestamp and the Bmad version) as datasets, and `global%record_environment` adds the user name and working directory for a lab notebook, off by default because a stats file travels.
 
 ## Output: stdout is for humans, files are for programs
 
-The program's terminal output is formatted for reading and carries no contract beyond
-that: units chosen for the eye, columns aligned, wording free to improve. **Parsing it
-is discouraged.** Everything a program should read is written to a file, at full
-precision:
+The program's terminal output is formatted for reading and carries no contract beyond that: units chosen for the eye, columns aligned, wording free to improve. **Parsing it is discouraged.** Everything a program should read is written to a file, at full precision:
 
 | File | What |
 |---|---|
@@ -332,12 +169,9 @@ precision:
 | `<out_root>.import.txt` | The load record: the per-slice current profile, with the bunch's analysis moments from the resampler or the per-slice counts and first moments from the keep mode. Written at load time, so it exists under `load_only = T` |
 | `<out_root>.migration.txt` | Slice migration: one row per event (s, particles moved, charge dropped, phase-continuity residual, the smallest phase distance any examined particle had to a slice boundary) plus the run summary |
 
-This is Tao's division of labour. `show ele` is for people, `show value` and pytao are
-for precision. It is why the validation suite reads files rather than scraping the
-screen.
+This is Tao's division of labour. `show ele` is for people, `show value` and pytao are for precision. It is why the validation suite reads files rather than scraping the screen.
 
-What a run looks like: a framed block naming the configuration, a progress table, and a
-completion block listing what was written.
+What a run looks like: a framed block naming the configuration, a progress table, and a completion block listing what was written.
 
 ```
 ================================================================================
@@ -372,70 +206,21 @@ completion block listing what was written.
 ================================================================================
 ```
 
-Four choices in that table are deliberate. Values carry an **SI prefix** chosen per
-value, so one column holds both `4.230 kW` at startup and `761.499 MW` at saturation
-without losing the early digits a fixed unit would flatten. The **element name is
-last**, unpadded, so every numeric column is fixed however long a name gets: no
-truncation rule, no name shoving the numbers rightward. The **step column is blank for
-one-step elements**, which is most of a real lattice. And the distance column is **`s`**,
-Bmad's arc length along the reference orbit: through a bending break the arc exceeds the
-chord the light takes, which is exactly what the light-path correction accounts for.
+Four choices in that table are deliberate. Values carry an **SI prefix** chosen per value, so one column holds both `4.230 kW` at startup and `761.499 MW` at saturation without losing the early digits a fixed unit would flatten. The **element name is last**, unpadded, so every numeric column is fixed however long a name gets: no truncation rule, no name shoving the numbers rightward. The **step column is blank for one-step elements**, which is most of a real lattice. And the distance column is **`s`**, Bmad's arc length along the reference orbit: through a bending break the arc exceeds the chord the light takes, which is exactly what the light-path correction accounts for.
 
-The **Radiation** line reports the grid the run built, which is the file's when the field
-came from one and the derived one when the deck stated none ([](input-reference.md#param-wavefront-grid)).
+The **Radiation** line reports the grid the run built, which is the file's when the field came from one and the derived one when the deck stated none ([](input-reference.md#param-wavefront-grid)).
 
-The **Work**, **Estimate** and **Load** lines are the pre-run. Work counts what the run
-will do, and every number in it is known before the first step: the integration steps
-over the line, the macroparticles in the window, their product, and the transverse grid
-points the field solve touches per step over the window and every member of the field
-set. Estimate turns that into wall clock at rates measured on one machine, which the
-line names, from the particle push and the field solve ([](performance.md)). It is an
-estimate and it is checked: the **Cost** line in the completion block prints the clock
-beside it on every run. Load says where the macroparticle count stands against the load
-the source filter's convergence was measured at, 1024 macroparticles in 128 beamlets, and
-what the beamlet size buys, which is the harmonics the shot noise is imposed at,
-`(beamlet_size - 1)/2`. A harmonic field above that is refused with the beamlet size that
-would carry it.
+The **Work**, **Estimate** and **Load** lines are the pre-run. Work counts what the run will do, and every number in it is known before the first step: the integration steps over the line, the macroparticles in the window, their product, and the transverse grid points the field solve touches per step over the window and every member of the field set. Estimate turns that into wall clock at rates measured on one machine, which the line names, from the particle push and the field solve ([](performance.md)). It is an estimate and it is checked: the **Cost** line in the completion block prints the clock beside it on every run. Load says where the macroparticle count stands against the load the source filter's convergence was measured at, 1024 macroparticles in 128 beamlets, and what the beamlet size buys, which is the harmonics the shot noise is imposed at, `(beamlet_size - 1)/2`. A harmonic field above that is refused with the beamlet size that would carry it.
 
-The **Frames** line appears when `global%dump_at_comb` is on, and states how many frames
-the run will write and roughly how many bytes they take. A comb of zero is a frame at
-every integration step, so the number is worth reading before the run rather than after
-the disk fills ([](input-reference.md#param-global-dump-at-comb), [](reading-output.md)).
+The **Frames** line appears when `global%dump_at_comb` is on, and states how many frames the run will write and roughly how many bytes they take. A comb of zero is a frame at every integration step, so the number is worth reading before the run rather than after the disk fills ([](input-reference.md#param-global-dump-at-comb), [](reading-output.md)).
 
-Setting `global%load_only` stops the run after this block. That is the pre-run on its own:
-everything the deck derives and everything it will cost, with the initial state written
-and nothing tracked ([](input-reference.md#param-global-load-only)).
+Setting `global%load_only` stops the run after this block. That is the pre-run on its own: everything the deck derives and everything it will cost, with the initial state written and nothing tracked ([](input-reference.md#param-global-load-only)).
 
-The **Split** block is the run's own convergence report. The field power is separated into
-the part inside an angle of about four mode diffraction angles, which is what couples to
-the mode, and the part outside it, which is the emission of macroparticles that occupy one
-grid point each. That second part is an artifact of the representation, it grows as the
-cells shrink and falls as the beamlet count rises, and at common settings it is most of
-the total power of an unseeded run. The angular filter that removes it is on by default,
-and what it costs and what load it wants is [](fel-physics.md#sec-convergence). The block reports both at the
-record where the mode peaked and at the last record, and the run then warns when the
-outside part reaches a tenth of the inside part and confirms convergence below a
-hundredth. In the run above the filter is on, so 0.2 percent of the 792.7 MW exit power is
-that emission and 0.08 percent of the 1.56 GW at saturation. The same numbers are in the statistics file under
-`run/`, and the per-record per-slice arrays are `field/total/power_inside_angle` beside
-`field/total/power`.
+The **Split** block is the run's own convergence report. The field power is separated into the part inside an angle of about four mode diffraction angles, which is what couples to the mode, and the part outside it, which is the emission of macroparticles that occupy one grid point each. That second part is an artifact of the representation, it grows as the cells shrink and falls as the beamlet count rises, and at common settings it is most of the total power of an unseeded run. The angular filter that removes it is on by default, and what it costs and what load it wants is [](fel-physics.md#sec-convergence). The block reports both at the record where the mode peaked and at the last record, and the run then warns when the outside part reaches a tenth of the inside part and confirms convergence below a hundredth. In the run above the filter is on, so 0.2 percent of the 792.7 MW exit power is that emission and 0.08 percent of the 1.56 GW at saturation. The same numbers are in the statistics file under `run/`, and the per-record per-slice arrays are `field/total/power_inside_angle` beside `field/total/power`.
 
-Below the two records the block names the **thin slices**: the slices carrying charge
-whose beamlet count is under 128 or whose power outside the split angle is over a tenth
-of the power inside it, by index and position, up to eight of them with a count of the
-rest. A window ratio is a mean over the window, so a thin tail disappears into it, and a
-beam imported with irregular counts per slice is where that happens. The remedy the line
-names is `load_mode = "sample"`, which draws the same number of beamlets in every slice
-([](input-reference.md#param-beam-load-mode)).
+Below the two records the block names the **thin slices**: the slices carrying charge whose beamlet count is under 128 or whose power outside the split angle is over a tenth of the power inside it, by index and position, up to eight of them with a count of the rest. A window ratio is a mean over the window, so a thin tail disappears into it, and a beam imported with irregular counts per slice is where that happens. The remedy the line names is `load_mode = "sample"`, which draws the same number of beamlets in every slice ([](input-reference.md#param-beam-load-mode)).
 
-The physics columns are filled whatever the comb setting: with per-record rows they come
-from the current record, and with `comb_ds_save < 0` from the element-end row, which is
-filled just before the row that reads it. Between element ends in that mode the last
-element-end values are carried forward rather than blanked. A mid-element row exists to
-answer "is it alive and roughly where".
+The physics columns are filled whatever the comb setting: with per-record rows they come from the current record, and with `comb_ds_save < 0` from the element-end row, which is filled just before the row that reads it. Between element ends in that mode the last element-end values are carried forward rather than blanked. A mid-element row exists to answer "is it alive and roughly where".
 
-There is exactly **one** deliberate exception. A refusal has to be recognizable *by
-name*, so the checks match the ALL-CAPS text of a refusal together with a nonzero exit
-status. Those texts are a supported contract and change only together with their
-checks, in the same commit. Nothing else printed to the terminal is.
+There is exactly **one** deliberate exception. A refusal has to be recognizable *by name*, so the checks match the ALL-CAPS text of a refusal together with a nonzero exit status. Those texts are a supported contract and change only together with their checks, in the same commit. Nothing else printed to the terminal is.
 

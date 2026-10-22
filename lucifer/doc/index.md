@@ -3,15 +3,9 @@ title: "Lucifer: an FEL tracker inside Bmad"
 short_title: Introduction
 ---
 
-Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its
-physics is transcribed from Genesis 1.3 Version 4 (Genesis4), embedded in Bmad's lattice
-machinery, and validated against Genesis4 from bitwise-identical starting states.
+Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its physics is transcribed from Genesis 1.3 Version 4 (Genesis4), embedded in Bmad's lattice machinery, and validated against Genesis4 from bitwise-identical starting states.
 
-An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a
-Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and
-apertures are Bmad's own, the FEL parameters are lattice attributes rather than a
-parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's
-`track1_bunch`. A run is one input file naming a lattice.
+An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's own, the FEL parameters are lattice attributes rather than a parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's `track1_bunch`. A run is one input file naming a lattice.
 
 ## Features
 
@@ -40,9 +34,7 @@ Bmad's own `fel_method` attribute, set on the element as any attribute is.
 | `averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production method. |
 | `unaveraged` | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. Its cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also an independent check on the averaged method, since the two share no approximation. |
 
-The averaged method's transverse maps have a third option behind them, the transcribed
-Genesis4 maps, which the comparison tiers select through [](input-reference.md)'s
-`global%transport_model`. It is validation-internal and no production run sets it.
+The averaged method's transverse maps have a third option behind them, the transcribed Genesis4 maps, which the comparison tiers select through [](input-reference.md)'s `global%transport_model`. It is validation-internal and no production run sets it.
 
 ## Where to start
 
@@ -60,10 +52,7 @@ Genesis4 maps, which the comparison tiers select through [](input-reference.md)'
 | see what changed | [](changelog.md) |
 | find a paper this code implements | [](references.md) |
 
-Runnable cases live in `lucifer/examples/`, each a directory of real input files with
-its own README and the numbers measured on it. Every one of them has a page here, with
-its figure and its input files: [](generated/examples/examples.md) carries the table of
-which example shows which feature.
+Runnable cases live in `lucifer/examples/`, each a directory of real input files with its own README and the numbers measured on it. Every one of them has a page here, with its figure and its input files: [](generated/examples/examples.md) carries the table of which example shows which feature.
 
 ## Known missing features
 
@@ -74,9 +63,4 @@ which example shows which feature.
 - On the GPU: collective effects and the unaveraged mode, each refused. A CUDA backend, which the device interface is shaped for.
 - MPI. This one is a design decision rather than a gap: the shared-memory design is what this program is, and the case for adding MPI would have to be made on measurement.
 
-Validation runs on eleven comparison tiers and twenty-five check sections, on both
-debug and production builds, before every commit. Seven of the eleven tiers are
-transcription checks that agree with Genesis4 at the floor set by its truncated
-impedance constants, three are priced model differences rather than defects, and one
-proves nonuniform weights invisible against the uniform run. The levels, the
-attributions and the tier table are in [](validation.md).
+Validation runs on eleven comparison tiers and twenty-five check sections, on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants, three are priced model differences rather than defects, and one proves nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).
