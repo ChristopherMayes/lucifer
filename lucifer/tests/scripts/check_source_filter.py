@@ -1,38 +1,41 @@
 #!/usr/bin/env python3
 """
-Check the source-term filter against Genesis4's own (fel-physics.md sec-source-filter).
+Check the source-term filter against Genesis4's own (fel-physics.md, sec-source-filter).
 
-The filter is a transcription, so the check is the one every transcribed path gets: both
+The filter is a transcription, so the check is the one every transcribed path gets. Both
 codes run the same configuration from the same particles and the same field, and what is
 left over is transcription fidelity. Genesis4 4.6.15 carries the filter as source_filter,
 so the reference exists rather than having to be argued for. The chain is
 Aramis-td-sase-filter.in, the pure-SASE deck with the filter on at Genesis4's own defaults
-(xcut = ycut = sigmoid = 1), which puts the sigmoid's edge at half the grid's Nyquist
-frequency. The same deck with the filter off is tdsase, recorded at 2.3e-6.
+(xcut = ycut = sigmoid = 1). That puts the sigmoid's half-height at twice the grid's
+Nyquist frequency, off the grid (FieldSolverFFT.cpp, FieldSolverFFT::init). The same deck
+with the filter off is the tdsase tier, recorded at 2.3e-6.
 
-Three runs, each compared against that one reference:
+Four runs, each compared against that one reference:
 
   filtered    the filter on at the reference's own settings, over the whole line. This
               is the level.
+  unfiltered  the filter off. It must differ, or the filtered run says nothing about
+              the filter.
   mutate      the sigmoid on the propagated field instead of on the source. Both
               suppress wide angles and both leave a plausible power curve, so only the
               comparison against Genesis4 separates them.
   xcut2       the sigmoid's edge at twice the cut. The shape is right and the position
               is wrong.
 
-The last two, and the unfiltered run beside them, stop at the second undulator.
+The last three stop at the second undulator.
 
-The two mutations must land far outside the tolerance the first run holds, or the check
-reports that it cannot fail and stops.
+The two mutations must land far outside the tolerance the first run holds. Otherwise the
+check reports that it cannot fail, and the run fails.
 
-Then the edge's refusals, where the tolerance puts the edge relative to the angle it
-protects, the containment of the seed inside the derived edge, and where the filter
-reaches. That last one is measured rather than read off the line the run prints:
-the filter is on by default, so an unaveraged element and a coherent source are no-ops
-instead of refusals, and a no-op that works and a no-op that quietly filters print the same
-line. Each pair runs with the switch on and off. The unaveraged line and the coherent source
-must not move, the mixed line must, and the coherent case is the one that caught a fall
-through the arming of the per-element state.
+Then come the edge's refusals, where the tolerance puts the edge relative to the angle
+it protects, the containment of the seed inside the derived edge, and where the filter
+reaches. The reach is checked on the exit power rather than read off the line the run
+prints. The filter is on by default, so an unaveraged element and a coherent source are
+no-ops instead of refusals, and a no-op that works and a no-op that quietly filters print
+the same line. Each pair runs with the switch on and off. The unaveraged line and the
+coherent source must not move, and the mixed line must. The coherent case is the one that
+detects a fall-through in the arming of the per-element state.
 
 Usage:
 
@@ -53,10 +56,10 @@ from compare_fel import load_fortran_diag, load_genesis_out, load_nslice  # noqa
 
 ROOT = "AramisTDSASEF"
 
-# The level is measured over the whole line. The three runs that must fail are stopped at
-# the end of the second undulator, since each is wrong from its first step and a full line
-# to prove it costs four times the section. The comparison then runs over the records both
-# sides have, which is what load_fortran_diag and load_genesis_out already agree on.
+# The level is taken over the whole line. The three runs that must fail are stopped at
+# the end of the second undulator, since each is wrong from its first step. The
+# comparison then runs over the records both sides have, which is what load_fortran_diag
+# and load_genesis_out already agree on.
 SHORT = "UND##2"
 
 NML = """&fel_params
@@ -102,8 +105,8 @@ def run(exe, wd, root, lam, sample, on="T", xcut=1.0, mutate="F", track_end=""):
     log = wd / f"fel-{root}.log"
 
     # Four threads, the same cap check_device.py takes. The two benchmark passes run this
-    # section at the same time as three other jobs, and four unbounded runs a pass
-    # oversubscribed the machine badly enough to kill an unrelated run in the next section.
+    # section at the same time as three other jobs. Four unbounded runs a pass
+    # oversubscribe the machine badly enough to kill an unrelated run in the next section.
 
     with log.open("w") as fh:
         r = subprocess.run([exe, nml.name], cwd=wd, stdout=fh, stderr=subprocess.STDOUT,
@@ -154,9 +157,10 @@ def refusals(exe, wd):
     """
     The three settings that must stop a run rather than quietly do something else.
 
-    The soft width is the one that cost half the physical seed with nothing in the output
-    saying so. The angle together with the grid-relative cuts has no meaning, since one is
-    a property of the physics and the other of the mesh. A negative angle is not an angle.
+    A soft width that attenuates the axis removes half the physical seed with nothing in
+    the output saying so. The angle together with the grid-relative cuts has no meaning,
+    since one is a property of the physics and the other of the mesh. A negative angle is
+    not an angle.
     """
     ok = True
     for extra, want, what in (
@@ -177,13 +181,13 @@ def containment(exe, wd):
     """
     The default edge has to contain the mode, and the on-axis transmission cannot say so:
     a sigmoid that is 1 on axis can still clip a gain-guided mode whose divergence exceeds
-    the beam's diffraction angle. This measures it instead, on a seeded steady-state run
-    with the filter off, read at the first record rather than at the exit. At the exit the
-    field is the mode plus the wide-angle emission of the beamlets, which is 10 percent of
-    the power even at 2048 beamlets, so a containment measured there reports the artifact
-    and not the edge. At the first record the field is the injected Gaussian and nothing
-    else. Containing it is the stronger statement in any case, since the gain-guided mode
-    that grows out of it is narrower than the seed.
+    the beam's diffraction angle. This check takes the containment directly, on a seeded
+    steady-state run with the filter off, read at the first record rather than at the
+    exit. At the exit the field is the mode plus the wide-angle emission of the beamlets,
+    which is 10 percent of the power even at 2048 beamlets. A containment taken there
+    reports the artifact and not the edge. At the first record the field is the injected
+    Gaussian and nothing else. Containing it is the stronger statement in any case, since
+    the gain-guided mode that grows out of it is narrower than the seed.
     """
     deck = REFUSE.replace('lat_file = "aramis_1seg.bmad"', 'lat_file = "aramis.bmad"')
     deck = deck.replace("beam_init%n_particle = 512", "beam_init%n_particle = 2048")
@@ -230,21 +234,20 @@ def tolerance(exe, wd):
     """
     Where the edge goes relative to the angle it protects.
 
-    The derived edge used to be the protected angle itself, which puts the sigmoid's
-    half-amplitude point on it and passes a quarter of the source intensity there. The
-    tolerance names the largest intensity loss allowed inside that angle and the edge
-    moves out to hold it.
+    An edge at the protected angle itself puts the sigmoid's half-amplitude point on it
+    and passes a quarter of the source intensity there. The tolerance names the largest
+    intensity loss allowed inside that angle, and the edge moves out to hold it.
 
     Every check here has to fail against a run that reads source_filter_tolerance and
-    then derives the old edge anyway, so each one compares the edge the run printed
-    against the edge the tolerance asks for. An unchanged tier digit cannot do that
-    work: the default reproduces the old edge to the bit, which is the point of it.
+    then puts the edge at the protected angle anyway. Each one therefore compares the edge
+    the run printed against the edge the tolerance asks for. The tiers cannot catch that,
+    since the default of 0.75 puts the edge at the protected angle to the bit.
     """
     ok = True
     width = 0.05
 
-    # The default and an explicit 0.75 are the edge in use before the tolerance existed,
-    # and the two smaller tolerances have to move it by the margin and by nothing else.
+    # The default and an explicit 0.75 put the edge at the protected angle. The two
+    # smaller tolerances have to move it by the margin and by nothing else.
 
     protected = None
     for extra, tol, what in (
@@ -289,8 +292,8 @@ def tolerance(exe, wd):
     ok = ok and good
 
     # Both ends of the range are singular. At one the margin runs to positive infinity and
-    # the edge collapses onto the axis, which a test on the margin's sign would take, so
-    # the range is checked before anything takes a logarithm.
+    # the edge collapses onto the axis, which a test on the margin's sign would accept.
+    # The range is therefore checked before anything takes a logarithm.
 
     for extra, want, what in (
         ("  global%source_filter_tolerance = 0\n", "MUST LIE STRICTLY", "a tolerance of zero"),
@@ -376,7 +379,7 @@ def exit_power(wd, root):
 
 def scope(exe, wd):
     """
-    Where the filter reaches, measured rather than read off a printed line.
+    Where the filter reaches, checked on the exit power rather than read off a printed line.
 
     The filter is applied to the source term the averaged deposit builds, so an
     unaveraged element has nothing for it to act on and a coherent source is an analytic
@@ -401,9 +404,9 @@ def scope(exe, wd):
             root = f"sfscope{on}"
             (wd / f"{root}.nml").write_text(SCOPE.format(lat=lat, root=root, on=on, extra=extra))
 
-            # Four threads, the cap run() takes above and for the same reason: these six
+            # Four threads, the cap run() takes above and for the same reason. These six
             # runs land in the middle of a pass that shares the machine with four other
-            # jobs, and an unbounded one here took an unrelated section down with it.
+            # jobs, and an unbounded run here can take an unrelated section down with it.
 
             r = subprocess.run([exe, f"{root}.nml"], cwd=wd, capture_output=True, text=True,
                                env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})

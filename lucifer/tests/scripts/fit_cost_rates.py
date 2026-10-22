@@ -4,12 +4,14 @@ Fit the cost estimate's rates to a set of measured runs (doc/performance.md).
 
 code/fel_cost_mod.f90 estimates a run's walk from five constants. They are measured
 rather than chosen, and the page they are measured from says that re-measuring it means
-re-fitting them. This script is that fit, so the constants are never hand-derived twice.
+re-fitting them. This script is that fit.
 
-The model is the module's: one rate for the particle push, linear in particle-steps; two
-for the field solve, a deposit linear in particle-steps and a transform going as
-ngrid^2 log2(ngrid) per slice per step; a serial fraction carrying the rates to any
-thread count through Amdahl's law; and the share of the walk the push and the solve own.
+The model is the module's:
+  - One rate for the particle push, linear in particle-steps.
+  - Two rates for the field solve. The deposit is linear in particle-steps, and the
+    transform goes as ngrid^2 log2(ngrid) per slice per step.
+  - A serial fraction, carrying the rates to any thread count through Amdahl's law.
+  - The share of the walk the push and the solve own.
 
 Every run's configuration is read from its own header and its phase seconds from its own
 Timing block, so the input is the logs the runs already wrote. Rates come out per thread.
@@ -98,9 +100,10 @@ def main():
     if len(runs) < 2:
         sys.exit("need at least two filtered runs")
 
-    # The serial fraction first, from whichever configuration was run at more than one
-    # thread count. Least squares on the walk against Amdahl's law, over a grid: five
-    # points and one parameter do not need anything cleverer.
+    # The serial fraction first, from the configuration run at the most thread counts,
+    # which must be at least three. Least squares on the log of the walk against
+    # Amdahl's law, over a grid of f from 0 to 0.2 in steps of 0.0005. One parameter
+    # needs nothing more.
 
     groups = {}
     for r in runs:

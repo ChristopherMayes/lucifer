@@ -27,10 +27,15 @@ The experiments, each a set of runs and one figure:
                 shot-noise power and saturation estimates, from the deck's parameters.
   f. genesis    Genesis4 on the harness's SASE tier deck at three grids with both of its
                 field solvers, and Lucifer started from each of its dumps.
-  g. filter     The source filter (fel-physics.md sec-source-filter) at grid 256 and two
-                loads, with its sigmoid's edge at the central cone and at the 3 urad cut,
-                against the same runs with the filter off. What the filter does to the
-                power inside the mode is what this measures.
+  g. filter     The source filter (fel-physics.md, sec-source-filter) at the machine's
+                filter grid, 256 on the first machine, and two loads, with its sigmoid's
+                edge at the central cone and at the 3 urad cut, against the same runs with
+                the filter off. What the filter does to the power inside the mode is what
+                this measures.
+  h. tolerance  The filter's passband tolerance, global%source_filter_tolerance, swept at
+                one load while the reported split stays on the protected angle.
+  i. cause      The cell-size exponent on one segment against the derived block sum, with
+                the step, the slice spacing, the half width and the plane each varied.
 
 Lucifer runs on the device by default (global%device = "metal"), with one CPU run at the
 sweep's smallest grid as the cross-check. Genesis runs on the CPU. Every run is cached
@@ -42,11 +47,11 @@ Usage:
   startup_noise.py --exe <lucifer> --genesis <genesis4>
                    --examples <lucifer/examples> --latdir <lucifer/tests> --workdir <dir>
                    --out <doc/generated/startup-noise> [--device metal|off] [--only a,b,...]
-                   [--machine aramis|flash|flash1]
+                   [--cpu-threads N] [--machine aramis|flash|flash1|lcls]
 
-The second and third machines take experiments e and g: the line of experiments c and d
-is the first machine's own, and the sweep of a and b is priced against what its answer
-adds. Their results and figures carry the machine's name.
+The other three machines take experiments e, g and h. The line of experiments c and d and
+the cause of experiment i are the first machine's own, and the sweep of a and b is priced
+against what its answer adds. Their results and figures carry the machine's name.
 """
 
 from __future__ import annotations
@@ -90,9 +95,10 @@ I_ALFVEN = 17045.0
 #
 # dumps and und_end_record place the far-field dumps: five undulator ends, and the record
 # index of each in a stats file written with comb_ds_save = -1, where a record is an
-# element end. window is the long window of experiments a, b and g, (slices, wavelengths
-# per slice), which must be longer than the line's whole slippage. At 1.5 Angstrom the
-# slippage is 3762 wavelengths, so the first machine's twelve per slice would not reach it.
+# element end. window is the long window of experiments a, b, g, h and i, (slices,
+# wavelengths per slice), which must be longer than the line's whole slippage. At
+# 1.5 Angstrom the slippage is 3762 wavelengths, so the first machine's twelve per slice
+# would not reach it.
 
 MACHINES = {
     "aramis": dict(lat="aramis.bmad", lat2="aramis_x2.bmad", lambda0=1e-10, half_width=2e-4,
@@ -121,8 +127,9 @@ MACHINES = {
                    und_end_record={1: 0, 2: 6, 3: 12, 4: 18, 6: 30}),
     # LCLS: the grid derives to 127 points over 191 um, so the sweep runs at the device's
     # 128. Dumps at the ends of undulators 1, 6, 12, 20 and 30 span the startup, the
-    # exponential regime and saturation, which on this line sits near 60 m. A cell is six
-    # segments and twelve breaks, so undulator n ends at record 4(n-1) + floor((n-1)/3).
+    # exponential regime and saturation, which on this line sits near 60 m. Every segment
+    # is followed by a break of drift, quadrupole and drift, so undulator n ends at
+    # record 4(n-1).
     "lcls": dict(lat="lcls.bmad", lat2=None, lambda0=1.50992e-10, half_width=1.914e-4,
                  current=3000.0, sig_pz=1.3e-4, norm_emit=4.0e-7, gamma0=26614.536,
                  aw=2.475918, coupling=0.744325, lambda_u=0.03, seg_length=3.42,
@@ -305,7 +312,7 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
     if device != "off":
         extra += f'  global%device = "{device}"\n'
     if xcut is None:
-        extra += '  global%source_filter = F\n'      # Silence now means on, and this page's
+        extra += '  global%source_filter = F\n'      # An unset filter is on, and this page's
                                                       # unfiltered rows are the comparison.
     elif xcut == "default":
         extra += '  global%source_filter = T\n'
@@ -373,10 +380,11 @@ def interior(P):
 
 
 def far_field_split(path, cuts):
-    """Power inside and outside each angular radius, summed over slices, from one field
-    dump. The far field is the FFT of the field over the grid, and the angle of a
-    transverse wavenumber is k_perp / k. Parseval keeps the total equal to the
-    near-field power, which is checked here to 1e-9."""
+    """Power inside and outside each angular radius from one field dump, per slice and
+    averaged over the window's interior, with the total over the window beside them. The
+    far field is the FFT of the field over the grid, and the angle of a transverse
+    wavenumber is k_perp / k. Parseval keeps the total equal to the near-field power,
+    which is checked here to 1e-9."""
     f = fieldio.read_field(path)
     u, dx, dy = f["u"], f["dx"], f["dy"]
     nslice, ny, nx = u.shape
@@ -519,13 +527,14 @@ def exp_floor(rn, args, lat, results):
 
 def exp_filter(rn, args, lat, results):
     """
-    The source filter against the split this page defines (fel-physics.md
-    sec-source-filter). The filter suppresses the source at wide transverse angles, and
-    what has never been measured is what that does to the power inside the mode, which is
-    the part that amplifies. Grid 256, the cell size the page's scaling law is written
-    at, and the two loads that bracket the examples. Two edge positions: the central cone
-    of one segment, which is where the physical emission stops, and the 3 urad cut this
-    page splits at, which is inside the cone and inside the coherent mode.
+    The source filter against the split this page defines (fel-physics.md,
+    sec-source-filter). The filter suppresses the source at wide transverse angles. This
+    experiment measures what that does to the power inside the mode, the part that
+    amplifies. The grid is the machine's filter_grid, 256 on the first machine, the cell
+    size the page's scaling law is written at. The loads are the two that bracket the
+    examples, and one on the second and third machines. Two edge positions: the central
+    cone of one segment, which is where the physical emission stops, and the 3 urad cut
+    this page splits at, which is inside the cone and inside the coherent mode.
     """
     # The grid comes from the beam, as the page's own criterion says: cells of about
     # sigma/7. The second machine's beam is five times the first's, so its grid is coarser.
@@ -549,16 +558,17 @@ def exp_filter(rn, args, lat, results):
     # angular selectivity from that softness.
     cases = [("off", None, 1.0), ("default", "default", 0.0)]
     if args.machine == "aramis":
-        # The edge and width sweep is the first machine's. The second answers one
-        # question, whether the derived default holds there, and its runs are on the CPU
-        # at about 48 minutes each on four threads, so it takes the two cases that answer it.
+        # The edge and width sweep is the first machine's. The others answer one
+        # question, whether the derived default holds there, and take the two cases that
+        # answer it. A run of the second machine takes about 48 minutes on four
+        # CPU threads.
         for k, v in res["edges"].items():
             cases.append((k, v["xcut"], 1.0))
             cases.append((k + "_sharp", v["xcut"], SHARP_WIDTH))
     res["sharp_width"] = SHARP_WIDTH
 
-    # The second machine answers one question at one load. The first and the fourth carry
-    # both, since the load is what the wide-angle share scales with.
+    # The second and third machines answer one question at one load. The first and the
+    # fourth carry both loads, since the load is what the wide-angle share scales with.
     loads = (1024,) if args.machine in ("flash", "flash1") else (1024, 4096)
     for npart in loads:
         for name, xcut, width in cases:
@@ -579,7 +589,7 @@ def exp_filter(rn, args, lat, results):
             }
 
     # The three numbers the page needs, at the last dump and at the one before it, which
-    # is the last still inside the exponential regime on all three machines.
+    # is the last still inside the exponential regime on the first three machines.
     late = sorted(UND_END_RECORDS)[-2]
     for npart in loads:
         base = res[f"n{npart}_off"]
@@ -618,8 +628,8 @@ def fit_gain_length(z, power, z_sat):
 
     # Every record a decade above the starting power and below saturation. A band set from
     # the saturated power instead collapses onto one metre on the two six-segment lines,
-    # where the records are element ends and few, and it returned a gain length of 60 m
-    # against a line that saturates at 21.6 m.
+    # where the records are element ends and few. It gives a gain length of 60 m against a
+    # line that saturates at 21.6 m.
 
     band = (pp > 10 * pp[0]) & (zz < z_sat)
     if band.sum() < 4:
@@ -642,14 +652,14 @@ def exp_tolerance(rn, args, lat, results):
     Where the source filter's edge sits relative to the angle it protects
     (fel-physics.md sec-source-filter).
 
-    The edge used to be the protected angle itself, which puts the sigmoid's
-    half-amplitude point on it and takes three quarters of the source intensity there.
+    An edge at the protected angle itself puts the sigmoid's half-amplitude point on it
+    and takes three quarters of the source intensity there.
     global%source_filter_tolerance names the largest loss allowed inside that angle and
-    moves the edge out to hold it. This sweeps it while the reported split stays on the
-    protected angle, so every row is measured against one acceptance.
+    moves the edge out to hold it. This experiment sweeps it while the reported split
+    stays on the protected angle, so every row is measured against one acceptance.
 
-    One seed a row. That is an exploratory sweep: it says whether the tolerance reaches
-    the gain at all and how far, and it cannot select a default, which needs paired
+    One seed a row. That makes it an exploratory sweep. It says whether the tolerance
+    reaches the gain at all and how far. It cannot select a default, which needs paired
     ensembles over the seed spread this page measures at about 25 percent.
     """
     ng = MACHINES[args.machine]["filter_grid"]
@@ -725,8 +735,9 @@ def exp_beamlets(rn, args, lat, results):
 
 
 def saturation_point(z, P):
-    """The z of the first record where the power's growth rate over one FODO cell falls
-    under a tenth of its peak, and the power there. NaN if the run never turned over."""
+    """The z of the first record past the peak growth rate where the rate, taken between
+    neighbouring records, falls under a tenth of its peak, and the power there. NaN if the
+    run never turned over."""
     lnP = np.log(np.maximum(P, 1e-300))
     rate = np.gradient(lnP, z)
     i0 = int(np.argmax(rate))
@@ -809,16 +820,16 @@ def exp_genesis(rn, args, results):
 # ---------------------------------------------------------------------------
 # i. The cell-size exponent, derived and measured to its cause
 #
-# The source's exponent is 2 (deposit-demo.ipynb) and the reported floor's falls from
-# 2 toward 1 as the cells shrink (doc/startup-noise.md's floor table). The derivation
-# in the design record (docs/analyses/cell-size-exponent.md) says why: the field
-# record slips one slice every L_ref = sample * lambda_u of undulator, so a field slice
-# sees the same static source for N_ref = L_ref / dz steps and an independent one
-# after, a mode at k_perp dephases by phi = k_perp^2 dz / (2 k_s) between deposits, and
-# a block of N deposits adds as sin^2(N phi/2)/sin^2(phi/2), N^2 while N phi is small
-# and N once it is not. The knee is theta_t = sqrt(lambda / (sample lambda_u)). The
-# same sum is evaluated here beside every measurement, with nothing fitted, so the
-# JSON carries the prediction and the number in one place.
+# A deposit alone has the exponent 2 whatever its shape function, and the reported
+# floor's falls from 2 toward 1 as the cells shrink (doc/startup-noise.md, "Emission
+# outside the mode", which also carries the derivation). The field record slips one
+# slice every L_ref = sample * lambda_u of undulator. A field slice therefore sees the
+# same static source for N_ref = L_ref / dz steps and an independent one after. A mode
+# at k_perp dephases by phi = k_perp^2 dz / (2 k_s) between deposits. A block of N
+# deposits adds as sin^2(N phi/2)/sin^2(phi/2), N^2 while N phi is small and N once it
+# is not. The knee is theta_t = sqrt(lambda / (sample lambda_u)). The same sum is
+# evaluated here beside every measurement, with nothing fitted, so the JSON carries the
+# prediction and the number in one place.
 
 CAUSE_GRIDS = (64, 128, 256, 512)
 CAUSE_DS = (0.0225, 0.045, 0.09, 0.18)      # m, N_ref of 8, 4, 2 and 1 at sample 12
@@ -1013,8 +1024,8 @@ def exp_cause(rn, args, results):
         say(f"sample {smp}", res["spacing"][str(smp)])
 
     # The half width, at cells near 3.15 and 1.57 um. The device takes powers of two, so
-    # the cell moves by 0.4 percent between widths; both grids of a pair move together and
-    # the exponent over the pair is what is compared. The 1024-point grid is the CPU's.
+    # the cell moves by 0.4 percent between widths. Both grids of a pair move together,
+    # and the exponent over the pair is what is compared. The 1024-point grid is the CPU's.
     res["width"] = {}
     for half in CAUSE_WIDTHS:
         grids = tuple(1 << int(round(math.log2(2 * half / d + 1))) for d in (3.15e-6, 1.569e-6))
@@ -1171,7 +1182,7 @@ def filter_figure(results, out):
     for j, npart in enumerate(loads):
         for name, label, c, ls in cases:
             if f"n{npart}_{name}" not in fi:
-                continue          # the second machine runs the default alone
+                continue          # Only the first machine runs the edge sweep.
             r = fi[f"n{npart}_{name}"]
             z = [d["z"] for d in r["dumps"]]
             ax[j].semilogy(z, [d[cut_key("in")] for d in r["dumps"]], ls, color=c, marker="o",
@@ -1185,7 +1196,7 @@ def filter_figure(results, out):
     fig.suptitle(f"Inside {float(REPORT_CUT) * 1e6:.3g} urad (circles) and outside it (crosses), "
                  "with and without the source filter", fontsize=10)
     fig.tight_layout()
-    # The second machine's figure carries its name, so the two never overwrite each other.
+    # Every machine but the first carries its name in the file name, so none overwrites another.
     suffix = "" if fi.get("machine", "aramis") == "aramis" else f"-{fi['machine']}"
     fig.savefig(pathlib.Path(out) / f"source-filter{suffix}.png", dpi=130)
     plt.close(fig)
@@ -1232,7 +1243,8 @@ def figures(results, out):
     fig.savefig(out / "power-outside-and-inside-the-mode.png", dpi=150)
     plt.close(fig)
 
-    # 2. The floor against the cell size, the gain against the load, at the first dump.
+    # 2. The floor against the cell size at the first dump, and the gain against the load
+    #    at the third.
     fig, ax = plt.subplots(1, 2, figsize=(10, 4))
     dxs = [fl[f"floor_g{ng}_n1024"]["dx"] for ng in GRIDS]
     for npart, mk in zip(NPARTS, "osd^"):
@@ -1349,7 +1361,7 @@ def main():
     if mach["lat2"]:
         (rn.wd / lat2).write_text("call, file = aramis.bmad\nARAMIS2: line = (ARAMIS, ARAMIS)\nuse, ARAMIS2\n")
 
-    # The second machine writes beside the first, never over it.
+    # Every other machine writes beside the first, never over it.
     suffix = "" if args.machine == "aramis" else f"-{args.machine}"
     results_file = out / f"startup-noise{suffix}.json"
     results = json.loads(results_file.read_text()) if results_file.exists() else {}

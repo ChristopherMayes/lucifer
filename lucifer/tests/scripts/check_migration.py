@@ -1,27 +1,34 @@
 #!/usr/bin/env python3
 """
-Checks for slice migration under weights (self-referenced:
-6.9: Genesis migrates only under one4one, so weighted migration has no reference).
+Checks of slice migration under weights, self-referenced with no Genesis run.
 
-Three checks:
+Genesis migrates only under one4one, so weighted migration has no reference.
 
-1. Conservation. A beam with artificially large energy spread (gen_delgam = 60) tracked
-   through the full line migrates heavily and bleeds charge off the window ends. At
-   every diagnostic record, in-window charge (sum of the per-slice current column times
-   spacing/c) plus the charge dropped so far (per-event log lines, full precision) must
-   equal the initial charge to 1e-10 relative. The run must actually bite: >10000 moves
-   and nonzero drops are asserted.
+1. Conservation. A beam with an energy spread of 60 in gamma, beam_init%sig_pz = 5.28e-3,
+   tracked through the full line migrates heavily and loses charge off the window ends.
+   At every diagnostic record, the in-window charge plus the charge dropped so far must
+   equal the initial charge to 1e-10 relative. The in-window charge is the sum of the
+   per-slice current column times spacing/c. The drops are the per-event rows of
+   <out_root>.migration.txt, at full precision. The run must exercise migration, so more
+   than 10000 moves and a nonzero drop are required.
 
-2. Phase continuity. The same run carries migrate_check = T: at every migration the
-   whole-beam weighted phasor must satisfy S_before = S_after + S_dropped -- every
-   mover's phase shifts by an exact multiple of 2*pi*sample, every drop removes exactly
-   its own term. The reported worst deviation must be < 1e-10 (measured: rounding,
-   ~7e-15).
+2. Phase continuity. The same run sets migrate_check = T. At every migration the
+   whole-beam weighted phasor must satisfy S_before = S_after + S_dropped. Every mover's
+   phase shifts by an exact multiple of 2*pi*sample, and every drop removes exactly its
+   own term. The reported worst deviation must be < 1e-10. Rounding gives about 7e-15
+   (validation.md, val-slice-migration-under-weights).
 
-3. No-op. A frozen-phase configuration (delgam ~ 0, negligible emittance, dark, no
-   noise) run with migrate = T must report zero moves and reproduce the migrate = F run
-   bit for bit (diag byte-equal, dumps dataset-equal): migration must not fire
-   spuriously and its inactive presence must change nothing.
+3. Window residency. In the final dump of the same run every surviving particle's
+   theta lies in its slice window [0, 2*pi*sample).
+
+4. No-op. A frozen-phase configuration (energy spread near zero, negligible emittance,
+   dark, no noise) run with migrate = T must report zero moves. It must reproduce the
+   migrate = F run bit for bit, the diag byte-equal and the dumps dataset-equal.
+   Migration must not fire spuriously, and its inactive presence must change nothing.
+
+5. Migration against the restored phase. An element displaced by a full carrier turn of
+   z_offset must keep every particle, move none, leave none outside its window, and
+   give the same theta as the zero-offset run.
 
 Usage: check_migration.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis.bmad and aramis_1seg.bmad. Exit 0 only if all pass.
@@ -162,10 +169,10 @@ def main():
     print(f"--- migration phase continuity: worst phasor deviation {bdev:.2e} "
           f"(tol 1e-10)  {'ok' if p_ok else 'FAIL'}")
 
-    # Window residency: the routine's postcondition. The final dump is written right
+    # 3: window residency, the routine's postcondition. The final dump is written right
     # after the last migration, so every surviving particle's theta must lie in its slice
-    # window [0, 2*pi*sample). An unadjusted z on the move survives conservation (the
-    # cascade drops are accounted) but not this.
+    # window [0, 2*pi*sample). A z left unadjusted on the move passes conservation, since
+    # the cascade of drops is accounted, and fails this check.
     #
     # The window is the same [0, slen) for every slice, since theta is the phase inside a
     # slice and a move shifts z by exactly one spacing. The dump carries the lag rather
@@ -181,7 +188,7 @@ def main():
     print(f"--- migration window residency: {n_out} particles outside their window "
           f"in the final dump  {'ok' if w_ok else 'FAIL'}")
 
-    # 3: no-op bit identity on a frozen-phase beam.
+    # 4: no-op bit identity on a frozen-phase beam.
     for mig, root in (("F", "mignf"), ("T", "mignt")):
         out = run(exe, wd, f"{root}.nml", BASE.format(lat="aramis_1seg.bmad", root=root,
                   sig_pz="8.804506566858e-08", emit="1e-13", npart=256, slen="1.2e-9", q="1.200830742713e-14", half="6e-10", mig=mig))
@@ -194,13 +201,13 @@ def main():
     print(f"--- migration no-op: {moved} moves, diag byte-equal {diag_eq}, "
           f"dumps dataset-equal {d_eq}  {'ok' if n_ok else 'FAIL'}")
 
-    # 4: migration against the restored phase. A displaced element carries its
-    # z_offset phase inside and gives it back at its last step, and the migration there
-    # once read the displaced phase: at a full carrier turn every particle moved one
-    # slice and an eighth of the charge fell off the window, and the survivors sat
-    # outside their new slices once the nominal phase returned. Cold, nearly chargeless
-    # and at the frozen-phase emittance of check 3, so nothing moves on its own and the
-    # offset run and the zero-offset run hold the same beam. n_particle is per slice.
+    # 5: migration against the restored phase. A displaced element carries its
+    # z_offset phase inside and gives it back at its last step. A migration there that
+    # read the displaced phase would, at a full carrier turn, move every particle one
+    # slice and drop an eighth of the charge off the window. The survivors would sit
+    # outside their new slices once the nominal phase returned. The beam is cold, nearly
+    # chargeless and at the frozen-phase emittance of check 4. Nothing moves on its own,
+    # and the offset run and the zero-offset run hold the same beam. n_particle is per slice.
     z_turn = 2 * 11357.82**2 * 1e-10
     runs = {}
     for tag, zoff, mig in (("zo0f", 0.0, "F"), ("zo1f", z_turn, "F"),

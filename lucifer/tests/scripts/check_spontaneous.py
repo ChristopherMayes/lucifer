@@ -1,39 +1,43 @@
 #!/usr/bin/env python3
 """
 Spontaneous emission: the FEL modes against Bmad's own radiation physics and against
-the analytic undulator-radiation rate. Bmad-only -- Genesis is not involved, because
-the averaged mode's agreement with Genesis is already established by the tiers.
+the analytic undulator-radiation rate. Bmad only. Genesis is not involved, since the
+benchmark's tiers already hold the averaged mode's agreement with Genesis.
 
-one short helical wiggler (spont_probe.bmad, 40 periods, benchmark parameters) tracked
-four ways from the same beam:
+One short helical wiggler (spont_probe.bmad, 40 periods, benchmark parameters) is
+tracked four ways from the same beam:
 
-  1. Bmad's own runge_kutta with radiation damping (spont_probe_rk.bmad: the same
+  1. Bmad's own runge_kutta with radiation damping. spont_probe_rk.bmad is the same
      wiggler with tracking_method = runge_kutta, so the FEL walk hands it to
-     track1_bunch -- no FEL model, no grid, no SVEA band). This is the independent
+     track1_bunch, with no FEL model, no grid and no SVEA band. This is the independent
      implementation, and it must reproduce the analytic rate.
-  2. The same, radiation off: the integrator must lose exactly nothing.
-  3. The averaged FEL mode: loses essentially nothing, by design. The KMR/SVEA step
-     adds 2S to the field while kicking particles with E, so the |S|^2 part of the
-     field energy is created rather than taken from the beam. This is a documented
-     model property, not a defect -- Genesis carries an optional &sponrad module to
-     add the missing loss by hand, off by default. The check pins it as a known zero.
-  4. The unaveraged FEL mode: it conserves energy by construction (the /u_s deposit
-     makes kick and source exact duals), so its beam does pay -- but only for the
-     radiation the grid can hold. An SVEA grid represents angles up to the FFT
-     Nyquist, theta_max = lambda/(2 dx), so only a few percent of the emission is
-     captured, and that is what the beam is charged.
+  2. The same, radiation off. The integrator must lose nothing.
+  3. The averaged FEL mode loses almost nothing, by design. The KMR/SVEA step adds 2S
+     to the field while kicking particles with E, so the |S|^2 part of the field energy
+     is created rather than taken from the beam. This is a documented model property.
+     Genesis carries an optional &sponrad module, off by default, to add the missing
+     loss by hand. The check holds it as a known zero.
+  4. The unaveraged FEL mode conserves energy by construction, since the /u_s deposit
+     makes kick and source exact duals. Its beam pays only for the radiation the grid
+     can hold. An SVEA grid represents angles up to the FFT Nyquist,
+     theta_max = lambda/(2 dx), so only a few percent of the emission is captured, and
+     that is what the beam is charged.
 
 The analytic rate is the classical result dgamma/ds = (2/3) r_e gamma^2 ku^2 aw^2
-(aw rms, both polarizations) -- identical to the coefficient in Genesis's own
-Incoherent.cpp, 1.88e-15 * (ku gamma aw)^2.
+(aw rms, both polarizations). That is the coefficient in Genesis's own Incoherent.cpp,
+1.88e-15 * (ku gamma aw)^2.
 
-The physics check on (4) is the scaling: vary only the grid's angular acceptance
-(ngrid at fixed box) and the captured loss must track the acceptance the way undulator
+The physics check on (4) is the scaling. Only the grid's angular acceptance varies
+(ngrid at fixed box), and the captured loss must track the acceptance the way undulator
 radiation does. The absolute normalization is compared against a dipole-limit estimate
-of the angular distribution, which is only good to a factor of a few at aw ~ 1 -- so
-the shape is checked tightly and the magnitude loosely, which is the honest split.
+of the angular distribution, which is good only to a factor of a few at aw ~ 1. The
+shape is therefore checked tightly and the magnitude loosely.
 
-Run by the benchmark harness; exits nonzero on failure.
+Then, with Bmad's switches on: damping in both FEL modes (5), fluctuations against the
+analytic variance and against runge_kutta (6), 1 against 8 threads with fluctuations on
+(7), and the energy ledger closing with the radiated energy (8).
+
+Run by the benchmark harness. Exits nonzero on failure.
 """
 
 from __future__ import annotations
@@ -91,11 +95,11 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-# sig_pz override for the fluctuation rows: with a real energy spread the
-# sigma^2-differencing measurement is dominated by the cross-covariance sampling term
-# (beamlet-common kicks against 2048-particle sample variances, ~50% noise). Starting
-# from (near-)zero spread measures the kicks directly. Measured and learned, not
-# guessed: a dark segment with real shot noise isolates the spontaneous term.
+# sig_pz override for the fluctuation rows. With a real energy spread the sigma^2
+# differencing is dominated by the cross-covariance sampling term, beamlet-common kicks
+# against 2048-particle sample variances, at about 50% noise. Starting from near-zero
+# spread measures the kicks directly. A dark segment with real shot noise isolates the
+# spontaneous term.
 def cold(nml):
     return nml.replace("sig_pz = 8.804506566858e-05", "sig_pz = 1e-12")
 
@@ -141,8 +145,8 @@ def sigma_gamma(wd, root):
 
 def dipole_fraction(u):
     """Fraction of a dipole-limit angular distribution (1+u^2)/(1+u)^4 inside u,
-    u = gamma^2 theta^2 / (1 + aw^2). Closed form; exact for aw << 1, indicative
-    at aw ~ 1 (which is why only the shape is checked tightly)."""
+    u = gamma^2 theta^2 / (1 + aw^2). The form is closed, exact for aw << 1 and
+    indicative at aw ~ 1, which is why only the shape is checked tightly."""
     x = 1.0 + u
     return 1.5 * (2 / 3 - 1 / x + 1 / x**2 - (2 / 3) / x**3)
 
@@ -173,13 +177,13 @@ def main():
     print(f"--- analytic spontaneous loss over {L_UND} m: {analytic:.6f} in gamma "
           f"({analytic/L_UND:.5f}/m; = Genesis Incoherent.cpp doLoss)")
 
-    # Every run of this section is independent of the others (distinct roots, all
-    # analysis afterwards), so the pool runs them all. The checks read in order.
+    # Every run here is independent of the others, with distinct roots and all analysis
+    # afterwards, so the pool runs them all. The checks read in order.
     #
-    # Four threads a job rather than eight, which is the pool width's other half: at
-    # eight this machine's sixteen CPUs give two workers, and thirteen jobs then run
-    # two at a time. Neither number is physics -- thread-count independence is itself
-    # one of the checks below -- so the pair is chosen to fill the machine and overlap.
+    # Four threads a job rather than eight. At eight, sixteen CPUs give two workers and
+    # the thirteen jobs run two at a time. Neither number is physics, since thread-count
+    # independence is itself one of the checks below. The pair is chosen to fill the
+    # machine.
     jobs = [
         lambda: run(exe, wd, "sp_rk", NML.format(lat="spont_probe_rk.bmad", root="sp_rk",
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n  reference_run = T\n")),
@@ -191,11 +195,10 @@ def main():
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
         lambda: run(exe, wd, "sp_uv_d", NML.format(lat="sp_uv.bmad", root="sp_uv_d",
                     ngrid=NGRID_REF, extra="  radiation_damping = T\n")),
-        # sp_uv_f1 runs single threaded on purpose, which makes it the longest job in
-        # the section at about 32 s. Shrinking its grid would pay for itself, and it is
-        # deliberately not done: besides the thread-identity comparison it feeds the
-        # energy-ledger closure, whose recorded level is a grid quantity, so a cheaper
-        # deck here moves a measured number rather than only the clock.
+        # sp_uv_f1 runs single threaded for the thread-identity comparison, and that
+        # makes it the longest job here. Its grid stays at the reference. It also feeds
+        # the energy-ledger closure, whose recorded level is a grid quantity, so a
+        # smaller grid would move that level.
         lambda: run(exe, wd, "sp_uv_f1", cold(NML.format(lat="sp_uv.bmad", root="sp_uv_f1",
                     ngrid=NGRID_REF,
                     extra="  radiation_fluctuations = T\n  radiation_damping = T\n")), threads="1"),
@@ -250,11 +253,11 @@ def main():
           note=f"(measured {r_meas:.2f}x vs predicted {r_pred:.2f}x)")
 
     # 5. Damping on: both FEL modes honor bmad_com%radiation_damping_on.
-    #    Averaged: the full analytic rate (its native debit is ~0). Unaveraged: the
-    #    composite prediction -- the explicit term integrates the ramp envelope
-    #    (int g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps), and the grid-captured
-    #    self-field work measured in step (4) adds on top. Measured 0.9703 vs
-    #    predicted 0.9705 at the defaults.
+    #    Averaged: the full analytic rate, since its native debit is about 0.
+    #    Unaveraged: the composite prediction. The explicit term integrates the ramp
+    #    envelope, int g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps, and the
+    #    grid-captured self-field work of step (4) adds on top
+    #    (validation.md, val-spontaneous-emission-the-two).
     print("--- bmad_com%radiation_damping_on, both FEL modes:")
     check("damping: averaged mode vs analytic, |ratio - 1|",
           abs(loss(wd, "sp_avg_d") / analytic - 1), 0.0, 5e-3)
@@ -265,11 +268,11 @@ def main():
           note=f"(composite = {composite:.4f} of analytic)")
 
     # 6. Fluctuations on: the Genesis/Saldin variance 1.015e-27 ku^3 aw^2 F(aw) g0^4
-    #    per meter (Genesis reaches it with uniform*sqrt(3) draws, ours are Gaussian).
-    #    Cold beam (see cold()). The FEL modes must sit on the analytic form, and Bmad's
-    #    own runge_kutta + fluctuations is the independent cross-reference -- measured
-    #    11% below the fit form, the two references' own convention spread, recorded
-    #    as a |ln| level rather than absorbed.
+    #    per meter. Genesis reaches it with uniform*sqrt(3) draws, and Lucifer's are
+    #    Gaussian. The beam is cold (see cold()). The FEL modes must sit on the analytic
+    #    form. Bmad's own runge_kutta with fluctuations is the independent
+    #    cross-reference. It sits 11% below the fit form, the spread between the two
+    #    references' conventions, and the check holds that as a |ln| level.
     print("--- bmad_com%radiation_fluctuations_on (cold beam):")
     f_aw = 1.42 * AW + 1 / (1 + 1.5 * AW + 0.95 * AW**2)      # helical fit
     sig_an = np.sqrt(1.015e-27 * ku**3 * AW**2 * f_aw * GAMMA0**4 * L_UND)
@@ -289,7 +292,8 @@ def main():
     check("fluctuations: 1-thread vs 8-thread byte-identical (1 = yes)",
           0.0 if same else 1.0, 0.0, 0.5)
 
-    # 8. The ledger closes with the E_radiated column (radiation on, TD, unaveraged):
+    # 8. The ledger closes with the E_radiated column (radiation on, time-dependent,
+    #    unaveraged):
     #    E_beam + U_window + U_escaped - U_spont + E_radiated = const, actual drawn sums.
     led = np.loadtxt(wd / "sp_uv_f1.ledger.txt")
     etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]

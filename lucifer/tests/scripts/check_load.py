@@ -14,16 +14,19 @@ Four things, each on the check built for it:
                    moments to roundoff.
   in-cone startup  a generated Gaussian bunch in sample mode radiates, inside 3 urad at
                    the end of the first undulator, the physical spontaneous power of the
-                   beam within that angle: 0.133 MW per slice at 3 kA on 1.57 um cells
-                   (doc/startup-noise.md, the interior mean of a flat window). A field
-                   record collects the emission of every beam slice it slipped past, so
-                   for a bunch the comparable quantity is the sum over a window long
-                   enough that nothing escapes: the in-cone power summed over the records,
-                   over the summed current in units of 3 kA, read from the stats split.
+                   beam within that angle. That power is 0.133 MW per slice at 3 kA on
+                   1.57 um cells, the interior mean of a flat window (doc/startup-noise.md,
+                   the table under "The source filter, measured"). A field record collects
+                   the emission of every beam slice it slipped past. For a bunch the
+                   comparable quantity is therefore a sum over a window long enough that
+                   nothing escapes: the in-cone power summed over the records, divided by
+                   the summed current in units of 3 kA. The power inside the angle is read
+                   from the stats file.
   refusals         noise asked for on a load that is not quiet is refused with the floor
                    in the message: the generator without the quiet start, and a bunch of
                    copies whose phases were shifted singly. The unshifted copies load, and
-                   the message says the noise went on particles sharing their coordinates.
+                   the message says the noise went on particles sharing their transverse
+                   coordinates. A slice dump given as beam_init%position_file is refused.
 
 Usage:
 
@@ -162,13 +165,13 @@ def keep_exactness(exe, wd):
     return ok
 
 
-# The in-cone measurement. The page's deck is a flat 3 kA over 300 slices of 12
-# wavelengths on a 255-point grid of 2e-4 m half width, 1024 macroparticles per slice in
-# beamlets of 8, and its statistic is the mean over the interior records. Here the current
-# is a Gaussian, the bunch's own, at the same peak: sigma_z of 5.5e-9 m, 37 slices of 12
-# wavelengths across 8 sigma, in a window with 24 slices of headroom on each side, since
-# the field slips 22 slices over the first undulator (266 periods) and every record that
-# started on the bunch must still be in the window at its end.
+# The in-cone check. The page's deck is a flat 3 kA over 300 slices of 12 wavelengths
+# on a 255-point grid of 2e-4 m half width, with 1024 macroparticles per slice in
+# beamlets of 8. Its statistic is the mean over the interior records. Here the current is
+# a Gaussian, the bunch's own, at the same peak: sigma_z of 5.5e-9 m, 37 slices of 12
+# wavelengths across 8 sigma. The window has 24 slices of headroom on each side. The field
+# slips 22 slices over the first undulator, 266 periods, and every record that started on
+# the bunch must still be in the window at its end.
 
 INCONE_TARGET = 0.133e6
 INCONE_CUT = 3e-6

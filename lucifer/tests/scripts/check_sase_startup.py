@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Cross-code validation of the shot-noise level: a dark start (no seed
-field), one undulator segment, each code generating its own noisy beam -- Genesis with
-its loader and RNG, lucifer with its weighted Fawley loader -- so the two noise
-implementations are fully independent. SASE startup power is proportional to the
-imposed <|b|^2>, and the tracking itself is validated elsewhere at 1e-6, so agreement of
-the mean startup power validates the noise level and nothing else.
+Cross-code check of the shot-noise level from a dark start over one undulator segment.
 
-Statistics: per side, mean over slices and seeds of the final-record slice power. Slice
-powers are near-exponentially distributed, so with n samples the mean carries a relative
-sigma of about 1/sqrt(n); the check is |ln(P_bmad/P_genesis)| < 0.30, roughly 3 sigma at
-the default 6 seeds x 32 slices per side and far below the factor-type errors a wrong
-noise normalization produces.
+There is no seed field, and each code generates its own noisy beam: Genesis with its
+loader and random number generator, Lucifer with its weighted Fawley loader. The two
+noise implementations are independent. SASE startup power is proportional to the
+imposed <|b|^2>, and the tracking is validated elsewhere at 1e-6. Agreement of the mean
+startup power therefore checks the noise level and nothing else.
+
+Statistics: per side, the mean over slices and seeds of the final-record slice power.
+Slice powers are near-exponentially distributed, so with n samples the mean carries a
+relative sigma of about 1/sqrt(n). The check is |ln(P_bmad/P_genesis)| < 0.30. That is
+roughly 3 sigma at the default 6 seeds x 32 slices per side, and far below the
+factor-type errors a wrong noise normalization produces.
 
 Usage: check_sase_startup.py --exe <lucifer> --genesis <genesis4> --workdir <dir> [--seeds N]
 The workdir must hold Aramis-1seg.lat and aramis_1seg.bmad. Exit 0 on pass.

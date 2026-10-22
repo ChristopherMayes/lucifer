@@ -1,31 +1,38 @@
 #!/usr/bin/env python3
 """
-Statistical check for the weighted shot-noise loader (a
-feature Genesis cannot represent is tested against its own statistics, not a reference).
+Statistical check of the weighted shot-noise loader against its own statistics.
+
+Genesis cannot represent nonuniform weights, so there is no reference to compare to.
 
 Physics under test: after quiet loading plus Fawley-style noise, each slice's bunching
-satisfies <|b(h)|^2> = 1/N_lambda per imposed harmonic, with N_lambda the slice's real
-electron count (charge/e) -- for uniform AND nonuniform per-particle weights.
+satisfies <|b(h)|^2> = 1/N_lambda per imposed harmonic. N_lambda is the slice's real
+electron count, charge/e. This holds for uniform and for nonuniform per-particle weights.
 
-Method: run lucifer with load_only = T over many seeds, in both weight modes
-(uniform, and gen_test_weights = T which alternates beamlet weights 0.25x/1.75x at
-constant charge). Read each .beam.h5, compute the charge-weighted |b(h)|^2 per slice for
-the imposed harmonics, and test the scaled mean m = <|b(h)|^2 * N_lambda> against 1.
+Method: run lucifer with load_only = T over many seeds, in both weight modes. The modes
+are uniform, and gen_test_weights = T, which alternates beamlet weights of 0.25x and
+1.75x at constant charge. Each .beam.h5 gives the charge-weighted |b(h)|^2 per slice for
+the imposed harmonics, and the scaled mean m = <|b(h)|^2 * N_lambda> is tested against 1.
 b is a sum of many independent beamlet contributions, so |b|^2*N_lambda is Exp(1) to
-excellent approximation and the mean over n samples has sigma = 1/sqrt(n); the check is
-|m - 1| < 5/sqrt(n) per weight mode, plus a looser per-harmonic check (n/3 samples).
+excellent approximation, and the mean over n samples has sigma = 1/sqrt(n). The check is
+|m - 1| < 5/sqrt(n) per weight mode, plus a looser per-harmonic check on n/3 samples.
 
-Fawley's kick is linear in the noise amplitude only while a group holds many electrons,
-so every deck here keeps about 150 electrons per group, as the generator's has. At 18 the
-scaled mean sits at 0.88 and the higher harmonics far lower, in every mode alike, which is
-the algorithm's own limit (Genesis4 has the same one) and not a load defect.
+Fawley's kick is linear in the noise amplitude only while a group holds many electrons.
+Every deck here therefore keeps about 150 electrons per group, as the generator's does.
+At 18 electrons per group the scaled mean sits at 0.88, and the higher harmonics far
+lower, in every mode alike. That is the algorithm's own limit, which Genesis4 shares,
+and is not a load defect (validation.md, val-shot-noise-under-weights).
 
 The same statistic then runs on the loads that do not draw their own beamlets
-(fel-physics.md sec-noise): load_mode = "keep" from a generated bunch, where the loader
-makes the beamlets; a bunch of copies made outside the loader and loaded without the quiet
-start, where the noise goes on the particles sharing their transverse coordinates; and the
-same copies with their coordinates jittered so none coincide, where it goes on the
-occupants of each deposit cell. The loader's message must name the grouping it used.
+(fel-physics.md, sec-noise):
+- load_mode = "keep" from a generated bunch, where the loader makes the beamlets.
+- A bunch of copies made outside the loader and loaded without the quiet start. The
+  noise goes on the particles sharing their transverse coordinates.
+- The same copies with their coordinates jittered so none coincide. The noise goes on
+  the occupants of each deposit cell.
+The loader's message must name the grouping it used.
+
+Last, the stats file's mode split, the power within split_angle of the axis, is checked
+against the same quantity taken from a field dump to 1e-6.
 
 Usage: check_shot_noise.py --exe <lucifer> --workdir <dir> [--seeds N] [--lat <bmad file>]
 Exit 0 only if every check passes.
@@ -85,13 +92,12 @@ NML = """! flat keys; routed into the three groups by nml.to_groups
 def b2_samples(dump_file, harmonics):
     """Charge-weighted |b(h)|^2 * N_lambda for every slice and harmonic.
 
-    The dump is openPMD, so the weights are the ones the loader wrote. An earlier
-    version read Genesis format, which carries one current per slice, and had to
-    reconstruct the alternating test pattern to weight the sum. Reading the weights
-    tests the loader instead of assuming it.
+    The dump is openPMD, so the weights are the ones the loader wrote. Reading the
+    weights tests the loader instead of assuming it. A Genesis-format dump carries one
+    current per slice and would need the alternating test pattern reconstructed.
 
     |b(h)| is invariant under a constant shift of theta, which is what a dump's missing
-    reference phase amounts to, so this measurement is unaffected by it."""
+    reference phase amounts to. This statistic is therefore unaffected by it."""
     out = []
     for sl in beamio.read_slices(dump_file, LAMBDA0, SPACING):
         if sl["n"] == 0:
@@ -243,11 +249,12 @@ def split_check(exe, lat, workdir):
     The stats file's mode split against the same quantity taken from a field dump.
 
     Every record that takes the field angle moments also reports the power within
-    split_angle of the axis, from the transform those moments already pay for
-    (fel-physics.md sec-source-filter). A dump's own far field is the independent route to
-    the same number, and Parseval makes them equal, so a difference is a bug in the
-    masking or the normalization rather than a tolerance. One seeded steady-state segment
-    is enough: the split does not care what the field is, only how it is resolved.
+    split_angle of the axis, from the transform those moments already compute
+    (fel-physics.md, sec-source-filter). A dump's own far field is an independent route
+    to the same number, and Parseval makes the two equal. A difference is a bug in the
+    masking or the normalization, and the 1e-6 check allows rounding only. One seeded
+    steady-state segment is enough. The split depends on how the field is resolved and
+    not on what the field is.
     """
     root = "sn_split"
     (workdir / f"{root}.nml").write_text(to_groups(SPLIT_NML.format(lat=lat)))
