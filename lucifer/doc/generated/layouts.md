@@ -7,7 +7,7 @@ short_title: HDF5 layouts
 
 # HDF5 file layouts
 
-The hierarchy of each representative file this program writes, printed from the file itself: every group, dataset, link and attribute in name order, and no dataset values. A dataset line gives the shape, the on-disk datatype and the storage layout. An attribute line, marked `@`, gives the datatype, the shape and the value, a floating value at six significant figures. A string datatype says whether its length is fixed or variable and names its encoding. A soft or external link shows its target and is not followed. Two attribute names are left out wherever they occur, `date` and `softwareVersion`, since their values change between runs or builds, and each keeps its name, datatype and shape beside the marker `(omitted)`. Nothing else is left out. What the records mean is on [Reading the output](../reading-output.md).
+This page shows the hierarchy of each representative file this program writes, printed from the file itself: every group, dataset, link and attribute in name order, and no dataset values. A dataset line gives the shape, the on-disk datatype and the storage layout. An attribute line, marked `@`, gives the datatype, the shape and the value, a floating value at six significant figures. A string datatype says whether its length is fixed or variable and names its encoding. A soft or external link shows its target and is not followed. Two attribute names are left out wherever they occur, `date` and `softwareVersion`, since their values change between runs or builds, and each keeps its name, datatype and shape beside the marker `(omitted)`. Nothing else is left out. What the records mean is on [Reading the output](../reading-output.md).
 
 ## Contents
 
@@ -33,7 +33,7 @@ Each file below comes from one of four runs of the executable the regeneration t
 (layout-avg-000002-beam-h5)=
 ## avg-000002.beam.h5
 
-Run `avg`: interior frame of an averaged undulator, the coordinates the map evolves. Role: frame.
+The `avg` run writes it: interior frame of an averaged undulator, the coordinates the map evolves. Its role is frame.
 
 ```text
 /                               group
@@ -267,7 +267,7 @@ Run `avg`: interior frame of an averaged undulator, the coordinates the map evol
 (layout-avg-000005-beam-h5)=
 ## avg-000005.beam.h5
 
-Run `avg`: frame at the end of QU, the whole window, at the same s as the final dump. Role: frame, checkpoint.
+The `avg` run writes it: frame at the end of QU, the whole window, at the same s as the final dump. Its role is frame, checkpoint.
 
 ```text
 /                               group
@@ -522,7 +522,7 @@ Run `avg`: frame at the end of QU, the whole window, at the same s as the final 
 (layout-avg-final-beam-h5)=
 ## avg-final.beam.h5
 
-Run `avg`: final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair. Role: dump, checkpoint.
+The `avg` run writes it: final dump at the zero-length END marker Bmad appends to the line, the beam of the checkpoint pair. Its role is dump, checkpoint.
 
 ```text
 /                               group
@@ -757,7 +757,7 @@ Run `avg`: final dump at the zero-length END marker Bmad appends to the line, th
 (layout-avg-final-wf-h5)=
 ## avg-final.wf.h5
 
-Run `avg`: final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair. Role: dump, checkpoint.
+The `avg` run writes it: final dump at the zero-length END marker Bmad appends to the line, the field of the checkpoint pair. Its role is dump, checkpoint.
 
 ```text
 /                             group
@@ -805,7 +805,7 @@ Run `avg`: final dump at the zero-length END marker Bmad appends to the line, th
 (layout-unavg-000002-beam-h5)=
 ## unavg-000002.beam.h5
 
-Run `unavg`: interior frame of an unaveraged undulator, the oscillation resolved. Role: frame.
+The `unavg` run writes it: interior frame of an unaveraged undulator, the oscillation resolved. Its role is frame.
 
 ```text
 /                               group
@@ -1039,7 +1039,7 @@ Run `unavg`: interior frame of an unaveraged undulator, the oscillation resolved
 (layout-crop-000002-wf-h5)=
 ## crop-000002.wf.h5
 
-Run `crop`: field frame of both polarizations over three of six slices. Role: frame.
+The `crop` run writes it: field frame of both polarizations over three of six slices. Its role is frame.
 
 ```text
 /                             group
@@ -1106,7 +1106,7 @@ Run `crop`: field frame of both polarizations over three of six slices. Role: fr
 (layout-keep-final-beam-h5)=
 ## keep-final.beam.h5
 
-Run `keep`: final dump of several patches, two of them empty. Role: dump, checkpoint.
+The `keep` run writes it: final dump of several patches, two of them empty. Its role is dump, checkpoint.
 
 ```text
 /                               group

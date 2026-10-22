@@ -318,7 +318,7 @@ def page(work):
     L.append("")
     L.append("# HDF5 file layouts")
     L.append("")
-    L.append("The hierarchy of each representative file this program writes, printed from the file "
+    L.append("This page shows the hierarchy of each representative file this program writes, printed from the file "
              "itself: every group, dataset, link and attribute in name order, and no dataset values. "
              "A dataset line gives the shape, the on-disk datatype and the storage layout. An attribute "
              "line, marked `@`, gives the datatype, the shape and the value, a floating value at six "
@@ -355,7 +355,7 @@ def page(work):
             L.append(f"({anchor(name)})=")
             L.append(f"## {name}")
             L.append("")
-            L.append(f"Run `{fx['root']}`: {case}. Role: {role}.")
+            L.append(f"The `{fx['root']}` run writes it: {case}. Its role is {role}.")
             L.append("")
             L.append("```text")
             L.extend(inventory(work / name))

@@ -14,7 +14,8 @@ of that history. The entries before that date describe that branch.
   words where they carried 3,374 at 21, none over 40 words where 463 were, no prose semicolon where
   there were 26, and no date, since a measurement keeps its machine and configuration and this page
   holds the dates. Every sentence has a subject and a finite verb, where about 350 stood as fragments
-  such as "Measured on this input: ..." and "Refused at parse time: ...". Every number, code span,
+  such as "Measured on this input: ..." and "Refused at parse time: ...". The opening sentences of the
+  three generated pages, written by their generators, are sentences too. Every number, code span,
   formula, label, link, heading and table cell is as it was,
   by `tests/scripts/check_prose_only.py`, except where a page disagreed with the code. About sixty
   statements did, among them the checks each script runs, the device's source-filter grid, the FEL
