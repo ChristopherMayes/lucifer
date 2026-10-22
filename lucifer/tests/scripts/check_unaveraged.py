@@ -89,6 +89,13 @@ LAMBDA1 = 1e-10
 SEED_P = 1e3                   # small-signal seed power [W]
 SEED_W0 = 4e-4                 # 1/e^2 intensity radius [m]
 
+# The probe grid is odd on purpose. fc_measured divides the energy modulation by the
+# seed's on-axis envelope E0, and the probe beam sits on the axis. With a cell centered
+# on the axis the beam reads E0 itself. With an even count the axis falls between four
+# cells and the bilinear gather reads the Gaussian low by dx^2/(2 w0^2), 3.0e-3 at 128
+# points and this waist, which the formula then charges to the coupling factor. At 127
+# points the planar factor measures 0.75050 and at 128 points 0.74864 against the closed
+# form's 0.75095. These runs stay on the CPU, which takes an odd grid.
 PROBE = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"
   out_root = "{root}"
@@ -103,7 +110,7 @@ PROBE = """! flat keys; routed into the three groups by nml.to_groups
   beamlet_size = 8
   seed_power = {power}
   seed_waist_size = {w0}
-  grid_n_pts = 128
+  grid_n_pts = 129
   grid_half_width = 2e-3
   ran_seed = 4242
   unaveraged_steps_per_period = {spp}

@@ -9,6 +9,15 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Fixed: the unaveraged coupling probes of `check_unaveraged.py` ran on a 128-point grid
+  since the decks moved to powers of two on 2026-09-09. The probe beam sits on the axis and the formula
+  divides by the seed's on-axis envelope, and with an even count the axis falls between four cells, so the
+  gather read the Gaussian seed low by dx²/2w0², 3.0e-3 at that grid and waist, and charged it to the
+  coupling factor: the planar factor measured 0.74864 against the closed form's 0.75095 where it had
+  measured 0.75051. The probe pair is back on 129 points, which the CPU takes, and the three factors read
+  0.75051, 0.84803 and 0.21287 again, at 5.9e-4, 5.9e-4 and 7.1e-4 from their closed forms. The check's
+  tolerance of 5e-3 let the move pass every keystone, and the generated tables now carry the factors to
+  five digits.
 - 2026-10-23 Changed: every check script records what each check measured, through
   `tests/scripts/checkrec.py`, beside the line it prints, and the benchmark gathers the records into its
   results file beside the section outcomes. `report_validation.py` renders one table per check section

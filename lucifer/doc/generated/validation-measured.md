@@ -469,20 +469,20 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| energy ledger: max\|d(E_beam+U_field)\| / sum\|dU\| | 9.3879e-06 | 9.3897e-06 | <= 1.0000e-04 |
-| ledger internal: \|dE_kick - dE_beam\| / max\|dE\| | 1.2499e-05 | same | <= 1.0000e-04 |
-| energy ledger, 100 um seed, 20 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 3.6854e-06 | 3.6852e-06 | <= 1.0000e-04 |
-| energy ledger, 100 um seed, 40 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 2.3740e-06 | 2.3741e-06 | <= 1.0000e-04 |
-| order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7) | 5.9929e-01 | 5.9926e-01 | <= 1.0000e+00 |
-| order: particle energy, observed between 20 and 40 (2 expected, floor 1.7) | 4.2581e-01 | same | <= 1.0000e+00 |
+| energy ledger: max\|d(E_beam+U_field)\| / sum\|dU\| | 4.8059e-06 | 4.8068e-06 | <= 1.0000e-04 |
+| ledger internal: \|dE_kick - dE_beam\| / max\|dE\| | 9.6433e-06 | 9.6432e-06 | <= 1.0000e-04 |
+| energy ledger, 100 um seed, 20 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 1.3233e-05 | same | <= 1.0000e-04 |
+| energy ledger, 100 um seed, 40 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 5.3601e-06 | 5.3600e-06 | <= 1.0000e-04 |
+| order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7) | 5.7868e-01 | 5.7861e-01 | <= 1.0000e+00 |
+| order: particle energy, observed between 20 and 40 (2 expected, floor 1.7) | 4.2788e-01 | same | <= 1.0000e+00 |
 | ballistic: max\|dgamma\| (B does no work) | 4.8046e-16 | same | <= 1.0000e-12 |
 | ballistic: \|emit_x out/in - 1\| (ramp handoff) | 9.7567e-11 | 9.7574e-11 | <= 1.0000e-06 |
 | handoff: \|<x>_out - <x>_in\| (dark) | 1.9339e-09 | same | <= 1.0000e-07 |
 | handoff: \|<px>_out - <px>_in\| (dark, gamma*beta units) | 3.6359e-14 | 3.6426e-14 | <= 1.0000e-06 |
-| fc measured vs closed form, planar (h=1): \|ratio-1\| | 3.0756e-03 | same | <= 5.0000e-03 |
-| fc measured vs closed form, helical (h=1): \|ratio-1\| | 3.0785e-03 | same | <= 5.0000e-03 |
-| fc measured vs closed form, planar_h3 (h=3): \|ratio-1\| | 3.1930e-03 | same | <= 5.0000e-03 |
-| convergence: \|fc(30)/fc(20) - 1\| | 5.8683e-06 | same | <= 5.0000e-04 |
+| fc measured vs closed form, planar (h=1): \|ratio-1\| | 5.8828e-04 | same | <= 5.0000e-03 |
+| fc measured vs closed form, helical (h=1): \|ratio-1\| | 5.9279e-04 | same | <= 5.0000e-03 |
+| fc measured vs closed form, planar_h3 (h=3): \|ratio-1\| | 7.0543e-04 | same | <= 5.0000e-03 |
+| convergence: \|fc(30)/fc(20) - 1\| | 7.5001e-06 | same | <= 5.0000e-04 |
 | gain curve: \|ln(P_unavg/P_avg)\| at segment exit | 2.7430e-03 | 2.7455e-03 | <= 2.0000e-01 |
 | sandwich: ledger rows confined to the unaveraged segment (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | sandwich: ledger max\|d(E+U)\| / sum\|dU\| on the middle segment | 1.4589e-04 | same | <= 1.0000e-03 |
