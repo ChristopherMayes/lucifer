@@ -7,7 +7,7 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 (val-the-keystone-rule)=
 ## The keystone rule
 
-Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule: a moved line there is a change to the files this program writes, to explain, review, regenerate and stage, and neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. From the `bmad-ecosystem` root, with the interpreter of the `bmad-fel-validate` environment:
+Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug, not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule: a moved line there is a change to the files this program writes, to explain, review, regenerate and stage, and neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. From the root of the Lucifer repository, with `BMAD_DIR` naming a Bmad checkout and the interpreter of the `bmad-fel-validate` environment:
 
 ```
 BUILD_PRODUCTION=N lucifer/util/conda_compile      # debug: Bmad, then Lucifer
@@ -23,7 +23,8 @@ both run `lucifer/util/bmad_release_check` against the checkout, and the preflig
 its self-test first. The Linux CI job clones `bmad-sim/bmad-ecosystem` at the declared
 release, runs the same check on the clone, and builds Lucifer against it with `BMAD_DIR`
 set, so a green run there certifies that release and no later one. The suite takes four
-locations, each defaulting to that layout inside a Bmad checkout: the Lucifer source,
+locations, each defaulting to the layout of a Lucifer source inside a Bmad checkout, and a
+Lucifer repository sets `BMAD_DIR`: the Lucifer source,
 which is its own tree, the Bmad source with its regression suite and debug binaries
 (`BMAD_DIR`, else `DIST_BASE_DIR`, else the Lucifer source's parent), and the two Lucifer
 binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). A Lucifer source tree

@@ -5,10 +5,19 @@ short_title: Changelog
 
 # Lucifer changelog
 
-Development history of the FEL tracker on the `lucifer-dev` branch, newest first.
-This is the branch's own record. Bmad's `changelog.md` carries what a merge changes,
-and it is written at the merge.
+Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was developed on
+the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
+of that history. The entries before that date describe that branch.
 
+- 2026-10-21 Changed: Lucifer lives in a repository of its own, `ChristopherMayes/lucifer`,
+  carrying the history of every commit that built it. It builds against a Bmad checkout that
+  `BMAD_DIR` names, at or after the release in `lucifer/BMAD_RELEASE`, where it had been built
+  inside the fork's checkout. The repository root holds `LICENSE`, the GPL-3.0 text, a README,
+  and a `.gitignore` carrying the rules Bmad's own `.gitignore` gave Lucifer: `debug`,
+  `production`, `*.mod`, `*.digested*`, `__pycache__` and `.DS_Store`. Lucifer is licensed
+  GPL-3.0-only, the routines transcribed from Genesis 1.3 Version 4 being derivative works of
+  it under the same license. The workflows run on `main`, and the documentation is published
+  from this repository. Every recorded digit held.
 - 2026-10-21 Changed: the Bmad release Lucifer needs is declared in `lucifer/BMAD_RELEASE`, a minimum,
   currently `20261018-0`, where it was a sentence in the user guide that nothing read.
   `lucifer/util/bmad_release_check` compares a checkout's `bmad_version_date` with it, the date and the

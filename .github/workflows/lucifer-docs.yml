@@ -7,8 +7,7 @@
 # the input reference agrees with the Fortran declarations, the examples agree with the
 # feature list, and the generated example pages are current.
 #
-# Scoped to the lucifer-dev branch on purpose. The distribution's own ci.yml owns every
-# other branch, and this workflow has nothing to say about them.
+# On main, the branch every Lucifer commit lands on, and on pull requests against it.
 
 name: Lucifer - Docs & Conformance
 
@@ -18,9 +17,9 @@ permissions:
 on:
   workflow_dispatch:
   push:
-    branches: [lucifer-dev]
+    branches: [main]
   pull_request:
-    branches: [lucifer-dev]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -106,9 +105,9 @@ jobs:
           sys.exit(bad)
           PY
 
-  # Publishing the site the job above already built. This serves the fork's own Pages
-  # site, which is the only place Lucifer's documentation is readable without building
-  # it: the rest of Bmad ships LaTeX. The permissions live on this job rather than the
+  # Publishing the site the job above already built. This serves the repository's own
+  # Pages site, which is the only place Lucifer's documentation is readable without
+  # building it: Bmad itself ships LaTeX. The permissions live on this job rather than the
   # workflow, so the conformance steps keep read-only access to the repository.
   #
   # A pull request builds the documentation and stops there. A proposed change must not

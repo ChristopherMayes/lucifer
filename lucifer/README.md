@@ -71,7 +71,11 @@ harness refuses a feature that has lost its example.
 
 ## License
 
-Lucifer is part of the Bmad distribution and is distributed on the distribution's terms.
-Its physics is transcribed from Genesis 1.3 Version 4, which is licensed under the GNU
-General Public License version 3, and every transcribed routine carries a citation to
-the Genesis4 file and lines it came from. Those citations are kept deliberately.
+Copyright 2026 the Lucifer authors. Lucifer is licensed under the GNU General Public
+License version 3 only (SPDX: `GPL-3.0-only`), whose text is in `LICENSE` at the
+repository root. The routines transcribed from Genesis 1.3 Version 4 are derivative works
+of it, modified from 2026-07-31 on, and are distributed under the same license. Genesis
+1.3 Version 4 carries the notice "Copyright 2010, 2011 Paul Scherrer Institut. All rights
+reserved." and is licensed under the GNU General Public License version 3. Every
+transcribed routine carries a citation to the Genesis4 file and lines it came from. Those
+citations are kept deliberately.

@@ -1,0 +1,10 @@
+# Build output. Master.cmake places the binaries in debug/ and production/ beside the
+# Lucifer source and builds in lucifer/debug and lucifer/production, and Fortran module
+# files land in both. Digested lattices are Bmad's parse cache, written beside the lattice.
+debug
+production
+*.mod
+*.digested*
+
+__pycache__
+.DS_Store

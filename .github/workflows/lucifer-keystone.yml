@@ -33,8 +33,8 @@
 # operating system, the C library, the allocator and every dependency build, and it runs
 # the tiers and the check sections, which nothing outside this laptop has ever run. It
 # does not vary the compiler project, which is conda-forge gfortran on both sides. The
-# distribution's own ci.yml builds with the system compiler on every push, which is how an
-# unconditional -lfftw3f was caught, and it runs no tier.
+# distribution's own CI builds with the system compiler, which is how an unconditional
+# -lfftw3f was caught, and it runs no tier.
 #
 # It does NOT compare digits. A different FFTW and HDF5 give different last digits by
 # construction, so the eleven recorded tier levels stay a property of the machine that
@@ -43,16 +43,13 @@
 #
 # What is deliberately not here, so the difference from the local keystone is on the
 # record: the production build and the two-build digit comparison, the examples, and
-# Bmad's own regression suite, which ci.yml already runs. The device section cannot run
+# Bmad's own regression suite, which Bmad's own CI runs. The device section cannot run
 # on a runner with no Metal device and skips with its reason recorded, the one section allowed
 # to.
 #
-# `workflow_dispatch` and `schedule` read this file from the repository's DEFAULT branch
-# rather than from the ref they name, which is GitHub's rule for both. They were inert
-# while the fork's default branch was `main` and this file lived only on `lucifer-dev`,
-# and they went live when `lucifer-dev` became the default: a dispatch against that ref
-# now returns a run rather than a 404. `push` is the trigger that reads the pushed ref,
-# and it is the one that does not depend on which branch is the default.
+# `workflow_dispatch` and `schedule` read this file from the repository's default branch,
+# main, rather than from the ref they name, which is GitHub's rule for both. `push` is the
+# trigger that reads the pushed ref.
 #
 # On every push to the branch, and weekly besides. Every commit here is validated before
 # it lands, and the keystone that does it runs on one macOS machine, so a per-push run is
@@ -62,9 +59,8 @@
 # path filter would be no substitute, since the defects this reaches come from the
 # platform rather than from which file moved.
 #
-# It does not replace the per-push build coverage from ci.yml, conda-build.yml and
-# pytao.yml, which build the whole distribution and are what caught a compile error this
-# job would have reached only on the following Monday.
+# It does not replace Bmad's own CI, which builds the whole distribution on every push
+# to Bmad.
 
 name: Lucifer - Keystone (Linux)
 
@@ -73,7 +69,7 @@ permissions:
 
 on:
   push:
-    branches: [lucifer-dev]
+    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: "17 9 * * 1"
@@ -111,7 +107,7 @@ jobs:
           echo "BMAD_DIR=$RUNNER_TEMP/bmad" >> "$GITHUB_ENV"
 
       # Two packages the build needs on Linux and not on macOS. The distribution's own
-      # conda-build.yml appends the same two, and the file is the distribution's, so the
+      # conda build workflow appends the same two, and the file is the distribution's, so the
       # append happens here in the runner rather than in the clone's tree. The file is
       # copied into the workspace first: setup-miniconda reads environment-file relative to
       # the workspace even when given an absolute path, and an absolute path under the
@@ -146,7 +142,7 @@ jobs:
       # and requires it to reproduce one thread bit for bit. MPI is off, since Lucifer is
       # shared memory and the reference runs single process. The test executables are off,
       # which drops regression_tests from the build list and nothing else: this job does
-      # not run that suite, ci.yml does, and building it is minutes a runner spends on
+      # not run that suite, Bmad's own CI does, and building it is minutes a runner spends on
       # binaries no step here executes.
       #
       # The `set +e` is load-bearing, and finding out why cost three rounds.

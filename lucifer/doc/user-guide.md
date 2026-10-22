@@ -5,7 +5,17 @@ Everything needed to get from a checkout to a tracked FEL run. The parameter-by-
 ## Building
 
 Lucifer is a Bmad user program, built against a Bmad distribution rather than as part of
-one. The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in
+one. Its repository holds Lucifer alone, and a Bmad checkout sits beside it, named by
+`BMAD_DIR`:
+
+```
+git clone https://github.com/ChristopherMayes/lucifer.git
+git clone https://github.com/bmad-sim/bmad-ecosystem.git bmad
+git -C bmad checkout "$(cat lucifer/lucifer/BMAD_RELEASE)"
+cd lucifer
+BMAD_DIR=../bmad BUILD_PRODUCTION=N lucifer/util/conda_compile   # debug: Bmad, then Lucifer
+```
+ The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in
 `lucifer/BMAD_RELEASE`, currently `20261018-0`, the first release carrying the two Bmad
 changes Lucifer needs: the `fel_method` element attribute and openPMD particle patches in
 the beam files. An older Bmad refuses the lattices and reads a multi-slice beam file as one
@@ -16,8 +26,7 @@ the Bmad version it was built against at startup and records it in the stats fil
 
 Its `CMakeLists.txt` includes Bmad's `Master.cmake`, which compiles it against the
 distribution's libraries and modules and places its binaries in `debug/` and `production/`
-beside the Lucifer source: inside a Bmad checkout that is the checkout's own `debug/bin`
-and `production/bin`, and outside one it is the directory next to the source. One script
+beside the Lucifer source, which is the repository root. One script
 builds Bmad and then Lucifer, with the conda preferences the recorded levels were measured
 under:
 
@@ -28,7 +37,7 @@ lucifer/util/conda_compile                         # production
 BUILD_BMAD=N lucifer/util/conda_compile            # Lucifer alone, Bmad already built
 ```
 
-The Bmad source is `BMAD_DIR`, or the parent of the Lucifer source when that holds a Bmad
+The Bmad source is `BMAD_DIR`, which a Lucifer clone needs since its parent holds no Bmad
 checkout. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over
 with a note, since `dist_source_me` uses that name as a loop variable and leaves it at
 the checkout's `util/` once sourced. By hand, the same build is `source
