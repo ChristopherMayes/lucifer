@@ -9,6 +9,16 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-22 Changed: the comments and docstrings of the Python checks, the keystone suite, the readers,
+  the report generators and the two example scripts say what each block does and why, as the Fortran's
+  do. Every tolerance keeps the number that sets it and names the page that holds it. How a number was
+  found, when, and what a run cost went, and the one measurement no page held, the chicane's slice-floor
+  boundary, is on `validation.md`. About eighty docstrings and comments that disagreed with their code
+  now match it, among them the source filter's edge at twice the Nyquist frequency, the eleven tiers of
+  `compare_fel.py`, the checks each module docstring lists and the tolerances the import check applies.
+  Five argparse descriptions that broke off mid-sentence are complete. `check_comments_only.py` compares
+  a Python file as its syntax tree with the docstrings removed, and every file's tree is identical to
+  before. The shell scripts are not yet covered.
 - 2026-10-22 Fixed: the setup warning for the source filter said the default was measured over ratios
   of 0.3 to 3, the band the warning fires outside. It now says the ratio is outside 0.3 to 3 and that the
   default was measured over ratios of 1.14 to 1.86 on four machines, the range `startup-noise.md` records.
