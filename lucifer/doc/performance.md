@@ -3,9 +3,9 @@ title: Performance
 short_title: Performance
 ---
 
-Where a run spends its time, measured. Every number here is machine-local and carries the machine and the build that produced it. That is why this page is hand written and stays out of `generated/`.
+This page is the measured record of where a run spends its time. Every number here is machine-local and carries the machine and the build that produced it. That is why this page is hand written and stays out of `generated/`.
 
-The instrument is `code/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the walk, so the fractions sum to it and the remainder has its own row named `unaccounted`. Measured below, that remainder is 0.02% of the walk, so the partition is the walk.
+The instrument is `code/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the walk, so the fractions sum to it and the remainder has its own row named `unaccounted`. That remainder, measured below, is 0.02% of the walk, so the partition is the walk.
 
 Timers cannot see inside a parallel region. The deposit and its FFT interleave per slice, and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
 
@@ -22,7 +22,7 @@ Every table below whose deck states `ngrid` 255 was measured before the harness 
 
 The phases mode needs no genesis4 and no MPI. It compares the code against itself, so it starts from the tracker's own shot-noise quiet start rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice and `--big-slices` the larger case.
 
-The sampling split, on macOS:
+The sampling split is taken on macOS with:
 
 ```
 OMP_NUM_THREADS=12 production/bin/lucifer <deck>.in &
@@ -31,7 +31,7 @@ sample $(pgrep -n lucifer) 15 1 -file prof.txt -mayDie
 
 Read the `Sort by top of stack` section, which is exclusive cost per symbol. The call graph is per thread and fragments the same information across dozens of stacks.
 
-The vectorization audit:
+The vectorization audit runs as:
 
 ```
 ./lucifer/tests/scripts/vec_audit.sh
@@ -42,7 +42,7 @@ It takes the compile command from the production build's own makefile, so the re
 (perf-the-phase-profile)=
 ## The phase profile
 
-Apple M3 Max, 12 performance cores, production build, full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 255, 12 threads, the source filter at its default. The `was` columns are the same runs measured with the filter off, before it became the default. They are given wherever the move exceeds the run-to-run spread below.
+The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 255, 12 threads and the source filter at its default. The `was` columns are the same runs measured with the filter off, before it became the default. They are given wherever the move exceeds the run-to-run spread below.
 
 | phase | 96 slices | was | 504 slices | was |
 |---|---|---|---|---|
@@ -58,7 +58,7 @@ Apple M3 Max, 12 performance cores, production build, full 6-FODO Benchmark1-SAS
 | unaccounted | 0.004 s, 0.0% | 0.003 s, 0.0% | 0.007 s, 0.0% | 0.006 s, 0.0% |
 | walk | 30.333 s | 23.917 s | 164.650 s | 127.370 s |
 
-One phase moved, and it moved the walk with it. The field solve is up 40 percent at 96 slices and 44 percent at 504. Everything else is inside the spread. The source filter is the reason. It adds a forward transform of the source per field per step, where an unfiltered solve adds the source in real space and transforms twice rather than three times ([](fel-physics.md#sec-source-filter)). Measured directly on the 96-slice configuration, the same deck with the filter off and on:
+One phase moved, and it moved the walk with it. The field solve is up 40 percent at 96 slices and 44 percent at 504. Everything else is inside the spread. The source filter is the reason. It adds a forward transform of the source per field per step, where an unfiltered solve adds the source in real space and transforms twice rather than three times ([](fel-physics.md#sec-source-filter)). The same deck, measured directly on the 96-slice configuration with the filter off and on, gives:
 
 | | filter off | filter on | ratio |
 |---|---|---|---|
@@ -66,7 +66,7 @@ One phase moved, and it moved the walk with it. The field solve is up 40 percent
 | particle push | 4.484 s | 4.441 s | 0.99 |
 | walk | 23.392 s | 29.646 s | 1.27 |
 
-Two runs each, mean. The filter costs 27 percent of this walk and 42 percent of its field solve, and it leaves the push alone. The 8 to 14 percent [](fel-physics.md#sec-convergence) quotes is the cost at the derived grid on a shorter line, where the transform is a smaller share of a run. This line at `ngrid` 255 is where the transform dominates, so it is where the filter costs most. The filter-off walk of 23.392 s reproduces the 23.917 s of the `was` column, so nothing else in the code moved between the two measurements.
+Each column is the mean of two runs. The filter costs 27 percent of this walk and 42 percent of its field solve, and it leaves the push alone. The 8 to 14 percent [](fel-physics.md#sec-convergence) quotes is the cost at the derived grid on a shorter line, where the transform is a smaller share of a run. This line at `ngrid` 255 is where the transform dominates, so it is where the filter costs most. The filter-off walk of 23.392 s reproduces the 23.917 s of the `was` column, so nothing else in the code moved between the two measurements.
 
 The `= FEL step` row is derived rather than measured, as its label says. It is the sum of the undulator prep, the space-charge profile, the particle push and the field solve, so it is the share of the walk the undulator segments own. It is left out of the leaf sum, and the other rows add to the walk minus the remainder.
 
@@ -93,9 +93,9 @@ The power of two is the slower of the two large grids, at 1.17x the walk of 255 
 
 ## The particles against the grid
 
-The field solve and the particle push scale differently, so their ratio is a property of the configuration and not of the code. Same machine and line, 96 slices, 12 threads.
+The field solve and the particle push scale differently, so their ratio is a property of the configuration and not of the code. The machine and line are the same, at 96 slices and 12 threads.
 
-Two runs at each count, mean.
+Each row is the mean of two runs at that count.
 
 | particles per slice | particle push | field solve | walk |
 |---|---|---|---|
@@ -112,7 +112,7 @@ That flatness also splits the field solve without a profiler. Fitting the 512 an
 (perf-thread-scaling)=
 ## Thread scaling
 
-96 slices, 2048 particles per slice, full line, same machine and build. The implied serial fraction inverts Amdahl's law, $f = (n/S - 1)/(n - 1)$, and bounds this configuration rather than the code.
+The configuration is 96 slices of 2048 particles per slice through the full line, on the same machine and build. The implied serial fraction inverts Amdahl's law, $f = (n/S - 1)/(n - 1)$, and bounds this configuration rather than the code.
 
 | threads | walk | speedup | efficiency | implied serial |
 |---|---|---|---|---|
@@ -135,7 +135,7 @@ The field-free drift is parallel over slices for the same reason. A time-depende
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
 
-96 slices, 2048 particles per slice, 12 threads, the filter at its default, 15 s of samples at 1 ms, 120732 samples. Exclusive cost, categorized by symbol. The `was` column is the same measurement with the filter off.
+The configuration is 96 slices of 2048 particles per slice on 12 threads with the filter at its default, sampled for 15 s at 1 ms, 120732 samples. The table is exclusive cost, categorized by symbol. The `was` column is the same measurement with the filter off.
 
 | | share | was |
 |---|---|---|
@@ -158,7 +158,7 @@ An estimate of the field solve near 10% of a run holds only at many more particl
 (perf-the-sampling-split-unaveraged)=
 ## The sampling split, unaveraged mode
 
-One slice, 16384 particles, `ngrid` 129, serial (the mode's parallelism is over slices and there is one). The phase table gives the unaveraged step 99.7% of the walk, so this is the mode. Both columns are 20 s of samples at 1 ms, and the totals differ because the hoisted run finishes sooner inside that window.
+The configuration is one slice of 16384 particles at `ngrid` 129, run serially (the mode's parallelism is over slices and there is one). The phase table gives the unaveraged step 99.7% of the walk, so this is the mode. Both columns are 20 s of samples at 1 ms, and the totals differ because the hoisted run finishes sooner inside that window.
 
 | | before the hoist | after |
 |---|---|---|
@@ -180,7 +180,7 @@ The before column's label covers every libm transcendental the run entered, `exp
 (perf-the-hoist-measured)=
 ## The hoist, measured
 
-Same machine and build, one thread, median of five runs at 2048 particles and three at 16384. The change is bit-identical by construction and checked as such: the diag and ledger files of the unaveraged example are byte-identical before and after at 1 and 8 threads.
+The machine and build are the same, on one thread, and each entry is the median of five runs at 2048 particles and three at 16384. The change is bit-identical by construction and checked as such: the diag and ledger files of the unaveraged example are byte-identical before and after at 1 and 8 threads.
 
 | configuration | before | after | change |
 |---|---|---|---|
@@ -230,7 +230,7 @@ The version of this that could pay is a vectorized pair inside a loop that vecto
 (perf-the-vectorization-audit)=
 ## The vectorization audit
 
-gfortran 13.3.0 at the production flags, which are `-O2 -ftree-vectorize -march=armv8.3-a` with per-file `-O3` on `fel_track_mod`.
+The compiler is gfortran 13.3.0 at the production flags, which are `-O2 -ftree-vectorize -march=armv8.3-a` with per-file `-O3` on `fel_track_mod`.
 
 | file | vectorized | not vectorized |
 |---|---|---|
@@ -255,7 +255,7 @@ One pattern accounts for all five. A per-particle loop calls a routine that the 
 (perf-what-the-numbers-say-to-do)=
 ## What the numbers say to do
 
-Ordered by measured share, for the averaged mode at 2048 particles per slice and `ngrid` 255, read from the `was` columns above, which were measured with the filter off.
+The items below are ordered by measured share, for the averaged mode at 2048 particles per slice and `ngrid` 255, and read from the `was` columns above, which were measured with the filter off.
 
 The FFT is 61% of the run, and it is in FFTW rather than in this code. What this code controls is how many transforms it asks for: two per slice per field per step without the filter and three with it, at the grid the deck sets. `ngrid` is a deck parameter, and $255^2$ is 65025 points against 2048 particles, so a convergence study on `ngrid` is worth more here than any change to the deposit.
 
@@ -278,7 +278,7 @@ The unaveraged mode has its own twin, and it costs more than the averaged one be
 (perf-estimate)=
 ## The estimate against the clock
 
-Every run prints an estimated walk in its header and the measured walk beside it in its footer. The rates are fitted to the tables above and are this machine's. Measured here on the eleven comparison tiers and four examples, each run on its own rather than beside the other keystone jobs, since a machine running five jobs at once measures the load and not the deck.
+Every run prints an estimated walk in its header and the measured walk beside it in its footer. The rates are fitted to the tables above and are this machine's. The estimate is measured here on the eleven comparison tiers and four examples, each run on its own rather than beside the other keystone jobs. A machine running five jobs at once measures the load and not the deck.
 
 | run | filter | measured | estimate | estimate/measured |
 |---|---|---|---|---|
@@ -305,7 +305,7 @@ Every row is inside a factor of two. Fitted with the source filter on, the trans
 (perf-frames)=
 ## The frame series, measured
 
-What a frame costs, on the same machine. The deck is the `sase` example, 96 slices of 2048 macroparticles at `ngrid` 255, one frame every 20 m.
+This section measures what a frame costs, on the same machine. The deck is the `sase` example, 96 slices of 2048 macroparticles at `ngrid` 255, one frame every 20 m.
 
 | | size | per unit |
 |---|---|---|
@@ -314,7 +314,7 @@ What a frame costs, on the same machine. The deck is the `sase` example, 96 slic
 
 The beam frame carries no overhead to trim. Its 68 bytes are six coordinates, the time the reference phase folds into, the time offset that places the particle's slice in the bunch, the reference momentum and the label. The uniform weight and the zero longitudinal position are constant records that cost nothing per particle. The field is seven times the beam and is where a series' bytes are.
 
-Compression does not pay on this data. Chunked one slice at a time with the shuffle filter:
+Compression does not pay on this data. The field is chunked one slice at a time with the shuffle filter:
 
 | | size | ratio | read |
 |---|---|---|---|
@@ -325,7 +325,7 @@ Compression does not pay on this data. Chunked one slice at a time with the shuf
 
 A saturated FEL field is not sparse. The wide-angle emission of the point beamlets fills the grid, and a float64 mantissa of a noise-like field is incompressible, so gzip buys 1.3 times for sixteen times the read. Storing the field as float32 halves it exactly and costs 5.9e-8 of relative accuracy. That is far below anything a picture or a moment needs and far above single-precision tracking's own floor. Neither is taken. The measurement is what a later decision is made against.
 
-Writing frames dominates a run at a movie-grade comb, and the device readback does not. One undulator segment, 15 slices of 4096 at `ngrid` 256 on the Metal backend, a comb of 0.1 m and 31 records:
+Writing frames dominates a run at a movie-grade comb, and the device readback does not. The deck is one undulator segment, 15 slices of 4096 at `ngrid` 256 on the Metal backend, with a comb of 0.1 m and 31 records:
 
 | | frames off | frames on |
 |---|---|---|
@@ -339,7 +339,7 @@ The readback is about 0.10 s either way, since it happens at every comb row whet
 (perf-interlude-steps)=
 ## The interlude's pieces, measured
 
-`global%interlude_ds_step` cuts an interlude element into pieces so that stats rows and frames land along it ([](validation.md#val-interlude-steps)). What that costs is the field's drift rather than the beam's tracking, since a piece drifts every slice of the window where it tracks one bunch per slice. Three undulators of 0.6 m with two pipes of 0.6 m between them, 32 slices of 512 macroparticles at `ngrid` 128, `comb_ds_save = 0.02`, 12 threads, production build, best of three.
+`global%interlude_ds_step` cuts an interlude element into pieces so that stats rows and frames land along it ([](validation.md#val-interlude-steps)). What that costs is the field's drift rather than the beam's tracking, since a piece drifts every slice of the window where it tracks one bunch per slice. The line is three undulators of 0.6 m with two pipes of 0.6 m between them, with 32 slices of 512 macroparticles at `ngrid` 128, `comb_ds_save = 0.02`, 12 threads and a production build, best of three.
 
 | `interlude_ds_step` | pieces an element | walk | rows |
 |---|---|---|---|
@@ -347,7 +347,7 @@ The readback is about 0.10 s either way, since it happens at every comb row whet
 | 0.06 | 10 | 0.325 s | 2592 |
 | 0.02 | 30 | 0.427 s | 3680 |
 
-Where the time goes, from the run's own phase table at the two ends of that scan:
+The run's own phase table at the two ends of that scan says where the time goes:
 
 | phase | whole | cut at 0.02 |
 |---|---|---|
@@ -363,7 +363,7 @@ Bmad's global `bmad_com%sr_wakes_on` chooses the interlude path for every elemen
 (perf-device)=
 ## The device, measured against the CPU
 
-The Metal backend ([](validation.md#val-device)) run against the CPU path on the same decks, one 9 m Aramis segment of 89 steps at `ngrid` 256, `comb_ds_save = -1` so both sides pay stats at the element end only. Walk seconds, best of three, M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps. The difference from its wall clock is the host side of each step, dominated by the dispatch floor.
+The Metal backend ([](validation.md#val-device)) is run against the CPU path on the same decks: one 9 m Aramis segment of 89 steps at `ngrid` 256, with `comb_ds_save = -1` so both sides pay stats at the element end only. The table gives walk seconds, best of three, on the M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps. The difference from its wall clock is the host side of each step, dominated by the dispatch floor.
 
 | case | CPU, 12 threads | device wall | device busy | ratio |
 |---|---|---|---|---|
@@ -372,7 +372,7 @@ The Metal backend ([](validation.md#val-device)) run against the CPU path on the
 | SASE window, 96 x 8192 | 3.92 s | 0.316 s | 0.196 s | 12.4x |
 | dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.037 s | 0.009 s | 0.9x |
 
-Where a step's device seconds go, per pass. `global%device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU. Dispatch-boundary sampling would time each dispatch inside one encoder, and the M3 Max reports it absent. The full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, the filter on and `comb_ds_save = -1`. The readbacks therefore fall at element ends, and each element's steps batch into one command buffer. Best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
+This table says where a step's device seconds go, per pass. `global%device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU. Dispatch-boundary sampling would time each dispatch inside one encoder, and the M3 Max reports it absent. The deck is the full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, with the filter on and `comb_ds_save = -1`. The readbacks therefore fall at element ends, and each element's steps batch into one command buffer. Each row is the best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
 
 | particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -380,7 +380,7 @@ Where a step's device seconds go, per pass. `global%device_timing` encodes each 
 | 8192 | 0.875 s | 0.256 s | 0.0197 s | 0.0184 s | 0.0116 s | 0.0142 s | 0.0577 s | 0.0605 s | 0.1821 s | 27.7% |
 | 131072 | 1.800 s | 0.312 s | 0.0482 s | 0.0423 s | 0.0147 s | 0.0825 s | 0.0590 s | 0.0614 s | 0.3081 s | 7.1% |
 
-The instrument is not free, and its price says how far the table above can be read. The same three loads with the timing off against on, best of five:
+The instrument is not free, and its price says how far the table above can be read. The same three loads are run with the timing off against on, best of five:
 
 | particles a slice | walk off | walk on | busy off | busy on | busy |
 |---|---|---|---|---|---|
@@ -388,9 +388,9 @@ The instrument is not free, and its price says how far the table above can be re
 | 8192 | 0.683 s | 0.882 s | 0.1240 s | 0.2580 s | 2.08x |
 | 131072 | 1.700 s | 1.800 s | 0.2740 s | 0.3170 s | 1.16x |
 
-The absolute seconds in the per-pass table are therefore the instrument's rather than a production run's. At the two lighter loads the encoder boundaries cost about as much as the work. The shares survive that better than the seconds do, with one bias. A pass bears one boundary per encoder, so the deposit's one encoder a step carries less of the overhead than the filter's four or the solve's four, and the deposit's share is therefore a floor. Read that way, the deposit is 7.7 percent of the six at 1024 and 8192 particles a slice and 26.8 percent at 131072, where the overhead is smallest and the figure is firmest. The transform, filter and solve together are two thirds of a step at production loads. That is the conclusion the load scan of [](#perf-device) reaches from the outside: the step is dominated by the grid and not by the particles until the load is very high.
+The absolute seconds in the per-pass table are therefore the instrument's rather than a production run's. At the two lighter loads the encoder boundaries cost about as much as the work. The shares survive that better than the seconds do, with one bias. A pass bears one boundary per encoder, so the deposit's one encoder a step carries less of the overhead than the filter's four or the solve's four, and the deposit's share is therefore a floor. On that reading the deposit is 7.7 percent of the six at 1024 and 8192 particles a slice and 26.8 percent at 131072, where the overhead is smallest and the figure is firmest. The transform, filter and solve together are two thirds of a step at production loads. That is the conclusion the load scan of [](#perf-device) reaches from the outside: the step is dominated by the grid and not by the particles until the load is very high.
 
-What the fixed-point deposit costs. The same three loads and the same deck as the two tables above, timing off on both sides so the instrument's own boundaries are out of it, best of five. The float deposit is the build before the accumulator changed.
+The fixed-point deposit's cost is measured on the same three loads and the same deck as the two tables above, timing off on both sides so the instrument's own boundaries are out of it, best of five. The float deposit is the build before the accumulator changed.
 
 | particles a slice | busy, float | busy, fixed point | busy | walk, float | walk, fixed point | walk |
 |---|---|---|---|---|---|---|
@@ -400,7 +400,7 @@ What the fixed-point deposit costs. The same three loads and the same deck as th
 
 The fixed point costs a quarter to a third more device time on those decks, and six to seven percent more wall clock. A single slice leaves the step dominated by the host's dispatch rather than by the device, so the backend is busy for only about a sixth of the walk there. That is the cheap end of the range and not a general figure, so the same comparison is made below on a window that keeps the device busy.
 
-Where the device time goes after the change, on the deck and conditions of the per-pass table above, so that the passes can be compared rather than inferred.
+This table says where the device time goes after the change, on the deck and conditions of the per-pass table above, so that the passes can be compared rather than inferred.
 
 | particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -410,7 +410,7 @@ Where the device time goes after the change, on the deck and conditions of the p
 
 The two tables were taken at different times, so the passes the change does not touch say whether they can be compared at all. At 8192 and 131072 the transverse, push and solve lines sit at 0.94 to 0.97 of the earlier ones, close enough to read the rest. At 1024 they sit at 0.56 to 0.59 and its spread is 26 percent, so that row measures nothing. On the two rows that carry, the clear is 1.6x and the deposit 1.3x at 8192 and 1.6x at 131072. Every other pass is unmoved. The deposit does two atomic adds a component where it did one, the clear writes twice the words, and the pass that converts reads four integers where it read two floats.
 
-What it costs where the device is the bottleneck. One Aramis segment, 96 slices at `ngrid` 256 with shot noise and `comb_ds_save = -1`, which leaves the backend busy for about 68 percent of the walk instead of a sixth. The two builds are the one before the accumulator changed and the one after, timing off on both, best of five after a discarded warm-up.
+What it costs where the device is the bottleneck is measured on one Aramis segment, 96 slices at `ngrid` 256 with shot noise and `comb_ds_save = -1`. That window leaves the backend busy for about 68 percent of the walk instead of a sixth. The two builds are the one before the accumulator changed and the one after, timing off on both, best of five after a discarded warm-up.
 
 | slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
@@ -419,7 +419,7 @@ What it costs where the device is the bottleneck. One Aramis segment, 96 slices 
 
 That table has the clear as it first stood, one word a thread. On this window the clear was the largest single pass at 0.0863 s of 0.328 s busy, a quarter of all device time, since it writes 96 slices of 256 by 256 accumulators every step. It is a memory fill, so what it costs is the width of a store. Four words a thread halves it, to 0.0427 s. The same widening on the float deposit is worth nothing, 0.99x and 1.01x on the walk, because that clear writes half the words and was never the bottleneck. The saving belongs to the fixed point's own bytes and is credited there.
 
-With the clear widened on both sides and the deposit's gamma guard in the kernel, six pairs alternating between the two builds so that drift falls on both:
+With the clear widened on both sides and the deposit's gamma guard in the kernel, six pairs are run alternating between the two builds so that drift falls on both:
 
 | slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
@@ -435,7 +435,7 @@ What the price buys is in [](validation.md#val-device): two runs of one deck ide
 
 A second polarization plane costs one more plane: every field plane transforms, and the kick gathers and deposits into one more. On the one-segment unaveraged deck at 89 record steps, forcing the second plane raises the device's busy time from 0.250 s to 0.295 s and the walk from 0.325 s to 0.372 s. That is 18% of the device and 14% of the walk. The kernels are the same kernels with a branch, so a one-plane run pays none of it.
 
-The mode's parallelism on the CPU is over slices and nothing else, so what the device is worth depends on how many slices a deck has. Both regimes are measured, since they are different questions, and only the single-slice one shows the parallelism the CPU leaves unused. One 4 m Aramis segment in the unaveraged mode, 89 record steps of 60 substeps, `ngrid` 128, `comb_ds_save` at its default, production builds, M3 Max. Best of five after a discarded warm-up, the spread over the five beside each.
+The mode's parallelism on the CPU is over slices and nothing else, so what the device is worth depends on how many slices a deck has. Both regimes are measured, since they are different questions, and only the single-slice one shows the parallelism the CPU leaves unused. The deck is one 4 m Aramis segment in the unaveraged mode, 89 record steps of 60 substeps, `ngrid` 128, `comb_ds_save` at its default, production builds, on the M3 Max. Each entry is the best of five after a discarded warm-up, with the spread over the five beside it.
 
 | slices x particles | CPU | device | ratio | device busy | busy share of the walk |
 |---|---|---|---|---|---|
@@ -446,7 +446,7 @@ The mode's parallelism on the CPU is over slices and nothing else, so what the d
 
 The single-slice rows are against a CPU using one core of twelve, which is what that deck gets on the CPU. The last row is where the difference is largest: the device carries sixteen times the particles for 25% more time while the CPU pays the full factor. The many-slice rows are against twelve CPU threads and land near ten. The backend is busy for three quarters to nine tenths of the walk in every row. This mode is therefore device-bound rather than dispatch-bound, which the averaged path's single-slice decks are not.
 
-Where a step's device seconds go, per pass, with `global%device_timing = T`. The 32-slice deck above, the same conditions, one complete run. The half push runs twice a substep and the solve is four dispatches, so those lines carry more encoders than the others, and the record step's energy baseline adds one dispatch to the quiver line.
+This table says where a step's device seconds go, per pass, with `global%device_timing = T`. The deck is the 32-slice one above, under the same conditions, in one complete run. The half push runs twice a substep and the solve is four dispatches, so those lines carry more encoders than the others, and the record step's energy baseline adds one dispatch to the quiver line.
 
 | particles a slice | busy | solve | zero | quiver | kick | spont | the five |
 |---|---|---|---|---|---|---|---|
@@ -457,7 +457,7 @@ The kernels this mode adds are the quiver, kick and spont lines: 34% of the five
 
 The instrument's own price applies here as it does above: encoder boundaries the production path does not pay. This mode encodes eight dispatches a substep, so a segment runs past 42,000 of them and the sample buffer is committed early many times over. The seconds in that table are the instrument's. The shares are what carries.
 
-What the fixed-point deposit costs, re-measured here. This mode deposits twenty times an undulator period where the averaged path deposits once a record step, so the question is whether the higher rate changes the answer. The comparison is the accumulator narrowed to one 32-bit atomic a component and a two-word clear, the float accumulator's own traffic, against the fixed point as it ships. Same decks, timing off on both, best of five.
+What the fixed-point deposit costs is re-measured here. This mode deposits twenty times an undulator period where the averaged path deposits once a record step, so the question is whether the higher rate changes the answer. The comparison is the accumulator narrowed to one 32-bit atomic a component and a two-word clear, the float accumulator's own traffic, against the fixed point as it ships. The decks are the same, timing off on both, best of five.
 
 | slices x particles | walk, narrow | walk, fixed point | walk | busy, narrow | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
@@ -465,9 +465,9 @@ What the fixed-point deposit costs, re-measured here. This mode deposits twenty 
 | 32 x 4096 | 1.421 s | 1.598 s | 1.12x | 1.140 s | 1.327 s | 1.16x |
 | 1 x 16384 | 0.427 s | 0.488 s | 1.14x | 0.300 s | 0.353 s | 1.18x |
 
-Zero to fourteen percent on the walk and six to eighteen on device time, the range the averaged path measured for the same change. The load per deposit sets the price rather than the rate. A deck with few particles a slice pays almost nothing, because it is paying for the clear rather than the atomics. What the price buys is in [](validation.md#val-device-unaveraged): two device runs of one unaveraged deck agree on their diag and ledger files bit for bit, at 4 threads against 8.
+The price is zero to fourteen percent on the walk and six to eighteen on device time, the range the averaged path measured for the same change. The load per deposit sets the price rather than the rate. A deck with few particles a slice pays almost nothing, because it is paying for the clear rather than the atomics. What the price buys is in [](validation.md#val-device-unaveraged): two device runs of one unaveraged deck agree on their diag and ledger files bit for bit, at 4 threads against 8.
 
-The field set, measured on the planar segment of the harmonics check (3.96 m, 88 steps), since a helical segment couples only the fundamental and the set has nothing to carry there. The window is the same 96 x 8192 at `ngrid` 256 and `comb_ds_save = -1`:
+The field set is measured on the planar segment of the harmonics check (3.96 m, 88 steps), since a helical segment couples only the fundamental and the set has nothing to carry there. The window is the same 96 x 8192 at `ngrid` 256 and `comb_ds_save = -1`:
 
 | case | CPU, 12 threads | device wall | device busy | ratio |
 |---|---|---|---|---|
@@ -475,9 +475,9 @@ The field set, measured on the planar segment of the harmonics check (3.96 m, 88
 | harmonics 1, 3 | 5.249 s | 0.503 s | 0.365 s | 10.4x |
 | two polarizations (tilt 0.3) | 4.502 s | 0.418 s | 0.296 s | 10.8x |
 
-A second member costs the device 87% more wall clock and the CPU 57% more. A second plane costs the device 55% more and the CPU 35% more. The device pays the extra planes' transforms in full and the gather and deposit loops over members per particle. The CPU's field solve is already the smaller share, so the ratio narrows by a fifth and no more. Production build, min of two runs, walk time.
+A second member costs the device 87% more wall clock and the CPU 57% more. A second plane costs the device 55% more and the CPU 35% more. The device pays the extra planes' transforms in full and the gather and deposit loops over members per particle. The CPU's field solve is already the smaller share, so the ratio narrows by a fifth and no more. The rows are walk time in a production build, min of two runs.
 
-The readback schedule is the other setting. The rows above read back at the element end only. `comb_ds_save = 0` (a stats row every step) pays a beam-and-field readback per step, the same trade the reference manual describes for `output_step`. Measured at that finest comb on the 96 x 8192 case, with the readback's conversion loops first serial and then parallel over slices:
+The readback schedule is the other setting. The rows above read back at the element end only. `comb_ds_save = 0` (a stats row every step) pays a beam-and-field readback per step, the same trade the reference manual describes for `output_step`. The 96 x 8192 case is measured at that finest comb, with the readback's conversion loops first serial and then parallel over slices:
 
 | comb = 0, walk | host stats | readback | per stats row |
 |---|---|---|---|
