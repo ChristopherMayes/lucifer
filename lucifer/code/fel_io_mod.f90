@@ -5,10 +5,10 @@
 ! formats), the openPMD field imports, the escaped-slice bank and its drain, the
 ! full-pulse reconstruction, the stats-file finalize, and the wake-eloss block writer.
 !
-! Every procedure takes the run state (fel_run_struct) explicitly, and nothing here
-! stops: errors return through err_flag and the caller decides -- the library contract
-! (doc/user-guide.md). All terminal output goes through out_io. The file-name echo
-! lines are s_blank$ so scripts see bare names.
+! Every routine takes the run state (fel_run_struct) explicitly. Nothing here stops.
+! Errors return through err_flag and the caller decides (doc/user-guide.md). All
+! terminal output goes through out_io. The file-name echo lines are s_blank$, so
+! scripts see bare names.
 !-
 
 module fel_io_mod
@@ -19,11 +19,11 @@ use fel_timer_mod
 use fel_cost_mod
 use wavefront_openpmd_mod
 use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
-! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read in
-! fel_write_meta, which is the only place this module reaches into the parser.
+! For bp_com%num_lat_files, the parser's tally of how many files it opened. Read only in
+! fel_write_meta.
 use bmad_parser_struct, only: bp_com
-! For bmad_version_date, the distribution's own version. Tao reports the same string,
-! and Lucifer ships inside the same distribution, so there is no second version to keep.
+! For bmad_version_date, the distribution's own version. Tao reports the same string.
+! Lucifer builds against the same distribution, so there is no second version to keep.
 use bmad_version_mod, only: bmad_version_date
 !$ use omp_lib
 
@@ -35,10 +35,10 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_dump_beam (run, ele, prefix, err_flag)
+! Subroutine fel_dump_beam (run, ele, prefix, err_flag, s_pos)
 !
-! Routine to write the beam at the given filename prefix as openPMD (.beam.h5), the
-! only particle format this tracker writes. Genesis .par.h5 conversion lives in
+! Routine to write the beam at the given filename prefix as openPMD (.beam.h5). This is
+! the only particle format this tracker writes. Genesis .par.h5 conversion lives in
 ! lucifer/tests/scripts/convert_genesis.py, outside the physics.
 !
 ! Input:
@@ -46,9 +46,9 @@ contains
 !   ele       -- ele_struct: Element the beam sits at.
 !   prefix    -- character(*): Filename prefix. Format suffixes are appended.
 !   s_pos     -- real(rp), optional: Where along ele the beam sits. A dump at an element's
-!                  end passes ele%s, so the particle records carry the downstream face and
-!                  ele is the element completed. Omitted, the beam sits at the upstream
-!                  face, which is the initial dump, and the element completed is the one
+!                  end passes ele%s. The particle records then carry the downstream face,
+!                  and ele is the element completed. If not present, the beam sits at the
+!                  upstream face (the initial dump), and the element completed is the one
 !                  before ele.
 !
 ! Output:
@@ -94,17 +94,18 @@ end subroutine fel_dump_beam
 ! Function fel_checkpoint_eligible (run, ix_done) result (ok)
 !
 ! Routine to say whether the boundary at the end of element ix_done is one a continuation
-! may start from, so that the frames written there carry the checkpoint group
+! may start from. Frames written there then carry the checkpoint group
 ! (fel_write_checkpoint_group). The boundary is eligible outside every undulator and at
-! the physical end of one, with the beam in the averaged chart. A sliced endpoint inside
-! an undulator, where a superimposed element has cut one physical device into
-! super_slaves, is not a completed handoff: the averaged tracker's px there is the slow
-! momentum inside a field that has not ended, and the unaveraged tracker's ramp has
-! closed on a plane the device does not end at. The frame is written whatever the answer.
-! Only the group is withheld, and a continuation from that frame is refused.
+! the physical end of one, with the beam in the averaged chart.
 !
-! Note: A lattice with a cut undulator is refused at setup today, its slaves referring to
-! their lord for the field model (fel_assert_wiggler_sane), so the slave branch below
+! A sliced endpoint inside an undulator is not a completed handoff. There a superimposed
+! element has cut one physical device into super_slaves. The averaged tracker's px is
+! the slow momentum inside a field that has not ended. The unaveraged tracker's ramp has
+! closed on a plane the device does not end at. The frame is written whatever the
+! answer. Only the group is withheld, and a continuation from that frame is refused.
+!
+! Note: A lattice with a cut undulator is refused at setup, since its slaves refer to
+! their lord for the field model (fel_assert_wiggler_sane). So the slave branch below
 ! guards a boundary no run reaches yet.
 !
 ! Input:
@@ -132,9 +133,9 @@ branch => run%lat%branch(0)
 if (ix_done < 0 .or. ix_done > branch%n_ele_track) return
 s_b = branch%ele(ix_done)%s
 
-! A boundary strictly inside an undulator's physical extent. The extent of a slave is
-! its lord's, since the lord is the device and the slaves are how a superposition cut
-! it. The tolerance is a length no lattice resolves.
+! Refuse a boundary strictly inside an undulator's physical extent. The extent of a
+! slave is its lord's, since the lord is the device. The tolerance (1 nm) is a length
+! no lattice resolves.
 
 tol = 1.0e-9_rp
 do je = 1, branch%n_ele_track
@@ -167,14 +168,14 @@ end function fel_checkpoint_eligible
 ! Routine to stamp a dump with where it was taken.
 !
 ! A frame is read on its own, so it has to say where along the line it is and what the
-! beam was moving through. The particle records are the coordinates the selected tracking
-! method produced there, the period-averaged map's without the fast oscillation and the
-! unaveraged mode's with it resolved (doc/reading-output.md), so the method and the
-! device's numbers ride the file rather than being looked up in a lattice the reader may
-! not have. A frame taken in a break carries the element and no undulator numbers.
+! beam was moving through. The particle records are the coordinates the selected
+! tracking method produced there (doc/reading-output.md). The period-averaged map has
+! no fast oscillation, and the unaveraged mode has it resolved. So the method and the
+! device's numbers go in the file, and the reader needs no lattice. A frame taken in a
+! break carries the element and no undulator numbers.
 !
 ! The attributes go under lucifer/frame (fel_private_group) in a file the writers have
-! already closed, so no writer's layout changes, every kind of file is stamped the same
+! already closed. So no writer's layout changes, every kind of file is stamped the same
 ! way, and the root keeps the standard's declarations. The iteration's time is the
 ! standard's own and goes where the standard puts it.
 !
@@ -214,8 +215,8 @@ if (err) then
   return
 endif
 
-! 3.0: the attributes sit under lucifer/frame, and a .beam.h5 at this version holds the
-! coordinates the selected tracking method produced, wherever it was taken.
+! Frame format 3.0: the attributes sit under lucifer/frame. A .beam.h5 at this version
+! holds the coordinates the selected tracking method produced, wherever it was taken.
 call hdf5_write_attribute_string (g_id, 'frameFormat', fel_frame_format$, err)
 call hdf5_write_attribute_real (g_id, 'sPosition', run%z_now, err)
 call hdf5_write_attribute_string (g_id, 'elementName', trim(branch%ele(ie)%name), err)
@@ -225,10 +226,10 @@ call hdf5_write_attribute_int (g_id, 'sliceFirst', run%dump_is1, err)
 call hdf5_write_attribute_int (g_id, 'sliceLast', run%dump_is2, err)
 
 ! Where the frame sits in the lab. s is a curvilinear coordinate, so a scene holding a
-! line with a bend needs the floor to place the frame and the grid transverse to it. The
-! floor is taken at the frame's own s rather than the element's, since a frame lands
-! mid-element and ele%floor is the downstream face. coords_curvilinear_to_floor walks the
-! geometry, so a bend is right and not straightened.
+! line with a bend needs the floor to place the frame and the grid transverse to it.
+! The floor is taken at the frame's own s and not the element's, since a frame lands
+! mid-element and ele%floor is the downstream face. coords_curvilinear_to_floor walks
+! the geometry, so a bend is not straightened.
 
 fl = coords_curvilinear_to_floor ([0.0_rp, 0.0_rp, run%z_now], branch, err)
 if (.not. err) then
@@ -236,11 +237,11 @@ if (.not. err) then
   call hdf5_write_attribute_real (g_id, 'floorAngles', [fl%theta, fl%phi, fl%psi], err)
 endif
 
-! openPMD orders a series by the iteration's time and has no notion of s, so the frame
-! carries Bmad's own reference time rather than a number defined as s over c. The
-! reference momentum is constant through an undulator, so the time at a position inside
-! an element is linear between the element's two faces. The writers leave the attribute
-! at zero, which would stack a whole series at one instant.
+! openPMD orders a series by the iteration's time and has no notion of s. So the frame
+! carries Bmad's reference time rather than s/c. The reference momentum is constant
+! through an undulator, so the time inside an element is linear between the element's
+! two faces. The writers leave the attribute at zero, which would stack a whole series
+! at one instant.
 
 t_ref = branch%ele(ie)%ref_time
 if (ie >= 1) then
@@ -250,7 +251,7 @@ if (ie >= 1) then
 endif
 
 ! The iteration group's name differs between the two writers, so it is found rather than
-! spelled: each file holds exactly one.
+! spelled. Each file holds exactly one.
 
 d_id = -1
 if (hdf5_exists(f_id, 'data', err, .false.)) d_id = hdf5_open_group (f_id, 'data', err, .true.)
@@ -269,9 +270,9 @@ if (d_id >= 0 .and. .not. err) then
   call H5Gclose_f (d_id, h5_err)
 endif
 
-! The lattice's elements run from 0, which is the entry face, and the run's per-element
-! arrays run from 1. The frame taken before the walk enters its first element therefore
-! has a name and a position and no method and no undulator, which is what it is.
+! The lattice's elements run from 0, the entry face, and the run's per-element arrays
+! run from 1. So the frame taken before the walk enters its first element has a name and
+! a position, and no method and no undulator.
 
 if (ie >= 1) then
   call hdf5_write_attribute_string (g_id, 'felMethod', &
@@ -287,8 +288,8 @@ if (ie >= 1) then
     call hdf5_write_attribute_int (g_id, 'helical', merge(1, 0, und%helical), err)
 
     ! The rest of what rebuilding the orbit takes: where the frame sits in the device, and
-    ! how long the device and its ramped ends are. A reader that walks a frame series has
-    ! the lattice's geometry from the frames alone (doc/reading-output.md).
+    ! how long the device and its ramped ends are. A reader that walks a frame series
+    ! gets the lattice's geometry from the frames alone (doc/reading-output.md).
 
     call hdf5_write_attribute_real (g_id, 'sElement', run%z_now - branch%ele(ie)%s_start, err)
     call hdf5_write_attribute_real (g_id, 'elementLength', branch%ele(ie)%value(l$), err)
@@ -309,14 +310,15 @@ end subroutine fel_frame_attributes
 ! Subroutine fel_write_slippage_residual (file_name, accuslip, err_flag)
 !
 ! Routine to stamp a field file with the slippage the record has accumulated and not yet
-! rotated, fel_slip_struct%accuslip, as the attribute slippageResidual of the group
-! lucifer/field (fel_private_group), in fundamental wavelengths, signed. It is the one piece of the field's state that the
-! record itself does not hold: the rotation index is folded into the time order the file
-! is written in, and this remainder decides when the next rotation falls. A restart that
-! starts it at zero rotates on a different schedule from the run it continues. The
-! value is written as it stands and is never reduced into
-! [0, n_wavelength), since the threshold is 0.8 n_wavelength and a residual after a
-! rotation is negative as often as not.
+! rotated (fel_slip_struct%accuslip). It is written as the attribute slippageResidual of
+! the group lucifer/field (fel_private_group), in fundamental wavelengths, signed.
+!
+! This is the one piece of the field's state the record itself does not hold. The
+! rotation index is folded into the time order the file is written in. This remainder
+! decides when the next rotation falls. A restart that starts it at zero rotates on a
+! different schedule from the run it continues. The value is written as it stands and
+! is never reduced into [0, n_wavelength). The threshold is 0.8 n_wavelength, and a
+! residual after a rotation is negative as often as not.
 !
 ! Input:
 !   file_name -- character(*): The field file, already written.
@@ -357,24 +359,24 @@ end subroutine fel_write_slippage_residual
 ! Subroutine fel_dump_frame (run, ie, at_end, err_flag)
 !
 ! Routine to write one frame of the series global%dump_at_comb asks for: the beam and
-! the field set at this comb position, through the same writers the element-end dumps
-! use, named <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5 with the record
-! the stats row this frame sits on. A frame and its row therefore share one index. The
-! beam frame holds the coordinates the selected tracking method produced there, inside an
-! averaged undulator as anywhere else, with nothing reconstructed.
+! the field set at this comb position. It uses the same writers as the element-end
+! dumps. The files are <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5, where
+! record is the stats row this frame sits on. So a frame and its row share one index.
+! The beam frame holds the coordinates the selected tracking method produced there,
+! inside an averaged undulator as anywhere else, with nothing reconstructed.
 !
 ! The field's records are rotated to time order to be written and rotated back, so the
-! run continues from the state it had. fel_dump_field_set leaves them unrotated, which
-! is right at the end of a run and wrong in the middle of one: a diagnostic that changes
+! run continues from the state it had. fel_dump_field_set leaves them unrotated. That is
+! right at the end of a run and wrong in the middle of one. A diagnostic that changes
 ! the state it observes is the failure the FP32 twin's read-only proof exists to catch.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state.
 !   ie        -- integer: Index of the element the frame is taken in.
 !   at_end    -- logical: The frame is at the element's end. The walk's z_now reaches an
-!                  end by accumulation and can miss ele%s in its last bit, so the beam is
-!                  placed at the downstream face by this flag rather than by comparing the
-!                  two, and a frame at an element end is the element's own dump exactly.
+!                  end by accumulation and can miss ele%s in its last bit. So this flag,
+!                  and not a comparison of the two, places the beam at the downstream
+!                  face. A frame at an element end is then exactly the element's own dump.
 !
 ! Output:
 !   err_flag  -- logical: Set True if a file could not be written. False otherwise.
@@ -400,13 +402,13 @@ ffield => run%ffield
 
 write (prefix, '(2a, i6.6)') trim(run%global%out_root), '-', run%stats%irec
 
-! A frame is written wherever the comb falls, as the beam stands there: inside an
-! unaveraged segment px is the resolved kinetic momentum and inside an averaged one the
-! map's period-averaged momentum, and the frame carries whichever the selected method
+! A frame is written wherever the comb falls, as the beam stands there. Inside an
+! unaveraged segment px is the resolved kinetic momentum. Inside an averaged one it is
+! the map's period-averaged momentum. The frame carries whichever the selected method
 ! produced, with nothing reconstructed. fel_dump_beam, whose dumps land on element
-! boundaries, keeps the chart assertion. A frame at an element end that carries the whole
-! window is a checkpoint where the boundary is eligible (fel_checkpoint_eligible), and
-! gets the group on both of its files. Every other frame is written without it and a
+! boundaries, keeps the chart check. A frame at an element end that carries the whole
+! window is a checkpoint where the boundary is eligible (fel_checkpoint_eligible). It
+! gets the group on both of its files. Every other frame is written without it, and a
 ! continuation from it is refused.
 
 s_frame = run%z_now
@@ -415,8 +417,8 @@ whole = (run%dump_is1 == 1 .and. run%dump_is2 == run%nslice)
 ckpt = at_end .and. whole
 if (ckpt) ckpt = fel_checkpoint_eligible(run, ie)
 
-! The walk's own beam is written as it stands and never touched: a diagnostic that moved
-! the state it observes would steer the run, so a run with frames on is the run with them
+! The walk's own beam is written as it stands and never touched. A diagnostic that moved
+! the state it observes would steer the run. A run with frames on is the run with them
 ! off, to the bit.
 
 fbeam => run%fbeam
@@ -440,14 +442,14 @@ do ihh = 1, run%n_harm
   if (run%ustate%active .or. .not. whole) then
 
     ! A scratch copy. Inside an unaveraged segment the record is the substep's midpoint
-    ! field, half a substep past the plane this frame is named for (fel_unaveraged_mod),
-    ! and the frame carries the plane's own field: the copy is carried back and written,
-    ! and the live record is not touched, so a run with frames on and one with them off
+    ! field, half a substep past the plane this frame is named for (fel_unaveraged_mod).
+    ! The frame carries the plane's own field. So the copy is carried back and written,
+    ! and the live record is not touched. A run with frames on and one with them off then
     ! hold the same field to the bit. Carrying the live record back and forward again
     ! would leave two transform pairs of rounding in it, 5e-15 of the field on the mixed
-    ! line, which is a diagnostic steering the run it observes by a little rather than by
-    ! nothing. A slice range takes its slab from the same copy. The copy is in time order
-    ! for the write, as the whole-window path below rotates the live record to be.
+    ! line (doc/validation.md). A slice range takes its slab from the same copy. The copy
+    ! is in time order for the write, as the whole-window path below rotates the live
+    ! record to be.
 
     wf_sub = ffield(ihh)%wf
     if (run%ustate%active) then
@@ -462,9 +464,9 @@ do ihh = 1, run%n_harm
     endif
     if (.not. whole) then
 
-      ! The slab keeps its place: the mesh's z origin is the first slice's, so a reader
+      ! The slab keeps its place. The mesh's z origin is the first slice's. So a reader
       ! that walks the standard attributes puts the cut field where the whole window's
-      ! would sit, beside the cut beam whose timeOffset carries each slice's own placement.
+      ! would sit. It sits beside the cut beam, whose timeOffset places each slice.
 
       eslab = wf_sub%Ex(:, :, run%dump_is1:run%dump_is2)
       call move_alloc (eslab, wf_sub%Ex)
@@ -479,7 +481,7 @@ do ihh = 1, run%n_harm
   else
 
     ! The whole window on the averaged path is written in place: rotated to time order,
-    ! written, rotated back, which is a permutation and exact. The field frame of a
+    ! written, rotated back. A rotation is a permutation and exact. The field frame of a
     ! saturated run is the largest thing this program writes, and this path copies none
     ! of it.
 
@@ -515,21 +517,21 @@ end subroutine fel_dump_frame
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_dump_field_set (run, prefix, err_flag)
+! Subroutine fel_dump_field_set (run, prefix, err_flag, ix_done)
 !
 ! Routine to write the whole field set at the given filename prefix as openPMD
 ! EXT_Wavefront (.wf.h5), both polarizations as components of one mesh record. Genesis
 ! .fld.h5 conversion lives in lucifer/tests/scripts/convert_genesis.py.
 ! The fundamental keeps the pre-harmonic names. A harmonic's files carry -h<h>.
-! Every record is unrotated to time order first: each field owns its rotation state.
-! The fields move in lockstep, but the cshift must run per record.
+! Every record is unrotated to time order first, since each field owns its rotation
+! state. The fields move in lockstep, but the cshift must run per record.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state with the field set to dump.
 !   prefix    -- character(*): Filename prefix. Format-specific suffixes are appended.
-!   ix_done   -- integer, optional: Index of the element the dump completes, so the files
+!   ix_done   -- integer, optional: Index of the element the dump completes. The files
 !                  carry the checkpoint group where that boundary is eligible
-!                  (fel_checkpoint_eligible). Omitted, no group is written.
+!                  (fel_checkpoint_eligible). If not present, no group is written.
 !
 ! Output:
 !   run       -- fel_run_struct: Field records unrotated to time order (slip%first = 0).
@@ -594,8 +596,8 @@ end subroutine fel_dump_field_set
 !
 ! Routine to print the run's configuration as one framed block for a human to read:
 ! what lattice, what beam, what radiation, what is switched on, where the output goes.
-! This replaces a scatter of loose informational messages. Display only -- the same
-! values, resolved, are echoed machine-readably into the stats file's Meta group.
+! Display only. The same values, resolved, are echoed machine-readably into the stats
+! file's meta/ group.
 !
 ! Input:
 !   run -- fel_run_struct: The fully set-up run state.
@@ -642,8 +644,8 @@ else
 endif
 call out_io (s_blank$, r_name, trim(line))
 
-! The grid is the built wavefront's, not the input's, since a field read from a file
-! carries its own and the deck then states none.
+! The grid is the built wavefront's and not the input's. A field read from a file
+! carries its own grid, and the deck then states none.
 
 block
   integer n_grid(3)
@@ -656,9 +658,9 @@ block
 end block
 call out_io (s_blank$, r_name, trim(line))
 
-! What the run will do and what that costs. The count is exact and the estimate is one
-! machine's, which the line says (fel_cost_mod). load_only stops after this block, so a
-! deck can be priced without tracking it (doc/user-guide.md).
+! What the run will do and how long it will take. The count is exact. The estimate is
+! one machine's, which the line says (fel_cost_mod). load_only stops after this block,
+! so a deck's cost can be seen without tracking it (doc/user-guide.md).
 
 block
   real(rp) n_pstep, n_gpt, secs
@@ -671,11 +673,11 @@ block
         n_gpt, ' grid points per step'
   call out_io (s_blank$, r_name, trim(line))
 
-  ! The device's transform pair is single precision and loses a fixed fraction of the
-  ! field's energy every time it runs, in one direction, so what a deck loses is set by
-  ! how often the pair runs: once a record step in an averaged element and nsub times in
-  ! an unaveraged one, where nstep already counts the substeps. Nothing else in the output
-  ! says which regime a deck is in (validation.md, val-device-unaveraged).
+  ! The device's transform pair is single precision. It loses a fixed fraction of the
+  ! field's energy every time it runs, always in one direction. So what a deck loses is
+  ! set by how often the pair runs: once a record step in an averaged element, and nsub
+  ! times in an unaveraged one (nstep already counts the substeps). Nothing else in the
+  ! output says which regime a deck is in (validation.md, val-device-unaveraged).
 
   if (run%dev%on) then
     write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Device      FP32 transform pair ', nstep, &
@@ -684,8 +686,8 @@ block
     call out_io (s_blank$, r_name, trim(line))
   endif
 
-  ! The interlude's pieces, when the knob cuts them. Only then: a run that tracks an
-  ! interlude whole says nothing, which is every run that does not ask for this.
+  ! The interlude's pieces, only when global%interlude_ds_step cuts them. A run that
+  ! tracks an interlude whole prints nothing here.
 
   if (run%n_int_ele > 0) then
     write (line, '(3a, i0, a, i0, a)') ' Interlude   steps of ', &
@@ -699,15 +701,13 @@ block
         trim(backend) // ' path, for ', fel_cost_machine$, '.'
   call out_io (s_blank$, r_name, trim(line))
 
-  ! The frame series, when it is on. A comb of zero on a long line is a frame per step,
-  ! so the bytes are stated before the run rather than discovered on a full disk. The
-  ! per-frame size is the beam's coordinates and the field set's grid, which are the two
-  ! counts above.
-
-  ! What the series will write. The beam and the field carry the slice range and nothing
-  ! else does, so the range is what they are priced over. The reductions are per record
-  ! whether or not frames are on, and the transverse projection is the grid's own size,
-  ! so they are priced separately and stated even without a series.
+  ! The frame series, when it is on. A comb of zero on a long line is a frame per step.
+  ! So the bytes are stated before the run rather than discovered on a full disk. The
+  ! per-frame size is the beam's coordinates and the field set's grid, the two counts
+  ! above. Only the beam and the field carry the slice range, so their sizes scale with
+  ! it. The reductions are per record whether or not frames are on, and the transverse
+  ! projection is the grid's own size. So they are sized separately, and stated even
+  ! without a series.
 
   block
     real(rp) n_rng, b_frame, f_frame, red_bytes
@@ -715,8 +715,8 @@ block
     character(12) lab
     nrng = run%dump_is2 - run%dump_is1 + 1
     n_rng = real(nrng, rp) / max(1, run%nslice)
-    ! 68 bytes a macroparticle, measured on a real frame: six coordinates, the time the
-    ! phase folds into, the offset that places the slice, the reference momentum and the
+    ! 68 bytes a macroparticle (doc/performance.md): six coordinates, the time the phase
+    ! folds into, the offset that places the slice, the reference momentum and the
     ! label. The writer stores a uniform weight and the zero z as constant records, which
     ! cost nothing per particle.
     b_frame = 68.0_rp * n_particle * n_rng
@@ -741,9 +741,9 @@ block
     endif
   end block
 
-  ! The load against the floor the filter's convergence was measured at: 1024
-  ! macroparticles per slice in 128 beamlets, below which the mode power in the
-  ! exponential regime rises on its own (doc/fel-physics.md sec-convergence).
+  ! The load against the floor of the filter's convergence: 1024 macroparticles per
+  ! slice in 128 beamlets. Below it, the mode power in the exponential regime rises on
+  ! its own (doc/fel-physics.md sec-convergence).
 
   nbeamlet = minval(run%fbeam%slice%n) / max(1, run%bparam%beamlet_size)
   write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', minval(run%fbeam%slice%n), &
@@ -768,9 +768,9 @@ block
     call out_io (s_blank$, r_name, '             measured to remove it (fel-physics.md).')
   endif
 
-  ! The beamlet size stated by what it does. The quiet start leaves no bunching below
-  ! harmonic beamlet_size, and fel_fawley_noise then imposes the physical level on
-  ! harmonics 1 through (beamlet_size - 1)/2.
+  ! The beamlet size, stated by what it does. The quiet start leaves no bunching below
+  ! harmonic beamlet_size. fel_fawley_noise then imposes the physical level on harmonics
+  ! 1 through (beamlet_size - 1)/2.
 
   nharm_noise = (run%bparam%beamlet_size - 1) / 2
   if (run%bparam%shot_noise) then
@@ -800,9 +800,8 @@ end subroutine fel_write_header
 ! Subroutine fel_write_footer (run)
 !
 ! Routine to close a run for a human: how far it went and how long it took, what the
-! light ended up as, and which files were written. The file names were formerly printed
-! as the writers went. Collecting them here means the last thing on screen is the list
-! of what to open.
+! light ended up as, and which files were written. The file list comes last, so the last
+! thing on screen is the list of what to open.
 !
 ! Input:
 !   run -- fel_run_struct: The finished run state.
@@ -838,9 +837,9 @@ write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, '
 call out_io (s_blank$, r_name, trim(line))
 
 ! The mode against the wide-angle emission of the point beamlets, from the records the
-! run already took (doc/startup-noise.md). The share is reported and not estimated: a
-! formula fitted on one machine was 40 times low on another, while the
-! split itself held on all three.
+! run already took (doc/startup-noise.md). The share is reported and not estimated. A
+! formula fitted on one machine is 40 times low on another (doc/fel-physics.md), while
+! the split itself holds on all three.
 
 call fel_stats_convergence (stats, cvg)
 if (cvg%ok) then
@@ -858,7 +857,7 @@ if (cvg%ok) then
   enddo
 
   ! The verdict reads the worse of the two records. The criterion is stated at the mode's
-  ! saturation, and a run that passes there can still exit with most of its power outside
+  ! saturation. A run that passes there can still exit with most of its power outside
   ! the mode, since the artifact keeps growing after the mode turns over.
 
   worst = maxval(cvg%ratio)
@@ -882,16 +881,16 @@ if (cvg%ok) then
   endif
 
   ! The thin slices, named rather than averaged away. A window ratio is a mean over the
-  ! window, so a tail whose beamlets are under the measured floor or whose light is
-  ! mostly wide angle disappears into it. An imported beam with irregular counts per
-  ! slice is the case this is for, and load_mode = "sample" is what levels it.
+  ! window. A tail under the floor of 128 beamlets, or whose light is mostly wide angle,
+  ! disappears into it. This is for an imported beam with irregular counts per slice.
+  ! load_mode = "sample" levels it.
 
   n_thin = 0;  n_shown = 0
   do is = 1, min(stats%nslice, size(run%fbeam%slice))
 
     ! A slice the bunch never reached is outside the beam and not a thin load. A window
     ! that holds the slippage has a quarter of its slices empty by construction
-    ! (doc/fel-physics.md sec-window), and listing those would bury the ones that matter.
+    ! (doc/fel-physics.md sec-window). Listing those would bury the ones that matter.
 
     if (stats%charge_live(is, cvg%ir(1)) <= 0) cycle
     nbl = run%fbeam%slice(is)%n / max(1, run%bparam%beamlet_size)
@@ -920,13 +919,13 @@ if (cvg%ok) then
 endif
 
 ! Where the time went, one row per phase the run entered. The phases partition the
-! walk, so the unaccounted row is the walk's own overhead and nothing is counted twice.
+! walk. So the unaccounted row is the walk's own overhead, and nothing is counted twice.
 ! doc/performance.md reads a table like this one.
 
 call fel_timer_write (r_name)
 
-! The estimate beside the clock, on every run. An estimate nobody reads against a
-! measurement drifts away from the machine it was fitted on (fel_cost_mod).
+! The estimate beside the clock, on every run, so the two can be compared on any
+! machine (fel_cost_mod).
 
 call fel_cost_estimate (run, secs, backend)
 write (line, '(7a)') ' Cost        walk ', &
@@ -945,15 +944,15 @@ if (run%fp32%on) then
   call out_io (s_blank$, r_name, trim(line))
 endif
 
-! What slippage transmitted out of the window, per member of the field set. The energy
-! the record lost this way is the other half of a conservation statement the window's
-! own power cannot make, and the unaveraged ledger is otherwise its only reader.
+! What slippage carried out of the window, per member of the field set. The energy the
+! record lost this way is the other half of a conservation statement the window's own
+! power cannot make. Otherwise the unaveraged ledger is its only reader.
 
 if (run%ffield(1)%slip%timerun) then
   line = ' Escaped    '
   do ih = 1, run%n_harm
     ! Full precision, since a restart comparison differences this against the same total
-    ! at a checkpoint (doc/validation.md), and six digits cannot reach its floor.
+    ! at a checkpoint (doc/validation.md). Six digits cannot reach its floor.
     write (line, '(2a, i0, a, es24.16, a)') trim(line), ' h', run%ffield(ih)%harm, ' ', &
           run%ffield(ih)%slip%u_escaped, ' J'
     if (ih < run%n_harm) line = trim(line) // ','
@@ -961,9 +960,9 @@ if (run%ffield(1)%slip%timerun) then
   call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
 endif
 
-! The file list is by existence, not by replaying which switches were on: a candidate
-! name that is there gets listed with its size, and the naming rules stay in the one
-! place that owns them (the writers).
+! The file list is by existence, and not by replaying which switches were on. A
+! candidate name that is there is listed with its size. The naming rules stay in the
+! writers, which own them.
 
 n_listed = 0
 call note_file (trim(run%global%out_root) // '-final.beam.h5')
@@ -1024,7 +1023,7 @@ end subroutine fel_write_footer
 ! Subroutine fel_read_openpmd_into_field (run, fname, ihh, err_flag)
 !
 ! Routine to read an openPMD wavefront into field-set entry ihh (the fundamental
-! import path). The photon energy must be the fundamental's: a file carrying a
+! import path). The photon energy must be the fundamental's. A file carrying a
 ! harmonic in field_file(1) is refused.
 !
 ! Input:
@@ -1067,18 +1066,19 @@ if (abs(ffield(ihh)%wf%wavelength - fbeam%wavelength) > 1e-6_rp * fbeam%waveleng
   err_flag = .true.;  return
 endif
 ffield(ihh)%wf%dz = fbeam%slice_spacing
-ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength authority (the 1e-12
-                                               ! beam/field consistency check's spirit).
+ffield(ihh)%wf%wavelength = fbeam%wavelength   ! One wavelength for beam and field, as the
+                                               !   1e-12 consistency check requires.
 
-! The slippage the record had accumulated and not yet rotated when it was written, which
-! the record itself does not hold (fel_write_slippage_residual), and the checkpoint group
-! saying where the frame was taken. A continuation requires both, and requires the
-! position and element to be the beam file's, since a beam and a field from two
-! boundaries are two states and not one. An initialization takes neither: the record
-! starts from a whole-slice boundary, and a file that carried a residual is told so, so a
-! stale residual never enters a fresh run by being present. A residual the tracker could
-! not have written is refused in either mode rather than read as absent: its magnitude
-! never reaches n_wavelength, since the threshold is 0.8 of it.
+! Read the slippage the record had accumulated and not yet rotated when it was written
+! (fel_write_slippage_residual). The record itself does not hold it. Also read the
+! checkpoint group saying where the frame was taken. A continuation requires both. It
+! also requires the position and element to match the beam file's, since a beam and a
+! field from two boundaries are two states and not one.
+!
+! An initialization takes neither. The record starts from a whole-slice boundary. A
+! file that carried a residual gets a message saying so, so a stale residual never
+! enters a fresh run. A residual the tracker could not have written is refused in either
+! mode. Its magnitude never reaches n_wavelength, since the threshold is 0.8 of it.
 
 call hdf5_open_file (fname, 'READ', f_id, rerr, .false.)
 if (rerr) return
@@ -1189,9 +1189,9 @@ end subroutine fel_read_openpmd_into_field
 !+
 ! Subroutine fel_import_harmonic_field (run, fname, err_flag)
 !
-! Routine to import a harmonic field: match the file's photon energy to the field-set
-! entry carrying that harmonic (no match is refused), require the fundamental's
-! grid and window, and keep the walk's wavelength convention (fundamental / h).
+! Routine to import a harmonic field. The file's photon energy is matched to the
+! field-set entry carrying that harmonic, and no match is refused. The grid and window
+! must be the fundamental's. The walk's wavelength convention (fundamental / h) is kept.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state with the fundamental already loaded.
@@ -1260,16 +1260,17 @@ end subroutine fel_import_harmonic_field
 !+
 ! Subroutine fel_drain_bank (run, ihh, err_flag)
 !
-! Routine to drain the slippage bank: each transmitted slice streams to
-! <out_root>-escaped.fld.h5 as it leaves (peak memory a handful of grid planes), with
-! its wavefront_params (the full 4x4 at bank time: exactly what the analytic
-! free-space propagation of pulse statistics needs) and its transmission z. Genesis
-! field-file conventions (dfl units) are used so existing tooling reads the file.
+! Routine to drain the slippage bank. Each slice carried out streams to
+! <out_root>-escaped.fld.h5 as it leaves, so peak memory is a handful of grid planes.
+! Each is stored with its wavefront_params and its transmission z. The params are the
+! full 4x4 at bank time, which the analytic free-space propagation of pulse statistics
+! needs. Genesis field-file conventions (dfl units) are used, so existing tools read
+! the file.
 !
-! During the run the groups are numbered in transmission order, slice k being the k-th
-! to leave, which is the reverse of Genesis's order: light leaves at the head, so the
-! first to leave is the furthest ahead. fel_order_bank renumbers them at finalize and
-! the root datasets land then, so the finished file is a Genesis field file.
+! During the run the groups are numbered in transmission order: slice k is the k-th to
+! leave. That is the reverse of Genesis's order. Light leaves at the head, so the first
+! to leave is the furthest ahead. fel_order_bank renumbers them at finalize, and the
+! root datasets are written then. So the finished file is a Genesis field file.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state. run%ffield(ihh)%bank holds the slices to drain.
@@ -1342,7 +1343,7 @@ do k = 1, bnk%n
   run%bank_z(run%n_banked(ihh), ihh) = z_now
   run%bank_pms(:, run%n_banked(ihh), ihh) = [pms%centroid, reshape(pms%sigma, [16]), &
                            pms%energy, pms%power, pms%on_axis_intensity, pms%emit_x, pms%emit_y]
-  if (two_pol) then             ! The y component's params add to the banked energy.
+  if (two_pol) then             ! The y component's params, written below as wavefront_params_y.
     call wavefront_params_of_plane (bnk%plane_y(:,:,k), wfl%dx, wfl%wavelength, &
                                     fbeam%slice_spacing, pms, .true., berr)
     if (berr) return
@@ -1381,11 +1382,11 @@ end subroutine fel_drain_bank
 !
 ! Routine to renumber the escaped file's slice groups into Genesis's order, where
 ! slice i sits at refposition + (i-1) slicespacing. fel_drain_bank numbers them in
-! transmission order as they leave, and light leaves at the window's head, so the
-! k-th to leave is the (n_banked - k + 1)-th in increasing coordinate. Each group
-! moves whole, its field planes, wavefront_params and z_transmit with it. Done once,
-! at finalize, when n_banked is known. run%bank_z and run%bank_pms stay in
-! transmission order.
+! transmission order as they leave. Light leaves at the window's head, so the k-th to
+! leave is the (n_banked - k + 1)-th in increasing coordinate. Each group moves whole,
+! with its field planes, wavefront_params and z_transmit. This is done once, at
+! finalize, when n_banked is known. run%bank_z and run%bank_pms stay in transmission
+! order.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state. run%esc_id(ihh) is the open escaped file.
@@ -1470,19 +1471,21 @@ end function fel_escaped_file_name
 !+
 ! Subroutine fel_finalize_diagnostics (run, err_flag)
 !
-! Routine to finalize the run's file diagnostics: the stats file always, and with
-! keep_escaped_field also the escaped file's root datasets and the full pulse at the
-! exit plane. For the pulse, each banked slice is read back, free-space propagated over
-! z_end - z_transmit (transmitted light is fixed information, and undulator vacuum is
-! free space for light with no beam under it), and concatenated above the live
-! window. Earliest-transmitted light is furthest ahead, so banked slice k lands at
+! Routine to finalize the run's file diagnostics: the stats file always. With
+! keep_escaped_field, also the escaped file's root datasets and the full pulse at the
+! exit plane.
+!
+! For the pulse, each banked slice is read back and free-space propagated over
+! z_end - z_transmit. Transmitted light is fixed information, and undulator vacuum is
+! free space for light with no beam under it. The slices are concatenated above the
+! live window. Earliest-transmitted light is furthest ahead. So banked slice k lands at
 ! pulse index nslice + (run%n_banked - k + 1), which is also its number in the
 ! finished escaped file (fel_order_bank). The caller has already unrotated the live
 ! window (the final-dump cshift).
 !
-! refposition in both files is what Genesis means by it, the in-bunch coordinate of
-! the file's slice 1 (readFieldHDF5 places slice i at refposition + (i-1) slicespacing):
-! 0 for the pulse, whose slice 1 is the live window's tail, and nslice times the
+! refposition in both files is what Genesis means by it: the in-bunch coordinate of
+! the file's slice 1 (readFieldHDF5 places slice i at refposition + (i-1) slicespacing).
+! It is 0 for the pulse, whose slice 1 is the live window's tail. It is nslice times the
 ! slice spacing for the escaped file, whose slice 1 is the slot just past the window's
 ! head. Neither is the beamline position, which is the openPMD files' zCoordinate.
 !
@@ -1517,8 +1520,8 @@ two_pol = run%two_pol
 keep_escaped_field = run%global%keep_escaped_field
 out_root = run%global%out_root
 
-! The parameters the file states as data. Assembled here because this is where the
-! whole run is visible; fel_stats_mod knows the accumulator and nothing else.
+! The parameters the file states as data. They are assembled here because the whole run
+! is visible here. fel_stats_mod knows the accumulator and nothing else.
 
 sprm%slice_spacing = fbeam%slice_spacing
 sprm%species = 'electron'
@@ -1586,10 +1589,10 @@ end subroutine fel_finalize_diagnostics
 ! Subroutine fel_write_pulse_file (run, fname, use_y, ihh, err_flag)
 !
 ! Routine to write one component of the full exit-plane pulse (Genesis's format holds
-! one per file): the live window's slices, then each banked slice read back from the
-! escaped file and free-space propagated over z_end - z_transmit. Shared by the -x
-! and -y files. The escaped file is in Genesis's order by now (fel_order_bank), so its
-! slice i lands at pulse slice nslice + i, and the transmission z of that slice is
+! one per file). It writes the live window's slices, then each banked slice read back
+! from the escaped file and free-space propagated over z_end - z_transmit. Shared by
+! the -x and -y files. The escaped file is in Genesis's order by now (fel_order_bank).
+! So its slice i lands at pulse slice nslice + i. The transmission z of that slice is
 ! run%bank_z(n_banked - i + 1), which stays in transmission order.
 !
 ! Input:
@@ -1742,34 +1745,33 @@ end subroutine fel_write_wake_block
 ! (every default explicit, straight from the structs), the top-level lattice file's name
 ! and text, how many files the parser opened, an ISO timestamp and the Bmad version.
 !
-! Datasets, not attributes. HDF5 caps a single attribute at 64 kB and the largest that
-! writes here is 65495 bytes, while a scalar string dataset took 3 MB. An echoed namelist
-! runs to 12 kB and a lattice text to 37 kB on a real lattice, so the old attributes were
-! at half the cap already, and the failure path was a warning: the provenance would have
-! gone missing silently on a lattice of no unusual size. The cost is that
-! meta/ no longer escapes dataset-level identity comparisons for free, since input_echo
-! carries out_root and two runs differ there. The harness excludes meta/ by name instead.
+! The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
+! the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
+! namelist runs to 12 kB and a lattice text to 37 kB on a real lattice
+! (doc/reading-output.md). A failure would only warn, so the provenance would go missing
+! silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
+! differ in meta/. The harness excludes meta/ by name from identity comparisons.
 !
-! It is not a reproducibility record, and it no longer claims to be. lattice_source is the
-! Top-level file only: Bmad's "call, file =" pulls in more, and every wrapper lattice in
-! this tree records a call statement while the lattice it calls is absent.
-! n_lattice_files says how many files the parser actually opened, so a reader can see at
-! a glance whether the text is the whole story. What the file offers for reproduction is
-! the lattice/ table (every tracked element with the values the physics used) beside the
-! input echo. Serializing the lattice is not an option: write_bmad_lattice_file inlines a
-! grid_field as ASCII under one_file$ and writes sibling binary files otherwise, so no
-! output_form is both complete and bounded, and Bmad has no HDF5 lattice format to
-! borrow. lat%creation_hash is not a substitute either, hashing inode and size, which
-! makes it machine specific rather than a fingerprint of content.
+! Note: meta/ is not a reproducibility record. lattice_source is the top-level file
+! only. Bmad's "call, file =" pulls in more, and a wrapper lattice records a call
+! statement without the lattice it calls. n_lattice_files says how many files the parser
+! opened, so a reader can see whether the text is the whole story. For reproduction the
+! file offers the lattice/ table (every tracked element with the values the physics
+! used) beside the input echo.
+!
+! Serializing the lattice is not an option. write_bmad_lattice_file inlines a grid_field
+! as ASCII under one_file$ and writes sibling binary files otherwise. So no output_form
+! is both complete and bounded, and Bmad has no HDF5 lattice format. lat%creation_hash is
+! not a substitute either. It hashes inode and size, which makes it machine specific and
+! not a fingerprint of content.
 !
 ! A stats file is meant to travel, so nothing here identifies a person by default. The
-! timestamp and the Bmad version identify the run. The user name and working directory
-! go in only under global%record_environment, and the file records a lattice basenAME.
-! What a user types into the namelist is echoed as typed, so an absolute path there is
-! still an absolute path in the file. Genesis records user and cwd always. Parity is not
-! a reason to leak.
+! timestamp and the Bmad version identify the run. The login name and working directory
+! go in only under global%record_environment. The file records a lattice basename.
+! Namelist input is echoed as typed, so an absolute path there is still an absolute path
+! in the file. Genesis always records user and cwd. Parity is not a reason to leak.
 !
-! Note: This is best effort. A failure warns, never fails the run.
+! Note: This is best effort. A failure warns, and never fails the run.
 !
 ! Input:
 !   run         -- fel_run_struct: Run state.
@@ -1817,11 +1819,11 @@ call fel_h5_text (g_id, 'input_echo', 'input echo', &
       'File names appear as the user typed them.', txt, merr)
 
 ! The lattice: which one, and how much of it is here. bmad_parser opens the top-level
-! file plus every file its "call, file =" statements reach, and file_text reads one of
-! them, so a wrapper lattice records a call statement and drops what it calls. The count
-! is the honesty signal. It comes from the parser's own tally, which outlives the parse
-! because parser_end_stuff deallocates only the array of names, and zero means the tally
-! was not available rather than that no file was read.
+! file plus every file its "call, file =" statements reach. file_text reads only the
+! top-level file, so a wrapper lattice records a call statement and drops what it calls. The
+! count says whether the text is complete. It comes from the parser's own tally, which
+! outlives the parse because parser_end_stuff deallocates only the array of names. Zero
+! means the tally was not available, and not that no file was read.
 
 ix = splitfilename(run%lat_file, path, base)
 call fel_h5_text (g_id, 'lattice_file', 'lattice file', &
@@ -1851,7 +1853,7 @@ call fel_h5_text (g_id, 'bmad_version', 'Bmad distribution version', &
       'The date-like form is Bmad''s own, and bmad_inc_version above is a different ' // &
       'number: the lattice-format version.', bmad_version_date, merr)
 
-! The environment, only when asked for: these identify a person and a machine, and they
+! The environment, only when asked for. These identify a person and a machine, and they
 ! are of no use to a reader elsewhere.
 
 if (run%global%record_environment) then
@@ -1879,20 +1881,20 @@ end subroutine fel_write_meta
 ! Subroutine fel_write_params (run, stats_file)
 !
 ! Routine to write the input tree into the stats file: params/, one subgroup per input
-! structure the program honors, each carrying @struct and holding the resolved value of
-! every honored component. What the user controlled, as data, so two runs diff by their
-! inputs and no reader needs a defaults table. What the run produced is run/, written by
-! fel_stats_write, and the literal text stays in meta/input_echo.
+! structure the program honors. Each carries @struct and holds the resolved value of
+! every honored component. So the inputs are data, two runs diff by their inputs, and
+! no reader needs a defaults table. What the run produced is run/, written by
+! fel_stats_write. The literal text stays in meta/input_echo.
 !
-! Components the program refuses are not here: recording a knob that did nothing would
-! lie about the run (the quiet start's honored beam_init set is doc/input-reference.md's
-! table). List-valued inputs (the dump locators, the harmonic set, the field files) are
-! string or integer array attributes on their subgroup rather than datasets, since a
-! dataset needs an axis and a list of inputs has none worth defining. A blank file-name
-! input is omitted: absence means unset. bmad_com and space_charge_com are written
-! whole, since the namelist exposes them whole and all of Bmad's tracking reads them.
+! Components the program refuses are not here, since recording a knob that did nothing
+! would misstate the run. The quiet start's honored beam_init set is the table in
+! doc/input-reference.md. List-valued inputs (the dump locators, the harmonic set, the
+! field files) are string or integer array attributes on their subgroup. A dataset
+! needs an axis, and a list of inputs has none worth defining. A blank file-name input
+! is omitted: absence means unset. bmad_com and space_charge_com are written whole,
+! since the namelist exposes them whole and all of Bmad's tracking reads them.
 !
-! Best effort, like fel_write_meta: a failure warns and never fails the run.
+! Note: This is best effort, like fel_write_meta. A failure warns, and never fails the run.
 !
 ! Input:
 !   run         -- fel_run_struct: Run state, after setup.
@@ -1930,10 +1932,10 @@ call H5LTset_attribute_string_f (f_id, 'params', 'description', &
 
 ! ------------------------------------------------------------ global.
 
-! out_root is NOT here, deliberately: it is the run's own name rather than a physics
-! input. Every output file already carries it, the echo records it as typed, and as
-! data it would make two otherwise identical runs compare different, which is exactly
-! what the thread-identity check must not see.
+! out_root is *not* here. It is the run's own name and not a physics input. Every
+! output file already carries it, and the echo records it as typed. As data it would
+! make two otherwise identical runs compare different, which the thread-identity check
+! must not see.
 
 call sub_open ('global', 'fel_global_struct', 'The run switches (&fel_params global%).')
 call fel_h5_str (g_id, 'interlude_model', 'interludes', &
@@ -2214,8 +2216,8 @@ end subroutine sub_open
 ! Subroutine loc_note (attrib, list)
 !
 ! Routine to record a locator list as a string-array attribute of the nonblank
-! entries. An attribute rather than a dataset, since a dataset needs an axis and a
-! list of inputs has none worth defining. Omitted when empty: absence means unset.
+! entries. An attribute and not a dataset, since a dataset needs an axis and a list of
+! inputs has none worth defining. Omitted when empty: absence means unset.
 !-
 
 subroutine loc_note (attrib, list)
@@ -2240,7 +2242,7 @@ end subroutine loc_note
 !+
 ! Subroutine file_note (name, val, descrip)
 !
-! Routine to record one file-name input as a text dataset, as the user typed it.
+! Routine to record one file-name input as a text dataset, as typed.
 ! A blank one is omitted: absence means unset.
 !-
 
@@ -2258,7 +2260,7 @@ end subroutine file_note
 !+
 ! Subroutine write_bmad_com ()
 !
-! Routine to write Bmad's bmad_com whole: the namelist exposes every component and all
+! Routine to write Bmad's bmad_com whole. The namelist exposes every component and all
 ! of Bmad's tracking reads them, so every one is honored. Descriptions follow the
 ! struct's own comments.
 !-
@@ -2375,7 +2377,7 @@ end subroutine write_bmad_com
 !+
 ! Subroutine write_space_charge_com ()
 !
-! Routine to write Bmad's space_charge_com whole, same reasoning as bmad_com.
+! Routine to write Bmad's space_charge_com whole, for the same reason as bmad_com.
 !-
 
 subroutine write_space_charge_com ()
@@ -2442,25 +2444,26 @@ end subroutine fel_write_params
 ! Subroutine fel_write_lattice (run, stats_file)
 !
 ! Routine to write the lattice table into the stats file: one row per tracked element,
-! which is what a layout plot needs and what the file has never carried. Genesis writes
-! its Lattice/ group as per-step arrays; this is a table instead, joined to the records
-! through coords/ix_ele, so nothing is duplicated per record and the two cannot drift.
+! which is what a layout plot needs. Genesis writes its Lattice/ group as per-step
+! arrays. This is a table instead, joined to the records through coords/ix_ele. So
+! nothing is duplicated per record, and the two cannot drift.
 !
-! NOT a lattice serialization. It carries what a plot and a join need, and anything
-! that needs the real lattice reads meta/lattice_file or meta/lattice_text, which stay
-! the reproducibility record. Bmad has no portable HDF5 lattice format, and a
-! statistics file is the wrong place to invent one.
+! Note: This is *not* a lattice serialization. It carries what a plot and a join need.
+! Anything that needs the real lattice reads meta/lattice_file or meta/lattice_source.
+! Bmad has no portable HDF5 lattice format, and a statistics file is the wrong place to
+! invent one.
 !
-! The table's axis is named ele and gets its own coordinate here, coords/ele = 0..n_ele.
-! coords/ix_ele is then a variable on the record axis whose values index that one, which
-! is the join. Both were called ix_ele before, and one name for two axes of different
-! length is a collision every reader has to resolve by hand.
+! The table's axis is named ele and gets its own coordinate, coords/ele = 0..n_ele.
+! coords/ix_ele is then a variable on the record axis whose values index that one. That
+! is the join. One name for two axes of different length would be a collision every
+! reader resolves by hand.
 !
-! aw is the value the physics used, derived through b_max and l_period with the
-! helical or planar factor, not the raw attribute: that is the number a Genesis user
-! compares against Lattice/aw, and deriving it here would repeat fel_setup_lattice.
+! aw is the value the physics used, derived through b_max and l_period with the helical
+! or planar factor, and not the raw attribute. That is the number a Genesis user
+! compares against Lattice/aw. It is taken from the run, since deriving it here would
+! repeat fel_setup_lattice.
 !
-! Best effort, like fel_write_meta: a failure warns and never fails the run.
+! Note: This is best effort, like fel_write_meta. A failure warns, and never fails the run.
 !
 ! Input:
 !   run         -- fel_run_struct: Run state, after setup.
@@ -2484,9 +2487,9 @@ character(*), parameter :: r_name = 'fel_write_lattice'
 
 !
 
-! The table is indexed by ix_ele, element 0 (Bmad's beginning element) included, so
-! coords/ix_ele indexes it with no offset arithmetic anywhere: lattice/name(ix_ele) is
-! the record's element. The first record of a run sits at element 0.
+! The table is indexed by ix_ele, element 0 (Bmad's beginning element) included. So
+! coords/ix_ele indexes it with no offset arithmetic: lattice/name(ix_ele) is the
+! record's element. The first record of a run sits at element 0.
 
 branch => run%lat%branch(0)
 ne = branch%n_ele_track
@@ -2576,9 +2579,8 @@ call fel_h5_real (g_id, 'z_offset', 'm', 'z offset', &
       'Longitudinal misalignment, the inter-segment phasing knob.', 'ele', z_off, merr)
 call H5Gclose_f (g_id, h5e)
 
-! The axis itself, into the coords/ group the stats writer left open for it. Every name
-! in an @axes attribute resolves to a coords/ dataset, and lattice/ is the only table
-! whose axis this routine knows the length of.
+! The axis itself, into the coords/ group. Every name in an @axes attribute resolves to
+! a coords/ dataset, and only this routine knows the length of the lattice/ axis.
 
 call H5Gopen_f (f_id, 'coords', g_id, h5e)
 if (h5e < 0) then
@@ -2602,8 +2604,8 @@ end subroutine fel_write_lattice
 !+
 ! Subroutine resolved_input_text (run, txt)
 !
-! Routine to render the resolved input echo as one string. Goes through
-! fel_write_resolved_input and a scratch file since namelist output needs an
+! Routine to render the resolved input echo as one string. It goes through
+! fel_write_resolved_input and a scratch file, since namelist output needs an
 ! external unit.
 !
 ! Input:
