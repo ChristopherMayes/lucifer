@@ -1,19 +1,21 @@
 !+
 ! Module fel_device_mod
 !
-! The Fortran side of the device seam: the only unit that calls the C interface of
-! lucifer_device.h, behind which one backend file sits per build (the Metal backend
-! where the toolchain can carry it, a refusing stub in every other build, including a
-! macOS one whose Objective-C++ compiler is a GNU one). Everything device-shaped
-! crosses here: the chart conversions, the residency bookkeeping, the lockstep
-! instrument's device role, and the refusals. No Metal type or call appears outside
-! device/lucifer_metal.mm, and no luc_dev call appears outside this module. The FP64
-! comparison quantities the instrument's rows are measured against (the roll-off, the
-! source deposit, the median) are fel_fp32_mod's own module procedures, called from
-! here rather than repeated: they are transcriptions of fel_field_step's conventions,
-! and a second copy is a second thing to find the day a convention changes.
+! Fortran side of the device seam. This is the only module that calls the C interface of
+! lucifer_device.h. One backend file sits behind that interface per build: the Metal
+! backend where the toolchain can carry it, and a stub that refuses in every other build.
+! A macOS build whose Objective-C++ compiler is a GNU one also gets the stub.
 !
-! The device chart. Transverse coordinates and the energy offset are FP32; the
+! The chart conversions, the residency bookkeeping, the device role in the lockstep
+! instrument and the refusals all live here. No Metal type or call appears outside
+! device/lucifer_metal.mm, and no luc_dev call appears outside this module.
+!
+! The FP64 quantities the instrument's rows compare against (the roll-off, the source
+! deposit, the median) are fel_fp32_mod's module procedures, called from here. They
+! transcribe fel_field_step's conventions. A second copy here would have to be found and
+! changed whenever a convention changes.
+!
+! The device chart: Transverse coordinates and the energy offset are FP32. The
 ! longitudinal state is a 64-bit fixed-point phase in ticks of 2 pi / 2^32, held off a
 ! static FP64 per-slice reference z_ref. The conversions are exact FP64 both ways:
 !
@@ -21,50 +23,47 @@
 !   down:  gamma = gamma0 + goff, pz = (sqrt(gamma^2-1) - p0_mc)/p0_mc,
 !          z = beta (z_ref + delta / ks) with delta = uphase / ticks
 !
-! (the down form is fel_advance's own exit chart z = -beta (phi0 - theta)/ks with
-! theta = phi0 + ks z_ref + delta, so the boundary is the CPU chart evaluated in
-! FP64). Bucket wraps in the accumulator are exact integer arithmetic -- the migration
-! operation a later landing needs -- and fel_device_setup asserts that exactly on the
-! device itself, not to a tolerance. The kernel-side reformulations (energy offset,
-! detuning difference, base rotator times small angle) mirror fel_fp32_mod, whose
-! lockstep levels price them; the fixed-point phase replaces the FP32 residual dzr,
-! whose ulp floor forced that module's moving reference: with a
-! uniform 1.5e-9 rad quantum the reference can stay static for a whole element.
+! The down form is fel_advance's own exit chart z = -beta (phi0 - theta)/ks with
+! theta = phi0 + ks z_ref + delta. So the boundary is the CPU chart evaluated in FP64.
+! Bucket wraps in the accumulator are exact integer arithmetic. fel_device_setup asserts
+! that exactly on the device itself, not to a tolerance.
 !
-! Two modes. The averaged FEL step is the one this module was written for, and the
-! unaveraged step rides the same buffers in its own chart: px and py carry the kinetic
-! transverse momenta ux and uy where the averaged chart carries Bmad's, and the phase
-! accumulator carries ks (tau - tau_ref) where the averaged chart carries the whole
-! theta. dev%unavg says which chart the staging and the readback use, and the
-! fel_device_unavg_* routines below carry the rest. doc/validation.md's
-! val-device-unaveraged records what that mode's kernels transcribe and what they cost.
+! The kernels reformulate the energy offset, the detuning difference and the base rotator
+! times a small angle as fel_fp32_mod does. The fixed-point phase replaces that module's
+! FP32 residual dzr, whose ulp floor forces a moving reference there. With a uniform
+! 1.5e-9 rad quantum the reference stays static for a whole element.
 !
-! Two roles. With fp32_check off the device is the run inside averaged FEL elements:
-! beam and field upload at element entry, stay resident through the element, and come
-! back at the comb's stats positions and the element end (fel_track_line_mod owns that
-! schedule). With fp32_check = 'lockstep' or 'freerun' the device takes the CPU twin's
-! role in the instrument: the FP64 path runs untouched, the device advances the same
-! step from the shared state, and the rows, guard, stream and ceilings are
-! fel_fp32_mod's own machinery with the device's arithmetic under test. The guard
-! column is then the median per-step phase increment in ticks of the fixed-point
-! quantum rather than in FP32 ulps; the same floor applies.
+! Two modes: The averaged FEL step uses the chart above. The unaveraged step uses the same
+! buffers in its own chart. There px and py carry the kinetic transverse momenta ux and uy
+! instead of Bmad's. The phase accumulator carries ks (tau - tau_ref) instead of the
+! whole theta. dev%unavg says which chart the staging and the readback use. The
+! fel_device_unavg_* routines carry the rest. doc/validation.md (val-device-unaveraged)
+! records what that mode's kernels transcribe and what they cost.
+!
+! Two roles: With fp32_check off, the device is the run inside averaged FEL elements. Beam
+! and field upload at element entry, stay resident through the element, and come back at
+! the comb's stats positions and at the element end. fel_track_line_mod owns that schedule.
+! With fp32_check = 'lockstep' or 'freerun', the device takes the CPU twin's role in the
+! instrument. The FP64 path runs untouched and the device advances the same step from the
+! shared state. The rows, guard, stream and ceilings are fel_fp32_mod's own, with the
+! device's arithmetic under test. The guard column is then the median per-step phase
+! increment in ticks of the fixed-point quantum instead of in FP32 ulps. The same floor
+! applies.
 !
 ! The device deposit accumulates in fixed point, so two runs of one deck agree bit for
-! bit. Integer addition is associative and commutative where float addition is neither,
-! so the order threads reach a cell cannot change the answer. Both reference backends
-! deposit in floats and are reproducible in neither (manual/GPU.md, gpu/metal-engine
-! 4919b01). The float deposit left a divergence here of 2.0e-7 on a field power, far
-! inside the ceilings, and what it cost was the right to assert a device output
-! exactly. Every array of the statistics file is asserted exactly now.
+! bit. Integer addition is associative and commutative and float addition is neither. So
+! the order threads reach a cell cannot change the answer. Both reference backends deposit
+! in floats and are not reproducible (manual/GPU.md, gpu/metal-engine 4919b01). A float
+! deposit here gave two runs 2.0e-7 apart on a field power (doc/validation.md, val-device).
+! That is far inside the ceilings, but no device output could then be asserted exactly.
 !
-! The field set. The resident field is every member of the run's set (the fundamental
-! and its harmonics, one grid) with one or two planes each (Ex, or the (Ex, Ey) pair
-! when two polarizations are live). The routines here take the set as ff(:), the
-! fel_field_struct of each member in set order, and the step's constants carry each member's
-! harmonic, coupling and deposit scale plus the element's polarization pair
-! (fel_device_par_struct). Every member rides the one fixed-point phase, at h times
-! it, and every plane slips together, as on the CPU. One member and one plane is the
-! single-field path it was before the set.
+! The field set: The resident field holds every member of the run's set (the fundamental
+! and its harmonics, on one grid). Each member has one plane (Ex), or two (Ex, Ey) when two
+! polarizations are live. The routines here take the set as ff(:), the fel_field_struct of
+! each member in set order. The step's constants carry each member's harmonic, coupling
+! and deposit scale, and the element's polarization pair (fel_device_par_struct). Every
+! member rides the one fixed-point phase, at h times it, and every plane slips together,
+! as on the CPU. With one member and one plane this is the single-field path.
 !-
 
 module fel_device_mod
@@ -79,9 +78,9 @@ use, intrinsic :: ieee_exceptions, only: ieee_usual, ieee_get_flag, ieee_set_fla
 
 implicit none
 
-! Ticks of phase: 2^32 per radiation period, the fixed-point quantum. The FP64 forms
-! here are exact; the kernels carry their own FP32 roundings of the same constants,
-! which is part of the arithmetic the instrument prices.
+! Ticks of phase: 2^32 per radiation period, the fixed-point quantum. The FP64 forms here
+! are exact. The kernels carry their own FP32 roundings of the same constants, and the
+! instrument's rows include them.
 
 real(rp), parameter :: fel_dev_ticks_per_rad$ = 4294967296.0_rp / twopi
 real(rp), parameter :: fel_dev_rad_per_tick$ = twopi / 4294967296.0_rp
@@ -91,32 +90,32 @@ real(rp), parameter :: fel_dev_rad_per_tick$ = twopi / 4294967296.0_rp
 
 integer, parameter :: fel_dev_max_field$ = 9
 
-! The pass slots of lucifer_device.h, and their names for the report. The two mirrors
-! move together, as the parameter struct's do.
-
 ! The deposit's fixed-point constants. The accumulator is a signed 64-bit integer built
-! from two 32-bit atomic words, and the scale is a power of two so that it and its
-! reciprocal are exact. fel_dev_dep_room$ leaves two bits above the sign for the modular
-! head. The gamma floor is the divisor the bound assumes a particle's energy can fall to:
-! an FEL extracts of order rho, a part in a thousand, so an eighth of the reference is
-! conservative past any argument and costs three of the bound's spare bits.
+! from two 32-bit atomic words. The scale is a power of two, so it and its reciprocal are
+! exact. fel_dev_dep_room$ leaves two bits above the sign for the modular head.
+! fel_dev_gamma_floor$ is the divisor on the lowest loaded gamma that gives the gamma the
+! bound assumes a particle can fall to. An FEL extracts of order rho, a part in a
+! thousand, so a factor of eight is conservative and costs three of the bound's spare bits.
 
 real(rp), parameter :: fel_dev_dep_room$ = 4.611686018427388e18_rp   ! 2^62
 real(rp), parameter :: fel_dev_gamma_floor$ = 8.0_rp
 
 ! Below this many bits between the quantum and the FP32 spacing of the bound, the fixed
-! point would not be finer than the float accumulation it replaces, and the run is
-! refused at the first step, before anything converts (fel_track_mod's fill_device_par).
+! point is no finer than the float accumulation it replaces. The run is then refused at
+! the first step, before anything converts (fill_device_par in fel_track_mod).
 
 integer, parameter :: fel_dev_dep_bits_min$ = 8
 
-! What the FP32 transform pair loses of the field's energy each time it runs, in one
-! direction: about 0.17 of an FP32 quantum a butterfly stage, over the 2 log2(ngrid)
-! stages of a forward and an inverse transform. Measured with no charge on the field at
-! grids 64 to 512, 1.27e-7 to 1.79e-7 a pair, which the rate gives as 1.22e-7 to 1.83e-7
-! (validation.md, val-device-unaveraged). The run header projects a deck's loss from it.
+! Fraction of the field's energy the FP32 transform pair loses each time it runs, always
+! in one direction: about 0.17 of an FP32 quantum a butterfly stage, over the
+! 2 log2(ngrid) stages of a forward and an inverse transform. doc/validation.md
+! (val-device-unaveraged) holds the fit over grids 64 to 512. The run header projects a
+! deck's loss from it.
 
 real(rp), parameter :: fel_dev_stage_loss$ = 0.17_rp / 16777216.0_rp   ! 0.17 * 2^-24
+
+! The pass slots of lucifer_device.h, and their names for the report. The two mirrors
+! move together, as the parameter struct's do.
 
 integer, parameter :: fel_dev_pass_n$ = 9
 character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
@@ -127,8 +126,9 @@ character(10), parameter :: fel_dev_pass_name$(fel_dev_pass_n$) = &
 ! Struct fel_device_par_struct
 !
 ! One step's constants for luc_dev_step, mirroring luc_dev_step_par of
-! lucifer_device.h field for field (all doubles, then the 32-bit ints). Editing
-! either mirror alone skews the layout silently; keep them together.
+! lucifer_device.h field for field (all doubles, then the 32-bit ints).
+!
+! Note: Editing either mirror alone skews the layout silently. Edit both together.
 !-
 
 type, bind(c) :: fel_device_par_struct
@@ -175,11 +175,10 @@ end type
 
 type fel_device_struct
   logical :: on = .false.               ! A backend is armed for this run.
-  ! resident means the device state IS the run: only the production role sets it, and
-  ! the walk's readbacks key on it. The twin's carried freerun state gets its own
-  ! flag, because a readback of twin state into the FP64 arrays would be the
-  ! instrument steering the run it observes -- the exact failure the read-only proof
-  ! exists to catch, and the first thing it caught.
+  ! resident means the device state is the run. Only the production role sets it, and the
+  ! walk's readbacks key on it. The twin's carried freerun state has its own flag,
+  ! twin_live. A readback of twin state into the FP64 arrays would make the instrument
+  ! steer the run it observes.
   logical :: resident = .false.         ! Production role: beam and field live on the device.
   ! The unaveraged mode's residency reads the same seven particle buffers in its own
   ! chart, so the flag says which chart the staging and the readback use. z_ref then
@@ -206,13 +205,13 @@ type fel_device_struct
   real(rp) :: dep_gam_floor = 0       ! The gamma the deposit bound was built on.
   logical :: dep_breach = .false.     ! A readback found a particle under it.
   integer :: nstep = 0                  ! Device steps encoded this run.
-  ! The instrument's per-member record: run-level worst phasor, source and field
-  ! divergence of each member, the footer's attribution when the set has more than
-  ! one member (the ten-column stream itself carries the worst over members).
+  ! The instrument's per-member record: the worst phasor, source and field divergence of
+  ! each member over the run. The footer prints it when the set has more than one member,
+  ! since the ten-column stream carries only the worst over members.
   real(rp), allocatable :: worst_h(:,:) ! (3, nfield).
   ! Staging, sized once: per-slice particle arrays padded to npart with zero-weight
-  ! entries (the device wants a rectangular array; padding radiates nothing and is
-  ! never read back), one field plane, and the per-slice phase rotators per member.
+  ! entries, one field plane, and the per-slice phase rotators per member. The device
+  ! takes a rectangular array. The padding radiates nothing and is never read back.
   real(c_float), allocatable :: sx(:), spx(:), sy(:), spy(:), sg(:), sw(:)
   integer(c_int64_t), allocatable :: su(:)
   integer(c_int64_t), allocatable :: su0(:,:)
@@ -386,8 +385,7 @@ interface
 
 end interface
 
-! A generic name, kept inside the module: every caller of it is here, and the seam's
-! strings are the only reason it exists.
+! from_c is private. Every caller is in this module.
 
 private from_c
 
@@ -400,21 +398,21 @@ contains
 ! Subroutine fel_device_query (usable, device, reason)
 !
 ! Routine to report what device backend this build carries, without arming anything.
-! luc_dev_available is the one call a stub build answers, and it allocates nothing, so
-! this is safe and free in every build. It is what the usage banner reports and what a
-! caller reads to decide whether device = "metal" is worth asking for at all.
+! luc_dev_available is the one call a stub build answers. It allocates nothing, so this
+! routine is safe in every build. The usage banner reports its answer, and a caller reads
+! it to decide whether to ask for device = "metal".
 !
-! Two things can make a backend unusable, and they are different: a build compiled
-! against the stub carries none at all, and a build carrying the Metal backend can
-! still run on a machine with no Metal device or no unified memory. The reason
-! distinguishes them. Neither is a platform test: a caller that keys on the platform
-! rather than on this answer will skip the device on a machine that has one.
+! Two things make a backend unusable. A build compiled against the stub carries none.
+! A build carrying the Metal backend can still run on a machine with no Metal device or
+! no unified memory. The reason distinguishes the two.
+!
+! Note: Key on this answer and not on the platform. A platform test skips the device on a
+! machine that has one.
 !
 ! The floating-point exception flags are saved and restored across the call. Metal's
-! own device enumeration raises overflow on this machine, and a program whose last act
-! is this query would then report a signalling overflow at exit, attributing the
-! framework's arithmetic to the run's own. A query answers a question and leaves no
-! trace.
+! device enumeration can raise the overflow flag. A program whose last act is this query
+! would then report a signalling overflow at exit, charging the framework's arithmetic
+! to the run.
 !
 ! Output:
 !   usable -- logical: True if device = "metal" would be accepted here.
@@ -477,28 +475,31 @@ end subroutine from_c
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu, timing, dep_mutate, err_flag)
+! Subroutine fel_device_setup (dev, device_req, beam, ngrid, sample, harm, npol, fp32_iu,
+!                                                                timing, dep_mutate, err_flag)
 !
-! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal'
-! asks for the one backend this tree knows; a build without it (the stub) refuses with
-! the stub's own reason, and any other value is refused, with the error listing what
-! this tree knows. Allocates the resident buffers for this run shape (the grid
-! refusal, naming the nearest supported size, comes back from the backend), runs the
-! exact-wrap assertion on the device, and writes the device header lines into the
-! instrument's stream when one is open.
+! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal' asks
+! for the one backend this tree knows. A build without it (the stub) refuses with the
+! stub's own reason. Any other value is refused, and the error lists what this tree knows.
+!
+! The routine allocates the resident buffers for this run shape, runs the exact-wrap
+! assertion on the device, and writes the device header lines into the instrument's stream
+! when one is open. The backend refuses an unsupported grid and names the nearest
+! supported size.
 !
 ! Input:
 !   device_req -- character(*): global%device.
-!   beam       -- fel_beam_struct: The beam (slice fills size the rectangular array).
+!   beam       -- fel_beam_struct: The beam. Slice fills size the rectangular array.
 !   ngrid      -- integer: Transverse grid points per side, one grid for the set.
-!   sample     -- real(rp): Slice spacing in radiation wavelengths (integer by check).
-!   harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the member count.
+!   sample     -- integer: Slice spacing in radiation wavelengths.
+!   harm(:)    -- integer: The set's harmonic numbers, in set order. size(harm) is the
+!                   member count.
 !   npol       -- integer: Planes per member, 1 or 2.
 !   fp32_iu    -- integer: The instrument's stream unit, 0 when dark.
-!   timing     -- logical: Time each pass of a step separately, one encoder a pass.
-!   dep_mutate -- integer: Shift the deposit's fixed-point scale by this many bits.
-!                 Zero in every run but the check that measures what the quantum costs.
+!   timing     -- logical: Time each pass of a step separately, one encoder a pass?
 !                   A device that samples no counters at an encoder boundary refuses.
+!   dep_mutate -- integer: Shift the deposit's fixed-point scale by this many bits.
+!                   Zero in every run except the check of what the quantum costs.
 !
 ! Output:
 !   dev        -- fel_device_struct: Armed (or left dark).
@@ -549,9 +550,8 @@ if (.not. usable) then
 endif
 dev%name = name
 
-! The rectangular particle array: padded to the largest fill, so uneven slice fills
-! cost padding rather than a refusal. The padding has zero weight and is never read
-! back.
+! The rectangular particle array is padded to the largest fill, so uneven slice fills
+! cost padding and not a refusal. The padding has zero weight and is never read back.
 
 np = 0
 do is = 1, size(beam%slice)
@@ -579,9 +579,9 @@ dev%nslice = size(beam%slice)
 dev%npart = np
 dev%ngrid = ngrid
 
-! Per-pass timing, asked for before anything is encoded, which is the one point the
-! backend accepts it. A device that samples no counters at an encoder boundary refuses
-! rather than reporting zeros, since a table of zeros reads like a free pass.
+! Per-pass timing is asked for before anything is encoded. That is the one point the
+! backend accepts it. A device that samples no counters at an encoder boundary refuses,
+! since a table of zeros would read as passes that take no time.
 
 if (timing) then
   if (luc_dev_timing(1_c_int, c_reason, 256) /= 0) then
@@ -595,12 +595,12 @@ if (timing) then
                'The production path pays no such boundary, so a price is taken with it off.')
 endif
 
-! The exact-wrap assertion, on the device's own arithmetic: a bucket shift and its
-! return must be bit-exact, and the extracted phase must never see the shift. Wraps
-! are modular arithmetic, so this asserts exactly rather than to a tolerance. The
-! bucket is sample whole periods, and the sample is an integer from the deck to here
-! (fel_slicing_struct), so this cannot fire. It stands because the arithmetic below
-! depends on it and a future path that reached here another way would be caught.
+! The exact-wrap assertion, on the device's own arithmetic: A bucket shift and its return
+! must be bit-exact, and the extracted phase must never see the shift. Wraps are modular
+! arithmetic, so this asserts exactly and not to a tolerance. The bucket is sample whole
+! periods. sample is an integer from the deck to here (fel_slicing_struct), so the
+! sample check cannot fire. It stays because the arithmetic below depends on it, and a
+! future path that reached here another way would be caught.
 
 if (sample < 1) then
   call out_io (s_error$, r_name, 'DEVICE = "metal" HAS A SLICE SPACING OF \i0\ WAVELENGTHS.', &
@@ -617,23 +617,20 @@ if (luc_dev_wrap_check(bucket) /= 0) then
 endif
 dev%wrap_exact = .true.
 
-! The deposit accumulates in fixed point so that the answer does not depend on the
-! order threads reach a cell. The scale has to keep the per-cell sum
-! inside a signed 64-bit integer, and the bound taken here is the one nothing can
-! breach: every macroparticle of every slice in one cell, in phase, at the lowest gamma
-! the run can reach. Cancellation cannot hide an overflow, since the accumulator is
-! modular and only the total has to fit, but the absolute sum is bounded anyway.
+! The deposit accumulates in fixed point so the answer does not depend on the order
+! threads reach a cell. The scale must keep the per-cell sum inside a signed 64-bit
+! integer. The bound taken here is one nothing can breach: every macroparticle of every
+! slice in one cell, in phase, at the lowest gamma the run can reach. The accumulator is
+! modular and only the total has to fit, so cancellation cannot hide an overflow. The
+! absolute sum is bounded anyway.
 !
-! A contribution carries w/gamma, so the bound needs the smallest gamma the run will
-! ever deposit at. That is measured here over the loaded beam rather than assumed of the
-! reference, and fel_dev_gamma_floor$ is then applied to what was measured. The margin
-! covers what tracking can take off a particle: an FEL extracts of order rho, a part in
-! a thousand, so a factor of eight below the loaded minimum is conservative past any
-! argument and costs three of the bound's spare bits.
+! A contribution carries w/gamma, so the bound needs the smallest gamma the run will ever
+! deposit at. That gamma is taken from the loaded beam and not assumed of the reference.
+! fel_dev_gamma_floor$ then divides it, and its definition gives the margin.
 !
-! The charge is what setup can bound. The element's own deposit scale and the grid's
-! roll-off complete it at the first step, which is where the scale, its origin and its
-! headroom are printed and where a scale the device cannot carry refuses the run.
+! Setup can bound the charge. The element's own deposit scale and the grid's roll-off
+! complete the bound at the first step. The scale, its origin and its headroom are
+! printed there, and a scale the device cannot carry refuses the run there.
 
 p0_mc_l = fel_p0_mc(beam)
 gam_min = -1
@@ -692,13 +689,13 @@ end subroutine fel_device_setup
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_element_begin (dev, beam, wf)
+! Subroutine fel_device_element_begin (dev, beam, ff)
 !
-! Routine to make the beam and the field set resident at an FEL element's entry: the
-! static per-slice reference is set to the slice's FP64 mean z, every slice converts
-! through the module header's chart, and every plane of every member rounds to FP32
-! in ring order. From here to fel_device_element_end the device state is the run
-! inside the element; the host arrays are stale until a readback refreshes them.
+! Routine to make the beam and the field set resident at an FEL element's entry. The
+! static per-slice reference is set to the slice's FP64 mean z. Every slice converts
+! through the module header's chart, and every plane of every member rounds to FP32 in
+! ring order. From here to fel_device_element_end the device state is the run inside the
+! element. The host arrays are stale until a readback refreshes them.
 !
 ! Input:
 !   beam  -- fel_beam_struct: The beam.
@@ -826,8 +823,8 @@ end subroutine fel_device_set_kernel
 ! Routine to upload the source filter's sigmoid for one field member
 ! (fel-physics.md sec-source-filter). The table is real and the same for every member,
 ! since it is built on the grid's own normalized frequency axis and carries no
-! wavelength, but it rides the propagator's per-member layout so that one device kernel
-! serves both multiplies.
+! wavelength. It uses the propagator's per-member layout so one device kernel serves
+! both multiplies.
 !
 ! Input:
 !   dev      -- fel_device_struct: The resident device state.
@@ -915,12 +912,12 @@ end subroutine fel_device_stage_slice
 !+
 ! Subroutine fel_device_step_run (dev, par, phi0, phi0_new, ks, err_flag)
 !
-! Routine to encode one resident integration step: the per-slice phase rotators of
-! every member (the push reads e^{-i h (phi0 + ks z_ref)}, the deposit its phi0_new
-! counterpart), the exact tick count of the common phase advance, and one command
-! buffer holding the whole step. The propagators are the caller's, uploaded through
-! fel_device_set_kernel before this. Nothing is waited on here; the next host touch
-! of a buffer drains it.
+! Routine to encode one resident integration step: the per-slice phase rotators of every
+! member (the push reads e^{-i h (phi0 + ks z_ref)}, the deposit its phi0_new
+! counterpart), the exact tick count of the common phase advance, and one command buffer
+! holding the whole step. The propagators are the caller's, uploaded through
+! fel_device_set_kernel before this. Nothing is waited on here. The next host touch of a
+! buffer drains it.
 !
 ! Input:
 !   par       -- fel_device_par_struct: The step's constants, filled by the caller.
@@ -986,22 +983,20 @@ end subroutine fel_device_step_run
 !+
 ! Subroutine fel_device_readback (dev, beam, ff)
 !
-! Routine to refresh the host FP64 state from the resident device state: the beam
-! through the module header's exact down-chart, the field record slice for slice in
-! ring order. The comb's stats positions and the element end call this; between them
-! the host arrays are stale by design ("stats read back at the comb's positions
-! only"). A readback observes and never steers: the device state is untouched.
+! Routine to refresh the host FP64 state from the resident device state. The beam comes
+! back through the module header's exact down-chart, and the field record slice by slice
+! in ring order. The comb's stats positions and the element end call this. Between them
+! the host arrays are stale by design. A readback observes and never steers: the device
+! state is untouched.
 !
-! Parallel over slices, and the measurement that made it so is in
-! doc/performance.md's device section: at the finest comb the serial conversion loops
-! were half the cost of every stats row, ~4.3 ms a record on the 96 x 8192 case. The
-! conversions are elementwise with no accumulation and each iteration writes only its
-! own slice's arrays or its own field plane, so any thread order computes the same
-! bits. Two structural points hold that. The device drains once, serially, before the
-! parallel regions, after which every transfer is a pure disjoint copy from the
-! shared-storage buffers (lucifer_device.h's post-drain contract). And the staging is
-! block-local per slice rather than the module-level scratch, which is sized for one
-! slice at a time and is not thread-safe by design.
+! The conversion loops run in parallel over slices, since serial loops are a large share
+! of every stats row at the finest comb (doc/performance.md, perf-device). The
+! conversions are elementwise with no accumulation. Each iteration writes only its own
+! slice's arrays or its own field plane, so any thread order gives the same bits. Two
+! structural points hold that. The device drains once, serially, before the parallel
+! regions. After that every transfer is a disjoint copy from the shared-storage buffers
+! (the post-drain contract of lucifer_device.h). And the staging is block-local per
+! slice. The module-level staging arrays are sized for one slice and are not thread-safe.
 !-
 
 subroutine fel_device_readback (dev, beam, ff)
@@ -1028,11 +1023,8 @@ ks = twopi / beam%wavelength
 call luc_dev_sync ()
 
 ! The deposit's bound assumes no particle deposits below dev%dep_gam_floor, an eighth of
-! the lowest gamma the run loaded. Setup measured that, and here it is checked: every
-! readback happens at an element's last step, so a beam that passes here is a beam the
-! next element starts from. Together those two cover the state before every element's
-! deposits. What is not covered is evolution inside one element, which is the interval
-! between two checks, and an FEL takes of order rho off a particle over a whole line.
+! the lowest gamma the run loaded. gam_low holds each slice's lowest gamma read back, for
+! the message below when the kernel reports a particle under that floor.
 
 allocate (gam_low(size(beam%slice)))
 gam_low = huge(1.0_rp)
@@ -1076,11 +1068,11 @@ do is = 1, size(beam%slice)
 enddo
 !$OMP end parallel do
 
-! The kernel drops any particle under the floor without converting or accumulating it and
-! records a fault, so this reports what the deposit already refused to use. The readback's
-! own minimum is printed beside it and can look healthy: a particle is free to cross the
-! floor and come back between two readbacks, which is exactly the interval the kernel
-! covers and a readback cannot.
+! The kernel drops any particle under the floor without converting or accumulating it,
+! and records a fault. So this reports what the deposit already refused to use. The
+! readback's own minimum is printed beside it and can look healthy. A particle can cross
+! the floor and come back between two readbacks. The kernel covers that interval and a
+! readback cannot.
 
 if (luc_dev_dep_fault() /= 0) then
   dev%dep_breach = .true.
@@ -1119,11 +1111,11 @@ end subroutine fel_device_readback
 !+
 ! Subroutine fel_device_release (dev)
 !
-! Routine to end residency without a readback, for the caller that has just read the
-! state back itself and is about to change the host arrays: slice migration at an
-! element's last step. After a readback the host is authoritative, and a second
-! readback would overwrite whatever the caller does next with the device's older
-! state. The comb readback and fel_device_element_end that follow become no-ops.
+! Routine to end residency without a readback. The caller has just read the state back
+! itself and is about to change the host arrays: slice migration at an element's last
+! step. After a readback the host is authoritative. A second readback would overwrite
+! what the caller does next with the device's older state. The comb readback and
+! fel_device_element_end that follow do nothing.
 !-
 
 subroutine fel_device_release (dev)
@@ -1143,11 +1135,11 @@ end subroutine fel_device_release
 ! Subroutine fel_device_ensure_capacity (dev, beam)
 !
 ! Routine to grow the resident particle rectangle when a slice has outgrown it. The
-! rectangle is sized at setup to the largest fill, and slice migration moves particles
-! between slices on the host, so a later element can arrive with a fill the device has
-! no room for. The seam reallocates the seven particle buffers, growth only and without
-! recompiling anything, and the staging arrays follow. The guard baseline su0 is
-! re-staged by the upload that always follows, so it is simply resized.
+! rectangle is sized at setup to the largest fill. Slice migration moves particles between
+! slices on the host, so a later element can arrive with a fill the device has no room
+! for. The seam reallocates the seven particle buffers, growth only and without
+! recompiling anything, and the staging arrays follow. The upload that always follows
+! re-stages the guard baseline su0, so su0 is only resized here.
 !-
 
 subroutine fel_device_ensure_capacity (dev, beam)
@@ -1182,10 +1174,9 @@ end subroutine fel_device_ensure_capacity
 !+
 ! Subroutine fel_device_element_end (dev, beam, ff)
 !
-! Routine to end residency at the element's exit: the final readback, after which the
-! host FP64 state is the run again (rounded through the device representation, the
-! residency boundary the design brief names) and the walk's interludes proceed on the
-! CPU. The next FEL element re-uploads.
+! Routine to end residency at the element's exit with the final readback. The host FP64
+! state is then the run again, rounded through the device representation, and the walk's
+! interludes proceed on the CPU. The next FEL element uploads again.
 !-
 
 subroutine fel_device_element_end (dev, beam, ff)
@@ -1208,10 +1199,10 @@ end subroutine fel_device_element_end
 !+
 ! Function fel_device_slice_energy (dev, im, ifld, dx) result (energy)
 !
-! Routine to read one resident field slice's energy-like sum, sum|E|^2 * dx^2/(2 Z0)
-! in FP64 over the FP32 record, both planes when two are live: the escape accounting
-! the device-resident slippage needs (fel_device_apply_slippage in fel_track_mod owns
-! the bookkeeping; this module owns the seam crossing). im is the member and ifld the
+! Routine to read one resident field slice's energy-like sum, sum|E|^2 * dx^2/(2 Z0), in
+! FP64 over the FP32 record, both planes when two are live. The device-resident slippage
+! needs it for the escape accounting. fel_device_apply_slippage in fel_track_mod owns the
+! bookkeeping, and this module owns the seam crossing. im is the member and ifld the
 ! 1-based record index.
 !-
 
@@ -1238,7 +1229,7 @@ end function fel_device_slice_energy
 !+
 ! Subroutine fel_device_zero_slice (dev, im, ifld)
 !
-! Routine to zero one resident field slice of member im, every plane, the
+! Routine to zero one resident field slice of member im, every plane. This is the
 ! non-periodic fill of the slippage rotation. ifld is the 1-based record index.
 !-
 
@@ -1259,15 +1250,15 @@ end subroutine fel_device_zero_slice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_twin_begin (dev, fp32, beam, wf, s0, par, phi0, phi0_new, ks, err_flag)
+! Subroutine fel_device_twin_begin (dev, fp32, beam, ff, s0, par, phi0, phi0_new, ks, err_flag)
 !
-! Routine to put the device in the twin's role for one step, part one: uploads and
-! the step encode, called after the FP64 particle advance and BEFORE the production
-! field solve (the lockstep field image must round from the pre-solve record). In
-! lockstep the shared state is the caller's pre-step snapshot s0 and the reference
-! moves to the slice mean; in freerun the resident state carries and only the first
-! step uploads. The encoded step then runs concurrently with the production solve.
-! The propagators are the caller's, set through fel_device_set_kernel before this.
+! Routine to put the device in the twin's role for one step, part one: the uploads and
+! the step encode. It is called after the FP64 particle advance and *before* the
+! production field solve, since the lockstep field image must round from the pre-solve
+! record. In lockstep the shared state is the caller's pre-step snapshot s0, and the
+! reference moves to the slice mean. In freerun the resident state carries and only the
+! first step uploads. The encoded step runs concurrently with the production solve. The
+! propagators are the caller's, set through fel_device_set_kernel before this.
 !
 ! Input:
 !   ff(:)     -- fel_field_struct: The field set, in set order.
@@ -1317,10 +1308,10 @@ if (upload) then
       delta = ks * s0(5, ip, is) / beta - ks * dev%z_ref(is)
       dev%su(ip) = nint(delta * fel_dev_ticks_per_rad$, c_int64_t)
 
-      ! The check's mutation reaches the shared state here in lockstep, the residual
-      ! coarsening fel_fp32_twin_slice applies to dzr, in ticks: without it the qres
-      ! perturbation alone would carry falsifiability, and the goal is two hooks
-      ! (state and kernel), each of which must move a recorded level.
+      ! The global%fp32_mutate hook coarsens the shared state here in lockstep, in ticks,
+      ! as fel_fp32_twin_slice coarsens dzr. The qres perturbation in the kernel is the
+      ! second hook. There are two hooks, state and kernel, and each must move a
+      ! recorded level.
 
       if (fp32%mutate) dev%su(ip) = 65536_c_int64_t * (dev%su(ip) / 65536_c_int64_t)
     enddo
@@ -1350,33 +1341,32 @@ end subroutine fel_device_twin_begin
 !+
 ! Subroutine fel_device_twin_rows (dev, fp32, beam, ff, par, phi0, phi0_new, ks)
 !
-! Routine to put the device in the twin's role, part two: after the production solve,
-! read the device state back and fill fel_fp32_mod's rows against the FP64 path.
-! Rows 1 to 4 carry the device's FP32 transverse maps (the CPU twin refreshed those
-! from FP64, so its recorded levels there were pure rounding; the device's are
-! arithmetic and get their own recorded levels). Rows 5 to 7 follow
-! fel_fp32_twin_slice's conventions with the phase compared in the tick chart's FP64
-! image; rows 8 and 9 follow fel_fp32_field_twin's, against a fresh FP64 deposit of
-! the shared post-step state. The guard statistic is the median per-step phase
-! increment in ticks (uniform quantum, so no spacing division). The device's own
-! phase accumulators are kept as the next step's guard baseline, which is what makes
-! the freerun guard cost no extra sync.
+! Routine to put the device in the twin's role, part two. After the production solve it
+! reads the device state back and fills fel_fp32_mod's rows against the FP64 path.
 !
-! The field set: the phasor, source and field rows are each the worst over the set's
-! members, so the stream keeps its ten columns and its recorded ceilings, and every
-! member's own worst is kept in dev%worst_h for the footer's attribution. A member's
-! phasor and deposit are compared at h times the fundamental phase, fel_field_step's
-! harm*theta, through fel_fp32_deposit64 unchanged (h*theta is its theta, the
-! member's scale its scl_w). Every member's source and field rows are normalized by
-! the fundamental's post-solve field norm over its planes, the run's power scale. A
-! harmonic's own norm cannot serve: on a quiet start the CPU cancels the harmonic
-! bunching to FP64 roundoff while the device's FP32 phase leaves it at ~1e-7 of the
-! charge, and a dark member's row divided by its own roundoff-level field measured
-! that noise against nothing (the first attempt read 6 to 8 on a deposit whose
-! end-to-end power agreed at 1e-3). The harmonic's fidelity lives in its phasor row,
-! which needs no field normalization, and in the end-to-end harmonic power against
-! the CPU that check_device.py holds. With one member this is the normalization the
-! single-field rows always had.
+! Rows 1 to 4 carry the device's FP32 transverse maps. The CPU twin refreshes those from
+! FP64, so its levels there are pure rounding. The device's are arithmetic and have
+! their own ceilings. Rows 5 to 7 follow fel_fp32_twin_slice's conventions, with the
+! phase compared in the tick chart's FP64 image. Rows 8 and 9 follow
+! fel_fp32_field_twin's, against a fresh FP64 deposit of the shared post-step state. The
+! guard statistic is the median per-step phase increment in ticks. The quantum is
+! uniform, so there is no spacing division. The device's own phase accumulators are kept
+! as the next step's guard baseline, so the freerun guard needs no extra sync.
+!
+! The field set: The phasor, source and field rows are each the worst over the set's
+! members, so the stream keeps its ten columns and its ceilings. Each member's own worst
+! is kept in dev%worst_h for the footer. A member's phasor and deposit are compared at h
+! times the fundamental phase (fel_field_step's harm*theta), through fel_fp32_deposit64
+! unchanged, with h*theta as its theta and the member's scale as its scl_w.
+!
+! Every member's source and field rows are normalized by the fundamental's post-solve
+! field norm over its planes, the run's power scale. A harmonic's own norm cannot serve.
+! On a quiet start the CPU cancels the harmonic bunching to FP64 roundoff, while the
+! device's FP32 phase leaves it at ~1e-7 of the charge. A dark member's row divided by
+! its own roundoff-level field would compare that noise against nothing
+! (doc/validation.md, val-device). The harmonic's fidelity lives in its phasor row, which
+! needs no field normalization, and in the end-to-end harmonic power against the CPU.
+! With one member this is the single-field normalization.
 !
 ! Input:
 !   ff(:) -- fel_field_struct: The field set, in set order, post-solve. The ring
@@ -1574,9 +1564,9 @@ end subroutine fel_device_twin_rows
 !+
 ! Subroutine fel_device_close_run (dev, fp32)
 !
-! Routine to report what the device did and release it: the step count and the
-! device-busy seconds from the backend's own command-buffer timestamps, the honest
-! pair a wall clock is judged against (the dispatch floor is their difference). When
+! Routine to report what the device did and release it. The report gives the step count
+! and the device-busy seconds from the backend's own command-buffer timestamps. A wall
+! clock is judged against that pair, and the dispatch floor is their difference. When
 ! the device held the twin's role over a set of more than one member, its per-member
 ! worst levels go into the instrument's footer first, since the ten-column stream
 ! carries only the worst over members. The caller closes that stream afterwards.
@@ -1609,10 +1599,10 @@ call out_io (s_info$, r_name, 'Device: \i0\ steps encoded, device busy \f10.3\ s
              i_array = [dev%nstep], r_array = [real(luc_dev_seconds(), rp)])
 
 ! The per-pass table, when the run asked for it. The passes of one kind in a step sum
-! into one line: the transverse map runs twice a step, and the filter and the solve are
+! into one line. The transverse map runs twice a step, and the filter and the solve are
 ! four dispatches each, so the count says how many encoders went into each figure. The
-! sum is reported against the busy seconds above, which is the same time measured by
-! the command buffer rather than by the encoders inside it.
+! sum is reported against the busy seconds above, the same time as the command buffer
+! clocks it instead of the encoders inside it.
 
 if (dev%timing) then
   early = luc_dev_pass_seconds (psec, pcount, fel_dev_pass_n$)
@@ -1645,29 +1635,30 @@ end subroutine fel_device_close_run
 !
 ! Routine to choose the deposit's fixed-point scale from a bound on what one cell can
 ! hold, and to refuse a bound the kernel's arithmetic cannot carry. Both modes deposit
-! through the same accumulator and differ only in how the bound is built, so the choice,
+! through the same accumulator and differ only in how the bound is built. So the choice,
 ! the two refusals and the origin line live here once.
 !
 ! The scale is the largest power of two that keeps the bounded per-cell sum inside the
-! accumulator, so the scale and its reciprocal are both exact and the conversion back to
-! a float source costs one rounding.
+! accumulator. The scale and its reciprocal are then exact, and the conversion back to a
+! float source costs one rounding.
 !
 ! The headroom is the margin the fixed point wins by. A quantum below the FP32 spacing of
-! the bound resolves the accumulator everywhere more finely than the float accumulation it
-! replaces, and the bits between the two are what the run reports. Too few of them and the
-! run is refused here, before the first step converts anything. The scale is chosen against
-! the same bound the headroom is measured against, so their product lands between 2^61 and
-! 2^62 whatever the deck and the headroom is 37 bits. No deck therefore reaches that
-! refusal, and raising fel_dev_dep_bits_min$ past 37 is what fires it and how it was
-! verified.
+! the bound resolves the accumulator more finely than the float accumulation it replaces.
+! The bits between the two are what the run reports. With too few of them the run is
+! refused here, before the first step converts anything.
 !
-! The scale and its reciprocal reach the kernel as single precision, so both have to be
+! Note: The scale is chosen against the same bound the headroom is taken against. So their
+! product lands between 2^61 and 2^62 whatever the deck, and the headroom is 37 bits. No
+! deck reaches the headroom refusal. Raising fel_dev_dep_bits_min$ past 37 fires it.
+!
+! The scale and its reciprocal reach the kernel in single precision, so both must be
 ! finite and normal there. The headroom cannot catch that, for the same reason it always
-! reads 37 bits: a bound below about 5e-20 V/m sends the scale past the largest float and
-! a bound above about 4e56 sends its reciprocal there, and either would deposit through an
-! infinity while the headroom still reported healthy.
+! reads 37 bits. A bound below about 5e-20 V/m sends the scale past the largest float,
+! and a bound above about 4e56 V/m sends its reciprocal there. Either would deposit
+! through an infinity while the headroom still read healthy.
 !
 ! Input:
+!   dev      -- fel_device_struct: The device state. dep_mutate shifts the scale.
 !   s_bound  -- real(rp): The bound on one cell's accumulated source [V/m].
 !   origin   -- character(*): What the bound is built from, for the origin line.
 !
@@ -1699,11 +1690,11 @@ endif
 
 dep_scale = 2.0_rp ** (floor(log(fel_dev_dep_room$ / s_bound) / log(2.0_rp)) + dev%dep_mutate)
 
-! dep_mutate is zero in every run but the one check that measures what the quantum costs.
-! It is a power of two, so it moves the quantum and leaves everything else alone, which is
-! what lets the quantization be measured against the phase and arithmetic error rather
-! than bounded away from them. A shift down coarsens the quantum and eats the headroom
-! below, so a large enough shift is refused there like any other unusable scale.
+! dep_mutate is zero in every run except the check of what the quantum costs. The shift is
+! a power of two, so it moves the quantum and leaves everything else alone. That separates
+! the quantization from the phase and arithmetic error. A shift down coarsens the quantum
+! and eats the headroom, so a large enough shift is refused below like any other
+! unusable scale.
 
 ! The FP32 spacing at the bound lies between 2^-24 and 2^-23 of it. The narrower is
 ! taken, so the reported headroom is the one the bound's own binade cannot undercut.
@@ -1749,12 +1740,12 @@ end subroutine fel_device_dep_scale
 !+
 ! Subroutine fel_device_unavg_begin (dev, nsub, err_flag)
 !
-! Routine to size the unaveraged mode's own device buffers for one segment and clear
-! the ledger's banked spontaneous energy. Called at an unaveraged element's entry,
-! after fel_device_element_begin has made the beam and the field resident in that
-! mode's chart. The per-substep stage factors and carrier rotators are sized here
-! because nsub is the segment's (fel_unavg_setup), and the banked energy is cleared
-! because the caller reads it as this element's own.
+! Routine to size the unaveraged mode's own device buffers for one segment and clear the
+! ledger's banked spontaneous energy. It is called at an unaveraged element's entry,
+! after fel_device_element_begin has made the beam and the field resident in that mode's
+! chart. The per-substep stage factors and carrier rotators are sized here because nsub
+! is the segment's (fel_unavg_setup). The banked energy is cleared because the caller
+! reads it as this element's own.
 !
 ! Input:
 !   nsub     -- integer: Substeps in one record step of this segment.
@@ -1800,17 +1791,17 @@ end subroutine fel_device_unavg_begin
 ! the four-pass solve, all in one command buffer. Nothing is waited on here.
 !
 ! Input:
-!   par        -- fel_device_unavg_par_struct: The step's constants, from the caller.
-!   fq(:,:,:)  -- real(rp): The stage factors (4, 4 stages, 2 halves) a substep, as
-!                   unavg_field_quartet built them. Rounded to FP32 here.
-!   cbase(:,:) -- complex(rp): e^{i(psi_mid - ks tau_ref)} per substep per slice, FP64
-!                   on the caller's side and rounded once here. psi_mid reaches some
-!                   1700 radians over a segment, which no float carries, so the caller
-!                   reduces it modulo 2 pi before it becomes a rotator.
+!   par         -- fel_device_unavg_par_struct: The step's constants, from the caller.
+!   fq(:,:,:,:) -- real(rp): The stage factors, (4, 4 stages, 2 halves, nsub), as
+!                    unavg_field_quartet built them. Rounded to FP32 here.
+!   cbase(:,:)  -- complex(rp): e^{i(psi_mid - ks tau_ref)}, (nslice, nsub). FP64 on the
+!                    caller's side and rounded once here. psi_mid reaches some 1700
+!                    radians over a segment, which no float carries. So the caller
+!                    reduces it modulo 2 pi before it becomes a rotator.
 !
 ! Output:
-!   dev        -- fel_device_struct: One more record step encoded.
-!   err_flag   -- logical: Set True if the backend refuses. False otherwise.
+!   dev         -- fel_device_struct: One more record step encoded.
+!   err_flag    -- logical: Set True if the backend refuses. False otherwise.
 !-
 
 subroutine fel_device_unavg_step (dev, par, fq, cbase, err_flag)
@@ -1870,15 +1861,15 @@ end subroutine fel_device_unavg_step
 !
 ! Routine to read the unaveraged ledger's two device-side terms.
 !
-! dE_step is the beam energy the kicks moved over the record step just encoded.
-! gamma changes only in the kick, exactly (B does no work), so the step's change is
-! sum w (gamma_end - gamma_start) m_e and the two energy offsets are what the device
-! holds. Summed in FP64 slice by slice and particle by particle, which is the CPU
-! step's own order, so no thread and no device schedule reaches the answer.
+! dE_step is the beam energy the kicks moved over the record step just encoded. gamma
+! changes only in the kick, exactly (B does no work). So the step's change is
+! sum w (gamma_end - gamma_start) m_e, and the device holds the two energy offsets. The
+! sum runs in FP64 slice by slice and particle by particle, the CPU step's own order, so
+! no thread and no device schedule reaches the answer.
 !
-! u_spont is the energy this element's deposits banked as spontaneous emission,
-! 4 sum|src|^2 over the source grid and over every substep, which is the one
-! field-energy term the kick/deposit duality does not charge to the beam.
+! u_spont is the energy this element's deposits banked as spontaneous emission:
+! 4 sum|src|^2 over the source grid and over every substep. It is the one field-energy
+! term the kick/deposit duality does not charge to the beam.
 !
 ! Output:
 !   dE_step -- real(rp): The record step's kick-side beam energy change [J].
@@ -1918,23 +1909,23 @@ end subroutine fel_device_unavg_ledger
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_device_unavg_twin_begin (dev, beam, ff, s0, nsub, err_flag)
+! Subroutine fel_device_unavg_twin_begin (dev, beam, ff, s0, nsub, mutate, err_flag)
 !
-! Routine to put the device in the twin's role for one unaveraged record step, part
-! one: the shared pre-step state uploads in the unaveraged chart, the field images
-! round from the pre-step FP64 records, and the work buffers are sized on the first
-! step. The encoded step then runs while the FP64 path advances the same record step.
+! Routine to put the device in the twin's role for one unaveraged record step, part one.
+! The shared pre-step state uploads in the unaveraged chart, the field images round from
+! the pre-step FP64 records, and the work buffers are sized on the first step. The
+! encoded step then runs while the FP64 path advances the same record step.
 !
 ! Lockstep only, so the state is rebuilt from FP64 every record step and the lag
-! reference moves to the slice's own mean. Residency is never claimed: a readback of
-! twin state into the run's arrays would be the instrument steering what it observes.
+! reference moves to the slice's own mean. Residency is never claimed. A readback of twin
+! state into the run's arrays would make the instrument steer what it observes.
 !
 ! Input:
 !   s0(:,:,:) -- real(rp): Pre-step FP64 state, (6, npart, nslice) as x, px, y, py,
-!                  z, pz in the beam's stored chart. px carries the quiver mid-segment
+!                  z, pz in the beam's stored chart. px carries the quiver mid-segment,
 !                  and the conversion here is fel_unavg_step's own.
 !   nsub      -- integer: Substeps in one record step of this segment.
-!   mutate    -- logical: global%fp32_mutate, the check's own failure hook.
+!   mutate    -- logical: global%fp32_mutate. Coarsen the uploaded lag accumulator?
 !-
 
 subroutine fel_device_unavg_twin_begin (dev, beam, ff, s0, nsub, mutate, err_flag)
@@ -1986,10 +1977,10 @@ do is = 1, size(beam%slice)
     delta = ks * (-s0(5, ip, is) / beta) - ks * tau_r
     dev%su(ip) = nint(delta * fel_dev_ticks_per_rad$, c_int64_t)
 
-    ! The check's mutation reaches the shared state here, the coarsening the averaged
-    ! twin applies to its own accumulator: 65536 ticks is 9.6e-5 rad, which the recorded
-    ! rows must feel. Without it the run's own arithmetic would be the only thing under
-    ! test and a level nothing can move proves nothing.
+    ! The fp32_mutate hook coarsens the shared state here, as the averaged twin coarsens
+    ! its own accumulator. 65536 ticks is 9.6e-5 rad, which the recorded rows must feel.
+    ! Without the hook only the run's own arithmetic is under test, and a level nothing
+    ! can move proves nothing.
 
     if (mutate) dev%su(ip) = 65536_c_int64_t * (dev%su(ip) / 65536_c_int64_t)
   enddo
@@ -2012,17 +2003,16 @@ end subroutine fel_device_unavg_twin_begin
 !+
 ! Subroutine fel_device_unavg_twin_rows (dev, fp32, beam, ff, ks, de_cpu, deturn)
 !
-! Routine to put the device in the twin's role, part two: read the device state back
-! after the record step and fill fel_fp32_mod's nine rows against the FP64 unaveraged
-! path. The columns mean what that mode's own twin makes them mean: rows 1 to 4 are
-! the quiver chart, so they are a worst per-particle difference and see the common
-! offset an rms would miss, row 8 is the ledger's kick-side term and
-! row 9 the field.
+! Routine to put the device in the twin's role, part two. It reads the device state back
+! after the record step and fills fel_fp32_mod's nine rows against the FP64 unaveraged
+! path. The columns mean what that mode's own twin makes them mean. Rows 1 to 4 are the
+! quiver chart, so they are a worst per-particle difference and see the common offset an
+! rms would miss. Row 8 is the ledger's kick-side term and row 9 the field.
 !
 ! The guard is the median per-record-step phase increment in ticks of the fixed-point
-! quantum. There is no common advance to subtract here: the accumulator carries the
-! lag alone, where the averaged chart carries the whole theta and the step's phi0
-! advance comes out of it.
+! quantum. There is no common advance to subtract here. The accumulator carries the lag
+! alone, where the averaged chart carries the whole theta and the step's phi0 advance
+! comes out of it.
 !
 ! Input:
 !   de_cpu(:) -- real(rp): The FP64 step's kick-side energy change per slice [J].
@@ -2112,9 +2102,9 @@ do is = 1, size(beam%slice)
   fp32%bmag64(is) = sqrt(p64r**2 + p64i**2) / sc(7)
   fp32%bmag32(is) = sqrt(p32r**2 + p32i**2) / sc(7)
 
-  ! The field row over the whole record, which is both planes when two are live: the
-  ! difference and the norm are summed over them, so the row prices the field the slice
-  ! holds rather than one of its components.
+  ! The field row covers the whole record, both planes when two are live. The difference
+  ! and the norm are summed over the planes, so the row compares the field the slice holds
+  ! and not one of its components.
 
   call luc_dev_download_field_slice (0, 0, ifld-1, edev)
   w_f = 0

@@ -1,22 +1,23 @@
 !+
 ! Module fel_unaveraged_mod
 !
-! The unaveraged mode (fel-physics.md sec-unaveraged):
-! particles integrated through the undulator's real field (the full Newton-Lorentz
-! quiver, no period averaging) with the radiation field as a co-evolving kick. There
-! is no resonance approximation. What the cost per step buys is physics the averaged
-! map cannot reach: the full quiver dynamics, the energy accounting the beam actually
-! pays, polarization-agnostic coupling and arbitrary harmonic content. The mode is
-! also an independent check on the averaged path, since the coupling factor fc, the harmonic
-! content and the entry/exit behavior of the averaged mode become measured outputs
-! here instead of assumed inputs. MINERVA (Freund and van der Slot) is the published
-! existence proof for this physics, and only its published work was used here. This mode differs by keeping the grid field and
-! the Lorentz force where MINERVA evaluates modal fields. The cost is priced in
-! fel-physics.md and measured in examples/saturation_demo.
+! The unaveraged mode (fel-physics.md sec-unaveraged). Particles are integrated through
+! the undulator's real field, with the full Newton-Lorentz quiver and no period
+! averaging, and the radiation field acts as a co-evolving kick. There is no resonance
+! approximation. The mode reaches physics the averaged map cannot: the full quiver
+! dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling
+! and arbitrary harmonic content.
+!
+! The mode is also an independent check on the averaged path. The coupling factor fc,
+! the harmonic content and the entry/exit behavior of the averaged mode are outputs here
+! instead of assumed inputs. MINERVA (Freund and van der Slot) is the published existence
+! proof for this physics, and only its published work was used here. This mode keeps the
+! grid field and the Lorentz force where MINERVA evaluates modal fields. The cost per
+! step is in fel-physics.md (sec-unaveraged) and examples/saturation_demo.
 !
 ! DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
-! path. Those are what this mode measures, and their appearance here would make the
-! check circular. The harness greps this file for them.
+! path. They are outputs of this mode, and their appearance here would make the check
+! circular. The harness greps this file for them.
 !
 ! The step, per substep delta (Strang split, second order):
 !
@@ -24,12 +25,12 @@
 !      a = e*A/(m_e c), with gamma exact (B does no work). The vector potential carries
 !      a sin^2 amplitude envelope g(s) over n_ramp periods at each end, with g' terms
 !      retained in b, so the quiver builds adiabatically and vanishes at the segment
-!      ends -- the averaged<->unaveraged handoff (the K/gamma chart hazard) happens
+!      ends. So the averaged<->unaveraged handoff (the K/gamma chart hazard) happens
 !      where the two momentum conventions coincide. Each handoff also applies the
-!      ramp's slippage compensation as a discrete phase jump (unavg_ramp_phase_jump:
-!      the ramped ends slip ~3 rad of optical phase less than the contracted
-!      hard-edge element. Uncompensated, that scrambles the bunching-to-field phase
-!      of every pre-bunched segment entry).
+!      ramp's slippage compensation as a discrete phase jump (unavg_ramp_phase_jump).
+!      The ramped ends slip ~3 rad of optical phase less than the contracted hard-edge
+!      element. Uncompensated, that scrambles the bunching-to-field phase of every
+!      pre-bunched segment entry.
 !   2. radiation kick + source deposit at the substep midpoint:
 !        dgamma/ds = -Re[W conj(j)]/(u_s m_e),   W = -i*Ehat*e^{i Psi}
 !      with Psi = (phi0 - ku*s_local) - ks*tau the optical phase (phi0 is the beam's
@@ -37,53 +38,53 @@
 !      comparable), and the polarization-basis current
 !        j = u_x (planar),  (u_x - i u_y)/sqrt(2) (helical).
 !      The source is the same SVEA deposit as the averaged solver with the coupling
-!      Removed and the actual quiver current in its place:
+!      removed and the actual quiver current in its place:
 !        src += i e^{-i Psi} * j * (Z0 c dz /(2 dgrid^2 Ds)) * w/u_s
-!      added to the record as +2*src and the pair then carried through the shared pure
+!      added to the record as +2*src, and the pair then carried through the shared pure
 !      diffraction (fel_field_diffract): E' = D (E + 2 src). The /u_s (where the
 !      averaged solver has Genesis's /gamma) makes the kick/deposit pair exact energy
-!      duals per substep (same operands, same bilinear weights, and the source landing
-!      on the record the kick read before the unitary diffraction), so the ledger closes
-!      to the physical spontaneous-emission term and rounding, by construction. With the
-!      source added after the diffraction the two sides carried different cross terms,
-!      first order in the substep's diffraction phase. Period-averaging the
-!      pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ factor
-!      emerges from the figure-8).
+!      duals per substep: same operands, same bilinear weights, and the source landing
+!      on the record the kick read before the unitary diffraction. So the ledger closes
+!      to the physical spontaneous-emission term and rounding, by construction. With
+!      the source added after the diffraction, the two sides would carry different
+!      cross terms, first order in the substep's diffraction phase. Period-averaging
+!      the pair reproduces the averaged mode's fc to O(1-beta_par) ~ 5e-9 (the JJ
+!      factor emerges from the figure-8).
 !   3. half magnetic push.
 !
-! Units: E in V/m (wavefront convention), m_electron in eV, b in 1/m. The physical
-! field of the scalar envelope: planar E_x = Re[-i Ehat e^{i Psi}]; helical
+! Units: E in V/m (wavefront convention), m_electron in eV, b in 1/m. The physical field
+! of the scalar envelope is planar E_x = Re[-i Ehat e^{i Psi}]. Helical is
 ! (E_x, E_y) = (Re[-i Ehat e^{i Psi}], Re[Ehat e^{i Psi}])/sqrt(2), the pair (1, +i)
 ! that rotates with the electron (jhat = (u_x - i u_y)/sqrt(2) below is its dual). Both
 ! give intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 !
-! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables,
-! chosen on merit: the currency here is short-probe
-! accuracy, and 4th order is what makes fc measurable at 6e-4 with 20
-! steps/period (a 2nd-order symplectic scheme needs ~100 steps/period to match, and
-! no explicit symplectic method exists for this non-separable Hamiltonian without
-! paying implicit iterations). The structural cost is measured, not argued: gamma is
-! conserved exactly by construction (B does no work: gamma changes only in the kick),
-! and over the longest benchmark segment (266 periods, 5320 steps) the dark-run
-! emittance drifts by <= 3.3e-6, orders below every check. If production-length
-! unaveraged runs ever appear (oscillator passes), revisit with a symplectic
-! composition. The ballistic check is the instrument that will say when.
+! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables, chosen on
+! merit. The currency here is short-probe accuracy, and 4th order is what resolves fc at
+! 6e-4 with 20 steps/period (doc/validation.md, val-the-unaveraged-mode-fc). A 2nd-order
+! symplectic scheme needs ~100 steps/period to match. No explicit symplectic method
+! exists for this non-separable Hamiltonian without implicit iterations. gamma is
+! conserved exactly by construction (B does no work, and gamma changes only in the
+! kick). The dark-run emittance drift over the longest benchmark segment (266 periods,
+! 5320 steps) is <= 3.3e-6, orders below every check (doc/validation.md).
 !
-! Parallel over slices with the averaged step's own guarantees (the OpenMP design's
-! design): disjoint particle arrays and field slices per iteration, serial kernel
-! init, threadprivate FFT plans, per-slice energy summed in fixed order. Results
-! are bit-identical across thread counts, and the harness checks it.
+! Note: If production-length unaveraged runs appear (oscillator passes), revisit the
+! push with a symplectic composition. The ballistic check will show when.
 !
-! The device path (fel_device_mod, doc/validation.md val-device-unaveraged). With a
-! backend armed the beam and the field stay resident for the whole segment and one
-! record step is one command buffer of nsub substeps. Three kernels are this mode's own
-! and the rest of a substep is the kernels the averaged path already had. Residency
-! starts inside the first record step rather than at the walk's element entry, because
-! the entry handoff moves z and the chart conversion has to see the moved value, and it
-! ends inside the last one for the same reason. The quantities that do not depend on the
-! particle are built here in FP64 and uploaded once a substep, which is the hoist
-! doc/performance.md prices. With fp32_check on, the device takes the instrument's twin role
-! instead and the FP64 path below runs untouched.
+! The step runs parallel over slices with the averaged step's guarantees: disjoint
+! particle arrays and field slices per iteration, serial kernel init, threadprivate FFT
+! plans, and per-slice energy summed in fixed order. Results are bit-identical across
+! thread counts, and the harness checks it.
+!
+! The device path (fel_device_mod, doc/validation.md val-device-unaveraged): With a
+! backend armed, the beam and the field stay resident for the whole segment, and one
+! record step is one command buffer of nsub substeps. Three kernels are this mode's own.
+! The rest of a substep uses the kernels the averaged path already had. Residency starts
+! inside the first record step and not at the walk's element entry. The entry handoff
+! moves z, and the chart conversion has to see the moved value. Residency ends inside the
+! last record step for the same reason. The quantities that do not depend on the
+! particle are built here in FP64 and uploaded once a substep (the hoist of
+! doc/performance.md). With fp32_check on, the device takes the instrument's twin role
+! instead, and the FP64 path below runs untouched.
 !-
 
 module fel_unaveraged_mod
@@ -118,11 +119,10 @@ contains
 !+
 ! Subroutine fel_unavg_setup (und, ustate, l, dz_record, steps_per_period, ramp_periods, err_flag)
 !
-! Routine to size one segment's unaveraged state: substeps per record step from the
-! requested steps per period (10 is the floor our own fc convergence supports, 20 the
-! default), ramps
-! from the requested periods. Refuses a ramp pair longer than the segment and a record
-! step that does not hold an integer substep count.
+! Routine to size one segment's unaveraged state. Substeps per record step come from the
+! requested steps per period (10 is the floor our own fc convergence supports, and 20
+! the default). Ramps come from the requested periods. The routine refuses a ramp pair
+! longer than the segment and a record step that does not hold an integer substep count.
 !
 ! Input:
 !   und              -- fel_und_struct: Undulator parameters.
@@ -178,26 +178,25 @@ end subroutine fel_unavg_setup
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_unavg_bfield (und, ustate, x, y, s, bx, by, bz)
+! Subroutine fel_unavg_bfield (und, x, y, g, gp, c_u, s_u, bx, by, bz)
 !
-! The normalized magnetostatic field b = e*B/(m_e c) = curl(a) [1/m] at s into the
-! segment, from the analytic vector potential with the ramp envelope g(s):
+! Routine to evaluate the normalized magnetostatic field b = e*B/(m_e c) = curl(a) [1/m]
+! at s into the segment, from the analytic vector potential with the ramp envelope g(s):
 !
 !   planar:  a_x = a0 g(s) cos(ku s) cosh(ku y),          a0 = sqrt(2) aw
 !   helical: a_x = a0 g(s) cos(ku s) (1 + ku^2 r^2/4),    a0 = aw
 !            a_y = a0 g(s) sin(ku s) (1 + ku^2 r^2/4)
 !
-! (aw rms; peak = rms*sqrt(2) planar, = rms helical). The curl retains the g' ramp
+! aw is rms. The peak is rms*sqrt(2) planar and rms helical. The curl retains the g' ramp
 ! terms. The transverse profiles are the near-axis models whose ponderomotive-average
-! focusing reproduces the averaged mode's natural-focusing split exactly (planar
-! kx = 0, ky = ku^2; helical kx = ky = ku^2/2) -- checked in sec-unaveraged.
+! focusing reproduces the averaged mode's natural-focusing split exactly: planar kx = 0,
+! ky = ku^2, and helical kx = ky = ku^2/2 (fel-physics.md sec-unaveraged).
 !
-! The four quantities that depend on s and not on the particle arrive as arguments:
-! the envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK
-! stage shares them, so the caller evaluates them once per stage rather than once per
-! particle per stage. Taking them as arguments rather than computing
-! them here is what makes that structural: this routine can no longer be the place a
-! per-particle transcendental hides.
+! The four quantities that depend on s and not on the particle arrive as arguments: the
+! envelope g and its slope gp, and cos(ku s), sin(ku s). Every particle at one RK stage
+! shares them, so the caller evaluates them once per stage and not once per particle per
+! stage. Taking them as arguments makes that structural: this routine cannot be the place
+! a per-particle transcendental hides.
 !
 ! Input:
 !   und        -- fel_und_struct: Undulator parameters (helicity, tilt frame).
@@ -206,8 +205,8 @@ end subroutine fel_unavg_setup
 !   c_u, s_u   -- real(rp): cos(und%ku * s) and sin(und%ku * s) at this s.
 !
 ! Output:
-!   bx, by, bz -- real(rp): The analytic undulator field B = curl(a), with the
-!                   envelope's g' terms so the ramps stay divergence-free [T].
+!   bx, by, bz -- real(rp): The normalized undulator field b = curl(a) [1/m], with the
+!                   envelope's g' terms so the ramps stay divergence-free.
 !-
 
 subroutine fel_unavg_bfield (und, x, y, g, gp, c_u, s_u, bx, by, bz)
@@ -253,17 +252,18 @@ end subroutine fel_unavg_bfield
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_unavg_step (und, ustate, beam, wf, slip, dz_record, first, last, dE_beam, err_flag)
+! Subroutine fel_unavg_step (und, ustate, beam, ff, dz_record, first, last, dE_beam, dU_spont,
+!                                                                         fp32, dev, err_flag)
 !
-! Routine to advance the beam and field one record step of the unaveraged mode:
-! nsub Strang substeps of (half B push, radiation kick + deposit, half B push, field
-! diffract + add source), per slice, serially. first/last mark the segment's record
-! boundaries: entry asserts and takes the averaged chart (the ramp guarantees a = 0
-! there, so kinetic momentum equals the stored canonical-convention px), exit hands
-! it back and restores the flag. beam%phi0 advances at the averaged ponderomotive
-! rate so every diagnostic row stays comparable. The optical carrier used internally
-! is Psi = (phi0 - ku*s) - ks*tau. dE_beam returns the weighted particle energy
-! change of this step [J] for the energy-ledger check.
+! Routine to advance the beam and field one record step of the unaveraged mode: nsub
+! Strang substeps of (half B push, radiation kick + deposit, half B push, field diffract
+! + add source), per slice. first and last mark the segment's record boundaries. Entry
+! asserts and takes the averaged chart, since the ramp guarantees a = 0 there and the
+! kinetic momentum equals the stored canonical-convention px. Exit hands it back and
+! restores the flag. beam%phi0 advances at the averaged ponderomotive rate so every
+! diagnostic row stays comparable. The optical carrier used internally is
+! Psi = (phi0 - ku*s) - ks*tau. dE_beam returns the weighted particle energy change of
+! this step [J] for the energy-ledger check.
 !
 ! Input:
 !   und       -- fel_und_struct: Undulator parameters.
@@ -276,7 +276,7 @@ end subroutine fel_unavg_bfield
 !   last      -- logical: True on the last (exit handoff and ramp phase jump).
 !   fp32      -- fel_fp32_struct: The lockstep instrument, dark when it is off.
 !   dev       -- fel_device_struct: The device backend, dark when it is off. With the
-!                  instrument off it runs the step; with it on it is the twin.
+!                  instrument off it runs the step. With it on it is the twin.
 !
 ! Output:
 !   beam      -- fel_beam_struct: Advanced by Newton-Lorentz RK4 through the field.
@@ -349,10 +349,10 @@ dgrid = wf%dx
 call fel_field_kernel_init (ngrid, dgrid, ks, dsub)
 
 ! The twin's own field. Its propagator is this mode's, one substep and not one record
-! step, which is the whole reason the averaged instrument's field row does not carry over
-! here: sixty of these run where that one runs once, so the roundings are sixty deep.
-! Both caches are filled from this serial context, the single-precision planner not being
-! thread safe where its executor is.
+! step. nsub of these run where the averaged instrument's runs once, so the roundings are
+! nsub deep, and that instrument's field row does not carry over here. Both caches are
+! filled from this serial context, since the single-precision planner is not thread safe
+! where its executor is.
 
 if (fp32%on) then
   call fel_fp32_field_prep (fp32, ngrid, ngrid)
@@ -388,25 +388,22 @@ if (first) then
   call unavg_ramp_phase_jump ()
 
   ! The field the segment carries is the substep's midpoint field. The step below reads
-  ! the record for the kick at the midpoint and writes D(E + 2S) after, which is the
+  ! the record for the kick at the midpoint and writes D(E + 2S) after. That is the
   ! Strang split with the stored variable taken half a substep past the plane the
-  ! particles reach: consecutive half diffractions merge into whole ones, and the record
+  ! particles reach. Consecutive half diffractions merge into whole ones, and the record
   ! M_n = D_{h/2} E(z_n) advances as M_{n+1} = D_h (M_n + 2 S_n). The field the segment
-  ! receives sits on its entry plane, so it is carried the half step here, and carried
-  ! back at exit. Without the pair the record kept its plane's name and not its plane:
-  ! the particles worked against a field half a substep from where they stood and the
-  ! exit plane was handed a field half a substep past it, first order in the substep
-  ! at both, and the mode's convergence was first order for a diffracting field where
-  ! the split is second order.
+  ! receives sits on its entry plane, so it is carried the half step here and carried
+  ! back at exit. Without the pair, the particles would work against a field half a
+  ! substep from where they stand, and the exit plane would get a field half a substep
+  ! past it. That error is first order in the substep at both ends, and would make the
+  ! mode first order for a diffracting field where the split is second order.
 
   call unavg_field_to_midpoint (0.5_rp, err)
   if (err) return
 endif
 
-! The device path (fel_device_mod). The beam and the field stay resident for the whole
-! segment and one record step is one command buffer of nsub substeps. Residency starts
-! here rather than at the walk's element entry because the entry handoff above moves z,
-! and the chart conversion has to see the moved value.
+! The device path (module header). Residency starts here because the entry handoff
+! above moves z, and the chart conversion has to see the moved value.
 
 if (dev%on .and. .not. fp32%on) then
   call unavg_device_step (err)
@@ -422,9 +419,9 @@ dEturn_slice = 0
 any_err = .false.
 
 ! The device in the instrument's twin role. It advances the same record step from the
-! state this one received, encoded before the FP64 loop below so the two overlap and so
-! its field image rounds from the pre-step record. The FP64 path is untouched, which the
-! harness asserts the way it does for the CPU twin.
+! state this one received. It is encoded before the FP64 loop below, so the two overlap
+! and its field image rounds from the pre-step record. The FP64 path is untouched, and
+! the harness asserts that as it does for the CPU twin.
 
 dev_twin = dev%on .and. fp32%on
 if (dev_twin) then
@@ -444,12 +441,11 @@ if (dev_twin) then
   if (err) return
 endif
 
-! Parallel over slices, the averaged step's own design: each slice
-! touches only its own particle arrays and its own field slice (the beam-to-field
-! mapping is a bijection), the kernel cache is read-only here (initialized serially
-! above), the FFT plan cache is threadprivate, and the per-slice energy lands in
-! dE_slice so the final sum is a fixed-order serial reduction. Results are
-! bit-identical across thread counts, and the harness checks that.
+! Parallel over slices, as the averaged step is. Each slice touches only its own particle
+! arrays and its own field slice (the beam-to-field mapping is a bijection). The kernel
+! cache is read-only here, initialized serially above. The FFT plan cache is
+! threadprivate. The per-slice energy lands in dE_slice, so the final sum is a
+! fixed-order serial reduction.
 
 !$OMP parallel do private(sl, ifld, ux, uy, xx, yy, tau, gam, crsource, crsource_y, s_sub, isub, ip, &
 !$OMP&   cx, cy, cpx, cpy, cz, cpz, &
@@ -511,11 +507,11 @@ do is = 1, nslice
       call fel_grid_weights (wf, xx(ip), yy(ip), ix, iy, wx, wy, on_grid)
       if (on_grid .and. two_pol) then
 
-        ! Two live polarizations: Component-wise duals. The instantaneous kinetic
+        ! Two live polarizations: component-wise duals. The instantaneous kinetic
         ! momenta u_x, u_y are real numbers, each working against and depositing into
         ! its own field component. No polarization convention enters at all (manual
-        ! sec-field vector convention). The scalar branch below keeps the folded
-        ! ĵ-convention verbatim for single-polarization lines.
+        ! sec-field vector convention). The scalar branch below keeps the folded jhat
+        ! convention verbatim for single-polarization lines.
 
         ehat =        wf%Ex(ix,   iy,   ifld) * wx * wy
         ehat = ehat + wf%Ex(ix+1, iy,   ifld) * (1-wx) * wy
@@ -555,12 +551,12 @@ do is = 1, nslice
         if (fp32%on) dEturn_slice(is) = dEturn_slice(is) + sl%weight(ip) * abs(dgam) * m_electron
         gam(ip) = gam(ip) + dgam
 
-        ! /u_s, not Genesis's averaged /gamma: the source and the E.v force are exact
-        ! duals of one wave equation, and using the same u_s the kick used makes the
-        ! per-substep energy exchange cancel identically (the diffraction between
-        ! substeps is unitary), leaving only physical spontaneous emission in the
-        ! ledger. The period-averaged limit shifts by beta_par ~ 5e-9 -- five orders
-        ! below the fc checks. A merit choice, not a transcription (sec-unaveraged).
+        ! /u_s, not Genesis's averaged /gamma. The source and the E.v force are exact
+        ! duals of one wave equation. Using the u_s the kick used makes the per-substep
+        ! energy exchange cancel identically (the diffraction between substeps is
+        ! unitary), leaving only physical spontaneous emission in the ledger. The
+        ! period-averaged limit shifts by beta_par ~ 5e-9, five orders below the fc
+        ! checks. This is a choice on merit and not a transcription (sec-unaveraged).
         cdep = cmplx(0.0_rp, 1.0_rp, rp) * exp(cmplx(0.0_rp, -(psi_mid - ks*tau(ip)), rp)) &
                * jhat * scl_u * sl%weight(ip) / u_s
         crsource(ix,   iy)   = crsource(ix,   iy)   + (wx * wy) * cdep
@@ -575,14 +571,13 @@ do is = 1, nslice
 
     ! The source lands on the record the kick read, and the pair diffracts together:
     ! E' = D (E + 2 src). The kick charged the beam the cross term 2 Re<E, dE> against
-    ! this E, and with D unitary the record's energy moves by exactly that plus the
-    ! deposit's own 4|src|^2, so the ledger closes to rounding. Diffracting first and
-    ! adding after, E' = D E + 2 src, charges the beam against E while the record gains
-    ! the cross term against D E, and the difference, 4 Re<(D - I) E, dE>, is first
-    ! order in the substep's diffraction phase: 1.2 percent of the turnover at 20
-    ! substeps a period on a seed of 100 um waist, halving with the substep. The stored
-    ! record is then the substep's midpoint field, which is the same Strang split read at
-    ! the other half step, and the device's solve does the same.
+    ! this E. With D unitary the record's energy moves by exactly that plus the deposit's
+    ! own 4|src|^2, so the ledger closes to rounding. Diffracting first and adding after,
+    ! E' = D E + 2 src, charges the beam against E while the record gains the cross term
+    ! against D E. The difference, 4 Re<(D - I) E, dE>, is first order in the substep's
+    ! diffraction phase (fel-physics.md sec-unaveraged gives its size). The stored record
+    ! is then the substep's midpoint field, the same Strang split read at the other half
+    ! step. The device's solve does the same.
 
     wf%Ex(:,:,ifld) = wf%Ex(:,:,ifld) + 2 * crsource
     if (two_pol) wf%Ey(:,:,ifld) = wf%Ey(:,:,ifld) + 2 * crsource_y
@@ -590,7 +585,7 @@ do is = 1, nslice
     any_err = any_err .or. err
 
     ! The same step on the twin's record, in single precision, from the source the FP64
-    ! side just built: the row then prices the transform pair, the rounded propagator and
+    ! side just built. The row then covers the transform pair, the rounded propagator and
     ! the accumulation over the substeps, and not the deposit that fed them.
 
     if (fp32%on .and. allocated(fp32%k32)) then
@@ -647,14 +642,14 @@ dU_spont = sum(dU_sp_slice)
 beam%phi0 = beam%phi0 + dz_record * phi0_rate_avg
 ustate%s = ustate%s + dz_record
 
-! Exit handoff: the ramp has closed (a = 0), kinetic equals canonical again.
-
-! The device twin's rows, read before the exit handoff: the ramp's phase jump moves z
-! on the host and the twin advanced the record step, not the handoff, so a comparison
-! taken after it would price the jump instead of the arithmetic. The CPU twin runs
+! The device twin's rows are read before the exit handoff. The ramp's phase jump moves z
+! on the host, and the twin advanced the record step and not the handoff. A comparison
+! taken after the jump would compare the jump and not the arithmetic. The CPU twin runs
 ! inside the loop above and sits before the handoff for the same reason.
 
 if (dev_twin) call fel_device_unavg_twin_rows (dev, fp32, beam, ff, ks, dE_slice, dEturn_slice)
+
+! Exit handoff: the ramp has closed (a = 0), and kinetic equals canonical again.
 
 if (last) then
   call unavg_field_to_midpoint (-0.5_rp, err)   ! Back onto the exit plane.
@@ -681,9 +676,9 @@ err_flag = .false.
 contains
 
 ! One record step on the device. The quantities that do not depend on the particle are
-! built here in FP64 and uploaded once a substep rather than once a particle, which is
-! the hoist doc/performance.md prices, and everything else is the kernels'. What the device
-! does not carry the caller has refused at setup, so nothing here falls back.
+! built here in FP64 and uploaded once a substep and not once a particle (the hoist of
+! doc/performance.md). Everything else is the kernels'. Setup has refused what the device
+! does not carry, so nothing here falls back.
 
 subroutine unavg_device_step (uerr)
 
@@ -750,9 +745,9 @@ logical uerr
 
 uerr = .true.
 
-! A readback found a particle whose |j|/u_s broke the deposit's bound, so the bound no
-! longer holds and nothing further is deposited. The walk stops the run at the comb
-! position that read it; this is the second reading, as fill_device_par's is.
+! A readback found a particle whose |j|/u_s broke the deposit's bound. The bound no
+! longer holds, so nothing further is deposited. The walk stops the run at the comb
+! position that read it. This is the second reading, as fill_device_par's is.
 
 if (dev%dep_breach) return
 
@@ -806,14 +801,14 @@ upar%helical = merge(1, 0, und%helical)
 upar%pad = 0
 
 ! The deposit's bound. A contribution here carries |j|/u_s where the averaged deposit
-! carries a roll-off over gamma, so the bound is the run's whole charge times the
-! largest ratio the kernel is allowed to meet. The quiver sets that ratio: |j| reaches
-! sqrt(2) aw at the peak of a planar wiggle and less on a helical one, the betatron
-! momentum adds a hundredth of that on the checked decks, and u_s falls no lower than
-! the gamma floor the device measured at setup. One rest momentum of headroom on the
-! numerator covers a transverse momentum no FEL beam has. The kernel checks the ratio
-! on every particle and refuses the run through the same fault the averaged deposit's
-! gamma floor uses, so the bound is checked rather than assumed.
+! carries a roll-off over gamma. So the bound is the run's whole charge times the largest
+! ratio the kernel is allowed to meet. The quiver sets that ratio. |j| reaches sqrt(2) aw
+! at the peak of a planar wiggle and less on a helical one. The betatron momentum adds a
+! hundredth of that on the checked decks. u_s falls no lower than the gamma floor the
+! device took at setup. One rest momentum of headroom on the numerator covers a
+! transverse momentum no FEL beam has. The kernel checks the ratio on every particle and
+! refuses the run through the same fault the averaged deposit's gamma floor uses, so the
+! bound is checked and not assumed.
 
 q_tot = dev%dep_qbound * dev%dep_gam_floor
 upar%dep_u_bound = (sqrt(2.0_rp) * und%aw + 1) / dev%dep_gam_floor
@@ -851,23 +846,22 @@ uerr = .false.
 
 end subroutine unavg_field_to_midpoint
 
-! The ramp's slippage compensation, applied as one discrete jump per segment end,
-! at the handoffs where the envelope is exactly zero and nothing couples. The
-! element's contract is L meters of full-strength undulator. The entry/exit ramps
-! are a numerical device (an adiabatic switch-on), and an electron under a ramped
-! quiver <u_perp^2> = g^2 aw^2 lags the wave less than the contracted hard-edge
-! element would have it, by dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds, which
-! is ks*dtau ~ 2.6 rad of optical phase per end at the benchmark parameters
-! (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp per end). Uncompensated, every
-! segment after the first receives a pre-bunched beam with its bunching-to-field
-! phase rotated by that much. The first segment is immune (nothing is bunched
-! yet), and that is exactly how it was caught: per-segment ln-power deviations vs
-! the averaged mode of {0.0000, +0.08, +0.005, +0.02, +0.01, +0.13}. The jump must
-! be discrete and at the ends: compensating continuously inside the ramp detunes
-! the live interaction where the coupling is already substantial (measured -0.9%
-! gain on the first segment, doubling with ramp length). In hardware terms this is
-! the phase shifter that makes a tapered-end segment equivalent to its ideal
-! hard-edged length. In the stored chart z = -beta*tau, so tau += dtau is
+! The ramp's slippage compensation, applied as one discrete jump per segment end, at the
+! handoffs where the envelope is exactly zero and nothing couples. The element's contract
+! is L meters of full-strength undulator. The entry and exit ramps are a numerical device
+! (an adiabatic switch-on). An electron under a ramped quiver <u_perp^2> = g^2 aw^2 lags
+! the wave less than the contracted hard-edge element would have it, by
+! dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds. That is ks*dtau ~ 2.6 rad of optical
+! phase per end at the benchmark parameters (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp
+! per end). Uncompensated, every segment after the first receives a pre-bunched beam
+! with its bunching-to-field phase rotated by that much. The first segment is immune,
+! since nothing is bunched yet.
+!
+! The jump must be discrete and at the ends. Compensating continuously inside the ramp
+! detunes the live interaction where the coupling is already substantial: -0.9% gain on
+! the first segment, doubling with ramp length (doc/validation.md, the unaveraged mode). In
+! hardware terms this is the phase shifter that makes a tapered-end segment equivalent
+! to its ideal hard-edged length. In the stored chart z = -beta*tau, so tau += dtau is
 ! z -= aw^2 INT(1-g^2) / (2 p^2), per particle with its own momentum.
 
 subroutine unavg_ramp_phase_jump ()
@@ -892,9 +886,9 @@ end subroutine unavg_ramp_phase_jump
 ! The s-dependent field factors at the four RK stage positions of a push over h from
 ! s0: the envelope and its slope, and the undulator phase's cosine and sine. None of
 ! them depends on the particle, so one call here replaces four per particle. The stage
-! positions are the expressions the push evaluated inline before the hoist, in the
-! same order, so every value is the same bits it was. Stages two and three share a
-! position and the third is a copy of the second, which says so.
+! positions are the push's own expressions in the same order, so every value is the bits
+! an inline evaluation gives. Stages two and three share a position, and the third is a
+! copy of the second.
 
 subroutine unavg_field_quartet (s0, h, fq)
 
@@ -918,19 +912,19 @@ enddo
 
 end subroutine unavg_field_quartet
 
-! One RK4 magnetic push of a whole slice over step h, stages outermost: each RK stage
-! is one loop over the particles into its stage array, and the combination is a last
-! loop. Per particle this is the same operations on the same values in the same order
-! as the particle-outermost form it replaces (nothing couples particles inside a push,
-! and the stage field factors are per stage already), so the results are byte-identical
-! and the identity checks hold it there. Stages outermost is also the shape a GPU
-! kernel transcribes: array work per stage, no call tree per particle.
+! One RK4 magnetic push of a whole slice over step h, stages outermost. Each RK stage is
+! one loop over the particles into its stage array, and the combination is a last loop.
+! Per particle this is the same operations on the same values in the same order as a
+! particle-outermost loop, since nothing couples particles inside a push and the stage
+! field factors are per stage already. So the results are byte-identical to that form.
+! Stages outermost is also the shape a GPU kernel transcribes: array work per stage, no
+! call tree per particle.
 !
-! All per-particle state passes by argument: host-associated variables privatized by
-! the caller's OMP region are not redirected inside called procedures, so nothing
-! mutable may be host-associated here (und/ustate/inv_beta0 are read-only shared).
-! gamma is untouched: B does no work, exactly. kst is caller scratch, sized (5, n, 4),
-! so the allocation is paid once per slice rather than once per push.
+! All per-particle state passes by argument. Host-associated variables privatized by the
+! caller's OMP region are not redirected inside called procedures. So nothing mutable may
+! be host-associated here. und, ustate and inv_beta0 are read-only and shared. gamma is
+! untouched: B does no work, exactly. kst is caller scratch, sized (5, n, 4), so the
+! allocation is paid once per slice and not once per push.
 
 subroutine unavg_push_all (h, n, xx, yy, ux, uy, tau, gam, fq, kst)
 
@@ -958,7 +952,7 @@ do ip = 1, n
   call unavg_ode (yt, fq(:,4), gam(ip), kst(:,ip,4))
 enddo
 
-! The combination, elementwise exactly as the per-particle form wrote it.
+! The combination, elementwise, in the per-particle order.
 
 do ip = 1, n
   xx(ip)  = xx(ip)  + (h/6) * (kst(1,ip,1) + 2*kst(1,ip,2) + 2*kst(1,ip,3) + kst(1,ip,4))
@@ -994,63 +988,62 @@ end subroutine unavg_ode
 !------------------------------------------------------------------------------
 ! contains
 !+
-! Subroutine unavg_twin_slice (is, n, x0, y0, px0, py0, z0, pz0)
+! Subroutine unavg_twin_slice (is, n, ifl, x0, y0, px0, py0, z0, pz0)
 !
-! Routine to advance one slice's single-precision twin over this record step's
-! substeps and fill the slice's divergence row. The FP64 arrays are the state as this
-! step received it, and beam%slice(is) already carries the FP64 result, so the two are
-! compared where the record step ends. That granularity is the choice: a substep is
-! internal to the integrator, where a record step is the point the FP64 path and any
-! device port synchronize, so it measures what a port would have to match.
+! Routine to advance one slice's single-precision twin over this record step's substeps
+! and fill the slice's divergence row. The FP64 arrays are the state as this step
+! received it, and beam%slice(is) already carries the FP64 result. So the two are
+! compared where the record step ends. A substep is internal to the integrator, where a
+! record step is the point the FP64 path and any device port synchronize. So the row
+! shows what a port would have to match.
 !
-! Both sides gather the field from the FP64 record. What the twin therefore prices is
-! the particle path, which is where every reformulation below lives. The field's own
-! single-precision accumulation is a separate quantity and is not measured here: this
-! mode diffracts nsub times a record step where the averaged mode diffracts once, so it
-! pays that many roundings, and the averaged instrument's field row does not carry over.
-! doc/validation.md says so where the levels are recorded.
+! Both sides gather the field from the FP64 record, so the particle rows cover the
+! particle path alone, which is where every reformulation below lives. The field's
+! single-precision arithmetic has its own row, from the twin's field record the caller
+! advances every substep. This mode diffracts nsub times a record step where the
+! averaged mode diffracts once, so the averaged instrument's field row does not carry
+! over (doc/validation.md, val-unaveraged-fp32).
 !
-! What single precision destroys in this advance, each measured on a real mid-segment
-! state of the one-segment deck rather than argued:
+! What single precision destroys in this advance, on a real mid-segment state of the
+! one-segment deck (doc/validation.md, val-unaveraged-fp32):
 !
 !   slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
 !             the difference is 1.9e-9, which is 0.016 of the quantum of one in single
-!             precision, so the naive difference is exactly zero and the slippage is
+!             precision. So the naive difference is exactly zero and the slippage is
 !             gone. Formed through the identity in fel_fp32_unavg_ode it comes back to
 !             1.2e-7. This is the reformulation the mode lives on.
 !   energy    gamma is 11358 with a quantum of 9.8e-4 against a per-substep change of
 !             1.0e-6, which is a thousandth of a quantum. The working variable is
 !             goff = gamma - gamma0, whose quantum is 6.0e-8 and which carries the same
 !             change at 18 quanta.
-!   lag       tau is the particle's lag and its per-substep change is 3.1e-12 m, which
-!             the guard below measures rather than infers. Most of that is the quiver's
-!             own longitudinal oscillation and not the slippage drift, so a figure taken
+!   lag       tau is the particle's lag, and its per-substep change is 3.1e-12 m. The
+!             guard below takes that change directly. Most of it is the quiver's own
+!             longitudinal oscillation and not the slippage drift. So a figure taken
 !             from two states many substeps apart understates it by nearly three orders.
 !             Carrying the whole lag, one slice resolves the change at 4.4e5 quanta and
-!             32 slices at 1.4e4, but a 351-slice window at 164 nm reaches 5.8e-5 m and
+!             32 slices at 1.4e4. A 351-slice window at 164 nm reaches 5.8e-5 m and
 !             resolves it at 0.84 of a quantum, which is lost. The residual off a
 !             per-slice FP64 reference is one slice's spread whatever the window, so it
-!             does not move with the slice count. The margin is the reason the guard
-!             watches this and not something else.
+!             does not move with the slice count. This margin is why the guard watches
+!             the lag and nothing else.
 !   phase     Psi carried whole per particle costs 2.7e-5 rad at a segment's end and
 !             grows with s. The base is one FP64 number a slice a substep, which is
-!             what a device kernel would upload, and only the residual ks*dtaur is
-!             single precision, at 2.4e-7 rad.
+!             what a device kernel would upload. Only the residual ks*dtaur is single
+!             precision, at 2.4e-7 rad.
 !
-! u_s itself needs no reformulation, which measurement rather than expectation settled:
-! sqrt(gamma^2 - 1 - ux^2 - uy^2) does lose the 1 and the ux^2 entirely in single
-! precision, but they are 6.7e-9 of the result, so the naive and the reformed values
-! agree to 5.0e-8. The same value serves the kick and the deposit, which is what keeps
-! the pair exact energy duals.
+! u_s itself needs no reformulation, against expectation. sqrt(gamma^2 - 1 - ux^2 - uy^2)
+! does lose the 1 and the ux^2 entirely in single precision. But they are 6.7e-9 of the
+! result, so the naive and the reformed values agree to 5.0e-8. The same value serves the
+! kick and the deposit, which keeps the pair exact energy duals.
 !
-! Runs inside the caller's parallel slice loop: everything written is indexed by is.
+! This runs inside the caller's parallel slice loop. Everything written is indexed by is.
 !-
 
 subroutine unavg_twin_slice (is, n, ifl, x0, y0, px0, py0, z0, pz0)
 
-! ifl is passed and not host-associated, and the slice is reached through beam, which
-! is shared: this module's push header states the rule, that a variable the caller's
-! OMP region privatizes is not redirected inside a called procedure.
+! ifl is passed and not host-associated, and the slice is reached through beam, which is
+! shared. A variable the caller's OMP region privatizes is not redirected inside a called
+! procedure (see unavg_push_all).
 
 integer is, n, ifl
 real(rp) x0(:), y0(:), px0(:), py0(:), z0(:), pz0(:)
@@ -1120,11 +1113,10 @@ h32 = real(dsub, sp)
 s_t = ustate%s
 
 ! The guard. The lag residual is the one single-precision quantity here whose per-substep
-! change can fall under its own quantum, and whether it does depends on the window and
-! not on the physics: the residual is a slice's own spread, where the whole lag grows with
-! the slice count. The statistic is that change in units of the residual's spacing, summed
-! over the substeps here and reduced to a median at the end, which is the shape and the
-! floor the averaged instrument's guard already uses.
+! change can fall under its own quantum. Whether it does depends on the window and not on
+! the physics, since the whole lag grows with the slice count. The statistic is that
+! change in units of the residual's spacing, summed over the substeps here and reduced to
+! a median at the end. That is the shape and the floor of the averaged instrument's guard.
 
 allocate (dtau_ulp(n), tsave(n))
 dtau_ulp = 0
@@ -1165,7 +1157,7 @@ do jsub = 1, ustate%nsub
     else
       jr = t%ux(ip);  ji = 0.0_sp
     endif
-    ! W = -i Ehat e^{i ang}; dgamma = -dsub Re[W conj(j)] / (u_s m_e).
+    ! W = -i Ehat e^{i ang}, and dgamma = -dsub Re[W conj(j)] / (u_s m_e).
     wr =  ehat_r * sn + ehat_i * cs
     wi = -ehat_r * cs + ehat_i * sn
     dg32 = -h32 * (wr * jr + wi * ji) / (us32 * real(m_electron, sp))
@@ -1184,9 +1176,9 @@ do jsub = 1, ustate%nsub
   s_t = s_t + dsub
 enddo
 
-! The rows. Every one is a worst per-particle difference, which sees a common offset:
-! ux and uy hold the quiver, which is an offset a slice shares and not a spread, so a
-! statistic blind to an offset would report health on a wrong chart.
+! The rows. Every one is a worst per-particle difference, which sees a common offset. ux
+! and uy hold the quiver, an offset a slice shares and not a spread. A statistic blind to
+! an offset would report health on a wrong chart.
 
 dstat = 0
 wsum = 0
@@ -1222,18 +1214,17 @@ sc(7) = wsum + 1e-30_rp
 fp32%div_slice(1:6, is) = dstat(1:6) / sc(1:6)
 fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
 ! The energy the twin's kicks took from the beam, against the FP64 step's own. This is
-! the ledger's own term and not a coordinate, and it is the row a single-precision path
-! that quietly stopped conserving would move first, the kick and the deposit being exact
+! the ledger's own term and not a coordinate. A single-precision path that quietly
+! stopped conserving would move this row first, since the kick and the deposit are exact
 ! duals only while they share operands.
 !
-! The scale is the energy the step actually moved and not the energy it netted. Over a
-! record step the gains and the losses very nearly cancel, so the net is a small
-! difference of large exchanges and a relative error against it means nothing: on the
-! benchmark segment that ratio reaches 3, which is a statement about the cancellation
-! rather than about single precision. The turnover is the sum of the absolute exchanges,
-! which is what the ledger's own check normalizes by for the same reason, and what the
-! averaged instrument's phasor row does when it scales to charge rather than to a
-! noise-level sum.
+! The scale is the energy the step moved and not the energy it netted. Over a record step
+! the gains and the losses very nearly cancel, so the net is a small difference of large
+! exchanges, and a relative error against it means nothing. Against the net the ratio
+! reaches 3 on the benchmark segment (doc/validation.md, val-unaveraged-fp32). The
+! turnover is the sum of the absolute exchanges. The ledger's own check normalizes by it
+! for the same reason, as the averaged instrument's phasor row scales to charge and not
+! to a noise-level sum.
 
 fp32%div_slice(8, is) = abs(dE32 - dE_slice(is)) / (dEturn + 1e-30_rp)
 ! The field row, the twin's record against the FP64 one, normalized by the FP64 field's

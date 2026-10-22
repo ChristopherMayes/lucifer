@@ -1,24 +1,25 @@
 !+
 ! Module fel_fp32_mod
 !
-! The single-precision particle path and the lockstep instrument that prices it
-! (doc/performance.md, doc/validation.md). Apple GPUs have no FP64, so before any
-! kernel is written a single-precision form of the averaged FEL advance must exist
-! with its divergence from the FP64 path a measured number. Nothing outside the
-! instrument reads the FP32 state, and the FP64 path is untouched: this module is a
-! measuring device, not a production mode.
+! The single-precision particle path, and the lockstep instrument that compares it with
+! the FP64 path (doc/performance.md, doc/validation.md). Apple GPUs have no FP64. So a
+! single-precision form of the averaged FEL advance exists, with its divergence from the
+! FP64 path recorded, before any kernel is written. Nothing outside the instrument reads
+! the FP32 state, and the FP64 path is untouched. This module is an instrument and not a
+! production mode.
 !
-! The FP32 state is the packed six-vector (x, px, y, py, dzr, pz), 24 bytes per
-! particle. dzr is the longitudinal residual of the split z = z_ref + dzr, with z_ref
-! one FP64 number per slice. Storing Bmad's z absolutely in FP32 fails silently (the
-! per-step increment rounds to zero and bunching never forms), so the residual form is
-! load-bearing and the runtime guard below watches it. The reference must also move:
-! the beam's common z drift is secular, a static reference lets the residual grow until
-! its ulp swallows the physics, and the guard caught exactly that on this instrument's
-! first run (step 514 of the steady-state example, 28 ulps against the floor of 32).
-! z_ref therefore refreshes to the slice's FP64 mean each step, one host number per
-! slice, and in freerun mode the persistent residuals rebase across the reference move
-! by fel_fp32_renorm, which is the migration operation doing double duty.
+! The FP32 state is the packed six-vector (x, px, y, py, dzr, pz), 24 bytes per particle.
+! dzr is the longitudinal residual of the split z = z_ref + dzr, with z_ref one FP64
+! number per slice. Storing Bmad's z absolutely in FP32 fails silently: the per-step
+! increment rounds to zero and bunching never forms. So the residual form is required,
+! and the runtime guard below watches it.
+!
+! The reference must also move. The beam's common z drift is secular, and with a static
+! reference the residual grows until its ulp swallows the physics. With a static
+! reference the guard refuses the steady-state example (doc/validation.md,
+! val-fp32-lockstep). So z_ref refreshes to the slice's FP64 mean each step, one host
+! number per slice. In freerun mode fel_fp32_renorm rebases the persistent residuals
+! across the reference move, the same operation slice migration uses.
 !
 ! Reformulations, each forced by an FP32 quantum and each below FP64 notice:
 !
@@ -29,7 +30,7 @@
 !            loses the 1 entirely (the quantum of gamma^2 is about 15).
 !   phase    The working variable is delta = theta - phi0, formed as ks * dzr
 !            (the 1/beta corrections are ~4e-9 of theta, below FP32 resolution and
-!            part of what the instrument measures). The phase factor is
+!            part of what the instrument's rows include). The phase factor is
 !            e^{-i theta} = e^{-i phi0} * e^{-i delta}: the base rotator is one FP64
 !            evaluation per slice, the per-particle sincos is FP32 on the small
 !            angle. This is the angle-addition form a device kernel would use.
@@ -41,23 +42,26 @@
 !            small like quantities. The remaining floor is btper0's own FP32
 !            representation, and the recorded levels carry it.
 !
-! The instrument runs both precisions from a shared state at fel_advance's own
-! sequence point: the FP64 slice is copied before its
-! advance, the twin advances the FP32 image of that copy, and the comparison reads
-! both results before anything else touches the slice. In lockstep mode the FP32
-! state is rebuilt from FP64 every step, so a wrong formula shows as a jump rather
-! than as growth. In freerun mode dzr, pz and the FP32 field record persist across
-! steps, the deposit feeds the twin's own field and the gather reads it, so the twin is
-! a complete single-precision run beside the FP64 one; the transverse coordinates are
-! refreshed from FP64 in both modes, since the transverse maps stay FP64 and enter
-! rounded. A freerun window is one slice by refusal: the twin keeps no slippage
-! rotation of its own, and slippage moves light between slices. The source phasor sum(w * awloc * e^{-i theta}) is compared at the
-! same point; the production deposit runs one FP64 transverse half-step later, which
-! is precision-neutral between the sides.
+! The instrument runs both precisions from a shared state at fel_advance's own sequence
+! point. The FP64 slice is copied before its advance, the twin advances the FP32 image of
+! that copy, and the comparison reads both results before anything else touches the
+! slice. In lockstep mode the FP32 state is rebuilt from FP64 every step, so a wrong
+! formula shows as a jump and not as growth. In freerun mode dzr, pz and the FP32 field
+! record persist across steps. The deposit feeds the twin's own field and the gather
+! reads it, so the twin is a complete single-precision run beside the FP64 one. The
+! transverse coordinates are refreshed from FP64 in both modes, since the transverse maps
+! stay FP64 and enter rounded.
 !
-! Everything here is serial-safe inside the caller's parallel slice loop: the twin
-! touches only its slice's state and its slice's row of the divergence arrays, so the
-! instrument's own output is identical at any thread count.
+! Note: A freerun window is one slice, and more are refused. The twin keeps no slippage
+! rotation of its own, and slippage moves light between slices.
+!
+! The source phasor sum(w * awloc * e^{-i theta}) is compared at the same point. The
+! production deposit runs one FP64 transverse half-step later, which is precision-neutral
+! between the two sides.
+!
+! Everything here is safe inside the caller's parallel slice loop. The twin touches only
+! its slice's state and its slice's row of the divergence arrays, so the instrument's own
+! output is identical at any thread count.
 !-
 
 module fel_fp32_mod
@@ -73,20 +77,19 @@ integer, parameter :: fel_fp32_nq$ = 9   ! x, px, y, py, pz, theta, phasor, sour
 #ifdef LUCIFER_HAVE_FFTW3F
 
 ! The single-precision transform's plan cache, threadprivate for the reason
-! wavefront_mod's is: the axis of parallelism is the slice and not the transform, so
+! wavefront_mod's is. The axis of parallelism is the slice and not the transform, so
 ! every thread needs its own plans and its own aligned buffer. FFTW's new-array execute
-! rule makes running a plan on a differently aligned array undefined, which is why the
-! buffer is FFTW's own allocation and the transform runs on it rather than on the
-! caller's array.
+! rule makes running a plan on a differently aligned array undefined. So the buffer is
+! FFTW's own allocation, and the transform runs on it and not on the caller's array.
 !
-! The planner is not thread safe where the executor is, so the build of a thread's cache
-! holds a named lock and fel_fp32_fft_plan_threads fills every thread's cache before the
-! slice loops start. Four threads planning at once segfault inside the library. That is
-! wavefront_fft2_plan_threads' arrangement, and the reason it exists.
+! The planner is not thread safe where the executor is. So the build of a thread's cache
+! holds a named lock, and fel_fp32_fft_plan_threads fills every thread's cache before the
+! slice loops start. Four threads planning at once segfault inside the library. This is
+! the arrangement of wavefront_fft2_plan_threads, for the same reason.
 !
 ! The plans are FFTW_ESTIMATE, so which thread's plan runs cannot move a digit.
-! FFTW_MEASURE chooses by timing and is nondeterministic at the ulp level, the same
-! decision recorded in wavefront_mod.
+! FFTW_MEASURE chooses by timing and is nondeterministic at the ulp level, as
+! wavefront_mod also records.
 
 type (c_ptr), private, save :: f32_plan_f = c_null_ptr
 type (c_ptr), private, save :: f32_plan_b = c_null_ptr
@@ -98,11 +101,11 @@ integer, private, save :: f32_ng = 0
 #endif
 
 ! The field twin transforms with FFTW's single-precision interface, and not every
-! toolchain carries it: the conda environment does, and the off-site distribution
-! builds FFTW from source in double precision only. The build detects the library and
-! defines LUCIFER_HAVE_FFTW3F when it is there (lucifer/CMakeLists.txt). Without it the
-! instrument refuses at setup rather than transforming in another precision, which
-! would measure something other than what it reports.
+! toolchain carries it. The conda environment does. The off-site distribution builds FFTW
+! from source in double precision only. The build detects the library and defines
+! LUCIFER_HAVE_FFTW3F when it is there (lucifer/CMakeLists.txt). Without it the
+! instrument refuses at setup. Transforming in another precision would report a
+! precision the run did not use.
 
 #ifdef LUCIFER_HAVE_FFTW3F
 logical, parameter :: fel_fp32_have_fftw3f$ = .true.
@@ -126,14 +129,6 @@ type fel_fp32_slice_struct
   real(sp), allocatable :: pz(:)                      ! (p - p0)/p0, already an offset.
   real(rp) :: z_ref = 0                               ! The slice's FP64 z reference [m].
 end type
-
-!+
-! Struct fel_fp32_struct
-!
-! The instrument's run state: mode, the per-slice FP32 sets, the per-step divergence
-! table the parallel loop fills and the serial epilogue reduces, and the guard and
-! worst-case accumulators the footer and the check read.
-!-
 
 !+
 ! Struct fel_fp32_unavg_slice_struct
@@ -170,9 +165,17 @@ type fel_fp32_unavg_struct
   logical :: helical = .false.
 end type
 
+!+
+! Struct fel_fp32_struct
+!
+! The instrument's run state: mode, the per-slice FP32 sets, the per-step divergence
+! table the parallel loop fills and the serial epilogue reduces, and the guard and
+! worst-case accumulators the footer and the check read.
+!-
+
 type fel_fp32_struct
   logical :: on = .false.
-  logical :: freerun = .false.       ! dzr/pz/field persist across steps (compounding measured).
+  logical :: freerun = .false.       ! dzr, pz and the field persist across steps.
   logical :: mutate = .false.        ! Check hook: truncate dzr harder so the check can fail.
   integer :: iu = 0                  ! The .fp32.txt stream.
   integer :: istep = 0               ! Steps instrumented.
@@ -183,7 +186,7 @@ type fel_fp32_struct
   real(rp) :: ulp_min = huge(1.0_rp)         ! Run-level worst (smallest) guard statistic.
   logical :: checked = .false.               ! A configuration check ran (first step).
   ! The field twin: one FP32 field record per beam slice. In lockstep it is the FP64
-  ! record rounded each step before the solve; in freerun it carries, fed by its own
+  ! record rounded each step before the solve. In freerun it carries, fed by its own
   ! deposit, and the particle twin gathers from it.
   complex(sp), allocatable :: e32(:,:,:)     ! (ngrid, ngrid, nslice).
   complex(sp), allocatable :: k32(:,:)       ! The propagator, rounded from the FP64 kernel.
@@ -200,21 +203,23 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_fp32_setup (fp32, mode, mutate, nslice, out_root, err_flag)
+! Subroutine fel_fp32_setup (fp32, mode, mutate, nslice, bucket_shift, out_root, err_flag)
 !
-! Routine to arm the instrument from the input knob: '' or 'off' leaves it dark,
-! 'lockstep' rebuilds the FP32 state from FP64 every step, 'freerun' lets the
-! longitudinal state carry across steps. Opens the .fp32.txt stream.
+! Routine to arm the instrument from the input knob and open the .fp32.txt stream. '' or
+! 'off' leaves it dark. 'lockstep' rebuilds the FP32 state from FP64 every step.
+! 'freerun' lets the longitudinal state carry across steps.
 !
 ! Input:
-!   mode     -- character(*): global%fp32_check.
-!   mutate   -- logical: global%fp32_mutate, the check's own failure hook.
-!   nslice   -- integer: Slice count.
-!   out_root -- character(*): Output root for the stream file.
+!   mode         -- character(*): global%fp32_check.
+!   mutate       -- logical: global%fp32_mutate. Coarsen the twin's state so the check
+!                     can fail?
+!   nslice       -- integer: Slice count.
+!   bucket_shift -- real(rp): The slice bucket [m], for the renormalization round trip.
+!   out_root     -- character(*): Output root for the stream file.
 !
 ! Output:
-!   fp32     -- fel_fp32_struct: Armed (or left dark).
-!   err_flag -- logical: Set True on an unrecognized mode. False otherwise.
+!   fp32         -- fel_fp32_struct: Armed (or left dark).
+!   err_flag     -- logical: Set True on an unrecognized mode or a refusal. False otherwise.
 !-
 
 subroutine fel_fp32_setup (fp32, mode, mutate, nslice, bucket_shift, out_root, err_flag)
@@ -258,9 +263,9 @@ if (.not. fel_fp32_have_fftw3f$) then
   return
 endif
 
-! Freerun now carries the FP32 field, and the field twin keeps one record per beam
-! slice with no slippage bookkeeping of its own, so a multi-slice freerun would hold
-! each slice's light fixed where the real dynamics rotate it across slices.
+! Freerun carries the FP32 field, and the field twin keeps one record per beam slice with
+! no slippage bookkeeping of its own. A multi-slice freerun would hold each slice's light
+! fixed where the real dynamics rotate it across slices.
 
 if (fp32%freerun .and. nslice > 1) then
   call out_io (s_error$, r_name, 'FP32_CHECK = "freerun" CARRIES THE FP32 FIELD AND COVERS A', &
@@ -297,9 +302,9 @@ write (fp32%iu, '(a)') '# the one that moves with the window.'
 write (fp32%iu, '(a, l1)') '# freerun = ', fp32%freerun
 
 ! Migration in the residual representation is a bucket renormalization: a mover's
-! residual re-references to the new slice origin by the FP64 bucket shift. The
-! round trip (shift out and back) is measured here on residuals spanning the slice,
-! in ulps of the residual, and recorded beside the run's own levels.
+! residual re-references to the new slice origin by the FP64 bucket shift. The round
+! trip (shift out and back) is taken here on residuals spanning the slice, in ulps of the
+! residual, and written beside the run's own levels.
 
 nprobe = 4097
 allocate (rres(nprobe), rorig(nprobe))
@@ -328,11 +333,10 @@ end subroutine fel_fp32_setup
 ! Routine to allocate the twin's field record before a slice loop reaches it.
 !
 ! The record is one array for the whole window, and fel_fp32_twin_slice runs under the
-! slice loop's OMP parallel do, so the loop cannot be what first touches it. Allocating
-! it there on first use let two threads find it unallocated at the same moment and both
-! allocate it, which stops a bounds-checked build with no message on stdout. A one-slice
-! window never raced and an eight-slice window raced about one run in five under load.
-! The grid is not known at fel_fp32_setup, which is why this is separate.
+! slice loop's OMP parallel do. So the loop cannot be what first touches it. Allocated
+! there on first use, two threads can find it unallocated at once and both allocate it.
+! A bounds-checked build then stops with no message on stdout (doc/changelog.md). The grid
+! is not known at fel_fp32_setup, which is why this routine is separate.
 !
 ! Input:
 !   fp32 -- fel_fp32_struct: The instrument, after fel_fp32_setup.
@@ -389,11 +393,10 @@ end subroutine fel_fp32_renorm
 !+
 ! Function fel_fp32_faw (x, y, kx, ky, ax, ay, cos_t, sin_t) result (value)
 !
-! The FP64 comparison side's transverse roll-off, faw of fel_track_mod on loose
-! scalars rather than on an fel_und_struct, which the instrument and the device seam
-! do not carry. Shared by both of the instrument's roles: the CPU twin compares
-! against it and the device twin does the same, and one transcription of the
-! expression is the point.
+! Routine to evaluate the FP64 comparison side's transverse roll-off. This is faw of
+! fel_track_mod on loose scalars instead of on an fel_und_struct, which the instrument
+! and the device seam do not carry. The CPU twin and the device twin both compare
+! against it, so the expression is transcribed once.
 !
 ! Input:
 !   x, y            -- real(rp): Transverse position [m].
@@ -430,15 +433,15 @@ end function fel_fp32_faw
 ! Subroutine fel_fp32_deposit64 (src, x, y, theta, wgt, scl_w, gridmax, dgrid, &
 !                                   kx2, ky2, ax, ay, cos_t, sin_t)
 !
-! One particle's FP64 source deposit, fel_field_step's own expressions:
-! part = sqrt(faw2) * scl_w * wgt with faw2 = 1 + kx*dx^2 + ky*dy^2 (no half, which
-! is Genesis's own roll-off transcribed), cpart = (sin theta + i cos theta) * part,
-! bilinear scatter onto the lower-left cell and its three neighbours.
+! Routine to add one particle's FP64 source deposit, with fel_field_step's own
+! expressions: part = sqrt(faw2) * scl_w * wgt with faw2 = 1 + kx*dx^2 + ky*dy^2 (no
+! half, which is Genesis's own roll-off transcribed), cpart = (sin theta + i cos theta)
+! * part, and a bilinear scatter onto the lower-left cell and its three neighbours.
 !
-! This is the reference the FP32 source row is measured against, and both roles of the
-! instrument need it: the CPU field twin and the device twin. It lives here, once,
-! because it is a transcription of a convention -- a second copy would have to be
-! found and changed the day fel_field_step's deposit changes.
+! The FP32 source row is compared against this deposit, in both of the instrument's
+! roles: the CPU field twin and the device twin. It transcribes a convention, so it lives
+! here once. A second copy would have to be found and changed whenever fel_field_step's
+! deposit changes.
 !
 ! Input:
 !   src(:,:)        -- complex(rp): The accumulating source grid.
@@ -496,11 +499,11 @@ end subroutine fel_fp32_deposit64
 !+
 ! Subroutine fel_fp32_median (v, nn, med)
 !
-! The median of the first nn entries, scratch reordered in place. Heapsort:
-! O(n log n), no recursion, no degenerate case. This runs per slice per step in both
-! of the instrument's roles, so it must be cheap and it must terminate on any input
-! (a quickselect written here first did not, and hung a run). The sift is inlined
-! twice because a contained procedure cannot hold one of its own.
+! Routine to find the median of the first nn entries, reordering them in place. The sort
+! is a heapsort: O(n log n), no recursion, no degenerate case. This runs per slice per
+! step in both of the instrument's roles, so it must be cheap and must terminate on any
+! input. The sift is inlined twice because a contained procedure cannot hold one of its
+! own.
 !
 ! Input:
 !   v(:)  -- real(rp): The values. Reordered in place.
@@ -567,12 +570,12 @@ end subroutine fel_fp32_median
 !                                    cos_t, sin_t, rtmp, delz, xks, xku, phi0, phi0_new)
 !
 ! Routine to advance one slice's FP32 twin from the shared pre-advance state and fill
-! this slice's divergence row. The x0.. arrays are the FP64 state exactly as
-! fel_advance received it, sl is the slice after the FP64 advance, and the twin
-! mirrors fel_advance's arithmetic under the module header's reformulations:
-! fundamental field only, no collective terms (the setup refusals hold that).
+! this slice's divergence row. The x0.. arrays are the FP64 state exactly as fel_advance
+! received it, and sl is the slice after the FP64 advance. The twin mirrors
+! fel_advance's arithmetic under the module header's reformulations. It covers the
+! fundamental field only and no collective terms, and the setup refusals hold that.
 !
-! Runs inside the caller's parallel loop: everything written is indexed by is.
+! This runs inside the caller's parallel loop. Everything written is indexed by is.
 !-
 
 subroutine fel_fp32_twin_slice (fp32, is, x0, y0, px0, py0, z0, pz0, sl, beam, &
@@ -630,11 +633,11 @@ if (.not. allocated(t%x)) then
   t%dzr = real(z0(1:n) - t%z_ref, sp)
 endif
 
-! The shared state: transverse always from FP64 (the transverse maps stay FP64), the
-! longitudinal from FP64 in lockstep mode and carried in freerun mode. The FP64
-! reference moves to the slice mean each step in both modes: one host number per
-! slice, which is the split's working principle. In freerun the persistent residuals
-! rebase across the move, the renormalization the migration path uses.
+! The shared state: transverse always from FP64, since the transverse maps stay FP64.
+! Longitudinal from FP64 in lockstep mode, and carried in freerun mode. The FP64
+! reference moves to the slice mean each step in both modes, one host number per slice.
+! In freerun the persistent residuals rebase across the move, the renormalization the
+! migration path uses.
 
 t%x = real(x0(1:n), sp);   t%px = real(px0(1:n), sp)
 t%y = real(y0(1:n), sp);   t%py = real(py0(1:n), sp)
@@ -648,8 +651,8 @@ else
   t%dzr = real(z0(1:n) - t%z_ref, sp)
 endif
 
-! The check's own mutation: a deliberately coarser residual, so the recorded level
-! must move and the check is falsifiable.
+! The fp32_mutate hook: a deliberately coarser residual. The recorded level must then
+! move, so the check can fail.
 
 if (fp32%mutate) t%dzr = anint(t%dzr / (256 * spacing(t%dzr))) * (256 * spacing(t%dzr))
 
@@ -876,23 +879,24 @@ end subroutine fel_fp32_twin_slice
 ! Subroutine fel_fp32_field_twin (fp32, is, sl, beam, exfld_post, exp_k2, scl_w, &
 !                                    dx, gridmax, kx2, ky2, ax, ay, cos_t, sin_t, xks)
 !
-! Routine to run one slice's FP32 field step and fill the source and field rows. Serial,
-! from the caller's epilogue after the production solve loop: the FP64 record already
-! carries this step's solve, and the twin recomputes the same step in FP32 from its own
-! field record (rounded pre-solve in lockstep, carried in freerun).
+! Routine to run one slice's FP32 field step and fill the source and field rows. It runs
+! serially, from the caller's epilogue after the production solve loop. The FP64 record
+! already carries this step's solve, and the twin recomputes the same step in FP32 from
+! its own field record (rounded pre-solve in lockstep, carried in freerun).
 !
-! The source comparison uses the shared post-step FP64 particle state on both sides
-! (the FP32 side through rounded values), so the rows price the field arithmetic alone:
-! the deposit's weights, phases and FP32 accumulation, the single-precision transform
-! pair, and the rounded propagator. The freerun deposit instead uses the twin's own
-! longitudinal state, since there the FP32 field must be fed by the FP32 run. The
-! deposit expressions mirror fel_field_step exactly: part = sqrt(faw2)*scl_w*w/gamma
+! The source comparison uses the shared post-step FP64 particle state on both sides, the
+! FP32 side through rounded values. So the rows isolate the field arithmetic: the
+! deposit's weights, phases and FP32 accumulation, the single-precision transform pair,
+! and the rounded propagator. The freerun deposit instead uses the twin's own
+! longitudinal state, since there the FP32 field must be fed by the FP32 run.
+!
+! The deposit expressions mirror fel_field_step exactly: part = sqrt(faw2)*scl_w*w/gamma
 ! with faw2 = 1 + kx*dx^2 + ky*dy^2 (no half: Genesis's own roll-off, transcribed),
 ! cpart = (sin theta + i cos theta) * part = i e^{-i theta} * part, bilinear scatter,
 ! transform, kernel multiply, inverse transform, 1/N, plus 2*source in real space.
 !
-! Both rows are normalized by the post-solve FP64 field's norm: the source alone can
-! sit at noise level on a dark start, and the post-solve field bounds it from below.
+! Both rows are normalized by the post-solve FP64 field's norm. The source alone can sit
+! at noise level on a dark start, and the post-solve field bounds it from below.
 !-
 
 subroutine fel_fp32_field_twin (fp32, is, sl, beam, exfld_post, exp_k2, scl_w, &
@@ -950,10 +954,10 @@ do ip = 1, n
   call fel_fp32_deposit64 (s64, sl%x(ip), sl%y(ip), theta, sl%weight(ip) / gam, &
                            scl_w, gridmax, dx, kx2, ky2, ax, ay, cos_t, sin_t)
 
-  ! The FP32 side. Lockstep prices the field arithmetic from the same shared state, so
-  ! it rounds the FP64 particle; freerun feeds the field from the twin's own run, so it
-  ! uses the twin's longitudinal state with the transverse rounded at this sequence
-  ! point (the transverse maps stay FP64, the standing model).
+  ! The FP32 side. Lockstep compares the field arithmetic from the same shared state, so
+  ! it rounds the FP64 particle. Freerun feeds the field from the twin's own run, so it
+  ! uses the twin's longitudinal state, with the transverse rounded at this sequence
+  ! point (the transverse maps stay FP64).
 
   x_s = real(sl%x(ip), sp)
   y_s = real(sl%y(ip), sp)
@@ -963,9 +967,9 @@ do ip = 1, n
   else
     del_s = real(theta - phi_dep, sp)
     pz_s = real(sl%pz(ip), sp)
-    ! The check's mutation hook reaches the field side here: in lockstep the deposit
-    ! reads the rounded FP64 state, so the residual coarsening alone would not move
-    ! these rows, and a falsifiable check needs it to.
+    ! The fp32_mutate hook reaches the field side here. In lockstep the deposit reads the
+    ! rounded FP64 state, so the residual coarsening alone would not move these rows, and
+    ! the check needs them to move.
     if (fp32%mutate) del_s = anint(del_s / (256 * spacing(del_s))) * (256 * spacing(del_s))
   endif
   gam_s = gam032 + pz_s * e032
@@ -1067,32 +1071,16 @@ end subroutine fel_fp32_kernel_cache
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fft32_solve (e, k32, ng)
-!
-! Routine to apply one field-solve step in single precision: forward transform,
-! propagator multiply, inverse transform, 1/N. FFTW's single-precision interface,
-! plans cached per grid size with FFTW_ESTIMATE (FFTW_MEASURE picks its algorithm by
-! timing and is nondeterministic at the ulp level, the same decision wavefront_mod
-! records). Serial by design: the caller's epilogue runs slices one at a time, so one
-! plan pair and one aligned buffer suffice.
-!
-! A build without the single-precision library compiles the body out, since a call to
-! fftwf_execute_dft would fail to link at all. Setup refuses such a build
-! (fel_fp32_have_fftw3f$), so this routine is unreachable there, and the message says
-! so rather than pretending to a fallback.
-!-
-
-!+
 ! Subroutine fft32_plan (ng, ok)
 !
 ! Routine to fill the calling thread's single-precision plan cache for an ng by ng
-! transform, rebuilding it where the size changed. One thread's cache and one thread's
-! buffer, so a caller inside a parallel region touches nothing another thread holds.
+! transform, rebuilding it where the size changed. The cache and the buffer are the
+! thread's own, so a caller inside a parallel region touches nothing another thread holds.
 !
-! The build holds a named lock, the planner and the allocator carrying global state where
-! the executor carries none. fel_fp32_fft_plan_threads calls this from every thread ahead
-! of the slice loops, so a call from inside a parallel region afterwards finds its own
-! cache already warm, plans nothing and takes no lock.
+! The build holds a named lock, since the planner and the allocator carry global state
+! where the executor carries none. fel_fp32_fft_plan_threads calls this from every thread
+! ahead of the slice loops. A later call from inside a parallel region then finds its own
+! cache warm, plans nothing and takes no lock.
 !-
 
 subroutine fft32_plan (ng, ok)
@@ -1111,10 +1099,9 @@ include 'fftw3.f03'
 ok = .true.
 if (ng == f32_ng .and. c_associated(f32_plan_f)) return
 
-! The allocator and the planner carry global state where the executor carries none, so
-! the build runs one thread at a time. The buffer and the two plan handles are this
-! thread's own, and the transforms themselves run outside this lock. Four threads
-! planning at once segfault inside the library, which is what this prevents.
+! One thread at a time builds. Four threads planning at once segfault inside the
+! library. The buffer and the two plan handles are this thread's own, and the transforms
+! run outside this lock.
 
 !$OMP CRITICAL (fel_fp32_fft_plan_lock)
 
@@ -1155,9 +1142,9 @@ end subroutine fft32_plan
 ! Subroutine fel_fp32_fft_plan_threads (ng, err_flag)
 !
 ! Routine to warm every thread's single-precision plan cache from this serial context, so
-! that no FFTW planner call runs beside a transform once the parallel regions start. The
-! shape and the reason are wavefront_fft2_plan_threads', and a build without the
-! single-precision library refuses at setup rather than reaching here.
+! no FFTW planner call runs beside a transform once the parallel regions start. The shape
+! and the reason are those of wavefront_fft2_plan_threads. A build without the
+! single-precision library refuses at setup and never reaches here.
 !-
 
 subroutine fel_fp32_fft_plan_threads (ng, err_flag)
@@ -1185,6 +1172,22 @@ end subroutine fel_fp32_fft_plan_threads
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
+!+
+! Subroutine fft32_solve (e, k32, ng)
+!
+! Routine to apply one field-solve step in single precision: forward transform,
+! propagator multiply, inverse transform, 1/N. It uses FFTW's single-precision interface,
+! with plans cached per grid size and built with FFTW_ESTIMATE. FFTW_MEASURE picks its
+! algorithm by timing and is nondeterministic at the ulp level, as wavefront_mod also
+! records. The caller's epilogue runs slices one at a time, so one plan pair and one
+! aligned buffer per thread suffice.
+!
+! A build without the single-precision library compiles the body out, since a call to
+! fftwf_execute_dft would fail to link. Setup refuses such a build
+! (fel_fp32_have_fftw3f$), so this routine is unreachable there. The message says so
+! and does not pretend to a fallback.
+!-
+
 subroutine fft32_solve (e, k32, ng)
 
 use, intrinsic :: iso_c_binding
@@ -1237,11 +1240,10 @@ end subroutine fft32_solve
 !+
 ! Subroutine fel_fp32_step_close (fp32, err_flag)
 !
-! Routine to reduce the step's per-slice divergences, write the row, and run the
-! guard. Serial, after the caller's parallel loop. The guard refuses when the median
-! per-step residual increment falls below 32 ulps of the residual: below that the
-! FP32 representation is absorbing the physics, which is the silent failure the
-! design brief records.
+! Routine to reduce the step's per-slice divergences, write the row, and run the guard.
+! It runs serially, after the caller's parallel loop. The guard refuses when the median
+! per-step residual increment falls below 32 ulps of the residual. Below that the FP32
+! representation absorbs the physics silently (doc/performance.md).
 !-
 
 subroutine fel_fp32_step_close (fp32, err_flag)
@@ -1302,9 +1304,9 @@ do iq = 1, fel_fp32_nq$
 enddo
 write (fp32%iu, '(a, es13.4)') 'guard_ulp_min ', fp32%ulp_min
 
-! The end-to-end exit observables: the last step's field power and bunching, FP32
-! against FP64. In freerun this is the whole-run compounding a device port will be
-! judged against; in lockstep it restates the last per-step rows and says so.
+! The end-to-end exit observables: the last step's field power and bunching, FP32 against
+! FP64. In freerun this is the whole-run compounding a device port is judged against. In
+! lockstep it restates the last per-step rows.
 
 if (allocated(fp32%pow64)) then
   pw = 0
@@ -1326,12 +1328,13 @@ end subroutine fel_fp32_close
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_fp32_unavg_bfield (aw, ku, helical, cos_t, sin_t, x, y, g, gp, c_u, s_u, bx, by, bz)
+! Subroutine fel_fp32_unavg_bfield (aw, ku, helical, cos_t, sin_t, x, y, g, gp, c_u, s_u,
+!                                                                               bx, by, bz)
 !
-! fel_unavg_bfield in single precision, term for term. Nothing here needs a
-! reformulation: the arguments are of order one and the products carry no
-! cancellation. ku*y reaches 4e-3 on the checked decks, so cosh and sinh are
-! evaluated where they are well conditioned.
+! Routine to evaluate fel_unavg_bfield in single precision, term for term. Nothing here
+! needs a reformulation. The arguments are of order one and the products carry no
+! cancellation. ku*y reaches 4e-3 on the checked decks, so cosh and sinh are evaluated
+! where they are well conditioned.
 !-
 
 subroutine fel_fp32_unavg_bfield (aw, ku, helical, cos_t, sin_t, x, y, g, gp, c_u, s_u, bx, by, bz)
@@ -1375,21 +1378,21 @@ end subroutine fel_fp32_unavg_bfield
 !+
 ! Subroutine fel_fp32_unavg_ode (y, fq, goff, u, dyds)
 !
-! unavg_ode in single precision. The transverse four lines transcribe directly.
-! The fifth does not, and it is the one the mode lives on.
+! Routine to evaluate unavg_ode in single precision. The four transverse lines
+! transcribe directly. The fifth does not, and it is the one the mode lives on.
 !
-! The FP64 form is dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within
-! 1.3e-8 and their difference is the slippage, 1.9e-9 on the checked deck. In
-! single precision a number near one has a quantum of 1.19e-7, so the answer is
-! 0.016 of one quantum and the naive difference is exactly zero: the slippage
-! disappears and with it the physics. Measured on a real mid-segment state, the
-! naive form is wrong by the whole of the answer.
+! The FP64 form is dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8,
+! and their difference is the slippage, 1.9e-9 on the checked deck. In single precision
+! a number near one has a quantum of 1.19e-7. So the answer is 0.016 of one quantum, and
+! the naive difference is exactly zero: the slippage disappears and with it the physics.
+! On a real mid-segment state the naive form is wrong by the whole of the answer
+! (doc/validation.md, val-unaveraged-fp32).
 !
 ! The identity 1/ra - 1/rb = (a - b) / (ra*rb*(ra + rb)), with ra = u_s/gamma,
-! rb = beta0, a = 1 - ra^2 and b = 1 - rb^2, moves the cancellation into a - b,
-! which is a difference of two small like quantities and carries no ones at all.
-! It is exact and not a series, so there is no truncation to budget for. The same
-! shape as the averaged twin's detuning (this module's header).
+! rb = beta0, a = 1 - ra^2 and b = 1 - rb^2, moves the cancellation into a - b. That is a
+! difference of two small like quantities and carries no ones at all. It is exact and
+! not a series, so there is no truncation to budget for. It has the same shape as the
+! averaged twin's detuning (this module's header).
 !-
 
 subroutine fel_fp32_unavg_ode (y, fq, goff, u, dyds)
@@ -1422,10 +1425,10 @@ end subroutine fel_fp32_unavg_ode
 !+
 ! Subroutine fel_fp32_unavg_push (h, n, t, u, fq)
 !
-! unavg_push_all in single precision, one RK4 magnetic push of the slice over h.
-! Particle outermost where the FP64 routine is stage outermost, which is a cache
-! choice there and changes no arithmetic: each particle's four stages depend on
-! that particle alone.
+! Routine to do unavg_push_all in single precision: one RK4 magnetic push of the slice
+! over h. The particle loop is outermost where the FP64 routine has the stage loop
+! outermost. That is a cache choice there and changes no arithmetic, since each
+! particle's four stages depend on that particle alone.
 !-
 
 subroutine fel_fp32_unavg_push (h, n, t, u, fq)
