@@ -1,32 +1,31 @@
 !+
 ! Module fel_cost_mod
 !
-! What a run will cost, counted before it tracks and estimated from rates measured on
-! one machine (doc/performance.md).
+! Work count and wall clock estimate of a run, made before it tracks. The rates come
+! from one machine (doc/performance.md).
 !
-! The count is exact. Once the setup pass has run, the slices, the macroparticles, the
-! integration steps and the grid points are all known, and their product is the work.
+! The count is exact. After the setup pass the slices, the macroparticles, the
+! integration steps and the grid points are all known. Their product is the work.
 ! The estimate is not exact, and the line that prints it names the machine it is for.
 !
-! The model is two terms, which is what the measurement supports. The particle push is
-! linear in particle-steps. The field solve is a transform that does not care how many
-! particles deposited into the grid, going as ngrid^2 log2(ngrid) per slice per step,
-! with a deposit linear in particle-steps beside it. The 512 and 8192 particle rows of
-! the performance page separate the two, since the push moves by a factor of 14 across
-! them while the transform moves by 8 percent.
+! The model has two terms. The particle push is linear in particle-steps. The field
+! solve is a transform that goes as ngrid^2 log2(ngrid) per slice per step, whatever the
+! particle count. A deposit linear in particle-steps sits beside it. The 512 and 8192
+! particle rows of doc/performance.md separate the two terms: the push moves by a factor
+! of 14 between them and the transform by 8 percent.
 !
-! Rates below are per thread. The page's tables were taken at twelve threads, and the
-! thread scan there inverts to a serial fraction of 2.1 percent. The parallelism is over
-! slices, so a window of one slice gets nothing from threads and the effective thread
-! count is the smaller of the two.
+! The rates below are per thread. The page's tables were taken at twelve threads. The
+! thread scan there gives a serial fraction of 2.1 percent. The parallelism is over
+! slices, so the effective thread count is the smaller of the thread and slice counts.
+! A window of one slice gets nothing from threads.
 !
-! The rates are fitted by tests/scripts/fit_cost_rates.py from the logs of the runs the
-! page records, so a re-measurement is a command and the constants are not derived by
-! hand twice. Fitted 2026-09-07 over thirteen runs, three particle counts and two slice
-! counts at five thread counts: the worst residual on the walk is 4.0 percent. That is
-! the calibration set and not a claim about another machine or another line. The
-! estimate is a number to plan a run against, so the footer of every run prints the
-! measured walk beside it rather than leaving it unchecked.
+! tests/scripts/fit_cost_rates.py fits the rates from the logs of the runs the page
+! records: thirteen runs, three particle counts and two slice counts at five thread
+! counts. The worst residual on the walk is 4.0 percent over that set. The footer of
+! every run prints the walk beside the estimate.
+!
+! Note: The rates hold for the recording machine and line. Another machine or another
+! line can differ.
 !-
 
 module fel_cost_mod
@@ -36,35 +35,36 @@ use fel_struct
 
 implicit none
 
-! The recording machine and the day the rates were fitted, printed with the estimate so
-! that a number read on another machine is read as what it is.
+! The recording machine and the day the rates were fitted, printed with the estimate.
 
 character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-09-07'
 
-! Fitted from doc/performance.md, the phase profile and the particles-against-the-grid
-! tables, production build, divided out to one thread. The source filter is on in every
-! run they come from, since it is the default: it adds a forward transform of the source
-! per field per step, which raises the transform rate by 58 percent and leaves the push
-! and the deposit where they were.
+! Fitted from the phase profile and the particles-against-the-grid tables of
+! doc/performance.md (production build), divided out to one thread. The source filter
+! is on in every run of those tables since it is the default. The filter adds a forward
+! transform of the source per field per step. That raises the transform rate by
+! 58 percent (doc/performance.md) and leaves the push and the deposit alone.
 
 real(rp), parameter :: fel_cost_push$ = 2.06e-7_rp     ! s per particle-step.
 real(rp), parameter :: fel_cost_deposit$ = 1.30e-8_rp  ! s per particle-step.
 real(rp), parameter :: fel_cost_solve$ = 4.02e-9_rp    ! s per grid point per log2(ngrid) per step.
 
 ! The thread scan's serial fraction, and the share of the walk the push and the solve
-! own. The share is 87.9, 87.0 and 85.8 percent over a factor of 16 in the load and 86.6
-! at 504 slices, so one constant carries it.
+! own. The share is 87.9, 87.0 and 85.8 percent over a factor of 16 in particles per
+! slice and 86.6 percent at 504 slices, so one constant carries it.
 
 real(rp), parameter :: fel_cost_serial$ = 0.021_rp
 real(rp), parameter :: fel_cost_walk_share$ = 0.878_rp
 
-! The device against the CPU, from the page's own table: the largest window measured is
-! 12.4 times the twelve-thread CPU, and the smallest deck measures the host dispatch
-! floor at 0.037 s over 89 steps. The four device points cannot carry a two-term fit of
-! their own, since the two largest share a particle count per slice and the smallest is
-! the floor, so the device takes the CPU model divided by the measured ratio with the
-! floor added. The ratio runs from 7.3 to 12.4 over the cases measured, so this term is
-! the weakest one here and the estimate says so by naming the backend.
+! The device against the CPU, from the device table of doc/performance.md. The largest
+! window there is 12.4 times the twelve-thread CPU. The smallest deck gives the host
+! dispatch floor: 0.037 s over 89 steps.
+! The four device points cannot carry a two-term fit of their own. The two largest share
+! a particle count per slice and the smallest is the floor. So the device takes the CPU
+! model divided by the ratio, plus the floor.
+!
+! Note: The ratio runs from 7.3 to 12.4 over the device table. This is the least certain
+! term, and the printed estimate names the backend.
 
 real(rp), parameter :: fel_cost_device$ = 12.4_rp
 real(rp), parameter :: fel_cost_dispatch$ = 4.2e-4_rp  ! s per step, host side.
@@ -75,24 +75,24 @@ contains
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid)
+! Subroutine fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
 !
-! Routine to count the work of a run from the state the setup pass built. Exact: every
-! number here is known before the first step.
+! Routine to count the work of a run from the state the setup pass built.
+! The count is exact since every number is known before the first step.
 !
 ! Input:
-!   run        -- fel_run_struct: The run, after fel_setup_schedule.
+!   run         -- fel_run_struct: The run, after fel_setup_schedule.
 !
 ! Output:
-!   nstep      -- integer: FEL integration steps over the walk, summed over the segments
-!                   the walk covers. An unaveraged segment counts its own substeps,
-!                   which is what it integrates and deposits on.
-!   n_particle -- integer: Macroparticles in the window.
-!   n_pstep    -- real(rp): Particle-steps, the product of the two. Real because it
-!                   passes 2^31 on an ordinary time-dependent run.
-!   n_gpt      -- real(rp): Transverse grid points the field solve touches per step,
-!                   over the window and over every member and plane of the field set.
-!   ngrid      -- integer: Transverse points on a side of one grid.
+!   nstep       -- integer: FEL integration steps, summed over the segments the walk
+!                    covers. An unaveraged segment counts its substeps, since it
+!                    integrates and deposits on each.
+!   n_particle  -- integer: Macroparticles in the window.
+!   n_pstep     -- real(rp): Particle-steps, the product of the two. Real since it
+!                    passes 2^31 on an ordinary time-dependent run.
+!   n_gpt       -- real(rp): Transverse grid points the field solve touches per step,
+!                    over the window and over every member and plane of the field set.
+!   ngrid       -- integer: Transverse points on a side of one grid.
 !   nstep_unavg -- integer: How many of nstep are unaveraged substeps.
 !-
 
@@ -106,8 +106,8 @@ integer nstep, n_particle, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
 
 !
 
-! Only the elements the walk covers. global%track_start and track_end bound it, and a
-! deck that stops after the second segment pays for two segments and not for the line.
+! Only the elements the walk covers, as bounded by global%track_start and track_end.
+! For example, a deck that stops after the second segment counts two segments.
 
 branch => run%lat%branch(0)
 nstep = 0;  nstep_unavg = 0
@@ -116,9 +116,9 @@ do ie = run%i_start, run%i_end
   ele => branch%ele(ie)
   n_ele = max(1, nint(ele%value(num_steps$)))
 
-  ! An unaveraged segment resolves the quiver, so its integration step is a fraction of
-  ! a period rather than the record step, and it pushes and deposits on every substep.
-  ! fel_unavg_setup builds the same count from the same two numbers.
+  ! An unaveraged segment resolves the quiver. Its integration step is a fraction of a
+  ! period, and it pushes and deposits on every substep. fel_unavg_setup builds the same
+  ! count from the same two numbers.
 
   if (run%fel_mode(ie) == unaveraged$) then
     lambda_w = ele%value(l_period$)
@@ -151,8 +151,8 @@ end subroutine fel_cost_count
 ! Routine to estimate the wall clock of a run's walk on the recording machine.
 !
 ! The estimate covers the walk, which is the tracking. The parse, the beam and field
-! build and the final dumps are outside it and are 1 percent of the walk on the page's
-! own runs.
+! build and the final dumps are outside it. They are 1 percent of the walk on the runs
+! of doc/performance.md.
 !
 ! Input:
 !   run     -- fel_run_struct: The run, after fel_setup_schedule.
@@ -173,8 +173,8 @@ character(*) backend
 
 call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
 
-! One thread, the two terms. Every member and plane of the field set is already counted
-! into n_gpt, and each carries the same log of its own grid.
+! One thread, the two terms. Every member and plane of the field set is already in n_gpt,
+! and each has the same log2(ngrid).
 
 t_one = (fel_cost_push$ + fel_cost_deposit$) * n_pstep
 if (ngrid > 1) t_one = t_one + fel_cost_solve$ * n_gpt * log(real(ngrid, rp)) / log(2.0_rp) * nstep
@@ -200,10 +200,9 @@ end subroutine fel_cost_estimate
 !+
 ! Function fel_cost_secs_str (secs) result (str)
 !
-! Routine to write a number of seconds for a human. Seconds are the unit either way, so
-! fel_si_str is not used here: its bare-unit row leaves two spaces before the unit, and
-! its prefixes would report a short run in milliseconds where the line beside it is in
-! seconds.
+! Routine to write a number of seconds for a human.
+! fel_si_str is not used. Its bare-unit row leaves two spaces before the unit. And its
+! prefixes would put a short run in milliseconds beside a line in seconds.
 !
 ! Input:
 !   secs -- real(rp): Seconds.

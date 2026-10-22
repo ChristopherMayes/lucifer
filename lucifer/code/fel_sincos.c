@@ -1,9 +1,9 @@
-/* fel_sincos_c: the (sin, cos) pair in ONE libm call. The FEL step's ODE evaluates
-   both per particle per RK stage; gfortran emits two separate calls where one
-   paired call costs about one. VALUE-PRESERVING, verified: on macOS __sincos is
-   bitwise-identical to the separate sin/cos pair over a 44M-point sweep of the
-   physical theta domain (the perf goal's lever-b test), so the benchmark keystone
-   stays bit-for-bit. */
+/* fel_sincos_c: the (sin, cos) pair in one libm call. The FEL step's ODE needs both
+   per particle per RK stage. gfortran emits two calls, and one paired call costs about
+   as much as one of them.
+   On macOS __sincos agrees bit for bit with the separate libm sin and cos. It differs
+   from gfortran's sin and cos intrinsics by one ulp on about 2e-6 of arguments of the
+   theta domain (doc/validation.md). */
 
 #include <math.h>
 

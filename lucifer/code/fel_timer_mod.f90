@@ -1,33 +1,27 @@
 !+
 ! Module fel_timer_mod
 !
-! Where a run spends its time, accumulated per phase and printed in the footer. The
-! phases partition the walk: every timed region belongs to exactly one of them, so the
-! fractions sum to the walk and the leftover is named unaccounted rather than hidden.
+! Wall clock time of a run, accumulated per phase and printed in the footer. The phases
+! partition the walk. Every timed region belongs to exactly one phase, so the fractions
+! sum to the walk. The leftover gets its own row, named unaccounted.
 !
-! Two rules make the instrument honest.
+! The timers sit at region boundaries and never inside a parallel loop. A clock call
+! inside the slice loop would time the loop it perturbs. The phases that interleave
+! per slice (the deposit against its FFT, the field gather against the RK4) come from a
+! sampling profiler instead. doc/performance.md gives that split beside this one.
 !
-! The timers sit at region boundaries, never inside a parallel loop. A clock call inside
-! the slice loop would measure the loop it perturbs, and the phases that interleave per
-! slice (the deposit against its FFT, the field gather against the RK4) are read from a
-! sampling profiler instead. doc/performance.md records that split beside this one.
-!
-! The timers are always on. Each phase costs two system_clock calls per region against
-! milliseconds of work inside it, and the measured cost of the whole instrument is below
-! the run-to-run spread of the run it measures. An instrument behind a switch is an
-! instrument nobody runs.
+! The timers are always on. Each region costs two system_clock calls against
+! milliseconds of work, which is below the run-to-run spread in doc/performance.md.
 !
 ! State is module level, like the FFT plan cache and the field-solve kernel cache. The
 ! phases accumulate from fel_timer_reset, so a driver walking the lattice twice sees the
-! total of both walks, and the numbers never enter the physics. That is what keeps the
-! re-entrancy contract intact, and lucifer_smoke_test holds it: two walks in one process
-! must agree bit for bit with two processes, which they do because nothing here is read
-! by anything but the report.
+! total of both walks. Nothing here is read by anything but the report, so the numbers
+! never enter the physics. lucifer_smoke_test checks this: two walks in one process
+! must agree bit for bit with two processes.
 !
-! An embedding program that never calls fel_timer_reset gets no table and no error. The
-! clock rate is then zero, fel_timer_write returns at once, and the timers cost their two
-! clock calls and nothing else. An error return can leave a phase open, which also costs
-! nothing: a failed run prints no footer.
+! Note: An embedding program that never calls fel_timer_reset gets no table and no
+! error. The clock rate is then zero and fel_timer_write returns at once. An error
+! return can leave a phase open. That is harmless since a failed run prints no footer.
 !-
 
 module fel_timer_mod
@@ -37,8 +31,8 @@ use output_mod
 
 implicit none
 
-! The phases. Order is the order they print, grouped by where they act, and
-! fel_t_walk$ = 0 is the whole walk rather than a leaf: it is the denominator.
+! The phases, in print order and grouped by where they act. fel_t_walk$ = 0 is the whole
+! walk and is the denominator. It is not a leaf.
 
 integer, parameter :: fel_t_walk$ = 0
 
@@ -88,9 +82,9 @@ contains
 !+
 ! Subroutine fel_timer_reset ()
 !
-! Routine to zero every phase and start the run clock. Called once by the driver before
-! it reads its input, so the run total covers everything the process does and the work
-! outside the walk reads off as the difference.
+! Routine to zero every phase and start the run clock.
+! The driver calls this once before it reads its input. So the run total covers the
+! whole process, and the work outside the walk is the difference.
 !-
 
 subroutine fel_timer_reset ()
@@ -108,8 +102,10 @@ end subroutine fel_timer_reset
 !+
 ! Subroutine fel_tic (iphase)
 !
-! Routine to open a phase. Must be called outside every parallel region, and must be
-! closed by fel_toc on the paths that reach the footer.
+! Routine to open a phase.
+!
+! Note: Call this outside every parallel region. A phase must be closed by fel_toc on
+! every path that reaches the footer.
 !
 ! Input:
 !   iphase -- integer: One of the fel_t_...$ phase indices.
@@ -129,8 +125,8 @@ end subroutine fel_tic
 !+
 ! Subroutine fel_toc (iphase)
 !
-! Routine to close a phase, adding its elapsed clock to the phase total and counting
-! the region.
+! Routine to close a phase. The elapsed clock is added to the phase total and the region
+! is counted.
 !
 ! Input:
 !   iphase -- integer: The phase fel_tic opened.
@@ -178,20 +174,18 @@ end function fel_timer_seconds
 !+
 ! Subroutine fel_timer_write (r_name)
 !
-! Routine to print the phase table: every phase this run entered, its region count, its
-! seconds and its share of the walk, then the unaccounted remainder, the walk and the
-! run. Phases the run never entered are left out, so an averaged run says nothing about
-! the unaveraged step.
+! Routine to print the phase table.
+! Each phase this run entered gets its region count, its seconds and its share of the
+! walk. The unaccounted remainder, the walk and the run follow. Phases the run never
+! entered are left out.
 !
-! The unaccounted row is the point of the table. The phases partition the walk by
-! construction, so what is left is the walk's own overhead: the element loop, the
-! comb tests, the wake and space-charge resolution per element, and the instrument
-! itself. A large remainder is a phase somebody forgot to name.
+! The phases partition the walk, so the unaccounted row is the walk's own overhead: the
+! element loop, the comb tests, the wake and space-charge setup per element, and the
+! timers themselves. A large remainder means a phase is missing a timer.
 !
-! One row is derived rather than measured, and its label carries an = to say so: the
-! FEL step is the sum of the phases inside it, which is the share of the run the
-! undulator segments own. It is left out of the leaf sum, so the leaf rows still add to
-! the walk minus the remainder.
+! The "= FEL step" row is derived. It is the sum of the phases inside the step, which
+! is the share the undulator segments own. It is left out of the leaf sum, so the leaf
+! rows still add to the walk minus the remainder.
 !
 ! Input:
 !   r_name -- character(*): The caller's name, for out_io.
@@ -222,8 +216,7 @@ enddo
 call out_io (s_blank$, r_name, ' Timing      phase                  regions      seconds     of walk')
 
 ! The step's own phases, then their subtotal, then everything outside the step. The
-! subtotal is printed unconditionally after the group rather than beside one of them,
-! since which of them a run enters depends on its mode.
+! subtotal follows the group because which phases a run enters depends on its mode.
 
 do ip = fel_t_und_prep$, fel_t_unavg$
   call write_phase_row (ip)
@@ -257,8 +250,8 @@ write (line, '(a, a20, i13, f13.3, f11.1, a)') '             ', label, &
       n_region(fel_t_walk$), walk, 100.0_rp, '%'
 call out_io (s_blank$, r_name, trim(line))
 
-! The run against the walk is everything outside it: parsing, the beam and field build,
-! the slippage schedule, and the final dumps and stats file that follow the walk.
+! The run minus the walk is parsing, the beam and field build, the slippage schedule,
+! and the final dumps and stats file.
 
 label = 'run'
 write (line, '(a, a20, a13, f13.3)') '             ', label, '', run
@@ -270,9 +263,8 @@ contains
 !+
 ! Subroutine write_phase_row (iphase)
 !
-! Routine to print one measured phase, or nothing when the run never entered it. An
-! averaged run says nothing about the unaveraged step this way, and a run without
-! wakes says nothing about wakes.
+! Routine to print one phase row, or nothing when the run never entered the phase.
+! For example, an averaged run prints no unaveraged step row.
 !-
 
 subroutine write_phase_row (iphase)
