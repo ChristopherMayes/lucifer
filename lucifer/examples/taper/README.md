@@ -1,15 +1,15 @@
 # A post-saturation taper: heterogeneity as different elements
 
-One command, Bmad only:
+The example runs in one command, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py taper.stats.h5
 
-The `steady_state` run over `taper.bmad`. That lattice is `../aramis.bmad` for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
+This is the `steady_state` run over `taper.bmad`. That lattice is `../aramis.bmad` for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
 
 The FEL parameters are lattice attributes, so a heterogeneous line is a line of elements that differ. Each element carries its own `b_max`, `l_period` and `field_calc`, and the tracker derives each segment's `aw` from the element it is standing in. There is no per-segment namelist input and nothing to keep in step with the lattice.
 
-Measured against `../steady_state` (same seed, same starting state):
+Against `../steady_state` with the same seed and the same starting state, the two lines give:
 
 | line | P at 57 m | behavior |
 |---|---|---|
@@ -20,4 +20,4 @@ The step is at z = 38.0 m, where the fourth FODO cell ends. The two gain curves 
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.08 percent of the power inside it on the tapered line, so the 8.85 GW is the mode and the taper's gain is the mode's. With the filter off the same deck reported 9.64 GW, of which 9 percent was that emission.
 
-Runs in ~4 s.
+The run takes ~4 s.

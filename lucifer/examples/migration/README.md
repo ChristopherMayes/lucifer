@@ -1,6 +1,6 @@
 # Slice migration: particles that outgrow their slice
 
-Two commands, Bmad only:
+The example runs in two commands, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_no_migrate.in
@@ -10,7 +10,7 @@ A particle's ponderomotive phase drifts, and once it leaves the slice window the
 
 No artificial driver is needed to make this happen. The phase advance a particle accumulates depends on its energy and on its betatron angles, both of which vary across the beam, so a real beam in a real line migrates on its own. Adding `../sase_wake`'s chamber block to this deck raises the moves from 148,777 to 226,776 and the dropped charge from 1.47% to 3.05%. A wake that costs the tail slices 121 keV/m and the head slices 1.9 keV/m is a systematic phase walk on top of the beam's own spread.
 
-Measured on this input:
+On this input the run gives:
 
 | | value |
 |---|---|
@@ -32,4 +32,4 @@ Migration changes the physics and not only the bookkeeping. With migration off, 
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 1.3 percent of the power inside it with migration on and 1.0 percent with it off, so both exit powers are the mode. With the filter off the same decks reported 3.13 and 1.81 GW, and 90 percent of each of those was that emission.
 
-Runs in ~15 s each.
+Each run takes ~15 s.

@@ -14,7 +14,7 @@ An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulato
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py crossed.stats.h5
 
-Measured by this example (1 MW x seed, 0.6 m x-set, 0.2 m gap, 0.6 m y-set):
+With a 1 MW x seed, a 0.6 m x-set, a 0.2 m gap and a 0.6 m y-set, the example measures:
 
 | z (m) | P_x (W) | P_y (W) |
 |---|---|---|
@@ -25,7 +25,7 @@ Measured by this example (1 MW x seed, 0.6 m x-set, 0.2 m gap, 0.6 m y-set):
 
 P_x is flat through the y-set to five digits, while P_y climbs from nothing on the microbunching the x-set left behind. The tilted undulator cannot amplify the orthogonal component. It only diffracts it. `plot_fel.py` shows this in its polarization panel, which is present only when a run carries two components, and that figure is this example's page in the documentation.
 
-Outputs: `crossed-final.wf.h5`, an openPMD EXT_Wavefront file carrying both polarizations as the x and y components of one mesh record, and `crossed.stats.h5`, whose field group carries the total, the x component and a `field/y/` group. Runs in ~1 s.
+The outputs are `crossed-final.wf.h5`, an openPMD EXT_Wavefront file carrying both polarizations as the x and y components of one mesh record, and `crossed.stats.h5`, whose field group carries the total, the x component and a `field/y/` group. The run takes ~1 s.
 
 ## The input files
 

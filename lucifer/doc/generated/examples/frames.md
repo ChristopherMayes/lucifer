@@ -9,13 +9,13 @@ short_title: "frames"
 
 Everything on this page lives in and runs from `lucifer/examples/frames/`.
 
-One command:
+The example runs in one command:
 
     ../../../production/bin/lucifer lucifer.in
 
 A run writes its beam and its field at element ends. A visualization wants them along z inside the undulators, and it wants to follow a particle from one to the next. This deck turns on the frame series and the field's reductions, and cuts both to four slices of the window ([reading the output](../../reading-output.md)).
 
-Two segments of the Aramis line, a 1 m comb and a window of 24 wavelengths at 3 wavelengths per slice, which is 8 slices. Measured on this input:
+The deck runs two segments of the Aramis line with a 1 m comb and a window of 24 wavelengths at 3 wavelengths per slice, which is 8 slices. On this input the run gives:
 
 | | value |
 |---|---|
@@ -39,7 +39,7 @@ Each file says where it was taken. `sPosition`, `elementName`, `phi0`, `sliceFir
 
 The slice range is what keeps the output small. The same deck over the whole window writes twice the bytes, and a run at one wavelength per slice with thousands of slices would write gigabytes a frame. [](../../performance.md) measures a full-size frame at 95 MB and the cost of compression, which does not pay on this data.
 
-Runs in ~0.4 s.
+The run takes ~0.4 s.
 
 ## The input files
 

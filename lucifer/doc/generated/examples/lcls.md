@@ -9,7 +9,7 @@ short_title: "lcls"
 
 Everything on this page lives in and runs from `lucifer/examples/lcls/`.
 
-One command, Bmad only:
+The example runs in one command, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py lcls.stats.h5
@@ -43,11 +43,11 @@ Two numbers are this file's and are marked in the lattice header. The segment is
 
 The field and K agree here to 0.04 percent, where the FLASH1 line's two published numbers are 2.7 percent apart. The resonance that follows at 13.6 GeV is 1.5099 Angstrom against the published 1.5.
 
-The slice energy spread. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys: at 1024 macroparticles per slice, 0.3 µm gives a power gain length of 3.52 m and saturation at 55 m where 0.4 µm gives 3.93 m and 62 m.
+The slice energy spread is derived rather than published. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys: at 1024 macroparticles per slice, 0.3 µm gives a power gain length of 3.52 m and saturation at 55 m where 0.4 µm gives 3.93 m and 62 m.
 
 ## What the run measures
 
-Four seeds at the settings below, measured with the source filter off. The spread is the SASE fluctuation of a 300-slice window. What the filter changes is measured below.
+Four seeds were run at the settings below, measured with the source filter off. The spread is the SASE fluctuation of a 300-slice window. What the filter changes is measured below.
 
 | quantity | this deck | published | source |
 |---|---|---|---|
@@ -98,7 +98,7 @@ The gain length is the one number the artifact biases, and it biases it upward. 
 
 The lattice carries the optics, so the beam is generated matched to the periodic solution in the `beginning` statement, which the run holds between 26.1 and 34.3 m over the line. There is no `gamma0` and no match transform.
 
-Runs in ~90 s, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator at 1254 integration steps, each taken over every slice of the window.
+The run takes ~90 s, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator at 1254 integration steps, each taken over every slice of the window.
 
 ## The input files
 

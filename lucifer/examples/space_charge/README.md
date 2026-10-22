@@ -1,6 +1,6 @@
 # Longitudinal space charge
 
-Four commands, Bmad only:
+The example runs in four commands, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_off.in
@@ -14,7 +14,7 @@ The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets
 
 `lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that. With space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
 
-Measured on this input:
+On this input the run gives:
 
 | | value |
 |---|---|
@@ -28,7 +28,7 @@ The beam-energy panel of the plot is the whole result: a symmetric fan opening f
 
 The chirp matters at this size. At 6.89e-3 it is more than twenty times the 3.1e-4 bandwidth implied by the 2.25 m gain length of `../steady_state`, so a bunch this short does not lase without something to compensate it.
 
-The short-range harmonics measure exactly zero here, which is correct. They act on the density structure inside a slice, and a quiet-start dark beam has none: the initial bunching is 4e-17. `lucifer_short_range.in` gives them something to act on, by matching the `../steady_state` deck parameter for parameter and adding `nz = 4, nphi = 1`. Against that run as its control:
+The short-range harmonics measure exactly zero here, which is correct. They act on the density structure inside a slice, and a quiet-start dark beam has none: the initial bunching is 4e-17. `lucifer_short_range.in` gives them something to act on, by matching the `../steady_state` deck parameter for parameter and adding `nz = 4, nphi = 1`. Against that run as its control, the short-range deck gives:
 
 | run | exit power | exit bunching |
 |---|---|---|
@@ -43,4 +43,4 @@ The master switch off while the elements still ask for `slice` is not refused, b
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.25 percent of the power inside it on the short-range deck, so its 805.8 MW is the mode, as is the 792.7 MW it is compared against. With the filter off both reported 46 percent of their power as that emission. The long-range decks start dark, and what the filter leaves of their femtowatt fields is 1.6 percent outside the mode, which is why the comparison there is made on the beam.
 
-Runs in ~7 s each.
+Each run takes ~7 s.

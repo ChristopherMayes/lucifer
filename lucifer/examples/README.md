@@ -1,6 +1,6 @@
 # FEL examples
 
-Self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates, the numbers measured on it, and what to look for in the plot.
+The examples are self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates, the numbers measured on it, and what to look for in the plot.
 
 The validation benchmark against Genesis4 is in `lucifer/tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`lucifer/doc/fel-physics.md`](../doc/fel-physics.md).
 
@@ -48,7 +48,7 @@ Times are wall clock for a production build on twelve cores. A debug build is se
 
 ## What each feature is exemplified by
 
-One row per feature declared in [the introduction](../doc/index.md).
+The table has one row per feature declared in [the introduction](../doc/index.md).
 
 | Feature | Shown by |
 |---|---|
@@ -81,7 +81,7 @@ Thread independence is a few commands rather than a directory. The threads divid
     done
     cmp t1.diag.txt t12.diag.txt
 
-Measured on this configuration: 96 slices, 1 thread against 12, the two diag files identical at 28,960,122 bytes. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The harness runs the same check on the td1 tier at every commit.
+On this configuration, 96 slices at 1 thread against 12, the two diag files are identical at 28,960,122 bytes. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The harness runs the same check on the td1 tier at every commit.
 
 ## Planned examples
 

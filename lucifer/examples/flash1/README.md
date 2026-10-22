@@ -1,6 +1,6 @@
 # FLASH1 at 13.7 nm: a real machine at its published parameters
 
-One command, Bmad only:
+The example runs in one command, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py flash1.stats.h5
@@ -31,11 +31,11 @@ Three numbers are this file's and are marked in the lattice header. The segment 
 
 The published K and the published field disagree by 2.7 percent. K = 1.23 needs 0.4825 T at this period. The field is the one taken. The disagreement then appears again in the energy: 13.7 nm needs 668.5 MeV at K = 1.19807 and 686 MeV at K = 1.23, against the machine's 700 MeV with its lasing spike near 680.
 
-The slice energy spread. The papers give a bound on the beam and no slice value. Figure 2 of Ackermann puts a chirp of about 0.1 MeV per fs across the lasing spike. The FEL averages over one coherence time, measured there as 4.2 fs, so the chirp contributes 0.42 MeV to the spread the interaction sees, which is 6e-4 of the energy. That is the value here, and it is under the published bound of 0.1 percent. The value matters: at 1e-4 this deck's field gain length is 1.6 m and at 1e-3 it is 2.6 m.
+The slice energy spread is derived rather than published. The papers give a bound on the beam and no slice value. Figure 2 of Ackermann puts a chirp of about 0.1 MeV per fs across the lasing spike. The FEL averages over one coherence time, measured there as 4.2 fs, so the chirp contributes 0.42 MeV to the spread the interaction sees, which is 6e-4 of the energy. That is the value here, and it is under the published bound of 0.1 percent. The value matters: at 1e-4 this deck's field gain length is 1.6 m and at 1e-3 it is 2.6 m.
 
 ## What the run measures
 
-Four seeds at the settings below, measured with the source filter off. The spread is the SASE fluctuation of a 351-slice window. The same four seeds were run with the filter on, as the deck runs, and one analysis was applied to both sets. The exit pulse energy is 50.8 +- 6.8 µJ with the filter off against 50.8 +- 6.7 µJ with it on. The peak bunching is 0.241 +- 0.006 against 0.247 +- 0.019, and the field gain length 2.11 +- 0.11 m against 2.01 +- 0.14 m. Those six numbers come from one fit over both sets, which is not the fit the rows below were recorded with, so they compare with each other and not with the table. The fitted gain length is 5 percent shorter with the filter on. The wide-angle emission raises the startup level the fit begins from, so a curve carrying it climbs more slowly through the fit window and reads longer.
+Four seeds were run at the settings below, measured with the source filter off. The spread is the SASE fluctuation of a 351-slice window. The same four seeds were run with the filter on, as the deck runs, and one analysis was applied to both sets. The exit pulse energy is 50.8 +- 6.8 µJ with the filter off against 50.8 +- 6.7 µJ with it on. The peak bunching is 0.241 +- 0.006 against 0.247 +- 0.019, and the field gain length 2.11 +- 0.11 m against 2.01 +- 0.14 m. Those six numbers come from one fit over both sets, which is not the fit the rows below were recorded with, so they compare with each other and not with the table. The fitted gain length is 5 percent shorter with the filter on. The wide-angle emission raises the startup level the fit begins from, so a curve carrying it climbs more slowly through the fit window and reads longer.
 
 | quantity | this deck | published | source |
 |---|---|---|---|
@@ -74,8 +74,8 @@ Two of these do not carry over from Aramis. The convergence page estimates the w
 
 The lattice carries the optics, so the bunch is generated matched to the periodic solution in the `beginning` statement, and there is no `gamma0` and no match transform. The current is derived from `bunch_charge` and `sig_z` and is never given. The window covers the bunch to four sigma either side with 990 wavelengths of slippage headroom at each end, because radiation made at the head of the bunch slips out of a shorter window before the exit. About a quarter of the slices therefore carry no charge, which is the price of holding the whole pulse.
 
-Measured on this input at the `ran_seed` default of 12345: the exit power is 85.2 GW summed over the window and the pulse energy is 46.7 µJ. The run's own convergence report puts the power outside the split angle of 81 µrad at 0.0004 times the power inside it, so the total is the mode. With the filter off the same deck gave 84.5 GW and 46.3 µJ with 7 percent of the total outside the mode. At 4096 macroparticles per slice the filter removes an artifact that was already small here, and the settings table above was measured without it.
+On this input at the `ran_seed` default of 12345 the exit power is 85.2 GW summed over the window and the pulse energy is 46.7 µJ. The run's own convergence report puts the power outside the split angle of 81 µrad at 0.0004 times the power inside it, so the total is the mode. With the filter off the same deck gave 84.5 GW and 46.3 µJ with 7 percent of the total outside the mode. At 4096 macroparticles per slice the filter removes an artifact that was already small here, and the settings table above was measured without it.
 
 Leaving `grid_n_pts` and `grid_half_width` out of the deck derived 127 points over a 962 µm half width, cells of 15.27 µm against the 15.63 µm of the 129-point grid. That run gave 46.74 µJ against 46.72 and a ratio of 0.0003 against 0.0004, so the stated grid is the derived one. The derivation rounds the point count up to a power of two, so the same deck without a grid now derives 128 points.
 
-Runs in ~20 s.
+The run takes ~20 s.

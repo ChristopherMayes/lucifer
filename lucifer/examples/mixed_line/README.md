@@ -1,6 +1,6 @@
 # Two FEL methods in one line
 
-Two commands, Bmad only:
+The example runs in two commands, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_averaged.in
@@ -10,7 +10,7 @@ The FEL method is an element attribute, so a line whose segments are tracked dif
 
 `lucifer_averaged.in` is the all-averaged twin, which overrides that one element back to the default. The two runs differ in one segment's method and in nothing else.
 
-Measured on this input (seeded steady state, measured on a 129-point grid, where the decks now state 128 points):
+On this input, a seeded steady state measured on a 129-point grid where the decks now state 128 points, the two runs give:
 
 | | value |
 |---|---|
@@ -30,4 +30,4 @@ The harness runs the same configuration as its sandwich check. There the mixed l
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 3.0 times the power inside it in both runs, so three quarters of each exit power is that emission. The difference between the two runs is 3.6e-2 in ln P inside the mode against 7.4e-3 in the total, so the price the mixed line pays is five times larger in the mode than in the number the table quotes. Both decks state `global%source_filter = F`, so the two FEL methods compare like for like. The filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
 
-Runs in ~7 s, and the averaged twin in ~1 s.
+The run takes ~7 s, and the averaged twin ~1 s.

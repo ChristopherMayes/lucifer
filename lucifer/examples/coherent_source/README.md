@@ -1,6 +1,6 @@
 # The coherent source: converged results at a fraction of the particles
 
-Three commands, Bmad only:
+The example runs in three commands, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_low_m.in
@@ -9,7 +9,7 @@ Three commands, Bmad only:
 
 A run whose beam is transversely Gaussian (an idealized machine, a parameter scan, a seeded amplifier study) can trade the per-particle source deposit for Tanaka's coherent retrieval, `global%source_model = "coherent"` (PRAB 27, 030703 (2024), the manual's coherent-source section). It then converges at one to two orders of magnitude fewer macroparticles. With few particles the per-cell source is spiky, and that sampling noise always overestimates the gain. The coherent source carries the slice's exact bunching phasor on a fitted Gaussian instead, so the artifact never enters.
 
-Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration):
+Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration) are compared:
 
 | run | source, particles/slice | exit power | vs reference | wall (12 threads) |
 |---|---|---|---|---|

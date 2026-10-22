@@ -9,14 +9,14 @@ short_title: "harmonics"
 
 Everything on this page lives in and runs from `lucifer/examples/harmonics/`.
 
-One command, Bmad only:
+The example runs in one command, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py harmonics.stats.h5
 
-A strongly seeded steady-state run on a planar segment carrying two radiation fields (namelist `harmonics = 1, 3`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
+This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (namelist `harmonics = 1, 3`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
 
-Measured by this example (200 MW seed, 3.96 m planar, rms aw = 0.84853):
+With a 200 MW seed on 3.96 m of planar undulator at rms aw = 0.84853, the example measures:
 
 | z (m) | P1 (W) | P3 (W) |
 |---|---|---|
@@ -29,7 +29,7 @@ Measured by this example (200 MW seed, 3.96 m planar, rms aw = 0.84853):
 
 A helical undulator would give nothing here, since its coupling fc(h) vanishes for every harmonic (the manual's harmonic-radiation section). That is why this example is planar. The deck turns the source filter off, as the comparison against Genesis 1.3 Version 4 (Genesis4) requires. The harness's harmonics section runs the same configuration against Genesis4 (fundamental 5.3e-8, harmonic growth 1.3e-4) and against the exact Bessel deposit sum (3.3e-16).
 
-Runs in ~1 s.
+The run takes ~1 s.
 
 ## The input files
 

@@ -9,13 +9,13 @@ short_title: "spontaneous"
 
 Everything on this page lives in and runs from `lucifer/examples/spontaneous/`.
 
-Two commands, Bmad only:
+The example runs in two commands, with Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_damping_only.in
     python ../plot_fel.py spontaneous.stats.h5
 
-Undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad_com%radiation_damping_on` subtracts the classical rate from every particle. `bmad_com%radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../input-reference.md)).
+This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad_com%radiation_damping_on` subtracts the classical rate from every particle. `bmad_com%radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../input-reference.md)).
 
 Both decks are the `../steady_state` deck plus the switches, so that run is the control and the difference is the radiation.
 
@@ -35,7 +35,7 @@ Fluctuations barely move the exit numbers here, because at 1 Angstrom the quantu
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.1 percent of the power inside it and at the exit 0.4 percent, so the exit power is the mode. With the filter off the same deck reported 45 percent of its exit power as that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch.
 
-Runs in ~5 s each.
+Each run takes ~5 s.
 
 ## The input files
 

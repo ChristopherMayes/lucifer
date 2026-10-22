@@ -7,7 +7,7 @@ short_title: "saturation_demo"
 
 Everything on this page lives in and runs from `lucifer/examples/saturation_demo/`.
 
-The Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), run to saturation: the full 57 m 6-FODO Aramis line, a dark start, growth from shot noise alone, 96 slices x 2048 particles. It is tracked three ways from identical initial dumps, each on the machine's full performance-core count. Every input is a file in this directory:
+This is the Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), run to saturation: the full 57 m 6-FODO Aramis line, a dark start, growth from shot noise alone, 96 slices x 2048 particles. It is tracked three ways from identical initial dumps, each on the machine's full performance-core count. Every input is a file in this directory:
 
 | file | what it is |
 |---|---|
@@ -31,7 +31,7 @@ The report (`tests/scripts/report_fel_saturation.py`) is a multi-page PDF built 
 
 The grid here is `ngrid` 255, and odd where the rest of the examples run powers of two. This demo's headline is an agreement with Genesis4, and Genesis4 propagates the transverse field on half-integer wavenumbers when `ngrid` is even, so a comparison this tight has to run where the reference is right (`lucifer/doc/validation.md`). The grid moves to 256 once that is fixed upstream.
 
-Measured (M3 Max, 12 performance cores, production builds both sides):
+On an M3 Max with 12 performance cores and production builds on both sides, the three trackers give:
 
 | | wall | exit total power | vs Genesis4 |
 |---|---|---|---|
