@@ -1,6 +1,6 @@
 # Longitudinal space charge
 
-Three commands, Bmad only:
+Four commands, Bmad only:
 
     ../../../production/bin/lucifer lucifer.in
     ../../../production/bin/lucifer lucifer_off.in
@@ -10,9 +10,9 @@ Three commands, Bmad only:
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../doc/fel-physics.md)). The two terms answer different questions, so this example measures them separately.
 
-Which elements it acts in is the elements' own business. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so `space_charge_com%n_bin` has nothing to say here and is ignored. `space_charge%` in the deck holds the solver's numbers and nothing about whether it runs.
+The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so `space_charge_com%n_bin` plays no part in it. `space_charge%` in the deck holds the solver's numbers and nothing about whether it runs.
 
-`lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that: with space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
+`lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that. With space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
 
 Measured on this input:
 
@@ -24,11 +24,11 @@ Measured on this input:
 | contribution of `nz = 2, nphi = 1` | 0 MeV |
 | contribution of `longrange = T` | 40.0 MeV, all of it |
 
-The beam-energy panel of the plot is the whole result: a symmetric fan opening from zero to plus and minus 20 MeV, with the mean and the energy spread both flat on zero through all 57 m. The bunch pushes itself apart, the tail losing energy and the head gaining it, and the mean is preserved because the force is internal. The power panels show numbers near 1e-13 W, which is the dark run's numerical floor rather than light. A 4 nm bunch is 13 attoseconds long, which is where this matters. Lengthening it ten times at the same 3 kA peak, by scaling `sig_z`, `bunch_charge` and `window_length` together, drops the span from 40.0 to 14.1 MeV. The effect weakens with bunch length and not in proportion to it, because a 4 nm bunch is far shorter than the beam's own 20 micrometer transverse size and the simple line-charge scaling does not hold there.
+The beam-energy panel of the plot is the whole result: a symmetric fan opening from zero to plus and minus 20 MeV, with the mean and the energy spread both flat on zero through all 57 m. The bunch pushes itself apart, the tail losing energy and the head gaining it, and the mean is preserved because the force is internal. The power panels show numbers near 1e-13 W, which is the dark run's numerical floor and not light. A 4 nm bunch is 13 attoseconds long, which is where this matters. Lengthening it ten times at the same 3 kA peak, by scaling `sig_z`, `bunch_charge` and `window_length` together, drops the span from 40.0 to 14.1 MeV. The effect weakens with bunch length and not in proportion to it. A 4 nm bunch is far shorter than the beam's own 20 micrometer transverse size, and the simple line-charge scaling does not hold there.
 
-The chirp is worth knowing at this size. At 6.89e-3 it is more than twenty times the 3.1e-4 bandwidth implied by the 2.25 m gain length of `../steady_state`, so a bunch this short does not lase without something to compensate it.
+The chirp matters at this size. At 6.89e-3 it is more than twenty times the 3.1e-4 bandwidth implied by the 2.25 m gain length of `../steady_state`, so a bunch this short does not lase without something to compensate it.
 
-The short-range harmonics measure exactly zero here, and that is correct rather than a defect. They act on the density structure inside a slice, and a quiet-start dark beam has none: the initial bunching is 4e-17. `lucifer_short_range.in` gives them something to act on, by matching the `../steady_state` deck parameter for parameter and adding `nz = 4, nphi = 1`. Against that run as its control:
+The short-range harmonics measure exactly zero here, which is correct. They act on the density structure inside a slice, and a quiet-start dark beam has none: the initial bunching is 4e-17. `lucifer_short_range.in` gives them something to act on, by matching the `../steady_state` deck parameter for parameter and adding `nz = 4, nphi = 1`. Against that run as its control:
 
 | run | exit power | exit bunching |
 |---|---|---|
@@ -37,11 +37,10 @@ The short-range harmonics measure exactly zero here, and that is correct rather 
 
 That is +0.75% in exit power, past saturation, from the short-range term acting on a beam the FEL has bunched.
 
-Two configurations refuse rather than surprise. `slice` with neither term configured, `nz = 0` and `longrange = F`, is refused: the solve would cost its full price and return an exact zero. And `fft_3d` on an FEL element is refused, since that solver wants a three-dimensional grid this walk does not build.
+Two configurations are refused. `slice` with neither term configured, `nz = 0` and `longrange = F`, is refused, since the solve would run at its full cost and return an exact zero. `fft_3d` on an FEL element is refused, since that solver wants a three-dimensional grid this walk does not build.
 
-The master switch off while the elements still ask for `slice` is not refused, because that is how a lattice is run without space charge without editing it. `lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch false. The run says so and tracks the space-charge-free path, measured as exactly the control run's zero.
+The master switch off while the elements still ask for `slice` is not refused, because that is how a lattice is run without space charge and without editing it. `lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch false. The run prints a note saying so and tracks without space charge, measured as exactly the control run's zero.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets, which is the emission of macroparticles that occupy one grid point each and is no part of what a real beam radiates ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.25 percent of the power inside it on the short-range deck, so its 805.8 MW is the mode, as is the 792.7 MW it is compared against. With the filter off both reported 46 percent of their power as that emission. The long-range decks start dark, and what the filter leaves of their femtowatt fields is 1.6 percent outside the mode, which is why the comparison there is made on the beam.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is 0.25 percent of the power inside it on the short-range deck, so its 805.8 MW is the mode, as is the 792.7 MW it is compared against. With the filter off both reported 46 percent of their power as that emission. The long-range decks start dark, and what the filter leaves of their femtowatt fields is 1.6 percent outside the mode, which is why the comparison there is made on the beam.
 
 Runs in ~7 s each.
-

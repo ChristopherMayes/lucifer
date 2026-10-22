@@ -7,7 +7,7 @@ One command, Bmad only:
 
 LCLS at SLAC lased at 1.5 Angstrom in April 2009, the first hard X-ray free-electron laser, and reached saturation within its 132 m undulator. This example is that line at its published numbers: thirty-three planar segments, a coasting slab of the published beam, and SASE from the quiet start. It is the fourth machine the numerical settings are measured on, beside the 0.1 nm Aramis benchmark the other examples use and the 13.7 nm FLASH1 line of `../flash1` ([SASE convergence](../../doc/startup-noise.md)).
 
-The sources are P. Emma, *First lasing of the LCLS X-ray FEL at 1.5 Å*, PAC09, TH3PBI01, [proceedings](https://proceedings.jacow.org/pac2009/papers/th3pbi01.pdf), whose Tables 1, 2 and 4 carry the parameters, and Emma et al., *First lasing and operation of an ångstrom-wavelength free-electron laser*, Nature Photonics **4**, 641 (2010), [doi:10.1038/nphoton.2010.176](https://doi.org/10.1038/nphoton.2010.176).
+The first source is P. Emma, *First lasing of the LCLS X-ray FEL at 1.5 Å*, PAC09, TH3PBI01, [proceedings](https://proceedings.jacow.org/pac2009/papers/th3pbi01.pdf), whose Tables 1, 2 and 4 carry the parameters. The second is Emma et al., *First lasing and operation of an ångstrom-wavelength free-electron laser*, Nature Photonics **4**, 641 (2010), [doi:10.1038/nphoton.2010.176](https://doi.org/10.1038/nphoton.2010.176).
 
 ## What is published and what this file chose
 
@@ -34,11 +34,11 @@ Two numbers are this file's and are marked in the lattice header. The segment is
 
 The field and K agree here to 0.04 percent, where the FLASH1 line's two published numbers are 2.7 percent apart. The resonance that follows at 13.6 GeV is 1.5099 Angstrom against the published 1.5.
 
-The slice energy spread. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1), so the slice spread arriving at the undulator is 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys: at 1024 macroparticles per slice, 0.3 µm gives a power gain length of 3.52 m and saturation at 55 m where 0.4 µm gives 3.93 m and 62 m.
+The slice energy spread. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys: at 1024 macroparticles per slice, 0.3 µm gives a power gain length of 3.52 m and saturation at 55 m where 0.4 µm gives 3.93 m and 62 m.
 
 ## What the run measures
 
-Four seeds at the settings below, measured with the source filter off, before it became the default. The spread is the SASE fluctuation of a 300-slice window. What the filter changes is measured below.
+Four seeds at the settings below, measured with the source filter off. The spread is the SASE fluctuation of a 300-slice window. What the filter changes is measured below.
 
 | quantity | this deck | published | source |
 |---|---|---|---|
@@ -55,7 +55,7 @@ The energy loss is the one number that does not compare directly. This window ca
 
 ## The window, and why it is a slab
 
-At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavelengths and 500 cooperation lengths, and the whole line slips the light forward by 3762 wavelengths, 0.57 µm. A time-dependent run over the whole bunch would need tens of thousands of slices and would learn nothing the interior of a shorter window does not say, since each cooperation length lases independently of the others. The deck therefore carries a flat 3 kA slab of 300 slices at 68 wavelengths, 3.08 µm, which is 150 cooperation lengths long and 5.4 times the slippage. The pulse energy above is the peak power per slice times the machine's own pulse duration, not a sum over this window.
+At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavelengths and 500 cooperation lengths, and the whole line slips the light forward by 3762 wavelengths, 0.57 µm. A time-dependent run over the whole bunch would need tens of thousands of slices. It would learn nothing the interior of a shorter window does not say, since each cooperation length lases independently of the others. The deck therefore carries a flat 3 kA slab of 300 slices at 68 wavelengths, 3.08 µm, which is 150 cooperation lengths long and 5.4 times the slippage. The pulse energy above is the peak power per slice times the machine's own pulse duration, and never a sum over this window.
 
 ## The numerical settings, and how each was chosen
 
@@ -71,9 +71,11 @@ Every value is measured on this machine.
 | `beamlet_size` | 8, the default | |
 | `global%source_filter` | T, the default | at its derived 4.5 µrad edge it removes 105 times the wide-angle power and moves the mode power 4 percent, since 4096 macroparticles has already converged. The rows above were measured with it off |
 
+The rows were measured on the 127-point grid. The derivation rounds the point count up to a power of two, so the deck now derives 128 points over the same half width.
+
 The run's own convergence report puts the power outside the split angle of 4.5 µrad at 0.0003 times the power inside it, so the total field power is the mode. With the filter off the same deck reported 5 percent of its total outside the mode.
 
-The four seeds were rerun with the filter on and analysed the same way as without it, so the two columns differ only in the filter. The saturation point, the peak bunching, the pulse energy and the energy loss move by 1 to 3 percent, which is the table above standing. The fitted gain length moves by 12 percent, which it does not.
+The four seeds were rerun with the filter on and analysed the same way as without it, so the two columns differ only in the filter. The saturation point, the peak bunching, the pulse energy and the energy loss move by 1 to 3 percent, so the table above holds for them. The fitted gain length moves by 12 percent, so it does not.
 
 | quantity, one analysis over the same four seeds | filter off | filter on |
 |---|---|---|
@@ -83,8 +85,8 @@ The four seeds were rerun with the filter on and analysed the same way as withou
 | mean energy loss at the exit | 9.81 +- 0.09 MeV | 9.57 +- 0.13 MeV |
 | power gain length fitted over the exponential decade | 4.72 +- 0.05 m | 4.14 +- 0.05 m |
 
-The gain length is the one number the artifact biases, and it biases it upward. The wide-angle emission is large at startup and grows more slowly than the mode, so it flattens the early part of the power curve and a fit over the exponential decade reads a longer gain length than the mode has. Removing it shortens the fitted value by 12 percent, six times the fluctuation. The absolute values in this table are from a fit over the window's total power and are not the fit that produced the 3.81 m in the table above, so they compare with each other and not with it.
+The gain length is the one number the artifact biases, and it biases it upward. The wide-angle emission is large at startup and grows more slowly than the mode, so it flattens the early part of the power curve, and a fit over the exponential decade reads a longer gain length than the mode has. Removing it shortens the fitted value by 12 percent, six times the fluctuation. The absolute values in this table come from a fit over the window's total power, which is not the fit that produced the 3.81 m in the table above, so they compare with each other and not with it.
 
 The lattice carries the optics, so the beam is generated matched to the periodic solution in the `beginning` statement, which the run holds between 26.1 and 34.3 m over the line. There is no `gamma0` and no match transform.
 
-Runs in ~90 s, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator at 1254 integration steps, and the slices are what they are.
+Runs in ~90 s, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator at 1254 integration steps, each taken over every slice of the window.

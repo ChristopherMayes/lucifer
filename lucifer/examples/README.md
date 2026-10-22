@@ -1,14 +1,8 @@
 # FEL examples
 
-Self-contained runs of the FEL tracker, one command each, no Genesis 1.3 Version 4
-(Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way
-comparison, which needs the genesis4 binary. Every directory holds its own README with
-what the example demonstrates, the numbers measured on it, and what to look for in the
-plot.
+Self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates, the numbers measured on it, and what to look for in the plot.
 
-For the validation benchmark against Genesis4 see `lucifer/tests/`. That is where the
-physics is proven. The physics itself, with equations, conventions and provenance, is
-the manual, [`lucifer/doc/fel-physics.md`](../doc/fel-physics.md).
+The validation benchmark against Genesis4 is in `lucifer/tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`lucifer/doc/fel-physics.md`](../doc/fel-physics.md).
 
 ## Running an example
 
@@ -16,29 +10,19 @@ the manual, [`lucifer/doc/fel-physics.md`](../doc/fel-physics.md).
     ../../../production/bin/lucifer lucifer.in        # or debug/bin
     python ../plot_fel.py <out_root>.stats.h5             # needs h5py + matplotlib
 
-Every input deck is named `lucifer.in`, and variants carry a descriptive suffix:
-`lucifer_averaged.in`, `lucifer_detuned.in`. That is a convention for reading a
-directory, not a default the program looks for. The file name is an argument, and any
-name works.
+Every input deck is named `lucifer.in`, and variants carry a descriptive suffix: `lucifer_averaged.in`, `lucifer_detuned.in`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
 
-The decks carry no comments. Each line is a namelist parameter documented in
-[the input reference](../doc/input-reference.md), the story is this file and the
-directory's own README, and a deck is short enough to paste into a terminal.
+A deck carries no comment beyond the one line that says why a setting departs from its default. Each line is a namelist parameter documented in [the input reference](../doc/input-reference.md). What a deck is for is said in this file and in the directory's own README, and a deck is short enough to paste into a terminal.
 
 ## Shared pieces
 
-`aramis.bmad` is the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator
-segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom. Most examples
-call it, and the ones that need a different line carry their own lattice.
+`aramis.bmad` is the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom. Most examples call it, and the ones that need a different line carry their own lattice.
 
-`plot_fel.py` draws ten panels against s from any stats file, with an eleventh when a
-second polarization is live and a twelfth per harmonic. What the panels mean is
-[reading an output file](../doc/reading-output.md).
+`plot_fel.py` draws ten panels against s from any stats file, with an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields. What the panels mean is [reading an output file](../doc/reading-output.md).
 
 ## The examples
 
-Times are wall clock for a production build on twelve cores. A debug build is several
-times slower.
+Times are wall clock for a production build on twelve cores. A debug build is several times slower.
 
 | Example | What it is | Time |
 |---|---|---|
@@ -88,9 +72,7 @@ One row per feature declared in [the introduction](../doc/index.md).
 | One load path | [`import/`](import/) |
 | A coherent source model | [`coherent_source/`](coherent_source/) |
 
-Thread independence is a few commands rather than a directory. The threads divide the
-slices, so it takes a time-dependent example. Add `global%write_diag = T` to
-`migration/lucifer.in` and run it twice:
+Thread independence is a few commands rather than a directory. The threads divide the slices, so it takes a time-dependent example. Add `global%write_diag = T` to `migration/lucifer.in` and run it twice:
 
     cd migration
     for n in 1 12; do
@@ -99,10 +81,7 @@ slices, so it takes a time-dependent example. Add `global%write_diag = T` to
     done
     cmp t1.diag.txt t12.diag.txt
 
-Measured on this configuration: 96 slices, 1 thread against 12, the two diag files
-identical at 28,960,122 bytes. Compare the text file rather than the stats file, since
-HDF5 object headers carry timestamps and a whole-file compare would false-alarm on
-them. The harness runs the same check on the td1 tier at every commit.
+Measured on this configuration: 96 slices, 1 thread against 12, the two diag files identical at 28,960,122 bytes. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The harness runs the same check on the td1 tier at every commit.
 
 ## Planned examples
 
@@ -121,11 +100,6 @@ Each of these is a feature with no example yet, and the reason it has none.
 
 ## What a run writes
 
-`<out_root>.stats.h5` is the statistics file, and
-[reading an output file](../doc/reading-output.md) covers it and the plot panels.
-`<out_root>.diag.txt` is the Genesis4-comparison text file, written on
-`global%write_diag = T` and large. Several examples write one more file named for what
-it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`.
+`<out_root>.stats.h5` is the statistics file, and [reading an output file](../doc/reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `global%write_diag = T` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`.
 
-Run outputs are ignored by git, not committed. `.gitignore` in this directory covers
-them by extension.
+Run outputs are not committed. `.gitignore` in this directory covers them by extension.
