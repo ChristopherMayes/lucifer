@@ -30,7 +30,9 @@ em-dashes, " -- ", dates, sentences naming the user or a goal, and hard-wrapped 
 which are prose lines of 100 columns or less whose next line continues the paragraph.
 
 Code blocks, indented blocks, tables, headings, labels and directive lines are not
-prose and are not measured in the third form.
+prose and are not measured in the third form. The sentence counts take each line as one
+paragraph or list item, so a page is reflowed to that form first, which the second
+form proves.
 """
 
 from __future__ import annotations
@@ -193,17 +195,31 @@ def unwrapped(rev: str, paths) -> int:
     return bad
 
 
+ABBREVIATIONS = ("e.g", "i.e", "vs", "cf", "et", "al", "Fig", "Figs", "Eq", "Eqs", "Sec", "No",
+                 "approx", "Dr", "St", "Phys", "Rev", "Accel", "Beams", "Nucl", "Instrum", "Meth",
+                 "Methods", "Lett", "Opt", "Commun", "Proc", "Conf", "Vol", "pp", "ed", "eds", "Ref",
+                 "Refs", "Appl", "Sci", "Rep", "Mod", "Part", "Univ", "Lab", "Inst", "Tech", "Trans",
+                 "Soc", "Am", "Ann", "Int", "Eng", "Comput", "Res", "Suppl", "Ser", "J", "Chap",
+                 "Instr", "Technol", "ST", "Stab")
+
+
 def sentences(prose_lines):
-    """The sentences of the prose, each as its word count."""
-    text = " ".join(prose_lines)
-    text = re.sub(r"`[^`]*`", "X", text)
-    text = re.sub(r"\$[^$]*\$", "X", text)
-    text = re.sub(r"\[\]\([^)]*\)", "", text)
-    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"(\d)\.(\d)", r"\1N\2", text)
-    text = re.sub(r"\b(e\.g|i\.e|vs|cf|al|Fig|No|approx|Sec|Eq|Dr|St)\.", r"\1", text)
-    parts = re.split(r"(?<=[.!?])\s+(?=[A-Z\"(])", text)
-    return [s for s in parts if len(s.split()) > 1]
+    """The sentences of the prose, each as its text. A paragraph or list item is measured
+    on its own, so a list never reads as one sentence, and a sentence may begin with a
+    lowercase name such as openPMD."""
+    out = []
+    for line in prose_lines:
+        t = re.sub(r"`[^`]*`", "X", line)
+        t = re.sub(r"\$[^$]*\$", "X", t)
+        t = re.sub(r"\[\]\([^)]*\)", "X", t)
+        t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", t)
+        t = re.sub(r"^\s*([-*]|\d+\.)\s+", "", t)
+        t = t.replace("*", "")
+        t = re.sub(r"(?<=\d)\.(?=\d)", "N", t)
+        t = re.sub(r"\b(" + "|".join(re.escape(a) for a in ABBREVIATIONS) + r")\.", r"\1", t)
+        t = re.sub(r"\b([A-Z])\.(?=\s)", r"\1", t)
+        out += [s for s in re.split(r"(?<=[.!?])\s+", t) if len(s.split()) > 1]
+    return out
 
 
 def counts(paths) -> None:
@@ -227,7 +243,7 @@ def counts(paths) -> None:
                "median": statistics.median(lens) if lens else 0,
                "p90": sorted(lens)[int(0.9 * len(lens))] if lens else 0,
                ">20": sum(1 for n in lens if n > 20), ">40": sum(1 for n in lens if n > 40),
-               "semi": len(re.findall(r"[a-z)]; [a-z]", re.sub(r"`[^`]*`|\$[^$]*\$", "", text))),
+               "semi": len(re.findall(r"[a-z)]; \S", re.sub(r"`[^`]*`|\$[^$]*\$", "", text))),
                "emdash": text.count("—") + text.count("–"),
                "dbldash": text.count(" -- "),
                "date": len(re.findall(DATE, text)),
