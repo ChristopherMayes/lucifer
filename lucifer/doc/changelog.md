@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-22 Fixed: the setup warning for the source filter said the default was measured over ratios
+  of 0.3 to 3, the band the warning fires outside. It now says the ratio is outside 0.3 to 3 and that the
+  default was measured over ratios of 1.14 to 1.86 on four machines, the range `startup-noise.md` records.
+  The band is unchanged.
 - 2026-10-22 Changed: the comments of every module, the driver, `CMakeLists.txt` and `fel_sincos.c` say
   what each block does and why in short sentences. Every formula, Genesis citation, caveat and parameter
   stays. How a fact was found, when and by whom, which check showed it and what it cost went, and a

@@ -1158,8 +1158,8 @@ if (any(is_fel)) then
                                 1 / (1 + exp(-1 / run%global%source_filter_width))])
       endif
       if (ratio > 0 .and. (ratio < 0.3_rp .or. ratio > 3.0_rp)) then
-        call out_io (s_warn$, r_name, 'The two filter angles differ by more than the range ' // &
-                     'the default was measured over (0.3 to 3).', &
+        call out_io (s_warn$, r_name, 'The ratio of the two filter angles is outside 0.3 to 3. ' // &
+                     'The default was measured over ratios of 1.14 to 1.86 on four machines.', &
                      'Check the power inside the edge against the total before trusting the run.')
       endif
 
