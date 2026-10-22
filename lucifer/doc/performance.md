@@ -73,7 +73,7 @@ Two runs each, mean. The filter costs 27 percent of this walk and 42 percent of 
 
 The `= FEL step` row is derived rather than measured, which its label says: it is the sum of the undulator prep, the space-charge profile, the particle push and the field solve, so it is the share of the walk the undulator segments own. It is left out of the leaf sum, and the other rows still add to the walk minus the remainder.
 
-The shares are the result and the third decimal is noise. Two 96-slice runs back to back give walks of 29.625 s and 29.667 s, and a third taken in a different batch gives 30.333 s, so the run-to-run spread is about 2% on a walk and a few tenths of a point on a share.
+The shares are the result and the third decimal is noise. Two 96-slice runs back to back give walks of 29.625 s and 29.667 s, and a third taken in a different batch gives 30.333 s, so the run-to-run spread is about 2% on a walk and a few tenths of a point on a share. The phase timers' own cost, two `system_clock` calls per region, is below that spread.
 
 The shares hold across a factor of 5.25 in slice count. The run row against the walk row is everything outside the walk: the parse, the beam and field build, the slippage schedule, the final dumps and the stats file. That is 0.2 s at 96 slices and 0.8 s at 504.
 
@@ -145,6 +145,8 @@ The scaling improved with the filter on, from 9.16x to 9.59x at twelve threads a
 The nameable serial phases account for 0.6% of the walk, well under the 2.8% the speedup implies. The rest is not serial code. Two parallel regions are spawned per integration step (1068 steps, so about 4300 region entries), and the sampling profile below puts 10.0% of its samples in the thread wait, which at 76% efficiency is the barrier and not a lock.
 
 A steady-state run gets nothing from threads. The parallelism is over slices, and a steady-state window has one: the unaveraged example measures 21.94 s at 1 thread and 21.76 s at 12.
+
+The field-free drift is parallel over slices for the same reason. A time-dependent line makes one `wavefront_drift` call per field-free element, and with its slice loop serial, a 590-slice, 256-point case took about 0.5 s per element on one core, the largest serial block of the walk.
 
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
@@ -312,7 +314,7 @@ Every run prints an estimated walk in its header and the measured walk beside it
 | `taper` | on | 5.1 s | 4.7 s | 0.92 |
 | `flash1` | on | 22.6 s | 18.5 s | 0.82 |
 
-Every row is inside a factor of two, which is what the estimate is held to. The filter column is what separates the two blocks. The examples take the default, and three of the four now read between 0.92 and 0.97 where all four read 0.80 against the previous rates. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)), so their field solve is the cheaper two-transform one while the rate pricing it is the filtered default's. That is the 1.13 to 1.33 the tier block sits at, and it is a property of the configuration rather than of the machine.
+Every row is inside a factor of two, which is what the estimate is held to. Fitted with the source filter on, the transform rate is 58 percent higher than with it off, and the push and deposit rates are unchanged. The work outside the walk (parsing, building the beam and field, the final dumps) is 1 percent of the walk on these runs, and the estimate leaves it out. The filter column is what separates the two blocks. The examples take the default, and three of the four now read between 0.92 and 0.97 where all four read 0.80 against the previous rates. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)), so their field solve is the cheaper two-transform one while the rate pricing it is the filtered default's. That is the 1.13 to 1.33 the tier block sits at, and it is a property of the configuration rather than of the machine.
 
 `tier1_unavg` is the highest at 1.87 and is high for a second reason: the unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period, and the count carries those substeps while the rates it multiplies are the averaged path's. `flash1` is the lowest at 0.82, on 351 slices at `ngrid` 129, which is the furthest configuration here from the one the rates were fitted on.
 
@@ -371,6 +373,8 @@ Where the time goes, from the run's own phase table at the two ends of that scan
 | the FEL step | 0.240 s | 0.244 s |
 
 The FEL step is untouched, which it must be. The drift is 1.3% of the walk whole and 24% cut thirty ways, and it dominates because it is one transform pair per slice per piece where the seam's own tracking is one bunch per slice. So the price is set by the window's slice count and the pieces per element, and a deck that wants frames through a break pays for the field's diffraction rather than for the beam's transport. Rows cost the rest: 2016 to 3680 of them moves stats and diag by 0.020 s.
+
+Bmad's global `bmad_com%sr_wakes_on` chooses the interlude path for every element of a line at once. With it on, an element carrying a wake takes the serial whole-window path, and with it off every interlude takes the slice-parallel loop. On a 103-element line with 74 wake-carrying pipes at 12 threads, that one switch decided the path of the whole lattice.
 
 (perf-device)=
 ## The device, measured against the CPU

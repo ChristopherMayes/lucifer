@@ -622,6 +622,10 @@ collected from trailing charge) fails tdwk at 7.0e-3 against its 8.7e-7 pristine
 flipping the sign of `ez` fails tdsc at 9.1e-1. Removing the migration-stride recompute
 leaves one eloss block and fails the stale-wake structural check.
 
+Genesis4's `getSize` is the product $\sigma_x \sigma_y$, which the long-range term transcribes. A
+sum of variances in its place, $\sigma_x^2 + \sigma_y^2$, puts a 1.7e-1 error on the
+space-charge comparison.
+
 (val-bmad-element-wakes-across)=
 ## Bmad element wakes across the whole bunch
 
@@ -776,6 +780,8 @@ fc checks pass it, which is why the ledger is check zero. A hard-edge entry
 probe beam. Note the exit momentum re-absorbs the quiver at integer-period lengths,
 so the orbit, not the exit mean px, is the reliable instrument).
 skipping the exit handoff flag is refused at the first seam element.
+
+The ramp phase jump at each segment end compensates the slippage the ramps lose against the hard-edged contract. Without it, the per-segment ln-power deviation against the averaged mode over the six segments of the benchmark line is 0.0000, +0.08, +0.005, +0.02, +0.01 and +0.13. The first segment is immune, since nothing is bunched yet. Compensating continuously inside the ramp instead costs -0.9% gain on the first segment, doubling with ramp length, so the jump is discrete and at the ends.
 
 (val-two-polarizations-vector-radiation)=
 ## Two polarizations: vector radiation, tilt honored, the crossed undulator
@@ -1029,6 +1035,8 @@ Until 2026-09-13 the residual was in the third list, and it belongs in the first
 Refusal texts are a supported contract. stdout is otherwise for humans and carries no contract at all, which is why the suite reads files rather than scraping the screen. The one exception is deliberate: a refusal must be recognizable from its message, so the suite matches the capitalized text of a refusal together with a nonzero exit status. Those texts therefore change only with their checks, in the same commit.
 
 A fourth: an element-driven line reproduces the namelist-driven reference bit-identically at $z=0$, growing only to **3.4e-12** over the line, which is the one-ulp round trip of the $a_w$ lattice attribute. The FEL element's assertion checks refuse each malformed lattice, naming the attribute at fault.
+
+The whole-window row at an element end moves each slice's moments into the window's chart with the $(z, p_z)$ shear $J_{56} = L\, \partial\beta/\partial p_z$. Without the shear the cov$(v, z)$ cross terms of the whole-window sigma matrix carry a 4e-6 relative error, against 2e-13 on every other entry, and the whole-window normal-mode decomposition reads invalid.
 
 (val-parallelism-openmp-over-slices)=
 ## Parallelism: OpenMP over slices, bit-identical by construction

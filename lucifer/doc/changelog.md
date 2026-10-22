@@ -9,6 +9,15 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-22 Changed: the comments of every module, the driver, `CMakeLists.txt` and `fel_sincos.c` say
+  what each block does and why in short sentences. Every formula, Genesis citation, caveat and parameter
+  stays. How a fact was found, when and by whom, which check showed it and what it cost went, and a
+  measurement a comment carried is cited by the page that holds it. Eight measurements no page held moved
+  to `validation.md` and `performance.md`. 27 routine headers whose first line did not repeat the
+  declaration now do, and about thirty comments that disagreed with the code now match it, among them
+  the helical polarization (1, +i)/sqrt(2), the source filter's edge at lambda/dx and the y component's
+  params in the escaped bank. `tests/scripts/check_comments_only.py` proves an edit changed comments
+  only, and the code of every file is identical to before.
 - 2026-10-21 Fixed: `run_examples.sh` ran a directory's decks in the shell glob's order, which follows the
   locale's collation, and under `en_US.UTF-8` the import example's `lucifer_from_file.in` sorts ahead of
   `lucifer.in`, whose bunch file it reads. It failed with `hdf5_open_file` in every fresh checkout, and
