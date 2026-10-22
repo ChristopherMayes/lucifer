@@ -70,6 +70,7 @@ import numpy as np
 
 import beamio
 import fieldio
+from checkrec import record
 from nml import to_groups
 from scipy.special import jv
 
@@ -182,6 +183,7 @@ def check(name, value, tol, note=""):
     global FAILED
     ok = value <= tol
     print(f"--- {name}: {value:.3e} (check {tol:.0e}) {note} {'ok' if ok else '** FAIL **'}")
+    record(name, value, tol, "max", ok)
     if not ok:
         FAILED = True
 

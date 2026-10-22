@@ -20,6 +20,14 @@ The results files are written by run_fel_benchmark.sh --results, one record per 
   build|<flavor>
   section|<name>|<outcome>[|<reason>]
   tier|<key>|<level>|<outcome>|<description>
+  check|<json>
+
+A check line is one check a section's script made, written by checkrec.record() with
+the section, the check's name, the value it measured, the bound it held the value to,
+how (max, min, range, equal or bool) and whether it passed. The two builds' records are
+paired by section and name. A name recorded twice in one build, or recorded in one
+build and not the other, is refused, since a table that silently dropped a check would
+say less than it claims.
 
 A results file with a section recorded as anything but pass is refused. The device
 section skips on a build with no usable backend, as on a Linux CI runner. A table
@@ -28,17 +36,28 @@ So the generated table comes from a full local run on both builds.
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 
 def read_results(path):
-    """Parse one results file into {'build':…, 'sections':[…], 'tiers':[…]}."""
-    out = {"build": None, "sections": [], "tiers": []}
+    """Parse one results file into {'build':…, 'sections':[…], 'tiers':[…], 'checks':[…]}."""
+    out = {"build": None, "sections": [], "tiers": [], "checks": []}
     for line in Path(path).read_text().splitlines():
         if not line.strip():
             continue
         kind, _, rest = line.partition("|")
+        if kind == "check":
+            try:
+                row = json.loads(rest)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"{path}: a check record is not JSON: {rest[:80]} ({exc})")
+            for key in ("section", "name", "value", "bound", "kind", "pass"):
+                if key not in row:
+                    raise SystemExit(f"{path}: a check record lacks {key!r}: {rest[:80]}")
+            out["checks"].append(row)
+            continue
         f = rest.split("|")
         if kind == "build":
             out["build"] = f[0]
@@ -57,7 +76,79 @@ def read_results(path):
             f"{path}: this run skipped {', '.join(skipped)}, so it records fewer sections "
             "than a full\n  run and the table would undercount them. Write the table from a "
             "full run on both builds.")
+    seen = set()
+    for row in out["checks"]:
+        key = (row["section"], row["name"])
+        if key in seen:
+            raise SystemExit(f"{path}: the check {row['name']!r} is recorded twice in section "
+                             f"{row['section']!r}, so the two builds cannot be paired by name")
+        seen.add(key)
     return out
+
+
+def fmt(x):
+    """A value as the table prints it: six significant digits for a float, the integer
+    itself, yes or no for a truth value, and nothing for no value."""
+    if x is None:
+        return ""
+    if isinstance(x, bool):
+        return "yes" if x else "no"
+    if isinstance(x, int):
+        return str(x)
+    if isinstance(x, float):
+        return f"{x:.6e}"
+    if isinstance(x, list):
+        return "[" + ", ".join(fmt(v) for v in x) + "]"
+    return str(x)
+
+
+def fmt_bound(row):
+    """The bound a check held its value to, with the sense of the comparison."""
+    kind, bound = row["kind"], row["bound"]
+    if kind == "max":
+        return f"<= {fmt(bound)}"
+    if kind == "min":
+        return f">= {fmt(bound)}"
+    if kind == "range" and isinstance(bound, list) and len(bound) == 2:
+        return f"{fmt(bound[0])} to {fmt(bound[1])}"
+    if kind == "equal":
+        return f"= {fmt(bound)}"
+    if kind == "bool":
+        return "holds"
+    return fmt(bound)
+
+
+def check_tables(dbg, prod):
+    """The per-section tables of checks, debug and production side by side."""
+    pmap = {(r["section"], r["name"]): r for r in prod["checks"]}
+    dkeys = {(r["section"], r["name"]) for r in dbg["checks"]}
+    missing = [k for k in pmap if k not in dkeys] + [k for k in dkeys if k not in pmap]
+    if missing:
+        raise SystemExit("checks recorded in one build and not the other:\n  "
+                         + "\n  ".join(f"{s}: {n}" for s, n in sorted(missing)))
+    sections = [s for s, _ in dbg["sections"]]
+    by_section = {s: [r for r in dbg["checks"] if r["section"] == s] for s in sections}
+    L = []
+    n = 0
+    for s in sections:
+        rows = by_section[s]
+        if not rows:
+            continue
+        L.append(f"### `{s}`")
+        L.append("")
+        L.append("| Check | Debug | Production | Bound |")
+        L.append("|---|---|---|---|")
+        for r in rows:
+            p = pmap[(s, r["name"])]
+            dval, pval = fmt(r["value"]), fmt(p["value"])
+            mark = "" if r["pass"] and p["pass"] else " (FAILING)"
+            dbound, pbound = fmt_bound(r), fmt_bound(p)
+            bound = dbound if dbound == pbound else f"{dbound} (debug), {pbound} (production)"
+            name = r["name"].replace("|", "\\|")
+            L.append(f"| {name} | {dval}{mark} | {'same' if pval == dval else pval} | {bound} |")
+            n += 1
+        L.append("")
+    return L, n
 
 
 def main():
@@ -116,9 +207,20 @@ def main():
         L.append(f"- `{s}`")
     L.append("")
 
+    tables, n_checks = check_tables(dbg, prod)
+    if tables:
+        L.append("## Measured levels of the checks")
+        L.append("")
+        L.append("Each table below is one check section as its script recorded it: the value each check")
+        L.append("measured on each build and the bound it held the value to. The scripts write these")
+        L.append('records as they run, and the keystone regenerates them. Production reads "same"')
+        L.append("where the two builds agree to every printed digit.")
+        L.append("")
+        L.extend(tables)
+
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text("\n".join(L))
-    print(f"wrote {args.out}: {len(dbg['tiers'])} tiers, {len(dsec)} check sections")
+    print(f"wrote {args.out}: {len(dbg['tiers'])} tiers, {len(dsec)} check sections, {n_checks} checks")
     return 0
 
 

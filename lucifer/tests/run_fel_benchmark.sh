@@ -974,9 +974,15 @@ sec_diagnostics () {
 # status, the seconds and a skip reason, and it is what the parent reads: a section
 # that ran leaves one, whatever happened, and a section with no record did not run.
 run_section () {   # <name> <dir>
-  local name="$1" dir="$2" fn t0=$SECONDS rc outcome reason=""
+  local name="$1" dir="$2" fn t0=$SECONDS rc outcome reason="" rec
   fn="sec_$(echo "$name" | tr '-' '_')"
-  ( cd "$dir" && LUCIFER_CPU_BUDGET="$SECTION_CPUS" "$fn" "$dir" ) > "$SECTIONS/$name.log" 2>&1
+  # Each check the section's script makes is recorded as a line of $rec by checkrec.py,
+  # and the results file takes those lines beside the section's outcome below. The file
+  # starts empty so a section run twice into one directory records its checks once.
+  rec="$(cd "$dir" && pwd)/.checks"
+  : > "$rec"
+  ( cd "$dir" && LUCIFER_CPU_BUDGET="$SECTION_CPUS" LUCIFER_CHECK_RECORD="$rec" \
+      LUCIFER_CHECK_SECTION="$name" "$fn" "$dir" ) > "$SECTIONS/$name.log" 2>&1
   rc=$?
   case $rc in
     0)  outcome=pass ;;
@@ -1030,7 +1036,10 @@ for name in $SECTION_ORDER; do
   case "$outcome" in
     pass)
       echo "  [time: $name $secs s]"
-      if [[ -n "$RESULTS" ]]; then echo "section|$name|pass" >> "$RESULTS"; fi ;;
+      if [[ -n "$RESULTS" ]]; then
+        echo "section|$name|pass" >> "$RESULTS"
+        if [[ -s "$SECTIONS/$name/.checks" ]]; then cat "$SECTIONS/$name/.checks" >> "$RESULTS"; fi
+      fi ;;
     skip)
       echo "  [time: $name $secs s, skipped: $reason]"
       if [[ -n "$RESULTS" ]]; then echo "section|$name|skip|$reason" >> "$RESULTS"; fi ;;
