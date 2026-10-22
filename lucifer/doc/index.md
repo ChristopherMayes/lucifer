@@ -5,7 +5,7 @@ short_title: Introduction
 
 Lucifer (*lux ferre*, light-bringer) tracks a free-electron laser inside Bmad. Its physics is transcribed from Genesis 1.3 Version 4 (Genesis4), embedded in Bmad's lattice machinery, and validated against Genesis4 from bitwise-identical starting states.
 
-An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's own, the FEL parameters are lattice attributes rather than a parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's `track1_bunch`. A run is one input file naming a lattice.
+An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lucifer lattice is a Bmad lattice. Quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's own. The FEL parameters are lattice attributes and not a parallel namelist, and every non-FEL element tracks each slice's bunch through Bmad's `track1_bunch`. A run is one input file naming a lattice.
 
 ## Features
 
@@ -17,9 +17,9 @@ An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lu
 - **Two polarizations** and harmonic field sets, with tilt honored on planar and helical undulators.
 - **Undulator tapering**, as a line whose segments are different elements rather than a per-segment input.
 - **Phasing between segments**, following the real geometry in absolute time tracking and autophased in the default relative mode.
-- **Spontaneous emission** gated on Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
+- **Spontaneous emission** turned on by Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
-- **A GPU backend** for the averaged method on Apple Silicon (`global%device = "metal"`): the beam and the field stay resident on the device through each FEL element, measured between 7x and 12x against twelve CPU cores and judged per step against the FP64 path ([](validation.md#val-device)), harmonic field sets, both polarizations and slice migration included. Configurations its kernels do not cover are refused, never run quietly on the CPU instead.
+- **A GPU backend** for the averaged method on Apple Silicon (`global%device = "metal"`). The beam and the field stay resident on the device through each FEL element, harmonic field sets, both polarizations and slice migration included. It is measured between 7x and 12x against twelve CPU cores and checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
 - **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
 - **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever load there is.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
@@ -27,7 +27,7 @@ An FEL segment is a real Bmad wiggler element carrying a Bmad attribute, so a Lu
 (intro-two-methods)=
 ## The two FEL methods
 
-Bmad's own `fel_method` attribute, set on the element as any attribute is.
+The method is Bmad's own `fel_method` attribute, set on the element as any attribute is.
 
 | `tracking_method` | what it is for |
 |---|---|
@@ -52,7 +52,7 @@ The averaged method's transverse maps have a third option behind them, the trans
 | see what changed | [](changelog.md) |
 | find a paper this code implements | [](references.md) |
 
-Runnable cases live in `lucifer/examples/`, each a directory of real input files with its own README and the numbers measured on it. Every one of them has a page here, with its figure and its input files: [](generated/examples/examples.md) carries the table of which example shows which feature.
+Runnable cases live in `lucifer/examples/`, each a directory of real input files with its own README and the numbers measured on it. Every one of them has a page here, with its figure and its input files. [](generated/examples/examples.md) carries the table of which example shows which feature.
 
 ## Known missing features
 
@@ -61,6 +61,6 @@ Runnable cases live in `lucifer/examples/`, each a directory of real input files
 - One-to-one particle tracking, and the particle sorting it implies.
 - Undulator field errors.
 - On the GPU: collective effects and the unaveraged mode, each refused. A CUDA backend, which the device interface is shaped for.
-- MPI. This one is a design decision rather than a gap: the shared-memory design is what this program is, and the case for adding MPI would have to be made on measurement.
+- MPI. The shared-memory design is a design decision rather than a gap, and a case for adding MPI would rest on a measurement.
 
-Validation runs on eleven comparison tiers and twenty-five check sections, on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants, three are priced model differences rather than defects, and one proves nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).
+Validation runs on eleven comparison tiers and twenty-eight check sections, on both debug and production builds, before every commit. Seven of the eleven tiers are transcription checks that agree with Genesis4 at the floor set by its truncated impedance constants. Three are priced model differences rather than defects, and one shows nonuniform weights invisible against the uniform run. The levels, the attributions and the tier table are in [](validation.md).
