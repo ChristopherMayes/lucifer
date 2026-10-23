@@ -259,6 +259,18 @@ def preflight() -> None:
                     f"regression suite and the generators; got {sys.executable}")
     if shutil.which("git") is None:
         pytest.fail("git is needed for the regeneration diff")
+    # Bmad writes a digested copy beside each lattice it parses and reads it back while
+    # bmad_inc_version$ matches, which a release can leave unchanged while it renumbers
+    # the attribute indices the copy was written with. Bmad's own regression tests then
+    # read their lattices at the old indices and fail, as three did at 20261023-0 against
+    # files the 20261018-0 build had written, while a fresh checkout passed. Every digested
+    # file under both trees goes before a job launches, so each run parses what the
+    # source says.
+    stale = [f for root in (BMAD / "regression_tests", LUCIFER)
+             for f in root.rglob("*.digested*") if f.is_file()]
+    for f in stale:
+        f.unlink()
+    print(f"keystone: removed {len(stale)} digested lattice files under {BMAD / 'regression_tests'} and {LUCIFER}")
 
 
 @pytest.fixture(scope="session")
