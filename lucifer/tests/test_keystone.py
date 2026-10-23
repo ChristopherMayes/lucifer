@@ -3,7 +3,7 @@
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the four page sets and requires the Markdown diff to be empty. Before it
+regenerates the five page sets and requires the Markdown diff to be empty. Before it
 runs a generator, the sixth test verifies for itself that all five outcomes are present
 and successful. So it does not lean on test order and cannot pass on a partial run.
 Nothing here builds. Both trees are prerequisites and are checked before any job
@@ -301,7 +301,7 @@ def test_job(keystone: Keystone, name: str) -> None:
 
 
 def test_regeneration(keystone: Keystone) -> None:
-    """Regenerate the four page sets and require no diff, after all five jobs passed.
+    """Regenerate the five page sets and require no diff, after all five jobs passed.
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
@@ -319,6 +319,10 @@ def test_regeneration(keystone: Keystone) -> None:
          "--code", str(LUCIFER / "program"), "--out", str(GENERATED / "api.md")),
         (str(SCRIPTS / "report_examples.py"), "--examples", str(LUCIFER / "examples"),
          "--out", str(GENERATED / "examples")),
+        # The startup-noise page's tables, from the committed JSON of the driver's runs. The
+        # driver runs on demand, so this costs no run.
+        (str(SCRIPTS / "report_startup_noise.py"), "--json", str(GENERATED / "startup-noise"),
+         "--out", str(GENERATED / "startup-noise-measured.md")),
         # The layouts page runs its own fixtures with the production executable. A failed
         # fixture fails this test, keeps its log in the artifact directory and leaves the
         # committed page as it was, since the generator writes the page whole or not at all.

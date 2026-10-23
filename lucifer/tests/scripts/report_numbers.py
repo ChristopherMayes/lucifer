@@ -251,6 +251,8 @@ def main() -> int:
     src.read_tsv(pathlib.Path(a.standards), "standard")
     src.read_scripts(sorted((tests / "scripts").glob("check_*.py")))
     src.read_generated(doc / "generated" / "validation-measured.md")
+    if (doc / "generated" / "startup-noise-measured.md").exists():
+        src.read_generated(doc / "generated" / "startup-noise-measured.md")
     src.read_record(examples / "measured.tsv")
     src.read_decks([examples, tests / "bmad", tests / "genesis4"])
     hand = read_hand(pathlib.Path(a.classes))

@@ -67,6 +67,9 @@ import subprocess
 import sys
 import time
 
+import datetime
+import re
+
 import h5py
 import numpy as np
 
@@ -269,11 +272,16 @@ fft_fieldsolver = {fft}
 &end
 """
 
+# The comparison against Genesis4 runs with the source filter off, since Genesis4's run
+# carries none and the filter is this program's default (fel-physics.md,
+# sec-source-filter). A deck that left it on would compare a filtered run with an
+# unfiltered one and read a difference of order one.
 LUCIFER_FROM_GENESIS = """&fel_params
   lat_file = "aramis.bmad"
   global%out_root = "{root}"
   global%interlude_model = "genesis"
   global%transport_model = "genesis"
+  global%source_filter = F
   global%write_diag = T
   slicing%n_wavelength = 3
 /
@@ -341,13 +349,15 @@ class Runner:
         self.wd = pathlib.Path(workdir)
         self.wd.mkdir(parents=True, exist_ok=True)
         self.threads = str(threads)
+        self.n_ran = 0        # Decks run rather than found, so an experiment knows if it ran.
 
     def run(self, name, text, exe=None, env_threads=None):
+        """Runs the deck and returns True, or returns False when its outputs are there."""
         deck = self.wd / f"{name}.in"
         stamp = self.wd / f"{name}.done"
         digest = hashlib.sha256(text.encode()).hexdigest()
         if stamp.exists() and stamp.read_text().strip() == digest:
-            return
+            return False
         deck.write_text(text)
         env = {"OMP_NUM_THREADS": env_threads or self.threads, "PATH": os.environ["PATH"],
                "HOME": os.environ.get("HOME", "")}
@@ -358,7 +368,39 @@ class Runner:
             print(f"FAIL: {name} exited {r.returncode}, see {self.wd / (name + '.log')}")
             sys.exit(1)
         stamp.write_text(digest)
+        self.n_ran += 1
         print(f"  ran {name}")
+        return True
+
+
+def kept_wall(ran, t0, old):
+    """The wall time of a run that happened, or the time a cached run took when it was
+    made, so a rerun from the cache does not record 0."""
+    return time.time() - t0 if ran else (old or {}).get("wall_s", 0.0)
+
+
+def provenance(args, exe):
+    """What measured the numbers: the Lucifer commit of the source tree this script sits
+    in, the build flavor the binary's directory names, the genesis4 version from its own
+    banner, the machine, the backend and the day."""
+    here = pathlib.Path(__file__).resolve().parent
+    try:
+        commit = subprocess.run(["git", "-C", str(here), "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "-C", str(here), "status", "--porcelain", "--", str(here.parent.parent)],
+                               capture_output=True, text=True, check=True).stdout.strip() != ""
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        commit, dirty = "unknown", False
+    flavor = next((p for p in pathlib.Path(exe).resolve().parts if p in ("debug", "production")), "unknown")
+    try:
+        banner = subprocess.run([args.genesis], capture_output=True, text=True, timeout=30)
+        m = re.search(r"Version\s+([0-9][0-9.]*)", banner.stdout + banner.stderr)
+        genesis = m.group(1) if m else "unknown"
+    except (OSError, subprocess.TimeoutExpired):
+        genesis = "unknown"
+    return {"lucifer_commit": commit + ("+" if dirty else ""), "build": flavor,
+            "genesis4": genesis, "machine": args.machine, "backend": args.device,
+            "date": datetime.date.today().isoformat()}
 
 
 # ---------------------------------------------------------------------------
@@ -576,9 +618,9 @@ def exp_filter(rn, args, lat, results):
             # that experiment has already run in this work directory.
             root = f"floor_g{ng}_n{npart}" if name == "off" else f"filt_{name}_n{npart}"
             t0 = time.time()
-            rn.run(root, deck_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES,
-                                   xcut=xcut, width=width))
-            wall = time.time() - t0
+            ran = rn.run(root, deck_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES,
+                                        xcut=xcut, width=width))
+            wall = kept_wall(ran, t0, results.get("filter", {}).get(f"n{npart}_{name}"))
             rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
             z, P, b = element_end_power(rn.wd, root)
             zs, Ps = saturation_point(z, interior(P))
@@ -671,9 +713,9 @@ def exp_tolerance(rn, args, lat, results):
     for tol in tols:
         root = f"tol{str(tol).replace('.', 'p')}_n1024"
         t0 = time.time()
-        rn.run(root, deck_text(lat, root, ng, 1024, 8, LONG, args.device, DUMP_ELES,
-                               xcut="default", tolerance=tol))
-        wall = time.time() - t0
+        ran = rn.run(root, deck_text(lat, root, ng, 1024, 8, LONG, args.device, DUMP_ELES,
+                                    xcut="default", tolerance=tol))
+        wall = kept_wall(ran, t0, results.get("tolerance", {}).get("rows", {}).get(str(tol)))
         rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
         z, P, b = element_end_power(rn.wd, root)
         Pi = interior(P)
@@ -1374,20 +1416,28 @@ def main():
     for k, v in th.items():
         print(f"  {k:24s} {v:.4e}")
 
-    if "a" in want:
-        exp_floor(rn, args, lat, results)
-    if "b" in want:
-        exp_beamlets(rn, args, lat, results)
-    if ("c" in want or "d" in want) and mach["lat2"]:
-        exp_line(rn, args, lat, lat2, results)
-    if "f" in want:
-        exp_genesis(rn, args, results)
-    if "g" in want:
-        exp_filter(rn, args, lat, results)
-    if "h" in want:
-        exp_tolerance(rn, args, lat, results)
-    if "i" in want and args.machine == "aramis":
-        exp_cause(rn, args, results)
+    # Each experiment's wall time is recorded when it ran a deck. One that came whole
+    # from the cache keeps the time of the run that made it.
+    results["provenance"] = provenance(args, args.exe)
+    walls = results.setdefault("wall_s", {})
+    experiments = (("a", exp_floor, (rn, args, lat, results)),
+                   ("b", exp_beamlets, (rn, args, lat, results)),
+                   ("cd", exp_line, (rn, args, lat, lat2, results)),
+                   ("f", exp_genesis, (rn, args, results)),
+                   ("g", exp_filter, (rn, args, lat, results)),
+                   ("h", exp_tolerance, (rn, args, lat, results)),
+                   ("i", exp_cause, (rn, args, results)))
+    for key, fn, fargs in experiments:
+        if not (set(key) & want):
+            continue
+        if key == "cd" and not mach["lat2"]:
+            continue
+        if key == "i" and args.machine != "aramis":
+            continue
+        n0, t0 = rn.n_ran, time.time()
+        fn(*fargs)
+        if rn.n_ran > n0:
+            walls[key] = time.time() - t0
     results_file.write_text(json.dumps(rounded(results), indent=1))
     if "cause" in results:
         cause_figure(results, out)

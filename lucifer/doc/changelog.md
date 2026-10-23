@@ -9,6 +9,44 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Added: `tests/scripts/startup_noise.py` records the provenance of its runs in each JSON
+  it writes. That is the Lucifer commit of the source tree, marked + when the tree had uncommitted
+  changes, the build the binary's directory names, the genesis4 version from its banner, the
+  machine, the backend and the day. Each experiment records its wall time when it ran a deck, and an
+  experiment that came whole from the cache keeps the time of the run that made it rather than
+  writing 0, which the per-case times did before.
+- 2026-10-23 Added: `tests/scripts/report_startup_noise.py` writes
+  `doc/generated/startup-noise-measured.md`, the twelve measured tables of the startup-noise page,
+  from the committed JSON of each machine, and the page includes each table from that file between
+  its markers, with its caption and its label. A provenance table says which commit, build,
+  genesis4, backend and day measured each machine's record and how long the run took. The keystone
+  regenerates the file beside the four page sets, at no run cost, since the driver runs on demand
+  and the record is committed. A record lacking an experiment a table needs refuses to render, since
+  an include whose markers are missing brings in the whole file. The page's prose carries no digit
+  the tables carry and points at them, and the user guide's Split paragraph points at the
+  steady-state example's table in place of four stale numbers.
+- 2026-10-23 Changed: the startup-noise record of every machine is re-measured cold on the
+  production build of lucifer 631235b, on the device, 59 minutes for Aramis, 36 for the FLASH probe,
+  26 for FLASH1 and 54 for LCLS. The committed Aramis record had no tolerance and no cause
+  experiment and the three others no tolerance, which the page's tables showed, so those are
+  recorded for the first time. Of the numbers both records carry, the floor, beamlet and window
+  powers moved below their printed precision. The filter rows moved by what one seed moves over 57 m
+  of SASE gain after the even-grid propagator correction. The derived default's mode power at the
+  exit on Aramis at 1024 particles reads +86 percent where the record had +102, and at 4096 +22
+  percent for +19. The FLASH probe reads +16 for +22 and LCLS at 1024 +15 for +19. The wide-angle
+  factors moved the same way, 1670 for 1546 on Aramis. The tolerance sweep's trends are the page's,
+  and every saturation point is unmoved. The page's claims hold at every table, read against the new
+  values.
+- 2026-10-23 Fixed: the deck `startup_noise.py` runs Lucifer on from Genesis4's dumps stated no
+  filter. Since the source filter became the default it compared a filtered run against Genesis4's
+  unfiltered one, and the agreement read a relative difference of order one. The deck states
+  `source_filter = F`, and the agreement reads 1.9e-6 at all three grids again.
+- 2026-10-23 Fixed: three statements on the startup-noise page disagreed with its own record. The
+  FLASH1 two-row table gave the bunching at 20.4 m as 0.134 and 0.177, a rise of a third. The record
+  gives 0.341 and 0.374, a rise of a tenth, which is what the four-machine table and the prose said.
+  The FLASH1 excess over the analytic startup power was given as 2.5 to 3.4 at every cell and load,
+  where the record gives 1.9 to 3.9 and 17.5 at the finest cell with the lightest load. The
+  staircase's increments were given in MW where the record gives 53, 63, 67 and 22 kW per slice.
 - 2026-10-23 Changed: `doc/changelog.md` is wrapped at 100 columns, each entry at spaces with its
   two-space continuation indent and no code span split across a line break. Before, 716 of its 1,954
   lines ran past 100. No word moved: the file's whitespace-separated tokens are those of the
