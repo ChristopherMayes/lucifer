@@ -126,7 +126,7 @@ ORDER = ["exit_power", "exit_power_per_slice", "exit_power_slice_spread", "exit_
          "wide_angle_ratio_exit", "split_angle", "gain_length", "power_after_first_element",
          "power_after_first_element_per_slice",
          "initial_bunching", "exit_bunching", "exit_bunching_max", "bunching_max", "bunching_max_s",
-         "bunching_peak", "exit_power_slice_max", "initial_energy",
+         "bunching_peak", "slice_power_max_at_bunching_max", "exit_power_slice_max", "initial_energy",
          "exit_energy", "energy_change", "initial_sigma_energy", "exit_sigma_energy",
          "exit_energy_span", "n_slice",
          "n_record", "slice_spacing", "n_particle", "grid_n_pts", "grid_cell", "grid_derived",
@@ -148,6 +148,7 @@ WORDS = {"exit_power": "exit power", "exit_power_per_slice": "exit power per sli
          "bunching_peak": "bunching at the mode peak", "initial_bunching": "initial bunching, mean |b| over slices",
          "bunching_max": "bunching, the maximum along the line of the mean |b|",
          "bunching_max_s": "s of the bunching maximum", "exit_power_slice_max": "exit power of the largest slice",
+         "slice_power_max_at_bunching_max": "power of the largest slice at the bunching maximum",
          "initial_energy": "mean slice energy at the start", "exit_energy": "mean slice energy at the exit",
          "energy_change": "mean slice energy, exit minus start",
          "exit_energy_span": "span of the slice energies at the exit, head to tail",
@@ -183,7 +184,8 @@ def measured_table(page, decks):
     for q in dict.fromkeys(quantities):
         cells = [decks[d].get(q, ("", ""))[0] for d in names]
         unit = next((decks[d][q][1] for d in names if q in decks[d]), "")
-        page.append(f"| {WORDS.get(q, q)} | " + " | ".join(cells) + f" | {unit} |")
+        word = WORDS.get(q) or (f"exit power, the {q[11:]} component" if q.startswith("exit_power_") else q)
+        page.append(f"| {word} | " + " | ".join(cells) + f" | {unit} |")
     page.append("")
 
 

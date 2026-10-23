@@ -14,6 +14,8 @@ The quantities are one fixed set for every deck, so a page can compare its decks
 by column and a number a README once typed from a run comes from the run itself:
 
   exit_power, exit_pulse_energy          the window totals at the last record
+  exit_power_<component>                 the exit power of each field component beyond the
+                                         total and the x plane, such as y or h3
   exit_power_per_slice, exit_power_slice_spread  the exit power over the slices, and the
                                          rms over the mean of the per-slice powers
   peak_power, peak_power_s               the window power's maximum along the line
@@ -30,7 +32,9 @@ by column and a number a README once typed from a run comes from the run itself:
                                          exit, and the largest slice's at the exit
   bunching_max, bunching_max_s           the maximum along the line of the mean |b| over
                                          slices, and where it sits, the saturation point
-  exit_power_slice_max                   the largest slice's power at the exit
+  slice_power_max_at_bunching_max, exit_power_slice_max
+                                         the largest slice's power at the saturation point
+                                         and at the exit
   bunching_peak                          the mean |b| at the mode's peak, as the program
                                          reports it
   initial_energy, exit_energy, energy_change
@@ -184,12 +188,18 @@ def rows_for(deck: pathlib.Path, log: pathlib.Path):
             if key in run:
                 rows.append((name, float(run[key][()]), unit))
         rows.append(("split_angle", float(h5["field/total/split_angle"][()]), "rad"))
+        # Each field component beyond the total and the x plane, a second polarization or
+        # a harmonic, gets its own exit power, so a page can show what the component did.
+        for comp in sorted(h5["field"]):
+            if comp not in ("total", "x") and f"field/{comp}/power" in h5:
+                rows.append((f"exit_power_{comp}", float(h5[f"field/{comp}/power"][-1].sum()), "W"))
         b = h5["beam/slice/bunching"][()]
         bm = np.mean(np.abs(b), axis=1)
         kb = int(np.argmax(bm))
         rows += [("initial_bunching", float(bm[0]), ""), ("exit_bunching", float(bm[-1]), ""),
                  ("exit_bunching_max", float(np.max(np.abs(b[-1]))), ""),
                  ("bunching_max", float(bm[kb]), ""), ("bunching_max_s", s[kb], "m"),
+                 ("slice_power_max_at_bunching_max", float(np.max(power[kb])), "W"),
                  ("exit_power_slice_max", float(np.max(power[-1])), "W")]
         e = h5["beam/slice/energy"][()]
         e0, e1 = float(np.nanmean(e[0])), float(np.nanmean(e[-1]))

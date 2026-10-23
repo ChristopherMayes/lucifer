@@ -44,6 +44,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | bunching, the maximum along the line of the mean |b| | 8.0057e-04 |  |
 | s of the bunching maximum | 1.4000e+00 | m |
 | bunching at the mode peak | 4.2511e-17 |  |
+| power of the largest slice at the bunching maximum | 1.0000e+06 | W |
 | exit power of the largest slice | 1.0000e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | eV |
@@ -63,6 +64,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | source filter, rho angle | 2.5880e-06 | rad |
 | source filter, ratio of the angles | 1.2600e+00 |  |
 | source filter, edge | 3.2637e-06 | rad |
+| exit power, the y component | 1.8501e+02 | W |
 
 ## The input files
 

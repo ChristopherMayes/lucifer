@@ -36,6 +36,7 @@ bmad_wake	lucifer.in	peak_power	4.8315e+07	W
 bmad_wake	lucifer.in	peak_power_s	5.6760e+01	m
 bmad_wake	lucifer.in	power_after_first_element	6.0799e+06	W
 bmad_wake	lucifer.in	power_after_first_element_per_slice	6.3332e+04	W
+bmad_wake	lucifer.in	slice_power_max_at_bunching_max	1.3751e+06	W
 bmad_wake	lucifer.in	slice_spacing	3.0000e-10	m
 bmad_wake	lucifer.in	split_angle	2.9625e-06	rad
 bmad_wake	lucifer.in	wide_angle_ratio	3.0674e-02	
@@ -77,6 +78,7 @@ bmad_wake	lucifer_transcribed.in	peak_power	4.8288e+07	W
 bmad_wake	lucifer_transcribed.in	peak_power_s	5.6680e+01	m
 bmad_wake	lucifer_transcribed.in	power_after_first_element	6.0861e+06	W
 bmad_wake	lucifer_transcribed.in	power_after_first_element_per_slice	6.3397e+04	W
+bmad_wake	lucifer_transcribed.in	slice_power_max_at_bunching_max	1.3749e+06	W
 bmad_wake	lucifer_transcribed.in	slice_spacing	3.0000e-10	m
 bmad_wake	lucifer_transcribed.in	split_angle	2.9625e-06	rad
 bmad_wake	lucifer_transcribed.in	wide_angle_ratio	2.9994e-02	
@@ -116,6 +118,7 @@ chicane	lucifer.in	peak_power	2.6084e+08	W
 chicane	lucifer.in	peak_power_s	2.3050e+00	m
 chicane	lucifer.in	power_after_first_element	1.9978e+08	W
 chicane	lucifer.in	power_after_first_element_per_slice	1.9978e+08	W
+chicane	lucifer.in	slice_power_max_at_bunching_max	2.6084e+08	W
 chicane	lucifer.in	slice_spacing	1.0000e-10	m
 chicane	lucifer.in	split_angle	2.7594e-06	rad
 chicane	lucifer.in	wide_angle_ratio	1.0220e-04	
@@ -155,6 +158,7 @@ chicane	lucifer_detuned.in	peak_power	2.0000e+08	W
 chicane	lucifer_detuned.in	peak_power_s	2.1000e-01	m
 chicane	lucifer_detuned.in	power_after_first_element	1.9978e+08	W
 chicane	lucifer_detuned.in	power_after_first_element_per_slice	1.9978e+08	W
+chicane	lucifer_detuned.in	slice_power_max_at_bunching_max	1.9284e+08	W
 chicane	lucifer_detuned.in	slice_spacing	1.0000e-10	m
 chicane	lucifer_detuned.in	split_angle	2.7594e-06	rad
 chicane	lucifer_detuned.in	wide_angle_ratio	1.5550e-06	
@@ -191,6 +195,7 @@ coherent_source	lucifer.in	peak_power	1.3182e+09	W
 coherent_source	lucifer.in	peak_power_s	4.1318e+01	m
 coherent_source	lucifer.in	power_after_first_element	3.8806e+03	W
 coherent_source	lucifer.in	power_after_first_element_per_slice	3.8806e+03	W
+coherent_source	lucifer.in	slice_power_max_at_bunching_max	1.3026e+09	W
 coherent_source	lucifer.in	slice_spacing	1.0000e-10	m
 coherent_source	lucifer.in	split_angle	2.7931e-06	rad
 coherent_source	lucifer.in	wide_angle_ratio	3.3331e-03	
@@ -231,6 +236,7 @@ coherent_source	lucifer_low_m.in	peak_power	1.6683e+09	W
 coherent_source	lucifer_low_m.in	peak_power_s	3.8762e+01	m
 coherent_source	lucifer_low_m.in	power_after_first_element	4.1976e+03	W
 coherent_source	lucifer_low_m.in	power_after_first_element_per_slice	4.1976e+03	W
+coherent_source	lucifer_low_m.in	slice_power_max_at_bunching_max	1.6053e+09	W
 coherent_source	lucifer_low_m.in	slice_spacing	1.0000e-10	m
 coherent_source	lucifer_low_m.in	split_angle	2.7931e-06	rad
 coherent_source	lucifer_low_m.in	wide_angle_ratio	1.0852e-02	
@@ -271,6 +277,7 @@ coherent_source	lucifer_reference.in	peak_power	1.5611e+09	W
 coherent_source	lucifer_reference.in	peak_power_s	3.8134e+01	m
 coherent_source	lucifer_reference.in	power_after_first_element	4.1639e+03	W
 coherent_source	lucifer_reference.in	power_after_first_element_per_slice	4.1639e+03	W
+coherent_source	lucifer_reference.in	slice_power_max_at_bunching_max	1.5550e+09	W
 coherent_source	lucifer_reference.in	slice_spacing	1.0000e-10	m
 coherent_source	lucifer_reference.in	split_angle	2.9661e-06	rad
 coherent_source	lucifer_reference.in	wide_angle_ratio	1.3742e-03	
@@ -288,6 +295,7 @@ crossed_undulator	lucifer.in	exit_power_inside	9.9982e+05	W
 crossed_undulator	lucifer.in	exit_power_outside	1.8502e+02	W
 crossed_undulator	lucifer.in	exit_power_per_slice	1.0000e+06	W
 crossed_undulator	lucifer.in	exit_power_slice_max	1.0000e+06	W
+crossed_undulator	lucifer.in	exit_power_y	1.8501e+02	W
 crossed_undulator	lucifer.in	exit_pulse_energy	3.3357e-13	J
 crossed_undulator	lucifer.in	exit_sigma_energy	5.2944e+05	eV
 crossed_undulator	lucifer.in	fel_steps	80	
@@ -310,6 +318,7 @@ crossed_undulator	lucifer.in	peak_power	1.0000e+06	W
 crossed_undulator	lucifer.in	peak_power_s	1.4000e+00	m
 crossed_undulator	lucifer.in	power_after_first_element	9.9982e+05	W
 crossed_undulator	lucifer.in	power_after_first_element_per_slice	9.9982e+05	W
+crossed_undulator	lucifer.in	slice_power_max_at_bunching_max	1.0000e+06	W
 crossed_undulator	lucifer.in	slice_spacing	1.0000e-10	m
 crossed_undulator	lucifer.in	split_angle	3.2637e-06	rad
 crossed_undulator	lucifer.in	wide_angle_ratio	4.4003e-09	
@@ -351,6 +360,7 @@ flash1	lucifer.in	peak_power	8.5177e+10	W
 flash1	lucifer.in	peak_power_s	3.1577e+01	m
 flash1	lucifer.in	power_after_first_element	2.8978e+05	W
 flash1	lucifer.in	power_after_first_element_per_slice	8.2557e+02	W
+flash1	lucifer.in	slice_power_max_at_bunching_max	4.5362e+09	W
 flash1	lucifer.in	slice_spacing	1.6440e-07	m
 flash1	lucifer.in	split_angle	8.1501e-05	rad
 flash1	lucifer.in	wide_angle_ratio	5.8869e-04	
@@ -391,6 +401,7 @@ frames	lucifer.in	peak_power	1.6735e+05	W
 frames	lucifer.in	peak_power_s	5.7811e+00	m
 frames	lucifer.in	power_after_first_element	4.0678e+04	W
 frames	lucifer.in	power_after_first_element_per_slice	5.0847e+03	W
+frames	lucifer.in	slice_power_max_at_bunching_max	2.7294e+04	W
 frames	lucifer.in	slice_spacing	3.0000e-10	m
 frames	lucifer.in	split_angle	3.0742e-06	rad
 frames	lucifer.in	wide_angle_ratio	2.9678e-02	
@@ -426,6 +437,7 @@ harmonics	lucifer.in	peak_power	2.0000e+08	W
 harmonics	lucifer.in	peak_power_s	1.8000e-01	m
 harmonics	lucifer.in	power_after_first_element	1.8464e+08	W
 harmonics	lucifer.in	power_after_first_element_per_slice	1.8464e+08	W
+harmonics	lucifer.in	slice_power_max_at_bunching_max	1.8464e+08	W
 harmonics	lucifer.in	slice_spacing	1.0000e-10	m
 harmonics	lucifer.in	split_angle	2.7594e-06	rad
 harmonics	lucifer.in	wide_angle_ratio	1.5550e-06	
@@ -467,6 +479,7 @@ import	lucifer.in	peak_power	1.9034e+05	W
 import	lucifer.in	peak_power_s	4.5574e+01	m
 import	lucifer.in	power_after_first_element	9.0333e+04	W
 import	lucifer.in	power_after_first_element_per_slice	2.6568e+03	W
+import	lucifer.in	slice_power_max_at_bunching_max	8.7907e+03	W
 import	lucifer.in	slice_spacing	3.0000e-10	m
 import	lucifer.in	split_angle	2.9795e-06	rad
 import	lucifer.in	wide_angle_ratio	2.1939e-02	
@@ -508,6 +521,7 @@ import	lucifer_from_file.in	peak_power	3.2155e+05	W
 import	lucifer_from_file.in	peak_power_s	2.5633e+01	m
 import	lucifer_from_file.in	power_after_first_element	2.9438e+05	W
 import	lucifer_from_file.in	power_after_first_element_per_slice	8.6581e+03	W
+import	lucifer_from_file.in	slice_power_max_at_bunching_max	1.9930e+04	W
 import	lucifer_from_file.in	slice_spacing	3.0000e-10	m
 import	lucifer_from_file.in	split_angle	2.9914e-06	rad
 import	lucifer_from_file.in	wide_angle_ratio	3.2999e-02	
@@ -550,6 +564,7 @@ lcls	lucifer.in	peak_power	7.4069e+12	W
 lcls	lucifer.in	peak_power_s	1.3220e+02	m
 lcls	lucifer.in	power_after_first_element	2.6729e+07	W
 lcls	lucifer.in	power_after_first_element_per_slice	8.9096e+04	W
+lcls	lucifer.in	slice_power_max_at_bunching_max	3.4381e+10	W
 lcls	lucifer.in	slice_spacing	1.0267e-08	m
 lcls	lucifer.in	split_angle	4.5125e-06	rad
 lcls	lucifer.in	wide_angle_ratio	4.9356e-04	
@@ -591,6 +606,7 @@ migration	lucifer.in	peak_power	1.3276e+08	W
 migration	lucifer.in	peak_power_s	5.6016e+01	m
 migration	lucifer.in	power_after_first_element	7.9371e+06	W
 migration	lucifer.in	power_after_first_element_per_slice	8.2678e+04	W
+migration	lucifer.in	slice_power_max_at_bunching_max	4.5555e+06	W
 migration	lucifer.in	slice_spacing	3.0000e-10	m
 migration	lucifer.in	split_angle	3.0037e-06	rad
 migration	lucifer.in	wide_angle_ratio	2.2562e-02	
@@ -632,6 +648,7 @@ migration	lucifer_no_migrate.in	peak_power	1.9402e+08	W
 migration	lucifer_no_migrate.in	peak_power_s	5.6760e+01	m
 migration	lucifer_no_migrate.in	power_after_first_element	7.9371e+06	W
 migration	lucifer_no_migrate.in	power_after_first_element_per_slice	8.2678e+04	W
+migration	lucifer_no_migrate.in	slice_power_max_at_bunching_max	9.8914e+06	W
 migration	lucifer_no_migrate.in	slice_spacing	3.0000e-10	m
 migration	lucifer_no_migrate.in	split_angle	3.0037e-06	rad
 migration	lucifer_no_migrate.in	wide_angle_ratio	1.7833e-02	
@@ -668,6 +685,7 @@ mixed_line	lucifer.in	peak_power	1.6722e+09	W
 mixed_line	lucifer.in	peak_power_s	3.8000e+01	m
 mixed_line	lucifer.in	power_after_first_element	4.4159e+03	W
 mixed_line	lucifer.in	power_after_first_element_per_slice	4.4159e+03	W
+mixed_line	lucifer.in	slice_power_max_at_bunching_max	1.6722e+09	W
 mixed_line	lucifer.in	slice_spacing	1.0000e-10	m
 mixed_line	lucifer.in	split_angle	2.9077e-06	rad
 mixed_line	lucifer.in	wide_angle_ratio	4.0755e-01	
@@ -704,6 +722,7 @@ mixed_line	lucifer_averaged.in	peak_power	1.6863e+09	W
 mixed_line	lucifer_averaged.in	peak_power_s	5.7000e+01	m
 mixed_line	lucifer_averaged.in	power_after_first_element	4.4159e+03	W
 mixed_line	lucifer_averaged.in	power_after_first_element_per_slice	4.4159e+03	W
+mixed_line	lucifer_averaged.in	slice_power_max_at_bunching_max	1.6678e+09	W
 mixed_line	lucifer_averaged.in	slice_spacing	1.0000e-10	m
 mixed_line	lucifer_averaged.in	split_angle	2.9077e-06	rad
 mixed_line	lucifer_averaged.in	wide_angle_ratio	4.1176e-01	
@@ -745,6 +764,7 @@ sase	lucifer.in	peak_power	5.9252e+07	W
 sase	lucifer.in	peak_power_s	5.6760e+01	m
 sase	lucifer.in	power_after_first_element	6.0902e+06	W
 sase	lucifer.in	power_after_first_element_per_slice	6.3440e+04	W
+sase	lucifer.in	slice_power_max_at_bunching_max	3.1217e+06	W
 sase	lucifer.in	slice_spacing	3.0000e-10	m
 sase	lucifer.in	split_angle	2.9625e-06	rad
 sase	lucifer.in	wide_angle_ratio	1.5419e-02	
@@ -786,6 +806,7 @@ sase_wake	lucifer.in	peak_power	4.2003e+07	W
 sase_wake	lucifer.in	peak_power_s	5.6760e+01	m
 sase_wake	lucifer.in	power_after_first_element	6.0771e+06	W
 sase_wake	lucifer.in	power_after_first_element_per_slice	6.3303e+04	W
+sase_wake	lucifer.in	slice_power_max_at_bunching_max	1.2272e+06	W
 sase_wake	lucifer.in	slice_spacing	3.0000e-10	m
 sase_wake	lucifer.in	split_angle	2.9625e-06	rad
 sase_wake	lucifer.in	wide_angle_ratio	1.0737e-02	
@@ -827,6 +848,7 @@ space_charge	lucifer.in	peak_power	3.1405e-15	W
 space_charge	lucifer.in	peak_power_s	5.5747e+01	m
 space_charge	lucifer.in	power_after_first_element	5.3798e-19	W
 space_charge	lucifer.in	power_after_first_element_per_slice	6.7248e-21	W
+space_charge	lucifer.in	slice_power_max_at_bunching_max	1.0999e-16	W
 space_charge	lucifer.in	slice_spacing	3.0000e-10	m
 space_charge	lucifer.in	split_angle	3.0130e-06	rad
 space_charge	lucifer.in	wide_angle_ratio	2.2083e-02	
@@ -868,6 +890,7 @@ space_charge	lucifer_gate_off.in	peak_power	1.8224e-15	W
 space_charge	lucifer_gate_off.in	peak_power_s	5.5612e+01	m
 space_charge	lucifer_gate_off.in	power_after_first_element	1.7324e-18	W
 space_charge	lucifer_gate_off.in	power_after_first_element_per_slice	2.1655e-20	W
+space_charge	lucifer_gate_off.in	slice_power_max_at_bunching_max	5.0996e-17	W
 space_charge	lucifer_gate_off.in	slice_spacing	3.0000e-10	m
 space_charge	lucifer_gate_off.in	split_angle	3.0130e-06	rad
 space_charge	lucifer_gate_off.in	wide_angle_ratio	2.2506e-02	
@@ -909,6 +932,7 @@ space_charge	lucifer_off.in	peak_power	1.8224e-15	W
 space_charge	lucifer_off.in	peak_power_s	5.5612e+01	m
 space_charge	lucifer_off.in	power_after_first_element	1.7324e-18	W
 space_charge	lucifer_off.in	power_after_first_element_per_slice	2.1655e-20	W
+space_charge	lucifer_off.in	slice_power_max_at_bunching_max	5.0996e-17	W
 space_charge	lucifer_off.in	slice_spacing	3.0000e-10	m
 space_charge	lucifer_off.in	split_angle	3.0130e-06	rad
 space_charge	lucifer_off.in	wide_angle_ratio	2.2506e-02	
@@ -949,6 +973,7 @@ space_charge	lucifer_short_range.in	peak_power	1.5452e+09	W
 space_charge	lucifer_short_range.in	peak_power_s	3.8179e+01	m
 space_charge	lucifer_short_range.in	power_after_first_element	4.1638e+03	W
 space_charge	lucifer_short_range.in	power_after_first_element_per_slice	4.1638e+03	W
+space_charge	lucifer_short_range.in	slice_power_max_at_bunching_max	1.5405e+09	W
 space_charge	lucifer_short_range.in	slice_spacing	1.0000e-10	m
 space_charge	lucifer_short_range.in	split_angle	2.9661e-06	rad
 space_charge	lucifer_short_range.in	wide_angle_ratio	1.3790e-03	
@@ -989,6 +1014,7 @@ spontaneous	lucifer.in	peak_power	1.1534e+09	W
 spontaneous	lucifer.in	peak_power_s	3.8045e+01	m
 spontaneous	lucifer.in	power_after_first_element	4.1206e+03	W
 spontaneous	lucifer.in	power_after_first_element_per_slice	4.1206e+03	W
+spontaneous	lucifer.in	slice_power_max_at_bunching_max	1.1304e+09	W
 spontaneous	lucifer.in	slice_spacing	1.0000e-10	m
 spontaneous	lucifer.in	split_angle	2.9661e-06	rad
 spontaneous	lucifer.in	wide_angle_ratio	1.9120e-03	
@@ -1029,6 +1055,7 @@ spontaneous	lucifer_damping_only.in	peak_power	1.1543e+09	W
 spontaneous	lucifer_damping_only.in	peak_power_s	3.8045e+01	m
 spontaneous	lucifer_damping_only.in	power_after_first_element	4.1251e+03	W
 spontaneous	lucifer_damping_only.in	power_after_first_element_per_slice	4.1251e+03	W
+spontaneous	lucifer_damping_only.in	slice_power_max_at_bunching_max	1.1337e+09	W
 spontaneous	lucifer_damping_only.in	slice_spacing	1.0000e-10	m
 spontaneous	lucifer_damping_only.in	split_angle	2.9661e-06	rad
 spontaneous	lucifer_damping_only.in	wide_angle_ratio	1.8648e-03	
@@ -1069,6 +1096,7 @@ steady_state	lucifer.in	peak_power	1.5611e+09	W
 steady_state	lucifer.in	peak_power_s	3.8134e+01	m
 steady_state	lucifer.in	power_after_first_element	4.1639e+03	W
 steady_state	lucifer.in	power_after_first_element_per_slice	4.1639e+03	W
+steady_state	lucifer.in	slice_power_max_at_bunching_max	1.5550e+09	W
 steady_state	lucifer.in	slice_spacing	1.0000e-10	m
 steady_state	lucifer.in	split_angle	2.9661e-06	rad
 steady_state	lucifer.in	wide_angle_ratio	1.3742e-03	
@@ -1109,6 +1137,7 @@ taper	lucifer.in	peak_power	8.8074e+09	W
 taper	lucifer.in	peak_power_s	5.6760e+01	m
 taper	lucifer.in	power_after_first_element	4.1639e+03	W
 taper	lucifer.in	power_after_first_element_per_slice	4.1639e+03	W
+taper	lucifer.in	slice_power_max_at_bunching_max	1.6909e+09	W
 taper	lucifer.in	slice_spacing	1.0000e-10	m
 taper	lucifer.in	split_angle	2.9661e-06	rad
 taper	lucifer.in	wide_angle_ratio	1.1970e-03	
@@ -1148,6 +1177,7 @@ unaveraged	lucifer.in	peak_power	5.0000e+03	W
 unaveraged	lucifer.in	peak_power_s	2.6899e-01	m
 unaveraged	lucifer.in	power_after_first_element	4.4185e+03	W
 unaveraged	lucifer.in	power_after_first_element_per_slice	4.4185e+03	W
+unaveraged	lucifer.in	slice_power_max_at_bunching_max	4.4185e+03	W
 unaveraged	lucifer.in	slice_spacing	1.0000e-10	m
 unaveraged	lucifer.in	split_angle	2.9077e-06	rad
 unaveraged	lucifer.in	wide_angle_ratio	2.2985e-07	
@@ -1183,6 +1213,7 @@ unaveraged	lucifer_averaged.in	peak_power	5.0000e+03	W
 unaveraged	lucifer_averaged.in	peak_power_s	1.3449e-01	m
 unaveraged	lucifer_averaged.in	power_after_first_element	4.4159e+03	W
 unaveraged	lucifer_averaged.in	power_after_first_element_per_slice	4.4159e+03	W
+unaveraged	lucifer_averaged.in	slice_power_max_at_bunching_max	4.4159e+03	W
 unaveraged	lucifer_averaged.in	slice_spacing	1.0000e-10	m
 unaveraged	lucifer_averaged.in	split_angle	2.9077e-06	rad
 unaveraged	lucifer_averaged.in	wide_angle_ratio	2.2985e-07	

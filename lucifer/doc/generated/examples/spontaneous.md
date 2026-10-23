@@ -64,6 +64,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | bunching, the maximum along the line of the mean |b| | 2.8189e-01 | 2.8165e-01 |  |
 | s of the bunching maximum | 3.8672e+01 | 3.8628e+01 | m |
 | bunching at the mode peak | 2.7861e-01 | 2.7902e-01 |  |
+| power of the largest slice at the bunching maximum | 1.1304e+09 | 1.1337e+09 | W |
 | exit power of the largest slice | 5.5527e+08 | 5.5672e+08 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8029e+09 | 5.8029e+09 | eV |
