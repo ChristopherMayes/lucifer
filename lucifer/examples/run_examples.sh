@@ -77,7 +77,8 @@ if [[ -z "$PYTHON" ]]; then
     if [[ -x "$candidate" ]]; then PYTHON="$candidate"; break; fi
   done
 fi
-if [[ $FIGURES -eq 1 && ( -z "$PYTHON" || ! -x "$PYTHON" ) ]]; then
+# The record of each run and the figures both need the Python with h5py.
+if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   echo "Error: Python not found, and the figures need h5py and matplotlib." >&2
   echo "  Create it with: conda env create -f $LUCIFER_DIR/wavefront/tests/environment.yml" >&2
   echo "  Or run with --no-figures to only check that the examples run." >&2
@@ -126,6 +127,7 @@ cd "$LUCIFER_DIR/examples" || exit 1
 mkdir -p "$FIG_DIR"
 
 STATE="$(mktemp -d "${TMPDIR:-/tmp}/run_examples.XXXXXX")"
+RECORD="$SCRIPT_DIR/../tests/scripts/example_record.py"
 trap 'rm -rf "$STATE"' EXIT
 
 echo "=============================================================================="
@@ -192,6 +194,14 @@ run_dir () {   # <dir> <index>
       status=1
     fi
     printf '%s\n%s\n%s\n%s\n' "$verdict" "$rc" "$dt" "$line" > "$STATE/out.$idx.$k"
+    # What the run measured, from its stats file and its log, one row per quantity. The
+    # rows of every deck become examples/measured.tsv below, and the pages carry them.
+    if [[ "$verdict" == "ok" ]]; then
+      if ! "$PYTHON" "$RECORD" "$dir/$deck" "$dir/$log" >> "$STATE/rec.$idx" 2> "$STATE/recerr.$idx"; then
+        echo "Error: $dir/$deck: the record could not be written; see $STATE/recerr.$idx" > "$STATE/note.$idx"
+        status=1
+      fi
+    fi
     k=$((k + 1))
   done
 
@@ -266,6 +276,21 @@ while [[ $idir -lt ${#DIRS[@]} ]]; do
   if [[ -f "$STATE/note.$idir" ]]; then cat "$STATE/note.$idir" >&2; FAILED=1; fi
   idir=$((idir + 1))
 done
+
+# The record of every run, assembled in one order whatever order the workers finished
+# in, so two runs of the same binary write the same bytes. The keystone regenerates
+# this file and diffs it with the generated pages. The sample output the user guide
+# includes comes from the steady-state example's log the same way.
+if [[ $FAILED -eq 0 ]]; then
+  {
+    printf 'directory\tdeck\tquantity\tvalue\tunit\n'
+    cat "$STATE"/rec.* 2>/dev/null | LC_ALL=C sort
+  } > measured.tsv
+  if ! "$PYTHON" "$RECORD" --sample steady_state/lucifer.log --out "$LUCIFER_DIR/doc/generated/sample-output.md"; then
+    echo "Error: the sample output could not be written from steady_state/lucifer.log" >&2
+    FAILED=1
+  fi
+fi
 
 # The saturation demo's locations, from a directory outside both checkouts. The binary
 # directories are named under names the defaults never produce, through the two

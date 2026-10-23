@@ -2,8 +2,10 @@
 """
 Generate doc/generated/examples/ from the example directories themselves.
 
-Each page carries the example's own README prose, the figure the runner saved, and every
-input file it runs on, fenced verbatim from the file on disk. The embedded text is read
+Each page carries the example's own README prose, the figure the runner saved, the
+quantities the runner recorded for each of its decks (examples/measured.tsv, one table
+per example with a column per deck), and every input file it runs on, fenced verbatim
+from the file on disk. The embedded text is read
 rather than transcribed, so a deck shown in the documentation cannot drift from the deck
 that runs: editing the deck and regenerating is the only way to change the page.
 
@@ -22,6 +24,7 @@ leave a dead link on the page with no message.
 """
 
 import argparse
+import csv
 import re
 import sys
 from pathlib import Path
@@ -117,6 +120,64 @@ def embed(page, path, label=None):
     page.append("")
 
 
+ORDER = ["exit_power", "exit_power_per_slice", "exit_power_slice_spread", "exit_pulse_energy",
+         "peak_power", "peak_power_s", "mode_peak_inside",
+         "mode_peak_s", "exit_power_inside", "exit_power_outside", "exit_power_inside_s", "wide_angle_ratio",
+         "wide_angle_ratio_exit", "split_angle", "gain_length", "power_after_first_element",
+         "power_after_first_element_per_slice",
+         "exit_bunching", "bunching_peak", "initial_sigma_energy", "exit_sigma_energy", "n_slice",
+         "n_record", "slice_spacing", "n_particle", "grid_n_pts", "grid_cell", "grid_derived",
+         "grid_derived_from", "fel_steps", "filter_mode_angle", "filter_rho_angle", "filter_ratio",
+         "filter_edge"]
+WORDS = {"exit_power": "exit power", "exit_power_per_slice": "exit power per slice",
+         "exit_power_slice_spread": "exit power, rms over mean across slices",
+         "exit_power_inside_s": "s of the last record with the split",
+         "power_after_first_element_per_slice": "power per slice at the first element end",
+         "exit_pulse_energy": "exit pulse energy",
+         "peak_power": "peak power", "peak_power_s": "s of the peak power",
+         "mode_peak_inside": "mode peak, power inside the split", "mode_peak_s": "s of the mode peak",
+         "exit_power_inside": "exit power inside the split", "exit_power_outside": "exit power outside the split",
+         "wide_angle_ratio": "outside over inside, the run's maximum",
+         "wide_angle_ratio_exit": "outside over inside at the exit", "split_angle": "split angle",
+         "gain_length": "gain length, the shortest e-folding length over five consecutive records",
+         "power_after_first_element": "power at the first element end",
+         "exit_bunching": "exit bunching, mean |b| over slices", "bunching_peak": "bunching, the run's maximum",
+         "initial_sigma_energy": "slice energy spread at the start", "exit_sigma_energy": "slice energy spread at the exit",
+         "n_slice": "slices", "n_record": "records", "slice_spacing": "slice spacing",
+         "n_particle": "macroparticles per slice", "grid_n_pts": "grid points", "grid_cell": "grid cell",
+         "grid_derived": "grid derived by setup", "grid_derived_from": "grid rounded up from",
+         "fel_steps": "FEL steps", "filter_mode_angle": "source filter, mode angle",
+         "filter_rho_angle": "source filter, rho angle", "filter_ratio": "source filter, ratio of the angles",
+         "filter_edge": "source filter, edge"}
+
+
+def read_record(path):
+    """{directory: {deck: {quantity: (value, unit)}}} from examples/measured.tsv."""
+    rec = {}
+    if not path.exists():
+        return rec
+    for row in csv.DictReader(path.open(), delimiter="\t"):
+        rec.setdefault(row["directory"], {}).setdefault(row["deck"], {})[row["quantity"]] = (row["value"], row["unit"])
+    return rec
+
+
+def measured_table(page, decks):
+    """One table for an example: a row per quantity, a column per deck, and the unit."""
+    names = sorted(decks, key=lambda d: (d != "lucifer.in", d))
+    quantities = [q for q in ORDER if any(q in decks[d] for d in names)]
+    quantities += sorted(q for d in names for q in decks[d] if q not in ORDER)
+    page += ["## Measured on this run", "",
+             "The runner wrote these from each run's stats file and log, and the keystone "
+             "regenerates them. A float carries five significant digits.", "",
+             "| Quantity | " + " | ".join(f"`{d}`" for d in names) + " | Unit |",
+             "|---|" + "---|" * len(names) + "---|"]
+    for q in dict.fromkeys(quantities):
+        cells = [decks[d].get(q, ("", ""))[0] for d in names]
+        unit = next((decks[d][q][1] for d in names if q in decks[d]), "")
+        page.append(f"| {WORDS.get(q, q)} | " + " | ".join(cells) + f" | {unit} |")
+    page.append("")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -134,12 +195,18 @@ def main():
         raise SystemExit(f"{ex}: no example directory carries a README.md")
 
     written = []
+    record = read_record(ex / "measured.tsv")
 
     # The index page, from the examples index, plus the lattice every example shares.
     idx = ex / "README.md"
     title, body = split_title(idx.read_text(), idx)
     page = front_matter(title, "All examples", f"examples/{idx.name}")
     page += [rewrite_links(body, names, idx).rstrip("\n"), "",
+            "## Where the numbers come from", "",
+            "Every table headed \"Measured on this run\" on these pages is written by the runner, "
+            "`examples/run_examples.sh`, from the stats file and the log of each run it makes, into "
+            "`examples/measured.tsv`. The keystone regenerates that file and these pages and "
+            "requires no diff, so a number on a page is the number the current binary gives.", "",
             "## The shared lattice", "",
             "Most examples call this line. The ones that need a different lattice carry "
             "their own, shown on their own page.", ""]
@@ -163,6 +230,8 @@ def main():
         page += [f"Everything on this page lives in and runs from "
                  f"`lucifer/examples/{d.name}/`.", ""]
         page += [rewrite_links(body, names, readme).rstrip("\n"), ""]
+        if d.name in record:
+            measured_table(page, record[d.name])
         page += ["## The input files", "",
                  "The deck, its variants, and any lattice they name, as they are on disk.", ""]
         for f in files:

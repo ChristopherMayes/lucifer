@@ -331,7 +331,7 @@ def test_regeneration(keystone: Keystone) -> None:
     # The Markdown only. The figures are committed and a plotting library upgrade
     # rewrites them all with no physics moving (doc/validation.md).
     r = subprocess.run(["git", "diff", "--exit-code", "--stat", "--",
-                        "doc/generated/*.md", "doc/generated/examples/*.md"],
+                        "doc/generated/*.md", "doc/generated/examples/*.md", "examples/measured.tsv"],
                        cwd=str(LUCIFER), capture_output=True, text=True)
     assert r.returncode == 0, ("a generated page moved after regeneration; a moved digit is a bug, "
                                "not a new baseline:\n" + r.stdout)

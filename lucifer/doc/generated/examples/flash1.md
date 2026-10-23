@@ -89,6 +89,45 @@ Leaving `grid_n_pts` and `grid_half_width` out of the deck derived 127 points ov
 
 The run takes ~20 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | Unit |
+|---|---|---|
+| exit power | 8.5177e+10 | W |
+| exit power per slice | 2.4267e+08 | W |
+| exit power, rms over mean across slices | 2.6601e+00 |  |
+| exit pulse energy | 4.6709e-05 | J |
+| peak power | 8.5177e+10 | W |
+| s of the peak power | 3.1577e+01 | m |
+| mode peak, power inside the split | 8.5127e+10 | W |
+| s of the mode peak | 3.1577e+01 | m |
+| exit power inside the split | 8.5127e+10 | W |
+| exit power outside the split | 5.0114e+07 | W |
+| outside over inside, the run's maximum | 5.8869e-04 |  |
+| outside over inside at the exit | 5.8869e-04 |  |
+| split angle | 8.1501e-05 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 9.5236e-01 | m |
+| power at the first element end | 2.8978e+05 | W |
+| power per slice at the first element end | 8.2557e+02 | W |
+| exit bunching, mean |b| over slices | 7.6488e-02 |  |
+| bunching, the run's maximum | 2.0050e-01 |  |
+| slice energy spread at the start | 4.0099e+05 | eV |
+| slice energy spread at the exit | 5.9655e+05 | eV |
+| slices | 351 |  |
+| records | 361 |  |
+| slice spacing | 1.6440e-07 | m |
+| macroparticles per slice | 4096 |  |
+| grid points | 128 |  |
+| grid cell | 1.5748e-05 | m |
+| grid derived by setup | no |  |
+| FEL steps | 330 |  |
+| source filter, mode angle | 8.1500e-05 | rad |
+| source filter, rho angle | 4.4410e-05 | rad |
+| source filter, ratio of the angles | 1.8400e+00 |  |
+| source filter, edge | 8.1501e-05 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

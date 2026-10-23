@@ -29,6 +29,45 @@ On these inputs the keep mode exits at 42.2 kW after 57 m in 45 s, and the sampl
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 3 percent of the power inside it in both modes. With the filter off the same decks reported 3.5 and 11.2 MW, of which 99 percent was that emission, which is why the exit powers here are eighty times lower and are the mode. Both modes load the same bunch on the same grid, so the comparison between them is unaffected.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_from_file.in` | Unit |
+|---|---|---|---|
+| exit power | 4.1816e+04 | 8.6549e+04 | W |
+| exit power per slice | 1.2299e+03 | 2.5456e+03 | W |
+| exit power, rms over mean across slices | 1.6403e+00 | 1.7227e+00 |  |
+| exit pulse energy | 4.1845e-14 | 8.6609e-14 | J |
+| peak power | 1.9034e+05 | 3.2155e+05 | W |
+| s of the peak power | 4.5574e+01 | 2.5633e+01 | m |
+| mode peak, power inside the split | 1.5995e+05 | 2.8497e+05 | W |
+| s of the mode peak | 4.2430e+01 | 4.5100e+00 | m |
+| exit power inside the split | 4.0194e+04 | 8.2287e+04 | W |
+| exit power outside the split | 1.6223e+03 | 4.2617e+03 | W |
+| outside over inside, the run's maximum | 2.1939e-02 | 3.2999e-02 |  |
+| outside over inside at the exit | 4.0363e-02 | 5.1790e-02 |  |
+| split angle | 2.9795e-06 | 2.9914e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 4.7782e+00 | 3.8292e+00 | m |
+| power at the first element end | 9.0333e+04 | 2.9438e+05 | W |
+| power per slice at the first element end | 2.6568e+03 | 8.6581e+03 | W |
+| exit bunching, mean |b| over slices | 6.1271e-02 | 1.1616e-02 |  |
+| bunching, the run's maximum | 6.8322e-03 | 8.5572e-03 |  |
+| slice energy spread at the start | 4.5587e+05 | 4.3733e+05 | eV |
+| slice energy spread at the exit | 4.5632e+05 | 4.3771e+05 | eV |
+| slices | 34 | 34 |  |
+| records | 1105 | 1105 |  |
+| slice spacing | 3.0000e-10 | 3.0000e-10 | m |
+| macroparticles per slice | 40320 | 2048 |  |
+| grid points | 256 | 256 |  |
+| grid cell | 1.5690e-06 | 1.5690e-06 | m |
+| grid derived by setup | no | no |  |
+| FEL steps | 1068 | 1068 |  |
+| source filter, mode angle | 2.9790e-06 | 2.9910e-06 | rad |
+| source filter, rho angle | 2.6200e-06 | 2.6320e-06 | rad |
+| source filter, ratio of the angles | 1.1400e+00 | 1.1400e+00 |  |
+| source filter, edge | 2.9794e-06 | 2.9914e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

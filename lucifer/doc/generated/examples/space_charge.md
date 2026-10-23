@@ -54,6 +54,45 @@ The run reports the split between the mode and the wide-angle emission of the po
 
 Each run takes ~7 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_gate_off.in` | `lucifer_off.in` | `lucifer_short_range.in` | Unit |
+|---|---|---|---|---|---|
+| exit power | 1.8401e-15 | 1.2618e-15 | 1.2618e-15 | 8.0572e+08 | W |
+| exit power per slice | 2.3002e-17 | 1.5773e-17 | 1.5773e-17 | 8.0572e+08 | W |
+| exit power, rms over mean across slices | 1.1749e+00 | 1.1893e+00 | 1.1893e+00 |  |  |
+| exit pulse energy | 1.8414e-33 | 1.2627e-33 | 1.2627e-33 | 2.6876e-10 | J |
+| peak power | 3.1405e-15 | 1.8224e-15 | 1.8224e-15 | 1.5452e+09 | W |
+| s of the peak power | 5.5747e+01 | 5.5612e+01 | 5.5612e+01 | 3.8179e+01 | m |
+| mode peak, power inside the split | 2.7608e-15 | 1.7596e-15 | 1.7596e-15 | 1.5403e+09 | W |
+| s of the mode peak | 5.6760e+01 | 5.6760e+01 | 5.6760e+01 | 3.8000e+01 | m |
+| exit power inside the split | 1.7958e-15 | 1.2332e-15 | 1.2332e-15 | 8.0328e+08 | W |
+| exit power outside the split | 4.4390e-17 | 2.8655e-17 | 2.8655e-17 | 2.4339e+06 | W |
+| outside over inside, the run's maximum | 2.2083e-02 | 2.2506e-02 | 2.2506e-02 | 1.3790e-03 |  |
+| outside over inside at the exit | 2.4719e-02 | 2.3237e-02 | 2.3237e-02 | 3.0300e-03 |  |
+| split angle | 3.0130e-06 | 3.0130e-06 | 3.0130e-06 | 2.9661e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 2.2869e+00 | 2.5485e+00 | 2.5485e+00 | 2.1113e+00 | m |
+| power at the first element end | 5.3798e-19 | 1.7324e-18 | 1.7324e-18 | 4.1638e+03 | W |
+| power per slice at the first element end | 6.7248e-21 | 2.1655e-20 | 2.1655e-20 | 4.1638e+03 | W |
+| exit bunching, mean |b| over slices | 3.0789e-13 | 2.4485e-13 | 2.4485e-13 | 2.4154e-01 |  |
+| bunching, the run's maximum | 3.2578e-13 | 2.2396e-13 | 2.2396e-13 | 3.0008e-01 |  |
+| slice energy spread at the start | 0.0000e+00 | 0.0000e+00 | 0.0000e+00 | 5.0879e+05 | eV |
+| slice energy spread at the exit | 1.8440e-06 | 0.0000e+00 | 0.0000e+00 | 2.5369e+06 | eV |
+| slices | 80 | 80 | 80 | 1 |  |
+| records | 1105 | 1105 | 1105 | 1105 |  |
+| slice spacing | 3.0000e-10 | 3.0000e-10 | 3.0000e-10 | 1.0000e-10 | m |
+| macroparticles per slice | 512 | 512 | 512 | 8192 |  |
+| grid points | 128 | 128 | 128 | 256 |  |
+| grid cell | 3.1500e-06 | 3.1500e-06 | 3.1500e-06 | 1.5690e-06 | m |
+| grid derived by setup | no | no | no | no |  |
+| FEL steps | 1068 | 1068 | 1068 | 1068 |  |
+| source filter, mode angle | 3.0130e-06 | 3.0130e-06 | 3.0130e-06 | 2.9660e-06 | rad |
+| source filter, rho angle | 2.6250e-06 | 2.6250e-06 | 2.6250e-06 | 2.6110e-06 | rad |
+| source filter, ratio of the angles | 1.1500e+00 | 1.1500e+00 | 1.1500e+00 | 1.1400e+00 |  |
+| source filter, edge | 3.0130e-06 | 3.0130e-06 | 3.0130e-06 | 2.9661e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

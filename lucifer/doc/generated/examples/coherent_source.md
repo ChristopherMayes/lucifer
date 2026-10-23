@@ -32,6 +32,44 @@ The refusals are part of the feature (the manual's coherent-source section). A p
 
 Plot any run with ../plot_fel.py <root>.stats.h5.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_low_m.in` | `lucifer_reference.in` | Unit |
+|---|---|---|---|---|
+| exit power | 7.4861e+08 | 1.1816e+09 | 8.0199e+08 | W |
+| exit power per slice | 7.4861e+08 | 1.1816e+09 | 8.0199e+08 | W |
+| exit pulse energy | 2.4971e-10 | 3.9412e-10 | 2.6752e-10 | J |
+| peak power | 1.3182e+09 | 1.6683e+09 | 1.5611e+09 | W |
+| s of the peak power | 4.1318e+01 | 3.8762e+01 | 3.8134e+01 | m |
+| mode peak, power inside the split | 1.2854e+09 | 1.5881e+09 | 1.5578e+09 | W |
+| s of the mode peak | 4.2510e+01 | 3.8000e+01 | 3.8000e+01 | m |
+| exit power inside the split | 7.1333e+08 | 1.1569e+09 | 7.9951e+08 | W |
+| exit power outside the split | 3.5283e+07 | 2.4610e+07 | 2.4843e+06 | W |
+| outside over inside, the run's maximum | 3.3331e-03 | 1.0852e-02 | 1.3742e-03 |  |
+| outside over inside at the exit | 4.9463e-02 | 2.1272e-02 | 3.1073e-03 |  |
+| split angle | 2.7931e-06 | 2.7931e-06 | 2.9661e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 2.0369e+00 | 1.9904e+00 | 2.1043e+00 | m |
+| power at the first element end | 3.8806e+03 | 4.1976e+03 | 4.1639e+03 | W |
+| power per slice at the first element end | 3.8806e+03 | 4.1976e+03 | 4.1639e+03 | W |
+| exit bunching, mean |b| over slices | 2.7442e-01 | 1.7420e-01 | 2.4127e-01 |  |
+| bunching, the run's maximum | 3.2232e-01 | 2.3442e-01 | 3.0142e-01 |  |
+| slice energy spread at the start | 4.7654e+05 | 4.7654e+05 | 5.0879e+05 | eV |
+| slice energy spread at the exit | 2.4428e+06 | 2.7134e+06 | 2.5464e+06 | eV |
+| slices | 1 | 1 | 1 |  |
+| records | 1105 | 1105 | 1105 |  |
+| slice spacing | 1.0000e-10 | 1.0000e-10 | 1.0000e-10 | m |
+| macroparticles per slice | 512 | 512 | 8192 |  |
+| grid points | 256 | 256 | 256 |  |
+| grid cell | 1.5690e-06 | 1.5690e-06 | 1.5690e-06 | m |
+| grid derived by setup | no | no | no |  |
+| FEL steps | 1068 | 1068 | 1068 |  |
+| source filter, mode angle |  | 2.7930e-06 | 2.9660e-06 | rad |
+| source filter, rho angle |  | 2.5600e-06 | 2.6110e-06 | rad |
+| source filter, ratio of the angles |  | 1.0900e+00 | 1.1400e+00 |  |
+| source filter, edge |  | 2.7931e-06 | 2.9661e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

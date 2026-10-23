@@ -27,6 +27,43 @@ P_x is flat through the y-set to five digits, while P_y climbs from nothing on t
 
 The outputs are `crossed-final.wf.h5`, an openPMD EXT_Wavefront file carrying both polarizations as the x and y components of one mesh record, and `crossed.stats.h5`, whose field group carries the total, the x component and a `field/y/` group. The run takes ~1 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | Unit |
+|---|---|---|
+| exit power | 1.0000e+06 | W |
+| exit power per slice | 1.0000e+06 | W |
+| exit pulse energy | 3.3357e-13 | J |
+| peak power | 1.0000e+06 | W |
+| s of the peak power | 1.4000e+00 | m |
+| mode peak, power inside the split | 1.0000e+06 | W |
+| s of the mode peak | 0.0000e+00 | m |
+| exit power inside the split | 9.9982e+05 | W |
+| exit power outside the split | 1.8502e+02 | W |
+| outside over inside, the run's maximum | 4.4003e-09 |  |
+| outside over inside at the exit | 1.8505e-04 |  |
+| split angle | 3.2637e-06 | rad |
+| power at the first element end | 9.9982e+05 | W |
+| power per slice at the first element end | 9.9982e+05 | W |
+| exit bunching, mean |b| over slices | 8.0057e-04 |  |
+| bunching, the run's maximum | 4.2511e-17 |  |
+| slice energy spread at the start | 5.2937e+05 | eV |
+| slice energy spread at the exit | 5.2944e+05 | eV |
+| slices | 1 |  |
+| records | 82 |  |
+| slice spacing | 1.0000e-10 | m |
+| macroparticles per slice | 2048 |  |
+| grid points | 128 |  |
+| grid cell | 3.1500e-06 | m |
+| grid derived by setup | no |  |
+| FEL steps | 80 |  |
+| source filter, mode angle | 3.2640e-06 | rad |
+| source filter, rho angle | 2.5880e-06 | rad |
+| source filter, ratio of the angles | 1.2600e+00 |  |
+| source filter, edge | 3.2637e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

@@ -26,6 +26,44 @@ Read [reading an output file](../../reading-output.md) for the stats file and th
 
 The run takes ~5 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | Unit |
+|---|---|---|
+| exit power | 8.0199e+08 | W |
+| exit power per slice | 8.0199e+08 | W |
+| exit pulse energy | 2.6752e-10 | J |
+| peak power | 1.5611e+09 | W |
+| s of the peak power | 3.8134e+01 | m |
+| mode peak, power inside the split | 1.5578e+09 | W |
+| s of the mode peak | 3.8000e+01 | m |
+| exit power inside the split | 7.9951e+08 | W |
+| exit power outside the split | 2.4843e+06 | W |
+| outside over inside, the run's maximum | 1.3742e-03 |  |
+| outside over inside at the exit | 3.1073e-03 |  |
+| split angle | 2.9661e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 2.1043e+00 | m |
+| power at the first element end | 4.1639e+03 | W |
+| power per slice at the first element end | 4.1639e+03 | W |
+| exit bunching, mean |b| over slices | 2.4127e-01 |  |
+| bunching, the run's maximum | 3.0142e-01 |  |
+| slice energy spread at the start | 5.0879e+05 | eV |
+| slice energy spread at the exit | 2.5464e+06 | eV |
+| slices | 1 |  |
+| records | 1105 |  |
+| slice spacing | 1.0000e-10 | m |
+| macroparticles per slice | 8192 |  |
+| grid points | 256 |  |
+| grid cell | 1.5690e-06 | m |
+| grid derived by setup | no |  |
+| FEL steps | 1068 |  |
+| source filter, mode angle | 2.9660e-06 | rad |
+| source filter, rho angle | 2.6110e-06 | rad |
+| source filter, ratio of the angles | 1.1400e+00 |  |
+| source filter, edge | 2.9661e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

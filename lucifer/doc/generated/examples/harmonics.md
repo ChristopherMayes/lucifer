@@ -31,6 +31,39 @@ A helical undulator would give nothing here, since its coupling fc(h) vanishes f
 
 The run takes ~1 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | Unit |
+|---|---|---|
+| exit power | 1.8464e+08 | W |
+| exit power per slice | 1.8464e+08 | W |
+| exit pulse energy | 6.1589e-11 | J |
+| peak power | 2.0000e+08 | W |
+| s of the peak power | 1.8000e-01 | m |
+| mode peak, power inside the split | 2.0000e+08 | W |
+| s of the mode peak | 0.0000e+00 | m |
+| exit power inside the split | 1.8340e+08 | W |
+| exit power outside the split | 1.2439e+06 | W |
+| outside over inside, the run's maximum | 1.5550e-06 |  |
+| outside over inside at the exit | 6.7825e-03 |  |
+| split angle | 2.7594e-06 | rad |
+| power at the first element end | 1.8464e+08 | W |
+| power per slice at the first element end | 1.8464e+08 | W |
+| exit bunching, mean |b| over slices | 1.1071e-01 |  |
+| bunching, the run's maximum | 3.9886e-17 |  |
+| slice energy spread at the start | 5.0879e+05 | eV |
+| slice energy spread at the exit | 8.6474e+05 | eV |
+| slices | 1 |  |
+| records | 89 |  |
+| slice spacing | 1.0000e-10 | m |
+| macroparticles per slice | 8192 |  |
+| grid points | 128 |  |
+| grid cell | 3.1500e-06 | m |
+| grid derived by setup | no |  |
+| FEL steps | 88 |  |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

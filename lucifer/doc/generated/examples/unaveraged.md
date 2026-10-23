@@ -27,6 +27,43 @@ One segment sits in the lethargy regime, so the plot shows the two curves overla
 
 The run takes ~5 s, against under a second for the averaged twin.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_averaged.in` | Unit |
+|---|---|---|---|
+| exit power | 4.4185e+03 | 4.4159e+03 | W |
+| exit power per slice | 4.4185e+03 | 4.4159e+03 | W |
+| exit pulse energy | 1.4738e-15 | 1.4730e-15 | J |
+| peak power | 5.0000e+03 | 5.0000e+03 | W |
+| s of the peak power | 2.6899e-01 | 1.3449e-01 | m |
+| mode peak, power inside the split | 5.0000e+03 | 5.0000e+03 | W |
+| s of the mode peak | 0.0000e+00 | 0.0000e+00 | m |
+| exit power inside the split | 4.2156e+03 | 4.1988e+03 | W |
+| exit power outside the split | 2.0288e+02 | 2.1709e+02 | W |
+| outside over inside, the run's maximum | 2.2985e-07 | 2.2985e-07 |  |
+| outside over inside at the exit | 4.8126e-02 | 5.1702e-02 |  |
+| split angle | 2.9077e-06 | 2.9077e-06 | rad |
+| power at the first element end | 4.4185e+03 | 4.4159e+03 | W |
+| power per slice at the first element end | 4.4185e+03 | 4.4159e+03 | W |
+| exit bunching, mean |b| over slices | 5.9004e-04 | 5.9416e-04 |  |
+| bunching, the run's maximum | 3.6362e-17 | 3.6362e-17 |  |
+| slice energy spread at the start | 5.0869e+05 | 5.0869e+05 | eV |
+| slice energy spread at the exit | 5.0871e+05 | 5.0871e+05 | eV |
+| slices | 1 | 1 |  |
+| records | 90 | 90 |  |
+| slice spacing | 1.0000e-10 | 1.0000e-10 | m |
+| macroparticles per slice | 2048 | 2048 |  |
+| grid points | 128 | 128 |  |
+| grid cell | 3.1500e-06 | 3.1500e-06 | m |
+| grid derived by setup | no | no |  |
+| FEL steps | 5340 | 89 |  |
+| source filter, mode angle | 2.9080e-06 |  | rad |
+| source filter, rho angle | 2.5940e-06 |  | rad |
+| source filter, ratio of the angles | 1.1200e+00 |  |  |
+| source filter, edge | 2.9077e-06 |  | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

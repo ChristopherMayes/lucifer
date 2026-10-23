@@ -109,6 +109,10 @@ Each of these is a feature with no example yet, and the reason it has none.
 
 Run outputs are not committed. `.gitignore` in this directory covers them by extension.
 
+## Where the numbers come from
+
+Every table headed "Measured on this run" on these pages is written by the runner, `examples/run_examples.sh`, from the stats file and the log of each run it makes, into `examples/measured.tsv`. The keystone regenerates that file and these pages and requires no diff, so a number on a page is the number the current binary gives.
+
 ## The shared lattice
 
 Most examples call this line. The ones that need a different lattice carry their own, shown on their own page.

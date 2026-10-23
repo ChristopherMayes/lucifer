@@ -172,46 +172,16 @@ The program's terminal output is formatted for reading and carries no contract b
 
 This is Tao's division of labour. `show ele` is for people, and `show value` and pytao are for precision. It is why the validation suite reads files rather than scraping the screen.
 
-A run looks like this: a framed block naming the configuration, a progress table, and a completion block listing what was written.
+A run prints a framed block naming the configuration, a progress table with a wall time per row, and a completion block listing what was written. The lines below are the steady-state example's, written from its log by the examples runner with the progress rows left out, since their wall times belong to the machine that ran it:
 
-```
-================================================================================
- Lucifer -- FEL tracking in Bmad, Bmad version 20260904-1
---------------------------------------------------------------------------------
- Lattice     ../aramis.bmad
-             49 elements, 57.000 m, 12 FEL segments
- Beam        1 slice x 8192 particles, gamma0 = 11357.82
- Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid 256 points of 1.569 um
- Work        1068 FEL steps, 8192 macroparticles, 8.75E+06 particle-steps, 6.55E+04 grid points per step
- Estimate    4.7 s of walk on the CPU path, for Apple M3 Max, 12 cores, 2026-09-07.
- Load        8192 macroparticles in the thinnest slice, beamlets of 8, 1024 beamlets.
-             This load is the one the filter's convergence was measured on (fel-physics.md).
-             No shot noise. The quiet start leaves no bunching below harmonic 8.
- Switches    sr wakes F, space charge F, radiation damping F
- Output      out_root "steady_state", threads 12
-================================================================================
-     %        s       ele       step          power         energy    <|b|>  elapsed  element
-    7.0     3.990      1/49      89/89       4.164 kW       1.389 fJ   0.0006    0:00  UND
-   15.3     8.740      5/49      89/89      31.738 kW      10.587 fJ   0.0016    0:01  UND
-  100.0    57.000     48/49                801.994 MW     267.516 pJ   0.2413    0:07  D2
---------------------------------------------------------------------------------
- Done        57.000 m, 48 element ends
- Exit        power 801.994 MW, pulse energy 267.516 pJ, <|b|> 0.2413
- Split       2.966 urad, the mode angle. Inside it the mode, outside it the beamlets.
-             mode peak, z =   38.000 m: inside 1.558 GW, outside 2.141 MW, ratio  1.37E-03, <|b|> 0.3014
-             last record, z = 57.000 m: inside 799.509 MW, outside 2.484 MW, ratio  3.11E-03, <|b|> 0.2413
- Cost        walk 7.3 s measured, 4.7 s estimated on the CPU path for Apple M3 Max, 12 cores, 2026-09-07.
- Wrote       steady_state-final.beam.h5                      530.872 kB
-             steady_state-final.wf.h5                        1.056 MB
-             steady_state.stats.h5                           1.120 MB
-================================================================================
+```{include} generated/sample-output.md
 ```
 
-Four choices in that table are deliberate. Values carry an SI prefix chosen per value, so one column holds both `4.230 kW` at startup and `761.499 MW` at saturation without losing the early digits a fixed unit would flatten. The element name is last, unpadded, so every numeric column is fixed however long a name gets: no truncation rule, no name shoving the numbers rightward. The step column is blank for one-step elements, which is most of a real lattice. And the distance column is `s`, Bmad's arc length along the reference orbit. Through a bending break the arc exceeds the chord the light takes, which is what the light-path correction accounts for.
+Four choices in the progress table, which the sample leaves out, are deliberate. Values carry an SI prefix chosen per value, so one column holds a kilowatt startup and a megawatt saturation without losing the early digits a fixed unit would flatten. The element name is last, unpadded, so every numeric column is fixed however long a name gets: no truncation rule, no name shoving the numbers rightward. The step column is blank for one-step elements, which is most of a real lattice. And the distance column is `s`, Bmad's arc length along the reference orbit. Through a bending break the arc exceeds the chord the light takes, which is what the light-path correction accounts for.
 
 The Radiation line reports the grid the run built, which is the file's when the field came from one and the derived one when the deck stated none ([](input-reference.md#param-wavefront-grid)).
 
-The Work, Estimate and Load lines are the pre-run. Work counts what the run will do, and every number in it is known before the first step. The numbers are the integration steps over the line, the macroparticles in the window, their product, and the transverse grid points the field solve touches per step over the window and every member of the field set. Estimate turns that into wall clock at rates measured on one machine, which the line names, from the particle push and the field solve ([](performance.md)). It is an estimate and it is checked: the Cost line in the completion block prints the clock beside it on every run. Load says where the macroparticle count stands against the load the source filter's convergence was measured at, 1024 macroparticles in 128 beamlets. It also says what the beamlet size buys, which is the harmonics the shot noise is imposed at, `(beamlet_size - 1)/2`. A harmonic field above that is refused when shot noise is on, with the beamlet size that would carry it.
+The Work, Estimate and Load lines are the pre-run. The sample above leaves the Estimate line out, since it names a machine and a date. Work counts what the run will do, and every number in it is known before the first step. The numbers are the integration steps over the line, the macroparticles in the window, their product, and the transverse grid points the field solve touches per step over the window and every member of the field set. Estimate turns that into wall clock at rates measured on one machine, which the line names, from the particle push and the field solve ([](performance.md)). It is an estimate and it is checked: the Cost line in the completion block prints the clock beside it on every run. Load says where the macroparticle count stands against the load the source filter's convergence was measured at, 1024 macroparticles in 128 beamlets. It also says what the beamlet size buys, which is the harmonics the shot noise is imposed at, `(beamlet_size - 1)/2`. A harmonic field above that is refused when shot noise is on, with the beamlet size that would carry it.
 
 The Frames line appears when `global%dump_at_comb` is on, and states how many frames the run will write and roughly how many bytes they take. A comb of zero is a frame at every integration step, so read the number before the run rather than after the disk fills ([](input-reference.md#param-global-dump-at-comb), [](reading-output.md)).
 

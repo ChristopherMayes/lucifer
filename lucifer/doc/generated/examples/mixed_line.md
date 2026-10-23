@@ -41,6 +41,40 @@ The run reports the split between the mode and the wide-angle emission of the po
 
 The run takes ~7 s, and the averaged twin ~1 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_averaged.in` | Unit |
+|---|---|---|---|
+| exit power | 1.6598e+09 | 1.6863e+09 | W |
+| exit power per slice | 1.6598e+09 | 1.6863e+09 | W |
+| exit pulse energy | 5.5366e-10 | 5.6247e-10 | J |
+| peak power | 1.6722e+09 | 1.6863e+09 | W |
+| s of the peak power | 3.8000e+01 | 5.7000e+01 | m |
+| mode peak, power inside the split | 1.1880e+09 | 1.1814e+09 | W |
+| s of the mode peak | 3.8000e+01 | 3.8000e+01 | m |
+| exit power inside the split | 3.8097e+08 | 3.8720e+08 | W |
+| exit power outside the split | 1.2789e+09 | 1.2991e+09 | W |
+| outside over inside, the run's maximum | 4.0755e-01 | 4.1176e-01 |  |
+| outside over inside at the exit | 3.3569e+00 | 3.3550e+00 |  |
+| split angle | 2.9077e-06 | 2.9077e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 1.8661e+00 | 1.8661e+00 | m |
+| power at the first element end | 4.4159e+03 | 4.4159e+03 | W |
+| power per slice at the first element end | 4.4159e+03 | 4.4159e+03 | W |
+| exit bunching, mean |b| over slices | 1.1891e-01 | 1.1251e-01 |  |
+| bunching, the run's maximum | 2.3538e-01 | 2.3527e-01 |  |
+| slice energy spread at the start | 5.0869e+05 | 5.0869e+05 | eV |
+| slice energy spread at the exit | 2.4231e+06 | 2.4181e+06 | eV |
+| slices | 1 | 1 |  |
+| records | 1105 | 1105 |  |
+| slice spacing | 1.0000e-10 | 1.0000e-10 | m |
+| macroparticles per slice | 2048 | 2048 |  |
+| grid points | 128 | 128 |  |
+| grid cell | 3.1500e-06 | 3.1500e-06 | m |
+| grid derived by setup | no | no |  |
+| FEL steps | 6319 | 1068 |  |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

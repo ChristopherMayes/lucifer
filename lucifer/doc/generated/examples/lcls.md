@@ -100,6 +100,46 @@ The lattice carries the optics, so the beam is generated matched to the periodic
 
 The run takes ~90 s, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator at 1254 integration steps, each taken over every slice of the window.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | Unit |
+|---|---|---|
+| exit power | 7.4069e+12 | W |
+| exit power per slice | 2.4690e+10 | W |
+| exit power, rms over mean across slices | 8.0064e-01 |  |
+| exit pulse energy | 2.5367e-04 | J |
+| peak power | 7.4069e+12 | W |
+| s of the peak power | 1.3220e+02 | m |
+| mode peak, power inside the split | 7.4032e+12 | W |
+| s of the mode peak | 1.3220e+02 | m |
+| exit power inside the split | 7.4032e+12 | W |
+| exit power outside the split | 3.6539e+09 | W |
+| outside over inside, the run's maximum | 4.9356e-04 |  |
+| outside over inside at the exit | 4.9356e-04 |  |
+| split angle | 4.5125e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 3.5577e+00 | m |
+| power at the first element end | 2.6729e+07 | W |
+| power per slice at the first element end | 8.9096e+04 | W |
+| exit bunching, mean |b| over slices | 1.3656e-01 |  |
+| bunching, the run's maximum | 1.3656e-01 |  |
+| slice energy spread at the start | 1.7674e+06 | eV |
+| slice energy spread at the exit | 1.1106e+07 | eV |
+| slices | 300 |  |
+| records | 1351 |  |
+| slice spacing | 1.0267e-08 | m |
+| macroparticles per slice | 4096 |  |
+| grid points | 128 |  |
+| grid cell | 3.0140e-06 | m |
+| grid derived by setup | yes |  |
+| grid rounded up from | 127 |  |
+| FEL steps | 1254 |  |
+| source filter, mode angle | 4.5130e-06 | rad |
+| source filter, rho angle | 2.4240e-06 | rad |
+| source filter, ratio of the angles | 1.8600e+00 |  |
+| source filter, edge | 4.5125e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

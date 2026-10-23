@@ -37,6 +37,44 @@ The run reports the split between the mode and the wide-angle emission of the po
 
 Each run takes ~5 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_damping_only.in` | Unit |
+|---|---|---|---|
+| exit power | 5.5527e+08 | 5.5672e+08 | W |
+| exit power per slice | 5.5527e+08 | 5.5672e+08 | W |
+| exit pulse energy | 1.8522e-10 | 1.8570e-10 | J |
+| peak power | 1.1534e+09 | 1.1543e+09 | W |
+| s of the peak power | 3.8045e+01 | 3.8045e+01 | m |
+| mode peak, power inside the split | 1.1510e+09 | 1.1521e+09 | W |
+| s of the mode peak | 3.8000e+01 | 3.8000e+01 | m |
+| exit power inside the split | 5.5181e+08 | 5.5366e+08 | W |
+| exit power outside the split | 3.4624e+06 | 3.0631e+06 | W |
+| outside over inside, the run's maximum | 1.9120e-03 | 1.8648e-03 |  |
+| outside over inside at the exit | 6.2746e-03 | 5.5325e-03 |  |
+| split angle | 2.9661e-06 | 2.9661e-06 | rad |
+| gain length, the shortest e-folding length over five consecutive records | 2.1402e+00 | 2.1360e+00 | m |
+| power at the first element end | 4.1206e+03 | 4.1251e+03 | W |
+| power per slice at the first element end | 4.1206e+03 | 4.1251e+03 | W |
+| exit bunching, mean |b| over slices | 2.2699e-01 | 2.3541e-01 |  |
+| bunching, the run's maximum | 2.7861e-01 | 2.7902e-01 |  |
+| slice energy spread at the start | 5.0879e+05 | 5.0879e+05 | eV |
+| slice energy spread at the exit | 2.3323e+06 | 2.3430e+06 | eV |
+| slices | 1 | 1 |  |
+| records | 1105 | 1105 |  |
+| slice spacing | 1.0000e-10 | 1.0000e-10 | m |
+| macroparticles per slice | 8192 | 8192 |  |
+| grid points | 256 | 256 |  |
+| grid cell | 1.5690e-06 | 1.5690e-06 | m |
+| grid derived by setup | no | no |  |
+| FEL steps | 1068 | 1068 |  |
+| source filter, mode angle | 2.9660e-06 | 2.9660e-06 | rad |
+| source filter, rho angle | 2.6110e-06 | 2.6110e-06 | rad |
+| source filter, ratio of the angles | 1.1400e+00 | 1.1400e+00 |  |
+| source filter, edge | 2.9661e-06 | 2.9661e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.

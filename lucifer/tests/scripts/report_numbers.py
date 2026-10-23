@@ -13,7 +13,8 @@ read and classified by matching its value against the sources a number can come 
   tolerance  a tolerance or bound a check script holds a value to: its module-level
              constants, the literal bound in a check() call, and the bounds of the
              generated tables
-  measured   a value a generated page carries, from the harness's records
+  measured   a value a generated page carries, from the harness's records, or a value of
+             the examples' record, examples/measured.tsv
   example    a setting of a deck under examples/ or tests/
 
 A token that matches no source is classified by hand in tests/number_classes.tsv, which
@@ -156,6 +157,14 @@ class Sources:
                 for n in re.findall(NUMBER, cell):
                     self.add(cls, n, f"{path.name}:{cells[0][:30]}")
 
+    def read_record(self, path: pathlib.Path):
+        """Measured values from the examples' record, one row per deck and quantity."""
+        if not path.exists():
+            return
+        for row in csv.DictReader(path.open(), delimiter="\t"):
+            if row.get("value") not in (None, "", "yes", "no"):
+                self.add("measured", row["value"], f"measured.tsv:{row['directory']}/{row['deck']}:{row['quantity']}")
+
     def read_decks(self, roots):
         """Settings of the decks, and of the namelists the check scripts carry as text."""
         for root in roots:
@@ -242,6 +251,7 @@ def main() -> int:
     src.read_tsv(pathlib.Path(a.standards), "standard")
     src.read_scripts(sorted((tests / "scripts").glob("check_*.py")))
     src.read_generated(doc / "generated" / "validation-measured.md")
+    src.read_record(examples / "measured.tsv")
     src.read_decks([examples, tests / "bmad", tests / "genesis4"])
     hand = read_hand(pathlib.Path(a.classes))
 

@@ -29,6 +29,43 @@ The harness's phasing section checks the same physics. The re-anchor baseline is
 
 Each run takes ~1 s.
 
+## Measured on this run
+
+The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
+
+| Quantity | `lucifer.in` | `lucifer_detuned.in` | Unit |
+|---|---|---|---|
+| exit power | 2.6084e+08 | 1.8402e+08 | W |
+| exit power per slice | 2.6084e+08 | 1.8402e+08 | W |
+| exit pulse energy | 8.7007e-11 | 6.1382e-11 | J |
+| peak power | 2.6084e+08 | 2.0000e+08 | W |
+| s of the peak power | 2.3050e+00 | 2.1000e-01 | m |
+| mode peak, power inside the split | 2.6081e+08 | 2.0000e+08 | W |
+| s of the mode peak | 2.3050e+00 | 0.0000e+00 | m |
+| exit power inside the split | 2.6081e+08 | 1.8400e+08 | W |
+| exit power outside the split | 2.6656e+04 | 1.9107e+04 | W |
+| outside over inside, the run's maximum | 1.0220e-04 | 1.5550e-06 |  |
+| outside over inside at the exit | 1.0220e-04 | 1.0384e-04 |  |
+| split angle | 2.7594e-06 | 2.7594e-06 | rad |
+| power at the first element end | 1.9978e+08 | 1.9978e+08 | W |
+| power per slice at the first element end | 1.9978e+08 | 1.9978e+08 | W |
+| exit bunching, mean |b| over slices | 1.3452e-01 | 1.1840e-01 |  |
+| bunching, the run's maximum | 1.3452e-01 | 3.9886e-17 |  |
+| slice energy spread at the start | 5.0879e+05 | 5.0879e+05 | eV |
+| slice energy spread at the exit | 6.0581e+05 | 5.6553e+05 | eV |
+| slices | 1 | 1 |  |
+| records | 142 | 142 |  |
+| slice spacing | 1.0000e-10 | 1.0000e-10 | m |
+| macroparticles per slice | 8192 | 8192 |  |
+| grid points | 128 | 128 |  |
+| grid cell | 3.1500e-06 | 3.1500e-06 | m |
+| grid derived by setup | no | no |  |
+| FEL steps | 132 | 132 |  |
+| source filter, mode angle | 2.7590e-06 | 2.7590e-06 | rad |
+| source filter, rho angle | 2.5490e-06 | 2.5490e-06 | rad |
+| source filter, ratio of the angles | 1.0800e+00 | 1.0800e+00 |  |
+| source filter, edge | 2.7594e-06 | 2.7594e-06 | rad |
+
 ## The input files
 
 The deck, its variants, and any lattice they name, as they are on disk.
