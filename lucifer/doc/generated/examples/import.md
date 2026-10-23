@@ -25,7 +25,7 @@ The bunch is a Gaussian test bunch sized to what the FEL window can afford: `sig
 
 `lucifer_from_file.in` names that file in `beam_init%position_file` and loads it in the sample mode. `beam_init%n_particle = 2048` macroparticles go into every slice, resampled by Genesis4's `importdistribution` method from the particles that fell into each slice's sampling window, with the current taken from the same window. The same slices come out, since both modes bin the same bunch on the same spacing. `write_genesis_dist` writes the same bunch as a Genesis4 distribution file for its `&importdistribution`.
 
-On these inputs both modes exit far below saturation, a startup from a real bunch rather than a saturated FEL. The measured quantities are in the table below, the slice count and the peak slice's macroparticle count among them. The two exit powers differ, and the two runs are different SASE realizations of the same physics. The keep mode draws no random number before the noise and the sample mode draws for every resampled particle, so the noise falls on different phasors. In a dark start a small change in the load re-rolls the realization, as the per-slice spread of `../sase` shows. The keep mode costs what its 400000 macroparticles cost, several times the sample mode's wall time. A production run with a bunch from an accelerator simulation would keep fewer copies or sample.
+On these inputs both modes exit far below saturation, a startup from a real bunch rather than a saturated FEL. The measured quantities are in the table below, the slice count and the peak slice's macroparticle count among them. The two exit powers differ, and the two runs are different SASE realizations of the same physics. The keep mode draws no random number before the noise and the sample mode draws for every resampled particle, so the noise falls on different phasors. In a dark start a small change in the load re-rolls the realization, as the per-slice spread of `../sase` shows. The keep mode costs what its 400000 macroparticles cost. A production run with a bunch from an accelerator simulation would keep fewer copies or sample.
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both modes, and the table carries the ratio. With the filter off the same decks reported far more power, nearly all of it that emission, which is why the exit powers here are the mode. Both modes load the same bunch on the same grid, so the comparison between them is unaffected.
 
@@ -54,7 +54,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 6.4530e-02 | 1.3340e-02 |  |
 | exit bunching, mean |b| over slices | 6.1271e-02 | 1.1616e-02 |  |
 | exit bunching, the largest slice | 4.0166e-01 | 2.5148e-02 |  |
+| bunching, the maximum along the line of the mean |b| | 7.7367e-02 | 1.6281e-02 |  |
+| s of the bunching maximum | 3.8941e+01 | 4.5100e+00 | m |
 | bunching at the mode peak | 6.8322e-03 | 8.5572e-03 |  |
+| exit power of the largest slice | 7.0747e+03 | 1.3827e+04 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy, exit minus start | 1.2734e+02 | -5.6585e+01 | eV |

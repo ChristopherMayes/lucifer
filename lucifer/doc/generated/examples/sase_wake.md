@@ -18,7 +18,7 @@ This is the `../sase` run through a deliberately narrow copper chamber of 0.5 mm
 
 The chamber is a demonstration case. At 5.8 GeV and 1 Angstrom a normal chamber's wake is small, and this radius makes the physics visible in one run.
 
-On this input the run writes the per-slice energy-loss rate to `sase_wake.wake.txt` at 1.94 to 121.5 keV/m across the window. The head slices lose least, because the wake is causal and the head has little charge ahead of it. The mean energy drops 8.29 m_e c^2, about 4.24 MeV, over the 57 m line, and the per-slice drop runs from 0.25 to 13.56 m_e c^2 across the window. The drop is visible in the energy panel against the initial spread. The SASE still lases, to an exit power below the `../sase` run's. The measured quantities are in the table below on the example's page. The power of an unseeded run depends on the grid and the particle count of its input ([SASE convergence](../../startup-noise.md)).
+On this input the run writes the per-slice energy-loss rate to `sase_wake.wake.txt` at 1.94 to 121.5 keV/m across the window. The head slices lose least, because the wake is causal and the head has little charge ahead of it. The mean energy drops over the 57 m line by the energy change in the table, and the drop varies across the window by the span the table gives at the exit. The drop is visible in the energy panel against the initial spread. The SASE still lases, to an exit power below the `../sase` run's. The measured quantities are in the table below on the example's page. The power of an unseeded run depends on the grid and the particle count of its input ([SASE convergence](../../startup-noise.md)).
 
 The same resistive-wall kernel applied through Bmad's own wake machinery instead of the transcribed model is `../bmad_wake`, which carries both runs and their agreement. What a loss this size does to the ponderomotive phases is `../migration`.
 
@@ -51,7 +51,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 5.6750e-03 |  |
 | exit bunching, mean |b| over slices | 1.4149e-02 |  |
 | exit bunching, the largest slice | 4.6745e-02 |  |
+| bunching, the maximum along the line of the mean |b| | 1.4149e-02 |  |
+| s of the bunching maximum | 5.7000e+01 | m |
 | bunching at the mode peak | 1.4031e-02 |  |
+| exit power of the largest slice | 1.2272e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.7996e+09 | eV |
 | mean slice energy, exit minus start | -4.2328e+06 | eV |

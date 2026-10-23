@@ -28,6 +28,9 @@ by column and a number a README once typed from a run comes from the run itself:
   initial_bunching, exit_bunching, exit_bunching_max
                                          the mean of |b| over slices at the start and the
                                          exit, and the largest slice's at the exit
+  bunching_max, bunching_max_s           the maximum along the line of the mean |b| over
+                                         slices, and where it sits, the saturation point
+  exit_power_slice_max                   the largest slice's power at the exit
   bunching_peak                          the mean |b| at the mode's peak, as the program
                                          reports it
   initial_energy, exit_energy, energy_change
@@ -182,9 +185,12 @@ def rows_for(deck: pathlib.Path, log: pathlib.Path):
                 rows.append((name, float(run[key][()]), unit))
         rows.append(("split_angle", float(h5["field/total/split_angle"][()]), "rad"))
         b = h5["beam/slice/bunching"][()]
-        rows += [("initial_bunching", float(np.mean(np.abs(b[0]))), ""),
-                 ("exit_bunching", float(np.mean(np.abs(b[-1]))), ""),
-                 ("exit_bunching_max", float(np.max(np.abs(b[-1]))), "")]
+        bm = np.mean(np.abs(b), axis=1)
+        kb = int(np.argmax(bm))
+        rows += [("initial_bunching", float(bm[0]), ""), ("exit_bunching", float(bm[-1]), ""),
+                 ("exit_bunching_max", float(np.max(np.abs(b[-1]))), ""),
+                 ("bunching_max", float(bm[kb]), ""), ("bunching_max_s", s[kb], "m"),
+                 ("exit_power_slice_max", float(np.max(power[-1])), "W")]
         e = h5["beam/slice/energy"][()]
         e0, e1 = float(np.nanmean(e[0])), float(np.nanmean(e[-1]))
         rows += [("initial_energy", e0, "eV"), ("exit_energy", e1, "eV"), ("energy_change", e1 - e0, "eV"),

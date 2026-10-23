@@ -112,7 +112,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 8.8848e-03 |  |
 | exit bunching, mean |b| over slices | 7.6488e-02 |  |
 | exit bunching, the largest slice | 5.3733e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 8.0278e-02 |  |
+| s of the bunching maximum | 3.1027e+01 | m |
 | bunching at the mode peak | 2.0050e-01 |  |
+| exit power of the largest slice | 4.5362e+09 | W |
 | mean slice energy at the start | 6.6849e+08 | eV |
 | mean slice energy at the exit | 6.6828e+08 | eV |
 | mean slice energy, exit minus start | -2.1442e+05 | eV |

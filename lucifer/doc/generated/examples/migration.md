@@ -25,7 +25,7 @@ The exit powers are those of this input's grid and particle count. The power of 
 
 `migration.migration.txt` carries one row per event: the s position, the count, the charge dropped, the phasor deviation, and the smallest phase distance any particle at that event had to a slice boundary. The totals are at the end. The rows are what a plot of migration would be drawn from.
 
-The per-slice current shows the difference most directly. With `migrate = F` it cannot change. All 96 slices sit at exactly 3000 A at the exit, the value they were loaded with, because no particle ever leaves the slice it started in. With `migrate = T` the profile evolves across the window. The drain is at the high-index end of the window, where the last two slices are the emptiest. In the plot, the emptiest slice is the one gray line whose bunching climbs far above every other slice's. That is a small-population artifact and not physics. A slice with a small fraction of its charge left has a noisy bunching estimate, and `n_eff` in the diag columns is what says so.
+The per-slice current shows the difference most directly. With `migrate = F` it cannot change. All 96 slices sit at exactly 3000 A at the exit, the value they were loaded with, because no particle ever leaves the slice it started in. With `migrate = T` the profile evolves across the window. The drain is at the high-index end of the window, where the last two slices are the emptiest. In the plot, the emptiest slice is the one gray line whose bunching climbs far above every other slice's, to the largest slice bunching the table carries. That is a small-population artifact and not physics. A slice with a small fraction of its charge left has a noisy bunching estimate, and `n_eff` in the diag columns is what says so.
 
 Migration changes the physics and not only the bookkeeping. With migration off, a particle whose phase has left its slice keeps radiating into the field of the slice it started in, and the bunching each slice sees is smeared by contributions that belong elsewhere. On this configuration that shows in the exit bunching, which the table carries for both runs. The default is off because Genesis 1.3 Version 4 (Genesis4) does not migrate without one4one, and the comparison tiers would otherwise measure a model difference rather than a transcription ([validation](../../validation.md), the slice-migration section).
 
@@ -60,7 +60,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 6.7994e-03 | 6.7994e-03 |  |
 | exit bunching, mean |b| over slices | 3.5969e-02 | 2.7499e-02 |  |
 | exit bunching, the largest slice | 2.5376e-01 | 1.2279e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 3.5969e-02 | 2.7499e-02 |  |
+| s of the bunching maximum | 5.7000e+01 | 5.6760e+01 | m |
 | bunching at the mode peak | 3.3399e-02 | 2.7477e-02 |  |
+| exit power of the largest slice | 4.5555e+06 | 6.3168e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy, exit minus start | 1.3336e+03 | -7.5451e+03 | eV |

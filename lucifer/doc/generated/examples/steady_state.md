@@ -18,7 +18,7 @@ This is a seeded, single-slice FEL on the benchmark line (`../aramis.bmad`): a 3
 
 `sig_z = 0` makes the run steady state. The whole charge sits in the one slice window, so the current is `I = Q*c/slice_spacing`, and `bunch_charge` in the deck encodes 3 kA exactly. The current is always derived this way and never entered ([the input reference](../../input-reference.md)).
 
-On this input the quiet start is exact to an initial bunching of 4.0e-17, so the FEL grows from the seed and not from sampling noise. The power grows exponentially from the seed, saturates past the middle of the line, and falls back at the exit as particles rotate in the bucket. The gain length, the peak power with its position, and the exit power are in the table below on the example's page. The beam sizes start on the lattice's matched values, since `init_beam_distribution` generates the bunch from the Twiss in the lattice's `beginning` statement.
+On this input the quiet start is exact to the initial bunching in the table, so the FEL grows from the seed and not from sampling noise. The power grows exponentially from the seed, saturates past the middle of the line, and falls back at the exit as particles rotate in the bucket. The gain length, the peak power with its position, and the exit power are in the table below on the example's page. The beam sizes start on the lattice's matched values, since `init_beam_distribution` generates the bunch from the Twiss in the lattice's `beginning` statement.
 
 The two `dump_*_at` lines write the beam and the field at the third undulator, `steady_state-at9-UND.beam.h5` and `-at9-UND.wf.h5`, both openPMD. `at9` is the element index the locator resolved. Mid-run dumps are how a run is handed to another program or restarted from the middle, and a single slice keeps them under 1.5 MB here. The same two lines on the `../sase` window write about a hundred megabytes.
 
@@ -50,7 +50,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 2.4127e-01 |  |
 | exit bunching, the largest slice | 2.4127e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 3.0279e-01 |  |
+| s of the bunching maximum | 3.8403e+01 | m |
 | bunching at the mode peak | 3.0142e-01 |  |
+| exit power of the largest slice | 8.0199e+08 | W |
 | mean slice energy at the start | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8036e+09 | eV |
 | mean slice energy, exit minus start | -2.6909e+05 | eV |

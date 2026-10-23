@@ -1,4 +1,6 @@
 directory	deck	quantity	value	unit
+bmad_wake	lucifer.in	bunching_max	1.5323e-02	
+bmad_wake	lucifer.in	bunching_max_s	5.7000e+01	m
 bmad_wake	lucifer.in	bunching_peak	1.5301e-02	
 bmad_wake	lucifer.in	energy_change	-1.1881e+06	eV
 bmad_wake	lucifer.in	exit_bunching	1.5323e-02	
@@ -9,6 +11,7 @@ bmad_wake	lucifer.in	exit_power	3.0293e+07	W
 bmad_wake	lucifer.in	exit_power_inside	2.9369e+07	W
 bmad_wake	lucifer.in	exit_power_outside	9.2352e+05	W
 bmad_wake	lucifer.in	exit_power_per_slice	3.1555e+05	W
+bmad_wake	lucifer.in	exit_power_slice_max	1.3751e+06	W
 bmad_wake	lucifer.in	exit_power_slice_spread	1.2031e+00	
 bmad_wake	lucifer.in	exit_pulse_energy	3.0314e-11	J
 bmad_wake	lucifer.in	exit_sigma_energy	5.1993e+05	eV
@@ -37,6 +40,8 @@ bmad_wake	lucifer.in	slice_spacing	3.0000e-10	m
 bmad_wake	lucifer.in	split_angle	2.9625e-06	rad
 bmad_wake	lucifer.in	wide_angle_ratio	3.0674e-02	
 bmad_wake	lucifer.in	wide_angle_ratio_exit	3.1445e-02	
+bmad_wake	lucifer_transcribed.in	bunching_max	1.5178e-02	
+bmad_wake	lucifer_transcribed.in	bunching_max_s	5.7000e+01	m
 bmad_wake	lucifer_transcribed.in	bunching_peak	1.5167e-02	
 bmad_wake	lucifer_transcribed.in	energy_change	-1.1799e+06	eV
 bmad_wake	lucifer_transcribed.in	exit_bunching	1.5178e-02	
@@ -47,6 +52,7 @@ bmad_wake	lucifer_transcribed.in	exit_power	3.0288e+07	W
 bmad_wake	lucifer_transcribed.in	exit_power_inside	2.9387e+07	W
 bmad_wake	lucifer_transcribed.in	exit_power_outside	9.0131e+05	W
 bmad_wake	lucifer_transcribed.in	exit_power_per_slice	3.1550e+05	W
+bmad_wake	lucifer_transcribed.in	exit_power_slice_max	1.3749e+06	W
 bmad_wake	lucifer_transcribed.in	exit_power_slice_spread	1.1995e+00	
 bmad_wake	lucifer_transcribed.in	exit_pulse_energy	3.0309e-11	J
 bmad_wake	lucifer_transcribed.in	exit_sigma_energy	5.1722e+05	eV
@@ -75,6 +81,8 @@ bmad_wake	lucifer_transcribed.in	slice_spacing	3.0000e-10	m
 bmad_wake	lucifer_transcribed.in	split_angle	2.9625e-06	rad
 bmad_wake	lucifer_transcribed.in	wide_angle_ratio	2.9994e-02	
 bmad_wake	lucifer_transcribed.in	wide_angle_ratio_exit	3.0670e-02	
+chicane	lucifer.in	bunching_max	1.3452e-01	
+chicane	lucifer.in	bunching_max_s	2.3050e+00	m
 chicane	lucifer.in	bunching_peak	1.3452e-01	
 chicane	lucifer.in	energy_change	-2.0246e+04	eV
 chicane	lucifer.in	exit_bunching	1.3452e-01	
@@ -85,6 +93,7 @@ chicane	lucifer.in	exit_power	2.6084e+08	W
 chicane	lucifer.in	exit_power_inside	2.6081e+08	W
 chicane	lucifer.in	exit_power_outside	2.6656e+04	W
 chicane	lucifer.in	exit_power_per_slice	2.6084e+08	W
+chicane	lucifer.in	exit_power_slice_max	2.6084e+08	W
 chicane	lucifer.in	exit_pulse_energy	8.7007e-11	J
 chicane	lucifer.in	exit_sigma_energy	6.0581e+05	eV
 chicane	lucifer.in	fel_steps	132	
@@ -111,6 +120,8 @@ chicane	lucifer.in	slice_spacing	1.0000e-10	m
 chicane	lucifer.in	split_angle	2.7594e-06	rad
 chicane	lucifer.in	wide_angle_ratio	1.0220e-04	
 chicane	lucifer.in	wide_angle_ratio_exit	1.0220e-04	
+chicane	lucifer_detuned.in	bunching_max	1.2541e-01	
+chicane	lucifer_detuned.in	bunching_max_s	1.4800e+00	m
 chicane	lucifer_detuned.in	bunching_peak	3.9886e-17	
 chicane	lucifer_detuned.in	energy_change	5.4705e+03	eV
 chicane	lucifer_detuned.in	exit_bunching	1.1840e-01	
@@ -121,6 +132,7 @@ chicane	lucifer_detuned.in	exit_power	1.8402e+08	W
 chicane	lucifer_detuned.in	exit_power_inside	1.8400e+08	W
 chicane	lucifer_detuned.in	exit_power_outside	1.9107e+04	W
 chicane	lucifer_detuned.in	exit_power_per_slice	1.8402e+08	W
+chicane	lucifer_detuned.in	exit_power_slice_max	1.8402e+08	W
 chicane	lucifer_detuned.in	exit_pulse_energy	6.1382e-11	J
 chicane	lucifer_detuned.in	exit_sigma_energy	5.6553e+05	eV
 chicane	lucifer_detuned.in	fel_steps	132	
@@ -147,6 +159,8 @@ chicane	lucifer_detuned.in	slice_spacing	1.0000e-10	m
 chicane	lucifer_detuned.in	split_angle	2.7594e-06	rad
 chicane	lucifer_detuned.in	wide_angle_ratio	1.5550e-06	
 chicane	lucifer_detuned.in	wide_angle_ratio_exit	1.0384e-04	
+coherent_source	lucifer.in	bunching_max	3.4271e-01	
+coherent_source	lucifer.in	bunching_max_s	4.0780e+01	m
 coherent_source	lucifer.in	bunching_peak	3.2232e-01	
 coherent_source	lucifer.in	energy_change	-2.1383e+05	eV
 coherent_source	lucifer.in	exit_bunching	2.7442e-01	
@@ -157,6 +171,7 @@ coherent_source	lucifer.in	exit_power	7.4861e+08	W
 coherent_source	lucifer.in	exit_power_inside	7.1333e+08	W
 coherent_source	lucifer.in	exit_power_outside	3.5283e+07	W
 coherent_source	lucifer.in	exit_power_per_slice	7.4861e+08	W
+coherent_source	lucifer.in	exit_power_slice_max	7.4861e+08	W
 coherent_source	lucifer.in	exit_pulse_energy	2.4971e-10	J
 coherent_source	lucifer.in	exit_sigma_energy	2.4428e+06	eV
 coherent_source	lucifer.in	fel_steps	1068	
@@ -180,6 +195,8 @@ coherent_source	lucifer.in	slice_spacing	1.0000e-10	m
 coherent_source	lucifer.in	split_angle	2.7931e-06	rad
 coherent_source	lucifer.in	wide_angle_ratio	3.3331e-03	
 coherent_source	lucifer.in	wide_angle_ratio_exit	4.9463e-02	
+coherent_source	lucifer_low_m.in	bunching_max	2.3820e-01	
+coherent_source	lucifer_low_m.in	bunching_max_s	3.7240e+01	m
 coherent_source	lucifer_low_m.in	bunching_peak	2.3442e-01	
 coherent_source	lucifer_low_m.in	energy_change	-4.2874e+05	eV
 coherent_source	lucifer_low_m.in	exit_bunching	1.7420e-01	
@@ -190,6 +207,7 @@ coherent_source	lucifer_low_m.in	exit_power	1.1816e+09	W
 coherent_source	lucifer_low_m.in	exit_power_inside	1.1569e+09	W
 coherent_source	lucifer_low_m.in	exit_power_outside	2.4610e+07	W
 coherent_source	lucifer_low_m.in	exit_power_per_slice	1.1816e+09	W
+coherent_source	lucifer_low_m.in	exit_power_slice_max	1.1816e+09	W
 coherent_source	lucifer_low_m.in	exit_pulse_energy	3.9412e-10	J
 coherent_source	lucifer_low_m.in	exit_sigma_energy	2.7134e+06	eV
 coherent_source	lucifer_low_m.in	fel_steps	1068	
@@ -217,6 +235,8 @@ coherent_source	lucifer_low_m.in	slice_spacing	1.0000e-10	m
 coherent_source	lucifer_low_m.in	split_angle	2.7931e-06	rad
 coherent_source	lucifer_low_m.in	wide_angle_ratio	1.0852e-02	
 coherent_source	lucifer_low_m.in	wide_angle_ratio_exit	2.1272e-02	
+coherent_source	lucifer_reference.in	bunching_max	3.0279e-01	
+coherent_source	lucifer_reference.in	bunching_max_s	3.8403e+01	m
 coherent_source	lucifer_reference.in	bunching_peak	3.0142e-01	
 coherent_source	lucifer_reference.in	energy_change	-2.6909e+05	eV
 coherent_source	lucifer_reference.in	exit_bunching	2.4127e-01	
@@ -227,6 +247,7 @@ coherent_source	lucifer_reference.in	exit_power	8.0199e+08	W
 coherent_source	lucifer_reference.in	exit_power_inside	7.9951e+08	W
 coherent_source	lucifer_reference.in	exit_power_outside	2.4843e+06	W
 coherent_source	lucifer_reference.in	exit_power_per_slice	8.0199e+08	W
+coherent_source	lucifer_reference.in	exit_power_slice_max	8.0199e+08	W
 coherent_source	lucifer_reference.in	exit_pulse_energy	2.6752e-10	J
 coherent_source	lucifer_reference.in	exit_sigma_energy	2.5464e+06	eV
 coherent_source	lucifer_reference.in	fel_steps	1068	
@@ -254,6 +275,8 @@ coherent_source	lucifer_reference.in	slice_spacing	1.0000e-10	m
 coherent_source	lucifer_reference.in	split_angle	2.9661e-06	rad
 coherent_source	lucifer_reference.in	wide_angle_ratio	1.3742e-03	
 coherent_source	lucifer_reference.in	wide_angle_ratio_exit	3.1073e-03	
+crossed_undulator	lucifer.in	bunching_max	8.0057e-04	
+crossed_undulator	lucifer.in	bunching_max_s	1.4000e+00	m
 crossed_undulator	lucifer.in	bunching_peak	4.2511e-17	
 crossed_undulator	lucifer.in	energy_change	-3.9091e-03	eV
 crossed_undulator	lucifer.in	exit_bunching	8.0057e-04	
@@ -264,6 +287,7 @@ crossed_undulator	lucifer.in	exit_power	1.0000e+06	W
 crossed_undulator	lucifer.in	exit_power_inside	9.9982e+05	W
 crossed_undulator	lucifer.in	exit_power_outside	1.8502e+02	W
 crossed_undulator	lucifer.in	exit_power_per_slice	1.0000e+06	W
+crossed_undulator	lucifer.in	exit_power_slice_max	1.0000e+06	W
 crossed_undulator	lucifer.in	exit_pulse_energy	3.3357e-13	J
 crossed_undulator	lucifer.in	exit_sigma_energy	5.2944e+05	eV
 crossed_undulator	lucifer.in	fel_steps	80	
@@ -290,6 +314,8 @@ crossed_undulator	lucifer.in	slice_spacing	1.0000e-10	m
 crossed_undulator	lucifer.in	split_angle	3.2637e-06	rad
 crossed_undulator	lucifer.in	wide_angle_ratio	4.4003e-09	
 crossed_undulator	lucifer.in	wide_angle_ratio_exit	1.8505e-04	
+flash1	lucifer.in	bunching_max	8.0278e-02	
+flash1	lucifer.in	bunching_max_s	3.1027e+01	m
 flash1	lucifer.in	bunching_peak	2.0050e-01	
 flash1	lucifer.in	energy_change	-2.1442e+05	eV
 flash1	lucifer.in	exit_bunching	7.6488e-02	
@@ -300,6 +326,7 @@ flash1	lucifer.in	exit_power	8.5177e+10	W
 flash1	lucifer.in	exit_power_inside	8.5127e+10	W
 flash1	lucifer.in	exit_power_outside	5.0114e+07	W
 flash1	lucifer.in	exit_power_per_slice	2.4267e+08	W
+flash1	lucifer.in	exit_power_slice_max	4.5362e+09	W
 flash1	lucifer.in	exit_power_slice_spread	2.6601e+00	
 flash1	lucifer.in	exit_pulse_energy	4.6709e-05	J
 flash1	lucifer.in	exit_sigma_energy	5.9655e+05	eV
@@ -328,6 +355,8 @@ flash1	lucifer.in	slice_spacing	1.6440e-07	m
 flash1	lucifer.in	split_angle	8.1501e-05	rad
 flash1	lucifer.in	wide_angle_ratio	5.8869e-04	
 flash1	lucifer.in	wide_angle_ratio_exit	5.8869e-04	
+frames	lucifer.in	bunching_max	5.8875e-02	
+frames	lucifer.in	bunching_max_s	8.7400e+00	m
 frames	lucifer.in	bunching_peak	3.7415e-02	
 frames	lucifer.in	energy_change	6.2637e+03	eV
 frames	lucifer.in	exit_bunching	5.8875e-02	
@@ -338,6 +367,7 @@ frames	lucifer.in	exit_power	1.5236e+05	W
 frames	lucifer.in	exit_power_inside	1.4797e+05	W
 frames	lucifer.in	exit_power_outside	4.3915e+03	W
 frames	lucifer.in	exit_power_per_slice	1.9045e+04	W
+frames	lucifer.in	exit_power_slice_max	2.7294e+04	W
 frames	lucifer.in	exit_power_slice_spread	4.4252e-01	
 frames	lucifer.in	exit_pulse_energy	1.5247e-13	J
 frames	lucifer.in	exit_sigma_energy	5.2519e+05	eV
@@ -365,6 +395,8 @@ frames	lucifer.in	slice_spacing	3.0000e-10	m
 frames	lucifer.in	split_angle	3.0742e-06	rad
 frames	lucifer.in	wide_angle_ratio	2.9678e-02	
 frames	lucifer.in	wide_angle_ratio_exit	2.9678e-02	
+harmonics	lucifer.in	bunching_max	1.1071e-01	
+harmonics	lucifer.in	bunching_max_s	3.9600e+00	m
 harmonics	lucifer.in	bunching_peak	3.9886e-17	
 harmonics	lucifer.in	energy_change	5.0518e+03	eV
 harmonics	lucifer.in	exit_bunching	1.1071e-01	
@@ -375,6 +407,7 @@ harmonics	lucifer.in	exit_power	1.8464e+08	W
 harmonics	lucifer.in	exit_power_inside	1.8340e+08	W
 harmonics	lucifer.in	exit_power_outside	1.2439e+06	W
 harmonics	lucifer.in	exit_power_per_slice	1.8464e+08	W
+harmonics	lucifer.in	exit_power_slice_max	1.8464e+08	W
 harmonics	lucifer.in	exit_pulse_energy	6.1589e-11	J
 harmonics	lucifer.in	exit_sigma_energy	8.6474e+05	eV
 harmonics	lucifer.in	fel_steps	88	
@@ -397,6 +430,8 @@ harmonics	lucifer.in	slice_spacing	1.0000e-10	m
 harmonics	lucifer.in	split_angle	2.7594e-06	rad
 harmonics	lucifer.in	wide_angle_ratio	1.5550e-06	
 harmonics	lucifer.in	wide_angle_ratio_exit	6.7825e-03	
+import	lucifer.in	bunching_max	7.7367e-02	
+import	lucifer.in	bunching_max_s	3.8941e+01	m
 import	lucifer.in	bunching_peak	6.8322e-03	
 import	lucifer.in	energy_change	1.2734e+02	eV
 import	lucifer.in	exit_bunching	6.1271e-02	
@@ -407,6 +442,7 @@ import	lucifer.in	exit_power	4.1816e+04	W
 import	lucifer.in	exit_power_inside	4.0194e+04	W
 import	lucifer.in	exit_power_outside	1.6223e+03	W
 import	lucifer.in	exit_power_per_slice	1.2299e+03	W
+import	lucifer.in	exit_power_slice_max	7.0747e+03	W
 import	lucifer.in	exit_power_slice_spread	1.6403e+00	
 import	lucifer.in	exit_pulse_energy	4.1845e-14	J
 import	lucifer.in	exit_sigma_energy	4.5632e+05	eV
@@ -435,6 +471,8 @@ import	lucifer.in	slice_spacing	3.0000e-10	m
 import	lucifer.in	split_angle	2.9795e-06	rad
 import	lucifer.in	wide_angle_ratio	2.1939e-02	
 import	lucifer.in	wide_angle_ratio_exit	4.0363e-02	
+import	lucifer_from_file.in	bunching_max	1.6281e-02	
+import	lucifer_from_file.in	bunching_max_s	4.5100e+00	m
 import	lucifer_from_file.in	bunching_peak	8.5572e-03	
 import	lucifer_from_file.in	energy_change	-5.6585e+01	eV
 import	lucifer_from_file.in	exit_bunching	1.1616e-02	
@@ -445,6 +483,7 @@ import	lucifer_from_file.in	exit_power	8.6549e+04	W
 import	lucifer_from_file.in	exit_power_inside	8.2287e+04	W
 import	lucifer_from_file.in	exit_power_outside	4.2617e+03	W
 import	lucifer_from_file.in	exit_power_per_slice	2.5456e+03	W
+import	lucifer_from_file.in	exit_power_slice_max	1.3827e+04	W
 import	lucifer_from_file.in	exit_power_slice_spread	1.7227e+00	
 import	lucifer_from_file.in	exit_pulse_energy	8.6609e-14	J
 import	lucifer_from_file.in	exit_sigma_energy	4.3771e+05	eV
@@ -473,6 +512,8 @@ import	lucifer_from_file.in	slice_spacing	3.0000e-10	m
 import	lucifer_from_file.in	split_angle	2.9914e-06	rad
 import	lucifer_from_file.in	wide_angle_ratio	3.2999e-02	
 import	lucifer_from_file.in	wide_angle_ratio_exit	5.1790e-02	
+lcls	lucifer.in	bunching_max	3.9853e-01	
+lcls	lucifer.in	bunching_max_s	6.3920e+01	m
 lcls	lucifer.in	bunching_peak	1.3656e-01	
 lcls	lucifer.in	energy_change	-9.4466e+06	eV
 lcls	lucifer.in	exit_bunching	1.3656e-01	
@@ -483,6 +524,7 @@ lcls	lucifer.in	exit_power	7.4069e+12	W
 lcls	lucifer.in	exit_power_inside	7.4032e+12	W
 lcls	lucifer.in	exit_power_outside	3.6539e+09	W
 lcls	lucifer.in	exit_power_per_slice	2.4690e+10	W
+lcls	lucifer.in	exit_power_slice_max	1.0445e+11	W
 lcls	lucifer.in	exit_power_slice_spread	8.0064e-01	
 lcls	lucifer.in	exit_pulse_energy	2.5367e-04	J
 lcls	lucifer.in	exit_sigma_energy	1.1106e+07	eV
@@ -512,6 +554,8 @@ lcls	lucifer.in	slice_spacing	1.0267e-08	m
 lcls	lucifer.in	split_angle	4.5125e-06	rad
 lcls	lucifer.in	wide_angle_ratio	4.9356e-04	
 lcls	lucifer.in	wide_angle_ratio_exit	4.9356e-04	
+migration	lucifer.in	bunching_max	3.5969e-02	
+migration	lucifer.in	bunching_max_s	5.7000e+01	m
 migration	lucifer.in	bunching_peak	3.3399e-02	
 migration	lucifer.in	energy_change	1.3336e+03	eV
 migration	lucifer.in	exit_bunching	3.5969e-02	
@@ -522,6 +566,7 @@ migration	lucifer.in	exit_power	7.7178e+07	W
 migration	lucifer.in	exit_power_inside	7.5568e+07	W
 migration	lucifer.in	exit_power_outside	1.6106e+06	W
 migration	lucifer.in	exit_power_per_slice	8.0394e+05	W
+migration	lucifer.in	exit_power_slice_max	4.5555e+06	W
 migration	lucifer.in	exit_power_slice_spread	1.5880e+00	
 migration	lucifer.in	exit_pulse_energy	7.7232e-11	J
 migration	lucifer.in	exit_sigma_energy	5.4336e+05	eV
@@ -550,6 +595,8 @@ migration	lucifer.in	slice_spacing	3.0000e-10	m
 migration	lucifer.in	split_angle	3.0037e-06	rad
 migration	lucifer.in	wide_angle_ratio	2.2562e-02	
 migration	lucifer.in	wide_angle_ratio_exit	2.1313e-02	
+migration	lucifer_no_migrate.in	bunching_max	2.7499e-02	
+migration	lucifer_no_migrate.in	bunching_max_s	5.6760e+01	m
 migration	lucifer_no_migrate.in	bunching_peak	2.7477e-02	
 migration	lucifer_no_migrate.in	energy_change	-7.5451e+03	eV
 migration	lucifer_no_migrate.in	exit_bunching	2.7499e-02	
@@ -560,6 +607,7 @@ migration	lucifer_no_migrate.in	exit_power	1.1167e+08	W
 migration	lucifer_no_migrate.in	exit_power_inside	1.0968e+08	W
 migration	lucifer_no_migrate.in	exit_power_outside	1.9929e+06	W
 migration	lucifer_no_migrate.in	exit_power_per_slice	1.1632e+06	W
+migration	lucifer_no_migrate.in	exit_power_slice_max	6.3168e+06	W
 migration	lucifer_no_migrate.in	exit_power_slice_spread	1.5114e+00	
 migration	lucifer_no_migrate.in	exit_pulse_energy	1.1175e-10	J
 migration	lucifer_no_migrate.in	exit_sigma_energy	5.4046e+05	eV
@@ -588,6 +636,8 @@ migration	lucifer_no_migrate.in	slice_spacing	3.0000e-10	m
 migration	lucifer_no_migrate.in	split_angle	3.0037e-06	rad
 migration	lucifer_no_migrate.in	wide_angle_ratio	1.7833e-02	
 migration	lucifer_no_migrate.in	wide_angle_ratio_exit	1.8171e-02	
+mixed_line	lucifer.in	bunching_max	2.3638e-01	
+mixed_line	lucifer.in	bunching_max_s	3.7760e+01	m
 mixed_line	lucifer.in	bunching_peak	2.3538e-01	
 mixed_line	lucifer.in	energy_change	-6.2473e+05	eV
 mixed_line	lucifer.in	exit_bunching	1.1891e-01	
@@ -598,6 +648,7 @@ mixed_line	lucifer.in	exit_power	1.6598e+09	W
 mixed_line	lucifer.in	exit_power_inside	3.8097e+08	W
 mixed_line	lucifer.in	exit_power_outside	1.2789e+09	W
 mixed_line	lucifer.in	exit_power_per_slice	1.6598e+09	W
+mixed_line	lucifer.in	exit_power_slice_max	1.6598e+09	W
 mixed_line	lucifer.in	exit_pulse_energy	5.5366e-10	J
 mixed_line	lucifer.in	exit_sigma_energy	2.4231e+06	eV
 mixed_line	lucifer.in	fel_steps	6319	
@@ -621,6 +672,8 @@ mixed_line	lucifer.in	slice_spacing	1.0000e-10	m
 mixed_line	lucifer.in	split_angle	2.9077e-06	rad
 mixed_line	lucifer.in	wide_angle_ratio	4.0755e-01	
 mixed_line	lucifer.in	wide_angle_ratio_exit	3.3569e+00	
+mixed_line	lucifer_averaged.in	bunching_max	2.3623e-01	
+mixed_line	lucifer_averaged.in	bunching_max_s	3.7760e+01	m
 mixed_line	lucifer_averaged.in	bunching_peak	2.3527e-01	
 mixed_line	lucifer_averaged.in	energy_change	-6.3359e+05	eV
 mixed_line	lucifer_averaged.in	exit_bunching	1.1251e-01	
@@ -631,6 +684,7 @@ mixed_line	lucifer_averaged.in	exit_power	1.6863e+09	W
 mixed_line	lucifer_averaged.in	exit_power_inside	3.8720e+08	W
 mixed_line	lucifer_averaged.in	exit_power_outside	1.2991e+09	W
 mixed_line	lucifer_averaged.in	exit_power_per_slice	1.6863e+09	W
+mixed_line	lucifer_averaged.in	exit_power_slice_max	1.6863e+09	W
 mixed_line	lucifer_averaged.in	exit_pulse_energy	5.6247e-10	J
 mixed_line	lucifer_averaged.in	exit_sigma_energy	2.4181e+06	eV
 mixed_line	lucifer_averaged.in	fel_steps	1068	
@@ -654,6 +708,8 @@ mixed_line	lucifer_averaged.in	slice_spacing	1.0000e-10	m
 mixed_line	lucifer_averaged.in	split_angle	2.9077e-06	rad
 mixed_line	lucifer_averaged.in	wide_angle_ratio	4.1176e-01	
 mixed_line	lucifer_averaged.in	wide_angle_ratio_exit	3.3550e+00	
+sase	lucifer.in	bunching_max	1.5717e-02	
+sase	lucifer.in	bunching_max_s	5.6240e+01	m
 sase	lucifer.in	bunching_peak	1.5668e-02	
 sase	lucifer.in	energy_change	-2.1499e+03	eV
 sase	lucifer.in	exit_bunching	1.5675e-02	
@@ -664,6 +720,7 @@ sase	lucifer.in	exit_power	3.3963e+07	W
 sase	lucifer.in	exit_power_inside	3.3335e+07	W
 sase	lucifer.in	exit_power_outside	6.2773e+05	W
 sase	lucifer.in	exit_power_per_slice	3.5378e+05	W
+sase	lucifer.in	exit_power_slice_max	1.9297e+06	W
 sase	lucifer.in	exit_power_slice_spread	1.3124e+00	
 sase	lucifer.in	exit_pulse_energy	3.3986e-11	J
 sase	lucifer.in	exit_sigma_energy	5.1684e+05	eV
@@ -692,6 +749,8 @@ sase	lucifer.in	slice_spacing	3.0000e-10	m
 sase	lucifer.in	split_angle	2.9625e-06	rad
 sase	lucifer.in	wide_angle_ratio	1.5419e-02	
 sase	lucifer.in	wide_angle_ratio_exit	1.8831e-02	
+sase_wake	lucifer.in	bunching_max	1.4149e-02	
+sase_wake	lucifer.in	bunching_max_s	5.7000e+01	m
 sase_wake	lucifer.in	bunching_peak	1.4031e-02	
 sase_wake	lucifer.in	energy_change	-4.2328e+06	eV
 sase_wake	lucifer.in	exit_bunching	1.4149e-02	
@@ -702,6 +761,7 @@ sase_wake	lucifer.in	exit_power	2.7890e+07	W
 sase_wake	lucifer.in	exit_power_inside	2.7577e+07	W
 sase_wake	lucifer.in	exit_power_outside	3.1333e+05	W
 sase_wake	lucifer.in	exit_power_per_slice	2.9052e+05	W
+sase_wake	lucifer.in	exit_power_slice_max	1.2272e+06	W
 sase_wake	lucifer.in	exit_power_slice_spread	1.1168e+00	
 sase_wake	lucifer.in	exit_pulse_energy	2.7909e-11	J
 sase_wake	lucifer.in	exit_sigma_energy	5.1382e+05	eV
@@ -730,6 +790,8 @@ sase_wake	lucifer.in	slice_spacing	3.0000e-10	m
 sase_wake	lucifer.in	split_angle	2.9625e-06	rad
 sase_wake	lucifer.in	wide_angle_ratio	1.0737e-02	
 sase_wake	lucifer.in	wide_angle_ratio_exit	1.1362e-02	
+space_charge	lucifer.in	bunching_max	3.1327e-13	
+space_charge	lucifer.in	bunching_max_s	5.6760e+01	m
 space_charge	lucifer.in	bunching_peak	3.2578e-13	
 space_charge	lucifer.in	energy_change	-5.5882e+01	eV
 space_charge	lucifer.in	exit_bunching	3.0789e-13	
@@ -740,6 +802,7 @@ space_charge	lucifer.in	exit_power	1.8401e-15	W
 space_charge	lucifer.in	exit_power_inside	1.7958e-15	W
 space_charge	lucifer.in	exit_power_outside	4.4390e-17	W
 space_charge	lucifer.in	exit_power_per_slice	2.3002e-17	W
+space_charge	lucifer.in	exit_power_slice_max	1.0158e-16	W
 space_charge	lucifer.in	exit_power_slice_spread	1.1749e+00	
 space_charge	lucifer.in	exit_pulse_energy	1.8414e-33	J
 space_charge	lucifer.in	exit_sigma_energy	1.8440e-06	eV
@@ -768,6 +831,8 @@ space_charge	lucifer.in	slice_spacing	3.0000e-10	m
 space_charge	lucifer.in	split_angle	3.0130e-06	rad
 space_charge	lucifer.in	wide_angle_ratio	2.2083e-02	
 space_charge	lucifer.in	wide_angle_ratio_exit	2.4719e-02	
+space_charge	lucifer_gate_off.in	bunching_max	2.4485e-13	
+space_charge	lucifer_gate_off.in	bunching_max_s	5.7000e+01	m
 space_charge	lucifer_gate_off.in	bunching_peak	2.2396e-13	
 space_charge	lucifer_gate_off.in	energy_change	0.0000e+00	eV
 space_charge	lucifer_gate_off.in	exit_bunching	2.4485e-13	
@@ -778,6 +843,7 @@ space_charge	lucifer_gate_off.in	exit_power	1.2618e-15	W
 space_charge	lucifer_gate_off.in	exit_power_inside	1.2332e-15	W
 space_charge	lucifer_gate_off.in	exit_power_outside	2.8655e-17	W
 space_charge	lucifer_gate_off.in	exit_power_per_slice	1.5773e-17	W
+space_charge	lucifer_gate_off.in	exit_power_slice_max	5.0996e-17	W
 space_charge	lucifer_gate_off.in	exit_power_slice_spread	1.1893e+00	
 space_charge	lucifer_gate_off.in	exit_pulse_energy	1.2627e-33	J
 space_charge	lucifer_gate_off.in	exit_sigma_energy	0.0000e+00	eV
@@ -806,6 +872,8 @@ space_charge	lucifer_gate_off.in	slice_spacing	3.0000e-10	m
 space_charge	lucifer_gate_off.in	split_angle	3.0130e-06	rad
 space_charge	lucifer_gate_off.in	wide_angle_ratio	2.2506e-02	
 space_charge	lucifer_gate_off.in	wide_angle_ratio_exit	2.3237e-02	
+space_charge	lucifer_off.in	bunching_max	2.4485e-13	
+space_charge	lucifer_off.in	bunching_max_s	5.7000e+01	m
 space_charge	lucifer_off.in	bunching_peak	2.2396e-13	
 space_charge	lucifer_off.in	energy_change	0.0000e+00	eV
 space_charge	lucifer_off.in	exit_bunching	2.4485e-13	
@@ -816,6 +884,7 @@ space_charge	lucifer_off.in	exit_power	1.2618e-15	W
 space_charge	lucifer_off.in	exit_power_inside	1.2332e-15	W
 space_charge	lucifer_off.in	exit_power_outside	2.8655e-17	W
 space_charge	lucifer_off.in	exit_power_per_slice	1.5773e-17	W
+space_charge	lucifer_off.in	exit_power_slice_max	5.0996e-17	W
 space_charge	lucifer_off.in	exit_power_slice_spread	1.1893e+00	
 space_charge	lucifer_off.in	exit_pulse_energy	1.2627e-33	J
 space_charge	lucifer_off.in	exit_sigma_energy	0.0000e+00	eV
@@ -844,6 +913,8 @@ space_charge	lucifer_off.in	slice_spacing	3.0000e-10	m
 space_charge	lucifer_off.in	split_angle	3.0130e-06	rad
 space_charge	lucifer_off.in	wide_angle_ratio	2.2506e-02	
 space_charge	lucifer_off.in	wide_angle_ratio_exit	2.3237e-02	
+space_charge	lucifer_short_range.in	bunching_max	3.0185e-01	
+space_charge	lucifer_short_range.in	bunching_max_s	3.8448e+01	m
 space_charge	lucifer_short_range.in	bunching_peak	3.0008e-01	
 space_charge	lucifer_short_range.in	energy_change	-2.7033e+05	eV
 space_charge	lucifer_short_range.in	exit_bunching	2.4154e-01	
@@ -854,6 +925,7 @@ space_charge	lucifer_short_range.in	exit_power	8.0572e+08	W
 space_charge	lucifer_short_range.in	exit_power_inside	8.0328e+08	W
 space_charge	lucifer_short_range.in	exit_power_outside	2.4339e+06	W
 space_charge	lucifer_short_range.in	exit_power_per_slice	8.0572e+08	W
+space_charge	lucifer_short_range.in	exit_power_slice_max	8.0572e+08	W
 space_charge	lucifer_short_range.in	exit_pulse_energy	2.6876e-10	J
 space_charge	lucifer_short_range.in	exit_sigma_energy	2.5369e+06	eV
 space_charge	lucifer_short_range.in	fel_steps	1068	
@@ -881,6 +953,8 @@ space_charge	lucifer_short_range.in	slice_spacing	1.0000e-10	m
 space_charge	lucifer_short_range.in	split_angle	2.9661e-06	rad
 space_charge	lucifer_short_range.in	wide_angle_ratio	1.3790e-03	
 space_charge	lucifer_short_range.in	wide_angle_ratio_exit	3.0300e-03	
+spontaneous	lucifer.in	bunching_max	2.8189e-01	
+spontaneous	lucifer.in	bunching_max_s	3.8672e+01	m
 spontaneous	lucifer.in	bunching_peak	2.7861e-01	
 spontaneous	lucifer.in	energy_change	-9.3367e+05	eV
 spontaneous	lucifer.in	exit_bunching	2.2699e-01	
@@ -891,6 +965,7 @@ spontaneous	lucifer.in	exit_power	5.5527e+08	W
 spontaneous	lucifer.in	exit_power_inside	5.5181e+08	W
 spontaneous	lucifer.in	exit_power_outside	3.4624e+06	W
 spontaneous	lucifer.in	exit_power_per_slice	5.5527e+08	W
+spontaneous	lucifer.in	exit_power_slice_max	5.5527e+08	W
 spontaneous	lucifer.in	exit_pulse_energy	1.8522e-10	J
 spontaneous	lucifer.in	exit_sigma_energy	2.3323e+06	eV
 spontaneous	lucifer.in	fel_steps	1068	
@@ -918,6 +993,8 @@ spontaneous	lucifer.in	slice_spacing	1.0000e-10	m
 spontaneous	lucifer.in	split_angle	2.9661e-06	rad
 spontaneous	lucifer.in	wide_angle_ratio	1.9120e-03	
 spontaneous	lucifer.in	wide_angle_ratio_exit	6.2746e-03	
+spontaneous	lucifer_damping_only.in	bunching_max	2.8165e-01	
+spontaneous	lucifer_damping_only.in	bunching_max_s	3.8628e+01	m
 spontaneous	lucifer_damping_only.in	bunching_peak	2.7902e-01	
 spontaneous	lucifer_damping_only.in	energy_change	-9.3633e+05	eV
 spontaneous	lucifer_damping_only.in	exit_bunching	2.3541e-01	
@@ -928,6 +1005,7 @@ spontaneous	lucifer_damping_only.in	exit_power	5.5672e+08	W
 spontaneous	lucifer_damping_only.in	exit_power_inside	5.5366e+08	W
 spontaneous	lucifer_damping_only.in	exit_power_outside	3.0631e+06	W
 spontaneous	lucifer_damping_only.in	exit_power_per_slice	5.5672e+08	W
+spontaneous	lucifer_damping_only.in	exit_power_slice_max	5.5672e+08	W
 spontaneous	lucifer_damping_only.in	exit_pulse_energy	1.8570e-10	J
 spontaneous	lucifer_damping_only.in	exit_sigma_energy	2.3430e+06	eV
 spontaneous	lucifer_damping_only.in	fel_steps	1068	
@@ -955,6 +1033,8 @@ spontaneous	lucifer_damping_only.in	slice_spacing	1.0000e-10	m
 spontaneous	lucifer_damping_only.in	split_angle	2.9661e-06	rad
 spontaneous	lucifer_damping_only.in	wide_angle_ratio	1.8648e-03	
 spontaneous	lucifer_damping_only.in	wide_angle_ratio_exit	5.5325e-03	
+steady_state	lucifer.in	bunching_max	3.0279e-01	
+steady_state	lucifer.in	bunching_max_s	3.8403e+01	m
 steady_state	lucifer.in	bunching_peak	3.0142e-01	
 steady_state	lucifer.in	energy_change	-2.6909e+05	eV
 steady_state	lucifer.in	exit_bunching	2.4127e-01	
@@ -965,6 +1045,7 @@ steady_state	lucifer.in	exit_power	8.0199e+08	W
 steady_state	lucifer.in	exit_power_inside	7.9951e+08	W
 steady_state	lucifer.in	exit_power_outside	2.4843e+06	W
 steady_state	lucifer.in	exit_power_per_slice	8.0199e+08	W
+steady_state	lucifer.in	exit_power_slice_max	8.0199e+08	W
 steady_state	lucifer.in	exit_pulse_energy	2.6752e-10	J
 steady_state	lucifer.in	exit_sigma_energy	2.5464e+06	eV
 steady_state	lucifer.in	fel_steps	1068	
@@ -992,6 +1073,8 @@ steady_state	lucifer.in	slice_spacing	1.0000e-10	m
 steady_state	lucifer.in	split_angle	2.9661e-06	rad
 steady_state	lucifer.in	wide_angle_ratio	1.3742e-03	
 steady_state	lucifer.in	wide_angle_ratio_exit	3.1073e-03	
+taper	lucifer.in	bunching_max	3.0278e-01	
+taper	lucifer.in	bunching_max_s	3.8403e+01	m
 taper	lucifer.in	bunching_peak	6.0533e-02	
 taper	lucifer.in	energy_change	-2.9349e+06	eV
 taper	lucifer.in	exit_bunching	6.0533e-02	
@@ -1002,6 +1085,7 @@ taper	lucifer.in	exit_power	8.8074e+09	W
 taper	lucifer.in	exit_power_inside	8.7969e+09	W
 taper	lucifer.in	exit_power_outside	1.0530e+07	W
 taper	lucifer.in	exit_power_per_slice	8.8074e+09	W
+taper	lucifer.in	exit_power_slice_max	8.8074e+09	W
 taper	lucifer.in	exit_pulse_energy	2.9378e-09	J
 taper	lucifer.in	exit_sigma_energy	5.2387e+06	eV
 taper	lucifer.in	fel_steps	1068	
@@ -1029,6 +1113,8 @@ taper	lucifer.in	slice_spacing	1.0000e-10	m
 taper	lucifer.in	split_angle	2.9661e-06	rad
 taper	lucifer.in	wide_angle_ratio	1.1970e-03	
 taper	lucifer.in	wide_angle_ratio_exit	1.1970e-03	
+unaveraged	lucifer.in	bunching_max	5.9004e-04	
+unaveraged	lucifer.in	bunching_max_s	3.9900e+00	m
 unaveraged	lucifer.in	bunching_peak	3.6362e-17	
 unaveraged	lucifer.in	energy_change	1.9412e-01	eV
 unaveraged	lucifer.in	exit_bunching	5.9004e-04	
@@ -1039,6 +1125,7 @@ unaveraged	lucifer.in	exit_power	4.4185e+03	W
 unaveraged	lucifer.in	exit_power_inside	4.2156e+03	W
 unaveraged	lucifer.in	exit_power_outside	2.0288e+02	W
 unaveraged	lucifer.in	exit_power_per_slice	4.4185e+03	W
+unaveraged	lucifer.in	exit_power_slice_max	4.4185e+03	W
 unaveraged	lucifer.in	exit_pulse_energy	1.4738e-15	J
 unaveraged	lucifer.in	exit_sigma_energy	5.0871e+05	eV
 unaveraged	lucifer.in	fel_steps	5340	
@@ -1065,6 +1152,8 @@ unaveraged	lucifer.in	slice_spacing	1.0000e-10	m
 unaveraged	lucifer.in	split_angle	2.9077e-06	rad
 unaveraged	lucifer.in	wide_angle_ratio	2.2985e-07	
 unaveraged	lucifer.in	wide_angle_ratio_exit	4.8126e-02	
+unaveraged	lucifer_averaged.in	bunching_max	5.9416e-04	
+unaveraged	lucifer_averaged.in	bunching_max_s	3.9900e+00	m
 unaveraged	lucifer_averaged.in	bunching_peak	3.6362e-17	
 unaveraged	lucifer_averaged.in	energy_change	1.9024e-01	eV
 unaveraged	lucifer_averaged.in	exit_bunching	5.9416e-04	
@@ -1075,6 +1164,7 @@ unaveraged	lucifer_averaged.in	exit_power	4.4159e+03	W
 unaveraged	lucifer_averaged.in	exit_power_inside	4.1988e+03	W
 unaveraged	lucifer_averaged.in	exit_power_outside	2.1709e+02	W
 unaveraged	lucifer_averaged.in	exit_power_per_slice	4.4159e+03	W
+unaveraged	lucifer_averaged.in	exit_power_slice_max	4.4159e+03	W
 unaveraged	lucifer_averaged.in	exit_pulse_energy	1.4730e-15	J
 unaveraged	lucifer_averaged.in	exit_sigma_energy	5.0871e+05	eV
 unaveraged	lucifer_averaged.in	fel_steps	89	

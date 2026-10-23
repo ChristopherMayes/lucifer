@@ -21,12 +21,7 @@ The table was exported by `chamber_wake%write_kernels` and then converted to Bma
 
 `lucifer_transcribed.in` is the comparison partner: the same beam and the same window through the transcribed model with the same chamber, so the two runs differ in the implementation and in nothing else. `../sase_wake` is not the partner, because it adds the gap and roughness terms that this table has no counterpart for.
 
-| implementation | exit mean energy change | granularity |
-|---|---|---|
-| transcribed `chamber_wake` | -2.319 m_e c^2 | per integration step |
-| Bmad `sr_wake` `z_long` table | -2.335 m_e c^2 | once per element |
-
-The two means differ by 0.69%. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them. The measured quantities of both decks are in the table below on the example's page.
+The transcribed `chamber_wake` applies the wake per integration step, and the Bmad `sr_wake` `z_long` table applies it once per element. The exit mean energy change of each deck is in the table below on the example's page, and the two differ by well under a percent. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them.
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so the exit powers are the mode. With the filter off both decks reported far more power, nearly all of it that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
 
@@ -57,7 +52,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 5.6750e-03 | 5.6750e-03 |  |
 | exit bunching, mean |b| over slices | 1.5323e-02 | 1.5178e-02 |  |
 | exit bunching, the largest slice | 5.3118e-02 | 5.2134e-02 |  |
+| bunching, the maximum along the line of the mean |b| | 1.5323e-02 | 1.5178e-02 |  |
+| s of the bunching maximum | 5.7000e+01 | 5.7000e+01 | m |
 | bunching at the mode peak | 1.5301e-02 | 1.5167e-02 |  |
+| exit power of the largest slice | 1.3751e+06 | 1.3749e+06 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8026e+09 | 5.8026e+09 | eV |
 | mean slice energy, exit minus start | -1.1881e+06 | -1.1799e+06 | eV |

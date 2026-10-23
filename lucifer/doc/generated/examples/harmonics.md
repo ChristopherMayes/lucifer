@@ -16,7 +16,7 @@ The example runs in one command, with Bmad only:
 
 This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (namelist `harmonics = 1, 3`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
 
-With a 200 MW seed on 3.96 m of planar undulator at rms aw = 0.84853, the fundamental gives up a few percent of its seed power to the beam over the segment, and the third harmonic climbs from nothing through several decades. The measured quantities are in the table below. The exit power there is the fundamental's, and the harmonic's power along z is in the plot.
+The seed is 200 MW on 3.96 m of planar undulator at rms aw = 0.84853. Over the segment the fundamental gives up a small fraction of its seed power to the beam, and the third harmonic climbs from nothing through several decades. The measured quantities are in the table below. The exit power there is the fundamental's, and the harmonic's power along z is in the plot.
 
 `plot_fel.py`'s harmonic panel shows both curves on one log scale, and that figure is this example's page in the documentation. The harmonic's full wavefront_params live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name, `harmonics-final-h3.wf.h5`, an openPMD EXT_Wavefront file with the photon energy identifying the harmonic.
 
@@ -47,7 +47,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 1.1071e-01 |  |
 | exit bunching, the largest slice | 1.1071e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 1.1071e-01 |  |
+| s of the bunching maximum | 3.9600e+00 | m |
 | bunching at the mode peak | 3.9886e-17 |  |
+| exit power of the largest slice | 1.8464e+08 | W |
 | mean slice energy at the start | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | eV |
 | mean slice energy, exit minus start | 5.0518e+03 | eV |

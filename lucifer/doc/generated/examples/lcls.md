@@ -59,7 +59,7 @@ The measured quantities are in the table below, written by the run that measured
 
 The power per slice is the direct comparison, since it does not depend on how much of the real bunch carries 3 kA. Multiplied by the published 75 fs pulse duration it gives the pulse energy to set against the paper's. The gain length compares with the measured 3.3 m and the design 4.5 m. The saturation point is where the mean bunching peaks, which the plot's bunching panel shows.
 
-The energy loss is the one number that does not compare directly. This window carries 3 kA everywhere and lases everywhere, while the real bunch has a current spike, so the whole 0.25 nC does not radiate at this rate. The paper's 4.6 MeV is the loss spread over the whole charge, and it was measured with 25 of the 33 segments installed, which is the first 100 m. This window's loss at 100 m, read from the plot's energy panel, is about twice that, so about half of the real bunch's charge radiates at the rate of this window.
+The energy loss is the one number that does not compare directly. This window carries 3 kA everywhere and lases everywhere, while the real bunch has a current spike, so the whole 0.25 nC does not radiate at this rate. The paper's 4.6 MeV is the loss spread over the whole charge, and it was measured with 25 of the 33 segments installed, which is the first 100 m. The table below carries this window's loss at the exit as the energy change. Its loss at 100 m, read from the plot's energy panel, is about twice the paper's, so about half of the real bunch's charge radiates at the rate of this window.
 
 ## The window, and why it is a slab
 
@@ -112,7 +112,10 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | initial bunching, mean |b| over slices | 1.0387e-03 |  |
 | exit bunching, mean |b| over slices | 1.3656e-01 |  |
 | exit bunching, the largest slice | 4.1949e-01 |  |
+| bunching, the maximum along the line of the mean |b| | 3.9853e-01 |  |
+| s of the bunching maximum | 6.3920e+01 | m |
 | bunching at the mode peak | 1.3656e-01 |  |
+| exit power of the largest slice | 1.0445e+11 | W |
 | mean slice energy at the start | 1.3600e+10 | eV |
 | mean slice energy at the exit | 1.3591e+10 | eV |
 | mean slice energy, exit minus start | -9.4466e+06 | eV |
