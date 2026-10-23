@@ -163,7 +163,7 @@ The configuration is one slice of 16384 particles at `ngrid` 129, run serially (
 | | before the hoist | after |
 |---|---|---|
 | libm transcendentals | 52.1% | 15.3% |
-| substep RK4 (`unavg_push`, `unavg_ode`) | 17.6% | 35.3% |
+| substep RK4 (`unavg_push_all`, `unavg_ode`) | 17.6% | 35.3% |
 | undulator field, this code's own arithmetic | 8.9% | 27.7% |
 | FFT transform and `fel_field_diffract` | 13.0% | 17.8% |
 | ramp envelope (`fel_und_envelope`) | 4.8% | 0.0% |
@@ -234,21 +234,21 @@ The compiler is gfortran 13.3.0 at the production flags, which are `-O2 -ftree-v
 
 | file | vectorized | not vectorized |
 |---|---|---|
-| `fel_track_mod.f90` | 26 | 158 |
-| `fel_unaveraged_mod.f90` | 12 | 33 |
-| `fel_collective_mod.f90` | 5 | 49 |
+| `fel_track_mod.f90` | 45 | 237 |
+| `fel_unaveraged_mod.f90` | 19 | 92 |
+| `fel_collective_mod.f90` | 5 | 50 |
 
-None of the hot per-particle loops is among the vectorized. The compiler rejects every one of them for the same reason, `control flow in loop`:
+None of the hot per-particle loops is among the vectorized. The compiler rejects every one of them for the same reason, `control flow in loop`. The audit's report gives each loop's line, which moves with every edit to the file, so the table names the loop by its routine:
 
 | loop | routine | what blocks it |
 |---|---|---|
-| `fel_track_mod.f90:1141` | `fel_transverse_track` | `fel_apply_focus`, called per particle, branches inside |
-| `fel_track_mod.f90:1213` | `fel_transverse_track_bmad` | the same, plus `quad_mat2_calc` |
-| `fel_track_mod.f90:1434` | `fel_advance` | `faw`, `fel_sincos` and `fel_runge_kutta`, called per particle |
-| `fel_track_mod.f90:1494` | `fel_advance`, the multi-harmonic twin | the same |
-| `fel_track_mod.f90:2099` | `fel_field_step`, the deposit | `if (.not. on_grid) cycle`, and the report also names `statement clobbers memory: fel_grid_weights` |
+| the particle loop | `fel_transverse_track` | `fel_apply_focus`, called per particle, branches inside |
+| the particle loop | `fel_transverse_track_bmad` | the same, plus `quad_mat2_calc` |
+| the particle loop | `fel_advance` | `faw`, `fel_sincos` and `fel_runge_kutta`, called per particle |
+| the particle loop of the multi-harmonic twin | `fel_advance` | the same |
+| the deposit's particle loop | `fel_field_step` | `if (.not. on_grid) cycle`, and the report also names `statement clobbers memory: fel_grid_weights` |
 
-The aggregate reasons, most common first, are `vectorization is not profitable` (56 in `fel_track_mod`), `control flow in loop` (30) and `complicated access pattern` (19). The first is mostly short fixed-length loops over the 6-vector, which the compiler is right about. The second covers the loops in the table.
+The aggregate reasons, most common first, are `vectorization is not profitable` (95 in `fel_track_mod`), `control flow in loop` (36) and `complicated access pattern` (33). The first is mostly short fixed-length loops over the 6-vector, which the compiler is right about. The second covers the loops in the table.
 
 One pattern accounts for all five. A per-particle loop calls a routine that the compiler does not inline, the routine carries a branch, and the branch ends the loop's chance of vectorizing. The deposit's `on_grid` guard is the clearest case: it is a mask written as a `cycle`.
 

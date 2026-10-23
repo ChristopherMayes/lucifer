@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# What the vectorizer did to the hot files, and what stopped it where it stopped.
+# vec_audit.sh reports what the vectorizer did to the hot files and what stopped it.
 #
 # The compile command comes from the production build's own build.make rather than from
 # a copy of the flags kept here. A copy drifts, and a vectorization report taken under
@@ -18,8 +18,8 @@
 # Usage:
 #   ./vec_audit.sh [--out <dir>] [--file <name.f90>]...
 #
-# Defaults: the three files that hold the per-particle loops, into a temporary
-# directory whose path is printed. doc/performance.md records the standing summary.
+# By default it audits the three files that hold the per-particle loops, into a temporary
+# directory whose path it prints. doc/performance.md records the standing summary.
 
 set -o pipefail
 
@@ -54,8 +54,8 @@ done
 mkdir -p "$OUT" || exit 1
 
 # The flags file defines Fortran_FLAGS and Fortran_INCLUDES as make variables, and the
-# per-file recipe in build.make interpolates them. Read both, then expand by hand: the
-# alternative is running make, which would rebuild into the tree.
+# per-file recipe in build.make interpolates them. The script reads both and expands them
+# by hand, since running make instead would rebuild into the tree.
 
 read_var () {   # <file> <name>
   sed -n "s/^$2 = //p" "$1" | head -1
@@ -84,8 +84,8 @@ status=0
 for src in "${FILES[@]}"; do
 
   # The per-file recipe carries this file's own options, which is how the production -O3
-  # on fel_track_mod reaches the audit. Take the compiler and everything after it from
-  # the recipe line, drop its make variables (already expanded above) and its -o.
+  # on fel_track_mod reaches the audit. The compiler and everything after it come from
+  # the recipe line, less its make variables, expanded above, and its -o.
 
   recipe="$(grep -m1 -A 4 "^CMakeFiles/lucifer.dir/code/$src.o: CMakeFiles" "$BUILD_MAKE" | \
             grep -m1 'gfortran')"
@@ -95,7 +95,7 @@ for src in "${FILES[@]}"; do
     continue
   fi
   FC="$(echo "$recipe" | awk '{print $1}')"
-  # Everything between the make variables and the -c, which is this file's own options.
+  # This file's own options are everything between the make variables and the -c.
   own="$(echo "$recipe" | sed 's|.*\$(Fortran_FLAGS)||; s| -c .*||')"
 
   rpt="$OUT/${src%.f90}.vec.txt"
@@ -115,8 +115,8 @@ for src in "${FILES[@]}"; do
   n_no="$(grep -c 'not vectorized' "$rpt" 2>/dev/null)"
   echo "  vectorized: $n_ok    not vectorized: $n_no    report: $rpt"
 
-  # The reasons, most common first. A count is what makes the report a shopping list:
-  # one reason behind twenty loops is one change.
+  # The reasons print most common first, with a count, since one reason behind twenty
+  # loops is one change.
 
   echo "  reasons the vectorizer gave, by count:"
   grep 'not vectorized' "$rpt" 2>/dev/null | sed 's/.*not vectorized: *//' | \

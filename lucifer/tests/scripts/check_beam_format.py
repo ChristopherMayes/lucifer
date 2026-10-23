@@ -240,7 +240,7 @@ def main():
     #
     # What must survive is the placement, which is timeOffset measured against its own
     # head. It survives to a few ulps of the absolute time rather than bit for bit, since
-    # a double at 1.9e-7 s resolves 4e-23 s and a slice step here is 1e-18 s.
+    # a double at 1.9e-7 s resolves 2.6e-23 s and a slice step here is 1.0e-18 s.
     WHERE = ["data/00001/particles/electron/" + k
              for k in ("timeOffset", "sPosition", "elementIndex")]
     same = sorted(a1) == sorted(a2) and \
@@ -497,9 +497,9 @@ def main():
     #
     # The level is 1e-4, a floor of the standard's own arithmetic and not of this writer.
     # timeOffset is an absolute time, and the ratio of a beamline's arrival time to one
-    # slice spacing is 3e10 here, so a double leaves about five digits for the slice
-    # structure. The ulp at t_ref is 6.5e-6 of a slice step. That is enough to place the
-    # slices in a plot. The exact partition stays in particlePatches.
+    # slice spacing is 1.9e11 here, 1.9e-7 s over 1.0e-18 s, so a double leaves about five
+    # digits for the slice structure. The ulp at t_ref is 2.6e-5 of a slice step. That is
+    # enough to place the slices in a plot. The exact partition stays in particlePatches.
 
     print("== the file as openPMD, read by a reader that knows nothing of this program ==")
     convert_genesis._beamphysics()

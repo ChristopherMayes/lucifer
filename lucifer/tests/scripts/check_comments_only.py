@@ -15,6 +15,13 @@ language says they are:
             continued onto the next line with & carries its quote state there.
   C         /* ... */ across lines, and // to the end of a line, outside strings.
   CMake     # to the end of a line, outside a quoted string.
+  Shell     # that begins a word, to the end of the line, outside single and double
+            quotes and outside a ${...} expansion, as the shell reads it. So $#, ${#a[@]},
+            a quoted "#" and x=#y are code. The shebang is code. The body of a here
+            document is the input of a command and is code, comments and all, up to its
+            delimiter. A quote left open at the end of a line carries over to the next.
+            A .sh file is shell, and so is a file with no suffix whose first line is a
+            shebang naming a shell.
   Python    # comments as the tokenizer finds them, and docstrings: the first
             statement of a module, class or function when it is a string. The code
             compared is the syntax tree with the docstrings removed, so a change to any
@@ -22,7 +29,11 @@ language says they are:
 
 A docstring is also a value at run time. A script that hands a line of its docstring
 to argparse, as __doc__.split("\n")[1] does, must still find a line there that is not
-blank, and each such line is printed so it can be read.
+blank, and each such line is printed so it can be read. A shell script's header is
+too, where --help prints a range of the script's own lines with sed -n 'A,Bp'. Lines 1
+to B+1 must keep the comment rows they had at <rev>, so the help prints the same span
+of the header and stops where it stopped, and the range's first and last lines are
+printed.
 
 The second form counts, per file and in total: lines, comment lines, comment lines
 that narrate (a date, the user, a keystone, a tier, a check section, a mutation, a
@@ -67,6 +78,13 @@ def kind(path: str) -> str:
         return "c"
     if p.suffix.lower() == ".py":
         return "python"
+    if p.suffix.lower() == ".sh":
+        return "shell"
+    if p.suffix == "" and p.is_file():
+        with open(p, errors="replace") as f:
+            first = f.readline()
+        if first.startswith("#!") and re.search(r"\b(ba|z|k|da)?sh\b", first):
+            return "shell"
     return "cmake"
 
 
@@ -153,6 +171,108 @@ def split_cmake(text: str):
     return code, comments
 
 
+# A here document's operator and delimiter: << or <<-, then the word, bare or quoted. A
+# here-string, <<<, is not one.
+HEREDOC = re.compile(r"<<(-?)[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+
+
+def shell_parse(text: str):
+    """(code lines, comment strings, comment rows from 1) of a shell script.
+
+    The scan keeps a stack of the contexts it is inside: a single or double quote, a
+    command substitution $(...) with its parenthesis depth, and a ${...} expansion. A
+    command substitution opens a new context even inside double quotes, so its own
+    quotes nest there. The stack carries over from one line to the next."""
+    code, comments, rows = [], [], set()
+    stack, body = [], []
+    for n, line in enumerate(text.splitlines(), 1):
+        if body:
+            code.append(line)
+            delim, tabs = body[0]
+            if (line.lstrip("\t") if tabs else line) == delim:
+                body.pop(0)
+            continue
+        if n == 1 and line.startswith("#!"):
+            code.append(line)
+            continue
+        out, i, opened = [], 0, []
+        while i < len(line):
+            ch = line[i]
+            top = stack[-1][0] if stack else None
+            if top == "'":
+                out.append(ch)
+                if ch == "'":
+                    stack.pop()
+                i += 1
+                continue
+            if ch == "\\" and i + 1 < len(line):
+                out.append(line[i:i + 2])
+                i += 2
+                continue
+            if line.startswith("$(", i) and top != "{":
+                stack.append(["(", 1])
+                out.append("$(")
+                i += 2
+                continue
+            if line.startswith("${", i):
+                stack.append(["{", 0])
+                out.append("${")
+                i += 2
+                continue
+            if top == '"':
+                out.append(ch)
+                if ch == '"':
+                    stack.pop()
+                i += 1
+                continue
+            if ch in ("'", '"'):
+                stack.append([ch, 0])
+            elif ch == "}" and top == "{":
+                stack.pop()
+            elif ch == "(" and top == "(":
+                stack[-1][1] += 1
+            elif ch == ")" and top == "(":
+                stack[-1][1] -= 1
+                if stack[-1][1] == 0:
+                    stack.pop()
+            elif line.startswith("<<", i) and not line.startswith("<<<", i) \
+                    and (i == 0 or line[i - 1] != "<") and top in (None, "("):
+                m = HEREDOC.match(line, i)
+                if m:
+                    opened.append((m.group(3), m.group(1) == "-"))
+                    out.append(m.group(0))
+                    i = m.end()
+                    continue
+            elif ch == "#" and top in (None, "(") and (i == 0 or line[i - 1] in " \t;|&()"):
+                comments.append(line[i + 1:])
+                rows.add(n)
+                break
+            out.append(ch)
+            i += 1
+        code.append("".join(out))
+        body.extend(opened)
+    return code, comments, rows
+
+
+HELP_RANGE = re.compile(r"sed -n '(\d+),(\d+)p' \"\$\{BASH_SOURCE\[0\]\}\"")
+
+
+def help_ranges(before: str, after: str):
+    """(a, b, rows before, rows after, the range's lines after) for each help range."""
+    out = []
+    for m in HELP_RANGE.finditer(after):
+        a, b = int(m.group(1)), int(m.group(2))
+        rows_b = {r for r in shell_parse(before)[2] if r <= b + 1}
+        rows_a = {r for r in shell_parse(after)[2] if r <= b + 1}
+        out.append((a, b, rows_b, rows_a, after.splitlines()[a - 1:b]))
+    return out
+
+
+def split_shell(text: str):
+    code, comments, _ = shell_parse(text)
+    return code, comments
+
+
 DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
 
@@ -219,7 +339,7 @@ def doc_lines_used(path: str, text: str):
 
 def split(path: str, text: str):
     return {"fortran": split_fortran, "c": split_c, "cmake": split_cmake,
-            "python": split_python}[kind(path)](text)
+            "python": split_python, "shell": split_shell}[kind(path)](text)
 
 
 def normalized(path: str, text: str):
@@ -252,6 +372,19 @@ def compare(rev: str, paths) -> int:
             if blank:
                 bad += 1
                 continue
+        if kind(path) == "shell":
+            moved = False
+            for a, b, rows_b, rows_a, shown in help_ranges(at_rev(rev, path), text):
+                if rows_b != rows_a:
+                    moved = True
+                    print(f"FAIL  {path}: --help prints lines {a} to {b}, and the comment rows "
+                          f"up to {b + 1} moved")
+                else:
+                    print(f"      {path}: --help prints lines {a} to {b}, from "
+                          f"{shown[0][:60]!r} to {shown[-1][:60]!r}")
+            if moved:
+                bad += 1
+                continue
         if before == after:
             unit = "syntax tree lines" if kind(path) == "python" else "code lines"
             print(f"ok    {path}: code identical to {rev}, {len(after)} {unit}")
@@ -278,8 +411,8 @@ def counts(paths) -> None:
         lines = text.splitlines()
         _, comments = split(path, text)
         # A long statement is code. Only a line that carries a comment counts as wide.
-        if kind(path) == "python":
-            rows = python_comment_rows(text)
+        if kind(path) in ("python", "shell"):
+            rows = python_comment_rows(text) if kind(path) == "python" else shell_parse(text)[2]
             wide = sum(1 for k, line in enumerate(lines, 1) if len(line) > WIDTH and k in rows)
         else:
             wide = sum(1 for line in lines if len(line) > WIDTH and split(path, line)[1])

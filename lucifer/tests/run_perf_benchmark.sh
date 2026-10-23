@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Head-to-head performance benchmark: the Bmad FEL tracker (OpenMP) against Genesis 1.3
-# Version 4 (MPI), serial and at the machine's full performance-core count, on the same
-# physics. This reproduces the head-to-head measurement of doc/validation.md as one
+# run_perf_benchmark.sh times the Bmad FEL tracker (OpenMP) head to head against Genesis
+# 1.3 Version 4 (MPI), serial and at the machine's full performance-core count, on the
+# same physics. This reproduces the head-to-head measurement of doc/validation.md as one
 # command instead of a by-hand procedure.
 #
-# Methodology, each point deliberate:
+# Each point of the method is deliberate:
 #
 #   - Both codes run the full 6-FODO Benchmark1-SASE line, time dependent, seeded plus
 #     shot noise, 2048 particles per slice.
@@ -24,16 +24,16 @@
 #   - Use production builds. A debug lucifer is accepted with a loud warning,
 #     and its numbers are not comparable.
 #
-# The --phases mode answers a different question: where this code's own time goes. It
-# needs no genesis4 and no MPI, since it compares the code against itself. Two runs at production-like parameters give the
-# per-phase table the tracker's footer prints, and a thread sweep over the same
-# configuration gives the scaling curve and the serial fraction Amdahl's law implies.
-# The phases partition the walk in the tracker itself (code/fel_timer_mod.f90), so the
-# table needs no instrument here beyond reading the footer.
+# The --phases mode answers a different question, where this code's own time goes. It
+# needs no genesis4 and no MPI, since it compares the code against itself. Two runs at
+# production-like parameters give the per-phase table the tracker's footer prints, and a
+# thread sweep over the same configuration gives the scaling curve and the serial
+# fraction Amdahl's law implies. The phases partition the walk in the tracker itself
+# (code/fel_timer_mod.f90), so the table needs no instrument here beyond the footer.
 #
-# What --phases cannot see: the phases that interleave per slice inside one parallel
-# region, which are the deposit against its FFT and the field gather against the RK4.
-# Those come from a sampling profiler, and doc/performance.md records that split.
+# --phases cannot see the phases that interleave per slice inside one parallel region,
+# which are the deposit against its FFT and the field gather against the RK4. Those come
+# from a sampling profiler, and doc/performance.md records that split.
 #
 # Usage:
 #   ./run_perf_benchmark.sh [--workers N] [--genesis <path>] [--exe <path>]
@@ -42,14 +42,14 @@
 #                           [--work-dir <path>] [--big-slices N] [--npart N]
 #
 # Defaults: workers = the machine's performance-core count (hw.perflevel0.physicalcpu on
-# macOS, nproc on Linux). Binaries and python found as in run_fel_benchmark.sh, except
-# the PRODUCTION lucifer is preferred. The work directory is kept.
+# macOS, nproc on Linux). The binaries and Python are found as in run_fel_benchmark.sh,
+# except that the production lucifer is preferred. The work directory is kept.
 
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
-# defaults and the variables that name them elsewhere (util/locations.sh).
+# The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
+# BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../util/locations.sh"
 
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
@@ -105,8 +105,8 @@ fi
 
 # The launcher must match the MPI the Genesis binary links (an OpenMPI mpirun aborts an
 # MPICH-linked genesis4 with "unsupported PMI version PMIx", and vice versa). On macOS
-# the binary's LC_RPATH names the MPI installation it loads from. Prefer the mpiexec
-# that lives beside it, and fall back to PATH only if that turns up nothing.
+# the binary's LC_RPATH names the MPI installation it loads from. The mpiexec that lives
+# beside it is preferred, and PATH is the fallback only if that turns up nothing.
 if [[ $PHASES -eq 1 ]]; then
   MPIRUN="not needed in the phases mode"
 fi
@@ -133,7 +133,7 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Error: lucifer not found. Build with: $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
-# Absolute from here on: the run changes directory.
+# Every path is absolute from here on, since the run changes directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 [[ "$EXE" == *"/debug/"* ]] && DEBUG_EXE_WARNING=1
 
@@ -158,8 +158,8 @@ NSLICE=$((4 * WORKERS))
 SLEN="$(awk -v n="$NSLICE" 'BEGIN { printf "%.6e", n * 3 * 1e-10 }')"
 
 # ------------------------------------------------------------------------------------
-# The phases mode: where this code's own time goes, from the footer table the tracker
-# prints, plus a thread sweep for the serial fraction. Genesis is not involved, so the
+# The phases mode measures where this code's own time goes, from the footer table the
+# tracker prints, plus a thread sweep for the serial fraction. Genesis is not involved, so the
 # starting state is the tracker's own shot-noise quiet start rather than an imported
 # dump: nothing here compares two codes, so nothing here needs identical particles.
 
@@ -182,7 +182,7 @@ if [[ $PHASES -eq 1 ]]; then
   cp "$SCRIPT_DIR/bmad/aramis.bmad" "$WORK_DIR/"
   cd "$WORK_DIR" || exit 1
 
-  # One deck per slice count, the SASE example's configuration with the window resized.
+  # Each slice count gets one deck, the SASE example's configuration with the window resized.
   # A time window of nslice slices at sample = 3 is nslice * 3 * lambda0 long, which is
   # the same arithmetic the head-to-head above does for Genesis.
   #
@@ -228,7 +228,7 @@ if [[ $PHASES -eq 1 ]]; then
 DECK
   }
 
-  # phase_run <label> <nslice> <threads>: one run, its footer table parsed out.
+  # phase_run <label> <nslice> <threads> does one run and parses out its footer table.
   phase_run () {
     local label="$1" ns="$2" nt="$3" root log
     root="phase_${ns}_${nt}"
@@ -261,7 +261,7 @@ DECK
   phase_run "profile" "$BIG_SLICES" "$WORKERS"
 
   # The thread sweep runs the smaller configuration, whose 1-thread run is affordable.
-  # Powers of two up to the worker count, then the worker count itself.
+  # It takes powers of two up to the worker count, then the worker count itself.
 
   SWEEP=""
   n=1
@@ -452,7 +452,7 @@ cat > perf.nml <<NML
 /
 NML
 
-# timed <label> <log> <command...>: uniform external wall clock.
+# timed <label> <log> <command...> times a command on one uniform external wall clock.
 declare -a TIMES
 timed () {
   local label="$1" log="$2"; shift 2
@@ -492,7 +492,7 @@ timed "lucifer, $WORKERS threads" fel-parallel.log \
   env OMP_NUM_THREADS="$WORKERS" "$EXE" perf.nml
 echo
 
-# Sanity before quoting numbers: same physics on both sides. The Bmad seam differs from
+# The physics on both sides must agree before any number is quoted. The Bmad seam differs from
 # Genesis by the priced ~4e-2 transport model difference. A factor-level disagreement
 # means the runs are not comparable and the timings are meaningless.
 

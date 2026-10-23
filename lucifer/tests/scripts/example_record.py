@@ -190,9 +190,15 @@ def rows_for(deck: pathlib.Path, log: pathlib.Path):
         rows.append(("split_angle", float(h5["field/total/split_angle"][()]), "rad"))
         # Each field component beyond the total and the x plane, a second polarization or
         # a harmonic, gets its own exit power, so a page can show what the component did.
+        # A polarization plane carries its power directly. A harmonic is a field of its
+        # own, with planes under it, and carries its power under its total.
         for comp in sorted(h5["field"]):
-            if comp not in ("total", "x") and f"field/{comp}/power" in h5:
-                rows.append((f"exit_power_{comp}", float(h5[f"field/{comp}/power"][-1].sum()), "W"))
+            if comp in ("total", "x"):
+                continue
+            for key in (f"field/{comp}/power", f"field/{comp}/total/power"):
+                if key in h5:
+                    rows.append((f"exit_power_{comp}", float(h5[key][-1].sum()), "W"))
+                    break
         b = h5["beam/slice/bunching"][()]
         bm = np.mean(np.abs(b), axis=1)
         kb = int(np.argmax(bm))

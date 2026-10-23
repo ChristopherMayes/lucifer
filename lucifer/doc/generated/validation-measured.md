@@ -105,7 +105,7 @@ where the two builds agree to every printed digit.
 | refused, copies shifted singly |  | same | holds |
 | refused, a slice dump through beam_init%position_file |  | same | holds |
 | refused, a negative slicing%n_wavelength |  | same | holds |
-| in-cone startup, Gaussian bunch in sample mode | 3.9400e-02 | same | <= 3.5000e-01 |
+| in-cone startup, Gaussian bunch in sample mode | 4.3086e-02 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
 ### `sase-startup`

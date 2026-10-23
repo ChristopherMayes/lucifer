@@ -415,6 +415,7 @@ harmonics	lucifer.in	exit_bunching_max	1.1071e-01
 harmonics	lucifer.in	exit_energy	5.8038e+09	eV
 harmonics	lucifer.in	exit_energy_span	0.0000e+00	eV
 harmonics	lucifer.in	exit_power	1.8464e+08	W
+harmonics	lucifer.in	exit_power_harm3	4.8069e+03	W
 harmonics	lucifer.in	exit_power_inside	1.8340e+08	W
 harmonics	lucifer.in	exit_power_outside	1.2439e+06	W
 harmonics	lucifer.in	exit_power_per_slice	1.8464e+08	W

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Validate the Fortran free-space wavefront propagator.
+# run_validation.sh validates the Fortran free-space wavefront propagator.
 #
 # One command runs everything and prints the largest relative difference found:
 #
@@ -29,7 +29,7 @@
 # Prerequisites:
 #
 #   1. Bmad built, so that debug/bin/wavefront_drift_test (or production/bin) exists:
-#        BUILD_PRODUCTION=N lucifer/util/conda_compile  # from the bmad-ecosystem root
+#        BUILD_PRODUCTION=N lucifer/util/conda_compile  # from the Lucifer clone's root
 #
 #   2. The Python environment defined alongside this script:
 #        conda env create -f environment.yml
@@ -48,8 +48,8 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
-# defaults and the variables that name them elsewhere (util/locations.sh).
+# The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
+# BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../../util/locations.sh"
 
 PYTHON=""
@@ -70,7 +70,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Locate the Fortran binary. Debug first, since that is the build to develop against.
+# The Fortran binary is the debug one first, since that is the build to develop against.
 
 if [[ -z "$EXE" ]]; then
   for candidate in "$DEBUG_BIN/wavefront_drift_test" "$PRODUCTION_BIN/wavefront_drift_test"; do
@@ -84,10 +84,10 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Or point at it with --exe <path>." >&2
   exit 1
 fi
-# Absolute from here on: the run changes directory.
+# Every path is absolute from here on, since the run changes directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
-# Locate Python.
+# The Python interpreter is located next.
 
 if [[ -z "$PYTHON" ]]; then
   for candidate in "${LUCIFER_PYTHON:-}" \
@@ -104,7 +104,7 @@ if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-# openPMD-beamphysics, from this interpreter's environment, a development version
+# openPMD-beamphysics comes from this interpreter's environment, a development version
 # included. The version and the path it came from are printed for the log, and no version
 # is checked here: the environment file states the minimum.
 if ! BEAMPHYSICS="$("$PYTHON" -c 'import os, beamphysics; print(beamphysics.__version__, os.path.dirname(beamphysics.__file__))' 2>&1)"; then
@@ -114,7 +114,7 @@ if ! BEAMPHYSICS="$("$PYTHON" -c 'import os, beamphysics; print(beamphysics.__ve
   exit 1
 fi
 
-# Work directory.
+# The work directory is set up next.
 
 CLEAN_WORK_DIR=0
 if [[ -z "$WORK_DIR" ]]; then

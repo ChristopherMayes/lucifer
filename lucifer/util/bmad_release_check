@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Check that a Bmad checkout is at least the release Lucifer declares.
+# bmad_release_check checks that a Bmad checkout is at least the release Lucifer declares.
 #
 #   bmad_release_check <bmad root>    # the checkout against lucifer/BMAD_RELEASE
 #   bmad_release_check --self-test    # the comparison against fixed cases
@@ -27,8 +27,8 @@ release_valid () {   # <release>
   [[ "$1" =~ ^[0-9]{8}-[0-9]+$ ]]
 }
 
-# Prints -1, 0 or 1 as the first release is below, equal to or above the second. Both must
-# be valid. The 10# prefix keeps a leading zero from reading as octal.
+# release_cmp prints -1, 0 or 1 as the first release is below, equal to or above the
+# second. Both must be valid. The 10# prefix keeps a leading zero from reading as octal.
 release_cmp () {   # <release a> <release b>
   local da="${1%%-*}" ra="${1#*-}" db="${2%%-*}" rb="${2#*-}"
   if (( 10#$da != 10#$db )); then
@@ -42,8 +42,8 @@ release_cmp () {   # <release a> <release b>
 
 self_test () {
   local n=0 bad=0 a b want got s
-  # Ordered pairs and the comparison they must give. The two -10 cases are the ones a
-  # string comparison gets wrong.
+  # Each case is an ordered pair and the comparison it must give. The two -10 cases are
+  # the ones a string comparison gets wrong.
   while read -r a b want; do
     n=$((n + 1))
     got="$(release_cmp "$a" "$b")"

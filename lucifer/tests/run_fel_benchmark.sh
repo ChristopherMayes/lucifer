@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Validate the Bmad FEL tracker against Genesis 1.3 Version 4: steady state and
-# time dependent with slippage.
+# run_fel_benchmark.sh validates the Bmad FEL tracker against Genesis 1.3 Version 4, in
+# the steady state and time dependent with slippage.
 #
 # One command runs everything: Genesis over the Benchmark1-SASE lattice (writing the
 # initial dumps both codes start from), a conversion of those dumps to openPMD, which is
@@ -17,11 +17,11 @@
 # Prerequisites:
 #
 #   1. Bmad built, so debug/bin/lucifer (or production/bin) exists:
-#        BUILD_PRODUCTION=N lucifer/util/conda_compile   # from the bmad-ecosystem root
+#        BUILD_PRODUCTION=N lucifer/util/conda_compile   # from the Lucifer clone's root
 #
-#   2. A genesis4 binary (CPU is fine). Default location below. Override with --genesis.
-#      Built per the Genesis repository's instructions. The benchmark needs FFTW support
-#      compiled in, since it runs with fft_fieldsolver = true.
+#   2. genesis4 4.6.15 from conda-forge, in the bmad-fel-validate environment, which the
+#      harness takes ahead of PATH. --genesis names another, and its version is checked.
+#      The benchmark needs FFTW support compiled in, since it runs with fft_fieldsolver = true.
 #
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
 #      (conda env create -f ../wavefront/tests/environment.yml).
@@ -31,7 +31,7 @@
 #      round-trips the wavefront files through its Wavefront class in both directions.
 #
 # Options:
-#   --genesis <path>    genesis4 binary. Default: $GENESIS4, else genesis4 on PATH.
+#   --genesis <path>    genesis4 binary. Default: $GENESIS4, else bmad-fel-validate's, else PATH.
 #   --exe <path>        lucifer binary. Default: the --build flavor's, else debug then
 #                       production.
 #   --build <flavor>    debug or production: the build that ran, which the results file
@@ -72,8 +72,8 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
-# defaults and the variables that name them elsewhere (util/locations.sh).
+# The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
+# BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../util/locations.sh"
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
 # searched first on purpose: an unrelated environment on PATH would supply a different
@@ -142,7 +142,7 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Error: lucifer not found. Build with: BUILD_PRODUCTION=N $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
-# Absolute from here on: the run changes into its work directory.
+# Every path is absolute from here on, since the run changes into its work directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
 if [[ -z "$PYTHON" ]]; then
@@ -158,7 +158,7 @@ if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-# openPMD-beamphysics, from this interpreter's environment, a development version
+# openPMD-beamphysics comes from this interpreter's environment, a development version
 # included. The version and the path it came from are printed for the log, and no version
 # is checked here: the environment file states the minimum.
 if ! BEAMPHYSICS="$("$PYTHON" -c 'import os, beamphysics; print(beamphysics.__version__, os.path.dirname(beamphysics.__file__))' 2>&1)"; then
@@ -168,13 +168,13 @@ if ! BEAMPHYSICS="$("$PYTHON" -c 'import os, beamphysics; print(beamphysics.__ve
   exit 1
 fi
 
-# The core allocation of this pass, and what it buys. A check run takes four threads
-# (the check scripts set that themselves), so the sections running at once number the
-# allocation over four, and each of them hands the allocation over that number to the
-# pools inside its check script through LUCIFER_CPU_BUDGET (scripts/pool.py). The
-# allocation is spent once between the sections of a pass and never once each. Run
-# by hand, a pass takes the machine's performance cores. In a keystone the suite
-# hands each pass its share (tests/test_keystone.py).
+# The block below sets this pass's core allocation and says what it buys. A check run
+# takes four threads (the check scripts set that themselves), so the sections running at
+# once number the allocation over four, and each of them hands the allocation over that
+# number to the pools inside its check script through LUCIFER_CPU_BUDGET
+# (scripts/pool.py). The allocation is spent once between the sections of a pass and
+# never once each. Run by hand, a pass takes the machine's performance cores. In a
+# keystone the suite hands each pass its share (tests/test_keystone.py).
 if [[ -z "$CPUS" ]]; then
   CPUS="$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || true)"
   [[ -n "${CPUS:-}" ]] || CPUS="$(sysctl -n hw.ncpu 2>/dev/null || true)"
@@ -201,13 +201,13 @@ echo "FEL steady-state benchmark"
 echo "=============================================================================="
 echo "  lucifer: $EXE"
 echo "  genesis4:    $GENESIS"
-# Which reference this is. The recorded levels belong to one version of it, and another
-# moves them while every check still passes, so this is a refusal rather than a note:
-# 4.6.15 both carries the CODATA electron rest energy and seeds its noise per global
-# slice index, and digits recorded against anything earlier do not compare. The version
-# comes from the binary's own banner, which it prints before complaining about the
-# missing input file, so a binary named by --genesis identifies itself the same way a
-# packaged one does.
+# The lines below establish which reference this is. The recorded levels belong to one
+# version of it, and another moves them while every check still passes, so this is a
+# refusal rather than a note: 4.6.15 both carries the CODATA electron rest energy and
+# seeds its noise per global slice index, and digits recorded against anything earlier
+# do not compare. The version comes from the binary's own banner, which it prints before
+# complaining about the missing input file, so a binary named by --genesis identifies
+# itself the same way a packaged one does.
 GENESIS_VERSION_WANTED=4.6.15
 GENESIS_VERSION="$("$GENESIS" 2>&1 | sed -n 's/.*Version \([0-9][0-9.]*\).*/\1/p' | head -1)"
 echo "               version $GENESIS_VERSION"
@@ -220,10 +220,10 @@ if [[ "$GENESIS_VERSION" != "$GENESIS_VERSION_WANTED" ]]; then
   exit 1
 fi
 
-# Which electron rest energy it was compiled with. Releases to v4.6.14 carried the
-# pre-CODATA value, which loosened the transcription levels without failing anything.
-# The version check above already excludes those, so this line is a statement of what
-# the reference carries rather than a warning about what it might.
+# The next line prints which electron rest energy the reference carries. Releases to
+# v4.6.14 carried the pre-CODATA value, which loosened the transcription levels without
+# failing anything. The version check above already excludes those, so this line is a
+# statement of what the reference carries rather than a warning about what it might.
 GENESIS_EEV="$("$PYTHON" "$SCRIPT_DIR/scripts/genesis_constants.py" "$GENESIS" 2>/dev/null)"
 echo "               $GENESIS_EEV"
 echo "  python:      $PYTHON"
@@ -332,7 +332,7 @@ else
     echo "FAIL: a Genesis reference chain failed (see above)" >&2
     exit 1
   fi
-  # Populate a private directory and move it into place, because the two build
+  # The set is built in a private directory and moved into place, because the two build
   # passes may run concurrently: a reader tests for the directory, so it must not
   # exist until it is complete, or a concurrent pass copies half a reference set and
   # compares against it. The rename is atomic within one filesystem, and a loser of
@@ -360,7 +360,7 @@ done
 section_time genesis-references
 echo
 
-# The boundary. The tracker reads openPMD only, so each chain's initial dumps are
+# This is the boundary. The tracker reads openPMD only, so each chain's initial dumps are
 # converted once, here, and every tier reads the converted file. Genesis keeps reading its
 # own dumps, so both codes still start from the same particles and the same field: the
 # conversion is exact (validated at 2.2e-15 for particles and 2.1e-16 for fields by
@@ -379,7 +379,7 @@ done
 section_time convert-reference-dumps
 echo
 
-# The window each chain's dumps were sliced on, read from the Genesis dump itself. An
+# The window each chain's dumps were sliced on is read from the Genesis dump itself. An
 # openPMD file carries the slice partition and not the radiation it was sliced on, so a
 # deck has to state the wavelength and the sample, and taking them from the reference file
 # is one truth rather than two.
@@ -399,13 +399,13 @@ WINEOF
 
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
 # Every deck reads the converted openPMD dumps and writes openPMD, the only format the
-# tracker speaks. The three input groups (doc/user-guide.md): extra &fel_params content
-# (wake/sc) as argument 6, extra &fel_beam_init content (check knobs) as argument 7.
-# transport_model = genesis on every tier this builds: a transcription comparison needs
-# Genesis4's own transverse maps, so what is left over is transcription fidelity rather
-# than a transport model difference. It is a no-op for the unaveraged tier, which
-# integrates the field and has no map to choose.
-# nbins is the beamlet size the Genesis decks load with, which no dump format carries.
+# tracker speaks. Of the three input groups (doc/user-guide.md), argument 6 adds
+# &fel_params content (wake or space charge) and argument 7 adds &fel_beam_init content
+# (check knobs). Every tier this builds sets transport_model = genesis, since a
+# transcription comparison needs Genesis4's own transverse maps, so what is left over is
+# transcription fidelity rather than a transport model difference. It is a no-op for the
+# unaveraged tier, which integrates the field and has no map to choose. nbins is the
+# beamlet size the Genesis decks load with, which no dump format carries.
 
 make_nml () {
   local lam sample
@@ -464,15 +464,15 @@ make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = 
   chamber_wake%hrough = 100e-9
   chamber_wake%lrough = 100e-6"
 
-# Assertion checks: a lattice whose FEL element is missing b_max, missing l_period, or
-# uses a fieldmap field_calc, or that carries Bmad wakes on
-# any element (the slice-at-a-time seam cannot apply them meaningfully), must be
-# Refused -- the failure message names the offending attribute and element -- not passed
-# through to fail downstream with an unrelated message (missing b_max) or a segfault in
-# the parse-time reference tracking (fieldmap). Each check mutates one attribute of the
-# real single-segment lattice and requires both a nonzero exit and the by-name message.
+# The assertion checks: a lattice whose FEL element is missing b_max or l_period, uses a
+# fieldmap field_calc, or carries Bmad wakes on any element, which the slice-at-a-time
+# seam cannot apply meaningfully, must be refused with a message naming the attribute
+# and the element. It must not pass through to fail downstream with an unrelated message
+# (missing b_max) or a segfault in the parse-time reference tracking (fieldmap). Each
+# check mutates one attribute of the real single-segment lattice and requires both a
+# nonzero exit and that message.
 #
-# An FEL element is an ordinary Bmad wiggler now, so Bmad's own sanity checks reach it
+# An FEL element is an ordinary Bmad wiggler, so Bmad's own sanity checks reach it
 # first and two of these are Bmad's refusals rather than this program's. A missing
 # l_period is one: Bmad names the attribute and refuses to compute the element, which is
 # the earlier and better place for it. The field map is the other, and it takes a real
@@ -488,7 +488,7 @@ sed 's/field_calc = helical_model, &/field_calc = fieldmap, cartesian_map = {ter
     aramis_1seg.bmad > refusal_fieldmap.bmad
 
 CHECKS_OK=1
-run_assert_refusal () {   # <name> <by-name message fragment> [extra &fel_params lines]
+run_assert_refusal () {   # <name> <a fragment of the message> [extra &fel_params lines]
   make_nml refusal_$1.nml refusal_$1.bmad refusal_$1 bmad Aramis "${3:-}"
   if "$EXE" refusal_$1.nml > fel-refusal_$1.log 2>&1; then
     echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
@@ -516,8 +516,8 @@ SEGW: line = (UND, PW)
 use, SEGW
 LAT
 
-# Space charge asked for with neither term configured: the solve would cost its full
-# price and return an exact zero, so which term was meant is worth asking. The other
+# Space charge asked for with neither term configured is refused, since the solve would
+# cost its full price and return an exact zero, and which term was meant is worth asking. The other
 # space-charge refusal, a three-dimensional method on an FEL element, is covered by the
 # collective checks.
 
@@ -567,14 +567,14 @@ export OMP_NUM_THREADS=1
 
 # The tiers are independent single-thread processes over the shared dumps. They
 # run concurrently (12 performance cores hold all eleven) and their logs print
-# in the usual order afterwards. Same configurations, same single-thread
-# arithmetic -- the documented tier numbers are unchanged.
+# in the usual order afterwards. The configurations and the single-thread arithmetic are
+# the same, so the documented tier numbers are unchanged.
 
 TIERS="tier1 tier1u tier2 tier2g tier1s td1 td2 td2g tdsase tdsc tdwk"
 
 # Two passes of a keystone reach their tier blocks at the same moment, and eleven
 # single-thread processes each is twenty-two on twelve cores: the block took 216 to
-# 225 s inside a keystone against 115 s with the machine to itself (2026-09-13). The
+# 225 s inside a keystone against 115 s with the machine to itself. The
 # suite therefore lets one pass through the block first and holds the other here. The
 # held pass runs its setup meanwhile and its own block then runs on a quieter machine.
 # Waiting is bounded and says so: a pass whose partner died before writing its marker
@@ -615,8 +615,8 @@ section_time tiers-all-eleven
 # Thread-count independence: the time-dependent single-segment configuration rerun with
 # eight threads must reproduce the one-thread run bit for bit -- each slice's arithmetic
 # is independent of which thread runs it, so any difference at all is a race. The diag
-# file is compared byte for byte. The dumps dataset by dataset, exactly (HDF5 object
-# headers carry timestamps, so whole-file cmp would false-alarm).
+# file is compared byte for byte. The dumps are compared dataset by dataset, exactly,
+# since HDF5 object headers carry timestamps and a whole-file cmp would false-alarm.
 
 echo "--- thread independence: td1 with OMP_NUM_THREADS=8 --------------------------"
 sed 's/out_root = "td1"/out_root = "td1t8"/' td1.nml > td1t8.nml
@@ -695,9 +695,9 @@ echo
 
 SECTION_ORDER="shot-noise load sase-startup seam-wake import migration collective source-filter fp32-lockstep device unaveraged spontaneous two-polarization beam-format harmonics phasing coherent-source input-reference examples program-structure tao-lattices diagnostics"
 
-# The launch order, longest first by the debug pass of 2026-09-13 (device 116 s,
-# source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section is
-# not left to run alone at the end. The printed order is SECTION_ORDER regardless.
+# The launch order is longest first, by the section times of one debug pass (device
+# 116 s, source-filter 85, spontaneous 71, unaveraged 66, import 29), so a long section
+# is not left to run alone at the end. The printed order is SECTION_ORDER regardless.
 LAUNCH_ORDER="device source-filter spontaneous unaveraged import two-polarization diagnostics sase-startup phasing beam-format load tao-lattices harmonics collective shot-noise migration fp32-lockstep coherent-source seam-wake program-structure input-reference examples"
 
 SECTIONS="$WORK_DIR/sections"
@@ -708,10 +708,10 @@ stage_section () {   # <dir>: the inputs a section may read, and nothing it did 
   cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/bmad/*.bmad "$1/"
 }
 
-# Shot-noise checks. The statistical check is self-referenced
-# (no cross-code reference exists: Genesis cannot represent weighted noise). The SASE startup cross-check pits the
-# two codes' fully independent loaders and RNGs against each other at the level the
-# noise sets, the startup power.
+# The shot-noise check is self-referenced, since no cross-code reference exists: Genesis
+# cannot represent weighted noise. The SASE startup cross-check pits the two codes' fully
+# independent loaders and RNGs against each other at the level the noise sets, the
+# startup power.
 
 sec_shot_noise () {
   echo "--- shot-noise statistical check (weighted Fawley loading) ---------------------"
@@ -719,7 +719,7 @@ sec_shot_noise () {
     || { echo "FAIL: shot-noise statistics; outputs kept in: $1" >&2; return 1; }
 }
 
-# The load path. Keep mode must hand every bunch moment through unchanged, the split
+# In the load-path checks, keep mode must hand every bunch moment through unchanged, the split
 # weights must be invisible, a generated Gaussian bunch in sample mode must radiate the
 # physical spontaneous power inside the cone, and the two loads that would count the
 # noise twice must be refused.
@@ -736,11 +736,11 @@ sec_sase_startup () {
     || { echo "FAIL: SASE startup level; outputs kept in: $1" >&2; return 1; }
 }
 
-# Seam-wake checks: element sr wakes across the whole window --
-# closed-form pseudomode ramp, exact causality with the d8 direction cross-check, the
-# z_long kernel cross-validation against the wake model (first-principles
-# tight, resolved-beam at the derived boundary bound), split-weight invariance and
-# thread determinism. Self-referenced. Needs no Genesis.
+# The seam-wake checks cover element sr wakes across the whole window: the closed-form
+# pseudomode ramp, exact causality with the d8 direction cross-check, the z_long kernel
+# cross-validation against the wake model (first-principles tight, resolved-beam at the
+# derived boundary bound), split-weight invariance and thread determinism. They are
+# self-referenced and need no Genesis.
 
 sec_seam_wake () {
   echo "--- seam-wake checks -------------------------------------------------------------"
@@ -748,11 +748,11 @@ sec_seam_wake () {
     || { echo "FAIL: seam-wake checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# Distribution-import checks: the bunch_struct resampler transcribed
-# from Genesis's SDDSBeam.cpp -- exact where no RNG enters (the per-slice current
-# profile against Genesis importing the SAME distribution file, the match transform
-# hitting its Twiss targets, split-weight invariance, thread determinism), statistical
-# where the resampling RNG forces it (slice Twiss recovery, startup power cross-code).
+# The distribution-import checks hold the bunch_struct resampler transcribed from
+# Genesis's SDDSBeam.cpp, exactly where no RNG enters (the per-slice current profile
+# against Genesis importing the same distribution file, the match transform hitting its
+# Twiss targets, split-weight invariance, thread determinism) and statistically where
+# the resampling RNG forces it (slice Twiss recovery, startup power cross-code).
 
 sec_import () {
   echo "--- distribution-import checks --------------------------------------------------"
@@ -760,9 +760,9 @@ sec_import () {
     || { echo "FAIL: distribution-import checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# Slice-migration checks: conservation under heavy migration, exact
-# phase continuity of the moves, and no-op bit identity (self-referenced
-# -- Genesis migrates only under one4one).
+# The slice-migration checks hold conservation under heavy migration, exact phase
+# continuity of the moves, and no-op bit identity. They are self-referenced, since
+# Genesis migrates only under one4one.
 
 sec_migration () {
   echo "--- slice-migration checks ------------------------------------------------------"
@@ -770,9 +770,9 @@ sec_migration () {
     || { echo "FAIL: migration checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# Collective-effects self-referenced checks: exact energy bookkeeping of
-# the wake's eloss on a cold dark beam, and the stale-wake structural check (the
-# convolution must follow the currents under migration).
+# The collective-effects checks are self-referenced. They hold the exact energy
+# bookkeeping of the wake's eloss on a cold dark beam, and the stale-wake structural
+# check, in which the convolution must follow the currents under migration.
 
 sec_collective () {
   echo "--- collective-effects checks ---------------------------------------------------"
@@ -780,7 +780,7 @@ sec_collective () {
     || { echo "FAIL: collective checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# Source-filter checks: the transcribed angular filter on the source term run against
+# The source-filter checks run the transcribed angular filter on the source term against
 # Genesis4's own, from the same particles and the same field, plus the two mutations that
 # leave a plausible power curve and only the reference can separate.
 
@@ -790,7 +790,7 @@ sec_source_filter () {
     || { echo "FAIL: source-filter checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# FP32 lockstep checks: the single-precision particle path's divergence from the
+# In the FP32 lockstep checks, the single-precision particle path's divergence from the
 # FP64 reference lands inside its recorded ceilings, the instrument is read-only on
 # the FP64 physics (diag byte-identical on vs off), its mutation hook moves the
 # recorded level so the check can fail, freerun measures the compounding rate, and
@@ -802,15 +802,15 @@ sec_fp32_lockstep () {
     || { echo "FAIL: FP32 lockstep checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# Device backend checks: the Metal backend judged by the lockstep instrument with
-# the device in the twin's role, inside its recorded ceilings; the exact-wrap
-# assertion on the fixed-point phase; read-only on the FP64 physics; the perturbed
-# kernel constant moves a recorded level so the check can fail; the freerun twin
-# and the resident production run land in the same end-to-end band. The field set
-# (harmonic members, two polarization planes) is judged the same ways plus the Bessel
-# deposit identity and one time-dependent Genesis reference imported by CPU and
-# device alike, which is why this section takes the reference binary and the
-# conversion checkout. Everything the backend does not cover is refused.
+# The device backend checks judge the Metal backend by the lockstep instrument, with the
+# device in the twin's role, inside its recorded ceilings. They hold the exact-wrap
+# assertion on the fixed-point phase and the instrument read-only on the FP64 physics.
+# The perturbed kernel constant moves a recorded level so the check can fail, and the
+# freerun twin and the resident production run land in the same end-to-end band. The
+# field set (harmonic members, two polarization planes) is judged the same ways, plus
+# the Bessel deposit identity and one time-dependent Genesis reference imported by CPU
+# and device alike, which is why this section takes the reference binary. Everything
+# the backend does not cover is refused.
 #
 # This is the one section that can skip, and it keys on the answer lucifer itself
 # gives rather than on the platform. A build compiled against the refusing stub has
@@ -841,7 +841,7 @@ sec_device () {
     || { echo "FAIL: device backend checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# Unaveraged-mode checks (fel-physics.md sec-unaveraged): the energy
+# The unaveraged-mode checks (fel-physics.md sec-unaveraged) hold the energy
 # ledger, ballistic conservation and ramp handoff, fc measured against the closed
 # forms in both limits and at h = 3, step-size convergence, and the priced gain-curve
 # comparison against the averaged mode. The fc/faw leak grep is part of the check: the
@@ -942,9 +942,9 @@ sec_program_structure () {
 }
 
 sec_tao_lattices () {
-  # Tao beside the tracker, which is where the distribution build puts both, else in the
-  # Bmad checkout's bin of the declared build first, where a Lucifer source outside the
-  # checkout finds it.
+  # Tao is looked for beside the tracker, which is where the distribution build puts
+  # both, and else in the Bmad checkout's bin of the declared build first, where a
+  # Lucifer source outside the checkout finds it.
   local tao="" candidate
   local kinds=(debug production)
   [[ "$BUILD" == production ]] && kinds=(production debug)
@@ -970,9 +970,10 @@ sec_diagnostics () {
     || { echo "FAIL: diagnostic checks; outputs kept in: $1" >&2; return 1; }
 }
 
-# One section to its log and its record. The record carries the outcome, the exit
-# status, the seconds and a skip reason, and it is what the parent reads: a section
-# that ran leaves one, whatever happened, and a section with no record did not run.
+# run_section runs one section into its log and its record. The record carries the
+# outcome, the exit status, the seconds and a skip reason, and it is what the parent
+# reads: a section that ran leaves one, whatever happened, and a section with no record
+# did not run.
 run_section () {   # <name> <dir>
   local name="$1" dir="$2" fn t0=$SECONDS rc outcome reason="" rec
   fn="sec_$(echo "$name" | tr '-' '_')"
@@ -1000,7 +1001,7 @@ cp AramisTDSASEF.out.h5 AramisTDSASEF-initial.par.h5 AramisTDSASEF-initial.beam.
 echo "--- check sections: $SECTION_WORKERS at once, $SECTION_CPUS cores each, in $SECTIONS ---"
 echo
 
-# A slot per worker, held in a fifo, since bash 3.2 has no "wait -n". A worker takes a
+# Each worker holds a slot in a fifo, since bash 3.2 has no "wait -n". A worker takes a
 # slot before it launches and returns it as it ends, whatever it returned.
 SLOTS="$SECTIONS/.slots"
 mkfifo "$SLOTS"
@@ -1017,9 +1018,9 @@ done
 for pid in $SEC_PIDS; do wait "$pid"; done
 exec 9>&-
 
-# Every expected section exactly once, in the listed order, each with its own time.
-# A results row is written for a pass or a skip and never for a failure, so a
-# results file with a section missing says which section did not pass.
+# The output lists every expected section exactly once, in the listed order, each with
+# its own time. A results row is written for a pass or a skip and never for a failure,
+# so a results file with a section missing says which section did not pass.
 SECTIONS_OK=1
 SECTIONS_FAILED=""
 for name in $SECTION_ORDER; do

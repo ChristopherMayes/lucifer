@@ -13,8 +13,8 @@
 #                   the parent of the Lucifer source. A variable naming a directory with
 #                   no util/dist_source_me is passed over with a note, since
 #                   dist_source_me uses BMAD_DIR as a loop variable and leaves it at
-#                   the checkout's util/ once sourced. Empty when no candidate is a
-#                   checkout, and the script that needs it refuses then.
+#                   the checkout's util/ once sourced. It is empty when no candidate is
+#                   a checkout, and the script that needs it then refuses to run.
 #
 # A relative value is taken against the directory the script was started in, before
 # any script changes directory, and every value is absolute from here on.

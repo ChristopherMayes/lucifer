@@ -1,23 +1,23 @@
 #!/bin/bash
 #
-# The saturation demo, thin runner: every input is a real file in THIS directory
-# (Genesis decks, Bmad namelists, the unaveraged wrapper lattice) -- read them, edit
-# them, rerun. One practical SASE case -- Genesis's own Benchmark1-SASE configuration,
-# the full 57 m Aramis line, dark start, 96 slices x 2048 particles -- tracked three
-# ways from IDENTICAL initial dumps, each on the machine's full performance-core count:
-# Genesis4 (MPI), the Bmad averaged mode (the bmad_standard default), and the Bmad
-# unaveraged mode (~32x the averaged cost, the progress lines show it working).
+# run.sh is the saturation demo's thin runner. Every input is a real file in this
+# directory, the Genesis decks, the Bmad namelists and the unaveraged wrapper lattice, to
+# read, edit and rerun. It tracks one practical SASE case -- Genesis's own Benchmark1-SASE
+# configuration, the full 57 m Aramis line, dark start, 96 slices x 2048 particles --
+# three ways from identical initial dumps, each on the machine's full performance-core
+# count: Genesis4 (MPI), the Bmad averaged mode (the bmad_standard default), and the Bmad
+# unaveraged mode, at about 32 times the averaged cost, whose progress lines show it working.
 #
 # Methodology: an untimed Genesis prep run (same ranks, same seed, no &track) writes
 # the shared initial dumps. Wall times come from one external clock (/usr/bin/time -p).
 # check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
-# decks stay static. Measured results: the "The saturation demo" section of
-# lucifer/examples/saturation_demo/README.md.
+# decks stay static. The section "The saturation demo" of
+# lucifer/examples/saturation_demo/README.md records the results.
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]
 #                  [--python <path>] [--work-dir <path>] [--show-locations]
-# Outputs land in ./output (or --work-dir). The summary report: output/sat-demo-report.pdf.
+# Outputs land in ./output (or --work-dir). The summary report is output/sat-demo-report.pdf.
 # --show-locations prints every location the run would use, absolute, checks from a
 # scratch directory that the executable, the interpreter and the helper scripts are
 # there, and exits before anything runs.
@@ -25,8 +25,8 @@
 set -o pipefail
 
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
-# defaults and the variables that name them elsewhere (util/locations.sh).
+# The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
+# BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$DEMO_DIR/../../util/locations.sh"
 SCRIPTS="$LUCIFER_DIR/tests/scripts"
 
@@ -76,11 +76,11 @@ WORK_DIR="$(lucifer_abs "$WORK_DIR")"
 
 [[ $SHOW -eq 1 || -x "$GENESIS" ]] || { echo "Error: genesis4 not found at $GENESIS (use --genesis)." >&2; exit 1; }
 
-# The launcher of the MPI genesis4 was built against: a PATH mpirun from another MPI
-# aborts the binary on sight, and an unrelated environment on PATH supplies exactly that.
-# A conda genesis4 has its environment's launcher beside it, as mpirun with or without an
-# mpiexec, so that is looked for first. Then the binary's LC_RPATH, with conda's
-# @loader_path resolved against the binary's own directory, and PATH last.
+# The launcher must be the one of the MPI genesis4 was built against. A PATH mpirun from
+# another MPI aborts the binary on sight, and an unrelated environment on PATH supplies
+# exactly that. A conda genesis4 has its environment's launcher beside it, as mpirun with
+# or without an mpiexec, so that is looked for first. The binary's LC_RPATH comes next,
+# with conda's @loader_path resolved against the binary's own directory, and PATH last.
 if [[ -z "$MPIRUN" && -x "$GENESIS" ]]; then
   gdir="$(dirname "$GENESIS")"
   for c in "$gdir/mpiexec" "$gdir/mpirun"; do
@@ -115,10 +115,11 @@ if [[ -z "$PYTHON" ]]; then
 fi
 [[ -x "$PYTHON" ]] || { echo "Error: python (numpy+h5py+matplotlib) not found." >&2; exit 1; }
 
-# The locations alone. The check runs from a scratch directory, so a path that held only
-# relative to where the script started is caught the way the real run would hit it, and
-# the real work directory is not created. genesis4 and the MPI launcher are reported and
-# not required, since this answers where the run's files are and not whether it can run.
+# --show-locations reports the locations alone. The check runs from a scratch directory,
+# so a path that held only relative to where the script started is caught the way the
+# real run would hit it, and the real work directory is not created. genesis4 and the MPI
+# launcher are reported and not required, since this answers where the run's files are
+# and not whether it can run.
 if [[ $SHOW -eq 1 ]]; then
   echo "saturation demo locations:"
   for pair in "demo:$DEMO_DIR" "source:$LUCIFER_DIR" "scripts:$SCRIPTS" \

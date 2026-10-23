@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build Bmad against a conda environment, then build Lucifer against that Bmad.
+# conda_compile builds Bmad against a conda environment, then Lucifer against that Bmad.
 #
 # Lucifer is a Bmad user program: its CMakeLists.txt includes Bmad's Master.cmake, which
 # compiles it against the Bmad distribution's libraries and modules and places its
@@ -22,9 +22,9 @@
 
 set -e
 
-# The Bmad root, by the shared rule (locations.sh), into a name of this script's own:
-# dist_source_me uses BMAD_DIR as a loop variable and would otherwise overwrite the one
-# given here.
+# The Bmad root comes from the shared rule (locations.sh) into a name of this script's
+# own, since dist_source_me uses BMAD_DIR as a loop variable and would otherwise
+# overwrite the one given here.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/locations.sh"
 BMAD_ROOT="$BMAD_SRC"
 if [[ -z "$BMAD_ROOT" ]]; then
@@ -50,15 +50,15 @@ conda activate bmad-build
 
 export LDFLAGS="$LDFLAGS -Wl,-no_compact_unwind"
 
-# Pin HDF5 to this environment.
+# The lines below pin HDF5 to this environment.
 #
 # util/Master.cmake calls find_package(HDF5 COMPONENTS Fortran HL) with nothing to anchor
 # it, and CMake's FindHDF5 prefers the h5fc and h5cc compiler wrappers it finds on PATH. Any
 # other conda environment that is active, or merely earlier on PATH, therefore supplies the
 # HDF5 that gets linked, while the compile side picks up this environment's hdf5.mod from
-# ACC_CONDA_PATH/include. Observed on one machine: compiled against 1.14.6 module files and
-# linked against 2.1.0 shared libraries, a mismatch across a major version that happened to
-# run. HDF5_ROOT takes precedence over the wrapper search and makes the choice explicit.
+# ACC_CONDA_PATH/include. On one machine a build compiled against 1.14.6 module files and
+# linked against 2.1.0 shared libraries, a mismatch across a major version that happened
+# to run. HDF5_ROOT takes precedence over the wrapper search and makes the choice explicit.
 
 export HDF5_ROOT="$CONDA_PREFIX"
 
@@ -118,7 +118,7 @@ if [[ "$BUILD_BMAD" == "Y" ]]; then
   fi
 fi
 
-# Lucifer, through Master.cmake with the environment dist_source_me set. mk builds
+# Lucifer builds through Master.cmake with the environment dist_source_me set. mk builds
 # production and mkd debug, into debug/ and production/ beside the Lucifer source.
 
 cd "$LUCIFER_DIR"

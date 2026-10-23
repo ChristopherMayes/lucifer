@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Measure the coarse-step question: how does the gain
-# curve converge with the undulator integration step delz, up to SIMPLEX's matched
-# configuration of twelve periods per step with slippage exactly one slice per step?
+# run_delz_sweep.sh measures how the gain curve converges with the undulator
+# integration step delz, up to SIMPLEX's matched configuration of twelve periods per
+# step, where the slippage is exactly one slice per step.
 #
 # Method: Genesis generates ONE time-dependent initial state (Aramis-td-s12.in: 32 slices
 # of spacing 12*lambda0, shot noise on), and the Bmad tracker runs the full 6-FODO line
@@ -11,18 +11,18 @@
 # integration error, not SASE statistics. The comparison samples total power (summed over
 # slices) at the twelve undulator-segment exits, positions every run records regardless
 # of delz, against the finest run. A convergence order is fitted from successive step
-# halvings/triplings. This is a measurement, not a check: results are recorded in
+# halvings/triplings. The sweep measures and fails nothing, and its results are in
 # lucifer/doc/validation.md.
 #
 #   ./run_delz_sweep.sh [--genesis <path>] [--exe <path>] [--python <path>] [--work-dir <path>]
 #
-# Same prerequisites as run_fel_benchmark.sh.
+# Its prerequisites are run_fel_benchmark.sh's.
 
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
-# defaults and the variables that name them elsewhere (util/locations.sh).
+# The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
+# BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../util/locations.sh"
 
 # genesis4 comes from conda-forge, in this project's own environment. PATH is not
@@ -64,7 +64,7 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Error: lucifer not found. Build with: BUILD_PRODUCTION=N $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
-# Absolute from here on: the run changes directory.
+# Every path is absolute from here on, since the run changes directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
 if [[ -z "$PYTHON" ]]; then

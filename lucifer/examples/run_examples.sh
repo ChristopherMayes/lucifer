@@ -1,9 +1,9 @@
 #!/bin/bash
-# Run every example and save the figure the documentation shows.
+# run_examples.sh runs every example and saves the figure the documentation shows.
 #
-# Two jobs in one pass. It is the answer to "do all the examples still run", printing one
-# line per deck and exiting nonzero if any deck failed. And it produces the figures the
-# generated pages reference, one per example, into doc/generated/examples/.
+# It does two jobs in one pass. It answers whether all the examples still run, printing
+# one line per deck and exiting nonzero if any deck failed. It also writes the figures
+# the generated pages reference, one per example, into doc/generated/examples/.
 #
 # The figures are committed. Building an FEL run at documentation build time would be
 # wrong, and a page whose figure is missing is worse than a page with an old one. Their
@@ -26,8 +26,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# The locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and BMAD_SRC, with their
-# defaults and the variables that name them elsewhere (util/locations.sh).
+# The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
+# BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../util/locations.sh"
 FIG_DIR="$LUCIFER_DIR/doc/generated/examples"
 
@@ -57,7 +57,7 @@ if ! [[ "$JOBS" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-# Production by default: these timings are the ones the READMEs quote.
+# The production build is the default, since the wall times the READMEs give are its own.
 if [[ -z "$EXE" ]]; then
   for candidate in "$PRODUCTION_BIN/lucifer" "$DEBUG_BIN/lucifer"; do
     if [[ -x "$candidate" ]]; then EXE="$candidate"; break; fi
@@ -67,7 +67,7 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
   echo "Error: lucifer not found. Build with: $LUCIFER_DIR/util/conda_compile" >&2
   exit 1
 fi
-# Absolute from here on: the run changes directory.
+# Every path is absolute from here on, since the run changes directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
 
 if [[ -z "$PYTHON" ]]; then
@@ -85,7 +85,7 @@ if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-# How many directories run at once, and why the number is what it is.
+# The block below sets how many directories run at once, and says why.
 #
 # The unit is a directory, never a deck. The import example's second deck reads the
 # openPMD file its first deck writes, so a directory's decks stay in order inside one
@@ -96,9 +96,9 @@ fi
 # The count is small because one example run is already parallel. Each run takes the
 # OpenMP runtime's own thread count, which this script does not set and the run header
 # prints (12 on the machine below), and one run alone draws 8.4 cores on average and
-# 11.7 at its peak. A fourth worker therefore finds little idle capacity left. Measured
-# on an M3 Max of 12 performance cores, the examples alone with no other keystone job
-# running, 2026-09-13:
+# 11.7 at its peak. A fourth worker therefore finds little idle capacity left. The table
+# was measured on an M3 Max of 12 performance cores, with the examples alone and no other
+# keystone job running:
 #
 #   workers          1     2     3     4     6
 #   seconds        390   293   262   255   248
@@ -146,10 +146,11 @@ DIRS=()
 for dir in */; do
   dir="${dir%/}"
   [[ "$dir" == "saturation_demo" ]] && continue
-  # lucifer.in first, then the rest in byte order. A directory's decks can depend on each
-  # other: import's lucifer_from_file.in reads the bunch its lucifer.in writes. The glob's
-  # own order follows the locale's collation, under which lucifer_from_file.in sorts ahead
-  # of lucifer.in, and that went unseen while an earlier run's bunch file sat in the tree.
+  # The decks run lucifer.in first, then the rest in byte order. A directory's decks can
+  # depend on each other: import's lucifer_from_file.in reads the bunch its lucifer.in
+  # writes. The glob's own order follows the locale's collation, under which
+  # lucifer_from_file.in sorts ahead of lucifer.in, and a bunch file an earlier run left
+  # in the tree hides that.
   shopt -s nullglob
   decks=()
   [[ -f "$dir/lucifer.in" ]] && decks=("$dir/lucifer.in")
@@ -166,9 +167,10 @@ for dir in */; do
   DIRS+=("$dir")
 done
 
-# One directory's work: its decks in order, then its figure. Every deck leaves a record
-# carrying the worker's own verdict, so the table and the exit status cannot disagree,
-# and a deck that left no record at all is a failure the parent reports by name.
+# run_dir does one directory's work, its decks in order and then its figure. Every deck
+# leaves a record carrying the worker's own verdict, so the table and the exit status
+# cannot disagree, and a deck that left no record at all is a failure the parent reports
+# by name.
 run_dir () {   # <dir> <index>
   local dir="$1" idx="$2"
   local k=0 status=0 deck_path deck log rc dt t0 line verdict primary root stats
@@ -185,8 +187,8 @@ run_dir () {   # <dir> <index>
     dt=$((SECONDS - t0))
     line="$(grep -m1 '^ Exit' "$dir/$log" 2>/dev/null | sed 's/^ *Exit *//')"
     # A completed run always prints its exit line, so its absence is a failure even when
-    # the status says otherwise. A stale binary rejecting a lattice it does not understand
-    # looked like success here until this check existed.
+    # the status says otherwise. A stale binary that rejects a lattice it does not
+    # understand would otherwise look like success.
     verdict=ok
     if [[ $rc -ne 0 || -z "$line" ]]; then
       line="$(grep -m1 -E 'ERROR|FATAL' "$dir/$log" 2>/dev/null | head -c 90)"
@@ -194,8 +196,9 @@ run_dir () {   # <dir> <index>
       status=1
     fi
     printf '%s\n%s\n%s\n%s\n' "$verdict" "$rc" "$dt" "$line" > "$STATE/out.$idx.$k"
-    # What the run measured, from its stats file and its log, one row per quantity. The
-    # rows of every deck become examples/measured.tsv below, and the pages carry them.
+    # The record holds what the run measured, from its stats file and its log, one row
+    # per quantity. The rows of every deck become examples/measured.tsv below, and the
+    # pages carry them.
     if [[ "$verdict" == "ok" ]]; then
       if ! "$PYTHON" "$RECORD" "$dir/$deck" "$dir/$log" >> "$STATE/rec.$idx" 2> "$STATE/recerr.$idx"; then
         echo "Error: $dir/$deck: the record could not be written; see $STATE/recerr.$idx" > "$STATE/note.$idx"
@@ -205,7 +208,7 @@ run_dir () {   # <dir> <index>
     k=$((k + 1))
   done
 
-  # One figure per example, from the primary deck's stats file. The out_root is read from
+  # Each example gets one figure, from the primary deck's stats file. The out_root is read from
   # the deck rather than assumed equal to the directory name, because several examples
   # deliberately differ (chicane writes "chicane", coherent_source writes "coherent").
   # It runs in this worker, after this directory's decks, because it reads what they wrote.
@@ -226,8 +229,8 @@ run_dir () {   # <dir> <index>
   return $status
 }
 
-# A slot per worker, held in a fifo, because this runs under bash 3.2 where "wait -n" does
-# not exist. A worker takes a slot before it launches and returns it as it ends, whatever
+# Each worker holds a slot in a fifo, because this runs under bash 3.2, where "wait -n"
+# does not exist. A worker takes a slot before it launches and returns it as it ends, whatever
 # it returns, so a failing directory frees its slot like any other. A worker killed by a
 # signal returns nothing and the launch loop then waits, which is the tier loop's
 # behaviour too and what the keystone's timeout covers (tests/test_keystone.py).
@@ -277,7 +280,7 @@ while [[ $idir -lt ${#DIRS[@]} ]]; do
   idir=$((idir + 1))
 done
 
-# The record of every run, assembled in one order whatever order the workers finished
+# The record of every run is assembled in one order, whatever order the workers finished
 # in, so two runs of the same binary write the same bytes. The keystone regenerates
 # this file and diffs it with the generated pages. The sample output the user guide
 # includes comes from the steady-state example's log the same way.
@@ -292,7 +295,7 @@ if [[ $FAILED -eq 0 ]]; then
   fi
 fi
 
-# The saturation demo's locations, from a directory outside both checkouts. The binary
+# The saturation demo's locations are checked from a directory outside both checkouts. The binary
 # directories are named under names the defaults never produce, through the two
 # variables and relative to that directory, and the executable is given once as a
 # relative path and once left to the variables. run.sh makes each absolute and checks it
