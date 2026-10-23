@@ -15,7 +15,7 @@ The example runs in two commands, with Bmad only:
     ../../../production/bin/lucifer lucifer_transcribed.in
     python ../plot_fel.py bmad_wake.stats.h5
 
-This is the resistive-wall wake of `../sase_wake`, delivered through Bmad's own wake machinery instead of the transcribed Genesis 1.3 Version 4 (Genesis4) model. `ztable.wake` is the Bane and Stupakov resistive-wall kernel for a 0.5 mm copper chamber, attached as an `sr_wake` `z_long` table to every element of `wake_lattice.bmad`. The undulators apply it once per element at mid-element across the whole 96-slice window. The quadrupoles and pipes apply it through Bmad's own `track1_bunch`. The drift slots are pipes here, because a Bmad drift cannot carry a wake.
+This is the resistive-wall wake of `../sase_wake`, delivered through Bmad's own wake machinery instead of the transcribed Genesis 1.3 Version 4 (Genesis4) model. `ztable.wake` is the Bane and Stupakov resistive-wall kernel for a 0.5 mm copper chamber, attached as an `sr_wake` `z_long` table to every element of `wake_lattice.bmad`. The undulators apply it once per element at mid-element across the whole window. The quadrupoles and pipes apply it through Bmad's own `track1_bunch`. The drift slots are pipes here, because a Bmad drift cannot carry a wake.
 
 The table was exported by `chamber_wake%write_kernels` and then converted to Bmad's conventions. The sign is flipped to Bmad's positive-decelerating sense, the self-slice term is unhalved, the causal side is at z < 0, and the table is padded past the window. The conversion is described in the header of `wake_lattice.bmad`, and any `chamber_wake%on` run regenerates the exported kernel (the manual's [Bmad element wakes section](../../fel-physics.md)).
 
@@ -26,11 +26,11 @@ The table was exported by `chamber_wake%write_kernels` and then converted to Bma
 | transcribed `chamber_wake` | -2.319 m_e c^2 | per integration step |
 | Bmad `sr_wake` `z_long` table | -2.335 m_e c^2 | once per element |
 
-The two means differ by 0.69%. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them.
+The two means differ by 0.69%. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them. The measured quantities of both decks are in the table below on the example's page.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 1.7 percent of the power inside it in both runs, so the exit powers here are the mode. With the filter off both decks reported a hundred times more power, 27 times the mode's, all of it that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so the exit powers are the mode. With the filter off both decks reported far more power, nearly all of it that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
 
-The run takes ~25 s.
+Each run takes about half a minute.
 
 ## Measured on this run
 
@@ -54,10 +54,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 5.4367e+00 | 5.4305e+00 | m |
 | power at the first element end | 6.0799e+06 | 6.0861e+06 | W |
 | power per slice at the first element end | 6.3332e+04 | 6.3397e+04 | W |
+| initial bunching, mean |b| over slices | 5.6750e-03 | 5.6750e-03 |  |
 | exit bunching, mean |b| over slices | 1.5323e-02 | 1.5178e-02 |  |
-| bunching, the run's maximum | 1.5301e-02 | 1.5167e-02 |  |
+| exit bunching, the largest slice | 5.3118e-02 | 5.2134e-02 |  |
+| bunching at the mode peak | 1.5301e-02 | 1.5167e-02 |  |
+| mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8026e+09 | 5.8026e+09 | eV |
+| mean slice energy, exit minus start | -1.1881e+06 | -1.1799e+06 | eV |
 | slice energy spread at the start | 5.0577e+05 | 5.0577e+05 | eV |
 | slice energy spread at the exit | 5.1993e+05 | 5.1722e+05 | eV |
+| span of the slice energies at the exit, head to tail | 2.3681e+06 | 2.3683e+06 | eV |
 | slices | 96 | 96 |  |
 | records | 1105 | 1105 |  |
 | slice spacing | 3.0000e-10 | 3.0000e-10 | m |

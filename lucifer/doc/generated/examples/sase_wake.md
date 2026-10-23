@@ -18,13 +18,13 @@ This is the `../sase` run through a deliberately narrow copper chamber of 0.5 mm
 
 The chamber is a demonstration case. At 5.8 GeV and 1 Angstrom a normal chamber's wake is small, and this radius makes the physics visible in one run.
 
-On this input the run writes the per-slice energy-loss rate to `sase_wake.wake.txt` at 1.94 to 121.5 keV/m across the window. The head slices lose least, because the wake is causal and the head has little charge ahead of it. The mean energy drops 8.29 m_e c^2, about 4.24 MeV, over the 57 m line, and the per-slice drop runs from 0.25 to 13.56 m_e c^2 across the window. The drop is visible in the energy panel against the 1 m_e c^2 initial spread. The SASE still reaches 26.7 MW, against 3.02 GW for the same run with no wake. Both powers are those of this input's grid and particle count. The power of an unseeded run depends on both ([SASE convergence](../../startup-noise.md)).
+On this input the run writes the per-slice energy-loss rate to `sase_wake.wake.txt` at 1.94 to 121.5 keV/m across the window. The head slices lose least, because the wake is causal and the head has little charge ahead of it. The mean energy drops 8.29 m_e c^2, about 4.24 MeV, over the 57 m line, and the per-slice drop runs from 0.25 to 13.56 m_e c^2 across the window. The drop is visible in the energy panel against the initial spread. The SASE still lases, to an exit power below the `../sase` run's. The measured quantities are in the table below on the example's page. The power of an unseeded run depends on the grid and the particle count of its input ([SASE convergence](../../startup-noise.md)).
 
 The same resistive-wall kernel applied through Bmad's own wake machinery instead of the transcribed model is `../bmad_wake`, which carries both runs and their agreement. What a loss this size does to the ponderomotive phases is `../migration`.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 0.9 percent of the power inside it, so the 26.7 MW above is the mode. With the filter off the same deck reported 2.94 GW, of which 99 percent was that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is about a percent of the power inside it, so the exit power is the mode. With the filter off the same deck reports far more power, nearly all of it that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
 
-The run takes ~25 s.
+The run takes about half a minute.
 
 ## Measured on this run
 
@@ -48,10 +48,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 5.9703e+00 | m |
 | power at the first element end | 6.0771e+06 | W |
 | power per slice at the first element end | 6.3303e+04 | W |
+| initial bunching, mean |b| over slices | 5.6750e-03 |  |
 | exit bunching, mean |b| over slices | 1.4149e-02 |  |
-| bunching, the run's maximum | 1.4031e-02 |  |
+| exit bunching, the largest slice | 4.6745e-02 |  |
+| bunching at the mode peak | 1.4031e-02 |  |
+| mean slice energy at the start | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.7996e+09 | eV |
+| mean slice energy, exit minus start | -4.2328e+06 | eV |
 | slice energy spread at the start | 5.0577e+05 | eV |
 | slice energy spread at the exit | 5.1382e+05 | eV |
+| span of the slice energies at the exit, head to tail | 6.8405e+06 | eV |
 | slices | 96 |  |
 | records | 1105 |  |
 | slice spacing | 3.0000e-10 | m |

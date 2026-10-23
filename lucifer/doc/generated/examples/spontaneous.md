@@ -31,11 +31,11 @@ The classical rate `(2/3) r_e gamma^2 k_u^2 a_w^2` is 0.030616 m_e c^2 per metre
 
 The harness makes the same comparison without any FEL model, tracking the wiggler with Bmad's own `runge_kutta`, and reproduces the analytic rate to 1.0e-4 ([validation](../../validation.md), the spontaneous-emission section). That check also measures what the averaged FEL mode does not do. Its field gains `2S` while the particles are kicked by `E`, so the `|S|^2` part of the field energy is created rather than taken from the beam. Genesis 1.3 Version 4 (Genesis4) carries an optional `&sponrad` module for the same reason, off by default.
 
-Fluctuations barely move the exit numbers here, because at 1 Angstrom the quantum kick is small against the 1 m_e c^2 the beam starts with and the 4.5 m_e c^2 the FEL itself drives by saturation. They are refused together with slice migration, since one draw per beamlet and a pass that regroups beamlets cannot both be right.
+Fluctuations barely move the exit numbers here, because at 1 Angstrom the quantum kick is small against the slice energy spread the beam starts with and the several times larger spread the FEL itself drives by saturation. Fluctuations are refused together with slice migration, since one draw per beamlet and a pass that regroups beamlets cannot both be right.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.1 percent of the power inside it and at the exit 0.4 percent, so the exit power is the mode. With the filter off the same deck reported 45 percent of its exit power as that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the mode peak and at the exit the power outside the split angle is a small fraction of the power inside it, so the exit power is the mode. With the filter off the same deck reports about half of its exit power as that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch. The measured quantities of both decks, the energy spreads and the ratios among them, are in the table below.
 
-Each run takes ~5 s.
+Each run takes about five seconds.
 
 ## Measured on this run
 
@@ -58,10 +58,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 2.1402e+00 | 2.1360e+00 | m |
 | power at the first element end | 4.1206e+03 | 4.1251e+03 | W |
 | power per slice at the first element end | 4.1206e+03 | 4.1251e+03 | W |
+| initial bunching, mean |b| over slices | 3.9886e-17 | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 2.2699e-01 | 2.3541e-01 |  |
-| bunching, the run's maximum | 2.7861e-01 | 2.7902e-01 |  |
+| exit bunching, the largest slice | 2.2699e-01 | 2.3541e-01 |  |
+| bunching at the mode peak | 2.7861e-01 | 2.7902e-01 |  |
+| mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8029e+09 | 5.8029e+09 | eV |
+| mean slice energy, exit minus start | -9.3367e+05 | -9.3633e+05 | eV |
 | slice energy spread at the start | 5.0879e+05 | 5.0879e+05 | eV |
 | slice energy spread at the exit | 2.3323e+06 | 2.3430e+06 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 |  |
 | records | 1105 | 1105 |  |
 | slice spacing | 1.0000e-10 | 1.0000e-10 | m |

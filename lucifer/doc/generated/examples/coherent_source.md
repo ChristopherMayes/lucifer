@@ -18,17 +18,11 @@ The example runs in three commands, with Bmad only:
 
 A run whose beam is transversely Gaussian (an idealized machine, a parameter scan, a seeded amplifier study) can trade the per-particle source deposit for Tanaka's coherent retrieval, `global%source_model = "coherent"` (PRAB 27, 030703 (2024), the manual's coherent-source section). It then converges at one to two orders of magnitude fewer macroparticles. With few particles the per-cell source is spiky, and that sampling noise always overestimates the gain. The coherent source carries the slice's exact bunching phasor on a fitted Gaussian instead, so the artifact never enters.
 
-Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration) are compared:
+Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration) are compared. `lucifer_reference.in` deposits 8192 particles per slice. `lucifer_low_m.in` deposits 512. `lucifer.in` runs the coherent source on the same 512. The measured quantities are in the table below. The low-M deposit comes out high against the reference, and the coherent source at the same count lands close to it. Each run takes a few seconds.
 
-| run | source, particles/slice | exit power | vs reference | wall (12 threads) |
-|---|---|---|---|---|
-| `lucifer_reference.in` | deposit, 8192 | 7.93e+08 W | -- | 5 s |
-| `lucifer_low_m.in` | deposit, 512 | 1.11e+09 W | 1.39x high (ln +0.33) | 3 s |
-| `lucifer.in` | coherent, 512 | 7.46e+08 W | ln -0.061 | 3 s |
+The low-M deposit is the artifact the coherent source removes, and the source filter, on by default, removes most of it on its own. Cutting particles without the coherent source raises the predicted power on this case, and with the filter off the rise was far larger. The run's own convergence report gives the power outside the split angle over the power inside it, and the table carries that ratio at the exit for each run. The coherent source builds no transformed source for the filter to act on, so the filter turns itself off for that run and says so. Its own ratio at the exit is the largest of the three ([the convergence section](../../fel-physics.md#sec-convergence)). The power the low-M deposit adds is the wide-angle emission of 64 beamlets. The coherent source does not have it, since it never puts a macroparticle on a grid point. `lucifer.in` is the same particle count giving the converged answer. Per-slice cost dominates a time-dependent run, where the same particle reduction pays in proportion.
 
-The middle row is the artifact the coherent source removes, and the source filter, on by default, removes most of it on its own. Cutting particles without the coherent source multiplies the predicted power by 1.39 on this case, where with the filter off it multiplied it by 7.6. The run's own convergence report puts the power outside the split angle at 1.9 percent of the power inside it on that row and 0.2 percent on the reference row. The coherent source builds no transformed source for the filter to act on, so the filter turns itself off for that run and says so. Its own ratio at the exit is 5.0 percent ([the convergence section](../../fel-physics.md#sec-convergence)). The power the middle row adds is the wide-angle emission of 64 beamlets. The coherent source does not have it, since it never puts a macroparticle on a grid point. The last row is the same particle count giving the converged answer. Per-slice cost dominates a time-dependent run, where the same particle reduction pays in proportion.
-
-The refusals are part of the feature (the manual's coherent-source section). A per-slice Gaussianity test is sized against its own sampling significance, and a profile with real structure is refused. An offset, mismatched or tilted Gaussian beam passes, since the source centers and tilts with the beam's phasor-weighted moments. Harmonic fields, two live polarizations and the unaveraged mode are refused in v1. A dark start is refused, since the coherent model drops the spontaneous, spatially incoherent emission that SASE grows from, and its startup comes out about 175x low. Seed the field, as here, or use the default deposit.
+The refusals are part of the feature (the manual's coherent-source section). A per-slice Gaussianity test is sized against its own sampling significance, and a profile with real structure is refused. An offset, mismatched or tilted Gaussian beam passes, since the source centers and tilts with the beam's phasor-weighted moments. Harmonic fields, two live polarizations and the unaveraged mode are refused in v1. A dark start is refused, since the coherent model drops the spontaneous, spatially incoherent emission that SASE grows from, and its startup comes out far too low. Seed the field, as here, or use the default deposit.
 
 Plot any run with ../plot_fel.py <root>.stats.h5.
 
@@ -53,10 +47,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 2.0369e+00 | 1.9904e+00 | 2.1043e+00 | m |
 | power at the first element end | 3.8806e+03 | 4.1976e+03 | 4.1639e+03 | W |
 | power per slice at the first element end | 3.8806e+03 | 4.1976e+03 | 4.1639e+03 | W |
+| initial bunching, mean |b| over slices | 3.8856e-17 | 3.8856e-17 | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 2.7442e-01 | 1.7420e-01 | 2.4127e-01 |  |
-| bunching, the run's maximum | 3.2232e-01 | 2.3442e-01 | 3.0142e-01 |  |
+| exit bunching, the largest slice | 2.7442e-01 | 1.7420e-01 | 2.4127e-01 |  |
+| bunching at the mode peak | 3.2232e-01 | 2.3442e-01 | 3.0142e-01 |  |
+| mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8036e+09 | 5.8034e+09 | 5.8036e+09 | eV |
+| mean slice energy, exit minus start | -2.1383e+05 | -4.2874e+05 | -2.6909e+05 | eV |
 | slice energy spread at the start | 4.7654e+05 | 4.7654e+05 | 5.0879e+05 | eV |
 | slice energy spread at the exit | 2.4428e+06 | 2.7134e+06 | 2.5464e+06 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 | 1 |  |
 | records | 1105 | 1105 | 1105 |  |
 | slice spacing | 1.0000e-10 | 1.0000e-10 | 1.0000e-10 | m |

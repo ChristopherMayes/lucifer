@@ -16,18 +16,13 @@ The example runs in two commands, with Bmad only:
 
 The line is two undulator segments with a four-bend closed-bump chicane in the break, in absolute time tracking mode (`bmad_com[absolute_time_tracking] = T` in the lattice). The inter-segment phase then follows the real geometry. The beam detours the bump while the radiation drifts the chord between the undulator faces, which is computed from `ele%floor` and never entered by hand. The arc-minus-chord delay (583 wavelengths at the reference angle) re-injects the light onto the bunched beam at whatever carrier phase the bend angle dictates.
 
-The two lattices differ by 0.43 microradians of bend angle: half a wavelength of delay. With a 200 MW seed and two 0.99 m helical segments, the two lattices give:
-
-| lattice | P at segment-1 exit | P at line exit | segment-2 ratio |
-|---|---|---|---|
-| `chicane.bmad` (in phase) | 1.998e8 W | 2.642e8 W | 1.32 |
-| `detuned.bmad` (+lambda/2 of delay) | 1.998e8 W | 1.872e8 W | 0.94 |
+The two lattices differ by 0.43 microradians of bend angle: half a wavelength of delay. With a 200 MW seed and two 0.99 m helical segments, the two lattices leave the first segment with the same power and part in the second. `chicane.bmad`, in phase, amplifies in the second segment. `detuned.bmad`, with half a wavelength more delay, absorbs there, and its exit power ends below the seed. The power after the first segment and the exit power of each deck are in the table below on the example's page.
 
 The second segment amplifies or absorbs on a half-wavelength of geometry. A real machine turns that knob by trimming its chicane. In the default relative mode the same two lattices produce identical output, since the geometric fraction is autophased away, which is the chicane semantics of Genesis 1.3 Version 4 (Genesis4). The deliberate off-phase knob in that mode is the wiggler's own `z_offset` (the manual's phasing section).
 
-The harness's phasing section checks the same physics. The re-anchor baseline is flat, and the z_offset knob sits on the analytic slope. The knob curve equals Genesis4's own PHASESHIFTER scan at 6.0e-6. The absolute-mode chicane ramp sits on the independent geometric prediction at 6.8e-4, and the unaveraged ledger closes across the chicane at 4.0e-6. Four refusals are asserted.
+The harness's phasing section checks the same physics. The re-anchor baseline is flat, and the z_offset knob sits on the analytic slope. The knob curve equals Genesis4's own PHASESHIFTER scan. The absolute-mode chicane ramp sits on the independent geometric prediction, and the unaveraged ledger closes across the chicane. The levels are in [](../../validation.md#val-levels-phasing). Four refusals are asserted.
 
-Each run takes ~1 s.
+Each run takes about a second.
 
 ## Measured on this run
 
@@ -49,10 +44,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | split angle | 2.7594e-06 | 2.7594e-06 | rad |
 | power at the first element end | 1.9978e+08 | 1.9978e+08 | W |
 | power per slice at the first element end | 1.9978e+08 | 1.9978e+08 | W |
+| initial bunching, mean |b| over slices | 3.9886e-17 | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 1.3452e-01 | 1.1840e-01 |  |
-| bunching, the run's maximum | 1.3452e-01 | 3.9886e-17 |  |
+| exit bunching, the largest slice | 1.3452e-01 | 1.1840e-01 |  |
+| bunching at the mode peak | 1.3452e-01 | 3.9886e-17 |  |
+| mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
+| mean slice energy, exit minus start | -2.0246e+04 | 5.4705e+03 | eV |
 | slice energy spread at the start | 5.0879e+05 | 5.0879e+05 | eV |
 | slice energy spread at the exit | 6.0581e+05 | 5.6553e+05 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 |  |
 | records | 142 | 142 |  |
 | slice spacing | 1.0000e-10 | 1.0000e-10 | m |

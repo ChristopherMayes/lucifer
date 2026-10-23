@@ -16,20 +16,13 @@ The example runs in one command, with Bmad only:
 
 This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (namelist `harmonics = 1, 3`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
 
-With a 200 MW seed on 3.96 m of planar undulator at rms aw = 0.84853, the example measures:
-
-| z (m) | P1 (W) | P3 (W) |
-|---|---|---|
-| 0.00 | 2.000e8 | 0 |
-| 1.98 | 1.975e8 | 7.3e-1 |
-| 3.01 | 1.905e8 | 1.7e2 |
-| 3.96 (exit) | 1.847e8 | 5.1e3 |
+With a 200 MW seed on 3.96 m of planar undulator at rms aw = 0.84853, the fundamental gives up a few percent of its seed power to the beam over the segment, and the third harmonic climbs from nothing through several decades. The measured quantities are in the table below. The exit power there is the fundamental's, and the harmonic's power along z is in the plot.
 
 `plot_fel.py`'s harmonic panel shows both curves on one log scale, and that figure is this example's page in the documentation. The harmonic's full wavefront_params live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name, `harmonics-final-h3.wf.h5`, an openPMD EXT_Wavefront file with the photon energy identifying the harmonic.
 
-A helical undulator would give nothing here, since its coupling fc(h) vanishes for every harmonic (the manual's harmonic-radiation section). That is why this example is planar. The deck turns the source filter off, as the comparison against Genesis 1.3 Version 4 (Genesis4) requires. The harness's harmonics section runs the same configuration against Genesis4 (fundamental 5.3e-8, harmonic growth 1.3e-4) and against the exact Bessel deposit sum (3.3e-16).
+A helical undulator would give nothing here, since its coupling fc(h) vanishes for every harmonic (the manual's harmonic-radiation section). That is why this example is planar. The deck turns the source filter off, as the comparison against Genesis 1.3 Version 4 (Genesis4) requires. The harness's harmonics section runs the same configuration against Genesis4, on the fundamental's power and on the harmonic's growth, and against the exact Bessel deposit sum, at the levels in [](../../validation.md#val-levels-harmonics).
 
-The run takes ~1 s.
+The run takes about a second.
 
 ## Measured on this run
 
@@ -51,10 +44,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | split angle | 2.7594e-06 | rad |
 | power at the first element end | 1.8464e+08 | W |
 | power per slice at the first element end | 1.8464e+08 | W |
+| initial bunching, mean |b| over slices | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 1.1071e-01 |  |
-| bunching, the run's maximum | 3.9886e-17 |  |
+| exit bunching, the largest slice | 1.1071e-01 |  |
+| bunching at the mode peak | 3.9886e-17 |  |
+| mean slice energy at the start | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8038e+09 | eV |
+| mean slice energy, exit minus start | 5.0518e+03 | eV |
 | slice energy spread at the start | 5.0879e+05 | eV |
 | slice energy spread at the exit | 8.6474e+05 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | eV |
 | slices | 1 |  |
 | records | 89 |  |
 | slice spacing | 1.0000e-10 | m |

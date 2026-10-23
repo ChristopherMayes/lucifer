@@ -25,8 +25,16 @@ by column and a number a README once typed from a run comes from the run itself:
                                          value at the exit, as the program reports them
   mode_peak_inside, mode_peak_s          the inside power's maximum and where it sits
   split_angle                            the angle the split is taken at
-  exit_bunching, bunching_peak           the mean |b| over slices at the exit, and the
-                                         run's maximum
+  initial_bunching, exit_bunching, exit_bunching_max
+                                         the mean of |b| over slices at the start and the
+                                         exit, and the largest slice's at the exit
+  bunching_peak                          the mean |b| at the mode's peak, as the program
+                                         reports it
+  initial_energy, exit_energy, energy_change
+                                         the mean of the slice energies at the start and
+                                         the exit, and the difference
+  exit_energy_span                       the span of the slice mean energies at the exit,
+                                         head to tail
   gain_length                            the shortest e-folding length of the inside
                                          power over any five consecutive records that
                                          have the split, the exponential regime
@@ -174,7 +182,13 @@ def rows_for(deck: pathlib.Path, log: pathlib.Path):
                 rows.append((name, float(run[key][()]), unit))
         rows.append(("split_angle", float(h5["field/total/split_angle"][()]), "rad"))
         b = h5["beam/slice/bunching"][()]
-        rows.append(("exit_bunching", float(np.mean(np.abs(b[-1]))), ""))
+        rows += [("initial_bunching", float(np.mean(np.abs(b[0]))), ""),
+                 ("exit_bunching", float(np.mean(np.abs(b[-1]))), ""),
+                 ("exit_bunching_max", float(np.max(np.abs(b[-1]))), "")]
+        e = h5["beam/slice/energy"][()]
+        e0, e1 = float(np.nanmean(e[0])), float(np.nanmean(e[-1]))
+        rows += [("initial_energy", e0, "eV"), ("exit_energy", e1, "eV"), ("energy_change", e1 - e0, "eV"),
+                 ("exit_energy_span", float(np.nanmax(e[-1]) - np.nanmin(e[-1])), "eV")]
         lg = gain_length(s, win_in)
         if lg is not None:
             rows.append(("gain_length", lg, "m"))

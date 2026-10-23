@@ -18,13 +18,13 @@ This is a seeded, single-slice FEL on the benchmark line (`../aramis.bmad`): a 3
 
 `sig_z = 0` makes the run steady state. The whole charge sits in the one slice window, so the current is `I = Q*c/slice_spacing`, and `bunch_charge` in the deck encodes 3 kA exactly. The current is always derived this way and never entered ([the input reference](../../input-reference.md)).
 
-On this input the quiet start is exact to an initial bunching of 4.0e-17, so the FEL grows from the seed and not from sampling noise. The power gain length is 2.25 m, fitted to ln P over 4 to 30 m of lattice, which includes the gainless breaks between segments. Saturation reaches 1.56 GW at z = 37.2 m. Past saturation the power falls back to 792.7 MW at the exit as particles rotate in the bucket. The beam sizes start on the lattice's matched values, since `init_beam_distribution` generates the bunch from the Twiss in the lattice's `beginning` statement.
+On this input the quiet start is exact to an initial bunching of 4.0e-17, so the FEL grows from the seed and not from sampling noise. The power grows exponentially from the seed, saturates past the middle of the line, and falls back at the exit as particles rotate in the bucket. The gain length, the peak power with its position, and the exit power are in the table below on the example's page. The beam sizes start on the lattice's matched values, since `init_beam_distribution` generates the bunch from the Twiss in the lattice's `beginning` statement.
 
-The two `dump_*_at` lines write the beam and the field at the third undulator, `steady_state-at9-UND.beam.h5` and `-at9-UND.wf.h5`, both openPMD. `at9` is the element index the locator resolved. Mid-run dumps are how a run is handed to another program or restarted from the middle, and a single slice keeps them under 1.5 MB here. The same two lines on a 96-slice run write 111 MB.
+The two `dump_*_at` lines write the beam and the field at the third undulator, `steady_state-at9-UND.beam.h5` and `-at9-UND.wf.h5`, both openPMD. `at9` is the element index the locator resolved. Mid-run dumps are how a run is handed to another program or restarted from the middle, and a single slice keeps them under 1.5 MB here. The same two lines on the `../sase` window write about a hundred megabytes.
 
-Read [reading an output file](../../reading-output.md) for the stats file and the ten plot panels. The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At saturation the power outside the split angle is 0.08 percent of the power inside it, and at the exit 0.24 percent, so the 792.7 MW quoted above is the mode. With the filter off the same deck reported 761.5 MW at the exit and 1.62 GW at saturation, of which 45 and 9 percent were that emission.
+Read [reading an output file](../../reading-output.md) for the stats file and the ten plot panels. The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). The table gives the power outside the split angle over the power inside it, at the mode peak and at the exit. Both ratios are well under a percent, so the exit power is the mode. With the filter off the same deck reports more power at the exit and at the peak, and nearly half of that exit power is this emission.
 
-The run takes ~5 s.
+The run takes about five seconds.
 
 ## Measured on this run
 
@@ -47,10 +47,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 2.1043e+00 | m |
 | power at the first element end | 4.1639e+03 | W |
 | power per slice at the first element end | 4.1639e+03 | W |
+| initial bunching, mean |b| over slices | 3.9886e-17 |  |
 | exit bunching, mean |b| over slices | 2.4127e-01 |  |
-| bunching, the run's maximum | 3.0142e-01 |  |
+| exit bunching, the largest slice | 2.4127e-01 |  |
+| bunching at the mode peak | 3.0142e-01 |  |
+| mean slice energy at the start | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8036e+09 | eV |
+| mean slice energy, exit minus start | -2.6909e+05 | eV |
 | slice energy spread at the start | 5.0879e+05 | eV |
 | slice energy spread at the exit | 2.5464e+06 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | eV |
 | slices | 1 |  |
 | records | 1105 |  |
 | slice spacing | 1.0000e-10 | m |

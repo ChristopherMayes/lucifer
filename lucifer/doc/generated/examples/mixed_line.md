@@ -19,27 +19,21 @@ The FEL method is an element attribute, so a line whose segments are tracked dif
 
 `lucifer_averaged.in` is the all-averaged twin, which overrides that one element back to the default. The two runs differ in one segment's method and in nothing else.
 
-On this input, a seeded steady state measured on a 129-point grid where the decks now state 128 points, the two runs give:
+On this input, a seeded steady state, the two runs are bit-identical up to the first record inside `UNDU`, at z = 19.045 m, and differ from there. The measured quantities are in the table below, the exit power of each run and the step count that the one unaveraged segment adds among them.
 
-| | value |
-|---|---|
-| first difference between the runs | z = 19.045 m, the first record inside `UNDU` |
-| largest difference along the line | 2.68e-2 in ln P, at z = 24.7 m |
-| difference at the exit | -7.39e-3 in ln P (1.757 GW against 1.770 GW) |
+In the plot the log-power panel runs straight through the boundary at 19 to 23 m, with no step and no kink where the method changes, and saturation arrives at the same place on both lines. A difference of a few percent is not visible on a six-decade axis, which is why the table is the check and the plot is the sanity check.
 
-In the plot the log-power panel runs straight through the boundary at 19 to 23 m, with no step and no kink where the method changes, and saturation arrives at 37 m as it does on the all-averaged line. A 2.7% difference is not visible on a six-decade axis, which is why the table above is the check and the plot is the sanity check.
+The two curves are bit-identical up to the method boundary, which is the check that the mixing itself is what differs. Through the unaveraged segment they separate by a few percent in ln P, and they stay within that at the exit. Two formulations of the same physics, sharing no approximation, hand the same beam and field back and forth across an element boundary.
 
-The two curves are bit-identical up to the method boundary, which is the check that the mixing itself is what differs. Through the unaveraged segment they separate by 2.7%, and by the exit they have converged back to 0.74%. Two formulations of the same physics, sharing no approximation, hand the same beam and field back and forth across an element boundary.
-
-The cost is where the difference is spent. The one unaveraged segment takes about 5 s of the 6 s run at 20 substeps per period, and the eleven averaged segments share the rest. Per-element selection puts the expensive method in the segment where it is wanted and the cheap one everywhere else.
+The cost is where the difference is spent. The one unaveraged segment takes most of the run's wall time at 20 substeps per period, and the eleven averaged segments share the rest. Per-element selection puts the expensive method in the segment where it is wanted and the cheap one everywhere else.
 
 Collective effects are refused in a line with any unaveraged segment, so this example carries none, and the harness checks the refusal.
 
 The harness runs the same configuration as its sandwich check. There the mixed line must agree with the all-averaged line at the exit, the energy ledger rows must appear only inside the unaveraged segment, and a wake on that segment must be refused ([validation](../../validation.md)). This directory is the runnable version of that check.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is 3.0 times the power inside it in both runs, so three quarters of each exit power is that emission. The difference between the two runs is 3.6e-2 in ln P inside the mode against 7.4e-3 in the total, so the price the mixed line pays is five times larger in the mode than in the number the table quotes. Both decks state `global%source_filter = F`, so the two FEL methods compare like for like. The filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is several times the power inside it in both runs, so most of each exit power is that emission. The table carries the exit power inside and outside the split for both runs, so the difference between them can be read in the mode as well as in the total. Both decks state `global%source_filter = F`, so the two FEL methods compare like for like. The filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
 
-The run takes ~7 s, and the averaged twin ~1 s.
+The run takes a few seconds, and the averaged twin about a second.
 
 ## Measured on this run
 
@@ -62,10 +56,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 1.8661e+00 | 1.8661e+00 | m |
 | power at the first element end | 4.4159e+03 | 4.4159e+03 | W |
 | power per slice at the first element end | 4.4159e+03 | 4.4159e+03 | W |
+| initial bunching, mean |b| over slices | 3.6362e-17 | 3.6362e-17 |  |
 | exit bunching, mean |b| over slices | 1.1891e-01 | 1.1251e-01 |  |
-| bunching, the run's maximum | 2.3538e-01 | 2.3527e-01 |  |
+| exit bunching, the largest slice | 1.1891e-01 | 1.1251e-01 |  |
+| bunching at the mode peak | 2.3538e-01 | 2.3527e-01 |  |
+| mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8032e+09 | 5.8032e+09 | eV |
+| mean slice energy, exit minus start | -6.2473e+05 | -6.3359e+05 | eV |
 | slice energy spread at the start | 5.0869e+05 | 5.0869e+05 | eV |
 | slice energy spread at the exit | 2.4231e+06 | 2.4181e+06 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |
 | slices | 1 | 1 |  |
 | records | 1105 | 1105 |  |
 | slice spacing | 1.0000e-10 | 1.0000e-10 | m |

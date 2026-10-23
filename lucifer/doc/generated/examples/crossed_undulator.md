@@ -9,23 +9,14 @@ short_title: "crossed_undulator"
 
 Everything on this page lives in and runs from `lucifer/examples/crossed_undulator/`.
 
-An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulator rotated a quarter turn, `UNDY: UNDX, tilt = pi/2`, follows after a short gap. The tilt is standard Bmad, and it is what states the polarization. Microbunching is longitudinal and blind to polarization, so the y set radiates orthogonally polarized light seeded by the bunching the x set built. The x field passes through the y set gaining nothing, and the harness holds that isolation at 1.6e-14 (the manual's field-solver vector convention).
+An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulator rotated a quarter turn, `UNDY: UNDX, tilt = pi/2`, follows after a short gap. The tilt is standard Bmad, and it is what states the polarization. Microbunching is longitudinal and blind to polarization, so the y set radiates orthogonally polarized light seeded by the bunching the x set built. The x field passes through the y set gaining nothing, and the harness holds that isolation at the level in [](../../validation.md#val-levels-two-polarization) (the manual's field-solver vector convention).
 
     ../../../production/bin/lucifer lucifer.in
     python ../plot_fel.py crossed.stats.h5
 
-With a 1 MW x seed, a 0.6 m x-set, a 0.2 m gap and a 0.6 m y-set, the example measures:
+With a 1 MW x seed, a 0.6 m x-set, a 0.2 m gap and a 0.6 m y-set, P_x is flat through the y-set to five digits, while P_y climbs from nothing on the microbunching the x-set left behind. The measured quantities are in the table below, the total exit power and the power inside the split angle among them, and the plot carries P_y along z. The tilted undulator cannot amplify the orthogonal component. It only diffracts it. `plot_fel.py` shows this in its polarization panel, which is present only when a run carries two components, and that figure is this example's page in the documentation.
 
-| z (m) | P_x (W) | P_y (W) |
-|---|---|---|
-| 0.00 (entry) | 1.0000e6 | 0 |
-| 0.60 (x-set exit) | 9.9982e5 | 0 |
-| 1.00 (inside the y-set) | 9.9982e5 | 1.63e1 |
-| 1.26 (exit) | 9.9982e5 | 1.35e2 |
-
-P_x is flat through the y-set to five digits, while P_y climbs from nothing on the microbunching the x-set left behind. The tilted undulator cannot amplify the orthogonal component. It only diffracts it. `plot_fel.py` shows this in its polarization panel, which is present only when a run carries two components, and that figure is this example's page in the documentation.
-
-The outputs are `crossed-final.wf.h5`, an openPMD EXT_Wavefront file carrying both polarizations as the x and y components of one mesh record, and `crossed.stats.h5`, whose field group carries the total, the x component and a `field/y/` group. The run takes ~1 s.
+The outputs are `crossed-final.wf.h5`, an openPMD EXT_Wavefront file carrying both polarizations as the x and y components of one mesh record, and `crossed.stats.h5`, whose field group carries the total, the x component and a `field/y/` group. The run takes about a second.
 
 ## Measured on this run
 
@@ -47,10 +38,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | split angle | 3.2637e-06 | rad |
 | power at the first element end | 9.9982e+05 | W |
 | power per slice at the first element end | 9.9982e+05 | W |
+| initial bunching, mean |b| over slices | 4.2511e-17 |  |
 | exit bunching, mean |b| over slices | 8.0057e-04 |  |
-| bunching, the run's maximum | 4.2511e-17 |  |
+| exit bunching, the largest slice | 8.0057e-04 |  |
+| bunching at the mode peak | 4.2511e-17 |  |
+| mean slice energy at the start | 5.8038e+09 | eV |
+| mean slice energy at the exit | 5.8038e+09 | eV |
+| mean slice energy, exit minus start | -3.9091e-03 | eV |
 | slice energy spread at the start | 5.2937e+05 | eV |
 | slice energy spread at the exit | 5.2944e+05 | eV |
+| span of the slice energies at the exit, head to tail | 0.0000e+00 | eV |
 | slices | 1 |  |
 | records | 82 |  |
 | slice spacing | 1.0000e-10 | m |

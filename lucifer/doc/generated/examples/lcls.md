@@ -43,62 +43,49 @@ Two numbers are this file's and are marked in the lattice header. The segment is
 
 The field and K agree here to 0.04 percent, where the FLASH1 line's two published numbers are 2.7 percent apart. The resonance that follows at 13.6 GeV is 1.5099 Angstrom against the published 1.5.
 
-The slice energy spread is derived rather than published. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys: at 1024 macroparticles per slice, 0.3 µm gives a power gain length of 3.52 m and saturation at 55 m where 0.4 µm gives 3.93 m and 62 m.
+The slice energy spread is derived rather than published. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys. Runs at its two ends, 0.3 and 0.4 µm, differ in gain length and in saturation point by about a tenth, at a quarter of this deck's macroparticles.
 
 ## What the run measures
 
-Four seeds were run at the settings below, measured with the source filter off. The spread is the SASE fluctuation of a 300-slice window. What the filter changes is measured below.
+The measured quantities are in the table below, written by the run that measured them. The published values they compare with are these:
 
-| quantity | this deck | published | source |
-|---|---|---|---|
-| power gain length in the exponential regime | 3.81 +- 0.04 m | 3.3 m measured, 4.5 m design | Table 1 |
-| saturation, where the bunching peaks | 64.7 +- 1.9 m | about 60 m | text |
-| peak bunching factor | 0.384 +- 0.037 | | |
-| peak power in one slice | 14.1 +- 1.0 GW | 15 GW | text |
-| pulse energy at the published 75 fs duration | 1.06 mJ | 1.1 mJ | text |
-| mean energy loss per electron at the exit | 10.06 +- 0.25 MeV | 4.6 MeV over the whole bunch | text |
+| quantity | published | source |
+|---|---|---|
+| power gain length in the exponential regime | 3.3 m measured, 4.5 m design | Table 1 |
+| saturation, where the bunching peaks | about 60 m | text |
+| peak power in one slice | 15 GW | text |
+| pulse energy at the published 75 fs duration | 1.1 mJ | text |
+| mean energy loss per electron at the exit | 4.6 MeV over the whole bunch | text |
 
-The peak power per slice is the direct comparison, since it does not depend on how much of the real bunch carries 3 kA, and it lands within 6 percent of the machine. Multiplied by the published 75 fs pulse duration it gives the pulse energy to within 4 percent. The gain length sits between the measured 3.3 m and the design 4.5 m, and the saturation point within 8 percent of the machine.
+The power per slice is the direct comparison, since it does not depend on how much of the real bunch carries 3 kA. Multiplied by the published 75 fs pulse duration it gives the pulse energy to set against the paper's. The gain length compares with the measured 3.3 m and the design 4.5 m. The saturation point is where the mean bunching peaks, which the plot's bunching panel shows.
 
-The energy loss is the one number that does not compare directly. This window carries 3 kA everywhere and lases everywhere, while the real bunch has a current spike, so the whole 0.25 nC does not radiate at this rate. The paper's 4.6 MeV is the loss spread over the whole charge, and it was measured with 25 of the 33 segments installed. At 100 m, which is those 25 segments, this run has lost 8.19 MeV, so about half of the real bunch's charge radiates at the rate of this window.
+The energy loss is the one number that does not compare directly. This window carries 3 kA everywhere and lases everywhere, while the real bunch has a current spike, so the whole 0.25 nC does not radiate at this rate. The paper's 4.6 MeV is the loss spread over the whole charge, and it was measured with 25 of the 33 segments installed, which is the first 100 m. This window's loss at 100 m, read from the plot's energy panel, is about twice that, so about half of the real bunch's charge radiates at the rate of this window.
 
 ## The window, and why it is a slab
 
-At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavelengths and 500 cooperation lengths, and the whole line slips the light forward by 3762 wavelengths, 0.57 µm. A time-dependent run over the whole bunch would need tens of thousands of slices. It would learn nothing the interior of a shorter window does not say, since each cooperation length lases independently of the others. The deck therefore carries a flat 3 kA slab of 300 slices at 68 wavelengths, 3.08 µm, which is 150 cooperation lengths long and 5.4 times the slippage. The pulse energy above is the peak power per slice times the machine's own pulse duration, and never a sum over this window.
+At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavelengths and 500 cooperation lengths, and the whole line slips the light forward by 3762 wavelengths, 0.57 µm. A time-dependent run over the whole bunch would need tens of thousands of slices. It would learn nothing the interior of a shorter window does not say, since each cooperation length lases independently of the others. The deck therefore carries a flat 3 kA slab 3.08 µm long, which is 150 cooperation lengths and 5.4 times the slippage, as the slice count and slice spacing in the table below. The pulse energy to set against the paper's is the peak power per slice times the machine's own pulse duration, and never a sum over this window.
 
 ## The numerical settings, and how each was chosen
 
-Every value is measured on this machine.
+Every value is measured on this machine. The grid, the slice count, the macroparticle count and the filter's edge are in the table below, as the run printed them.
 
-| setting | here | measured |
-|---|---|---|
-| `grid_n_pts`, `grid_half_width` | derived: 127 points over 191.4 µm | the deck states neither. Cells of 3.038 µm are the beam size over 7, the criterion of the convergence page, and both are printed with their origin at setup |
-| `slicing%n_wavelength` | 68 | two slices per cooperation length. Thirty-four wavelengths per slice over 600 slices, the same window at twice the sampling, gives a gain length of 3.76 m against 3.79 and saturation at 62.7 m against 63.3, at twice the wall clock |
-| `slicing%n_slice` | 300 | 3.08 µm, 5.4 times the whole line's slippage |
-| `ds_step` (lattice) | 0.09 m | three periods, 38 steps per segment. One period gives the same gain length to two decimals and 4 percent more exit power, inside the seed spread, at 2.3 times the wall clock |
-| `beam_init%n_particle` | 4096 | 1024 leaves 21 percent of the exit power outside the mode, 4096 leaves 5.4 percent. The convergence page asks for under 10 |
-| `beamlet_size` | 8, the default | |
-| `global%source_filter` | T, the default | at its derived 4.5 µrad edge it removes 105 times the wide-angle power and moves the mode power 4 percent, since 4096 macroparticles has already converged. The rows above were measured with it off |
+- `grid_n_pts` and `grid_half_width`: the deck states neither. Setup derives cells of the beam size over 7, the criterion of the convergence page, rounds the point count up to a power of two, and prints both with their origin.
+- `slicing%n_wavelength` is 68, two slices per cooperation length. Half the spacing over twice the slices, the same window at twice the sampling, moves the gain length and the saturation point by about a percent, at twice the wall clock.
+- `slicing%n_slice` holds 5.4 times the whole line's slippage.
+- `ds_step` in the lattice is 0.09 m, three periods and 38 steps per segment. One period gives the same gain length and an exit power inside the seed spread, at over twice the wall clock.
+- `beam_init%n_particle` is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
+- `beamlet_size` is 8, the default.
+- `global%source_filter` is T, the default. At its derived edge it removes about a hundred times the wide-angle power and moves the mode power a few percent, since the macroparticle count has already converged.
 
-The rows were measured on the 127-point grid. The derivation rounds the point count up to a power of two, so the deck now derives 128 points over the same half width.
+The run's own convergence report puts the power outside the split angle at a small fraction of the power inside it, so the total field power is the mode. With the filter off the same deck reports about a hundred times that fraction outside the mode.
 
-The run's own convergence report puts the power outside the split angle of 4.5 µrad at 0.0003 times the power inside it, so the total field power is the mode. With the filter off the same deck reported 5 percent of its total outside the mode.
+Four seeds were run with the filter on and with it off and analysed the same way, so the two sets differ only in the filter. The saturation point, the peak bunching, the pulse energy and the energy loss move by a few percent. The fitted gain length moves by about an eighth, several times the seed-to-seed fluctuation.
 
-The four seeds were rerun with the filter on and analysed the same way as without it, so the two columns differ only in the filter. The saturation point, the peak bunching, the pulse energy and the energy loss move by 1 to 3 percent, so the table above holds for them. The fitted gain length moves by 12 percent, so it does not.
-
-| quantity, one analysis over the same four seeds | filter off | filter on |
-|---|---|---|
-| exit pulse energy | 260.0 +- 3.6 µJ | 257.0 +- 5.5 µJ |
-| saturation, where the mean bunching peaks | 64.9 +- 0.7 m | 65.9 +- 0.8 m |
-| peak mean bunching | 0.387 +- 0.007 | 0.397 +- 0.007 |
-| mean energy loss at the exit | 9.81 +- 0.09 MeV | 9.57 +- 0.13 MeV |
-| power gain length fitted over the exponential decade | 4.72 +- 0.05 m | 4.14 +- 0.05 m |
-
-The gain length is the one number the artifact biases, and it biases it upward. The wide-angle emission is large at startup and grows more slowly than the mode, so it flattens the early part of the power curve, and a fit over the exponential decade reads a longer gain length than the mode has. Removing it shortens the fitted value by 12 percent, six times the fluctuation. The absolute values in this table come from a fit over the window's total power, which is not the fit that produced the 3.81 m in the table above, so they compare with each other and not with it.
+The gain length is the one number the artifact biases, and it biases it upward. The wide-angle emission is large at startup and grows more slowly than the mode, so it flattens the early part of the power curve. A fit over the exponential decade then reads a longer gain length than the mode has. Removing it shortens the fitted value. The table below carries a different fit, the shortest e-folding length of the mode power over five consecutive records, so the two compare only with themselves.
 
 The lattice carries the optics, so the beam is generated matched to the periodic solution in the `beginning` statement, which the run holds between 26.1 and 34.3 m over the line. There is no `gamma0` and no match transform.
 
-The run takes ~90 s, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator at 1254 integration steps, each taken over every slice of the window.
+The run takes about two minutes, the longest of the examples that do not need Genesis4. A hard X-ray line is 132 m of undulator, and every integration step is taken over every slice of the window.
 
 ## Measured on this run
 
@@ -122,10 +109,16 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | gain length, the shortest e-folding length over five consecutive records | 3.5577e+00 | m |
 | power at the first element end | 2.6729e+07 | W |
 | power per slice at the first element end | 8.9096e+04 | W |
+| initial bunching, mean |b| over slices | 1.0387e-03 |  |
 | exit bunching, mean |b| over slices | 1.3656e-01 |  |
-| bunching, the run's maximum | 1.3656e-01 |  |
+| exit bunching, the largest slice | 4.1949e-01 |  |
+| bunching at the mode peak | 1.3656e-01 |  |
+| mean slice energy at the start | 1.3600e+10 | eV |
+| mean slice energy at the exit | 1.3591e+10 | eV |
+| mean slice energy, exit minus start | -9.4466e+06 | eV |
 | slice energy spread at the start | 1.7674e+06 | eV |
 | slice energy spread at the exit | 1.1106e+07 | eV |
+| span of the slice energies at the exit, head to tail | 1.4736e+07 | eV |
 | slices | 300 |  |
 | records | 1351 |  |
 | slice spacing | 1.0267e-08 | m |
