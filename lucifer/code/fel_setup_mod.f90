@@ -109,8 +109,24 @@ if (run%global%interlude_ds_step > 0 .and. run%global%interlude_model /= 'bmad')
 endif
 
 if (run%global%unaveraged_ramp_periods < -1) then
-  call out_io (s_error$, r_name, 'UNAVERAGED_RAMP_PERIODS MUST BE POSITIVE, 0 (THE DEFAULT OF 2), OR THE', &
+  call out_io (s_error$, r_name, 'UNAVERAGED_RAMP_PERIODS MUST BE POSITIVE, 0 (THE DEFAULT OF ' // &
+               int_str(fel_ramp_periods_default$) // '), OR THE', &
                'HARD-EDGE SENTINEL -1, GOT: ' // int_str(run%global%unaveraged_ramp_periods))
+  err_flag = .true.;  return
+endif
+
+! A 0 takes the default here, so a hard edge is only ever the sentinel -1 and never the
+! result of leaving the setting at 0. The run records the value it used.
+
+if (run%global%unaveraged_ramp_periods == 0) &
+      run%global%unaveraged_ramp_periods = fel_ramp_periods_default$
+
+! A spacing of 0 is derived from the gain in derive_slicing_and_step. A negative one is
+! refused here, before anything reads it.
+
+if (run%slicing%n_wavelength < 0) then
+  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH MUST BE 0, WHICH DERIVES IT FROM THE GAIN,', &
+               'OR A POSITIVE INTEGER, GOT: ' // int_str(run%slicing%n_wavelength))
   err_flag = .true.;  return
 endif
 
@@ -722,7 +738,7 @@ rho = described_pierce ()
 ! to derive from. Both keep a spacing of one wavelength, and the spacing is never left
 ! unset.
 
-if (run%slicing%n_wavelength <= 0) then
+if (run%slicing%n_wavelength == 0) then
   td = (run%beam_init%sig_z > 0 .or. &
         run%beam_init%grid(3)%x_max > run%beam_init%grid(3)%x_min .or. &
         run%slicing%window_length > 0 .or. run%slicing%n_slice > 0)

@@ -699,7 +699,8 @@ if (lambda0 <= 0) then
   err_flag = .true.;  return
 endif
 if (window_sample < 1) then
-  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH MUST BE A POSITIVE INTEGER.')
+  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH IS \i0\ WHERE THE BEAM IS BUILT.', &
+               'fel_setup_lattice SETS IT, SO IT MUST RUN BEFORE fel_init_beam.', i_array = [window_sample])
   err_flag = .true.;  return
 endif
 
@@ -892,7 +893,8 @@ if (lambda0 <= 0) then
   err_flag = .true.;  return
 endif
 if (window_sample < 1) then
-  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH MUST BE A POSITIVE INTEGER.')
+  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH IS \i0\ WHERE THE BEAM IS BUILT.', &
+               'fel_setup_lattice SETS IT, SO IT MUST RUN BEFORE fel_init_beam.', i_array = [window_sample])
   err_flag = .true.;  return
 endif
 if (beamlet_size < 1) then

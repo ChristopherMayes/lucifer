@@ -17,7 +17,8 @@ point is measuring the inputs of the averaged mode (the coupling factor fc).
    also checks the handoff. With the sin^2 ramps the quiver vanishes at the segment
    ends, so the exit emittance equals the entry emittance and the orbit is unchanged.
    A hard-edge entry (unaveraged_ramp_periods = -1, the explicit sentinel) fails the
-   orbit check.
+   orbit check. The same dark run with the ramp set to 0 takes the default of 2 periods
+   and gives a byte-identical diag, so a hard edge is never the result of a 0.
 
 3. fc measured, both limits. Paired probes (12 and 20 periods, identical 2-period
    ramps): the difference of the two energy-modulation phasors
@@ -376,6 +377,14 @@ def main():
           abs(float(d1["x"].mean() - d0["x"].mean())), 1e-7)
     check("handoff: |<px>_out - <px>_in| (dark, gamma*beta units)",
           abs(float(d1["px"].mean() - d0["px"].mean())), 1e-6)
+    # A ramp of 0 takes the default, and only the sentinel -1 is a hard edge. The dark
+    # run at 0 must therefore be the dark run at the default to the byte. A setup that
+    # took 0 as a hard edge moves the orbit and fails this.
+    run(exe, wd, "uv_dark0", probe_nml(wd, lat="unavg_probe_planar_b.bmad", root="uv_dark0",
+        spp=20, ramp=0, lam=LAMBDA1, power=0.0, w0=SEED_W0))
+    same = (wd / "uv_dark.diag.txt").read_bytes() == (wd / "uv_dark0.diag.txt").read_bytes()
+    check("ramp: 0 runs the default of 2 periods, diag byte-identical (0 = yes)",
+          0.0 if same else 1.0, 0.5)
 
     # 3. fc in both limits, differential pair measurement.
     results = {}
@@ -431,7 +440,7 @@ def main():
     run(exe, wd, "uv_sand_avg", GAIN.format(root="uv_sand_avg", lat="sandwich_avg.bmad"))
     led = np.loadtxt(wd / "uv_sand.ledger.txt")
     confined = float(((led[:, 0] > 0.81 - 1e-9) & (led[:, 0] < 1.41 + 1e-9)).all())
-    check("sandwich: ledger rows confined to the unaveraged segment (1 = yes)",
+    check("sandwich: ledger rows confined to the unaveraged segment (0 = yes)",
           1.0 - confined, 0.5)
     etot = led[:, 1] + led[:, 2]
     turn = np.abs(np.diff(led[:, 2])).sum()
@@ -463,7 +472,7 @@ def main():
     refused = run_expect_refusal(exe, wd, "uv_sandw",
         GAIN.format(root="uv_sandw", lat="sandwich_wake.bmad"),
         "ELEMENT SR WAKES ARE NOT SUPPORTED IN THE UNAVERAGED MODE")
-    check("sandwich: wake on the unaveraged segment refused (1 = yes)",
+    check("sandwich: wake on the unaveraged segment refused (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
     # 8. Thread invariance: the parallel slice loop must be invisible. A multi-slice
@@ -476,7 +485,7 @@ def main():
     run(exe, wd, "uv_tid8", TDID.format(root="uv_tid8", lat=wl), threads="8")
     same = all((wd / f"uv_tid1{s}").read_bytes() == (wd / f"uv_tid8{s}").read_bytes()
                for s in (".diag.txt", ".ledger.txt"))
-    check("thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes)",
+    check("thread invariance: 1-thread vs 8-thread TD run byte-identical (0 = yes)",
           0.0 if same else 1.0, 0.5)
 
     # 9. The time-dependent ledger closure. The window is an open system, since slippage

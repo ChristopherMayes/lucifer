@@ -4221,7 +4221,7 @@ Five groups, and each answers one question.
            axis carries ct_slice, t_slice and z_slice. All three carry @head_direction:
            a higher slice index is toward the window head (the migration invariant).
            A per-slice plot cannot be drawn without it.
-  params/  Every scalar as data: the window (lambda0, window_sample, slice_spacing,
+  params/  Every scalar as data: the window (lambda0, n_wavelength, slice_spacing,
            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
            Nothing a reader needs is left in the echoed namelist.
   beam/    slice/ holds the per-record sufficient statistics, named as the

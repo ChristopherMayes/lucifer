@@ -7,7 +7,8 @@ live in the Fortran declarations, so a hand-written table can drift from them. T
 check holds the two together in both directions:
 
   1. Every fel-owned parameter the page names must exist in its struct, with the
-     default the page states.
+     default the page states. A default the struct writes as a named constant, such as
+     fel_ramp_periods_default$, is read as that constant's value.
   2. Every component of those structs must be named somewhere on the page, so the
      reference cannot go quietly incomplete when a parameter is added.
   3. Every input dataset the stats file writes must name a component of its struct.
@@ -39,6 +40,11 @@ STRUCTS = {
     "fel_space_charge_input_struct": ("fel_collective_mod.f90", "space_charge%"),
 }
 
+# A named constant a default is written as, "integer, parameter :: name$ = 2". A struct
+# default given by name reads as the constant's own value.
+PARAM = re.compile(r"^\s*(?:real\(rp\)|integer)\s*,\s*parameter\s*::\s*(\w+\$)\s*=\s*([^!]+?)\s*(?:!.*)?$",
+                   re.M)
+
 DECL = re.compile(r"""^\s*(?:type\s*\([^)]*\)|character\([^)]*\)|real\(rp\)|integer|logical)
                        \s*(?:,\s*allocatable)?\s*::\s*(.*?)\s*(?:!.*)?$""", re.X)
 
@@ -60,8 +66,9 @@ def norm_default(v):
     return v
 
 
-def parse_struct(text, name):
-    """{component: normalized default} for one type block."""
+def parse_struct(text, name, params=None):
+    """{component: normalized default} for one type block. A default written as a named
+    constant takes the constant's value from params."""
     m = re.search(r"^type " + name + r"\b(.*?)^end type", text, re.S | re.M)
     if not m:
         raise SystemExit(f"struct {name} not found")
@@ -85,7 +92,8 @@ def parse_struct(text, name):
                     continue
                 out[comp] = None
             else:
-                out[comp] = norm_default(val)
+                val = val.strip().rstrip(",").strip()
+                out[comp] = norm_default((params or {}).get(val, val))
     return out
 
 
@@ -117,8 +125,12 @@ def main():
             continue
         rows[name.strip("`").strip()] = cells[1].strip().strip("`").strip()
 
+    params = {}
+    for f in sorted(code.glob("*.f90")):
+        params.update(PARAM.findall(f.read_text()))
+
     for struct, (src, prefix) in STRUCTS.items():
-        decl = parse_struct((code / src).read_text(), struct)
+        decl = parse_struct((code / src).read_text(), struct, params)
         for comp, default in decl.items():
             name = prefix + comp
             checked += 1

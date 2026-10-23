@@ -607,7 +607,7 @@ def refposition_checks(exe, genesis, wd):
     check("refposition: both unmoved by the interlude's drift [m]",
           max(abs(p_ref - p_ref0), abs(b_ref - b_ref0)), 1e-18)
     # Tail to head: the escaped file's slice 1 left last, and the furthest ahead left first.
-    check("refposition: the escaped file's z_transmit falls with its slice number (1 = yes)",
+    check("refposition: the escaped file's z_transmit falls with its slice number (0 = yes)",
           0.0 if np.all(np.diff(zt) <= 0) and zt[0] > zt[-1] else 1.0, 0.5,
           note=f"[{b_n} banked, z_transmit {zt[0]:.3f} to {zt[-1]:.3f} m]")
 
@@ -1055,7 +1055,7 @@ def main():
 
     same = all(h5_identical(wd / f"dg{s}", wd / f"dg1{s}")
                for s in (".stats.h5", "-escaped.fld.h5", "-pulse.fld.h5"))
-    check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes)",
+    check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes)",
           0.0 if same else 1.0, 0.5)
 
     # 5a. Zero-length wake elements of both polarities. This lattice gives the
@@ -1099,7 +1099,7 @@ def main():
     r = subprocess.run([str(exe), "dg_bad.nml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = r.returncode != 0 and "NO_SUCH_ELEMENT" in (r.stdout + r.stderr)
-    check("refusal: unknown dump_beam_at element refused (1 = yes)",
+    check("refusal: unknown dump_beam_at element refused (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
     # 7. The pre-run (doc/user-guide.md). The deck loads 512 macroparticles per slice in
@@ -1422,7 +1422,7 @@ def main():
         extra='  global%dump_slice_first = 4\n  global%dump_slice_last = 99\n')))
     r4 = subprocess.run([str(exe), "rgbad.nml"], cwd=wd, capture_output=True, text=True,
                         env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
-    check("refusal: a slice range outside the window refused (1 = yes)",
+    check("refusal: a slice range outside the window refused (0 = yes)",
           0.0 if (r4.returncode != 0 and "INSIDE THE WINDOW" in (r4.stdout + r4.stderr)) else 1.0, 0.5)
 
     interludes(exe, wd)

@@ -9,6 +9,28 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Fixed: `global%unaveraged_ramp_periods = 0` ran an unaveraged element with a hard edge,
+  while the refusal's message, the struct's comment and the input reference all said 0 keeps the
+  default of 2 periods and only the sentinel -1 is a hard edge. Setup now takes the default at 0,
+  from one named constant, `fel_ramp_periods_default$`, and the stats file records the value the run
+  used. The pre-run block gains an Unaveraged line, printed when the line has an unaveraged element,
+  with the substeps a period, the ramp and where the ramp came from. `check_unaveraged.py` holds the
+  dark probe at 0 byte-identical in its diag to the probe at the default, which the earlier code
+  fails. `check_input_reference.py` reads a struct default written as a named constant as that
+  constant's value. No deck in the harness or the examples sets 0, so no digit moves.
+- 2026-10-23 Fixed: a negative `slicing%n_wavelength` was derived from the gain as though it were 0.
+  The derivation took any value at or below zero, and the two refusals of a value below one in
+  `fel_init_mod.f90` run after it and never saw one. Setup now refuses a negative value with the
+  value in the message, and derives only at 0. The two later refusals guard a caller that builds the
+  beam without running `fel_setup_lattice` first, and their messages say so. `check_load.py` holds
+  the refusal of -3.
+- 2026-10-23 Changed: the stats module's comments and two dataset descriptions written into every
+  stats file, `coords/ct_slice` and `run/slice_spacing`, named the retired
+  `wavefront_init%window_sample`. They name `slicing%n_wavelength`.
+- 2026-10-23 Changed: twelve checks in `check_diagnostics.py`, `check_spontaneous.py`,
+  `check_two_polarization.py` and `check_unaveraged.py` were labelled "(1 = yes)" while recording 0
+  for yes against a bound of 0.5. Their labels say "(0 = yes)", their values and bounds are
+  unchanged, and the generated tables carry the new labels.
 - 2026-10-23 Added: a grid parity check in `check_diagnostics.py`, section `diagnostics`. The steady-state
   example's deck runs at its 256 points and at 255 with the cell held, the half width scaled by 254/255,
   and the exit power's relative difference is held at 3e-2, measured 1.1e-2. On an even count the axis

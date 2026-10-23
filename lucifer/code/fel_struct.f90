@@ -42,6 +42,11 @@ use fel_stats_mod
 
 implicit none
 
+! The sin^2 ramp of an unaveraged element, in periods at each end, where the deck leaves
+! global%unaveraged_ramp_periods unset or sets it to 0 (fel-physics.md sec-unaveraged).
+
+integer, parameter :: fel_ramp_periods_default$ = 2
+
 !+
 ! Struct fel_slicing_struct
 !
@@ -97,7 +102,7 @@ type fel_global_struct
   ! Periods over which the field ramps at each end. 0 keeps the default of 2 and -1 asks
   ! for a hard edge. A hard edge reintroduces the handoff phase jump, so it is never the
   ! result of leaving the setting at 0.
-  integer :: unaveraged_ramp_periods = 2
+  integer :: unaveraged_ramp_periods = fel_ramp_periods_default$
   ! The FEL source model (fel-physics.md sec-coherent-source). 'deposit' is the standard
   ! per-particle scatter. 'coherent' is the SIMPLEX-hybrid coherent-Gaussian source
   ! (Tanaka, PRAB 27, 030703 (2024)). It drops the spatially incoherent artifact, keeps

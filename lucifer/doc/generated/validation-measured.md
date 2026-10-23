@@ -104,6 +104,7 @@ where the two builds agree to every printed digit.
 | copies made outside the loader take the noise on the copies |  | same | holds |
 | refused, copies shifted singly |  | same | holds |
 | refused, a slice dump through beam_init%position_file |  | same | holds |
+| refused, a negative slicing%n_wavelength |  | same | holds |
 | in-cone startup, Gaussian bunch in sample mode | 3.9400e-02 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
@@ -479,18 +480,19 @@ where the two builds agree to every printed digit.
 | ballistic: \|emit_x out/in - 1\| (ramp handoff) | 9.7567e-11 | 9.7574e-11 | <= 1.0000e-06 |
 | handoff: \|<x>_out - <x>_in\| (dark) | 1.9339e-09 | same | <= 1.0000e-07 |
 | handoff: \|<px>_out - <px>_in\| (dark, gamma*beta units) | 3.6359e-14 | 3.6426e-14 | <= 1.0000e-06 |
+| ramp: 0 runs the default of 2 periods, diag byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | fc measured vs closed form, planar (h=1): \|ratio-1\| | 5.8828e-04 | same | <= 5.0000e-03 |
 | fc measured vs closed form, helical (h=1): \|ratio-1\| | 5.9279e-04 | same | <= 5.0000e-03 |
 | fc measured vs closed form, planar_h3 (h=3): \|ratio-1\| | 7.0543e-04 | same | <= 5.0000e-03 |
 | convergence: \|fc(30)/fc(20) - 1\| | 7.5001e-06 | same | <= 5.0000e-04 |
 | gain curve: \|ln(P_unavg/P_avg)\| at segment exit | 2.7430e-03 | 2.7455e-03 | <= 2.0000e-01 |
-| sandwich: ledger rows confined to the unaveraged segment (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| sandwich: ledger rows confined to the unaveraged segment (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | sandwich: ledger max\|d(E+U)\| / sum\|dU\| on the middle segment | 1.4589e-04 | same | <= 1.0000e-03 |
 | sandwich: frames on against off, final beam and field identical to the bit (5 frames inside the unaveraged segment) (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | sandwich: frames landed inside the unaveraged segment (5 expected) | 0 | same | <= 5.0000e-01 |
 | sandwich: \|ln(P_mixed/P_averaged)\| at exit | 1.0428e-03 | same | <= 5.0000e-02 |
-| sandwich: wake on the unaveraged segment refused (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| thread invariance: 1-thread vs 8-thread TD run byte-identical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| sandwich: wake on the unaveraged segment refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| thread invariance: 1-thread vs 8-thread TD run byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | TD ledger: max\|d(E_beam+U_window+U_escaped-U_spont+E_rad)\| / turnover | 4.3341e-10 | 9.8500e-10 | <= 1.0000e-03 |
 | twin: worst transverse row | 9.9829e-07 | same | <= 1.0000e-05 |
 | twin: worst transverse momentum row | 7.6421e-06 | 7.1084e-06 | <= 1.0000e-04 |
@@ -518,7 +520,7 @@ where the two builds agree to every printed digit.
 | fluctuations: averaged sigma growth vs analytic, \|ratio - 1\| | 1.3468e-02 | same | 0.0000e+00 to 5.0000e-02 |
 | fluctuations: unaveraged sigma growth vs analytic, \|ratio - 1\| | 1.7894e-02 | same | 0.0000e+00 to 5.0000e-02 |
 | fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.3485e-01 | same | 0.0000e+00 to 2.5000e-01 |
-| fluctuations: 1-thread vs 8-thread byte-identical (1 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
+| fluctuations: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
 | ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.9122e-12 | 5.2658e-12 | 0.0000e+00 to 1.0000e-03 |
 
 (val-levels-two-polarization)=
@@ -538,15 +540,15 @@ where the two builds agree to every printed digit.
 | crossed, unaveraged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.4202e-01 | same | <= 5.0000e-01 |
 | crossed: averaged vs unaveraged y-power, \|ln ratio\| (priced) | 2.5136e-01 | same | <= 5.0000e-01 |
 | crossed: unaveraged TD ledger closure, both components | 1.7528e-09 | 1.7309e-09 | <= 1.0000e-03 |
-| crossed: 1-thread vs 8-thread byte-identical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| crossed: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | helical re-anchor: vector vs scalar path, shot-noise power | 1.5959e-14 | same | <= 1.0000e-12 |
 | handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
 | handedness, averaged: the pair (1, -i) leaves the beam unmodulated | 3.6010e-06 | same | <= 1.0000e-02 |
 | handedness, unaveraged: the pair (1, +i) reproduces the scalar seed's energy modulation | 2.5204e-08 | same | <= 1.0000e-06 |
 | handedness, unaveraged: the pair (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
-| refusal: tilt on helical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| refusal: tilt with transcribed maps (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| import: the restart without the seed's polarization runs as the one with it (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: tilt on helical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: tilt with transcribed maps (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| import: the restart without the seed's polarization runs as the one with it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | import: the y plane is carried to the end (Py/Px floor) | 1.0000e+00 | same | <= 1.0000e+03 |
 
 (val-levels-beam-format)=
@@ -815,13 +817,13 @@ where the two builds agree to every printed digit.
 | bank: banked slice energies vs ledger U_escaped, rel | 6.8834e-15 | 7.9936e-15 | <= 1.0000e-12 |
 | bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
 | pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.8823e-03 | same | <= 2.0000e-02 |
-| thread invariance: stats/escaped/pulse data identical 1 vs 8 (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | zero-length wake: coords/s repeats where one CAN kick | 0.0000e+00 | same | <= 5.0000e-01 |
 | zero-length wake: and every repeat straddles an element boundary | 0 | same | <= 5.0000e-01 |
 | zero-length wake: s is still non-decreasing | 0 | same | <= 5.0000e-01 |
 | zero-length wake: one that CANNOT kick leaves the file unchanged (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | provenance: global%record_environment restores user and cwd | 0 | same | <= 5.0000e-01 |
-| refusal: unknown dump_beam_at element refused (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: unknown dump_beam_at element refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: the header states the work | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: particle-steps is the product of the two counts | 1.2493e-03 | same | <= 1.0000e-02 |
 | pre-run: the header estimates the walk and names the machine | 0.0000e+00 | same | <= 5.0000e-01 |
@@ -856,7 +858,7 @@ where the two builds agree to every printed digit.
 | range: the field frame carries the range's slices | 0 | same | <= 5.0000e-01 |
 | range: the cut field's mesh starts at its first slice's z [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | range: and its transverse origin is the whole window's [m] | 0.0000e+00 | same | <= 1.0000e-18 |
-| refusal: a slice range outside the window refused (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: a slice range outside the window refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: the knob at zero is the run that never named it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: cut into pieces, exit power against the whole element | 1.2341e-13 | 1.1959e-13 | <= 1.0000e-09 |
 | interlude: cut into pieces, exit sigma_x against the whole element | 5.9606e-16 | same | <= 1.0000e-09 |
@@ -887,7 +889,7 @@ where the two builds agree to every printed digit.
 | refposition: the pulse file's is 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refposition: the escaped file's is the window length n_slice * slicespacing [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refposition: both unmoved by the interlude's drift [m] | 0.0000e+00 | same | <= 1.0000e-18 |
-| refposition: the escaped file's z_transmit falls with its slice number (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refposition: the escaped file's z_transmit falls with its slice number (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refposition: Wavefront.from_genesis4 puts the pulse's first slice at zmin 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refposition: the pulse's live slices are the final field, slice by slice, rel | 1.5515e-16 | same | <= 1.0000e-08 |
 | refposition: pulse slice n_slice + i carries the energy of escaped slice i, rel | 1.4988e-14 | same | <= 1.0000e-08 |

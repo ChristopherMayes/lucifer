@@ -666,6 +666,7 @@ block
   real(rp) n_pstep, n_gpt, secs
   integer nstep, n_particle, ngrid, nstep_unavg, nbeamlet, nharm_noise
   character(16) backend
+  character(64) ramp_str
 
   call fel_cost_count (run, nstep, n_particle, n_pstep, n_gpt, ngrid, nstep_unavg)
   write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Work        ', nstep, &
@@ -693,6 +694,25 @@ block
     write (line, '(3a, i0, a, i0, a)') ' Interlude   steps of ', &
           trim(adjustl(fel_si_str(run%global%interlude_ds_step, 'm'))), ': ', &
           run%n_int_piece, ' pieces, ', run%n_int_ele, ' element(s) cut'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
+
+  ! The unaveraged elements' substeps and ramps, only when the line has one. The ramp
+  ! says where it came from, since a hard edge brings back the handoff's phase jump.
+
+  if (any(run%fel_mode == unaveraged$)) then
+    select case (run%global%unaveraged_ramp_periods)
+    case (-1)
+      ramp_str = 'a hard edge, the sentinel -1'
+    case (fel_ramp_periods_default$)
+      write (ramp_str, '(a, i0, a)') 'sin^2 ramps of ', run%global%unaveraged_ramp_periods, &
+            ' periods at each end, the default'
+    case default
+      write (ramp_str, '(a, i0, a)') 'sin^2 ramps of ', run%global%unaveraged_ramp_periods, &
+            ' periods at each end, as the deck sets'
+    end select
+    write (line, '(a, i0, 2a)') ' Unaveraged  ', run%global%unaveraged_steps_per_period, &
+          ' substeps a period, ', trim(ramp_str)
     call out_io (s_blank$, r_name, trim(line))
   endif
 
@@ -1966,7 +1986,8 @@ call fel_h5_int (g_id, 'unaveraged_steps_per_period', '1', 'steps per period', &
       'Integration steps per undulator period in unaveraged elements. Refused below 10.', &
       '', run%global%unaveraged_steps_per_period, merr)
 call fel_h5_int (g_id, 'unaveraged_ramp_periods', '1', 'ramp periods', &
-      'Periods the field ramps over at each end of an unaveraged element. -1 is a hard edge.', &
+      'Periods the field ramps over at each end of an unaveraged element, the default where ' // &
+      'the deck set 0. -1 is a hard edge.', &
       '', run%global%unaveraged_ramp_periods, merr)
 call fel_h5_flag (g_id, 'write_diag', 'write diag', &
       'Write the Genesis-comparison text diag file.', run%global%write_diag, merr)

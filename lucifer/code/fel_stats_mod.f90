@@ -15,7 +15,7 @@
 !            axis carries ct_slice, t_slice and z_slice. All three carry @head_direction:
 !            a higher slice index is toward the window head (the migration invariant).
 !            A per-slice plot cannot be drawn without it.
-!   params/  Every scalar as data: the window (lambda0, window_sample, slice_spacing,
+!   params/  Every scalar as data: the window (lambda0, n_wavelength, slice_spacing,
 !            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
 !            Nothing a reader needs is left in the echoed namelist.
 !   beam/    slice/ holds the per-record sufficient statistics, named as the
@@ -183,7 +183,7 @@ end type
 !-
 
 type fel_stats_params_struct
-  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m] (window_sample * lambda0).
+  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m] (n_wavelength * lambda0).
   real(rp) :: beta0 = 1            ! Reference beta, for the slice z variable.
   real(rp) :: grid_dx = 0          ! Transverse grid spacing [m], for the projections'
   real(rp) :: grid_dy = 0          !   own axes. Zero where no projection is written.
@@ -1151,8 +1151,8 @@ e_s = pack(stats%z(1:ir), mask)
 ! holds z_global = z_local + beta_j*(islice-1)*spacing with the particle's beta. Since
 ! z = -beta*c*(t - t_ref), at a grid point t - t_ref = -(islice-1)*spacing/c and the
 ! beta cancels. fel_apply_slippage accumulates in radiation wavelengths and rotates the
-! record one slice at window_sample. The slippage rate (1+aw^2)/(2 gamma^2 lambda) is
-! exactly one wavelength per undulator period. So one slice is exactly window_sample
+! record one slice at slicing%n_wavelength. The slippage rate (1+aw^2)/(2 gamma^2 lambda)
+! is exactly one wavelength per undulator period. So one slice is exactly n_wavelength
 ! wavelengths of slippage, and the rotation needs no interpolation. The light-travel
 ! distance is therefore the field's own coordinate.
 !
@@ -1191,7 +1191,7 @@ call fel_h5_real (g_id, 's_element_end', 'm', 's at element end', &
 call fel_h5_int (g_id, 'slice', '1', 'slice', &
       'Slice number, the axis every per-slice dataset runs over.', 'slice', sl, err)
 call fel_h5_real (g_id, 'ct_slice', 'm', 'ct', &
-      'Light-travel distance of each slice ahead of the reference, window_sample ' // &
+      'Light-travel distance of each slice ahead of the reference, n_wavelength ' // &
       'wavelengths per slice. Exact and free of beta, and the coordinate slippage ' // &
       'counts in.', 'slice', ct_slice, err)
 call fel_h5_real (g_id, 't_slice', 's', 't', &
@@ -1308,7 +1308,7 @@ call group_note (f_id, 'run', 'run', 'What the run produced, one scalar each.', 
 call fel_h5_real (g_id, 'p0c', 'eV', 'p0c', 'Reference momentum times c.', '', stats%p0c, err)
 call fel_h5_str (g_id, 'species', 'species', 'Particle species.', '', [prm%species], err)
 call fel_h5_real (g_id, 'slice_spacing', 'm', 'slice spacing', &
-      'Slice spacing, window_sample * lambda0. A light-travel distance, c times the ' // &
+      'Slice spacing, n_wavelength * lambda0. A light-travel distance, c times the ' // &
       'slice time separation: the grid is exactly uniform in t and ct, which is what ' // &
       'makes slippage a whole-slice shift. In Bmad z the separation is beta*this, per ' // &
       'particle. See coords/ct_slice.', '', prm%slice_spacing, err)

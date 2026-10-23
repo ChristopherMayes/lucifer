@@ -27,6 +27,8 @@ Four things, each on the check built for it:
                    copies whose phases were shifted singly. The unshifted copies load, and
                    the message says the noise went on particles sharing their transverse
                    coordinates. A slice dump given as beam_init%position_file is refused.
+                   A negative slicing%n_wavelength is refused with the value in the
+                   message, where 0 derives the spacing from the gain.
 
 Usage:
 
@@ -274,6 +276,13 @@ def refusals(exe, wd):
     good = rc != 0 and "BEAM DUMP IN SLICES" in out
     print(f"  refused, a slice dump through beam_init%position_file: {'ok' if good else 'MISSED'}")
     record("refused, a slice dump through beam_init%position_file", None, None, "bool", good)
+    ok = ok and good
+
+    # A negative spacing is refused. A setup that derived it as though it were 0 fails this.
+    rc, out = run(exe, wd, "ldnegsample", BUNCH, pextra="  global%load_only = T\n", sample=-3)
+    good = rc != 0 and "SLICING%N_WAVELENGTH MUST BE 0" in out and "GOT: -3" in out
+    print(f"  refused, a negative slicing%n_wavelength: {'ok' if good else 'MISSED'}")
+    record("refused, a negative slicing%n_wavelength", None, None, "bool", good)
     ok = ok and good
     return ok
 

@@ -291,7 +291,7 @@ def main():
     #    the one seeded stream, so 1 vs 8 threads must be byte-identical.
     same = all((wd / f"sp_uv_f1{s}").read_bytes() == (wd / f"sp_uv_f8{s}").read_bytes()
                for s in (".diag.txt", ".ledger.txt"))
-    check("fluctuations: 1-thread vs 8-thread byte-identical (1 = yes)",
+    check("fluctuations: 1-thread vs 8-thread byte-identical (0 = yes)",
           0.0 if same else 1.0, 0.0, 0.5)
 
     # 8. The ledger closes with the E_radiated column (radiation on, time-dependent,

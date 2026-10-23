@@ -248,7 +248,7 @@ def main():
                                        extra="  keep_escaped_field = T\n"), threads="1")
     same = all((wd / f"p2t_uv{s}").read_bytes() == (wd / f"p2t_uv1{s}").read_bytes()
                for s in (".diag.txt", ".ledger.txt"))
-    check("crossed: 1-thread vs 8-thread byte-identical (1 = yes)", 0.0 if same else 1.0, 0.5)
+    check("crossed: 1-thread vs 8-thread byte-identical (0 = yes)", 0.0 if same else 1.0, 0.5)
 
     # 5. Helical re-anchor: the scalar path against the vector path, on real physics.
     #    This is a dark time-dependent run with physical shot noise. A quiet start's
@@ -329,8 +329,8 @@ def main():
         "call, file = crossed_probe.bmad\nuse, CROSSED\n")
     ok2 = refuse(exe, wd, "p2f2", NML.format(lat="p2_tr_tilt.bmad", root="p2f2",
                  extra='  transport_model = "genesis"\n'), "KNOW NO TILT")
-    check("refusal: tilt on helical (1 = yes)", 0.0 if ok1 else 1.0, 0.5)
-    check("refusal: tilt with transcribed maps (1 = yes)", 0.0 if ok2 else 1.0, 0.5)
+    check("refusal: tilt on helical (0 = yes)", 0.0 if ok1 else 1.0, 0.5)
+    check("refusal: tilt with transcribed maps (0 = yes)", 0.0 if ok2 else 1.0, 0.5)
 
     # 7. An imported vector field decides the run's planes. When the state was set at
     #    lattice setup from the seed's polarization and the tilts alone, a file carrying
@@ -349,7 +349,7 @@ def main():
     run(exe, wd, "p2i_y", NML.format(lat="p2_hel.bmad", root="p2i_y",
                                      extra=load + "  seed_polarization = 'y'\n"))
     same = (wd / "p2i_def.diag.txt").read_bytes() == (wd / "p2i_y.diag.txt").read_bytes()
-    check("import: the restart without the seed's polarization runs as the one with it (1 = yes)",
+    check("import: the restart without the seed's polarization runs as the one with it (0 = yes)",
           0.0 if same else 1.0, 0.5)
     py = dump_power(wd, "p2i_def-final.wf.h5", "y")
     px = dump_power(wd, "p2i_def-final.wf.h5", "x")
