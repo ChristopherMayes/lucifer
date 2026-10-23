@@ -9,6 +9,20 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: `lucifer/BMAD_RELEASE` names Bmad 20261023-0, which carries
+  bmad-sim/bmad-ecosystem PR 2225. That PR corrects `parser_read_sr_wake` for a `z_long` table that
+  sets `smoothing_sigma`. Its smoothing kernel was an exponential ramp rather than a Gaussian, and
+  the table's z = 0 entry was not halved before smoothing, so such a table took 13 to 16 percent too
+  much energy from the beam. Lucifer applies Bmad's element wakes through the seam, so a user
+  lattice with a smoothed table is what the new minimum protects. No lattice under `lucifer/` sets
+  `smoothing_sigma`, and PR 2223's change to `track_a_lcavity` reaches no lattice under `lucifer/`
+  either, since none holds an lcavity. PR 2204 renumbers `ref_tilt_tot$` and adds
+  `dpz_ele_dpz_start$` in `bmad/modules/bmad_struct.f90`, which every Lucifer module compiles
+  against, and no Lucifer routine reads either. The keystone against the new release reproduces all
+  11 tiers, the 704 checks of `doc/generated/validation-measured.md` and every row of
+  `examples/measured.tsv` with no diff, and `doc/generated/sample-output.md` changes only in the
+  Bmad version its first line prints. Bmad's regression suite reports 54 passed and 3 skipped, which
+  it reported at 20261018-0 too, where `doc/validation.md` had said 53.
 - 2026-10-23 Added: `tests/scripts/startup_noise.py` records the provenance of its runs in each JSON
   it writes. That is the Lucifer commit of the source tree, marked + when the tree had uncommitted
   changes, the build the binary's directory names, the genesis4 version from its banner, the
