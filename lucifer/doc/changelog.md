@@ -9,6 +9,37 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Added: a grid parity check in `check_diagnostics.py`, section `diagnostics`. The steady-state
+  example's deck runs at its 256 points and at 255 with the cell held, the half width scaled by 254/255,
+  and the exit power's relative difference is held at 3e-2, measured 1.1e-2. On an even count the axis
+  falls between four cells, so a beam on the axis reads a centred field low by dx²/2w² through the bilinear
+  gather, and the deposit returns the same deficit. Every check whose reference is an analytic value of a
+  field the beam samples on the grid was run at both parities of one cell. The unaveraged planar coupling
+  factor reads 0.74864 at 128 points and 0.75050 at 127, 2.5e-3 of a 5e-3 tolerance, which is why the
+  probes run on 129. The in-cone startup reads 1.382e5 W per 3 kA slice at 256 points and 1.336e5 W at
+  255 against a target of 1.33e5 W measured on 255, so the parity is 3.4e-2 of the 0.35 tolerance and most
+  of what the check reads. The seed containment reads 0.9999997 at 64 and 63 points, the spontaneous
+  captured fraction 3.316e-2 at 256 and 3.304e-2 at 255 in a range of 1e-2 to 8e-2, the coherent source's
+  limit identity 1.802e-2 at 128 and 1.807e-2 at 127 against 5e-2, and the harmonic one-step deposit
+  2.4e-14 at 151 and 2.1e-14 at 150 against 1e-12. The one-step deposit's own power moves by 3.4e-2 between
+  the parities, as the in-cone power does, while the ratio its check holds does not. The decks that hold
+  an odd grid on purpose say why beside their grid line: the harmonic and phasing checks and the Genesis
+  reference decks for the comparison against Genesis4, the smoke test's twin for the odd-grid path, the
+  unaveraged probes for the axis, and the saturation demo on its page.
+- 2026-10-23 Changed: the user guide's account of the Split block says what its bunching is, the mean over
+  the window at that record weighted by the live charge of each slice, and that the bunching at the mode's
+  peak is not the largest along the line, which the examples' record carries as the bunching maximum. The
+  descriptions of `run/power_inside_angle_peak` and `field/total/power_inside_angle` and the statistics
+  extension's F12a say the power inside the split sums both polarization planes.
+- 2026-10-23 Fixed: the power inside the split angle was integrated over the x plane alone while the total
+  summed both planes, so on a run with two live planes the whole y plane counted as outside the split.
+  `field/total/power_inside_angle`, `run/power_inside_angle_peak` and the Split block now integrate both
+  planes within the same angle, a dark plane adds nothing, and on a run with one plane nothing moves. On
+  the crossed-undulator example the power outside the split at the exit falls from 185.02 W, the y plane's
+  own 185.01 W, to 0.358 W, and the mode peak moves from the start to the exit. `check_two_polarization.py`
+  holds the y plane's share outside the split on the crossed run, the exit's outside power less the x
+  plane's own at the y set's entrance over the y power, at 0.5, measured 0.140 averaged and 0.142
+  unaveraged. A split taken on one plane reads 1 there.
 - 2026-10-23 Changed: every measured number on the example pages is written by the run that measured it.
   `examples/run_examples.sh` records a fixed set of quantities for every deck it runs, through
   `tests/scripts/example_record.py` from the run's stats file and log, into `examples/measured.tsv`, 1,219

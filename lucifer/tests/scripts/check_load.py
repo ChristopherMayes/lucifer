@@ -200,6 +200,9 @@ def incone(exe, wd):
     pextra = (f'  global%track_end = "UND##1"\n  global%source_filter = F\n'
               f'  global%source_filter_angle = {INCONE_CUT:.1e}\n'
               f'  slicing%window_length = {WINDOW:.6e}\n')
+    # The target comes from the page's 255-point deck and this run takes 256. The parity
+    # moves the in-cone power by 3.4 percent of itself, most of what this check reads
+    # against the target, and a tenth of its tolerance.
     rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
                   sample=INCONE_SAMPLE)
     if rc != 0:

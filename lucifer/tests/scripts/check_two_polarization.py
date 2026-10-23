@@ -131,6 +131,21 @@ def diag(wd, root):
     return np.loadtxt(fn).reshape(-1, ns, 12)
 
 
+def split_outside(wd, root):
+    """The window power outside the split angle at the last record that took the field
+    angle moments, the same at the record before it, and the y plane's power at the
+    last. On the crossed line the records that take the moments are the element ends,
+    so the one before the last is the y set's entrance, where the field is the x plane
+    alone and its outside power is the x plane's own."""
+    with h5py.File(wd / f"{root}.stats.h5") as h:
+        p_in = np.asarray(h["field/total/power_inside_angle"])
+        p_tot = np.asarray(h["field/total/power"])
+        p_y = np.asarray(h["field/y/power"])
+    live = np.where(np.isfinite(p_in).all(axis=1))[0]
+    out = p_tot.sum(axis=1) - p_in.sum(axis=1)
+    return float(out[live[-1]]), float(out[live[-2]]), float(p_y[live[-1]].sum())
+
+
 def dump_power(wd, fname, component="x"):
     """Total power [W] in one polarization of a field dump, summed over every slice.
 
@@ -207,6 +222,14 @@ def main():
               iso, 5e-2, note="(the y set must only diffract Ex)")
         check(f"crossed, {mode}: afterburner floor, Px/Py (y must light up)",
               px / max(py, 1e-300), 2e2, note=f"(Py/Px = {py/max(px,1e-300):.3e})")
+        # The split counts both planes. The y plane's share outside the split is the
+        # exit's outside power less the x plane's own, read at the y set's entrance, over
+        # the y power. A split taken on the x plane alone puts the whole y plane outside
+        # and reads 1 here, whatever the y plane's shape.
+        out_exit, out_x, p_y = split_outside(wd, f"p2c_{tag}")
+        check(f"crossed, {mode}: the y plane's share outside the split, "
+              "(outside at exit - the x plane's own) / Py", (out_exit - out_x) / p_y, 0.5,
+              note="(a split on the x plane alone reads 1)")
         lnr_modes[mode] = (px, py)
     lnr = abs(np.log(lnr_modes["averaged"][1] / lnr_modes["unaveraged"][1]))
     check("crossed: averaged vs unaveraged y-power, |ln ratio| (priced)", lnr, 0.5)

@@ -966,7 +966,7 @@ sec_tao_lattices () {
 sec_diagnostics () {
   echo "--- diagnostic-output checks (stats file, dumps, escaped-field bank) ----------"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_diagnostics.py" --exe "$EXE" --latdir "$SCRIPT_DIR/bmad" --workdir "$1" \
-        --genesis "$GENESIS" \
+        --genesis "$GENESIS" --examples "$SCRIPT_DIR/../examples" \
     || { echo "FAIL: diagnostic checks; outputs kept in: $1" >&2; return 1; }
 }
 

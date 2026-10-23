@@ -443,7 +443,7 @@ type (fel_field_struct), target :: ff(:)
 type (wavefront_struct), pointer :: wf
 type (fel_slice_struct), pointer :: sl
 type (wavefront_params_struct) pms
-real(rp) p_in
+real(rp) p_in, p_in_y
 integer io
 type (fel_slice_diag_struct) bdiag_arr(:)
 real(rp) fpow(:), fonax(:)
@@ -478,7 +478,7 @@ any_err = .false.
 ! every slice, so the diag writer only prints. Each slice's arithmetic is the serial
 ! code, so diag.txt is bit-for-bit the same as a serial sweep.
 
-!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, p_in, err) &
+!$OMP parallel do private(sl, w, wsum, mean, cen, sig, v, vmin, vmax, ip, i, j, io, pms, p_in, p_in_y, err) &
 !$OMP&   reduction(.or.: any_err)
 do is = 1, nslice
   sl => beam%slice(is)
@@ -560,10 +560,16 @@ do is = 1, nslice
   stats%f_emit_y(is, ir) = pms%emit_y
   stats%f_angles_valid(is, ir) = merge(1, 0, pms%angle_moments_valid)
 
+  ! The second plane counts toward the slice's power inside the split where it falls,
+  ! integrated within the same angle, so on a run with one plane nothing moves. A dark
+  ! plane returns NaN, since it has nothing to take moments of, and holds no power to add.
+
   if (allocated(wf%Ey)) then
     call wavefront_params_of_plane (wf%Ey(:,:,fel_field_index(ff(1)%slip, is, nslice)), wf%dx, &
-                                    wf%wavelength, beam%slice_spacing, pms, with_angles, err)
+                                    wf%wavelength, beam%slice_spacing, pms, with_angles, err, &
+                                    theta_cut = stats%split_angle, power_inside = p_in_y)
     any_err = any_err .or. err
+    if (pms%power > 0) stats%f_p_in(is, ir) = stats%f_p_in(is, ir) + p_in_y
     stats%f2_centroid(:, is, ir) = pms%centroid
     stats%f2_sigma(:, is, ir) = reshape(pms%sigma, [16])
     stats%f2_energy(is, ir) = pms%energy
@@ -1328,8 +1334,9 @@ if (cvg%ok) then
         'where the mode saturates, among the records that took the field angle moments.', &
         'none', cvg%z(1), err)
   call fel_h5_real (g_id, 'power_inside_angle_peak', 'W', 'mode power', &
-        'Power within field/total/split_angle of the axis, summed over the window, ' // &
-        'at z_mode_peak. This is the part that couples to the mode.', 'none', cvg%p_in(1), err)
+        'Power within field/total/split_angle of the axis, summed over the window and ' // &
+        'over both polarization planes, at z_mode_peak. This is the part that couples ' // &
+        'to the mode.', 'none', cvg%p_in(1), err)
   call fel_h5_real (g_id, 'power_outside_angle_peak', 'W', 'wide-angle power', &
         'Power outside that angle, summed over the window, at z_mode_peak. This is ' // &
         'the emission of the point macroparticle beamlets, which grows as the cells ' // &
@@ -1476,8 +1483,9 @@ block
   call H5Gopen_f (b_id, 'total', t_id, h5e)
   if (h5e == 0) then
     call fel_h5_real (t_id, 'power_inside_angle', 'W', 'power inside the split angle', &
-          'Radiation power of the slice within split_angle of the axis, from the ' // &
-          'transform the angle moments take. NaN where they were not taken.', &
+          'Radiation power of the slice within split_angle of the axis, summed over ' // &
+          'both polarization planes, from the transform the angle moments take. NaN ' // &
+          'where they were not taken.', &
           'record,slice', stats%f_p_in(:,1:ir), err)
     call fel_h5_real_rank0 (t_id, 'split_angle', 'rad', 'split angle', &
           'The angular radius power_inside_angle is measured within: the larger of four ' // &

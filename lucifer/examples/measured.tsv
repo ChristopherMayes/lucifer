@@ -284,15 +284,15 @@ coherent_source	lucifer_reference.in	wide_angle_ratio	1.3742e-03
 coherent_source	lucifer_reference.in	wide_angle_ratio_exit	3.1073e-03	
 crossed_undulator	lucifer.in	bunching_max	8.0057e-04	
 crossed_undulator	lucifer.in	bunching_max_s	1.4000e+00	m
-crossed_undulator	lucifer.in	bunching_peak	4.2511e-17	
+crossed_undulator	lucifer.in	bunching_peak	8.0057e-04	
 crossed_undulator	lucifer.in	energy_change	-3.9091e-03	eV
 crossed_undulator	lucifer.in	exit_bunching	8.0057e-04	
 crossed_undulator	lucifer.in	exit_bunching_max	8.0057e-04	
 crossed_undulator	lucifer.in	exit_energy	5.8038e+09	eV
 crossed_undulator	lucifer.in	exit_energy_span	0.0000e+00	eV
 crossed_undulator	lucifer.in	exit_power	1.0000e+06	W
-crossed_undulator	lucifer.in	exit_power_inside	9.9982e+05	W
-crossed_undulator	lucifer.in	exit_power_outside	1.8502e+02	W
+crossed_undulator	lucifer.in	exit_power_inside	1.0000e+06	W
+crossed_undulator	lucifer.in	exit_power_outside	3.5795e-01	W
 crossed_undulator	lucifer.in	exit_power_per_slice	1.0000e+06	W
 crossed_undulator	lucifer.in	exit_power_slice_max	1.0000e+06	W
 crossed_undulator	lucifer.in	exit_power_y	1.8501e+02	W
@@ -310,7 +310,7 @@ crossed_undulator	lucifer.in	initial_bunching	4.2511e-17
 crossed_undulator	lucifer.in	initial_energy	5.8038e+09	eV
 crossed_undulator	lucifer.in	initial_sigma_energy	5.2937e+05	eV
 crossed_undulator	lucifer.in	mode_peak_inside	1.0000e+06	W
-crossed_undulator	lucifer.in	mode_peak_s	0.0000e+00	m
+crossed_undulator	lucifer.in	mode_peak_s	1.4000e+00	m
 crossed_undulator	lucifer.in	n_particle	2048	
 crossed_undulator	lucifer.in	n_record	82	
 crossed_undulator	lucifer.in	n_slice	1	
@@ -321,8 +321,8 @@ crossed_undulator	lucifer.in	power_after_first_element_per_slice	9.9982e+05	W
 crossed_undulator	lucifer.in	slice_power_max_at_bunching_max	1.0000e+06	W
 crossed_undulator	lucifer.in	slice_spacing	1.0000e-10	m
 crossed_undulator	lucifer.in	split_angle	3.2637e-06	rad
-crossed_undulator	lucifer.in	wide_angle_ratio	4.4003e-09	
-crossed_undulator	lucifer.in	wide_angle_ratio_exit	1.8505e-04	
+crossed_undulator	lucifer.in	wide_angle_ratio	3.5795e-07	
+crossed_undulator	lucifer.in	wide_angle_ratio_exit	3.5795e-07	
 flash1	lucifer.in	bunching_max	8.0278e-02	
 flash1	lucifer.in	bunching_max_s	3.1027e+01	m
 flash1	lucifer.in	bunching_peak	2.0050e-01	

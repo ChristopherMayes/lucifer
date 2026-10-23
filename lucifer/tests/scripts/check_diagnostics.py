@@ -59,6 +59,7 @@ import argparse
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
@@ -542,6 +543,42 @@ field = GREF-copy
 """
 
 
+def grid_parity(exe, wd, examples):
+    """The parity cost of a power-of-two grid, on the steady-state example's deck. The
+    deck runs at its 256 points and at 255 with the cell held, the half width scaled by
+    254/255, and the exit power's relative difference is recorded. On an even
+    grid the axis falls between four cells, so a beam on the axis reads a centred field
+    low by dx^2 over twice the waist squared through the bilinear gather, and the deposit
+    returns the same deficit. An odd grid puts a cell on the axis. The example's dumps are
+    left out, since the exit power is what the check reads, and the lattice is the
+    example's own (doc/validation.md, the transverse grid)."""
+    deck = (examples / "steady_state" / "lucifer.in").read_text()
+    shutil.copy(examples / "aramis.bmad", wd / "aramis.bmad")
+    deck = deck.replace('lat_file = "../aramis.bmad"', 'lat_file = "aramis.bmad"')
+    deck = "\n".join(line for line in deck.splitlines()
+                     if "dump_beam_at" not in line and "dump_field_at" not in line) + "\n"
+    for needed in ('global%out_root = "steady_state"', "grid_n_pts = 256", "grid_half_width = 2e-4"):
+        if needed not in deck:
+            print(f"FAIL: the steady-state example's deck no longer states {needed}")
+            sys.exit(1)
+    power = {}
+    for n in (256, 255):
+        text = deck.replace('global%out_root = "steady_state"', f'global%out_root = "gp{n}"')
+        if n == 255:
+            text = text.replace("grid_n_pts = 256", "grid_n_pts = 255")
+            text = text.replace("grid_half_width = 2e-4", f"grid_half_width = {2e-4 * 254 / 255:.12e}")
+        (wd / f"gp{n}.nml").write_text(text)
+        r = subprocess.run([str(exe), f"gp{n}.nml"], cwd=wd, capture_output=True, text=True,
+                           env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
+        if r.returncode != 0:
+            print(f"FAIL: gp{n} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
+            sys.exit(1)
+        with h5py.File(wd / f"gp{n}.stats.h5") as h5:
+            power[n] = float(np.sum(h5["field/total/power"][-1]))
+    check("grid parity: the steady-state example's exit power at 255 against 256 points, |rel|",
+          abs(power[255] / power[256] - 1), 3e-2, note="(the cell held)")
+
+
 def refposition_checks(exe, genesis, wd):
     """refposition in the pulse and escaped files, held against Genesis's own reader."""
     from beamphysics.wavefront import Wavefront
@@ -618,6 +655,7 @@ def main():
     ap.add_argument("--latdir", required=True)
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--genesis", required=True, help="genesis4 binary, for the import of the pulse file")
+    ap.add_argument("--examples", required=True, help="the examples directory, for the grid parity check")
     args = ap.parse_args()
 
     exe = pathlib.Path(args.exe).resolve()
@@ -1389,6 +1427,7 @@ def main():
 
     interludes(exe, wd)
     refposition_checks(exe, pathlib.Path(args.genesis).resolve(), wd)
+    grid_parity(exe, wd, pathlib.Path(args.examples).resolve())
 
     if FAILED:
         print("diagnostic checks: FAIL")

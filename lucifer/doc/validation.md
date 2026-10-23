@@ -150,6 +150,8 @@ Four places therefore hold an odd grid on purpose, each saying so where it is wr
 
 The other four checks that run Genesis4 are unaffected and stay on powers of two. The distribution import, the SASE startup cross-check, the beam format check and the device's own Genesis comparison compare loaders, formats and short propagations rather than a long field solve. The device's Genesis anchor at grid 64 moved with the correction, which is the upstream defect measured on a short planar segment, and its level sits well inside that check's bound ([](#val-levels-device)).
 
+A power-of-two grid has a parity cost of its own, apart from the reference. On an even count the axis falls between four cells. A beam on the axis then reads a centred field low by the cell squared over twice the waist squared through the bilinear gather, and the deposit returns the same deficit. An odd count puts a cell on the axis. `check_diagnostics.py` measures that cost on the steady-state example's deck, at its 256 points and at 255 with the cell held, as the exit power's relative difference, and the row is in [](#val-levels-diagnostics). The checks whose reference is an analytic value of a field the beam samples on the grid were each run at both parities of one cell. The unaveraged coupling probes moved by half their tolerance and run on an odd grid for it ([](#val-the-unaveraged-mode-fc)). The in-cone startup moved by a tenth of its tolerance, since its target was measured on an odd grid. The seed containment, the spontaneous capture, the coherent source's limit identity and the harmonic one-step deposit moved by far less. The numbers are in the changelog.
+
 (val-validation-from-one-command)=
 ## Validation, from one command
 

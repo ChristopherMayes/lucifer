@@ -532,8 +532,10 @@ where the two builds agree to every printed digit.
 | rotation, unaveraged: beam-size swap identity at exit | 2.2204e-16 | 4.4409e-16 | <= 1.0000e-08 |
 | crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.5543e-15 | 1.1102e-15 | <= 5.0000e-02 |
 | crossed, averaged: afterburner floor, Px/Py (y must light up) | 1.1377e+02 | same | <= 2.0000e+02 |
+| crossed, averaged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.3978e-01 | same | <= 5.0000e-01 |
 | crossed, unaveraged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 2.5052e-06 | 2.5048e-06 | <= 5.0000e-02 |
 | crossed, unaveraged: afterburner floor, Px/Py (y must light up) | 1.4644e+02 | same | <= 2.0000e+02 |
+| crossed, unaveraged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.4202e-01 | same | <= 5.0000e-01 |
 | crossed: averaged vs unaveraged y-power, \|ln ratio\| (priced) | 2.5136e-01 | same | <= 5.0000e-01 |
 | crossed: unaveraged TD ledger closure, both components | 1.7528e-09 | 1.7309e-09 | <= 1.0000e-03 |
 | crossed: 1-thread vs 8-thread byte-identical (1 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
@@ -892,3 +894,4 @@ where the two builds agree to every printed digit.
 | refposition: Genesis imports the pulse and re-dumps the same slice count | 0 | same | <= 5.0000e-01 |
 | refposition: Genesis's re-dump is the pulse, slice by slice, rel | 2.0210e-16 | same | <= 1.0000e-12 |
 | refposition: and carries the pulse's own refposition [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| grid parity: the steady-state example's exit power at 255 against 256 points, \|rel\| | 1.1474e-02 | same | <= 3.0000e-02 |
