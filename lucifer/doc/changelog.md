@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: every measured number on the example pages is written by the run that measured it.
+  `examples/run_examples.sh` records a fixed set of quantities for every deck it runs, through
+  `tests/scripts/example_record.py` from the run's stats file and log, into `examples/measured.tsv`, 1,219
+  rows for the 30 decks, which the keystone regenerates and diffs beside the pages. Each example's page
+  carries its rows as a table, a column per deck, and the user guide's sample output is written from the
+  steady-state example's log. The READMEs carry no digit the record carries and point at the table. Of the
+  numbers they quoted from runs, nearly every exit power, saturation position, wide-angle ratio and energy
+  change was stale against the current binary, among them `steady_state`'s exit at 792.7 MW against
+  802.0 MW recorded and `migration`'s exit powers at 86.3 and 123.4 MW against 77.2 and 111.7 MW. The
+  published values the `flash1` and `lcls` pages compare with stay as citations, and a number from a run
+  of a variant that is not a deck in the directory left with its sentence kept in words.
 - 2026-10-23 Fixed: the unaveraged coupling probes of `check_unaveraged.py` ran on a 128-point grid
   since the decks moved to powers of two on 2026-09-09. The probe beam sits on the axis and the formula
   divides by the seed's on-axis envelope, and with an even count the axis falls between four cells, so the
