@@ -38,7 +38,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | peak power | 1.3182e+09 | 1.6683e+09 | 1.5611e+09 | W |
 | s of the peak power | 4.1318e+01 | 3.8762e+01 | 3.8134e+01 | m |
 | mode peak, power inside the split | 1.2854e+09 | 1.5881e+09 | 1.5578e+09 | W |
-| s of the mode peak | 4.2510e+01 | 3.8000e+01 | 3.8000e+01 | m |
+| s of the mode peak | 4.1990e+01 | 3.7760e+01 | 3.7680e+01 | m |
 | exit power inside the split | 7.1333e+08 | 1.1569e+09 | 7.9951e+08 | W |
 | exit power outside the split | 3.5283e+07 | 2.4610e+07 | 2.4843e+06 | W |
 | outside over inside, the run's maximum | 3.3331e-03 | 1.0852e-02 | 1.3742e-03 |  |
@@ -52,7 +52,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | exit bunching, the largest slice | 2.7442e-01 | 1.7420e-01 | 2.4127e-01 |  |
 | bunching, the maximum along the line of the mean |b| | 3.4271e-01 | 2.3820e-01 | 3.0279e-01 |  |
 | s of the bunching maximum | 4.0780e+01 | 3.7240e+01 | 3.8403e+01 | m |
-| bunching at the mode peak | 3.2232e-01 | 2.3442e-01 | 3.0142e-01 |  |
+| bunching at the mode peak | 3.3428e-01 | 2.3801e-01 | 3.0143e-01 |  |
 | power of the largest slice at the bunching maximum | 1.3026e+09 | 1.6053e+09 | 1.5550e+09 | W |
 | exit power of the largest slice | 7.4861e+08 | 1.1816e+09 | 8.0199e+08 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | 5.8038e+09 | eV |

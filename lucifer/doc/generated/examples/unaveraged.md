@@ -43,7 +43,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | exit power inside the split | 4.2156e+03 | 4.1988e+03 | W |
 | exit power outside the split | 2.0288e+02 | 2.1709e+02 | W |
 | outside over inside, the run's maximum | 2.2985e-07 | 2.2985e-07 |  |
-| outside over inside at the exit | 4.8126e-02 | 5.1702e-02 |  |
+| outside over inside at the exit | 4.8127e-02 | 5.1702e-02 |  |
 | split angle | 2.9077e-06 | 2.9077e-06 | rad |
 | power at the first element end | 4.4185e+03 | 4.4159e+03 | W |
 | power per slice at the first element end | 4.4185e+03 | 4.4159e+03 | W |
@@ -57,7 +57,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | exit power of the largest slice | 4.4185e+03 | 4.4159e+03 | W |
 | mean slice energy at the start | 5.8038e+09 | 5.8038e+09 | eV |
 | mean slice energy at the exit | 5.8038e+09 | 5.8038e+09 | eV |
-| mean slice energy, exit minus start | 1.9412e-01 | 1.9024e-01 | eV |
+| mean slice energy, exit minus start | 1.9411e-01 | 1.9024e-01 | eV |
 | slice energy spread at the start | 5.0869e+05 | 5.0869e+05 | eV |
 | slice energy spread at the exit | 5.0871e+05 | 5.0871e+05 | eV |
 | span of the slice energies at the exit, head to tail | 0.0000e+00 | 0.0000e+00 | eV |

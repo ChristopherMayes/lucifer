@@ -230,15 +230,15 @@ The version of this that could pay is a vectorized pair inside a loop that vecto
 (perf-the-vectorization-audit)=
 ## The vectorization audit
 
-The compiler is gfortran 13.3.0 at the production flags, which are `-O2 -ftree-vectorize -march=armv8.3-a` with per-file `-O3` on `fel_track_mod`.
+The compiler is gfortran 15.3.0 from conda-forge at the production flags, which are `-O2 -ftree-vectorize -march=armv8.3-a` with per-file `-O3` on `fel_track_mod`.
 
 | file | vectorized | not vectorized |
 |---|---|---|
-| `fel_track_mod.f90` | 45 | 237 |
-| `fel_unaveraged_mod.f90` | 19 | 92 |
-| `fel_collective_mod.f90` | 5 | 50 |
+| `fel_track_mod.f90` | 47 | 251 |
+| `fel_unaveraged_mod.f90` | 12 | 77 |
+| `fel_collective_mod.f90` | 1 | 49 |
 
-None of the hot per-particle loops is among the vectorized. The compiler rejects every one of them for the same reason, `control flow in loop`. The audit's report gives each loop's line, which moves with every edit to the file, so the table names the loop by its routine:
+None of the hot per-particle loops is among the vectorized. The compiler rejects every one of them for the same reason, `unsupported control flow in loop`. The audit's report gives each loop's line, which moves with every edit to the file, so the table names the loop by its routine:
 
 | loop | routine | what blocks it |
 |---|---|---|
@@ -248,7 +248,7 @@ None of the hot per-particle loops is among the vectorized. The compiler rejects
 | the particle loop of the multi-harmonic twin | `fel_advance` | the same |
 | the deposit's particle loop | `fel_field_step` | `if (.not. on_grid) cycle`, and the report also names `statement clobbers memory: fel_grid_weights` |
 
-The aggregate reasons, most common first, are `vectorization is not profitable` (95 in `fel_track_mod`), `control flow in loop` (36) and `complicated access pattern` (33). The first is mostly short fixed-length loops over the 6-vector, which the compiler is right about. The second covers the loops in the table.
+The aggregate reasons, most common first, are `vectorization is not profitable` (112 in `fel_track_mod`), `complicated access pattern` (33) and `unsupported control flow in loop` (31). The first is mostly short fixed-length loops over the 6-vector, which the compiler is right about. The second covers the loops in the table.
 
 One pattern accounts for all five. A per-particle loop calls a routine that the compiler does not inline, the routine carries a branch, and the branch ends the loop's chance of vectorizing. The deposit's `on_grid` guard is the clearest case: it is a mask written as a `cycle`.
 

@@ -36,7 +36,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 | exit power per slice | 8.8074e+09 | W |
 | exit pulse energy | 2.9378e-09 | J |
 | peak power | 8.8074e+09 | W |
-| s of the peak power | 5.6760e+01 | m |
+| s of the peak power | 5.7000e+01 | m |
 | mode peak, power inside the split | 8.7969e+09 | W |
 | s of the mode peak | 5.7000e+01 | m |
 | exit power inside the split | 8.7969e+09 | W |

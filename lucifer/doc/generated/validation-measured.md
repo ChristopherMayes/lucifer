@@ -7,7 +7,7 @@ physics moves, and the keystone regenerates this file and requires no diff.
 |---|---|---|---|
 | `tier1` | FEL core, one undulator segment | 1.825899e-06 | same |
 | `tier1_unavg` | one segment, unaveraged dynamics vs Genesis4 (priced model difference) | 6.984497e-02 | 6.984652e-02 |
-| `tier2_genesis` | full line, transcribed interludes | 1.771890e-05 | 1.771900e-05 |
+| `tier2_genesis` | full line, transcribed interludes | 1.771890e-05 | 1.771899e-05 |
 | `tier2_bmad` | full line, Bmad seam interludes | 5.001254e-02 | same |
 | `td1` | FEL core + slippage, one undulator segment | 8.362073e-07 | same |
 | `td2_genesis` | full line time dependent, transcribed interludes | 2.376734e-06 | 2.376736e-06 |
@@ -90,14 +90,14 @@ where the two builds agree to every printed digit.
 | shot noise, the occupants of each deposit cell, harmonic 1 | 1.0530e+00 | same | 5.6967e-01 to 1.4303e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 2 | 9.4860e-01 | same | 5.6967e-01 to 1.4303e+00 |
 | shot noise, the occupants of each deposit cell, harmonic 3 | 9.0833e-01 | same | 5.6967e-01 to 1.4303e+00 |
-| mode split against the dump's far field | 2.2451e-16 | same | <= 1.0000e-06 |
+| mode split against the dump's far field | 0.0000e+00 | 3.3676e-16 | <= 1.0000e-06 |
 
 (val-levels-load)=
 ### `load`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| keep mode against the bunch, currents, counts and moments | 1.5202e-11 | same | <= 1.0000e-10 |
+| keep mode against the bunch, currents, counts and moments | 1.5202e-11 | 1.0440e-11 | <= 1.0000e-10 |
 | the dump carries the bunch's charge | 2.1036e-16 | same | <= 1.0000e-12 |
 | split weights against the unsplit load | 3.4719e-12 | same | <= 1.0000e-11 |
 | refused, noise on the unquiet generator |  | same | holds |
@@ -239,19 +239,19 @@ where the two builds agree to every printed digit.
 | lockstep steady worst_theta | 9.0832e-06 | same | <= 3.0000e-04 |
 | lockstep steady worst_phasor | 7.7028e-08 | 7.4524e-08 | <= 3.0000e-05 |
 | lockstep steady worst_source | 1.2749e-05 | 1.2748e-05 | <= 1.0000e-04 |
-| lockstep steady worst_field | 1.2753e-05 | 1.2754e-05 | <= 1.0000e-04 |
+| lockstep steady worst_field | 1.2748e-05 | 1.2746e-05 | <= 1.0000e-04 |
 | lockstep steady guard ulps | 6.7548e+03 | same | >= 2.5600e+02 |
 | bucket renormalization round trip [ulp] | 1.0000e+00 | same | <= 1.5000e+00 |
 | FP64 diag byte-identical, instrument on vs off |  | same | holds |
 | mutation moves worst_theta | 1.1658e-04 | same | >= 9.0832e-05 |
 | mutation moves worst_source | 3.8704e-04 | 3.8705e-04 | >= 6.3745e-05 (debug), >= 6.3740e-05 (production) |
-| freerun compounds past lockstep (phasor) | 1.0070e-06 | 1.1080e-06 | >= 7.7028e-08 (debug), >= 7.4524e-08 (production) |
-| freerun end-to-end power divergence recorded | 7.3719e-04 | 6.9305e-04 | 0 to 1.0000e-02 |
+| freerun compounds past lockstep (phasor) | 1.0073e-06 | 1.1073e-06 | >= 7.7028e-08 (debug), >= 7.4524e-08 (production) |
+| freerun end-to-end power divergence recorded | 7.3736e-04 | 6.9311e-04 | 0 to 1.0000e-02 |
 | lockstep TD worst_pz | 2.1196e-07 | same | <= 2.0000e-06 |
 | lockstep TD worst_theta | 9.3080e-06 | same | <= 3.0000e-04 |
 | lockstep TD worst_phasor | 1.5207e-07 | 1.5142e-07 | <= 3.0000e-05 |
 | lockstep TD worst_source | 5.2451e-06 | 5.2396e-06 | <= 1.0000e-04 |
-| lockstep TD worst_field | 5.2565e-06 | 5.2505e-06 | <= 1.0000e-04 |
+| lockstep TD worst_field | 5.2515e-06 | 5.2477e-06 | <= 1.0000e-04 |
 | lockstep TD guard ulps | 5.7301e+03 | same | >= 2.5600e+02 |
 | instrument stream byte-identical, 1 vs 8 threads |  | same | holds |
 | wake with the instrument refused |  | same | holds |
@@ -408,15 +408,15 @@ where the two builds agree to every printed digit.
 | unaveraged lockstep steady worst_pz | 2.1513e-06 | same | <= 6.5000e-06 |
 | unaveraged lockstep steady worst_theta | 3.3663e-06 | 3.3645e-06 | <= 1.1000e-05 |
 | unaveraged lockstep steady worst_phasor | 6.5601e-08 | 6.5927e-08 | <= 2.5000e-07 |
-| unaveraged lockstep steady worst_source | 6.6825e-05 | 6.2477e-05 | <= 5.0000e-03 |
+| unaveraged lockstep steady worst_source | 6.6128e-05 | 6.2477e-05 | <= 5.0000e-03 |
 | unaveraged lockstep steady worst_field | 6.3381e-06 | 6.4110e-06 | <= 2.0000e-05 |
 | unaveraged lockstep steady guard [ticks] | 3.1319e+09 | same | >= 1.0000e+09 |
 | unaveraged FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | unaveraged FP64 ledger byte-identical, device twin on vs off |  | same | holds |
 | unaveraged mutation moves worst_theta | 9.8122e-05 | 9.8236e-05 | >= 3.3663e-05 (debug), >= 3.3645e-05 (production) |
 | unaveraged mutation moves worst_phasor | 3.2597e-05 | same | >= 3.2801e-06 (debug), >= 3.2964e-06 (production) |
-| unaveraged mutation moves worst_field | 7.7091e-04 | 7.7092e-04 | >= 1.2676e-04 (debug), >= 1.2822e-04 (production) |
-| unaveraged production power vs CPU | 1.7239e-03 | 1.7230e-03 | <= 5.0000e-03 |
+| unaveraged mutation moves worst_field | 7.7092e-04 | 7.7091e-04 | >= 1.2676e-04 (debug), >= 1.2822e-04 (production) |
+| unaveraged production power vs CPU | 1.7235e-03 | 1.7260e-03 | <= 5.0000e-03 |
 | unaveraged frames on the device, count against the CPU | 9 | same | = 9 |
 | unaveraged field frames on the device, count against the CPU | 9 | same | = 9 |
 | unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
@@ -437,9 +437,9 @@ where the two builds agree to every printed digit.
 | unaveraged TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | unaveraged production TD window power vs CPU | 1.6997e-06 | 1.6361e-06 | <= 5.0000e-03 |
 | two unaveraged device runs, diag and ledger identical |  | same | holds |
-| FP32 transform pair energy loss, unaveraged deck | 1.2826e-07 | 1.2772e-07 | 5.0000e-08 to 4.0000e-07 |
+| FP32 transform pair energy loss, unaveraged deck | 1.2829e-07 | 1.2854e-07 | 5.0000e-08 to 4.0000e-07 |
 | header counts the transform pairs, unaveraged deck | [5340, 5340] | same | = [5340, 5340] |
-| header projection over measured loss, unaveraged deck | 9.5117e-01 | 9.5525e-01 | 5.0000e-01 to 2.0000e+00 |
+| header projection over measured loss, unaveraged deck | 9.5098e-01 | 9.4915e-01 | 5.0000e-01 to 2.0000e+00 |
 | FP32 transform pair energy loss, averaged deck | 1.2733e-07 | same | 5.0000e-08 to 4.0000e-07 |
 | header counts the transform pairs, averaged deck | [89, 0] | same | = [89, 0] |
 | header projection over measured loss, averaged deck | 9.5814e-01 | same | 5.0000e-01 to 2.0000e+00 |
@@ -451,17 +451,17 @@ where the two builds agree to every printed digit.
 | two-plane unaveraged lockstep worst_theta | 1.9855e-06 | same | <= 1.1000e-05 |
 | two-plane unaveraged lockstep worst_phasor | 1.6516e-08 | same | <= 2.5000e-07 |
 | two-plane unaveraged lockstep worst_source | 2.1786e-04 | same | <= 5.0000e-03 |
-| two-plane unaveraged lockstep worst_field | 2.0059e-06 | 2.0278e-06 | <= 2.0000e-05 |
+| two-plane unaveraged lockstep worst_field | 2.0194e-06 | 1.9969e-06 | <= 2.0000e-05 |
 | two-plane unaveraged lockstep guard [ticks] | 1.1170e+08 | same | >= 1.0000e+07 |
 | two-plane unaveraged FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | two-plane unaveraged FP64 ledger byte-identical, device twin on vs off |  | same | holds |
 | two-plane unaveraged mutation moves worst_theta | 9.7376e-05 | same | >= 1.9855e-05 |
 | two-plane unaveraged mutation moves worst_phasor | 3.1506e-05 | same | >= 8.2580e-07 |
-| two-plane unaveraged mutation moves worst_field | 2.1729e-04 | same | >= 4.0118e-05 (debug), >= 4.0556e-05 (production) |
-| two-plane unaveraged production power x vs CPU | 2.0142e-04 | 2.0397e-04 | <= 5.0000e-03 |
-| two-plane unaveraged production power y vs CPU | 2.9800e-02 | same | <= 1.0000e-01 |
+| two-plane unaveraged mutation moves worst_field | 2.1729e-04 | same | >= 4.0388e-05 (debug), >= 3.9938e-05 (production) |
+| two-plane unaveraged production power x vs CPU | 2.0188e-04 | 2.0313e-04 | <= 5.0000e-03 |
+| two-plane unaveraged production power y vs CPU | 2.9801e-02 | same | <= 1.0000e-01 |
 | two-plane unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
-| FP32 transform pair energy loss, two-plane deck | 1.2923e-07 | 1.3001e-07 | 5.0000e-08 to 4.0000e-07 |
+| FP32 transform pair energy loss, two-plane deck | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
 | handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7298e-07 | same | <= 1.0000e-05 |
 | handedness on the device: (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
 
@@ -470,11 +470,11 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| energy ledger: max\|d(E_beam+U_field)\| / sum\|dU\| | 4.8059e-06 | 4.8068e-06 | <= 1.0000e-04 |
+| energy ledger: max\|d(E_beam+U_field)\| / sum\|dU\| | 4.8122e-06 | 4.8119e-06 | <= 1.0000e-04 |
 | ledger internal: \|dE_kick - dE_beam\| / max\|dE\| | 9.6433e-06 | 9.6432e-06 | <= 1.0000e-04 |
 | energy ledger, 100 um seed, 20 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 1.3233e-05 | same | <= 1.0000e-04 |
 | energy ledger, 100 um seed, 40 substeps a period: max\|d(E_beam+U_field)\| / sum\|dU\| | 5.3601e-06 | 5.3600e-06 | <= 1.0000e-04 |
-| order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7) | 5.7868e-01 | 5.7861e-01 | <= 1.0000e+00 |
+| order: field, observed between 20 and 40 substeps a period (2 expected, floor 1.7) | 5.7861e-01 | 5.7868e-01 | <= 1.0000e+00 |
 | order: particle energy, observed between 20 and 40 (2 expected, floor 1.7) | 4.2788e-01 | same | <= 1.0000e+00 |
 | ballistic: max\|dgamma\| (B does no work) | 4.8046e-16 | same | <= 1.0000e-12 |
 | ballistic: \|emit_x out/in - 1\| (ramp handoff) | 9.7567e-11 | 9.7574e-11 | <= 1.0000e-06 |
@@ -493,14 +493,14 @@ where the two builds agree to every printed digit.
 | sandwich: \|ln(P_mixed/P_averaged)\| at exit | 1.0428e-03 | same | <= 5.0000e-02 |
 | sandwich: wake on the unaveraged segment refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | thread invariance: 1-thread vs 8-thread TD run byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| TD ledger: max\|d(E_beam+U_window+U_escaped-U_spont+E_rad)\| / turnover | 4.3341e-10 | 9.8500e-10 | <= 1.0000e-03 |
+| TD ledger: max\|d(E_beam+U_window+U_escaped-U_spont+E_rad)\| / turnover | 4.5759e-10 | 9.8500e-10 | <= 1.0000e-03 |
 | twin: worst transverse row | 9.9829e-07 | same | <= 1.0000e-05 |
 | twin: worst transverse momentum row | 7.6421e-06 | 7.1084e-06 | <= 1.0000e-04 |
 | twin: worst energy row | 2.1138e-06 | 2.1051e-06 | <= 1.0000e-04 |
-| twin: worst phase row | 9.6864e-06 | 9.9196e-06 | <= 1.0000e-03 |
+| twin: worst phase row | 9.6871e-06 | 9.9196e-06 | <= 1.0000e-03 |
 | twin: worst phasor row | 7.8557e-08 | 8.3188e-08 | <= 1.0000e-05 |
-| twin: worst ledger row, its energy against the FP64 step's | 1.5558e-05 | 1.5561e-05 | <= 1.0000e-04 |
-| twin: worst field row, after every substep of the record step | 6.1148e-06 | 6.1692e-06 | <= 5.0000e-05 |
+| twin: worst ledger row, its energy against the FP64 step's | 1.5559e-05 | 1.5561e-05 | <= 1.0000e-04 |
+| twin: worst field row, after every substep of the record step | 5.8824e-06 | 5.9548e-06 | <= 5.0000e-05 |
 | twin: the FP64 stream is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | twin: the ledger is identical with it on against off (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | twin: freerun refused in the unaveraged mode (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
@@ -521,18 +521,18 @@ where the two builds agree to every printed digit.
 | fluctuations: unaveraged sigma growth vs analytic, \|ratio - 1\| | 1.7894e-02 | same | 0.0000e+00 to 5.0000e-02 |
 | fluctuations: FEL form vs Bmad runge_kutta+fluctuations, \|ln ratio\| | 1.3485e-01 | same | 0.0000e+00 to 2.5000e-01 |
 | fluctuations: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | 0.0000e+00 to 5.0000e-01 |
-| ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.9122e-12 | 5.2658e-12 | 0.0000e+00 to 1.0000e-03 |
+| ledger: max\|d(E+U+U_esc-U_spont+E_rad)\| / turnover, radiation on | 4.9122e-12 | 5.0416e-12 | 0.0000e+00 to 1.0000e-03 |
 
 (val-levels-two-polarization)=
 ### `two-polarization`
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.0948e-15 | 9.6405e-15 | <= 1.0000e-08 |
+| rotation, averaged: power \|x-run - y-run\| / max, all records | 9.0948e-15 | 9.2767e-15 | <= 1.0000e-08 |
 | rotation, averaged: beam-size swap identity at exit | 2.2204e-16 | 0.0000e+00 | <= 1.0000e-08 |
 | rotation, unaveraged: power \|x-run - y-run\| / max, all records | 5.5091e-07 | 5.7792e-07 | <= 1.0000e-05 |
-| rotation, unaveraged: beam-size swap identity at exit | 2.2204e-16 | 4.4409e-16 | <= 1.0000e-08 |
-| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.5543e-15 | 1.1102e-15 | <= 5.0000e-02 |
+| rotation, unaveraged: beam-size swap identity at exit | 2.2204e-16 | 6.6613e-16 | <= 1.0000e-08 |
+| crossed, averaged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 1.1102e-15 | 1.5543e-15 | <= 5.0000e-02 |
 | crossed, averaged: afterburner floor, Px/Py (y must light up) | 1.1377e+02 | same | <= 2.0000e+02 |
 | crossed, averaged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.3978e-01 | same | <= 5.0000e-01 |
 | crossed, unaveraged: x-field gain ISOLATION through the y set, \|ln(Px/P_drift)\| | 2.5052e-06 | 2.5048e-06 | <= 5.0000e-02 |
@@ -541,7 +541,7 @@ where the two builds agree to every printed digit.
 | crossed: averaged vs unaveraged y-power, \|ln ratio\| (priced) | 2.5136e-01 | same | <= 5.0000e-01 |
 | crossed: unaveraged TD ledger closure, both components | 1.7528e-09 | 1.7309e-09 | <= 1.0000e-03 |
 | crossed: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| helical re-anchor: vector vs scalar path, shot-noise power | 1.5959e-14 | same | <= 1.0000e-12 |
+| helical re-anchor: vector vs scalar path, shot-noise power | 1.5798e-14 | 1.5959e-14 | <= 1.0000e-12 |
 | handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
 | handedness, averaged: the pair (1, -i) leaves the beam unmodulated | 3.6010e-06 | same | <= 1.0000e-02 |
 | handedness, unaveraged: the pair (1, +i) reproduces the scalar seed's energy modulation | 2.5204e-08 | same | <= 1.0000e-06 |
@@ -650,13 +650,13 @@ where the two builds agree to every printed digit.
 | h3both-final-h3.wf.h5 unitDimension |  | same | holds |
 | h3both-final-h3.wf.h5 photonEnergy wavelength | 0.0000e+00 | same | <= 3.3333e-17 |
 | h3both-final-h3.wf.h5 component unitSI |  | same | holds |
-| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.4371e-16 | 1.5943e-16 | <= 1.0000e-13 |
+| the converter's Genesis view agrees complex-wise (h3both-final-h3.wf.h5) | 1.4260e-16 | same | <= 1.0000e-13 |
 | Fortran openPMD read-back, re-dump dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| Python Wavefront class energy (its Genesis path) | 1.1937e-12 | 1.1936e-12 | <= 1.0000e-09 |
-| Python openPMD reader (vs Genesis dump) | 1.4371e-16 | 1.5943e-16 | <= 1.0000e-13 |
+| Python Wavefront class energy (its Genesis path) | 1.1933e-12 | 1.1936e-12 | <= 1.0000e-09 |
+| Python openPMD reader (vs Genesis dump) | 1.4260e-16 | same | <= 1.0000e-13 |
 | Python openPMD write/read round trip exact | 0.0000e+00 | same | <= 5.0000e-01 |
 | Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
-| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 1.0991e-14 | 2.3648e-14 | <= 1.0000e-12 |
+| one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 1.1213e-14 | 2.5646e-14 | <= 1.0000e-12 |
 | 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal harmonics without the fundamental |  | same | holds |
 | refusal harmonics + unaveraged element |  | same | holds |
@@ -678,7 +678,7 @@ where the two builds agree to every printed digit.
 | chicane, relative mode: geometric fraction dropped (flat, rad span) | 6.8083e-06 | 6.2633e-06 | <= 5.0000e-03 |
 | chicane, absolute mode vs independent geometry (rad) | 6.8312e-04 | 6.7027e-04 | <= 2.0000e-03 |
 | 2D trace vs the small-angle closed form | 6.4361e-08 | same | <= 1.0000e-06 |
-| unaveraged ledger closure across the chicane | 2.8785e-11 | 3.6834e-11 | <= 1.0000e-04 |
+| unaveraged ledger closure across the chicane | 2.7411e-11 | 3.9141e-11 | <= 1.0000e-04 |
 | extra banked slices == floor(delay/lambda), three delays | 0.0000e+00 | same | <= 5.0000e-01 |
 | TD chicane 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal non-closed-bump break |  | same | holds |
@@ -814,7 +814,7 @@ where the two builds agree to every printed digit.
 | stats: angle moments valid exactly where they were computed | 0 | same | <= 5.0000e-01 |
 | stats: theta moments are NaN where they were not computed | 0.0000e+00 | same | <= 5.0000e-01 |
 | stats: and finite where they were | 0.0000e+00 | same | <= 5.0000e-01 |
-| bank: banked slice energies vs ledger U_escaped, rel | 6.8834e-15 | 7.9936e-15 | <= 1.0000e-12 |
+| bank: banked slice energies vs ledger U_escaped, rel | 7.3275e-15 | 7.9936e-15 | <= 1.0000e-12 |
 | bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
 | pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.8823e-03 | same | <= 2.0000e-02 |
 | thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
@@ -851,18 +851,18 @@ where the two builds agree to every printed digit.
 | frames: the series lands inside the undulator, not only at its ends | 0.0000e+00 | same | <= 5.0000e-01 |
 | frame vs row: per-slice bunching from the frame's particles | 4.7844e-15 | 3.4313e-15 | <= 2.0000e-12 |
 | frame vs row: per-slice transverse centroid from the frame's particles, no conversion | 2.7105e-20 | same | <= 1.0000e-14 |
-| frame vs row: per-slice power from the field frame | 6.6651e-16 | 7.7759e-16 | <= 1.0000e-10 |
+| frame vs row: per-slice power from the field frame | 6.6651e-16 | same | <= 1.0000e-10 |
 | frame vs row: the transverse projection integrates to the record's power | 3.8577e-15 | same | <= 1.0000e-10 |
-| frame vs row: the slice projection integrates to each slice's power | 4.2818e-15 | 4.1137e-15 | <= 1.0000e-10 |
+| frame vs row: the slice projection integrates to each slice's power | 4.2818e-15 | 4.0779e-15 | <= 1.0000e-10 |
 | range: the beam frame's patch count is the range | 0 | same | <= 5.0000e-01 |
 | range: the field frame carries the range's slices | 0 | same | <= 5.0000e-01 |
 | range: the cut field's mesh starts at its first slice's z [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | range: and its transverse origin is the whole window's [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | refusal: a slice range outside the window refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: the knob at zero is the run that never named it (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| interlude: cut into pieces, exit power against the whole element | 1.2341e-13 | 1.1959e-13 | <= 1.0000e-09 |
+| interlude: cut into pieces, exit power against the whole element | 1.2341e-13 | 1.1814e-13 | <= 1.0000e-09 |
 | interlude: cut into pieces, exit sigma_x against the whole element | 5.9606e-16 | same | <= 1.0000e-09 |
-| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.6656e-14 | 8.3368e-14 | <= 1.0000e-09 |
+| interlude: the hand-split lattice agrees too, so the fringe difference the iterator buys is below notice here | 9.6838e-14 | 8.4642e-14 | <= 1.0000e-09 |
 | interlude: rows strictly inside the quadrupole, whole (0 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the quadrupole, cut (4 expected) | 0 | same | <= 5.0000e-01 |
 | interlude: rows strictly inside the pipe, cut (9 expected) | 0 | same | <= 5.0000e-01 |
@@ -875,7 +875,7 @@ where the two builds agree to every printed digit.
 | interlude: and says nothing where nothing is cut | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: a wake-carrying element is not cut | 0 | same | <= 5.0000e-01 |
 | interlude: and the elements without a wake still are | 0 | same | <= 5.0000e-01 |
-| interlude: the zero wake left the physics alone, so only the rows differ | 6.9170e-15 | 1.2742e-15 | <= 1.0000e-09 |
+| interlude: the zero wake left the physics alone, so only the rows differ | 7.4631e-15 | 1.2742e-15 | <= 1.0000e-09 |
 | interlude: refused with the transcribed Genesis interlude (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | interlude: with sr_wakes_on off the wake element is cut like any other | 0 | same | <= 5.0000e-01 |
 | interlude: and its physics is the whole-element run's | 0.0000e+00 | same | <= 1.0000e-09 |
