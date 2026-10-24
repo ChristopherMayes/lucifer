@@ -57,6 +57,13 @@ jobs:
       - name: Examples conformance
         run: python tests/scripts/check_examples.py
 
+      # The site can be whole while the tree is not: the example pages are generated
+      # from the examples' READMEs with their links retargeted, so a README link into a
+      # directory that no longer exists reads correctly on the site and is dead on
+      # GitHub. Every relative link in every committed Markdown file must resolve.
+      - name: Links resolve
+        run: python tests/scripts/check_links.py
+
       # A deck edited without regenerating its page would leave the documentation
       # quoting text that no longer runs. Regenerating here and requiring no diff is the
       # same guarantee the keystone gives, and it costs no build. The Markdown only: the

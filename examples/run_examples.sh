@@ -333,6 +333,14 @@ if [[ $FAILED -ne 0 ]]; then
   echo "       locations did not resolve."
   exit 1
 fi
+
+# Every relative link in the committed Markdown files resolves. The READMEs here are
+# what the example pages are generated from, with their links retargeted, so a dead
+# link in one reads correctly on the site and is caught nowhere else.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_links.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a relative link in a committed Markdown file does not resolve."
+  exit 1
+fi
 if [[ $FIGURES -eq 1 ]]; then
   echo " All examples ran. Figures in doc/generated/examples/."
   echo " Regenerate the pages with tests/scripts/report_examples.py after changing a deck."
