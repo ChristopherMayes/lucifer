@@ -160,7 +160,7 @@ jobs:
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           set -e
-          conda env create -f tests/wavefront/environment.yml
+          conda env create -f tests/environment-validate.yml
           # The reference's own banner, so a wrong version is visible here rather than
           # only in the harness's refusal. genesis4 exits non-zero when it is given no
           # input file, which is not a failure of this step.

@@ -20,7 +20,7 @@ that a later FEL tracker will carry, and the transport step it will use outside 
 | `programs/wavefront_drift_test.f90` | Test driver, both modes |
 | `tests/wavefront/run_validation.sh` | The whole validation, one command |
 | `tests/wavefront/validate_drift.py` | Python side: builds the test input, drifts it, compares |
-| `tests/wavefront/environment.yml` | Conda environment for the Python side |
+| `tests/environment-validate.yml` | Conda environment for the Python side |
 
 ## Building and running
 
@@ -29,7 +29,7 @@ cd <bmad-ecosystem>
 conda env create -n bmad-build -f .github/bmad-build-env.yaml   # once
 BUILD_PRODUCTION=N util/conda_compile
 
-conda env create -f tests/wavefront/environment.yml        # once
+conda env create -f tests/environment-validate.yml        # once
 ./tests/wavefront/run_validation.sh
 ```
 

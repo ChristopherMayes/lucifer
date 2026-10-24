@@ -9,7 +9,7 @@
 # Each entry is a minimum. bmad is taken in its nompi variant, which carries HDF5 without
 # MPI, since Lucifer is shared memory and the reference runs single process. compilers is
 # conda-forge's current toolchain, gfortran and clang, the one the package itself was built
-# with. The validation environment is a different file, tests/wavefront/environment.yml.
+# with. The validation environment is a different file, tests/environment-validate.yml.
 name: lucifer-build
 channels:
   - conda-forge

@@ -18,7 +18,7 @@ Lucifer is under development and unreleased. It has no version number, and its i
 | [`util/`](util) | The build script, the release check and the locations rule the scripts share |
 | [`cmake/`](cmake) | `FindBmad.cmake`, which finds the Bmad tree to build against |
 
-`BMAD_RELEASE` names the Bmad release Lucifer needs, a minimum. `searchf.namelist` is the index Bmad's `getf` reads.
+`BMAD_RELEASE` names the Bmad release Lucifer needs, a minimum.
 
 ## Building
 
