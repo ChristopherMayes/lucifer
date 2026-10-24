@@ -9,6 +9,35 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: the recording toolchain is gfortran 15.3 and clang 21.1 from conda-forge,
+  where every digit recorded before was measured with gfortran 13.3 and the clang of 2025-06. The
+  `bmad-build` environment is created again from Bmad's own `.github/bmad-build-env.yaml`, whose
+  unpinned `compilers` entry resolved to GCC 13.3 on 2025-06-26 and resolves to 15.3 today, the
+  compiler conda-forge's `bmad` 20261023.0 package and the Linux CI job build with. Both trees were
+  built clean against Bmad 20261023-0, 3 min 27 s for debug and 5 min 30 s for production. The
+  keystone against the new toolchain reproduces all 11 tiers to every printed digit, and 39 of the
+  704 rows of `doc/generated/validation-measured.md` moved at their fifth digit, every one inside
+  its bound. At full precision 77 of the 520 numeric checks moved, the largest by 4.8e-2 of its
+  bound, the keep-mode moments at 1.0e-11 against 1.0e-10, and the lockstep and device levels by at
+  most 1e-2 of theirs. One production tier moved by 5.6e-7 of itself, below its seventh digit. In
+  `examples/measured.tsv` the exit powers hold their printed digits, and 28 rows moved. The
+  saturation position of eleven decks flipped by one record where the power curve is flat at its
+  peak, the bunching read at that record moved with it, and two rows moved in their last digit.
+  `util/conda_compile` puts the environment's bin first on PATH and refuses a `gfortran` found
+  anywhere else. `conda activate` leaves another environment's bin ahead when the invoking shell put
+  it there, and the compiler packages no longer export `FC`, `CC` and `CXX` on activation, which had
+  hidden that. On macOS the script sets `CC`, `CXX` and `OBJCXX` to the environment's clang by path.
+  `dist_source_me` names `gcc` and `g++`, the environment carries no `g++`, and the Metal backend
+  had compiled as the stub under the `g++` the name found outside it. It prints the compiler CMake
+  chose, from the newest `CMakeFortranCompiler.cmake` in the project's build tree, beside the line
+  `dist_source_me` prints from the PATH's first `gfortran`, which on this machine was MacPorts' and
+  never the one that built the binaries. `tests/scripts/vec_audit.sh` puts the compiler's own
+  directory first on PATH, since the conda-forge gfortran drives its assembler and linker through
+  the clang beside it. The vectorization audit on `doc/performance.md` follows the new compiler's
+  report: 47 loops vectorized and 251 not in `fel_track_mod`, where 13.3 gave 45 and 237, and the
+  rejection reads `unsupported control flow in loop`. `doc/validation.md` names the toolchain beside
+  the machine, and `doc/user-guide.md` says the environment file resolves the compilers of the day
+  it is created.
 - 2026-10-23 Changed: `lucifer/BMAD_RELEASE` names Bmad 20261023-0, which carries
   bmad-sim/bmad-ecosystem PR 2225. That PR corrects `parser_read_sr_wake` for a `z_long` table that
   sets `smoothing_sigma`. Its smoothing kernel was an exponential ramp rather than a Gaussian, and
