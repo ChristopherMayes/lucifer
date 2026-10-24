@@ -9,6 +9,34 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Changed: `docs/performance.md` is re-measured on gfortran 15.3 and clang 21.1, the
+  toolchain the recorded digits belong to since 2026-10-23, and every table on it carries one line
+  naming the toolchain, the machine and the day it was measured, the re-measured tables with
+  2026-10-24 and the kept ones with their September day and gfortran 13.3. The phase profile at 96
+  slices of 2048 particles on 12 threads: walk 33.574 s against 30.333 on 2026-09-07, the field
+  solve 74.9 percent against 71.5 and the particle push 12.5 against 15.6, the push 11 percent
+  faster across the toolchain and the solve, which is FFTW's, 16 percent slower; at 504 slices the
+  walk is 165.546 s against 164.650. The thread sweep reaches 11.22x at twelve threads against
+  9.59x, with the one-thread walk 372.3 s against 290.8. The transform-length table, now the phases
+  deck at each grid through a `--grid-scan` option of `tests/run_perf_benchmark.sh`, puts `ngrid`
+  256 within 0.3 percent of 255 where the old toolchain's FFTW had the power of two 1.17x slower.
+  The sampling split puts the transform at 73.9 percent of the samples against 68.8, and the
+  unaveraged split gains a third column from `tests/perf/unavg_sample.in`. The device table's decks
+  are `tests/perf/*.in` and `tests/perf/device_table.sh` prints it: the device is 7.3x, 6.1x, 9.1x
+  and 0.7x the twelve-thread CPU on its four cases against 7.3x, 8.2x, 12.4x and 0.9x, the device
+  walls longer by 20 to 48 percent. The five constants of `src/fel_cost_mod.f90` are refitted by
+  `tests/scripts/fit_cost_rates.py` over sixteen phases logs: push 2.03e-7 against 2.06e-7 s per
+  particle-step, deposit 2.08e-8 against 1.30e-8, transform 4.68e-9 against 4.02e-9 s per grid point
+  per log2(ngrid) per step, serial fraction 0.0105 against 0.021 and walk share 0.883 against 0.878,
+  with the worst residual 16.5 percent against 4.0, on the sweep's four- and eight-thread rows,
+  where one serial fraction cannot carry a sweep whose efficiency is 92 percent at four threads and
+  94 at twelve. The device ratio and the dispatch floor follow the table, 9.1 and 5.1e-4 s a step.
+  `tests/scripts/estimate_vs_clock.py` prints the estimate-against-the-clock table from fifteen
+  footers, the eleven tiers and four examples each run alone at twelve threads, which read 0.87 to
+  1.94 against 0.82 to 1.87. The phases mode also takes `--ngrid` and `--no-sweep`. The audit
+  section says the production flags are `-O2` with per-file `-O3`, which the build's own
+  `flags.make` carries, where the page had named `-ftree-vectorize -march=armv8.3-a`. Nothing in the
+  code changed, and the keystone reproduces every recorded digit.
 - 2026-10-24 Changed: every path that still named `doc/`, the pages' directory until they moved to
   `docs/` on 2026-10-23, names `docs/`: 206 mentions in 70 files, among them the headers and
   comments of `src/*.f90` and `programs/*.f90`, which `docs/generated/api.md` reproduces, the check

@@ -5,11 +5,13 @@ short_title: Performance
 
 This page is the measured record of where a run spends its time. Every number here is machine-local and carries the machine and the build that produced it. That is why this page is hand written and stays out of `generated/`.
 
-The instrument is `code/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the walk, so the fractions sum to it and the remainder has its own row named `unaccounted`. That remainder, measured below, is 0.02% of the walk, so the partition is the walk.
+The instrument is `src/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the walk, so the fractions sum to it and the remainder has its own row named `unaccounted`. That remainder, measured below, is 0.02% of the walk, so the partition is the walk.
 
 Timers cannot see inside a parallel region. The deposit and its FFT interleave per slice, and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.
 
-The tables below are also the calibration of the cost estimate every run prints in its header. `code/fel_cost_mod.f90` holds the fitted rates, one for the particle push and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the logs the runs below wrote. Over the thirteen runs of this page the worst residual on the walk is 4.0 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-running that script and pasting its five constants back.
+The tables below are also the calibration of the cost estimate every run prints in its header. `src/fel_cost_mod.f90` holds the fitted rates, one for the particle push and two for the field solve, and `tests/scripts/fit_cost_rates.py` fits them to the logs the runs below wrote. Over the sixteen runs of this page the worst residual on the walk is 16.5 percent, on the four- and eight-thread rows of the thread sweep, where one serial fraction cannot carry a sweep whose efficiency is 92 percent at four threads and 94 at twelve. Every other row is inside 10 percent. The estimate is for this machine and says so on the line, and the run's footer prints the measured walk beside it. Re-measuring this page means re-running that script and pasting its five constants back.
+
+Two toolchains sit side by side on this page, and every table carries one line naming the toolchain, the machine and the day it was measured. The tables re-measured on 2026-10-24 were taken under gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits of [](validation.md) belong to since 2026-10-23. The tables kept from September 2026 were taken under gfortran 13.3 and the clang of 2025-06, and no later measurement has replaced them. Where a kept table and a re-measured one are compared, the comparison crosses the toolchain and the text says so.
 
 (perf-reproducing)=
 ## Reproducing this
@@ -18,9 +20,19 @@ The tables below are also the calibration of the cost estimate every run prints 
 ./tests/run_perf_benchmark.sh --phases
 ```
 
-Every table below whose deck states `ngrid` 255 was measured before the harness moved to power-of-two grids. `run_perf_benchmark.sh` now states 256, so a fresh run reports walks about 1.17x those numbers on the large grid ([](#perf-the-transform-length)). The shares between phases are what those tables are for, and they do not move with the grid.
+The phases mode needs no genesis4 and no MPI. It compares the code against itself, so it starts from the tracker's own shot-noise quiet start rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice, `--big-slices` the larger case, `--ngrid` the transverse grid, 256 by default, and `--no-sweep` leaves the sweep out. The particles-against-the-grid table is the same command at `--npart 512` and `--npart 8192`, and the transform-length table is `--grid-scan "128 151 255 256 257"`, which runs the small configuration at each grid three times and takes the best walk. The kept tables that state `ngrid` 255 were measured before the harness moved to power-of-two grids, and on this toolchain the two grids are within 0.3 percent of each other ([](#perf-the-transform-length)).
 
-The phases mode needs no genesis4 and no MPI. It compares the code against itself, so it starts from the tracker's own shot-noise quiet start rather than an imported dump. It runs the profile at two slice counts, sweeps the thread count over the smaller one, and prints both tables. `--npart` sets the particles per slice and `--big-slices` the larger case.
+The device table runs as:
+
+```
+./tests/perf/device_table.sh
+```
+
+Its four decks are the `*.in` files beside it. The estimate-against-the-clock table reads the footers of runs made one at a time:
+
+```
+./tests/scripts/estimate_vs_clock.py tier1=<log> tier1_unavg=<log> ...
+```
 
 The sampling split is taken on macOS with:
 
@@ -28,6 +40,8 @@ The sampling split is taken on macOS with:
 OMP_NUM_THREADS=12 build-release/bin/lucifer <deck>.in &
 sample $(pgrep -n lucifer) 15 1 -file prof.txt -mayDie
 ```
+
+The averaged deck is the 96-slice one the phases mode writes, and the unaveraged one is `tests/perf/unavg_sample.in`, run at one thread and sampled for 20 s.
 
 Read the `Sort by top of stack` section, which is exclusive cost per symbol. The call graph is per thread and fragments the same information across dozens of stacks.
 
@@ -42,23 +56,30 @@ It takes the compile command from the production build's own makefile, so the re
 (perf-the-phase-profile)=
 ## The phase profile
 
-The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 255, 12 threads and the source filter at its default. The `was` columns are the same runs measured with the filter off, before it became the default. They are given wherever the move exceeds the run-to-run spread below.
+The machine and configuration are an Apple M3 Max with 12 performance cores, a production build, the full 6-FODO Benchmark1-SASE line, 2048 particles per slice, `ngrid` 256, 12 threads and the source filter at its default. Each column is the mean of two runs. The `2026-09-07` columns are the same configuration at `ngrid` 255 under gfortran 13.3, the record this one replaces.
 
-| phase | 96 slices | was | 504 slices | was |
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
+
+| phase | 96 slices | 2026-09-07 | 504 slices | 2026-09-07 |
 |---|---|---|---|---|
-| field solve (deposit and FFT) | 21.687 s, 71.5% | 15.435 s, 64.5% | 118.060 s, 71.7% | 82.072 s, 64.4% |
-| particle push (transverse maps, RK4) | 4.735 s, 15.6% | 4.485 s, 18.8% | 24.509 s, 14.9% | 23.608 s, 18.5% |
-| `= FEL step`, the sum of the phases inside it | 26.468 s, 87.3% | 19.966 s, 83.5% | 142.645 s, 86.6% | 105.731 s, 83.0% |
-| stats and diag | 3.140 s, 10.4% | 3.201 s, 13.4% | 18.559 s, 11.3% | 18.223 s, 14.3% |
-| field drift through the breaks | 0.490 s, 1.6% | 0.510 s, 2.1% | 2.597 s, 1.6% | 2.556 s, 2.0% |
-| seam interlude | 0.096 s, 0.3% | 0.103 s, 0.4% | 0.578 s, 0.4% | 0.574 s, 0.5% |
-| slippage | 0.104 s, 0.3% | 0.102 s, 0.4% | 0.106 s, 0.1% | 0.109 s, 0.1% |
-| undulator prep (plans, kernel cache) | 0.045 s, 0.1% | 0.046 s, 0.2% | 0.075 s, 0.0% | 0.051 s, 0.0% |
-| element end | 0.032 s, 0.1% | 0.032 s, 0.1% | 0.159 s, 0.1% | 0.170 s, 0.1% |
-| unaccounted | 0.004 s, 0.0% | 0.003 s, 0.0% | 0.007 s, 0.0% | 0.006 s, 0.0% |
-| walk | 30.333 s | 23.917 s | 164.650 s | 127.370 s |
+| field solve (deposit and FFT) | 25.152 s, 74.9% | 21.687 s, 71.5% | 124.885 s, 75.4% | 118.060 s, 71.7% |
+| particle push (transverse maps, RK4) | 4.199 s, 12.5% | 4.735 s, 15.6% | 21.031 s, 12.7% | 24.509 s, 14.9% |
+| `= FEL step`, the sum of the phases inside it | 29.406 s, 87.6% | 26.468 s, 87.3% | 145.972 s, 88.2% | 142.645 s, 86.6% |
+| stats and diag | 3.326 s, 9.9% | 3.140 s, 10.4% | 16.083 s, 9.7% | 18.559 s, 11.3% |
+| field drift through the breaks | 0.619 s, 1.8% | 0.490 s, 1.6% | 2.783 s, 1.7% | 2.597 s, 1.6% |
+| seam interlude | 0.096 s, 0.3% | 0.096 s, 0.3% | 0.469 s, 0.3% | 0.578 s, 0.4% |
+| slippage | 0.095 s, 0.3% | 0.104 s, 0.3% | 0.092 s, 0.1% | 0.106 s, 0.1% |
+| undulator prep (plans, kernel cache) | 0.056 s, 0.2% | 0.045 s, 0.1% | 0.056 s, 0.0% | 0.075 s, 0.0% |
+| wake | 0.000 s, 0.0% | | 0.000 s, 0.0% | |
+| element end | 0.030 s, 0.1% | 0.032 s, 0.1% | 0.142 s, 0.1% | 0.159 s, 0.1% |
+| unaccounted | 0.003 s, 0.0% | 0.004 s, 0.0% | 0.006 s, 0.0% | 0.007 s, 0.0% |
+| walk | 33.574 s | 30.333 s | 165.546 s | 164.650 s |
 
-One phase moved, and it moved the walk with it. The field solve is up 40 percent at 96 slices and 44 percent at 504. Everything else is inside the spread. The source filter is the reason. It adds a forward transform of the source per field per step, where an unfiltered solve adds the source in real space and transforms twice rather than three times ([](fel-physics.md#sec-source-filter)). The same deck, measured directly on the 96-slice configuration with the filter off and on, gives:
+Across the toolchain the push is faster and the solve is slower. The push, which is this code's own arithmetic through gfortran, takes 11 percent less at 96 slices and 14 percent less at 504. The field solve, whose transform is FFTW's and not the compiler's, takes 16 percent more at 96 slices and 6 percent more at 504, and the grid moved from 255 to 256 between the two records, which the transform-length table below puts at 0.3 percent on this toolchain. The 96-slice walk is up 11 percent and the 504-slice walk is unchanged within the spread. The shares hold: the solve is three quarters of the walk at both sizes, and what moved is the split between the two toolchains' libraries rather than anything in the code.
+
+The source filter, which has been the default since 2026-09-07, adds a forward transform of the source per field per step, where an unfiltered solve adds the source in real space and transforms twice rather than three times ([](fel-physics.md#sec-source-filter)). The same deck, measured on 2026-09-07 on the 96-slice configuration with the filter off and on, gives:
+
+*Measured 2026-09-07: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | | filter off | filter on | ratio |
 |---|---|---|---|
@@ -70,26 +91,28 @@ Each column is the mean of two runs. The filter costs 27 percent of this walk an
 
 The `= FEL step` row is derived rather than measured, as its label says. It is the sum of the undulator prep, the space-charge profile, the particle push and the field solve, so it is the share of the walk the undulator segments own. It is left out of the leaf sum, and the other rows add to the walk minus the remainder.
 
-The shares are the result and the third decimal is noise. Two 96-slice runs back to back give walks of 29.625 s and 29.667 s, and a third taken in a different batch gives 30.333 s. The run-to-run spread is therefore about 2% on a walk and a few tenths of a point on a share. The phase timers' own cost, two `system_clock` calls per region, is below that spread.
+The shares are the result and the third decimal is noise. The two 96-slice runs behind the table give walks of 33.182 s and 33.965 s, and the two 504-slice runs 164.300 s and 166.791 s. The run-to-run spread is therefore about 2% on a walk and a few tenths of a point on a share. The phase timers' own cost, two `system_clock` calls per region, is below that spread.
 
-The shares hold across a factor of 5.25 in slice count. The run row against the walk row is everything outside the walk: the parse, the beam and field build, the slippage schedule, the final dumps and the stats file. That is 0.2 s at 96 slices and 0.8 s at 504.
+The shares hold across a factor of 5.25 in slice count. The run row against the walk row is everything outside the walk: the parse, the beam and field build, the slippage schedule, the final dumps and the stats file. That is 0.2 s at 96 slices and 0.9 s at 504.
 
 Slippage is 0.4% of the walk and 0.1% at the larger size. [](validation.md#val-parallelism-openmp-over-slices) lists the slippage rotation among the serial operations between steps, and it is too small to cap the scaling. The field solve and the particle push are where the time is, and both are slice-parallel.
 
 (perf-the-transform-length)=
 ## The transform length
 
-Every deck in the harness runs a power-of-two transverse grid, so one deck runs on the CPU and on the Metal field solver unchanged, and the derived count rounds up to one ([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is measured here. The deck is the `steady_state` example, one slice of 8192 macroparticles over the full 57 m line, 12 threads, production build, varying only `grid_n_pts`. The 255 and 256 rows are six runs alternating between the two so that any drift falls on both. The best of each is taken.
+Every deck in the harness runs a power-of-two transverse grid, so one deck runs on the CPU and on the Metal field solver unchanged, and the derived count rounds up to one ([](input-reference.md#param-wavefront-grid)). What that costs on the CPU is measured here. The deck is the phases deck above, 96 slices of 2048 macroparticles over the full line, 12 threads, production build, varying only `grid_n_pts`, three runs at each grid and the best taken. The last column is the walk over the grid points, and at the small grids the particle work, which does not move with the grid, is most of it.
+
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
 | ngrid | factors | points | walk | seconds a point |
 |---|---|---|---|---|
-| 128 | 2^7 | 16384 | 4.366 s | 2.66e-4 |
-| 151 | prime | 22801 | 5.766 s | 2.53e-4 |
-| 255 | 3 x 5 x 17 | 65025 | 5.252 s | 8.08e-5 |
-| 256 | 2^8 | 65536 | 6.148 s | 9.38e-5 |
-| 257 | prime | 66049 | 8.046 s | 1.22e-4 |
+| 128 | 2^7 | 16384 | 12.563 s | 7.67e-4 |
+| 151 | prime | 22801 | 22.575 s | 9.90e-4 |
+| 255 | 3 x 5 x 17 | 65025 | 32.418 s | 4.99e-4 |
+| 256 | 2^8 | 65536 | 32.308 s | 4.93e-4 |
+| 257 | prime | 66049 | 53.614 s | 8.12e-4 |
 
-The power of two is the slower of the two large grids, at 1.17x the walk of 255 for 0.8 percent more points. FFTW's mixed radix takes 3 x 5 x 17 better than it takes 2^8, and a power-of-two stride is where a two-dimensional transform's rows collide in the cache. A prime is worse than either, 1.56x against 255, which is the transform falling back to its general algorithm. What the grid convention buys is a deck that moves between the backends. On this machine that costs speed, where a power of two is usually assumed to pay for itself.
+The two large grids cost the same on this toolchain: 256 is 0.3 percent faster than 255 for 0.8 percent more points. On gfortran 13.3 and the FFTW beside it, measured on 2026-09-07 on a one-slice deck, the power of two was the slower of the two at 1.17x, which the previous version of this table recorded and the `2026-09-07` columns above still reflect. The library is the difference, since the transform is FFTW's and the compiler never sees it. A prime is worse than either on both toolchains, 1.66x against 256 here, which is the transform falling back to its general algorithm, and 151 costs 1.8x what 128 does for 1.4x the points. What the grid convention buys is a deck that moves between the backends, and on this toolchain it costs nothing.
 
 ## The particles against the grid
 
@@ -97,15 +120,17 @@ The field solve and the particle push scale differently, so their ratio is a pro
 
 Each row is the mean of two runs at that count.
 
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
+
 | particles per slice | particle push | field solve | walk |
 |---|---|---|---|
-| 512 | 1.178 s, 4.6% | 21.182 s, 83.2% | 25.446 s |
-| 2048 | 4.441 s, 15.0% | 21.339 s, 72.0% | 29.646 s |
-| 8192 | 16.722 s, 36.2% | 22.934 s, 49.6% | 46.224 s |
+| 512 | 0.996 s, 3.5% | 24.049 s, 84.8% | 28.366 s |
+| 2048 | 4.199 s, 12.5% | 25.152 s, 74.9% | 33.574 s |
+| 8192 | 15.871 s, 32.7% | 25.702 s, 53.0% | 48.492 s |
 
-The push is linear in the particles (1.178, 4.441, 16.722 for 512, 2048, 8192) and the field solve is nearly flat (21.182, 21.339, 22.934). Three FFTs of $255^2$ points per slice per step cost the same whatever the particle count deposited into the grid. The crossover sits past 8192 particles per slice at `ngrid` 255, since the filter raised the flat part and left the push where it was.
+The push is linear in the particles (0.996, 4.199, 15.871 for 512, 2048, 8192) and the field solve is nearly flat (24.049, 25.152, 25.702). Three FFTs of $256^2$ points per slice per step cost the same whatever the particle count deposited into the grid. The crossover sits past 8192 particles per slice at `ngrid` 256, where the push is a third of the walk and the solve half.
 
-That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 21.06$ s and $d = 2.28 \times 10^{-4}$ s per particle. The slope is the deposit, and it is unchanged, as it should be. The filter multiplies a transformed source and does not touch how the source is built. At 2048 particles per slice the fit predicts 21.06 s of transform and propagator plus 0.47 s of deposit, 21.53 s against the 21.339 s measured, a 0.9% residual on a two-point fit. The transform and propagator are 98.7% of the solve by that fit against 95.6% by the sampling profile below. The two agreed to half a point before the filter. The fit's deposit term is 2% of a larger solve, so the two-point $C$ carries the solve's own 1.5% spread almost whole.
+That flatness also splits the field solve without a profiler. Fitting the 512 and 8192 points to $C + d \cdot n$ gives $C = 23.94$ s and $d = 2.15 \times 10^{-4}$ s per particle. The slope is the deposit, and it is within 6 percent of the 2.28e-4 of 2026-09-07, as it should be, since the deposit is this code's own arithmetic and the filter does not touch how the source is built. At 2048 particles per slice the fit predicts 23.94 s of transform and propagator plus 0.44 s of deposit, 24.38 s against the 25.152 s measured, a 3 percent residual on a two-point fit. The transform and propagator are 98.2 percent of the solve by that fit against 98.6 percent by the sampling profile below, the transform's 73.9 percent of the walk over the solve's 74.9. The fit's deposit term is 2 percent of the solve, so the two-point $C$ carries the solve's own spread almost whole.
 
 [](validation.md#val-the-particlepath-cost-measured) measured a real 131-slice case where the particle path dominated at 8192 particles per slice while the field FFTs stayed constant. That is this table, and the two agree.
 
@@ -114,44 +139,49 @@ That flatness also splits the field solve without a profiler. Fitting the 512 an
 
 The configuration is 96 slices of 2048 particles per slice through the full line, on the same machine and build. The implied serial fraction inverts Amdahl's law, $f = (n/S - 1)/(n - 1)$, and bounds this configuration rather than the code.
 
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
+
 | threads | walk | speedup | efficiency | implied serial |
 |---|---|---|---|---|
-| 1 | 290.8 s | 1.00 | the reference | |
-| 2 | 149.7 s | 1.94 | 97% | 3.0% |
-| 4 | 76.5 s | 3.80 | 95% | 1.7% |
-| 8 | 41.6 s | 7.00 | 87% | 2.0% |
-| 12 | 30.3 s | 9.59 | 80% | 2.3% |
+| 1 | 372.3 s | 1.00 | the reference | |
+| 2 | 195.7 s | 1.90 | 95% | 5.1% |
+| 4 | 101.6 s | 3.66 | 92% | 3.0% |
+| 8 | 52.8 s | 7.05 | 88% | 1.9% |
+| 12 | 33.2 s | 11.22 | 94% | 0.6% |
 
-The scaling improved with the filter on, from 9.16x to 9.59x at twelve threads and from 76% efficiency to 80%. The filter's work is a transform per slice, which is the parallel part, so adding it lengthens the parallel region and leaves the serial part alone. The estimate takes 2.1% as the serial fraction, fitted over the whole sweep.
+The twelve-thread speedup is 11.22x against the 9.59x of 2026-09-07 under gfortran 13.3, and the one-thread walk is 372.3 s against 290.8. The two moves are one: the one-thread walk grew 28 percent across the toolchain and the twelve-thread walk 9.5 percent, so the parallel part grew more than the serial part did, and the sweep's efficiency at twelve threads rose from 80 to 94 percent. The implied serial fraction is not one number on this toolchain, 5.1 percent at two threads and 0.6 at twelve, which is why one Amdahl constant carries the sweep to 16.5 percent at worst. The estimate takes 1.05 percent, fitted over the whole sweep.
 
-[](validation.md#val-parallelism-openmp-over-slices) records 3.97x at 8 threads on 32 slices in a debug build and says that is the floor of the scaling rather than its ceiling. At 96 slices in a production build the same 8 threads give 6.76x, so the claim holds.
+[](validation.md#val-parallelism-openmp-over-slices) records 3.97x at 8 threads on 32 slices in a debug build and says that is the floor of the scaling rather than its ceiling. At 96 slices in a production build the same 8 threads give 7.05x, so the claim holds.
 
-The nameable serial phases account for 0.6% of the walk, well under the 2.8% the filter-off speedup implies. The rest is the cost of the parallel regions themselves. Two are spawned per integration step (1068 steps, so about 4300 region entries). The sampling profile below, in its `was` column, puts 10.0% of its samples in the thread wait, which at 76% efficiency is the barrier and not a lock.
+The nameable serial phases account for 0.6% of the walk. The rest is the cost of the parallel regions themselves. Two are spawned per integration step (1068 steps, so about 4300 region entries). The sampling profile below puts 3.7 percent of its samples in the thread wait, which at 94 percent efficiency is the barrier and not a lock.
 
-A steady-state run gets nothing from threads. The parallelism is over slices, and a steady-state window has one: the unaveraged example measures 21.94 s at 1 thread and 21.76 s at 12.
+A steady-state run gets nothing from threads. The parallelism is over slices, and a steady-state window has one: the unaveraged example measured 21.94 s at 1 thread and 21.76 s at 12 on 2026-09-01, before the hoist and the interchange took the mode's step to 60 percent of itself.
 
 The field-free drift is parallel over slices for the same reason. A time-dependent line makes one `wavefront_drift` call per field-free element. With that call's slice loop serial, a 590-slice, 256-point case took about 0.5 s per element on one core, the largest serial block of the walk.
 
 (perf-the-sampling-split)=
 ## The sampling split, averaged mode
 
-The configuration is 96 slices of 2048 particles per slice on 12 threads with the filter at its default, sampled for 15 s at 1 ms, 120732 samples. The table is exclusive cost, categorized by symbol. The `was` column is the same measurement with the filter off.
+The configuration is 96 slices of 2048 particles per slice on 12 threads with the filter at its default, sampled for 15 s at 1 ms, 92446 samples. The table is exclusive cost, categorized by symbol. The `2026-09-07` column is the same measurement under gfortran 13.3, and its `was` column the same with the filter off.
 
-| | share | was |
-|---|---|---|
-| FFT transform (libfftw3, `wavefront_fft2`) | 68.8% | 61.3% |
-| libm sin and cos | 6.5% | 8.5% |
-| diagnostics | 5.5% | 4.6% |
-| thread wait | 5.1% | 10.0% |
-| deposit and propagator multiply | 4.9% | 5.7% |
-| transverse maps (`quad_mat2_calc`, and its `cexp`) | 4.9% | 5.9% |
-| longitudinal RK4 and ODE | 3.7% | 3.6% |
-| slippage and drift | 0.1% | 0.1% |
-| everything else | 0.6% | 0.4% |
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
-The transform took the filter's third pass and rose 7.5 points, which is the whole of what moved. The thread wait halved, and the thread scan above agrees. A longer parallel region against the same serial part is better efficiency.
+| | share | 2026-09-07 | was |
+|---|---|---|---|
+| FFT transform (libfftw3, `wavefront_fft2`) | 73.9% | 68.8% | 61.3% |
+| diagnostics | 5.3% | 5.5% | 4.6% |
+| transverse maps (`quad_mat2_calc`, and its `cexp`) | 4.2% | 4.9% | 5.9% |
+| longitudinal RK4 and ODE | 4.0% | 3.7% | 3.6% |
+| thread wait | 3.7% | 5.1% | 10.0% |
+| libm sin and cos | 3.0% | 6.5% | 8.5% |
+| libm, internals the sampler could not name | 2.8% | | |
+| deposit and propagator multiply | 2.8% | 4.9% | 5.7% |
+| slippage and drift | 0.0% | 0.1% | 0.1% |
+| everything else | 0.3% | 0.6% | 0.4% |
 
-An estimate of the field solve near 10% of a run holds only at many more particles per slice, where the table above shows the balance reversing. At these parameters it is 71.5% by the phase timer and 68.8% in the transform alone by samples.
+The transform is up 5.1 points across the toolchain and everything this code compiles is down, which is the phase table's split read by symbol: the push's share fell and the solve's rose. The sampler attributes 2.8 percent to addresses inside libm it cannot name, which the earlier toolchain's libm did not show and which belong with the sin, cos and exp lines. The thread wait is 3.7 percent against 5.1, and the thread sweep above agrees. On 2026-09-07 the transform took the filter's third pass and rose 7.5 points over the `was` column, which was the whole of what moved then.
+
+An estimate of the field solve near 10% of a run holds only at many more particles per slice, where the table above shows the balance reversing. At these parameters it is 74.9% by the phase timer and 73.9% in the transform alone by samples.
 
 `quad_mat2_calc` is Bmad's own quadrupole map, and its cost is a complex exponential per particle. `cexp` and the `exp` beneath it are the whole 5.9%. The libm sin and cos are the deposit's phase factor and the ODE's, through `fel_sincos`.
 
@@ -160,16 +190,20 @@ An estimate of the field solve near 10% of a run holds only at many more particl
 
 The configuration is one slice of 16384 particles at `ngrid` 129, run serially (the mode's parallelism is over slices and there is one). The phase table gives the unaveraged step 99.7% of the walk, so this is the mode. Both columns are 20 s of samples at 1 ms, and the totals differ because the hoisted run finishes sooner inside that window.
 
-| | before the hoist | after |
-|---|---|---|
-| libm transcendentals | 52.1% | 15.3% |
-| substep RK4 (`unavg_push_all`, `unavg_ode`) | 17.6% | 35.3% |
-| undulator field, this code's own arithmetic | 8.9% | 27.7% |
-| FFT transform and `fel_field_diffract` | 13.0% | 17.8% |
-| ramp envelope (`fel_und_envelope`) | 4.8% | 0.0% |
-| deposit, this code's own arithmetic | 1.2% | 1.9% |
-| everything else | 2.4% | 1.8% |
-| total samples | 13302 | 7964 |
+*Measured 2026-09-02 for the first two columns under gfortran 13.3, and 2026-10-24 for the third under gfortran 15.3, Apple M3 Max, production build, one thread.*
+
+| | before the hoist | after | 2026-10-24 |
+|---|---|---|---|
+| libm transcendentals | 52.1% | 15.3% | 18.7% |
+| substep RK4 (`unavg_push_all`, `unavg_ode`) | 17.6% | 35.3% | 32.7% |
+| undulator field, this code's own arithmetic | 8.9% | 27.7% | 15.0% |
+| FFT transform and `fel_field_diffract` | 13.0% | 17.8% | 21.9% |
+| ramp envelope (`fel_und_envelope`) | 4.8% | 0.0% | 0.0% |
+| deposit, this code's own arithmetic | 1.2% | 1.9% | 2.1% |
+| everything else | 2.4% | 1.8% | 9.6% |
+| total samples | 13302 | 7964 | 8085 |
+
+The third column is the same deck, `tests/perf/unavg_sample.in`, under gfortran 15.3 on 2026-10-24, with the interchange of 2026-09-02 in the binary as well as the hoist. Its `everything else` holds 7.7 points the sampler attributes to the step's own parallel-region body, `fel_unavg_step`, where the newer compiler inlines what the older one called, and the undulator field's line is lower by the same amount. The walk was 12.2 s against the 21.94 s of 2026-09-01.
 
 Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics, and `fel_und_envelope` called two more, all four per particle per RK stage. The argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all.
 
@@ -182,6 +216,8 @@ The before column's label covers every libm transcendental the run entered, `exp
 
 The machine and build are the same, on one thread, and each entry is the median of five runs at 2048 particles and three at 16384. The change is bit-identical by construction and checked as such: the diag and ledger files of the unaveraged example are byte-identical before and after at 1 and 8 threads.
 
+*Measured 2026-09-02: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | configuration | before | after | change |
 |---|---|---|---|
 | 2048 particles per slice | 5.293 s | 4.507 s | -14.8% |
@@ -190,6 +226,8 @@ The machine and build are the same, on one thread, and each entry is the median 
 The gain grows with the particle count because what it removes is per-particle and what remains at fixed count is the per-substep FFT.
 
 The loop order is the next lever after the hoist. The substep RK4 and the undulator field arithmetic were 63% of the mode's samples, four RK stages inside each particle of a `do ip` loop. The push runs stage-major: per stage, one loop over the slice's particles into per-particle stage arrays, then one loop for the RK4 combination. Per particle the operations, values and order are unchanged, so the results are byte-identical, checked the same way as the hoist.
+
+*Measured 2026-09-02: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | configuration | before | after | change |
 |---|---|---|---|
@@ -205,6 +243,8 @@ After the interchange the mode's samples split 37.5% substep RK4, 21.4% FFT, 18.
 
 The probe is an inline (sin, cos) pair with no libm call, Cody-Waite reduction and the fdlibm kernel polynomials, swapped into `fel_sincos.c` for the measurement and reverted. A first probe build recorded the argument range of that call site: $[-159.8, 19.0]$ on the 96-slice averaged configuration and $[-127.4, 17.1]$ on the unaveraged example. Both sit well inside the range a two-term Cody-Waite reduction handles. The probe run reproduces the reference exit power, pulse energy and bunching to every printed digit. The physics is the same, so the timing difference is the call.
 
+*Measured 2026-09-02: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | case | reference | probe | change |
 |---|---|---|---|
 | 96 slices, 2048 particles, 12 threads | 23.917 s | 23.158 s | -3.2% |
@@ -214,6 +254,8 @@ The probe is an inline (sin, cos) pair with no libm call, Cody-Waite reduction a
 The averaged rows bound the libm call from below at 3.2% of a run at 2048 particles per slice, against the 8.5% the sampler attributes to sin and cos. The polynomial is cheaper than the call and not free. The unaveraged row barely moves. That mode never reaches this file. Its own transcendentals were the undulator field's and the ramp envelope's intrinsics, which the hoist above removed instead.
 
 Neither probe build is a candidate implementation, and the audit rules the inline pair out. `tests/scripts/sincos_audit.c` sweeps it against libm:
+
+*Measured 2026-09-02: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | range | worst error | arguments differing |
 |---|---|---|
@@ -230,7 +272,9 @@ The version of this that could pay is a vectorized pair inside a loop that vecto
 (perf-the-vectorization-audit)=
 ## The vectorization audit
 
-The compiler is gfortran 15.3.0 from conda-forge at the production flags, which are `-O2 -ftree-vectorize -march=armv8.3-a` with per-file `-O3` on `fel_track_mod`.
+The compiler is gfortran 15.3.0 from conda-forge at the production flags, which are `-O2` with per-file `-O3` on `fel_track_mod`, read from the production build's own `flags.make`. At `-O2` gfortran runs its vectorizer at the cheap cost model, and no `-march` is set, so the code runs on any arm64.
+
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
 | file | vectorized | not vectorized |
 |---|---|---|
@@ -239,6 +283,8 @@ The compiler is gfortran 15.3.0 from conda-forge at the production flags, which 
 | `fel_collective_mod.f90` | 1 | 49 |
 
 None of the hot per-particle loops is among the vectorized. The compiler rejects every one of them for the same reason, `unsupported control flow in loop`. The audit's report gives each loop's line, which moves with every edit to the file, so the table names the loop by its routine:
+
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
 
 | loop | routine | what blocks it |
 |---|---|---|
@@ -280,32 +326,36 @@ The unaveraged mode has its own twin, and it costs more than the averaged one be
 
 Every run prints an estimated walk in its header and the measured walk beside it in its footer. The rates are fitted to the tables above and are this machine's. The estimate is measured here on the eleven comparison tiers and four examples, each run on its own rather than beside the other keystone jobs. A machine running five jobs at once measures the load and not the deck.
 
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
+
 | run | filter | measured | estimate | estimate/measured |
 |---|---|---|---|---|
-| tier1 | off | 0.297 s | 0.394 s | 1.33 |
-| tier1_unavg | off | 12.6 s | 23.6 s | 1.87 |
-| tier2_bmad | off | 3.8 s | 4.7 s | 1.24 |
-| tier2_genesis | off | 3.7 s | 4.7 s | 1.27 |
-| td1 | off | 0.671 s | 0.845 s | 1.26 |
-| td2_bmad | off | 8.6 s | 10.1 s | 1.17 |
-| td2_genesis | off | 8.8 s | 10.1 s | 1.15 |
-| tdsase | off | 8.9 s | 10.1 s | 1.13 |
-| tdsc | off | 0.738 s | 0.845 s | 1.15 |
-| tdwk | off | 0.691 s | 0.845 s | 1.22 |
-| weight_split | off | 0.453 s | 0.576 s | 1.27 |
-| `sase` | on | 31.5 s | 30.4 s | 0.97 |
-| `steady_state` | on | 5.0 s | 4.7 s | 0.94 |
-| `taper` | on | 5.1 s | 4.7 s | 0.92 |
-| `flash1` | on | 22.6 s | 18.5 s | 0.82 |
+| tier1 | off | 0.325 s | 0.43 s | 1.32 |
+| tier1_unavg | off | 13.3 s | 25.8 s | 1.94 |
+| tier2_bmad | off | 4.1 s | 5.2 s | 1.27 |
+| tier2_genesis | off | 4.0 s | 5.2 s | 1.30 |
+| td1 | off | 0.72 s | 0.867 s | 1.20 |
+| td2_bmad | off | 9.1 s | 10.4 s | 1.14 |
+| td2_genesis | off | 9.1 s | 10.4 s | 1.14 |
+| tdsase | off | 9.2 s | 10.4 s | 1.13 |
+| tdsc | off | 0.768 s | 0.867 s | 1.13 |
+| tdwk | off | 0.76 s | 0.867 s | 1.14 |
+| weight_split | off | 0.502 s | 0.615 s | 1.23 |
+| `sase` | on | 32.4 s | 31.4 s | 0.97 |
+| `steady_state` | on | 6.0 s | 5.2 s | 0.87 |
+| `taper` | on | 6.0 s | 5.2 s | 0.87 |
+| `flash1` | on | 19.6 s | 17.7 s | 0.90 |
 
-Every row is inside a factor of two. Fitted with the source filter on, the transform rate is 58 percent higher than with it off, and the push and deposit rates are unchanged. The work outside the walk (parsing, building the beam and field, the final dumps) is 1 percent of the walk on these runs, and the estimate leaves it out. The filter column is what separates the two blocks. The examples take the default, and three of the four read between 0.92 and 0.97, where all four read 0.80 against the rates fitted with the filter off. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)). Their field solve is therefore the cheaper two-transform one, while the rate costing it is the filtered default's. That is the 1.13 to 1.33 the tier block sits at, a property of the configuration rather than of the machine.
+Every row is inside a factor of two, and the table is `tests/scripts/estimate_vs_clock.py` over the fifteen footers. The rates are fitted with the source filter on, which the measurement of 2026-09-07 put at 58 percent of the transform rate with the push and deposit rates unchanged. The work outside the walk (parsing, building the beam and field, the final dumps) is 1 percent of the walk on these runs, and the estimate leaves it out. The filter column is what separates the two blocks. The examples take the default and read between 0.87 and 0.97. Every tier turns the filter off, since each compares against a code that carries none ([](validation.md)). Their field solve is therefore the cheaper two-transform one, while the rate costing it is the filtered default's. That is the 1.13 to 1.32 the tier block sits at, a property of the configuration rather than of the machine. On 2026-09-07 the same fifteen rows read 0.82 to 1.87.
 
-`tier1_unavg` is the highest at 1.87, for a second reason. The unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period. The count carries those substeps while the rates it multiplies are the averaged path's. `flash1` is the lowest at 0.82, on 351 slices at `ngrid` 129, the configuration furthest from the one the rates were fitted on.
+`tier1_unavg` is the highest at 1.94, for a second reason. The unaveraged mode resolves the quiver, so it integrates and deposits on twenty substeps per period. The count carries those substeps while the rates it multiplies are the averaged path's. `steady_state` and `taper` are the lowest at 0.87, one slice of 8192 particles over the full line, where the estimate's push rate, fitted at 2048 particles a slice, runs ahead of a push that is a third of the walk.
 
 (perf-frames)=
 ## The frame series, measured
 
 This section measures what a frame costs, on the same machine. The deck is the `sase` example, 96 slices of 2048 macroparticles at `ngrid` 255, one frame every 20 m.
+
+*Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | | size | per unit |
 |---|---|---|
@@ -315,6 +365,8 @@ This section measures what a frame costs, on the same machine. The deck is the `
 The beam frame carries no overhead to trim. Its 68 bytes are six coordinates, the time the reference phase folds into, the time offset that places the particle's slice in the bunch, the reference momentum and the label. The uniform weight and the zero longitudinal position are constant records that cost nothing per particle. The field is seven times the beam and is where a series' bytes are.
 
 Compression does not pay on this data. The field is chunked one slice at a time with the shuffle filter:
+
+*Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | | size | ratio | read |
 |---|---|---|---|
@@ -326,6 +378,8 @@ Compression does not pay on this data. The field is chunked one slice at a time 
 A saturated FEL field is not sparse. The wide-angle emission of the point beamlets fills the grid, and a float64 mantissa of a noise-like field is incompressible, so gzip buys 1.3 times for sixteen times the read. Storing the field as float32 halves it exactly and costs 5.9e-8 of relative accuracy. That is far below anything a picture or a moment needs and far above single-precision tracking's own floor. Neither is taken. The measurement is what a later decision is made against.
 
 Writing frames dominates a run at a movie-grade comb, and the device readback does not. The deck is one undulator segment, 15 slices of 4096 at `ngrid` 256 on the Metal backend, with a comb of 0.1 m and 31 records:
+
+*Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | | frames off | frames on |
 |---|---|---|
@@ -341,6 +395,8 @@ The readback is about 0.10 s either way, since it happens at every comb row whet
 
 `global%interlude_ds_step` cuts an interlude element into pieces so that stats rows and frames land along it ([](validation.md#val-interlude-steps)). What that costs is the field's drift rather than the beam's tracking, since a piece drifts every slice of the window where it tracks one bunch per slice. The line is three undulators of 0.6 m with two pipes of 0.6 m between them, with 32 slices of 512 macroparticles at `ngrid` 128, `comb_ds_save = 0.02`, 12 threads and a production build, best of three.
 
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | `interlude_ds_step` | pieces an element | walk | rows |
 |---|---|---|---|
 | 0, the default | 1 | 0.285 s | 2016 |
@@ -348,6 +404,8 @@ The readback is about 0.10 s either way, since it happens at every comb row whet
 | 0.02 | 30 | 0.427 s | 3680 |
 
 The run's own phase table at the two ends of that scan says where the time goes:
+
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | phase | whole | cut at 0.02 |
 |---|---|---|
@@ -365,14 +423,20 @@ Bmad's global `bmad_com%sr_wakes_on` chooses the interlude path for every elemen
 
 The Metal backend ([](validation.md#val-device)) is run against the CPU path on the same decks: one 9 m Aramis segment of 89 steps at `ngrid` 256, with `comb_ds_save = -1` so both sides pay stats at the element end only. The table gives walk seconds, best of three, on the M3 Max (12 performance cores for the CPU, production builds). The device-busy column is the backend's own command-buffer timestamps. The difference from its wall clock is the host side of each step, dominated by the dispatch floor.
 
-| case | CPU, 12 threads | device wall | device busy | ratio |
-|---|---|---|---|---|
-| steady state, 1 x 8192 particles | 0.360 s | 0.049 s | 0.015 s | 7.3x |
-| SASE window, 24 x 4096, slippage live | 0.873 s | 0.107 s | 0.048 s | 8.2x |
-| SASE window, 96 x 8192 | 3.92 s | 0.316 s | 0.196 s | 12.4x |
-| dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.037 s | 0.009 s | 0.9x |
+*Measured 2026-10-24: Apple M3 Max, 12 performance cores, production build, gfortran 15.3 and clang 21.1 from conda-forge, the toolchain the recorded digits belong to.*
+
+| case | CPU, 12 threads | device wall | device busy | ratio | 2026-09-04 |
+|---|---|---|---|---|---|
+| steady state, 1 x 8192 particles | 0.436 s | 0.059 s | 0.018 s | 7.3x | 7.3x |
+| SASE window, 24 x 4096, slippage live | 0.758 s | 0.124 s | 0.061 s | 6.1x | 8.2x |
+| SASE window, 96 x 8192 | 3.509 s | 0.383 s | 0.290 s | 9.1x | 12.4x |
+| dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.045 s | 0.014 s | 0.7x | 0.9x |
+
+The decks are `tests/perf/*.in` and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-09-04, under gfortran 13.3 and the clang of 2025-06, when the CPU walks were 0.360, 0.873, 3.92 and 0.032 s and the device walls 0.049, 0.107, 0.316 and 0.037. The device walls are longer on the current toolchain, by 20 to 48 percent, and the busy seconds with them, which is the host side and the Metal library of the newer clang rather than the shaders, which are compiled at run time by the same Metal compiler. The source filter is on in these runs and was not the default then.
 
 This table says where a step's device seconds go, per pass. `global%device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU. Dispatch-boundary sampling would time each dispatch inside one encoder, and the M3 Max reports it absent. The deck is the full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, with the filter on and `comb_ds_save = -1`. The readbacks therefore fall at element ends, and each element's steps batch into one command buffer. Each row is the best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
+
+*Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -381,6 +445,8 @@ This table says where a step's device seconds go, per pass. `global%device_timin
 | 131072 | 1.800 s | 0.312 s | 0.0482 s | 0.0423 s | 0.0147 s | 0.0825 s | 0.0590 s | 0.0614 s | 0.3081 s | 7.1% |
 
 The instrument is not free, and its price says how far the table above can be read. The same three loads are run with the timing off against on, best of five:
+
+*Measured 2026-09-09: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | particles a slice | walk off | walk on | busy off | busy on | busy |
 |---|---|---|---|---|---|
@@ -392,6 +458,8 @@ The absolute seconds in the per-pass table are therefore the instrument's rather
 
 The fixed-point deposit's cost is measured on the same three loads and the same deck as the two tables above, timing off on both sides so the instrument's own boundaries are out of it, best of five. The float deposit is the build before the accumulator changed.
 
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | particles a slice | busy, float | busy, fixed point | busy | walk, float | walk, fixed point | walk |
 |---|---|---|---|---|---|---|
 | 1024 | 0.1120 s | 0.1390 s | 1.24x | 0.611 s | 0.649 s | 1.06x |
@@ -401,6 +469,8 @@ The fixed-point deposit's cost is measured on the same three loads and the same 
 The fixed point costs a quarter to a third more device time on those decks, and six to seven percent more wall clock. A single slice leaves the step dominated by the host's dispatch rather than by the device, so the backend is busy for only about a sixth of the walk there. That is the cheap end of the range and not a general figure, so the same comparison is made below on a window that keeps the device busy.
 
 This table says where the device time goes after the change, on the deck and conditions of the per-pass table above, so that the passes can be compared rather than inferred.
+
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | particles a slice | walk | busy | transverse | push | zero | deposit | filter | solve | the six | spread |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -412,6 +482,8 @@ The two tables were taken at different times, so the passes the change does not 
 
 What it costs where the device is the bottleneck is measured on one Aramis segment, 96 slices at `ngrid` 256 with shot noise and `comb_ds_save = -1`. That window leaves the backend busy for about 68 percent of the walk instead of a sixth. The two builds are the one before the accumulator changed and the one after, timing off on both, best of five after a discarded warm-up.
 
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
 | 96 x 1024 | 0.329 s | 0.385 s | 1.17x | 0.226 s | 0.283 s | 1.25x |
@@ -420,6 +492,8 @@ What it costs where the device is the bottleneck is measured on one Aramis segme
 That table has the clear as it first stood, one word a thread. On this window the clear was the largest single pass at 0.0863 s of 0.328 s busy, a quarter of all device time, since it writes 96 slices of 256 by 256 accumulators every step. It is a memory fill, so what it costs is the width of a store. Four words a thread halves it, to 0.0427 s. The same widening on the float deposit is worth nothing, 0.99x and 1.01x on the walk, because that clear writes half the words and was never the bottleneck. The saving belongs to the fixed point's own bytes and is credited there.
 
 With the clear widened on both sides and the deposit's gamma guard in the kernel, six pairs are run alternating between the two builds so that drift falls on both:
+
+*Measured 2026-09-12: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | slices x particles | walk, float | walk, fixed point | walk | busy, float | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
@@ -437,6 +511,8 @@ A second polarization plane costs one more plane: every field plane transforms, 
 
 The mode's parallelism on the CPU is over slices and nothing else, so what the device is worth depends on how many slices a deck has. Both regimes are measured, since they are different questions, and only the single-slice one shows the parallelism the CPU leaves unused. The deck is one 4 m Aramis segment in the unaveraged mode, 89 record steps of 60 substeps, `ngrid` 128, `comb_ds_save` at its default, production builds, on the M3 Max. Each entry is the best of five after a discarded warm-up, with the spread over the five beside it.
 
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | slices x particles | CPU | device | ratio | device busy | busy share of the walk |
 |---|---|---|---|---|---|
 | 32 x 512, 12 threads | 8.508 s, 3.8% | 0.941 s, 13.1% | 9.0x | 0.833 s | 89% |
@@ -447,6 +523,8 @@ The mode's parallelism on the CPU is over slices and nothing else, so what the d
 The single-slice rows are against a CPU using one core of twelve, which is what that deck gets on the CPU. The last row is where the difference is largest: the device carries sixteen times the particles for 25% more time while the CPU pays the full factor. The many-slice rows are against twelve CPU threads and land near ten. The backend is busy for three quarters to nine tenths of the walk in every row. This mode is therefore device-bound rather than dispatch-bound, which the averaged path's single-slice decks are not.
 
 This table says where a step's device seconds go, per pass, with `global%device_timing = T`. The deck is the 32-slice one above, under the same conditions, in one complete run. The half push runs twice a substep and the solve is four dispatches, so those lines carry more encoders than the others, and the record step's energy baseline adds one dispatch to the quiver line.
+
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | particles a slice | busy | solve | zero | quiver | kick | spont | the five |
 |---|---|---|---|---|---|---|---|
@@ -459,6 +537,8 @@ The instrument's own price applies here as it does above: encoder boundaries the
 
 What the fixed-point deposit costs is re-measured here. This mode deposits twenty times an undulator period where the averaged path deposits once a record step, so the question is whether the higher rate changes the answer. The comparison is the accumulator narrowed to one 32-bit atomic a component and a two-word clear, the float accumulator's own traffic, against the fixed point as it ships. The decks are the same, timing off on both, best of five.
 
+*Measured 2026-09-10: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | slices x particles | walk, narrow | walk, fixed point | walk | busy, narrow | busy, fixed point | busy |
 |---|---|---|---|---|---|---|
 | 32 x 512 | 0.897 s | 0.901 s | 1.00x | 0.776 s | 0.819 s | 1.06x |
@@ -469,6 +549,8 @@ The price is zero to fourteen percent on the walk and six to eighteen on device 
 
 The field set is measured on the planar segment of the harmonics check (3.96 m, 88 steps), since a helical segment couples only the fundamental and the set has nothing to carry there. The window is the same 96 x 8192 at `ngrid` 256 and `comb_ds_save = -1`:
 
+*Measured 2026-09-12: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
+
 | case | CPU, 12 threads | device wall | device busy | ratio |
 |---|---|---|---|---|
 | fundamental only | 3.344 s | 0.269 s | 0.185 s | 12.4x |
@@ -478,6 +560,8 @@ The field set is measured on the planar segment of the harmonics check (3.96 m, 
 A second member costs the device 87% more wall clock and the CPU 57% more. A second plane costs the device 55% more and the CPU 35% more. The device pays the extra planes' transforms in full and the gather and deposit loops over members per particle. The CPU's field solve is already the smaller share, so the ratio narrows by a fifth and no more. The rows are walk time in a production build, min of two runs.
 
 The readback schedule is the other setting. The rows above read back at the element end only. `comb_ds_save = 0` (a stats row every step) pays a beam-and-field readback per step, the same trade the reference manual describes for `output_step`. The 96 x 8192 case is measured at that finest comb, with the readback's conversion loops first serial and then parallel over slices:
+
+*Measured 2026-09-12: Apple M3 Max, production build, gfortran 13.3 and the clang of 2025-06, kept as measured.*
 
 | comb = 0, walk | host stats | readback | per stats row |
 |---|---|---|---|
