@@ -17,7 +17,7 @@ This page lists what this code implements, and where each thing came from. Every
 
 **SIMPLEX**, T. Tanaka. Its source is unlicensed and unread. The coherent source is implemented from the published paper alone.
 
-**openPMD-beamphysics** is a library the validation harness calls: it converts the Genesis4 reference dumps, and the wavefront round trip goes through its openPMD I/O in both directions.
+**openPMD-beamphysics** is a library the benchmark calls: it converts the Genesis4 reference dumps, and the wavefront round trip goes through its openPMD I/O in both directions.
 
 ## Papers the code implements
 

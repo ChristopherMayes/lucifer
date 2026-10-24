@@ -34,7 +34,7 @@ reference file is involved:
   7. An imported field carrying Ey decides the run's planes, with or without the seed's
      polarization in the deck.
 
-Run by the benchmark harness. Exits nonzero on failure.
+Run by the benchmark. Exits nonzero on failure.
 """
 
 from __future__ import annotations

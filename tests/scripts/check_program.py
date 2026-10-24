@@ -60,7 +60,7 @@ and the tracking window.
      floor. A continuation from the dump with the attribute stripped is refused, and so
      is an impossible residual.
 
-Run by the benchmark harness. Exits nonzero on failure. No Genesis run is involved.
+Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ use, SEG
 """
 
 # The namelist twin of lucifer_smoke_test's in-code configuration (same values).
-# grid_n_pts is 63 here on purpose, and this pair is the only place in the harness that is
+# grid_n_pts is 63 here on purpose, and this pair is the only place in the benchmark that is
 # not a power of two. Every other deck runs a power-of-two grid, which is what the Metal
 # field solver takes, so a deck moves between the backends unchanged. This pair holds the
 # odd-grid path on the CPU, which has to keep working: a user writing a Genesis-style odd

@@ -300,7 +300,7 @@ end type
 !
 ! The beam-side scalars of &fel_beam_init. They sit beside Bmad's beam_init, which
 ! describes the bunch, and imp, the resampler. They are the source and output files,
-! the quiet-start settings and the check instruments the validation harness sets.
+! the quiet-start settings and the check instruments the benchmark sets.
 !-
 
 type fel_beam_init_param_struct
@@ -325,7 +325,7 @@ type fel_beam_init_param_struct
   logical :: quiet_start = .true.
   integer :: beamlet_size = 8             ! Copies per beamlet. A loading parameter only.
   logical :: shot_noise = .false.         ! Impose physical shot noise on the load.
-  ! Check instruments, set by the validation harness. They are not physics inputs.
+  ! Check instruments, set by the benchmark. They are not physics inputs.
   logical :: split_weights = .false.      ! Coincident w/3 + 2w/3 copies after loading.
   logical :: swap_beam_xy = .false.       ! Swap (x,px) <-> (y,py) after generation.
   logical :: gen_test_weights = .false.   ! Alternate beamlet weights 0.25x/1.75x.

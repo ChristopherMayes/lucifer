@@ -19,8 +19,8 @@
 #   1. Lucifer built, so build-debug/bin/lucifer (or build-release/bin) exists:
 #        BUILD_PRODUCTION=N util/conda_compile   # from the Lucifer clone's root
 #
-#   2. genesis4 4.6.15 from conda-forge, in the bmad-fel-validate environment, which the
-#      harness takes ahead of PATH. --genesis names another, and its version is checked.
+#   2. genesis4 4.6.15 from conda-forge, in the bmad-fel-validate environment, which this
+#      benchmark takes ahead of PATH. --genesis names another, and its version is checked.
 #      The benchmark needs FFTW support compiled in, since it runs with fft_fieldsolver = true.
 #
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
@@ -61,7 +61,7 @@
 # whether it hit or missed. Deleting the cache is always safe and costs one cold run.
 #
 # Every section runs on every invocation. There is no quicker mode, on purpose: a
-# cheap run that checks less is what this harness exists to prevent. The device
+# cheap run that checks less is what this benchmark exists to prevent. The device
 # section is the one section that can skip, and only where the build carries no
 # usable device backend, which it establishes from lucifer's own banner rather than
 # from the platform. A results file recording that skip cannot write the generated
@@ -254,7 +254,7 @@ cd "$WORK_DIR" || exit 1
 export FI_PROVIDER=tcp
 
 # Every section prints its wall time, so a regression in test cost is visible from the
-# harness output itself.
+# benchmark's own output.
 
 BENCH_T_LAST=$SECONDS
 section_time () {   # <label>
@@ -292,7 +292,7 @@ run_genesis () {   # <deck> ...: the decks of one chain, in order
 # The references are a pure function of the reference binary and the decks that make
 # them, and they cost 131 s on both passes of every run, so they are cached. The key
 # names all three things that can change the answer: the binary's own bytes, every
-# deck genesis reads, and the version the harness pins, which is what a set generated
+# deck genesis reads, and the version the benchmark pins, which is what a set generated
 # by some other reference would fail. The cache holds whatever the chains wrote, found
 # by diffing the directory rather than by a list of names that could fall behind the
 # decks. It lives outside the repository, is safe to delete at any time, and the run

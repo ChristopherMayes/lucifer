@@ -15,7 +15,7 @@ Lucifer is the reference writer. The escaped-field and pulse field files are com
 
 ## 2. The record axis, FEL reading
 
-- **F7.** The core `record` axis carries the per-record beam and field data. `coords/s` (path length, Bmad's s) may legitimately repeat at a zero-length element that acts, a wake kick or a thin kicker, which is the case core R16 exists for. A repeat inside one element is a writer defect, and the writer's harness checks it.
+- **F7.** The core `record` axis carries the per-record beam and field data. `coords/s` (path length, Bmad's s) may legitimately repeat at a zero-length element that acts, a wake kick or a thin kicker, which is the case core R16 exists for. A repeat inside one element is a writer defect, and the writer's checks catch it.
 
 ## 3. Groups
 
@@ -37,7 +37,7 @@ Lucifer is the reference writer. The escaped-field and pulse field files are com
 
 The kinds are `per_slice`, `field`, `component`, `harmonic`, `beam`, `projected`, `twiss`, `modes`. The axes are `slice`, `wavefront`, `wavefront_col`, `bmad_t`, `grid_x`, `grid_y`. The attributes are `@head_direction`, `@harmonic`, `@harmonics`, `@fel_version`.
 
-## 6. Writer-harness identities
+## 6. Writer-check identities
 
 These identities are not checkable by the generic validator and are required of a conforming writer's own tests. `t_slice == -ct_slice/c` holds exactly, and so does `z_slice == beta0 * ct_slice`. The `reduced/` projections integrate to `power` per record and per slice where they are written. `field/total` equals the sum of its `@derived_from`. The angle-moment validity flags match where the FFTs actually ran. The position entries of `rel_max` and `rel_min` match extremes over a particle dump at the same plane. Every repeated `coords/s` straddles an element boundary.
 

@@ -15,7 +15,7 @@ about this program.
 2. The state round trip. The file stores absolute momenta and a time where the tracker
    keeps packed (px, py) and a lag, so those pass through P/p0 and -beta*c*dt on the way
    out and back, while x and y are untouched. The state is read out here through the
-   converter, in Genesis's chart, the one other view of the beam the harness has: theta
+   converter, in Genesis's chart, the one other view of the beam the benchmark has: theta
    and gamma instead of a time and a momentum. Every column comes back exact on this
    configuration, so the levels bound what the chart could cost and are not expected
    values. Which coordinate pays is fixed. Whether it pays depends on the configuration.

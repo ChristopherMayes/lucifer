@@ -2,7 +2,7 @@
 """
 Generate docs/generated/validation-measured.md from benchmark results files.
 
-The levels in the documentation are written by the harness that produces them, and not
+The levels in the documentation are written by the benchmark that produces them, and not
 by hand. Run the benchmark on each build with --results, then point this script at both
 files.
 

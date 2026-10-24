@@ -36,7 +36,7 @@ behaves between undulator segments, held by symmetries, closed forms and Genesis
      interludes. A z_offset exceeding its upstream break. A z_offset on the first
      element, which has no break to displace into.
 
-Run by the benchmark harness. Exits nonzero on failure. Needs genesis4 for section 4.
+Run by the benchmark. Exits nonzero on failure. Needs genesis4 for section 4.
 """
 
 from __future__ import annotations

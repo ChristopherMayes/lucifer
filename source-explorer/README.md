@@ -33,7 +33,7 @@ port 4175. That port must be free.
 
 `npm run build` writes `dist/`. Serve that directory with an HTTP server.
 Opening the HTML through a `file:` URL does not load the worker.
-This prototype is independent of the Fortran build and benchmark harness.
+This prototype is independent of the Fortran build and benchmark.
 
 ## Source and field
 

@@ -12,7 +12,7 @@ generically, so silence is never mistaken for coverage. For example, the validat
 verify that a declared join key resolves (R18), and not that every join key is declared.
 It cannot see whether R26's strings are really the code's enums, whether R28's NaN means
 not-computed, or whether R34's input trees are complete. Those belong in the writing
-program's own harness.
+program's own checks.
 
 Exit status: nonzero if any MUST failure, zero otherwise.
 """

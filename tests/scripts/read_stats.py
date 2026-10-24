@@ -304,7 +304,7 @@ def same_data(a, b):
     The stats file carries NaN wherever a quantity was not computed: the theta moments
     away from element ends, an empty slice's moments, the twiss of a degenerate slice.
     Two files with a NaN in the same place are identical, and plain equality would call
-    every such pair different, so every identity check in the harness comes here.
+    every such pair different, so every identity check in the benchmark comes here.
     """
     a, b = np.asarray(a), np.asarray(b)
     if a.shape != b.shape or a.dtype != b.dtype:

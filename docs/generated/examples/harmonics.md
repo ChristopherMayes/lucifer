@@ -20,7 +20,7 @@ The seed is 200 MW on 3.96 m of planar undulator at rms aw = 0.84853. Over the s
 
 `plot_fel.py`'s harmonic panel shows both curves on one log scale, and that figure is this example's page in the documentation. The harmonic's full wavefront_params live under `field/harm3/` in the stats file. Its dump carries `-h3` in the name, `harmonics-final-h3.wf.h5`, an openPMD EXT_Wavefront file with the photon energy identifying the harmonic.
 
-A helical undulator would give nothing here, since its coupling fc(h) vanishes for every harmonic (the manual's harmonic-radiation section). That is why this example is planar. The deck turns the source filter off, as the comparison against Genesis 1.3 Version 4 (Genesis4) requires. The harness's harmonics section runs the same configuration against Genesis4, on the fundamental's power and on the harmonic's growth, and against the exact Bessel deposit sum, at the levels in [](../../validation.md#val-levels-harmonics).
+A helical undulator would give nothing here, since its coupling fc(h) vanishes for every harmonic (the manual's harmonic-radiation section). That is why this example is planar. The deck turns the source filter off, as the comparison against Genesis 1.3 Version 4 (Genesis4) requires. The benchmark's harmonics section runs the same configuration against Genesis4, on the fundamental's power and on the harmonic's growth, and against the exact Bessel deposit sum, at the levels in [](../../validation.md#val-levels-harmonics).
 
 The run takes about a second.
 

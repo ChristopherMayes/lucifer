@@ -3759,7 +3759,7 @@ the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An e
 namelist runs to 12 kB and a lattice text to 37 kB on a real lattice
 (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
-differ in meta/. The harness excludes meta/ by name from identity comparisons.
+differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
 
 Note: meta/ is not a reproducibility record. lattice_source is the top-level file
 only. Bmad's "call, file =" pulls in more, and a wrapper lattice records a call
@@ -4249,7 +4249,7 @@ There is one record axis. Element ends are always recorded whatever the comb
 (fel_comb_take). So an element end is a record, and the element-end arrays need no
 axis of their own: at_element_end selects them. scripts/read_stats.py is the reader
 everything uses. scripts/bunch_params_from_stats.py reconstructs a bunch_params dict
-from any (record, slice) of the sufficient statistics. The harness checks that at
+from any (record, slice) of the sufficient statistics. The benchmark checks that at
 element ends it reproduces the stored twiss.
 
 Beam moments are computed in two passes: the mean first, then centered second moments
@@ -4799,7 +4799,7 @@ allocatable state, which a namelist object cannot. fel_setup copies these in.
 ```
 The beam-side scalars of &fel_beam_init. They sit beside Bmad's beam_init, which
 describes the bunch, and imp, the resampler. They are the source and output files,
-the quiet-start settings and the check instruments the validation harness sets.
+the quiet-start settings and the check instruments the benchmark sets.
 ```
 
 (api-fel-run-struct)=
@@ -6483,7 +6483,7 @@ step is in fel-physics.md (sec-unaveraged) and examples/saturation_demo.
 
 DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 path. They are outputs of this mode, and their appearance here would make the check
-circular. The harness greps this file for them.
+circular. The benchmark greps this file for them.
 
 The step, per substep delta (Strang split, second order):
 
@@ -6539,7 +6539,7 @@ push with a symplectic composition. The ballistic check will show when.
 The step runs parallel over slices with the averaged step's guarantees: disjoint
 particle arrays and field slices per iteration, serial kernel init, threadprivate FFT
 plans, and per-slice energy summed in fixed order. Results are bit-identical across
-thread counts, and the harness checks it.
+thread counts, and the benchmark checks it.
 
 The device path (fel_device_mod, docs/validation.md val-device-unaveraged): With a
 backend armed, the beam and the field stay resident for the whole segment, and one
@@ -6780,7 +6780,7 @@ The FEL-step particle-path microbenchmark: time fel_advance on a synthetic singl
 slice at fixed state and decompose the per-particle-step cost into
 the full path, the RK4+ODE alone (no gather, fixed rpart), and the bare sin/cos
 pair. Each optimization lever then gets a number, not a guess. Serial on purpose:
-this measures the per-particle constant. Parallel scaling is the perf harness's job.
+this measures the per-particle constant. Parallel scaling is the performance benchmark's job.
 
   lucifer_advance_bench [npart] [nstep]      (defaults 8192, 400)
 
@@ -6800,14 +6800,14 @@ a clang-built twin of the same loop is compiler/libm, not physics.
 ```
 The library-contract check (docs/user-guide.md): drive the FEL tracker without the
 namelist layer. Fill the input structs in code, call the library, write the dumps.
-The harness compares its outputs dataset-identically against a namelist-driven run
+The benchmark compares its outputs dataset-identically against a namelist-driven run
 of the same configuration, and runs it twice in one process (both passes here) to
 prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 
   lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>
 
 With an unreadable lattice file the library must return an error (never exit): this
-program then prints its proof-of-return line and stops with code 2. The harness's
+program then prints its proof-of-return line and stops with code 2. The benchmark's
 library-error check requires exactly that behavior.
 ```
 
@@ -7538,7 +7538,7 @@ Output:
 openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
 Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
 The standard document is authoritative for this format. This module and the
-harness's h5py reader are each checked against its text.
+benchmark's h5py reader are each checked against its text.
 
 Layout (also see fel-physics.md sec-field-set):
 

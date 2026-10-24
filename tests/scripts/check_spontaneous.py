@@ -37,7 +37,7 @@ Then, with Bmad's switches on: damping in both FEL modes (5), fluctuations again
 analytic variance and against runge_kutta (6), 1 against 8 threads with fluctuations on
 (7), and the energy ledger closing with the radiated energy (8).
 
-Run by the benchmark harness. Exits nonzero on failure.
+Run by the benchmark. Exits nonzero on failure.
 """
 
 from __future__ import annotations

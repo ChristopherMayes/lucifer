@@ -19,7 +19,7 @@ that quietly loses its example reads exactly like one that never had it. Six ass
      which is what makes the pages copy-paste safe.
   6. Every generated page's figure exists.
 
-Nothing here runs the program, so it is also the part of the harness that a machine with
+Nothing here runs the program, so it is also the part of the benchmark that a machine with
 no Fortran build can run.
 
 Usage:

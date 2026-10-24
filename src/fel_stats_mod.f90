@@ -41,7 +41,7 @@
 ! (fel_comb_take). So an element end is a record, and the element-end arrays need no
 ! axis of their own: at_element_end selects them. scripts/read_stats.py is the reader
 ! everything uses. scripts/bunch_params_from_stats.py reconstructs a bunch_params dict
-! from any (record, slice) of the sufficient statistics. The harness checks that at
+! from any (record, slice) of the sufficient statistics. The benchmark checks that at
 ! element ends it reproduces the stored twiss.
 !
 ! Beam moments are computed in two passes: the mean first, then centered second moments
@@ -1256,7 +1256,7 @@ call fel_h5_str (g_id, 'mode', 'mode', &
       'The three normal modes, bunch_params_struct''s a, b and c. A separate axis from ' // &
       'plane because the two are different decompositions of one beam, so nothing may ' // &
       'average across them. The labels are eigenvector-identified rather than ' // &
-      'magnitude-sorted, which is why the harness compares mode emittances as a set.', &
+      'magnitude-sorted, which is why the benchmark compares mode emittances as a set.', &
       'mode', fel_stats_norm$, err)
 if (err) return
 
@@ -1299,7 +1299,7 @@ if (err) return
 ! ------------------------------------------------------------------
 ! run/: the scalars the run produced. params/ holds the inputs, and fel_io_mod writes
 ! it (one subgroup per honored input struct). The three counts restate axis lengths on
-! purpose. n_element_end comes from the accumulator's counter. So the harness check of
+! purpose. n_element_end comes from the accumulator's counter. So the benchmark check of
 ! it against the mask tests the walk's bookkeeping. coords/element_end, packed from
 ! that mask, cannot.
 

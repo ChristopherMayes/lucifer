@@ -17,7 +17,7 @@
 !
 ! DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 ! path. They are outputs of this mode, and their appearance here would make the check
-! circular. The harness greps this file for them.
+! circular. The benchmark greps this file for them.
 !
 ! The step, per substep delta (Strang split, second order):
 !
@@ -73,7 +73,7 @@
 ! The step runs parallel over slices with the averaged step's guarantees: disjoint
 ! particle arrays and field slices per iteration, serial kernel init, threadprivate FFT
 ! plans, and per-slice energy summed in fixed order. Results are bit-identical across
-! thread counts, and the harness checks it.
+! thread counts, and the benchmark checks it.
 !
 ! The device path (fel_device_mod, docs/validation.md val-device-unaveraged): With a
 ! backend armed, the beam and the field stay resident for the whole segment, and one
@@ -421,7 +421,7 @@ any_err = .false.
 ! The device in the instrument's twin role. It advances the same record step from the
 ! state this one received. It is encoded before the FP64 loop below, so the two overlap
 ! and its field image rounds from the pre-step record. The FP64 path is untouched, and
-! the harness asserts that as it does for the CPU twin.
+! the benchmark asserts that as it does for the CPU twin.
 
 dev_twin = dev%on .and. fp32%on
 if (dev_twin) then

@@ -82,9 +82,9 @@ jobs:
   keystone:
     runs-on: ubuntu-latest
     # Measured on this runner on 2026-10-24, against the conda-forge package: 36.0 minutes
-    # end to end, of which the harness is 33.9, the Lucifer build 0.7 and the two
+    # end to end, of which the benchmark is 33.9, the Lucifer build 0.7 and the two
     # environments 0.9. The run of 2026-10-23 that cloned Bmad and built its debug tree
-    # took 37.5, with 6.4 in that build and 30 in the harness. The harness costs four
+    # took 37.5, with 6.4 in that build and 30 in the benchmark. The benchmark costs four
     # times its local 7.7 minutes because a runner has four cores against the recording
     # machine's sixteen and its Genesis references are always cold, and its longest
     # sections are spontaneous at 642 s and the eleven tiers at 320 s.
@@ -144,7 +144,7 @@ jobs:
           echo "LUCIFER_BMAD_ROOT=$CONDA_PREFIX" >> "$GITHUB_ENV"
 
       # Which backend this build carries, from lucifer's own banner. This is the line the
-      # harness reads to decide whether the device section can run, so having it in the
+      # benchmark reads to decide whether the device section can run, so having it in the
       # log makes the skip below checkable rather than asserted.
       - name: Name the device backend
         shell: bash
@@ -153,9 +153,9 @@ jobs:
       # One environment for the reference and the Python side, from the repository's own
       # file, which pins genesis4 4.6.15. The pin is the whole reason this job is
       # possible: releases to 4.6.14 carry a pre-CODATA electron rest energy and seed
-      # their noise per MPI rank, and the harness refuses any other version, printing what it found and wanted. It
+      # their noise per MPI rank, and the benchmark refuses any other version, printing what it found and wanted. It
       # is separate from the build environment for the reason the recording machine keeps
-      # them separate, and the harness finds it by name.
+      # them separate, and the benchmark finds it by name.
       - name: Install the reference and the Python side
         shell: bash -o pipefail {0}
         run: |
@@ -163,20 +163,20 @@ jobs:
           set -e
           conda env create -f tests/environment-validate.yml
           # The reference's own banner, so a wrong version is visible here rather than
-          # only in the harness's refusal. genesis4 exits non-zero when it is given no
+          # only in the benchmark's refusal. genesis4 exits non-zero when it is given no
           # input file, so it runs inside a shell that exits zero after the banner, and
           # conda run then prints no error line for a status this step ignores anyway.
           conda run -n bmad-fel-validate bash -c 'genesis4 2>&1 | head -3; true'
           # openPMD-beamphysics comes from the same file, at the minimum it states or
-          # later. The harness prints the version and path again before its sections run.
+          # later. The benchmark prints the version and path again before its sections run.
           conda run -n bmad-fel-validate python -c \
               "import beamphysics; print('openPMD-beamphysics', beamphysics.__version__)"
 
-      # The harness prints the reference version and the electron rest energy it carries,
+      # The benchmark prints the reference version and the electron rest energy it carries,
       # every section's name and wall time, and every tier's level against its tolerance.
       # Its exit status is zero only if every tier passed. Run from the validate
       # environment, which is how the recording machine runs it.
-      - name: Benchmark harness, debug build
+      - name: Benchmark, debug build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"

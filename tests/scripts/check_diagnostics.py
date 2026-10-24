@@ -50,7 +50,7 @@ rather than by a reference file.
      is an external reader, and a round trip through this program's own reader cannot
      stand in for it.
 
-Run by the benchmark harness. Exits nonzero on failure.
+Run by the benchmark. Exits nonzero on failure.
 """
 
 from __future__ import annotations

@@ -81,7 +81,7 @@ Thread independence is a few commands rather than a directory. The threads divid
     done
     cmp t1.diag.txt t12.diag.txt
 
-On this configuration, 1 thread against 12, the two diag files are identical. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The harness runs the same check on the td1 tier at every commit.
+On this configuration, 1 thread against 12, the two diag files are identical. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The benchmark runs the same check on the td1 tier at every commit.
 
 ## Planned examples
 

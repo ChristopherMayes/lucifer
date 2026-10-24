@@ -31,7 +31,7 @@ sec-field-set):
      matches no field of the run. A Genesis-format harmonic import, which carries no
      photon energy to match on.
 
-Run by the benchmark harness. Exits nonzero on failure. Needs the genesis4 binary
+Run by the benchmark. Exits nonzero on failure. Needs the genesis4 binary
 (--genesis) for section 2, and openPMD-beamphysics installed in this interpreter's
 environment for the openPMD checks of section 1.
 """
@@ -159,7 +159,7 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-# The grids here are odd on purpose, where the rest of the harness runs powers of two.
+# The grids here are odd on purpose, where the rest of the benchmark runs powers of two.
 # Genesis propagates the transverse field on wavenumbers that are whole multiples of dk
 # only when ngrid is odd. On an even ngrid its FieldSolverFFT carries every mode half a
 # step out. Lucifer's kernel is correct at both parities, so a power comparison this tight

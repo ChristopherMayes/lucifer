@@ -1,4 +1,4 @@
-# Environment for the wavefront validation harness.
+# Environment for the wavefront benchmark.
 #
 # This provides the Python side of the Fortran/Python drift comparison and of the FEL
 # benchmark, openPMD-beamphysics included. The scripts import whatever this environment
@@ -36,7 +36,7 @@ dependencies:
   - pytest
   # The reference code the FEL benchmark compares against. It lives here so the
   # comparison runs against a named build rather than whatever is on PATH: the
-  # recorded levels belong to the build that produced them, and the harness refuses a
+  # recorded levels belong to the build that produced them, and the benchmark refuses a
   # reference reporting any other version.
   #
   # 4.6.15 is the first release carrying both things the levels need: the CODATA

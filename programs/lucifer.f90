@@ -93,7 +93,7 @@ if (n_arg /= 1) then
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
   ! Print what global%device can be set to in this build. The backend is a property of
   ! the build and the machine. Where there is none, the reason names the toolchain
-  ! requirement and not the platform. A test harness reads this line to decide whether
+  ! requirement and not the platform. A benchmark reads this line to decide whether
   ! the device checks can run.
   call fel_device_query (dev_usable, dev_name, dev_reason)
   if (dev_usable) then

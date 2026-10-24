@@ -9,6 +9,20 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Changed: the word harness is retired. The comparison against Genesis4 with its
+  tolerances and check sections, `tests/run_fel_benchmark.sh` and the scripts under `tests/scripts`,
+  is the benchmark, and `tests/run_perf_benchmark.sh` is the performance benchmark. The word is
+  testing jargon that Bmad's own corpus uses once, in a comment of one regression test, and it stood
+  192 times in 60 files here: 27 on `docs/validation.md`, 9 in the CI workflow, 21 in the comments
+  of `src/*.f90` and `programs/*.f90`, which `docs/generated/api.md` reproduces, and one in a
+  message `fel_stats_mod` prints about the mode emittances, which now says the benchmark compares
+  them as a set. `tests/scripts/check_retired_words.py` reads every Markdown, Python, shell,
+  Fortran, YAML and CMake file git tracks, less this changelog's history and the generated pages,
+  and fails naming each line that carries a retired word, `harness`, `gate` or `refused by name`,
+  with the reason for each in the script. It runs in `.github/workflows/lucifer-docs.yml` beside the
+  conformance and link checks and at the end of `examples/run_examples.sh`, so the keystone's
+  examples job carries it. On the tree before the edit it named 134 lines, and after it none in 130
+  files. The entries of this changelog dated before 2026-10-23 keep the word as history.
 - 2026-10-24 Changed: `docs/performance.md` is re-measured on gfortran 15.3 and clang 21.1, the
   toolchain the recorded digits belong to since 2026-10-23, and every table on it carries one line
   naming the toolchain, the machine and the day it was measured, the re-measured tables with
@@ -23,7 +37,7 @@ of that history. The entries before that date describe that branch.
   The same binary with the June-2024 fftw 3.3.10 placed first on its library path runs the 96-slice
   deck in 30.481 s at 255 and 32.952 s at 256 against 32.418 and 32.308 with today's 3.3.11, so the
   old library reproduces the September walk at 255 to half a percent, and the 11 percent between the
-  two phase-profile records is the grid the harness moved to through a library that paid 8 percent
+  two phase-profile records is the grid the benchmark moved to through a library that paid 8 percent
   for a power of two, which today's does not. The sampling split puts the transform at 73.9 percent
   of the samples against 68.8, and the unaveraged split gains a third column from
   `tests/perf/unavg_sample.in`. The device table's decks are `tests/perf/*.in` and
@@ -70,9 +84,9 @@ of that history. The entries before that date describe that branch.
   `util/bmad_release_check` runs on the environment's prefix before the build. The job's header
   comment says what it now varies, the Bmad build among it, and what it leaves out, the regression
   suite the package does not carry. The first green run against the package, on 2026-10-24, took
-  36.0 min end to end, the harness 33.9, the Lucifer build 0.7 and the two environments 0.9, against
-  37.5 for the clone-and-build run of 2026-10-23 with 6.4 in the Bmad debug build and 30 in the
-  harness. The benchmark harness and the wavefront validation run unchanged at their tolerances, and
+  36.0 min end to end, the benchmark 33.9, the Lucifer build 0.7 and the two environments 0.9,
+  against 37.5 for the clone-and-build run of 2026-10-23 with 6.4 in the Bmad debug build and 30 in
+  the benchmark. The benchmark and the wavefront validation run unchanged at their tolerances, and
   the device section skips on a runner as before.
 - 2026-10-23 Changed: Lucifer builds against conda-forge's `bmad` package. `cmake/FindBmad.cmake`
   searches `include/bmad` for `bmad.mod`, where the package keeps its 373 module files, as well as
@@ -94,12 +108,12 @@ of that history. The entries before that date describe that branch.
   need the distribution's debug tree. Against the package, `bmad` 20261023.0 nompi with hdf5 2.2.0
   and gfortran 15.3, the Release build takes 29 s on an M3 Max, the configure reports release
   20261023-0 from the module file, and the binary links the package's static archives, OpenBLAS and
-  the six HDF5 libraries with the Metal backend. The benchmark harness on that binary,
-  `--build production` in its own work directory, took 4 min 16 s: all 11 tiers at the recorded
-  production levels to every printed digit, every one of the 704 checks passing, and 3 of them moved
-  against the record, the phasing exit-power ratio by 3e-7 of itself and the SASE startup and import
-  startup levels at their last digit. Nothing is re-recorded. The keystone on the distribution build
-  reproduces every recorded digit.
+  the six HDF5 libraries with the Metal backend. The benchmark on that binary, `--build production`
+  in its own work directory, took 4 min 16 s: all 11 tiers at the recorded production levels to
+  every printed digit, every one of the 704 checks passing, and 3 of them moved against the record,
+  the phasing exit-power ratio by 3e-7 of itself and the SASE startup and import startup levels at
+  their last digit. Nothing is re-recorded. The keystone on the distribution build reproduces every
+  recorded digit.
 - 2026-10-23 Changed: Lucifer builds with its own `CMakeLists.txt` against an installed Bmad, named
   by `LUCIFER_BMAD_ROOT`, a distribution build's `production/` or `debug/` root or a prefix of the
   same shape, and no longer includes Bmad's `Master.cmake` or sources `dist_source_me`. The two
@@ -275,7 +289,7 @@ of that history. The entries before that date describe that branch.
   with the substeps a period, the ramp and where the ramp came from. `check_unaveraged.py` holds the
   dark probe at 0 byte-identical in its diag to the probe at the default, which the earlier code
   fails. `check_input_reference.py` reads a struct default written as a named constant as that
-  constant's value. No deck in the harness or the examples sets 0, so no digit moves.
+  constant's value. No deck in the benchmark or the examples sets 0, so no digit moves.
 - 2026-10-23 Fixed: a negative `slicing%n_wavelength` was derived from the gain as though it were 0.
   The derivation took any value at or below zero, and the two refusals of a value below one in
   `fel_init_mod.f90` run after it and never saw one. Setup now refuses a negative value with the

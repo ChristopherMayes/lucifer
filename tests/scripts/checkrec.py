@@ -1,7 +1,7 @@
 """Record what a check measured, beside the line it prints.
 
 A check script prints one line per check: the name, the value it measured, the bound it
-held the value to, and ok or FAIL. The harness reads only the exit status, so the
+held the value to, and ok or FAIL. The benchmark reads only the exit status, so the
 measured values reached the documentation by hand. record() writes the same facts as
 one line of the results file, and the documentation is generated from them.
 
@@ -24,7 +24,7 @@ sets for each section, with the section's name from LUCIFER_CHECK_SECTION, as
 
 The benchmark appends each section's file to its results file beside the section's
 outcome. With LUCIFER_CHECK_RECORD unset, as in a script run by hand, record() does
-nothing, so a script behaves the same inside and outside the harness.
+nothing, so a script behaves the same inside and outside the benchmark.
 """
 
 from __future__ import annotations

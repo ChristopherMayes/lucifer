@@ -288,7 +288,7 @@ type (ele_struct) ele
 
 character(*), parameter :: r_name = 'fel_assert_wiggler_sane'
 
-! These refusals must end the program with a nonzero exit, and the harness's refusal
+! These refusals must end the program with a nonzero exit, and the benchmark's refusal
 ! checks test for it. err_exit cannot be used here. Its integer-divide traceback does
 ! not trap on arm64, and its final bare stop exits 0. So the stops below stay.
 
@@ -871,7 +871,7 @@ phi0_new = beam%phi0 + und%dz * fel_phi0_rate(ks, und%ku, fel_p0_mc(beam))
 ! and slippage in the caller. Inside the loops each slice touches only its own
 ! particle arrays and its own field slice (the beam-to-field mapping is a bijection).
 ! Each slice's arithmetic does not depend on the thread that runs it. So results are
-! bit-identical across thread counts, and the benchmark harness checks this.
+! bit-identical across thread counts, and the benchmark checks this.
 
 call fel_tic (fel_t_und_prep$)
 do io = 1, size(ff)
@@ -1376,7 +1376,7 @@ if (.not. allocated(coll%long_esc)) allocate (coll%long_esc(size(beam%slice)))
 call fel_longrange_esc (coll%efield, beam, gamma0, 0.0_rp, coll%long_esc)
 
 ! The per-particle temporaries live at routine scope, so the parallel loop must make
-! them private explicitly. A missed one is a race, which the harness's
+! them private explicitly. A missed one is a race, which the benchmark's
 ! thread-count-independence check catches.
 
 any_err = .false.

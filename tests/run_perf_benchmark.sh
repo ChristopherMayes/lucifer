@@ -547,7 +547,7 @@ timed "Genesis4, $WORKERS MPI ranks" genesis-parallel.log \
   "$MPIRUN" -np "$WORKERS" "$GENESIS" perf-parallel.in
 
 # The tracker reads openPMD only, so the Genesis dumps convert once here. The conversion
-# is outside every timed section: it is harness work, not either code's.
+# is outside every timed section: it is the benchmark's own work, not either code's.
 
 for pair in "AramisPerf-initial.par.h5 AramisPerf-initial.beam.h5" \
             "AramisPerf-initial.fld.h5 AramisPerf-initial.wf.h5"; do

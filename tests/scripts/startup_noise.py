@@ -25,7 +25,7 @@ The experiments, each a set of runs and one figure:
                 saturated power and the saturation point against startup.
   e. theory     Ming Xie's gain length and Saldin, Schneidmiller and Yurkov's effective
                 shot-noise power and saturation estimates, from the deck's parameters.
-  f. genesis    Genesis4 on the harness's SASE tier deck at three grids with both of its
+  f. genesis    Genesis4 on the benchmark's SASE tier deck at three grids with both of its
                 field solvers, and Lucifer started from each of its dumps.
   g. filter     The source filter (fel-physics.md, sec-source-filter) at the machine's
                 filter grid, 256 on the first machine, and two loads, with its sigmoid's
@@ -41,7 +41,7 @@ Lucifer runs on the device by default (global%device = "metal"), with one CPU ru
 sweep's smallest grid as the cross-check. Genesis runs on the CPU. Every run is cached
 in the work directory by its deck text, so a rerun costs only what changed. The figures
 and a JSON file of every number go to --out. This script is run on demand and never by
-the benchmark harness.
+the benchmark.
 
 Usage:
   startup_noise.py --exe <lucifer> --genesis <genesis4>
