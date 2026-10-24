@@ -20,9 +20,11 @@
 ! A window of one slice gets nothing from threads.
 !
 ! tests/scripts/fit_cost_rates.py fits the rates from the logs of the runs the page
-! records: thirteen runs, three particle counts and two slice counts at five thread
-! counts. The worst residual on the walk is 4.0 percent over that set. The footer of
-! every run prints the walk beside the estimate.
+! records: sixteen runs, three particle counts and two slice counts at five thread
+! counts. The worst residual on the walk is 16.5 percent over that set, on the thread
+! sweep's four- and eight-thread rows, where one serial fraction cannot carry a sweep
+! whose efficiency is 92 percent at four threads and 94 at twelve. The footer of every
+! run prints the walk beside the estimate.
 !
 ! Note: The rates hold for the recording machine and line. Another machine or another
 ! line can differ.
@@ -37,37 +39,38 @@ implicit none
 
 ! The recording machine and the day the rates were fitted, printed with the estimate.
 
-character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-09-07'
+character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-10-24'
 
 ! Fitted from the phase profile and the particles-against-the-grid tables of
-! docs/performance.md (production build), divided out to one thread. The source filter
-! is on in every run of those tables since it is the default. The filter adds a forward
-! transform of the source per field per step. That raises the transform rate by
-! 58 percent (docs/performance.md) and leaves the push and the deposit alone.
+! docs/performance.md (production build, gfortran 15.3), divided out to one thread. The
+! source filter is on in every run of those tables since it is the default. The filter
+! adds a forward transform of the source per field per step, which the measurement of
+! 2026-09-07 put at 58 percent of the transform rate, with the push and the deposit
+! left alone.
 
-real(rp), parameter :: fel_cost_push$ = 2.06e-7_rp     ! s per particle-step.
-real(rp), parameter :: fel_cost_deposit$ = 1.30e-8_rp  ! s per particle-step.
-real(rp), parameter :: fel_cost_solve$ = 4.02e-9_rp    ! s per grid point per log2(ngrid) per step.
+real(rp), parameter :: fel_cost_push$ = 2.03e-7_rp     ! s per particle-step.
+real(rp), parameter :: fel_cost_deposit$ = 2.08e-8_rp  ! s per particle-step.
+real(rp), parameter :: fel_cost_solve$ = 4.68e-9_rp    ! s per grid point per log2(ngrid) per step.
 
 ! The thread scan's serial fraction, and the share of the walk the push and the solve
-! own. The share is 87.9, 87.0 and 85.8 percent over a factor of 16 in particles per
-! slice and 86.6 percent at 504 slices, so one constant carries it.
+! own. The share is 88.5, 87.5 and 85.9 percent over a factor of 16 in particles per
+! slice and 88.1 percent at 504 slices, so one constant carries it.
 
-real(rp), parameter :: fel_cost_serial$ = 0.021_rp
-real(rp), parameter :: fel_cost_walk_share$ = 0.878_rp
+real(rp), parameter :: fel_cost_serial$ = 0.0105_rp
+real(rp), parameter :: fel_cost_walk_share$ = 0.883_rp
 
 ! The device against the CPU, from the device table of docs/performance.md. The largest
-! window there is 12.4 times the twelve-thread CPU. The smallest deck gives the host
-! dispatch floor: 0.037 s over 89 steps.
+! window there is 9.1 times the twelve-thread CPU. The smallest deck gives the host
+! dispatch floor: 0.045 s over 89 steps.
 ! The four device points cannot carry a two-term fit of their own. The two largest share
 ! a particle count per slice and the smallest is the floor. So the device takes the CPU
 ! model divided by the ratio, plus the floor.
 !
-! Note: The ratio runs from 7.3 to 12.4 over the device table. This is the least certain
+! Note: The ratio runs from 6.1 to 9.1 over the device table. This is the least certain
 ! term, and the printed estimate names the backend.
 
-real(rp), parameter :: fel_cost_device$ = 12.4_rp
-real(rp), parameter :: fel_cost_dispatch$ = 4.2e-4_rp  ! s per step, host side.
+real(rp), parameter :: fel_cost_device$ = 9.1_rp
+real(rp), parameter :: fel_cost_dispatch$ = 5.1e-4_rp  ! s per step, host side.
 integer, parameter :: fel_cost_device_threads$ = 12    ! The CPU thread count that ratio is against.
 
 contains

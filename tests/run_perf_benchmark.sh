@@ -40,6 +40,13 @@
 #                           [--mpirun <path>] [--python <path>] [--work-dir <path>]
 #   ./run_perf_benchmark.sh --phases [--workers N] [--exe <path>] [--python <path>]
 #                           [--work-dir <path>] [--big-slices N] [--npart N]
+#                           [--ngrid N] [--no-sweep] [--grid-scan "N1 N2 ..."]
+#
+# --ngrid sets the transverse grid of every deck the phases mode writes, 256 by default.
+# --no-sweep leaves the thread sweep out, for a particle count whose profile alone is
+# wanted. --grid-scan runs the small configuration at each listed grid three times at the
+# worker count, takes the best walk of each, and prints the transform-length table in
+# place of the profile and the sweep.
 #
 # Defaults: workers = the machine's performance-core count (hw.perflevel0.physicalcpu on
 # macOS, nproc on Linux). The binaries and Python are found as in run_fel_benchmark.sh,
@@ -70,6 +77,9 @@ MPIRUN=""
 PHASES=0
 BIG_SLICES=504
 NPART=2048
+NGRID=256
+SWEEP_ON=1
+GRID_SCAN=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -82,7 +92,10 @@ while [[ $# -gt 0 ]]; do
     --phases)      PHASES=1;        shift 1 ;;
     --big-slices)  BIG_SLICES="$2"; shift 2 ;;
     --npart)       NPART="$2";      shift 2 ;;
-    -h|--help)  sed -n '2,46p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --ngrid)       NGRID="$2";      shift 2 ;;
+    --no-sweep)    SWEEP_ON=0;      shift 1 ;;
+    --grid-scan)   GRID_SCAN="$2";  shift 2 ;;
+    -h|--help)  sed -n '2,54p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -170,6 +183,7 @@ if [[ $PHASES -eq 1 ]]; then
   echo "  lucifer:     $EXE"
   echo "  workers:     $WORKERS (performance cores)"
   echo "  particles:   $NPART per slice"
+  echo "  grid:        $NGRID points"
   echo "  workdir:     $WORK_DIR"
   if [[ $DEBUG_EXE_WARNING -eq 1 ]]; then
     echo
@@ -222,16 +236,17 @@ if [[ $PHASES -eq 1 ]]; then
 &fel_wavefront_init
   wavefront_init%lambda0 = 1e-10
   wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 256
+  wavefront_init%grid_n_pts = $NGRID
   wavefront_init%grid_half_width = 2e-4
 /
 DECK
   }
 
-  # phase_run <label> <nslice> <threads> does one run and parses out its footer table.
+  # phase_run <label> <nslice> <threads> [<suffix>] does one run and parses out its
+  # footer table. The suffix keeps a scan's repeated runs apart.
   phase_run () {
     local label="$1" ns="$2" nt="$3" root log
-    root="phase_${ns}_${nt}"
+    root="phase_${ns}_${nt}${4:-}"
     log="$root.log"
     phase_deck "$root.in" "$ns" "$root"
     echo "--- $label: $ns slices, $nt thread(s) ---"
@@ -257,20 +272,76 @@ DECK
     fi
   }
 
+  # The grid scan: the small configuration at each grid, three runs each, the best walk.
+  # The transform's cost per grid point is what the table isolates, since the particle
+  # work is the same at every grid.
+
+  if [[ -n "$GRID_SCAN" ]]; then
+    for g in $GRID_SCAN; do
+      NGRID="$g"
+      for rep in 1 2 3; do
+        phase_run "grid scan" "$((8 * WORKERS))" "$WORKERS" "_g${g}_r${rep}"
+      done
+    done
+    "$PYTHON" - "$WORK_DIR" "$((8 * WORKERS))" "$WORKERS" "$NPART" $GRID_SCAN <<'SCAN'
+import re, sys, os
+from collections import Counter
+
+work, small, workers, npart = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+grids = [int(g) for g in sys.argv[5:]]
+
+def walk_of(path):
+    for line in open(path):
+        m = re.match(r'^\s{2,}walk\s+\d+\s+(\d+\.\d+)', line.rstrip())
+        if m:
+            return float(m.group(1))
+    return None
+
+def factors(n):
+    out, d = [], 2
+    while d * d <= n:
+        while n % d == 0:
+            out.append(d); n //= d
+        d += 1
+    if n > 1:
+        out.append(n)
+    if len(out) == 1:
+        return 'prime'
+    c = Counter(out)
+    return ' x '.join(f'{p}^{k}' if k > 1 else f'{p}' for p, k in sorted(c.items()))
+
+print('==============================================================================')
+print(f'Transform length ({small} slices x {npart} particles, full line, {workers} threads, best of three)')
+print('==============================================================================')
+print(f"    {'ngrid':>6s} {'factors':>12s} {'points':>8s} {'walk [s]':>9s} {'seconds a point':>16s}")
+for g in grids:
+    walks = [walk_of(os.path.join(work, f'phase_{small}_{workers}_g{g}_r{r}.log')) for r in (1, 2, 3)]
+    walks = [w for w in walks if w is not None]
+    if not walks:
+        print(f'    {g:>6d}  no walk found')
+        continue
+    best = min(walks)
+    print(f'    {g:>6d} {factors(g):>12s} {g * g:>8d} {best:>9.3f} {best / (g * g):>16.3e}')
+SCAN
+    exit 0
+  fi
+
   phase_run "profile" "$((8 * WORKERS))" "$WORKERS"
   phase_run "profile" "$BIG_SLICES" "$WORKERS"
 
   # The thread sweep runs the smaller configuration, whose 1-thread run is affordable.
   # It takes powers of two up to the worker count, then the worker count itself.
 
-  SWEEP=""
-  n=1
-  while [[ $n -lt $WORKERS ]]; do SWEEP="$SWEEP $n"; n=$((n * 2)); done
-  SWEEP="$SWEEP $WORKERS"
-  for nt in $SWEEP; do
-    [[ "$nt" == "$WORKERS" && -f "phase_$((8 * WORKERS))_$WORKERS.log" ]] && continue
-    phase_run "sweep" "$((8 * WORKERS))" "$nt"
-  done
+  if [[ $SWEEP_ON -eq 1 ]]; then
+    SWEEP=""
+    n=1
+    while [[ $n -lt $WORKERS ]]; do SWEEP="$SWEEP $n"; n=$((n * 2)); done
+    SWEEP="$SWEEP $WORKERS"
+    for nt in $SWEEP; do
+      [[ "$nt" == "$WORKERS" && -f "phase_$((8 * WORKERS))_$WORKERS.log" ]] && continue
+      phase_run "sweep" "$((8 * WORKERS))" "$nt"
+    done
+  fi
   echo
 
   "$PYTHON" - "$WORK_DIR" "$((8 * WORKERS))" "$BIG_SLICES" "$WORKERS" "$NPART" <<'EOF'

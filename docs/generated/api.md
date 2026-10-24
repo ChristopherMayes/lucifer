@@ -1322,9 +1322,11 @@ slices, so the effective thread count is the smaller of the thread and slice cou
 A window of one slice gets nothing from threads.
 
 tests/scripts/fit_cost_rates.py fits the rates from the logs of the runs the page
-records: thirteen runs, three particle counts and two slice counts at five thread
-counts. The worst residual on the walk is 4.0 percent over that set. The footer of
-every run prints the walk beside the estimate.
+records: sixteen runs, three particle counts and two slice counts at five thread
+counts. The worst residual on the walk is 16.5 percent over that set, on the thread
+sweep's four- and eight-thread rows, where one serial fraction cannot carry a sweep
+whose efficiency is 92 percent at four threads and 94 at twelve. The footer of every
+run prints the walk beside the estimate.
 
 Note: The rates hold for the recording machine and line. Another machine or another
 line can differ.
