@@ -8,30 +8,31 @@
 # happened to work. The debug build is what reaches that class, since -fbounds-check
 # turns such a read into a failure rather than a wrong number.
 #
-# The build is against conda, and the first reason is the users: Bmad ships on
-# conda-forge, so a conda build is the configuration most people will run, and a check is
-# worth more against what is delivered than against a configuration only the off-site
-# distribution assembles. It is also what the recording machine uses, through
-# util/conda_compile, so the CI build and the recorded levels come from one arrangement.
+# Bmad comes from conda-forge's bmad package, installed from environment.yml at the
+# repository root, and Lucifer builds against it with the two cmake lines of
+# docs/user-guide.md, the first route there. Bmad ships on conda-forge, so this is the
+# configuration most people will run, and a check is worth more against what is delivered
+# than against a configuration only the off-site distribution assembles. Nothing is
+# cloned and no distribution is built: until 2026-10-23 the job cloned bmad-sim/bmad-ecosystem
+# at the declared release and built its debug tree for 6.4 minutes before Lucifer's own
+# build began. util/bmad_release_check reads the package's release from its
+# bmad_version_mod.mod and refuses one below BMAD_RELEASE before anything is built. The
+# declared release is a minimum, so a green run certifies that release and no later one.
 #
-# Two mechanical properties come with that choice. LAPACK comes from the environment
-# rather than being built from source, and building it from source in a static debug
-# configuration fails in its own archive step, a path the distribution's CI never takes
-# because it builds shared. And the tracker and the reference then read one HDF5: lucifer
-# resolves conda's through the rpath of the environment it was built in, and genesis4
-# resolves its own, where a shared build reached through LD_LIBRARY_PATH would offer the
-# reference a library it was not linked against. The recording machine keeps those two
-# environments apart for exactly that reason.
-#
-# Bmad is not this repository's. It comes from a shallow clone of bmad-sim/bmad-ecosystem
-# at the release BMAD_RELEASE declares, checked by util/bmad_release_check before anything
-# is built, and this checkout is read for Lucifer alone. The declared release is a minimum,
-# so a green run certifies that release and no later one.
+# The package is a production build of Bmad. Lucifer's Debug configuration is built
+# against it, so Lucifer's own code runs with -fbounds-check and Bmad's does not, where
+# the recording machine's debug pass runs both bounds-checked against the distribution's
+# debug tree. The tracker and the reference read one HDF5: lucifer resolves the package
+# environment's through the rpath it was built with, and genesis4 resolves its own, where
+# a shared build reached through LD_LIBRARY_PATH would offer the reference a library it
+# was not linked against. The recording machine keeps those two environments apart for
+# exactly that reason.
 #
 # What this varies and what it does not, so the coverage is not overstated. It varies the
-# operating system, the C library, the allocator and every dependency build, and it runs
-# the tiers and the check sections, which nothing outside this laptop has ever run. It
-# does not vary the compiler project, which is conda-forge gfortran on both sides. The
+# operating system, the C library, the allocator, every dependency build and the Bmad
+# build itself, which is conda-forge's and not the distribution's, and it runs the tiers
+# and the check sections, which nothing outside this laptop has ever run. It does not
+# vary the compiler project, which is conda-forge gfortran on both sides. The
 # distribution's own CI builds with the system compiler, which is how an unconditional
 # -lfftw3f was caught, and it runs no tier.
 #
@@ -42,9 +43,9 @@
 #
 # What is deliberately not here, so the difference from the local keystone is on the
 # record: the production build and the two-build digit comparison, the examples, and
-# Bmad's own regression suite, which Bmad's own CI runs. The device section cannot run
-# on a runner with no Metal device and skips with its reason recorded, the one section allowed
-# to.
+# Bmad's own regression suite, which the package does not carry and Bmad's own CI runs.
+# The device section cannot run on a runner with no Metal device and skips with its
+# reason recorded, the one section allowed to.
 #
 # `workflow_dispatch` and `schedule` read this file from the repository's default branch,
 # main, rather than from the ref they name, which is GitHub's rule for both. `push` is the
@@ -80,144 +81,66 @@ concurrency:
 jobs:
   keystone:
     runs-on: ubuntu-latest
-    # Measured on this runner, from the run that proved this file: 37.5 minutes end to
-    # end, of which the harness is 30, the build 6.4 and the two environments 1.1. The
-    # harness costs four times its local 7.7 minutes because a runner has four cores
-    # against the recording machine's sixteen and its Genesis references are always cold,
-    # and its longest sections are spontaneous at 642 s and the eleven tiers at 320 s.
+    # Measured on this runner on 2026-10-23, with the Bmad clone and its 6.4-minute debug
+    # build: 37.5 minutes end to end, of which the harness is 30 and the two environments
+    # 1.1. The harness costs four times its local 7.7 minutes because a runner has four
+    # cores against the recording machine's sixteen and its Genesis references are always
+    # cold, and its longest sections are spontaneous at 642 s and the eleven tiers at
+    # 320 s. The package build's own wall clock is in docs/changelog.md.
     timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v6
 
-      # The declared Bmad release, at its tag, outside this checkout. The check prints the
-      # clone's release beside the declared minimum and refuses a clone below it. BMAD_DIR
-      # reaches every later step through GITHUB_ENV, which is how the harness finds the
-      # Bmad source, its Tao and its regression suite.
-      - name: Clone the declared Bmad release
-        shell: bash
-        run: |
-          set -e
-          tag="$(head -n 1 BMAD_RELEASE | tr -d '[:space:]')"
-          git clone --depth 1 --branch "$tag" \
-              https://github.com/bmad-sim/bmad-ecosystem.git "$RUNNER_TEMP/bmad"
-          echo "Bmad clone: tag $tag, commit $(git -C "$RUNNER_TEMP/bmad" rev-parse HEAD)"
-          util/bmad_release_check "$RUNNER_TEMP/bmad"
-          echo "BMAD_DIR=$RUNNER_TEMP/bmad" >> "$GITHUB_ENV"
-
-      # Two packages the build needs on Linux and not on macOS. The distribution's own
-      # conda build workflow appends the same two, and the file is the distribution's, so the
-      # append happens here in the runner rather than in the clone's tree. The file is
-      # copied into the workspace first: setup-miniconda reads environment-file relative to
-      # the workspace even when given an absolute path, and an absolute path under the
-      # runner's temporary directory failed as the workspace path joined to it.
-      - name: Include the Linux-only build requirements
-        shell: bash
-        run: |
-          cp "$RUNNER_TEMP/bmad/.github/bmad-build-env.yaml" bmad-build-env.yaml
-          echo '  - libacl' >> bmad-build-env.yaml
-          echo '  - libgomp' >> bmad-build-env.yaml
-
+      # The build environment is the repository's own file: conda-forge's bmad in its
+      # nompi variant, the compilers and cmake, each a minimum. The package resolves on the
+      # day the job runs, so the release it carries is checked against BMAD_RELEASE below
+      # and printed.
       - name: Install the build environment
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
           use-mamba: true
-          activate-environment: bmad-build
+          activate-environment: lucifer-build
           channels: conda-forge
-          environment-file: bmad-build-env.yaml
-          python-version: "3.12"
+          environment-file: environment.yml
           conda-remove-defaults: true
 
-      # The preferences are the ones util/conda_compile writes on the recording
-      # machine, less two macOS-only lines: that script restores util/dist_prefs from
-      # origin/main, which a shallow clone of one tag does not have, and it passes a
-      # linker flag the GNU linker rejects. So the steps are written out here, against the
-      # clone, and the release check they would have run ran in the clone step above. HDF5_ROOT pins the library to this environment, the same
-      # reason conda_compile sets it: CMake's FindHDF5 otherwise prefers whichever h5fc
-      # is first on PATH, and a mismatch across a major version can compile and link.
-      #
-      # OpenMP is on because the harness reruns a time-dependent tier at eight threads
-      # and requires it to reproduce one thread bit for bit. MPI is off, since Lucifer is
-      # shared memory and the reference runs single process. The test executables are off,
-      # which drops regression_tests from the build list and nothing else: this job does
-      # not run that suite, Bmad's own CI does, and building it is minutes a runner spends on
-      # binaries no step here executes.
-      #
-      # The `set +e` is load-bearing, and finding out why cost three rounds.
-      # util/dist_source_me is an environment script in Bourne style whose last statement
-      # is a test that is false on a perfectly good run, so it returns non-zero and ends
-      # any shell that has errexit set. The distribution's own install_bmad.sh runs it
-      # from a script with no -e for that reason. Here errexit arrives on its own:
-      # setup-miniconda appends `set -eo pipefail` into conda.sh, so every shell that
-      # initializes conda has it, whether the step asked for it or not, and a login shell
-      # picks the same thing up through the profile. The death is silent because
-      # ACC_CONDA_BUILD=Y makes dist_source_me write its log to a file rather than the
-      # terminal, so the step failed in one second with no output at all.
-      #
-      # The build command's status is therefore checked explicitly, and the three
-      # binaries the later steps need are listed after it, so a build that half worked
-      # cannot pass.
-      #
-      # Lucifer then builds with its own CMakeLists.txt against the clone's debug tree,
-      # named by LUCIFER_BMAD_ROOT, into build-debug/ at this checkout's root, the two
-      # lines util/conda_compile runs. The Fortran compiler is named by path, since the
-      # compiler packages export nothing on activation and CMake would otherwise take the
-      # first gfortran on PATH.
-      - name: Build the debug tree
+      # The package's release against the declared minimum, read from the module file the
+      # package installs. The check prints both and refuses a package below the minimum.
+      - name: Check the package's release
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
-          set +e
-          conda activate bmad-build
-          export HDF5_ROOT="$CONDA_PREFIX"
-          # A name of this step's own for the clone, since dist_source_me overwrites
-          # BMAD_DIR, and it takes the working directory as the Bmad root.
-          bmad_root="$RUNNER_TEMP/bmad"
-          cd "$bmad_root" || exit 1
-          cat <<PREFS >> util/dist_prefs
-          export DIST_F90_REQUEST="gfortran"
-          export ACC_PLOT_PACKAGE="pgplot"
-          export ACC_PLOT_DISPLAY_TYPE="X"
-          export ACC_ENABLE_OPENMP="Y"
-          export ACC_ENABLE_MPI="N"
-          export ACC_FORCE_BUILTIN_MPI="N"
-          export ACC_ENABLE_GFORTRAN_OPTIMIZATION="N"
-          export ACC_ENABLE_SHARED="Y"
-          export ACC_ENABLE_SHARED_ONLY="N"
-          export ACC_ENABLE_FPIC="Y"
-          export ACC_ENABLE_PROFILING="N"
-          export ACC_SET_GMAKE_JOBS="$(nproc)"
-          export ACC_CONDA_BUILD="Y"
-          export ACC_CONDA_BUILD_TESTS="N"
-          export ACC_CONDA_PATH="$CONDA_PREFIX"
-          export ACC_USE_MACPORTS="N"
-          PREFS
-          cp "$CONDA_PREFIX/share/gnuconfig/config."* .
-          source ./util/dist_source_me
-          ./util/dist_build_debug
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo "util/dist_build_debug exited $status"
-            exit "$status"
-          fi
-          cd "$GITHUB_WORKSPACE" || exit 1
+          conda activate lucifer-build
+          set -e
+          conda list bmad | grep '^bmad '
+          util/bmad_release_check "$CONDA_PREFIX"
+
+      # The two cmake lines of the user guide, in the Debug configuration. The Fortran and
+      # C compilers are named by path, since the compiler packages export nothing on
+      # activation and CMake would otherwise take the first gfortran on PATH. HDF5_ROOT pins
+      # the library to this environment, since CMake's FindHDF5 otherwise prefers whichever
+      # h5fc is first on PATH, and a mismatch across a major version can compile and link.
+      # The three binaries the later steps need are listed after the build, so a build
+      # that half worked cannot pass.
+      - name: Build the debug configuration against the package
+        shell: bash -o pipefail {0}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          conda activate lucifer-build
+          set -e
           export FC="$CONDA_PREFIX/bin/gfortran"
+          for f in "$CONDA_PREFIX"/bin/*-cc "$CONDA_PREFIX"/bin/*-gcc "$CONDA_PREFIX"/bin/clang; do
+            [ -x "$f" ] && { export CC="$f"; break; }
+          done
+          echo "FC=$FC CC=${CC:-<CMake's choice>}"
           cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug \
-                -DLUCIFER_BMAD_ROOT="$bmad_root/debug" -DHDF5_ROOT="$CONDA_PREFIX"
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo "cmake configure exited $status"
-            exit "$status"
-          fi
+                -DLUCIFER_BMAD_ROOT="$CONDA_PREFIX" -DHDF5_ROOT="$CONDA_PREFIX"
           cmake --build build-debug --parallel "$(nproc)"
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo "cmake --build exited $status"
-            exit "$status"
-          fi
           ls -l build-debug/bin/lucifer build-debug/bin/lucifer_smoke_test \
-                build-debug/bin/wavefront_drift_test "$bmad_root/debug/bin/tao"
+                build-debug/bin/wavefront_drift_test "$CONDA_PREFIX/bin/tao"
+          echo "LUCIFER_BMAD_ROOT=$CONDA_PREFIX" >> "$GITHUB_ENV"
 
       # Which backend this build carries, from lucifer's own banner. This is the line the
       # harness reads to decide whether the device section can run, so having it in the

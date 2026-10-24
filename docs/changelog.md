@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: the Linux CI job in `.github/workflows/lucifer-keystone.yml` installs
+  conda-forge's `bmad` package from `environment.yml` and builds Lucifer's Debug configuration
+  against it with the two cmake lines of the user guide, `FC` named by path and `LUCIFER_BMAD_ROOT`
+  exported for `tests/run_fel_benchmark.sh` to find the package's `tao`. It clones nothing and
+  builds no distribution. Until now it cloned `bmad-sim/bmad-ecosystem` at the declared release,
+  appended the Linux-only packages to Bmad's own environment file, sourced `dist_source_me` and
+  built the distribution's debug tree, 6.4 minutes of a 37.5-minute run measured on 2026-10-23.
+  `util/bmad_release_check` runs on the environment's prefix before the build. The job's header
+  comment says what it now varies, the Bmad build among it, and what it leaves out, the regression
+  suite the package does not carry. The benchmark harness and the wavefront validation run unchanged
+  at their tolerances, and the device section skips on a runner as before.
 - 2026-10-23 Changed: Lucifer builds against conda-forge's `bmad` package. `cmake/FindBmad.cmake`
   searches `include/bmad` for `bmad.mod`, where the package keeps its 373 module files, as well as
   `modules/` and `include/`. It reads the release the tree carries from `bmad_version_mod.mod`
