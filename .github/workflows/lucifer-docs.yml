@@ -52,10 +52,10 @@ jobs:
       # The three conformance checks are standard library only, so nothing else is
       # installed. If one of them ever needs numpy, it stops belonging in this job.
       - name: Input-reference conformance
-        run: python lucifer/tests/scripts/check_input_reference.py
+        run: python tests/scripts/check_input_reference.py
 
       - name: Examples conformance
-        run: python lucifer/tests/scripts/check_examples.py
+        run: python tests/scripts/check_examples.py
 
       # A deck edited without regenerating its page would leave the documentation
       # quoting text that no longer runs. Regenerating here and requiring no diff is the
@@ -64,10 +64,10 @@ jobs:
       # diffing them would fail on a version bump rather than on a stale page.
       - name: Example pages are current
         run: |
-          python lucifer/tests/scripts/report_examples.py \
-            --examples lucifer/examples \
-            --out lucifer/doc/generated/examples
-          git diff --exit-code -- 'lucifer/doc/generated/examples/*.md'
+          python tests/scripts/report_examples.py \
+            --examples examples \
+            --out docs/generated/examples
+          git diff --exit-code -- 'docs/generated/examples/*.md'
 
       # BASE_URL is what makes the built site work at a project-page address. Pages
       # serves this repository under /<name>, so without it every asset and link
@@ -75,7 +75,7 @@ jobs:
       # from the repository rather than written out, so a rename or another fork needs
       # no edit here.
       - name: Build the documentation
-        working-directory: lucifer/doc
+        working-directory: docs
         env:
           BASE_URL: /${{ github.event.repository.name }}
         run: myst build --html
@@ -84,19 +84,19 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: lucifer/doc/_build/html
+          path: docs/_build/html
 
       - name: Scripts parse
         run: |
-          for f in lucifer/tests/*.sh lucifer/examples/*.sh lucifer/examples/*/*.sh \
-                   lucifer/wavefront/tests/*.sh; do
+          for f in tests/*.sh examples/*.sh examples/*/*.sh tests/wavefront/*.sh \
+                   util/*.sh; do
             [ -e "$f" ] || continue
             bash -n "$f" || exit 1
           done
           python - <<'PY'
           import ast, pathlib, sys
           bad = 0
-          for f in sorted(pathlib.Path("lucifer").rglob("*.py")):
+          for f in sorted(p for p in pathlib.Path(".").rglob("*.py") if ".git" not in p.parts):
               try:
                   ast.parse(f.read_text())
               except SyntaxError as e:

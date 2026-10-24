@@ -78,7 +78,7 @@ Genesis4 is driven by namelists over its own lattice format. Lucifer is driven b
 
 ## Moving files between the codes
 
-`lucifer/tests/scripts/convert_genesis.py` holds all of the format knowledge, in both directions:
+`tests/scripts/convert_genesis.py` holds all of the format knowledge, in both directions:
 
 ```
 python3 convert_genesis.py <in> <out>

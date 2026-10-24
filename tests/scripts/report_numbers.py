@@ -230,10 +230,10 @@ def hand_lookup(hand, page, token, context):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("--doc", default=str(LUCIFER / "doc"))
+    ap.add_argument("--doc", default=str(LUCIFER / "docs"))
     ap.add_argument("--examples", default=str(LUCIFER / "examples"))
     ap.add_argument("--tests", default=str(LUCIFER / "tests"))
-    ap.add_argument("--code", default=str(LUCIFER / "code"))
+    ap.add_argument("--code", default=str(LUCIFER / "src"))
     ap.add_argument("--classes", default=str(LUCIFER / "tests" / "number_classes.tsv"))
     ap.add_argument("--standards", default=str(LUCIFER / "tests" / "number_standards.tsv"))
     ap.add_argument("--unmatched", help="Write the unmatched tokens here as hand-table rows")

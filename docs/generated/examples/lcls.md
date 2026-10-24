@@ -7,7 +7,7 @@ short_title: "lcls"
 
 ![lcls](lcls.png)
 
-Everything on this page lives in and runs from `lucifer/examples/lcls/`.
+Everything on this page lives in and runs from `examples/lcls/`.
 
 The example runs in one command, with Bmad only:
 

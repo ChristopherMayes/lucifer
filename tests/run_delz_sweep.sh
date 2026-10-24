@@ -12,7 +12,7 @@
 # slices) at the twelve undulator-segment exits, positions every run records regardless
 # of delz, against the finest run. A convergence order is fitted from successive step
 # halvings/triplings. The sweep measures and fails nothing, and its results are in
-# lucifer/doc/validation.md.
+# docs/validation.md.
 #
 #   ./run_delz_sweep.sh [--genesis <path>] [--exe <path>] [--python <path>] [--work-dir <path>]
 #

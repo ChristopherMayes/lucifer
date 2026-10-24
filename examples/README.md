@@ -2,11 +2,11 @@
 
 The examples are self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates and what to look for in the plot. The quantities measured on each run are in a table on the example's page, written by the runner.
 
-The validation benchmark against Genesis4 is in `lucifer/tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`lucifer/doc/fel-physics.md`](../doc/fel-physics.md).
+The validation benchmark against Genesis4 is in `tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`docs/fel-physics.md`](../doc/fel-physics.md).
 
 ## Running an example
 
-    cd lucifer/examples/<example>
+    cd examples/<example>
     ../../../production/bin/lucifer lucifer.in        # or debug/bin
     python ../plot_fel.py <out_root>.stats.h5             # needs h5py + matplotlib
 

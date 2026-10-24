@@ -7,7 +7,7 @@ short_title: "frames"
 
 ![frames](frames.png)
 
-Everything on this page lives in and runs from `lucifer/examples/frames/`.
+Everything on this page lives in and runs from `examples/frames/`.
 
 The example runs in one command:
 

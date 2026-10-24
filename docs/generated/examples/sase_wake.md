@@ -7,7 +7,7 @@ short_title: "sase_wake"
 
 ![sase_wake](sase_wake.png)
 
-Everything on this page lives in and runs from `lucifer/examples/sase_wake/`.
+Everything on this page lives in and runs from `examples/sase_wake/`.
 
 The example runs in one command, with Bmad only:
 

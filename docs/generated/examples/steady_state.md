@@ -7,7 +7,7 @@ short_title: "steady_state"
 
 ![steady_state](steady_state.png)
 
-Everything on this page lives in and runs from `lucifer/examples/steady_state/`.
+Everything on this page lives in and runs from `examples/steady_state/`.
 
 The example runs in one command, with Bmad only:
 

@@ -7,7 +7,7 @@ short_title: "coherent_source"
 
 ![coherent_source](coherent_source.png)
 
-Everything on this page lives in and runs from `lucifer/examples/coherent_source/`.
+Everything on this page lives in and runs from `examples/coherent_source/`.
 
 The example runs in three commands, with Bmad only:
 

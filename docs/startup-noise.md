@@ -15,7 +15,7 @@ The script [startup_noise.py](../tests/scripts/startup_noise.py) runs the simula
 
 ```
 python3 startup_noise.py --exe <lucifer> --genesis <genesis4> \
-        --examples <lucifer/examples> --latdir <lucifer/tests> --workdir <dir> --out <dir>
+        --examples <examples> --latdir <tests> --workdir <dir> --out <dir>
 ```
 
 ## The model

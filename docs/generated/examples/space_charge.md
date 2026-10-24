@@ -7,7 +7,7 @@ short_title: "space_charge"
 
 ![space_charge](space_charge.png)
 
-Everything on this page lives in and runs from `lucifer/examples/space_charge/`.
+Everything on this page lives in and runs from `examples/space_charge/`.
 
 The example runs in four commands, with Bmad only:
 

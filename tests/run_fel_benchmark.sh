@@ -16,8 +16,8 @@
 #
 # Prerequisites:
 #
-#   1. Bmad built, so debug/bin/lucifer (or production/bin) exists:
-#        BUILD_PRODUCTION=N lucifer/util/conda_compile   # from the Lucifer clone's root
+#   1. Lucifer built, so build-debug/bin/lucifer (or build-release/bin) exists:
+#        BUILD_PRODUCTION=N util/conda_compile   # from the Lucifer clone's root
 #
 #   2. genesis4 4.6.15 from conda-forge, in the bmad-fel-validate environment, which the
 #      harness takes ahead of PATH. --genesis names another, and its version is checked.
@@ -849,7 +849,7 @@ sec_device () {
 
 sec_unaveraged () {
   echo "--- unaveraged-mode checks ------------------------------------------------------"
-  if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../code/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
+  if grep -n "fel_und_coupling\|faw" "$SCRIPT_DIR/../src/fel_unaveraged_mod.f90" | grep -v "^[0-9]*: *!"; then
     echo "FAIL: averaged coupling quantities (fc/faw) leaked into the unaveraged path" >&2
     return 1
   fi
@@ -908,7 +908,7 @@ sec_input_reference () {
 # regeneration (tests/test_keystone.py), which then requires an empty diff.
 
 sec_examples () {
-  local pages="$LUCIFER_DIR/doc/generated/examples" f differ=0
+  local pages="$LUCIFER_DIR/docs/generated/examples" f differ=0
   echo "--- examples conformance (the feature matrix, the directories, the pages) -----"
   "$PYTHON" "$SCRIPT_DIR/scripts/report_examples.py" \
        --examples "$LUCIFER_DIR/examples" --out "$1/pages" > /dev/null \

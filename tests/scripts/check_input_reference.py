@@ -101,8 +101,8 @@ def main():
     here = Path(__file__).resolve().parent
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--doc", default=str(here / "../../doc/input-reference.md"))
-    p.add_argument("--code", default=str(here / "../../code"))
+    p.add_argument("--doc", default=str(here / "../../docs/input-reference.md"))
+    p.add_argument("--code", default=str(here / "../../src"))
     args = p.parse_args()
 
     doc = Path(args.doc).read_text()

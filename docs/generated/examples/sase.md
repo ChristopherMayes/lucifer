@@ -7,7 +7,7 @@ short_title: "sase"
 
 ![sase](sase.png)
 
-Everything on this page lives in and runs from `lucifer/examples/sase/`.
+Everything on this page lives in and runs from `examples/sase/`.
 
 The example runs in one command, with Bmad only:
 

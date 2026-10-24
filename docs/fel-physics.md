@@ -6,7 +6,7 @@ short_title: Physics manual
 (sec-intro)=
 ## Introduction
 
-This manual states the physics and the numerical conventions of the Bmad FEL tracker. The code references these sections by label. The validation harness (`lucifer/tests/`) checks each statement against Genesis 1.3 Version 4 (Genesis4), against closed forms, or against independent implementations. The measured levels are in `lucifer/doc/validation.md`. Each section ends with a Provenance note and a Validation note. The Provenance note names the Genesis4 routine the physics was transcribed from, moved here from the source comments. The Validation note names the check that pins it. The physics was transcribed from Genesis4 (GPL permits transcription), validated at transcription level, and then re-expressed in Bmad's units and conventions. The agreement at transcription level is recorded in `validation.md`.
+This manual states the physics and the numerical conventions of the Bmad FEL tracker. The code references these sections by label. The validation harness (`tests/`) checks each statement against Genesis 1.3 Version 4 (Genesis4), against closed forms, or against independent implementations. The measured levels are in `docs/validation.md`. Each section ends with a Provenance note and a Validation note. The Provenance note names the Genesis4 routine the physics was transcribed from, moved here from the source comments. The Validation note names the check that pins it. The physics was transcribed from Genesis4 (GPL permits transcription), validated at transcription level, and then re-expressed in Bmad's units and conventions. The agreement at transcription level is recorded in `validation.md`.
 
 Throughout: $m_e c^2$ is Bmad's `m_electron` (eV), $c$ is `c_light`, $Z_0 = \mu_0 c$ (`mu_0_vac*c_light`), $e$ is `e_charge`, and $\varepsilon_0$ is `eps_0_vac`. Genesis4 carries its own truncated constants (EG $Z_0 = 376.73$ against $376.7303\ldots$). The resulting $8.3\times10^{-7}$ relative difference is the accepted floor of every Genesis4 comparison ([](#sec-numerics)).
 
@@ -494,7 +494,7 @@ The measured levels and how they are checked are in [](validation.md#val-distrib
 (sec-pardump)=
 ### Particle dumps
 
-A run writes its beam as openPMD (`.beam.h5`) through Bmad's own `hdf5_write_beam`, and reads the same. There is no second format and no knob to select one. A `beam_file` that is not openPMD is refused, with the conversion command in the message, and `lucifer/tests/scripts/convert_genesis.py` converts a Genesis4 `.par.h5` of [](#sec-units)'s conventions either way.
+A run writes its beam as openPMD (`.beam.h5`) through Bmad's own `hdf5_write_beam`, and reads the same. There is no second format and no knob to select one. A `beam_file` that is not openPMD is refused, with the conversion command in the message, and `tests/scripts/convert_genesis.py` converts a Genesis4 `.par.h5` of [](#sec-units)'s conventions either way.
 
 The reason is charge. openPMD's macro-charge is the per-particle weight $w_j$, so a weighted beam survives. Genesis4 `.par.h5` carries one current per slice, Eq. [](#eq-importcurrent) read backwards, so a reader must divide it out uniformly. Per-particle weights are this port's day-one difference from Genesis4. The converter refuses to write a nonuniform-weight beam in that format, since the file would silently read back uniform.
 
@@ -689,7 +689,7 @@ The harmonic convention is Genesis4's. The harmonic ponderomotive phase enters t
 (sec-openpmd)=
 ### The openPMD wavefront
 
-Radiation dumps speak one format, the openPMD `Wavefront` extension (`EXT_Wavefront.md`, standard branch `upcoming-2.0.0`), written as `.wf.h5` with a harmonic's file carrying `-h<h>`. The standard document is authoritative. The harness verifies the written attributes against its text independently of the writer. A `field_file` that is not openPMD is refused, with the conversion command in the message, and `lucifer/tests/scripts/convert_genesis.py` converts a Genesis4 field dump either way. Per-harmonic imports are matched to the field whose photon energy they carry, and a file matching none is refused.
+Radiation dumps speak one format, the openPMD `Wavefront` extension (`EXT_Wavefront.md`, standard branch `upcoming-2.0.0`), written as `.wf.h5` with a harmonic's file carrying `-h<h>`. The standard document is authoritative. The harness verifies the written attributes against its text independently of the writer. A `field_file` that is not openPMD is refused, with the conversion command in the message, and `tests/scripts/convert_genesis.py` converts a Genesis4 field dump either way. Per-harmonic imports are matched to the field whose photon energy they carry, and a file matching none is refused.
 
 The mapping is below, one decision per row where the extension's text under-determines the file (each carried upstream into openPMD-beamphysics's own openPMD I/O):
 

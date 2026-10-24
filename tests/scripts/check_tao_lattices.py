@@ -13,7 +13,7 @@ intact, since a wrapper reaches its base by relative path, and so that no digest
 lands in the source tree.
 
 Usage:
-  check_tao_lattices.py --tao <tao> --latdir <lucifer/tests/bmad> --examples <lucifer/examples>
+  check_tao_lattices.py --tao <tao> --latdir <tests/bmad> --examples <examples>
                         --workdir <dir>
 """
 

@@ -45,7 +45,7 @@ the benchmark harness.
 
 Usage:
   startup_noise.py --exe <lucifer> --genesis <genesis4>
-                   --examples <lucifer/examples> --latdir <lucifer/tests> --workdir <dir>
+                   --examples <examples> --latdir <tests> --workdir <dir>
                    --out <doc/generated/startup-noise> [--device metal|off] [--only a,b,...]
                    [--cpu-threads N] [--machine aramis|flash|flash1|lcls]
 
@@ -1377,8 +1377,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
-    ap.add_argument("--examples", required=True, help="lucifer/examples, for aramis.bmad")
-    ap.add_argument("--latdir", required=True, help="lucifer/tests, for the Genesis lattice and deck")
+    ap.add_argument("--examples", required=True, help="examples, for aramis.bmad")
+    ap.add_argument("--latdir", required=True, help="tests, for the Genesis lattice and deck")
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="metal")

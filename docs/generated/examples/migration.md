@@ -7,7 +7,7 @@ short_title: "migration"
 
 ![migration](migration.png)
 
-Everything on this page lives in and runs from `lucifer/examples/migration/`.
+Everything on this page lives in and runs from `examples/migration/`.
 
 The example runs in two commands, with Bmad only:
 

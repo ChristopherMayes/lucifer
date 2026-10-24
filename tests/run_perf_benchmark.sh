@@ -135,7 +135,7 @@ if [[ -z "$EXE" || ! -x "$EXE" ]]; then
 fi
 # Every path is absolute from here on, since the run changes directory.
 EXE="$(cd "$(dirname "$EXE")" && pwd)/$(basename "$EXE")"
-[[ "$EXE" == *"/debug/"* ]] && DEBUG_EXE_WARNING=1
+[[ "$EXE" == *debug* ]] && DEBUG_EXE_WARNING=1
 
 if [[ -z "$PYTHON" ]]; then
   for candidate in "${LUCIFER_PYTHON:-}" \
@@ -362,7 +362,7 @@ echo "  workdir:     $WORK_DIR"
 if [[ $DEBUG_EXE_WARNING -eq 1 ]]; then
   echo
   echo "  WARNING: using a DEBUG lucifer. Its timings are not comparable to a"
-  echo "  release Genesis build; compile production (lucifer/util/conda_compile) for real numbers."
+  echo "  release Genesis build; compile production (util/conda_compile) for real numbers."
 fi
 echo
 

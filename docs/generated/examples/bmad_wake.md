@@ -7,7 +7,7 @@ short_title: "bmad_wake"
 
 ![bmad_wake](bmad_wake.png)
 
-Everything on this page lives in and runs from `lucifer/examples/bmad_wake/`.
+Everything on this page lives in and runs from `examples/bmad_wake/`.
 
 The example runs in two commands, with Bmad only:
 

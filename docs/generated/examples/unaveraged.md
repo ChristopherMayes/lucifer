@@ -7,7 +7,7 @@ short_title: "unaveraged"
 
 ![unaveraged](unaveraged.png)
 
-Everything on this page lives in and runs from `lucifer/examples/unaveraged/`.
+Everything on this page lives in and runs from `examples/unaveraged/`.
 
 The example runs in two commands, with Bmad only:
 

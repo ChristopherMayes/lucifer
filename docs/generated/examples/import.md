@@ -7,7 +7,7 @@ short_title: "import"
 
 ![import](import.png)
 
-Everything on this page lives in and runs from `lucifer/examples/import/`.
+Everything on this page lives in and runs from `examples/import/`.
 
 The example runs in two commands, with Bmad only:
 

@@ -7,7 +7,7 @@ short_title: "spontaneous"
 
 ![spontaneous](spontaneous.png)
 
-Everything on this page lives in and runs from `lucifer/examples/spontaneous/`.
+Everything on this page lives in and runs from `examples/spontaneous/`.
 
 The example runs in two commands, with Bmad only:
 

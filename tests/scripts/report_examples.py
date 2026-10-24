@@ -239,7 +239,7 @@ def main():
         # The commands below carry paths relative to the example's own directory, which a
         # reader of the repository knows and a reader of this page has not been told.
         page += [f"Everything on this page lives in and runs from "
-                 f"`lucifer/examples/{d.name}/`.", ""]
+                 f"`examples/{d.name}/`.", ""]
         page += [rewrite_links(body, names, readme).rstrip("\n"), ""]
         if d.name in record:
             measured_table(page, record[d.name])

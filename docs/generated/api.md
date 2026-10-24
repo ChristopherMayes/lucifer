@@ -6766,6 +6766,137 @@ Usage:
   lucifer <input_file>
 ```
 
+## `lucifer_advance_bench.f90`
+
+(api-lucifer-advance-bench)=
+### `lucifer_advance_bench`
+
+*Program*
+
+```
+The FEL-step particle-path microbenchmark: time fel_advance on a synthetic single
+slice at fixed state and decompose the per-particle-step cost into
+the full path, the RK4+ODE alone (no gather, fixed rpart), and the bare sin/cos
+pair. Each optimization lever then gets a number, not a guess. Serial on purpose:
+this measures the per-particle constant. Parallel scaling is the perf harness's job.
+
+  lucifer_advance_bench [npart] [nstep]      (defaults 8192, 400)
+
+Prints ns per particle-step for: full fel_advance, fel_runge_kutta only, sincos
+only, and a checksum (so the compiler cannot elide the work). Genesis parity note:
+the RK4/ODE arithmetic is BeamSolver::RungeKutta/ODE verbatim, so any cost ratio to
+a clang-built twin of the same loop is compiler/libm, not physics.
+```
+
+## `lucifer_smoke_test.f90`
+
+(api-lucifer-smoke-test)=
+### `lucifer_smoke_test`
+
+*Program*
+
+```
+The library-contract check (doc/user-guide.md): drive the FEL tracker without the
+namelist layer. Fill the input structs in code, call the library, write the dumps.
+The harness compares its outputs dataset-identically against a namelist-driven run
+of the same configuration, and runs it twice in one process (both passes here) to
+prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
+
+  lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>
+
+With an unreadable lattice file the library must return an error (never exit): this
+program then prints its proof-of-return line and stops with code 2. The harness's
+library-error check requires exactly that behavior.
+```
+
+## `wavefront_drift_test.f90`
+
+(api-wavefront-drift-test)=
+### `wavefront_drift_test`
+
+*Program*
+
+```
+Test driver for the Fortran free-space wavefront propagator. Two modes.
+
+  wavefront_drift_test <input_file> <output_file> <z_drift>
+
+Reads an openPMD EXT_Wavefront field file into a wavefront_struct, drifts it, and writes
+the result back out in the same format. This is the Fortran half of the Fortran against
+Python comparison. tests/run_validation.sh drives both halves and reports the largest
+relative difference.
+
+The input carries both transverse polarisations, with a different field in each, and both
+are propagated and written back. On top of that this mode makes a second copy whose Ey is
+a duplicate of its Ex, and checks that the two come out identical. That is a cheap test of
+the claim that free-space propagation does not couple the two: the components go through
+separate arrays and separate transforms, so a mistake that mixed them up, or treated one
+differently, would show. The copy also says that Ex is unmoved by what Ey holds.
+
+  wavefront_drift_test -self_check [tolerance]
+
+Compares wavefront_drift against wavefront_drift_reference, the longhand DFT
+implementation, on rectangular grids with unequal transverse spacings.
+
+This mode dates from the Genesis4 file format, which required nx = ny and dx = dy. On a
+square grid with equal spacings the propagation kernel is symmetric under interchanging
+the two transverse axes, so a transposed transform was invisible to the Python comparison
+however asymmetric the test field was. Confirmed by mutation: swapping the two arguments
+of fftw_plan_dft_2d passed that comparison at 6e-16. openPMD puts no such constraint on
+the grid and the Python comparison now runs a rectangular case of its own, so the blind
+spot is covered twice. Two independent references on rectangular grids is worth keeping:
+this one shares no line of code with FFTW.
+
+Invariants printed in both modes: the total field energy, which the propagator conserves
+exactly because its kernel has unit modulus, and the intensity weighted transverse rms
+sizes.
+```
+
+(api-file-drift-mode)=
+### `file_drift_mode`
+
+*Subroutine* `()`
+
+```
+Routine to read a Genesis4 field file, drift it, and write it back out.
+```
+
+(api-self-check-mode)=
+### `self_check_mode`
+
+*Subroutine* `()`
+
+```
+Routine to compare wavefront_drift against wavefront_drift_reference on rectangular grids.
+```
+
+(api-one-self-check)=
+### `one_self_check`
+
+*Subroutine* `(nx, ny, d_rel, err)`
+
+```
+Routine to run one rectangular grid case: build a field, drift it both ways, and compare.
+```
+
+(api-fill-test-field)=
+### `fill_test_field`
+
+*Subroutine* `(wf)`
+
+```
+Routine to fill a wavefront with a deterministic asymmetric test field.
+
+Asymmetry is the point, and every feature below breaks a symmetry that would otherwise
+let a bug through. The centroid is off axis in both planes and differently in each, so an
+x and y interchange shows. The amplitude carries a cross term, so the ellipse is tilted
+and a transpose shows even where the two widths happen to agree. The linear phase gives a
+nonzero mean transverse wavenumber, so the centroid moves during the drift and the sign of
+the kernel matters. The quadratic phase has opposite signs in x and y, so the two axes
+evolve differently. Everything varies with slice index, so a mistake on the slice axis
+cannot cancel. Ey is a different field from Ex, not a copy.
+```
+
 ## `wavefront_mod.f90`
 
 (api-wavefront-mod)=

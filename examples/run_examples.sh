@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The next line sources the locations, LUCIFER_DIR, DEBUG_BIN, PRODUCTION_BIN and
 # BMAD_SRC, with their defaults and the names that set them elsewhere (util/locations.sh).
 source "$SCRIPT_DIR/../util/locations.sh"
-FIG_DIR="$LUCIFER_DIR/doc/generated/examples"
+FIG_DIR="$LUCIFER_DIR/docs/generated/examples"
 
 EXE=""
 PYTHON=""
@@ -289,7 +289,7 @@ if [[ $FAILED -eq 0 ]]; then
     printf 'directory\tdeck\tquantity\tvalue\tunit\n'
     cat "$STATE"/rec.* 2>/dev/null | LC_ALL=C sort
   } > measured.tsv
-  if ! "$PYTHON" "$RECORD" --sample steady_state/lucifer.log --out "$LUCIFER_DIR/doc/generated/sample-output.md"; then
+  if ! "$PYTHON" "$RECORD" --sample steady_state/lucifer.log --out "$LUCIFER_DIR/docs/generated/sample-output.md"; then
     echo "Error: the sample output could not be written from steady_state/lucifer.log" >&2
     FAILED=1
   fi

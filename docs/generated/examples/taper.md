@@ -7,7 +7,7 @@ short_title: "taper"
 
 ![taper](taper.png)
 
-Everything on this page lives in and runs from `lucifer/examples/taper/`.
+Everything on this page lives in and runs from `examples/taper/`.
 
 The example runs in one command, with Bmad only:
 

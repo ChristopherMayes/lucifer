@@ -7,7 +7,7 @@ short_title: "harmonics"
 
 ![harmonics](harmonics.png)
 
-Everything on this page lives in and runs from `lucifer/examples/harmonics/`.
+Everything on this page lives in and runs from `examples/harmonics/`.
 
 The example runs in one command, with Bmad only:
 

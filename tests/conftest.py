@@ -1,4 +1,4 @@
-"""Collection rules for the suites under lucifer/tests.
+"""Collection rules for the suites under tests.
 
 The keystone suite launches five long jobs from one session fixture. A session fixture
 runs once per xdist worker, so a parallel run would launch them several times over into
@@ -16,6 +16,6 @@ def pytest_configure(config: pytest.Config) -> None:
         pass                                   # xdist not installed, nothing to refuse
     if n not in (None, 0, "0"):
         raise pytest.UsageError(
-            "xdist is refused for lucifer/tests: the keystone's session fixture runs the "
+            "xdist is refused for tests: the keystone's session fixture runs the "
             "five jobs once, and once per worker would run them into the same work "
             "directories. Run without -n.")

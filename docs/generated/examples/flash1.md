@@ -7,7 +7,7 @@ short_title: "flash1"
 
 ![flash1](flash1.png)
 
-Everything on this page lives in and runs from `lucifer/examples/flash1/`.
+Everything on this page lives in and runs from `examples/flash1/`.
 
 The example runs in one command, with Bmad only:
 

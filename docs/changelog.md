@@ -44,6 +44,19 @@ of that history. The entries before that date describe that branch.
   build produces reproduces every recorded digit, the 11 tiers on both builds, the 704 check rows
   and `examples/measured.tsv`, with the compiler and flags unchanged, in 558 s with a confirming run
   of 546 s on the staged tree.
+- 2026-10-23 Changed: the repository is laid out as a standalone project at its root. `lucifer/code`
+  is `src/`, with `lucifer/device` under `src/device/` and the wavefront propagator's modules beside
+  the FEL modules. `lucifer/program/lucifer.f90`, the smoke test and the advance benchmark from
+  `lucifer/tests` and `lucifer/wavefront/wavefront_drift_test.f90` are the four main programs in
+  `programs/`. `lucifer/doc` is `docs/`, `lucifer/examples`, `lucifer/tests` and `lucifer/util` are
+  at the root, the wavefront validation is `tests/wavefront/`, and `BMAD_RELEASE`,
+  `searchf.namelist` and `CMakeLists.txt` sit at the root with `cmake/`. The move is one commit of
+  283 renames with no file's content edited, and every path in the scripts, the two workflows,
+  `myst.yml`, the pages and the README follows it. `docs/README.md` is folded into the root
+  `README.md`, which now carries the layout, the two build lines and the document table.
+  `docs/generated/api.md` gains the three programs that were under `tests/` and `wavefront/`, since
+  `report_api.py` now reads `src/` and `programs/`. The build directories are `build-debug/` and
+  `build-release/`, ignored as `build-*`.
 - 2026-10-23 Changed: the recording toolchain is gfortran 15.3 and clang 21.1 from conda-forge,
   where every digit recorded before was measured with gfortran 13.3 and the clang of 2025-06. The
   `bmad-build` environment is created again from Bmad's own `.github/bmad-build-env.yaml`, whose

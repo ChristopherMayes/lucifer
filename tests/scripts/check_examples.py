@@ -99,9 +99,9 @@ def main():
 
     luc = Path(args.lucifer_dir)
     ex = luc / "examples"
-    index_md = luc / "doc" / "index.md"
+    index_md = luc / "docs" / "index.md"
     matrix_md = ex / "README.md"
-    pages = luc / "doc" / "generated" / "examples"
+    pages = luc / "docs" / "generated" / "examples"
 
     problems = []
     idx_text = index_md.read_text()

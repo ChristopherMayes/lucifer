@@ -7,7 +7,7 @@ short_title: "chicane"
 
 ![chicane](chicane.png)
 
-Everything on this page lives in and runs from `lucifer/examples/chicane/`.
+Everything on this page lives in and runs from `examples/chicane/`.
 
 The example runs in two commands, with Bmad only:
 

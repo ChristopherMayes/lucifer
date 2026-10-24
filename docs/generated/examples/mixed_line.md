@@ -7,7 +7,7 @@ short_title: "mixed_line"
 
 ![mixed_line](mixed_line.png)
 
-Everything on this page lives in and runs from `lucifer/examples/mixed_line/`.
+Everything on this page lives in and runs from `examples/mixed_line/`.
 
 The example runs in two commands, with Bmad only:
 
