@@ -1,8 +1,7 @@
-# Build output. Master.cmake places the binaries in debug/ and production/ beside the
-# Lucifer source and builds in lucifer/debug and lucifer/production, and Fortran module
-# files land in both. Digested lattices are Bmad's parse cache, written beside the lattice.
-debug
-production
+# Build output. util/conda_compile builds into build-debug and build-release at the root,
+# and any build-* directory is a build. Digested lattices are Bmad's parse cache, written
+# beside the lattice.
+build-*
 *.mod
 *.digested*
 

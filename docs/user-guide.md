@@ -4,30 +4,34 @@ This page holds everything needed to get from a checkout to a tracked FEL run. T
 
 ## Building
 
-Lucifer is a Bmad user program, built against a Bmad distribution rather than as part of one. Its repository holds Lucifer alone, and a Bmad checkout sits beside it, named by `BMAD_DIR`:
+Lucifer is a Bmad user program, built with its own CMake against an installed Bmad rather than as part of one. The one variable that names Bmad is `LUCIFER_BMAD_ROOT`: a distribution build's `production/` or `debug/` root, which holds `lib/`, `modules/` and `include/`, or a prefix of the same shape with the modules under `include/`. The two lines a user types, from the repository root:
+
+```
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DLUCIFER_BMAD_ROOT=<bmad>/production
+cmake --build build-release --parallel
+```
+
+The binaries land in `build-release/bin`, the modules in `build-release/modules` and `liblucifer.a` in `build-release/lib`. `cmake/FindBmad.cmake` finds `bmad.mod`, the three archives `libbmad.a`, `libsim_utils.a` and `libforest.a`, and the libraries they call, xraylib, FGSL and GSL, LAPACK95 with LAPACK and BLAS, and FFTW with its OpenMP threads, searched in the tree's `lib/`, in the `packages/` beside a distribution build and in the active conda environment's `lib/`, and nowhere else. HDF5 is found through CMake's `FindHDF5`, which `HDF5_ROOT` points at the environment. The configuration is `Release` or `Debug`, and the two carry the flags the recorded levels were measured under: `-O2` for Release, with `src/fel_track_mod.f90` at `-O3`, and `-O0 -fbounds-check -Wuninitialized` for Debug, over `-cpp -fno-range-check -fdollar-ok -fbacktrace -ffree-line-length-none -fopenmp -fPIC` for both. The single-precision FFTW is optional and `fp32_check` is refused without it. On macOS with a clang toolchain the Metal backend is built, and anywhere else a stub takes its place and `global%device` is refused. Both choices are printed at configure time.
+
+The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in `BMAD_RELEASE`, currently `20261023-0`. The first release carrying the two Bmad changes Lucifer needs, the `fel_method` element attribute and openPMD particle patches in the beam files, is `20261018-0`, and an older Bmad refuses the lattices and reads a multi-slice beam file as one bunch. `20261023-0` also corrects the smoothing of a `z_long` wake table that sets `smoothing_sigma`, which Lucifer applies through Bmad's element wakes, and before which such a table took 13 to 16 percent too much energy from the beam. `util/bmad_release_check <bmad root>` compares a checkout's `bmad_version_date` with that minimum, the date and the revision as numbers. The build script runs it before it builds anything, and an older checkout is refused. The tracker prints the Bmad version it was built against at startup and records it in the stats file.
+
+One script builds Bmad and then Lucifer, with the conda preferences the recorded levels were measured under. Its repository holds Lucifer alone, and a Bmad checkout sits beside it, named by `BMAD_DIR`:
 
 ```
 git clone https://github.com/ChristopherMayes/lucifer.git
 git clone https://github.com/bmad-sim/bmad-ecosystem.git bmad
-git -C bmad checkout "$(cat lucifer/lucifer/BMAD_RELEASE)"
+git -C bmad checkout "$(cat lucifer/BMAD_RELEASE)"
 cd lucifer
-BMAD_DIR=../bmad BUILD_PRODUCTION=N lucifer/util/conda_compile   # debug: Bmad, then Lucifer
+conda env create -n bmad-build -f ../bmad/.github/bmad-build-env.yaml   # once
+conda activate bmad-build
+BMAD_DIR=../bmad BUILD_PRODUCTION=N util/conda_compile   # debug: Bmad, then Lucifer
+BMAD_DIR=../bmad util/conda_compile                      # production
+BMAD_DIR=../bmad BUILD_BMAD=N util/conda_compile         # Lucifer alone, Bmad already built
 ```
 
-The Bmad it needs is a `bmad-sim/bmad-ecosystem` release at or after the one named in `lucifer/BMAD_RELEASE`, currently `20261023-0`. The first release carrying the two Bmad changes Lucifer needs, the `fel_method` element attribute and openPMD particle patches in the beam files, is `20261018-0`, and an older Bmad refuses the lattices and reads a multi-slice beam file as one bunch. `20261023-0` also corrects the smoothing of a `z_long` wake table that sets `smoothing_sigma`, which Lucifer applies through Bmad's element wakes, and before which such a table took 13 to 16 percent too much energy from the beam. `lucifer/util/bmad_release_check <bmad root>` compares a checkout's `bmad_version_date` with that minimum, the date and the revision as numbers. The build script runs it before it builds anything, and an older checkout is refused. The tracker prints the Bmad version it was built against at startup and records it in the stats file.
+`util/conda_compile` builds the Bmad distribution from the checkout, with the distribution's own scripts, and then configures and builds Lucifer with the two cmake lines above against that build's `debug/` or `production/`, into `build-debug/` or `build-release/` at the repository root. The compilers are the environment's, named by path, and a `gfortran` found anywhere else is refused. The environment file is Bmad's own, and its compiler entry resolves to conda-forge's current compilers on the day the environment is created, gfortran 15.3 at the time of writing. The recorded levels belong to the compiler the file resolved when they were recorded, and the build log names the compiler CMake chose. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over with a note, since the distribution's `dist_source_me` uses that name as a loop variable and leaves it at the checkout's `util/` once sourced. Lucifer's own build never sources it.
 
-Its `CMakeLists.txt` includes Bmad's `Master.cmake`, which compiles it against the distribution's libraries and modules. The binaries land in `debug/` and `production/` beside the Lucifer source, which is the repository root. One script builds Bmad and then Lucifer, with the conda preferences the recorded levels were measured under. The environment file is Bmad's own, and its compiler entry resolves to conda-forge's current compilers on the day the environment is created, gfortran 15.3 at the time of writing. The recorded levels belong to the compiler the file resolved when they were recorded, and the build log names the compiler CMake chose.
-
-```
-conda env create -n bmad-build -f <bmad>/.github/bmad-build-env.yaml   # once
-BUILD_PRODUCTION=N lucifer/util/conda_compile      # debug, the build to develop against
-lucifer/util/conda_compile                         # production
-BUILD_BMAD=N lucifer/util/conda_compile            # Lucifer alone, Bmad already built
-```
-
-The Bmad source is `BMAD_DIR`, which a Lucifer clone needs since its parent holds no Bmad checkout. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over with a note, since `dist_source_me` uses that name as a loop variable and leaves it at the checkout's `util/` once sourced. By hand, the same build is `source <bmad>/util/dist_source_me` from the Bmad root and then `mk` or `mkd` in the Lucifer directory.
-
-Running the validation harness needs one thing beyond the binary: a Python environment with numpy, h5py, pytest and openPMD-beamphysics 0.16.3 or later, described by `lucifer/wavefront/tests/environment.yml`. The scripts use whatever version that environment holds and print it. A development version of openPMD-beamphysics is installed into the environment as well. The harness takes four locations, each defaulting to the layout above: the Lucifer source, which is the scripts' own tree, the Bmad source with its regression suite (`BMAD_DIR`), and the two binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). A relative value is taken against the directory a script was started in. The benchmark records the build its `--build` option declares, debug or production, and never reads it off a directory name. The exact commands the harness runs are in [`validation.md`](validation.md).
+Running the validation harness needs one thing beyond the binary: a Python environment with numpy, h5py, pytest and openPMD-beamphysics 0.16.3 or later, described by `tests/wavefront/environment.yml`. The scripts use whatever version that environment holds and print it. A development version of openPMD-beamphysics is installed into the environment as well. The harness takes four locations, each defaulting to the layout above: the Lucifer source, which is the scripts' own tree, the Bmad source with its regression suite (`BMAD_DIR`), and the two binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`), which default to `build-debug/bin` and `build-release/bin`. A relative value is taken against the directory a script was started in. The benchmark records the build its `--build` option declares, debug or production, and never reads it off a directory name. The exact commands the harness runs are in [`validation.md`](validation.md).
 
 ## The two FEL methods
 
@@ -64,13 +68,13 @@ What each written file holds is the output section below, and what to do with it
 The examples are the fastest way in. Each is a directory of real input files, a README with the numbers measured on it, and nothing else to fetch:
 
 ```
-cd lucifer/examples/steady_state && lucifer lucifer.in
+cd examples/steady_state && lucifer lucifer.in
 ```
 
 The one that needs Genesis4, and the only one with a runner, is the three-way saturation comparison:
 
 ```
-cd lucifer/examples/saturation_demo && ./run.sh
+cd examples/saturation_demo && ./run.sh
 ```
 
 The validation harness is a separate thing, described with its commands in [`validation.md`](validation.md).
@@ -79,35 +83,35 @@ The validation harness is a separate thing, described with its commands in [`val
 
 | Path | Contents |
 |---|---|
-| `lucifer/doc/fel-physics.md` | **The physics manual**: equations, conventions, Genesis4 provenance and validation pointers, one section per subsystem |
-| `lucifer/code/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
-| `lucifer/code/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis4 interlude model |
-| `lucifer/program/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements tracked by an FEL method (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; loads the beam from a `beam_init` bunch and generates the seed field when no dumps are named |
-| `lucifer/examples/` | Self-contained single-command examples, one directory per feature, each with its own README and measured numbers. Its index says which example shows which feature |
-| `lucifer/tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights, in keep mode, and on copies and deposit cells grouped by the loader, plus the stats file's mode split against a field dump |
-| `lucifer/tests/scripts/check_load.py` | Load-path checks: keep mode exact against the bunch, split-weight invariance, the in-cone startup power of a Gaussian bunch, the refusals of noise on unquiet loads |
-| `lucifer/tests/scripts/bunchfile.py` | Reads and writes the openPMD-beamphysics bunch files `beam_init%position_file` reads, for the checks that build a bunch outside the loader |
-| `lucifer/tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis4's, independent RNGs |
-| `lucifer/tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity, and migration under a full carrier turn of `z_offset` |
-| `lucifer/code/fel_import_mod.f90` | The resampler: a bunch_struct resampled into FEL slices by Genesis4's importdistribution method, the sample mode from a file, plus the Genesis4-distribution-file writer. Also see the resampler in [`validation.md`](validation.md) |
-| `lucifer/tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, lord resolution on a split pipe, exact causality cross-checked against the transcribed wake model, the z_long kernel against a numpy convolution, split-weight invariance, thread determinism |
-| `lucifer/tests/scripts/check_import.py` | Resampler checks, exact: the current profile against Genesis4 on the same file, the generated moments, split-weight invariance, the openPMD round trip, the zero-charge refusal, thread determinism and the quiet-loaded current. Statistical: Twiss recovery, startup power and the imported current against the analytic Gaussian |
-| `lucifer/code/fel_collective_mod.f90` | Wakes and space charge at Genesis4's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
-| `lucifer/tests/genesis4/collective/` | Genesis4 decks: the collective tiers, importing the shared time-dependent dumps |
-| `lucifer/tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping with sigma_energy invariance, stale-wake structure under migration, a stride that only drops, the charge representation under splitting, the long-range kernel at zero width, the short-range solve on a collapsed slice |
-| `lucifer/code/fel_unaveraged_mod.f90` | The unaveraged mode: full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; fc and faw appear nowhere in it |
-| `lucifer/tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison, the mixed line, thread determinism, the time-dependent ledger and the single-precision twin |
-| `lucifer/tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
-| `lucifer/tests/run_fel_benchmark.sh` | The whole validation, one command |
-| `lucifer/tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count. Also see the parallelism record in [`validation.md`](validation.md) |
-| `lucifer/tests/scripts/compare_fel.py` | Comparison: four steady-state tiers and six time-dependent tiers against Genesis4, plus the split-weight invariance check |
-| `lucifer/tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis4 curves (power, checked relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
-| `lucifer/tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis4 deck: pure SASE, the time-dependent window with the seed removed (`power = 0`), writing its own shared dumps |
-| `lucifer/tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis4 deck: Benchmark1-SASE steady state, modified as documented in the deck header |
-| `lucifer/tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis4 deck: one undulator segment, importing the same dumps |
-| `lucifer/tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis4 decks: the time-dependent pair, 32 slices with shot noise |
-| `lucifer/tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
-| `lucifer/tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement: one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding that attribute) |
+| `docs/fel-physics.md` | **The physics manual**: equations, conventions, Genesis4 provenance and validation pointers, one section per subsystem |
+| `src/fel_beam_mod.f90` | Packed particle slices in Bmad coordinates plus per-particle weight, openPMD `.beam.h5` dump read/write through Bmad's own beam I/O, copy-only `coord_struct` conversion, weighted beam diagnostics with `N_eff` |
+| `src/fel_track_mod.f90` | The transcribed FEL step: transverse push with natural focusing, RK4 ponderomotive advance, source deposition, FFT field solve; the rotating-record slippage machinery (`fel_slip_struct`, `fel_apply_slippage`, `fel_field_index`); plus the transcribed Genesis4 interlude model |
+| `programs/lucifer.f90` | The tracker: walks a Bmad lattice, FEL steps inside wiggler/undulator elements tracked by an FEL method (parameters from the lattice attributes, described in the FEL element section), seam everywhere else, slippage schedule transcribed from Genesis4; loads the beam from a `beam_init` bunch and generates the seed field when no dumps are named |
+| `examples/` | Self-contained single-command examples, one directory per feature, each with its own README and measured numbers. Its index says which example shows which feature |
+| `tests/scripts/check_shot_noise.py` | Statistical check: `<\|b(h)\|^2> = 1/N_lambda` over many seeds, uniform and nonuniform weights, in keep mode, and on copies and deposit cells grouped by the loader, plus the stats file's mode split against a field dump |
+| `tests/scripts/check_load.py` | Load-path checks: keep mode exact against the bunch, split-weight invariance, the in-cone startup power of a Gaussian bunch, the refusals of noise on unquiet loads |
+| `tests/scripts/bunchfile.py` | Reads and writes the openPMD-beamphysics bunch files `beam_init%position_file` reads, for the checks that build a bunch outside the loader |
+| `tests/scripts/check_sase_startup.py` | Cross-code check: SASE startup power, our loader against Genesis4's, independent RNGs |
+| `tests/scripts/check_migration.py` | Migration checks: charge conservation under heavy migration, exact phase continuity, window residency, no-op bit identity, and migration under a full carrier turn of `z_offset` |
+| `src/fel_import_mod.f90` | The resampler: a bunch_struct resampled into FEL slices by Genesis4's importdistribution method, the sample mode from a file, plus the Genesis4-distribution-file writer. Also see the resampler in [`validation.md`](validation.md) |
+| `tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, lord resolution on a split pipe, exact causality cross-checked against the transcribed wake model, the z_long kernel against a numpy convolution, split-weight invariance, thread determinism |
+| `tests/scripts/check_import.py` | Resampler checks, exact: the current profile against Genesis4 on the same file, the generated moments, split-weight invariance, the openPMD round trip, the zero-charge refusal, thread determinism and the quiet-loaded current. Statistical: Twiss recovery, startup power and the imported current against the analytic Gaussian |
+| `src/fel_collective_mod.f90` | Wakes and space charge at Genesis4's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
+| `tests/genesis4/collective/` | Genesis4 decks: the collective tiers, importing the shared time-dependent dumps |
+| `tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping with sigma_energy invariance, stale-wake structure under migration, a stride that only drops, the charge representation under splitting, the long-range kernel at zero width, the short-range solve on a collapsed slice |
+| `src/fel_unaveraged_mod.f90` | The unaveraged mode: full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; fc and faw appear nowhere in it |
+| `tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison, the mixed line, thread determinism, the time-dependent ledger and the single-precision twin |
+| `tests/bmad/unavg_probe_*.bmad` | The paired coupling probes (12/20 periods, planar and helical) |
+| `tests/run_fel_benchmark.sh` | The whole validation, one command |
+| `tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count. Also see the parallelism record in [`validation.md`](validation.md) |
+| `tests/scripts/compare_fel.py` | Comparison: four steady-state tiers and six time-dependent tiers against Genesis4, plus the split-weight invariance check |
+| `tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis4 curves (power, checked relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
+| `tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis4 deck: pure SASE, the time-dependent window with the seed removed (`power = 0`), writing its own shared dumps |
+| `tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis4 deck: Benchmark1-SASE steady state, modified as documented in the deck header |
+| `tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis4 deck: one undulator segment, importing the same dumps |
+| `tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis4 decks: the time-dependent pair, 32 slices with shot noise |
+| `tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
+| `tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement: one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding that attribute) |
 
 ## Architecture
 
@@ -164,7 +168,7 @@ The program's terminal output is formatted for reading and carries no contract b
 | File | What |
 |---|---|
 | `<out_root>.stats.h5` | The run: per-record beam, field and Twiss data, the lattice table, and the axes and parameters to read them by. Self-describing (see [`reading-output.md`](reading-output.md)) |
-| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis4 dump can. At an eligible boundary both carry the `lucifer` checkpoint group a continuation reads (`global%continuation = T`). `lucifer/tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
+| `<out_root>-final.beam.h5`, `-final.wf.h5` | Final beam and field, openPMD, the only dump format this code writes. The beam file carries the per-particle weight, which no Genesis4 dump can. At an eligible boundary both carry the `lucifer` checkpoint group a continuation reads (`global%continuation = T`). `tests/scripts/convert_genesis.py` converts either kind to Genesis4 conventions, for feeding Genesis4 |
 | `<out_root>.diag.txt` | The per-record Genesis4-comparison instrument, one row per slice per record |
 | `<out_root>.ledger.txt` | The unaveraged energy ledger, one row per record step |
 | `<out_root>.import.txt` | The load record: the per-slice current profile, with the bunch's analysis moments from the resampler or the per-slice counts and first moments from the keep mode. Written at load time, so it exists under `load_only = T` |

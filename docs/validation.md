@@ -10,23 +10,23 @@ The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equa
 Every commit is validated before it lands, and the tiers land on their recorded digits. A moved digit is a bug and not a new baseline. The generated [HDF5 file layouts](generated/layouts.md) page is held to the same diff under a different rule. A moved line there is a change to the files this program writes, to explain, review, regenerate and stage. It is neither a bug nor proof that a schema changed, since the regeneration shows only that the page agrees with the output and cannot show that the change was reviewed. The keystone runs from the root of the Lucifer repository, with `BMAD_DIR` naming a Bmad checkout and the interpreter of the `bmad-fel-validate` environment:
 
 ```
-BUILD_PRODUCTION=N lucifer/util/conda_compile      # debug: Bmad, then Lucifer
-lucifer/util/conda_compile                         # production
-python3 -m pytest lucifer/tests/test_keystone.py -v
+BUILD_PRODUCTION=N util/conda_compile      # debug: Bmad, then Lucifer
+util/conda_compile                         # production
+python3 -m pytest tests/test_keystone.py -v
 ```
 
-The build script builds the Bmad distribution and then Lucifer against it, through Bmad's `Master.cmake`. It places Lucifer's binaries in `debug/` and `production/` beside the Lucifer source ([building](user-guide.md#building)). The Bmad release is a minimum, declared in `lucifer/BMAD_RELEASE`. The build script and the suite's preflight both run `lucifer/util/bmad_release_check` against the checkout, and the preflight runs its self-test first. The Linux CI job clones `bmad-sim/bmad-ecosystem` at the declared release, runs the same check on the clone, and builds Lucifer against it with `BMAD_DIR` set. A green run there certifies that release and no later one. The suite takes four locations: the Lucifer source, which is its own tree, the Bmad source with its regression suite and debug binaries (`BMAD_DIR`, else `DIST_BASE_DIR`, else the Lucifer source's parent), and the two Lucifer binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`). Each defaults to the layout of a Lucifer source inside a Bmad checkout, and a Lucifer repository sets `BMAD_DIR`. A Lucifer source tree outside the Bmad checkout runs the same suite with `BMAD_DIR` set. openPMD-beamphysics is a package in the validation environment, 0.16.3 or later, and *not* a location. A relative value is taken against the directory the suite was started in. Every job is handed the resolved absolute values, since the jobs run from the Lucifer source. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over with a note, since `dist_source_me` uses that name as a loop variable and leaves it at the checkout's `util/` once sourced. The shell scripts take the same rule from `util/locations.sh`, which they source.
+The build script builds the Bmad distribution and then Lucifer against it with Lucifer's own CMake, into `build-debug/` and `build-release/` at the repository root ([building](user-guide.md#building)), and a Lucifer built by the two cmake lines there alone runs the same suite. The Bmad release is a minimum, declared in `BMAD_RELEASE`. The build script and the suite's preflight both run `util/bmad_release_check` against the checkout, and the preflight runs its self-test first. The Linux CI job clones `bmad-sim/bmad-ecosystem` at the declared release, runs the same check on the clone, and builds Lucifer against it with `BMAD_DIR` set. A green run there certifies that release and no later one. The suite takes four locations: the Lucifer source, which is its own tree, the Bmad source with its regression suite and debug binaries (`BMAD_DIR`, else `DIST_BASE_DIR`, else the Lucifer source's parent), and the two Lucifer binary directories (`LUCIFER_DEBUG_BIN`, `LUCIFER_PRODUCTION_BIN`), which default to `build-debug/bin` and `build-release/bin`. openPMD-beamphysics is a package in the validation environment, 0.16.3 or later, and *not* a location. A relative value is taken against the directory the suite was started in. Every job is handed the resolved absolute values, since the jobs run from the Lucifer source. A `BMAD_DIR` naming a directory with no `util/dist_source_me` is passed over with a note, since `dist_source_me` uses that name as a loop variable and leaves it at the checkout's `util/` once sourced. The shell scripts take the same rule from `util/locations.sh`, which they source.
 
 The suite launches the five jobs at once, each from an absolute working directory into its own log under a fresh artifact directory it names, and keeps every outcome, a launch that failed and a job that timed out included. Five tests read those outcomes, one each. A sixth regenerates the five page sets and requires the Markdown diff to be empty. It verifies for itself that all five passed before it runs a generator, so it cannot pass on a partial run and does not lean on test order. Selecting one test still runs all five jobs, xdist is refused, and a job past its hour is killed as a process group. The five jobs are the ones below, unchanged. The suite launches them from fixed directories, where a retyped recipe can launch a benchmark from a directory an earlier command moved into and report a complete keystone from a partial run.
 
 ```
-./lucifer/tests/run_fel_benchmark.sh --exe $PWD/debug/bin/lucifer --build debug \
+./tests/run_fel_benchmark.sh --exe $PWD/build-debug/bin/lucifer --build debug \
         --results <art>/fel-debug.txt --work-dir <art>/wd-dbg
-./lucifer/tests/run_fel_benchmark.sh --exe $PWD/production/bin/lucifer --build production \
+./tests/run_fel_benchmark.sh --exe $PWD/build-release/bin/lucifer --build production \
         --results <art>/fel-prod.txt --work-dir <art>/wd-prd
 (cd $BMAD_DIR/regression_tests && pytest test_fortran.py --bmad-bin=$BMAD_DIR/debug/bin)
-./lucifer/wavefront/tests/run_validation.sh
-./lucifer/examples/run_examples.sh --no-figures
+./tests/wavefront/run_validation.sh
+./examples/run_examples.sh --no-figures
 ```
 
 The five run at once because they share only a source tree they read: separate work directories, separate output roots, and no shared state anywhere else. Nothing persists FFTW wisdom or writes outside its own directory. On an M3 Max the whole thing takes 7.7 minutes with the Genesis references cached and 9.2 without, against 25 minutes with every step in sequence and the references regenerated twice per run. The references are cached because they are a pure function of the reference binary and the decks that make them. The cache key names both and the pinned version besides, and each run says whether it hit or missed. Deleting `~/.cache/lucifer/genesis-refs` is always safe and costs one cold run.
@@ -88,18 +88,18 @@ Regenerate then diff checks that the committed generated pages agree with what t
 The Linux CI job (`.github/workflows/lucifer-keystone.yml`) is a different check, and a green run of it is not a completed keystone. The CI job builds the debug tree only, leaves the regression suite out of its build, and asserts the harness's tolerances rather than the recorded digits, which belong to the machine that recorded them. The CI job establishes portability and physics agreement within tolerance under that build configuration. The keystone establishes both builds, all five jobs, the regeneration and agreement with the recorded results, and only the suite above does that. Widening the CI job to the full suite would need a decision about platform-specific numerical expectations, and that decision has not been taken.
 
 ```
-python3 lucifer/tests/scripts/report_validation.py \
+python3 tests/scripts/report_validation.py \
         --debug /tmp/fel-debug.txt --production /tmp/fel-prod.txt \
-        --out lucifer/doc/generated/validation-measured.md
-python3 lucifer/tests/scripts/report_api.py \
-        --code lucifer/code --code lucifer/program --out lucifer/doc/generated/api.md
-python3 lucifer/tests/scripts/report_examples.py \
-        --examples lucifer/examples --out lucifer/doc/generated/examples
-python3 lucifer/tests/scripts/report_startup_noise.py \
-        --json lucifer/doc/generated/startup-noise --out lucifer/doc/generated/startup-noise-measured.md
-python3 lucifer/tests/scripts/report_layouts.py \
-        --exe production/bin/lucifer --out lucifer/doc/generated/layouts.md --log /tmp/layouts.log
-git diff --exit-code -- 'lucifer/doc/generated/*.md' 'lucifer/doc/generated/examples/*.md'
+        --out docs/generated/validation-measured.md
+python3 tests/scripts/report_api.py \
+        --code src --code programs --out docs/generated/api.md
+python3 tests/scripts/report_examples.py \
+        --examples examples --out docs/generated/examples
+python3 tests/scripts/report_startup_noise.py \
+        --json docs/generated/startup-noise --out docs/generated/startup-noise-measured.md
+python3 tests/scripts/report_layouts.py \
+        --exe build-release/bin/lucifer --out docs/generated/layouts.md --log /tmp/layouts.log
+git diff --exit-code -- 'docs/generated/*.md' 'docs/generated/examples/*.md'
 ```
 
 The startup-noise generator writes the measured tables of [](startup-noise.md) from the JSON that `tests/scripts/startup_noise.py` commits beside its figures, one file per machine, and the page includes each table from the generated file. The driver runs on demand and never in the keystone, so the regeneration renders the committed record at no run cost, and the page's provenance table says which commit, build, backend and day measured it.
@@ -117,7 +117,7 @@ The measured levels in this document are written by the harness that measured th
 
 The diff names the Markdown. The figures in `doc/generated/examples/` are committed beside the pages and deliberately excluded. A plotting-library upgrade rewrites every one of them byte for byte without changing any physics, and a check that fails on that is a check that gets switched off. `examples/run_examples.sh` writes them, and the examples check asserts that each page's figure exists rather than what it contains.
 
-The regression suite reports 54 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `lucifer/wavefront/tests/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one, which the version check then has to accept. It refuses whatever does not report the recorded version, however it was named.
+The regression suite reports 54 passed and 3 skipped. Build in the `bmad-build` environment. The harness runs its Python in `bmad-fel-validate`, which also carries the `genesis4` the comparison runs against, from conda-forge and pinned in `tests/wavefront/environment.yml`. The harness takes that one rather than searching PATH, because the levels recorded here belong to the build that produced them. `--genesis <path>` or `$GENESIS4` names a different one, which the version check then has to accept. It refuses whatever does not report the recorded version, however it was named.
 
 The levels here were measured against the Genesis4 4.6.15 release. The harness refuses a reference reporting any other version rather than running against it, printing the one it found and the one it wants. The failure it prevents is silent: a different reference moves the recorded digits while every tolerance still passes. Two properties of 4.6.15 are load-bearing. It carries the CODATA electron rest energy, which is also Bmad's `m_electron`. Releases to v4.6.14 carried a value 2.14e-7 above it and loosened the transcription tiers by several percent of their own value ([](genesis4.md) states the constant and the size). And it seeds each stochastic stream from the global slice index, which this project contributed upstream, so noise realizations differ from every earlier release. The digits below were re-recorded on that migration, and which of them moved is stated in the changelog with the reason. The regeneration check refuses to absorb a reference change either way: it shows up as a non-empty diff on the generated table rather than as quietly different digits. Only environments this project created are used. An unrelated `devel` environment on PATH once caused an HDF5 mismatch, and the same class of mistake is why the reference's own variant is chosen to match the HDF5 its environment already runs.
 
@@ -406,7 +406,7 @@ The helical re-anchor, which rotates the reference polarization basis and must r
 
 The walk carries an ordered set of radiation fields, Genesis4's `vector<Field*>` shape, with the fundamental always entry 1. A harmonic field h (namelist `harmonics = 1, 3, ...`) lives at wavelength lambda_1/h and enters the physics in exactly three places. Those are its coupling fc(h) (the Bessel factor, zero for every harmonic of a helical device), the harmonic ponderomotive phase h*theta in kick and deposit, and its own diffraction kernel and escape accounting. In V/m no other factor appears. Genesis4's per-field ks factors are its internal unit conversion, absorbed once. Harmonic fields start dark and grow from the beam's bunching, or import. Nonlinear harmonic generation is `examples/harmonics/`, where P3 grows from a dark start under a 200 MW fundamental over 4 m. The example's page carries the harmonic's exit power in its table of what the run measured ([](generated/examples/harmonics.md)). A single-entry set is the pre-harmonic walk bit for bit (the two-polarization overlay discipline again). Harmonics with two live polarizations, and with an unaveraged element, are refused, so unvalidated combinations refuse rather than guess.
 
-Dumps speak one format, openPMD, in both directions. A field dump is an openPMD EXT_Wavefront file (`.wf.h5`), both polarizations as complex components of one mesh record (h5py reads them as complex128 natively), one file per harmonic with photonEnergy identifying it, and a harmonic's file carrying `-h<h>`. The standard document is authoritative: the harness verifies every required attribute against its text independently of the writer. A file that is not openPMD is refused on import, with the conversion command in the message, and `lucifer/tests/scripts/convert_genesis.py` converts either kind of file in either direction. The Python side of the round trip is openPMD-beamphysics's own `Wavefront.from_openpmd`/`write_openpmd`, exercised against the Fortran writer and reader every harness run.
+Dumps speak one format, openPMD, in both directions. A field dump is an openPMD EXT_Wavefront file (`.wf.h5`), both polarizations as complex components of one mesh record (h5py reads them as complex128 natively), one file per harmonic with photonEnergy identifying it, and a harmonic's file carrying `-h<h>`. The standard document is authoritative: the harness verifies every required attribute against its text independently of the writer. A file that is not openPMD is refused on import, with the conversion command in the message, and `tests/scripts/convert_genesis.py` converts either kind of file in either direction. The Python side of the round trip is openPMD-beamphysics's own `Wavefront.from_openpmd`/`write_openpmd`, exercised against the Fortran writer and reader every harness run.
 
 One format rather than a choice of formats is a decision, and its cost is one conversion step in the benchmark. The Genesis4 reference chains write their own dumps, and the harness converts them once per chain before the tiers read them. What that buys is that no writer in the physics code has to hold a second chart, no deck names a format, and every dump carries the per-particle weight.
 
@@ -533,7 +533,7 @@ It saturates near 4x at 8 threads. Two parallel regions are spawned per integrat
 One command reproduces this measurement on any machine:
 
 ```
-./lucifer/tests/run_perf_benchmark.sh
+./tests/run_perf_benchmark.sh
 ```
 
 It detects the performance-core count (`--workers N` to override) and sizes the window to 4 slices per worker so Genesis4 does not pad. It finds the MPI launcher that matches the Genesis4 binary's own linkage, since an OpenMPI `mpirun` aborts an MPICH-linked genesis4 on sight. It times all four runs with one external clock, and refuses to print a table unless the two codes' answers agree at the documented seam level first.

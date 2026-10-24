@@ -24,10 +24,9 @@
 # environments apart for exactly that reason.
 #
 # Bmad is not this repository's. It comes from a shallow clone of bmad-sim/bmad-ecosystem
-# at the release lucifer/BMAD_RELEASE declares, checked by lucifer/util/bmad_release_check
-# before anything is built, and nothing but lucifer/ and the workflows is read from this
-# checkout. The declared release is a minimum, so a green run certifies that release and
-# no later one.
+# at the release BMAD_RELEASE declares, checked by util/bmad_release_check before anything
+# is built, and this checkout is read for Lucifer alone. The declared release is a minimum,
+# so a green run certifies that release and no later one.
 #
 # What this varies and what it does not, so the coverage is not overstated. It varies the
 # operating system, the C library, the allocator and every dependency build, and it runs
@@ -99,11 +98,11 @@ jobs:
         shell: bash
         run: |
           set -e
-          tag="$(head -n 1 lucifer/BMAD_RELEASE | tr -d '[:space:]')"
+          tag="$(head -n 1 BMAD_RELEASE | tr -d '[:space:]')"
           git clone --depth 1 --branch "$tag" \
               https://github.com/bmad-sim/bmad-ecosystem.git "$RUNNER_TEMP/bmad"
           echo "Bmad clone: tag $tag, commit $(git -C "$RUNNER_TEMP/bmad" rev-parse HEAD)"
-          lucifer/util/bmad_release_check "$RUNNER_TEMP/bmad"
+          util/bmad_release_check "$RUNNER_TEMP/bmad"
           echo "BMAD_DIR=$RUNNER_TEMP/bmad" >> "$GITHUB_ENV"
 
       # Two packages the build needs on Linux and not on macOS. The distribution's own
@@ -130,7 +129,7 @@ jobs:
           python-version: "3.12"
           conda-remove-defaults: true
 
-      # The preferences are the ones lucifer/util/conda_compile writes on the recording
+      # The preferences are the ones util/conda_compile writes on the recording
       # machine, less two macOS-only lines: that script restores util/dist_prefs from
       # origin/main, which a shallow clone of one tag does not have, and it passes a
       # linker flag the GNU linker rejects. So the steps are written out here, against the
@@ -159,6 +158,12 @@ jobs:
       # The build command's status is therefore checked explicitly, and the three
       # binaries the later steps need are listed after it, so a build that half worked
       # cannot pass.
+      #
+      # Lucifer then builds with its own CMakeLists.txt against the clone's debug tree,
+      # named by LUCIFER_BMAD_ROOT, into build-debug/ at this checkout's root, the two
+      # lines util/conda_compile runs. The Fortran compiler is named by path, since the
+      # compiler packages export nothing on activation and CMake would otherwise take the
+      # first gfortran on PATH.
       - name: Build the debug tree
         shell: bash -o pipefail {0}
         run: |
@@ -196,25 +201,30 @@ jobs:
             echo "util/dist_build_debug exited $status"
             exit "$status"
           fi
-          # Lucifer is a Bmad user program and is built after the distribution, through
-          # Master.cmake with the environment dist_source_me set, into debug/ beside its
-          # source, which here is this checkout's root and not the clone.
-          (cd "$GITHUB_WORKSPACE/lucifer" && mkd)
+          cd "$GITHUB_WORKSPACE" || exit 1
+          export FC="$CONDA_PREFIX/bin/gfortran"
+          cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug \
+                -DLUCIFER_BMAD_ROOT="$bmad_root/debug" -DHDF5_ROOT="$CONDA_PREFIX"
           status=$?
           if [ "$status" -ne 0 ]; then
-            echo "mkd in lucifer/ exited $status"
+            echo "cmake configure exited $status"
             exit "$status"
           fi
-          cd "$GITHUB_WORKSPACE" || exit 1
-          ls -l debug/bin/lucifer debug/bin/lucifer_smoke_test debug/bin/wavefront_drift_test \
-                "$bmad_root/debug/bin/tao"
+          cmake --build build-debug --parallel "$(nproc)"
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "cmake --build exited $status"
+            exit "$status"
+          fi
+          ls -l build-debug/bin/lucifer build-debug/bin/lucifer_smoke_test \
+                build-debug/bin/wavefront_drift_test "$bmad_root/debug/bin/tao"
 
       # Which backend this build carries, from lucifer's own banner. This is the line the
       # harness reads to decide whether the device section can run, so having it in the
       # log makes the skip below checkable rather than asserted.
       - name: Name the device backend
         shell: bash
-        run: ./debug/bin/lucifer || true
+        run: ./build-debug/bin/lucifer || true
 
       # One environment for the reference and the Python side, from the repository's own
       # file, which pins genesis4 4.6.15. The pin is the whole reason this job is
@@ -227,7 +237,7 @@ jobs:
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           set -e
-          conda env create -f lucifer/wavefront/tests/environment.yml
+          conda env create -f tests/wavefront/environment.yml
           # The reference's own banner, so a wrong version is visible here rather than
           # only in the harness's refusal. genesis4 exits non-zero when it is given no
           # input file, which is not a failure of this step.
@@ -247,8 +257,8 @@ jobs:
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
           set -e
-          ./lucifer/tests/run_fel_benchmark.sh \
-              --exe "$PWD/debug/bin/lucifer" --build debug \
+          ./tests/run_fel_benchmark.sh \
+              --exe "$PWD/build-debug/bin/lucifer" --build debug \
               --results "$RUNNER_TEMP/fel-debug.txt" \
               --work-dir "$RUNNER_TEMP/wd-dbg"
 
@@ -258,7 +268,7 @@ jobs:
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
           set -e
-          ./lucifer/wavefront/tests/run_validation.sh \
+          ./tests/wavefront/run_validation.sh \
               --work-dir "$RUNNER_TEMP/wd-wf"
 
       # The results file records what ran, what skipped and why, and each tier's level.

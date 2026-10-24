@@ -148,27 +148,26 @@ if [[ "$BUILD_BMAD" == "Y" ]]; then
   fi
 fi
 
-# Lucifer builds through Master.cmake with the environment dist_source_me set. mk builds
-# production and mkd debug, into debug/ and production/ beside the Lucifer source.
+# Lucifer builds with its own CMake against the Bmad tree of the same flavor, into
+# build-debug or build-release at the root. LUCIFER_BMAD_ROOT names the tree, and the compilers
+# are the environment's, set above.
 
-cd "$LUCIFER_DIR"
+export FC="$CONDA_PREFIX/bin/gfortran"
 if [[ "$BUILD_PRODUCTION" == "Y" ]]; then
-  echo "**** Building Lucifer, production"
-  mk
-  build_tree="$LUCIFER_DIR/production"
+  build_type=Release;  build_dir="$LUCIFER_DIR/build-release";  bmad_tree="$BMAD_ROOT/production"
 else
-  echo "**** Building Lucifer, debug"
-  mkd
-  build_tree="$LUCIFER_DIR/debug"
+  build_type=Debug;    build_dir="$LUCIFER_DIR/build-debug";    bmad_tree="$BMAD_ROOT/debug"
 fi
+echo "**** Building Lucifer, $build_type, against $bmad_tree"
+jobs="$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
+cmake -S "$LUCIFER_DIR" -B "$build_dir" -DCMAKE_BUILD_TYPE="$build_type" -DLUCIFER_BMAD_ROOT="$bmad_tree" \
+      -DHDF5_ROOT="$CONDA_PREFIX"
+cmake --build "$build_dir" --parallel "$jobs"
 
-# The compiler the binaries were built with, from CMake's own record in the project's
-# build tree, which Master.cmake keeps beside the source while the binaries go up a level. A
-# tree configured by more than one CMake holds one record per version, and the newest is
-# this build's. The line
+# The compiler the binaries were built with, from CMake's own record of it. The line
 # dist_source_me prints above names the gfortran first on PATH, which can be another one.
 
-compiler_file="$(ls -t "$build_tree"/CMakeFiles/*/CMakeFortranCompiler.cmake 2>/dev/null | head -n 1)"
+compiler_file="$(ls -t "$build_dir"/CMakeFiles/*/CMakeFortranCompiler.cmake 2>/dev/null | head -n 1)"
 if [[ -n "$compiler_file" ]]; then
   fc_path="$(sed -n 's/^set(CMAKE_Fortran_COMPILER "\(.*\)")$/\1/p' "$compiler_file")"
   fc_version="$(sed -n 's/^set(CMAKE_Fortran_COMPILER_VERSION "\(.*\)")$/\1/p' "$compiler_file")"

@@ -9,6 +9,41 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: Lucifer builds with its own `CMakeLists.txt` against an installed Bmad, named
+  by `LUCIFER_BMAD_ROOT`, a distribution build's `production/` or `debug/` root or a prefix of the
+  same shape, and no longer includes Bmad's `Master.cmake` or sources `dist_source_me`. The two
+  lines a user types are
+  `cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DLUCIFER_BMAD_ROOT=<bmad>/production` and
+  `cmake --build build-release --parallel`, and the binaries land in `build-release/bin`.
+  `cmake/FindBmad.cmake` finds `bmad.mod`, the archives `libbmad.a`, `libsim_utils.a` and
+  `libforest.a` ahead of their shared libraries, and the ten libraries `ACC_BMAD_LINK_LIBS` resolved
+  to on the production build of 2026-10-23, `xrlf03`, `xrl`, `fgsl`, `gsl`, `gslcblas`, `lapack95`,
+  `lapack`, `blas`, `fftw3` and `fftw3_omp`, each with its reason, searched in the tree's `lib/`, in
+  `packages/{production,debug}/lib` beside a distribution build and in `$CONDA_PREFIX/lib`, and
+  nowhere else: CMake's default search had taken the SDK's `liblapack.tbd`, Accelerate, where the
+  Bmad tree links OpenBLAS. HDF5 comes through `FindHDF5` with `HDF5_ROOT` at the environment,
+  linked through the two lists it fills, `HDF5_Fortran_HL_LIBRARIES` and `HDF5_Fortran_LIBRARIES`,
+  since the `hdf5::` targets name the two front libraries alone and a static `libbmad.a` then fails
+  on `h5ltread_dataset_c`, which `libhdf5_hl_f90cstub` carries. The flags are the ones
+  `Master.cmake` gave a user program,
+  `-cpp -fno-range-check -fdollar-ok -fbacktrace -ffree-line-length-none -fopenmp -fPIC` with `-O2`
+  for Release and `-g -O0 -fno-range-check -fbounds-check -Wuninitialized` for Debug, `-O3` on
+  `src/fel_track_mod.f90` in both, `-std=gnu99` for the C shim, `-std=gnu++17 -fobjc-arc` for the
+  Metal backend and `-Wl,-no_compact_unwind` at the link on macOS. The X11 libraries and the
+  `CESR_*` defines the distribution passed are dropped, since no Lucifer source uses them. The
+  `fftw3f` search, the `LUCIFER_HAVE_FFTW3F` define on `src/fel_fp32_mod.f90` and the Metal choice,
+  a Clang-family Objective-C++ compiler with the Metal and Foundation frameworks, else
+  `src/device/lucifer_device_stub.c`, carry over as plain CMake. `util/conda_compile` builds the
+  Bmad distribution as before and then runs the two cmake lines into `build-debug/` or
+  `build-release/` at the root, with `FC` named by path, and prints the compiler CMake chose from
+  the build directory's own record. `util/locations.sh` and `tests/test_keystone.py` default the two
+  binary directories to `build-debug/bin` and `build-release/bin`, and `tests/scripts/vec_audit.sh`
+  reads `build-release/CMakeFiles/lucifer_lib.dir` and resolves the relative `-Jmodules` CMake
+  writes against the build directory. The four `cmake.*` specs are gone. The Linux CI job builds
+  Lucifer with the same two lines against the clone's `debug/`. The keystone on the binaries the new
+  build produces reproduces every recorded digit, the 11 tiers on both builds, the 704 check rows
+  and `examples/measured.tsv`, with the compiler and flags unchanged, in 558 s with a confirming run
+  of 546 s on the staged tree.
 - 2026-10-23 Changed: the recording toolchain is gfortran 15.3 and clang 21.1 from conda-forge,
   where every digit recorded before was measured with gfortran 13.3 and the clang of 2025-06. The
   `bmad-build` environment is created again from Bmad's own `.github/bmad-build-env.yaml`, whose

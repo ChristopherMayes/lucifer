@@ -15,7 +15,7 @@ The tables below are also the calibration of the cost estimate every run prints 
 ## Reproducing this
 
 ```
-./lucifer/tests/run_perf_benchmark.sh --phases
+./tests/run_perf_benchmark.sh --phases
 ```
 
 Every table below whose deck states `ngrid` 255 was measured before the harness moved to power-of-two grids. `run_perf_benchmark.sh` now states 256, so a fresh run reports walks about 1.17x those numbers on the large grid ([](#perf-the-transform-length)). The shares between phases are what those tables are for, and they do not move with the grid.
@@ -25,7 +25,7 @@ The phases mode needs no genesis4 and no MPI. It compares the code against itsel
 The sampling split is taken on macOS with:
 
 ```
-OMP_NUM_THREADS=12 production/bin/lucifer <deck>.in &
+OMP_NUM_THREADS=12 build-release/bin/lucifer <deck>.in &
 sample $(pgrep -n lucifer) 15 1 -file prof.txt -mayDie
 ```
 
@@ -34,7 +34,7 @@ Read the `Sort by top of stack` section, which is exclusive cost per symbol. The
 The vectorization audit runs as:
 
 ```
-./lucifer/tests/scripts/vec_audit.sh
+./tests/scripts/vec_audit.sh
 ```
 
 It takes the compile command from the production build's own makefile, so the report always describes the binary that ships. Build production first.

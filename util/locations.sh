@@ -1,13 +1,12 @@
 # The locations the Lucifer scripts share, for sourcing from bash. Each has a default
-# that is the layout inside a Bmad checkout, so a Lucifer source tree there runs with
-# nothing set.
+# that is the layout of a Lucifer clone built by util/conda_compile with a Bmad checkout
+# beside it, so that layout runs with BMAD_DIR alone set.
 #
 #   LUCIFER_DIR     The Lucifer source: this file's own tree.
-#   DEBUG_BIN       Lucifer's debug binaries. Master.cmake places a project's binaries
-#   PRODUCTION_BIN  in debug/ and production/ beside the project's source, in the Bmad
-#                   checkout and out of it alike, so both default to the tree beside
-#                   this one, and LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them
-#                   elsewhere.
+#   DEBUG_BIN       Lucifer's debug and production binaries. util/conda_compile builds
+#   PRODUCTION_BIN  into build-debug/ and build-release/ at the Lucifer root, so both
+#                   default to the bin/ of those two, and LUCIFER_DEBUG_BIN and
+#                   LUCIFER_PRODUCTION_BIN name them elsewhere.
 #   BMAD_SRC        The Bmad checkout, which carries the regression suite and Tao:
 #                   BMAD_DIR, else DIST_BASE_DIR as util/dist_source_me exports it, else
 #                   the parent of the Lucifer source. A variable naming a directory with
@@ -28,8 +27,8 @@ lucifer_abs () {   # <path>
 
 LUCIFER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 lucifer_parent="$(cd "$LUCIFER_DIR/.." && pwd)"
-DEBUG_BIN="$(lucifer_abs "${LUCIFER_DEBUG_BIN:-$lucifer_parent/debug/bin}")"
-PRODUCTION_BIN="$(lucifer_abs "${LUCIFER_PRODUCTION_BIN:-$lucifer_parent/production/bin}")"
+DEBUG_BIN="$(lucifer_abs "${LUCIFER_DEBUG_BIN:-$LUCIFER_DIR/build-debug/bin}")"
+PRODUCTION_BIN="$(lucifer_abs "${LUCIFER_PRODUCTION_BIN:-$LUCIFER_DIR/build-release/bin}")"
 
 BMAD_SRC=""
 for lucifer_var in BMAD_DIR DIST_BASE_DIR; do

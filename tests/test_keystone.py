@@ -9,9 +9,9 @@ and successful. So it does not lean on test order and cannot pass on a partial r
 Nothing here builds. Both trees are prerequisites and are checked before any job
 launches, since a benchmark reads the source tree throughout.
 
-    BUILD_PRODUCTION=N lucifer/util/conda_compile
-    lucifer/util/conda_compile
-    <bmad-fel-validate python> -m pytest lucifer/tests/test_keystone.py -v
+    BUILD_PRODUCTION=N util/conda_compile
+    util/conda_compile
+    <bmad-fel-validate python> -m pytest tests/test_keystone.py -v
 
 What the contract means in practice:
 
@@ -21,7 +21,7 @@ What the contract means in practice:
   worker, so a parallel run would launch the five jobs several times over, into the
   same work directories.
 - The regeneration test writes into the tree: the four generated page sets under
-  lucifer/doc/generated. The keystone writes them by design. An empty diff then shows
+  docs/generated. The keystone writes them by design. An empty diff then shows
   that the committed pages agree with what the sources generate.
 - A job that runs past its timeout is killed as a process group. Each job is started in
   its own session, so the group is the shell wrapper and everything it launched, the
@@ -59,9 +59,9 @@ import pytest
 #   The Lucifer source is this file's tree.
 #   The Bmad source, with the regression suite and its debug binaries, is BMAD_DIR,
 #     else DIST_BASE_DIR as util/dist_source_me exports it, else the Lucifer source's parent.
-#   The two binary directories default to debug/ and production/ beside the Lucifer
-#     source, where Master.cmake places a project's binaries. That holds in the Bmad
-#     checkout and out of it. LUCIFER_DEBUG_BIN and LUCIFER_PRODUCTION_BIN name them elsewhere.
+#   The two binary directories default to build-debug/bin and build-release/bin at the
+#     Lucifer root, where util/conda_compile builds. LUCIFER_DEBUG_BIN and
+#     LUCIFER_PRODUCTION_BIN name them elsewhere.
 # A relative value is taken against the directory pytest was started in. Every job is
 # handed the absolute values, since the jobs run from the Lucifer source and a relative
 # path would mean something else there.
@@ -89,8 +89,8 @@ def bmad_source() -> tuple[pathlib.Path, list[str]]:
 
 
 BMAD, BMAD_NOTES = bmad_source()
-DEBUG_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER.parent / "debug" / "bin"))
-PRODUCTION_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER.parent / "production" / "bin"))
+DEBUG_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_DEBUG_BIN") or LUCIFER / "build-debug" / "bin"))
+PRODUCTION_BIN = pathlib.Path(os.path.abspath(os.environ.get("LUCIFER_PRODUCTION_BIN") or LUCIFER / "build-release" / "bin"))
 # What every job is handed: each value as it was given, made absolute, with no symbolic
 # link followed. openPMD-beamphysics is not a location. It is a package installed in the
 # interpreter's environment, which every job inherits.
@@ -99,10 +99,10 @@ LOCATIONS = {"BMAD_DIR": str(BMAD),
 DEBUG_EXE = DEBUG_BIN / "lucifer"
 PRODUCTION_EXE = PRODUCTION_BIN / "lucifer"
 BENCHMARK = LUCIFER / "tests" / "run_fel_benchmark.sh"
-WAVEFRONT = LUCIFER / "wavefront" / "tests" / "run_validation.sh"
+WAVEFRONT = LUCIFER / "tests" / "wavefront" / "run_validation.sh"
 EXAMPLES = LUCIFER / "examples" / "run_examples.sh"
 SCRIPTS = LUCIFER / "tests" / "scripts"
-GENERATED = LUCIFER / "doc" / "generated"
+GENERATED = LUCIFER / "docs" / "generated"
 
 # One hour a job. The keystone takes nine minutes cold, so a job still running at an
 # hour has hung. Its process group is then killed rather than waited on.
@@ -327,8 +327,8 @@ def test_regeneration(keystone: Keystone) -> None:
     generators = (
         (str(SCRIPTS / "report_validation.py"), "--debug", str(art / "fel-debug.txt"),
          "--production", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation-measured.md")),
-        (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "code"),
-         "--code", str(LUCIFER / "program"), "--out", str(GENERATED / "api.md")),
+        (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "src"),
+         "--code", str(LUCIFER / "programs"), "--out", str(GENERATED / "api.md")),
         (str(SCRIPTS / "report_examples.py"), "--examples", str(LUCIFER / "examples"),
          "--out", str(GENERATED / "examples")),
         # The startup-noise page's tables, from the committed JSON of the driver's runs. The
@@ -347,7 +347,7 @@ def test_regeneration(keystone: Keystone) -> None:
     # The Markdown only. The figures are committed and a plotting library upgrade
     # rewrites them all with no physics moving (doc/validation.md).
     r = subprocess.run(["git", "diff", "--exit-code", "--stat", "--",
-                        "doc/generated/*.md", "doc/generated/examples/*.md", "examples/measured.tsv"],
+                        "docs/generated/*.md", "docs/generated/examples/*.md", "examples/measured.tsv"],
                        cwd=str(LUCIFER), capture_output=True, text=True)
     assert r.returncode == 0, ("a generated page moved after regeneration; a moved digit is a bug, "
                                "not a new baseline:\n" + r.stdout)

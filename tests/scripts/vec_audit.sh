@@ -25,8 +25,8 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LUCIFER="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BUILD_MAKE="$LUCIFER/production/CMakeFiles/lucifer.dir/build.make"
-FLAGS_MAKE="$LUCIFER/production/CMakeFiles/lucifer.dir/flags.make"
+BUILD_MAKE="$LUCIFER/build-release/CMakeFiles/lucifer_lib.dir/build.make"
+FLAGS_MAKE="$LUCIFER/build-release/CMakeFiles/lucifer_lib.dir/flags.make"
 
 OUT=""
 FILES=()
@@ -45,7 +45,7 @@ fi
 
 for f in "$BUILD_MAKE" "$FLAGS_MAKE"; do
   if [[ ! -f "$f" ]]; then
-    echo "Error: $f is missing. Build production first: lucifer/util/conda_compile" >&2
+    echo "Error: $f is missing. Build production first: util/conda_compile" >&2
     exit 1
   fi
 done
@@ -65,12 +65,14 @@ F_FLAGS="$(read_var "$FLAGS_MAKE" Fortran_FLAGS)"
 F_INCLUDES="$(read_var "$FLAGS_MAKE" Fortran_INCLUDES)"
 F_DEFINES="$(read_var "$FLAGS_MAKE" Fortran_DEFINES)"
 
-# -J in the build's flags points at the production module directory. The audit must not
-# write there, so the module output is redirected and the original -J becomes an -I: the
-# module files it holds are exactly what these files compile against.
+# -J in the build's flags points at the production module directory, as a path relative
+# to the build directory the way CMake writes it. The audit must not write there, so the
+# module output is redirected and the original -J becomes an -I: the module files it
+# holds are exactly what these files compile against.
 
 MOD_DIR="$(echo "$F_FLAGS" | sed -n 's/.*-J\([^ ]*\).*/\1/p')"
 F_FLAGS="$(echo "$F_FLAGS" | sed 's|-J[^ ]*||')"
+[[ -n "$MOD_DIR" && "$MOD_DIR" != /* ]] && MOD_DIR="$(dirname "$(dirname "$FLAGS_MAKE")")/../$MOD_DIR"
 [[ -n "$MOD_DIR" ]] && F_INCLUDES="$F_INCLUDES -I$MOD_DIR"
 
 echo "=============================================================================="
@@ -87,7 +89,7 @@ for src in "${FILES[@]}"; do
   # on fel_track_mod reaches the audit. The compiler and everything after it come from
   # the recipe line, less its make variables, expanded above, and its -o.
 
-  recipe="$(grep -m1 -A 4 "^CMakeFiles/lucifer.dir/code/$src.o: CMakeFiles" "$BUILD_MAKE" | \
+  recipe="$(grep -m1 -A 4 "^CMakeFiles/lucifer_lib.dir/src/$src.o: CMakeFiles" "$BUILD_MAKE" | \
             grep -m1 'gfortran')"
   if [[ -z "$recipe" ]]; then
     echo "  $src: no compile recipe in build.make. Not a source file of this library?" >&2
@@ -106,7 +108,7 @@ for src in "${FILES[@]}"; do
   # shellcheck disable=SC2086
   "$FC" $F_DEFINES $F_INCLUDES $F_FLAGS $own \
         -J"$OUT" -fopt-info-vec-all="$rpt" \
-        -c "$LUCIFER/code/$src" -o "$OUT/${src%.f90}.o" 2> "$OUT/${src%.f90}.err"
+        -c "$LUCIFER/src/$src" -o "$OUT/${src%.f90}.o" 2> "$OUT/${src%.f90}.err"
   if [[ $? -ne 0 ]]; then
     echo "  compile FAILED; stderr tail:" >&2
     tail -5 "$OUT/${src%.f90}.err" >&2
