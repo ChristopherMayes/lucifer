@@ -95,6 +95,9 @@ for src in "${FILES[@]}"; do
     continue
   fi
   FC="$(echo "$recipe" | awk '{print $1}')"
+  # The compiler's own directory goes first on PATH. A conda-forge gfortran drives the
+  # assembler and linker through the clang beside it, which it finds by name.
+  export PATH="$(dirname "$FC"):$PATH"
   # This file's own options are everything between the make variables and the -c.
   own="$(echo "$recipe" | sed 's|.*\$(Fortran_FLAGS)||; s| -c .*||')"
 

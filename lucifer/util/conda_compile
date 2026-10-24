@@ -48,6 +48,20 @@ source "$CONDA_ROOT/etc/profile.d/conda.sh"
 
 conda activate bmad-build
 
+# conda activate replaces the active environment's bin directory in PATH, and when the
+# shell that ran this script put some other environment's bin ahead of it through a
+# profile, the build environment lands behind that one and the build picks up whatever
+# gfortran and gcc the shell had. The compilers' conda packages once exported FC and CC
+# as absolute paths on activation, which hid this, and no longer do. So the build
+# environment's bin goes first here, and a gfortran found anywhere else refuses the run.
+
+export PATH="$CONDA_PREFIX/bin:$PATH"
+if [[ "$(command -v gfortran)" != "$CONDA_PREFIX/bin/gfortran" ]]; then
+  echo "Error: gfortran resolves to $(command -v gfortran), outside $CONDA_PREFIX/bin." >&2
+  exit 1
+fi
+echo "** gfortran IS:     $(command -v gfortran) ($(gfortran --version | head -n 1))"
+
 export LDFLAGS="$LDFLAGS -Wl,-no_compact_unwind"
 
 # The lines below pin HDF5 to this environment.
@@ -101,6 +115,22 @@ set +e
 source util/dist_source_me
 set -e
 
+# dist_source_me exports CC=gcc and CXX=g++ by name. On macOS the environment's C and
+# C++ compilers are clang and clang++, which the Metal backend's Objective-C++ needs and
+# which the recorded digits were measured with, and the environment carries no g++, so
+# that name would resolve to a compiler outside it. The compiler packages once exported
+# these on activation and no longer do, so the three are set here by path.
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  cxx="$(ls "$CONDA_PREFIX"/bin/*-clang++ 2>/dev/null | head -n 1)"
+  if [[ -z "$cxx" || ! -x "$CONDA_PREFIX/bin/clang" ]]; then
+    echo "Error: no clang and clang++ in $CONDA_PREFIX/bin for the C, C++ and Objective-C++ parts." >&2
+    exit 1
+  fi
+  export CC="$CONDA_PREFIX/bin/clang" CXX="$cxx" OBJCXX="$cxx"
+  echo "** CC, CXX, OBJCXX: $CC, $CXX"
+fi
+
 # The packages' configure scripts want current config.guess and config.sub, which the
 # conda environment ships. They are copied in for the build and removed after, so the
 # Bmad tree is left as it was.
@@ -125,7 +155,22 @@ cd "$LUCIFER_DIR"
 if [[ "$BUILD_PRODUCTION" == "Y" ]]; then
   echo "**** Building Lucifer, production"
   mk
+  build_tree="$LUCIFER_DIR/production"
 else
   echo "**** Building Lucifer, debug"
   mkd
+  build_tree="$LUCIFER_DIR/debug"
+fi
+
+# The compiler the binaries were built with, from CMake's own record in the project's
+# build tree, which Master.cmake keeps beside the source while the binaries go up a level. A
+# tree configured by more than one CMake holds one record per version, and the newest is
+# this build's. The line
+# dist_source_me prints above names the gfortran first on PATH, which can be another one.
+
+compiler_file="$(ls -t "$build_tree"/CMakeFiles/*/CMakeFortranCompiler.cmake 2>/dev/null | head -n 1)"
+if [[ -n "$compiler_file" ]]; then
+  fc_path="$(sed -n 's/^set(CMAKE_Fortran_COMPILER "\(.*\)")$/\1/p' "$compiler_file")"
+  fc_version="$(sed -n 's/^set(CMAKE_Fortran_COMPILER_VERSION "\(.*\)")$/\1/p' "$compiler_file")"
+  echo "Lucifer built with the Fortran compiler CMake chose: $fc_path, version $fc_version"
 fi
