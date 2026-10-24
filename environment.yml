@@ -1,0 +1,19 @@
+# The environment Lucifer builds in against the conda-forge bmad package, the first route
+# of docs/user-guide.md:
+#
+#   conda env create -n lucifer-build -f environment.yml
+#   conda activate lucifer-build
+#   cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DLUCIFER_BMAD_ROOT=$CONDA_PREFIX
+#   cmake --build build-release --parallel
+#
+# Each entry is a minimum. bmad is taken in its nompi variant, which carries HDF5 without
+# MPI, since Lucifer is shared memory and the reference runs single process. compilers is
+# conda-forge's current toolchain, gfortran and clang, the one the package itself was built
+# with. The validation environment is a different file, tests/wavefront/environment.yml.
+name: lucifer-build
+channels:
+  - conda-forge
+dependencies:
+  - bmad >=20261023.0 nompi_*
+  - compilers >=2.0
+  - cmake >=3.20

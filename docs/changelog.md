@@ -9,6 +9,32 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-23 Changed: Lucifer builds against conda-forge's `bmad` package. `cmake/FindBmad.cmake`
+  searches `include/bmad` for `bmad.mod`, where the package keeps its 373 module files, as well as
+  `modules/` and `include/`. It reads the release the tree carries from `bmad_version_mod.mod`
+  beside `bmad.mod`, the gzip stream gfortran writes with the `bmad_version_date` string inside,
+  through gzip, and from a checkout's `bmad/modules/bmad_version_mod.f90` when gzip is absent, sets
+  `Bmad_RELEASE`, prints it, and refuses a tree below the minimum in `BMAD_RELEASE` with both values
+  in the message, the date and the revision compared as numbers. `util/bmad_release_check` reads a
+  prefix the same way, and its self-test reads a checkout and a prefix made for the purpose, 23
+  cases. `tests/run_fel_benchmark.sh` looks for `tao` in `LUCIFER_BMAD_ROOT`'s `bin/` and on PATH
+  after the tracker's directory and the checkout's `debug` and `production` bin, and prints the one
+  it took. `util/conda_compile` finds the environment's `clang++` by a glob rather than `ls`, whose
+  output carries color codes under an alias. `environment.yml` at the root names `bmad` in its nompi
+  variant, `compilers` and `cmake` from conda-forge, each a minimum, as the `lucifer-build`
+  environment, and `doc/user-guide.md` gives that route first, the two cmake lines with
+  `LUCIFER_BMAD_ROOT=$CONDA_PREFIX`, and the distribution route through `util/conda_compile` second,
+  as the one the recorded levels come from. `doc/validation.md` says why the keystone stays on the
+  distribution build: the package is a production Bmad, and the debug pass and the regression job
+  need the distribution's debug tree. Against the package, `bmad` 20261023.0 nompi with hdf5 2.2.0
+  and gfortran 15.3, the Release build takes 29 s on an M3 Max, the configure reports release
+  20261023-0 from the module file, and the binary links the package's static archives, OpenBLAS and
+  the six HDF5 libraries with the Metal backend. The benchmark harness on that binary,
+  `--build production` in its own work directory, took 4 min 16 s: all 11 tiers at the recorded
+  production levels to every printed digit, every one of the 704 checks passing, and 3 of them moved
+  against the record, the phasing exit-power ratio by 3e-7 of itself and the SASE startup and import
+  startup levels at their last digit. Nothing is re-recorded. The keystone on the distribution build
+  reproduces every recorded digit.
 - 2026-10-23 Changed: Lucifer builds with its own `CMakeLists.txt` against an installed Bmad, named
   by `LUCIFER_BMAD_ROOT`, a distribution build's `production/` or `debug/` root or a prefix of the
   same shape, and no longer includes Bmad's `Master.cmake` or sources `dist_source_me`. The two

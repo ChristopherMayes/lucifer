@@ -1,19 +1,23 @@
 #!/bin/bash
 #
-# bmad_release_check checks that a Bmad checkout is at least the release Lucifer declares.
+# bmad_release_check checks that a Bmad checkout or an installed Bmad is at least the
+# release Lucifer declares.
 #
-#   bmad_release_check <bmad root>    # the checkout against lucifer/BMAD_RELEASE
-#   bmad_release_check --self-test    # the comparison against fixed cases
+#   bmad_release_check <bmad root>    # a checkout or a prefix, against BMAD_RELEASE
+#   bmad_release_check --self-test    # the comparison and both readings, on fixed cases
 #
-# The declared release is a minimum, the one line of lucifer/BMAD_RELEASE. The checkout's
-# release is bmad_version_date in bmad/modules/bmad_version_mod.f90, the string Bmad's
-# release process stamps there and the tracker prints at startup. A release is a date and
-# a revision counter, YYYYMMDD-N, and the counter is not padded, so 20261018-10 sorts
-# below 20261018-2 as a string. The date and the revision are compared as numbers. A value
-# missing or not of that form is refused, on either side.
+# The declared release is a minimum, the one line of BMAD_RELEASE at the repository root.
+# A checkout's release is bmad_version_date in bmad/modules/bmad_version_mod.f90, the
+# string Bmad's release process stamps there and the tracker prints at startup. An
+# installed Bmad, the conda-forge package among them, carries no source, and its release
+# is the same string inside include/bmad/bmad_version_mod.mod, which gfortran writes as a
+# gzip stream, so it is read through gzip. A release is a date and a revision counter,
+# YYYYMMDD-N, and the counter is not padded, so 20261018-10 sorts below 20261018-2 as a
+# string. The date and the revision are compared as numbers. A value missing or not of
+# that form is refused, on either side.
 #
 # The build script calls this as soon as it knows the Bmad root, before it builds anything
-# or touches util/dist_prefs, and the Linux CI job calls it on the release it clones.
+# or touches util/dist_prefs, and the Linux CI job calls it on the package it installs.
 #
 # Exit status: 0 when the checkout is at the minimum or later, 1 when it is below it or a
 # value is missing or malformed, 2 on a usage error.
@@ -37,6 +41,21 @@ release_cmp () {   # <release a> <release b>
     if (( 10#$ra < 10#$rb )); then echo -1; else echo 1; fi
   else
     echo 0
+  fi
+}
+
+# release_of_root sets FOUND to the release a root carries and VERSION_FILE to the file it
+# read, a checkout's bmad_version_mod.f90 first and a prefix's bmad_version_mod.mod
+# second. Both are empty when the root is neither.
+release_of_root () {   # <root>
+  local f90="$1/bmad/modules/bmad_version_mod.f90" mod="$1/include/bmad/bmad_version_mod.mod"
+  FOUND=""; VERSION_FILE=""
+  if [[ -f "$f90" ]]; then
+    VERSION_FILE="$f90"
+    FOUND="$(sed -n 's/.*bmad_version_date *= *"\([^"]*\)".*/\1/p' "$f90" | head -n 1)"
+  elif [[ -f "$mod" ]]; then
+    VERSION_FILE="$mod"
+    FOUND="$(gzip -dc "$mod" 2>/dev/null | grep -o "'[0-9]\{8\}-[0-9]\{1,\}'" | head -n 1 | tr -d "'")"
   fi
 }
 
@@ -69,6 +88,20 @@ CASES
     n=$((n + 1))
     if release_valid "$s"; then echo "FAIL: '$s' accepted"; bad=$((bad + 1)); fi
   done
+  # Both readings, on a checkout and a prefix made for the purpose.
+  local tmp
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/checkout/bmad/modules" "$tmp/prefix/include/bmad"
+  echo 'character(*), parameter :: bmad_version_date = "20261018-3"' > "$tmp/checkout/bmad/modules/bmad_version_mod.f90"
+  printf "GFORTRAN module version '15' created from bmad_version_mod.f90\n(() () ('20261019-12' 'bmad_version_mod'))\n" \
+    | gzip -c > "$tmp/prefix/include/bmad/bmad_version_mod.mod"
+  for s in "checkout 20261018-3" "prefix 20261019-12" "empty "; do
+    n=$((n + 1))
+    mkdir -p "$tmp/empty"
+    release_of_root "$tmp/${s%% *}"
+    if [[ "$FOUND" != "${s#* }" ]]; then echo "FAIL: ${s%% *} read as '$FOUND', expected '${s#* }'"; bad=$((bad + 1)); fi
+  done
+  rm -rf "$tmp"
   if [[ $bad -ne 0 ]]; then
     echo "bmad_release_check self-test: $bad of $n cases failed"
     return 1
@@ -77,7 +110,7 @@ CASES
 }
 
 if [[ $# -ne 1 ]]; then
-  echo "Usage: bmad_release_check <bmad root> | --self-test" >&2
+  echo "Usage: bmad_release_check <bmad checkout or prefix> | --self-test" >&2
   exit 2
 fi
 if [[ "$1" == "--self-test" ]]; then
@@ -88,28 +121,26 @@ fi
 root="$1"
 declared=""
 [[ -f "$DECLARED_FILE" ]] && declared="$(head -n 1 "$DECLARED_FILE" | tr -d '[:space:]')"
-version_file="$root/bmad/modules/bmad_version_mod.f90"
-found=""
-[[ -f "$version_file" ]] && \
-  found="$(sed -n 's/.*bmad_version_date *= *"\([^"]*\)".*/\1/p' "$version_file" | head -n 1)"
+release_of_root "$root"
+found="$FOUND"
 
-echo "Bmad release at $root: ${found:-<none>}"
+echo "Bmad release at $root: ${found:-<none>}${VERSION_FILE:+ ($VERSION_FILE)}"
 echo "Lucifer needs Bmad ${declared:-<none>} or later ($DECLARED_FILE)"
 
 if ! release_valid "$declared"; then
   echo "Error: the declared minimum '${declared}' in $DECLARED_FILE is missing or not of the form YYYYMMDD-N." >&2
   exit 1
 fi
-if [[ ! -f "$version_file" ]]; then
-  echo "Error: no $version_file, so $root is not a Bmad checkout." >&2
+if [[ -z "$VERSION_FILE" ]]; then
+  echo "Error: no bmad/modules/bmad_version_mod.f90 and no include/bmad/bmad_version_mod.mod under $root, so it is neither a Bmad checkout nor an installed Bmad." >&2
   exit 1
 fi
 if ! release_valid "$found"; then
-  echo "Error: bmad_version_date '${found}' in $version_file is missing or not of the form YYYYMMDD-N." >&2
+  echo "Error: bmad_version_date '${found}' in $VERSION_FILE is missing or not of the form YYYYMMDD-N." >&2
   exit 1
 fi
 if [[ "$(release_cmp "$found" "$declared")" == "-1" ]]; then
   echo "Error: the Bmad at $root is release $found, below the minimum $declared." >&2
-  echo "Check out release $declared or later: git -C $root checkout $declared" >&2
+  echo "Install release $declared or later, or check it out: git -C $root checkout $declared" >&2
   exit 1
 fi

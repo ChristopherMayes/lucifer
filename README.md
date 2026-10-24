@@ -22,14 +22,16 @@ Lucifer is under development and unreleased. It has no version number, and its i
 
 ## Building
 
-Lucifer is a Bmad user program and builds with its own CMake against an installed Bmad, named by `LUCIFER_BMAD_ROOT`: a distribution build's `production/` or `debug/` root, which holds `lib/`, `modules/` and `include/`, or a prefix of the same shape.
+Lucifer is a Bmad user program and builds with its own CMake against an installed Bmad, named by `LUCIFER_BMAD_ROOT`. The first route is conda-forge's `bmad` package, which `environment.yml` at the root names with the compilers and cmake:
 
 ```
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DLUCIFER_BMAD_ROOT=<bmad>/production
+conda env create -n lucifer-build -f environment.yml
+conda activate lucifer-build
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DLUCIFER_BMAD_ROOT=$CONDA_PREFIX
 cmake --build build-release --parallel
 ```
 
-The binaries land in `build-release/bin`. `util/conda_compile` builds the Bmad distribution from a checkout `BMAD_DIR` names and then runs those two lines, into `build-release/` or, with `BUILD_PRODUCTION=N`, `build-debug/`. The Bmad is a `bmad-sim/bmad-ecosystem` release at or after the one in [`BMAD_RELEASE`](BMAD_RELEASE), and `util/bmad_release_check` refuses an older checkout. The whole of it, with the environment, is in [`docs/user-guide.md`](docs/user-guide.md#building).
+The binaries land in `build-release/bin`. `LUCIFER_BMAD_ROOT` can as well name a distribution build's `production/` or `debug/` root, and `util/conda_compile` builds that distribution from a checkout `BMAD_DIR` names and then Lucifer against it, the route the recorded digits come from. The Bmad is a release at or after the one in [`BMAD_RELEASE`](BMAD_RELEASE), and the configure refuses an older one. The whole of it is in [`docs/user-guide.md`](docs/user-guide.md#building).
 
 ## Documentation
 

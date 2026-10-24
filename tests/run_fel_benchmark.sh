@@ -942,22 +942,26 @@ sec_program_structure () {
 }
 
 sec_tao_lattices () {
-  # Tao is looked for beside the tracker, which is where the distribution build puts
-  # both, and else in the Bmad checkout's bin of the declared build first, where a
-  # Lucifer source outside the checkout finds it.
+  # Tao is looked for beside the tracker, then in the bin of the Bmad the tracker was
+  # built against when LUCIFER_BMAD_ROOT names it, as an installed Bmad's does, then in
+  # the Bmad checkout's bin of the declared build first, and last on PATH.
   local tao="" candidate
   local kinds=(debug production)
   [[ "$BUILD" == production ]] && kinds=(production debug)
   local candidates=("${EXE%lucifer}tao")
+  [[ -n "${LUCIFER_BMAD_ROOT:-}" ]] && candidates+=("$LUCIFER_BMAD_ROOT/bin/tao")
   [[ -n "$BMAD_SRC" ]] && candidates+=("$BMAD_SRC/${kinds[0]}/bin/tao" "$BMAD_SRC/${kinds[1]}/bin/tao")
+  candidate="$(command -v tao 2>/dev/null || true)"
+  [[ -n "$candidate" ]] && candidates+=("$candidate")
   for candidate in "${candidates[@]}"; do
     if [[ -x "$candidate" ]]; then tao="$candidate"; break; fi
   done
   echo "--- Tao loads every committed lattice --------------------------------------"
   if [[ -z "$tao" ]]; then
-    echo "FAIL: tao not found beside the tracker at ${EXE%lucifer}tao nor in ${BMAD_SRC:-<no Bmad checkout, set BMAD_DIR>}/{debug,production}/bin" >&2
+    echo "FAIL: tao not found beside the tracker at ${EXE%lucifer}tao, in ${LUCIFER_BMAD_ROOT:-<LUCIFER_BMAD_ROOT unset>}/bin, in ${BMAD_SRC:-<no Bmad checkout, set BMAD_DIR>}/{debug,production}/bin, or on PATH" >&2
     return 1
   fi
+  echo "  tao: $tao"
   "$PYTHON" "$SCRIPT_DIR/scripts/check_tao_lattices.py" --tao "$tao" \
         --latdir "$SCRIPT_DIR/bmad" --examples "$SCRIPT_DIR/../examples" --workdir "$1/tao" \
     || { echo "FAIL: a committed lattice does not load in Tao; outputs kept in: $1/tao" >&2; return 1; }

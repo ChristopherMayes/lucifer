@@ -122,7 +122,11 @@ set -e
 # these on activation and no longer do, so the three are set here by path.
 
 if [[ "$(uname)" == "Darwin" ]]; then
-  cxx="$(ls "$CONDA_PREFIX"/bin/*-clang++ 2>/dev/null | head -n 1)"
+  # The glob rather than ls, whose output can carry color codes under an alias.
+  cxx=""
+  for f in "$CONDA_PREFIX"/bin/*-clang++; do
+    [[ -x "$f" ]] && { cxx="$f"; break; }
+  done
   if [[ -z "$cxx" || ! -x "$CONDA_PREFIX/bin/clang" ]]; then
     echo "Error: no clang and clang++ in $CONDA_PREFIX/bin for the C, C++ and Objective-C++ parts." >&2
     exit 1
