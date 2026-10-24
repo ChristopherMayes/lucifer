@@ -20,11 +20,16 @@ of that history. The entries before that date describe that branch.
   9.59x, with the one-thread walk 372.3 s against 290.8. The transform-length table, now the phases
   deck at each grid through a `--grid-scan` option of `tests/run_perf_benchmark.sh`, puts `ngrid`
   256 within 0.3 percent of 255 where the old toolchain's FFTW had the power of two 1.17x slower.
-  The sampling split puts the transform at 73.9 percent of the samples against 68.8, and the
-  unaveraged split gains a third column from `tests/perf/unavg_sample.in`. The device table's decks
-  are `tests/perf/*.in` and `tests/perf/device_table.sh` prints it: the device is 7.3x, 6.1x, 9.1x
-  and 0.7x the twelve-thread CPU on its four cases against 7.3x, 8.2x, 12.4x and 0.9x, the device
-  walls longer by 20 to 48 percent. The five constants of `src/fel_cost_mod.f90` are refitted by
+  The same binary with the June-2024 fftw 3.3.10 placed first on its library path runs the 96-slice
+  deck in 30.481 s at 255 and 32.952 s at 256 against 32.418 and 32.308 with today's 3.3.11, so the
+  old library reproduces the September walk at 255 to half a percent, and the 11 percent between the
+  two phase-profile records is the grid the harness moved to through a library that paid 8 percent
+  for a power of two, which today's does not. The sampling split puts the transform at 73.9 percent
+  of the samples against 68.8, and the unaveraged split gains a third column from
+  `tests/perf/unavg_sample.in`. The device table's decks are `tests/perf/*.in` and
+  `tests/perf/device_table.sh` prints it: the device is 7.3x, 6.1x, 9.1x and 0.7x the twelve-thread
+  CPU on its four cases against 7.3x, 8.2x, 12.4x and 0.9x, the device walls longer by 20 to 48
+  percent. The five constants of `src/fel_cost_mod.f90` are refitted by
   `tests/scripts/fit_cost_rates.py` over sixteen phases logs: push 2.03e-7 against 2.06e-7 s per
   particle-step, deposit 2.08e-8 against 1.30e-8, transform 4.68e-9 against 4.02e-9 s per grid point
   per log2(ngrid) per step, serial fraction 0.0105 against 0.021 and walk share 0.883 against 0.878,
