@@ -81,12 +81,13 @@ concurrency:
 jobs:
   keystone:
     runs-on: ubuntu-latest
-    # Measured on this runner on 2026-10-23, with the Bmad clone and its 6.4-minute debug
-    # build: 37.5 minutes end to end, of which the harness is 30 and the two environments
-    # 1.1. The harness costs four times its local 7.7 minutes because a runner has four
-    # cores against the recording machine's sixteen and its Genesis references are always
-    # cold, and its longest sections are spontaneous at 642 s and the eleven tiers at
-    # 320 s. The package build's own wall clock is in docs/changelog.md.
+    # Measured on this runner on 2026-10-24, against the conda-forge package: 36.0 minutes
+    # end to end, of which the harness is 33.9, the Lucifer build 0.7 and the two
+    # environments 0.9. The run of 2026-10-23 that cloned Bmad and built its debug tree
+    # took 37.5, with 6.4 in that build and 30 in the harness. The harness costs four
+    # times its local 7.7 minutes because a runner has four cores against the recording
+    # machine's sixteen and its Genesis references are always cold, and its longest
+    # sections are spontaneous at 642 s and the eleven tiers at 320 s.
     timeout-minutes: 120
 
     steps:
@@ -163,8 +164,9 @@ jobs:
           conda env create -f tests/environment-validate.yml
           # The reference's own banner, so a wrong version is visible here rather than
           # only in the harness's refusal. genesis4 exits non-zero when it is given no
-          # input file, which is not a failure of this step.
-          conda run -n bmad-fel-validate genesis4 2>&1 | head -3 || true
+          # input file, so it runs inside a shell that exits zero after the banner, and
+          # conda run then prints no error line for a status this step ignores anyway.
+          conda run -n bmad-fel-validate bash -c 'genesis4 2>&1 | head -3; true'
           # openPMD-beamphysics comes from the same file, at the minimum it states or
           # later. The harness prints the version and path again before its sections run.
           conda run -n bmad-fel-validate python -c \

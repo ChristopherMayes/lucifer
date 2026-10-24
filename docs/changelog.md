@@ -9,6 +9,24 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Changed: every path that still named `doc/`, the pages' directory until they moved to
+  `docs/` on 2026-10-23, names `docs/`: 206 mentions in 70 files, among them the headers and
+  comments of `src/*.f90` and `programs/*.f90`, which `docs/generated/api.md` reproduces, the check
+  scripts, `CMakeLists.txt`, `docs/validation.md`, `docs/fel-physics.md`, the examples' READMEs and
+  the changelog entries of 2026-10-23. Forty-one of those were links in the READMEs of the form
+  `../../doc/x.md`, dead on GitHub since the move while the site stayed whole because
+  `tests/scripts/report_examples.py` retargets them when it writes the example pages, and
+  `source-explorer/README.md` linked `../code/fel_track_mod.f90`, dead the same way.
+  `tests/scripts/check_links.py` resolves every relative link in every committed Markdown file
+  outside `docs/generated/` against the tree, the file part of a target with an anchor included, and
+  fails naming each that does not resolve. It runs in `.github/workflows/lucifer-docs.yml` beside
+  the two conformance checks and at the end of `examples/run_examples.sh`, so the keystone's
+  examples job carries it. On the tree before the edit it named 42 dead links, and after it none
+  among 335. `tests/wavefront/environment.yml` is `tests/environment-validate.yml`, so the two
+  environment files no longer share a name. `searchf.namelist` is removed: it was Bmad's `getf`
+  index, named a file the move had taken away, and nothing in the repository read it. The CI job's
+  banner step runs `genesis4` inside a shell that exits zero after printing it, so `conda run` no
+  longer prints an error line for the status the step ignored.
 - 2026-10-23 Changed: the Linux CI job in `.github/workflows/lucifer-keystone.yml` installs
   conda-forge's `bmad` package from `environment.yml` and builds Lucifer's Debug configuration
   against it with the two cmake lines of the user guide, `FC` named by path and `LUCIFER_BMAD_ROOT`
@@ -18,8 +36,11 @@ of that history. The entries before that date describe that branch.
   built the distribution's debug tree, 6.4 minutes of a 37.5-minute run measured on 2026-10-23.
   `util/bmad_release_check` runs on the environment's prefix before the build. The job's header
   comment says what it now varies, the Bmad build among it, and what it leaves out, the regression
-  suite the package does not carry. The benchmark harness and the wavefront validation run unchanged
-  at their tolerances, and the device section skips on a runner as before.
+  suite the package does not carry. The first green run against the package, on 2026-10-24, took
+  36.0 min end to end, the harness 33.9, the Lucifer build 0.7 and the two environments 0.9, against
+  37.5 for the clone-and-build run of 2026-10-23 with 6.4 in the Bmad debug build and 30 in the
+  harness. The benchmark harness and the wavefront validation run unchanged at their tolerances, and
+  the device section skips on a runner as before.
 - 2026-10-23 Changed: Lucifer builds against conda-forge's `bmad` package. `cmake/FindBmad.cmake`
   searches `include/bmad` for `bmad.mod`, where the package keeps its 373 module files, as well as
   `modules/` and `include/`. It reads the release the tree carries from `bmad_version_mod.mod`
@@ -120,9 +141,9 @@ of that history. The entries before that date describe that branch.
   directory first on PATH, since the conda-forge gfortran drives its assembler and linker through
   the clang beside it. The vectorization audit on `docs/performance.md` follows the new compiler's
   report: 47 loops vectorized and 251 not in `fel_track_mod`, where 13.3 gave 45 and 237, and the
-  rejection reads `unsupported control flow in loop`. `docs/validation.md` names the toolchain beside
-  the machine, and `docs/user-guide.md` says the environment file resolves the compilers of the day
-  it is created.
+  rejection reads `unsupported control flow in loop`. `docs/validation.md` names the toolchain
+  beside the machine, and `docs/user-guide.md` says the environment file resolves the compilers of
+  the day it is created.
 - 2026-10-23 Changed: `lucifer/BMAD_RELEASE` names Bmad 20261023-0, which carries
   bmad-sim/bmad-ecosystem PR 2225. That PR corrects `parser_read_sr_wake` for a `z_long` table that
   sets `smoothing_sigma`. Its smoothing kernel was an exponential ramp rather than a Gaussian, and
