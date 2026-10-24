@@ -8,7 +8,7 @@ The example runs in four commands, with Bmad only:
     ../../../production/bin/lucifer lucifer_gate_off.in
     python ../plot_fel.py space_charge.stats.h5
 
-Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../doc/fel-physics.md)). The two terms answer different questions, so this example measures them separately.
+Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../docs/fel-physics.md)). The two terms answer different questions, so this example measures them separately.
 
 The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so `space_charge_com%n_bin` plays no part in it. `space_charge%` in the deck holds the solver's numbers and nothing about whether it runs.
 
@@ -26,6 +26,6 @@ Two configurations are refused. `slice` with neither term configured, `nz = 0` a
 
 The master switch off while the elements still ask for `slice` is not refused, because that is how a lattice is run without space charge and without editing it. `lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch false. The run prints a note saying so and tracks without space charge, measured as exactly the control run's zero.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../doc/startup-noise.md)). At the exit the power outside the split angle is a fraction of a percent of the power inside it on the short-range deck, so its exit power is the mode, as is the control's. With the filter off both reported nearly half of their power as that emission. The long-range decks start dark, and what the filter leaves of their femtowatt fields is a few percent outside the mode, which is why the comparison there is made on the beam.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../docs/startup-noise.md)). At the exit the power outside the split angle is a fraction of a percent of the power inside it on the short-range deck, so its exit power is the mode, as is the control's. With the filter off both reported nearly half of their power as that emission. The long-range decks start dark, and what the filter leaves of their femtowatt fields is a few percent outside the mode, which is why the comparison there is made on the beam.
 
 Each run takes about seven seconds.

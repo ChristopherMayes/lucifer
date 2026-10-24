@@ -184,7 +184,7 @@ def write_nml(path, root, seed, extra="", source=BEAM_INIT_SOURCE):
 def read_import_file(wd, root):
     """The RNG-free quantities the exact checks read, the analysis moments and the
     per-slice current profile, from <out_root>.import.txt. Program stdout is for people
-    to read and is not parsed (doc/user-guide.md)."""
+    to read and is not parsed (docs/user-guide.md)."""
     path = pathlib.Path(wd) / (root + ".import.txt")
     moments = None
     currents = []

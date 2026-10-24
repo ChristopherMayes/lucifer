@@ -526,7 +526,7 @@ end subroutine setup_fel_elements
 ! Subroutine derive_grid ()
 !
 ! Routine to derive the transverse grid from the beam where the deck states none
-! (doc/startup-noise.md, Recommendations). The rms beam size comes from the emittances
+! (docs/startup-noise.md, Recommendations). The rms beam size comes from the emittances
 ! the deck states and the matched Twiss the lattice states. It is averaged over the FEL
 ! elements by length, since that is the beta the mode sees. Cells are then a seventh of
 ! it and the half width nine of it. The point count follows from whichever half width is
@@ -558,7 +558,7 @@ if (half <= 0) then
   half = fel_widths_per_sigma$ * sig
   run%winit%grid_half_width = half
   call out_io (s_info$, r_name, 'Grid half width \es10.3\ m, derived: \f0.1\ rms beam sizes ' // &
-               'of \es10.3\ m (doc/startup-noise.md).', &
+               'of \es10.3\ m (docs/startup-noise.md).', &
                r_array = [half, fel_widths_per_sigma$, sig])
 endif
 
@@ -1155,7 +1155,7 @@ if (any(is_fel)) then
       endif
 
       ! The ratio of the two angles goes as 1/sqrt(z_R/L_g). The default holds over ratios
-      ! of 1.14 to 1.86 on four machines (doc/startup-noise.md). A ratio outside 0.3 to 3
+      ! of 1.14 to 1.86 on four machines (docs/startup-noise.md). A ratio outside 0.3 to 3
       ! is far from that range and draws a warning.
 
       ratio = 0
@@ -1350,7 +1350,7 @@ if (err_flag) return
 ! The FP32 lockstep instrument. It carries a twin for each advance, so a lattice of
 ! either mode or of both is instrumented, each segment by the twin that mirrors it. The
 ! unaveraged twin covers that mode's particle path, where its reformulations live, and
-! adds a field row of its own. doc/validation.md records both.
+! adds a field row of its own. docs/validation.md records both.
 !
 ! Freerun compounds a single-precision state across steps, and the unaveraged twin does
 ! not carry one. So that combination is refused rather than reported as a lockstep.

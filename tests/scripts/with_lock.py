@@ -9,7 +9,7 @@ command's stdin, stdout and stderr are inherited, and its exit status is returne
 
 The benchmark's device section runs under this. The two build passes of a keystone run
 at once, and the device is one resource across both. So their device sections take
-turns while their CPU sections carry on (doc/validation.md, val-the-keystone-rule). A
+turns while their CPU sections carry on (docs/validation.md, val-the-keystone-rule). A
 wait longer than 1 s is printed, so the cost of taking turns can be read from the log.
 """
 

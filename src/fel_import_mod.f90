@@ -5,7 +5,7 @@
 ! arbitrary times and weights, into the evenly spaced, equal-population slices the FEL
 ! step needs. The method is Genesis 1.3 v4's own, transcribed from SDDSBeam.cpp. The
 ! class name is historical: it reads plain HDF5. Method, Genesis provenance and
-! validation are in lucifer/doc/fel-physics.md (sec-import). The only weighted
+! validation are in docs/fel-physics.md (sec-import). The only weighted
 ! generalization: the slice current is c*sum(w)/dslen where Genesis counts particles.
 ! The two are identical for uniform weights.
 !

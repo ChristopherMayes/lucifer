@@ -15,7 +15,7 @@ Genesis file, so steady-state and time-dependent tiers both work with no option.
 With --fld <bmad .wf.h5> <genesis .fld.h5>, a second figure overlays the final field:
 on-axis lineouts of amplitude and unwrapped phase, plus the transverse profile of the
 complex difference. That panel shows what a phase-dominated tier difference looks like,
-such as tier1_unavg's (doc/validation.md, val-validation-from-one-command).
+such as tier1_unavg's (docs/validation.md, val-validation-from-one-command).
 
 Usage:
   plot_fel_compare.py <bmad diag.txt> <genesis .out.h5> [-o out.png]

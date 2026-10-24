@@ -9,7 +9,7 @@
 # lib/. util/conda_compile runs these lines for both configurations.
 #
 # The flags are the ones Bmad's distribution build gave this program as a user program,
-# since the recorded levels of doc/validation.md were measured under them: gfortran at
+# since the recorded levels of docs/validation.md were measured under them: gfortran at
 # -O2 for Release, with the FEL step at -O3, and -O0 with bounds checks for Debug.
 
 cmake_minimum_required (VERSION 3.20)
@@ -88,7 +88,7 @@ add_library (lucifer_lib STATIC ${LUCIFER_SOURCES} src/fel_sincos.c)
 set_target_properties (lucifer_lib PROPERTIES OUTPUT_NAME lucifer)
 
 # -O3 with the paired-sincos shim takes the FEL step's particle path from 152 to about
-# 108 ns a particle-step, and neither pays alone (doc/validation.md). The change is at
+# 108 ns a particle-step, and neither pays alone (docs/validation.md). The change is at
 # the 1-ulp level, since gfortran's sin and cos differ from libm's by 1 ulp on about 2e-6
 # of arguments and -O3 re-contracts floating point. It applies in both configurations.
 set_source_files_properties (src/fel_track_mod.f90 PROPERTIES COMPILE_OPTIONS "-O3")

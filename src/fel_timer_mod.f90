@@ -8,10 +8,10 @@
 ! The timers sit at region boundaries and never inside a parallel loop. A clock call
 ! inside the slice loop would time the loop it perturbs. The phases that interleave
 ! per slice (the deposit against its FFT, the field gather against the RK4) come from a
-! sampling profiler instead. doc/performance.md gives that split beside this one.
+! sampling profiler instead. docs/performance.md gives that split beside this one.
 !
 ! The timers are always on. Each region costs two system_clock calls against
-! milliseconds of work, which is below the run-to-run spread in doc/performance.md.
+! milliseconds of work, which is below the run-to-run spread in docs/performance.md.
 !
 ! State is module level, like the FFT plan cache and the field-solve kernel cache. The
 ! phases accumulate from fel_timer_reset, so a driver walking the lattice twice sees the

@@ -6,7 +6,7 @@
 ! full-pulse reconstruction, the stats-file finalize, and the wake-eloss block writer.
 !
 ! Every routine takes the run state (fel_run_struct) explicitly. Nothing here stops.
-! Errors return through err_flag and the caller decides (doc/user-guide.md). All
+! Errors return through err_flag and the caller decides (docs/user-guide.md). All
 ! terminal output goes through out_io. The file-name echo lines are s_blank$, so
 ! scripts see bare names.
 !-
@@ -169,7 +169,7 @@ end function fel_checkpoint_eligible
 !
 ! A frame is read on its own, so it has to say where along the line it is and what the
 ! beam was moving through. The particle records are the coordinates the selected
-! tracking method produced there (doc/reading-output.md). The period-averaged map has
+! tracking method produced there (docs/reading-output.md). The period-averaged map has
 ! no fast oscillation, and the unaveraged mode has it resolved. So the method and the
 ! device's numbers go in the file, and the reader needs no lattice. A frame taken in a
 ! break carries the element and no undulator numbers.
@@ -289,7 +289,7 @@ if (ie >= 1) then
 
     ! The rest of what rebuilding the orbit takes: where the frame sits in the device, and
     ! how long the device and its ramped ends are. A reader that walks a frame series
-    ! gets the lattice's geometry from the frames alone (doc/reading-output.md).
+    ! gets the lattice's geometry from the frames alone (docs/reading-output.md).
 
     call hdf5_write_attribute_real (g_id, 'sElement', run%z_now - branch%ele(ie)%s_start, err)
     call hdf5_write_attribute_real (g_id, 'elementLength', branch%ele(ie)%value(l$), err)
@@ -447,7 +447,7 @@ do ihh = 1, run%n_harm
     ! and the live record is not touched. A run with frames on and one with them off then
     ! hold the same field to the bit. Carrying the live record back and forward again
     ! would leave two transform pairs of rounding in it, 5e-15 of the field on the mixed
-    ! line (doc/validation.md). A slice range takes its slab from the same copy. The copy
+    ! line (docs/validation.md). A slice range takes its slab from the same copy. The copy
     ! is in time order for the write, as the whole-window path below rotates the live
     ! record to be.
 
@@ -660,7 +660,7 @@ call out_io (s_blank$, r_name, trim(line))
 
 ! What the run will do and how long it will take. The count is exact. The estimate is
 ! one machine's, which the line says (fel_cost_mod). load_only stops after this block,
-! so a deck's cost can be seen without tracking it (doc/user-guide.md).
+! so a deck's cost can be seen without tracking it (docs/user-guide.md).
 
 block
   real(rp) n_pstep, n_gpt, secs
@@ -735,7 +735,7 @@ block
     character(12) lab
     nrng = run%dump_is2 - run%dump_is1 + 1
     n_rng = real(nrng, rp) / max(1, run%nslice)
-    ! 68 bytes a macroparticle (doc/performance.md): six coordinates, the time the phase
+    ! 68 bytes a macroparticle (docs/performance.md): six coordinates, the time the phase
     ! folds into, the offset that places the slice, the reference momentum and the
     ! label. The writer stores a uniform weight and the zero z as constant records, which
     ! cost nothing per particle.
@@ -763,7 +763,7 @@ block
 
   ! The load against the floor of the filter's convergence: 1024 macroparticles per
   ! slice in 128 beamlets. Below it, the mode power in the exponential regime rises on
-  ! its own (doc/fel-physics.md sec-convergence).
+  ! its own (docs/fel-physics.md sec-convergence).
 
   nbeamlet = minval(run%fbeam%slice%n) / max(1, run%bparam%beamlet_size)
   write (line, '(a, i0, a, i0, a, i0, a)') ' Load        ', minval(run%fbeam%slice%n), &
@@ -857,8 +857,8 @@ write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, '
 call out_io (s_blank$, r_name, trim(line))
 
 ! The mode against the wide-angle emission of the point beamlets, from the records the
-! run already took (doc/startup-noise.md). The share is reported and not estimated. A
-! formula fitted on one machine is 40 times low on another (doc/fel-physics.md), while
+! run already took (docs/startup-noise.md). The share is reported and not estimated. A
+! formula fitted on one machine is 40 times low on another (docs/fel-physics.md), while
 ! the split itself holds on all three.
 
 call fel_stats_convergence (stats, cvg)
@@ -887,7 +887,7 @@ if (cvg%ok) then
           'That part of the total is the wide-angle emission of the point beamlets, which', &
           'no physical beam radiates, so a total power quoted from this run is mostly', &
           'representation. Possible solution: more macroparticles per slice at the same', &
-          'beamlet_size. The criterion and the measured levels are in doc/startup-noise.md.', &
+          'beamlet_size. The criterion and the measured levels are in docs/startup-noise.md.', &
           r_array = [worst])
     if (.not. run%global%source_filter) then
       call out_io (s_warn$, r_name, 'This run has global%source_filter = F. The filter is on by ' // &
@@ -896,7 +896,7 @@ if (cvg%ok) then
   else if (worst < 0.01_rp) then
     call out_io (s_info$, r_name, 'The power outside the split angle stays under \f0.4\ ' // &
           'times the power inside it.', &
-          'The total power is converged by the criterion of doc/startup-noise.md.', &
+          'The total power is converged by the criterion of docs/startup-noise.md.', &
           r_array = [worst])
   endif
 
@@ -910,7 +910,7 @@ if (cvg%ok) then
 
     ! A slice the bunch never reached is outside the beam and not a thin load. A window
     ! that holds the slippage has a quarter of its slices empty by construction
-    ! (doc/fel-physics.md sec-window). Listing those would bury the ones that matter.
+    ! (docs/fel-physics.md sec-window). Listing those would bury the ones that matter.
 
     if (stats%charge_live(is, cvg%ir(1)) <= 0) cycle
     nbl = run%fbeam%slice(is)%n / max(1, run%bparam%beamlet_size)
@@ -940,7 +940,7 @@ endif
 
 ! Where the time went, one row per phase the run entered. The phases partition the
 ! walk. So the unaccounted row is the walk's own overhead, and nothing is counted twice.
-! doc/performance.md reads a table like this one.
+! docs/performance.md reads a table like this one.
 
 call fel_timer_write (r_name)
 
@@ -972,7 +972,7 @@ if (run%ffield(1)%slip%timerun) then
   line = ' Escaped    '
   do ih = 1, run%n_harm
     ! Full precision, since a restart comparison differences this against the same total
-    ! at a checkpoint (doc/validation.md). Six digits cannot reach its floor.
+    ! at a checkpoint (docs/validation.md). Six digits cannot reach its floor.
     write (line, '(2a, i0, a, es24.16, a)') trim(line), ' h', run%ffield(ih)%harm, ' ', &
           run%ffield(ih)%slip%u_escaped, ' J'
     if (ih < run%n_harm) line = trim(line) // ','
@@ -1160,7 +1160,7 @@ if (g_id < 0) then
   call out_io (s_error$, r_name, 'CONTINUATION FROM A FIELD FILE WITH NO CHECKPOINT GROUP: ' // trim(fname), &
        'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
        'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
-       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
+       'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (docs/reading-output.md).')
   return
 endif
 fmt_str = ''          ! The reads fill the characters they have and leave the rest.
@@ -1768,7 +1768,7 @@ end subroutine fel_write_wake_block
 ! The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 ! the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
 ! namelist runs to 12 kB and a lattice text to 37 kB on a real lattice
-! (doc/reading-output.md). A failure would only warn, so the provenance would go missing
+! (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 ! silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
 ! differ in meta/. The harness excludes meta/ by name from identity comparisons.
 !
@@ -1908,7 +1908,7 @@ end subroutine fel_write_meta
 !
 ! Components the program refuses are not here, since recording a knob that did nothing
 ! would misstate the run. The quiet start's honored beam_init set is the table in
-! doc/input-reference.md. List-valued inputs (the dump locators, the harmonic set, the
+! docs/input-reference.md. List-valued inputs (the dump locators, the harmonic set, the
 ! field files) are string or integer array attributes on their subgroup. A dataset
 ! needs an axis, and a list of inputs has none worth defining. A blank file-name input
 ! is omitted: absence means unset. bmad_com and space_charge_com are written whole,

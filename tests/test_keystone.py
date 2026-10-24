@@ -1,4 +1,4 @@
-"""The keystone as one pytest suite (doc/validation.md, val-the-keystone-rule).
+"""The keystone as one pytest suite (docs/validation.md, val-the-keystone-rule).
 
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
@@ -33,7 +33,7 @@ What the contract means in practice:
   read from them.
 
 The five check scripts are unchanged. This file launches them as the recipe in
-doc/validation.md does. A retyped recipe twice launched a benchmark from a directory an
+docs/validation.md does. A retyped recipe twice launched a benchmark from a directory an
 earlier command had moved into, ran four jobs of five, and reported a complete keystone
 from a one-line log. This file replaces the retyping.
 """
@@ -155,7 +155,7 @@ def performance_cores() -> int:
 
 
 def jobs(art: pathlib.Path) -> tuple[Job, ...]:
-    """The five jobs as the recipe in doc/validation.md launches them, with this session's artifacts.
+    """The five jobs as the recipe in docs/validation.md launches them, with this session's artifacts.
 
     The static allocation. The machine's performance cores are divided once, here, and
     every job spends what it is handed and no more.
@@ -167,7 +167,7 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
       The regression suite and the wavefront validation take one process each.
     The sum at the widest is two passes at the full count, two example runs at the
     thread count their runtime chooses, and two more processes. That sum is above the
-    core count by choice. doc/validation.md (val-the-keystone-rule) records the wall
+    core count by choice. docs/validation.md (val-the-keystone-rule) records the wall
     times that set it.
     """
     cores = performance_cores()
@@ -192,7 +192,7 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
         # Two workers for the examples, this job's whole allocation while the five run
         # together. At one worker the examples job finishes last. At two the debug pass
         # finishes last. Three workers slowed the benchmark passes by more than they
-        # saved. doc/validation.md (val-the-keystone-rule) records the wall times. A
+        # saved. docs/validation.md (val-the-keystone-rule) records the wall times. A
         # standalone run of run_examples.sh takes its own default instead.
         Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "2"), LUCIFER),
     )
@@ -345,7 +345,7 @@ def test_regeneration(keystone: Keystone) -> None:
         r = subprocess.run([sys.executable, *gen], cwd=str(LUCIFER), capture_output=True, text=True)
         assert r.returncode == 0, f"{pathlib.Path(gen[0]).name} exited {r.returncode}\n{r.stdout[-2000:]}\n{r.stderr[-2000:]}"
     # The Markdown only. The figures are committed and a plotting library upgrade
-    # rewrites them all with no physics moving (doc/validation.md).
+    # rewrites them all with no physics moving (docs/validation.md).
     r = subprocess.run(["git", "diff", "--exit-code", "--stat", "--",
                         "docs/generated/*.md", "docs/generated/examples/*.md", "examples/measured.tsv"],
                        cwd=str(LUCIFER), capture_output=True, text=True)

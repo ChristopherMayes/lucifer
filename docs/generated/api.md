@@ -295,7 +295,7 @@ Output:
 ```
 Routine to refuse a beam file written inside an undulator as a run's initial beam. A
 frame taken there holds the coordinates the selected tracking method produced, an
-ordinary particle record (doc/reading-output.md). A run cannot start from it. The
+ordinary particle record (docs/reading-output.md). A run cannot start from it. The
 averaged map would take the frame as an entrance and give it the K/gamma a hard-edge
 handoff injects. The unaveraged mode would need the segment position and the ramp
 state, which no file holds.
@@ -413,7 +413,7 @@ The standard records fold phi0 into each particle's time (fel_slice_to_bunch). T
 exact for a reader of the file and not for a continuation of the run. The fold rebuilds
 an equal phase at another magnitude. So the deposit phase of a high-gain segment
 differs by phi0 times the machine epsilon, and the gain amplifies that to 6.5e-8
-(doc/validation.md). A continuation reads phi0 and z from here instead, and holds the
+(docs/validation.md). A continuation reads phi0 and z from here instead, and holds the
 split the run had to the bit.
 ```
 
@@ -546,7 +546,7 @@ beamlets (fel-physics.md sec-noise). The algorithm is that of fel_fawley_noise. 
 each harmonic and each group, one amplitude is drawn on the group's real electron
 count, and one phase. Every member's phase is shifted by it. Only how the members are
 found differs. fel_fawley_noise is kept for the beamlets the loader makes, since the
-recorded validation levels depend on its draw order (lucifer/doc/validation.md).
+recorded validation levels depend on its draw order (docs/validation.md).
 ```
 
 ```
@@ -747,7 +747,7 @@ zero, and a dump written from z_j alone comes back with every theta short by phi
 next segment's gain is made of the beam's phase against the field's. The field is
 dumped with its absolute phase, so that shift is a real change of state. Without the
 fold a mid-line restart lands 2.1e-2 away on the windowed-composition check
-(doc/reading-output.md).
+(docs/reading-output.md).
 
 So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks. That
 makes the file's time coordinate -theta_j / (ks c), and a phi0 = 0 reader exact for
@@ -1043,7 +1043,7 @@ Output:
 In-undulator collective effects for the FEL tracker: wakefields applied as a per-slice
 energy-loss rate, and longitudinal space charge entering the pendulum equation as a
 per-particle ez. Physics, Genesis provenance and validation are in
-lucifer/doc/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
+docs/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
 
 Placement in the step: the wake's gamma decrement lands between the longitudinal
 advance and the second transverse half step. ez is computed per slice before the RK
@@ -1065,7 +1065,7 @@ Thread safety: fel_shortrange_ez uses per-call locals only, so it can be called 
 the parallel slice loop. The wake update is serial at the caller's barrier.
 
 Constants are Bmad's. The Genesis-comparison floors this creates are tabulated in the
-manual (sec-numerics) and in doc/validation.md.
+manual (sec-numerics) and in docs/validation.md.
 
 Not implemented: Genesis's transient wake option (&wake transient/ztrans), the
 incoherent-synchrotron module, harmonics beyond what the solver provides, and MPI.
@@ -1304,7 +1304,7 @@ Output:
 
 ```
 Work count and wall clock estimate of a run, made before it tracks. The rates come
-from one machine (doc/performance.md).
+from one machine (docs/performance.md).
 
 The count is exact. After the setup pass the slices, the macroparticles, the
 integration steps and the grid points are all known. Their product is the work.
@@ -1313,7 +1313,7 @@ The estimate is not exact, and the line that prints it names the machine it is f
 The model has two terms. The particle push is linear in particle-steps. The field
 solve is a transform that goes as ngrid^2 log2(ngrid) per slice per step, whatever the
 particle count. A deposit linear in particle-steps sits beside it. The 512 and 8192
-particle rows of doc/performance.md separate the two terms: the push moves by a factor
+particle rows of docs/performance.md separate the two terms: the push moves by a factor
 of 14 between them and the transform by 8 percent.
 
 The rates below are per thread. The page's tables were taken at twelve threads. The
@@ -1367,7 +1367,7 @@ Routine to estimate the wall clock of a run's walk on the recording machine.
 
 The estimate covers the walk, which is the tracking. The parse, the beam and field
 build and the final dumps are outside it. They are 1 percent of the walk on the runs
-of doc/performance.md.
+of docs/performance.md.
 ```
 
 ```
@@ -1442,7 +1442,7 @@ Two modes: The averaged FEL step uses the chart above. The unaveraged step uses 
 buffers in its own chart. There px and py carry the kinetic transverse momenta ux and uy
 instead of Bmad's. The phase accumulator carries ks (tau - tau_ref) instead of the
 whole theta. dev%unavg says which chart the staging and the readback use. The
-fel_device_unavg_* routines carry the rest. doc/validation.md (val-device-unaveraged)
+fel_device_unavg_* routines carry the rest. docs/validation.md (val-device-unaveraged)
 records what that mode's kernels transcribe and what they cost.
 
 Two roles: With fp32_check off, the device is the run inside averaged FEL elements. Beam
@@ -1459,7 +1459,7 @@ The device deposit accumulates in fixed point, so two runs of one deck agree bit
 bit. Integer addition is associative and commutative and float addition is neither. So
 the order threads reach a cell cannot change the answer. Both reference backends deposit
 in floats and are not reproducible (manual/GPU.md, gpu/metal-engine 4919b01). A float
-deposit here gave two runs 2.0e-7 apart on a field power (doc/validation.md, val-device).
+deposit here gave two runs 2.0e-7 apart on a field power (docs/validation.md, val-device).
 That is far inside the ceilings, but no device output could then be asserted exactly.
 
 The field set: The resident field holds every member of the run's set (the fundamental
@@ -1716,7 +1716,7 @@ the host arrays are stale by design. A readback observes and never steers: the d
 state is untouched.
 
 The conversion loops run in parallel over slices, since serial loops are a large share
-of every stats row at the finest comb (doc/performance.md, perf-device). The
+of every stats row at the finest comb (docs/performance.md, perf-device). The
 conversions are elementwise with no accumulation. Each iteration writes only its own
 slice's arrays or its own field plane, so any thread order gives the same bits. Two
 structural points hold that. The device drains once, serially, before the parallel
@@ -1837,7 +1837,7 @@ field norm over its planes, the run's power scale. A harmonic's own norm cannot 
 On a quiet start the CPU cancels the harmonic bunching to FP64 roundoff, while the
 device's FP32 phase leaves it at ~1e-7 of the charge. A dark member's row divided by
 its own roundoff-level field would compare that noise against nothing
-(doc/validation.md, val-device). The harmonic's fidelity lives in its phasor row, which
+(docs/validation.md, val-device). The harmonic's fidelity lives in its phasor row, which
 needs no field normalization, and in the end-to-end harmonic power against the CPU.
 With one member this is the single-field normalization.
 ```
@@ -2114,7 +2114,7 @@ lockstep.
 
 ```
 The single-precision particle path, and the lockstep instrument that compares it with
-the FP64 path (doc/performance.md, doc/validation.md). Apple GPUs have no FP64. So a
+the FP64 path (docs/performance.md, docs/validation.md). Apple GPUs have no FP64. So a
 single-precision form of the averaged FEL advance exists, with its divergence from the
 FP64 path recorded, before any kernel is written. Nothing outside the instrument reads
 the FP32 state, and the FP64 path is untouched. This module is an instrument and not a
@@ -2128,7 +2128,7 @@ and the runtime guard below watches it.
 
 The reference must also move. The beam's common z drift is secular, and with a static
 reference the residual grows until its ulp swallows the physics. With a static
-reference the guard refuses the steady-state example (doc/validation.md,
+reference the guard refuses the steady-state example (docs/validation.md,
 val-fp32-lockstep). So z_ref refreshes to the slice's FP64 mean each step, one host
 number per slice. In freerun mode fel_fp32_renorm rebases the persistent residuals
 across the reference move, the same operation slice migration uses.
@@ -2258,7 +2258,7 @@ Routine to allocate the twin's field record before a slice loop reaches it.
 The record is one array for the whole window, and fel_fp32_twin_slice runs under the
 slice loop's OMP parallel do. So the loop cannot be what first touches it. Allocated
 there on first use, two threads can find it unallocated at once and both allocate it.
-A bounds-checked build then stops with no message on stdout (doc/changelog.md). The grid
+A bounds-checked build then stops with no message on stdout (docs/changelog.md). The grid
 is not known at fel_fp32_setup, which is why this routine is separate.
 ```
 
@@ -2486,7 +2486,7 @@ and does not pretend to a fallback.
 Routine to reduce the step's per-slice divergences, write the row, and run the guard.
 It runs serially, after the caller's parallel loop. The guard refuses when the median
 per-step residual increment falls below 32 ulps of the residual. Below that the FP32
-representation absorbs the physics silently (doc/performance.md).
+representation absorbs the physics silently (docs/performance.md).
 ```
 
 (api-fel-fp32-close)=
@@ -2526,7 +2526,7 @@ and their difference is the slippage, 1.9e-9 on the checked deck. In single prec
 a number near one has a quantum of 1.19e-7. So the answer is 0.016 of one quantum, and
 the naive difference is exactly zero: the slippage disappears and with it the physics.
 On a real mid-segment state the naive form is wrong by the whole of the answer
-(doc/validation.md, val-unaveraged-fp32).
+(docs/validation.md, val-unaveraged-fp32).
 
 The identity 1/ra - 1/rb = (a - b) / (ra*rb*(ra + rb)), with ra = u_s/gamma,
 rb = beta0, a = 1 - ra^2 and b = 1 - rb^2, moves the cancellation into a - b. That is a
@@ -2783,7 +2783,7 @@ dataset open.
 Routine to write one string of any length as a scalar string dataset.
 
 The text goes in a dataset and *not* an attribute. HDF5 caps a single attribute at
-64 kB, and the largest that writes is 65495 bytes (doc/reading-output.md). A scalar
+64 kB, and the largest that writes is 65495 bytes (docs/reading-output.md). A scalar
 string dataset takes 3 MB. An echoed namelist or lattice file can pass the cap on an
 ordinary lattice. That failure is silent unless the error is checked.
 
@@ -2816,7 +2816,7 @@ The importdistribution equivalent. This module resamples a Bmad bunch_struct, wi
 arbitrary times and weights, into the evenly spaced, equal-population slices the FEL
 step needs. The method is Genesis 1.3 v4's own, transcribed from SDDSBeam.cpp. The
 class name is historical: it reads plain HDF5. Method, Genesis provenance and
-validation are in lucifer/doc/fel-physics.md (sec-import). The only weighted
+validation are in docs/fel-physics.md (sec-import). The only weighted
 generalization: the slice current is c*sum(w)/dslen where Genesis counts particles.
 The two are identical for uniform weights.
 
@@ -3049,7 +3049,7 @@ independent particles. Shot noise is imposed where asked.
 
 ```
 Routine to check the beam_init contract. The quiet-start generator honors the
-beam_init fields in the table of doc/input-reference.md. Every other field that is set
+beam_init fields in the table of docs/input-reference.md. Every other field that is set
 is refused. A standard structure that silently dropped fields would be worse than a
 custom one.
 
@@ -3324,7 +3324,7 @@ formats), the openPMD field imports, the escaped-slice bank and its drain, the
 full-pulse reconstruction, the stats-file finalize, and the wake-eloss block writer.
 
 Every routine takes the run state (fel_run_struct) explicitly. Nothing here stops.
-Errors return through err_flag and the caller decides (doc/user-guide.md). All
+Errors return through err_flag and the caller decides (docs/user-guide.md). All
 terminal output goes through out_io. The file-name echo lines are s_blank$, so
 scripts see bare names.
 ```
@@ -3396,7 +3396,7 @@ Routine to stamp a dump with where it was taken.
 
 A frame is read on its own, so it has to say where along the line it is and what the
 beam was moving through. The particle records are the coordinates the selected
-tracking method produced there (doc/reading-output.md). The period-averaged map has
+tracking method produced there (docs/reading-output.md). The period-averaged map has
 no fast oscillation, and the unaveraged mode has it resolved. So the method and the
 device's numbers go in the file, and the reader needs no lattice. A frame taken in a
 break carries the element and no undulator numbers.
@@ -3755,7 +3755,7 @@ and text, how many files the parser opened, an ISO timestamp and the Bmad versio
 The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
 namelist runs to 12 kB and a lattice text to 37 kB on a real lattice
-(doc/reading-output.md). A failure would only warn, so the provenance would go missing
+(docs/reading-output.md). A failure would only warn, so the provenance would go missing
 silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
 differ in meta/. The harness excludes meta/ by name from identity comparisons.
 
@@ -3804,7 +3804,7 @@ fel_stats_write. The literal text stays in meta/input_echo.
 
 Components the program refuses are not here, since recording a knob that did nothing
 would misstate the run. The quiet start's honored beam_init set is the table in
-doc/input-reference.md. List-valued inputs (the dump locators, the harmonic set, the
+docs/input-reference.md. List-valued inputs (the dump locators, the harmonic set, the
 field files) are string or integer array attributes on their subgroup. A dataset
 needs an axis, and a list of inputs has none worth defining. A blank file-name input
 is omitted: absence means unset. bmad_com and space_charge_com are written whole,
@@ -4025,7 +4025,7 @@ disagrees with the tracking locals.
 
 ```
 Routine to derive the transverse grid from the beam where the deck states none
-(doc/startup-noise.md, Recommendations). The rms beam size comes from the emittances
+(docs/startup-noise.md, Recommendations). The rms beam size comes from the emittances
 the deck states and the matched Twiss the lattice states. It is averaged over the FEL
 elements by length, since that is the beta the mode sees. Cells are then a seventh of
 it and the half width nine of it. The point count follows from whichever half width is
@@ -4282,7 +4282,7 @@ What the run's own field records say about its convergence: the power inside the
 split angle against the power outside it, at two records. Inside the angle lies the
 mode. Outside it lies the wide-angle emission of the point beamlets. That emission is
 an artifact of the macroparticle representation. It carries the whole dependence on
-the cell size and the macroparticle count (doc/startup-noise.md).
+the cell size and the macroparticle count (docs/startup-noise.md).
 
 Entry 1 is where the power inside the angle peaked. That is where the mode saturates
 and where the criterion is stated. Entry 2 is the last record, where an exit power is
@@ -4520,7 +4520,7 @@ took. Nothing is computed here that the accumulator did not already hold. Every
 element end that takes the field angle moments takes one transform pair. It stores
 the power inside split_angle beside the total (fel-physics.md sec-source-filter).
 
-The criterion of doc/startup-noise.md is stated at saturation, so it reads the
+The criterion of docs/startup-noise.md is stated at saturation, so it reads the
 peak-power record. The last record is where an exit power is quoted. Only records
 that took the angle moments are considered.
 ```
@@ -4822,7 +4822,7 @@ no singleton.
 Routine to format a value for display. The SI prefix is chosen so the mantissa lies in
 [1, 1000), with three decimals. The result is right-justified to a fixed width, so a
 column of values lines up (4.230 kW above 105.000 GW). This is display only. Stdout is
-for humans, and the files carry full precision (doc/user-guide.md).
+for humans, and the files carry full precision (docs/user-guide.md).
 
 Values outside the prefix range print in es11.3 with the bare unit. Exact zero prints
 as 0.000 with the bare unit.
@@ -4984,10 +4984,10 @@ sum to the walk. The leftover gets its own row, named unaccounted.
 The timers sit at region boundaries and never inside a parallel loop. A clock call
 inside the slice loop would time the loop it perturbs. The phases that interleave
 per slice (the deposit against its FFT, the field gather against the RK4) come from a
-sampling profiler instead. doc/performance.md gives that split beside this one.
+sampling profiler instead. docs/performance.md gives that split beside this one.
 
 The timers are always on. Each region costs two system_clock calls against
-milliseconds of work, which is below the run-to-run spread in doc/performance.md.
+milliseconds of work, which is below the run-to-run spread in docs/performance.md.
 
 State is module level, like the FFT plan cache and the field-solve kernel cache. The
 phases accumulate from fel_timer_reset, so a driver walking the lattice twice sees the
@@ -5253,7 +5253,7 @@ The drawn energy accumulates into e_rad_cum (the ledger's E_radiated column).
 These are drawn sums and not expectations, so the time-dependent closure stays exact.
 
 Note: In the unaveraged mode this double-counts the grid-captured band, about 3% at
-the reference grid (doc/validation.md), and check_spontaneous.py bounds it. That is
+the reference grid (docs/validation.md), and check_spontaneous.py bounds it. That is
 smaller than the uncertainty of the angular-distribution estimate.
 ```
 
@@ -5265,10 +5265,10 @@ smaller than the uncertainty of the angular-distribution estimate.
 ```
 Routine to print one row of the progress table: where the walk is and what the light
 and beam are doing. The slow modes (the unaveraged mode costs about 30x the averaged,
-doc/user-guide.md) then show progress. Element boundaries always print. Inside an
+docs/user-guide.md) then show progress. Element boundaries always print. Inside an
 element a 2 s wall clock throttle keeps fast runs quiet.
 
-The row is for a human (doc/user-guide.md). Values are SI-prefixed so a column of
+The row is for a human (docs/user-guide.md). Values are SI-prefixed so a column of
 them lines up. The element name is last so every numeric column stays fixed. The
 one-step elements get no step field. The files carry full precision, and nothing
 parses this row.
@@ -5340,7 +5340,7 @@ fel_beam_mod. It runs steady state (one slice) or time dependent (many slices wi
 slippage).
 
 The physics is transcribed from Genesis 1.3 Version 4, which GPL permits.
-lucifer/doc/fel-physics.md gives the physics, the Genesis source of each routine and
+docs/fel-physics.md gives the physics, the Genesis source of each routine and
 the validation (sec-core, sec-transverse, sec-field, sec-slippage).
 
 The step composition (transverse half step, longitudinal advance, transverse half
@@ -5406,7 +5406,7 @@ The angular filter on the source term, transcribed from Genesis4's source_filter
 multiplied by a sigmoid in normalized transverse spatial frequency, and only then
 added to the field. The field's own propagation is untouched. So the filter removes
 what a point-like beamlet radiates into the wide angles the grid carries, and does
-not change how the existing field diffracts (doc/startup-noise.md).
+not change how the existing field diffracts (docs/startup-noise.md).
 ```
 
 (api-fel-und-struct)=
@@ -5447,7 +5447,7 @@ Routine to compute the (sin, cos) pair with one libm sincos call (the C routine 
 fel_sincos.c).
 
 Note: The result is *not* bit-identical to gfortran's sin and cos intrinsics. The two
-differ by one ulp on about 2e-6 of arguments of the theta domain (doc/validation.md,
+differ by one ulp on about 2e-6 of arguments of the theta domain (docs/validation.md,
 "The particle-path cost").
 ```
 
@@ -5787,7 +5787,7 @@ ez. That is Genesis's own path in drifts (BeamSolver::advance with aw = 0).
 
 This is the Genesis interlude model, transcribed. A full-lattice run with it
 isolates what the Bmad seam changes. The seam integrates the path-length term
-exactly through the quad map, where this samples it once (doc/validation.md). The
+exactly through the quad map, where this samples it once (docs/validation.md). The
 production configuration is the seam.
 
 Note: Slippage is *not* applied here. The caller schedules it after the step, as
@@ -6524,12 +6524,12 @@ give intensity |Ehat|^2/(2 Z0), so the power diagnostic is mode-independent.
 
 The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables, chosen on
 merit. The currency here is short-probe accuracy, and 4th order is what resolves fc at
-6e-4 with 20 steps/period (doc/validation.md, val-the-unaveraged-mode-fc). A 2nd-order
+6e-4 with 20 steps/period (docs/validation.md, val-the-unaveraged-mode-fc). A 2nd-order
 symplectic scheme needs ~100 steps/period to match. No explicit symplectic method
 exists for this non-separable Hamiltonian without implicit iterations. gamma is
 conserved exactly by construction (B does no work, and gamma changes only in the
 kick). The dark-run emittance drift over the longest benchmark segment (266 periods,
-5320 steps) is <= 3.3e-6, orders below every check (doc/validation.md).
+5320 steps) is <= 3.3e-6, orders below every check (docs/validation.md).
 
 Note: If production-length unaveraged runs appear (oscillator passes), revisit the
 push with a symplectic composition. The ballistic check will show when.
@@ -6539,7 +6539,7 @@ particle arrays and field slices per iteration, serial kernel init, threadprivat
 plans, and per-slice energy summed in fixed order. Results are bit-identical across
 thread counts, and the harness checks it.
 
-The device path (fel_device_mod, doc/validation.md val-device-unaveraged): With a
+The device path (fel_device_mod, docs/validation.md val-device-unaveraged): With a
 backend armed, the beam and the field stay resident for the whole segment, and one
 record step is one command buffer of nsub substeps. Three kernels are this mode's own.
 The rest of a substep uses the kernels the averaged path already had. Residency starts
@@ -6547,7 +6547,7 @@ inside the first record step and not at the walk's element entry. The entry hand
 moves z, and the chart conversion has to see the moved value. Residency ends inside the
 last record step for the same reason. The quantities that do not depend on the
 particle are built here in FP64 and uploaded once a substep (the hoist of
-doc/performance.md). With fp32_check on, the device takes the instrument's twin role
+docs/performance.md). With fp32_check on, the device takes the instrument's twin role
 instead, and the FP64 path below runs untouched.
 ```
 
@@ -6684,10 +6684,10 @@ particle path alone, which is where every reformulation below lives. The field's
 single-precision arithmetic has its own row, from the twin's field record the caller
 advances every substep. This mode diffracts nsub times a record step where the
 averaged mode diffracts once, so the averaged instrument's field row does not carry
-over (doc/validation.md, val-unaveraged-fp32).
+over (docs/validation.md, val-unaveraged-fp32).
 
 What single precision destroys in this advance, on a real mid-segment state of the
-one-segment deck (doc/validation.md, val-unaveraged-fp32):
+one-segment deck (docs/validation.md, val-unaveraged-fp32):
 
   slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
             the difference is 1.9e-9, which is 0.016 of the quantum of one in single
@@ -6731,7 +6731,7 @@ This runs inside the caller's parallel slice loop. Everything written is indexed
 ```
 FEL tracker validated against Genesis 1.3 Version 4.
 
-The documentation is in lucifer/doc/:
+The documentation is in docs/:
   fel-physics.md       The physics: every equation the code integrates, its Genesis
                         provenance, and the check that pins it.
   input-reference.md   Every namelist parameter: default, meaning, and what refuses it.
@@ -6796,7 +6796,7 @@ a clang-built twin of the same loop is compiler/libm, not physics.
 *Program*
 
 ```
-The library-contract check (doc/user-guide.md): drive the FEL tracker without the
+The library-contract check (docs/user-guide.md): drive the FEL tracker without the
 namelist layer. Fill the input structs in code, call the library, write the dumps.
 The harness compares its outputs dataset-identically against a namelist-driven run
 of the same configuration, and runs it twice in one process (both passes here) to

@@ -772,7 +772,7 @@ kernel = wavefront_drift_kernel(wf, z_drift)
 ! So the arithmetic per slice does not depend on which thread runs it or on how many
 ! there are. A time-dependent line makes one of these calls per field-free element.
 ! At production slice counts a serial loop here is the largest serial block of the walk
-! (doc/performance.md perf-thread-scaling).
+! (docs/performance.md perf-thread-scaling).
 !
 ! wavefront_fft2_plan_threads warms every thread's plans from the serial context first.
 ! FFTW's planner is not reentrant, and creating a plan inside this loop would race with
@@ -1411,7 +1411,7 @@ dk = twopi / (nx * dx)
 stx = 0;  sty = 0;  stxx = 0;  styy = 0
 
 ! The power inside an angular radius is summed on this transform rather than on one of its
-! own. It is the quantity doc/startup-noise.md splits on. Inside it lies the radiation
+! own. It is the quantity docs/startup-noise.md splits on. Inside it lies the radiation
 ! that can couple to the mode. Outside it lies the wide-angle emission of the point
 ! beamlets, which is most of an unseeded run's power at the grids and loads in common use.
 

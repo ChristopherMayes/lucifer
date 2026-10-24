@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate doc/generated/examples/ from the example directories themselves.
+Generate docs/generated/examples/ from the example directories themselves.
 
 Each page carries the example's own README prose, the figure the runner saved, the
 quantities the runner recorded for each of its decks (examples/measured.tsv, one table
@@ -52,14 +52,14 @@ LINK = re.compile(r"\]\(([^)]+)\)")
 
 
 def rewrite_links(text, names, where):
-    """Retarget a README's relative links for a page in doc/generated/examples/."""
+    """Retarget a README's relative links for a page in docs/generated/examples/."""
     def sub(m):
         t = m.group(1)
         if t.startswith(("http://", "https://", "#")):
             return m.group(0)
-        # A doc page, from a per-directory README (../../doc/x.md) or the index (../doc/x.md),
-        # with an optional section anchor on the end (../../doc/x.md#sec-y).
-        d = re.fullmatch(r"\.\./(?:\.\./)?doc/([A-Za-z0-9._-]+\.md)(#[A-Za-z0-9._-]+)?", t)
+        # A doc page, from a per-directory README (../../docs/x.md) or the index (../docs/x.md),
+        # with an optional section anchor on the end (../../docs/x.md#sec-y).
+        d = re.fullmatch(r"\.\./(?:\.\./)?docs/([A-Za-z0-9._-]+\.md)(#[A-Za-z0-9._-]+)?", t)
         if d:
             return f"](../../{d.group(1)}{d.group(2) or ''})"
         # A sibling example, which the index names as a directory.

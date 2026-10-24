@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SASE startup against the transverse grid and the macroparticle load (doc/startup-noise.md).
+"""SASE startup against the transverse grid and the macroparticle load (docs/startup-noise.md).
 
 A SASE run started dark has two sources of power in the field. The bunching noise the
 quiet start loads radiates, and the FEL instability amplifies the part of that radiation
@@ -46,7 +46,7 @@ the benchmark harness.
 Usage:
   startup_noise.py --exe <lucifer> --genesis <genesis4>
                    --examples <examples> --latdir <tests> --workdir <dir>
-                   --out <doc/generated/startup-noise> [--device metal|off] [--only a,b,...]
+                   --out <docs/generated/startup-noise> [--device metal|off] [--only a,b,...]
                    [--cpu-threads N] [--machine aramis|flash|flash1|lcls]
 
 The other three machines take experiments e, g and h. The line of experiments c and d and
@@ -863,7 +863,7 @@ def exp_genesis(rn, args, results):
 # i. The cell-size exponent, derived and measured to its cause
 #
 # A deposit alone has the exponent 2 whatever its shape function, and the reported
-# floor's falls from 2 toward 1 as the cells shrink (doc/startup-noise.md, "Emission
+# floor's falls from 2 toward 1 as the cells shrink (docs/startup-noise.md, "Emission
 # outside the mode", which also carries the derivation). The field record slips one
 # slice every L_ref = sample * lambda_u of undulator. A field slice therefore sees the
 # same static source for N_ref = L_ref / dz steps and an independent one after. A mode

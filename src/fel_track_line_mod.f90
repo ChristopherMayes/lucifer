@@ -150,7 +150,7 @@ endif
 ! The unaveraged energy ledger (fel-physics.md sec-unaveraged). One row per record
 ! step inside FEL segments: total weighted beam energy, total window field energy,
 ! and the kick-side energy change of the step. The ledger check holds
-! d(E_beam + U_field) to the floor in doc/validation.md.
+! d(E_beam + U_field) to the floor in docs/validation.md.
 
 if (any_unavg) then
   open (newunit = iu_ledger, file = trim(out_root) // '.ledger.txt', action = 'write')
@@ -210,7 +210,7 @@ do ie = run%i_start, run%i_end
   ! concatenation below then has only its serial cost, so a wake-carrying element routes
   ! like any other interlude, through the parallel slice loop. On a line of many wake
   ! pipes the switch decides between the serial and parallel interlude paths for the
-  ! whole lattice (doc/performance.md).
+  ! whole lattice (docs/performance.md).
   !
   ! A zero-length element that cannot act is skipped. That is a marker, or a pipe whose
   ! wake scales with its length and so kicks by zero. A wake assigned over a range or a
@@ -320,7 +320,7 @@ do ie = run%i_start, run%i_end
       ! The offset is given back before the migration re-slices the beam. Migration
       ! reads each particle's phase against its slice's window. With the displaced phase
       ! still applied, every mover lands outside its new slice once the nominal phase
-      ! returns (doc/validation.md).
+      ! returns (docs/validation.md).
 
       if (istep == und%nstep) then
         if (fel_zoff(ie) /= 0) fbeam%phi0 = fbeam%phi0 + phase_rate * fel_zoff(ie)
@@ -452,7 +452,7 @@ do ie = run%i_start, run%i_end
               ! each iteration.
               ! Note: An OMP private clause on a subroutine-level scratch leaves the
               ! derived type's components improperly initialized under gfortran. That
-              ! gives a 2x bunching shift (doc/validation.md).
+              ! gives a 2x bunching shift (docs/validation.md).
 
               block
                 type (bunch_struct) bunch_l
@@ -705,12 +705,12 @@ if (migrate_check .and. (nm > 0 .or. chd > 0)) then
   endif
 endif
 
-! One row per event, at full precision, to the migration file (doc/user-guide.md): the
+! One row per event, at full precision, to the migration file (docs/user-guide.md): the
 ! charge that left the window ends and where, and the phase-continuity residual.
 !
 ! The margin is the smallest phase distance any examined particle had to a slice
 ! boundary at this decision, dropped particles included. No frame written after the
-! event can show it. A restart comparison reads it (doc/validation.md).
+! event can show it. A restart comparison reads it (docs/validation.md).
 
 if (nm > 0 .or. chd > 0) then
   write (iu_mig, '(es22.14, i12, 3es24.15e3)') z_now, nm, chd, dev, mrg
@@ -861,7 +861,7 @@ end subroutine write_ledger_row
 ! These are drawn sums and not expectations, so the time-dependent closure stays exact.
 !
 ! Note: In the unaveraged mode this double-counts the grid-captured band, about 3% at
-! the reference grid (doc/validation.md), and check_spontaneous.py bounds it. That is
+! the reference grid (docs/validation.md), and check_spontaneous.py bounds it. That is
 ! smaller than the uncertainty of the angular-distribution estimate.
 !-
 
@@ -943,10 +943,10 @@ end subroutine apply_radiation
 !
 ! Routine to print one row of the progress table: where the walk is and what the light
 ! and beam are doing. The slow modes (the unaveraged mode costs about 30x the averaged,
-! doc/user-guide.md) then show progress. Element boundaries always print. Inside an
+! docs/user-guide.md) then show progress. Element boundaries always print. Inside an
 ! element a 2 s wall clock throttle keeps fast runs quiet.
 !
-! The row is for a human (doc/user-guide.md). Values are SI-prefixed so a column of
+! The row is for a human (docs/user-guide.md). Values are SI-prefixed so a column of
 ! them lines up. The element name is last so every numeric column stays fixed. The
 ! one-step elements get no step field. The files carry full precision, and nothing
 ! parses this row.

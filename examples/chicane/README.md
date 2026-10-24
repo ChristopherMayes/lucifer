@@ -11,6 +11,6 @@ The two lattices differ by 0.43 microradians of bend angle: half a wavelength of
 
 The second segment amplifies or absorbs on a half-wavelength of geometry. A real machine turns that knob by trimming its chicane. In the default relative mode the same two lattices produce identical output, since the geometric fraction is autophased away, which is the chicane semantics of Genesis 1.3 Version 4 (Genesis4). The deliberate off-phase knob in that mode is the wiggler's own `z_offset` (the manual's phasing section).
 
-The harness's phasing section checks the same physics. The re-anchor baseline is flat, and the z_offset knob sits on the analytic slope. The knob curve equals Genesis4's own PHASESHIFTER scan. The absolute-mode chicane ramp sits on the independent geometric prediction, and the unaveraged ledger closes across the chicane. The levels are in [](../../doc/validation.md#val-levels-phasing). Four refusals are asserted.
+The harness's phasing section checks the same physics. The re-anchor baseline is flat, and the z_offset knob sits on the analytic slope. The knob curve equals Genesis4's own PHASESHIFTER scan. The absolute-mode chicane ramp sits on the independent geometric prediction, and the unaveraged ledger closes across the chicane. The levels are in [](../../docs/validation.md#val-levels-phasing). Four refusals are asserted.
 
 Each run takes about a second.

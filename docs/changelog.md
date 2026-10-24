@@ -33,9 +33,9 @@ of that history. The entries before that date describe that branch.
   it took. `util/conda_compile` finds the environment's `clang++` by a glob rather than `ls`, whose
   output carries color codes under an alias. `environment.yml` at the root names `bmad` in its nompi
   variant, `compilers` and `cmake` from conda-forge, each a minimum, as the `lucifer-build`
-  environment, and `doc/user-guide.md` gives that route first, the two cmake lines with
+  environment, and `docs/user-guide.md` gives that route first, the two cmake lines with
   `LUCIFER_BMAD_ROOT=$CONDA_PREFIX`, and the distribution route through `util/conda_compile` second,
-  as the one the recorded levels come from. `doc/validation.md` says why the keystone stays on the
+  as the one the recorded levels come from. `docs/validation.md` says why the keystone stays on the
   distribution build: the package is a production Bmad, and the debug pass and the regression job
   need the distribution's debug tree. Against the package, `bmad` 20261023.0 nompi with hdf5 2.2.0
   and gfortran 15.3, the Release build takes 29 s on an M3 Max, the configure reports release
@@ -101,7 +101,7 @@ of that history. The entries before that date describe that branch.
   compiler conda-forge's `bmad` 20261023.0 package and the Linux CI job build with. Both trees were
   built clean against Bmad 20261023-0, 3 min 27 s for debug and 5 min 30 s for production. The
   keystone against the new toolchain reproduces all 11 tiers to every printed digit, and 39 of the
-  704 rows of `doc/generated/validation-measured.md` moved at their fifth digit, every one inside
+  704 rows of `docs/generated/validation-measured.md` moved at their fifth digit, every one inside
   its bound. At full precision 77 of the 520 numeric checks moved, the largest by 4.8e-2 of its
   bound, the keep-mode moments at 1.0e-11 against 1.0e-10, and the lockstep and device levels by at
   most 1e-2 of theirs. One production tier moved by 5.6e-7 of itself, below its seventh digit. In
@@ -118,10 +118,10 @@ of that history. The entries before that date describe that branch.
   `dist_source_me` prints from the PATH's first `gfortran`, which on this machine was MacPorts' and
   never the one that built the binaries. `tests/scripts/vec_audit.sh` puts the compiler's own
   directory first on PATH, since the conda-forge gfortran drives its assembler and linker through
-  the clang beside it. The vectorization audit on `doc/performance.md` follows the new compiler's
+  the clang beside it. The vectorization audit on `docs/performance.md` follows the new compiler's
   report: 47 loops vectorized and 251 not in `fel_track_mod`, where 13.3 gave 45 and 237, and the
-  rejection reads `unsupported control flow in loop`. `doc/validation.md` names the toolchain beside
-  the machine, and `doc/user-guide.md` says the environment file resolves the compilers of the day
+  rejection reads `unsupported control flow in loop`. `docs/validation.md` names the toolchain beside
+  the machine, and `docs/user-guide.md` says the environment file resolves the compilers of the day
   it is created.
 - 2026-10-23 Changed: `lucifer/BMAD_RELEASE` names Bmad 20261023-0, which carries
   bmad-sim/bmad-ecosystem PR 2225. That PR corrects `parser_read_sr_wake` for a `z_long` table that
@@ -133,10 +133,10 @@ of that history. The entries before that date describe that branch.
   either, since none holds an lcavity. PR 2204 renumbers `ref_tilt_tot$` and adds
   `dpz_ele_dpz_start$` in `bmad/modules/bmad_struct.f90`, which every Lucifer module compiles
   against, and no Lucifer routine reads either. The keystone against the new release reproduces all
-  11 tiers, the 704 checks of `doc/generated/validation-measured.md` and every row of
-  `examples/measured.tsv` with no diff, and `doc/generated/sample-output.md` changes only in the
+  11 tiers, the 704 checks of `docs/generated/validation-measured.md` and every row of
+  `examples/measured.tsv` with no diff, and `docs/generated/sample-output.md` changes only in the
   Bmad version its first line prints. Bmad's regression suite reports 54 passed and 3 skipped, which
-  it reported at 20261018-0 too, where `doc/validation.md` had said 53.
+  it reported at 20261018-0 too, where `docs/validation.md` had said 53.
 - 2026-10-23 Added: `tests/scripts/startup_noise.py` records the provenance of its runs in each JSON
   it writes. That is the Lucifer commit of the source tree, marked + when the tree had uncommitted
   changes, the build the binary's directory names, the genesis4 version from its banner, the
@@ -144,7 +144,7 @@ of that history. The entries before that date describe that branch.
   experiment that came whole from the cache keeps the time of the run that made it rather than
   writing 0, which the per-case times did before.
 - 2026-10-23 Added: `tests/scripts/report_startup_noise.py` writes
-  `doc/generated/startup-noise-measured.md`, the twelve measured tables of the startup-noise page,
+  `docs/generated/startup-noise-measured.md`, the twelve measured tables of the startup-noise page,
   from the committed JSON of each machine, and the page includes each table from that file between
   its markers, with its caption and its label. A provenance table says which commit, build,
   genesis4, backend and day measured each machine's record and how long the run took. The keystone
@@ -175,7 +175,7 @@ of that history. The entries before that date describe that branch.
   The FLASH1 excess over the analytic startup power was given as 2.5 to 3.4 at every cell and load,
   where the record gives 1.9 to 3.9 and 17.5 at the finest cell with the lightest load. The
   staircase's increments were given in MW where the record gives 53, 63, 67 and 22 kW per slice.
-- 2026-10-23 Changed: `doc/changelog.md` is wrapped at 100 columns, each entry at spaces with its
+- 2026-10-23 Changed: `docs/changelog.md` is wrapped at 100 columns, each entry at spaces with its
   two-space continuation indent and no code span split across a line break. Before, 716 of its 1,954
   lines ran past 100. No word moved: the file's whitespace-separated tokens are those of the
   previous version, and its entries unwrapped are byte-identical to the previous version's.
@@ -203,9 +203,9 @@ of that history. The entries before that date describe that branch.
 - 2026-10-23 Fixed: `tests/scripts/example_record.py` looked for a harmonic's exit power under
   `field/<harmonic>/power`, where a harmonic keeps it under `field/<harmonic>/total/power`, so the
   harmonics example's record carried no third-harmonic power. The record gains `exit_power_harm3`,
-  4806.9 W, and the example's page shows it. `doc/validation.md` said the third harmonic climbs to
+  4806.9 W, and the example's page shows it. `docs/validation.md` said the third harmonic climbs to
   5.1 kW, and it now points at that page instead of carrying the digit.
-- 2026-10-23 Changed: the vectorization audit on `doc/performance.md` follows today's report.
+- 2026-10-23 Changed: the vectorization audit on `docs/performance.md` follows today's report.
   `fel_track_mod` has 45 loops vectorized and 237 not, where the page said 26 and 158,
   `fel_unaveraged_mod` 19 and 92 against 12 and 33, and `fel_collective_mod` 5 and 50 against 5 and
   49. The reasons' counts moved with them. The table of hot loops names each loop by its routine,

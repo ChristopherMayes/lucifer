@@ -4,7 +4,7 @@
 ! In-undulator collective effects for the FEL tracker: wakefields applied as a per-slice
 ! energy-loss rate, and longitudinal space charge entering the pendulum equation as a
 ! per-particle ez. Physics, Genesis provenance and validation are in
-! lucifer/doc/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
+! docs/fel-physics.md (sec-wakes, sec-spacecharge, sec-seamwake).
 !
 ! Placement in the step: the wake's gamma decrement lands between the longitudinal
 ! advance and the second transverse half step. ez is computed per slice before the RK
@@ -26,7 +26,7 @@
 ! the parallel slice loop. The wake update is serial at the caller's barrier.
 !
 ! Constants are Bmad's. The Genesis-comparison floors this creates are tabulated in the
-! manual (sec-numerics) and in doc/validation.md.
+! manual (sec-numerics) and in docs/validation.md.
 !
 ! Not implemented: Genesis's transient wake option (&wake transient/ztrans), the
 ! incoherent-synchrotron module, harmonics beyond what the solver provides, and MPI.
@@ -85,7 +85,7 @@ type fel_space_charge_input_struct
   ! works per slice on a radial grid. It is the default on merit. It carries the
   ! microbunching harmonics and the longitudinal-gamma correction that Bmad's slice
   ! model does not. It is also the path the Genesis comparison checks
-  ! (lucifer/doc/validation.md). Bmad's method is a candidate second value, so this is a
+  ! (docs/validation.md). Bmad's method is a candidate second value, so this is a
   ! field and not an assumption.
   character(16) :: model = 'genesis'
   real(rp) :: rmax = 0             ! Radial grid extent scale [m]. Grows adaptively as Genesis's.
@@ -575,7 +575,7 @@ allocate (fcur(nslice), fsize(nslice))
 ! Weighted current and transverse size per slice. Genesis's getSize is the product of
 ! the rms sizes, sigma_x*sigma_y: an effective area scale, and not a variance sum
 ! (sec-spacecharge). A variance sum here is a transcription error that the space-charge
-! comparison catches (lucifer/doc/validation.md). Weighted moments replace Genesis's
+! comparison catches (docs/validation.md). Weighted moments replace Genesis's
 ! particle counts. They are identical for uniform weights and correct otherwise. A
 ! slice of zero width keeps its zero. The kernel below has a finite limit there and
 ! takes it, where Genesis's guard put a square metre of area in its place.
@@ -611,7 +611,7 @@ scl = beam%slice_spacing / pi / c_light / 2 / eps_0_vac
 ! in the denominator has nothing to cancel against when A reaches zero. The second is
 ! the limit itself, 1 / 2 d^2, for a slice of zero width: a slice whose charge sits at
 ! one transverse point. A run can reach that state, since migration moves particles one
-! at a time and can leave one behind (lucifer/doc/validation.md).
+! at a time and can leave one behind (docs/validation.md).
 !
 ! The self term carries no field, and a slice with no charge sends none. Both are
 ! skipped before the kernel is formed, and not multiplied by zero after. At d = 0 or

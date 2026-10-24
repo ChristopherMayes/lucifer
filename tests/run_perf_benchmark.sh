@@ -2,7 +2,7 @@
 #
 # run_perf_benchmark.sh times the Bmad FEL tracker (OpenMP) head to head against Genesis
 # 1.3 Version 4 (MPI), serial and at the machine's full performance-core count, on the
-# same physics. This reproduces the head-to-head measurement of doc/validation.md as one
+# same physics. This reproduces the head-to-head measurement of docs/validation.md as one
 # command instead of a by-hand procedure.
 #
 # Each point of the method is deliberate:
@@ -16,7 +16,7 @@
 #     identical particles and field. Before any timing is quoted, the final total powers
 #     are required to agree at the documented seam level (the Bmad tracker runs its
 #     production configuration, interlude_model = "bmad", which differs from Genesis by
-#     the priced transport model difference of ~4e-2 -- see doc/validation.md).
+#     the priced transport model difference of ~4e-2 -- see docs/validation.md).
 #   - Wall times come from one uniform external clock (/usr/bin/time -p), not from each
 #     code's self-report. Serial Genesis runs the plain binary (one rank, no launcher),
 #     and parallel Genesis runs mpirun -np <workers>. The Bmad tracker runs the same binary
@@ -33,7 +33,7 @@
 #
 # --phases cannot see the phases that interleave per slice inside one parallel region,
 # which are the deposit against its FFT and the field gather against the RK4. Those come
-# from a sampling profiler, and doc/performance.md records that split.
+# from a sampling profiler, and docs/performance.md records that split.
 #
 # Usage:
 #   ./run_perf_benchmark.sh [--workers N] [--genesis <path>] [--exe <path>]

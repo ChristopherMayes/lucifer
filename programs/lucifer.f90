@@ -3,7 +3,7 @@
 !
 ! FEL tracker validated against Genesis 1.3 Version 4.
 !
-! The documentation is in lucifer/doc/:
+! The documentation is in docs/:
 !   fel-physics.md       The physics: every equation the code integrates, its Genesis
 !                         provenance, and the check that pins it.
 !   input-reference.md   Every namelist parameter: default, meaning, and what refuses it.
@@ -53,7 +53,7 @@ use, intrinsic :: iso_fortran_env, only: output_unit
 
 implicit none
 
-! The driver is read-parse-call (doc/user-guide.md). The namelist layer fills the input
+! The driver is read-parse-call (docs/user-guide.md). The namelist layer fills the input
 ! structs, and the library builds and walks the run. Every library error returns here.
 ! This is the one place that stops. The check instruments (split_weights, swap_beam_xy,
 ! gen_test_weights, resample_split_weights, chamber_wake%write_kernels) are carried in
@@ -80,14 +80,14 @@ call fel_timer_reset()
 n_arg = command_argument_count()
 if (n_arg /= 1) then
   call out_io (s_blank$, r_name, [ &
-        'Usage:                                                                      ', &
-        '  lucifer <input_file>                                                      ', &
-        '                                                                            ', &
-        'One input file names the lattice and holds the three namelist groups:       ', &
-        '&fel_params, &fel_beam_init and &fel_wavefront_init. Any file name works.   ', &
-        'The examples name theirs lucifer.in by convention, which is a convention    ', &
-        'rather than a default looked for here. lucifer/doc/ documents every         ', &
-        'parameter, every output file and the lattice attributes.                    '])
+        'Usage:                                                                   ', &
+        '  lucifer <input_file>                                                   ', &
+        '                                                                         ', &
+        'One input file names the lattice and holds the three namelist groups:    ', &
+        '&fel_params, &fel_beam_init and &fel_wavefront_init. Any file name works.', &
+        'The examples name theirs lucifer.in by convention, which is a convention ', &
+        'rather than a default looked for here. docs/ documents every             ', &
+        'parameter, every output file and the lattice attributes.                 '])
   ! Separate from the block above. A character array constructor needs every element the
   ! same length, and the length of the version string is not known here.
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
@@ -152,7 +152,7 @@ endif
 
 ! The pre-run. The header above has printed everything the run derives and everything
 ! it will cost. So the cost and the load of a deck can be read before any tracking is
-! done (doc/user-guide.md).
+! done (docs/user-guide.md).
 
 if (run%global%load_only) then
   call out_io (s_info$, r_name, 'load_only is set. The header above is the pre-run: what the deck ' // &

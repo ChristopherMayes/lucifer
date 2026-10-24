@@ -1,5 +1,5 @@
 ! A probe at FLASH's scales, for the second machine the source filter's default is
-! measured on (doc/startup-noise.md). This is not FLASH. It is a helical line whose
+! measured on (docs/startup-noise.md). This is not FLASH. It is a helical line whose
 ! wavelength, energy, current and emittance are of FLASH's order, chosen so that the
 ! ratio of the two angles the filter's default is built from differs from the Aramis
 ! benchmark's. FLASH1 itself, planar and at its published parameters, is

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Check doc/input-reference.md against the struct declarations that define the defaults.
+Check docs/input-reference.md against the struct declarations that define the defaults.
 
 The input reference states a default for every parameter Lucifer owns. Those defaults
 live in the Fortran declarations, so a hand-written table can drift from them. This

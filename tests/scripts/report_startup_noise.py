@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate doc/generated/startup-noise-measured.md from the JSON startup_noise.py writes.
+Generate docs/generated/startup-noise-measured.md from the JSON startup_noise.py writes.
 
-The measured tables of doc/startup-noise.md are written here from the record of the
-runs that measured them, one JSON per machine under doc/generated/startup-noise/, and
+The measured tables of docs/startup-noise.md are written here from the record of the
+runs that measured them, one JSON per machine under docs/generated/startup-noise/, and
 the page includes each table from this file between its markers. A table is a MyST
 table directive with its caption and its label, so every link to the page resolves as
 it did when the tables were typed by hand.
@@ -43,7 +43,7 @@ import startup_noise as sn  # noqa: E402
 MACHINES = (("aramis", "Aramis"), ("flash", "FLASH probe"), ("flash1", "FLASH1"), ("lcls", "LCLS"))
 
 # The sigmoid's width where the deck sets none, global%source_filter_width's default
-# (doc/input-reference.md). The derived default rows of the filter experiment run at it.
+# (docs/input-reference.md). The derived default rows of the filter experiment run at it.
 DEFAULT_WIDTH = 0.05
 
 

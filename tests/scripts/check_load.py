@@ -16,7 +16,7 @@ Four things, each on the check built for it:
                    the end of the first undulator, the physical spontaneous power of the
                    beam within that angle. That power is 0.1325 MW per slice at 3 kA on
                    256 points of 1.57 um, the interior mean of a flat window
-                   (doc/startup-noise.md, the table under "The source filter, measured"). A field record collects
+                   (docs/startup-noise.md, the table under "The source filter, measured"). A field record collects
                    the emission of every beam slice it slipped past. For a bunch the
                    comparable quantity is therefore a sum over a window long enough that
                    nothing escapes: the in-cone power summed over the records, divided by
@@ -208,7 +208,7 @@ def incone(exe, wd):
     # The target comes from the page's deck on the same 256 points this run takes. What
     # this check reads against it is the difference between this Gaussian bunch and the
     # page's flat window. The parity of this deck moves its in-cone power by 3.4 percent
-    # of itself (doc/validation.md, the transverse grid).
+    # of itself (docs/validation.md, the transverse grid).
     rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
                   sample=INCONE_SAMPLE)
     if rc != 0:

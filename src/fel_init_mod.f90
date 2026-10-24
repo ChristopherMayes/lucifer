@@ -615,7 +615,7 @@ end subroutine generate_initial_state
 ! Subroutine check_beam_init_contract ()
 !
 ! Routine to check the beam_init contract. The quiet-start generator honors the
-! beam_init fields in the table of doc/input-reference.md. Every other field that is set
+! beam_init fields in the table of docs/input-reference.md. Every other field that is set
 ! is refused. A standard structure that silently dropped fields would be worse than a
 ! custom one.
 !
@@ -661,7 +661,7 @@ if (trim(beam_init%distribution_type(2)) /= '' .and. trim(beam_init%distribution
 
 if (bad /= '') then
   call out_io (s_error$, r_name, 'BEAM_INIT%' // trim(bad) // ' IS SET BUT NOT HONORED BY THE', &
-                                 'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN doc/input-reference.md).', &
+                                 'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN docs/input-reference.md).', &
                                  'REFUSING RATHER THAN SILENTLY IGNORING IT.')
   err_flag = .true.;  return
 endif
@@ -765,7 +765,7 @@ call out_io (s_info$, r_name, 'Imported into \i0\ slices of \i0\ particles.', &
 
 ! The RNG-free outputs the exactness checks read (the analysis moments and the
 ! per-slice current profile) go to a file and not stdout. stdout is for humans, and
-! nslice current lines are not (doc/user-guide.md). Full precision, one row per slice.
+! nslice current lines are not (docs/user-guide.md). Full precision, one row per slice.
 ! The file is written at import time because load_only stops before tracking.
 
 open (newunit = iu_i, file = trim(out_root) // '.import.txt', action = 'write')

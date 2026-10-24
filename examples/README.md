@@ -2,7 +2,7 @@
 
 The examples are self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates and what to look for in the plot. The quantities measured on each run are in a table on the example's page, written by the runner.
 
-The validation benchmark against Genesis4 is in `tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`docs/fel-physics.md`](../doc/fel-physics.md).
+The validation benchmark against Genesis4 is in `tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`docs/fel-physics.md`](../docs/fel-physics.md).
 
 ## Running an example
 
@@ -12,13 +12,13 @@ The validation benchmark against Genesis4 is in `tests/`. The physics itself, wi
 
 Every input deck is named `lucifer.in`, and variants carry a descriptive suffix: `lucifer_averaged.in`, `lucifer_detuned.in`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
 
-A deck carries no comment beyond the one line that says why a setting departs from its default. Each line is a namelist parameter documented in [the input reference](../doc/input-reference.md). What a deck is for is said in this file and in the directory's own README, and a deck is short enough to paste into a terminal.
+A deck carries no comment beyond the one line that says why a setting departs from its default. Each line is a namelist parameter documented in [the input reference](../docs/input-reference.md). What a deck is for is said in this file and in the directory's own README, and a deck is short enough to paste into a terminal.
 
 ## Shared pieces
 
 `aramis.bmad` is the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom. Most examples call it, and the ones that need a different line carry their own lattice.
 
-`plot_fel.py` draws ten panels against s from any stats file, with an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields. What the panels mean is [reading an output file](../doc/reading-output.md).
+`plot_fel.py` draws ten panels against s from any stats file, with an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields. What the panels mean is [reading an output file](../docs/reading-output.md).
 
 ## The examples
 
@@ -48,7 +48,7 @@ Times are wall clock for a production build on twelve cores. A debug build is se
 
 ## What each feature is exemplified by
 
-The table has one row per feature declared in [the introduction](../doc/index.md).
+The table has one row per feature declared in [the introduction](../docs/index.md).
 
 | Feature | Shown by |
 |---|---|
@@ -100,6 +100,6 @@ Each of these is a feature with no example yet, and the reason it has none.
 
 ## What a run writes
 
-`<out_root>.stats.h5` is the statistics file, and [reading an output file](../doc/reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `global%write_diag = T` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`.
+`<out_root>.stats.h5` is the statistics file, and [reading an output file](../docs/reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `global%write_diag = T` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`.
 
 Run outputs are not committed. `.gitignore` in this directory covers them by extension.

@@ -339,7 +339,7 @@ do
     found = .true.
     call out_io (s_error$, r_name, '&fel_track_params IS NOT AN INPUT GROUP.', &
       'THE THREE GROUPS ARE &fel_params, &fel_beam_init AND &fel_wavefront_init.', &
-      'SEE doc/input-reference.md.')
+      'SEE docs/input-reference.md.')
     exit
   endif
 

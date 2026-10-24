@@ -4,7 +4,7 @@ The example runs in one command:
 
     ../../../production/bin/lucifer lucifer.in
 
-A run writes its beam and its field at element ends. A visualization wants them along z inside the undulators, and it wants to follow a particle from one to the next. This deck turns on the frame series and the field's reductions, and cuts both to four slices of the window ([reading the output](../../doc/reading-output.md)).
+A run writes its beam and its field at element ends. A visualization wants them along z inside the undulators, and it wants to follow a particle from one to the next. This deck turns on the frame series and the field's reductions, and cuts both to four slices of the window ([reading the output](../../docs/reading-output.md)).
 
 The deck runs two segments of the Aramis line with a 1 m comb and a window of 24 wavelengths at 3 wavelengths per slice, which is 8 slices. Each frame carries four of them, indices 3 to 6. A frame of each kind is written at every record, and the record count is in the table below with the run's other measured quantities. A beam frame is a fraction of a megabyte, a field frame about a megabyte, and the statistics file with the reductions a couple of megabytes, so everything the run wrote comes to some tens of megabytes.
 
@@ -16,6 +16,6 @@ Each file says where it was taken. `sPosition`, `elementName`, `phi0`, `sliceFir
 
 `global%dump_reduced = T` writes the field's intensity projections into the statistics file at every record: `xy_intensity`, `slice_x_intensity`, `slice_y_intensity` and the complex field on axis. They integrate back to `power` exactly and are two hundred times smaller than the field frames, so a picture of the run needs no field frame at all. The frames are here for the views that want the transverse profile of one slice at one position.
 
-The slice range is what keeps the output small. The same deck over the whole window writes twice the bytes, and a run at one wavelength per slice with thousands of slices would write gigabytes a frame. [](../../doc/performance.md) measures a full-size frame at 95 MB and the cost of compression, which does not pay on this data.
+The slice range is what keeps the output small. The same deck over the whole window writes twice the bytes, and a run at one wavelength per slice with thousands of slices would write gigabytes a frame. [](../../docs/performance.md) measures a full-size frame at 95 MB and the cost of compression, which does not pay on this data.
 
 The run takes under a second.

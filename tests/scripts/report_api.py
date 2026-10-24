@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate doc/generated/api.md from the source's own routine headers.
+Generate docs/generated/api.md from the source's own routine headers.
 
 Bmad documents a routine in a `!+ ... !-` block above it, and util/getf reads exactly
 that convention. This script reads the same blocks out of the FEL sources, so the API

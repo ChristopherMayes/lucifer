@@ -2,7 +2,7 @@
 ! Module fel_fp32_mod
 !
 ! The single-precision particle path, and the lockstep instrument that compares it with
-! the FP64 path (doc/performance.md, doc/validation.md). Apple GPUs have no FP64. So a
+! the FP64 path (docs/performance.md, docs/validation.md). Apple GPUs have no FP64. So a
 ! single-precision form of the averaged FEL advance exists, with its divergence from the
 ! FP64 path recorded, before any kernel is written. Nothing outside the instrument reads
 ! the FP32 state, and the FP64 path is untouched. This module is an instrument and not a
@@ -16,7 +16,7 @@
 !
 ! The reference must also move. The beam's common z drift is secular, and with a static
 ! reference the residual grows until its ulp swallows the physics. With a static
-! reference the guard refuses the steady-state example (doc/validation.md,
+! reference the guard refuses the steady-state example (docs/validation.md,
 ! val-fp32-lockstep). So z_ref refreshes to the slice's FP64 mean each step, one host
 ! number per slice. In freerun mode fel_fp32_renorm rebases the persistent residuals
 ! across the reference move, the same operation slice migration uses.
@@ -335,7 +335,7 @@ end subroutine fel_fp32_setup
 ! The record is one array for the whole window, and fel_fp32_twin_slice runs under the
 ! slice loop's OMP parallel do. So the loop cannot be what first touches it. Allocated
 ! there on first use, two threads can find it unallocated at once and both allocate it.
-! A bounds-checked build then stops with no message on stdout (doc/changelog.md). The grid
+! A bounds-checked build then stops with no message on stdout (docs/changelog.md). The grid
 ! is not known at fel_fp32_setup, which is why this routine is separate.
 !
 ! Input:
@@ -1243,7 +1243,7 @@ end subroutine fft32_solve
 ! Routine to reduce the step's per-slice divergences, write the row, and run the guard.
 ! It runs serially, after the caller's parallel loop. The guard refuses when the median
 ! per-step residual increment falls below 32 ulps of the residual. Below that the FP32
-! representation absorbs the physics silently (doc/performance.md).
+! representation absorbs the physics silently (docs/performance.md).
 !-
 
 subroutine fel_fp32_step_close (fp32, err_flag)
@@ -1271,7 +1271,7 @@ write (fp32%iu, '(i8, 10es13.4)') fp32%istep, row, gulp
 if (gulp < 32) then
   call out_io (s_error$, r_name, 'FP32 RESIDUAL GUARD: THE MEDIAN PER-STEP PHASE INCREMENT IS \es10.2\ ULPS', &
         'OF THE RESIDUAL, BELOW THE FLOOR OF 32. AT THIS GRANULARITY FP32 ABSORBS THE PHYSICS', &
-        'SILENTLY AND A RUN LOOKS CLEAN WITH NO BUNCHING (doc/performance.md), SO IT REFUSES INSTEAD.', &
+        'SILENTLY AND A RUN LOOKS CLEAN WITH NO BUNCHING (docs/performance.md), SO IT REFUSES INSTEAD.', &
         r_array = [gulp])
   err_flag = .true.
 endif
@@ -1386,7 +1386,7 @@ end subroutine fel_fp32_unavg_bfield
 ! a number near one has a quantum of 1.19e-7. So the answer is 0.016 of one quantum, and
 ! the naive difference is exactly zero: the slippage disappears and with it the physics.
 ! On a real mid-segment state the naive form is wrong by the whole of the answer
-! (doc/validation.md, val-unaveraged-fp32).
+! (docs/validation.md, val-unaveraged-fp32).
 !
 ! The identity 1/ra - 1/rb = (a - b) / (ra*rb*(ra + rb)), with ra = u_s/gamma,
 ! rb = beta0, a = 1 - ra^2 and b = 1 - rb^2, moves the cancellation into a - b. That is a

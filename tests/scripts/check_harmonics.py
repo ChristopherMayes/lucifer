@@ -64,7 +64,7 @@ H_PLANCK_EVS = 4.135667696e-15
 E_CHARGE = 1.602176634e-19
 C_LIGHT = 2.99792458e8
 
-# Each comment gives the level the check reads. doc/validation.md
+# Each comment gives the level the check reads. docs/validation.md
 # (val-harmonic-fields-and-the) records the levels.
 TOL_RT_FORMATS = 1e-13       # Double rounding of the dfl, with Bmad's own mu_0, is 4e-16.
 TOL_PY_ENERGY = 1e-9         # Python class energy through its Genesis path is 1.2e-12.
@@ -165,7 +165,7 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 # step out. Lucifer's kernel is correct at both parities, so a power comparison this tight
 # against Genesis has to run where Genesis is right, which is an odd grid. Moving these to
 # 64 and 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed
-# upstream. doc/validation.md (val-the-transverse-grid) has the account.
+# upstream. docs/validation.md (val-the-transverse-grid) has the account.
 
 NML_TD = """! flat keys; routed into the three groups by nml.to_groups
   lat_file = "{lat}"

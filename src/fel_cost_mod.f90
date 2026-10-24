@@ -2,7 +2,7 @@
 ! Module fel_cost_mod
 !
 ! Work count and wall clock estimate of a run, made before it tracks. The rates come
-! from one machine (doc/performance.md).
+! from one machine (docs/performance.md).
 !
 ! The count is exact. After the setup pass the slices, the macroparticles, the
 ! integration steps and the grid points are all known. Their product is the work.
@@ -11,7 +11,7 @@
 ! The model has two terms. The particle push is linear in particle-steps. The field
 ! solve is a transform that goes as ngrid^2 log2(ngrid) per slice per step, whatever the
 ! particle count. A deposit linear in particle-steps sits beside it. The 512 and 8192
-! particle rows of doc/performance.md separate the two terms: the push moves by a factor
+! particle rows of docs/performance.md separate the two terms: the push moves by a factor
 ! of 14 between them and the transform by 8 percent.
 !
 ! The rates below are per thread. The page's tables were taken at twelve threads. The
@@ -40,10 +40,10 @@ implicit none
 character(*), parameter :: fel_cost_machine$ = 'Apple M3 Max, 12 cores, 2026-09-07'
 
 ! Fitted from the phase profile and the particles-against-the-grid tables of
-! doc/performance.md (production build), divided out to one thread. The source filter
+! docs/performance.md (production build), divided out to one thread. The source filter
 ! is on in every run of those tables since it is the default. The filter adds a forward
 ! transform of the source per field per step. That raises the transform rate by
-! 58 percent (doc/performance.md) and leaves the push and the deposit alone.
+! 58 percent (docs/performance.md) and leaves the push and the deposit alone.
 
 real(rp), parameter :: fel_cost_push$ = 2.06e-7_rp     ! s per particle-step.
 real(rp), parameter :: fel_cost_deposit$ = 1.30e-8_rp  ! s per particle-step.
@@ -56,7 +56,7 @@ real(rp), parameter :: fel_cost_solve$ = 4.02e-9_rp    ! s per grid point per lo
 real(rp), parameter :: fel_cost_serial$ = 0.021_rp
 real(rp), parameter :: fel_cost_walk_share$ = 0.878_rp
 
-! The device against the CPU, from the device table of doc/performance.md. The largest
+! The device against the CPU, from the device table of docs/performance.md. The largest
 ! window there is 12.4 times the twelve-thread CPU. The smallest deck gives the host
 ! dispatch floor: 0.037 s over 89 steps.
 ! The four device points cannot carry a two-term fit of their own. The two largest share
@@ -152,7 +152,7 @@ end subroutine fel_cost_count
 !
 ! The estimate covers the walk, which is the tracking. The parse, the beam and field
 ! build and the final dumps are outside it. They are 1 percent of the walk on the runs
-! of doc/performance.md.
+! of docs/performance.md.
 !
 ! Input:
 !   run     -- fel_run_struct: The run, after fel_setup_schedule.

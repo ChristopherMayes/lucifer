@@ -60,12 +60,12 @@
 !
 ! The magnetic push is classical RK4 on the exact z-ODEs in kinetic variables, chosen on
 ! merit. The currency here is short-probe accuracy, and 4th order is what resolves fc at
-! 6e-4 with 20 steps/period (doc/validation.md, val-the-unaveraged-mode-fc). A 2nd-order
+! 6e-4 with 20 steps/period (docs/validation.md, val-the-unaveraged-mode-fc). A 2nd-order
 ! symplectic scheme needs ~100 steps/period to match. No explicit symplectic method
 ! exists for this non-separable Hamiltonian without implicit iterations. gamma is
 ! conserved exactly by construction (B does no work, and gamma changes only in the
 ! kick). The dark-run emittance drift over the longest benchmark segment (266 periods,
-! 5320 steps) is <= 3.3e-6, orders below every check (doc/validation.md).
+! 5320 steps) is <= 3.3e-6, orders below every check (docs/validation.md).
 !
 ! Note: If production-length unaveraged runs appear (oscillator passes), revisit the
 ! push with a symplectic composition. The ballistic check will show when.
@@ -75,7 +75,7 @@
 ! plans, and per-slice energy summed in fixed order. Results are bit-identical across
 ! thread counts, and the harness checks it.
 !
-! The device path (fel_device_mod, doc/validation.md val-device-unaveraged): With a
+! The device path (fel_device_mod, docs/validation.md val-device-unaveraged): With a
 ! backend armed, the beam and the field stay resident for the whole segment, and one
 ! record step is one command buffer of nsub substeps. Three kernels are this mode's own.
 ! The rest of a substep uses the kernels the averaged path already had. Residency starts
@@ -83,7 +83,7 @@
 ! moves z, and the chart conversion has to see the moved value. Residency ends inside the
 ! last record step for the same reason. The quantities that do not depend on the
 ! particle are built here in FP64 and uploaded once a substep (the hoist of
-! doc/performance.md). With fp32_check on, the device takes the instrument's twin role
+! docs/performance.md). With fp32_check on, the device takes the instrument's twin role
 ! instead, and the FP64 path below runs untouched.
 !-
 
@@ -677,7 +677,7 @@ contains
 
 ! One record step on the device. The quantities that do not depend on the particle are
 ! built here in FP64 and uploaded once a substep and not once a particle (the hoist of
-! doc/performance.md). Everything else is the kernels'. Setup has refused what the device
+! docs/performance.md). Everything else is the kernels'. Setup has refused what the device
 ! does not carry, so nothing here falls back.
 
 subroutine unavg_device_step (uerr)
@@ -859,7 +859,7 @@ end subroutine unavg_field_to_midpoint
 !
 ! The jump must be discrete and at the ends. Compensating continuously inside the ramp
 ! detunes the live interaction where the coupling is already substantial: -0.9% gain on
-! the first segment, doubling with ramp length (doc/validation.md, the unaveraged mode). In
+! the first segment, doubling with ramp length (docs/validation.md, the unaveraged mode). In
 ! hardware terms this is the phase shifter that makes a tapered-end segment equivalent
 ! to its ideal hard-edged length. In the stored chart z = -beta*tau, so tau += dtau is
 ! z -= aw^2 INT(1-g^2) / (2 p^2), per particle with its own momentum.
@@ -1002,10 +1002,10 @@ end subroutine unavg_ode
 ! single-precision arithmetic has its own row, from the twin's field record the caller
 ! advances every substep. This mode diffracts nsub times a record step where the
 ! averaged mode diffracts once, so the averaged instrument's field row does not carry
-! over (doc/validation.md, val-unaveraged-fp32).
+! over (docs/validation.md, val-unaveraged-fp32).
 !
 ! What single precision destroys in this advance, on a real mid-segment state of the
-! one-segment deck (doc/validation.md, val-unaveraged-fp32):
+! one-segment deck (docs/validation.md, val-unaveraged-fp32):
 !
 !   slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
 !             the difference is 1.9e-9, which is 0.016 of the quantum of one in single
@@ -1221,7 +1221,7 @@ fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
 ! The scale is the energy the step moved and not the energy it netted. Over a record step
 ! the gains and the losses very nearly cancel, so the net is a small difference of large
 ! exchanges, and a relative error against it means nothing. Against the net the ratio
-! reaches 3 on the benchmark segment (doc/validation.md, val-unaveraged-fp32). The
+! reaches 3 on the benchmark segment (docs/validation.md, val-unaveraged-fp32). The
 ! turnover is the sum of the absolute exchanges. The ledger's own check normalizes by it
 ! for the same reason, as the averaged instrument's phasor row scales to charge and not
 ! to a noise-level sum.

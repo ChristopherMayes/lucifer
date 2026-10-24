@@ -551,7 +551,7 @@ def grid_parity(exe, wd, examples):
     low by dx^2 over twice the waist squared through the bilinear gather, and the deposit
     returns the same deficit. An odd grid puts a cell on the axis. The example's dumps are
     left out, since the exit power is what the check reads, and the lattice is the
-    example's own (doc/validation.md, the transverse grid)."""
+    example's own (docs/validation.md, the transverse grid)."""
     deck = (examples / "steady_state" / "lucifer.in").read_text()
     shutil.copy(examples / "aramis.bmad", wd / "aramis.bmad")
     deck = deck.replace('lat_file = "../aramis.bmad"', 'lat_file = "aramis.bmad"')
@@ -1102,7 +1102,7 @@ def main():
     check("refusal: unknown dump_beam_at element refused (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
-    # 7. The pre-run (doc/user-guide.md). The deck loads 512 macroparticles per slice in
+    # 7. The pre-run (docs/user-guide.md). The deck loads 512 macroparticles per slice in
     # beamlets of 8, which is 64 beamlets and half the measured floor, so the load
     # standing and the thin-slice list both have something to report. The count is
     # arithmetic and is checked as arithmetic. The estimate is one machine's, and is
@@ -1167,7 +1167,7 @@ def main():
     check("refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it",
           0.0 if refused else 1.0, 0.5)
 
-    # 8. The frame series (doc/reading-output.md). The deck migrates, so labels have to
+    # 8. The frame series (docs/reading-output.md). The deck migrates, so labels have to
     # survive particles changing slice, and its comb is coarse enough to keep the frame
     # count small. The element-end dump is asked for by name so the two writers can be
     # compared on one position.

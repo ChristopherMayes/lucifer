@@ -110,7 +110,7 @@ type fel_stats_struct
   ! The power inside split_angle, per slice per record (fel-physics.md sec-source-filter).
   ! NaN where the record did not take the angle moments. The rest of f_power is the
   ! wide-angle emission of the point beamlets. A SASE run separates that from the mode
-  ! before quoting a power (doc/startup-noise.md).
+  ! before quoting a power (docs/startup-noise.md).
   real(rp), allocatable :: f_p_in(:,:)
   real(rp) :: split_angle = 0
   real(rp), allocatable :: f_emit_x(:,:), f_emit_y(:,:)
@@ -154,7 +154,7 @@ end type
 ! split angle against the power outside it, at two records. Inside the angle lies the
 ! mode. Outside it lies the wide-angle emission of the point beamlets. That emission is
 ! an artifact of the macroparticle representation. It carries the whole dependence on
-! the cell size and the macroparticle count (doc/startup-noise.md).
+! the cell size and the macroparticle count (docs/startup-noise.md).
 !
 ! Entry 1 is where the power inside the angle peaked. That is where the mode saturates
 ! and where the criterion is stated. Entry 2 is the last record, where an exit power is
@@ -741,7 +741,7 @@ enddo
 ! window-scale spread dominates them. But every cov(v,z) cross term is biased, and these
 ! are small by near-cancellation. The bias is 4e-6 relative on those terms against
 ! 2e-13 for the rest, and it flips the whole-window normal-mode decomposition to invalid
-! (belongs on doc/validation.md). The residual after the shear is second order,
+! (belongs on docs/validation.md). The residual after the shear is second order,
 ! O(d2beta/dpz2 * sigma_pz^2).
 
 p0_mc = fel_p0_mc(beam)
@@ -962,7 +962,7 @@ end subroutine fel_stats_exit_light
 ! element end that takes the field angle moments takes one transform pair. It stores
 ! the power inside split_angle beside the total (fel-physics.md sec-source-filter).
 !
-! The criterion of doc/startup-noise.md is stated at saturation, so it reads the
+! The criterion of docs/startup-noise.md is stated at saturation, so it reads the
 ! peak-power record. The last record is where an exit power is quoted. Only records
 ! that took the angle moments are considered.
 !
@@ -1321,7 +1321,7 @@ call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
       'Slices in the time window, the length of the slice axis.', '', ns, err)
 
 ! The split between the mode and the wide-angle emission of the point beamlets, at the
-! record where the mode power peaked. The criterion of doc/startup-noise.md is stated
+! record where the mode power peaked. The criterion of docs/startup-noise.md is stated
 ! at that record. The powers at every record are field/total/power and
 ! field/total/power_inside_angle, and the angle is field/total/split_angle. What these
 ! add is which record to read and the charge weighting of the bunching. They are
@@ -1473,7 +1473,7 @@ else
                           stats%f_on_axis(:,1:ir), 1, 1, err)
 endif
 
-! The mode split of doc/startup-noise.md, written once for the fundamental. NaN at every
+! The mode split of docs/startup-noise.md, written once for the fundamental. NaN at every
 ! record that did not take the angle moments, since the transform it needs is taken at
 ! element ends.
 

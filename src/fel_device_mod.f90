@@ -37,7 +37,7 @@
 ! buffers in its own chart. There px and py carry the kinetic transverse momenta ux and uy
 ! instead of Bmad's. The phase accumulator carries ks (tau - tau_ref) instead of the
 ! whole theta. dev%unavg says which chart the staging and the readback use. The
-! fel_device_unavg_* routines carry the rest. doc/validation.md (val-device-unaveraged)
+! fel_device_unavg_* routines carry the rest. docs/validation.md (val-device-unaveraged)
 ! records what that mode's kernels transcribe and what they cost.
 !
 ! Two roles: With fp32_check off, the device is the run inside averaged FEL elements. Beam
@@ -54,7 +54,7 @@
 ! bit. Integer addition is associative and commutative and float addition is neither. So
 ! the order threads reach a cell cannot change the answer. Both reference backends deposit
 ! in floats and are not reproducible (manual/GPU.md, gpu/metal-engine 4919b01). A float
-! deposit here gave two runs 2.0e-7 apart on a field power (doc/validation.md, val-device).
+! deposit here gave two runs 2.0e-7 apart on a field power (docs/validation.md, val-device).
 ! That is far inside the ceilings, but no device output could then be asserted exactly.
 !
 ! The field set: The resident field holds every member of the run's set (the fundamental
@@ -108,7 +108,7 @@ integer, parameter :: fel_dev_dep_bits_min$ = 8
 
 ! Fraction of the field's energy the FP32 transform pair loses each time it runs, always
 ! in one direction: about 0.17 of an FP32 quantum a butterfly stage, over the
-! 2 log2(ngrid) stages of a forward and an inverse transform. doc/validation.md
+! 2 log2(ngrid) stages of a forward and an inverse transform. docs/validation.md
 ! (val-device-unaveraged) holds the fit over grids 64 to 512. The run header projects a
 ! deck's loss from it.
 
@@ -990,7 +990,7 @@ end subroutine fel_device_step_run
 ! state is untouched.
 !
 ! The conversion loops run in parallel over slices, since serial loops are a large share
-! of every stats row at the finest comb (doc/performance.md, perf-device). The
+! of every stats row at the finest comb (docs/performance.md, perf-device). The
 ! conversions are elementwise with no accumulation. Each iteration writes only its own
 ! slice's arrays or its own field plane, so any thread order gives the same bits. Two
 ! structural points hold that. The device drains once, serially, before the parallel
@@ -1364,7 +1364,7 @@ end subroutine fel_device_twin_begin
 ! On a quiet start the CPU cancels the harmonic bunching to FP64 roundoff, while the
 ! device's FP32 phase leaves it at ~1e-7 of the charge. A dark member's row divided by
 ! its own roundoff-level field would compare that noise against nothing
-! (doc/validation.md, val-device). The harmonic's fidelity lives in its phasor row, which
+! (docs/validation.md, val-device). The harmonic's fidelity lives in its phasor row, which
 ! needs no field normalization, and in the end-to-end harmonic power against the CPU.
 ! With one member this is the single-field normalization.
 !

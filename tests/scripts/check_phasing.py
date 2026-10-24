@@ -61,7 +61,7 @@ FAILED = False
 TWO_G2L = 2 * 11357.82**2 * 1e-10       # 2 gamma^2 lambda: one full turn of gap phase.
 LAM = 1e-10
 
-# Each comment gives the level the check reads. doc/validation.md
+# Each comment gives the level the check reads. docs/validation.md
 # (val-phasing-between-segments-measured) records the levels.
 TOL_FLAT = 5e-3          # The adiabatic trend of the re-anchor baseline spans 1.5e-3.
 TOL_KNOB = 5e-3          # Knob ramp against the exact analytic slope: 1.5e-3.
@@ -97,7 +97,7 @@ use, SEG
 # on half-integer wavenumbers when ngrid is even. Lucifer's kernel is correct at both
 # parities, so the comparison has to run where the reference is right. At 128 and 64 the
 # two checks below read 1.0e-6 and 1.0e-5 against a 1e-6 level. Convert them once Genesis
-# is fixed upstream. doc/validation.md (val-the-transverse-grid) has the account.
+# is fixed upstream. docs/validation.md (val-the-transverse-grid) has the account.
 
 LATCHIC = """no_digested
 parameter[geometry] = open

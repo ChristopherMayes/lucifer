@@ -3,7 +3,7 @@
 #
 # It does two jobs in one pass. It answers whether all the examples still run, printing
 # one line per deck and exiting nonzero if any deck failed. It also writes the figures
-# the generated pages reference, one per example, into doc/generated/examples/.
+# the generated pages reference, one per example, into docs/generated/examples/.
 #
 # The figures are committed. Building an FEL run at documentation build time would be
 # wrong, and a page whose figure is missing is worse than a page with an old one. Their
@@ -108,7 +108,7 @@ fi
 # four performance cores, which is three here.
 #
 # The count is also a static allocation against the rest of the keystone, which runs
-# five jobs at once (doc/validation.md). The two benchmark passes take eleven concurrent
+# five jobs at once (docs/validation.md). The two benchmark passes take eleven concurrent
 # single-thread tier processes each while their tiers run, the regression suite takes
 # one and the wavefront validation one. The suite spends 2*11 + JOBS + 2 processes at its
 # widest, which is above the core count. A larger share here is taken from the passes
@@ -342,7 +342,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_links.py" --root "$LUCIFER_DI
   exit 1
 fi
 if [[ $FIGURES -eq 1 ]]; then
-  echo " All examples ran. Figures in doc/generated/examples/."
+  echo " All examples ran. Figures in docs/generated/examples/."
   echo " Regenerate the pages with tests/scripts/report_examples.py after changing a deck."
 else
   echo " All examples ran. No figures written (--no-figures)."

@@ -19,7 +19,7 @@
 #   ./vec_audit.sh [--out <dir>] [--file <name.f90>]...
 #
 # By default it audits the three files that hold the per-particle loops, into a temporary
-# directory whose path it prints. doc/performance.md records the standing summary.
+# directory whose path it prints. docs/performance.md records the standing summary.
 
 set -o pipefail
 

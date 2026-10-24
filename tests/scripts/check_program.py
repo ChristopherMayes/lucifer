@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Checks of the program's structure (doc/user-guide.md): the library contract, the comb,
+Checks of the program's structure (docs/user-guide.md): the library contract, the comb,
 and the tracking window.
 
   1. Library. lucifer_smoke_test drives the tracker with *no* namelist anywhere, its
@@ -932,7 +932,7 @@ def main():
     # needs the checkpoint group. The standard records fold phi0 into each particle's
     # time, and a reader rebuilds an equal phase at another magnitude, off by phi0 times
     # the machine epsilon. From an entry state bit-identical in every record, the
-    # segment's gain amplifies that to 6.5e-8 (doc/validation.md,
+    # segment's gain amplifies that to 6.5e-8 (docs/validation.md,
     # val-the-programs-own-identities). The group carries phi0 and each z as the tracker
     # holds them. The continuation rebuilds the split to the bit before any conversion or
     # advance, which is checked first, so a later disagreement could only be

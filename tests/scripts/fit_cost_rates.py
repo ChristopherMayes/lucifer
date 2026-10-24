@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fit the cost estimate's rates to a set of measured runs (doc/performance.md).
+Fit the cost estimate's rates to a set of measured runs (docs/performance.md).
 
 code/fel_cost_mod.f90 estimates a run's walk from five constants. They are measured
 rather than chosen, and the page they are measured from says that re-measuring it means

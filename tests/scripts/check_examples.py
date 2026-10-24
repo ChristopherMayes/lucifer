@@ -2,7 +2,7 @@
 """
 Examples conformance: the feature list, the matrix and the directories must agree.
 
-doc/index.md declares what the program does and examples/README.md says which example
+docs/index.md declares what the program does and examples/README.md says which example
 shows each declared feature. Neither statement is checkable on its own, and a feature
 that quietly loses its example reads exactly like one that never had it. Six assertions:
 

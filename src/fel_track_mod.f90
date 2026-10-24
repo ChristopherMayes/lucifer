@@ -7,7 +7,7 @@
 ! slippage).
 !
 ! The physics is transcribed from Genesis 1.3 Version 4, which GPL permits.
-! lucifer/doc/fel-physics.md gives the physics, the Genesis source of each routine and
+! docs/fel-physics.md gives the physics, the Genesis source of each routine and
 ! the validation (sec-core, sec-transverse, sec-field, sec-slippage).
 !
 ! The step composition (transverse half step, longitudinal advance, transverse half
@@ -84,7 +84,7 @@ implicit none
 ! multiplied by a sigmoid in normalized transverse spatial frequency, and only then
 ! added to the field. The field's own propagation is untouched. So the filter removes
 ! what a point-like beamlet radiates into the wide angles the grid carries, and does
-! not change how the existing field diffracts (doc/startup-noise.md).
+! not change how the existing field diffracts (docs/startup-noise.md).
 !-
 
 type fel_source_filter_struct
@@ -204,7 +204,7 @@ type (fel_kernel_struct), allocatable, target, private, save :: fel_kernels(:)
 ! fel_sincos.c).
 !
 ! Note: The result is *not* bit-identical to gfortran's sin and cos intrinsics. The two
-! differ by one ulp on about 2e-6 of arguments of the theta domain (doc/validation.md,
+! differ by one ulp on about 2e-6 of arguments of the theta domain (docs/validation.md,
 ! "The particle-path cost").
 !-
 
@@ -1322,7 +1322,7 @@ end subroutine fel_track_und_step
 !
 ! This is the Genesis interlude model, transcribed. A full-lattice run with it
 ! isolates what the Bmad seam changes. The seam integrates the path-length term
-! exactly through the quad map, where this samples it once (doc/validation.md). The
+! exactly through the quad map, where this samples it once (docs/validation.md). The
 ! production configuration is the seam.
 !
 ! Note: Slippage is *not* applied here. The caller schedules it after the step, as

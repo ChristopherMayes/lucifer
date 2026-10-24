@@ -9,7 +9,7 @@ constants set the floor of the comparison. The tracker uses Bmad's impedance,
 Z0 = mu_0*c = 376.7303..., and Genesis carries a truncated one, 376.73, which is 8.3e-7
 relative. That difference enters the coupling and compounds through gain. With Genesis's
 own constants transcribed, tier1 agreed at 2.8e-11 and tier2_genesis at 5.9e-8, as
-doc/validation.md records (val-validation-from-one-command). The tracker uses Bmad's
+docs/validation.md records (val-validation-from-one-command). The tracker uses Bmad's
 constants, so the tiers measure against the constants floor.
 
 The steady-state tiers:
@@ -300,7 +300,7 @@ def main():
     p.add_argument("--tol-tdsase", type=float, default=1.0e-3)
     # The space-charge floor is Genesis's truncated epsilon_0 in longRange, 8.85e-12,
     # which is 4.7e-4 relative. The wake tier sits at the impedance floor.
-    # doc/validation.md (val-validation-from-one-command) records both levels.
+    # docs/validation.md (val-validation-from-one-command) records both levels.
     p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
     p.add_argument("--tol-tdwk", type=float, default=1.0e-4)
     p.add_argument("--results", help="Append tier levels here for doc generation")
@@ -389,7 +389,7 @@ def main():
     print("The tier2_bmad number is a measured transport model difference, not an error:")
     print("Genesis samples the quad path-length term at mid-element, Bmad integrates it")
     print("exactly. tier2_genesis proves it: same code, Genesis's interlude model, and")
-    print("the difference collapses by six orders of magnitude. See doc/validation.md.")
+    print("the difference collapses by six orders of magnitude. See docs/validation.md.")
     print()
     # The results file feeds the generated pages. Levels are written at the six
     # significant figures the summary prints, so the generated table and the summary

@@ -183,7 +183,7 @@ type fel_global_struct
   character(60) :: dump_field_at(40) = ''    ! Element locators for mid-run field dumps.
   ! Write the beam and the field at every comb position as a frame series. This gives a
   ! visualization z resolution inside the undulators and not only at their ends. A frame
-  ! and its stats row share an index (doc/reading-output.md).
+  ! and its stats row share an index (docs/reading-output.md).
   logical :: dump_at_comb = .false.
   ! The slices a frame carries, in window order. The default pair is the whole window.
   ! A range keeps part of the bunch: a sample = 1 run has thousands of slices, and a
@@ -224,7 +224,7 @@ type fel_global_struct
   ! the time of one pass. On, each pass of a step is encoded into its own compute encoder
   ! with a timestamp attachment, which stage-boundary counter sampling can read. The run
   ! then reports the seconds per pass. The extra encoder boundaries slow the run, so this
-  ! is off by default and timings are taken with it off (doc/performance.md perf-device).
+  ! is off by default and timings are taken with it off (docs/performance.md perf-device).
   logical :: device_timing = .false.
   integer :: device_dep_mutate = 0     ! Shift the deposit's fixed-point scale, in bits.
 end type
@@ -255,7 +255,7 @@ type wavefront_init_struct
 end type
 
 ! The transverse grid derived from the beam when the deck sets none
-! (doc/startup-noise.md, Recommendations). Cells of a seventh of the rms beam size
+! (docs/startup-noise.md, Recommendations). Cells of a seventh of the rms beam size
 ! resolve the beam and the mode. Finer cells raise the wide-angle emission of the point
 ! beamlets without moving the mode power. A half width of nine beam sizes contains the
 ! mode, and above that the half width does not enter. fel-physics.md sec-field gives
@@ -426,7 +426,7 @@ contains
 ! Routine to format a value for display. The SI prefix is chosen so the mantissa lies in
 ! [1, 1000), with three decimals. The result is right-justified to a fixed width, so a
 ! column of values lines up (4.230 kW above 105.000 GW). This is display only. Stdout is
-! for humans, and the files carry full precision (doc/user-guide.md).
+! for humans, and the files carry full precision (docs/user-guide.md).
 !
 ! Values outside the prefix range print in es11.3 with the bare unit. Exact zero prints
 ! as 0.000 with the bare unit.

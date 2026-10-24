@@ -399,7 +399,7 @@ WINEOF
 
 # make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
 # Every deck reads the converted openPMD dumps and writes openPMD, the only format the
-# tracker speaks. Of the three input groups (doc/user-guide.md), argument 6 adds
+# tracker speaks. Of the three input groups (docs/user-guide.md), argument 6 adds
 # &fel_params content (wake or space charge) and argument 7 adds &fel_beam_init content
 # (check knobs). Every tier this builds sets transport_model = genesis, since a
 # transcription comparison needs Genesis4's own transverse maps, so what is left over is

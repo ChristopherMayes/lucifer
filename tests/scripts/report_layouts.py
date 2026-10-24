@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate doc/generated/layouts.md, the HDF5 hierarchy of the files this program writes.
+Generate docs/generated/layouts.md, the HDF5 hierarchy of the files this program writes.
 
 The page is an inventory and not a description. The generator runs a few small decks
 with the executable it is handed, opens the files they wrote, and prints for every
@@ -16,7 +16,7 @@ imaginary part stays visible.
 Deterministic by construction: fixed seeds, one thread, names in sorted order, no
 timestamp and no path outside the tree on the page. The keystone regenerates the page and
 requires an empty diff, and a moved line is a layout change to review and regenerate
-(doc/validation.md).
+(docs/validation.md).
 
 The page is written only after every fixture ran and every listed file was opened, and
 it is written whole, so a failed fixture leaves the committed page as it was. The log

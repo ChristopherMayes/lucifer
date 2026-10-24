@@ -140,7 +140,7 @@ $$
  {1-w[\log t+\log(1+t)-\log\varepsilon]}.
 $$
 
-The inversion matches `fel_filter_margin` in [fel_track_mod.f90](../code/fel_track_mod.f90).
+The inversion matches `fel_filter_margin` in [fel_track_mod.f90](../src/fel_track_mod.f90).
 The default 75% tolerance gives $\alpha_e=\alpha_p$.
 At 1% tolerance and $w=0.05$, $\alpha_e/\alpha_p=1.359691661$.
 A nonpositive denominator is refused. The on-axis amplitude must exceed 0.99.

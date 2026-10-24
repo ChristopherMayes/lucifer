@@ -59,7 +59,7 @@ implicit none
 ! All physical constants come from sim_utils (m_electron, c_light, mu_0_vac). Genesis
 ! carries its own values. EG: an impedance of free space truncated to 376.73 where
 ! mu_0_vac*c_light is 376.7303... The transcription was first validated with Genesis's
-! values (lucifer/doc/validation.md). With Bmad's constants the relative difference
+! values (docs/validation.md). With Bmad's constants the relative difference
 ! against Genesis is about 8e-7, and that is the floor of any comparison.
 
 !+
@@ -78,7 +78,7 @@ type fel_slice_struct
   real(rp), allocatable :: pz(:)       ! (p - p0)/p0
   real(rp), allocatable :: weight(:)   ! Macroparticle charge [C]
   ! A label that follows the macroparticle. It is unique over the window and unchanged by
-  ! migration, so a frame series can be read as trajectories (doc/reading-output.md).
+  ! migration, so a frame series can be read as trajectories (docs/reading-output.md).
   ! Written as openPMD's id record through coord_struct%ix_user.
   integer, allocatable :: id(:)
   integer :: n = 0                     ! Fill count.
@@ -765,7 +765,7 @@ end subroutine fel_read_openpmd_beam
 !
 ! Routine to refuse a beam file written inside an undulator as a run's initial beam. A
 ! frame taken there holds the coordinates the selected tracking method produced, an
-! ordinary particle record (doc/reading-output.md). A run cannot start from it. The
+! ordinary particle record (docs/reading-output.md). A run cannot start from it. The
 ! averaged map would take the frame as an entrance and give it the K/gamma a hard-edge
 ! handoff injects. The unaveraged mode would need the segment position and the ramp
 ! state, which no file holds.
@@ -910,7 +910,7 @@ call out_io (s_error$, r_name, 'CONTINUATION FROM A BEAM FILE WITH NO CHECKPOINT
      trim(file_name), &
      'A CHECKPOINT IS WRITTEN AT AN ELEMENT BOUNDARY OUTSIDE EVERY UNDULATOR OR AT THE PHYSICAL END', &
      'OF ONE. A FRAME FROM INSIDE AN ELEMENT, FROM A SLICED ENDPOINT INSIDE AN UNDULATOR, OR FROM', &
-     'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (doc/reading-output.md).')
+     'BEFORE THE GROUP EXISTED IS NOT ONE, AND NOTHING IS TAKEN FROM IT (docs/reading-output.md).')
 
 end subroutine fel_say_no_checkpoint
 
@@ -1021,7 +1021,7 @@ end subroutine fel_write_openpmd_beam
 ! exact for a reader of the file and not for a continuation of the run. The fold rebuilds
 ! an equal phase at another magnitude. So the deposit phase of a high-gain segment
 ! differs by phi0 times the machine epsilon, and the gain amplifies that to 6.5e-8
-! (doc/validation.md). A continuation reads phi0 and z from here instead, and holds the
+! (docs/validation.md). A continuation reads phi0 and z from here instead, and holds the
 ! split the run had to the bit.
 !
 ! Input:
@@ -1333,7 +1333,7 @@ end subroutine fel_fawley_noise
 ! each harmonic and each group, one amplitude is drawn on the group's real electron
 ! count, and one phase. Every member's phase is shifted by it. Only how the members are
 ! found differs. fel_fawley_noise is kept for the beamlets the loader makes, since the
-! recorded validation levels depend on its draw order (lucifer/doc/validation.md).
+! recorded validation levels depend on its draw order (docs/validation.md).
 !
 ! Input:
 !   theta(:)   -- real(rp): Ponderomotive phases.
@@ -1814,7 +1814,7 @@ end function fel_m_ind
 ! next segment's gain is made of the beam's phase against the field's. The field is
 ! dumped with its absolute phase, so that shift is a real change of state. Without the
 ! fold a mid-line restart lands 2.1e-2 away on the windowed-composition check
-! (doc/reading-output.md).
+! (docs/reading-output.md).
 !
 ! So a dump writes the lag the whole phase implies, z_j -> beta_j * theta_j / ks. That
 ! makes the file's time coordinate -theta_j / (ks c), and a phi0 = 0 reader exact for
@@ -1887,7 +1887,7 @@ err_flag = .true.
 ! A caller writing a frame from inside an unaveraged segment does not. The kinetic px is
 ! the particle's real transverse momentum, which is what an openPMD momentum record
 ! means. Only a continuation would misread it, and no frame from inside a segment is one
-! (fel-physics.md sec-unaveraged, doc/reading-output.md).
+! (fel-physics.md sec-unaveraged, docs/reading-output.md).
 
 if (.not. logic_option(.false., kinetic_ok)) then
   call fel_assert_averaged_chart (beam, 'fel_slice_to_bunch AT ELEMENT ' // trim(ele%name), err_flag)
