@@ -341,6 +341,12 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_links.py" --root "$LUCIFER_DI
   echo " FAIL: a relative link in a committed Markdown file does not resolve."
   exit 1
 fi
+
+# And no page, script or comment carries a word the repository has retired.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_retired_words.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a committed file carries a retired word."
+  exit 1
+fi
 if [[ $FIGURES -eq 1 ]]; then
   echo " All examples ran. Figures in docs/generated/examples/."
   echo " Regenerate the pages with tests/scripts/report_examples.py after changing a deck."
