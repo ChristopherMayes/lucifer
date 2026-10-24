@@ -134,7 +134,7 @@ jobs:
           for f in "$CONDA_PREFIX"/bin/*-cc "$CONDA_PREFIX"/bin/*-gcc "$CONDA_PREFIX"/bin/clang; do
             [ -x "$f" ] && { export CC="$f"; break; }
           done
-          echo "FC=$FC CC=${CC:-<CMake's choice>}"
+          echo "FC=$FC CC=${CC:-unset, so CMake chooses}"
           cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug \
                 -DLUCIFER_BMAD_ROOT="$CONDA_PREFIX" -DHDF5_ROOT="$CONDA_PREFIX"
           cmake --build build-debug --parallel "$(nproc)"
