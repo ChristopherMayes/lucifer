@@ -52,9 +52,13 @@ jobs:
       # The three conformance checks are standard library only, so nothing else is
       # installed. If one of them ever needs numpy, it stops belonging in this job.
       # The repository's own Python package, which the conformance checks import, and
-      # pytest for its tests, which need no executable and no other package.
+      # pytest for its tests, which need no executable and no other package. Two lines,
+      # since --no-deps applies to every package on its line, and pytest installed that
+      # way cannot import pluggy.
       - name: Install the package
-        run: python -m pip install -e python --no-deps pytest
+        run: |
+          python -m pip install -e python --no-deps
+          python -m pip install pytest
 
       - name: Input-reference conformance
         run: python tests/scripts/check_input_reference.py
