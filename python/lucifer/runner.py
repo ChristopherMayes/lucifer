@@ -22,6 +22,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 
+__all__ = ["run", "Result", "LuciferError", "executable"]
+
 
 class LuciferError(RuntimeError):
     """The program exited nonzero. ``message`` is its error text and ``output`` all of it."""

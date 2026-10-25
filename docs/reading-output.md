@@ -13,36 +13,7 @@ This page is for someone handed a Lucifer output file who never runs the program
 
 ## The Python side
 
-`lucifer.stats` in the Python package is the one reader everything in the tree uses. Because the file describes itself, it hard-codes no dataset names, so a file that grows a polarization or a harmonic needs no change in it.
-
-```python
-from lucifer.stats import read_stats
-
-with read_stats("run.stats.h5") as st:
-    st.s                          # (nz,) path length, a variable on the record axis
-    st.record                     # (nz,) the record axis itself
-    st["beam/slice/current"]      # (nz, ns) amperes, as the file states them
-    st.coord("plane")             # ('x', 'y', 'z')
-    st.dim_coords("beam/slice/sigma")   # the coordinate of each dimension, in order
-    st.units["beam/slice/t"]      # 's'
-    st.run["p0c"]                 # what the run produced
-    st.params["global"]["ran_seed"]     # what the user set
-    st.ele_name                   # (nz,) element name per record, gathered through ix_ele
-```
-
-`tests/scripts/validate_bmad_stats.py` is the format's conformance checker. It knows no program and no extension, needs only numpy and h5py, and exits nonzero on any failure:
-
-```
-python3 validate_bmad_stats.py run.stats.h5
-```
-
-`examples/plot_fel.py` draws ten panels against `s` straight from a stats file, with an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields:
-
-```
-python3 examples/plot_fel.py run.stats.h5 -o run.png
-```
-
-Units in these files are documentation, never a factor to apply. The values are already SI and eV. That is the opposite of openPMD's `unitSI`, which is why the two never appear in one file.
+`lucifer.stats` is the one reader of the stats file everything in the tree uses, and [](python.md) shows it with the beam reader, the conformance checker and the plotting script, every example run by a test.
 
 ## The stats file describes itself
 

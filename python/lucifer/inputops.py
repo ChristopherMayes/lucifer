@@ -11,6 +11,8 @@ import dataclasses
 import pathlib
 import tomllib
 
+__all__ = ["InputOps", "toml_value"]
+
 
 def toml_value(v) -> str:
     """One value as TOML text."""
@@ -110,10 +112,13 @@ class InputOps:
         return obj, parts[-1]
 
     def __getitem__(self, key: str):
+        """The value of a key by its dotted name, ``inp["beam.n_particle"]``. A name the
+        input file does not have raises KeyError."""
         obj, name = self._resolve(key)
         return getattr(obj, name)
 
     def __setitem__(self, key: str, value) -> None:
+        """Set a key by its dotted name, ``inp["beam.n_particle"] = 4096``."""
         obj, name = self._resolve(key)
         setattr(obj, name, value)
 

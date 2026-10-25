@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import re
 
+__all__ = ["to_toml", "write", "FlatError", "main"]
+
 TABLES = ("run", "window", "beam", "beam.resample", "field", "wake", "space_charge", "bmad")
 
 # Every key, by table. The order is the input file's.
@@ -87,7 +89,9 @@ LINE = re.compile(r"^\s*([A-Za-z_][\w%().]*)\s*=\s*(.*?)\s*(?<!\\)$")
 
 
 class FlatError(ValueError):
-    pass
+    """A line of flat text that is not key = value, a key no table has, or a value that
+    is not a number, a string, a boolean or a list of them. The message names the line
+    or the key."""
 
 
 def route(key: str) -> tuple[str, str]:

@@ -51,14 +51,15 @@ jobs:
 
       # The three conformance checks are standard library only, so nothing else is
       # installed. If one of them ever needs numpy, it stops belonging in this job.
-      # The repository's own Python package, which the conformance checks import, and
-      # pytest for its tests, which need no executable and no other package. Two lines,
-      # since --no-deps applies to every package on its line, and pytest installed that
-      # way cannot import pluggy.
+      # The repository's own Python package, which the conformance checks import,
+      # pytest for its tests, and numpy and h5py, since the package's two readers import
+      # them and the Python reference imports every module to read its docstrings. Two
+      # lines, since --no-deps applies to every package on its line, and pytest
+      # installed that way cannot import pluggy.
       - name: Install the package
         run: |
           python -m pip install -e python --no-deps
-          python -m pip install pytest
+          python -m pip install pytest numpy h5py
 
       - name: Input-reference conformance
         run: python tests/scripts/check_input_reference.py
@@ -71,6 +72,17 @@ jobs:
 
       - name: Package tests
         run: python -m pytest python/tests -q
+
+      # The Python reference is generated from the package's docstrings and needs no
+      # build, so it is regenerated and diffed here as the keystone does.
+      - name: Python reference is current
+        run: |
+          python tests/scripts/report_python_api.py --out docs/generated/python-api.md
+          git diff --exit-code -- docs/generated/python-api.md
+
+      # Every Python example on docs/python.md is the code of a region a test runs.
+      - name: Python page examples are tested code
+        run: python tests/scripts/check_python_page.py
 
       - name: Examples conformance
         run: python tests/scripts/check_examples.py

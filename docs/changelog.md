@@ -9,6 +9,26 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: the Python package is documented. `docs/python.md`, on the site after the page on
+  reading the output, describes the install, the schema the package carries and why it is the one
+  copy, `Input` and the generated models and what they leave to the program, running the program
+  with `lucifer.run`, a scan through overrides and a refusal, the two readers, and the flat
+  converter, with the From Python section of the user guide and the Python side of the output page
+  moved there and its stale `st.params["global"]` corrected to `st.params["run"]`. Each of its nine
+  Python examples is the code of a region a test runs: the four that need no executable in
+  `python/tests/test_page.py` under pytest, the five that run the program in a section of
+  `tests/scripts/check_program.py` that works in a directory of its own with `LUCIFER_EXE` set, as
+  the page does, and `tests/scripts/check_python_page.py` holds each block to its region byte for
+  byte and refuses a block with no region and a region no block shows.
+  `tests/scripts/report_python_api.py` writes `docs/generated/python-api.md` from the package through
+  inspect, every public class and function with its signature and its own docstring as written, the
+  models by name with a pointer to the input reference, in a fixed module order, and refuses a module
+  without `__all__`, a module its order does not name and a public name without a docstring of its
+  own. Each module now declares `__all__`, `FlatError`, the generator's two entry points,
+  `schema.main`, `Stats.close` and the dotted access of `Input` gained the docstrings they lacked,
+  and `FlatError` had been showing `ValueError`'s. The keystone regenerates the page as the seventh
+  page set, and the docs workflow installs numpy and h5py, regenerates and diffs the page, and runs
+  the page check.
 - 2026-10-25 Changed: the word deck is retired. The file a run reads is the input file, its keys
   are input keys, and the usage text reads `lucifer <input.toml>`. The Bmad corpus never says deck:
   it says input file, and master input file for a program's own, and Genesis4 says main input file.

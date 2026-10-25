@@ -8,6 +8,7 @@ project:
     - file: user-guide.md
     - file: input-reference.md
     - file: reading-output.md
+    - file: python.md
     - file: fel-physics.md
     - file: validation.md
     - file: performance.md
@@ -38,6 +39,7 @@ project:
         - file: generated/examples/coherent_source.md
         - file: generated/examples/saturation_demo.md
     - file: generated/api.md
+    - file: generated/python-api.md
     - file: generated/layouts.md
     - file: changelog.md
 site:

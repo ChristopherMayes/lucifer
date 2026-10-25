@@ -39,6 +39,8 @@ import pathlib
 import h5py
 import numpy as np
 
+__all__ = ["read_stats", "Stats", "same_data"]
+
 # The format versions this reader understands. No older ones: see the module docstring.
 # 1.0 is bmad-stats with the FEL extension, which replaced lucifer-stats 2.x.
 KNOWN_VERSIONS = ("1.0",)
@@ -111,6 +113,7 @@ class Stats:
         return path in self._h5
 
     def close(self):
+        """Close the file. ``with read_stats(path) as st:`` closes it on leaving."""
         self._h5.close()
 
     def __enter__(self):
@@ -241,7 +244,7 @@ class Stats:
     @property
     def meta(self):
         """The provenance group as a dict. Datasets, not attributes, so an echoed
-        namelist of any size fits: see the manual on HDF5's 64 kB attribute cap. This is
+        input file of any size fits: see the manual on HDF5's 64 kB attribute cap. This is
         *not* a reproducibility record, and meta/lattice_source says so itself."""
         out = {}
         for key, dset in self._h5["meta"].items():

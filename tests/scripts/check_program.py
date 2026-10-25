@@ -66,6 +66,9 @@ Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
+import os
 import pathlib
 import re
 import shutil
@@ -214,6 +217,93 @@ def stats_of(path):
                 "ix_ele": st.ix_ele}
 
 
+def page_examples(exe, wd):
+    """The examples on docs/python.md that run the program, as the page shows them: in a
+    directory of their own holding the input file, with LUCIFER_EXE naming the program.
+    Each region between "# example: <name>" and "# end example: <name>" is one block on the
+    page, which tests/scripts/check_python_page.py holds byte for byte. The checks after
+    the regions say what the page's prose says each example does."""
+    page = wd / "page"
+    page.mkdir(exist_ok=True)
+    (page / "smoke.bmad").write_text(LAT1)
+    (page / "lucifer.toml").write_text(to_toml(NML_TWIN.format(root="page", extra="", bextra="")))
+    said = io.StringIO()
+    old_exe = os.environ.get("LUCIFER_EXE")
+    os.environ["LUCIFER_EXE"] = str(exe)
+    try:
+        with contextlib.chdir(page), contextlib.redirect_stdout(said):
+            # example: run
+            from lucifer import Input, run
+
+            inp = Input.read("lucifer.toml")
+            inp["beam.n_particle"] = 1024
+            inp.run.out_root = "n1024"
+            result = run(inp, threads=4, name="n1024.toml")
+
+            with result.stats as st:
+                power = st["field/total/power"]            # (nz, ns) W, record by slice
+                echo = Input.loads(st.meta["input_echo"])  # the input file the run read
+            # end example: run
+
+            # example: scan
+            for n in (512, 1024, 2048):
+                run("lucifer.toml", threads=4, overrides=[f"beam.n_particle={n}", f"run.out_root=scan{n}"])
+            # end example: scan
+
+            # example: refusal
+            from lucifer import LuciferError
+
+            try:
+                run("lucifer.toml", overrides=["beam.n_particle=-5"])
+            except LuciferError as err:
+                print(err.message)
+            # end example: refusal
+
+            # example: stats
+            from lucifer.stats import read_stats
+
+            with read_stats("n1024.stats.h5") as st:
+                st.s                          # (nz,) path length, a variable on the record axis
+                st.record                     # (nz,) the record axis itself
+                st["beam/slice/current"]      # (nz, ns) amperes, as the file states them
+                st.coord("plane")             # ('x', 'y', 'z')
+                st.dim_coords("beam/slice/sigma")   # the coordinate of each dimension, in order
+                st.units["beam/slice/t"]      # 's'
+                st.run["p0c"]                 # what the run produced
+                st.params["run"]["ran_seed"]  # what the user set
+                st.ele_name                   # (nz,) element name per record, gathered through ix_ele
+            # end example: stats
+
+            # example: beam
+            from lucifer.beam import read_slices
+
+            slices = read_slices("n1024-final.beam.h5", wavelength=inp.field.lambda0)
+            slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
+            # end example: beam
+    finally:
+        if old_exe is None:
+            os.environ.pop("LUCIFER_EXE")
+        else:
+            os.environ["LUCIFER_EXE"] = old_exe
+
+    ok = (result.out_root == "n1024" and (page / "n1024.stats.h5").exists()
+          and power.ndim == 2 and echo.beam.n_particle == 1024 and echo.run.out_root == "n1024")
+    check("the page's run example: an input file read, varied, run, and read back from its echo", ok,
+          note=f"[power {power.shape}]")
+    ok = all((page / f"scan{n}.stats.h5").exists() for n in (512, 1024, 2048))
+    if ok:
+        with read_stats(page / "scan2048.stats.h5") as st:
+            ok = int(st.params["beam"]["n_particle"]) == 2048
+    check("the page's scan example: three runs through overrides, each with its own root", ok)
+    ok = "n_particle = -5 IS OUTSIDE ITS RANGE" in said.getvalue()
+    check("the page's refusal example: LuciferError carries the program's message", ok)
+    with read_stats(page / "n1024.stats.h5") as st:
+        ok = st.units["beam/slice/t"] == "s" and st.params["run"]["ran_seed"] == 777
+    check("the page's stats example: units and inputs as the page states them", ok)
+    ok = slices[0]["n"] == 1024 and len(slices[0]["x"]) == 1024
+    check("the page's beam example: the final dump read into slices", ok, note=f"[{slices[0]['n']} particles]")
+
+
 def main():
     global FAILED
     ap = argparse.ArgumentParser()
@@ -344,6 +434,10 @@ def main():
         ok = "n_particle = -5 IS OUTSIDE ITS RANGE" in err.message and err.returncode != 0
         note = f"[exit {err.returncode}: {err.message.splitlines()[0][:80]}]"
     check("a refusal through lucifer.run raises LuciferError with the program's message", ok, note=note)
+
+    # ------------------------------------------------------------------
+    print("== the examples on docs/python.md ==")
+    page_examples(exe, wd)
 
     # ------------------------------------------------------------------
     print("== the comb (run.comb_ds_save) ==")

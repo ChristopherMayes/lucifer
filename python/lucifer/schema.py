@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import pathlib
 
+__all__ = ["path", "load", "keys", "main"]
+
 TABLES = ("run", "window", "beam", "beam.resample", "field", "wake", "space_charge", "bmad")
 
 
@@ -42,6 +44,7 @@ def keys(schema: dict | None = None) -> dict[str, dict[str, dict]]:
 
 
 def main(argv=None) -> int:
+    """python -m lucifer.schema: print the path of the schema file."""
     print(path())
     return 0
 

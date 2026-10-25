@@ -15,6 +15,8 @@ import pathlib
 
 from lucifer import schema as schema_mod
 
+__all__ = ["render", "main"]
+
 CLASS = {"run": "Run", "window": "Window", "beam": "Beam", "beam.resample": "Resample",
          "field": "Field", "wake": "Wake", "space_charge": "SpaceCharge", "bmad": "Bmad"}
 PY_TYPE = {"string": "str", "number": "float", "integer": "int", "boolean": "bool"}
@@ -59,6 +61,7 @@ def field_lines(name: str, prop: dict) -> list[str]:
 
 
 def render(schema: dict) -> str:
+    """The text of models.py for ``schema``, the document ``lucifer.schema.load`` returns."""
     keys = schema_mod.keys(schema)
     out = [
         '"""The input file as typed models, generated from the schema. Do not edit.',
@@ -74,6 +77,8 @@ def render(schema: dict) -> str:
         "from dataclasses import dataclass, field as _field",
         "",
         "from lucifer.inputops import InputOps",
+        "",
+        "__all__ = [" + ", ".join(f'"{c}"' for c in ["Input", *(CLASS[t] for t in schema_mod.TABLES)]) + "]",
         "",
         "",
     ]
@@ -101,6 +106,7 @@ def render(schema: dict) -> str:
 
 
 def main(argv=None) -> int:
+    """python -m lucifer.generate: write models.py beside this module from schema.json."""
     text = render(schema_mod.load())
     pathlib.Path(__file__).with_name("models.py").write_text(text)
     return 0

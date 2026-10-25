@@ -725,6 +725,11 @@ where the two builds agree to every printed digit.
 | an Input from the models runs through lucifer.run and echoes every set key |  | same | holds |
 | an override through lucifer.run lands in params/ and names the new root |  | same | holds |
 | a refusal through lucifer.run raises LuciferError with the program's message |  | same | holds |
+| the page's run example: an input file read, varied, run, and read back from its echo |  | same | holds |
+| the page's scan example: three runs through overrides, each with its own root |  | same | holds |
+| the page's refusal example: LuciferError carries the program's message |  | same | holds |
+| the page's stats example: units and inputs as the page states them |  | same | holds |
+| the page's beam example: the final dump read into slices |  | same | holds |
 | the record axis: s non-decreasing, every repeat at an element boundary |  | same | holds |
 | comb > 0: rows == every-record rows at the comb positions (subset) |  | same | holds |
 | comb < 0: the rows are exactly the element ends |  | same | holds |

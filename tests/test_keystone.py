@@ -3,7 +3,7 @@
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the six page sets and requires the Markdown diff to be empty. Before it
+regenerates the seven page sets and requires the Markdown diff to be empty. Before it
 runs a generator, the sixth test verifies for itself that all five outcomes are present
 and successful. So it does not lean on test order and cannot pass on a partial run.
 Nothing here builds. Both trees are prerequisites and are checked before any job
@@ -20,8 +20,9 @@ What the contract means in practice:
 - xdist is refused (conftest.py beside this file). A session fixture runs once per
   worker, so a parallel run would launch the five jobs several times over, into the
   same work directories.
-- The regeneration test writes into the tree: the four generated page sets under
-  docs/generated. The keystone writes them by design. An empty diff then shows
+- The regeneration test writes into the tree: the seven generated page sets, under
+  docs/generated and, for the schema and the models, python/lucifer. The keystone writes
+  them by design. An empty diff then shows
   that the committed pages agree with what the sources generate.
 - A job that runs past its timeout is killed as a process group. Each job is started in
   its own session, so the group is the shell wrapper and everything it launched, the
@@ -313,7 +314,7 @@ def test_job(keystone: Keystone, name: str) -> None:
 
 
 def test_regeneration(keystone: Keystone) -> None:
-    """Regenerate the six page sets and require no diff, after all five jobs passed.
+    """Regenerate the seven page sets and require no diff, after all five jobs passed.
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
@@ -329,6 +330,8 @@ def test_regeneration(keystone: Keystone) -> None:
          "--production", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation-measured.md")),
         (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "src"),
          "--code", str(LUCIFER / "programs"), "--out", str(GENERATED / "api.md")),
+        # The Python package's reference, from its own docstrings.
+        (str(SCRIPTS / "report_python_api.py"), "--out", str(GENERATED / "python-api.md")),
         # The input file's schema, from the production binary into the package, the models the
         # package generates from it, and the key tables.
         (str(PRODUCTION_EXE), "--schema", str(LUCIFER / "python" / "lucifer" / "schema.json")),

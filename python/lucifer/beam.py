@@ -38,6 +38,8 @@ import pathlib
 import h5py
 import numpy as np
 
+__all__ = ["is_openpmd", "n_slice", "genesis_window", "read_slices"]
+
 C_LIGHT = 2.99792458e8
 M_ELECTRON = 0.51099895069e6      # eV, Bmad's value
 E_CHARGE = 1.602176634e-19
