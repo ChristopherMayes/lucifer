@@ -716,6 +716,12 @@ where the two builds agree to every printed digit.
 | a library error RETURNS (no beginning Twiss -> err to the program, exit 2) |  | same | holds |
 | a key in the wrong table is refused, naming the table it belongs in |  | same | holds |
 | a key no table has is refused, naming the table's keys |  | same | holds |
+| run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow |  | same | holds |
+| a key no table has on the command line is refused (run.wake_on=true) |  | same | holds |
+| a key in the wrong table on the command line is refused (beam.lambda0=1e-10) |  | same | holds |
+| a value outside its bounds on the command line is refused (beam.n_particle=-5) |  | same | holds |
+| an argument without = on the command line is refused (beam.n_particle) |  | same | holds |
+| a key without its table on the command line is refused (n_particle=512) |  | same | holds |
 | the record axis: s non-decreasing, every repeat at an element boundary |  | same | holds |
 | comb > 0: rows == every-record rows at the comb positions (subset) |  | same | holds |
 | comb < 0: the rows are exactly the element ends |  | same | holds |

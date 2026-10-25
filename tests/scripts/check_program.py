@@ -268,6 +268,41 @@ def main():
     check("a key no table has is refused, naming the table's keys", ok)
 
     # ------------------------------------------------------------------
+    print("== the overrides on the command line ==")
+
+    # Three keys set after the deck, two of them in one table and one a string the shell
+    # has stripped the quotes from. The run writes under the overridden root, the echo
+    # carries every value and params/ the particle count and the seed.
+    (wd / "ovr.toml").write_text(to_toml(NML_TWIN.format(root="ovr", extra="", bextra="")))
+    r = run([str(exe), "ovr.toml", "run.out_root=ovr2", "beam.n_particle=512", "run.ran_seed=778"], wd)
+    ok = (r.returncode == 0 and (wd / "ovr2.stats.h5").exists()
+          and not (wd / "ovr.stats.h5").exists()
+          and "Override: run.out_root = \"ovr2\"" in r.stdout
+          and "Override: beam.n_particle = 512" in r.stdout)
+    if ok:
+        with h5py.File(wd / "ovr2.stats.h5") as h5:
+            echo = h5["meta/input_echo"][()].decode()
+            ok = (int(h5["params/beam/n_particle"][()]) == 512
+                  and int(h5["params/run/ran_seed"][()]) == 778
+                  and 'out_root = "ovr2"' in echo and "n_particle = 512" in echo
+                  and "ran_seed = 778" in echo)
+    check("run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow",
+          ok, note=f"[exit {r.returncode}]")
+
+    # The deck's own refusals, reached from the command line: a key no table has, a key
+    # in the wrong table, a value outside its bounds, and an argument that is not
+    # key=value.
+    cases = [("run.wake_on=true", "wake_on IS NOT A KEY OF [run]", "a key no table has"),
+             ("beam.lambda0=1e-10", "belongs in [field]", "a key in the wrong table"),
+             ("beam.n_particle=-5", "OUTSIDE ITS RANGE", "a value outside its bounds"),
+             ("beam.n_particle", "IS NOT key=value", "an argument without ="),
+             ("n_particle=512", "NAMES NO TABLE", "a key without its table")]
+    for arg, text, what in cases:
+        r = run([str(exe), "ovr.toml", arg], wd)
+        ok = r.returncode != 0 and text in r.stdout and not (wd / "ovr.stats.h5").exists()
+        check(f"{what} on the command line is refused ({arg})", ok, note=f"[{text}]")
+
+    # ------------------------------------------------------------------
     print("== the comb (run.comb_ds_save) ==")
 
     # Every-record baseline (comb 0, the default), a spaced comb, and no comb.

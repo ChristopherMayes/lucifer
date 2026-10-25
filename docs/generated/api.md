@@ -3217,30 +3217,38 @@ Every key the deck can set is in the schema's table, and a key the table does no
 name is refused with the keys of its table, so a misspelling cannot pass as a
 default. A key in the wrong table is refused with the table it belongs in. The lattice
 is required, and everything else keeps the declarations' defaults when absent.
+
+A key can also be set on the command line, after the deck, as table.key=value with the
+value in TOML syntax, lucifer deck.toml beam.n_particle=4096 run.out_root=s7. A bare
+value for a string key is quoted, since the shell strips the quotes. The overrides are
+one TOML text parsed in memory and read through the same walk after the deck, so an
+override is refused as a deck line is.
 ```
 
 (api-fel-read-deck)=
 ### `fel_read_deck`
 
-*Subroutine* `(deck_file, run, err_flag)`
+*Subroutine* `(deck_file, run, err_flag, overrides)`
 
 ```
-Routine to read a TOML deck into the input structures of run. The Bmad switches of the
-[bmad] table set bmad_com and space_charge_com directly, since they are Bmad's own
-globals.
+Routine to read a TOML deck into the input structures of run, and then the overrides
+given on the command line. The Bmad switches of the [bmad] table set bmad_com and
+space_charge_com directly, since they are Bmad's own globals.
 ```
 
 ```
 Input:
   deck_file  -- character(*): The deck.
+  overrides  -- character(*), optional: The arguments after the deck, each
+                  table.key=value or lattice=value with the value in TOML syntax.
 
 Output:
   run        -- fel_run_struct: Input structures filled (global, winit, slicing,
                   chamber_wake, space_charge, beam_init, resample, bparam, lat_file,
                   field_file). Nothing else is touched.
   err_flag   -- logical: Set when the file does not parse, a key is unknown or in the
-                  wrong table, a value has the wrong type or is outside its bounds, or
-                  the lattice is missing.
+                  wrong table, a value has the wrong type or is outside its bounds, the
+                  lattice is missing, or an override is not table.key=value.
 ```
 
 ## `fel_io_mod.f90`
@@ -6832,10 +6840,11 @@ There are three ways in, all through the same input file:
 Time dependence follows from the starting state alone. A multi-slice window makes a
 time-dependent run, and a single slice makes the steady state. There is no separate
 switch. A key the schema does not name is refused with the keys of its table, and a
-key in the wrong table with the table it belongs in.
+key in the wrong table with the table it belongs in. The arguments after the deck set
+keys of the deck, each table.key=value, read through the same schema after it.
 
 Usage:
-  lucifer <deck.toml>
+  lucifer <deck.toml> [<table>.<key>=<value> ...]
   lucifer --schema <schema.json>
 ```
 

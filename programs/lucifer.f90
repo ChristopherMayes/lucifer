@@ -33,10 +33,11 @@
 ! Time dependence follows from the starting state alone. A multi-slice window makes a
 ! time-dependent run, and a single slice makes the steady state. There is no separate
 ! switch. A key the schema does not name is refused with the keys of its table, and a
-! key in the wrong table with the table it belongs in.
+! key in the wrong table with the table it belongs in. The arguments after the deck set
+! keys of the deck, each table.key=value, read through the same schema after it.
 !
 ! Usage:
-!   lucifer <deck.toml>
+!   lucifer <deck.toml> [<table>.<key>=<value> ...]
 !   lucifer --schema <schema.json>
 !-
 
@@ -66,14 +67,17 @@ type (fel_run_struct), target :: run
 integer n_arg, iu_k, i_k
 logical err, dev_usable
 character(400) param_file
+character(400), allocatable :: overrides(:)
 character(256) dev_reason
 character(64) dev_name
 character(*), parameter :: r_name = 'lucifer'
 
 !
 
-! The one argument is the deck. The examples name it lucifer.toml by convention. No name
-! is looked for here. --schema <file> writes the deck's schema as JSON Schema and stops.
+! The first argument is the deck. The examples name it lucifer.toml by convention. No name
+! is looked for here. The arguments after it are overrides, table.key=value, which
+! fel_read_deck applies after the deck. --schema <file> writes the deck's schema as JSON
+! Schema and stops.
 
 ! The run clock starts before anything is read. So the footer's run total covers the
 ! whole process, and the work outside the walk is the difference.
@@ -96,18 +100,20 @@ if (n_arg == 2) then
     stop
   endif
 endif
-if (n_arg /= 1) then
+if (n_arg == 0) then
   call out_io (s_blank$, r_name, [ &
         'Usage:                                                                  ', &
-        '  lucifer <deck.toml>                                                   ', &
+        '  lucifer <deck.toml> [<table>.<key>=<value> ...]                       ', &
         '  lucifer --schema <schema.json>                                        ', &
         '                                                                        ', &
         'One TOML deck names the lattice and holds the tables [run], [window],   ', &
         '[beam], [field], [wake], [space_charge] and [bmad]. Any file name works.', &
         'The examples name theirs lucifer.toml by convention, which is a         ', &
-        'convention rather than a default looked for here. --schema writes the   ', &
-        'deck''s schema as JSON Schema. docs/ documents every key, every output   ', &
-        'file and the lattice attributes.                                        '])
+        'convention rather than a default looked for here. An argument after the ', &
+        'deck sets one key of it, beam.n_particle=4096 or run.out_root=s7, read  ', &
+        'after the deck through the same schema. --schema writes the deck''s      ', &
+        'schema as JSON Schema. docs/ documents every key, every output file and ', &
+        'the lattice attributes.                                                 '])
   ! Separate from the block above. A character array constructor needs every element the
   ! same length, and the length of the version string is not known here.
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
@@ -127,8 +133,12 @@ if (n_arg /= 1) then
   stop 1
 endif
 call get_command_argument (1, param_file)
+allocate (overrides(n_arg-1))
+do i_k = 2, n_arg
+  call get_command_argument (i_k, overrides(i_k-1))
+enddo
 
-call fel_read_deck (param_file, run, err)
+call fel_read_deck (param_file, run, err, overrides)
 if (err) stop 1
 
 call fel_setup_lattice (run, err)

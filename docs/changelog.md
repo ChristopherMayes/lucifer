@@ -9,6 +9,21 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Added: a key of the deck can be set on the command line, after the deck, as
+  `table.key=value`, `lucifer lucifer.toml beam.n_particle=4096 run.out_root=s7`. The value is TOML,
+  and a bare value for a string key is quoted, since the shell strips the quotes. `fel_read_deck`
+  takes the arguments after the deck, assembles them into one TOML text, a heading and a key for
+  each dotted name, parses it in memory with toml-f and reads it through the same table walk after
+  the deck, so an unknown key, a key in the wrong table, a wrong type and a value outside its bounds
+  are refused with the deck's own messages, and an argument without `=` or without its table is
+  refused with the form. Each override applied is printed before the header, and the echo in
+  `meta/input_echo` and the record under `params/` carry the resolved values. `programs/lucifer.f90`
+  passes the arguments, and its usage text gives the form. `tests/scripts/check_program.py` runs
+  the smoke lattice with `run.out_root`, `run.ran_seed` and `beam.n_particle` overridden and reads
+  them back from the output root, the echo and `params/`, and runs five refusals from the command line, a key no table
+  has, a key in the wrong table, a value outside its bounds, an argument without `=` and a key
+  without its table. The overrides are one TOML text of dotted keys, since a heading per override
+  is refused on the second key of one table.
 - 2026-10-24 Changed: the deck is one TOML file, read through a schema that is the program's, and
   the three namelist groups are gone. `src/fel_schema_mod.f90` holds one table of every key the deck
   can set, 106 keys in nine tables, each with its TOML table and name, its type, its unit, its

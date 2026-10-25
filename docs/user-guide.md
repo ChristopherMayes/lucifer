@@ -56,6 +56,14 @@ lucifer lucifer.toml
 
 The name is an argument and any name works. `lucifer.toml` is the convention the examples follow, so that a directory reads the same way twice, and it is not a default the program looks for. Running `lucifer` with no argument prints that much, the Bmad version it was built against and the device backend this build carries.
 
+A key of the deck can be set on the command line, after the deck, as `table.key=value`:
+
+```
+lucifer lucifer.toml beam.n_particle=4096 run.out_root=s7
+```
+
+The value is TOML: a number, `true` or `false`, a quoted string or a bracketed list, and a bare value for a string key is quoted for you, since the shell strips the quotes. The overrides are read after the deck through the same schema, so an unknown key, a key in the wrong table, a wrong type and a value outside its bounds are refused as they are in the deck, and each override applied is printed before the run's header. The echo in `meta/input_echo` and the record under `params/` carry the resolved values, so a scan over one key is a shell loop over one deck.
+
 The file vocabulary of a run has four extensions:
 
 | Extension | Written by | What it is |
