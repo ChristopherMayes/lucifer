@@ -37,7 +37,7 @@ Its four decks are the `*.in` files beside it. The estimate-against-the-clock ta
 The sampling split is taken on macOS with:
 
 ```
-OMP_NUM_THREADS=12 build-release/bin/lucifer <deck>.in &
+OMP_NUM_THREADS=12 build-release/bin/lucifer <deck>.toml &
 sample $(pgrep -n lucifer) 15 1 -file prof.txt -mayDie
 ```
 
