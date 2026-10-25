@@ -23,7 +23,7 @@
         "source_filter_tolerance": {"type": "number", "default": 7.5e-1, "exclusiveMinimum": 0.0, "exclusiveMaximum": 1.0e0, "description": "The largest fraction of source intensity the filter may remove inside the protected angle."},
         "source_filter_xcut": {"type": "number", "default": 0.0, "minimum": 0.0, "description": "The edge in Genesis4's own unit, the shifted grid index over ngrid. Validation only."},
         "source_filter_ycut": {"type": "number", "default": 0.0, "minimum": 0.0, "description": "The edge in Genesis4's own unit, the shifted grid index over ngrid. Validation only."},
-        "source_filter_width": {"type": "number", "default": 5.000000074505806e-2, "exclusiveMinimum": 0.0, "description": "The sigmoid's width as a fraction of its edge. Small is a sharp edge."},
+        "source_filter_width": {"type": "number", "default": 5.0e-2, "exclusiveMinimum": 0.0, "description": "The sigmoid's width as a fraction of its edge. Small is a sharp edge."},
         "source_filter_mutate": {"type": "boolean", "default": false, "description": "Self-test of the filter check: apply the sigmoid to the propagated field instead of the source."},
         "track_start": {"type": "string", "default": "", "description": "Element locator opening the walk. Blank is the first element."},
         "track_end": {"type": "string", "default": "", "description": "Element locator closing the walk. Blank is the last element."},

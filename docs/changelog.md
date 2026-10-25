@@ -9,6 +9,16 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Fixed: the default of `run.source_filter_width` is declared in double precision,
+  `0.05_rp` in `src/fel_struct.f90` where it was `0.05`, a single-precision literal that the
+  declaration widened to `5.000000074505806e-2`, the one input default so declared. The sigmoid's
+  width was wrong by 7.5e-10 of itself on every run that left it unset. The eleven benchmark tiers
+  land on their recorded digits, and seven of the examples move at a peak: the record the mode peak
+  or the power peak sits at moves by one, 0.08 m, with the power at it unmoved to four digits, and
+  the bunching at the mode peak with it, `0.3014` to `0.3020` for the steady state, since the peak
+  is the highest of records that differ in their last digits. The old width given as an override,
+  `run.source_filter_width=0.05000000074505806`, brings every old digit back, which is what traces
+  the move to the constant. `examples/measured.tsv` and the example pages carry the new digits.
 - 2026-10-24 Changed: the echo in `meta/input_echo` and the defaults in the schema write a real
   with the fewest significant digits, 15 to 17, that read back to the same value, so `0.05` reads
   `5.0e-2` where it read `5.0000000000000003e-2`, and `2.5e-3` and `2.0e-1` likewise, while a value

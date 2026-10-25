@@ -228,7 +228,7 @@ where the two builds agree to every printed digit.
 | seed containment at the default edge | 1.0000e+00 | same | >= 9.9000e-01 |
 | the filter is untouched on an unaveraged line | 0.0000e+00 | same | <= 1.0000e-09 |
 | the filter is untouched on a coherent source | 0.0000e+00 | same | <= 1.0000e-09 |
-| the filter moves on a mixed line, two averaged segments of three | 1.1539e-03 | same | >= 1.0000e-09 |
+| the filter moves on a mixed line, two averaged segments of three | 1.1535e-03 | same | >= 1.0000e-09 |
 
 (val-levels-fp32-lockstep)=
 ### `fp32-lockstep`
@@ -398,7 +398,7 @@ where the two builds agree to every printed digit.
 | the source row with the quantum 24 bits coarser | 1.4673e-05 | same | <= 1.4688e-05 |
 | refused: a quantum 30 bits coarser, one past the floor |  | same | holds |
 | refused: harmonics together with two live polarizations |  | same | holds |
-| source filter, device vs CPU window power | 1.2394e-05 | same | <= 1.0000e-03 |
+| source filter, device vs CPU window power | 1.2393e-05 | same | <= 1.0000e-03 |
 | source filter on the device removes wide-angle power | 1.0083e+02 | same | >= 1.5000e+00 |
 | refused: source_filter_mutate on the device |  | same | holds |
 | unaveraged lockstep steady worst_x | 1.1317e-06 | same | <= 3.5000e-06 |
@@ -849,11 +849,11 @@ where the two builds agree to every printed digit.
 | frames: the unaveraged run wrote a series | 0.0000e+00 | same | <= 5.0000e-01 |
 | frames: every unaveraged frame names its method | 0 | same | <= 5.0000e-01 |
 | frames: the series lands inside the undulator, not only at its ends | 0.0000e+00 | same | <= 5.0000e-01 |
-| frame vs row: per-slice bunching from the frame's particles | 4.7844e-15 | 3.4313e-15 | <= 2.0000e-12 |
+| frame vs row: per-slice bunching from the frame's particles | 4.7809e-15 | 3.4313e-15 | <= 2.0000e-12 |
 | frame vs row: per-slice transverse centroid from the frame's particles, no conversion | 2.7105e-20 | same | <= 1.0000e-14 |
-| frame vs row: per-slice power from the field frame | 6.6651e-16 | same | <= 1.0000e-10 |
-| frame vs row: the transverse projection integrates to the record's power | 3.8577e-15 | same | <= 1.0000e-10 |
-| frame vs row: the slice projection integrates to each slice's power | 4.2818e-15 | 4.0779e-15 | <= 1.0000e-10 |
+| frame vs row: per-slice power from the field frame | 9.1601e-16 | same | <= 1.0000e-10 |
+| frame vs row: the transverse projection integrates to the record's power | 3.6380e-15 | 3.8199e-15 | <= 1.0000e-10 |
+| frame vs row: the slice projection integrates to each slice's power | 4.3620e-15 | 4.2127e-15 | <= 1.0000e-10 |
 | range: the beam frame's patch count is the range | 0 | same | <= 5.0000e-01 |
 | range: the field frame carries the range's slices | 0 | same | <= 5.0000e-01 |
 | range: the cut field's mesh starts at its first slice's z [m] | 0.0000e+00 | same | <= 1.0000e-18 |

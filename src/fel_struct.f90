@@ -141,7 +141,7 @@ type fel_global_struct
   ! edge. Genesis4's own default of 1 leaves the sigmoid at 0.73 on axis. That attenuates
   ! the coherent source as much as the wide angles and delays saturation
   ! (fel-physics.md sec-source-filter).
-  real(rp) :: source_filter_width = 0.05
+  real(rp) :: source_filter_width = 0.05_rp
   ! Self-test of the filter check, as fp32_mutate is for the FP32 check: apply the
   ! sigmoid to the propagated field instead of to the source. Both suppress wide angles,
   ! so the run still completes and looks reasonable. Only the comparison against
