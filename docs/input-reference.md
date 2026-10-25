@@ -9,9 +9,9 @@ This page is the normative reference for every key of the input file: its defaul
 | [`[window]`](#param-slicing) | The longitudinal discretization: the time window and the slice spacing |
 | [`[beam]`](#group-fel-beam-init) | The bunch description, the load and its switches, the files, and `[beam.resample]`, the resampler |
 | [`[field]`](#group-fel-wavefront-init) | The radiation starting condition and the field files |
-| [`[wake]`](#chamber-wakes) | The chamber wake, with Genesis4's `&wake` names |
-| [`[space_charge]`](#space-charge) | The space-charge solver |
-| [`[bmad]`](#bmads-own-switches) | The Bmad switches the tracker honors, `bmad_com` and `space_charge_com` |
+| [`[wake]`](#input-wake) | The chamber wake, with Genesis4's `&wake` names |
+| [`[space_charge]`](#input-space-charge) | The space-charge solver |
+| [`[bmad]`](#input-bmad) | The Bmad switches the tracker honors, `bmad_com` and `space_charge_com` |
 
 Per-element settings are [lattice attributes](#lattice-attributes) rather than input keys. How to build and run is [](user-guide.md). What the outputs hold is [](reading-output.md). The measured levels are [](validation.md). The physics is the manual, [](fel-physics.md). Every resolved input is echoed into the stats file's `meta/input_echo` as a complete input file, defaults made explicit, and recorded key by key under `params/`.
 
@@ -112,6 +112,7 @@ Note: this is the selecting half of Tao's comb and not the whole of it. `save_a_
 (param-global-record-environment)=
 **`run.record_environment`** is off by default because a statistics file is meant to travel, attached to a paper or mailed to a collaborator, and the user name and working directory identify a person and a machine. The timestamp and the Bmad version identify the run without them. See [](fel-physics.md#sec-meta).
 
+(input-bmad)=
 ### `[bmad]`: Bmad's own switches
 
 The `[bmad]` table sets the `bmad_com` and `space_charge_com` switches the tracker honors, as Tao sets them, and their defaults are Bmad's. Two matter most here.
@@ -123,6 +124,7 @@ The `[bmad]` table sets the `bmad_com` and `space_charge_com` switches the track
 
 Both are off by default, matching Genesis4's `&sponrad`. Fluctuations with `run.migrate = true` are refused: the quiet start cancels per beamlet, and migration scrambles the grouping. See [](fel-physics.md#sec-eom).
 
+(input-wake)=
 ### `[wake]`: the chamber wake
 
 The names are Genesis4's `&wake` names. Bmad element wakes are a separate mechanism, described under [element wakes](#element-wakes) below.
@@ -140,6 +142,7 @@ The names are Genesis4's `&wake` names. Bmad element wakes are a separate mechan
 
 The three kernels, their numerical impedance and the causal convolution are in [](fel-physics.md#sec-wakes).
 
+(input-space-charge)=
 ### `[space_charge]`
 
 Whether space charge acts is not in `[space_charge]`. It is the element's own `space_charge_method`, described with the other [lattice attributes](#lattice-attributes), and this group holds only the solver's numbers. A run with no element asking for it never reaches them.
@@ -217,8 +220,8 @@ The analytic loader honors the fields above and refuses every other `beam_init` 
 The names are Genesis4's `&importdistribution` names where an equivalent exists. `window.n_wavelength`, `ran_seed` and the seed field are shared with the generator: one seed governs generation, resampling and noise.
 
 ```{include} generated/input-keys.md
-:start-after: <!-- begin keys-beam.resample -->
-:end-before: <!-- end keys-beam.resample -->
+:start-after: <!-- begin keys-beam-resample -->
+:end-before: <!-- end keys-beam-resample -->
 ```
 
 On the user's path the counts are `beam.n_particle` and `beamlet_size`. Genesis4's `match` and `center` are not ported: a Bmad lattice carries its Twiss and `beam_init` generates matched bunches already. The method is in [](fel-physics.md#sec-import).
