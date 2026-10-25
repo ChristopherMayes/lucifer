@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Changed: `lucifer.plot` labels curves with symbols and draws the layout in
+  LUME-Genesis's colors. With `tex=True`, the default of `plot` and `summary`, a curve that
+  openpmd-beamphysics has a name for, `sigma_x`, `norm_emit_x`, `energy`, `sigma_energy` and the
+  Twiss quantities of `beam/bunch` and `beam/slice_twiss`, is labeled by `beamphysics.labels.texlabel`,
+  so the beam sizes read $\sigma_x$; power, bunching, the field's sizes and emittances, the energy
+  change and the harmonics' powers take symbols of their own; any other curve keeps the file's
+  `@long_name`, as all do with `tex=False`. The layout draws each FEL element's `aw` as a red box on
+  its own axis and each quadrupole's `k1` as a blue box on a twin axis at the right, at their values,
+  with the two zeros at one height, in place of boxes scaled to fit. Every box has an edge in its
+  color: a 0.08 m quadrupole on the 57 m SASE line is a pixel wide at its true length, and without
+  the edge it rendered nearly invisible. The examples' and the Python page's figures are redrawn.
 - 2026-10-25 Added: the Plotting section of `docs/python.md` shows the figures its examples draw,
   the power and bunching against s, the rms beam and field sizes, the projected and slice-average
   emittances at the element ends, and the summary figure, each under the code that draws it, from

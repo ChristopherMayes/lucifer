@@ -53,18 +53,19 @@ def main():
         plot("sase.stats.h5", y="field/total/power", y2="beam/slice/bunching", yscale="log")
         # end example: plot-power
         fig = save("power")
-        main_ax, layout_ax, twin_ax = fig.axes
-        expect("power", main_ax.get_ylabel() == "power (MW)" and twin_ax.get_ylabel() == "bunching"
-               and len(layout_ax.patches) >= 12, f"[{main_ax.get_ylabel()} | {twin_ax.get_ylabel()}; "
-               f"{len(layout_ax.patches)} elements drawn]")
+        main_ax, layout_ax, twin_ax, k1_ax = fig.axes
+        expect("power", main_ax.get_ylabel() == "$P$ (MW)" and twin_ax.get_ylabel() == "$|b|$"
+               and len(layout_ax.patches) == 12 and len(k1_ax.patches) == 12,
+               f"[{main_ax.get_ylabel()} | {twin_ax.get_ylabel()}; {len(layout_ax.patches)} undulators "
+               f"and {len(k1_ax.patches)} quadrupoles drawn]")
 
         # example: plot-sizes
         plot("sase.stats.h5", y=["beam_size_x", "field_size_x"])
         # end example: plot-sizes
         fig = save("sizes")
         labels = [t.get_text() for t in fig.axes[0].get_legend().get_texts()]
-        expect("sizes", fig.axes[0].get_ylabel() == "rms beam size, rms field size (µm)"
-               and labels == ["rms beam size x", "rms field size x"],
+        expect("sizes", fig.axes[0].get_ylabel() == r"$\sigma_{ x }, \sigma_{x,\mathrm{field}}$ (µm)"
+               and labels == [r"$\sigma_{ x }$", r"$\sigma_{x,\mathrm{field}}$"],
                f"[{fig.axes[0].get_ylabel()}; legend {labels}]")
 
         # example: plot-components
@@ -72,7 +73,7 @@ def main():
              labels=["projected", "slice average"])
         # end example: plot-components
         fig = save("emittance")
-        expect("emittance", fig.axes[0].get_ylabel() == "norm_emit (nm rad)",
+        expect("emittance", fig.axes[0].get_ylabel() == r"$\epsilon_{n, x}$ (nm rad)",
                f"[{fig.axes[0].get_ylabel()}]")
 
         # example: summary
@@ -81,7 +82,8 @@ def main():
         summary("sase.stats.h5")
         # end example: summary
         fig = save("summary")
-        expect("summary", len(fig.axes) == 12, f"[{len(fig.axes)} axes, ten panels and two layouts]")
+        expect("summary", len(fig.axes) == 14,
+               f"[{len(fig.axes)} axes, ten panels and two layouts with their k1 axes]")
         plt.close("all")
 
     print(f"python_page_figures: {4 - len(failed)} of 4 figures written to {out}"

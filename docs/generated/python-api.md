@@ -747,7 +747,7 @@ module costs nothing beyond numpy. They come with the extra lucifer[plot].
 (pyapi-lucifer-plot-plot)=
 ### `plot`
 
-*Function* `plot(stats, y='field/total/power', x='s', y2=(), xlim=None, ylim=None, ylim2=None, yscale='linear', yscale2='linear', include_layout=True, include_legend=True, return_figure=False, ax=None, reduce=None, labels=None)`
+*Function* `plot(stats, y='field/total/power', x='s', y2=(), xlim=None, ylim=None, ylim2=None, yscale='linear', yscale2='linear', include_layout=True, include_legend=True, return_figure=False, ax=None, reduce=None, labels=None, tex=True)`
 
 ```
 Plot curves of a stats file against s, the form of LUME-Genesis's plot().
@@ -760,14 +760,17 @@ brackets, or a derived quantity, as the module docstring describes. ``x`` is "s"
 and coulombs and the mean otherwise. With ``include_layout`` the lattice layout is
 drawn under the axes. With ``ax`` the curves go on that axes and no figure is made,
 which is how summary() builds its panels. ``labels`` names the curves of ``y`` and
-``y2`` in order in the legend, in place of the names the file gives. Returns the
-figure with ``return_figure``.
+``y2`` in order in the legend, in place of the names the file gives. With ``tex`` a
+curve with a symbol is labeled by it, through beamphysics.labels.texlabel where
+openpmd-beamphysics has a name for it, so the beam sizes read sigma_x and sigma_y, and
+without it every curve keeps the file's name. Returns the figure with
+``return_figure``.
 ```
 
 (pyapi-lucifer-plot-summary)=
 ### `summary`
 
-*Function* `summary(stats, return_figure=False)`
+*Function* `summary(stats, return_figure=False, tex=True)`
 
 ```
 The standard figure of a run, each panel made with plot(): radiation power and
@@ -775,20 +778,22 @@ window field energy on log and linear scales, the power inside the split angle w
 the file has it, bunching, the energy change and spread, the rms beam and field
 sizes, the beam's normalized and the field's emittances, a panel per polarization
 when the run carries two, a panel per harmonic when it carries harmonics, and the
-layout under them all. Returns the figure with ``return_figure``.
+layout under them all. ``tex`` is plot()'s. Returns the figure with ``return_figure``.
 ```
 
 (pyapi-lucifer-plot-layout)=
 ### `layout`
 
-*Function* `layout(stats, ax, xfactor=1.0, xlabel=True)`
+*Function* `layout(stats, ax, xfactor=1.0, xlabel=True, ylabels=True)`
 
 ```
-Draw the lattice layout on ``ax`` from the stats file's lattice group: an FEL
-element as a box up from the axis scaled by its aw, an element with a k1 as a box
-scaled by k1 with its sign, and the line itself as a rule. ``xfactor`` divides s, so
-the layout matches a plot drawn with a prefix on s. Nothing is modeled: the extents
-and strengths are the file's.
+Draw the lattice layout on ``ax`` from the stats file's lattice group, in
+LUME-Genesis's colors: each FEL element's aw as a red box on ``ax``, and each element
+with a k1 as a blue box at its k1, with its sign, on a twin axis at the right. Each box
+has an edge in its color, so a quadrupole a pixel wide stays visible at its true
+length. ``xfactor`` divides s, so the layout matches a plot drawn with a prefix on s,
+and ``ylabels`` labels the two axes, a_w and k_1. Nothing is modeled: the extents and
+strengths are the file's.
 ```
 
 (pyapi-lucifer-plot-ploterror)=

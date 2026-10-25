@@ -325,17 +325,17 @@ def page_examples(exe, wd):
     # The plots. The smoke run's power is about 10 MW and its bunching dimensionless, so the
     # labels carry the file's long names and units with the prefix the values take.
     from lucifer.plot import PlotError
-    main_ax, layout_ax, twin_ax = fig.axes
+    main_ax, layout_ax, twin_ax, k1_ax = fig.axes
     labels = (main_ax.get_ylabel(), twin_ax.get_ylabel(), layout_ax.get_xlabel())
-    ok = (labels == ("power (MW)", "bunching", "s (m)") and len(layout_ax.patches) == 1
+    ok = (labels == ("$P$ (MW)", "$|b|$", "$s$ (m)") and len(layout_ax.patches) == 1
           and (page / "n1024-power.png").stat().st_size > 0)
     check("plot: power and bunching on two axes, the file's units with their prefix, the layout under them",
           ok, note=f"[{' | '.join(labels)}; {len(layout_ax.patches)} element drawn]")
-    ok = fig_emit.axes[0].get_ylabel() == "norm_emit (nm rad)"
+    ok = fig_emit.axes[0].get_ylabel() == r"$\epsilon_{n, x}$ (nm rad)"
     check("plot: a component of a dataset on the element-end axis, in its unit", ok,
           note=f"[{fig_emit.axes[0].get_ylabel()}]")
     with read_stats(page / "n1024.stats.h5") as st:
-        n_axes = 12 + ("y" in st.components) + bool(st.harmonics)   # ten panels and two layouts
+        n_axes = 14 + ("y" in st.components) + bool(st.harmonics)   # ten panels, two layouts and their k1 axes
     import matplotlib.image as mpimg
     from lucifer.plot import summary
     shape = mpimg.imread(page / "n1024.png").shape

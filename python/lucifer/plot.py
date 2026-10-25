@@ -56,6 +56,8 @@ M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 # gray, so the color stays with the bold aggregate.
 COLORS = ("#2a78d6", "#eb6834", "#2b9f6a", "#8a5cc2", "#c23b4a", "#8c6d3f")
 GRAY, INK, INK2 = "#b0afa9", "#0b0b0b", "#52514e"
+# The layout's colors, LUME-Genesis's: red for an undulator's aw, blue for a quadrupole's k.
+LAYOUT_AW, LAYOUT_K1 = "red", "blue"
 # The figures' style, applied with matplotlib's rc_context around each figure, so the
 # user's own settings are never changed.
 STYLE = {
@@ -118,6 +120,46 @@ DERIVED = {
     "field_emit_x": ("field emittance", "x", "m rad", lambda st: _field_emit(st, "x")),
     "field_emit_y": ("field emittance", "y", "m rad", lambda st: _field_emit(st, "y")),
 }
+
+
+# The symbol of a curve, for labels drawn with tex. A name that openpmd-beamphysics knows is
+# rendered by its beamphysics.labels.texlabel, so a beam size reads sigma_x as it does in
+# LUME-Genesis; a quantity it has no name for has its own symbol here; any other curve keeps
+# the file's own name.
+BEAMPHYSICS_KEY = {
+    "beam_size_x": "sigma_x", "beam_size_y": "sigma_y",
+    "norm_emit_x": "norm_emit_x", "norm_emit_y": "norm_emit_y",
+    "beam/slice/energy": "energy", "beam/slice/sigma_energy": "sigma_energy",
+}
+SYMBOL = {
+    "field/total/power": "P", "field/total/power_inside_angle": r"P_\mathrm{inside}",
+    "field/total/energy": r"E_\mathrm{field}", "field/x/power": "P_x", "field/y/power": "P_y",
+    "beam/slice/bunching": "|b|", "beam/slice/current": "I",
+    "field_size_x": r"\sigma_{x,\mathrm{field}}", "field_size_y": r"\sigma_{y,\mathrm{field}}",
+    "field_emit_x": r"\epsilon_{x,\mathrm{field}}", "field_emit_y": r"\epsilon_{y,\mathrm{field}}",
+    "energy_change": r"\Delta\langle E\rangle",
+}
+# The Twiss quantities of beam/bunch and beam/slice_twiss, by their beamphysics names.
+TWISS = {"norm_emit": "norm_emit_{c}", "emit": "twiss_emit_{c}", "beta": "twiss_beta_{c}",
+         "alpha": "twiss_alpha_{c}", "gamma": "twiss_gamma_{c}", "eta": "twiss_eta_{c}",
+         "etap": "twiss_etap_{c}", "sigma": "sigma_{c}"}
+
+
+def _symbol(se):
+    """The TeX symbol of a curve, without the dollar signs, or None for the file's name."""
+    from beamphysics.labels import texlabel
+    path = se.name.split("[")[0].strip()
+    if path in BEAMPHYSICS_KEY:
+        return texlabel(BEAMPHYSICS_KEY[path])
+    if path in SYMBOL:
+        return SYMBOL[path]
+    m = re.fullmatch(r"field/harm(\d+)/total/power", path)
+    if m:
+        return f"P_{{{m.group(1)}}}"
+    m = re.fullmatch(r"beam/(?:bunch|slice_twiss)/(?:twiss|modes)/(\w+)", path)
+    if m and m.group(1) in TWISS and se.component:
+        return texlabel(TWISS[m.group(1)].format(c=se.component))
+    return None
 
 
 class _Series:
@@ -226,7 +268,7 @@ def _unit_label(prefix, unit):
 
 
 def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True, named=False,
-          labels=None):
+          labels=None, tex=True):
     """Draw the series on one axes in one unit, and return the axis label. With slices,
     a curve over several slices draws a thin line per slice under its aggregate. With
     named, the legend names each curve by its quantity, as it must when two axes share
@@ -237,6 +279,7 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
                         + ", ".join(f"{se.name} [{se.unit}]" for se in series))
     factor, prefix = _scale(units[0], [se.values for se in series])
     quantities = list(dict.fromkeys(se.quantity for se in series))
+    symbols = [_symbol(se) if tex else None for se in series]
     for k, se in enumerate(series):
         color = COLORS[(first_color + k) % len(COLORS)]
         v, s = se.values / factor, se.s / xfactor
@@ -259,6 +302,8 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
         same = len(quantities) == 1 and len(series) > 1 and not any(x.component for x in series)
         if labels is not None:
             label = labels[k]
+        elif symbols[k] and (len(series) > 1 or named):
+            label = f"${symbols[k]}$"
         elif same:
             # Curves of one quantity with no component, a power and a harmonic's power, are
             # told apart by their paths.
@@ -283,44 +328,64 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
             ax.yaxis.set_major_locator(MaxNLocator(4))
             ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
     multi = len(series) > 1 or any(se.values.shape[1] > 1 for se in series)
-    # The axis carries the quantities and the unit while their names fit beside the axis,
-    # else the first, and the legend names each curve.
-    joined = ", ".join(quantities)
-    name = joined if len(joined) <= 32 else quantities[0]
+    # With tex and a symbol for every curve, the axis carries the symbols, as LUME-Genesis's
+    # mathlabel does. Else it carries the quantities while their names fit beside the axis,
+    # else the first. The legend names each curve.
+    if all(symbols):
+        name = "$" + ", ".join(dict.fromkeys(symbols)) + "$"
+    else:
+        joined = ", ".join(quantities)
+        name = joined if len(joined) <= 32 else quantities[0]
     return name + _unit_label(prefix, units[0]), factor, multi
 
 
-def layout(stats, ax, xfactor=1.0, xlabel=True):
-    """Draw the lattice layout on ``ax`` from the stats file's lattice group: an FEL
-    element as a box up from the axis scaled by its aw, an element with a k1 as a box
-    scaled by k1 with its sign, and the line itself as a rule. ``xfactor`` divides s, so
-    the layout matches a plot drawn with a prefix on s. Nothing is modeled: the extents
-    and strengths are the file's."""
+def layout(stats, ax, xfactor=1.0, xlabel=True, ylabels=True):
+    """Draw the lattice layout on ``ax`` from the stats file's lattice group, in
+    LUME-Genesis's colors: each FEL element's aw as a red box on ``ax``, and each element
+    with a k1 as a blue box at its k1, with its sign, on a twin axis at the right. Each box
+    has an edge in its color, so a quadrupole a pixel wide stays visible at its true
+    length. ``xfactor`` divides s, so the layout matches a plot drawn with a prefix on s,
+    and ``ylabels`` labels the two axes, a_w and k_1. Nothing is modeled: the extents and
+    strengths are the file's."""
     from matplotlib.patches import Rectangle
+    from matplotlib.ticker import FormatStrFormatter
     st, close = _open(stats)
     try:
         s0, s1 = st["lattice/s_start"] / xfactor, st["lattice/s_end"] / xfactor
         aw, k1 = st["lattice/aw"], st["lattice/k1"]
         fel = st["lattice/is_fel"].astype(bool)
-        aw_max = max(float(np.max(np.abs(aw[fel]))) if fel.any() else 0.0, 1e-300)
         quad = (~fel) & (k1 != 0)
-        k_max = max(float(np.max(np.abs(k1[quad]))) if quad.any() else 0.0, 1e-300)
-        ax.axhline(0, color=INK2, lw=0.8, zorder=1)
-        for a, b, isf, w, k in zip(s0, s1, fel, aw, k1):
+        aw_max = float(np.max(np.abs(aw[fel]))) if fel.any() else 1.0
+        k_max = float(np.max(np.abs(k1[quad]))) if quad.any() else 1.0
+        kax = ax.twinx()
+        for a, b, isf, w, k, q in zip(s0, s1, fel, aw, k1, quad):
             if b <= a:
                 continue
             if isf:
-                ax.add_patch(Rectangle((a, 0), b - a, abs(w) / aw_max, color=COLORS[0], alpha=0.8, lw=0))
-            elif k != 0:
-                ax.add_patch(Rectangle((a, 0), b - a, 0.6 * k / k_max, color=COLORS[1], alpha=0.8, lw=0))
-        ax.set_ylim(-0.75, 1.15)
-        ax.set_yticks([])
-        for side in ("left", "right", "top"):
-            ax.spines[side].set_visible(False)
-        ax.grid(False)
+                ax.add_patch(Rectangle((a, 0), b - a, abs(w), facecolor=LAYOUT_AW, edgecolor=LAYOUT_AW,
+                                       alpha=0.5, lw=0.8))
+            elif q:
+                kax.add_patch(Rectangle((a, 0), b - a, k, facecolor=LAYOUT_K1, edgecolor=LAYOUT_K1,
+                                        alpha=0.5, lw=0.8))
+        # The two zeros at one height, so the aw boxes and the quadrupoles share a baseline.
+        ax.set_ylim(-1.15 * aw_max, 1.15 * aw_max)
+        kax.set_ylim(-1.15 * k_max, 1.15 * k_max)
+        for a_ in (ax, kax):
+            a_.grid(False)
+            a_.spines["top"].set_visible(False)
+            a_.tick_params(labelsize=7)
+        if ylabels:
+            ax.set_ylabel("$a_w$", fontsize=8)
+            kax.set_ylabel("$k_1$ (1/m$^2$)", fontsize=8)
+            ax.set_yticks([0, aw_max])
+            kax.set_yticks([-k_max, 0, k_max])
+            for a_ in (ax, kax):
+                a_.yaxis.set_major_formatter(FormatStrFormatter("%g"))
+        else:
+            ax.set_yticks([])
+            kax.set_yticks([])
         if xlabel:
-            prefix = {1.0: ""}.get(xfactor)
-            ax.set_xlabel("s" + (" (m)" if prefix == "" else ""))
+            ax.set_xlabel("$s$ (m)" if xfactor == 1.0 else "$s$")
     finally:
         if close:
             st.close()
@@ -328,7 +393,7 @@ def layout(stats, ax, xfactor=1.0, xlabel=True):
 
 def plot(stats, y="field/total/power", x="s", y2=(), xlim=None, ylim=None, ylim2=None,
          yscale="linear", yscale2="linear", include_layout=True, include_legend=True,
-         return_figure=False, ax=None, reduce=None, labels=None):
+         return_figure=False, ax=None, reduce=None, labels=None, tex=True):
     """Plot curves of a stats file against s, the form of LUME-Genesis's plot().
 
     ``stats`` is a Stats or a path. ``y`` and ``y2`` are a curve or a list of curves for
@@ -339,15 +404,18 @@ def plot(stats, y="field/total/power", x="s", y2=(), xlim=None, ylim=None, ylim2
     and coulombs and the mean otherwise. With ``include_layout`` the lattice layout is
     drawn under the axes. With ``ax`` the curves go on that axes and no figure is made,
     which is how summary() builds its panels. ``labels`` names the curves of ``y`` and
-    ``y2`` in order in the legend, in place of the names the file gives. Returns the
-    figure with ``return_figure``.
+    ``y2`` in order in the legend, in place of the names the file gives. With ``tex`` a
+    curve with a symbol is labeled by it, through beamphysics.labels.texlabel where
+    openpmd-beamphysics has a name for it, so the beam sizes read sigma_x and sigma_y, and
+    without it every curve keeps the file's name. Returns the figure with
+    ``return_figure``.
     """
     import matplotlib.pyplot as plt
     st, close = _open(stats)
     try:
         with plt.rc_context(STYLE):
             fig = _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2,
-                        include_layout, include_legend, ax, reduce, labels)
+                        include_layout, include_legend, ax, reduce, labels, tex)
     finally:
         if close:
             st.close()
@@ -355,14 +423,14 @@ def plot(stats, y="field/total/power", x="s", y2=(), xlim=None, ylim=None, ylim2
 
 
 def _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2, include_layout,
-          include_legend, ax, reduce, labels):
+          include_legend, ax, reduce, labels, tex):
     ys = [y] if isinstance(y, str) else list(y)
     y2s = [y2] if isinstance(y2, str) else list(y2)
     ser = [_series(st, k, x, reduce) for k in ys]
     ser2 = [_series(st, k, x, reduce) for k in y2s]
     if x == "s":
         xfactor, xprefix = _scale("m", [se.s for se in ser + ser2])
-        xlab = f"s ({xprefix}m)"
+        xlab = f"$s$ ({xprefix}m)" if tex else f"s ({xprefix}m)"
     else:
         xfactor, xlab = 1.0, "record"
     lax = None
@@ -379,7 +447,7 @@ def _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2, include_layout,
     if labels is not None and len(labels) != len(ser) + len(ser2):
         raise PlotError(f"labels names {len(labels)} curves and y and y2 hold {len(ser) + len(ser2)}")
     label, factor, multi = _draw(ax, ser, 0, xfactor, yscale, include_legend, named=bool(ser2),
-                                 labels=None if labels is None else labels[:len(ser)])
+                                 labels=None if labels is None else labels[:len(ser)], tex=tex)
     ax.set_ylabel(label)
     if ylim is not None:
         ax.set_ylim(*(v / factor if v is not None else None for v in ylim))
@@ -389,7 +457,7 @@ def _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2, include_layout,
         # The right axis draws aggregates alone, so the two axes' slices do not overlay.
         label2, factor2, _ = _draw(ax2, ser2, len(ser), xfactor, yscale2, include_legend,
                                    slices=False, named=True,
-                                   labels=None if labels is None else labels[len(ser):])
+                                   labels=None if labels is None else labels[len(ser):], tex=tex)
         ax2.grid(False)
         ax2.set_ylabel(label2)
         if ylim2 is not None:
@@ -416,25 +484,25 @@ def _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2, include_layout,
     return fig
 
 
-def summary(stats, return_figure=False):
+def summary(stats, return_figure=False, tex=True):
     """The standard figure of a run, each panel made with plot(): radiation power and
     window field energy on log and linear scales, the power inside the split angle where
     the file has it, bunching, the energy change and spread, the rms beam and field
     sizes, the beam's normalized and the field's emittances, a panel per polarization
     when the run carries two, a panel per harmonic when it carries harmonics, and the
-    layout under them all. Returns the figure with ``return_figure``."""
+    layout under them all. ``tex`` is plot()'s. Returns the figure with ``return_figure``."""
     import matplotlib.pyplot as plt
     st, close = _open(stats)
     try:
         with plt.rc_context(STYLE):
-            fig = _summary(plt, st)
+            fig = _summary(plt, st, tex)
     finally:
         if close:
             st.close()
     return fig if return_figure else None
 
 
-def _summary(plt, st):
+def _summary(plt, st, tex):
     two_pol = "y" in st.components
     harm = st.harmonics
     rows = [["power", "energy"], ["power_lin", "energy_lin"], ["bunching", "gamma"],
@@ -470,12 +538,12 @@ def _summary(plt, st):
         panels["harm"] = dict(y=["field/total/power"] + [f"field/harm{h}/total/power" for h in harm],
                               yscale="log", labels=["fundamental"] + [f"harmonic {h}" for h in harm])
     for key, kw in panels.items():
-        plot(st, ax=axd[key], include_layout=False, **kw)
+        plot(st, ax=axd[key], include_layout=False, tex=tex, **kw)
         axd[key].set_xlabel("")
     xfactor, xprefix = _scale("m", [st.s])
     for key in ("layout_left", "layout_right"):
-        layout(st, axd[key], xfactor=xfactor, xlabel=False)
-        axd[key].set_xlabel(f"s ({xprefix}m)")
+        layout(st, axd[key], xfactor=xfactor, xlabel=False, ylabels=False)
+        axd[key].set_xlabel(f"$s$ ({xprefix}m)" if tex else f"s ({xprefix}m)")
     nslice = st["field/total/power"].shape[1]
     title = st.path.name + (f"   ({nslice} slices; thin lines are individual slices)" if nslice > 1 else "")
     fig.suptitle(title, x=0.02, ha="left", fontsize=11)
