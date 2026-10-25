@@ -4,7 +4,7 @@ The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_from_file.in
-    python ../plot_fel.py import.stats.h5
+    python -m lucifer.plot import.stats.h5
 
 The bunch is described by Bmad's `beam_init_struct`, the native equivalent of what Genesis 1.3 Version 4 (Genesis4)'s `&beam` describes. It is loaded into FEL slices by each of the two `load_mode` settings and tracked dark through the full line: SASE from a real bunch (the manual's [loading section](../../docs/fel-physics.md)).
 

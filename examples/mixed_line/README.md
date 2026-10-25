@@ -4,7 +4,7 @@ The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_averaged.in
-    python ../plot_fel.py mixed_line.stats.h5
+    python -m lucifer.plot mixed_line.stats.h5
 
 The FEL method is an element attribute, so a line whose segments are tracked differently is a line of elements that differ. `mixed.bmad` calls `../aramis.bmad` for its parameters, defines `UNDU` as the same undulator carrying `fel_method = unaveraged`, and puts one `UNDU` in the third FODO cell. Eleven segments run the averaged default and the fifth runs unaveraged, integrating the real helical field with no period averaging (the manual's [unaveraged-mode section](../../docs/fel-physics.md)).
 

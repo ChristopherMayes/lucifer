@@ -67,6 +67,12 @@ class Result:
         from lucifer.stats import read_stats
         return read_stats(self.stats_path)
 
+    def plot(self, **kwargs):
+        """Plot curves of the run's stats file against s: lucifer.plot.plot, which names
+        its arguments. Needs the extra lucifer[plot]."""
+        from lucifer.plot import plot
+        return plot(self.stats_path, **kwargs)
+
     @property
     def files(self) -> list[pathlib.Path]:
         """Every file the footer says the run wrote."""

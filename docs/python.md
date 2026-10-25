@@ -6,10 +6,10 @@ The package `lucifer` under `python/` is the input file as typed Python, a runne
 ## Installing
 
 ```
-pip install -e python
+pip install -e "python[plot]"
 ```
 
-The package needs Python 3.11 or later. The input file, the runner and the schema use the standard library alone, and the readers need `numpy` and `h5py`. In this repository the package is installed into the `bmad-fel-validate` environment with that environment's own pip and `--no-deps`, since the environment's file states every dependency.
+The package needs Python 3.11 or later. The input file, the runner and the schema use the standard library alone, and the readers need `numpy` and `h5py`. The plots need the extra `plot`, which is openpmd-beamphysics and brings matplotlib, so `pip install -e python` installs everything else. In this repository the package is installed into the `bmad-fel-validate` environment with that environment's own pip and `--no-deps`, since the environment's file states every dependency.
 
 (python-schema)=
 ## The schema the package carries
@@ -129,13 +129,44 @@ slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
 python3 validate_bmad_stats.py run.stats.h5
 ```
 
-`examples/plot_fel.py` draws ten panels against `s` straight from a stats file, with an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields:
-
-```
-python3 examples/plot_fel.py run.stats.h5 -o run.png
-```
-
 Units in these files are documentation, never a factor to apply. The values are already SI and eV. That is the opposite of openPMD's `unitSI`, which is why the two never appear in one file.
+
+(python-plot)=
+## Plotting
+
+`lucifer.plot.plot` draws curves of a stats file against `s`, with the lattice layout under them, in the form of LUME-Genesis's `plot`. It takes the file or its path, the curves for the left axis as `y` and for the right as `y2`, their scales, their limits in the file's units, and `include_layout`, `include_legend` and `return_figure`. Each axis is labeled by the curve's `@long_name` and `@unit`, scaled by the SI prefix that openpmd-beamphysics chooses for the values, and a unit with a power or a quotient keeps its stated form. A curve on the record and slice axes is drawn as a thin gray line per slice with the window total bold for watts, joules and coulombs and the slice mean bold for the rest. A curve on the element-end axis is drawn as points at the element ends. The layout comes from the file's `lattice` group, FEL elements as boxes scaled by `aw` and elements with a `k1` as boxes scaled by it with its sign, so no lattice is built in Python. `Stats.plot` and `Result.plot` call it with their own file.
+
+% example: plot
+```python
+from lucifer.plot import plot
+
+fig = plot("n1024.stats.h5", y="field/total/power", y2="beam/slice/bunching",
+           yscale="log", return_figure=True)
+fig.savefig("n1024-power.png")
+```
+
+A curve is a dataset path, a path with components named in brackets by the labels of the dataset's own axes, `coords/plane`, `coords/bmad` or `coords/wavefront`, or one of the derived quantities the module lists with their formulas, the rms sizes, the normalized emittances with the dispersion removed, the energy change and the field emittances. A dataset the file does not have is refused with the datasets its group does have.
+
+% example: plot-components
+```python
+plot("n1024.stats.h5", y=["beam_size_x", "beam_size_y"])    # from the sigma matrix
+plot("n1024.stats.h5", y="beam/bunch/twiss/norm_emit[x]")   # one plane, at element ends
+```
+
+`lucifer.plot.summary` is the standard figure of a run: radiation power and window field energy on log and linear scales with the power inside the split angle, bunching, the energy change and spread, the rms beam and field sizes, the beam's normalized and the field's emittances, a panel per polarization when the run carries two and per harmonic when it carries harmonics, and the layout under them all. Each panel is one call of `plot`. The examples' figures in the documentation are this figure.
+
+% example: summary
+```python
+from lucifer.plot import summary
+
+summary("n1024.stats.h5", return_figure=True).savefig("n1024.png")
+```
+
+The same figure from the command line, by default to `<out_root>.png` in the current directory:
+
+```
+python -m lucifer.plot run.stats.h5 -o run.png
+```
 
 (python-flat)=
 ## Flat text

@@ -13,7 +13,7 @@ The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_transcribed.in
-    python ../plot_fel.py bmad_wake.stats.h5
+    python -m lucifer.plot bmad_wake.stats.h5
 
 This is the resistive-wall wake of `../sase_wake`, delivered through Bmad's own wake machinery instead of the transcribed Genesis 1.3 Version 4 (Genesis4) model. `ztable.wake` is the Bane and Stupakov resistive-wall kernel for a 0.5 mm copper chamber, attached as an `sr_wake` `z_long` table to every element of `wake_lattice.bmad`. The undulators apply it once per element at mid-element across the whole window. The quadrupoles and pipes apply it through Bmad's own `track1_bunch`. The drift slots are pipes here, because a Bmad drift cannot carry a wake.
 

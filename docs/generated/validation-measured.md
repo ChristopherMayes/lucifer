@@ -730,6 +730,10 @@ where the two builds agree to every printed digit.
 | the page's refusal example: LuciferError carries the program's message |  | same | holds |
 | the page's stats example: units and inputs as the page states them |  | same | holds |
 | the page's beam example: the final dump read into slices |  | same | holds |
+| plot: power and bunching on two axes, the file's units with their prefix, the layout under them |  | same | holds |
+| plot: a component of a dataset on the element-end axis, in its unit |  | same | holds |
+| summary: every panel and the layout, written to PNG |  | same | holds |
+| plot: a dataset the file does not have is refused, naming the group's datasets |  | same | holds |
 | the record axis: s non-decreasing, every repeat at an element boundary |  | same | holds |
 | comb > 0: rows == every-record rows at the comb positions (subset) |  | same | holds |
 | comb < 0: the rows are exactly the element ends |  | same | holds |

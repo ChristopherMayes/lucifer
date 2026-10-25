@@ -3,7 +3,7 @@
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    python ../plot_fel.py steady_state.stats.h5
+    python -m lucifer.plot steady_state.stats.h5
 
 This is a seeded, single-slice FEL on the benchmark line (`../aramis.bmad`): a 3 kA slice and a 5 kW Gaussian seed at its waist are tracked through 6 FODO cells of helical undulator. Nothing external is read. The program generates the quiet-start beam and the seed field from the namelist, and the lattice supplies everything else.
 

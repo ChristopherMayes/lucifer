@@ -9,6 +9,26 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: `lucifer.plot` draws curves of a stats file against s with the lattice layout
+  under them, in the form of LUME-Genesis's `plot`: `plot(stats, y, x, y2, xlim, ylim, ylim2, yscale,
+  yscale2, include_layout, include_legend, return_figure, ax, reduce, labels)`, with `Stats.plot` and
+  `Result.plot` calling it. A curve is a dataset path, a path with components named by its axes'
+  labels, `beam/bunch/twiss/norm_emit[x]` or `beam/slice/sigma[x,x]`, or one of nine derived
+  quantities whose formulas the module states, the rms sizes, the normalized emittances, the energy
+  change and the field emittances. Labels come from each dataset's `@long_name` and `@unit`, scaled by
+  the SI prefix openpmd-beamphysics's `nice_scale_prefix` chooses where the unit takes one; a curve
+  on the record and slice axes draws a line per slice under its window total or slice mean, a curve
+  on the element-end axis draws points, and the layout is drawn from the file's `lattice` group. A
+  curve the file cannot give is refused naming what it has. `summary` is the standard figure, each
+  panel one call of `plot` and a layout under each column, and `python -m lucifer.plot <stats.h5>` writes it. openpmd-beamphysics is
+  the extra `lucifer[plot]`, and matplotlib is imported only when a plot is drawn, so the core
+  package keeps no dependency. `examples/plot_fel.py` is removed: it had failed on import since the
+  reader moved into the package, and the examples' figures, which `examples/run_examples.sh` now
+  draws with the module, had not been redrawn since 2026-10-23 and showed the SASE example's power
+  near 4 GW where its record and stats file say 59 MW. The examples script runs the module on the
+  steady-state example even with `--no-figures`, so the keystone's examples job fails on a plotter
+  that fails, and `check_program.py` checks the labels, the layout, the summary's panels and the
+  refusal. The example READMEs say `python -m lucifer.plot`.
 - 2026-10-25 Fixed: `Stats.unit_of` raised `KeyError` for every dataset whose units are per entry,
   `beam/slice/sigma`, `field/x/sigma` and `beam/slice/centroid` among them, since it looked
   `coords/bmad_unit` up as an axis and it is a coordinate on the `bmad` axis. It reads the coordinate

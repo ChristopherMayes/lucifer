@@ -37,7 +37,8 @@ FIGURES=1
 JOBS=0
 
 # The committed figures are read on a page rather than zoomed into, and they live in the
-# repository's history, so they are written below plot_fel.py's own default resolution.
+# repository's history, so they are written below the default resolution of
+# python -m lucifer.plot.
 DPI=110
 
 while [[ $# -gt 0 ]]; do
@@ -77,10 +78,11 @@ if [[ -z "$PYTHON" ]]; then
     if [[ -x "$candidate" ]]; then PYTHON="$candidate"; break; fi
   done
 fi
-# The record of each run and the figures both need the Python with h5py.
+# The record of each run and the figures both need the Python with h5py, and the figures
+# need the package with its extra, lucifer[plot].
 if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
   echo "Error: Python not found, and the figures need h5py and matplotlib." >&2
-  echo "  Create it with: conda env create -f $LUCIFER_DIR/wavefront/tests/environment.yml" >&2
+  echo "  Create it with: conda env create -f $LUCIFER_DIR/tests/environment-validate.yml" >&2
   echo "  Or run with --no-figures to only check that the examples run." >&2
   exit 1
 fi
@@ -220,9 +222,9 @@ run_dir () {   # <dir> <index>
     if [[ -z "$root" || ! -f "$stats" ]]; then
       echo "Error: $dir: no stats file at $stats to plot." > "$STATE/note.$idx"
       status=1
-    elif ! "$PYTHON" plot_fel.py "$stats" --dpi "$DPI" -o "$FIG_DIR/$dir.png" \
+    elif ! "$PYTHON" -m lucifer.plot "$stats" --dpi "$DPI" -o "$FIG_DIR/$dir.png" \
            > "$dir/plot.log" 2>&1 < /dev/null; then
-      echo "Error: $dir: plot_fel.py failed; see $dir/plot.log" > "$STATE/note.$idx"
+      echo "Error: $dir: python -m lucifer.plot failed; see $dir/plot.log" > "$STATE/note.$idx"
       status=1
     fi
   fi
@@ -347,6 +349,15 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_retired_words.py" --root "$LU
   echo " FAIL: a committed file carries a retired word."
   exit 1
 fi
+# The plotting module runs even without figures, on the steady-state example's stats file
+# into a scratch image, so a plotter that fails to import or to draw fails this run.
+if ! "$PYTHON" -m lucifer.plot "$SCRIPT_DIR/steady_state/steady_state.stats.h5" --dpi 40 \
+       -o "$STATE/plot-check.png" > "$STATE/plot-check.log" 2>&1 < /dev/null; then
+  echo " FAIL: python -m lucifer.plot failed on the steady-state example:"
+  tail -20 "$STATE/plot-check.log"
+  exit 1
+fi
+
 if [[ $FIGURES -eq 1 ]]; then
   echo " All examples ran. Figures in docs/generated/examples/."
   echo " Regenerate the pages with tests/scripts/report_examples.py after changing an input file."

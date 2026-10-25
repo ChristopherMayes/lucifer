@@ -5,7 +5,7 @@ The example runs in three commands, with Bmad only:
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_low_m.in
     ../../build-release/bin/lucifer lucifer_reference.in
-    python ../plot_fel.py coherent.stats.h5
+    python -m lucifer.plot coherent.stats.h5
 
 A run whose beam is transversely Gaussian (an idealized machine, a parameter scan, a seeded amplifier study) can trade the per-particle source deposit for Tanaka's coherent retrieval, `run.source_model = "coherent"` (PRAB 27, 030703 (2024), the manual's coherent-source section). It then converges at one to two orders of magnitude fewer macroparticles. With few particles the per-cell source is spiky, and that sampling noise always overestimates the gain. The coherent source carries the slice's exact bunching phasor on a fitted Gaussian instead, so the artifact never enters.
 
@@ -15,4 +15,4 @@ The low-M deposit is the artifact the coherent source removes, and the source fi
 
 The refusals are part of the feature (the manual's coherent-source section). A per-slice Gaussianity test is sized against its own sampling significance, and a profile with real structure is refused. An offset, mismatched or tilted Gaussian beam passes, since the source centers and tilts with the beam's phasor-weighted moments. Harmonic fields, two live polarizations and the unaveraged mode are refused in v1. A dark start is refused, since the coherent model drops the spontaneous, spatially incoherent emission that SASE grows from, and its startup comes out far too low. Seed the field, as here, or use the default deposit.
 
-Plot any run with ../plot_fel.py <root>.stats.h5.
+Plot any run with python -m lucifer.plot <root>.stats.h5.

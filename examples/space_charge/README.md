@@ -6,7 +6,7 @@ The example runs in four commands, with Bmad only:
     ../../build-release/bin/lucifer lucifer_off.in
     ../../build-release/bin/lucifer lucifer_short_range.in
     ../../build-release/bin/lucifer lucifer_gate_off.in
-    python ../plot_fel.py space_charge.stats.h5
+    python -m lucifer.plot space_charge.stats.h5
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../docs/fel-physics.md)). The two terms answer different questions, so this example measures them separately.
 

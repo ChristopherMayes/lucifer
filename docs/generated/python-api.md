@@ -282,6 +282,16 @@ One run: its exit code and output, the input file it ran, and the files it wrote
 The stats file, opened through ``lucifer.stats.read_stats``.
 ```
 
+(pyapi-lucifer-runner-result-plot)=
+#### `Result.plot`
+
+*Method* `plot(**kwargs)`
+
+```
+Plot curves of the run's stats file against s: lucifer.plot.plot, which names
+its arguments. Needs the extra lucifer[plot].
+```
+
 (pyapi-lucifer-runner-result-files)=
 #### `Result.files`
 
@@ -572,6 +582,16 @@ What a derived group sums, from its @derived_from. A caller that adds up the
 children of field/ must skip these or it double-counts.
 ```
 
+(pyapi-lucifer-stats-stats-plot)=
+#### `Stats.plot`
+
+*Method* `plot(**kwargs)`
+
+```
+Plot curves of this file against s: lucifer.plot.plot with this file, which
+names its arguments. Needs the extra lucifer[plot].
+```
+
 (pyapi-lucifer-stats-stats-units-table)=
 #### `Stats.units_table`
 
@@ -675,6 +695,123 @@ Per-slice arrays from a Lucifer particle dump, either format.
 
 wavelength [m] is required for an openPMD dump and optional for a Genesis one, where
 a value that disagrees with the file is an error rather than a silent preference.
+```
+
+(pyapi-lucifer-plot)=
+## `lucifer.plot`
+
+*Module*
+
+```
+Plots of a stats file against s, with the lattice layout under them.
+
+    from lucifer.plot import plot, summary
+    plot("run.stats.h5", y="field/total/power", yscale="log")
+    plot("run.stats.h5", y=["beam_size_x", "beam_size_y"], y2="beam/slice/bunching")
+    summary("run.stats.h5")
+
+    python -m lucifer.plot run.stats.h5 -o run.png
+
+The file describes itself, so a plot needs no table of names: each dataset carries its
+@long_name, its @unit and its @axes, and the lattice group carries each element's
+extent and strength. A curve is named in one of three ways:
+
+  a dataset path            field/total/power
+  a path and components     beam/bunch/twiss/norm_emit[x], beam/slice/sigma[x,x]
+  a derived quantity        beam_size_x, one of the names in DERIVED below
+
+A component is named by the labels of the dataset's own axes, coords/plane, coords/bmad
+or coords/wavefront, and its unit comes from the file through Stats.unit_of. A dataset on
+the record and slice axes is drawn as a thin gray line per slice with the window total
+bold for watts, joules and coulombs and the slice mean bold for everything else. A
+dataset on the element-end axis is drawn as points at the element ends. The values are
+scaled by the SI prefix beamphysics.units chooses where the unit takes one, and a unit
+with a power or a quotient keeps its stated form, since a prefix on m^2 would misstate
+the scale.
+
+The derived quantities are the ones the summary figure needs and the file states only
+inside a matrix, each with its formula:
+
+  beam_size_x, beam_size_y      sqrt(beam/slice/sigma[x,x]), and [y,y]
+  field_size_x, field_size_y    sqrt(field/x/sigma[x,x]), and [y,y]
+  norm_emit_x, norm_emit_y      the projected normalized emittance per slice with the
+                                dispersion removed, Bmad's projected_twiss_calc, from
+                                beam/slice/sigma, beam/slice/centroid and run/p0c
+  energy_change                 beam/slice/energy less its value at the first record
+  field_emit_x, field_emit_y    field/x/emit_x and emit_y where field/x/angle_moments_valid
+
+matplotlib and beamphysics.units are imported inside the functions, so importing this
+module costs nothing beyond numpy. They come with the extra lucifer[plot].
+```
+
+(pyapi-lucifer-plot-plot)=
+### `plot`
+
+*Function* `plot(stats, y='field/total/power', x='s', y2=(), xlim=None, ylim=None, ylim2=None, yscale='linear', yscale2='linear', include_layout=True, include_legend=True, return_figure=False, ax=None, reduce=None, labels=None)`
+
+```
+Plot curves of a stats file against s, the form of LUME-Genesis's plot().
+
+``stats`` is a Stats or a path. ``y`` and ``y2`` are a curve or a list of curves for
+the left and the right axis, each a dataset path, a path with components in
+brackets, or a derived quantity, as the module docstring describes. ``x`` is "s" or
+"record". The limits are in the file's units, before any prefix. ``reduce`` is
+"sum" or "mean" across the slices, and by default the window sum for watts, joules
+and coulombs and the mean otherwise. With ``include_layout`` the lattice layout is
+drawn under the axes. With ``ax`` the curves go on that axes and no figure is made,
+which is how summary() builds its panels. ``labels`` names the curves of ``y`` and
+``y2`` in order in the legend, in place of the names the file gives. Returns the
+figure with ``return_figure``.
+```
+
+(pyapi-lucifer-plot-summary)=
+### `summary`
+
+*Function* `summary(stats, return_figure=False)`
+
+```
+The standard figure of a run, each panel made with plot(): radiation power and
+window field energy on log and linear scales, the power inside the split angle where
+the file has it, bunching, the energy change and spread, the rms beam and field
+sizes, the beam's normalized and the field's emittances, a panel per polarization
+when the run carries two, a panel per harmonic when it carries harmonics, and the
+layout under them all. Returns the figure with ``return_figure``.
+```
+
+(pyapi-lucifer-plot-layout)=
+### `layout`
+
+*Function* `layout(stats, ax, xfactor=1.0, xlabel=True)`
+
+```
+Draw the lattice layout on ``ax`` from the stats file's lattice group: an FEL
+element as a box up from the axis scaled by its aw, an element with a k1 as a box
+scaled by k1 with its sign, and the line itself as a rule. ``xfactor`` divides s, so
+the layout matches a plot drawn with a prefix on s. Nothing is modeled: the extents
+and strengths are the file's.
+```
+
+(pyapi-lucifer-plot-ploterror)=
+### `PlotError`
+
+*Class* `PlotError`
+
+*Bases* `ValueError`
+
+```
+A curve the file cannot give: a dataset it does not have, a component its axes do
+not label, or curves on one axis with different units. The message names what the
+file does have.
+```
+
+(pyapi-lucifer-plot-main)=
+### `main`
+
+*Function* `main(argv=None) -> int`
+
+```
+python -m lucifer.plot <stats.h5> [-o out.png] [--dpi N] [--show]: write the
+summary figure of a run, by default to <out_root>.png in the current directory.
 ```
 
 (pyapi-lucifer-flat)=

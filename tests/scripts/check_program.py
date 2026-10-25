@@ -230,6 +230,8 @@ def page_examples(exe, wd):
     said = io.StringIO()
     old_exe = os.environ.get("LUCIFER_EXE")
     os.environ["LUCIFER_EXE"] = str(exe)
+    # The plots draw into files, never a window.
+    os.environ.setdefault("MPLBACKEND", "Agg")
     try:
         with contextlib.chdir(page), contextlib.redirect_stdout(said):
             # example: run
@@ -280,6 +282,27 @@ def page_examples(exe, wd):
             slices = read_slices("n1024-final.beam.h5", wavelength=inp.field.lambda0)
             slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
             # end example: beam
+
+            # example: plot
+            from lucifer.plot import plot
+
+            fig = plot("n1024.stats.h5", y="field/total/power", y2="beam/slice/bunching",
+                       yscale="log", return_figure=True)
+            fig.savefig("n1024-power.png")
+            # end example: plot
+
+            # example: plot-components
+            plot("n1024.stats.h5", y=["beam_size_x", "beam_size_y"])    # from the sigma matrix
+            plot("n1024.stats.h5", y="beam/bunch/twiss/norm_emit[x]")   # one plane, at element ends
+            # end example: plot-components
+            import matplotlib.pyplot as plt
+            fig_emit = plt.gcf()
+
+            # example: summary
+            from lucifer.plot import summary
+
+            summary("n1024.stats.h5", return_figure=True).savefig("n1024.png")
+            # end example: summary
     finally:
         if old_exe is None:
             os.environ.pop("LUCIFER_EXE")
@@ -302,6 +325,35 @@ def page_examples(exe, wd):
     check("the page's stats example: units and inputs as the page states them", ok)
     ok = slices[0]["n"] == 1024 and len(slices[0]["x"]) == 1024
     check("the page's beam example: the final dump read into slices", ok, note=f"[{slices[0]['n']} particles]")
+
+    # The plots. The smoke run's power is about 10 MW and its bunching dimensionless, so the
+    # labels carry the file's long names and units with the prefix the values take.
+    from lucifer.plot import PlotError
+    main_ax, layout_ax, twin_ax = fig.axes
+    labels = (main_ax.get_ylabel(), twin_ax.get_ylabel(), layout_ax.get_xlabel())
+    ok = (labels == ("power (MW)", "bunching", "s (m)") and len(layout_ax.patches) == 1
+          and (page / "n1024-power.png").stat().st_size > 0)
+    check("plot: power and bunching on two axes, the file's units with their prefix, the layout under them",
+          ok, note=f"[{' | '.join(labels)}; {len(layout_ax.patches)} element drawn]")
+    ok = fig_emit.axes[0].get_ylabel() == "norm_emit (nm rad)"
+    check("plot: a component of a dataset on the element-end axis, in its unit", ok,
+          note=f"[{fig_emit.axes[0].get_ylabel()}]")
+    with read_stats(page / "n1024.stats.h5") as st:
+        n_axes = 12 + ("y" in st.components) + bool(st.harmonics)   # ten panels and two layouts
+    import matplotlib.image as mpimg
+    from lucifer.plot import summary
+    shape = mpimg.imread(page / "n1024.png").shape
+    got = len(summary(page / "n1024.stats.h5", return_figure=True).axes)
+    check("summary: every panel and the layout, written to PNG", got == n_axes and shape[0] > shape[1] > 0,
+          note=f"[{got} axes of {n_axes}, image {shape[1]}x{shape[0]}]")
+    try:
+        plot(page / "n1024.stats.h5", y="field/total/powr")
+        ok, note = False, "[no refusal]"
+    except PlotError as err:
+        ok = "has no dataset field/total/powr" in str(err) and "field/total holds:" in str(err) and "power" in str(err)
+        note = f"[{str(err)[:90]}]"
+    check("plot: a dataset the file does not have is refused, naming the group's datasets", ok, note=note)
+    plt.close("all")
 
 
 def main():

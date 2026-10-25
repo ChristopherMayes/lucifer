@@ -4,7 +4,7 @@ The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_no_migrate.in
-    python ../plot_fel.py migration.stats.h5
+    python -m lucifer.plot migration.stats.h5
 
 A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `run.migrate = true` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.in` is the same run with it off.
 

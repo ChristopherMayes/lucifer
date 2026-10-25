@@ -39,10 +39,10 @@
 !
 ! There is one record axis. Element ends are always recorded whatever the comb
 ! (fel_comb_take). So an element end is a record, and the element-end arrays need no
-! axis of their own: at_element_end selects them. scripts/read_stats.py is the reader
-! everything uses. scripts/bunch_params_from_stats.py reconstructs a bunch_params dict
-! from any (record, slice) of the sufficient statistics. The benchmark checks that at
-! element ends it reproduces the stored twiss.
+! axis of their own: at_element_end selects them. lucifer.stats in the Python package is
+! the reader everything uses. tests/scripts/bunch_params_from_stats.py reconstructs a
+! bunch_params dict from any (record, slice) of the sufficient statistics. The benchmark
+! checks that at element ends it reproduces the stored twiss.
 !
 ! Beam moments are computed in two passes: the mean first, then centered second moments
 ! (the variance rule of fel-physics.md sec-numerics). The one-pass form loses the entire

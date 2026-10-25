@@ -12,7 +12,7 @@ Everything on this page lives in and runs from `examples/sase_wake/`.
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    python ../plot_fel.py sase_wake.stats.h5
+    python -m lucifer.plot sase_wake.stats.h5
 
 This is the `../sase` run through a deliberately narrow copper chamber of 0.5 mm radius, with the undulator gap wake and a 100 nm rough surface added. All three wake families are transcribed from Genesis 1.3 Version 4 (Genesis4) and act as a per-slice energy-loss rate. The resistive wall acts through the numerical impedance of Bane and Stupakov, the gap wake is convolved with dI/ds, and roughness acts through the complex-q contour (the manual's [wakes section](../../fel-physics.md)).
 

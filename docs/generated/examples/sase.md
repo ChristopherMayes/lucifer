@@ -12,7 +12,7 @@ Everything on this page lives in and runs from `examples/sase/`.
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    python ../plot_fel.py sase.stats.h5
+    python -m lucifer.plot sase.stats.h5
 
 This is self-amplified spontaneous emission from nothing but the electrons. The loader generates a time window of slices spaced an integer number of wavelengths apart, imposes physical shot noise by weighted Fawley loading, and starts the field dark (`seed_power = 0`). The FEL then grows through the full line with slippage active. Before imposing the noise the loader prints the per-slice electron count `N_lambda`, the effective count `N_eff`, and the quiet floor it verified. The noise level is therefore a reported number.
 

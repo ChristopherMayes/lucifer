@@ -259,6 +259,12 @@ class Stats:
         children of field/ must skip these or it double-counts."""
         return _list(self._h5[group].attrs.get("derived_from", b""))
 
+    def plot(self, **kwargs):
+        """Plot curves of this file against s: lucifer.plot.plot with this file, which
+        names its arguments. Needs the extra lucifer[plot]."""
+        from lucifer.plot import plot
+        return plot(self, **kwargs)
+
     def units_table(self):
         """Every dataset with its unit, label, description and axes, in file order."""
         return [(name, self.units[name], self.long_name[name], self.axes[name],

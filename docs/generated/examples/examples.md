@@ -13,7 +13,7 @@ The validation benchmark against Genesis4 is in `tests/`. The physics itself, wi
 
     cd examples/<example>
     ../../build-release/bin/lucifer lucifer.toml        # or debug/bin
-    python ../plot_fel.py <out_root>.stats.h5             # needs h5py + matplotlib
+    python -m lucifer.plot <out_root>.stats.h5            # needs pip install -e "python[plot]"
 
 Every input file is named `lucifer.toml`, and variants carry a descriptive suffix: `lucifer_detuned.toml`, `lucifer_transcribed.toml`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
 
@@ -23,7 +23,7 @@ An input file carries no comment beyond the one line that says why a setting dep
 
 `aramis.bmad` is the Benchmark1-SASE line: 6 FODO cells of 3.99 m helical undulator segments, aw = 0.85 rms, 15 mm period, 5.8 GeV, resonant at 1 Angstrom. Most examples call it, and the ones that need a different line carry their own lattice.
 
-`plot_fel.py` draws ten panels against s from any stats file, with an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields. What the panels mean is [reading an output file](../../reading-output.md).
+`python -m lucifer.plot` draws the summary figure of any stats file, ten panels against s with the lattice layout under them, an eleventh when a second polarization is live and a twelfth when the run carries harmonic fields. Each panel is one call of `lucifer.plot.plot`, which [the Python page](../../python.md) describes, and what the panels mean is [reading an output file](../../reading-output.md).
 
 ## The examples
 

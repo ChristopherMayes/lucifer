@@ -6,6 +6,7 @@ schema   the JSON Schema the program writes with lucifer --schema, carried here.
 runner   runs the program on an input file and hands back where its output went.
 stats    reads the stats file.
 beam     reads a particle dump, openPMD or Genesis, into per-slice arrays.
+plot     plots a stats file against s with the lattice layout, and its summary figure.
 
 Nothing here holds a default the program does not, generates anything but the TOML the
 program reads, or checks what the program refuses itself. The program is the source of

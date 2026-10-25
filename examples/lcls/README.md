@@ -3,7 +3,7 @@
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    python ../plot_fel.py lcls.stats.h5
+    python -m lucifer.plot lcls.stats.h5
 
 LCLS at SLAC lased at 1.5 Angstrom in April 2009, the first hard X-ray free-electron laser, and reached saturation within its 132 m undulator. This example is that line at its published numbers: thirty-three planar segments, a coasting slab of the published beam, and SASE from the quiet start. It is the fourth machine the numerical settings are measured on, beside the 0.1 nm Aramis benchmark the other examples use and the 13.7 nm FLASH1 line of `../flash1` ([SASE convergence](../../docs/startup-noise.md)).
 

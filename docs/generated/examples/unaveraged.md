@@ -13,7 +13,7 @@ The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
     ../../build-release/bin/lucifer lucifer_averaged.in
-    python ../plot_fel.py unaveraged.stats.h5
+    python -m lucifer.plot unaveraged.stats.h5
 
 This is one seeded steady-state segment tracked with no period averaging and no resonance approximation (the manual's [unaveraged-mode section](../../fel-physics.md)). The particles ride the real helical field, quiver and all, at 20 integration substeps per period with sin^2 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
 

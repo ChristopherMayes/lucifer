@@ -3,7 +3,7 @@
 The example runs in one command, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    python ../plot_fel.py taper.stats.h5
+    python -m lucifer.plot taper.stats.h5
 
 This is the `steady_state` run over `taper.bmad`. That lattice is `../aramis.bmad` for the first four FODO cells, and the last two cells use a second undulator definition, `UND2`, whose `b_max`, and so `aw`, is 0.4% lower. A step-down taper re-matches the resonance to the beam the FEL has already decelerated, so the power keeps climbing past the point where the untapered line saturates and turns over.
 
