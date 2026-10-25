@@ -239,7 +239,9 @@ class Stats:
             return (self.units[path],), 1
         axis = _text(attrs["unit_of_axis"])
         power = int(np.atleast_1d(attrs["unit_power"])[0])
-        return self.coord(f"{axis}_unit"), power
+        # coords/<axis>_unit is a coordinate on that axis and not an axis of its own, so
+        # it is read directly: coord() resolves axes alone.
+        return tuple(_text(v) for v in self[f"coords/{axis}_unit"]), power
 
     @property
     def meta(self):

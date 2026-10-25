@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Fixed: `Stats.unit_of` raised `KeyError` for every dataset whose units are per entry,
+  `beam/slice/sigma`, `field/x/sigma` and `beam/slice/centroid` among them, since it looked
+  `coords/bmad_unit` up as an axis and it is a coordinate on the `bmad` axis. It reads the coordinate
+  directly. Nothing had called it.
 - 2026-10-25 Added: the Python package is documented. `docs/python.md`, on the site after the page on
   reading the output, describes the install, the schema the package carries and why it is the one
   copy, `Input` and the generated models and what they leave to the program, running the program
