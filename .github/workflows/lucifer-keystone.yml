@@ -98,7 +98,7 @@ jobs:
       # day the job runs, so the release it carries is checked against BMAD_RELEASE below
       # and printed.
       - name: Install the build environment
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
           use-mamba: true
