@@ -9,6 +9,28 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: the Python package carries the deck as typed models, a runner and the readers.
+  `python/lucifer/schema.json` is the one committed copy of the schema, written there by the
+  keystone's `lucifer --schema`, and `python -m lucifer.generate` writes `python/lucifer/models.py`
+  from it, a dataclass per table, `Run`, `Window`, `Beam` with `Resample`, `Field`, `Wake`,
+  `SpaceCharge` and `Bmad`, and `Deck` with the lattice and one of each, every field typed with the
+  program's default and a docstring of the key's description and bounds; the keystone regenerates
+  both and requires no diff, and the docs workflow regenerates the models from the committed
+  schema. `Deck.toml()` writes the keys set away from the defaults, every key with `explicit=True`,
+  `Deck.read` and `Deck.loads` go through `tomllib`, `Deck.from_flat` through the converter, and
+  `deck["beam.n_particle"]` reaches a key by its dotted name; an unknown key is Python's own
+  `TypeError`, and a bound stays the program's. `lucifer.run(deck, cwd, exe, threads, overrides)`
+  writes a `Deck` or takes a deck path, runs the executable named by `exe`, by `LUCIFER_EXE` or
+  found on `PATH`, passes the overrides as `table.key=value` arguments and returns a `Result` with
+  the output, `out_root`, the stats file's path and `.stats` opened through the reader; a nonzero
+  exit raises `LuciferError` with the program's error text. `tests/scripts/read_stats.py` is
+  `lucifer.stats` and `beamio.py` is `lucifer.beam`, moved whole, and the fifteen scripts that
+  imported them import them from the package. `python/tests/test_models.py` holds the models to
+  the schema field by field and the generated file to the generator, round-trips a deck, and runs
+  in the docs workflow; `check_program.py` runs a `Deck` from the models through `lucifer.run` on
+  the smoke lattice and reads every set key back from the echo, an override through it from
+  `params/`, and a refusal through it as `LuciferError`. `docs/user-guide.md` describes the three
+  uses under From Python.
 - 2026-10-24 Fixed: the default of `run.source_filter_width` is declared in double precision,
   `0.05_rp` in `src/fel_struct.f90` where it was `0.05`, a single-precision literal that the
   declaration widened to `5.000000074505806e-2`, the one input default so declared. The sigmoid's

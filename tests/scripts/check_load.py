@@ -46,7 +46,7 @@ import h5py
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import beamio  # noqa: E402
+import lucifer.beam as beamio
 import bunchfile  # noqa: E402
 from checkrec import record  # noqa: E402
 

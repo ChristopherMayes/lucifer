@@ -1,0 +1,163 @@
+"""What a ``Deck`` does: render itself as TOML, read one, and reach a key by its dotted
+name. ``models.Deck`` inherits this, so the generated file holds data alone.
+
+The TOML written here is the program's: a key is written when its value differs from
+the program's default, every key with ``explicit=True``, and nothing is checked that
+the program refuses itself.
+"""
+from __future__ import annotations
+
+import dataclasses
+import pathlib
+import tomllib
+
+
+def toml_value(v) -> str:
+    """One value as TOML text."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float):
+        return repr(v)
+    if isinstance(v, str):
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    if isinstance(v, (list, tuple)):
+        return "[" + ", ".join(toml_value(x) for x in v) + "]"
+    raise TypeError(f"no TOML for {type(v).__name__}: {v!r}")
+
+
+def _default(f: dataclasses.Field):
+    if f.default is not dataclasses.MISSING:
+        return f.default
+    return f.default_factory()
+
+
+def _is_table(f: dataclasses.Field) -> bool:
+    return dataclasses.is_dataclass(f.type) or (isinstance(f.type, str) and f.type[:1].isupper())
+
+
+class DeckOps:
+    """Mixin for the generated ``Deck``."""
+
+    # ------------------------------------------------------------------
+    # TOML out.
+
+    def toml(self, explicit: bool = False) -> str:
+        """The deck as TOML: the keys set away from the program's defaults, or every
+        key with ``explicit``. The lattice is always written."""
+        lines = []
+        for f in dataclasses.fields(self):
+            if _is_table(f):
+                continue
+            v = getattr(self, f.name)
+            if explicit or f.name == "lattice" or v != _default(f):
+                lines.append(f"{f.name} = {toml_value(v)}")
+        for f in dataclasses.fields(self):
+            if _is_table(f):
+                lines += _table_lines(f.name, getattr(self, f.name), explicit)
+        return "\n".join(lines) + "\n"
+
+    def write(self, path, explicit: bool = False) -> pathlib.Path:
+        """Write the deck at ``path`` and return it."""
+        path = pathlib.Path(path)
+        path.write_text(self.toml(explicit))
+        return path
+
+    # ------------------------------------------------------------------
+    # TOML in.
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """A deck from the mapping a TOML parser returns. An unknown key is Python's own
+        TypeError from the dataclass, and a bound is the program's."""
+        kw = {}
+        for f in dataclasses.fields(cls):
+            if f.name not in data:
+                continue
+            kw[f.name] = _table_from(f, data[f.name]) if _is_table(f) else data[f.name]
+        extra = set(data) - {f.name for f in dataclasses.fields(cls)}
+        if extra:
+            raise TypeError(f"the deck has no key {sorted(extra)}")
+        return cls(**kw)
+
+    @classmethod
+    def loads(cls, text: str):
+        """A deck from TOML text."""
+        return cls.from_dict(tomllib.loads(text))
+
+    @classmethod
+    def read(cls, path):
+        """A deck from a TOML file."""
+        return cls.loads(pathlib.Path(path).read_text())
+
+    @classmethod
+    def from_flat(cls, text: str):
+        """A deck from flat ``key = value`` text, through ``lucifer.deck.to_toml``."""
+        from lucifer.deck import to_toml
+        return cls.loads(to_toml(text))
+
+    # ------------------------------------------------------------------
+    # Dotted access: deck["beam.n_particle"].
+
+    def _resolve(self, key: str):
+        obj = self
+        parts = key.split(".")
+        for p in parts[:-1]:
+            obj = getattr(obj, p)
+        if not hasattr(obj, parts[-1]):
+            raise KeyError(key)
+        return obj, parts[-1]
+
+    def __getitem__(self, key: str):
+        obj, name = self._resolve(key)
+        return getattr(obj, name)
+
+    def __setitem__(self, key: str, value) -> None:
+        obj, name = self._resolve(key)
+        setattr(obj, name, value)
+
+    def items(self, explicit: bool = False):
+        """``(dotted key, value)`` pairs, the keys set away from the defaults or every key."""
+        out = []
+        for f in dataclasses.fields(self):
+            if _is_table(f):
+                out += _table_items(f.name, getattr(self, f.name), explicit)
+            elif explicit or f.name == "lattice" or getattr(self, f.name) != _default(f):
+                out.append((f.name, getattr(self, f.name)))
+        return out
+
+
+def _table_from(f: dataclasses.Field, data: dict):
+    cls = f.default_factory
+    kw = {}
+    for sf in dataclasses.fields(cls):
+        if sf.name in data:
+            kw[sf.name] = _table_from(sf, data[sf.name]) if _is_table(sf) else data[sf.name]
+    extra = set(data) - {sf.name for sf in dataclasses.fields(cls)}
+    if extra:
+        raise TypeError(f"[{f.name}] has no key {sorted(extra)}")
+    return cls(**kw)
+
+
+def _table_items(table: str, obj, explicit: bool) -> list:
+    out = []
+    for f in dataclasses.fields(obj):
+        v = getattr(obj, f.name)
+        if _is_table(f):
+            out += _table_items(f"{table}.{f.name}", v, explicit)
+        elif explicit or v != _default(f):
+            out.append((f"{table}.{f.name}", v))
+    return out
+
+
+def _table_lines(table: str, obj, explicit: bool) -> list[str]:
+    own = [(f.name, getattr(obj, f.name)) for f in dataclasses.fields(obj)
+           if not _is_table(f) and (explicit or getattr(obj, f.name) != _default(f))]
+    lines = []
+    if own:
+        lines += ["", f"[{table}]"] + [f"{k} = {toml_value(v)}" for k, v in own]
+    for f in dataclasses.fields(obj):
+        if _is_table(f):
+            lines += _table_lines(f"{table}.{f.name}", getattr(obj, f.name), explicit)
+    return lines

@@ -89,6 +89,38 @@ cd examples/saturation_demo && ./run.sh
 
 The benchmark is a separate thing, described with its commands in [`validation.md`](validation.md).
 
+## From Python
+
+The package under `python/` is the same deck as typed Python, with a runner and the readers of the output files. It has no dependency beyond the standard library for the deck, and `h5py` and `numpy` for the readers:
+
+```
+pip install -e python
+```
+
+`lucifer.Deck` is generated from the schema the program writes, a dataclass per table with the program's defaults, so an editor completes the keys and a misspelled one is Python's own error. A deck is written as the TOML the program reads, the keys set away from their defaults or every key with `explicit=True`, and read back from a file or from the echo a run leaves in `meta/input_echo`:
+
+```python
+from lucifer import Deck, run
+
+deck = Deck(lattice="aramis.bmad")
+deck.beam.n_particle = 4096
+deck["run.out_root"] = "s7"          # a key by its dotted name
+deck.write("s7.toml")                # the TOML the program reads
+same = Deck.read("s7.toml")
+```
+
+`lucifer.run` writes the deck or takes the path of one, runs the executable named by `exe=`, by `LUCIFER_EXE` or found on `PATH`, and returns where the output went. A refusal raises `LuciferError` carrying the program's message. The overrides of the command line pass through, so a scan is a loop:
+
+```python
+result = run(deck, cwd="s7", threads=12)
+power = result.stats["field/total/power"]       # the stats file, through lucifer.stats
+
+for n in (1024, 2048, 4096):
+    run("s7.toml", cwd="s7", overrides=[f"beam.n_particle={n}", f"run.out_root=n{n}"])
+```
+
+The readers are `lucifer.stats` for the stats file, described in [`reading-output.md`](reading-output.md), and `lucifer.beam` for a particle dump in either format. The check scripts under `tests/scripts` are the package's first client. Nothing in the package holds a default the program does not or checks what the program refuses: the schema it carries, `python/lucifer/schema.json`, is written by the program and the keystone regenerates both it and the models.
+
 ## Files
 
 | Path | Contents |

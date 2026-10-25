@@ -49,11 +49,11 @@ import sys
 import h5py
 import numpy as np
 
-import beamio
+import lucifer.beam as beamio
 import convert_genesis
 import fieldio
 from checkrec import record
-from read_stats import read_stats
+from lucifer.stats import read_stats
 from lucifer.deck import to_toml as to_groups
 from scipy.special import jv
 

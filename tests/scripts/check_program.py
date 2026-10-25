@@ -75,11 +75,13 @@ import sys
 import h5py
 import numpy as np
 
-import beamio
+import lucifer.beam as beamio
+from lucifer import Deck, LuciferError
+from lucifer import run as run_lucifer
 from lucifer.deck import to_toml
 import fieldio
 from checkrec import record
-from read_stats import read_stats, same_data
+from lucifer.stats import read_stats, same_data
 
 FAILED = False
 
@@ -301,6 +303,47 @@ def main():
         r = run([str(exe), "ovr.toml", arg], wd)
         ok = r.returncode != 0 and text in r.stdout and not (wd / "ovr.stats.h5").exists()
         check(f"{what} on the command line is refused ({arg})", ok, note=f"[{text}]")
+
+    # ------------------------------------------------------------------
+    print("== the package: a deck from the models, through the runner ==")
+
+    # A Deck built from the models, written by the runner and run on the smoke lattice:
+    # every key set away from a default comes back from the echo in meta/input_echo. The
+    # echo is the resolved deck, so it also carries what setup derived, n_wavelength
+    # here, and is read as a Deck without being equal to the one written.
+    deck = Deck.from_flat(NML_TWIN.format(root="pkg", extra="", bextra=""))
+    deck["beam.n_particle"] = 1024
+    deck.field.harmonics = [1, 3]
+    deck.run.dump_beam_at = ["UND"]
+    try:
+        res = run_lucifer(deck, cwd=wd, exe=exe, threads=4, name="pkg.toml")
+        with h5py.File(res.stats_path) as h5:
+            echo = Deck.loads(h5["meta/input_echo"][()].decode())
+        ok = (res.returncode == 0 and res.out_root == "pkg" and res.stats_path.exists()
+              and all(echo[k] == v for k, v in deck.items())
+              and res.stats_path in res.files and len(res.files) >= 5)
+        note = f"[{len(deck.items())} keys set, {len(res.files)} files]"
+    except LuciferError as err:
+        ok, note = False, f"[LuciferError: {err.message[:200]}]"
+    check("a Deck from the models runs through lucifer.run and echoes every set key", ok, note=note)
+
+    # An override through the runner lands in params/, and a refusal through it raises
+    # with the program's message.
+    try:
+        res = run_lucifer("pkg.toml", cwd=wd, exe=exe, threads=4,
+                          overrides=["run.out_root=pkg2", "run.ran_seed=779"])
+        with h5py.File(res.stats_path) as h5:
+            ok = res.out_root == "pkg2" and int(h5["params/run/ran_seed"][()]) == 779
+    except LuciferError as err:
+        ok = False
+    check("an override through lucifer.run lands in params/ and names the new root", ok)
+    try:
+        run_lucifer("pkg.toml", cwd=wd, exe=exe, threads=4, overrides=["beam.n_particle=-5"])
+        ok, note = False, "[no error raised]"
+    except LuciferError as err:
+        ok = "n_particle = -5 IS OUTSIDE ITS RANGE" in err.message and err.returncode != 0
+        note = f"[exit {err.returncode}: {err.message.splitlines()[0][:80]}]"
+    check("a refusal through lucifer.run raises LuciferError with the program's message", ok, note=note)
 
     # ------------------------------------------------------------------
     print("== the comb (run.comb_ds_save) ==")

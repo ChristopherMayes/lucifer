@@ -70,7 +70,7 @@ import sys
 import h5py
 import numpy as np
 
-import beamio
+import lucifer.beam as beamio
 import fieldio
 from checkrec import record
 from lucifer.deck import to_toml as to_groups

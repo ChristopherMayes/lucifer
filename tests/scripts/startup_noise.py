@@ -76,7 +76,7 @@ import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fieldio  # noqa: E402
-from read_stats import Stats  # noqa: E402
+from lucifer.stats import Stats  # noqa: E402
 
 C_LIGHT = 2.99792458e8
 E_CHARGE = 1.602176634e-19

@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 """
 Read a Lucifer statistics file. The one reader everything in the tree uses.
 
-    from read_stats import read_stats
+    from lucifer.stats import read_stats
     st = read_stats("run.stats.h5")
 
     st.record                    # (nz,) the record axis, 0..nz-1
@@ -13,7 +12,7 @@ Read a Lucifer statistics file. The one reader everything in the tree uses.
     st.coord("plane")            # ('x', 'y', 'z'), the projected planes
     st.dim_coords("beam/slice/sigma")   # the coordinate of each dimension, in order
     st.ele_name                  # (nz,) element name per record, gathered through ix_ele
-    st.run["p0c"]                # what the run produced. st.params["global"]["ran_seed"] is an input
+    st.run["p0c"]                # what the run produced. st.params["run"]["ran_seed"] is an input
 
 The file describes itself (fel-physics.md sec-stats), so this reader hard-codes almost nothing.
 Every dataset carries @unit, @long_name, @description and @axes, and every name in @axes
@@ -322,9 +321,9 @@ if __name__ == "__main__":
     print(f"  {len(st.s)} records, {st.at_end.sum()} element ends, "
           f"{st.run['n_slice']} slices, components {st.components}, "
           f"harmonics {st.harmonics}")
-    wi = st.params.get("wavefront_init", {})
-    print(f"  window: lambda0 {wi.get('lambda0', float('nan')):.4e} m, sample "
-          f"{wi.get('n_wavelength', 0)}, spacing {st.run['slice_spacing']:.4e} m, "
+    fi, wn = st.params.get("field", {}), st.params.get("window", {})
+    print(f"  window: lambda0 {fi.get('lambda0', float('nan')):.4e} m, sample "
+          f"{wn.get('n_wavelength', 0)}, spacing {st.run['slice_spacing']:.4e} m, "
           f"head at {st.head_direction}")
     print(f"  axes: {', '.join(f'{a}[{len(st.coord(a))}]' for a in st.axis_names)}")
     m = st.meta

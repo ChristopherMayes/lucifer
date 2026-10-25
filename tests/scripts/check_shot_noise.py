@@ -51,7 +51,7 @@ import numpy as np
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fieldio  # noqa: E402
 
-import beamio
+import lucifer.beam as beamio
 import bunchfile
 from checkrec import record
 from lucifer.deck import to_toml

@@ -95,14 +95,15 @@ python3 tests/scripts/report_api.py \
         --code src --code programs --out docs/generated/api.md
 python3 tests/scripts/report_examples.py \
         --examples examples --out docs/generated/examples
-build-release/bin/lucifer --schema docs/generated/schema.json
+build-release/bin/lucifer --schema python/lucifer/schema.json
+python3 -m lucifer.generate
 python3 tests/scripts/report_input_keys.py \
-        --schema docs/generated/schema.json --out docs/generated/input-keys.md
+        --schema python/lucifer/schema.json --out docs/generated/input-keys.md
 python3 tests/scripts/report_startup_noise.py \
         --json docs/generated/startup-noise --out docs/generated/startup-noise-measured.md
 python3 tests/scripts/report_layouts.py \
         --exe build-release/bin/lucifer --out docs/generated/layouts.md --log /tmp/layouts.log
-git diff --exit-code -- 'docs/generated/*.md' 'docs/generated/schema.json' 'docs/generated/examples/*.md'
+git diff --exit-code -- 'docs/generated/*.md' 'python/lucifer/schema.json' 'python/lucifer/models.py' 'docs/generated/examples/*.md'
 ```
 
 The startup-noise generator writes the measured tables of [](startup-noise.md) from the JSON that `tests/scripts/startup_noise.py` commits beside its figures, one file per machine, and the page includes each table from the generated file. The driver runs on demand and never in the keystone, so the regeneration renders the committed record at no run cost, and the page's provenance table says which commit, build, backend and day measured it.

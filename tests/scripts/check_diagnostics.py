@@ -72,9 +72,9 @@ to_groups = to_toml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
-from read_stats import read_stats, same_data  # noqa: E402
-import beamio  # noqa: E402
-from beamio import read_slices  # noqa: E402
+from lucifer.stats import read_stats, same_data  # noqa: E402
+import lucifer.beam as beamio
+from lucifer.beam import read_slices  # noqa: E402
 import fieldio  # noqa: E402
 
 import validate_bmad_stats  # noqa: E402  The standard's own conformance checker.
@@ -215,7 +215,7 @@ def h5_identical(fa, fb):
     there and nowhere else. Nothing in either is physics. Only datasets are compared, so
     attributes do not enter.
 
-    same_data counts NaN as equal to NaN, which the stats file needs. See read_stats.
+    same_data counts NaN as equal to NaN, which the stats file needs. See lucifer.stats.
     """
     with h5py.File(fa) as a, h5py.File(fb) as b:
         names_a, names_b = [], []

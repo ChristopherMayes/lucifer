@@ -367,7 +367,7 @@ def main():
               "format states it and an openPMD beam does not carry it.")
         return 1
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-    import beamio
+    import lucifer.beam as beamio
     slices = beamio.read_slices(src, a.wavelength, a.sample * a.wavelength)
     try:
         write_genesis_par(dst, slices, a.wavelength, a.sample * a.wavelength)
@@ -413,7 +413,7 @@ def round_trip(src, a):
         groups, scalars = read_genesis_par(src)
         write_openpmd_beam(d / "mid.beam.h5", groups, spacing)
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-        import beamio
+        import lucifer.beam as beamio
         write_genesis_par(d / "back.par.h5", beamio.read_slices(d / "mid.beam.h5", lam, spacing),
                           lam, spacing, scalars["refposition"], scalars["beamletsize"])
         worst = 0.0

@@ -51,12 +51,22 @@ jobs:
 
       # The three conformance checks are standard library only, so nothing else is
       # installed. If one of them ever needs numpy, it stops belonging in this job.
-      # The repository's own Python package, which the conformance checks import.
+      # The repository's own Python package, which the conformance checks import, and
+      # pytest for its tests, which need no executable and no other package.
       - name: Install the package
-        run: python -m pip install -e python --no-deps
+        run: python -m pip install -e python --no-deps pytest
 
       - name: Input-reference conformance
         run: python tests/scripts/check_input_reference.py
+
+      # The models the package carries are generated from its schema, and a schema
+      # edited without regenerating them would leave the two apart. Regenerating here
+      # and requiring no diff is the keystone's check without the build.
+      - name: Models agree with the schema
+        run: python -m lucifer.generate && git diff --exit-code -- python/lucifer/models.py
+
+      - name: Package tests
+        run: python -m pytest python/tests -q
 
       - name: Examples conformance
         run: python tests/scripts/check_examples.py

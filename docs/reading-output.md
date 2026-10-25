@@ -13,10 +13,10 @@ This page is for someone handed a Lucifer output file who never runs the program
 
 ## The Python side
 
-`tests/scripts/read_stats.py` is the one reader everything in the tree uses. Because the file describes itself, it hard-codes no dataset names, so a file that grows a polarization or a harmonic needs no change in it.
+`lucifer.stats` in the Python package is the one reader everything in the tree uses. Because the file describes itself, it hard-codes no dataset names, so a file that grows a polarization or a harmonic needs no change in it.
 
 ```python
-from read_stats import read_stats
+from lucifer.stats import read_stats
 
 with read_stats("run.stats.h5") as st:
     st.s                          # (nz,) path length, a variable on the record axis

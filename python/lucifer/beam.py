@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Read a Lucifer particle dump into per-slice arrays, in either format.
 

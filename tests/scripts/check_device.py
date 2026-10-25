@@ -93,7 +93,7 @@ import sys
 import h5py
 import numpy as np
 
-import beamio
+import lucifer.beam as beamio
 import check_harmonics as ch
 import check_migration as cm
 import check_two_polarization as tp
@@ -101,7 +101,7 @@ import convert_genesis
 import fieldio
 from checkrec import record
 from lucifer.deck import to_toml as to_groups
-from read_stats import read_stats
+from lucifer.stats import read_stats
 
 FAILED = False
 

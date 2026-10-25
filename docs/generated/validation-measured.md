@@ -722,6 +722,9 @@ where the two builds agree to every printed digit.
 | a value outside its bounds on the command line is refused (beam.n_particle=-5) |  | same | holds |
 | an argument without = on the command line is refused (beam.n_particle) |  | same | holds |
 | a key without its table on the command line is refused (n_particle=512) |  | same | holds |
+| a Deck from the models runs through lucifer.run and echoes every set key |  | same | holds |
+| an override through lucifer.run lands in params/ and names the new root |  | same | holds |
+| a refusal through lucifer.run raises LuciferError with the program's message |  | same | holds |
 | the record axis: s non-decreasing, every repeat at an element boundary |  | same | holds |
 | comb > 0: rows == every-record rows at the comb positions (subset) |  | same | holds |
 | comb < 0: the rows are exactly the element ends |  | same | holds |

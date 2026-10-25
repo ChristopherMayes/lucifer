@@ -329,9 +329,11 @@ def test_regeneration(keystone: Keystone) -> None:
          "--production", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation-measured.md")),
         (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "src"),
          "--code", str(LUCIFER / "programs"), "--out", str(GENERATED / "api.md")),
-        # The deck's schema, from the production binary, and the key tables from it.
-        (str(PRODUCTION_EXE), "--schema", str(GENERATED / "schema.json")),
-        (str(SCRIPTS / "report_input_keys.py"), "--schema", str(GENERATED / "schema.json"),
+        # The deck's schema, from the production binary into the package, the models the
+        # package generates from it, and the key tables.
+        (str(PRODUCTION_EXE), "--schema", str(LUCIFER / "python" / "lucifer" / "schema.json")),
+        (sys.executable, "-m", "lucifer.generate"),
+        (str(SCRIPTS / "report_input_keys.py"), "--schema", str(LUCIFER / "python" / "lucifer" / "schema.json"),
          "--out", str(GENERATED / "input-keys.md")),
         (str(SCRIPTS / "report_examples.py"), "--examples", str(LUCIFER / "examples"),
          "--out", str(GENERATED / "examples")),
@@ -346,15 +348,16 @@ def test_regeneration(keystone: Keystone) -> None:
          "--out", str(GENERATED / "layouts.md"), "--log", str(art / "layouts.log")),
     )
     for gen in generators:
-        # A Python generator runs under this interpreter; the tracker's --schema runs as it is.
+        # A Python generator runs under this interpreter; the tracker's --schema and the
+        # package's module run as they are.
         cmd = [sys.executable, *gen] if gen[0].endswith(".py") else list(gen)
         r = subprocess.run(cmd, cwd=str(LUCIFER), capture_output=True, text=True)
         assert r.returncode == 0, f"{pathlib.Path(gen[0]).name} exited {r.returncode}\n{r.stdout[-2000:]}\n{r.stderr[-2000:]}"
     # The Markdown only. The figures are committed and a plotting library upgrade
     # rewrites them all with no physics moving (docs/validation.md).
     r = subprocess.run(["git", "diff", "--exit-code", "--stat", "--",
-                        "docs/generated/*.md", "docs/generated/schema.json", "docs/generated/examples/*.md",
-                        "examples/measured.tsv"],
+                        "docs/generated/*.md", "python/lucifer/schema.json", "python/lucifer/models.py",
+                        "docs/generated/examples/*.md", "examples/measured.tsv"],
                        cwd=str(LUCIFER), capture_output=True, text=True)
     assert r.returncode == 0, ("a generated page moved after regeneration; a moved digit is a bug, "
                                "not a new baseline:\n" + r.stdout)

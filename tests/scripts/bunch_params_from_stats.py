@@ -34,8 +34,7 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from read_stats import Stats, read_stats  # noqa: E402
+from lucifer.stats import Stats, read_stats
 
 M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 

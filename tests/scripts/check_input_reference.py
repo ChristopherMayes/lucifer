@@ -3,12 +3,13 @@
 Check the input reference against the schema the program writes.
 
 The deck's keys, their types, defaults and bounds are the program's, written by
-lucifer --schema into docs/generated/schema.json and rendered into
+lucifer --schema into python/lucifer/schema.json and rendered into
 docs/generated/input-keys.md by report_input_keys.py, which docs/input-reference.md
 includes. What this check holds together:
 
   1. python/lucifer/deck.py's routing table names exactly the schema's keys, table by
-     table, so a deck the package writes is one the program reads.
+     table, so a deck the package writes is one the program reads, and the generated
+     models python/lucifer/models.py carry exactly those keys with the schema's defaults.
   2. Every key of the schema appears in docs/generated/input-keys.md.
   3. Every dotted key a page names in code font, `beam.n_particle` or `[wake]`, is a key
      or a table of the schema, so no page describes a key the program does not read.
@@ -47,13 +48,33 @@ def schema_keys(schema):
     return keys
 
 
+def schema_table(schema, table):
+    props = schema["properties"]
+    for part in table.split("."):
+        props = props[part]["properties"]
+    return props
+
+
 def main():
     failed = []
-    schema = json.loads((ROOT / "docs/generated/schema.json").read_text())
+    schema = json.loads((ROOT / "python/lucifer/schema.json").read_text())
     keys = schema_keys(schema)
 
-    # (1) The package's routing table.
+    # (1) The package's routing table, and the models' fields and defaults.
     from lucifer.deck import KEYS
+    from lucifer import models
+    for table, names in keys.items():
+        cls = models.Deck if table == "" else dict(models.TABLES)[table]
+        obj = cls()
+        have = {k for k in vars(obj) if not hasattr(vars(obj)[k], "__dataclass_fields__")}
+        if have != names:
+            failed.append(f"python/lucifer/models.py {cls.__name__} differs from the schema: "
+                          f"missing {sorted(names - have)}, extra {sorted(have - names)}")
+        props = schema["properties"] if table == "" else schema_table(schema, table)
+        for k in names & have:
+            if getattr(obj, k) != props[k]["default"]:
+                failed.append(f"python/lucifer/models.py {cls.__name__}.{k} defaults to "
+                              f"{getattr(obj, k)!r}, the schema to {props[k]['default']!r}")
     for table, names in keys.items():
         mine = set(KEYS.get(table, []))
         if mine != names:

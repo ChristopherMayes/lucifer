@@ -39,7 +39,7 @@ import numpy as np
 
 from checkrec import record
 from pool import run_all
-from read_stats import read_stats
+from lucifer.stats import read_stats
 
 FAILED = False
 
