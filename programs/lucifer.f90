@@ -6,24 +6,25 @@
 ! The documentation is in docs/:
 !   fel-physics.md       The physics: every equation the code integrates, its Genesis
 !                         provenance, and the check that pins it.
-!   input-reference.md   Every namelist parameter: default, meaning, and what refuses it.
+!   input-reference.md   Every deck key: default, meaning, and what refuses it.
 !                         This is the normative reference. This header is a summary.
 !   user-guide.md        Building, describing a run, running it, and the output files.
 !   reading-output.md    What the output files hold and how to read them.
 !   validation.md        What is checked against Genesis, how, and the recorded results.
 !   performance.md       Where a run spends its time, on a named machine.
 !
-! The program reads three namelist groups from one input file. Each group sets structs
-! directly, as Tao's &tao_params does. Defaults are in the struct declarations.
+! The program reads one TOML deck through the schema (fel_schema_mod). Each table sets
+! structs directly, as Tao's &tao_params does. Defaults are in the struct declarations.
 !
-!   &fel_params           lat_file, the global%... run switches, Bmad's bmad_com and
-!                         space_charge_com, and the chamber_wake% and space_charge%
-!                         collective descriptions.
-!   &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
-!                         source and output files, and the beam-side check settings.
-!   &fel_wavefront_init   wavefront_init%... radiation starting condition and the
-!                         field_file imports. The field record is the time window, so the
-!                         window is set here.
+!   lattice         The Bmad lattice file, the one top-level key.
+!   [run]           The run switches, fel_global_struct.
+!   [window]        The time window and the slice spacing, fel_slicing_struct.
+!   [beam]          Bmad's beam_init bunch description, the load and its switches, the
+!                   files, and [beam.resample], the resampler.
+!   [field]         The radiation starting condition and the field files. The field
+!                   record is the time window, so the window is set beside it.
+!   [wake]          The chamber wake. [space_charge] the space-charge solver.
+!   [bmad]          The bmad_com and space_charge_com switches the tracker honors.
 !
 ! There are three ways in, all through the same input file:
 !   A pair of Genesis dumps. Both codes then track from bitwise-identical initial conditions.
@@ -31,17 +32,19 @@
 !   An imported particle distribution.
 ! Time dependence follows from the starting state alone. A multi-slice window makes a
 ! time-dependent run, and a single slice makes the steady state. There is no separate
-! switch. The retired flat &fel_track_params group is refused, and the message names
-! the three groups that replace it.
+! switch. A key the schema does not name is refused with the keys of its table, and a
+! key in the wrong table with the table it belongs in.
 !
 ! Usage:
-!   lucifer <input_file>
+!   lucifer <deck.toml>
+!   lucifer --schema <schema.json>
 !-
 
 program lucifer
 
 use fel_struct
 use fel_input_mod
+use fel_schema_mod
 use fel_setup_mod
 use fel_init_mod
 use fel_track_line_mod
@@ -53,10 +56,10 @@ use, intrinsic :: iso_fortran_env, only: output_unit
 
 implicit none
 
-! The driver is read-parse-call (docs/user-guide.md). The namelist layer fills the input
+! The driver is read-parse-call (docs/user-guide.md). The deck reader fills the input
 ! structs, and the library builds and walks the run. Every library error returns here.
 ! This is the one place that stops. The check instruments (split_weights, swap_beam_xy,
-! gen_test_weights, resample_split_weights, chamber_wake%write_kernels) are carried in
+! gen_test_weights, resample_split_weights, wake.write_kernels) are carried in
 ! the input structs and act inside init and setup.
 
 type (fel_run_struct), target :: run
@@ -69,8 +72,8 @@ character(*), parameter :: r_name = 'lucifer'
 
 !
 
-! The one argument is the input file. The examples name it lucifer.in by convention.
-! No name is looked for here.
+! The one argument is the deck. The examples name it lucifer.toml by convention. No name
+! is looked for here. --schema <file> writes the deck's schema as JSON Schema and stops.
 
 ! The run clock starts before anything is read. So the footer's run total covers the
 ! whole process, and the work outside the walk is the difference.
@@ -78,20 +81,37 @@ character(*), parameter :: r_name = 'lucifer'
 call fel_timer_reset()
 
 n_arg = command_argument_count()
+if (n_arg == 2) then
+  call get_command_argument (1, param_file)
+  if (param_file == '--schema') then
+    call get_command_argument (2, param_file)
+    open (newunit = iu_k, file = trim(param_file), action = 'write', status = 'replace', iostat = i_k)
+    if (i_k /= 0) then
+      call out_io (s_error$, r_name, 'CANNOT WRITE THE SCHEMA TO: ' // trim(param_file))
+      stop 1
+    endif
+    call fel_schema_write_json (iu_k)
+    close (iu_k)
+    call out_io (s_blank$, r_name, 'Schema version ' // fel_schema_version$ // ' written to ' // trim(param_file))
+    stop
+  endif
+endif
 if (n_arg /= 1) then
   call out_io (s_blank$, r_name, [ &
-        'Usage:                                                                   ', &
-        '  lucifer <input_file>                                                   ', &
-        '                                                                         ', &
-        'One input file names the lattice and holds the three namelist groups:    ', &
-        '&fel_params, &fel_beam_init and &fel_wavefront_init. Any file name works.', &
-        'The examples name theirs lucifer.in by convention, which is a convention ', &
-        'rather than a default looked for here. docs/ documents every             ', &
-        'parameter, every output file and the lattice attributes.                 '])
+        'Usage:                                                                  ', &
+        '  lucifer <deck.toml>                                                   ', &
+        '  lucifer --schema <schema.json>                                        ', &
+        '                                                                        ', &
+        'One TOML deck names the lattice and holds the tables [run], [window],   ', &
+        '[beam], [field], [wake], [space_charge] and [bmad]. Any file name works.', &
+        'The examples name theirs lucifer.toml by convention, which is a         ', &
+        'convention rather than a default looked for here. --schema writes the   ', &
+        'deck''s schema as JSON Schema. docs/ documents every key, every output   ', &
+        'file and the lattice attributes.                                        '])
   ! Separate from the block above. A character array constructor needs every element the
   ! same length, and the length of the version string is not known here.
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
-  ! Print what global%device can be set to in this build. The backend is a property of
+  ! Print what run.device can be set to in this build. The backend is a property of
   ! the build and the machine. Where there is none, the reason names the toolchain
   ! requirement and not the platform. A benchmark reads this line to decide whether
   ! the device checks can run.
@@ -108,7 +128,7 @@ if (n_arg /= 1) then
 endif
 call get_command_argument (1, param_file)
 
-call fel_read_input (param_file, run, err)
+call fel_read_deck (param_file, run, err)
 if (err) stop 1
 
 call fel_setup_lattice (run, err)

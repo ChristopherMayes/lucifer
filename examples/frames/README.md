@@ -2,7 +2,7 @@
 
 The example runs in one command:
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
 
 A run writes its beam and its field at element ends. A visualization wants them along z inside the undulators, and it wants to follow a particle from one to the next. This deck turns on the frame series and the field's reductions, and cuts both to four slices of the window ([reading the output](../../docs/reading-output.md)).
 
@@ -12,9 +12,9 @@ The frame index is the statistics record index, so `frames-000006.beam.h5`, `fra
 
 Each file says where it was taken. `sPosition`, `elementName`, `phi0`, `sliceFirst` and `sliceLast` are on every frame. An FEL frame adds `aw`, `ku`, `helical` and `tilt`, and `floorPosition` and `floorAngles` place it in the lab. The averaged mode integrates the quiver away, so a reader that wants the physical orbit rebuilds it from `aw`, `ku` and `s`.
 
-`global%migrate = T` is on so the labels have work to do. Every macroparticle carries a label, and the label follows the particle when migration moves it to a neighbouring slice. Across this series 4591 distinct labels appear in the four slices dumped, against 1024 per slice in any one frame. Particles cross into and out of the range as they slip, and a label that stops appearing has left it. The labels are what make the series trajectories rather than snapshots.
+`run.migrate = true` is on so the labels have work to do. Every macroparticle carries a label, and the label follows the particle when migration moves it to a neighbouring slice. Across this series 4591 distinct labels appear in the four slices dumped, against 1024 per slice in any one frame. Particles cross into and out of the range as they slip, and a label that stops appearing has left it. The labels are what make the series trajectories rather than snapshots.
 
-`global%dump_reduced = T` writes the field's intensity projections into the statistics file at every record: `xy_intensity`, `slice_x_intensity`, `slice_y_intensity` and the complex field on axis. They integrate back to `power` exactly and are two hundred times smaller than the field frames, so a picture of the run needs no field frame at all. The frames are here for the views that want the transverse profile of one slice at one position.
+`run.dump_reduced = true` writes the field's intensity projections into the statistics file at every record: `xy_intensity`, `slice_x_intensity`, `slice_y_intensity` and the complex field on axis. They integrate back to `power` exactly and are two hundred times smaller than the field frames, so a picture of the run needs no field frame at all. The frames are here for the views that want the transverse profile of one slice at one position.
 
 The slice range is what keeps the output small. The same deck over the whole window writes twice the bytes, and a run at one wavelength per slice with thousands of slices would write gigabytes a frame. [](../../docs/performance.md) measures a full-size frame at 95 MB and the cost of compression, which does not pay on this data.
 

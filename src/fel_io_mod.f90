@@ -15,6 +15,7 @@ module fel_io_mod
 
 use fel_struct
 use fel_input_mod
+use fel_schema_mod
 use fel_timer_mod
 use fel_cost_mod
 use wavefront_openpmd_mod
@@ -358,7 +359,7 @@ end subroutine fel_write_slippage_residual
 !+
 ! Subroutine fel_dump_frame (run, ie, at_end, err_flag)
 !
-! Routine to write one frame of the series global%dump_at_comb asks for: the beam and
+! Routine to write one frame of the series run.dump_at_comb asks for: the beam and
 ! the field set at this comb position. It uses the same writers as the element-end
 ! dumps. The files are <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5, where
 ! record is the stats row this frame sits on. So a frame and its row share one index.
@@ -687,7 +688,7 @@ block
     call out_io (s_blank$, r_name, trim(line))
   endif
 
-  ! The interlude's pieces, only when global%interlude_ds_step cuts them. A run that
+  ! The interlude's pieces, only when run.interlude_ds_step cuts them. A run that
   ! tracks an interlude whole prints nothing here.
 
   if (run%n_int_ele > 0) then
@@ -890,7 +891,7 @@ if (cvg%ok) then
           'beamlet_size. The criterion and the measured levels are in docs/startup-noise.md.', &
           r_array = [worst])
     if (.not. run%global%source_filter) then
-      call out_io (s_warn$, r_name, 'This run has global%source_filter = F. The filter is on by ' // &
+      call out_io (s_warn$, r_name, 'This run has run.source_filter = false. The filter is on by ' // &
             'default and removes that emission at a converged load.')
     endif
   else if (worst < 0.01_rp) then
@@ -1044,7 +1045,7 @@ end subroutine fel_write_footer
 !
 ! Routine to read an openPMD wavefront into field-set entry ihh (the fundamental
 ! import path). The photon energy must be the fundamental's. A file carrying a
-! harmonic in field_file(1) is refused.
+! harmonic in field.file(1) is refused.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state.
@@ -1133,7 +1134,7 @@ if (.not. run%global%continuation) then
   call h5fclose_f (f_id, h5_err)
   if (has_res) then
     call out_io (s_info$, r_name, 'The field file carries a slippage residual of \es12.4\ wavelengths, ' // &
-                 'ignored: global%continuation is off, so the record starts from a whole-slice boundary.', &
+                 'ignored: run.continuation is off, so the record starts from a whole-slice boundary.', &
                  r_array = [residual])
   else
     call out_io (s_info$, r_name, 'The field file carries no slippage residual, so the record starts from a ' // &
@@ -1767,7 +1768,7 @@ end subroutine fel_write_wake_block
 !
 ! The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 ! the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
-! namelist runs to 12 kB and a lattice text to 37 kB on a real lattice
+! deck runs to 12 kB and a lattice text to 37 kB on a real lattice
 ! (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 ! silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
 ! differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
@@ -1787,8 +1788,8 @@ end subroutine fel_write_wake_block
 !
 ! A stats file is meant to travel, so nothing here identifies a person by default. The
 ! timestamp and the Bmad version identify the run. The login name and working directory
-! go in only under global%record_environment. The file records a lattice basename.
-! Namelist input is echoed as typed, so an absolute path there is still an absolute path
+! go in only under run.record_environment. The file records a lattice basename.
+! The deck is echoed as read, so an absolute path there is still an absolute path
 ! in the file. Genesis always records user and cwd. Parity is not a reason to leak.
 !
 ! Note: This is best effort. A failure warns, and never fails the run.
@@ -1879,11 +1880,11 @@ call fel_h5_text (g_id, 'bmad_version', 'Bmad distribution version', &
 if (run%global%record_environment) then
   call get_environment_variable ('USER', user_name)
   call fel_h5_text (g_id, 'user', 'user', &
-        'Who ran it, from $USER. Present because global%record_environment was set.', &
+        'Who ran it, from $USER. Present because run.record_environment was set.', &
         user_name, merr)
   call get_environment_variable ('PWD', cwd)
   call fel_h5_text (g_id, 'cwd', 'directory', &
-        'Where it ran, from $PWD. Present because global%record_environment was set.', &
+        'Where it ran, from $PWD. Present because run.record_environment was set.', &
         cwd, merr)
 endif
 
@@ -1924,12 +1925,12 @@ end subroutine fel_write_meta
 subroutine fel_write_params (run, stats_file)
 
 type (fel_run_struct), target :: run
+type (fel_key_struct), allocatable :: keys(:)
 character(*) stats_file
-integer(hid_t) f_id, p_id, g_id
-integer h5e, i, n
+integer(hid_t) f_id, p_id, g_id, b_id
+integer h5e, i, it
 logical merr
-character(60), allocatable :: locs(:)
-character(400), allocatable :: files(:)
+character(16) table
 character(*), parameter :: r_name = 'fel_write_params'
 
 !
@@ -1947,516 +1948,99 @@ endif
 merr = .false.
 call H5LTset_attribute_string_f (f_id, 'params', 'kind', 'input', h5e)
 call H5LTset_attribute_string_f (f_id, 'params', 'description', &
-      'What the user controlled: one subgroup per honored input structure, every ' // &
-      'honored component resolved after defaults.', h5e)
+      'What the user controlled: one subgroup per table of the deck, every key ' // &
+      'resolved after defaults, from the schema (schema version ' // fel_schema_version$ // ').', h5e)
 
-! ------------------------------------------------------------ global.
+call fel_schema_table (keys)
 
-! out_root is *not* here. It is the run's own name and not a physics input. Every
-! output file already carries it, and the echo records it as typed. As data it would
-! make two otherwise identical runs compare different, which the thread-identity check
-! must not see.
+! One subgroup per table, [beam.resample] inside beam/. Every recorded key is written by
+! its kind: a number or a flag as a scalar dataset, a word as a string dataset, a path as
+! text when it is set, and a list as an attribute of the subgroup, since a list of inputs
+! has no axis worth defining. out_root is the one key not recorded: it is the run's own
+! name and not a physics input, every output file carries it, and as data it would make
+! two otherwise identical runs compare different.
 
-call sub_open ('global', 'fel_global_struct', 'The run switches (&fel_params global%).')
-call fel_h5_str (g_id, 'interlude_model', 'interludes', &
-      'Interlude transport: bmad (the seam) or genesis (transcribed).', '', &
-      [run%global%interlude_model], merr)
-call fel_h5_str (g_id, 'transport_model', 'undulator transport', &
-      'Transverse transport inside averaged FEL elements: bmad (Bmad''s own kernel) or ' // &
-      'genesis (transcribed, validation-internal).', '', &
-      [run%global%transport_model], merr)
-call fel_h5_str (g_id, 'source_model', 'source', &
-      'The FEL source model: deposit or coherent.', '', [run%global%source_model], merr)
-call fel_h5_text (g_id, 'track_start', 'track start', &
-      'Element locator bounding the walk. Blank means the whole line.', &
-      run%global%track_start, merr)
-call fel_h5_text (g_id, 'track_end', 'track end', &
-      'Element locator bounding the walk. Blank means the whole line.', &
-      run%global%track_end, merr)
-call fel_h5_real (g_id, 'interlude_ds_step', 'm', 'interlude step', &
-      'The length an interlude element is cut into, for stats rows and frames along ' // &
-      'it. Zero tracks the element whole.', '', &
-      run%global%interlude_ds_step, merr)
-call fel_h5_real (g_id, 'comb_ds_save', 'm', 'comb', &
-      'Minimum z advance between per-record rows. 0 every record, negative none.', '', &
-      run%global%comb_ds_save, merr)
-call fel_h5_int (g_id, 'ran_seed', '1', 'seed', &
-      'The one RNG seed: generation, import and noise.', '', run%global%ran_seed, merr)
-call fel_h5_int (g_id, 'unaveraged_steps_per_period', '1', 'steps per period', &
-      'Integration steps per undulator period in unaveraged elements. Refused below 10.', &
-      '', run%global%unaveraged_steps_per_period, merr)
-call fel_h5_int (g_id, 'unaveraged_ramp_periods', '1', 'ramp periods', &
-      'Periods the field ramps over at each end of an unaveraged element, the default where ' // &
-      'the deck set 0. -1 is a hard edge.', &
-      '', run%global%unaveraged_ramp_periods, merr)
-call fel_h5_flag (g_id, 'write_diag', 'write diag', &
-      'Write the Genesis-comparison text diag file.', run%global%write_diag, merr)
-call fel_h5_flag (g_id, 'continuation', 'continuation', &
-      'beam_file and field_file are a checkpoint pair the run continues from, not an initialization.', &
-      run%global%continuation, merr)
-call fel_h5_flag (g_id, 'write_initial', 'write initial', &
-      'Dump the initial state before tracking.', run%global%write_initial, merr)
-call fel_h5_flag (g_id, 'load_only', 'load only', &
-      'Build the initial state, dump it, stop.', run%global%load_only, merr)
-call fel_h5_flag (g_id, 'keep_escaped_field', 'keep escaped', &
-      'Bank the field slices slippage transmits out of the window.', &
-      run%global%keep_escaped_field, merr)
-call fel_h5_flag (g_id, 'migrate', 'migrate', &
-      'Move particles between slices when their phase leaves the slice window.', &
-      run%global%migrate, merr)
-call fel_h5_flag (g_id, 'migrate_check', 'migrate check', &
-      'Verify phase continuity at each migration.', run%global%migrate_check, merr)
-call fel_h5_flag (g_id, 'reference_run', 'reference run', &
-      'No FEL interaction: Bmad tracks everything.', run%global%reference_run, merr)
-call fel_h5_flag (g_id, 'record_environment', 'record environment', &
-      'Record the user name and working directory in meta/.', &
-      run%global%record_environment, merr)
-call loc_note ('dump_beam_at', run%global%dump_beam_at)
-call loc_note ('dump_field_at', run%global%dump_field_at)
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ beam_init, honored set.
-
-call sub_open ('beam_init', 'beam_init_struct', &
-      'The bunch description (&fel_beam_init beam_init%), the quiet start''s honored set.')
-call fel_h5_int (g_id, 'n_particle', '1', 'particles per slice', &
-      'Macroparticles per slice (the import path reads it as bunch particles).', '', &
-      run%beam_init%n_particle, merr)
-call fel_h5_real (g_id, 'bunch_charge', 'C', 'charge', &
-      'Total bunch charge. The current is derived from it, never input.', '', &
-      run%beam_init%bunch_charge, merr)
-call fel_h5_real (g_id, 'a_norm_emit', 'm rad', 'a norm emit', &
-      'Normalized a-mode emittance.', '', run%beam_init%a_norm_emit, merr)
-call fel_h5_real (g_id, 'b_norm_emit', 'm rad', 'b norm emit', &
-      'Normalized b-mode emittance.', '', run%beam_init%b_norm_emit, merr)
-call fel_h5_real (g_id, 'sig_pz', '1', 'sig_pz', &
-      'Fractional momentum spread dP/P0.', '', run%beam_init%sig_pz, merr)
-call fel_h5_real (g_id, 'sig_z', 'm', 'sig_z', &
-      'Bunch length. Zero is the steady state for a one-slice window.', '', &
-      run%beam_init%sig_z, merr)
-call fel_h5_str (g_id, 'distribution_type', 'distribution', &
-      'Bmad''s per-plane distribution names, the z entry selecting the current ' // &
-      'profile: RAN_GAUSS is Gaussian, GRID is flat.', 'plane', &
-      run%beam_init%distribution_type, merr)
-call fel_h5_real (g_id, 'grid_z_min', 'm', 'grid z min', &
-      'Flat-profile z extent, beam_init%grid(3)%x_min. Read under GRID only.', '', &
-      run%beam_init%grid(3)%x_min, merr)
-call fel_h5_real (g_id, 'grid_z_max', 'm', 'grid z max', &
-      'Flat-profile z extent, beam_init%grid(3)%x_max. Read under GRID only.', '', &
-      run%beam_init%grid(3)%x_max, merr)
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ the beam-side scalars.
-
-call sub_open ('beam_param', 'fel_beam_init_param_struct', &
-      'The beam-side scalars of &fel_beam_init beside beam_init and imp.')
-call fel_h5_str (g_id, 'load_mode', 'load mode', &
-      'How the bunch became slices: sample (equal beamlets per slice, weights from the ' // &
-      'slice charge) or keep (every real particle a beamlet of copies).', '', &
-      [run%bparam%load_mode], merr)
-call fel_h5_flag (g_id, 'quiet_start', 'quiet start', &
-      'The load made quiet: beamlets of copies with phases spread over 2 pi.', &
-      run%bparam%quiet_start, merr)
-call fel_h5_int (g_id, 'beamlet_size', '1', 'beamlet size', &
-      'Copies per beamlet of the quiet start. A loading parameter only.', '', &
-      run%bparam%beamlet_size, merr)
-call fel_h5_flag (g_id, 'shot_noise', 'shot noise', &
-      'Impose physical shot noise on the load, by independent phasors per group.', &
-      run%bparam%shot_noise, merr)
-call fel_h5_flag (g_id, 'split_weights', 'split weights', &
-      'Check instrument: coincident w/3 + 2w/3 copies after loading.', &
-      run%bparam%split_weights, merr)
-call fel_h5_flag (g_id, 'swap_beam_xy', 'swap xy', &
-      'Check instrument: swap (x,px) and (y,py) after generation.', &
-      run%bparam%swap_beam_xy, merr)
-call fel_h5_flag (g_id, 'gen_test_weights', 'test weights', &
-      'Check instrument: alternate beamlet weights 0.25x/1.75x.', &
-      run%bparam%gen_test_weights, merr)
-call fel_h5_flag (g_id, 'resample_split_weights', 'import split', &
-      'Check instrument: split-weight copies before the import resample.', &
-      run%bparam%resample_split_weights, merr)
-call file_note ('beam_file', run%bparam%beam_file, 'An FEL beam already in slices, loaded as it is.')
-call file_note ('write_genesis_dist', run%bparam%write_genesis_dist, 'Write the bunch as a Genesis DISTRIBUTION file.')
-call file_note ('write_openpmd_file', run%bparam%write_openpmd_file, 'Write the bunch as openPMD-beamphysics.')
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ the import resampler.
-
-call sub_open ('resample', 'fel_resample_param_struct', &
-      'The resampler knobs (&fel_beam_init resample%).')
-call fel_h5_real (g_id, 'slice_width', '1', 'slice width', &
-      'Sampling window over bunch length (Genesis''s slicewidth).', '', run%resample%slice_width, merr)
-call fel_h5_int (g_id, 'n_particle_per_slice', '1', 'particles', &
-      'Macroparticles per slice after resampling.', '', run%resample%n_particle_per_slice, merr)
-call fel_h5_int (g_id, 'beamlet_size', '1', 'beamlet size', &
-      'Beamlet size of the resample.', '', run%resample%beamlet_size, merr)
-call fel_h5_int (g_id, 'n_slice', '1', 'slices', &
-      'Slice count. Zero means round(bunch length / spacing), Genesis''s rule.', '', &
-      run%resample%n_slice, merr)
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ the slicing.
-
-call sub_open ('slicing', 'fel_slicing_struct', &
-      'The longitudinal discretization shared by the beam and the field (&fel_params slicing%).')
-call fel_h5_real (g_id, 'window_length', 'm', 'window length', &
-      'Time window. Zero means derived from the bunch, or one slice.', '', &
-      run%slicing%window_length, merr)
-call fel_h5_int (g_id, 'n_wavelength', '1', 'wavelengths per slice', &
-      'Slice spacing in wavelengths (Genesis''s sample), and so the number of ' // &
-      'undulator periods of slippage per slice. An integer, which is what lets the ' // &
-      'field record rotate by one index with no interpolation.', '', &
-      run%slicing%n_wavelength, merr)
-call fel_h5_int (g_id, 'n_slice', '1', 'slice count', &
-      'The window as a slice count. Zero means it came from window_length.', '', &
-      run%slicing%n_slice, merr)
-call fel_h5_real (g_id, 'current', 'A', 'flat current', &
-      'A flat current, which needs no z description. Zero means the current came ' // &
-      'from the bunch.', '', run%slicing%current, merr)
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ the radiation start.
-
-call sub_open ('wavefront_init', 'wavefront_init_struct', &
-      'The radiation starting condition (&fel_wavefront_init wavefront_init%).')
-call fel_h5_real (g_id, 'lambda0', 'm', 'lambda0', &
-      'Fundamental radiation wavelength.', '', run%winit%lambda0, merr)
-call fel_h5_int (g_id, 'grid_n_pts', '1', 'grid points', &
-      'Transverse grid points per side.', '', run%winit%grid_n_pts, merr)
-call fel_h5_real (g_id, 'grid_half_width', 'm', 'grid half width', &
-      'Transverse grid half width.', '', run%winit%grid_half_width, merr)
-call fel_h5_real (g_id, 'seed_power', 'W', 'seed power', &
-      'Gaussian seed power. Zero is a dark start.', '', run%winit%seed_power, merr)
-call fel_h5_real (g_id, 'seed_waist_size', 'm', 'seed waist', &
-      'Seed intensity 1/e^2 radius.', '', run%winit%seed_waist_size, merr)
-call fel_h5_str (g_id, 'seed_polarization', 'polarization', &
-      'Seed polarization, x or y.', '', [run%winit%seed_polarization], merr)
-n = count(run%winit%harmonics > 0)
-call H5LTset_attribute_int_f (g_id, '.', 'harmonics', run%winit%harmonics(1:n), &
-                              int(n, size_t), h5e)
-merr = merr .or. (h5e < 0)
-allocate (files(count(run%field_file /= '')))
-n = 0
-do i = 1, size(run%field_file)
-  if (run%field_file(i) /= '') then
-    n = n + 1;  files(n) = run%field_file(i)
+do it = 1, size(fel_schema_tables$)
+  table = fel_schema_tables$(it)
+  ! Each subgroup carries @kind and @description, as the stats specification requires of
+  ! a group.
+  if (table == 'beam.resample') then
+    call H5Gopen_f (p_id, 'beam', b_id, h5e)
+    call H5Gcreate_f (b_id, 'resample', g_id, h5e)
+    call H5LTset_attribute_string_f (b_id, 'resample', 'kind', 'input', h5e)
+    call H5LTset_attribute_string_f (b_id, 'resample', 'description', 'The deck''s [beam.resample] table.', h5e)
+  else
+    call H5Gcreate_f (p_id, trim(table), g_id, h5e)
+    call H5LTset_attribute_string_f (p_id, trim(table), 'kind', 'input', h5e)
+    call H5LTset_attribute_string_f (p_id, trim(table), 'description', &
+          'The deck''s [' // trim(table) // '] table.', h5e)
   endif
+  merr = merr .or. (h5e < 0)
+  do i = 1, size(keys)
+    if (keys(i)%table /= table .or. .not. keys(i)%recorded) cycle
+    call write_key (keys(i))
+  enddo
+  call H5Gclose_f (g_id, h5e)
+  if (table == 'beam.resample') call H5Gclose_f (b_id, h5e)
 enddo
-if (n > 0) then
-  call hdf5_write_attribute_string_rank1 (g_id, 'field_file', files(1:n), merr)
-endif
-deallocate (files)
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ the chamber wake.
-
-call sub_open ('chamber_wake', 'fel_chamber_wake_init_struct', &
-      'The chamber-wake description (&fel_params chamber_wake%).')
-call fel_h5_flag (g_id, 'on', 'wake on', 'Any chamber wake at all.', run%chamber_wake%on, merr)
-call fel_h5_str (g_id, 'model', 'wake model', &
-      'Which chamber-wake implementation ran.', '', [run%chamber_wake%model], merr)
-call fel_h5_real (g_id, 'loss', 'eV/m', 'loss', 'External loss.', '', run%chamber_wake%loss, merr)
-call fel_h5_real (g_id, 'radius', 'm', 'radius', &
-      'Chamber radius, or half gap if flat.', '', run%chamber_wake%radius, merr)
-call fel_h5_real (g_id, 'conductivity', '1/(Ohm m)', 'conductivity', &
-      'DC conductivity. Zero means no resistive wake.', '', run%chamber_wake%conductivity, merr)
-call fel_h5_real (g_id, 'relaxation', 'm', 'relaxation', &
-      'AC relaxation distance c*tau.', '', run%chamber_wake%relaxation, merr)
-call fel_h5_flag (g_id, 'roundpipe', 'round pipe', &
-      'Round chamber. False is flat, parallel plates.', run%chamber_wake%roundpipe, merr)
-call fel_h5_str (g_id, 'material', 'material', &
-      'CU or AL shortcut for conductivity and relaxation. Blank when set directly.', &
-      '', [run%chamber_wake%material], merr)
-call fel_h5_real (g_id, 'gap', 'm', 'gap', &
-      'Undulator gap. Zero means no geometric wake.', '', run%chamber_wake%gap, merr)
-call fel_h5_real (g_id, 'lgap', 'm', 'gap period', 'Period of the gaps.', '', &
-      run%chamber_wake%lgap, merr)
-call fel_h5_real (g_id, 'hrough', 'm', 'roughness', &
-      'Roughness amplitude. Zero means no roughness wake.', '', run%chamber_wake%hrough, merr)
-call fel_h5_real (g_id, 'lrough', 'm', 'roughness period', 'Roughness period.', '', &
-      run%chamber_wake%lrough, merr)
-call file_note ('write_kernels', run%chamber_wake%write_kernels, &
-      'Check instrument: export the transcribed kernels.')
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ space charge.
-
-call sub_open ('space_charge', 'fel_space_charge_input_struct', &
-      'The FEL space-charge solver''s numbers (&fel_params space_charge%). Whether it ' // &
-      'ran in a given element is that element''s space_charge_method, in lattice/.')
-call fel_h5_str (g_id, 'model', 'space charge model', &
-      'Which space-charge implementation ran.', '', [run%space_charge%model], merr)
-call fel_h5_real (g_id, 'rmax', 'm', 'rmax', &
-      'Radial grid extent scale. Grows adaptively as Genesis''s.', '', run%space_charge%rmax, merr)
-call fel_h5_int (g_id, 'ngrid', '1', 'radial points', 'Radial grid points.', '', &
-      run%space_charge%ngrid, merr)
-call fel_h5_int (g_id, 'nz', '1', 'harmonics', &
-      'Longitudinal harmonics. Zero disables the short-range solve.', '', run%space_charge%nz, merr)
-call fel_h5_int (g_id, 'nphi', '1', 'azimuthal modes', &
-      'Azimuthal modes m = -nphi..nphi.', '', run%space_charge%nphi, merr)
-call fel_h5_flag (g_id, 'longrange', 'long range', &
-      'The whole-window longESC term.', run%space_charge%longrange, merr)
-call H5Gclose_f (g_id, h5e)
-
-! ------------------------------------------------------------ bmad_com, whole.
-
-call write_bmad_com ()
-call write_space_charge_com ()
 
 if (merr) call out_io (s_warn$, r_name, 'Could not write all of params/.')
 call H5Gclose_f (p_id, h5e)
 call H5Fclose_f (f_id, h5e)
 
-!------------------------------------------------------------------------------
+!-------------------------------------------------------
 contains
 
-!+
-! Subroutine sub_open (name, struct_name, descrip)
-!
-! Routine to open one input subgroup with its three attributes: kind, @struct naming
-! the Fortran type verbatim, and the description.
-!-
+subroutine write_key (key)
 
-subroutine sub_open (name, struct_name, descrip)
-
-integer h5e2
-character(*) name, struct_name, descrip
-
-!
-
-call H5Gcreate_f (p_id, name, g_id, h5e2)
-merr = merr .or. (h5e2 < 0)
-call H5LTset_attribute_string_f (p_id, name, 'kind', 'input', h5e2)
-call H5LTset_attribute_string_f (p_id, name, 'struct', struct_name, h5e2)
-call H5LTset_attribute_string_f (p_id, name, 'description', descrip, h5e2)
-merr = merr .or. (h5e2 < 0)
-
-end subroutine sub_open
-
-!+
-! Subroutine loc_note (attrib, list)
-!
-! Routine to record a locator list as a string-array attribute of the nonblank
-! entries. An attribute and not a dataset, since a dataset needs an axis and a list of
-! inputs has none worth defining. Omitted when empty: absence means unset.
-!-
-
-subroutine loc_note (attrib, list)
-
-integer nn, ii
-character(*) attrib, list(:)
+type (fel_key_struct) key
+real(rp) rv
+integer iv
+logical lv
+character(16) unit
+character(:), allocatable :: sv
+integer, allocatable :: ilist(:)
+character(400), allocatable :: slist(:)
 
 !
 
-nn = 0
-if (allocated(locs)) deallocate (locs)
-allocate (locs(count(list /= '')))
-do ii = 1, size(list)
-  if (list(ii) /= '') then
-    nn = nn + 1;  locs(nn) = list(ii)
+call fel_schema_value (run, key, rv, iv, lv, sv, ilist, slist)
+
+select case (key%kind)
+case (key_real$)
+  ! A dimensionless key carries the unit 1, which the stats specification requires.
+  unit = key%unit
+  if (unit == '') unit = '1'
+  call fel_h5_real (g_id, trim(key%name), trim(unit), trim(key%label), trim(key%descrip), '', rv, merr)
+case (key_int$)
+  call fel_h5_int (g_id, trim(key%name), '1', trim(key%label), trim(key%descrip), '', iv, merr)
+case (key_logical$)
+  call fel_h5_flag (g_id, trim(key%name), trim(key%label), trim(key%descrip), lv, merr)
+case (key_string$)
+  call fel_h5_str (g_id, trim(key%name), trim(key%label), trim(key%descrip), '', [sv], merr)
+case (key_path$)
+  if (sv /= '') call fel_h5_text (g_id, trim(key%name), trim(key%label), trim(key%descrip) // &
+        ' As the deck wrote it.', sv, merr)
+case (key_int_list$)
+  if (size(ilist) > 0) then
+    call H5LTset_attribute_int_f (g_id, '.', trim(key%name), ilist, int(size(ilist), size_t), h5e)
+    merr = merr .or. (h5e < 0)
   endif
-enddo
-if (nn > 0) call hdf5_write_attribute_string_rank1 (g_id, attrib, locs(1:nn), merr)
+case (key_string_list$)
+  ! One text, an entry a line, since a path can be longer than a string dataset holds.
+  if (size(slist) > 0) then
+    sv = trim(slist(1))
+    do iv = 2, size(slist)
+      sv = sv // char(10) // trim(slist(iv))
+    enddo
+    call fel_h5_text (g_id, trim(key%name), trim(key%label), trim(key%descrip) // ' One entry a line.', sv, merr)
+  endif
+end select
 
-end subroutine loc_note
-
-!+
-! Subroutine file_note (name, val, descrip)
-!
-! Routine to record one file-name input as a text dataset, as typed.
-! A blank one is omitted: absence means unset.
-!-
-
-subroutine file_note (name, val, descrip)
-
-character(*) name, val, descrip
-
-!
-
-if (val == '') return
-call fel_h5_text (g_id, name, name, descrip // ' As the user typed it.', val, merr)
-
-end subroutine file_note
-
-!+
-! Subroutine write_bmad_com ()
-!
-! Routine to write Bmad's bmad_com whole. The namelist exposes every component and all
-! of Bmad's tracking reads them, so every one is honored. Descriptions follow the
-! struct's own comments.
-!-
-
-subroutine write_bmad_com ()
-
-!
-
-call sub_open ('bmad_com', 'bmad_common_struct', &
-      'Bmad''s global tracking switches (&fel_params bmad_com%), written whole.')
-call fel_h5_real (g_id, 'max_aperture_limit', 'm', 'max aperture', 'Max aperture.', '', &
-      bmad_com%max_aperture_limit, merr)
-call fel_h5_real (g_id, 'd_orb', 'm,1,m,1,m,1', 'orbit deltas', &
-      'Orbit deltas for the mat6-via-tracking calc, per phase-space coordinate.', &
-      'bmad', bmad_com%d_orb, merr)
-call H5LTset_attribute_string_f (g_id, 'd_orb', 'unit_of_axis', 'bmad', h5e)
-merr = merr .or. (h5e < 0)
-call fel_h5_dset_attr_int (g_id, 'd_orb', 'unit_power', 1, merr)
-call fel_h5_real (g_id, 'default_ds_step', 'm', 'default step', &
-      'Default integration step for elements without an explicit one.', '', &
-      bmad_com%default_ds_step, merr)
-call fel_h5_real (g_id, 'significant_length', 'm', 'significant length', &
-      'Below this a length is zero.', '', bmad_com%significant_length, merr)
-call fel_h5_real (g_id, 'rel_tol_tracking', '1', 'rel tol', &
-      'Closed-orbit relative tolerance.', '', bmad_com%rel_tol_tracking, merr)
-call fel_h5_real (g_id, 'abs_tol_tracking', '1', 'abs tol', &
-      'Closed-orbit absolute tolerance.', '', bmad_com%abs_tol_tracking, merr)
-call fel_h5_real (g_id, 'rel_tol_adaptive_tracking', '1', 'RK rel tol', &
-      'Runge-Kutta tracking relative tolerance.', '', bmad_com%rel_tol_adaptive_tracking, merr)
-call fel_h5_real (g_id, 'abs_tol_adaptive_tracking', '1', 'RK abs tol', &
-      'Runge-Kutta tracking absolute tolerance.', '', bmad_com%abs_tol_adaptive_tracking, merr)
-call fel_h5_real (g_id, 'init_ds_adaptive_tracking', 'm', 'RK initial step', &
-      'Initial adaptive step size.', '', bmad_com%init_ds_adaptive_tracking, merr)
-call fel_h5_real (g_id, 'min_ds_adaptive_tracking', 'm', 'RK min step', &
-      'Minimum adaptive step size.', '', bmad_com%min_ds_adaptive_tracking, merr)
-call fel_h5_real (g_id, 'fatal_ds_adaptive_tracking', 'm', 'RK fatal step', &
-      'Below this step the particle is lost.', '', bmad_com%fatal_ds_adaptive_tracking, merr)
-call fel_h5_real (g_id, 'autoscale_amp_abs_tol', 'eV', 'autoscale abs', &
-      'Autoscale absolute amplitude tolerance.', '', bmad_com%autoscale_amp_abs_tol, merr)
-call fel_h5_real (g_id, 'autoscale_amp_rel_tol', '1', 'autoscale rel', &
-      'Autoscale relative amplitude tolerance.', '', bmad_com%autoscale_amp_rel_tol, merr)
-call fel_h5_real (g_id, 'autoscale_phase_tol', 'rad', 'autoscale phase', &
-      'Autoscale phase tolerance.', '', bmad_com%autoscale_phase_tol, merr)
-call fel_h5_real (g_id, 'electric_dipole_moment', '1', 'EDM', &
-      'Particle electric dipole moment.', '', bmad_com%electric_dipole_moment, merr)
-call fel_h5_real (g_id, 'synch_rad_scale', '1', 'synch rad scale', &
-      'Synchrotron radiation kick scale. One is physical, zero is off.', '', &
-      bmad_com%synch_rad_scale, merr)
-call fel_h5_real (g_id, 'sad_eps_scale', '1', 'sad eps', &
-      'sad_mult step length scale.', '', bmad_com%sad_eps_scale, merr)
-call fel_h5_real (g_id, 'sad_amp_max', '1', 'sad amp max', &
-      'sad_mult step length amplitude cap.', '', bmad_com%sad_amp_max, merr)
-call fel_h5_int (g_id, 'sad_n_div_max', '1', 'sad divisions', &
-      'sad_mult maximum divisions.', '', bmad_com%sad_n_div_max, merr)
-call fel_h5_int (g_id, 'taylor_order', '1', 'taylor order', &
-      'Taylor order. Zero means PTC''s saved default.', '', bmad_com%taylor_order, merr)
-call fel_h5_int (g_id, 'runge_kutta_order', '1', 'RK order', &
-      'Runge-Kutta order.', '', bmad_com%runge_kutta_order, merr)
-call fel_h5_int (g_id, 'default_integ_order', '1', 'PTC order', &
-      'PTC integration order.', '', bmad_com%default_integ_order, merr)
-call fel_h5_int (g_id, 'max_num_runge_kutta_step', '1', 'RK step cap', &
-      'Maximum RK steps before the particle counts as lost.', '', &
-      bmad_com%max_num_runge_kutta_step, merr)
-call fel_h5_flag (g_id, 'rf_phase_below_transition_ref', 'below transition', &
-      'Autoscale uses the below-transition stable point.', &
-      bmad_com%rf_phase_below_transition_ref, merr)
-call fel_h5_flag (g_id, 'sr_wakes_on', 'sr wakes', 'Short-range wakefields.', &
-      bmad_com%sr_wakes_on, merr)
-call fel_h5_flag (g_id, 'lr_wakes_on', 'lr wakes', 'Long-range wakefields.', &
-      bmad_com%lr_wakes_on, merr)
-call fel_h5_flag (g_id, 'auto_bookkeeper', 'auto bookkeeper', &
-      'Deprecated and no longer used.', bmad_com%auto_bookkeeper, merr)
-call fel_h5_flag (g_id, 'high_energy_space_charge_on', 'HE space charge', &
-      'High-energy space charge.', bmad_com%high_energy_space_charge_on, merr)
-call fel_h5_flag (g_id, 'high_energy_space_charge_linear', 'HE SC linear', &
-      'High-energy space charge, linear form.', &
-      bmad_com%high_energy_space_charge_linear, merr)
-call fel_h5_flag (g_id, 'csr_and_space_charge_on', 'CSR + SC', &
-      'CSR and space charge.', bmad_com%csr_and_space_charge_on, merr)
-call fel_h5_flag (g_id, 'spin_tracking_on', 'spin tracking', 'Spin tracking.', &
-      bmad_com%spin_tracking_on, merr)
-call fel_h5_flag (g_id, 'spin_sokolov_ternov_flipping_on', 'ST flipping', &
-      'Sokolov-Ternov spin flipping on emission.', &
-      bmad_com%spin_sokolov_ternov_flipping_on, merr)
-call fel_h5_flag (g_id, 'radiation_damping_on', 'radiation damping', &
-      'Radiation damping.', bmad_com%radiation_damping_on, merr)
-call fel_h5_flag (g_id, 'radiation_zero_average', 'damping zero average', &
-      'Shift damping to zero on the zero orbit.', bmad_com%radiation_zero_average, merr)
-call fel_h5_flag (g_id, 'radiation_fluctuations_on', 'radiation fluctuations', &
-      'Radiation fluctuations.', bmad_com%radiation_fluctuations_on, merr)
-call fel_h5_flag (g_id, 'conserve_taylor_maps', 'conserve maps', &
-      'Bookkeeper may set taylor_map_includes_offsets false.', &
-      bmad_com%conserve_taylor_maps, merr)
-call fel_h5_flag (g_id, 'absolute_time_tracking', 'absolute time', &
-      'Absolute rather than relative time tracking.', &
-      bmad_com%absolute_time_tracking, merr)
-call fel_h5_flag (g_id, 'absolute_time_ref_shift', 'abs time ref shift', &
-      'Apply the reference time shift under absolute time.', &
-      bmad_com%absolute_time_ref_shift, merr)
-call fel_h5_flag (g_id, 'convert_to_kinetic_momentum', 'kinetic momentum', &
-      'Cancel vector-potential kicks in symplectic tracking.', &
-      bmad_com%convert_to_kinetic_momentum, merr)
-call fel_h5_flag (g_id, 'normalize_twiss', 'normalize twiss', &
-      'Normalize the matrix for off-energy twiss.', bmad_com%normalize_twiss, merr)
-call fel_h5_flag (g_id, 'aperture_limit_on', 'apertures', &
-      'Use apertures in tracking.', bmad_com%aperture_limit_on, merr)
-call fel_h5_flag (g_id, 'spin_n0_direction_user_set', 'n0 user set', &
-      'User sets n0 for closed branches.', bmad_com%spin_n0_direction_user_set, merr)
-call fel_h5_flag (g_id, 'debug', 'debug', 'Code debugging.', bmad_com%debug, merr)
-call H5Gclose_f (g_id, h5e)
-
-end subroutine write_bmad_com
-
-!+
-! Subroutine write_space_charge_com ()
-!
-! Routine to write Bmad's space_charge_com whole, for the same reason as bmad_com.
-!-
-
-subroutine write_space_charge_com ()
-
-!
-
-call sub_open ('space_charge_com', 'space_charge_common_struct', &
-      'Bmad''s space-charge and CSR switches (&fel_params space_charge_com%), whole.')
-call fel_h5_real (g_id, 'ds_track_step', 'm', 'CSR step', 'CSR tracking step size.', '', &
-      space_charge_com%ds_track_step, merr)
-call fel_h5_real (g_id, 'dt_track_step', 's', 'time RK step', &
-      'Time Runge-Kutta initial step.', '', space_charge_com%dt_track_step, merr)
-call fel_h5_real (g_id, 'cathode_strength_cutoff', '1', 'cathode cutoff', &
-      'Cutoff for the cathode field calc.', '', space_charge_com%cathode_strength_cutoff, merr)
-call fel_h5_real (g_id, 'rel_tol_tracking', '1', 'rel tol', &
-      'Tracking relative tolerance.', '', space_charge_com%rel_tol_tracking, merr)
-call fel_h5_real (g_id, 'abs_tol_tracking', '1', 'abs tol', &
-      'Tracking absolute tolerance.', '', space_charge_com%abs_tol_tracking, merr)
-call fel_h5_real (g_id, 'beam_chamber_height', 'm', 'chamber height', &
-      'Used in the shielding calculation.', '', space_charge_com%beam_chamber_height, merr)
-call fel_h5_real (g_id, 'lsc_sigma_cutoff', '1', 'LSC cutoff', &
-      'Cutoff for the 1D longitudinal SC calc.', '', space_charge_com%lsc_sigma_cutoff, merr)
-call fel_h5_real (g_id, 'particle_sigma_cutoff', '1', 'particle cutoff', &
-      '3D SC cutoff for far-out particles. Nonpositive means ignore.', '', &
-      space_charge_com%particle_sigma_cutoff, merr)
-call fel_h5_real (g_id, 'mesh_growth_factor', '1', 'mesh growth', &
-      'Fractional padding when growing the SC mesh.', '', &
-      space_charge_com%mesh_growth_factor, merr)
-call fel_h5_real (g_id, 'mesh_shrink_factor', '1', 'mesh shrink', &
-      'Fractional threshold for shrinking the SC mesh.', '', &
-      space_charge_com%mesh_shrink_factor, merr)
-call fel_h5_int (g_id, 'space_charge_mesh_size', '1', 'SC mesh', &
-      'Grid size of the fft_3d space-charge calc, per spatial dimension.', 'plane', &
-      space_charge_com%space_charge_mesh_size, merr)
-call fel_h5_int (g_id, 'csr3d_mesh_size', '1', 'CSR mesh', &
-      'Grid size of the 3D CSR calc, per spatial dimension.', 'plane', &
-      space_charge_com%csr3d_mesh_size, merr)
-call fel_h5_int (g_id, 'n_bin', '1', 'bins', 'Number of bins used.', '', &
-      space_charge_com%n_bin, merr)
-call fel_h5_int (g_id, 'particle_bin_span', '1', 'bin span', &
-      'Longitudinal particle length over the bin size.', '', &
-      space_charge_com%particle_bin_span, merr)
-call fel_h5_int (g_id, 'n_shield_images', '1', 'shield images', &
-      'Chamber-wall shielding images. Zero means none.', '', &
-      space_charge_com%n_shield_images, merr)
-call fel_h5_int (g_id, 'sc_min_in_bin', '1', 'min in bin', &
-      'Minimum particles per bin for valid sigmas.', '', space_charge_com%sc_min_in_bin, merr)
-call fel_h5_flag (g_id, 'lsc_kick_transverse_dependence', 'LSC transverse', &
-      'Transverse dependence in the LSC kick.', &
-      space_charge_com%lsc_kick_transverse_dependence, merr)
-call fel_h5_flag (g_id, 'debug', 'debug', 'Code debugging.', space_charge_com%debug, merr)
-call file_note ('diagnostic_output_file', space_charge_com%diagnostic_output_file, &
-      'Diagnostic (wake) output file.')
-call H5Gclose_f (g_id, h5e)
-
-end subroutine write_space_charge_com
+end subroutine write_key
 
 end subroutine fel_write_params
+
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -2625,9 +2209,8 @@ end subroutine fel_write_lattice
 !+
 ! Subroutine resolved_input_text (run, txt)
 !
-! Routine to render the resolved input echo as one string. It goes through
-! fel_write_resolved_input and a scratch file, since namelist output needs an
-! external unit.
+! Routine to render the resolved deck as one string, every key of the schema with its
+! value, through fel_schema_write_toml and a scratch file.
 !
 ! Input:
 !   run  -- fel_run_struct: Run state.
@@ -2643,7 +2226,7 @@ character(:), allocatable :: txt
 integer iu
 
 open (newunit = iu, status = 'scratch', action = 'readwrite')
-call fel_write_resolved_input (run, iu)
+call fel_schema_write_toml (run, iu)
 call unit_text (iu, txt)
 close (iu)
 

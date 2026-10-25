@@ -43,9 +43,17 @@ set (CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/modules")
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
+# The conda environment the build runs in holds toml-f's CMake configuration and HDF5's,
+# so its prefix joins the search path when it is active.
+if (DEFINED ENV{CONDA_PREFIX})
+  list (APPEND CMAKE_PREFIX_PATH "$ENV{CONDA_PREFIX}")
+endif ()
+
 find_package (Bmad REQUIRED)
 find_package (OpenMP REQUIRED COMPONENTS Fortran)
 find_package (HDF5 REQUIRED COMPONENTS Fortran HL)
+# The deck is TOML, read with toml-f (src/fel_input_mod.f90, src/fel_schema_mod.f90).
+find_package (toml-f REQUIRED)
 
 # The FP32 field twin (src/fel_fp32_mod.f90) transforms with FFTW's single-precision
 # interface, which not every toolchain carries. Without the library nothing links against
@@ -107,7 +115,7 @@ if (LUCIFER_DEVICE_BACKEND STREQUAL metal)
   message (STATUS "Device backend: Metal")
 else ()
   target_sources (lucifer_lib PRIVATE src/device/lucifer_device_stub.c)
-  message (STATUS "Device backend: none, so global%device is refused")
+  message (STATUS "Device backend: none, so run.device is refused")
 endif ()
 
 target_include_directories (lucifer_lib PUBLIC "${Bmad_MODULE_DIR}" "${CMAKE_SOURCE_DIR}/src/device")
@@ -121,7 +129,7 @@ endif ()
 # two front libraries alone and the link of a static libbmad.a then fails.
 target_link_libraries (lucifer_lib PUBLIC ${Bmad_LIBRARIES}
                        ${HDF5_Fortran_HL_LIBRARIES} ${HDF5_Fortran_LIBRARIES}
-                       OpenMP::OpenMP_Fortran ${CMAKE_DL_LIBS})
+                       toml-f::toml-f OpenMP::OpenMP_Fortran ${CMAKE_DL_LIBS})
 if (APPLE)
   # The distribution linked its binaries with this, and the recorded levels carry it.
   target_link_options (lucifer_lib PUBLIC "-Wl,-no_compact_unwind")

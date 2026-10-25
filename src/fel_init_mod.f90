@@ -61,12 +61,12 @@ end function fel_line_slippage
 !+
 ! Subroutine fel_init_beam (run, err_flag)
 !
-! Routine to build the beam. It reads an openPMD particle dump of slices (beam_file), or
+! Routine to build the beam. It reads an openPMD particle dump of slices (beam.file), or
 ! loads a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
-! described bunch takes the analytic generator. A file, beam_init%position_file, takes
+! described bunch takes the analytic generator. A file, beam.position_file, takes
 ! the resampler of fel_import_mod. In the keep mode every particle of the bunch stays as
 ! a beamlet of copies. The routine applies the beam-side check instruments
-! (split_weights, swap_beam_xy) and sets run%nslice. One seed (global%ran_seed) governs
+! (split_weights, swap_beam_xy) and sets run%nslice. One seed (run.ran_seed) governs
 ! generation, resampling and noise. Errors return through err_flag, and nothing here stops.
 !
 ! Input:
@@ -133,7 +133,7 @@ window_sample = run%slicing%n_wavelength
 
 if (run%slicing%n_slice > 0) then
   if (window_length > 0) then
-    call out_io (s_error$, r_name, 'SLICING%WINDOW_LENGTH AND SLICING%N_SLICE BOTH STATE THE', &
+    call out_io (s_error$, r_name, 'WINDOW.WINDOW_LENGTH AND WINDOW.N_SLICE BOTH STATE THE', &
                                    'WINDOW. GIVE ONE.')
     err_flag = .true.;  return
   endif
@@ -141,11 +141,11 @@ if (run%slicing%n_slice > 0) then
 endif
 
 ! A flat current is Genesis's &beam current. The bunch's z structure is then not used.
-! With no window it is the steady state of one slice. slicing%current and
-! beam_init%bunch_charge are two ways to say the same thing, so both is refused.
+! With no window it is the steady state of one slice. window.current and
+! beam.bunch_charge are two ways to say the same thing, so both is refused.
 
 if (run%slicing%current > 0 .and. beam_init%bunch_charge > 0) then
-  call out_io (s_error$, r_name, 'SLICING%CURRENT AND BEAM_INIT%BUNCH_CHARGE BOTH SET THE CHARGE.', &
+  call out_io (s_error$, r_name, 'WINDOW.CURRENT AND BEAM.BUNCH_CHARGE BOTH SET THE CHARGE.', &
                                  'GIVE ONE.')
   err_flag = .true.;  return
 endif
@@ -155,8 +155,8 @@ seed_power = run%winit%seed_power
 seed_waist_size = run%winit%seed_waist_size
 
 ! There is one reference energy and the lattice holds it: gamma0 = e_tot/m_e c^2 from
-! the lattice header. It is never a namelist input.
-! Note: A namelist gamma0 once existed for symmetry with Genesis decks. A hand-rounded
+! the lattice header. It is never a deck input.
+! Note: A deck gamma0 once existed for symmetry with Genesis decks. A hand-rounded
 ! value disagreed with the lattice e_tot at 1.4e-9. The FEL physics then ran on one
 ! reference while Bmad's momenta were normalized by the other. The p0c check in the
 ! seam stopped the run mid-tracking.
@@ -166,7 +166,7 @@ if ((beam_file == '') .neqv. (field_file(1) == '')) then
   err_flag = .true.;  return
 endif
 if (run%global%continuation .and. beam_file == '') then
-  call out_io (s_error$, r_name, 'global%continuation NEEDS beam_file AND field_file,', &
+  call out_io (s_error$, r_name, 'run.continuation NEEDS beam.file AND field.file,', &
                                  'THE CHECKPOINT PAIR THE RUN CONTINUES FROM.')
   err_flag = .true.;  return
 endif
@@ -181,8 +181,8 @@ case default
   err_flag = .true.;  return
 end select
 if (beam_file /= '' .and. (beam_init%position_file /= '' .or. resample%use_beam_init)) then
-  call out_io (s_error$, r_name, 'A BEAM ALREADY IN SLICES (beam_file) AND A BUNCH TO SLICE', &
-                                 '(beam_init%position_file) ARE MUTUALLY EXCLUSIVE.')
+  call out_io (s_error$, r_name, 'A BEAM ALREADY IN SLICES (beam.file) AND A BUNCH TO SLICE', &
+                                 '(beam.position_file) ARE MUTUALLY EXCLUSIVE.')
   err_flag = .true.;  return
 endif
 
@@ -215,7 +215,7 @@ if (beam_file /= '') then
   if (lambda0 <= 0) then
     call out_io (s_error$, r_name, 'READING A BEAM DUMP NEEDS LAMBDA0 > 0.', &
                  'AN openPMD BEAM FILE CARRIES THE SLICE PARTITION AND NOT THE RADIATION', &
-                 'IT WAS SLICED ON, SO THE DECK MUST STATE lambda0 AND slicing%n_wavelength.', &
+                 'IT WAS SLICED ON, SO THE DECK MUST STATE lambda0 AND window.n_wavelength.', &
                  'FILE: ' // trim(beam_file))
     err_flag = .true.;  return
   endif
@@ -302,17 +302,17 @@ call check_beam_init_contract ()
 
 npart_gen = beam_init%n_particle
 if (npart_gen < 1 .or. beamlet_size < 1 .or. (quiet_start .and. mod(npart_gen, beamlet_size) /= 0)) then
-  call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE (MACROPARTICLES PER SLICE HERE) MUST BE A', &
+  call out_io (s_error$, r_name, 'BEAM.N_PARTICLE (MACROPARTICLES PER SLICE HERE) MUST BE A', &
                                  'POSITIVE MULTIPLE OF BEAMLET_SIZE.')
   err_flag = .true.;  return
 endif
 if (beam_init%a_norm_emit <= 0 .or. beam_init%b_norm_emit <= 0) then
-  call out_io (s_error$, r_name, 'BEAM_INIT%A_NORM_EMIT AND %B_NORM_EMIT MUST BE POSITIVE.')
+  call out_io (s_error$, r_name, 'BEAM.A_NORM_EMIT AND %B_NORM_EMIT MUST BE POSITIVE.')
   err_flag = .true.;  return
 endif
 if (beam_init%bunch_charge <= 0 .and. run%slicing%current <= 0) then
-  call out_io (s_error$, r_name, 'THE CHARGE IS UNSTATED: SET BEAM_INIT%BUNCH_CHARGE FOR A BUNCH', &
-                                 'WITH A Z STRUCTURE, OR SLICING%CURRENT FOR A FLAT ONE.')
+  call out_io (s_error$, r_name, 'THE CHARGE IS UNSTATED: SET BEAM.BUNCH_CHARGE FOR A BUNCH', &
+                                 'WITH A Z STRUCTURE, OR WINDOW.CURRENT FOR A FLAT ONE.')
   err_flag = .true.;  return
 endif
 
@@ -328,8 +328,8 @@ if (tw_beta_x <= 0 .or. tw_beta_y <= 0) then
 endif
 if (beam_init%sig_pz < 0 .or. seed_power < 0 .or. grid_n_pts < 3 .or. grid_half_width <= 0 .or. &
     window_sample < 1) then
-  call out_io (s_error$, r_name, 'CHECK BEAM_INIT%SIG_PZ, SEED_POWER, GRID_N_PTS, GRID_HALF_WIDTH,', &
-                                 'SLICING%N_WAVELENGTH.')
+  call out_io (s_error$, r_name, 'CHECK BEAM.SIG_PZ, SEED_POWER, GRID_N_PTS, GRID_HALF_WIDTH,', &
+                                 'WINDOW.N_WAVELENGTH.')
   err_flag = .true.;  return
 endif
 if (seed_power > 0 .and. seed_waist_size <= 0) then
@@ -357,7 +357,7 @@ case ('', 'RAN_GAUSS', 'ran_gauss', 'Ran_Gauss')
 case ('GRID', 'grid', 'Grid')
   flat_z = .true.
 case default
-  call out_io (s_error$, r_name, 'BEAM_INIT%DISTRIBUTION_TYPE(3) MUST BE RAN_GAUSS (GAUSSIAN BUNCH)', &
+  call out_io (s_error$, r_name, 'BEAM.Z_DISTRIBUTION MUST BE RAN_GAUSS (GAUSSIAN BUNCH)', &
                'OR GRID (FLAT, BMAD''S UNIFORM) FOR THE QUIET-START GENERATOR, GOT: ' // &
                trim(beam_init%distribution_type(3)))
   err_flag = .true.;  return
@@ -368,7 +368,7 @@ spacing_gen = window_sample * lambda0
 if (flat_z) then
   zlen_gen = beam_init%grid(3)%x_max - beam_init%grid(3)%x_min
   if (zlen_gen <= 0) then
-    call out_io (s_error$, r_name, 'A GRID (FLAT) Z-PLANE NEEDS BEAM_INIT%GRID(3)%X_MIN < %X_MAX.')
+    call out_io (s_error$, r_name, 'A GRID (FLAT) Z-PLANE NEEDS BEAM.Z_MIN < %X_MAX.')
     err_flag = .true.;  return
   endif
 elseif (beam_init%sig_z > 0) then
@@ -402,7 +402,7 @@ if (window_length > 0) then
   if (zlen_gen == 0 .and. run%slicing%current <= 0 .and. window_length > 1.5_rp * spacing_gen) then
     call out_io (s_error$, r_name, 'SIG_Z = 0 (THE STEADY-STATE DESCRIPTION) IS INVALID FOR A', &
                  'TIME-DEPENDENT WINDOW. GIVE THE BUNCH A LENGTH (SIG_Z, OR A GRID EXTENT),', &
-                 'OR STATE SLICING%CURRENT, WHICH IS FLAT AND NEEDS NO Z DESCRIPTION.')
+                 'OR STATE WINDOW.CURRENT, WHICH IS FLAT AND NEEDS NO Z DESCRIPTION.')
     err_flag = .true.;  return
   endif
   if (window_length < zlen_gen .and. run%slicing%current <= 0) then
@@ -440,7 +440,7 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 
-! The derived per-slice current. Where the deck states slicing%current, that is used.
+! The derived per-slice current. Where the deck states window.current, that is used.
 ! It needs no z description and is Genesis's &beam current. Otherwise it comes from the
 ! bunch:
 !   Flat:         I = Q*c/extent inside the grid extent.
@@ -660,7 +660,7 @@ if (trim(beam_init%distribution_type(2)) /= '' .and. trim(beam_init%distribution
     .and. trim(beam_init%distribution_type(2)) /= 'ran_gauss') bad = 'distribution_type(2) (transverse: RAN_GAUSS only)'
 
 if (bad /= '') then
-  call out_io (s_error$, r_name, 'BEAM_INIT%' // trim(bad) // ' IS SET BUT NOT HONORED BY THE', &
+  call out_io (s_error$, r_name, 'BEAM.' // trim(bad) // ' IS SET BUT NOT HONORED BY THE', &
                                  'QUIET-START GENERATOR (SEE THE HONORED-FIELDS TABLE IN docs/input-reference.md).', &
                                  'REFUSING RATHER THAN SILENTLY IGNORING IT.')
   err_flag = .true.;  return
@@ -675,8 +675,8 @@ end subroutine check_beam_init_contract
 ! Subroutine import_initial_state ()
 !
 ! Routine for the sample mode from a bunch (fel-physics.md sec-import). The bunch_struct
-! is read from the openPMD-beamphysics file beam_init%position_file. On the check route
-! resample%use_beam_init it is generated from beam_init instead. It is resampled into FEL
+! is read from the openPMD-beamphysics file beam.position_file. On the check route
+! beam.resample.use_beam_init it is generated from beam_init instead. It is resampled into FEL
 ! slices by the transcribed Genesis importdistribution method. fel_import_mod documents
 ! the algorithm and its provenance. The RNG-free outputs the exactness checks read are
 ! written at full precision.
@@ -699,7 +699,7 @@ if (lambda0 <= 0) then
   err_flag = .true.;  return
 endif
 if (window_sample < 1) then
-  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH IS \i0\ WHERE THE BEAM IS BUILT.', &
+  call out_io (s_error$, r_name, 'WINDOW.N_WAVELENGTH IS \i0\ WHERE THE BEAM IS BUILT.', &
                'fel_setup_lattice SETS IT, SO IT MUST RUN BEFORE fel_init_beam.', i_array = [window_sample])
   err_flag = .true.;  return
 endif
@@ -740,14 +740,14 @@ if (write_openpmd_file /= '') then
   call out_io (s_info$, r_name, 'Wrote openPMD-beamphysics file: ' // trim(write_openpmd_file))
 endif
 
-! On the normal path the per-slice count after copies is beam_init%n_particle, and the
+! On the normal path the per-slice count after copies is beam.n_particle, and the
 ! copies are beamlet_size. The generator reads the same two numbers. The resample
-! block's own counts are for its check route, resample%use_beam_init, where the bunch's
-! particle count is beam_init%n_particle.
+! block's own counts are for its check route, beam.resample.use_beam_init, where the bunch's
+! particle count is beam.n_particle.
 
 if (.not. resample%use_beam_init) then
   if (beam_init%n_particle < 1) then
-    call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE, THE MACROPARTICLES PER SLICE AFTER COPIES,', &
+    call out_io (s_error$, r_name, 'BEAM.N_PARTICLE, THE MACROPARTICLES PER SLICE AFTER COPIES,', &
                                    'MUST BE POSITIVE.')
     err_flag = .true.;  return
   endif
@@ -790,7 +790,7 @@ end subroutine import_initial_state
 ! Subroutine fel_bunch_from_beam_init (beam_b, err_i)
 !
 ! Routine to make the one bunch every slicing path starts from.
-! Bmad's init_beam_distribution reads beam_init%position_file when it is set (openPMD or
+! Bmad's init_beam_distribution reads beam.position_file when it is set (openPMD or
 ! Bmad's own ASCII). Otherwise it generates from the beam_init description. The two
 ! sources meet here, so the loaders never ask which one they have.
 !-
@@ -806,7 +806,7 @@ character(*), parameter :: r_name = 'fel_bunch_from_beam_init'
 
 err_i = .false.
 if (beam_init%position_file == '' .and. beam_init%n_particle < 1) then
-  call out_io (s_error$, r_name, 'BEAM_INIT%N_PARTICLE MUST BE POSITIVE.')
+  call out_io (s_error$, r_name, 'BEAM.N_PARTICLE MUST BE POSITIVE.')
   err_i = .true.;  return
 endif
 
@@ -815,11 +815,11 @@ endif
 ! windowed dump, and a steady-state frame has the single patch that refusal lets by.
 
 if (beam_init%position_file /= '') then
-  call fel_assert_not_interior_frame (beam_init%position_file, 'BEAM_INIT%POSITION_FILE', err_i)
+  call fel_assert_not_interior_frame (beam_init%position_file, 'BEAM.POSITION_FILE', err_i)
   if (err_i) return
 endif
 
-! Bmad's file read keeps only the first beam_init%n_particle particles when it is set.
+! Bmad's file read keeps only the first beam.n_particle particles when it is set.
 ! Here the count means the macroparticles per slice. So the read sees zero and takes the
 ! whole file.
 
@@ -832,11 +832,11 @@ if (err_i) return
 
 ! A file Bmad reads as several bunches is this tracker's own beam dump. It has one
 ! particle patch per slice, each slice's time counted from its own start. Read as a
-! bunch, its slices would collapse onto one another. The dump path is beam_file.
+! bunch, its slices would collapse onto one another. The dump path is beam.file.
 
 if (size(beam_b%bunch) > 1) then
   call out_io (s_error$, r_name, 'THE FILE HOLDS \i0\ PARTICLE PATCHES, WHICH IS A BEAM DUMP IN SLICES', &
-                                 'AND NOT A BUNCH. LOAD IT WITH beam_file, NOT beam_init%position_file.', &
+                                 'AND NOT A BUNCH. LOAD IT WITH beam.file, NOT beam.position_file.', &
                                  'FILE: ' // trim(beam_init%position_file), i_array = [size(beam_b%bunch)])
   err_i = .true.;  return
 endif
@@ -868,7 +868,7 @@ end subroutine fel_bunch_from_beam_init
 ! the same bunch loads the same way every time.
 !
 ! The window follows the bunch: ceiling(extent / spacing) slices from the earliest
-! particle. Where the deck states slicing%n_slice or slicing%window_length, that is the
+! particle. Where the deck states window.n_slice or window.window_length, that is the
 ! window, with the bunch centered and the particles outside counted in a warning.
 !-
 
@@ -893,7 +893,7 @@ if (lambda0 <= 0) then
   err_flag = .true.;  return
 endif
 if (window_sample < 1) then
-  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH IS \i0\ WHERE THE BEAM IS BUILT.', &
+  call out_io (s_error$, r_name, 'WINDOW.N_WAVELENGTH IS \i0\ WHERE THE BEAM IS BUILT.', &
                'fel_setup_lattice SETS IT, SO IT MUST RUN BEFORE fel_init_beam.', i_array = [window_sample])
   err_flag = .true.;  return
 endif
@@ -931,7 +931,7 @@ if (nalive < 1) then
 endif
 if (sum(bp%particle%charge, mask = bp%particle%state == alive$) <= 0) then
   call out_io (s_error$, r_name, 'BUNCH HAS ZERO TOTAL CHARGE; NOTHING WOULD LASE.', &
-    'AN openPMD FILE WITHOUT CHARGE DATA, OR AN UNSET beam_init%bunch_charge, LOADS DARK.')
+    'AN openPMD FILE WITHOUT CHARGE DATA, OR AN UNSET beam.bunch_charge, LOADS DARK.')
   err_flag = .true.;  return
 endif
 
@@ -1245,7 +1245,7 @@ end subroutine fel_init_beam
 !+
 ! Subroutine fel_init_wavefront (run, err_flag)
 !
-! Routine to build the field set. The fundamental is read from field_file(1), an openPMD
+! Routine to build the field set. The fundamental is read from field.file(1), an openPMD
 ! EXT_Wavefront, or the Gaussian seed is generated (seed_power = 0 is a dark start).
 ! The harmonic entries are initialized on the fundamental's grid. Any of them may be
 ! filled from openPMD imports matched by photon energy. The beam and field windows are
@@ -1332,7 +1332,7 @@ else
 endif
 
 ! Harmonic fields start dark on the fundamental's grid and window, at its wavelength / h.
-! An openPMD import (field_file entries 2+) fills the entry whose photon energy it
+! An openPMD import (field.file entries 2+) fills the entry whose photon energy it
 ! carries. Its grid must match the fundamental's, by the same one-window rule the
 ! fundamental import obeys.
 

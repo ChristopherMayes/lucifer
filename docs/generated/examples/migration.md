@@ -11,11 +11,11 @@ Everything on this page lives in and runs from `examples/migration/`.
 
 The example runs in two commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_no_migrate.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_no_migrate.in
     python ../plot_fel.py migration.stats.h5
 
-A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `global%migrate = T` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.in` is the same run with it off.
+A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `run.migrate = true` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.in` is the same run with it off.
 
 No artificial driver is needed to make this happen. The phase advance a particle accumulates depends on its energy and on its betatron angles, both of which vary across the beam, so a real beam in a real line migrates on its own. Adding `../sase_wake`'s chamber block to this deck raises both the moves and the dropped charge. A wake that costs the tail slices 121 keV/m and the head slices 1.9 keV/m (`../sase_wake`) is a systematic phase walk on top of the beam's own spread.
 
@@ -25,11 +25,11 @@ The exit powers are those of this input's grid and particle count. The power of 
 
 `migration.migration.txt` carries one row per event: the s position, the count, the charge dropped, the phasor deviation, and the smallest phase distance any particle at that event had to a slice boundary. The totals are at the end. The rows are what a plot of migration would be drawn from.
 
-The per-slice current shows the difference most directly. With `migrate = F` it cannot change. All 96 slices sit at exactly 3000 A at the exit, the value they were loaded with, because no particle ever leaves the slice it started in. With `migrate = T` the profile evolves across the window. The drain is at the high-index end of the window, where the last two slices are the emptiest. In the plot, the emptiest slice is the one gray line whose bunching climbs far above every other slice's, to the largest slice bunching the table carries. That is a small-population artifact and not physics. A slice with a small fraction of its charge left has a noisy bunching estimate, and `n_eff` in the diag columns is what says so.
+The per-slice current shows the difference most directly. With `migrate = false` it cannot change. All 96 slices sit at exactly 3000 A at the exit, the value they were loaded with, because no particle ever leaves the slice it started in. With `migrate = true` the profile evolves across the window. The drain is at the high-index end of the window, where the last two slices are the emptiest. In the plot, the emptiest slice is the one gray line whose bunching climbs far above every other slice's, to the largest slice bunching the table carries. That is a small-population artifact and not physics. A slice with a small fraction of its charge left has a noisy bunching estimate, and `n_eff` in the diag columns is what says so.
 
 Migration changes the physics and not only the bookkeeping. With migration off, a particle whose phase has left its slice keeps radiating into the field of the slice it started in, and the bunching each slice sees is smeared by contributions that belong elsewhere. On this configuration that shows in the exit bunching, which the table carries for both runs. The default is off because Genesis 1.3 Version 4 (Genesis4) does not migrate without one4one, and the comparison tiers would otherwise measure a model difference rather than a transcription ([validation](../../validation.md), the slice-migration section).
 
-`migrate_check = T` is the check and not the feature. It verifies that the whole-beam weighted phasor obeys `S_before = S_after + S_dropped` across every move, and the worst deviation at the end of `migration.migration.txt` is that residual. Migration under weights generalizes a Genesis4 method that requires one4one, and the check is what validates the generalization.
+`migrate_check = true` is the check and not the feature. It verifies that the whole-beam weighted phasor obeys `S_before = S_after + S_dropped` across every move, and the worst deviation at the end of `migration.migration.txt` is that residual. Migration under weights generalizes a Genesis4 method that requires one4one, and the check is what validates the generalization.
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so both exit powers are the mode. With the filter off the same decks reported far more power, most of it that emission.
 
@@ -39,7 +39,7 @@ Each run takes about a quarter of a minute.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_no_migrate.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_no_migrate.toml` | Unit |
 |---|---|---|---|
 | exit power | 7.7178e+07 | 1.1167e+08 | W |
 | exit power per slice | 8.0394e+05 | 1.1632e+06 | W |
@@ -88,64 +88,64 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "migration"
-  global%migrate = T
-  global%migrate_check = T
-  slicing%window_length = 2.88e-8
-  slicing%n_wavelength = 3
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 2.881993782512e-13
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.44e-8
-  beam_init%grid(3)%x_max =  1.44e-8
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  shot_noise = T
-/
+[run]
+out_root = "migration"
+migrate = true
+migrate_check = true
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[window]
+window_length = 2.88e-8
+n_wavelength = 3
+
+[beam]
+n_particle = 1024
+bunch_charge = 2.881993782512e-13
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.44e-8
+z_max = 1.44e-8
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0
 ```
 
-### `lucifer_no_migrate.in`
+### `lucifer_no_migrate.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "no_migrate"
-  slicing%window_length = 2.88e-8
-  slicing%n_wavelength = 3
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 2.881993782512e-13
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.44e-8
-  beam_init%grid(3)%x_max =  1.44e-8
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  shot_noise = T
-/
+[run]
+out_root = "no_migrate"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[window]
+window_length = 2.88e-8
+n_wavelength = 3
+
+[beam]
+n_particle = 1024
+bunch_charge = 2.881993782512e-13
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.44e-8
+z_max = 1.44e-8
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0
 ```

@@ -1,0 +1,25 @@
+lattice = "../aramis.bmad"
+
+[run]
+out_root = "from_file"
+ran_seed = 12345
+
+[window]
+n_wavelength = 3
+
+[beam]
+position_file = "import_bunch.h5"
+n_particle = 2048
+load_mode = "sample"
+quiet_start = true
+beamlet_size = 8
+shot_noise = true
+
+[beam.resample]
+slice_width = 0.01
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0

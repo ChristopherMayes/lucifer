@@ -253,7 +253,7 @@ n_slice is the window the deck asked for, and the file must agree. A dump carrie
 patch per slice. So a different patch count means the deck and the file describe
 different runs, and the run is refused. Pass -1 when the deck states no window, the
 usual case for a restart, and the file's patch count defines it. A bunch that is not a
-sliced window belongs on the bunch path (beam_init%position_file). That path slices it
+sliced window belongs on the bunch path (beam.position_file). That path slices it
 by load_mode instead of assuming a slicing the bunch does not carry.
 
 Neither beamlet_size nor one4one is read. one4one says every macroparticle carries one
@@ -339,7 +339,7 @@ dump.
 
 ```
 Input:
-  file_name -- character(*): The file the deck names as beam_file.
+  file_name -- character(*): The file the deck names as beam.file.
 
 Output:
   err_flag  -- logical: Set True if the file opens and holds no checkpoint group.
@@ -1577,7 +1577,7 @@ supported size.
 
 ```
 Input:
-  device_req -- character(*): global%device.
+  device_req -- character(*): run.device.
   beam       -- fel_beam_struct: The beam. Slice fills size the rectangular array.
   ngrid      -- integer: Transverse grid points per side, one grid for the set.
   sample     -- integer: Slice spacing in radiation wavelengths.
@@ -2002,7 +2002,7 @@ Input:
                  z, pz in the beam's stored chart. px carries the quiver mid-segment,
                  and the conversion here is fel_unavg_step's own.
   nsub      -- integer: Substeps in one record step of this segment.
-  mutate    -- logical: global%fp32_mutate. Coarsen the uploaded lag accumulator?
+  mutate    -- logical: run.fp32_mutate. Coarsen the uploaded lag accumulator?
 ```
 
 (api-fel-device-unavg-twin-rows)=
@@ -2237,8 +2237,8 @@ Routine to arm the instrument from the input knob and open the .fp32.txt stream.
 
 ```
 Input:
-  mode         -- character(*): global%fp32_check.
-  mutate       -- logical: global%fp32_mutate. Coarsen the twin's state so the check
+  mode         -- character(*): run.fp32_check.
+  mutate       -- logical: run.fp32_mutate. Coarsen the twin's state so the check
                     can fail?
   nslice       -- integer: Slice count.
   bucket_shift -- real(rp): The slice bucket [m], for the renormalization round trip.
@@ -2786,7 +2786,7 @@ Routine to write one string of any length as a scalar string dataset.
 
 The text goes in a dataset and *not* an attribute. HDF5 caps a single attribute at
 64 kB, and the largest that writes is 65495 bytes (docs/reading-output.md). A scalar
-string dataset takes 3 MB. An echoed namelist or lattice file can pass the cap on an
+string dataset takes 3 MB. An echoed deck or lattice file can pass the cap on an
 ordinary lattice. That failure is silent unless the error is checked.
 
 fel_h5_str writes a fixed-width array for label axes. This routine writes one string
@@ -3012,12 +3012,12 @@ Output:
 *Subroutine* `(run, err_flag)`
 
 ```
-Routine to build the beam. It reads an openPMD particle dump of slices (beam_file), or
+Routine to build the beam. It reads an openPMD particle dump of slices (beam.file), or
 loads a beam_init bunch by load_mode (fel-physics.md sec-loading). In the sample mode a
-described bunch takes the analytic generator. A file, beam_init%position_file, takes
+described bunch takes the analytic generator. A file, beam.position_file, takes
 the resampler of fel_import_mod. In the keep mode every particle of the bunch stays as
 a beamlet of copies. The routine applies the beam-side check instruments
-(split_weights, swap_beam_xy) and sets run%nslice. One seed (global%ran_seed) governs
+(split_weights, swap_beam_xy) and sets run%nslice. One seed (run.ran_seed) governs
 generation, resampling and noise. Errors return through err_flag, and nothing here stops.
 ```
 
@@ -3067,8 +3067,8 @@ with no analytic counterpart. They are accepted at their defaults only.
 
 ```
 Routine for the sample mode from a bunch (fel-physics.md sec-import). The bunch_struct
-is read from the openPMD-beamphysics file beam_init%position_file. On the check route
-resample%use_beam_init it is generated from beam_init instead. It is resampled into FEL
+is read from the openPMD-beamphysics file beam.position_file. On the check route
+beam.resample.use_beam_init it is generated from beam_init instead. It is resampled into FEL
 slices by the transcribed Genesis importdistribution method. fel_import_mod documents
 the algorithm and its provenance. The RNG-free outputs the exactness checks read are
 written at full precision.
@@ -3081,7 +3081,7 @@ written at full precision.
 
 ```
 Routine to make the one bunch every slicing path starts from.
-Bmad's init_beam_distribution reads beam_init%position_file when it is set (openPMD or
+Bmad's init_beam_distribution reads beam.position_file when it is set (openPMD or
 Bmad's own ASCII). Otherwise it generates from the beam_init description. The two
 sources meet here, so the loaders never ask which one they have.
 ```
@@ -3103,7 +3103,7 @@ keeps its phase and its weight. No random number is drawn before the shot noise,
 the same bunch loads the same way every time.
 
 The window follows the bunch: ceiling(extent / spacing) slices from the earliest
-particle. Where the deck states slicing%n_slice or slicing%window_length, that is the
+particle. Where the deck states window.n_slice or window.window_length, that is the
 window, with the bunch centered and the particles outside counted in a warning.
 ```
 
@@ -3168,7 +3168,7 @@ Routine to swap the contents of the two arrays a and b.
 *Subroutine* `(run, err_flag)`
 
 ```
-Routine to build the field set. The fundamental is read from field_file(1), an openPMD
+Routine to build the field set. The fundamental is read from field.file(1), an openPMD
 EXT_Wavefront, or the Gaussian seed is generated (seed_power = 0 is a dark start).
 The harmonic entries are initialized on the fundamental's grid. Any of them may be
 filled from openPMD imports matched by photon energy. The beam and field windows are
@@ -3208,109 +3208,39 @@ the distribution import share this. Both make their own beam and bring no field.
 *Module*
 
 ```
-The namelist layer of the FEL tracker, kept apart the way Tao keeps its tao_init_*
-files. There are three groups, all read from one input file. Each group fills the
-structs of fel_struct directly, as Tao's &tao_params does. EG: global%out_root,
-bmad_com%radiation_damping_on, chamber_wake%radius, space_charge%nz, beam_init%n_particle
-and wavefront_init%lambda0 are set by component. This module is library code. An
-embedding program may use the parsing, or skip it and fill the structs in code.
+The deck reader of the FEL tracker, kept apart the way Tao keeps its tao_init_*
+files. A deck is one TOML file, read through the schema (fel_schema_mod) into the
+input structures of fel_struct. This module is library code. An embedding program
+may use the reader, or skip it and fill the structures in code.
 
-  &fel_params          lat_file, global, bmad_com, space_charge_com, wake, sc,
-                       chamber_wake%write_kernels
-  &fel_beam_init       beam_init, resample, beam_file, write_genesis_dist,
-                       write_openpmd_file, load_mode, quiet_start, beamlet_size, shot_noise,
-                       split_weights, swap_beam_xy, gen_test_weights,
-                       resample_split_weights
-  &fel_wavefront_init  wavefront_init, field_file
-
-A group that is absent keeps its defaults. A group that is present must parse.
-The retired flat &fel_track_params group is refused, and the error names the three
-groups that replace it.
+Every key the deck can set is in the schema's table, and a key the table does not
+name is refused with the keys of its table, so a misspelling cannot pass as a
+default. A key in the wrong table is refused with the table it belongs in. The lattice
+is required, and everything else keeps the declarations' defaults when absent.
 ```
 
-(api-fel-read-input)=
-### `fel_read_input`
+(api-fel-read-deck)=
+### `fel_read_deck`
 
-*Subroutine* `(param_file, run, err_flag)`
+*Subroutine* `(deck_file, run, err_flag)`
 
 ```
-Routine to read the three namelist groups of param_file into the input structs of run.
-The namelist sets bmad_com and space_charge_com directly, since they are Bmad's own
+Routine to read a TOML deck into the input structures of run. The Bmad switches of the
+[bmad] table set bmad_com and space_charge_com directly, since they are Bmad's own
 globals.
 ```
 
 ```
 Input:
-  param_file   -- character(*): The input file.
+  deck_file  -- character(*): The deck.
 
 Output:
-  run          -- fel_run_struct: Input structs filled (global, winit, wake_init,
-                    sc_init, beam_init, imp, bparam, lat_file, field_file). Nothing else
-                    is touched.
-  err_flag     -- logical: Set on any parse error or on a retired input name.
-```
-
-(api-fel-write-resolved-input)=
-### `fel_write_resolved_input`
-
-*Subroutine* `(run, iu)`
-
-```
-Routine to write the resolved inputs of run, every default made explicit, as the
-three namelist groups to an open unit. This is the provenance echo in the Meta/ group
-of the stats file, as Genesis's Meta group embeds the whole input file. An embedding
-program may also use it to save a configuration built in code.
-```
-
-```
-Input:
-  run -- fel_run_struct: The run state after parsing (resolved values).
-  iu  -- integer: Open unit to write the namelist echo to.
-
-Output:
-  None beyond the write: the three groups, every value resolved, in namelist syntax
-  (the Meta/input_echo content).
-```
-
-(api-group-present)=
-### `group_present`
-
-*Function* `(iu, group_name) result (found)`
-
-```
-Routine to find whether the namelist group &group_name is in the open file. The scan is
-textual, since the standard gives no portable iostat for an absent group. Leading
-blanks and case are ignored.
-```
-
-```
-Input:
-  iu         -- integer: Open unit positioned at the file start.
-  group_name -- character(*): Namelist group name to look for, without the &.
-
-Output:
-  found      -- logical: True when the group appears in the file.
-```
-
-(api-has-retired-group)=
-### `has_retired_group`
-
-*Function* `(param_file) result (found)`
-
-```
-Routine to refuse retired input names, each with the name that replaced it. So
-migration is a mechanical edit of the input file. Refused are the flat
-&fel_track_params group, the window parameters that moved from wavefront_init to
-slicing, dist_file and use_beam_init.
-```
-
-```
-Input:
-  param_file -- character(*): Input file name.
-
-Output:
-  found      -- logical: True when a retired name is present. The caller then refuses
-                  the run, and the message names what replaced it.
+  run        -- fel_run_struct: Input structures filled (global, winit, slicing,
+                  chamber_wake, space_charge, beam_init, resample, bparam, lat_file,
+                  field_file). Nothing else is touched.
+  err_flag   -- logical: Set when the file does not parse, a key is unknown or in the
+                  wrong table, a value has the wrong type or is outside its bounds, or
+                  the lattice is missing.
 ```
 
 ## `fel_io_mod.f90`
@@ -3452,7 +3382,7 @@ Output:
 *Subroutine* `(run, ie, at_end, err_flag)`
 
 ```
-Routine to write one frame of the series global%dump_at_comb asks for: the beam and
+Routine to write one frame of the series run.dump_at_comb asks for: the beam and
 the field set at this comb position. It uses the same writers as the element-end
 dumps. The files are <out_root>-<record>.beam.h5 and <out_root>-<record>.wf.h5, where
 record is the stats row this frame sits on. So a frame and its row share one index.
@@ -3556,7 +3486,7 @@ so the footer never claims a file the run did not write.
 ```
 Routine to read an openPMD wavefront into field-set entry ihh (the fundamental
 import path). The photon energy must be the fundamental's. A file carrying a
-harmonic in field_file(1) is refused.
+harmonic in field.file(1) is refused.
 ```
 
 ```
@@ -3756,7 +3686,7 @@ and text, how many files the parser opened, an ISO timestamp and the Bmad versio
 
 The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
-namelist runs to 12 kB and a lattice text to 37 kB on a real lattice
+deck runs to 12 kB and a lattice text to 37 kB on a real lattice
 (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
 differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
@@ -3776,8 +3706,8 @@ not a fingerprint of content.
 
 A stats file is meant to travel, so nothing here identifies a person by default. The
 timestamp and the Bmad version identify the run. The login name and working directory
-go in only under global%record_environment. The file records a lattice basename.
-Namelist input is echoed as typed, so an absolute path there is still an absolute path
+go in only under run.record_environment. The file records a lattice basename.
+The deck is echoed as read, so an absolute path there is still an absolute path
 in the file. Genesis always records user and cwd. Parity is not a reason to leak.
 
 Note: This is best effort. A failure warns, and never fails the run.
@@ -3821,57 +3751,6 @@ Input:
   stats_file  -- character(*): The stats file to reopen and annotate.
 ```
 
-(api-sub-open)=
-### `sub_open`
-
-*Subroutine* `(name, struct_name, descrip)`
-
-```
-Routine to open one input subgroup with its three attributes: kind, @struct naming
-the Fortran type verbatim, and the description.
-```
-
-(api-loc-note)=
-### `loc_note`
-
-*Subroutine* `(attrib, list)`
-
-```
-Routine to record a locator list as a string-array attribute of the nonblank
-entries. An attribute and not a dataset, since a dataset needs an axis and a list of
-inputs has none worth defining. Omitted when empty: absence means unset.
-```
-
-(api-file-note)=
-### `file_note`
-
-*Subroutine* `(name, val, descrip)`
-
-```
-Routine to record one file-name input as a text dataset, as typed.
-A blank one is omitted: absence means unset.
-```
-
-(api-write-bmad-com)=
-### `write_bmad_com`
-
-*Subroutine* `()`
-
-```
-Routine to write Bmad's bmad_com whole. The namelist exposes every component and all
-of Bmad's tracking reads them, so every one is honored. Descriptions follow the
-struct's own comments.
-```
-
-(api-write-space-charge-com)=
-### `write_space_charge_com`
-
-*Subroutine* `()`
-
-```
-Routine to write Bmad's space_charge_com whole, for the same reason as bmad_com.
-```
-
 (api-fel-write-lattice)=
 ### `fel_write_lattice`
 
@@ -3913,9 +3792,8 @@ Input:
 *Subroutine* `(run, txt)`
 
 ```
-Routine to render the resolved input echo as one string. It goes through
-fel_write_resolved_input and a scratch file, since namelist output needs an
-external unit.
+Routine to render the resolved deck as one string, every key of the schema with its
+value, through fel_schema_write_toml and a scratch file.
 ```
 
 ```
@@ -3961,6 +3839,197 @@ Output:
   txt  -- character(:), allocatable: The unit's text.
 ```
 
+## `fel_schema_mod.f90`
+
+(api-fel-schema-mod)=
+### `fel_schema_mod`
+
+*Module*
+
+```
+The schema of the deck: one table of every key a deck can set, with its TOML table,
+its type, its unit, its bounds and its description, and the structure component it
+fills. Everything that reads or describes the deck goes through this table. The reader
+(fel_input_mod) walks it, lucifer --schema writes it out as JSON Schema, the stats
+file's params/ group records every key from it, and the echo in meta/input_echo is
+the resolved deck written back from it. A key added here is read, refused, recorded,
+echoed and documented with no other edit.
+
+The defaults are not in this table. They are the declarations' own (fel_struct), and
+every default this module reports is read from a default-constructed run, so the table
+cannot disagree with the structures.
+
+The deck is one TOML file. Its tables are [run] for the run switches
+(fel_global_struct), [window] for the slicing, [beam] for the bunch and the load with
+[beam.resample] for the resampler, [field] for the radiation start, [wake] for the
+chamber wake, [space_charge] for the space-charge solver and [bmad] for the Bmad
+switches the tracker honors. The lattice is the one top-level key.
+```
+
+(api-fel-key-struct)=
+### `fel_key_struct`
+
+*Struct*
+
+```
+One key of the deck. lo and hi bound a real or integer key; a bound at huge is no
+bound, and lo_open or hi_open makes it exclusive. recorded is false for the one key
+that is not physics input, out_root, which every output file carries already.
+```
+
+(api-fel-schema-table)=
+### `fel_schema_table`
+
+*Subroutine* `(keys)`
+
+```
+Routine to build the key table, in deck order. This is the one list of what a deck
+can say.
+```
+
+```
+Output:
+  keys  -- fel_key_struct(:), allocatable: Every key of the deck.
+```
+
+(api-fel-schema-set)=
+### `fel_schema_set`
+
+*Subroutine* `(run, key, tab, err_flag)`
+
+```
+Routine to read one key from the TOML table it lives in and store it in run. The
+type must be the key's own, and a real or integer key must lie inside its bounds.
+A refusal names the table, the key and what was expected.
+```
+
+```
+Input:
+  key       -- fel_key_struct: The key, present in tab.
+  tab       -- toml_table: The table holding it.
+
+Output:
+  run       -- fel_run_struct: The component the key fills is set.
+  err_flag  -- logical: Set on a wrong type, a value outside the bounds or a list
+                 longer than the component holds.
+```
+
+(api-fel-schema-value)=
+### `fel_schema_value`
+
+*Subroutine* `(run, key, rv, iv, lv, sv, ilist, slist)`
+
+```
+Routine to fetch one key's value from run into the argument of its kind. This is the
+one place that knows which component each key fills on the way out, as
+fel_schema_set is on the way in. A string list comes back without its blank tail.
+```
+
+```
+Input:
+  run    -- fel_run_struct: The run state.
+  key    -- fel_key_struct: The key.
+
+Output:
+  rv     -- real(rp): The value of a real key.
+  iv     -- integer: The value of an integer key.
+  lv     -- logical: The value of a logical key.
+  sv     -- character(:), allocatable: The value of a string or path key.
+  ilist  -- integer(:), allocatable: The value of an integer-list key.
+  slist  -- character(400), allocatable: The value of a string-list key.
+```
+
+(api-fel-schema-text)=
+### `fel_schema_text`
+
+*Function* `(run, key) result (txt)`
+
+```
+Routine to render one key's value in run as TOML text, the form a deck writes it in.
+The echo and the JSON Schema's defaults are built from this.
+```
+
+```
+Input:
+  run  -- fel_run_struct: The run state.
+  key  -- fel_key_struct: The key.
+
+Output:
+  txt  -- character(:), allocatable: The value as TOML text.
+```
+
+(api-fel-schema-quoted)=
+### `fel_schema_quoted`
+
+*Function* `(s) result (q)`
+
+```
+Routine to quote a string as a TOML basic string, escaping the quote and the backslash.
+```
+
+```
+Input:
+  s  -- character(*): The string.
+
+Output:
+  q  -- character(:), allocatable: The quoted string.
+```
+
+(api-real-text)=
+### `real_text`
+
+*Function* `(v) result (txt)`
+
+```
+Routine to render a real as TOML text: an integer value as "1.0", else in
+exponent form with the trailing zeros of the mantissa removed, so 1e-10 reads
+back as 1.0e-10 and 0.75 as 7.5e-1.
+```
+
+```
+Input:
+  v    -- real(rp): The value.
+
+Output:
+  txt  -- character(:), allocatable: The value as TOML text.
+```
+
+(api-fel-schema-write-toml)=
+### `fel_schema_write_toml`
+
+*Subroutine* `(run, iu)`
+
+```
+Routine to write the resolved deck of run as TOML to an open unit, every key of the
+schema with its value, defaults made explicit. This is the echo in the stats file's
+meta/input_echo, and what an embedding program writes to save a configuration built
+in code.
+```
+
+```
+Input:
+  run -- fel_run_struct: The run state after reading.
+  iu  -- integer: Open unit to write to.
+```
+
+(api-fel-schema-write-json)=
+### `fel_schema_write_json`
+
+*Subroutine* `(iu)`
+
+```
+Routine to write the schema as JSON Schema, draft 2020-12, to an open unit. Each table
+is an object that allows no key the schema does not name, and each key carries its
+type, its default as the structures declare it, its description with its unit, and
+its bounds. An editor that reads JSON Schema validates a deck against it as it is
+typed, and the input reference's key tables are generated from it.
+```
+
+```
+Input:
+  iu  -- integer: Open unit to write to.
+```
+
 ## `fel_setup_mod.f90`
 
 (api-fel-setup-mod)=
@@ -3991,7 +4060,7 @@ field-set allocation. Errors return through err_flag, and nothing here stops.
 
 ```
 Input:
-  run       -- fel_run_struct: Run state carrying the parsed namelist inputs and the lattice
+  run       -- fel_run_struct: Run state carrying the deck's inputs and the lattice
                  file name.
 
 Output:
@@ -4225,7 +4294,7 @@ Five groups, and each answers one question.
            A per-slice plot cannot be drawn without it.
   params/  Every scalar as data: the window (lambda0, n_wavelength, slice_spacing,
            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
-           Nothing a reader needs is left in the echoed namelist.
+           Nothing a reader needs is left in the echoed deck.
   beam/    slice/ holds the per-record sufficient statistics, named as the
            bunch_params_struct components. They are enough to construct one from any
            (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 6, 6) at
@@ -4707,22 +4776,22 @@ Every user-visible input struct is in this file, with its defaults in the declar
 One assembled-state struct, fel_run_struct, is passed explicitly by the library.
 
 The input structs have no allocatable or pointer components. So an input file sets
-them directly through a namelist, as in Tao:
+them directly through the deck, as in Tao:
 
-  &fel_params
-    lat_file = "line.bmad"
-    global%out_root = "run1"
-    bmad_com%radiation_damping_on = T
-    chamber_wake%radius = 2.5e-3
-    space_charge%nz = 2
+  [run]
+    lattice = "line.bmad"
+    run.out_root = "run1"
+    bmad.radiation_damping_on = true
+    wake.radius = 2.5e-3
+    space_charge.nz = 2
   /
-  &fel_beam_init
-    beam_init%n_particle = 8192
-    shot_noise = T
+  [beam]
+    beam.n_particle = 8192
+    shot_noise = true
   /
-  &fel_wavefront_init
-    wavefront_init%lambda0 = 1e-10
-    wavefront_init%grid_n_pts = 255
+  [field]
+    field.lambda0 = 1e-10
+    field.grid_n_pts = 255
   /
 
 bmad_com and space_charge_com are Bmad's own globals, exposed directly as Tao's
@@ -4740,7 +4809,7 @@ several passes over one state. So fel_run_struct is passed as an argument everyw
 *Struct*
 
 ```
-Longitudinal discretization of the run, set in &fel_params as slicing%. The beam's
+Longitudinal discretization of the run, set in [run] as window.. The beam's
 slices and the field's z samples are one partition. So the window belongs to neither
 the beam nor the field and sits beside them.
 
@@ -4762,7 +4831,7 @@ separate steady-state switch. Unset, the current comes from the bunch's z struct
 *Struct*
 
 ```
-Run-level switches and names, set in &fel_params as global%. The analog of
+Run-level switches and names, set in [run] as run.. The analog of
 tao_global_struct. Everything here concerns one run of the tracker. The physics is
 described by the lattice, beam_init and wavefront_init.
 ```
@@ -4773,11 +4842,11 @@ described by the lattice, beam_init and wavefront_init.
 *Struct*
 
 ```
-The radiation starting condition (&fel_wavefront_init), the analog of beam_init_struct.
+The radiation starting condition ([field]), the analog of beam_init_struct.
 A wavefront is an optical object: a transverse grid, a wavelength and a longitudinal
 spacing, and nothing else longitudinal. The time window that sets that spacing belongs
 to the FEL interaction and lives in fel_slicing_struct. harmonics requests the field
-set. A field_file import overrides the seed.
+set. A field.file import overrides the seed.
 ```
 
 (api-fel-chamber-wake-init-struct)=
@@ -4786,9 +4855,9 @@ set. A field_file import overrides the seed.
 *Struct*
 
 ```
-The chamber-wake description (&fel_params chamber_wake%), with Genesis &wake names. A
+The chamber-wake description ([run] wake.), with Genesis &wake names. A
 plain mirror of the configuration fields of fel_wake_struct. That struct carries
-allocatable state, which a namelist object cannot. fel_setup copies these in.
+allocatable state, which an input mirror need not. fel_setup copies these in.
 ```
 
 (api-fel-beam-init-param-struct)=
@@ -4797,7 +4866,7 @@ allocatable state, which a namelist object cannot. fel_setup copies these in.
 *Struct*
 
 ```
-The beam-side scalars of &fel_beam_init. They sit beside Bmad's beam_init, which
+The beam-side scalars of [beam]. They sit beside Bmad's beam_init, which
 describes the bunch, and imp, the resampler. They are the source and output files,
 the quiet-start settings and the check instruments the benchmark sets.
 ```
@@ -4892,7 +4961,7 @@ rounding down to n-1 pieces.
 
 ```
 Input:
-  ds_step -- real(rp): global%interlude_ds_step. Zero or negative gives one piece.
+  ds_step -- real(rp): run.interlude_ds_step. Zero or negative gives one piece.
   length  -- real(rp): The element's length [m].
 
 Output:
@@ -4911,7 +4980,7 @@ pieces. The setup's record-count precompute replays both decisions. The two must
 or the stats arrays are mis-sized.
 
 Bmad's own resolver, pointer_to_wake_ele, finds the wake on the element or on exactly
-one slave of a split lord. With bmad_com%sr_wakes_on off, track1_bunch applies no
+one slave of a split lord. With bmad.sr_wakes_on off, track1_bunch applies no
 wake, so no element carries one here. A zero-length element whose wake scales with
 its length (Bmad's default) kicks by exactly zero and carries none either. A
 long-range wake has no scale_with_length and acts at zero length, so it is kept.
@@ -5231,7 +5300,7 @@ exit channel, and this ledger exists only where they are refused.
 
 ```
 Routine to apply spontaneous radiation inside FEL elements.
-The routine follows Bmad's global switches bmad_com%radiation_damping_on and
+The routine follows Bmad's global switches bmad.radiation_damping_on and
 %radiation_fluctuations_on, as every Bmad tracking path does. Interludes get theirs
 through track1. This covers the custom-tracked FEL step, whose Newton-Lorentz
 equations of motion carry no radiation reaction. Per record:
@@ -6736,24 +6805,25 @@ FEL tracker validated against Genesis 1.3 Version 4.
 The documentation is in docs/:
   fel-physics.md       The physics: every equation the code integrates, its Genesis
                         provenance, and the check that pins it.
-  input-reference.md   Every namelist parameter: default, meaning, and what refuses it.
+  input-reference.md   Every deck key: default, meaning, and what refuses it.
                         This is the normative reference. This header is a summary.
   user-guide.md        Building, describing a run, running it, and the output files.
   reading-output.md    What the output files hold and how to read them.
   validation.md        What is checked against Genesis, how, and the recorded results.
   performance.md       Where a run spends its time, on a named machine.
 
-The program reads three namelist groups from one input file. Each group sets structs
-directly, as Tao's &tao_params does. Defaults are in the struct declarations.
+The program reads one TOML deck through the schema (fel_schema_mod). Each table sets
+structs directly, as Tao's &tao_params does. Defaults are in the struct declarations.
 
-  &fel_params           lat_file, the global%... run switches, Bmad's bmad_com and
-                        space_charge_com, and the chamber_wake% and space_charge%
-                        collective descriptions.
-  &fel_beam_init        Bmad's beam_init%... bunch description, the resample%... resampler,
-                        source and output files, and the beam-side check settings.
-  &fel_wavefront_init   wavefront_init%... radiation starting condition and the
-                        field_file imports. The field record is the time window, so the
-                        window is set here.
+  lattice         The Bmad lattice file, the one top-level key.
+  [run]           The run switches, fel_global_struct.
+  [window]        The time window and the slice spacing, fel_slicing_struct.
+  [beam]          Bmad's beam_init bunch description, the load and its switches, the
+                  files, and [beam.resample], the resampler.
+  [field]         The radiation starting condition and the field files. The field
+                  record is the time window, so the window is set beside it.
+  [wake]          The chamber wake. [space_charge] the space-charge solver.
+  [bmad]          The bmad_com and space_charge_com switches the tracker honors.
 
 There are three ways in, all through the same input file:
   A pair of Genesis dumps. Both codes then track from bitwise-identical initial conditions.
@@ -6761,11 +6831,12 @@ There are three ways in, all through the same input file:
   An imported particle distribution.
 Time dependence follows from the starting state alone. A multi-slice window makes a
 time-dependent run, and a single slice makes the steady state. There is no separate
-switch. The retired flat &fel_track_params group is refused, and the message names
-the three groups that replace it.
+switch. A key the schema does not name is refused with the keys of its table, and a
+key in the wrong table with the table it belongs in.
 
 Usage:
-  lucifer <input_file>
+  lucifer <deck.toml>
+  lucifer --schema <schema.json>
 ```
 
 ## `lucifer_advance_bench.f90`
@@ -6799,12 +6870,12 @@ a clang-built twin of the same loop is compiler/libm, not physics.
 
 ```
 The library-contract check (docs/user-guide.md): drive the FEL tracker without the
-namelist layer. Fill the input structs in code, call the library, write the dumps.
-The benchmark compares its outputs dataset-identically against a namelist-driven run
+deck reader. Fill the input structs in code, call the library, write the dumps.
+The benchmark compares its outputs dataset-identically against a deck-driven run
 of the same configuration, and runs it twice in one process (both passes here) to
 prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 
-  lucifer_smoke_test <lat_file> <out_root_pass1> <out_root_pass2>
+  lucifer_smoke_test <lattice> <out_root_pass1> <out_root_pass2>
 
 With an unreadable lattice file the library must return an error (never exit): this
 program then prints its proof-of-return line and stops with code 2. The benchmark's

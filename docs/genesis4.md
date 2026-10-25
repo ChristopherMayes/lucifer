@@ -47,26 +47,26 @@ Genesis4 is driven by namelists over its own lattice format. Lucifer is driven b
 
 | Genesis4 | Lucifer | Note |
 |---|---|---|
-| `&setup lambda0` | `wavefront_init%lambda0` | Required when starting from a beam dump, since the dump carries the slice partition and not the wavelength it was sliced on |
+| `&setup lambda0` | `field.lambda0` | Required when starting from a beam dump, since the dump carries the slice partition and not the wavelength it was sliced on |
 | `&setup delz` | the element's `ds_step` | Bmad's own step attribute. The step count `round(l/ds_step)` matches Genesis4's unroll |
-| `&setup rootname` | `global%out_root` | |
-| `&time sample` | `slicing%n_wavelength` | Slice spacing in wavelengths, an integer in both |
+| `&setup rootname` | `run.out_root` | |
+| `&time sample` | `window.n_wavelength` | Slice spacing in wavelengths, an integer in both |
 | `&time slen` | the number of slices in the starting state | Lucifer takes the window from the beam it is given rather than a length |
-| `&beam npart` | `beam_init%n_particle` | Per slice in both. Lucifer requires a positive multiple of `beamlet_size` |
+| `&beam npart` | `beam.n_particle` | Per slice in both. Lucifer requires a positive multiple of `beamlet_size` |
 | `&beam nbins` | `beamlet_size` | Beamlet size of the quiet start. No dump format carries it, so it is named on both sides |
-| `&importdistribution npart` | `resample%n_particle_per_slice` | Per slice in both, and Lucifer's name says so |
-| `&importdistribution nbins` | `resample%beamlet_size` | Beamlet size of the resample |
-| `&importdistribution nslice` | `resample%n_slice` | Slice count. Zero derives it from the bunch length |
-| `&track zstop` | `global%track_end` | Lucifer's bound is an element locator, not a distance. `global%track_start` has no Genesis4 equivalent |
+| `&importdistribution npart` | `beam.resample.n_particle_per_slice` | Per slice in both, and Lucifer's name says so |
+| `&importdistribution nbins` | `beam.resample.beamlet_size` | Beamlet size of the resample |
+| `&importdistribution nslice` | `beam.resample.n_slice` | Slice count. Zero derives it from the bunch length |
+| `&track zstop` | `run.track_end` | Lucifer's bound is an element locator, not a distance. `run.track_start` has no Genesis4 equivalent |
 | `&track fft_fieldsolver` | (always) | Lucifer transcribes the FFT solver only |
-| `&importdistribution slicewidth` | `resample%slice_width` | Same meaning, sampling window over bunch length |
+| `&importdistribution slicewidth` | `beam.resample.slice_width` | Same meaning, sampling window over bunch length |
 | `&importdistribution` (match, center) | not ported | A Bmad lattice matches the beam, so these are the lattice's job |
-| `&sponrad` | `bmad_com%radiation_damping_on`, `bmad_com%radiation_fluctuations_on` | Lucifer exposes Bmad's own switches directly, as Tao does, rather than an FEL-local flag. Both default off, matching Genesis4's `&sponrad` default |
-| `&write beam`, `&write field` | `beam_file`, `field_file` on the input side; openPMD dumps on the output side | See file exchange below |
-| `&track beamdumpstep`, `fielddumpstep` | `global%dump_at_comb` with `global%comb_ds_save` | Genesis4 strides in integration steps and separately for the beam and the field. Here one comb sets the cadence in metres and both files are written on it, so a frame and its statistics row share an index. A field that is wanted less often is read less often rather than written less often |
-| `&importbeam`, `&importfield` | `beam_file`, `field_file` | Lucifer reads openPMD only, so convert first |
-| (no equivalent) | `global%migrate` | Slice migration. Off by default, since the comparison tiers run against a code that never migrates |
-| (no equivalent) | `fel_method = averaged` or `unaveraged` | Selects the method per element, and `global%transport_model` selects the averaged method's maps |
+| `&sponrad` | `bmad.radiation_damping_on`, `bmad.radiation_fluctuations_on` | Lucifer exposes Bmad's own switches directly, as Tao does, rather than an FEL-local flag. Both default off, matching Genesis4's `&sponrad` default |
+| `&write beam`, `&write field` | `beam.file`, `field.file` on the input side; openPMD dumps on the output side | See file exchange below |
+| `&track beamdumpstep`, `fielddumpstep` | `run.dump_at_comb` with `run.comb_ds_save` | Genesis4 strides in integration steps and separately for the beam and the field. Here one comb sets the cadence in metres and both files are written on it, so a frame and its statistics row share an index. A field that is wanted less often is read less often rather than written less often |
+| `&importbeam`, `&importfield` | `beam.file`, `field.file` | Lucifer reads openPMD only, so convert first |
+| (no equivalent) | `run.migrate` | Slice migration. Off by default, since the comparison tiers run against a code that never migrates |
+| (no equivalent) | `fel_method = averaged` or `unaveraged` | Selects the method per element, and `run.transport_model` selects the averaged method's maps |
 
 ## Conventions that differ
 

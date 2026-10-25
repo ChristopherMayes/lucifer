@@ -11,13 +11,13 @@ Everything on this page lives in and runs from `examples/bmad_wake/`.
 
 The example runs in two commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_transcribed.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_transcribed.in
     python ../plot_fel.py bmad_wake.stats.h5
 
 This is the resistive-wall wake of `../sase_wake`, delivered through Bmad's own wake machinery instead of the transcribed Genesis 1.3 Version 4 (Genesis4) model. `ztable.wake` is the Bane and Stupakov resistive-wall kernel for a 0.5 mm copper chamber, attached as an `sr_wake` `z_long` table to every element of `wake_lattice.bmad`. The undulators apply it once per element at mid-element across the whole window. The quadrupoles and pipes apply it through Bmad's own `track1_bunch`. The drift slots are pipes here, because a Bmad drift cannot carry a wake.
 
-The table was exported by `chamber_wake%write_kernels` and then converted to Bmad's conventions. The sign is flipped to Bmad's positive-decelerating sense, the self-slice term is unhalved, the causal side is at z < 0, and the table is padded past the window. The conversion is described in the header of `wake_lattice.bmad`, and any `chamber_wake%on` run regenerates the exported kernel (the manual's [Bmad element wakes section](../../fel-physics.md)).
+The table was exported by `wake.write_kernels` and then converted to Bmad's conventions. The sign is flipped to Bmad's positive-decelerating sense, the self-slice term is unhalved, the causal side is at z < 0, and the table is padded past the window. The conversion is described in the header of `wake_lattice.bmad`, and any `wake.on` run regenerates the exported kernel (the manual's [Bmad element wakes section](../../fel-physics.md)).
 
 `lucifer_transcribed.in` is the comparison partner: the same beam and the same window through the transcribed model with the same chamber, so the two runs differ in the implementation and in nothing else. `../sase_wake` is not the partner, because it adds the gap and roughness terms that this table has no counterpart for.
 
@@ -31,7 +31,7 @@ Each run takes about half a minute.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_transcribed.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_transcribed.toml` | Unit |
 |---|---|---|---|
 | exit power | 3.0293e+07 | 3.0288e+07 | W |
 | exit power per slice | 3.1555e+05 | 3.1550e+05 | W |
@@ -80,72 +80,71 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "wake_lattice.bmad"
-  global%out_root = "bmad_wake"
-  global%ran_seed = 12345
-  slicing%window_length = 2.88e-8
-  slicing%n_wavelength = 3
-/
+```toml
+lattice = "wake_lattice.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 2.881993782512e-13
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.44e-8
-  beam_init%grid(3)%x_max =  1.44e-8
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  shot_noise = T
-/
+[run]
+out_root = "bmad_wake"
+ran_seed = 12345
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[window]
+window_length = 2.88e-8
+n_wavelength = 3
 
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 2048
+bunch_charge = 2.881993782512e-13
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.44e-8
+z_max = 1.44e-8
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0
 ```
 
-### `lucifer_transcribed.in`
+### `lucifer_transcribed.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "transcribed"
+```toml
+lattice = "../aramis.bmad"
 
-  chamber_wake%on = T
-  chamber_wake%radius = 0.5e-3
-  chamber_wake%material = "CU"
-  global%ran_seed = 12345
-  slicing%window_length = 2.88e-8
-  slicing%n_wavelength = 3
-/
+[run]
+out_root = "transcribed"
+ran_seed = 12345
 
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 2.881993782512e-13
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.44e-8
-  beam_init%grid(3)%x_max =  1.44e-8
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  shot_noise = T
-/
+[window]
+window_length = 2.88e-8
+n_wavelength = 3
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 2048
+bunch_charge = 2.881993782512e-13
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.44e-8
+z_max = 1.44e-8
+shot_noise = true
 
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0
+
+[wake]
+on = true
+radius = 0.5e-3
+material = "CU"
 ```
 
 ### `wake_lattice.bmad`

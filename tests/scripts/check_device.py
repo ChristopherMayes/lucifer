@@ -100,22 +100,22 @@ import check_two_polarization as tp
 import convert_genesis
 import fieldio
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 from read_stats import read_stats
 
 FAILED = False
 
-BASE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis_1seg.bmad"
+BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 1024
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 5e3
   seed_waist_size = 30e-6
   grid_n_pts = 64
@@ -125,11 +125,11 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-TD_EXTRA = """  beam_init%bunch_charge = 1.601107656951e-14
-  beam_init%sig_z = 0
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.200000e-09
-  beam_init%grid(3)%x_max = 1.200000e-09
+TD_EXTRA = """  beam.bunch_charge = 1.601107656951e-14
+  beam.sig_z = 0
+  beam.z_distribution = "GRID"
+  beam.z_min = -1.200000e-09
+  beam.z_max = 1.200000e-09
   seed_power = 0
   shot_noise = T
   beamlet_size = 8
@@ -137,7 +137,7 @@ TD_EXTRA = """  beam_init%bunch_charge = 1.601107656951e-14
   n_wavelength = 3
 """
 
-DEV = '  global%device = "metal"\n'
+DEV = '  run.device = "metal"\n'
 
 # The recorded ceilings. pz through field are three times the CPU twin's recorded
 # levels (validation.md, val-fp32-lockstep), absorbing that the device's sincos is not
@@ -253,17 +253,17 @@ PROJ_BAND = (0.5, 2.0)
 # segment is helical and couples only the fundamental, at the device's grid.
 PLANAR_LAT = ch.BMAD_LAT
 
-HARM_BASE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+HARM_BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 8192
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e9
   seed_waist_size = 30e-6
@@ -336,7 +336,7 @@ def main():
     # 1. Steady lockstep: the device in the twin's role, the recorded ceilings, the
     # exact-wrap verdict from the device's own arithmetic.
     run(args.exe, wd, "dev_ss.in", BASE.format(root="devss",
-        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n'))
     s = summary(wd, "devss")
     for q in CEIL:
         ok(f"device lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
@@ -354,7 +354,7 @@ def main():
     # 3. Falsifiable: the perturbed kernel constant and the coarsened upload must
     # move the recorded levels.
     run(args.exe, wd, "dev_mut.in", BASE.format(root="devmut",
-        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
     m = summary(wd, "devmut")
     ok("mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
        ">= 10x", m["theta"] >= 10 * s["theta"],
@@ -367,7 +367,7 @@ def main():
     # compounds. The production run replaces the CPU step outright. Both must land in
     # the recorded band, so they corroborate each other.
     run(args.exe, wd, "dev_fr.in", BASE.format(root="devfr",
-        extra=DEV + '  global%fp32_check = "freerun"\n'))
+        extra=DEV + '  run.fp32_check = "freerun"\n'))
     f = summary(wd, "devfr")
     ok("device freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
        "> 1x", f["phasor"] > s["phasor"],
@@ -387,7 +387,7 @@ def main():
     # 5. Time dependence: slippage rotates the resident record. Same ceilings,
     # same read-only proof, same production band, at 8 threads.
     run(args.exe, wd, "dev_td.in", BASE.format(root="devtd",
-        extra=TD_EXTRA + DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
+        extra=TD_EXTRA + DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devtd")
     for q in CEIL:
         ok(f"device lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
@@ -411,9 +411,9 @@ def main():
         ("dev_rw.in", DEV + '  wake_on = T\n  wake_radius = 2.5e-3\n'
                             '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n',
          "DOES NOT COVER WAKES"),
-        ("dev_rr.in", DEV + '  bmad_com%radiation_damping_on = T\n',
+        ("dev_rr.in", DEV + '  bmad.radiation_damping_on = T\n',
          "DOES NOT COVER SPONTANEOUS RADIATION"),
-        ("dev_rn.in", '  global%device = "cuda"\n', "UNRECOGNIZED DEVICE"),
+        ("dev_rn.in", '  run.device = "cuda"\n', "UNRECOGNIZED DEVICE"),
     ]
     for name, extra, msg in refusals:
         r = run(args.exe, wd, name, BASE.format(root=name.removesuffix(".in"), extra=extra),
@@ -470,7 +470,7 @@ def unaveraged(args, wd, exe):
 
     # 1. Steady lockstep, the device in the twin's role.
     run(args.exe, wd, "dvu_ss.in", base.format(root="dvuss",
-        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n'))
     s = summary(wd, "dvuss")
     for q in CEIL_U:
         ok(f"unaveraged lockstep steady worst_{q}", f"{s[q]:.3e}",
@@ -494,7 +494,7 @@ def unaveraged(args, wd, exe):
     # move. The transverse rows are not among them: gamma changes only in the kick, so a
     # phase perturbation reaches x and px only at second order.
     run(args.exe, wd, "dvu_mut.in", base.format(root="dvumut",
-        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
     m = summary(wd, "dvumut")
     for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
         ok(f"unaveraged mutation moves worst_{q}", f"{m[q]:.3e} vs {s[q]:.3e}",
@@ -516,7 +516,7 @@ def unaveraged(args, wd, exe):
     # check: a frame taken mid-segment carries the undulator quiver in px, and a
     # statistic that cannot see a common offset would pass with the quiver missing, so
     # the mean is compared and not the spread.
-    frame_extra = '  global%comb_ds_save = 0.5\n  global%dump_at_comb = T\n'
+    frame_extra = '  run.comb_ds_save = 0.5\n  run.dump_at_comb = T\n'
     run(args.exe, wd, "dvu_fr.in", base.format(root="dvufr", extra=DEV + frame_extra))
     run(args.exe, wd, "dvu_froff.in", base.format(root="dvufroff", extra=frame_extra))
     fd = sorted(wd.glob("dvufr-[0-9]*.beam.h5"))
@@ -534,7 +534,7 @@ def unaveraged(args, wd, exe):
     # plane's field where the record holds the substep's midpoint field, so the writer
     # diffracts, and it does so on a copy: the same run with the same comb and no frames
     # ends in the same beam and field to the bit, on the device and on the CPU.
-    comb_only = '  global%comb_ds_save = 0.5\n'
+    comb_only = '  run.comb_ds_save = 0.5\n'
     run(args.exe, wd, "dvu_frnf.in", base.format(root="dvufrnf", extra=DEV + comb_only))
     run(args.exe, wd, "dvu_froffnf.in", base.format(root="dvufroffnf", extra=comb_only))
     for tag, a, b in (("device", "dvufr", "dvufrnf"), ("CPU", "dvufroff", "dvufroffnf")):
@@ -585,7 +585,7 @@ def unaveraged(args, wd, exe):
     # 5. A time-dependent window: slippage rotates the resident record between record
     # steps and the ledger's banked terms cross the seam every record step.
     run(args.exe, wd, "dvu_td.in", base.format(root="dvutd",
-        extra=DEV + TD_EXTRA + '  global%fp32_check = "lockstep"\n'))
+        extra=DEV + TD_EXTRA + '  run.fp32_check = "lockstep"\n'))
     t = summary(wd, "dvutd")
     for q in CEIL_U:
         ok(f"unaveraged lockstep TD worst_{q}", f"{t[q]:.3e}",
@@ -647,10 +647,10 @@ def unaveraged(args, wd, exe):
     # device's kick reads both planes and fills both source planes, and each plane meets
     # the diffraction with its own source. The crossed line is the deck for it, an x set
     # then a y set, so both planes carry power by the end.
-    xb = base.replace('lat_file = "' + lat + '"', 'lat_file = "dvu_cross.bmad"')
+    xb = base.replace('lattice = "' + lat + '"', 'lattice = "dvu_cross.bmad"')
 
     run(args.exe, wd, "dvu_2p.in", xb.format(root="dvu2p",
-        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n'))
     t = summary(wd, "dvu2p")
     for q in CEIL_U:
         ok(f"two-plane unaveraged lockstep worst_{q}", f"{t[q]:.3e}", f"<= {CEIL_U[q]:.1e}",
@@ -667,7 +667,7 @@ def unaveraged(args, wd, exe):
     ok("two-plane unaveraged FP64 ledger byte-identical, device twin on vs off", same, "True", same)
 
     run(args.exe, wd, "dvu_2pm.in", xb.format(root="dvu2pm",
-        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
     m = summary(wd, "dvu2pm")
     for q, factor in (("theta", 10), ("phasor", 50), ("field", 20)):
         ok(f"two-plane unaveraged mutation moves worst_{q}", f"{m[q]:.3e} vs {t[q]:.3e}",
@@ -693,9 +693,9 @@ def unaveraged(args, wd, exe):
     # And with both planes: frames inside the segment carry both planes back onto the
     # plane, on a copy, and the run with frames ends where the run without them does.
     run(args.exe, wd, "dvu_2pfr.in", xb.format(root="dvu2pfr",
-        extra=DEV + '  global%comb_ds_save = 0.5\n  global%dump_at_comb = T\n'))
+        extra=DEV + '  run.comb_ds_save = 0.5\n  run.dump_at_comb = T\n'))
     run(args.exe, wd, "dvu_2pfrnf.in", xb.format(root="dvu2pfrnf",
-        extra=DEV + '  global%comb_ds_save = 0.5\n'))
+        extra=DEV + '  run.comb_ds_save = 0.5\n'))
     same = all(dumps_identical(wd / f"dvu2pfr-final.{k}.h5", wd / f"dvu2pfrnf-final.{k}.h5")
                for k in ("beam", "wf"))
     ok("two-plane unaveraged frames on against off, final beam and field identical (device)",
@@ -705,7 +705,7 @@ def unaveraged(args, wd, exe):
     # each plane's own, so the pair costs the set the same fraction it costs one plane,
     # and the band is the one section 7 holds.
     r = run(args.exe, wd, "dvu_d2.in",
-            xb.format(root="dvud2", extra=DEV + "  global%write_initial = T\n").replace(
+            xb.format(root="dvud2", extra=DEV + "  run.write_initial = T\n").replace(
                 "bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
     p0 = sum(tp.dump_power(wd, "dvud2-initial.wf.h5", c) for c in ("x", "y"))
     p1 = sum(tp.dump_power(wd, "dvud2-final.wf.h5", c) for c in ("x", "y"))
@@ -731,8 +731,8 @@ def unavg_handedness(args, wd, exe):
         "call, file = spont_probe.bmad\nwiggler::*[FEL_METHOD] = unaveraged\n")
     cold = tp.ss(tp.NML).replace("seed_waist_size = 30e-6", "seed_waist_size = 1e-2").replace(
         "seed_power = 1e4", "seed_power = 1e9").replace(
-        "beam_init%sig_pz = 8.804506566858e-05", "beam_init%sig_pz = 1e-12").replace(
-        "beam_init%bunch_charge = 8.0e-15", "beam_init%bunch_charge = 8.0e-18")
+        "beam.sig_pz = 8.804506566858e-05", "beam.sig_pz = 1e-12").replace(
+        "beam.bunch_charge = 8.0e-15", "beam.bunch_charge = 8.0e-18")
     run(args.exe, wd, "dvh_src.in", cold.format(lat="dvu_hel.bmad", root="dvhsrc",
         extra="  write_initial = T\n  load_only = T\n"))
 
@@ -752,7 +752,7 @@ def unavg_handedness(args, wd, exe):
     for tag, ff in (("scalar", "dvhsrc-initial.wf.h5"), ("plus", "dvh_plus.wf.h5"),
                     ("minus", "dvh_minus.wf.h5")):
         run(args.exe, wd, f"dvh_{tag}.in", cold.format(lat="dvu_hel.bmad", root=f"dvh{tag}",
-            extra=f'  beam_file = "dvhsrc-initial.beam.h5"\n  field_file = "{ff}"\n'
+            extra=f'  beam.file = "dvhsrc-initial.beam.h5"\n  field.file = "{ff}"\n'
                   '  load_mode = "keep"\n' + DEV))
         sig[tag] = float(tp.diag(wd, f"dvh{tag}")[-1, 0, 7])
     rel = abs(sig["plus"] - sig["scalar"]) / sig["scalar"]
@@ -819,8 +819,8 @@ def field_set(args, wd, exe):
     # floor). Lockstep rows and the per-member footer, read-only, mutation, freerun,
     # and the production run against the CPU on P1 and P3.
     print("== the field set: harmonics 1 and 3 on the device ==")
-    hb = HARM_BASE.replace('lat_file = "{lat}"', 'lat_file = "dev_planar_mid.bmad"')
-    run(args.exe, wd, "devh_ss.in", hb.format(root="devhss", extra=DEV + '  global%fp32_check = "lockstep"\n'))
+    hb = HARM_BASE.replace('lattice = "{lat}"', 'lattice = "dev_planar_mid.bmad"')
+    run(args.exe, wd, "devh_ss.in", hb.format(root="devhss", extra=DEV + '  run.fp32_check = "lockstep"\n'))
     s = summary(wd, "devhss")
     for q in CEIL:
         ok(f"harmonic lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
@@ -834,7 +834,7 @@ def field_set(args, wd, exe):
     same = (wd / "devhss.diag.txt").read_bytes() == (wd / "devhoff.diag.txt").read_bytes()
     ok("harmonic FP64 diag byte-identical, device twin on vs off", same, "True", same)
     run(args.exe, wd, "devh_mut.in", hb.format(root="devhmut",
-        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
     m = summary(wd, "devhmut")
     ok("harmonic mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
        ">= 10x", m["theta"] >= 10 * s["theta"],
@@ -842,7 +842,7 @@ def field_set(args, wd, exe):
     ok("harmonic mutation moves worst_source_h3", f"{m['source_h3']:.3e} vs {s['source_h3']:.3e}",
        ">= 5x", m["source_h3"] >= 5 * s["source_h3"],
        num=m["source_h3"], bound=5 * s["source_h3"], kind="min")
-    run(args.exe, wd, "devh_fr.in", hb.format(root="devhfr", extra=DEV + '  global%fp32_check = "freerun"\n'))
+    run(args.exe, wd, "devh_fr.in", hb.format(root="devhfr", extra=DEV + '  run.fp32_check = "freerun"\n'))
     f = summary(wd, "devhfr")
     ok("harmonic freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
        "> 1x", f["phasor"] > s["phasor"],
@@ -884,7 +884,7 @@ def field_set(args, wd, exe):
     td = ch.NML_TD.replace("grid_n_pts = 63", "grid_n_pts = 64").replace('transport_model = "genesis"',
                                                                             'transport_model = "bmad"')
     run(args.exe, wd, "devh_td.in", td.format(lat="dev_planar.bmad", root="devhtd",
-        extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
+        extra=DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devhtd")
     for q in CEIL:
         ok(f"harmonic lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
@@ -934,7 +934,7 @@ def field_set(args, wd, exe):
     # P3 is the floor radiating and is printed, not asserted.
     qs = ch.NML_TD.replace("grid_n_pts = 63", "grid_n_pts = 64").replace('transport_model = "genesis"',
                                                                             'transport_model = "bmad"')
-    qs = tp.ss(qs).replace("beam_init%bunch_charge = 8.0e-15", "beam_init%bunch_charge = 1.000692285594e-15")
+    qs = tp.ss(qs).replace("beam.bunch_charge = 8.0e-15", "beam.bunch_charge = 1.000692285594e-15")
     qs = qs.replace("seed_power = 1e4", "seed_power = 5e3")
     run(args.exe, wd, "devh_qs.in", qs.format(lat="dev_planar.bmad", root="devhqs", extra=""))
     run(args.exe, wd, "devh_qsdev.in", qs.format(lat="dev_planar.bmad", root="devhqsdev", extra=DEV))
@@ -955,7 +955,7 @@ def field_set(args, wd, exe):
                                      "XDRIFT: line = (UNDX, D1, DEQ)\nuse, XDRIFT\n")
     pn = tp.ss(tp.NML)
     run(args.exe, wd, "devp_ss.in", pn.format(lat="devp_c.bmad", root="devpss",
-        extra=DEV + '  global%fp32_check = "lockstep"\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n'))
     s = summary(wd, "devpss")
     for q in CEIL:
         ok(f"two-plane lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
@@ -964,7 +964,7 @@ def field_set(args, wd, exe):
     same = (wd / "devpss.diag.txt").read_bytes() == (wd / "devpoff.diag.txt").read_bytes()
     ok("two-plane FP64 diag byte-identical, device twin on vs off", same, "True", same)
     run(args.exe, wd, "devp_mut.in", pn.format(lat="devp_c.bmad", root="devpmut",
-        extra=DEV + '  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+        extra=DEV + '  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
     m = summary(wd, "devpmut")
     ok("two-plane mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
        ">= 10x", m["theta"] >= 10 * s["theta"],
@@ -994,7 +994,7 @@ def field_set(args, wd, exe):
        num=py_d / px_d, bound=PYPX_FLOOR, kind="min")
     tdn = tp.NML
     run(args.exe, wd, "devp_td.in", tdn.format(lat="devp_c.bmad", root="devptd",
-        extra=DEV + '  global%fp32_check = "lockstep"\n'), threads="8")
+        extra=DEV + '  run.fp32_check = "lockstep"\n'), threads="8")
     t = summary(wd, "devptd")
     for q in CEIL:
         ok(f"two-plane lockstep TD worst_{q}", f"{t[q]:.3e}", f"<= {CEIL[q]:.1e}", t[q] <= CEIL[q],
@@ -1040,14 +1040,14 @@ REPRO_SKIP = ("params", "meta/input_echo", "meta/timestamp")
 PRECISION_CASES = (
     ("cancelling phases", "  beamlet_size = 8\n", 1.464e-05),
     ("unequal weights", "  beamlet_size = 8\n  split_weights = T\n", 1.465e-05),
-    ("charge in few cells", "  beam_init%a_norm_emit = 4e-9\n"
-                            "  beam_init%b_norm_emit = 4e-9\n", 6.889e-06),
-    ("the largest load", "  beam_init%n_particle = 32768\n", 2.507e-06),
+    ("charge in few cells", "  beam.a_norm_emit = 4e-9\n"
+                            "  beam.b_norm_emit = 4e-9\n", 6.889e-06),
+    ("the largest load", "  beam.n_particle = 32768\n", 2.507e-06),
     # The load at which performance.md gives the deposit's cost. It carries no
     # float-deposit number, since the float deposit was not run at this load and no
     # longer exists to run, so it is held to the recorded ceiling and to the headroom
     # instead. It makes the accuracy cases reach the load the cost table uses.
-    ("the performance load", "  beam_init%n_particle = 131072\n", None),
+    ("the performance load", "  beam.n_particle = 131072\n", None),
 )
 
 # The float deposit is not reproducible, so its numbers above carry their own scatter and
@@ -1066,7 +1066,7 @@ PRECISION_MARGIN = 1.05
 PRECISION_BITS_MIN = 24
 
 # What the quantum costs, measured rather than bounded (validation.md, val-device).
-# global%device_dep_mutate shifts the derived scale by whole bits and touches nothing
+# run.device_dep_mutate shifts the derived scale by whole bits and touches nothing
 # else, so coarsening the quantum by a known factor and watching the source row separates
 # the quantization from the phase and arithmetic error beside it. On the cancelling-phase
 # deck the row is 1.4673e-05 at the derived scale and the same to every digit 24 bits
@@ -1107,7 +1107,7 @@ def precision(args, wd, exe):
     for name, extra, before in PRECISION_CASES:
         root = "devprec" + name.split()[0][:4]
         r = run(exe, wd, f"{root}.in", BASE.format(
-            root=root, extra=DEV + '  global%fp32_check = "lockstep"\n' + extra))
+            root=root, extra=DEV + '  run.fp32_check = "lockstep"\n' + extra))
         if r.returncode != 0:
             ok(f"deposit accuracy, {name}", "run failed", "exit 0", False)
             continue
@@ -1147,9 +1147,9 @@ def quantization(args, wd, exe):
     base = None
     for shift in (0, QUANT_SHIFT):
         root = f"devq{abs(shift)}"
-        extra = DEV + '  global%fp32_check = "lockstep"\n  beamlet_size = 8\n'
+        extra = DEV + '  run.fp32_check = "lockstep"\n  beamlet_size = 8\n'
         if shift:
-            extra += f"  global%device_dep_mutate = {shift}\n"
+            extra += f"  run.device_dep_mutate = {shift}\n"
         r = run(exe, wd, f"{root}.in", BASE.format(root=root, extra=extra))
         if r.returncode != 0:
             ok(f"quantum shifted {shift} bits", "run failed", "exit 0", False)
@@ -1165,8 +1165,8 @@ def quantization(args, wd, exe):
            num=v, bound=base * QUANT_UNMOVED, kind="max")
 
     root = "devqref"
-    extra = (DEV + '  global%fp32_check = "lockstep"\n  beamlet_size = 8\n'
-             f"  global%device_dep_mutate = {QUANT_REFUSED}\n")
+    extra = (DEV + '  run.fp32_check = "lockstep"\n  beamlet_size = 8\n'
+             f"  run.device_dep_mutate = {QUANT_REFUSED}\n")
     r = run(exe, wd, f"{root}.in", BASE.format(root=root, extra=extra), expect_fail=True)
     refused = r.returncode != 0 and "CANNOT CARRY ITS BOUND AND ITS PRECISION" in r.stdout
     ok(f"refused: a quantum {abs(QUANT_REFUSED)} bits coarser, one past the floor",
@@ -1277,7 +1277,7 @@ def migration(args, wd, exe):
     # 8b. Lockstep across migration: the twin re-stages every step over the changed
     # fills, inside the ceilings, and the FP64 path is untouched.
     run(args.exe, wd, "devm_l.in", heavy_base.format(root="devml", mig="T",
-        extra=DEV + '  global%fp32_check = "lockstep"\n', **heavy), threads="8")
+        extra=DEV + '  run.fp32_check = "lockstep"\n', **heavy), threads="8")
     s = summary(wd, "devml")
     for q in CEIL:
         ok(f"migrating lockstep worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.1e}", s[q] <= CEIL[q],
@@ -1358,9 +1358,9 @@ def genesis_harmonics(args, wd, exe):
     curves = {}
     for tag, extra in (("cpu", ""), ("dev", DEV)):
         name = f"devg_{tag}"
-        (wd / (name + ".nml")).write_text(to_groups(imp.format(lat="dev_planar.bmad", root=name,
+        (wd / (name + ".toml")).write_text(to_groups(imp.format(lat="dev_planar.bmad", root=name,
             beam="DEVG-initial.beam.h5", field="DEVG-initial.wf.h5", extra=extra)))
-        r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+        r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                            env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
         if r.returncode != 0:
             print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}")

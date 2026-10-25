@@ -82,7 +82,7 @@ import numpy as np
 import beamio
 import convert_genesis
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 FAILED = False
 
@@ -90,19 +90,19 @@ LAMBDA0 = 1e-10
 SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
 
-BASE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis.bmad"
+BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis.bmad"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 4.803322970853e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -2.4e-9
-  beam_init%grid(3)%x_max = 2.4e-9
-  beam_init%sig_pz = {sig_pz}
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 1024
+  beam.bunch_charge = 4.803322970853e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -2.4e-9
+  beam.z_max = 2.4e-9
+  beam.sig_pz = {sig_pz}
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 0
   grid_n_pts = 64
   grid_half_width = 2e-4
@@ -116,13 +116,13 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
 
 
 def run(exe, wd, root, text, expect_fail=False):
-    (wd / (root + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), root + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (root + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), root + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
     if expect_fail:
         return r.returncode, r.stdout
     if r.returncode != 0:
-        print(f"FAIL: {root}.nml exited {r.returncode}:\n{r.stdout[-2000:]}")
+        print(f"FAIL: {root}.toml exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
     return r.returncode, r.stdout
 
@@ -210,7 +210,7 @@ def restart(root, source, field, extra=""):
     """A load_only run that reads `source` and re-dumps its initial state. The driver
     requires a field beside a beam, so the source run's own field dump is read too."""
     return BASE.format(root=root, sig_pz="5.282703940115e-03",
-                       extra=f'  beam_file = "{source}"\n  field_file = "{field}"\n'
+                       extra=f'  beam.file = "{source}"\n  field.file = "{field}"\n'
                              f"  load_only = T\n  write_initial = T\n{extra}")
 
 
@@ -322,12 +322,12 @@ def main():
     # the grid. Taken from the deck's grid, the cutoff was infinite and every mode passed
     # while the header named the angle asked for.
     nogrid = BASE.replace("  grid_n_pts = 64\n", "").replace("  grid_half_width = 2e-4\n", "")
-    load = ('  beam_file = "bf1-final.beam.h5"\n  field_file = "bf1-final.wf.h5"\n'
-            '  global%track_end = "UND##1"\n  source_filter = T\n')
+    load = ('  beam.file = "bf1-final.beam.h5"\n  field.file = "bf1-final.wf.h5"\n'
+            '  run.track_end = "UND##1"\n  source_filter = T\n')
     for root, deck, ang in (("bff6", nogrid, "1e-6"), ("bff5", nogrid, "1e-5"), ("bffg", BASE, "1e-5")):
         run(exe, wd, root, deck.replace("  source_filter = F\n", "").format(
             root=root, sig_pz="5.282703940115e-03",
-            extra=load + f"  global%source_filter_angle = {ang}\n"))
+            extra=load + f"  run.source_filter_angle = {ang}\n"))
     def x_field(fn):
         with h5py.File(fn) as h5:
             return mesh(h5)["x"][...]
@@ -585,17 +585,17 @@ QD: pipe, l = 0.1
 QL: line = (QU, QD, QU)
 use, QL
 """)
-    qbase = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "qframe.bmad"
+    qbase = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "qframe.bmad"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 256
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 256
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 0
   grid_n_pts = 32
@@ -634,18 +634,18 @@ use, QL
     # The two paths, by location. The crest frame goes to the dump path and the zero to the
     # bunch path, and neither refusal reads a momentum.
     code, out = run(exe, wd, "qf_bf", qbase.format(root="qf_bf",
-                    extra=f'  beam_file = "{at_crest.name}"\n  field_file = "qf-final.wf.h5"\n'
+                    extra=f'  beam.file = "{at_crest.name}"\n  field.file = "qf-final.wf.h5"\n'
                           "  load_only = T\n"), expect_fail=True)
-    refused(f"beam_file, a frame {body[at_crest][0]:.5f} m into the device at a crest of the "
+    refused(f"beam.file, a frame {body[at_crest][0]:.5f} m into the device at a crest of the "
             f"undulator phase (mean px {body[at_crest][1]:.2e} of p0)", code, out, "NOT A PLACE A RUN STARTS",
-            name="beam_file, a frame into the device at a crest of the undulator phase")
+            name="beam.file, a frame into the device at a crest of the undulator phase")
     code, out = run(exe, wd, "qf_pf", qbase.format(root="qf_pf",
-                    extra=f'  beam_init%position_file = "{at_zero.name}"\n'
+                    extra=f'  beam.position_file = "{at_zero.name}"\n'
                           "  load_only = T\n"), expect_fail=True)
-    refused(f"beam_init%position_file, a frame {body[at_zero][0]:.5f} m in where the undulator "
+    refused(f"beam.position_file, a frame {body[at_zero][0]:.5f} m in where the undulator "
             f"phase crosses zero (mean px {body[at_zero][1]:.2e} of p0)", code, out,
             "NOT A PLACE A RUN STARTS",
-            name="beam_init%position_file, a frame into the device where the undulator phase crosses zero")
+            name="beam.position_file, a frame into the device where the undulator phase crosses zero")
 
     # A file that says nothing about a device is an external bunch. The absence of the
     # group lucifer is that assumption and not a proof of a boundary.
@@ -653,13 +653,13 @@ use, QL
     with h5py.File(wd / "qf_ext.beam.h5", "r+") as h5:
         del h5["lucifer"]
     run(exe, wd, "qf_ext", qbase.format(root="qf_ext",
-        extra='  beam_file = "qf_ext.beam.h5"\n  field_file = "qf-final.wf.h5"\n'
+        extra='  beam.file = "qf_ext.beam.h5"\n  field.file = "qf-final.wf.h5"\n'
               "  load_only = T\n  write_initial = T\n"))
     print("--- an external bunch, the same records with no device on them, loads: ok")
 
     # A face is a starting point, and its records come back through it as in 1.
     run(exe, wd, "qf_ok", qbase.format(root="qf_ok",
-        extra=f'  beam_file = "{boundary.name}"\n  field_file = "qf-final.wf.h5"\n'
+        extra=f'  beam.file = "{boundary.name}"\n  field.file = "qf-final.wf.h5"\n'
               "  load_only = T\n  write_initial = T\n"))
     b1, b2 = datasets(boundary), datasets(wd / "qf_ok-initial.beam.h5")
     # The same three records as the round trip above, and a fourth of the same kind. The
@@ -672,8 +672,8 @@ use, QL
 
     # And a continuation from that same face still holds, on the checkpoint it needs.
     run(exe, wd, "qf_cont", qbase.format(root="qf_cont",
-        extra=f'  beam_file = "{boundary.name}"\n'
-              f'  field_file = "{boundary.name.replace(".beam.h5", ".wf.h5")}"\n'
+        extra=f'  beam.file = "{boundary.name}"\n'
+              f'  field.file = "{boundary.name.replace(".beam.h5", ".wf.h5")}"\n'
               '  continuation = T\n  track_start = "QD"\n'))
     pa = beamio.read_slices(wd / "qf-final.beam.h5", 1e-10, 1e-10)[0]
     pb = beamio.read_slices(wd / "qf_cont-final.beam.h5", 1e-10, 1e-10)[0]

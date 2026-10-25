@@ -2,7 +2,7 @@
 """
 Record what an example's run measured, from its stats file and its log.
 
-  example_record.py <deck.in> <log>              # rows of the record, to stdout
+  example_record.py <deck.toml> <log>              # rows of the record, to stdout
   example_record.py --sample <log> --out <md>    # the sample output the user guide shows
 
 The first form reads the deck for its out_root, opens the stats file the run wrote
@@ -86,7 +86,7 @@ SAMPLE_PREFIXES = (" Lucifer --", " Beam ", " Radiation ", " Work ", " Load ", "
 
 def out_root(deck: pathlib.Path) -> str:
     for line in deck.read_text().splitlines():
-        m = re.match(r"\s*(?:global%)?out_root\s*=\s*['\"]([^'\"]+)['\"]", line)
+        m = re.match(r"\s*(?:run.)?out_root\s*=\s*['\"]([^'\"]+)['\"]", line)
         if m:
             return m.group(1)
     raise SystemExit(f"{deck}: no out_root")
@@ -225,8 +225,8 @@ def rows_for(deck: pathlib.Path, log: pathlib.Path):
                  ("slice_spacing", float(run["slice_spacing"][()]), "m")]
         npart = h5["beam/slice/n_particle_live"][()]
         rows.append(("n_particle", int(npart[0].max()), ""))
-        if "params/wavefront_init/grid_n_pts" in h5:
-            rows.append(("grid_n_pts", int(h5["params/wavefront_init/grid_n_pts"][()]), ""))
+        if "params/field/grid_n_pts" in h5:
+            rows.append(("grid_n_pts", int(h5["params/field/grid_n_pts"][()]), ""))
     rows += from_log(log)
     return rows
 

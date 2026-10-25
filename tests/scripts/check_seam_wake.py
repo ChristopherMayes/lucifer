@@ -21,7 +21,7 @@ Checks:
             (wake_on) on the same beam must mark the same affected mask in its eloss
             profile, so two independent implementations agree on the direction.
   zlong     Cross-validation on the same element. The transcribed resistive-wall kernel,
-            exported by chamber_wake%write_kernels, is fed to Bmad's z_long machinery as
+            exported by wake.write_kernels, is fed to Bmad's z_long machinery as
             a causal table. Bmad's energy change per slice must match a numpy
             convolution of the same table with the particle distribution, at 5e-2. The
             eloss of wake_on, a convolution of the same kernel with the slice density,
@@ -51,7 +51,7 @@ import numpy as np
 
 import beamio
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 LAMBDA0 = 1e-10
 SAMPLE = 3
@@ -80,20 +80,20 @@ WAKE_MODE = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
 WAKE_ZLONG = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
   z_long = {{position_dependence = none, w = {{ call::{table} }}}}}}"""
 
-NML_GEN = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML_GEN = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
   n_wavelength = {sample}
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = {q}
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -{half}
-  beam_init%grid(3)%x_max = {half}
-  beam_init%sig_pz = 0
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 512
+  beam.bunch_charge = {q}
+  beam.z_distribution = "GRID"
+  beam.z_min = -{half}
+  beam.z_max = {half}
+  beam.sig_pz = 0
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   ran_seed = 777
   seed_power = 0
@@ -115,28 +115,28 @@ def gen_nml(**kw):
     kw.setdefault("half", f"{slen / 2:.9e}")
     return to_groups(NML_GEN.format(**kw))
 
-NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML_IMP = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
   n_wavelength = {sample}
-  resample%n_particle_per_slice = 512
-  resample%beamlet_size = 8
+  beam.resample.n_particle_per_slice = 512
+  beam.resample.beamlet_size = 8
   ran_seed = 777
   seed_power = 0
   grid_n_pts = 64
   grid_half_width = 2e-4
-  resample%use_beam_init = T
+  beam.resample.use_beam_init = T
   shot_noise = T
-  beam_init%n_particle = 20000
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  beam_init%sig_z = 1.5e-10
-  beam_init%sig_pz = 1e-6
-  beam_init%bunch_charge = 3.0e-14
-  resample%n_slice = 12
-  resample%slice_width = 0.01
+  beam.n_particle = 20000
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
+  beam.sig_z = 1.5e-10
+  beam.sig_pz = 1e-6
+  beam.bunch_charge = 3.0e-14
+  beam.resample.n_slice = 12
+  beam.resample.slice_width = 0.01
   write_diag = T
 {extra}&end
 """
@@ -178,10 +178,10 @@ def main():
 
     # ---------------- ramp: uniform cold quiet beam, 12 slices, constant wake
     slen = 12 * SPACING
-    (w/"wr_a.nml").write_text(gen_nml(lat="wl_mode.bmad", root="wra", sample=SAMPLE, slen=slen, extra=""))
-    (w/"wr_b.nml").write_text(gen_nml(lat="wl_none.bmad", root="wrb", sample=SAMPLE, slen=slen, extra=""))
-    run(exe, "wr_a.nml", "wra.log", w)
-    run(exe, "wr_b.nml", "wrb.log", w)
+    (w/"wr_a.toml").write_text(gen_nml(lat="wl_mode.bmad", root="wra", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wr_b.toml").write_text(gen_nml(lat="wl_none.bmad", root="wrb", sample=SAMPLE, slen=slen, extra=""))
+    run(exe, "wr_a.toml", "wra.log", w)
+    run(exe, "wr_b.toml", "wrb.log", w)
     A, B = load_par(w, "wra"), load_par(w, "wrb")
     nsl = len(A)
     q = np.array([b["q"] for b in B])
@@ -229,10 +229,10 @@ def main():
     (w/"wl_lordn.bmad").write_text(
         LAT_BASE.format(l=L_ELE, wake="").replace("SEGW: line = (UNDW)",
         f"PW: pipe, l = {L_PIPE}\nMK: marker, superimpose, ref = PW\nSEGW: line = (UNDW, PW)"))
-    (w/"wo_a.nml").write_text(gen_nml(lat="wl_lordw.bmad", root="woa", sample=SAMPLE, slen=slen, extra=""))
-    (w/"wo_b.nml").write_text(gen_nml(lat="wl_lordn.bmad", root="wob", sample=SAMPLE, slen=slen, extra=""))
-    run(exe, "wo_a.nml", "woa.log", w)
-    run(exe, "wo_b.nml", "wob.log", w)
+    (w/"wo_a.toml").write_text(gen_nml(lat="wl_lordw.bmad", root="woa", sample=SAMPLE, slen=slen, extra=""))
+    (w/"wo_b.toml").write_text(gen_nml(lat="wl_lordn.bmad", root="wob", sample=SAMPLE, slen=slen, extra=""))
+    run(exe, "wo_a.toml", "woa.log", w)
+    run(exe, "wo_b.toml", "wob.log", w)
     A, B = load_par(w, "woa"), load_par(w, "wob")
     q = np.array([b["q"] for b in B])
     f = L_PIPE * AMP / P0C
@@ -248,12 +248,12 @@ def main():
         ok = False
 
     # ---------------- causality: spike at the tail, probes ahead get exactly zero
-    (w/"wc_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE,
+    (w/"wc_a.toml").write_text(imp_nml(lat="wl_mode.bmad", root="wca", sample=SAMPLE,
                                       extra=""))
-    (w/"wc_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE,
+    (w/"wc_b.toml").write_text(imp_nml(lat="wl_none.bmad", root="wcb", sample=SAMPLE,
                                       extra=""))
-    run(exe, "wc_a.nml", "wca.log", w)
-    run(exe, "wc_b.nml", "wcb.log", w)
+    run(exe, "wc_a.toml", "wca.log", w)
+    run(exe, "wc_b.toml", "wcb.log", w)
     A, B = load_par(w, "wca"), load_par(w, "wcb")
     q = np.array([b["q"] for b in B])
     charged = q > 0.01 * q.max()
@@ -267,9 +267,9 @@ def main():
         print("FAIL: wake kicked slices AHEAD of all charge (acausal or direction flipped)")
         ok = False
     # Direction cross-check: wake_on on the same beam must mark the same mask.
-    (w/"wc_d8.nml").write_text(imp_nml(lat="wl_none.bmad", root="wcd8", sample=SAMPLE,
+    (w/"wc_d8.toml").write_text(imp_nml(lat="wl_none.bmad", root="wcd8", sample=SAMPLE,
         extra="  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n"))
-    run(exe, "wc_d8.nml", "wcd8.log", w)
+    run(exe, "wc_d8.toml", "wcd8.log", w)
     eloss = []
     for line in (w/"wcd8.wake.txt").read_text().splitlines():
         parts = line.split()
@@ -288,10 +288,10 @@ def main():
     # ---------------- z_long cross-validation with the resistive-wall kernel of wake_on
     # Export the kernel from a wake_on run. Any beam serves, since the kernels do not
     # depend on the beam.
-    (w/"wz_k.nml").write_text(imp_nml(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
+    (w/"wz_k.toml").write_text(imp_nml(lat="wl_none.bmad", root="wzk", sample=SAMPLE,
         extra='  load_only = T\n  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n'
-              '  wake_relaxation = 8.1e-6\n  chamber_wake%write_kernels = "kern.txt"\n'))
-    run(exe, "wz_k.nml", "wzk.log", w)
+              '  wake_relaxation = 8.1e-6\n  wake.write_kernels = "kern.txt"\n'))
+    run(exe, "wz_k.toml", "wzk.log", w)
     kern = np.loadtxt(w/"kern.txt")
     s_k, w_res = kern[:, 0], kern[:, 1].copy()
     w_res[0] *= 2                                    # unhalve the Bane self-slice factor
@@ -310,8 +310,8 @@ def main():
         for z, wv in zip(z_tab, w_tab):
             fh.write(f"{z:.9e} {wv:.9e},\n")
     (w/"wl_zlong.bmad").write_text(LAT_BASE.format(l=L_ELE, wake=WAKE_ZLONG.format(table="ztable.wake")))
-    (w/"wz_a.nml").write_text(imp_nml(lat="wl_zlong.bmad", root="wza", sample=SAMPLE, extra=""))
-    run(exe, "wz_a.nml", "wza.log", w)
+    (w/"wz_a.toml").write_text(imp_nml(lat="wl_zlong.bmad", root="wza", sample=SAMPLE, extra=""))
+    run(exe, "wz_a.toml", "wza.log", w)
     A = load_par(w, "wza")
     B = load_par(w, "wcb")                            # the no-wake twin from causality
     # First principles: a convolution of the same table with the particle distribution,
@@ -373,11 +373,11 @@ def main():
     # against pairs of particles, ~1/(2*nslice) of the kick), binning at the slice center
     # against binning at the particle (~(spacing/kernel scale)^2), and once per element
     # against once per step (identical here, with one step). The bound below carries them.
-    (w/"wu_a.nml").write_text(gen_nml(lat="wl_zlong.bmad", root="wua", sample=SAMPLE, slen=slen, extra=""))
-    run(exe, "wu_a.nml", "wua.log", w)
-    (w/"wu_d8.nml").write_text(gen_nml(lat="wl_none.bmad", root="wud8", sample=SAMPLE, slen=slen,
+    (w/"wu_a.toml").write_text(gen_nml(lat="wl_zlong.bmad", root="wua", sample=SAMPLE, slen=slen, extra=""))
+    run(exe, "wu_a.toml", "wua.log", w)
+    (w/"wu_d8.toml").write_text(gen_nml(lat="wl_none.bmad", root="wud8", sample=SAMPLE, slen=slen,
         extra="  wake_on = T\n  wake_radius = 2.5e-3\n  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n"))
-    run(exe, "wu_d8.nml", "wud8.log", w)
+    run(exe, "wu_d8.toml", "wud8.log", w)
     AU = load_par(w, "wua")
     BU = load_par(w, "wrb")                          # the uniform no-wake twin
     eloss_u = []
@@ -413,12 +413,12 @@ def main():
         ok = False
 
     # ---------------- split-weight invariance through the wake
-    (w/"ws_a.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
+    (w/"ws_a.toml").write_text(imp_nml(lat="wl_mode.bmad", root="wsa", sample=SAMPLE,
                                              extra="  resample_split_weights = T\n"))
-    (w/"ws_b.nml").write_text(imp_nml(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
+    (w/"ws_b.toml").write_text(imp_nml(lat="wl_none.bmad", root="wsb", sample=SAMPLE,
                                              extra="  resample_split_weights = T\n"))
-    run(exe, "ws_a.nml", "wsa.log", w)
-    run(exe, "ws_b.nml", "wsb.log", w)
+    run(exe, "ws_a.toml", "wsa.log", w)
+    run(exe, "ws_b.toml", "wsb.log", w)
     A2, B2 = load_par(w, "wsa"), load_par(w, "wsb")
     A1, B1 = load_par(w, "wca"), load_par(w, "wcb")
     worst_s = 0.0
@@ -440,8 +440,8 @@ def main():
         ok = False
 
     # ---------------- thread determinism with a wake element
-    (w/"wt8.nml").write_text(imp_nml(lat="wl_mode.bmad", root="wt8", sample=SAMPLE, extra=""))
-    run(exe, "wt8.nml", "wt8.log", w, threads="8")
+    (w/"wt8.toml").write_text(imp_nml(lat="wl_mode.bmad", root="wt8", sample=SAMPLE, extra=""))
+    run(exe, "wt8.toml", "wt8.log", w, threads="8")
     d1 = re.sub(rb"wca", b"", (w/"wca.diag.txt").read_bytes())
     d8 = re.sub(rb"wt8", b"", (w/"wt8.diag.txt").read_bytes())
     print(f"thread determinism with wake: diag {'byte-identical' if d1 == d8 else 'DIFFERS'}")

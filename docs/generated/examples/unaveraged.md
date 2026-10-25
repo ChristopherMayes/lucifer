@@ -11,15 +11,15 @@ Everything on this page lives in and runs from `examples/unaveraged/`.
 
 The example runs in two commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_averaged.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_averaged.in
     python ../plot_fel.py unaveraged.stats.h5
 
 This is one seeded steady-state segment tracked with no period averaging and no resonance approximation (the manual's [unaveraged-mode section](../../fel-physics.md)). The particles ride the real helical field, quiver and all, at 20 integration substeps per period with sin^2 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
 
-The mode is `seg1.bmad`'s own `fel_method`, `unaveraged`. The substep count and the ramp length are global switches, `global%unaveraged_steps_per_period` and `global%unaveraged_ramp_periods`, at their defaults here. `lucifer_averaged.in` runs the identical configuration through the averaged default, with a lattice that calls the same file and overrides that one attribute.
+The mode is `seg1.bmad`'s own `fel_method`, `unaveraged`. The substep count and the ramp length are global switches, `run.unaveraged_steps_per_period` and `run.unaveraged_ramp_periods`, at their defaults here. `lucifer_averaged.in` runs the identical configuration through the averaged default, with a lattice that calls the same file and overrides that one attribute.
 
-On this input the two gain curves agree in ln P at the segment exit to under one part in a thousand, and the table below carries both exit powers. Those are two independent formulations of the same physics, sharing no approximation, and the agreement is what pins the averaged mode's coupling factor. `lucifer_averaged.in` states `global%source_filter = F`, since the unaveraged mode builds no source to filter and the two must compare like for like. The benchmark measures the factor itself to about 6e-4 with dedicated probes ([validation](../../validation.md)).
+On this input the two gain curves agree in ln P at the segment exit to under one part in a thousand, and the table below carries both exit powers. Those are two independent formulations of the same physics, sharing no approximation, and the agreement is what pins the averaged mode's coupling factor. `lucifer_averaged.in` states `run.source_filter = false`, since the unaveraged mode builds no source to filter and the two must compare like for like. The benchmark measures the factor itself to about 6e-4 with dedicated probes ([validation](../../validation.md)).
 
 The run also writes `unaveraged.ledger.txt`: beam energy relative to the reference and window field energy per record, whose sum is conserved. The benchmark checks the closure at 1e-4 of the turnover under a strong-exchange probe.
 
@@ -31,7 +31,7 @@ The run takes about five seconds, against under a second for the averaged twin.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_averaged.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_averaged.toml` | Unit |
 |---|---|---|---|
 | exit power | 4.4185e+03 | 4.4159e+03 | W |
 | exit power per slice | 4.4185e+03 | 4.4159e+03 | W |
@@ -78,61 +78,55 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "seg1.bmad"
-  global%out_root = "unaveraged"
-  global%write_diag = T
-/
+```toml
+lattice = "seg1.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "unaveraged"
+write_diag = true
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 2048
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
 ```
 
-### `lucifer_averaged.in`
+### `lucifer_averaged.toml`
 
-```fortran
-&fel_params
-  lat_file = "seg1_averaged.bmad"
-  global%out_root = "averaged"
-  global%source_filter = F   ! The averaged and unaveraged twins compare like for like.
-  global%write_diag = T
-/
+```toml
+lattice = "seg1_averaged.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "averaged"
+source_filter = false
+write_diag = true
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 2048
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
 ```
 
 ### `seg1.bmad`

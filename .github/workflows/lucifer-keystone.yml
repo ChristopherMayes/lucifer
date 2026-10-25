@@ -162,6 +162,10 @@ jobs:
           source "$CONDA/etc/profile.d/conda.sh"
           set -e
           conda env create -f tests/environment-validate.yml
+          # The repository's own Python package, which the check scripts import, into
+          # the validation environment with its own pip and no dependencies, as the
+          # recording machine installs it.
+          conda run -n bmad-fel-validate python -m pip install -e python --no-deps
           # The reference's own banner, so a wrong version is visible here rather than
           # only in the benchmark's refusal. genesis4 exits non-zero when it is given no
           # input file, so it runs inside a shell that exits zero after the banner, and

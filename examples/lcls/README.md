@@ -2,7 +2,7 @@
 
 The example runs in one command, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
     python ../plot_fel.py lcls.stats.h5
 
 LCLS at SLAC lased at 1.5 Angstrom in April 2009, the first hard X-ray free-electron laser, and reached saturation within its 132 m undulator. This example is that line at its published numbers: thirty-three planar segments, a coasting slab of the published beam, and SASE from the quiet start. It is the fourth machine the numerical settings are measured on, beside the 0.1 nm Aramis benchmark the other examples use and the 13.7 nm FLASH1 line of `../flash1` ([SASE convergence](../../docs/startup-noise.md)).
@@ -61,12 +61,12 @@ At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavel
 Every value is measured on this machine. The grid, the slice count, the macroparticle count and the filter's edge are in the table below, as the run printed them.
 
 - `grid_n_pts` and `grid_half_width`: the deck states neither. Setup derives cells of the beam size over 7, the criterion of the convergence page, rounds the point count up to a power of two, and prints both with their origin.
-- `slicing%n_wavelength` is 68, two slices per cooperation length. Half the spacing over twice the slices, the same window at twice the sampling, moves the gain length and the saturation point by about a percent, at twice the wall clock.
-- `slicing%n_slice` holds 5.4 times the whole line's slippage.
+- `window.n_wavelength` is 68, two slices per cooperation length. Half the spacing over twice the slices, the same window at twice the sampling, moves the gain length and the saturation point by about a percent, at twice the wall clock.
+- `window.n_slice` holds 5.4 times the whole line's slippage.
 - `ds_step` in the lattice is 0.09 m, three periods and 38 steps per segment. One period gives the same gain length and an exit power inside the seed spread, at over twice the wall clock.
-- `beam_init%n_particle` is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
+- `beam.n_particle` is the count that leaves under a tenth of the exit power outside the mode with the filter off, which is what the convergence page asks for. A quarter of the count leaves about four times that fraction outside.
 - `beamlet_size` is 8, the default.
-- `global%source_filter` is T, the default. At its derived edge it removes about a hundred times the wide-angle power and moves the mode power a few percent, since the macroparticle count has already converged.
+- `run.source_filter` is T, the default. At its derived edge it removes about a hundred times the wide-angle power and moves the mode power a few percent, since the macroparticle count has already converged.
 
 The run's own convergence report puts the power outside the split angle at a small fraction of the power inside it, so the total field power is the mode. With the filter off the same deck reports about a hundred times that fraction outside the mode.
 

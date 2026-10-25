@@ -42,7 +42,7 @@ import startup_noise as sn  # noqa: E402
 # The machines in the order the page presents them, with the name the page uses.
 MACHINES = (("aramis", "Aramis"), ("flash", "FLASH probe"), ("flash1", "FLASH1"), ("lcls", "LCLS"))
 
-# The sigmoid's width where the deck sets none, global%source_filter_width's default
+# The sigmoid's width where the deck sets none, run.source_filter_width's default
 # (docs/input-reference.md). The derived default rows of the filter experiment run at it.
 DEFAULT_WIDTH = 0.05
 

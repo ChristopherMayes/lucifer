@@ -11,16 +11,16 @@ Everything on this page lives in and runs from `examples/coherent_source/`.
 
 The example runs in three commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_low_m.in
-    ../../../production/bin/lucifer lucifer_reference.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_low_m.in
+    ../../build-release/bin/lucifer lucifer_reference.in
     python ../plot_fel.py coherent.stats.h5
 
-A run whose beam is transversely Gaussian (an idealized machine, a parameter scan, a seeded amplifier study) can trade the per-particle source deposit for Tanaka's coherent retrieval, `global%source_model = "coherent"` (PRAB 27, 030703 (2024), the manual's coherent-source section). It then converges at one to two orders of magnitude fewer macroparticles. With few particles the per-cell source is spiky, and that sampling noise always overestimates the gain. The coherent source carries the slice's exact bunching phasor on a fitted Gaussian instead, so the artifact never enters.
+A run whose beam is transversely Gaussian (an idealized machine, a parameter scan, a seeded amplifier study) can trade the per-particle source deposit for Tanaka's coherent retrieval, `run.source_model = "coherent"` (PRAB 27, 030703 (2024), the manual's coherent-source section). It then converges at one to two orders of magnitude fewer macroparticles. With few particles the per-cell source is spiky, and that sampling noise always overestimates the gain. The coherent source carries the slice's exact bunching phasor on a fitted Gaussian instead, so the artifact never enters.
 
-Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration) are compared. `lucifer_reference.in` deposits 8192 particles per slice. `lucifer_low_m.in` deposits 512. `lucifer.in` runs the coherent source on the same 512. The measured quantities are in the table below. The low-M deposit comes out high against the reference, and the coherent source at the same count lands close to it. Each run takes a few seconds.
+Three runs of the same seeded steady-state case (the full Aramis line, 5.2 decades of gain, ../steady_state's configuration) are compared. `lucifer_reference.in` deposits 8192 particles per slice. `lucifer_low_m.in` deposits 512. `lucifer.toml` runs the coherent source on the same 512. The measured quantities are in the table below. The low-M deposit comes out high against the reference, and the coherent source at the same count lands close to it. Each run takes a few seconds.
 
-The low-M deposit is the artifact the coherent source removes, and the source filter, on by default, removes most of it on its own. Cutting particles without the coherent source raises the predicted power on this case, and with the filter off the rise was far larger. The run's own convergence report gives the power outside the split angle over the power inside it, and the table carries that ratio at the exit for each run. The coherent source builds no transformed source for the filter to act on, so the filter turns itself off for that run and says so. Its own ratio at the exit is the largest of the three ([the convergence section](../../fel-physics.md#sec-convergence)). The power the low-M deposit adds is the wide-angle emission of 64 beamlets. The coherent source does not have it, since it never puts a macroparticle on a grid point. `lucifer.in` is the same particle count giving the converged answer. Per-slice cost dominates a time-dependent run, where the same particle reduction pays in proportion.
+The low-M deposit is the artifact the coherent source removes, and the source filter, on by default, removes most of it on its own. Cutting particles without the coherent source raises the predicted power on this case, and with the filter off the rise was far larger. The run's own convergence report gives the power outside the split angle over the power inside it, and the table carries that ratio at the exit for each run. The coherent source builds no transformed source for the filter to act on, so the filter turns itself off for that run and says so. Its own ratio at the exit is the largest of the three ([the convergence section](../../fel-physics.md#sec-convergence)). The power the low-M deposit adds is the wide-angle emission of 64 beamlets. The coherent source does not have it, since it never puts a macroparticle on a grid point. `lucifer.toml` is the same particle count giving the converged answer. Per-slice cost dominates a time-dependent run, where the same particle reduction pays in proportion.
 
 The refusals are part of the feature (the manual's coherent-source section). A per-slice Gaussianity test is sized against its own sampling significance, and a profile with real structure is refused. An offset, mismatched or tilted Gaussian beam passes, since the source centers and tilts with the beam's phasor-weighted moments. Harmonic fields, two live polarizations and the unaveraged mode are refused in v1. A dark start is refused, since the coherent model drops the spontaneous, spatially incoherent emission that SASE grows from, and its startup comes out far too low. Seed the field, as here, or use the default deposit.
 
@@ -30,7 +30,7 @@ Plot any run with ../plot_fel.py <root>.stats.h5.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_low_m.in` | `lucifer_reference.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_low_m.toml` | `lucifer_reference.toml` | Unit |
 |---|---|---|---|---|
 | exit power | 7.4861e+08 | 1.1816e+09 | 8.0199e+08 | W |
 | exit power per slice | 7.4861e+08 | 1.1816e+09 | 8.0199e+08 | W |
@@ -78,84 +78,75 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "coherent"
-  global%source_model = "coherent"
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "coherent"
+source_model = "coherent"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 512
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
 ```
 
-### `lucifer_low_m.in`
+### `lucifer_low_m.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "low_m"
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "low_m"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 512
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
 ```
 
-### `lucifer_reference.in`
+### `lucifer_reference.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "reference"
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "reference"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
 ```

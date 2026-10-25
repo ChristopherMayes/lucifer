@@ -50,7 +50,7 @@ implicit none
 
 type fel_wake_struct
   logical :: on = .false.
-  ! Namelist parameters, Genesis &wake names:
+  ! Deck keys, [wake], with Genesis &wake names:
   real(rp) :: loss = 0             ! External loss [eV/m], uniform (Genesis allows profiles).
   real(rp) :: radius = 2.5e-3_rp   ! Chamber radius, or half gap if flat [m].
   real(rp) :: conductivity = 0     ! DC conductivity [1/(Ohm m)]. 0: no resistive wake.
@@ -735,7 +735,7 @@ rbound = sqrt(rbound)
 rmax_l = ef%rmax
 if (rbound > rmax_l) rmax_l = rbound * 1.5_rp
 
-! The radial scale the bins and the cell volumes are built on. space_charge%rmax is a
+! The radial scale the bins and the cell volumes are built on. space_charge.rmax is a
 ! floor under it and the slice's own extent raises it. So the scale is positive for any
 ! slice with transverse size. A slice whose charge sits at one transverse point has no
 ! scale to derive. The cell volumes go as dr^2, so the field of such a slice grows
@@ -747,11 +747,11 @@ if (rbound > rmax_l) rmax_l = rbound * 1.5_rp
 
 if (rmax_l <= 0) then
   call out_io (s_error$, r_name, 'THE SHORT-RANGE SPACE-CHARGE SOLVE HAS NO RADIAL SCALE: THIS SLICE''S', &
-               'CHARGE SITS AT ONE TRANSVERSE POINT AND SPACE_CHARGE%RMAX IS NOT POSITIVE.', &
+               'CHARGE SITS AT ONE TRANSVERSE POINT AND SPACE_CHARGE.RMAX IS NOT POSITIVE.', &
                'THE CELL VOLUMES GO AS THE CELL WIDTH SQUARED, SO THE FIELD OF A SLICE OF ZERO', &
                'EXTENT HAS NO LIMIT, AND IT IS NOT ZERO: PARTICLES AT ONE TRANSVERSE POINT AND', &
                'DIFFERENT PONDEROMOTIVE PHASES PUSH EACH OTHER.', &
-               'POSSIBLE SOLUTION: SET SPACE_CHARGE%RMAX TO THE RADIAL SCALE THE SOLVE SHOULD USE.')
+               'POSSIBLE SOLUTION: SET SPACE_CHARGE.RMAX TO THE RADIAL SCALE THE SOLVE SHOULD USE.')
   err_flag = .true.;  return
 endif
 

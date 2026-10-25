@@ -26,8 +26,8 @@ Four things, each on the check built for it:
                    in the message: the generator without the quiet start, and a bunch of
                    copies whose phases were shifted singly. The unshifted copies load, and
                    the message says the noise went on particles sharing their transverse
-                   coordinates. A slice dump given as beam_init%position_file is refused.
-                   A negative slicing%n_wavelength is refused with the value in the
+                   coordinates. A slice dump given as beam.position_file is refused.
+                   A negative window.n_wavelength is refused with the value in the
                    message, where 0 derives the spacing from the gain.
 
 Usage:
@@ -35,6 +35,7 @@ Usage:
   check_load.py --exe <lucifer> --workdir <dir>
 """
 
+from lucifer.deck import to_toml
 import argparse
 import pathlib
 import re
@@ -54,37 +55,37 @@ SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
 E_CHARGE = 1.602176634e-19
 
-DECK = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%ran_seed = {seed}
-{pextra}  slicing%n_wavelength = {sample}
+DECK = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.ran_seed = {seed}
+{pextra}  window.n_wavelength = {sample}
 /
-&fel_beam_init
+[beam]
 {bextra}/
-&fel_wavefront_init
-  wavefront_init%lambda0 = {lam:.6e}
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = {ngrid}
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = {lam:.6e}
+  field.seed_power = 0
+  field.grid_n_pts = {ngrid}
+  field.grid_half_width = 2e-4
 /
 """
 
-BUNCH = """  beam_init%n_particle = 40000
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  beam_init%sig_z = 3e-10
-  beam_init%sig_pz = 8.8e-5
-  beam_init%bunch_charge = 1.5e-14
+BUNCH = """  beam.n_particle = 40000
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
+  beam.sig_z = 3e-10
+  beam.sig_pz = 8.8e-5
+  beam.bunch_charge = 1.5e-14
 """
 
 
 def run(exe, wd, root, bextra, pextra="", lat="aramis_1seg.bmad", seed=777, ngrid=64,
         sample=SAMPLE, threads="4"):
     """One run. Returns (returncode, stdout)."""
-    (wd / f"{root}.nml").write_text(DECK.format(lat=lat, root=root, seed=seed, pextra=pextra,
-                                                  bextra=bextra, lam=LAMBDA0, ngrid=ngrid, sample=sample))
-    r = subprocess.run([exe, f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+    (wd / f"{root}.toml").write_text(to_toml(DECK.format(lat=lat, root=root, seed=seed, pextra=pextra,
+                                                  bextra=bextra, lam=LAMBDA0, ngrid=ngrid, sample=sample)))
+    r = subprocess.run([exe, f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     (wd / f"{root}.log").write_text(r.stdout + r.stderr)
     return r.returncode, r.stdout + r.stderr
@@ -141,7 +142,7 @@ def keep_exactness(exe, wd):
     ok = True
     bextra = BUNCH + '  load_mode = "keep"\n  quiet_start = T\n  shot_noise = F\n' \
                      '  write_openpmd_file = "load_bunch.h5"\n'
-    rc, out = run(exe, wd, "ldkeep", bextra, pextra="  global%load_only = T\n")
+    rc, out = run(exe, wd, "ldkeep", bextra, pextra="  run.load_only = T\n")
     if rc != 0:
         print(f"FAIL: the keep load exited {rc}:\n{out[-1500:]}")
         return False
@@ -161,7 +162,7 @@ def keep_exactness(exe, wd):
 
     # Split weights: a third and two thirds, coincident, must record the same load.
     rc, out = run(exe, wd, "ldsplit", bextra.replace('  write_openpmd_file = "load_bunch.h5"\n', '')
-                  + "  resample_split_weights = T\n", pextra="  global%load_only = T\n")
+                  + "  resample_split_weights = T\n", pextra="  run.load_only = T\n")
     if rc != 0:
         print(f"FAIL: the split keep load exited {rc}:\n{out[-1500:]}")
         return False
@@ -192,19 +193,19 @@ WINDOW = 8 * SIG_Z + 2 * 24 * INCONE_SAMPLE * LAMBDA0
 
 
 def incone(exe, wd):
-    bextra = f"""  beam_init%n_particle = 1024
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  beam_init%sig_z = {SIG_Z:.6e}
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%bunch_charge = {Q_INCONE:.12e}
+    bextra = f"""  beam.n_particle = 1024
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
+  beam.sig_z = {SIG_Z:.6e}
+  beam.sig_pz = 8.804506566858e-5
+  beam.bunch_charge = {Q_INCONE:.12e}
   beamlet_size = 8
   quiet_start = T
   shot_noise = T
 """
-    pextra = (f'  global%track_end = "UND##1"\n  global%source_filter = F\n'
-              f'  global%source_filter_angle = {INCONE_CUT:.1e}\n'
-              f'  slicing%window_length = {WINDOW:.6e}\n')
+    pextra = (f'  run.track_end = "UND##1"\n  run.source_filter = F\n'
+              f'  run.source_filter_angle = {INCONE_CUT:.1e}\n'
+              f'  window.window_length = {WINDOW:.6e}\n')
     # The target comes from the page's deck on the same 256 points this run takes. What
     # this check reads against it is the difference between this Gaussian bunch and the
     # page's flat window. The parity of this deck moves its in-cone power by 3.4 percent
@@ -238,7 +239,7 @@ def refusals(exe, wd):
 
     # The generator without the quiet start carries the load's own noise already.
     rc, out = run(exe, wd, "ldloud", BUNCH.replace("40000", "512") + "  quiet_start = F\n  shot_noise = T\n",
-                  pextra="  global%load_only = T\n")
+                  pextra="  run.load_only = T\n")
     m = floor_re.search(out)
     good = rc != 0 and "NOT QUIET ENOUGH" in out and m is not None
     print(f"  refused, noise on the unquiet generator: {'ok' if good else 'MISSED'}"
@@ -250,9 +251,9 @@ def refusals(exe, wd):
     b = bunchfile.read_bunch(wd / "load_bunch.h5")
     bunchfile.write_bunch(wd / "load_bunch.h5", wd / "load_copies.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING))
-    rc, out = run(exe, wd, "ldcopies", '  beam_init%position_file = "load_copies.h5"\n'
+    rc, out = run(exe, wd, "ldcopies", '  beam.position_file = "load_copies.h5"\n'
                   '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n',
-                  pextra="  global%load_only = T\n")
+                  pextra="  run.load_only = T\n")
     good = rc == 0 and "particles sharing their transverse coordinates" in out
     fl = re.search(r"worst quiet floor before imposing, \|b\|\^2 \* N_lambda:\s*([0-9.E+-]+)", out)
     print(f"  copies made outside the loader take the noise on the copies: {'ok' if good else 'FAIL'}"
@@ -264,9 +265,9 @@ def refusals(exe, wd):
     # The same copies shifted singly are not quiet, and the message says by how much.
     bunchfile.write_bunch(wd / "load_bunch.h5", wd / "load_shifted.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING, shift=1.0))
-    rc, out = run(exe, wd, "ldshift", '  beam_init%position_file = "load_shifted.h5"\n'
+    rc, out = run(exe, wd, "ldshift", '  beam.position_file = "load_shifted.h5"\n'
                   '  load_mode = "keep"\n  quiet_start = F\n  shot_noise = T\n',
-                  pextra="  global%load_only = T\n")
+                  pextra="  run.load_only = T\n")
     m = floor_re.search(out)
     good = rc != 0 and "NOT QUIET ENOUGH" in out and m is not None
     print(f"  refused, copies shifted singly: {'ok' if good else 'MISSED'}"
@@ -275,18 +276,20 @@ def refusals(exe, wd):
     ok = ok and good
 
     # A slice dump is not a bunch.
-    rc, out = run(exe, wd, "lddump", '  beam_init%position_file = "ldkeep-initial.beam.h5"\n'
-                  '  load_mode = "keep"\n', pextra="  global%load_only = T\n")
+    rc, out = run(exe, wd, "lddump", '  beam.position_file = "ldkeep-initial.beam.h5"\n'
+                  '  load_mode = "keep"\n', pextra="  run.load_only = T\n")
     good = rc != 0 and "BEAM DUMP IN SLICES" in out
-    print(f"  refused, a slice dump through beam_init%position_file: {'ok' if good else 'MISSED'}")
-    record("refused, a slice dump through beam_init%position_file", None, None, "bool", good)
+    print(f"  refused, a slice dump through beam.position_file: {'ok' if good else 'MISSED'}")
+    record("refused, a slice dump through beam.position_file", None, None, "bool", good)
     ok = ok and good
 
-    # A negative spacing is refused. A setup that derived it as though it were 0 fails this.
-    rc, out = run(exe, wd, "ldnegsample", BUNCH, pextra="  global%load_only = T\n", sample=-3)
-    good = rc != 0 and "SLICING%N_WAVELENGTH MUST BE 0" in out and "GOT: -3" in out
-    print(f"  refused, a negative slicing%n_wavelength: {'ok' if good else 'MISSED'}")
-    record("refused, a negative slicing%n_wavelength", None, None, "bool", good)
+    # A negative spacing is refused by the deck reader, from the schema's bound on
+    # window.n_wavelength, with the value in the message. A setup that derived it as
+    # though it were 0 would never be reached.
+    rc, out = run(exe, wd, "ldnegsample", BUNCH, pextra="  run.load_only = T\n", sample=-3)
+    good = rc != 0 and "n_wavelength = -3 IS OUTSIDE ITS RANGE" in out
+    print(f"  refused, a negative window.n_wavelength: {'ok' if good else 'MISSED'}")
+    record("refused, a negative window.n_wavelength", None, None, "bool", good)
     ok = ok and good
     return ok
 

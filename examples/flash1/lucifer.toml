@@ -1,0 +1,23 @@
+lattice = "flash1.bmad"
+
+[run]
+out_root = "flash1"
+
+[window]
+n_wavelength = 12
+n_slice = 351
+
+[beam]
+n_particle = 4096
+bunch_charge = 7.983503e-11
+sig_z = 3.819304e-6
+sig_pz = 6e-4
+a_norm_emit = 1.5e-6
+b_norm_emit = 1.5e-6
+shot_noise = true
+
+[field]
+lambda0 = 1.37e-8
+grid_n_pts = 128
+grid_half_width = 1.0e-3
+seed_power = 0

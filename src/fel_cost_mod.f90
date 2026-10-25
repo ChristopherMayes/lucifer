@@ -109,7 +109,7 @@ integer nstep, n_particle, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
 
 !
 
-! Only the elements the walk covers, as bounded by global%track_start and track_end.
+! Only the elements the walk covers, as bounded by run.track_start and track_end.
 ! For example, a deck that stops after the second segment counts two segments.
 
 branch => run%lat%branch(0)

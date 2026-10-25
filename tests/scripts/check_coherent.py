@@ -27,6 +27,7 @@ Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations
+from lucifer.deck import to_toml
 
 import argparse
 import pathlib
@@ -59,41 +60,41 @@ SEG: line = (UNDP)
 use, SEG
 """
 
-NML = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%source_filter = F
-  global%interlude_model = "genesis"
-  global%transport_model = "genesis"
-  global%ran_seed = {seed}
+NML = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.source_filter = F
+  run.interlude_model = "genesis"
+  run.transport_model = "genesis"
+  run.ran_seed = {seed}
 {extra}/
-&fel_beam_init
-  beam_init%n_particle = {m}
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+[beam]
+  beam.n_particle = {m}
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 {bextra}/
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = 1e-10
+  field.seed_power = 5e3
+  field.seed_waist_size = 30e-6
+  field.grid_n_pts = 128
+  field.grid_half_width = 2e-4
 {wextra}/
 """
 
-COHERENT = '  global%source_model = "coherent"\n'
+COHERENT = '  run.source_model = "coherent"\n'
 
 SASE_B = """  beamlet_size = 8
   shot_noise = T
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.6e-9
-  beam_init%grid(3)%x_max = 1.6e-9
+  beam.z_distribution = "GRID"
+  beam.z_min = -1.6e-9
+  beam.z_max = 1.6e-9
 """
-SASE_W = """  slicing%window_length = 3.2e-9
-  slicing%n_wavelength = 1
+SASE_W = """  window.window_length = 3.2e-9
+  window.n_wavelength = 1
 """
 
 
@@ -117,13 +118,13 @@ def run(exe, wd, root, m, coherent, seed=777, bextra="", wextra="", pextra="", t
                       bextra=(SASE_B if sase else "") + bextra,
                       wextra=wextra)
     if sig_z is not None:
-        text = text.replace("  beam_init%sig_z = 0\n", f"  beam_init%sig_z = {sig_z}\n")
+        text = text.replace("  beam.sig_z = 0\n", f"  beam.sig_z = {sig_z}\n")
     if sase:
-        text = text.replace("  wavefront_init%seed_power = 5e3\n",
-                            "  wavefront_init%seed_power = 0\n")
-        text = text.replace("  beam_init%sig_z = 0\n", "")
-    (wd / f"{root}.nml").write_text(text)
-    r = subprocess.run([str(exe), f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+        text = text.replace("  field.seed_power = 5e3\n",
+                            "  field.seed_power = 0\n")
+        text = text.replace("  beam.sig_z = 0\n", "")
+    (wd / f"{root}.toml").write_text(to_toml(text))
+    r = subprocess.run([str(exe), f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if expect_fail is not None:
         return r.returncode != 0 and expect_fail in (r.stdout + r.stderr)
@@ -181,7 +182,7 @@ def main():
     # An offset Gaussian bunch, tilted in x-y, is written as openPMD and imported by both
     # source models, and the coherent run must track its own deposit twin. The import
     # runs where the resampler is validated, a time-dependent window of many slices
-    # with resample%n_slice = 0 so the count is derived. A single slice samples the
+    # with beam.resample.n_slice = 0 so the count is derived. A single slice samples the
     # beam degenerately in x and y. beamlet_size = 4 keeps the guard's estimate of
     # independent samples honest, so the double horn trips it.
 
@@ -192,12 +193,12 @@ def main():
     # disagreement of 5.9.
 
     (wd / "cohshort.bmad").write_text(LAT.replace("l = 3.96,", "l = 0.90,"))
-    IMP = ('  beam_init%position_file = "beam0.h5"\n  beam_init%n_particle = 2048\n  beamlet_size = 4\n'
-           '  shot_noise = T\n  resample%n_slice = 0\n  resample%slice_width = 0.05\n')
-    WIN = '  slicing%n_wavelength = 20\n'
-    run(exe, wd, "seedbeam", 200000, False, pextra='  global%load_only = T\n', sig_z='4e-9',
-        bextra='  resample%use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'
-               '  resample%n_particle_per_slice = 2048\n  resample%beamlet_size = 4\n')
+    IMP = ('  beam.position_file = "beam0.h5"\n  beam.n_particle = 2048\n  beamlet_size = 4\n'
+           '  shot_noise = T\n  beam.resample.n_slice = 0\n  beam.resample.slice_width = 0.05\n')
+    WIN = '  window.n_wavelength = 20\n'
+    run(exe, wd, "seedbeam", 200000, False, pextra='  run.load_only = T\n', sig_z='4e-9',
+        bextra='  beam.resample.use_beam_init = T\n  write_openpmd_file = "beam0.h5"\n'
+               '  beam.resample.n_particle_per_slice = 2048\n  beam.resample.beamlet_size = 4\n')
     with h5py.File(wd / "beam0.h5", "r+") as f:
         # openPMD-beamphysics as Bmad writes it: /data/%T/particles/electron/...
         for it in f["data"]:

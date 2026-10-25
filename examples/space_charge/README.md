@@ -2,17 +2,17 @@
 
 The example runs in four commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_off.in
-    ../../../production/bin/lucifer lucifer_short_range.in
-    ../../../production/bin/lucifer lucifer_gate_off.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_off.in
+    ../../build-release/bin/lucifer lucifer_short_range.in
+    ../../build-release/bin/lucifer lucifer_gate_off.in
     python ../plot_fel.py space_charge.stats.h5
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../docs/fel-physics.md)). The two terms answer different questions, so this example measures them separately.
 
-The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so `space_charge_com%n_bin` plays no part in it. `space_charge%` in the deck holds the solver's numbers and nothing about whether it runs.
+The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad.csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so Bmad's `space_charge_com` `n_bin`, set in the lattice file plays no part in it. `space_charge.` in the deck holds the solver's numbers and nothing about whether it runs.
 
-`lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that. With space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
+`lucifer.toml` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that. With space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
 
 The measured quantities of the four decks are in the table below, the head-to-tail span of the slice mean energies at the exit among them, with the control run's exact zero beside it. The long-range term gives all of the span, and the two short-range harmonics the deck sets give none of it.
 
@@ -22,7 +22,7 @@ The chirp matters at this size. Relative to the beam energy the span is more tha
 
 The short-range harmonics measure exactly zero here, which is correct. They act on the density structure inside a slice, and a quiet-start dark beam has none, since the initial bunching sits at the quiet start's floor. `lucifer_short_range.in` gives them something to act on, by matching the `../steady_state` deck parameter for parameter and adding `nz = 4, nphi = 1`. Against that run as its control, whose exit power and bunching its own page carries, the short-range deck's exit power is higher by about half a percent. That rise comes past saturation, from the short-range term acting on a beam the FEL has bunched.
 
-Two configurations are refused. `slice` with neither term configured, `nz = 0` and `longrange = F`, is refused, since the solve would run at its full cost and return an exact zero. `fft_3d` on an FEL element is refused, since that solver wants a three-dimensional grid this walk does not build.
+Two configurations are refused. `slice` with neither term configured, `nz = 0` and `longrange = false`, is refused, since the solve would run at its full cost and return an exact zero. `fft_3d` on an FEL element is refused, since that solver wants a three-dimensional grid this walk does not build.
 
 The master switch off while the elements still ask for `slice` is not refused, because that is how a lattice is run without space charge and without editing it. `lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch false. The run prints a note saying so and tracks without space charge, measured as exactly the control run's zero.
 

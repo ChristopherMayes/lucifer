@@ -216,29 +216,31 @@ if [[ $PHASES -eq 1 ]]; then
     slen="$(awk -v n="$2" 'BEGIN { printf "%.6e", n * 3 * 1e-10 }')"
     sigz="$(awk -v n="$2" 'BEGIN { printf "%.6e", n * 3 * 1e-10 / 2 }')"
     cat > "$1" <<DECK
-&fel_params
-  lat_file = "aramis.bmad"
-  global%out_root = "$3"
-  slicing%window_length = $slen
-  slicing%n_wavelength = 3
-/
-&fel_beam_init
-  beam_init%n_particle = $NPART
-  beam_init%bunch_charge = 2.881993782512e-13
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -$sigz
-  beam_init%grid(3)%x_max =  $sigz
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  shot_noise = T
-/
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = $NGRID
-  wavefront_init%grid_half_width = 2e-4
-/
+lattice = "aramis.bmad"
+
+[run]
+out_root = "$3"
+
+[window]
+window_length = $slen
+n_wavelength = 3
+
+[beam]
+n_particle = $NPART
+bunch_charge = 2.881993782512e-13
+z_distribution = "GRID"
+z_min = -$sigz
+z_max = $sigz
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+seed_power = 0
+grid_n_pts = $NGRID
+grid_half_width = 2e-4
 DECK
   }
 
@@ -248,9 +250,9 @@ DECK
     local label="$1" ns="$2" nt="$3" root log
     root="phase_${ns}_${nt}${4:-}"
     log="$root.log"
-    phase_deck "$root.in" "$ns" "$root"
+    phase_deck "$root.toml" "$ns" "$root"
     echo "--- $label: $ns slices, $nt thread(s) ---"
-    if ! env OMP_NUM_THREADS="$nt" "$EXE" "$root.in" > "$log" 2>&1; then
+    if ! env OMP_NUM_THREADS="$nt" "$EXE" "$root.toml" > "$log" 2>&1; then
       echo "FAILED; log tail:" >&2
       tail -20 "$log" >&2
       exit 1
@@ -267,7 +269,7 @@ DECK
     built="$(awk '/^ Beam / {for (i = 1; i <= NF; i++) if ($i == "slices" || $i == "slice") print $(i-1)}' "$log")"
     if [[ "$built" != "$ns" ]]; then
       echo "FAILED: asked for $ns slices and the run built ${built:-none}." >&2
-      echo "The deck states slicing%n_wavelength; a derived spacing would change the count." >&2
+      echo "The deck states window.n_wavelength; a derived spacing would change the count." >&2
       exit 1
     fi
   }
@@ -506,22 +508,22 @@ DECK
 make_deck perf-serial.in 1
 make_deck perf-parallel.in 0
 
-cat > perf.nml <<NML
-&fel_params
-  lat_file = "aramis.bmad"
-  global%out_root = "perf"
-  global%interlude_model = "bmad"
-  global%write_diag = T
-/
-&fel_beam_init
-  beam_file = "AramisPerf-initial.beam.h5"
-  beamlet_size = 8
-/
-&fel_wavefront_init
-  field_file = "AramisPerf-initial.wf.h5"
-  wavefront_init%lambda0 = 1e-10
-/
-NML
+cat > perf.toml <<DECK
+lattice = "aramis.bmad"
+
+[run]
+out_root = "perf"
+interlude_model = "bmad"
+write_diag = true
+
+[beam]
+file = "AramisPerf-initial.beam.h5"
+beamlet_size = 8
+
+[field]
+file = "AramisPerf-initial.wf.h5"
+lambda0 = 1e-10
+DECK
 
 # timed <label> <log> <command...> times a command on one uniform external wall clock.
 declare -a TIMES
@@ -557,10 +559,10 @@ for pair in "AramisPerf-initial.par.h5 AramisPerf-initial.beam.h5" \
   fi
 done
 timed "lucifer, 1 thread" fel-serial.log \
-  env OMP_NUM_THREADS=1 "$EXE" perf.nml
+  env OMP_NUM_THREADS=1 "$EXE" perf.toml
 mv perf.diag.txt perf-serial.diag.txt
 timed "lucifer, $WORKERS threads" fel-parallel.log \
-  env OMP_NUM_THREADS="$WORKERS" "$EXE" perf.nml
+  env OMP_NUM_THREADS="$WORKERS" "$EXE" perf.toml
 echo
 
 # The physics on both sides must agree before any number is quoted. The Bmad seam differs from

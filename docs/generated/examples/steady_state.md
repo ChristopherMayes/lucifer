@@ -11,7 +11,7 @@ Everything on this page lives in and runs from `examples/steady_state/`.
 
 The example runs in one command, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
     python ../plot_fel.py steady_state.stats.h5
 
 This is a seeded, single-slice FEL on the benchmark line (`../aramis.bmad`): a 3 kA slice and a 5 kW Gaussian seed at its waist are tracked through 6 FODO cells of helical undulator. Nothing external is read. The program generates the quiet-start beam and the seed field from the namelist, and the lattice supplies everything else.
@@ -30,7 +30,7 @@ The run takes about five seconds.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | Unit |
+| Quantity | `lucifer.toml` | Unit |
 |---|---|---|
 | exit power | 8.0199e+08 | W |
 | exit power per slice | 8.0199e+08 | W |
@@ -78,31 +78,28 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "steady_state"
-  global%dump_beam_at = "UND##3"
-  global%dump_field_at = "UND##3"
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "steady_state"
+dump_beam_at = "UND##3"
+dump_field_at = "UND##3"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
 ```

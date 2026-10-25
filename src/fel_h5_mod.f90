@@ -674,7 +674,7 @@ end subroutine fel_h5_dset_attr_strs
 !
 ! The text goes in a dataset and *not* an attribute. HDF5 caps a single attribute at
 ! 64 kB, and the largest that writes is 65495 bytes (docs/reading-output.md). A scalar
-! string dataset takes 3 MB. An echoed namelist or lattice file can pass the cap on an
+! string dataset takes 3 MB. An echoed deck or lattice file can pass the cap on an
 ! ordinary lattice. That failure is silent unless the error is checked.
 !
 ! fel_h5_str writes a fixed-width array for label axes. This routine writes one string

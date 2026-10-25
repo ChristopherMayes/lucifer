@@ -11,8 +11,8 @@ Everything on this page lives in and runs from `examples/chicane/`.
 
 The example runs in two commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_detuned.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_detuned.in
 
 The line is two undulator segments with a four-bend closed-bump chicane in the break, in absolute time tracking mode (`bmad_com[absolute_time_tracking] = T` in the lattice). The inter-segment phase then follows the real geometry. The beam detours the bump while the radiation drifts the chord between the undulator faces, which is computed from `ele%floor` and never entered by hand. The arc-minus-chord delay (583 wavelengths at the reference angle) re-injects the light onto the bunched beam at whatever carrier phase the bend angle dictates.
 
@@ -28,7 +28,7 @@ Each run takes about a second.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_detuned.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_detuned.toml` | Unit |
 |---|---|---|---|
 | exit power | 2.6084e+08 | 1.8402e+08 | W |
 | exit power per slice | 2.6084e+08 | 1.8402e+08 | W |
@@ -75,60 +75,54 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "chicane.bmad"
-  global%out_root = "chicane"
-  global%ran_seed = 12345
-/
+```toml
+lattice = "chicane.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "chicane"
+ran_seed = 12345
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 2e8
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 2e8
+seed_waist_size = 30e-6
 ```
 
-### `lucifer_detuned.in`
+### `lucifer_detuned.toml`
 
-```fortran
-&fel_params
-  lat_file = "detuned.bmad"
-  global%out_root = "detuned"
-  global%ran_seed = 12345
-/
+```toml
+lattice = "detuned.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "detuned"
+ran_seed = 12345
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 2e8
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 2e8
+seed_waist_size = 30e-6
 ```
 
 ### `chicane.bmad`

@@ -1,0 +1,22 @@
+lattice = "../aramis.bmad"
+
+[run]
+out_root = "sc_off"
+
+[window]
+window_length = 2.4e-8
+n_wavelength = 3
+
+[beam]
+n_particle = 512
+bunch_charge = 1.003345e-13
+sig_z = 4e-9
+sig_pz = 0
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0

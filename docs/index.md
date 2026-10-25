@@ -21,7 +21,7 @@ Lucifer has:
 - **Phasing between segments**, following the real geometry in absolute time tracking and autophased in the default relative mode.
 - **Spontaneous emission** turned on by Bmad's own `radiation_damping` and `radiation_fluctuations` switches.
 - **Shared-memory parallelism** over slices, bit-identical at any thread count.
-- **A GPU backend** for the averaged method on Apple Silicon (`global%device = "metal"`). The beam and the field stay resident on the device through each FEL element, harmonic field sets, both polarizations and slice migration included. It is measured between 7x and 12x against twelve CPU cores and checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
+- **A GPU backend** for the averaged method on Apple Silicon (`run.device = "metal"`). The beam and the field stay resident on the device through each FEL element, harmonic field sets, both polarizations and slice migration included. It is measured between 7x and 12x against twelve CPU cores and checked per step against the FP64 path ([](validation.md#val-device)). A configuration its kernels do not cover is refused, and none runs quietly on the CPU instead.
 - **openPMD** particle and field dumps in both directions, and a self-describing statistics file described by [](BMAD-STATS-SPEC.md).
 - **One load path**: a `beam_init` bunch, generated or read from openPMD, sliced by sampling or kept particle by particle, quietened if asked, with the physical noise imposed on whatever load there is.
 - **A coherent source model**, Tanaka's retrieval, for transversely coherent beams.
@@ -36,14 +36,14 @@ The method is Bmad's own `fel_method` attribute, set on the element as any attri
 | `averaged` | The wiggle-averaged (KMR) model on Bmad's own `bmad_standard` kernel maps. The production method. |
 | `unaveraged` | Direct integration through the analytic undulator field, with no period averaging and no resonance approximation. Its cost per step buys the full quiver dynamics, the energy accounting the beam actually pays, polarization-agnostic coupling and arbitrary harmonic content. It is also an independent check on the averaged method, since the two share no approximation. |
 
-The averaged method's transverse maps have a third option behind them, the transcribed Genesis4 maps, which the comparison tiers select through [](input-reference.md)'s `global%transport_model`. It is validation-internal and no production run sets it.
+The averaged method's transverse maps have a third option behind them, the transcribed Genesis4 maps, which the comparison tiers select through [](input-reference.md)'s `run.transport_model`. It is validation-internal and no production run sets it.
 
 ## Where to start
 
 | If you want to | Read |
 |---|---|
 | build it, describe a run, and run it | [](user-guide.md) |
-| know what a namelist parameter does | [](input-reference.md) |
+| know what a deck key does | [](input-reference.md) |
 | read an output file you were handed | [](reading-output.md) |
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what level | [](validation.md) |

@@ -1,188 +1,100 @@
 #!/usr/bin/env python3
 """
-Check docs/input-reference.md against the struct declarations that define the defaults.
+Check the input reference against the schema the program writes.
 
-The input reference states a default for every parameter Lucifer owns. Those defaults
-live in the Fortran declarations, so a hand-written table can drift from them. This
-check holds the two together in both directions:
+The deck's keys, their types, defaults and bounds are the program's, written by
+lucifer --schema into docs/generated/schema.json and rendered into
+docs/generated/input-keys.md by report_input_keys.py, which docs/input-reference.md
+includes. What this check holds together:
 
-  1. Every fel-owned parameter the page names must exist in its struct, with the
-     default the page states. A default the struct writes as a named constant, such as
-     fel_ramp_periods_default$, is read as that constant's value.
-  2. Every component of those structs must be named somewhere on the page, so the
-     reference cannot go quietly incomplete when a parameter is added.
-  3. Every input dataset the stats file writes must name a component of its struct.
+  1. python/lucifer/deck.py's routing table names exactly the schema's keys, table by
+     table, so a deck the package writes is one the program reads.
+  2. Every key of the schema appears in docs/generated/input-keys.md.
+  3. Every dotted key a page names in code font, `beam.n_particle` or `[wake]`, is a key
+     or a table of the schema, so no page describes a key the program does not read.
+     The pages are the committed Markdown under docs/ and the READMEs, less the
+     changelog, whose entries are history.
 
-Bmad-owned structures (beam_init, bmad_com, space_charge_com) are exempt. Their
-defaults are Bmad's to state, and the page documents only which fields Lucifer honors.
-
-Usage:
-
-  check_input_reference.py [--doc <file>] [--code <dir>]
+Standard library only, so the docs job runs it without an environment.
 """
-
-import argparse
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
-from checkrec import record
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "python"))
 
-# struct name -> (source file, the prefix the page writes it under)
-STRUCTS = {
-    "fel_global_struct":           ("fel_struct.f90",          "global%"),
-    "wavefront_init_struct":       ("fel_struct.f90",          "wavefront_init%"),
-    "fel_chamber_wake_init_struct": ("fel_struct.f90",         "chamber_wake%"),
-    "fel_beam_init_param_struct":  ("fel_struct.f90",          ""),
-    "fel_resample_param_struct":   ("fel_import_mod.f90",      "resample%"),
-    # The input type, and not the working one. The working copy carries the per-element
-    # flag active, which no deck can set and the page must not document.
-    "fel_space_charge_input_struct": ("fel_collective_mod.f90", "space_charge%"),
-}
-
-# A named constant a default is written as, "integer, parameter :: name$ = 2". A struct
-# default given by name reads as the constant's own value.
-PARAM = re.compile(r"^\s*(?:real\(rp\)|integer)\s*,\s*parameter\s*::\s*(\w+\$)\s*=\s*([^!]+?)\s*(?:!.*)?$",
-                   re.M)
-
-DECL = re.compile(r"""^\s*(?:type\s*\([^)]*\)|character\([^)]*\)|real\(rp\)|integer|logical)
-                       \s*(?:,\s*allocatable)?\s*::\s*(.*?)\s*(?:!.*)?$""", re.X)
+DOTTED = re.compile(r"`((?:run|window|beam\.resample|beam|field|wake|space_charge|bmad)\.[a-z_]+)`")
+# A file named in code font, `run.sh` or `bmad.mod`, reads like a dotted key and is not one.
+FILE_SUFFIXES = {"sh", "py", "md", "mod", "h5", "toml", "in", "bmad", "lat", "txt", "json", "yml", "cmake"}
+TABLE = re.compile(r"`\[((?:run|window|beam\.resample|beam|field|wake|space_charge|bmad|[a-z_.]+))\]`")
 
 
-def norm_default(v):
-    """Fortran literal -> the form a document would write."""
-    v = v.strip().rstrip(",").strip()
-    v = re.sub(r"_rp\b", "", v)
-    if v in (".false.", ".true."):
-        return {".false.": "F", ".true.": "T"}[v]
-    # An array literal whose tail is all zeros: the leading value is the default a
-    # user writes, since "harmonics = 1" sets the first entry and leaves the rest.
-    am = re.match(r"\[\s*([^,\]]+?)\s*(?:,\s*0\s*)*\]$", v)
-    if am:
-        return am.group(1).strip()
-    if v.startswith("'") and v.endswith("'"):
-        inner = v[1:-1]
-        return '""' if inner == "" else f'"{inner}"'
-    return v
-
-
-def parse_struct(text, name, params=None):
-    """{component: normalized default} for one type block. A default written as a named
-    constant takes the constant's value from params."""
-    m = re.search(r"^type " + name + r"\b(.*?)^end type", text, re.S | re.M)
-    if not m:
-        raise SystemExit(f"struct {name} not found")
-    out = {}
-    for line in m.group(1).split("\n"):
-        d = DECL.match(line)
-        if not d:
+def schema_keys(schema):
+    keys = {"": set()}
+    for name, p in schema["properties"].items():
+        if p.get("type") != "object":
+            keys[""].add(name)
             continue
-        # One line may declare several: "track_start = '', track_end = ''"
-        for part in re.split(r",(?![^(\[]*[)\]])", d.group(1)):
-            part = part.strip()
-            if not part:
-                continue
-            mm = re.match(r"(\w+)\s*(?:\([^)]*\))?\s*(?:=\s*(.+))?$", part)
-            if not mm:
-                continue
-            comp, val = mm.group(1), mm.group(2)
-            if val is None:
-                # A continued array literal from the previous component, not a new one.
-                if re.match(r"^[\d.\s\[\]'-]+$", part):
-                    continue
-                out[comp] = None
+        keys[name] = set()
+        for k, kp in p["properties"].items():
+            if kp.get("type") == "object":
+                keys[f"{name}.{k}"] = set(kp["properties"])
             else:
-                val = val.strip().rstrip(",").strip()
-                out[comp] = norm_default((params or {}).get(val, val))
-    return out
+                keys[name].add(k)
+    return keys
 
 
 def main():
-    here = Path(__file__).resolve().parent
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--doc", default=str(here / "../../docs/input-reference.md"))
-    p.add_argument("--code", default=str(here / "../../src"))
-    args = p.parse_args()
-
-    doc = Path(args.doc).read_text()
-    code = Path(args.code)
     failed = []
-    checked = 0
+    schema = json.loads((ROOT / "docs/generated/schema.json").read_text())
+    keys = schema_keys(schema)
 
-    # The page states parameters in table rows: | `name` | `default` | meaning |
-    # Split on the pipes rather than pattern-matching the cells. A cell holding
-    # anything unexpected must land in the comparison rather than slip past the regex.
-    rows = {}
-    for line in doc.split("\n"):
-        if not line.strip().startswith("|"):
-            continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 3:
-            continue
-        name = cells[0]
-        if not (name.startswith("`") and name.endswith("`")):
-            continue
-        rows[name.strip("`").strip()] = cells[1].strip().strip("`").strip()
+    # (1) The package's routing table.
+    from lucifer.deck import KEYS
+    for table, names in keys.items():
+        mine = set(KEYS.get(table, []))
+        if mine != names:
+            failed.append(f"python/lucifer/deck.py KEYS[{table!r}] differs from the schema: "
+                          f"missing {sorted(names - mine)}, extra {sorted(mine - names)}")
+    for table in KEYS:
+        if table not in keys:
+            failed.append(f"python/lucifer/deck.py names a table the schema does not: {table!r}")
 
-    params = {}
-    for f in sorted(code.glob("*.f90")):
-        params.update(PARAM.findall(f.read_text()))
+    # (2) The generated key tables.
+    page = (ROOT / "docs/generated/input-keys.md").read_text()
+    for table, names in keys.items():
+        for k in names:
+            if f"| `{k}` |" not in page:
+                failed.append(f"docs/generated/input-keys.md does not list {table}.{k}")
 
-    for struct, (src, prefix) in STRUCTS.items():
-        decl = parse_struct((code / src).read_text(), struct, params)
-        for comp, default in decl.items():
-            name = prefix + comp
-            checked += 1
-            # (1) Named on the page at all.
-            if name not in rows and not re.search(r"`" + re.escape(name) + r"`", doc):
-                failed.append(f"{struct}: {name} is not named in the reference")
+    # (3) Dotted keys on the pages.
+    tracked = subprocess.run(["git", "ls-files", "--", "*.md"], cwd=ROOT, capture_output=True,
+                             text=True).stdout.split()
+    tables = set(keys)
+    for f in tracked:
+        if f.startswith("docs/generated/") or f == "docs/changelog.md":
+            continue
+        text = (ROOT / f).read_text()
+        for m in DOTTED.finditer(text):
+            table, _, name = m.group(1).rpartition(".")
+            if name in FILE_SUFFIXES:
                 continue
-            # (2) If it has a table row, the stated default must match.
-            if name in rows and default is not None:
-                stated = rows[name]
-                if stated in ("", "-", "(none)"):
-                    continue
-                if stated != default:
-                    failed.append(f"{struct}: {name} default is {default} in code, "
-                                  f"{stated} on the page")
+            if table not in keys or name not in keys[table]:
+                failed.append(f"{f} names `{m.group(1)}`, which the schema does not have")
+        for m in TABLE.finditer(text):
+            if m.group(1) not in tables - {""}:
+                failed.append(f"{f} names `[{m.group(1)}]`, which is not a table of the deck")
 
-    # Parameters the page states under a fel-owned prefix that no struct declares.
-    known = {prefix + c for s, (src, prefix) in STRUCTS.items()
-             for c in parse_struct((code / src).read_text(), s)}
-    for name in rows:
-        if "%" not in name:
-            continue
-        fam = name.split("%")[0] + "%"
-        if fam in {p for _, p in STRUCTS.values()} and name not in known:
-            failed.append(f"{name} is on the page but no struct declares it")
-
-    # (3) The stats file writes one dataset per honored input. A dataset written under
-    # a name no struct component has means the file and the namelist disagree, which is
-    # how a reader ends up guessing. Names only: which helper writes a component, and
-    # which are deliberately left out, is fel_io_mod's business.
-    io = (code / "fel_io_mod.f90").read_text()
-    marks = [(m.group(1), m.end()) for m in re.finditer(r"call sub_open \('([a-z_]+)'", io)]
-    spans = {n: (s, marks[i + 1][1] if i + 1 < len(marks) else len(io))
-             for i, (n, s) in enumerate(marks)}
-    for struct, (src, prefix) in STRUCTS.items():
-        sub = prefix.rstrip("%")
-        if not sub or sub not in spans:
-            continue
-        comps = set(parse_struct((code / src).read_text(), struct))
-        a, b = spans[sub]
-        for name in set(re.findall(r"fel_h5_\w+ \(g_id, '([a-z_0-9]+)'", io[a:b])):
-            if name not in comps:
-                failed.append(f"params/{sub}/{name} is written to the stats file, "
-                              f"but {struct} has no component of that name")
-
-    for f in failed:
-        print(f"  FAIL: {f}")
-    print(f"  input reference: {checked} fel-owned parameters checked, "
-          f"{len(failed)} problems")
-    record("input reference problems", len(failed), 0, "max", not failed)
-    print("checks: " + ("FAIL" if failed else "PASS"))
-    return 1 if failed else 0
+    n = sum(len(v) for v in keys.values())
+    if failed:
+        print("\n".join(failed))
+        print(f"check_input_reference: FAIL, {len(failed)} problems over {n} keys")
+        return 1
+    print(f"check_input_reference: {n} keys in {len(keys)} tables, the package, the key tables and the pages agree")
+    return 0
 
 
 if __name__ == "__main__":

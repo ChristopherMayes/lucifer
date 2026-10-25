@@ -397,50 +397,46 @@ print(f"{lam:.12e} {sample}")
 WINEOF
 }
 
-# make_nml <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
+# make_deck <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
 # Every deck reads the converted openPMD dumps and writes openPMD, the only format the
 # tracker speaks. Of the three input groups (docs/user-guide.md), argument 6 adds
-# &fel_params content (wake or space charge) and argument 7 adds &fel_beam_init content
+# [wake], [space_charge] or [bmad] content and argument 7 adds [beam] content
 # (check knobs). Every tier this builds sets transport_model = genesis, since a
 # transcription comparison needs Genesis4's own transverse maps, so what is left over is
 # transcription fidelity rather than a transport model difference. It is a no-op for the
 # unaveraged tier, which integrates the field and has no map to choose. nbins is the
 # beamlet size the Genesis decks load with, which no dump format carries.
 
-make_nml () {
+make_deck () {
   local lam sample
   read -r lam sample <<<"$(read_window "$5-initial.par.h5")"
-  cat > "$1" <<NML
-&fel_params
-  lat_file = "$2"
-  global%out_root = "$3"
-  global%interlude_model = "$4"
-  global%transport_model = "genesis"
-  global%source_filter = F
-  global%write_diag = T
-  slicing%n_wavelength = $sample
+  # Flat keys, routed into the deck's tables by lucifer.deck, so the extra lines a caller
+  # adds name their key and nothing else.
+  "$PYTHON" -m lucifer.deck - "$1" <<DECK
+  lattice = "$2"
+  out_root = "$3"
+  interlude_model = "$4"
+  transport_model = "genesis"
+  source_filter = F
+  write_diag = T
+  n_wavelength = $sample
 ${6:+  $6}
-/
-&fel_beam_init
-  beam_file = "$5-initial.beam.h5"
+  beam.file = "$5-initial.beam.h5"
 ${7:+  $7}
-/
-&fel_wavefront_init
-  field_file = "$5-initial.wf.h5"
-  wavefront_init%lambda0 = $lam
-/
-NML
+  field.file = "$5-initial.wf.h5"
+  lambda0 = $lam
+DECK
 }
 
-make_nml tier1.nml  aramis_1seg.bmad tier1  bmad    Aramis
-make_nml tier2.nml  aramis.bmad      tier2  bmad    Aramis
-make_nml tier2g.nml aramis.bmad      tier2g genesis Aramis
-make_nml tier1s.nml aramis_1seg.bmad tier1s bmad    Aramis "" "split_weights = T"
-make_nml tier1u.nml aramis_1seg_unavg.bmad tier1u bmad Aramis
-make_nml td1.nml    aramis_1seg.bmad td1    bmad    AramisTD
-make_nml td2.nml    aramis.bmad      td2    bmad    AramisTD
-make_nml td2g.nml   aramis.bmad      td2g   genesis AramisTD
-make_nml tdsase.nml aramis.bmad      tdsase genesis AramisTDSASE
+make_deck tier1.toml  aramis_1seg.bmad tier1  bmad    Aramis
+make_deck tier2.toml  aramis.bmad      tier2  bmad    Aramis
+make_deck tier2g.toml aramis.bmad      tier2g genesis Aramis
+make_deck tier1s.toml aramis_1seg.bmad tier1s bmad    Aramis "" "split_weights = T"
+make_deck tier1u.toml aramis_1seg_unavg.bmad tier1u bmad Aramis
+make_deck td1.toml    aramis_1seg.bmad td1    bmad    AramisTD
+make_deck td2.toml    aramis.bmad      td2    bmad    AramisTD
+make_deck td2g.toml   aramis.bmad      td2g   genesis AramisTD
+make_deck tdsase.toml aramis.bmad      tdsase genesis AramisTDSASE
 # The space-charge tier says where space charge acts on the element, as any Bmad program
 # does, and turns on Bmad's master switch in the deck. The solver's numbers stay in
 # space_charge%.
@@ -450,19 +446,19 @@ call, file = aramis_1seg.bmad
 wiggler::*[SPACE_CHARGE_METHOD] = slice
 LAT
 
-make_nml tdsc.nml   aramis_1seg_sc.bmad tdsc   genesis AramisTD "space_charge%rmax = 250e-6
-  space_charge%nz = 2
-  space_charge%nphi = 1
-  space_charge%longrange = T
-  bmad_com%csr_and_space_charge_on = T"
-make_nml tdwk.nml   aramis_1seg.bmad tdwk   genesis AramisTD "chamber_wake%on = T
-  chamber_wake%radius = 2.5e-3
-  chamber_wake%conductivity = 5.813e7
-  chamber_wake%relaxation = 8.1e-6
-  chamber_wake%gap = 0.5e-3
-  chamber_wake%lgap = 0.015
-  chamber_wake%hrough = 100e-9
-  chamber_wake%lrough = 100e-6"
+make_deck tdsc.toml   aramis_1seg_sc.bmad tdsc   genesis AramisTD "space_charge.rmax = 250e-6
+  space_charge.nz = 2
+  space_charge.nphi = 1
+  space_charge.longrange = T
+  bmad.csr_and_space_charge_on = T"
+make_deck tdwk.toml   aramis_1seg.bmad tdwk   genesis AramisTD "wake.on = T
+  wake.radius = 2.5e-3
+  wake.conductivity = 5.813e7
+  wake.relaxation = 8.1e-6
+  wake.gap = 0.5e-3
+  wake.lgap = 0.015
+  wake.hrough = 100e-9
+  wake.lrough = 100e-6"
 
 # The assertion checks: a lattice whose FEL element is missing b_max or l_period, uses a
 # fieldmap field_calc, or carries Bmad wakes on any element, which the slice-at-a-time
@@ -488,9 +484,9 @@ sed 's/field_calc = helical_model, &/field_calc = fieldmap, cartesian_map = {ter
     aramis_1seg.bmad > refusal_fieldmap.bmad
 
 CHECKS_OK=1
-run_assert_refusal () {   # <name> <a fragment of the message> [extra &fel_params lines]
-  make_nml refusal_$1.nml refusal_$1.bmad refusal_$1 bmad Aramis "${3:-}"
-  if "$EXE" refusal_$1.nml > fel-refusal_$1.log 2>&1; then
+run_assert_refusal () {   # <name> <a fragment of the message> [extra deck lines]
+  make_deck refusal_$1.toml refusal_$1.bmad refusal_$1 bmad Aramis "${3:-}"
+  if "$EXE" refusal_$1.toml > fel-refusal_$1.log 2>&1; then
     echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
     CHECKS_OK=0
   elif ! grep -q "$2" fel-refusal_$1.log; then
@@ -532,7 +528,7 @@ run_assert_refusal fieldmap "FIELD_CALC MUST BE PLANAR_MODEL OR HELICAL_MODEL"
 run_assert_refusal lrwake   "LR (MULTI-BUNCH) WAKES ARE NOT SUPPORTED"
 run_assert_refusal zmax     "Z_MAX CAN HANDLE"
 run_assert_refusal scnone   "NEITHER SPACE-CHARGE TERM IS CONFIGURED" \
-                            "bmad_com%csr_and_space_charge_on = T"
+                            "bmad.csr_and_space_charge_on = T"
 
 # tracking_method = custom on a wiggler means some other program's tracking, so this
 # program must not claim the element. Nor must it claim a wiggler carrying no fel_method
@@ -541,8 +537,8 @@ run_assert_refusal scnone   "NEITHER SPACE-CHARGE TERM IS CONFIGURED" \
 # exists to prevent.
 
 sed 's/fel_method = averaged, //' aramis_1seg.bmad > custom_seam.bmad
-make_nml custom_seam.nml custom_seam.bmad custom_seam bmad Aramis
-if "$EXE" custom_seam.nml > fel-custom_seam.log 2>&1; then
+make_deck custom_seam.toml custom_seam.bmad custom_seam bmad Aramis
+if "$EXE" custom_seam.toml > fel-custom_seam.log 2>&1; then
   echo "FAIL: a custom-tracked wiggler was claimed as an FEL segment" >&2
   CHECKS_OK=0
 elif ! grep -q "NO FEL ELEMENT" fel-custom_seam.log; then
@@ -591,7 +587,7 @@ if [[ -n "$WAIT_TIERS" ]]; then
 fi
 TIER_PIDS=""
 for tier in $TIERS; do
-  "$EXE" $tier.nml > fel-$tier.log 2>&1 &
+  "$EXE" $tier.toml > fel-$tier.log 2>&1 &
   TIER_PIDS="$TIER_PIDS $tier:$!"
 done
 TIERS_OK=1
@@ -619,8 +615,8 @@ section_time tiers-all-eleven
 # since HDF5 object headers carry timestamps and a whole-file cmp would false-alarm.
 
 echo "--- thread independence: td1 with OMP_NUM_THREADS=8 --------------------------"
-sed 's/out_root = "td1"/out_root = "td1t8"/' td1.nml > td1t8.nml
-if ! OMP_NUM_THREADS=8 "$EXE" td1t8.nml > fel-td1t8.log 2>&1; then
+sed 's/out_root = "td1"/out_root = "td1t8"/' td1.toml > td1t8.toml
+if ! OMP_NUM_THREADS=8 "$EXE" td1t8.toml > fel-td1t8.log 2>&1; then
   echo "lucifer td1t8 FAILED; log tail:" >&2
   tail -20 fel-td1t8.log >&2
   exit 1

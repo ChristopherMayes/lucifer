@@ -1,0 +1,13 @@
+lattice = "aramis.bmad"
+
+[run]
+out_root = "sat-avg"
+interlude_model = "bmad"
+source_filter = false
+write_diag = true
+
+[beam]
+file = "AramisSat-initial.par.h5"
+
+[field]
+file = "AramisSat-initial.fld.h5"

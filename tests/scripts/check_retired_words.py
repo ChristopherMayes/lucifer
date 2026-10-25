@@ -19,6 +19,9 @@ through the pages and comments before it was noticed:
                    is the performance benchmark.
   gate, gates      process jargon for a check, a test, a tolerance or a refusal.
   refused by name  this port's coinage; the run is refused, and the message says why.
+  global% and the other namelist prefixes, the &fel_ group names and lucifer.in
+                   the namelist deck, replaced by the TOML deck on 2026-10-24, whose keys
+                   are table.name and whose example decks are lucifer.toml.
 
 A retired word in a quoted title or a URL is still a hit, so the list stays short and
 the words plain.
@@ -33,9 +36,41 @@ RETIRED = [
     ("harness", re.compile(r"\bharness(es|'s)?\b", re.I)),
     ("gate", re.compile(r"\bgates?\b", re.I)),
     ("refused by name", re.compile(r"\brefused by name\b", re.I)),
+    # The namelist deck's names, gone since 2026-10-24: the deck is TOML, and its keys are
+    # table.name, run.out_root for what was global%out_root.
+    # Not inside a Fortran component chain, run%global%out_root, which is code.
+    ("namelist prefix", re.compile(r"(?<![%\w])(global|beam_init|wavefront_init|slicing|chamber_wake|resample)%")),
+    ("namelist group", re.compile(r"&fel_(params|beam_init|wavefront_init|track_params)\b")),
+    ("lucifer.in", re.compile(r"\blucifer\.in\b")),
 ]
 SUFFIXES = (".md", ".py", ".sh", ".f90", ".yml", ".yaml", ".cmake", ".txt")
 SKIP = ("docs/changelog.md", "docs/generated/")
+
+
+def fortran_prose(line):
+    """The comment and the string literals of a Fortran line, the code left out."""
+    if re.match(r"\s*!", line):
+        return line
+    out, i, n = [], 0, len(line)
+    while i < n:
+        ch = line[i]
+        if ch == "'":
+            j = i + 1
+            while j < n:
+                if line[j] == "'":
+                    if j + 1 < n and line[j + 1] == "'":
+                        j += 2
+                        continue
+                    break
+                j += 1
+            out.append(line[i + 1:j])
+            i = j + 1
+        elif ch == "!":
+            out.append(line[i:])
+            break
+        else:
+            i += 1
+    return " ".join(out)
 
 
 def tracked(root):
@@ -56,10 +91,18 @@ def main():
     for path in tracked(root):
         if path.resolve() == Path(__file__).resolve():
             continue
+        # The deck converter knows the old names on purpose: it routes them to the new.
+        if path.relative_to(root).as_posix() == "python/lucifer/deck.py":
+            continue
         n_files += 1
+        fortran = path.suffix == ".f90"
         for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").split("\n"), 1):
             for word, pat in RETIRED:
-                if pat.search(line):
+                # In Fortran, a retired deck name is prose: a comment or a message. A local
+                # variable named like the old structure, beam_init%n_particle in a routine
+                # that takes beam_init, is code and stays.
+                text = fortran_prose(line) if fortran and word.startswith("namelist") else line
+                if pat.search(text):
                     hits.setdefault(word, []).append((path.relative_to(root), n, line.strip()))
     total = 0
     for word, _ in RETIRED:

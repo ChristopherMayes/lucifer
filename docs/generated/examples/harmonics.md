@@ -11,10 +11,10 @@ Everything on this page lives in and runs from `examples/harmonics/`.
 
 The example runs in one command, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
     python ../plot_fel.py harmonics.stats.h5
 
-This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (namelist `harmonics = 1, 3`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
+This is a strongly seeded steady-state run on a planar segment carrying two radiation fields (`field.harmonics = [1, 3]`): the fundamental at 1 Angstrom and a third harmonic at 1/3 Angstrom. The harmonic starts dark and grows from the bunching the fundamental drives. That is nonlinear harmonic generation, at three times the fundamental's growth rate, since P3 rides |b3|^2 and b3 grows as b1^3.
 
 The seed is 200 MW on 3.96 m of planar undulator at rms aw = 0.84853. Over the segment the fundamental gives up a small fraction of its seed power to the beam, and the third harmonic climbs from nothing through several decades. The measured quantities are in the table below. The exit power there is the fundamental's, and the harmonic's power along z is in the plot.
 
@@ -28,7 +28,7 @@ The run takes about a second.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | Unit |
+| Quantity | `lucifer.toml` | Unit |
 |---|---|---|
 | exit power | 1.8464e+08 | W |
 | exit power per slice | 1.8464e+08 | W |
@@ -72,34 +72,31 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "harmonics.bmad"
-  global%out_root = "harmonics"
-  global%source_filter = F   ! Compared against Genesis4, which has no such filter.
-  global%ran_seed = 12345
-/
+```toml
+lattice = "harmonics.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "harmonics"
+source_filter = false
+ran_seed = 12345
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%harmonics = 1, 3
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
 
-  wavefront_init%seed_power = 2e8
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 2e8
+seed_waist_size = 30e-6
+harmonics = [1, 3]
 ```
 
 ### `harmonics.bmad`

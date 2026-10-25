@@ -38,7 +38,7 @@ The binaries land in `build-release/bin`. `LUCIFER_BMAD_ROOT` can as well name a
 | document | what it answers |
 |---|---|
 | [`docs/user-guide.md`](docs/user-guide.md) | How do I build it, describe a run, and run it? |
-| [`docs/input-reference.md`](docs/input-reference.md) | What does this namelist parameter do, and what refuses it? |
+| [`docs/input-reference.md`](docs/input-reference.md) | What does this deck key do, and what refuses it? |
 | [`docs/reading-output.md`](docs/reading-output.md) | I have an output file. What is in it and how do I read it? |
 | [`docs/validation.md`](docs/validation.md) | What is checked, how, and at what measured level? |
 | [`docs/performance.md`](docs/performance.md) | Where does a run spend its time, on what machine? |
@@ -58,25 +58,25 @@ The FEL method is Bmad's own `fel_method` attribute, set on the element as any a
 | `averaged` | The wiggle-averaged (KMR) model on Bmad's own kernel maps: the production workhorse. |
 | `unaveraged` | Direct integration through the analytic undulator field, with no averaging and no resonance approximation. A production method whose ~30x cost buys full quiver dynamics, energy accounting the beam actually pays, polarization-agnostic coupling, and arbitrary harmonic content. Also an independent check on the averaged path, since the two share no approximation. |
 
-The averaged method's transverse maps have one more option behind them, the transcribed Genesis4 maps, selected for a whole run by `global%transport_model`. It is validation-internal and no production run sets it.
+The averaged method's transverse maps have one more option behind them, the transcribed Genesis4 maps, selected for a whole run by `run.transport_model`. It is validation-internal and no production run sets it.
 
 ## Running
 
 A run is one input file naming a lattice:
 
 ```
-lucifer lucifer.in
+lucifer lucifer.toml
 ```
 
-`lucifer.in` is the name the examples use by convention. It is an argument rather than a default, and any name works.
+`lucifer.toml` is the name the examples use by convention. It is an argument rather than a default, and any name works.
 
 The examples are the fastest way in. Each is a directory of real inputs with its own README and the numbers measured on it:
 
 ```
-cd examples/steady_state && ../../build-release/bin/lucifer lucifer.in
+cd examples/steady_state && ../../build-release/bin/lucifer lucifer.toml
 ```
 
-See [`docs/user-guide.md`](docs/user-guide.md) for the input file's three namelist groups, the lattice attributes, and what each output file is.
+See [`docs/user-guide.md`](docs/user-guide.md) for the deck's tables, the lattice attributes, and what each output file is.
 
 ## Where it stands
 

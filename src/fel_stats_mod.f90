@@ -17,7 +17,7 @@
 !            A per-slice plot cannot be drawn without it.
 !   params/  Every scalar as data: the window (lambda0, n_wavelength, slice_spacing,
 !            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
-!            Nothing a reader needs is left in the echoed namelist.
+!            Nothing a reader needs is left in the echoed deck.
 !   beam/    slice/ holds the per-record sufficient statistics, named as the
 !            bunch_params_struct components. They are enough to construct one from any
 !            (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 6, 6) at
@@ -1151,7 +1151,7 @@ e_s = pack(stats%z(1:ir), mask)
 ! holds z_global = z_local + beta_j*(islice-1)*spacing with the particle's beta. Since
 ! z = -beta*c*(t - t_ref), at a grid point t - t_ref = -(islice-1)*spacing/c and the
 ! beta cancels. fel_apply_slippage accumulates in radiation wavelengths and rotates the
-! record one slice at slicing%n_wavelength. The slippage rate (1+aw^2)/(2 gamma^2 lambda)
+! record one slice at window.n_wavelength. The slippage rate (1+aw^2)/(2 gamma^2 lambda)
 ! is exactly one wavelength per undulator period. So one slice is exactly n_wavelength
 ! wavelengths of slippage, and the rotation needs no interpolation. The light-travel
 ! distance is therefore the field's own coordinate.

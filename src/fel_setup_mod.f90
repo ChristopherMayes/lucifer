@@ -33,7 +33,7 @@ contains
 ! field-set allocation. Errors return through err_flag, and nothing here stops.
 !
 ! Input:
-!   run       -- fel_run_struct: Run state carrying the parsed namelist inputs and the lattice
+!   run       -- fel_run_struct: Run state carrying the deck's inputs and the lattice
 !                  file name.
 !
 ! Output:
@@ -125,13 +125,13 @@ if (run%global%unaveraged_ramp_periods == 0) &
 ! refused here, before anything reads it.
 
 if (run%slicing%n_wavelength < 0) then
-  call out_io (s_error$, r_name, 'SLICING%N_WAVELENGTH MUST BE 0, WHICH DERIVES IT FROM THE GAIN,', &
+  call out_io (s_error$, r_name, 'WINDOW.N_WAVELENGTH MUST BE 0, WHICH DERIVES IT FROM THE GAIN,', &
                'OR A POSITIVE INTEGER, GOT: ' // int_str(run%slicing%n_wavelength))
   err_flag = .true.;  return
 endif
 
-! bmad_com%radiation_damping_on and %radiation_fluctuations_on come straight from the
-! &fel_params namelist. They are Bmad's own switches, exposed directly as Tao exposes them.
+! bmad.radiation_damping_on and %radiation_fluctuations_on come straight from the
+! [bmad] table. They are Bmad's own switches, exposed directly as Tao exposes them.
 
 if (bmad_com%radiation_fluctuations_on .and. migrate) then
   call out_io (s_error$, r_name, 'RADIATION_FLUCTUATIONS DRAWS ONE KICK PER BEAMLET (THE QUIET START', &
@@ -224,7 +224,7 @@ enddo
 if (run%bparam%shot_noise .and. maxval(harmonics) > (run%bparam%beamlet_size - 1) / 2) then
   call out_io (s_error$, r_name, 'HARMONIC \i0\ IS ABOVE THE HIGHEST THE LOAD CARRIES SHOT ' // &
                'NOISE AT, WHICH IS (BEAMLET_SIZE - 1)/2 = \i0\ AT BEAMLET_SIZE = \i0\ .', &
-               'POSSIBLE SOLUTION: SET BEAM_INIT%BEAMLET_SIZE TO \i0\ OR MORE.', &
+               'POSSIBLE SOLUTION: SET BEAM.BEAMLET_SIZE TO \i0\ OR MORE.', &
                i_array = [maxval(harmonics), (run%bparam%beamlet_size - 1) / 2, &
                           run%bparam%beamlet_size, 2 * maxval(harmonics) + 1])
   err_flag = .true.;  return
@@ -885,12 +885,12 @@ sc_longrange = run%space_charge%longrange
 ! unknown one is refused rather than silently treated as the transcribed solver.
 
 if (run%chamber_wake%model /= 'genesis') then
-  call out_io (s_error$, r_name, 'CHAMBER_WAKE%MODEL MUST BE "genesis", GOT: ' // trim(run%chamber_wake%model))
+  call out_io (s_error$, r_name, 'WAKE.MODEL MUST BE "genesis", GOT: ' // trim(run%chamber_wake%model))
   err_flag = .true.;  return
 endif
 
 if (run%space_charge%model /= 'genesis') then
-  call out_io (s_error$, r_name, 'SPACE_CHARGE%MODEL MUST BE "genesis", GOT: ' // trim(run%space_charge%model))
+  call out_io (s_error$, r_name, 'SPACE_CHARGE.MODEL MUST BE "genesis", GOT: ' // trim(run%space_charge%model))
   err_flag = .true.;  return
 endif
 
@@ -901,14 +901,14 @@ endif
 ! that asks for space charge and gets none is the failure this refuses.
 
 if (sc_ngrid < 2) then
-  call out_io (s_error$, r_name, 'SPACE_CHARGE%NGRID IS THE RADIAL GRID''S POINT COUNT AND NEEDS AT ' // &
+  call out_io (s_error$, r_name, 'SPACE_CHARGE.NGRID IS THE RADIAL GRID''S POINT COUNT AND NEEDS AT ' // &
                'LEAST 2, GOT: ' // int_str(sc_ngrid), &
                'ONE POINT LEAVES NO WIDTH BETWEEN POINTS, AND THE SOLVE RETURNS ZERO.')
   err_flag = .true.;  return
 endif
 
 if (sc_nphi < 0) then
-  call out_io (s_error$, r_name, 'SPACE_CHARGE%NPHI IS THE HIGHEST AZIMUTHAL MODE AND CANNOT BE ' // &
+  call out_io (s_error$, r_name, 'SPACE_CHARGE.NPHI IS THE HIGHEST AZIMUTHAL MODE AND CANNOT BE ' // &
                'NEGATIVE, GOT: ' // int_str(sc_nphi), &
                'THE MODES RUN FROM -NPHI TO NPHI, WHICH IS NO MODES AT ALL BELOW ZERO, ' // &
                'AND THE SOLVE RETURNS ZERO.')
@@ -916,13 +916,13 @@ if (sc_nphi < 0) then
 endif
 
 if (sc_nz < 0) then
-  call out_io (s_error$, r_name, 'SPACE_CHARGE%NZ IS THE LONGITUDINAL HARMONIC COUNT AND CANNOT BE ' // &
+  call out_io (s_error$, r_name, 'SPACE_CHARGE.NZ IS THE LONGITUDINAL HARMONIC COUNT AND CANNOT BE ' // &
                'NEGATIVE, GOT: ' // int_str(sc_nz), 'ZERO DISABLES THE SHORT-RANGE SOLVE.')
   err_flag = .true.;  return
 endif
 
 if (sc_rmax < 0) then
-  call out_io (s_error$, r_name, 'SPACE_CHARGE%RMAX IS A RADIAL EXTENT AND CANNOT BE NEGATIVE, GOT: ' // &
+  call out_io (s_error$, r_name, 'SPACE_CHARGE.RMAX IS A RADIAL EXTENT AND CANNOT BE NEGATIVE, GOT: ' // &
                real_str(sc_rmax, 6), 'ZERO LETS THE SLICE''S OWN EXTENT SET THE SCALE.')
   err_flag = .true.;  return
 endif
@@ -949,8 +949,8 @@ if (sc_nz < 1 .and. .not. sc_longrange .and. bmad_com%csr_and_space_charge_on) t
     if (branch%ele(je)%space_charge_method /= slice$) cycle
     call out_io (s_error$, r_name, &
                  'SPACE_CHARGE_METHOD = SLICE IS SET ON ELEMENT ' // trim(branch%ele(je)%name) // ',', &
-                 'BUT NEITHER SPACE-CHARGE TERM IS CONFIGURED: SET SPACE_CHARGE%NZ >= 1 FOR THE', &
-                 'SHORT-RANGE HARMONICS, SPACE_CHARGE%LONGRANGE = T FOR THE LONG-RANGE TERM, OR BOTH.')
+                 'BUT NEITHER SPACE-CHARGE TERM IS CONFIGURED: SET SPACE_CHARGE.NZ >= 1 FOR THE', &
+                 'SHORT-RANGE HARMONICS, SPACE_CHARGE.LONGRANGE = T FOR THE LONG-RANGE TERM, OR BOTH.')
     err_flag = .true.;  return
   enddo
 endif
@@ -981,7 +981,7 @@ do je = 1, branch%n_ele_track
                    'INTERLUDE ONLY. THE BMAD SEAM TRACKS ONE SLICE AT A TIME THROUGH TRACK1_BUNCH, WHOSE', &
                    'OWN SPACE-CHARGE AND CSR PATHS NEED A CENTROID ORBIT THIS WALK DOES NOT CARRY, AND', &
                    'BMAD WOULD RETURN THE BUNCH UNTRACKED. SET THE METHOD ON THE FEL ELEMENTS ONLY, OR', &
-                   'TURN BMAD_COM%CSR_AND_SPACE_CHARGE_ON OFF.')
+                   'TURN BMAD.CSR_AND_SPACE_CHARGE_ON OFF.')
       err_flag = .true.;  return
     endif
   endif
@@ -1011,7 +1011,7 @@ if (.not. bmad_com%csr_and_space_charge_on) then
   if (n_ask > 0) then
     call out_io (s_info$, r_name, &
                  'Note: \i0\ element(s) set space_charge_method = slice, but ' // &
-                 'bmad_com%csr_and_space_charge_on', 'is false, so no space charge runs ' // &
+                 'bmad.csr_and_space_charge_on', 'is false, so no space charge runs ' // &
                  'anywhere. That combination is how a lattice runs without it.', &
                  i_array = [n_ask])
   endif
@@ -1080,7 +1080,7 @@ if (any(is_fel)) then
     ! lambda. Note: lambda/(4 dx) per unit xcut puts every edge four times wider than its
     ! name. On the generated path the grid comes from the input, the numbers the field was
     ! built from, and the conversion holds for every member of the field set. A field read
-    ! from field_file has the file's grid, whatever the deck states or leaves at zero. So
+    ! from field.file has the file's grid, whatever the deck states or leaves at zero. So
     ! the conversion is taken from the field itself. Taken from the deck it would be zero
     ! when the deck states no grid. Every cutoff would then be infinite, and the filter
     ! would pass every mode while the header named the angle asked for.
@@ -1281,7 +1281,7 @@ if (err_flag) return
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
 
-! The tracking window: global%track_start and track_end, with Tao's names and the role of
+! The tracking window: run.track_start and track_end, with Tao's names and the role of
 ! Genesis's zstop. It is resolved through Bmad's own locator. The schedule above was
 ! built on the full lattice, so a windowed run composes exactly with the full one. The
 ! walk covers [i_start, i_end], and no end-of-lattice fixup moves.

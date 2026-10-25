@@ -51,7 +51,7 @@ import sys
 import numpy as np
 
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 import pool
 
@@ -70,19 +70,19 @@ NGRID_SCAN = (64, 128, NGRID_REF)
 
 FAILED = False
 
-NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 2.4017e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.2e-9
-  beam_init%grid(3)%x_max = 1.2e-9
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 2048
+  beam.bunch_charge = 2.4017e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -1.2e-9
+  beam.z_max = 1.2e-9
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 0
   seed_waist_size = 30e-6
@@ -121,8 +121,8 @@ def check(name, value, lo, hi, note=""):
 
 
 def run(exe, wd, name, text, threads="4"):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
@@ -254,13 +254,13 @@ def main():
           r_meas / r_pred, 0.5, 2.0,
           note=f"(measured {r_meas:.2f}x vs predicted {r_pred:.2f}x)")
 
-    # 5. Damping on: both FEL modes honor bmad_com%radiation_damping_on.
+    # 5. Damping on: both FEL modes honor bmad.radiation_damping_on.
     #    Averaged: the full analytic rate, since its native debit is about 0.
     #    Unaveraged: the composite prediction. The explicit term integrates the ramp
     #    envelope, int g^2 ds = L - 2*(5/8)*l_ramp for the sin^2 ramps, and the
     #    grid-captured self-field work of step (4) adds on top
     #    (validation.md, val-spontaneous-emission-the-two).
-    print("--- bmad_com%radiation_damping_on, both FEL modes:")
+    print("--- bmad.radiation_damping_on, both FEL modes:")
     check("damping: averaged mode vs analytic, |ratio - 1|",
           abs(loss(wd, "sp_avg_d") / analytic - 1), 0.0, 5e-3)
     l_ramp = 2 * LAMBDA_U                       # unaveraged_ramp_periods default 2
@@ -275,7 +275,7 @@ def main():
     #    form. Bmad's own runge_kutta with fluctuations is the independent
     #    cross-reference. It sits 11% below the fit form, the spread between the two
     #    references' conventions, and the check holds that as a |ln| level.
-    print("--- bmad_com%radiation_fluctuations_on (cold beam):")
+    print("--- bmad.radiation_fluctuations_on (cold beam):")
     f_aw = 1.42 * AW + 1 / (1 + 1.5 * AW + 0.95 * AW**2)      # helical fit
     sig_an = np.sqrt(1.015e-27 * ku**3 * AW**2 * f_aw * GAMMA0**4 * L_UND)
     sig = {r: sigma_gamma(wd, r) for r in ("sp_avg_f", "sp_uv_f", "sp_rk_f")}

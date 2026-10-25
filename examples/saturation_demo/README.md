@@ -9,8 +9,8 @@ This is the Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), r
 | `sat_unavg.bmad` | two-line wrapper selecting `fel_method = unaveraged` |
 | `sat-prep.in` | Genesis4 deck that writes the shared initial dumps (no tracking) |
 | `sat-genesis.in` | the timed Genesis4 deck (same seed and ranks as the prep) |
-| `lucifer-avg.in` | Bmad averaged mode (the `bmad_standard` default) |
-| `lucifer-unavg.in` | Bmad unaveraged mode (~32x cost). The point is the same answer from raw dynamics |
+| `lucifer-avg.toml` | Bmad averaged mode (the `bmad_standard` default) |
+| `lucifer-unavg.toml` | Bmad unaveraged mode (~32x cost). The point is the same answer from raw dynamics |
 | `check_agreement.py` | exit powers must agree at the documented levels before timings mean anything |
 | `run.sh` | thin runner: prep, three timed runs (one external clock), check, PDF report |
 

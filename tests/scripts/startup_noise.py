@@ -32,12 +32,12 @@ The experiments, each a set of runs and one figure:
                 edge at the central cone and at the 3 urad cut, against the same runs with
                 the filter off. What the filter does to the power inside the mode is what
                 this measures.
-  h. tolerance  The filter's passband tolerance, global%source_filter_tolerance, swept at
+  h. tolerance  The filter's passband tolerance, run.source_filter_tolerance, swept at
                 one load while the reported split stays on the protected angle.
   i. cause      The cell-size exponent on one segment against the derived block sum, with
                 the step, the slice spacing, the half width and the plane each varied.
 
-Lucifer runs on the device by default (global%device = "metal"), with one CPU run at the
+Lucifer runs on the device by default (run.device = "metal"), with one CPU run at the
 sweep's smallest grid as the cross-check. Genesis runs on the CPU. Every run is cached
 in the work directory by its deck text, so a rerun costs only what changed. The figures
 and a JSON file of every number go to --out. This script is run on demand and never by
@@ -71,6 +71,7 @@ import datetime
 import re
 
 import h5py
+from lucifer.deck import to_toml
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -197,32 +198,32 @@ DUMP_ELES = ("UND##1", "UND##2", "UND##4", "UND##8", "UND##12")
 UND_END_RECORDS = {1: 0, 2: 4, 4: 12, 8: 28, 12: 44}   # record index of each undulator end
 SHARP_WIDTH = 0.05        # the source filter's sigmoid width where the edge is meant to be sharp
 
-DECK = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%comb_ds_save = -1
-  slicing%window_length = {slen:.6e}
-  slicing%n_wavelength = {sample}
+DECK = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.comb_ds_save = -1
+  window.window_length = {slen:.6e}
+  window.n_wavelength = {sample}
 {extra}/
 
-&fel_beam_init
-  beam_init%n_particle = {npart}
-  beam_init%bunch_charge = {charge:.12e}
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -{zhalf:.6e}
-  beam_init%grid(3)%x_max = {zhalf:.6e}
-  beam_init%sig_pz = {sigpz:.12e}
-  beam_init%a_norm_emit = {emit:.6e}
-  beam_init%b_norm_emit = {emit:.6e}
+[beam]
+  beam.n_particle = {npart}
+  beam.bunch_charge = {charge:.12e}
+  beam.z_distribution = "GRID"
+  beam.z_min = -{zhalf:.6e}
+  beam.z_max = {zhalf:.6e}
+  beam.sig_pz = {sigpz:.12e}
+  beam.a_norm_emit = {emit:.6e}
+  beam.b_norm_emit = {emit:.6e}
   shot_noise = T
   beamlet_size = {beamlet}
 /
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = {lam0:.12e}
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = {ngrid}
-  wavefront_init%grid_half_width = {half:.6e}
+[field]
+  field.lambda0 = {lam0:.12e}
+  field.seed_power = 0
+  field.grid_n_pts = {ngrid}
+  field.grid_half_width = {half:.6e}
 /
 """
 
@@ -276,22 +277,22 @@ fft_fieldsolver = {fft}
 # carries none and the filter is this program's default (fel-physics.md,
 # sec-source-filter). A deck that left it on would compare a filtered run with an
 # unfiltered one and read a difference of order one.
-LUCIFER_FROM_GENESIS = """&fel_params
-  lat_file = "aramis.bmad"
-  global%out_root = "{root}"
-  global%interlude_model = "genesis"
-  global%transport_model = "genesis"
-  global%source_filter = F
-  global%write_diag = T
-  slicing%n_wavelength = 3
+LUCIFER_FROM_GENESIS = """[run]
+  lattice = "aramis.bmad"
+  run.out_root = "{root}"
+  run.interlude_model = "genesis"
+  run.transport_model = "genesis"
+  run.source_filter = F
+  run.write_diag = T
+  window.n_wavelength = 3
 /
-&fel_beam_init
-  beam_file = "{gen}-initial.beam.h5"
+[beam]
+  beam.file = "{gen}-initial.beam.h5"
   beamlet_size = 8
 /
-&fel_wavefront_init
-  field_file = "{gen}-initial.wf.h5"
-  wavefront_init%lambda0 = 1e-10
+[field]
+  field.file = "{gen}-initial.wf.h5"
+  field.lambda0 = 1e-10
 /
 """
 
@@ -318,21 +319,21 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
     charge = CURRENT * slen / C_LIGHT
     extra = more
     if device != "off":
-        extra += f'  global%device = "{device}"\n'
+        extra += f'  run.device = "{device}"\n'
     if xcut is None:
-        extra += '  global%source_filter = F\n'      # An unset filter is on, and this page's
+        extra += '  run.source_filter = F\n'      # An unset filter is on, and this page's
                                                       # unfiltered rows are the comparison.
     elif xcut == "default":
-        extra += '  global%source_filter = T\n'
+        extra += '  run.source_filter = T\n'
     else:
-        extra += ('  global%source_filter = T\n'
-                  f'  global%source_filter_xcut = {xcut:.9f}\n'
-                  f'  global%source_filter_ycut = {xcut:.9f}\n'
-                  f'  global%source_filter_width = {width:.9f}\n')
+        extra += ('  run.source_filter = T\n'
+                  f'  run.source_filter_xcut = {xcut:.9f}\n'
+                  f'  run.source_filter_ycut = {xcut:.9f}\n'
+                  f'  run.source_filter_width = {width:.9f}\n')
     if tolerance is not None:
-        extra += f'  global%source_filter_tolerance = {tolerance:.9f}\n'
+        extra += f'  run.source_filter_tolerance = {tolerance:.9f}\n'
     if dumps:
-        extra += "  global%dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
+        extra += "  run.dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
     return DECK.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
                        charge=charge, zhalf=slen / 2, slen=slen, sample=sample, extra=extra,
                        lam0=LAMBDA0, sigpz=SIG_PZ, emit=NORM_EMIT,
@@ -358,7 +359,7 @@ class Runner:
         digest = hashlib.sha256(text.encode()).hexdigest()
         if stamp.exists() and stamp.read_text().strip() == digest:
             return False
-        deck.write_text(text)
+        deck.write_text(to_toml(text))
         env = {"OMP_NUM_THREADS": env_threads or self.threads, "PATH": os.environ["PATH"],
                "HOME": os.environ.get("HOME", "")}
         with open(self.wd / f"{name}.log", "w") as log:
@@ -696,7 +697,7 @@ def exp_tolerance(rn, args, lat, results):
 
     An edge at the protected angle itself puts the sigmoid's half-amplitude point on it
     and takes three quarters of the source intensity there.
-    global%source_filter_tolerance names the largest loss allowed inside that angle and
+    run.source_filter_tolerance names the largest loss allowed inside that angle and
     moves the edge out to hold it. This experiment sweeps it while the reported split
     stays on the protected angle, so every row is measured against one acceptance.
 
@@ -1083,7 +1084,7 @@ def exp_cause(rn, args, results):
     for ng in (128, 256):
         root = f"cause_plane_g{ng}"
         one(root, lat1, ng, LONG[1], HALF_WIDTH, 0.045, dumps=(),
-            more=f"  global%dump_at_comb = T\n  global%comb_ds_save = {CAUSE_PLANE_COMB}\n")
+            more=f"  run.dump_at_comb = T\n  run.comb_ds_save = {CAUSE_PLANE_COMB}\n")
         rows = cause_frames(rn.wd, root, cut)
         zs = [r["z"] for r in rows]
         pred = [cause_model(ng, HALF_WIDTH, 0.045, LONG[1], z, cut)[0] if z > 0 else 0.0 for z in zs]
@@ -1094,7 +1095,7 @@ def exp_cause(rn, args, results):
     (rn.wd / lat).write_text(f"call, file = {lat1}\nUND[l] = {CAUSE_STAIR_LENGTH}\n")
     root = "cause_stair_g256"
     one(root, lat, 256, LONG[1], HALF_WIDTH, 0.045, dumps=(),
-        more="  global%dump_at_comb = T\n  global%comb_ds_save = 0\n")
+        more="  run.dump_at_comb = T\n  run.comb_ds_save = 0\n")
     rows = cause_frames(rn.wd, root, cut)
     res["stair"] = {"z": [r["z"] for r in rows], "out": [r[key_out] for r in rows]}
 

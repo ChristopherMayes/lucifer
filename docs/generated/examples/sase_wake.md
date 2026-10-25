@@ -11,7 +11,7 @@ Everything on this page lives in and runs from `examples/sase_wake/`.
 
 The example runs in one command, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
     python ../plot_fel.py sase_wake.stats.h5
 
 This is the `../sase` run through a deliberately narrow copper chamber of 0.5 mm radius, with the undulator gap wake and a 100 nm rough surface added. All three wake families are transcribed from Genesis 1.3 Version 4 (Genesis4) and act as a per-slice energy-loss rate. The resistive wall acts through the numerical impedance of Bane and Stupakov, the gap wake is convolved with dI/ds, and roughness acts through the complex-q contour (the manual's [wakes section](../../fel-physics.md)).
@@ -30,7 +30,7 @@ The run takes about half a minute.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | Unit |
+| Quantity | `lucifer.toml` | Unit |
 |---|---|---|
 | exit power | 2.7890e+07 | W |
 | exit power per slice | 2.9052e+05 | W |
@@ -79,42 +79,41 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "sase_wake"
+```toml
+lattice = "../aramis.bmad"
 
-  chamber_wake%on = T
-  chamber_wake%radius = 0.5e-3
-  chamber_wake%material = "CU"
-  chamber_wake%gap = 0.5e-3
-  chamber_wake%lgap = 0.015
-  chamber_wake%hrough = 100e-9
-  chamber_wake%lrough = 100e-6
-  slicing%window_length = 2.88e-8
-  slicing%n_wavelength = 3
-/
+[run]
+out_root = "sase_wake"
 
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 2.881993782512e-13
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.44e-8
-  beam_init%grid(3)%x_max =  1.44e-8
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  shot_noise = T
-/
+[window]
+window_length = 2.88e-8
+n_wavelength = 3
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[beam]
+n_particle = 2048
+bunch_charge = 2.881993782512e-13
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.44e-8
+z_max = 1.44e-8
+shot_noise = true
 
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0
 
-/
+[wake]
+on = true
+radius = 0.5e-3
+material = "CU"
+gap = 0.5e-3
+lgap = 0.015
+hrough = 100e-9
+lrough = 100e-6
 ```

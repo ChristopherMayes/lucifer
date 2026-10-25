@@ -11,7 +11,7 @@ Everything on this page lives in and runs from `examples/crossed_undulator/`.
 
 An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulator rotated a quarter turn, `UNDY: UNDX, tilt = pi/2`, follows after a short gap. The tilt is standard Bmad, and it is what states the polarization. Microbunching is longitudinal and blind to polarization, so the y set radiates orthogonally polarized light seeded by the bunching the x set built. The x field passes through the y set gaining nothing, and the benchmark holds that isolation at the level in [](../../validation.md#val-levels-two-polarization) (the manual's field-solver vector convention).
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
     python ../plot_fel.py crossed.stats.h5
 
 With a 1 MW x seed, a 0.6 m x-set, a 0.2 m gap and a 0.6 m y-set, P_x is flat through the y-set to five digits, while P_y climbs from nothing on the microbunching the x-set left behind. The measured quantities are in the table below, the total exit power and the power inside the split angle among them, and the plot carries P_y along z. The tilted undulator cannot amplify the orthogonal component. It only diffracts it. `plot_fel.py` shows this in its polarization panel, which is present only when a run carries two components, and that figure is this example's page in the documentation.
@@ -22,7 +22,7 @@ The outputs are `crossed-final.wf.h5`, an openPMD EXT_Wavefront file carrying bo
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | Unit |
+| Quantity | `lucifer.toml` | Unit |
 |---|---|---|
 | exit power | 1.0000e+06 | W |
 | exit power per slice | 1.0000e+06 | W |
@@ -70,32 +70,30 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "run_lattice.bmad"
-  global%out_root = "crossed"
-  global%ran_seed = 4242
-/
+```toml
+lattice = "run_lattice.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  beamlet_size = 8
-/
+[run]
+out_root = "crossed"
+ran_seed = 4242
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 1e6
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 2048
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-05
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+beamlet_size = 8
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 1e6
+seed_waist_size = 30e-6
 ```
 
 ### `crossed.bmad`

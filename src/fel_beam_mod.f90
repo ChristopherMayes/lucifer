@@ -369,7 +369,7 @@ end function fel_theta
 ! patch per slice. So a different patch count means the deck and the file describe
 ! different runs, and the run is refused. Pass -1 when the deck states no window, the
 ! usual case for a restart, and the file's patch count defines it. A bunch that is not a
-! sliced window belongs on the bunch path (beam_init%position_file). That path slices it
+! sliced window belongs on the bunch path (beam.position_file). That path slices it
 ! by load_mode instead of assuming a slicing the bunch does not carry.
 !
 ! Neither beamlet_size nor one4one is read. one4one says every macroparticle carries one
@@ -578,7 +578,7 @@ exists = (g_id >= 0)
 if (.not. cont) then
   if (exists) then
     call out_io (s_info$, r_name, 'The beam file carries a checkpoint group, ignored: ' // &
-         'global%continuation is off, so the run starts from the standard records with phi0 at zero.')
+         'run.continuation is off, so the run starts from the standard records with phi0 at zero.')
     call H5Gclose_f (g_id, h5_err)
   endif
   call h5fclose_f (f_id, h5_err)
@@ -860,7 +860,7 @@ end subroutine fel_assert_not_interior_frame
 ! dump.
 !
 ! Input:
-!   file_name -- character(*): The file the deck names as beam_file.
+!   file_name -- character(*): The file the deck names as beam.file.
 !
 ! Output:
 !   err_flag  -- logical: Set True if the file opens and holds no checkpoint group.
@@ -1499,7 +1499,7 @@ if (floor_b2 > 0.01_rp / n_lambda) then
   call out_io (s_error$, r_name, 'SLICE \i0\ : THE LOAD IS NOT QUIET ENOUGH TO CARRY SHOT NOISE:', &
                'MAX_H |B(H)|^2 * N_LAMBDA = \es10.2\ AGAINST THE PHYSICAL LEVEL OF 1. IMPOSING', &
                'NOISE ON IT WOULD COUNT THE NOISE TWICE.', &
-               'POSSIBLE SOLUTION: quiet_start = T LETS THE LOADER QUIETEN IT FIRST, OR shot_noise = F', &
+               'POSSIBLE SOLUTION: quiet_start = true LETS THE LOADER QUIETEN IT FIRST, OR shot_noise = false', &
                'TAKES THE BEAM WITH THE NOISE IT ALREADY CARRIES.', &
                i_array = [islice], r_array = [floor_n_lambda])
   return

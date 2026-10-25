@@ -11,7 +11,7 @@
 #   ./device_table.sh [--exe <path>] [--workers N] [--work-dir <path>]
 #
 # The production lucifer is preferred, found as in run_fel_benchmark.sh. The work
-# directory is kept. The decks are the *.in files beside this script, and the lattice
+# directory is kept. The decks are the *.toml files beside this script, and the lattice
 # comes from tests/bmad. A build with no device backend refuses the device runs, which
 # this script reports and stops on.
 set -o pipefail
@@ -71,21 +71,18 @@ status=0
 for c in $CASES; do
   best_cpu=""; best_dev=""; busy=""
   for rep in 1 2 3; do
-    sed "s/global%out_root = \"$c\"/global%out_root = \"${c}_cpu$rep\"/" "$SCRIPT_DIR/$c.in" > "${c}_cpu$rep.in"
-    if ! env OMP_NUM_THREADS="$WORKERS" "$EXE" "${c}_cpu$rep.in" > "${c}_cpu$rep.log" 2>&1; then
+    sed "s/^out_root = \"$c\"/out_root = \"${c}_cpu$rep\"/" "$SCRIPT_DIR/$c.toml" > "${c}_cpu$rep.toml"
+    if ! env OMP_NUM_THREADS="$WORKERS" "$EXE" "${c}_cpu$rep.toml" > "${c}_cpu$rep.log" 2>&1; then
       echo "  $c: the CPU run failed; see $WORK_DIR/${c}_cpu$rep.log" >&2; status=1; continue
     fi
     w="$(walk_of "${c}_cpu$rep.log")"
     if [[ -z "$best_cpu" ]] || awk -v a="$w" -v b="$best_cpu" 'BEGIN { exit !(a < b) }'; then best_cpu="$w"; fi
   done
   for rep in 1 2 3; do
-    { sed "s/global%out_root = \"$c\"/global%out_root = \"${c}_dev$rep\"/" "$SCRIPT_DIR/$c.in" | \
-      sed 's/^\/$/XXSLASH/' ; } > "${c}_dev$rep.tmp"
-    # The device switch goes into &fel_params, the first group, before its closing slash.
-    awk 'BEGIN{done=0} /^XXSLASH$/ && !done {print "  global%device = \"metal\""; done=1} {sub(/^XXSLASH$/, "/"); print}' \
-      "${c}_dev$rep.tmp" > "${c}_dev$rep.in"
-    rm -f "${c}_dev$rep.tmp"
-    if ! env OMP_NUM_THREADS="$WORKERS" "$EXE" "${c}_dev$rep.in" > "${c}_dev$rep.log" 2>&1; then
+    # The device switch goes into [run], right after the table's heading.
+    sed "s/^out_root = \"$c\"/out_root = \"${c}_dev$rep\"/; s/^\[run\]$/[run]\ndevice = \"metal\"/" \
+      "$SCRIPT_DIR/$c.toml" > "${c}_dev$rep.toml"
+    if ! env OMP_NUM_THREADS="$WORKERS" "$EXE" "${c}_dev$rep.toml" > "${c}_dev$rep.log" 2>&1; then
       echo "  $c: the device run failed; see $WORK_DIR/${c}_dev$rep.log" >&2; status=1; continue
     fi
     w="$(walk_of "${c}_dev$rep.log")"

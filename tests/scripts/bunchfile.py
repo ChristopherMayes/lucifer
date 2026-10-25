@@ -1,5 +1,5 @@
 """
-Read and write the openPMD-beamphysics bunch files Bmad's beam_init%position_file reads.
+Read and write the openPMD-beamphysics bunch files Bmad's beam.position_file reads.
 
 A bunch file is one iteration, one species, every particle against the file's one time
 reference: what Bmad's hdf5_write_beam writes and hdf5_read_beam reads. The tracker's own

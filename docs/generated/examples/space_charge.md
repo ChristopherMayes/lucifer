@@ -11,17 +11,17 @@ Everything on this page lives in and runs from `examples/space_charge/`.
 
 The example runs in four commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_off.in
-    ../../../production/bin/lucifer lucifer_short_range.in
-    ../../../production/bin/lucifer lucifer_gate_off.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_off.in
+    ../../build-release/bin/lucifer lucifer_short_range.in
+    ../../build-release/bin/lucifer lucifer_gate_off.in
     python ../plot_fel.py space_charge.stats.h5
 
 Space charge enters the pendulum equation as a per-particle `ez`, from per-slice radial-harmonic solves plus a whole-window long-range term (the manual's [space-charge section](../../fel-physics.md)). The two terms answer different questions, so this example measures them separately.
 
-The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad_com%csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so `space_charge_com%n_bin` plays no part in it. `space_charge%` in the deck holds the solver's numbers and nothing about whether it runs.
+The elements say where it acts. `sc_line.bmad` calls the shared lattice and sets Bmad's own attribute on the undulators, `wiggler::*[SPACE_CHARGE_METHOD] = slice`, and the decks turn on Bmad's master switch, `bmad.csr_and_space_charge_on`. The FEL slices are the bins the solve uses, so Bmad's `space_charge_com` `n_bin`, set in the lattice file plays no part in it. `space_charge.` in the deck holds the solver's numbers and nothing about whether it runs.
 
-`lucifer.in` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that. With space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
+`lucifer.toml` and `lucifer_off.in` isolate the long-range term on a cold dark beam: a 4 nm Gaussian bunch at 3 kA peak, no seed and no shot noise, so space charge is the only channel that can change any particle's energy. The control run is the proof of that. With space charge off, every slice's mean energy is unchanged to the last bit over 57 m.
 
 The measured quantities of the four decks are in the table below, the head-to-tail span of the slice mean energies at the exit among them, with the control run's exact zero beside it. The long-range term gives all of the span, and the two short-range harmonics the deck sets give none of it.
 
@@ -31,7 +31,7 @@ The chirp matters at this size. Relative to the beam energy the span is more tha
 
 The short-range harmonics measure exactly zero here, which is correct. They act on the density structure inside a slice, and a quiet-start dark beam has none, since the initial bunching sits at the quiet start's floor. `lucifer_short_range.in` gives them something to act on, by matching the `../steady_state` deck parameter for parameter and adding `nz = 4, nphi = 1`. Against that run as its control, whose exit power and bunching its own page carries, the short-range deck's exit power is higher by about half a percent. That rise comes past saturation, from the short-range term acting on a beam the FEL has bunched.
 
-Two configurations are refused. `slice` with neither term configured, `nz = 0` and `longrange = F`, is refused, since the solve would run at its full cost and return an exact zero. `fft_3d` on an FEL element is refused, since that solver wants a three-dimensional grid this walk does not build.
+Two configurations are refused. `slice` with neither term configured, `nz = 0` and `longrange = false`, is refused, since the solve would run at its full cost and return an exact zero. `fft_3d` on an FEL element is refused, since that solver wants a three-dimensional grid this walk does not build.
 
 The master switch off while the elements still ask for `slice` is not refused, because that is how a lattice is run without space charge and without editing it. `lucifer_gate_off.in` is that case: the same lattice, the same solver numbers, the switch false. The run prints a note saying so and tracks without space charge, measured as exactly the control run's zero.
 
@@ -43,7 +43,7 @@ Each run takes about seven seconds.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_gate_off.in` | `lucifer_off.in` | `lucifer_short_range.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_gate_off.toml` | `lucifer_off.toml` | `lucifer_short_range.toml` | Unit |
 |---|---|---|---|---|---|
 | exit power | 1.8401e-15 | 1.2618e-15 | 1.2618e-15 | 8.0572e+08 | W |
 | exit power per slice | 2.3002e-17 | 1.5773e-17 | 1.5773e-17 | 8.0572e+08 | W |
@@ -92,127 +92,135 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "sc_line.bmad"
-  global%out_root = "space_charge"
+```toml
+lattice = "sc_line.bmad"
 
-  bmad_com%csr_and_space_charge_on = T
-  space_charge%rmax = 250e-6
-  space_charge%nz = 2
-  space_charge%nphi = 1
-  space_charge%longrange = T
-  slicing%window_length = 2.4e-8
-  slicing%n_wavelength = 3
-/
+[run]
+out_root = "space_charge"
 
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.003345e-13
-  beam_init%sig_z = 4e-9
-  beam_init%sig_pz = 0
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[window]
+window_length = 2.4e-8
+n_wavelength = 3
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 512
+bunch_charge = 1.003345e-13
+sig_z = 4e-9
+sig_pz = 0
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0
+
+[space_charge]
+rmax = 250e-6
+nz = 2
+nphi = 1
+longrange = true
+
+[bmad]
+csr_and_space_charge_on = true
 ```
 
-### `lucifer_gate_off.in`
+### `lucifer_gate_off.toml`
 
-```fortran
-&fel_params
-  lat_file = "sc_line.bmad"
-  global%out_root = "gate_off"
+```toml
+lattice = "sc_line.bmad"
 
-  bmad_com%csr_and_space_charge_on = F
-  space_charge%rmax = 250e-6
-  space_charge%nz = 2
-  space_charge%nphi = 1
-  space_charge%longrange = T
-  slicing%window_length = 2.4e-8
-  slicing%n_wavelength = 3
-/
+[run]
+out_root = "gate_off"
 
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.003345e-13
-  beam_init%sig_z = 4e-9
-  beam_init%sig_pz = 0
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[window]
+window_length = 2.4e-8
+n_wavelength = 3
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 512
+bunch_charge = 1.003345e-13
+sig_z = 4e-9
+sig_pz = 0
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0
+
+[space_charge]
+rmax = 250e-6
+nz = 2
+nphi = 1
+longrange = true
+
+[bmad]
+csr_and_space_charge_on = false
 ```
 
-### `lucifer_off.in`
+### `lucifer_off.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "sc_off"
-  slicing%window_length = 2.4e-8
-  slicing%n_wavelength = 3
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.003345e-13
-  beam_init%sig_z = 4e-9
-  beam_init%sig_pz = 0
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "sc_off"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 2e-4
-/
+[window]
+window_length = 2.4e-8
+n_wavelength = 3
+
+[beam]
+n_particle = 512
+bunch_charge = 1.003345e-13
+sig_z = 4e-9
+sig_pz = 0
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0
 ```
 
-### `lucifer_short_range.in`
+### `lucifer_short_range.toml`
 
-```fortran
-&fel_params
-  lat_file = "sc_line.bmad"
-  global%out_root = "short_range"
-  bmad_com%csr_and_space_charge_on = T
-  space_charge%rmax = 250e-6
-  space_charge%nz = 4
-  space_charge%nphi = 1
-/
+```toml
+lattice = "sc_line.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "short_range"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
+
+[space_charge]
+rmax = 250e-6
+nz = 4
+nphi = 1
+
+[bmad]
+csr_and_space_charge_on = true
 ```
 
 ### `sc_line.bmad`

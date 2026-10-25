@@ -42,6 +42,7 @@ Usage:
   check_source_filter.py --exe <lucifer> --workdir <dir> [--tol <rel>]
 """
 
+from lucifer.deck import to_toml
 import argparse
 import pathlib
 import re
@@ -63,26 +64,26 @@ ROOT = "AramisTDSASEF"
 # and load_genesis_out already agree on.
 SHORT = "UND##2"
 
-NML = """&fel_params
-  lat_file = "aramis.bmad"
-  global%out_root = "{root}"
-  global%interlude_model = "genesis"
-  global%transport_model = "genesis"
-  global%write_diag = T
-  global%source_filter = {on}
-  global%source_filter_xcut = {xcut}
-  global%source_filter_ycut = {xcut}
-  global%source_filter_width = 1
-  global%source_filter_mutate = {mutate}
-  slicing%n_wavelength = {sample}
+NML = """[run]
+  lattice = "aramis.bmad"
+  run.out_root = "{root}"
+  run.interlude_model = "genesis"
+  run.transport_model = "genesis"
+  run.write_diag = T
+  run.source_filter = {on}
+  run.source_filter_xcut = {xcut}
+  run.source_filter_ycut = {xcut}
+  run.source_filter_width = 1
+  run.source_filter_mutate = {mutate}
+  window.n_wavelength = {sample}
 {end}/
-&fel_beam_init
-  beam_file = "{dumps}-initial.beam.h5"
+[beam]
+  beam.file = "{dumps}-initial.beam.h5"
   beamlet_size = 8
 /
-&fel_wavefront_init
-  field_file = "{dumps}-initial.wf.h5"
-  wavefront_init%lambda0 = {lam:.12e}
+[field]
+  field.file = "{dumps}-initial.wf.h5"
+  field.lambda0 = {lam:.12e}
 /
 """
 
@@ -99,10 +100,10 @@ def window(par):
 
 def run(exe, wd, root, lam, sample, on="T", xcut=1.0, mutate="F", track_end=""):
     """One lucifer run in the work directory. Returns its diag file."""
-    nml = wd / f"{root}.nml"
-    end = f'  global%track_end = "{track_end}"\n' if track_end else ""
-    nml.write_text(NML.format(root=root, dumps=ROOT, lam=lam, sample=sample,
-                              on=on, xcut=xcut, mutate=mutate, end=end))
+    nml = wd / f"{root}.toml"
+    end = f'  run.track_end = "{track_end}"\n' if track_end else ""
+    nml.write_text(to_toml(NML.format(root=root, dumps=ROOT, lam=lam, sample=sample,
+                              on=on, xcut=xcut, mutate=mutate, end=end)))
     log = wd / f"fel-{root}.log"
 
     # Four threads, the same cap check_device.py takes. The two benchmark passes run this
@@ -131,25 +132,25 @@ def level(diag, out, nslice):
     return worst, exit_rel, float(gp[-1].sum()), float(fp[-1].sum())
 
 
-REFUSE = """&fel_params
-  lat_file = "aramis_1seg.bmad"
-  global%out_root = "sfref"
-  global%source_filter = T
+REFUSE = """[run]
+  lattice = "aramis_1seg.bmad"
+  run.out_root = "sfref"
+  run.source_filter = T
 {extra}/
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+[beam]
+  beam.n_particle = 512
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 /
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 64
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = 1e-10
+  field.seed_power = 5e3
+  field.seed_waist_size = 30e-6
+  field.grid_n_pts = 64
+  field.grid_half_width = 2e-4
 /
 """
 
@@ -161,17 +162,18 @@ def refusals(exe, wd):
     A soft width that attenuates the axis removes half the physical seed with nothing in
     the output saying so. The angle together with the grid-relative cuts has no meaning,
     since one is a property of the physics and the other of the mesh. A negative angle is
-    not an angle.
+    not an angle, and the deck reader refuses it from the schema's bound, as it refuses
+    a tolerance outside (0, 1), before setup is reached.
     """
     ok = True
     for extra, want, what in (
-        ("  global%source_filter_width = 1\n", "ON AXIS", "a width that attenuates the axis"),
-        ('  global%source_filter_angle = 3e-6\n  global%source_filter_xcut = 1\n',
+        ("  run.source_filter_width = 1\n", "ON AXIS", "a width that attenuates the axis"),
+        ('  run.source_filter_angle = 3e-6\n  run.source_filter_xcut = 1\n',
          "ARE BOTH SET", "the angle and the cut together"),
-        ("  global%source_filter_angle = -1e-6\n", "MUST BE POSITIVE", "a negative angle"),
+        ("  run.source_filter_angle = -1e-6\n", "OUTSIDE ITS RANGE", "a negative angle"),
     ):
-        (wd / "sfref.nml").write_text(REFUSE.format(extra=extra))
-        r = subprocess.run([exe, "sfref.nml"], cwd=wd, capture_output=True, text=True)
+        (wd / "sfref.toml").write_text(to_toml(REFUSE.format(extra=extra)))
+        r = subprocess.run([exe, "sfref.toml"], cwd=wd, capture_output=True, text=True)
         good = r.returncode != 0 and want in r.stdout
         print(f"  refused, {what}: {'ok' if good else 'MISSED'}")
         record(f"refused, {what}", None, None, "bool", good)
@@ -191,12 +193,12 @@ def containment(exe, wd):
     Gaussian and nothing else. Containing it is the stronger statement in any case, since
     the gain-guided mode that grows out of it is narrower than the seed.
     """
-    deck = REFUSE.replace('lat_file = "aramis_1seg.bmad"', 'lat_file = "aramis.bmad"')
-    deck = deck.replace("beam_init%n_particle = 512", "beam_init%n_particle = 2048")
-    deck = deck.replace('global%out_root = "sfref"', 'global%out_root = "sfcont"')
-    deck = deck.replace("  global%source_filter = T\n", "")
-    (wd / "sfcont.nml").write_text(deck.format(extra=""))
-    r = subprocess.run([exe, "sfcont.nml"], cwd=wd, capture_output=True, text=True)
+    deck = REFUSE.replace('lattice = "aramis_1seg.bmad"', 'lattice = "aramis.bmad"')
+    deck = deck.replace("beam.n_particle = 512", "beam.n_particle = 2048")
+    deck = deck.replace('run.out_root = "sfref"', 'run.out_root = "sfcont"')
+    deck = deck.replace("  run.source_filter = T\n", "")
+    (wd / "sfcont.toml").write_text(to_toml(deck.format(extra="")))
+    r = subprocess.run([exe, "sfcont.toml"], cwd=wd, capture_output=True, text=True)
     if r.returncode != 0:
         print(f"FAIL: containment run exited {r.returncode}:\n{r.stdout[-1500:]}", file=sys.stderr)
         return False
@@ -227,9 +229,9 @@ def edge_margin(tol, width):
 
 def tolerance_run(exe, wd, extra, root="sftol"):
     """One short run with extra namelist lines. Returns its result and stdout."""
-    deck = REFUSE.replace('global%out_root = "sfref"', f'global%out_root = "{root}"')
-    (wd / f"{root}.nml").write_text(deck.format(extra=extra))
-    return subprocess.run([exe, f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+    deck = REFUSE.replace('run.out_root = "sfref"', f'run.out_root = "{root}"')
+    (wd / f"{root}.toml").write_text(to_toml(deck.format(extra=extra)))
+    return subprocess.run([exe, f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                           env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
 
 
@@ -255,9 +257,9 @@ def tolerance(exe, wd):
     protected = None
     for extra, tol, what in (
         ("", 0.75, "left unset"),
-        ("  global%source_filter_tolerance = 0.75\n", 0.75, "stated as 0.75"),
-        ("  global%source_filter_tolerance = 0.2\n", 0.2, "stated as 0.2"),
-        ("  global%source_filter_tolerance = 0.01\n", 0.01, "stated as 0.01"),
+        ("  run.source_filter_tolerance = 0.75\n", 0.75, "stated as 0.75"),
+        ("  run.source_filter_tolerance = 0.2\n", 0.2, "stated as 0.2"),
+        ("  run.source_filter_tolerance = 0.01\n", 0.01, "stated as 0.01"),
     ):
         r = tolerance_run(exe, wd, extra)
         m = EDGE_LINE.search(r.stdout.replace("\n", " ")) if r.returncode == 0 else None
@@ -286,7 +288,7 @@ def tolerance(exe, wd):
 
     angles = []
     for tol in (0.75, 0.2, 0.01):
-        tolerance_run(exe, wd, f"  global%source_filter_tolerance = {tol}\n")
+        tolerance_run(exe, wd, f"  run.source_filter_tolerance = {tol}\n")
         with h5py.File(wd / "sftol.stats.h5") as h:
             angles.append(float(np.ravel(h["field/total/split_angle"][()])[0]))
     spread = max(angles) - min(angles)
@@ -301,11 +303,11 @@ def tolerance(exe, wd):
     # The range is therefore checked before anything takes a logarithm.
 
     for extra, want, what in (
-        ("  global%source_filter_tolerance = 0\n", "MUST LIE STRICTLY", "a tolerance of zero"),
-        ("  global%source_filter_tolerance = 1\n", "MUST LIE STRICTLY", "a tolerance of one"),
-        ("  global%source_filter_tolerance = 1.5\n", "MUST LIE STRICTLY", "a tolerance above one"),
-        ("  global%source_filter_tolerance = -0.1\n", "MUST LIE STRICTLY", "a negative tolerance"),
-        ("  global%source_filter_tolerance = 0.01\n  global%source_filter_width = 0.217\n",
+        ("  run.source_filter_tolerance = 0\n", "OUTSIDE ITS RANGE", "a tolerance of zero"),
+        ("  run.source_filter_tolerance = 1\n", "OUTSIDE ITS RANGE", "a tolerance of one"),
+        ("  run.source_filter_tolerance = 1.5\n", "OUTSIDE ITS RANGE", "a tolerance above one"),
+        ("  run.source_filter_tolerance = -0.1\n", "OUTSIDE ITS RANGE", "a negative tolerance"),
+        ("  run.source_filter_tolerance = 0.01\n  run.source_filter_width = 0.217\n",
          "IS TOO LARGE FOR", "a width too large for the tolerance"),
     ):
         r = tolerance_run(exe, wd, extra)
@@ -319,8 +321,8 @@ def tolerance(exe, wd):
     # margin of 0.60 and is an edge the run can build, so forming 1 - amplitude directly
     # would divide by zero on an input the run has to accept.
 
-    r = tolerance_run(exe, wd, "  global%source_filter_tolerance = 1e-17\n"
-                               "  global%source_filter_width = 0.01\n")
+    r = tolerance_run(exe, wd, "  run.source_filter_tolerance = 1e-17\n"
+                               "  run.source_filter_width = 0.01\n")
     m = EDGE_LINE.search(r.stdout.replace("\n", " ")) if r.returncode == 0 else None
     if m is None:
         print(f"FAIL: a tolerance of 1e-17 at a width of 0.01 is feasible and did not "
@@ -341,10 +343,10 @@ def tolerance(exe, wd):
     # edge the deck placed itself.
 
     for extra, what in (
-        ("  global%source_filter_tolerance = 0.01\n  global%source_filter_angle = 5e-6\n",
+        ("  run.source_filter_tolerance = 0.01\n  run.source_filter_angle = 5e-6\n",
          "a stated angle"),
-        ("  global%source_filter_tolerance = 0.01\n  global%source_filter_xcut = 1\n"
-         "  global%source_filter_ycut = 1\n  global%source_filter_width = 1\n",
+        ("  run.source_filter_tolerance = 0.01\n  run.source_filter_xcut = 1\n"
+         "  run.source_filter_ycut = 1\n  run.source_filter_width = 1\n",
          "stated cuts"),
     ):
         r = tolerance_run(exe, wd, extra)
@@ -357,25 +359,25 @@ def tolerance(exe, wd):
     return ok
 
 
-SCOPE = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%source_filter = {on}
+SCOPE = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.source_filter = {on}
 {extra}/
-&fel_beam_init
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+[beam]
+  beam.n_particle = 512
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 /
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 64
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = 1e-10
+  field.seed_power = 5e3
+  field.seed_waist_size = 30e-6
+  field.grid_n_pts = 64
+  field.grid_half_width = 2e-4
 /
 """
 
@@ -402,25 +404,25 @@ def scope(exe, wd):
     ok = True
     for lat, extra, want_move, what in (
         ("aramis_1seg_unavg.bmad", "", False, "an unaveraged line"),
-        ('  global%source_model = "coherent"\n', "", False, "a coherent source"),
+        ('  run.source_model = "coherent"\n', "", False, "a coherent source"),
         ("unavg_sandwich.bmad", "", True, "a mixed line, two averaged segments of three"),
     ):
         # The coherent case is the one row whose first field is a setting, not a lattice.
-        if lat.startswith("  global"):
+        if lat.startswith("  run."):
             lat, extra = "aramis_1seg.bmad", lat
         p = {}
         for on in ("T", "F"):
             root = f"sfscope{on}"
-            (wd / f"{root}.nml").write_text(SCOPE.format(lat=lat, root=root, on=on, extra=extra))
+            (wd / f"{root}.toml").write_text(to_toml(SCOPE.format(lat=lat, root=root, on=on, extra=extra)))
 
             # Four threads, the cap run() takes above and for the same reason. These six
             # runs land in the middle of a pass that shares the machine with four other
             # jobs, and an unbounded run here can take an unrelated section down with it.
 
-            r = subprocess.run([exe, f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+            r = subprocess.run([exe, f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                                env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
             if r.returncode != 0:
-                print(f"FAIL: {what} with global%source_filter = {on} exited "
+                print(f"FAIL: {what} with run.source_filter = {on} exited "
                       f"{r.returncode}:\n{r.stdout[-1500:]}", file=sys.stderr)
                 return False
             p[on] = exit_power(wd, root)

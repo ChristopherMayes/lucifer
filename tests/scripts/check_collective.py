@@ -33,7 +33,7 @@ The tiers against Genesis are in compare_fel.py. validation.md
    three nearest slices the field of a point charge, q / (4 pi eps0 d^2), within 5e-2.
 
 6. The short-range solve on a collapsed slice. With no radial scale the run is refused,
-   and so are space_charge%nphi and space_charge%ngrid outside their domains. With a
+   and so are space_charge.nphi and space_charge.ngrid outside their domains. With a
    scale, a lone particle and a slice with no charge take nothing from the solve, and a
    colocated pair opens a spread with its mean held.
 
@@ -55,25 +55,25 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 M_ELECTRON = 0.51099895069e6
 EPS0 = 8.8541878128e-12
 SPACING = 3e-10   # the probe deck's slice spacing, n_wavelength * lambda0
 
-BASE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 2.401661485427e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.200000e-09
-  beam_init%grid(3)%x_max = 1.200000e-09
-  beam_init%sig_pz = {sig_pz}
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 512
+  beam.bunch_charge = 2.401661485427e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -1.200000e-09
+  beam.z_max = 1.200000e-09
+  beam.sig_pz = {sig_pz}
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 0
   grid_n_pts = 64
   grid_half_width = 2e-4
@@ -351,7 +351,7 @@ def main():
     ok = True
 
     # 1. Energy bookkeeping on a cold dark beam, one segment.
-    run(exe, wd, "colle.nml", BASE.format(lat="aramis_1seg.bmad", root="colle",
+    run(exe, wd, "colle.toml", BASE.format(lat="aramis_1seg.bmad", root="colle",
                                           sig_pz="8.804506566858e-8", extra=""))
     eloss = wake_blocks(wd / "colle.wake.txt")[0][1]
     d = np.loadtxt(wd / "colle.diag.txt")
@@ -379,7 +379,7 @@ def main():
            "max", s_ok)
 
     # 2. Stale-wake structure: heavy migration must force recomputes that change eloss.
-    run(exe, wd, "collm.nml", BASE.format(lat="aramis.bmad", root="collm",
+    run(exe, wd, "collm.toml", BASE.format(lat="aramis.bmad", root="collm",
         sig_pz="5.282703940115e-3", extra="  migrate = T\n"))
     blocks = wake_blocks(wd / "collm.wake.txt")
     changed = len(blocks) > 1 and any(
@@ -403,15 +403,15 @@ def main():
     src = BASE.format(lat="aramis.bmad", root="colld_src", sig_pz="1e-8", extra=drop_extra)
     src = src.replace("lambda0 = 1e-10", "lambda0 = 1.006e-10").replace(
         "bunch_charge = 2.401661485427e-14", "bunch_charge = 2.401661485427e-16")
-    run(exe, wd, "colld_src.nml", src)
+    run(exe, wd, "colld_src.toml", src)
     n_head = keep_one_patch(wd / "colld_src-initial.beam.h5", wd / "colld_head.beam.h5", -1)
     text = BASE.format(lat="aramis.bmad", root="colld", sig_pz="1e-8",
-                       extra='  migrate = T\n  beam_file = "colld_head.beam.h5"\n'
-                             '  field_file = "colld_src-initial.wf.h5"\n  load_mode = "keep"\n'
-                             '  global%track_end = "UND##2"\n')
+                       extra='  migrate = T\n  beam.file = "colld_head.beam.h5"\n'
+                             '  field.file = "colld_src-initial.wf.h5"\n  load_mode = "keep"\n'
+                             '  run.track_end = "UND##2"\n')
     text = text.replace("lambda0 = 1e-10", "lambda0 = 1.006e-10").replace(
         "bunch_charge = 2.401661485427e-14", "bunch_charge = 2.401661485427e-16")
-    run(exe, wd, "colld.nml", text)
+    run(exe, wd, "colld.toml", text)
     events = migration_events(wd / "colld.migration.txt")
     drop_only = [e for e in events if e[1] == 0 and e[2] > 0]
     with_moves = [e for e in events if e[1] > 0]
@@ -439,24 +439,24 @@ def main():
     # the all-particle case as the control.
     sc_lat = (wd / "collsc.bmad")
     sc_lat.write_text("call, file = aramis_1seg.bmad\nwiggler::*[SPACE_CHARGE_METHOD] = slice\n")
-    sc_on = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 2\n"
-             "  space_charge%nphi = 1\n  space_charge%rmax = 250e-6\n")
+    sc_on = ("  bmad.csr_and_space_charge_on = T\n  space_charge.nz = 2\n"
+             "  space_charge.nphi = 1\n  space_charge.rmax = 250e-6\n")
     # Seeded, since a dark run's field is the numerical floor and comparing two floors
     # says nothing about the solve that feeds them.
     seeded = BASE.replace("seed_power = 0", "seed_power = 1e4\n  seed_waist_size = 30e-6")
     src = seeded.format(lat="collsc.bmad", root="collsc_src", sig_pz="8.804506566858e-08",
                         extra="  write_initial = T\n  load_only = T\n")
-    run(exe, wd, "collsc_src.nml", src)
+    run(exe, wd, "collsc_src.toml", src)
     n_sel = split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_sel.beam.h5",
                             16, which=0)
     n_all = split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_all.beam.h5", 2)
-    load = ('  beam_file = "{f}"\n  field_file = "collsc_src-initial.wf.h5"\n'
+    load = ('  beam.file = "{f}"\n  field.file = "collsc_src-initial.wf.h5"\n'
             '  load_mode = "keep"\n')
     for tag, extra in (("on", sc_on), ("off", "")):
         base_run = f"collsc_{tag}"
         for name, f in (("ref", "collsc_src-initial.beam.h5"), ("sel", "collsc_sel.beam.h5"),
                         ("all", "collsc_all.beam.h5")):
-            run(exe, wd, f"{base_run}_{name}.nml",
+            run(exe, wd, f"{base_run}_{name}.toml",
                 seeded.format(lat="collsc.bmad", root=f"{base_run}_{name}",
                               sig_pz="8.804506566858e-08", extra=load.format(f=f) + extra))
         ref = np.loadtxt(wd / f"{base_run}_ref.diag.txt")
@@ -496,8 +496,8 @@ def main():
     # solve off, so a slice's mean energy moves only by the long-range term's work. The
     # source's own contribution is isolated by differencing against the same beam with
     # that slice's charge set to zero, which leaves every other source where it was.
-    lr_only = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 0\n"
-               "  space_charge%longrange = T\n  space_charge%rmax = 250e-6\n")
+    lr_only = ("  bmad.csr_and_space_charge_on = T\n  space_charge.nz = 0\n"
+               "  space_charge.longrange = T\n  space_charge.rmax = 250e-6\n")
     dark = BASE.replace("wake_on = T", "wake_on = F")
     narrow_slice(wd / "collsc_src-initial.beam.h5", wd / "colllr_one.beam.h5", 0, singleton=True)
     narrow_slice(wd / "collsc_src-initial.beam.h5", wd / "colllr_nq.beam.h5", 0, singleton=True)
@@ -509,7 +509,7 @@ def main():
         g["weight"][int(g["particlePatches/numParticlesOffset"][()][0])] = 0.0
     got = {}
     for tag in ("one", "nq"):
-        run(exe, wd, f"colllr_{tag}.nml",
+        run(exe, wd, f"colllr_{tag}.toml",
             dark.format(lat="collsc.bmad", root=f"colllr_{tag}", sig_pz="8.804506566858e-08",
                         extra=load.format(f=f"colllr_{tag}.beam.h5") + lr_only))
         d = np.loadtxt(wd / f"colllr_{tag}.diag.txt")
@@ -538,15 +538,15 @@ def main():
     # push each other, and only a lone particle feels nothing, its own harmonic sum
     # cancelling. So the solve refuses where it has no scale. Where it has one, it must
     # give the lone particle nothing and the pair their mutual push.
-    sr_only = ("  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 2\n"
-               "  space_charge%nphi = 1\n")
+    sr_only = ("  bmad.csr_and_space_charge_on = T\n  space_charge.nz = 2\n"
+               "  space_charge.nphi = 1\n")
     dark = BASE.replace("wake_on = T", "wake_on = F")
 
     def sc_run(root, beam_file, extra, expect_fail=False):
         text = dark.format(lat="collsc.bmad", root=root, sig_pz="8.804506566858e-08",
                            extra=load.format(f=beam_file) + sr_only + extra)
-        (wd / f"{root}.nml").write_text(to_groups(text))
-        r = subprocess.run([str(exe), f"{root}.nml"], cwd=wd, capture_output=True, text=True,
+        (wd / f"{root}.toml").write_text(to_groups(text))
+        r = subprocess.run([str(exe), f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                            env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
         if expect_fail:
             return r
@@ -564,7 +564,7 @@ def main():
 
     # No radial scale to work from, and the solve says so rather than crashing or
     # returning a zero. The same beam with a scale stated runs.
-    r = sc_run("collpc_r0", "collpc_one.beam.h5", "  space_charge%rmax = 0\n", expect_fail=True)
+    r = sc_run("collpc_r0", "collpc_one.beam.h5", "  space_charge.rmax = 0\n", expect_fail=True)
     refused = r.returncode != 0 and "NO RADIAL SCALE" in (r.stdout + r.stderr)
     r_ok = refused
     print(f"--- short-range with no radial scale: refused (exit {r.returncode})  "
@@ -573,12 +573,14 @@ def main():
 
     # The configuration domains, refused where they are stated.
     for tag, extra, phrase in (
-            ("collpc_nphi", "  space_charge%rmax = 250e-6\n  space_charge%nphi = -1\n",
-             "SPACE_CHARGE%NPHI"),
-            ("collpc_ngrid", "  space_charge%rmax = 250e-6\n  space_charge%ngrid = 1\n",
-             "SPACE_CHARGE%NGRID")):
+            ("collpc_nphi", "  space_charge.rmax = 250e-6\n  space_charge.nphi = -1\n",
+             "NPHI"),
+            ("collpc_ngrid", "  space_charge.rmax = 250e-6\n  space_charge.ngrid = 1\n",
+             "NGRID")):
         r = sc_run(tag, "collsc_src-initial.beam.h5", extra, expect_fail=True)
-        got = r.returncode != 0 and phrase in (r.stdout + r.stderr)
+        # A negative nphi is refused by the deck reader, from the schema's bound, and a
+        # one-point radial grid at setup; the key's name is in both messages.
+        got = r.returncode != 0 and phrase in (r.stdout + r.stderr).upper()
         r_ok = r_ok and got
         print(f"--- {phrase.lower()} outside its domain: refused at setup  "
               f"{'ok' if got else 'FAIL'}")
@@ -586,13 +588,13 @@ def main():
 
     # Each case against itself with the solve off, so what is compared is this term's own
     # work and not the radiation the dark beam exchanges with its field either way.
-    scale = "  space_charge%rmax = 250e-6\n"
+    scale = "  space_charge.rmax = 250e-6\n"
     got = {}
     for tag, bf in (("one", "collpc_one.beam.h5"), ("two", "collpc_two.beam.h5"),
                     ("nq", "collpc_nq.beam.h5")):
         on = sc_run(f"collpc_{tag}", bf, scale)
         off = sc_run(f"collpc_{tag}f", bf,
-                     scale + "  bmad_com%csr_and_space_charge_on = F\n")
+                     scale + "  bmad.csr_and_space_charge_on = F\n")
         got[tag] = (float((on[-1, 0, 6] - on[0, 0, 6]) - (off[-1, 0, 6] - off[0, 0, 6])),
                     float((on[-1, 0, 7] - on[0, 0, 7]) - (off[-1, 0, 7] - off[0, 0, 7])))
     # The collapsed slice is slice 1. A lone particle feels its own field and nothing

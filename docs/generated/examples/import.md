@@ -11,8 +11,8 @@ Everything on this page lives in and runs from `examples/import/`.
 
 The example runs in two commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_from_file.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_from_file.in
     python ../plot_fel.py import.stats.h5
 
 The bunch is described by Bmad's `beam_init_struct`, the native equivalent of what Genesis 1.3 Version 4 (Genesis4)'s `&beam` describes. It is loaded into FEL slices by each of the two `load_mode` settings and tracked dark through the full line: SASE from a real bunch (the manual's [loading section](../../fel-physics.md)).
@@ -21,9 +21,9 @@ The lattice is the whole optics specification. The reference energy comes from i
 
 The bunch is a Gaussian test bunch sized to what the FEL window can afford: `sig_z = 1.2 nm` with 30 fC gives the benchmark 3 kA peak in a window a few hundred wavelengths long. A physical accelerator bunch is micrometers long and carries hundreds of pC. It needs thousands of slices and belongs to a production run rather than to an example.
 
-`lucifer.in` generates 50000 particles and keeps every one. `load_mode = "keep"` makes each particle a beamlet of eight phase copies at an eighth of its charge. The slices then hold as many macroparticles as the bunch put there, a handful in the tails and tens of thousands at the peak, 400000 in all. Every charge-weighted moment of the bunch is the load's, and the window is the bunch's own extent. `quiet_start = T` spreads the copies over 2 pi about each particle's phase. `shot_noise = T` imposes the physical noise on the beamlets after measuring that the load is quiet, 2.6e-29 in |b|^2 N_lambda before the noise goes on. The deck also writes the bunch with `write_openpmd_file` as `import_bunch.h5`, 2.8 MB of openPMD.
+`lucifer.toml` generates 50000 particles and keeps every one. `load_mode = "keep"` makes each particle a beamlet of eight phase copies at an eighth of its charge. The slices then hold as many macroparticles as the bunch put there, a handful in the tails and tens of thousands at the peak, 400000 in all. Every charge-weighted moment of the bunch is the load's, and the window is the bunch's own extent. `quiet_start = true` spreads the copies over 2 pi about each particle's phase. `shot_noise = true` imposes the physical noise on the beamlets after measuring that the load is quiet, 2.6e-29 in |b|^2 N_lambda before the noise goes on. The deck also writes the bunch with `write_openpmd_file` as `import_bunch.h5`, 2.8 MB of openPMD.
 
-`lucifer_from_file.in` names that file in `beam_init%position_file` and loads it in the sample mode. `beam_init%n_particle = 2048` macroparticles go into every slice, resampled by Genesis4's `importdistribution` method from the particles that fell into each slice's sampling window, with the current taken from the same window. The same slices come out, since both modes bin the same bunch on the same spacing. `write_genesis_dist` writes the same bunch as a Genesis4 distribution file for its `&importdistribution`.
+`lucifer_from_file.in` names that file in `beam.position_file` and loads it in the sample mode. `beam.n_particle = 2048` macroparticles go into every slice, resampled by Genesis4's `importdistribution` method from the particles that fell into each slice's sampling window, with the current taken from the same window. The same slices come out, since both modes bin the same bunch on the same spacing. `write_genesis_dist` writes the same bunch as a Genesis4 distribution file for its `&importdistribution`.
 
 On these inputs both modes exit far below saturation, a startup from a real bunch rather than a saturated FEL. The measured quantities are in the table below, the slice count and the peak slice's macroparticle count among them. The two exit powers differ, and the two runs are different SASE realizations of the same physics. The keep mode draws no random number before the noise and the sample mode draws for every resampled particle, so the noise falls on different phasors. In a dark start a small change in the load re-rolls the realization, as the per-slice spread of `../sase` shows. The keep mode costs what its 400000 macroparticles cost. A production run with a bunch from an accelerator simulation would keep fewer copies or sample.
 
@@ -33,7 +33,7 @@ The run reports the split between the mode and the wide-angle emission of the po
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_from_file.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_from_file.toml` | Unit |
 |---|---|---|---|
 | exit power | 4.1816e+04 | 8.6549e+04 | W |
 | exit power per slice | 1.2299e+03 | 2.5456e+03 | W |
@@ -82,65 +82,64 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "import"
-  global%ran_seed = 12345
-  slicing%n_wavelength = 3
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  load_mode = "keep"
-  quiet_start = T
-  beamlet_size = 8
-  shot_noise = T
+[run]
+out_root = "import"
+ran_seed = 12345
 
-  write_openpmd_file = "import_bunch.h5"
-  beam_init%n_particle = 50000
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-  beam_init%sig_z = 1.2e-9
-  beam_init%sig_pz = 8.8045e-5
-  beam_init%bunch_charge = 3.01e-14
-/
+[window]
+n_wavelength = 3
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 50000
+bunch_charge = 3.01e-14
+sig_z = 1.2e-9
+sig_pz = 8.8045e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+load_mode = "keep"
+quiet_start = true
+beamlet_size = 8
+shot_noise = true
+write_openpmd_file = "import_bunch.h5"
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0
 ```
 
-### `lucifer_from_file.in`
+### `lucifer_from_file.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "from_file"
-  global%ran_seed = 12345
-  slicing%n_wavelength = 3
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  load_mode = "sample"
-  quiet_start = T
-  beamlet_size = 8
-  shot_noise = T
+[run]
+out_root = "from_file"
+ran_seed = 12345
 
-  beam_init%position_file = "import_bunch.h5"
-  beam_init%n_particle = 2048
+[window]
+n_wavelength = 3
 
-  resample%slice_width = 0.01
-/
+[beam]
+position_file = "import_bunch.h5"
+n_particle = 2048
+load_mode = "sample"
+quiet_start = true
+beamlet_size = 8
+shot_noise = true
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam.resample]
+slice_width = 0.01
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0
 ```

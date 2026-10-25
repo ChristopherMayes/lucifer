@@ -73,7 +73,7 @@ import numpy as np
 import beamio
 import fieldio
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 from scipy.special import jv
 
 C_LIGHT = 2.99792458e8
@@ -97,17 +97,17 @@ SEED_W0 = 4e-4                 # 1/e^2 intensity radius [m]
 # points and this waist, which the formula then charges to the coupling factor. At 127
 # points the planar factor measures 0.75050 and at 128 points 0.74864 against the closed
 # form's 0.75095. These runs stay on the CPU, which takes an odd grid.
-PROBE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+PROBE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = {lam}
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = {q}
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-07
-  beam_init%a_norm_emit = 4e-9
-  beam_init%b_norm_emit = 4e-9
+  beam.n_particle = 2048
+  beam.bunch_charge = {q}
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-07
+  beam.a_norm_emit = 4e-9
+  beam.b_norm_emit = 4e-9
   beamlet_size = 8
   seed_power = {power}
   seed_waist_size = {w0}
@@ -129,17 +129,17 @@ def probe_nml(wd, **kw):
     kw["lat"] = unavg_wrapper(wd, kw["lat"])
     return PROBE.format(**kw)
 
-GAIN = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+GAIN = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 2048
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 5e3
   seed_waist_size = 30e-6
@@ -150,19 +150,19 @@ GAIN = """! flat keys; routed into the three groups by nml.to_groups
 &end
 """
 
-TDID = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+TDID = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 8.0e-15
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4e-10
-  beam_init%grid(3)%x_max = 4e-10
-  beam_init%sig_pz = 8.8045e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 512
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.8045e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
@@ -200,8 +200,8 @@ def check(name, value, tol, note=""):
 
 
 def run(exe, wd, name, text, threads="4"):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}\n{r.stderr[-1000:]}")
@@ -210,8 +210,8 @@ def run(exe, wd, name, text, threads="4"):
 
 def run_expect_refusal(exe, wd, name, text, fragment):
     """The run must fail, with its own message."""
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in r.stdout
 
@@ -452,7 +452,7 @@ def main():
     # copy. With frames every 0.1 m through the mixed line, five of them inside the
     # unaveraged segment, the final beam and field must be the frames-off run's to the bit.
     run(exe, wd, "uv_sandfr", GAIN.format(root="uv_sandfr", lat="unavg_sandwich.bmad").replace(
-        "  write_diag = T\n", "  write_diag = T\n  global%dump_at_comb = T\n  global%comb_ds_save = 0.1\n"))
+        "  write_diag = T\n", "  write_diag = T\n  run.dump_at_comb = T\n  run.comb_ds_save = 0.1\n"))
     inside = 0
     for fr in sorted(wd.glob("uv_sandfr-[0-9]*.wf.h5")):
         with h5py.File(fr) as h5:
@@ -523,7 +523,7 @@ def main():
 
     print("--- the single-precision twin of the unaveraged advance:")
     run(exe, wd, "uv_tw", GAIN.format(root="uv_tw", lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
-        .replace("&end", '  global%fp32_check = "lockstep"\n&end'))
+        .replace("&end", '  run.fp32_check = "lockstep"\n&end'))
     rows = [l.split() for l in (wd / "uv_tw.fp32.txt").read_text().splitlines()
             if l and not l.startswith("#") and l.split()[0].isdigit()]
     if not rows:
@@ -566,7 +566,7 @@ def main():
     # so the mode refuses it, with its own message.
     refused = run_expect_refusal(exe, wd, "uv_twfree", GAIN.format(root="uv_twfree",
         lat=unavg_wrapper(wd, "aramis_1seg.bmad"))
-        .replace("&end", '  global%fp32_check = "freerun"\n&end'),
+        .replace("&end", '  run.fp32_check = "freerun"\n&end'),
         "DOES NOT COVER THE UNAVERAGED MODE")
     check("twin: freerun refused in the unaveraged mode (0 = yes)",
           0.0 if refused else 1.0, 0.5)

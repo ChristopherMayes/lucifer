@@ -54,7 +54,8 @@ import fieldio  # noqa: E402
 import beamio
 import bunchfile
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml
+to_groups = to_toml
 
 E_CHARGE = 1.602176634e-19
 
@@ -63,19 +64,19 @@ E_CHARGE = 1.602176634e-19
 LAMBDA0 = 1e-10
 SPACING = 3 * LAMBDA0
 
-NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 4.803322970853e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -2.400000e-09
-  beam_init%grid(3)%x_max = 2.400000e-09
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 1024
+  beam.bunch_charge = 4.803322970853e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -2.400000e-09
+  beam.z_max = 2.400000e-09
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 0
   grid_n_pts = 32
   grid_half_width = 2e-4
@@ -115,7 +116,7 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
     samples = {h: [] for h in (1, 2, 3)}
     for seed in range(1, seeds + 1):
         root = f"sn_{'w' if test_weights else 'u'}_{seed}"
-        nml = workdir / f"{root}.nml"
+        nml = workdir / f"{root}.toml"
         nml.write_text(to_groups(NML.format(lat=lat, root=root, seed=1000 + 7 * seed,
                                              testw="T" if test_weights else "F")))
         r = subprocess.run([str(exe), nml.name], cwd=workdir,
@@ -129,34 +130,34 @@ def run_mode(exe, lat, workdir, seeds, test_weights):
     return samples
 
 
-KEEP_NML = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%source_filter = F
-  global%ran_seed = {seed}
-  global%load_only = T
-  slicing%n_wavelength = 3
+KEEP_NML = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.source_filter = F
+  run.ran_seed = {seed}
+  run.load_only = T
+  window.n_wavelength = 3
 /
-&fel_beam_init
+[beam]
   load_mode = "keep"
   quiet_start = {quiet}
   shot_noise = T
   beamlet_size = 8
 {source}/
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 32
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = 1e-10
+  field.seed_power = 0
+  field.grid_n_pts = 32
+  field.grid_half_width = 2e-4
 /
 """
 
-KEEP_BUNCH = """  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 4.803322970853e-14
-  beam_init%sig_z = 1.2e-9
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+KEEP_BUNCH = """  beam.n_particle = 2048
+  beam.bunch_charge = 4.803322970853e-14
+  beam.sig_z = 1.2e-9
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 """
 
 
@@ -165,9 +166,9 @@ def run_keep(exe, lat, workdir, seeds, label, source, quiet, want):
     samples = {h: [] for h in (1, 2, 3)}
     for seed in range(1, seeds + 1):
         root = f"sn_{label}_{seed}"
-        (workdir / f"{root}.nml").write_text(KEEP_NML.format(lat=lat, root=root, seed=2000 + 7 * seed,
-                                                              quiet=quiet, source=source))
-        r = subprocess.run([str(exe), f"{root}.nml"], cwd=workdir, capture_output=True, text=True)
+        (workdir / f"{root}.toml").write_text(to_toml(KEEP_NML.format(lat=lat, root=root, seed=2000 + 7 * seed,
+                                                              quiet=quiet, source=source)))
+        r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL: loader run {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
             sys.exit(1)
@@ -217,32 +218,32 @@ def other_loads(exe, lat, workdir, seeds):
     b = bunchfile.read_bunch(workdir / "sn_bunch.h5")
     bunchfile.write_bunch(workdir / "sn_bunch.h5", workdir / "sn_copies.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING))
-    src = '  beam_init%position_file = "sn_copies.h5"\n'
+    src = '  beam.position_file = "sn_copies.h5"\n'
     ok = judge(run_keep(exe, lat, workdir, max(3, seeds // 3), "copies", src, "F",
                         "particles sharing their transverse coordinates"),
                "copies made outside the loader") and ok
 
     bunchfile.write_bunch(workdir / "sn_bunch.h5", workdir / "sn_cells.h5",
                           bunchfile.copies(b, 8, LAMBDA0, SPACING, jitter=1e-12))
-    src = '  beam_init%position_file = "sn_cells.h5"\n'
+    src = '  beam.position_file = "sn_cells.h5"\n'
     ok = judge(run_keep(exe, lat, workdir, max(3, seeds // 3), "cells", src, "F",
                         "the occupants of each deposit cell"),
                "the occupants of each deposit cell") and ok
     return ok
 
 
-SPLIT_NML = """  lat_file = "{lat}"
+SPLIT_NML = """  lattice = "{lat}"
   out_root = "sn_split"
   source_filter = F
   dump_field_at = "END"
   ran_seed = 4321
   lambda0 = 1e-10
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 1024
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 5e3
   seed_waist_size = 30e-6
   grid_n_pts = 64
@@ -264,8 +265,8 @@ def split_check(exe, lat, workdir):
     not on what the field is.
     """
     root = "sn_split"
-    (workdir / f"{root}.nml").write_text(to_groups(SPLIT_NML.format(lat=lat)))
-    r = subprocess.run([str(exe), f"{root}.nml"], cwd=workdir, capture_output=True, text=True)
+    (workdir / f"{root}.toml").write_text(to_groups(SPLIT_NML.format(lat=lat)))
+    r = subprocess.run([str(exe), f"{root}.toml"], cwd=workdir, capture_output=True, text=True)
     if r.returncode != 0:
         print(f"FAIL: split run exited {r.returncode}:\n{r.stdout[-2000:]}")
         return False

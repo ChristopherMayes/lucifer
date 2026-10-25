@@ -3,24 +3,24 @@
 Checks of the program's structure (docs/user-guide.md): the library contract, the comb,
 and the tracking window.
 
-  1. Library. lucifer_smoke_test drives the tracker with *no* namelist anywhere, its
+  1. Library. lucifer_smoke_test drives the tracker with *no* deck anywhere, its
      structs filled in code, and runs twice in one process. Pass 1 must reproduce a
-     namelist-driven run of the same configuration dataset-identically, since the
+     deck-driven run of the same configuration dataset-identically, since the
      library is the program. Pass 2 must reproduce pass 1 bit-for-bit. That is,
      twice in one process equals two processes.
   2. Library errors return. lucifer_smoke_test on an unreadable lattice must print its
      proof-of-return line and exit with its own code 2. The library returns and the
      program decides, with no exit inside the library.
-  3. Retired group. The flat &fel_track_params is refused. Fortran ignores an unknown
-     namelist group in silence, so without the refusal a stale deck would run on
+  3. Refusals. A key in the wrong table and a key no table has are each refused, with
+     the table it belongs in or the keys the table has, so a stale deck cannot run on
      defaults.
-  4. The comb (global%comb_ds_save, with Bmad's ds_save semantics verbatim). A comb > 0
+  4. The comb (run.comb_ds_save, with Bmad's ds_save semantics verbatim). A comb > 0
      run's per-record rows must be exactly the every-record run's rows at the comb
      positions, a dataset-equal subset, with the element ends always present. comb < 0
      keeps *no* per-record rows, and the element-end arrays and dumps remain. The
      precomputed nrec is exact in every mode, since the arrays are sized once and
      never grown.
-  5. The window (global%track_start and track_end, Tao's names). The schedule is built
+  5. The window (run.track_start and track_end, Tao's names). The schedule is built
      on the full lattice, so a windowed run composes exactly. Run A = [start, D] dumps
      its final state, and run B = [after D, end] imports it. B's finals must be
      dataset-identical to the one-shot full run's finals, and A's finals to the full
@@ -76,6 +76,7 @@ import h5py
 import numpy as np
 
 import beamio
+from lucifer.deck import to_toml
 import fieldio
 from checkrec import record
 from read_stats import read_stats, same_data
@@ -87,7 +88,7 @@ KS_C = 2 * np.pi / LAMBDA0 * 2.99792458e8      # phase per second of the file's 
 
 # What the citation check below walks: the text this program ships.
 SOURCE_SUFFIXES = {".f90", ".mm", ".h", ".c", ".py", ".sh", ".md", ".bmad", ".lat", ".in",
-                   ".nml", ".yml", ".yaml", ".txt"}
+                   ".toml", ".yml", ".yaml", ".txt"}
 
 LAT1 = """no_digested
 parameter[geometry] = open
@@ -117,7 +118,7 @@ SEG: line = (UND, D, UND2)
 use, SEG
 """
 
-# The namelist twin of lucifer_smoke_test's in-code configuration (same values).
+# The deck twin of lucifer_smoke_test's in-code configuration (same values).
 # grid_n_pts is 63 here on purpose, and this pair is the only place in the benchmark that is
 # not a power of two. Every other deck runs a power-of-two grid, which is what the Metal
 # field solver takes, so a deck moves between the backends unchanged. This pair holds the
@@ -125,39 +126,43 @@ use, SEG
 # count gets one, and an imported Genesis field can carry one. The value has to match
 # lucifer_smoke_test.f90, since the check below compares the two runs byte for byte.
 
-NML_TWIN = """&fel_params
-  lat_file = "smoke.bmad"
-  global%out_root = "{root}"
-  global%source_filter = F
-  global%interlude_model = "genesis"
-  global%transport_model = "genesis"
-  global%write_diag = T
-  global%ran_seed = 777
+NML_TWIN = """[run]
+  lattice = "smoke.bmad"
+  run.out_root = "{root}"
+  run.source_filter = F
+  run.interlude_model = "genesis"
+  run.transport_model = "genesis"
+  run.write_diag = T
+  run.ran_seed = 777
 {extra}/
-&fel_beam_init
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+[beam]
+  beam.n_particle = 2048
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 {bextra}/
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 1e7
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 63
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = 1e-10
+  field.seed_power = 1e7
+  field.seed_waist_size = 30e-6
+  field.grid_n_pts = 63
+  field.grid_half_width = 2e-4
 /
 """
 
-OLD_STYLE = """&fel_track_params
-  lat_file = "smoke.bmad"
-  out_root = "old"
-  source_filter = F
-  lambda0 = 1e-10
-  wake_on = T
-/
+# A key in the wrong table, and a key no table has. The reader must refuse both and name
+# the table the first belongs in and the keys of the second's table.
+WRONG_TABLE = """lattice = "smoke.bmad"
+[beam]
+n_particle = 1024
+lambda0 = 1e-10
+"""
+NO_SUCH_KEY = """lattice = "smoke.bmad"
+[run]
+out_root = "old"
+wake_on = true
 """
 
 
@@ -177,8 +182,8 @@ def run(cmd, wd, threads="4"):
 
 
 def run_nml(exe, wd, root, nml_text):
-    (wd / f"{root}.nml").write_text(nml_text)
-    r = run([str(exe), f"{root}.nml"], wd)
+    (wd / f"{root}.toml").write_text(to_toml(nml_text))
+    r = run([str(exe), f"{root}.toml"], wd)
     if r.returncode != 0:
         print(f"FAIL: {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
@@ -234,7 +239,7 @@ def main():
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "snml.diag.txt").read_bytes()
     for s in ("-final.beam.h5", "-final.wf.h5"):
         same = same and h5_identical(wd / f"sp1{s}", wd / f"snml{s}")
-    check("no-namelist library run == namelist run (diag byte, dumps dataset)", same)
+    check("no-deck library run == deck run (diag byte, dumps dataset)", same)
 
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "sp2.diag.txt").read_bytes()
     for s in ("-final.beam.h5", "-final.wf.h5", ".stats.h5"):
@@ -250,23 +255,27 @@ def main():
           note=f"[exit {r.returncode}]")
 
     # ------------------------------------------------------------------
-    print("== the retired flat group ==")
-    (wd / "old.nml").write_text(OLD_STYLE)
-    r = run([str(exe), "old.nml"], wd)
-    ok = (r.returncode != 0 and "IS NOT AN INPUT GROUP" in r.stdout
-          and "&fel_params" in r.stdout and "&fel_beam_init" in r.stdout
-          and "&fel_wavefront_init" in r.stdout)
-    check("&fel_track_params refused, naming the three groups", ok)
+    print("== the deck's refusals ==")
+    (wd / "wrong_table.toml").write_text(WRONG_TABLE)
+    r = run([str(exe), "wrong_table.toml"], wd)
+    ok = (r.returncode != 0 and "lambda0 IS NOT A KEY OF [beam]" in r.stdout
+          and "belongs in [field]" in r.stdout)
+    check("a key in the wrong table is refused, naming the table it belongs in", ok)
+    (wd / "no_such_key.toml").write_text(NO_SUCH_KEY)
+    r = run([str(exe), "no_such_key.toml"], wd)
+    ok = (r.returncode != 0 and "wake_on IS NOT A KEY OF [run]" in r.stdout
+          and "The keys there are: out_root" in r.stdout)
+    check("a key no table has is refused, naming the table's keys", ok)
 
     # ------------------------------------------------------------------
-    print("== the comb (global%comb_ds_save) ==")
+    print("== the comb (run.comb_ds_save) ==")
 
     # Every-record baseline (comb 0, the default), a spaced comb, and no comb.
     run_nml(exe, wd, "cb0", NML_TWIN.format(root="cb0", extra="", bextra=""))
     run_nml(exe, wd, "cbp", NML_TWIN.format(root="cbp",
-            extra="  global%comb_ds_save = 0.05\n", bextra=""))
+            extra="  run.comb_ds_save = 0.05\n", bextra=""))
     run_nml(exe, wd, "cbn", NML_TWIN.format(root="cbn",
-            extra="  global%comb_ds_save = -1\n", bextra=""))
+            extra="  run.comb_ds_save = -1\n", bextra=""))
 
     s0, sp, sn = stats_of(wd / "cb0.stats.h5"), stats_of(wd / "cbp.stats.h5"), \
                  stats_of(wd / "cbn.stats.h5")
@@ -318,13 +327,13 @@ def main():
     # the bit. cb0 above ran with no comb key at all and fed every comparison.
 
     # ------------------------------------------------------------------
-    print("== the tracking window (global%track_start/track_end) ==")
+    print("== the tracking window (run.track_start/track_end) ==")
 
-    two = NML_TWIN.replace('lat_file = "smoke.bmad"', 'lat_file = "twoseg.bmad"')
+    two = NML_TWIN.replace('lattice = "smoke.bmad"', 'lattice = "twoseg.bmad"')
     run_nml(exe, wd, "wfull", two.format(root="wfull",
-            extra='  global%dump_beam_at = "D"\n  global%dump_field_at = "D"\n', bextra=""))
+            extra='  run.dump_beam_at = "D"\n  run.dump_field_at = "D"\n', bextra=""))
     run_nml(exe, wd, "wa", two.format(root="wa",
-            extra='  global%track_end = "D"\n', bextra=""))
+            extra='  run.track_end = "D"\n', bextra=""))
 
     # A = [start, D]: its finals equal the full run's mid-line dumps at D.
     ok = h5_identical(wd / "wa-final.beam.h5", wd / "wfull-at2-D.beam.h5")
@@ -333,9 +342,9 @@ def main():
 
     # B = [after D, end] from A's finals: composes to the full run's finals.
     run_nml(exe, wd, "wb", two.format(root="wb",
-            extra='  global%continuation = T\n  global%track_start = "UND2"\n', bextra="""  beam_file = "wa-final.beam.h5"
-""").replace("&fel_wavefront_init\n", """&fel_wavefront_init
-  field_file = "wa-final.wf.h5"
+            extra='  run.continuation = T\n  run.track_start = "UND2"\n', bextra="""  beam.file = "wa-final.beam.h5"
+""").replace("[field]\n", """[field]
+  field.file = "wa-final.wf.h5"
 """))
     # B's state passes through the dump format once more than the full run's, a pack and
     # an unpack of every coordinate. The composition therefore sits at the conversion
@@ -376,35 +385,35 @@ def main():
     # residual is part of the field's state, and a continuation takes nothing from a
     # file that lacks it.
 
-    rs_nml = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%source_filter = F
-  global%interlude_model = "genesis"
-  global%transport_model = "genesis"
-  global%write_diag = T
-  global%ran_seed = 777
-  slicing%n_wavelength = 4
+    rs_nml = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.source_filter = F
+  run.interlude_model = "genesis"
+  run.transport_model = "genesis"
+  run.write_diag = T
+  run.ran_seed = 777
+  window.n_wavelength = 4
 {extra}/
-&fel_beam_init
+[beam]
 {beam}/
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
+[field]
+  field.lambda0 = 1e-10
 {field}/
 """
-    gen_beam = """  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 2.401661485427e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.2e-9
-  beam_init%grid(3)%x_max =  1.2e-9
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+    gen_beam = """  beam.n_particle = 1024
+  beam.bunch_charge = 2.401661485427e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -1.2e-9
+  beam.z_max =  1.2e-9
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 """
-    gen_field = """  wavefront_init%seed_power = 1e7
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 63
-  wavefront_init%grid_half_width = 2e-4
+    gen_field = """  field.seed_power = 1e7
+  field.seed_waist_size = 30e-6
+  field.grid_n_pts = 63
+  field.grid_half_width = 2e-4
 """
     def rs_lat(pipe):
         return LAT2.replace("l = 0.30", f"l = {pipe}").replace("D: pipe", "D: pipe")
@@ -472,8 +481,8 @@ def main():
         return float(m[0])
 
     def rs_run(root, nml_text, expect_fail=False, fragment=""):
-        (wd / f"{root}.nml").write_text(nml_text)
-        r = run([str(exe), f"{root}.nml"], wd)
+        (wd / f"{root}.toml").write_text(to_toml(nml_text))
+        r = run([str(exe), f"{root}.toml"], wd)
         (wd / f"{root}.out").write_text(r.stdout + r.stderr)
         if expect_fail:
             ok = r.returncode != 0 and fragment in r.stdout + r.stderr
@@ -492,7 +501,7 @@ def main():
     # taken as the imported beam and, ramped, the imported field.
     (wd / "rs.bmad").write_text(rs_lat(0.30))
     rs_run("rsprep", rs_nml.format(lat="rs.bmad", root="rsprep",
-           extra='  slicing%window_length = 4.8e-9\n  global%track_end = "UND"\n',
+           extra='  window.window_length = 4.8e-9\n  run.track_end = "UND"\n',
            beam=gen_beam, field=gen_field))
     shutil.copy(wd / "rsprep-final.wf.h5", wd / "rsramp.wf.h5")
     with h5py.File(wd / "rsramp.wf.h5", "r+") as h5:
@@ -501,28 +510,28 @@ def main():
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
         if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
             del h5["lucifer/field"].attrs["slippageResidual"]      # the seed starts every run from zero
-    imp = dict(beam='  beam_file = "rsprep-final.beam.h5"\n', field='  field_file = "rsramp.wf.h5"\n')
+    imp = dict(beam='  beam.file = "rsprep-final.beam.h5"\n', field='  field.file = "rsramp.wf.h5"\n')
 
     for pipe, tag, kind in ((0.30, "rsh", "half a slice"), (0.35, "rsz", "near zero")):
         lat = f"rs_{tag}.bmad"
         (wd / lat).write_text(rs_lat(pipe))
         full, rest, bare, toD = f"{tag}full", f"{tag}rest", f"{tag}bare", f"{tag}toD"
         rs_run(full, rs_nml.format(lat=lat, root=full,
-               extra='  global%dump_beam_at = "D"\n  global%dump_field_at = "D"\n  global%dump_at_comb = T\n', **imp))
-        rs_run(toD, rs_nml.format(lat=lat, root=toD, extra='  global%track_end = "D"\n', **imp))
+               extra='  run.dump_beam_at = "D"\n  run.dump_field_at = "D"\n  run.dump_at_comb = T\n', **imp))
+        rs_run(toD, rs_nml.format(lat=lat, root=toD, extra='  run.track_end = "D"\n', **imp))
         dump_b, dump_f = f"{full}-at2-D.beam.h5", f"{full}-at2-D.wf.h5"
         resid = residual_of(wd / dump_f)
         # The continuation carrying the residual, and one from the same dump with the
         # residual stripped, as in a file written without the attribute.
         rs_run(rest, rs_nml.format(lat=lat, root=rest,
-               extra='  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
-               beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{dump_f}"\n'))
+               extra='  run.continuation = T\n  run.track_start = "UND2"\n  run.dump_at_comb = T\n',
+               beam=f'  beam.file = "{dump_b}"\n', field=f'  field.file = "{dump_f}"\n'))
         shutil.copy(wd / dump_f, wd / f"{tag}bare.wf.h5")
         with h5py.File(wd / f"{tag}bare.wf.h5", "r+") as h5:
             del h5["lucifer/field"].attrs["slippageResidual"]
         stripped = rs_run(bare, rs_nml.format(lat=lat, root=bare,
-               extra='  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
-               beam=f'  beam_file = "{dump_b}"\n', field=f'  field_file = "{tag}bare.wf.h5"\n'),
+               extra='  run.continuation = T\n  run.track_start = "UND2"\n  run.dump_at_comb = T\n',
+               beam=f'  beam.file = "{dump_b}"\n', field=f'  field.file = "{tag}bare.wf.h5"\n'),
                expect_fail=True, fragment="NO slippageResidual")
 
         w_rest, n_rest, ids_r, pops_r, first_r = compare_runs(full, rest)
@@ -554,8 +563,8 @@ def main():
     with h5py.File(wd / "rsbad.wf.h5", "r+") as h5:
         h5["lucifer/field"].attrs["slippageResidual"] = np.array([7.0])
     ok = rs_run("rsbad", rs_nml.format(lat="rs_rsh.bmad", root="rsbad",
-                extra='  global%track_start = "UND2"\n',
-                beam='  beam_file = "rshfull-at2-D.beam.h5"\n', field='  field_file = "rsbad.wf.h5"\n'),
+                extra='  run.track_start = "UND2"\n',
+                beam='  beam.file = "rshfull-at2-D.beam.h5"\n', field='  field.file = "rsbad.wf.h5"\n'),
                 expect_fail=True, fragment="slippageResidual")
     check("a residual of 7 wavelengths at 4 a slice is refused, and the message names slippageResidual", ok)
 
@@ -582,24 +591,24 @@ def main():
     mw_lat = LAT2.replace("SEG: line = (UND, D, UND2)",
                           "UND3: UND\nD2: pipe, l = 0.30\nSEG: line = (UND, D, UND2, D2, UND3)")
     (wd / "mw.bmad").write_text(mw_lat)
-    mw_beam = """  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 2.401661485427e-14
-  beam_init%distribution_type(3) = "RAN_GAUSS"
-  beam_init%sig_z = 1.0e-9
-  beam_init%sig_pz = 5.282703940115e-03
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+    mw_beam = """  beam.n_particle = 1024
+  beam.bunch_charge = 2.401661485427e-14
+  beam.z_distribution = "RAN_GAUSS"
+  beam.sig_z = 1.0e-9
+  beam.sig_pz = 5.282703940115e-03
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 """
-    wake_extra = """  chamber_wake%on = T
-  chamber_wake%radius = 2.5e-3
-  chamber_wake%conductivity = 5.813e7
-  chamber_wake%relaxation = 8.1e-6
-  chamber_wake%gap = 0.5e-3
-  chamber_wake%lgap = 0.015
-  chamber_wake%hrough = 100e-9
-  chamber_wake%lrough = 100e-6
+    wake_extra = """  wake.on = T
+  wake.radius = 2.5e-3
+  wake.conductivity = 5.813e7
+  wake.relaxation = 8.1e-6
+  wake.gap = 0.5e-3
+  wake.lgap = 0.015
+  wake.hrough = 100e-9
+  wake.lrough = 100e-6
 """
-    mig_extra = "  global%migrate = T\n  global%migrate_check = T\n"
+    mig_extra = "  run.migrate = T\n  run.migrate_check = T\n"
 
     def mig_events(root):
         """[(s, moved, dropped charge, margin)] per event, and the summary totals."""
@@ -658,7 +667,7 @@ def main():
 
     (wd / "mw.bmad").write_text(mw_lat)
     rs_run("mwprep", rs_nml.format(lat="mw.bmad", root="mwprep",
-           extra=mig_extra + '  slicing%window_length = 4.8e-9\n  global%track_end = "UND"\n',
+           extra=mig_extra + '  window.window_length = 4.8e-9\n  run.track_end = "UND"\n',
            beam=mw_beam, field=gen_field))
     shutil.copy(wd / "mwprep-final.wf.h5", wd / "mwramp.wf.h5")
     with h5py.File(wd / "mwramp.wf.h5", "r+") as h5:
@@ -667,17 +676,17 @@ def main():
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
         if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
             del h5["lucifer/field"].attrs["slippageResidual"]
-    mw_imp = dict(beam='  beam_file = "mwprep-final.beam.h5"\n', field='  field_file = "mwramp.wf.h5"\n')
+    mw_imp = dict(beam='  beam.file = "mwprep-final.beam.h5"\n', field='  field.file = "mwramp.wf.h5"\n')
     s_ckpt = 0.75
 
     for tag, wake, what in (("mwm", "", "migration alone"), ("mww", wake_extra, "with the chamber wake")):
         full, toD, rest = f"{tag}full", f"{tag}toD", f"{tag}rest"
         rs_run(full, rs_nml.format(lat="mw.bmad", root=full,
-               extra=mig_extra + wake + '  global%dump_beam_at = "D"\n  global%dump_field_at = "D"\n  global%dump_at_comb = T\n', **mw_imp))
-        rs_run(toD, rs_nml.format(lat="mw.bmad", root=toD, extra=mig_extra + wake + '  global%track_end = "D"\n', **mw_imp))
+               extra=mig_extra + wake + '  run.dump_beam_at = "D"\n  run.dump_field_at = "D"\n  run.dump_at_comb = T\n', **mw_imp))
+        rs_run(toD, rs_nml.format(lat="mw.bmad", root=toD, extra=mig_extra + wake + '  run.track_end = "D"\n', **mw_imp))
         rs_run(rest, rs_nml.format(lat="mw.bmad", root=rest,
-               extra=mig_extra + wake + '  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
-               beam=f'  beam_file = "{full}-at2-D.beam.h5"\n', field=f'  field_file = "{full}-at2-D.wf.h5"\n'))
+               extra=mig_extra + wake + '  run.continuation = T\n  run.track_start = "UND2"\n  run.dump_at_comb = T\n',
+               beam=f'  beam.file = "{full}-at2-D.beam.h5"\n', field=f'  field.file = "{full}-at2-D.wf.h5"\n'))
         resid = residual_of(wd / f"{full}-at2-D.wf.h5")
         ev_full, mv_full, dr_full = mig_events(full)
         ev_toD, mv_toD, dr_toD = mig_events(toD)
@@ -760,8 +769,8 @@ def main():
             ck = h5["lucifer/checkpoint"]
             ck.attrs.modify("phi0", np.atleast_1d(ck.attrs["phi0"]) + delta)
         rs_run(root, rs_nml.format(lat="mw.bmad", root=root,
-               extra=mig_extra + '  global%continuation = T\n  global%track_start = "UND2"\n  global%dump_at_comb = T\n',
-               beam=f'  beam_file = "{root}.beam.h5"\n', field='  field_file = "mwmfull-at2-D.wf.h5"\n'))
+               extra=mig_extra + '  run.continuation = T\n  run.track_start = "UND2"\n  run.dump_at_comb = T\n',
+               beam=f'  beam.file = "{root}.beam.h5"\n', field='  field.file = "mwmfull-at2-D.wf.h5"\n'))
         exact, w_field, _, _, common = identity_and_floor("mwmfull", root)
         ev, _, _ = mig_events(root)
         outcome[side] = (exact, w_field, [(round(e[0], 3), e[1]) for e in ev])
@@ -804,19 +813,19 @@ def main():
                     f, name.decode() if isinstance(name, bytes) else str(name))
         return out
 
-    ew_beam = """  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 2.401661485427e-14
-  beam_init%distribution_type(3) = "RAN_GAUSS"
-  beam_init%sig_z = 1.0e-9
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+    ew_beam = """  beam.n_particle = 1024
+  beam.bunch_charge = 2.401661485427e-14
+  beam.z_distribution = "RAN_GAUSS"
+  beam.sig_z = 1.0e-9
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 """
     # One starting state for both cases: the run to the first undulator's end is the same
     # line either way, and its field is ramped slice by slice as the residual case does.
     (wd / "ew_n.bmad").write_text(ew_lat("", False))
     rs_run("ewprep", rs_nml.format(lat="ew_n.bmad", root="ewprep",
-           extra='  slicing%window_length = 4.8e-9\n  global%track_end = "UND"\n',
+           extra='  window.window_length = 4.8e-9\n  run.track_end = "UND"\n',
            beam=ew_beam, field=gen_field))
     shutil.copy(wd / "ewprep-final.wf.h5", wd / "ewramp.wf.h5")
     with h5py.File(wd / "ewramp.wf.h5", "r+") as h5:
@@ -825,13 +834,13 @@ def main():
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
         if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
             del h5["lucifer/field"].attrs["slippageResidual"]
-    ew_imp = dict(beam='  beam_file = "ewprep-final.beam.h5"\n', field='  field_file = "ewramp.wf.h5"\n')
+    ew_imp = dict(beam='  beam.file = "ewprep-final.beam.h5"\n', field='  field.file = "ewramp.wf.h5"\n')
 
     for lord, what in ((False, "on the element itself"), (True, "resolved through a split lord")):
         tag = "lw" if lord else "ew"
         (wd / f"{tag}_w.bmad").write_text(ew_lat(ew_wake, lord))
         (wd / f"{tag}_n.bmad").write_text(ew_lat("", lord))
-        dumps = '  global%dump_beam_at = "UND,PW*"\n  global%dump_field_at = "UND,PW*"\n  global%dump_at_comb = T\n'
+        dumps = '  run.dump_beam_at = "UND,PW*"\n  run.dump_field_at = "UND,PW*"\n  run.dump_at_comb = T\n'
         rs_run(f"{tag}on", rs_nml.format(lat=f"{tag}_w.bmad", root=f"{tag}on", extra=dumps, **ew_imp))
         rs_run(f"{tag}off", rs_nml.format(lat=f"{tag}_n.bmad", root=f"{tag}off", extra=dumps, **ew_imp))
 
@@ -859,9 +868,9 @@ def main():
 
         def ew_restart(root, src, start, wake):
             text = rs_nml.format(lat=f"{tag}_{'w' if wake else 'n'}.bmad", root=root,
-                                 extra=f'  global%continuation = T\n  global%track_start = "{start}"\n  global%dump_at_comb = T\n',
-                                 beam=f'  beam_file = "{src}.beam.h5"\n',
-                                 field=f'  field_file = "{src}.wf.h5"\n')
+                                 extra=f'  run.continuation = T\n  run.track_start = "{start}"\n  run.dump_at_comb = T\n',
+                                 beam=f'  beam.file = "{src}.beam.h5"\n',
+                                 field=f'  field.file = "{src}.wf.h5"\n')
             rs_run(root, text)
 
         ew_restart(f"{tag}rA", f"{tag}on-at1-UND", apply_ele, True)
@@ -964,15 +973,15 @@ use, SEG
     (wd / "uvsplit.bmad").write_text(uv_lat.replace("UNDB: UNDA, fel_method = unaveraged\n",
                                                     "UNDB: UNDA, fel_method = unaveraged\nUNDS: UNDA\nMK: marker, superimpose, ref = UNDS\n")
                                            .replace("SEG: line = (UNDA, P1, UNDB, P1, UNDA)", "SEG: line = (UNDS, P1, UNDB, P1, UNDA)"))
-    uv_beam = """  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 2.401661485427e-14
-  beam_init%distribution_type(3) = "RAN_GAUSS"
-  beam_init%sig_z = 1.0e-9
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+    uv_beam = """  beam.n_particle = 1024
+  beam.bunch_charge = 2.401661485427e-14
+  beam.z_distribution = "RAN_GAUSS"
+  beam.sig_z = 1.0e-9
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
 """
-    CONT = '  global%continuation = T\n'
+    CONT = '  run.continuation = T\n'
 
     def uv_frames(root):
         out = {}
@@ -1031,7 +1040,7 @@ use, SEG
     # dump and its field ramped slice by slice with the residual stripped, neither a
     # checkpoint pair.
     rs_run("uvprep", rs_nml.format(lat="uvsand.bmad", root="uvprep",
-           extra='  slicing%window_length = 4.8e-9\n  global%track_end = "UNDA##1"\n',
+           extra='  window.window_length = 4.8e-9\n  run.track_end = "UNDA##1"\n',
            beam=uv_beam, field=gen_field))
     shutil.copy(wd / "uvprep-final.wf.h5", wd / "uvramp.wf.h5")
     with h5py.File(wd / "uvramp.wf.h5", "r+") as h5:
@@ -1040,10 +1049,10 @@ use, SEG
         m["x"][...] = u * (1.0 + 0.5 * np.arange(u.shape[0]) / u.shape[0])[:, None, None]
         if "lucifer/field" in h5 and "slippageResidual" in h5["lucifer/field"].attrs:
             del h5["lucifer/field"].attrs["slippageResidual"]
-    uv_imp = dict(beam='  beam_file = "uvprep-final.beam.h5"\n', field='  field_file = "uvramp.wf.h5"\n')
+    uv_imp = dict(beam='  beam.file = "uvprep-final.beam.h5"\n', field='  field.file = "uvramp.wf.h5"\n')
 
     rs_run("uvfull", rs_nml.format(lat="uvsand.bmad", root="uvfull",
-           extra='  global%dump_beam_at = "P1,UNDB"\n  global%dump_field_at = "P1,UNDB"\n  global%dump_at_comb = T\n', **uv_imp))
+           extra='  run.dump_beam_at = "P1,UNDB"\n  run.dump_field_at = "P1,UNDB"\n  run.dump_at_comb = T\n', **uv_imp))
     r_before = residual_of(wd / "uvfull-at2-P1.wf.h5")
     r_after = residual_of(wd / "uvfull-at3-UNDB.wf.h5")
     check("both unaveraged-boundary checkpoints carry a residual off a whole-slice boundary, and the "
@@ -1065,8 +1074,8 @@ use, SEG
                f"none at s = {interior_a} (averaged) or s = {interior_b} (unaveraged)]")
 
     rs_run("uvrafter", rs_nml.format(lat="uvsand.bmad", root="uvrafter",
-           extra=CONT + '  global%track_start = "P1##2"\n  global%dump_at_comb = T\n',
-           beam='  beam_file = "uvfull-at3-UNDB.beam.h5"\n', field='  field_file = "uvfull-at3-UNDB.wf.h5"\n'))
+           extra=CONT + '  run.track_start = "P1##2"\n  run.dump_at_comb = T\n',
+           beam='  beam.file = "uvfull-at3-UNDB.beam.h5"\n', field='  field.file = "uvfull-at3-UNDB.wf.h5"\n'))
     n_a, exact_a, wf_a, wp_a, wt_a = floor_of("uvfull", "uvrafter")
     check("continuation after the segment: field and particles at the floor through the averaged segment",
           exact_a and wf_a <= 1e-10 and wp_a <= 1e-10 and wt_a <= 1e-10,
@@ -1076,8 +1085,8 @@ use, SEG
     # written before any entrance conversion or advance, and its group and records are
     # the checkpoint's to the bit, so whatever follows is the segment's doing.
     rs_run("uvrbefore", rs_nml.format(lat="uvsand.bmad", root="uvrbefore",
-           extra=CONT + '  global%track_start = "UNDB"\n  global%dump_at_comb = T\n',
-           beam='  beam_file = "uvfull-at2-P1.beam.h5"\n', field='  field_file = "uvfull-at2-P1.wf.h5"\n'))
+           extra=CONT + '  run.track_start = "UNDB"\n  run.dump_at_comb = T\n',
+           beam='  beam.file = "uvfull-at2-P1.beam.h5"\n', field='  field.file = "uvfull-at2-P1.wf.h5"\n'))
     frb = uv_frames("uvrbefore")
     entry = round(0.81, 9)
     g0 = group_of(str(frb[entry]).replace(".wf.h5", ".beam.h5"))
@@ -1103,8 +1112,8 @@ use, SEG
     # The same checkpoint loaded the other way, an initialization, stopped after its
     # initial dump: the records are folded, phi0 and the residual start at zero.
     rs_run("uvinit", rs_nml.format(lat="uvsand.bmad", root="uvinit",
-           extra='  global%track_start = "UNDB"\n  global%load_only = T\n  global%write_initial = T\n',
-           beam='  beam_file = "uvfull-at2-P1.beam.h5"\n', field='  field_file = "uvfull-at2-P1.wf.h5"\n'))
+           extra='  run.track_start = "UNDB"\n  run.load_only = T\n  run.write_initial = T\n',
+           beam='  beam.file = "uvfull-at2-P1.beam.h5"\n', field='  field.file = "uvfull-at2-P1.wf.h5"\n'))
     gi = group_of(wd / "uvinit-initial.beam.h5")
     ri = residual_of(wd / "uvinit-initial.wf.h5")
     dz_init = float(np.max(np.abs(gi["z"] - ckb["z"]))) if gi is not None else -1.0
@@ -1117,8 +1126,8 @@ use, SEG
     # Refusals, each naming its condition.
     def refused(root, beam, field, start, fragment, lat="uvsand.bmad"):
         return rs_run(root, rs_nml.format(lat=lat, root=root,
-                      extra=CONT + f'  global%track_start = "{start}"\n',
-                      beam=f'  beam_file = "{beam}"\n', field=f'  field_file = "{field}"\n'),
+                      extra=CONT + f'  run.track_start = "{start}"\n',
+                      beam=f'  beam.file = "{beam}"\n', field=f'  field.file = "{field}"\n'),
                       expect_fail=True, fragment=fragment)
 
     def variant(name, src, edit):
@@ -1135,9 +1144,9 @@ use, SEG
     # answer: a frame from inside a device is not a place a run starts, and this mode wrote
     # this one, so the refusal reads where it was taken and not which method took it.
     init_inu = rs_run("uvi_inu", rs_nml.format(lat="uvsand.bmad", root="uvi_inu",
-                      extra='  global%track_start = "P1##2"\n  global%load_only = T\n',
-                      beam=f'  beam_file = "{pathlib.Path(fb).name}"\n',
-                      field=f'  field_file = "{fon[interior_b].name}"\n'),
+                      extra='  run.track_start = "P1##2"\n  run.load_only = T\n',
+                      beam=f'  beam.file = "{pathlib.Path(fb).name}"\n',
+                      field=f'  field.file = "{fon[interior_b].name}"\n'),
                       expect_fail=True, fragment="NOT A PLACE A RUN STARTS")
     check("and as an initialization it is refused for where it was taken, this mode having written it",
           init_inu)
@@ -1153,7 +1162,7 @@ use, SEG
     # from. fel_checkpoint_eligible keeps its guard against that boundary for a lattice
     # where one does.
     split_refused = rs_run("uvsplit", rs_nml.format(lat="uvsplit.bmad", root="uvsplit",
-           extra='  global%track_end = "UNDS#2"\n  global%dump_beam_at = "UNDS#1"\n  global%dump_field_at = "UNDS#1"\n', **uv_imp),
+           extra='  run.track_end = "UNDS#2"\n  run.dump_beam_at = "UNDS#1"\n  run.dump_field_at = "UNDS#1"\n', **uv_imp),
            expect_fail=True, fragment="SUPER_SLAVE")
     check("an undulator cut by a superimposed marker is refused at setup, so no sliced endpoint inside one is "
           "ever dumped", split_refused,

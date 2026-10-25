@@ -210,8 +210,8 @@ contains
 ! 'freerun' lets the longitudinal state carry across steps.
 !
 ! Input:
-!   mode         -- character(*): global%fp32_check.
-!   mutate       -- logical: global%fp32_mutate. Coarsen the twin's state so the check
+!   mode         -- character(*): run.fp32_check.
+!   mutate       -- logical: run.fp32_mutate. Coarsen the twin's state so the check
 !                     can fail?
 !   nslice       -- integer: Slice count.
 !   bucket_shift -- real(rp): The slice bucket [m], for the renormalization round trip.

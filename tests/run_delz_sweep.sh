@@ -117,25 +117,27 @@ for np in 1 2 3 6 12; do
 call, file = aramis.bmad
 UND[ds_step] = $delz
 LAT
-  cat > "sweep_p$np.nml" <<NML
-&fel_params
-  lat_file = "sweep_p$np.bmad"
-  global%out_root = "sweep_p$np"
-  global%interlude_model = "bmad"
-  global%write_diag = T
-  slicing%n_wavelength = 12
-/
-&fel_beam_init
-  beam_file = "AramisS12-initial.beam.h5"
-  beamlet_size = 8
-/
-&fel_wavefront_init
-  field_file = "AramisS12-initial.wf.h5"
-  wavefront_init%lambda0 = 1e-10
-/
-NML
+  cat > "sweep_p$np.toml" <<DECK
+lattice = "sweep_p$np.bmad"
+
+[run]
+out_root = "sweep_p$np"
+interlude_model = "bmad"
+write_diag = true
+
+[window]
+n_wavelength = 12
+
+[beam]
+file = "AramisS12-initial.beam.h5"
+beamlet_size = 8
+
+[field]
+file = "AramisS12-initial.wf.h5"
+lambda0 = 1e-10
+DECK
   echo "--- lucifer: ds_step = $np period(s) -----------------------------------"
-  if ! "$EXE" "sweep_p$np.nml" > "sweep_p$np.log" 2>&1; then
+  if ! "$EXE" "sweep_p$np.toml" > "sweep_p$np.log" 2>&1; then
     echo "lucifer ds_step=$delz FAILED; log tail:" >&2
     tail -20 "sweep_p$np.log" >&2
     exit 1

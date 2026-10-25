@@ -13,7 +13,7 @@ that quietly loses its example reads exactly like one that never had it. Six ass
   3. Every directory a matrix row points at exists. A row with no link at all is
      allowed only in the two documented prose forms below. A planned row has no
      directory yet and says what it waits on.
-  4. Every example directory carries a README and a deck, with lucifer.in the primary
+  4. Every example directory carries a README and a deck, with lucifer.toml the primary
      name wherever a reader rather than a runner picks the deck.
   5. Every deck fenced into a generated page is byte-identical to the file on disk,
      which is what makes the pages copy-paste safe.
@@ -157,16 +157,16 @@ def main():
                                 "a planned example with a directory is a contradiction")
 
     # 4. Every directory is a complete example. A directory run by hand carries
-    # lucifer.in as its primary deck. One with its own runner may name its decks by
+    # lucifer.toml as its primary deck. One with its own runner may name its decks by
     # role instead, since the runner rather than the reader chooses them.
     for d in dirs:
         if not (ex / d / "README.md").is_file():
             problems.append(f"examples/{d}/ has no README.md")
-        decks = sorted(f.name for f in (ex / d).glob("lucifer*.in"))
+        decks = sorted(f.name for f in (ex / d).glob("lucifer*.toml"))
         if not decks:
-            problems.append(f"examples/{d}/ has no lucifer*.in deck")
-        elif "lucifer.in" not in decks and not (ex / d / "run.sh").is_file():
-            problems.append(f"examples/{d}/ has no lucifer.in and no run.sh to name its "
+            problems.append(f"examples/{d}/ has no lucifer*.toml deck")
+        elif "lucifer.toml" not in decks and not (ex / d / "run.sh").is_file():
+            problems.append(f"examples/{d}/ has no lucifer.toml and no run.sh to name its "
                             f"decks for it: {decks}")
 
     # 5 and 6. The generated pages quote the real files, and their figures exist.

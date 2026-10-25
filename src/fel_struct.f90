@@ -6,22 +6,22 @@
 ! One assembled-state struct, fel_run_struct, is passed explicitly by the library.
 !
 ! The input structs have no allocatable or pointer components. So an input file sets
-! them directly through a namelist, as in Tao:
+! them directly through the deck, as in Tao:
 !
-!   &fel_params
-!     lat_file = "line.bmad"
-!     global%out_root = "run1"
-!     bmad_com%radiation_damping_on = T
-!     chamber_wake%radius = 2.5e-3
-!     space_charge%nz = 2
+!   [run]
+!     lattice = "line.bmad"
+!     run.out_root = "run1"
+!     bmad.radiation_damping_on = true
+!     wake.radius = 2.5e-3
+!     space_charge.nz = 2
 !   /
-!   &fel_beam_init
-!     beam_init%n_particle = 8192
-!     shot_noise = T
+!   [beam]
+!     beam.n_particle = 8192
+!     shot_noise = true
 !   /
-!   &fel_wavefront_init
-!     wavefront_init%lambda0 = 1e-10
-!     wavefront_init%grid_n_pts = 255
+!   [field]
+!     field.lambda0 = 1e-10
+!     field.grid_n_pts = 255
 !   /
 !
 ! bmad_com and space_charge_com are Bmad's own globals, exposed directly as Tao's
@@ -43,14 +43,14 @@ use fel_stats_mod
 implicit none
 
 ! The sin^2 ramp of an unaveraged element, in periods at each end, where the deck leaves
-! global%unaveraged_ramp_periods unset or sets it to 0 (fel-physics.md sec-unaveraged).
+! run.unaveraged_ramp_periods unset or sets it to 0 (fel-physics.md sec-unaveraged).
 
 integer, parameter :: fel_ramp_periods_default$ = 2
 
 !+
 ! Struct fel_slicing_struct
 !
-! Longitudinal discretization of the run, set in &fel_params as slicing%. The beam's
+! Longitudinal discretization of the run, set in [run] as window.. The beam's
 ! slices and the field's z samples are one partition. So the window belongs to neither
 ! the beam nor the field and sits beside them.
 !
@@ -79,7 +79,7 @@ end type
 !+
 ! Struct fel_global_struct
 !
-! Run-level switches and names, set in &fel_params as global%. The analog of
+! Run-level switches and names, set in [run] as run.. The analog of
 ! tao_global_struct. Everything here concerns one run of the tracker. The physics is
 ! described by the lattice, beam_init and wavefront_init.
 !-
@@ -153,7 +153,7 @@ type fel_global_struct
   ! built on the full lattice. So a windowed run composes exactly with the full run:
   ! [1,k] and then [k+1,end] from its dumps reproduce [1,end] bit for bit.
   character(60) :: track_start = '', track_end = ''
-  ! What beam_file and field_file are for. Off, they initialize a fresh run from sliced
+  ! What beam.file and field.file are for. Off, they initialize a fresh run from sliced
   ! inputs, prepared or ramped. Only the standard records are read, phi0 and the slippage
   ! residual start at zero, and a checkpoint group in either file is ignored.
   ! On, they continue a run. Both files must be frames of one eligible boundary and carry
@@ -232,11 +232,11 @@ end type
 !+
 ! Struct wavefront_init_struct
 !
-! The radiation starting condition (&fel_wavefront_init), the analog of beam_init_struct.
+! The radiation starting condition ([field]), the analog of beam_init_struct.
 ! A wavefront is an optical object: a transverse grid, a wavelength and a longitudinal
 ! spacing, and nothing else longitudinal. The time window that sets that spacing belongs
 ! to the FEL interaction and lives in fel_slicing_struct. harmonics requests the field
-! set. A field_file import overrides the seed.
+! set. A field.file import overrides the seed.
 !-
 
 type wavefront_init_struct
@@ -267,9 +267,9 @@ real(rp), parameter :: fel_widths_per_sigma$ = 9
 !+
 ! Struct fel_chamber_wake_init_struct
 !
-! The chamber-wake description (&fel_params chamber_wake%), with Genesis &wake names. A
+! The chamber-wake description ([run] wake.), with Genesis &wake names. A
 ! plain mirror of the configuration fields of fel_wake_struct. That struct carries
-! allocatable state, which a namelist object cannot. fel_setup copies these in.
+! allocatable state, which an input mirror need not. fel_setup copies these in.
 !-
 
 type fel_chamber_wake_init_struct
@@ -293,26 +293,26 @@ type fel_chamber_wake_init_struct
 end type
 
 ! Space charge needs no init mirror. fel_space_charge_struct is pure scalars and is read
-! directly in &fel_params as space_charge%.
+! directly in [run] as space_charge..
 
 !+
 ! Struct fel_beam_init_param_struct
 !
-! The beam-side scalars of &fel_beam_init. They sit beside Bmad's beam_init, which
+! The beam-side scalars of [beam]. They sit beside Bmad's beam_init, which
 ! describes the bunch, and imp, the resampler. They are the source and output files,
 ! the quiet-start settings and the check instruments the benchmark sets.
 !-
 
 type fel_beam_init_param_struct
-  character(400) :: beam_file = ''        ! An FEL beam already in slices (with field_file(1)).
+  character(400) :: beam_file = ''        ! An FEL beam already in slices (with field.file(1)).
   character(400) :: write_genesis_dist = ''  ! Write the bunch as a Genesis4 distribution file.
   character(400) :: write_openpmd_file = ''  ! Write the bunch as openPMD-beamphysics.
   ! How a bunch becomes slices (fel-physics.md sec-loading). The bunch is beam_init's,
-  ! generated or read through beam_init%position_file. It is binned by arrival time into
+  ! generated or read through beam.position_file. It is binned by arrival time into
   ! the slices of slicing.
   ! "sample" draws the same number of beamlets in every slice from what fell into it,
   ! weighted by the slice charge, so the current follows the bunch. This is Genesis's
-  ! &beam with &profile and its importdistribution in one. beam_init%n_particle is the
+  ! &beam with &profile and its importdistribution in one. beam.n_particle is the
   ! count per slice after phase copies.
   ! "keep" keeps every real particle as a beamlet of beamlet_size copies at
   ! weight/beamlet_size. The counts follow the charge, so the correlations of a
@@ -378,7 +378,7 @@ type fel_run_struct
   real(rp), allocatable :: light_corr(:)   ! Chord-vs-arc correction on a break's last element [m].
   logical, allocatable :: is_fel(:)
   ! Space charge per element: ele%space_charge_method = slice and Bmad's master switch
-  ! bmad_com%csr_and_space_charge_on, resolved once at setup for the walk to read.
+  ! bmad.csr_and_space_charge_on, resolved once at setup for the walk to read.
   logical, allocatable :: sc_here(:)
   logical, allocatable :: dump_beam_here(:), dump_field_here(:)
   integer :: i_start = 1, i_end = 0        ! The resolved tracking window [elements].
@@ -541,7 +541,7 @@ end function fel_comb_take
 ! rounding down to n-1 pieces.
 !
 ! Input:
-!   ds_step -- real(rp): global%interlude_ds_step. Zero or negative gives one piece.
+!   ds_step -- real(rp): run.interlude_ds_step. Zero or negative gives one piece.
 !   length  -- real(rp): The element's length [m].
 !
 ! Output:
@@ -573,7 +573,7 @@ end function fel_interlude_pieces
 ! or the stats arrays are mis-sized.
 !
 ! Bmad's own resolver, pointer_to_wake_ele, finds the wake on the element or on exactly
-! one slave of a split lord. With bmad_com%sr_wakes_on off, track1_bunch applies no
+! one slave of a split lord. With bmad.sr_wakes_on off, track1_bunch applies no
 ! wake, so no element carries one here. A zero-length element whose wake scales with
 ! its length (Bmad's default) kicks by exactly zero and carries none either. A
 ! long-range wake has no scale_with_length and acts at zero length, so it is kept.

@@ -168,12 +168,12 @@ enddo
 
 ! A bunch with no charge imports as a dark beam. Every window current and every weight
 ! is zero, and the run tracks and produces nothing, silently. The usual causes are an
-! openPMD file without charge data and an unset beam_init%bunch_charge. The run is
+! openPMD file without charge data and an unset beam.bunch_charge. The run is
 ! refused, and the error names both.
 
 if (sum(wt) <= 0) then
   call out_io (s_error$, r_name, 'BUNCH HAS ZERO TOTAL CHARGE; NOTHING WOULD LASE.', &
-    'AN openPMD FILE WITHOUT CHARGE DATA, OR AN UNSET beam_init%bunch_charge, IMPORTS DARK.')
+    'AN openPMD FILE WITHOUT CHARGE DATA, OR AN UNSET beam.bunch_charge, IMPORTS DARK.')
   return
 endif
 
@@ -434,7 +434,7 @@ sl%n = prm%n_particle_per_slice
 sl%weight(1:prm%n_particle_per_slice) = w_part
 
 ! Noise where the deck asks for it. Genesis's importdistribution applies it whether or
-! not its shotnoise flag says so. This port applies it only with shot_noise = T.
+! not its shotnoise flag says so. This port applies it only with shot_noise = true.
 
 if (ne > 0 .and. shot_noise) then
   call fel_impose_noise (sl, theta(1:prm%n_particle_per_slice), prm%n_particle_per_slice, quiet_start, &

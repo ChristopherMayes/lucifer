@@ -146,20 +146,20 @@ DIRS=()
 for dir in */; do
   dir="${dir%/}"
   [[ "$dir" == "saturation_demo" ]] && continue
-  # The decks run lucifer.in first, then the rest in byte order. A directory's decks can
-  # depend on each other: import's lucifer_from_file.in reads the bunch its lucifer.in
+  # The decks run lucifer.toml first, then the rest in byte order. A directory's decks can
+  # depend on each other: import's lucifer_from_file.toml reads the bunch its lucifer.toml
   # writes. The glob's own order follows the locale's collation, under which
-  # lucifer_from_file.in sorts ahead of lucifer.in, and a bunch file an earlier run left
+  # lucifer_from_file.toml sorts ahead of lucifer.toml, and a bunch file an earlier run left
   # in the tree hides that.
   shopt -s nullglob
   decks=()
-  [[ -f "$dir/lucifer.in" ]] && decks=("$dir/lucifer.in")
+  [[ -f "$dir/lucifer.toml" ]] && decks=("$dir/lucifer.toml")
   while IFS= read -r d; do
     decks+=("$d")
-  done < <(LC_ALL=C ls -1 "$dir"/lucifer*.in 2>/dev/null | LC_ALL=C sort | grep -vx "$dir/lucifer.in")
+  done < <(LC_ALL=C ls -1 "$dir"/lucifer*.toml 2>/dev/null | LC_ALL=C sort | grep -vx "$dir/lucifer.toml")
   shopt -u nullglob
   if [[ ${#decks[@]} -eq 0 ]]; then
-    echo "Error: $dir has no lucifer*.in deck." >&2
+    echo "Error: $dir has no lucifer*.toml deck." >&2
     FAILED=1
     continue
   fi
@@ -180,7 +180,7 @@ run_dir () {   # <dir> <index>
   while IFS= read -r deck_path; do decks+=("$deck_path"); done < "$STATE/decks.$idx"
   for deck_path in "${decks[@]}"; do
     deck="$(basename "$deck_path")"
-    log="${deck%.in}.log"
+    log="${deck%.toml}.log"
     t0=$SECONDS
     ( cd "$dir" && "$EXE" "$deck" > "$log" 2>&1 < /dev/null )
     rc=$?
@@ -213,7 +213,7 @@ run_dir () {   # <dir> <index>
   # deliberately differ (chicane writes "chicane", coherent_source writes "coherent").
   # It runs in this worker, after this directory's decks, because it reads what they wrote.
   if [[ $FIGURES -eq 1 ]]; then
-    primary="$dir/lucifer.in"
+    primary="$dir/lucifer.toml"
     [[ -f "$primary" ]] || primary="${decks[0]}"
     root="$(sed -n 's/.*out_root[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$primary" | head -1)"
     stats="$dir/$root.stats.h5"

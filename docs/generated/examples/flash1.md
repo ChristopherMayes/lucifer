@@ -11,7 +11,7 @@ Everything on this page lives in and runs from `examples/flash1/`.
 
 The example runs in one command, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
+    ../../build-release/bin/lucifer lucifer.toml
     python ../plot_fel.py flash1.stats.h5
 
 FLASH at DESY lased at 13.7 nm in 2006, the first free-electron laser to reach saturation at that wavelength, and reported its undulator, its beam and its performance. This example is that line: six planar segments, a Gaussian bunch on the published beam, and SASE from the quiet start through 27 m of undulator. Every other example in this directory runs the Aramis benchmark at 0.1 nm, so this one is also the third machine the numerical defaults are measured on ([SASE convergence](../../startup-noise.md)).
@@ -66,12 +66,12 @@ Every value is measured on this machine. The Aramis column is what the other exa
 | `grid_n_pts` | 255 | 129 | cells of sigma_x/6.8, the criterion of the convergence page. 65 points give a lower pulse energy, and 257 raise the share of the power outside the mode several times |
 | `grid_half_width` | 2e-4 m | 1.0e-3 m | 9.3 rms beam sizes. At the same cell size 0.7 mm and 1.5 mm give pulse energies that agree to a tenth of a percent, so the half width does not enter |
 | `ds_step` | 0.045 m | 0.0819 m | three periods, 55 steps per segment. One period gives a pulse energy inside the seed spread, at nearly three times the wall clock |
-| `slicing%n_wavelength` | 3 | 12 | 3.4 slices per cooperation length of 40 wavelengths. Six wavelengths per slice give a pulse energy inside the seed spread, at twice the wall clock |
-| `slicing%n_slice` | 96 | 351 | the bunch to four sigma either side, plus 990 wavelengths of slippage at each end |
-| `beam_init%n_particle` | 2048 | 4096 | measured with the filter off, the share of the exit power outside the mode falls with the load, from a quarter at 1024 to under the convergence page's tenth at 4096 and lower again at 16384. The filter row below is what the load now rests on |
+| `window.n_wavelength` | 3 | 12 | 3.4 slices per cooperation length of 40 wavelengths. Six wavelengths per slice give a pulse energy inside the seed spread, at twice the wall clock |
+| `window.n_slice` | 96 | 351 | the bunch to four sigma either side, plus 990 wavelengths of slippage at each end |
+| `beam.n_particle` | 2048 | 4096 | measured with the filter off, the share of the exit power outside the mode falls with the load, from a quarter at 1024 to under the convergence page's tenth at 4096 and lower again at 16384. The filter row below is what the load now rests on |
 | `beamlet_size` | 8 | 8 | at 4096 particles, a beamlet of 4 leaves less outside the mode and one of 16 leaves more. Eight resolves three harmonics where four resolves one |
-| `global%source_filter` | T | T | the default, at the derived edge the table below records. It removes most of the wide-angle power here and moves the pulse energy by under a percent, since 4096 particles has already converged. At 1024 particles it removes a larger share and reaches the same answer at two thirds of the wall clock |
-| `resample%slice_width` | 0.01 | not read | the deck describes its bunch and the loader evaluates it per slice, so nothing is resampled |
+| `run.source_filter` | T | T | the default, at the derived edge the table below records. It removes most of the wide-angle power here and moves the pulse energy by under a percent, since 4096 particles has already converged. At 1024 particles it removes a larger share and reaches the same answer at two thirds of the wall clock |
+| `beam.resample.slice_width` | 0.01 | not read | the deck describes its bunch and the loader evaluates it per slice, so nothing is resampled |
 
 The rows were measured at 129 points here and 255 on Aramis. The decks state 128 and 256, the powers of two the device field solver takes.
 
@@ -91,7 +91,7 @@ The run takes about twenty seconds.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | Unit |
+| Quantity | `lucifer.toml` | Unit |
 |---|---|---|
 | exit power | 8.5177e+10 | W |
 | exit power per slice | 2.4267e+08 | W |
@@ -140,33 +140,32 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "flash1.bmad"
-  global%out_root = "flash1"
-  slicing%n_slice = 351
-  slicing%n_wavelength = 12
-/
+```toml
+lattice = "flash1.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 4096
-  beam_init%bunch_charge = 7.983503e-11
-  beam_init%sig_z = 3.819304e-6
-  beam_init%sig_pz = 6e-4
-  beam_init%a_norm_emit = 1.5e-6
-  beam_init%b_norm_emit = 1.5e-6
-  shot_noise = T
-/
+[run]
+out_root = "flash1"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1.37e-8
+[window]
+n_wavelength = 12
+n_slice = 351
 
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 128
-  wavefront_init%grid_half_width = 1.0e-3
-/
+[beam]
+n_particle = 4096
+bunch_charge = 7.983503e-11
+sig_z = 3.819304e-6
+sig_pz = 6e-4
+a_norm_emit = 1.5e-6
+b_norm_emit = 1.5e-6
+shot_noise = true
+
+[field]
+lambda0 = 1.37e-8
+grid_n_pts = 128
+grid_half_width = 1.0e-3
+seed_power = 0
 ```
 
 ### `flash1.bmad`

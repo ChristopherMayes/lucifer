@@ -26,7 +26,7 @@ rather than by a reference file.
      thin-slice list on a deck loaded under the measured floor, load_only stopping
      after the header, and the refusal of a harmonic at which the load carries no shot
      noise.
-  8. The frame series (global%dump_at_comb). One frame per stats record, a frame at an
+  8. The frame series (run.dump_at_comb). One frame per stats record, a frame at an
      element end identical to that element's own dump, labels unique in every frame and
      following migration, the frame's attributes against the lattice, frames landing
      inside an element, and a run with frames identical to the same run without.
@@ -34,7 +34,7 @@ rather than by a reference file.
      centroid from the frame's own particles, per-slice power from the field frame, and
      the reduced projections integrating to the row's power. Also a slice range
      cutting both files.
- 10. The interlude's own steps (global%interlude_ds_step). The knob at zero reproduces
+ 10. The interlude's own steps (run.interlude_ds_step). The knob at zero reproduces
      the run that never named it byte for byte. Cutting an element reproduces tracking
      it whole. Rows and frames land inside a quadrupole and a pipe at the s the rows
      carry. The stats file is exact-sized against the rows written, and the header
@@ -67,7 +67,8 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml
+to_groups = to_toml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
@@ -80,19 +81,19 @@ import validate_bmad_stats  # noqa: E402  The standard's own conformance checker
 
 FAILED = False
 
-NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 8.0e-15
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4e-10
-  beam_init%grid(3)%x_max = 4e-10
-  beam_init%sig_pz = 8.8045e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 512
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.8045e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
@@ -115,18 +116,18 @@ wiggler::*[FEL_METHOD] = unaveraged
 # The frame-series deck. A short segment, a coarse comb so the frame count stays small,
 # and migration on so labels have to follow particles between slices.
 
-FRAME_NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis_1seg.bmad"
+FRAME_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   lambda0 = 1e-10
-  beam_init%n_particle = 256
-  beam_init%bunch_charge = 8.0e-15
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4e-10
-  beam_init%grid(3)%x_max = 4e-10
-  beam_init%sig_pz = 8.8045e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 256
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.8045e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
@@ -144,18 +145,18 @@ FRAME_NML = """! flat keys; routed into the three groups by nml.to_groups
 # half the floor at which the source filter's convergence was measured, so the load
 # standing and the thin-slice list both have something to report.
 
-PRE_NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis_1seg.bmad"
+PRE_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   lambda0 = 1e-10
-  beam_init%n_particle = 512
-  beam_init%bunch_charge = 8.0e-15
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4e-10
-  beam_init%grid(3)%x_max = 4e-10
-  beam_init%sig_pz = 8.8045e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 512
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.8045e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
@@ -205,18 +206,20 @@ def particle_frames(wd, root):
 
 
 def h5_identical(fa, fb):
-    """Whether two HDF5 files hold the same data, with meta/ excluded.
+    """Whether two HDF5 files hold the same data, with meta/ and params/ excluded.
 
     meta/ holds provenance as datasets (fel-physics.md, sec-meta), since HDF5 caps an
     attribute at 64 kB. input_echo carries out_root and timestamp carries the clock, so
-    any two runs differ in meta/. Nothing in meta/ is physics. Only datasets are
-    compared, so attributes do not enter.
+    any two runs differ in meta/. params/ records every key of the deck, the frame and
+    dump switches among them, so two runs that differ only in what they write differ
+    there and nowhere else. Nothing in either is physics. Only datasets are compared, so
+    attributes do not enter.
 
     same_data counts NaN as equal to NaN, which the stats file needs. See read_stats.
     """
     with h5py.File(fa) as a, h5py.File(fb) as b:
         names_a, names_b = [], []
-        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith("meta/")
+        keep = lambda n, o: isinstance(o, h5py.Dataset) and not n.startswith(("meta/", "params/"))
         a.visititems(lambda n, o: names_a.append(n) if keep(n, o) else None)
         b.visititems(lambda n, o: names_b.append(n) if keep(n, o) else None)
         if sorted(names_a) != sorted(names_b):
@@ -234,8 +237,8 @@ def check(name, value, tol, note=""):
 
 
 def run(exe, wd, name, text, threads="8"):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-3000:]}\n{r.stderr[-1000:]}")
@@ -244,7 +247,7 @@ def run(exe, wd, name, text, threads="8"):
 
 
 
-# The interlude's own steps (global%interlude_ds_step). Tao's comb has two halves.
+# The interlude's own steps (run.interlude_ds_step). Tao's comb has two halves.
 # comb_ds_save is the first: save_a_bunch_step selects among positions a tracker already
 # reaches. The interlude step is the second, tao_lattice_calc_mod's n_slice branch,
 # which cuts an element that would otherwise be crossed in one map. The lattice is a
@@ -268,17 +271,17 @@ SEG: line = (UND, QF, P1, UND)
 use, SEG
 """
 
-INT_NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+INT_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 256
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 256
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 5e3
   seed_waist_size = 30e-6
@@ -313,13 +316,13 @@ def interludes(exe, wd):
 
     run(exe, wd, "int_w", INT_NML.format(lat="intlat.bmad", root="int_w", extra=""))
     run(exe, wd, "int_off", INT_NML.format(lat="intlat.bmad", root="int_off",
-        extra="  global%interlude_ds_step = 0\n"))
+        extra="  run.interlude_ds_step = 0\n"))
     same = (wd / "int_w.diag.txt").read_bytes() == (wd / "int_off.diag.txt").read_bytes()
     check("interlude: the knob at zero is the run that never named it (0 = yes)",
           0.0 if same else 1.0, 0.5)
 
     run(exe, wd, "int_p", INT_NML.format(lat="intlat.bmad", root="int_p",
-        extra="  global%interlude_ds_step = 0.04\n"))
+        extra="  run.interlude_ds_step = 0.04\n"))
     run(exe, wd, "int_h", INT_NML.format(lat="intlath.bmad", root="int_h", extra=""))
     w = np.loadtxt(wd / "int_w.diag.txt")
     p = np.loadtxt(wd / "int_p.diag.txt")
@@ -352,14 +355,14 @@ def interludes(exe, wd):
     # mismatch would mean the two disagree about where a row falls.
     with h5py.File(wd / "int_p.stats.h5") as f:
         nrec = f["coords/s"].shape[0]
-        step = float(np.ravel(f["params/global/interlude_ds_step"])[0])
+        step = float(np.ravel(f["params/run/interlude_ds_step"])[0])
     check("interlude: the stats file holds exactly the rows the diag carries",
           abs(nrec - len(p)), 0.5, note=f"[{nrec} against {len(p)}]")
     check("interlude: the stats file records the step it ran at", abs(step - 0.04), 1e-12)
 
     # Frames along the interlude, which is what the knob is for.
     run(exe, wd, "int_f", INT_NML.format(lat="intlat.bmad", root="int_f",
-        extra="  global%interlude_ds_step = 0.04\n  global%dump_at_comb = T\n"))
+        extra="  run.interlude_ds_step = 0.04\n  run.dump_at_comb = T\n"))
     frames = particle_frames(wd, "int_f")
     check("interlude: one frame per stats row with the pieces on",
           abs(len(frames) - len(p)), 0.5, note=f"[{len(frames)} frames, {len(p)} rows]")
@@ -376,13 +379,13 @@ def interludes(exe, wd):
     # The pre-run header states the pieces before it tracks, and says nothing when the
     # element is tracked whole.
     r = run(exe, wd, "int_hdr", INT_NML.format(lat="intlat.bmad", root="int_hdr",
-        extra="  global%interlude_ds_step = 0.04\n  global%load_only = T\n"))
+        extra="  run.interlude_ds_step = 0.04\n  run.load_only = T\n"))
     m = re.search(r"Interlude   steps of .*: (\d+) pieces, (\d+) element", r.stdout)
     check("interlude: the header states the pieces before it tracks",
           0.0 if (m and int(m.group(1)) == 15 and int(m.group(2)) == 2) else 1.0, 0.5,
           note=f"[{m.group(0) if m else 'absent'}]")
     r = run(exe, wd, "int_hdr0", INT_NML.format(lat="intlat.bmad", root="int_hdr0",
-        extra="  global%load_only = T\n"))
+        extra="  run.load_only = T\n"))
     check("interlude: and says nothing where nothing is cut",
           0.0 if "Interlude" not in r.stdout else 1.0, 0.5)
 
@@ -399,7 +402,7 @@ def interludes(exe, wd):
         "P1: pipe, l = 0.40, sr_wake = {scale_with_length = T, z_long = "
         "{position_dependence = none, w = {-1e-6 0.0, 0.0 0.0, 1e-6 0.0,}}}"))
     run(exe, wd, "int_wk", INT_NML.format(lat="intlatw.bmad", root="int_wk",
-        extra="  global%interlude_ds_step = 0.04\n"))
+        extra="  run.interlude_ds_step = 0.04\n"))
     wk = np.loadtxt(wd / "int_wk.diag.txt")
     check("interlude: a wake-carrying element is not cut", abs(inside(wk, 0.5, 0.9) - 0), 0.5,
           note=f"[{inside(wk, 0.5, 0.9)} rows inside it]")
@@ -408,20 +411,20 @@ def interludes(exe, wd):
     check("interlude: the zero wake left the physics alone, so only the rows differ",
           abs(wk[-1, 2] - p[-1, 2]) / p[-1, 2], 1e-9)
 
-    (wd / "int_gen.nml").write_text(to_groups(INT_NML.format(lat="intlat.bmad", root="int_gen",
-        extra='  global%interlude_ds_step = 0.04\n  global%interlude_model = "genesis"\n')))
-    rg = subprocess.run([str(exe), "int_gen.nml"], cwd=wd, capture_output=True, text=True,
+    (wd / "int_gen.toml").write_text(to_groups(INT_NML.format(lat="intlat.bmad", root="int_gen",
+        extra='  run.interlude_ds_step = 0.04\n  run.interlude_model = "genesis"\n')))
+    rg = subprocess.run([str(exe), "int_gen.toml"], cwd=wd, capture_output=True, text=True,
                         env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = rg.returncode != 0 and "TRANSCRIPTION OF GENESIS" in (rg.stdout + rg.stderr)
     check("interlude: refused with the transcribed Genesis interlude (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
-    # The switch off. With bmad_com%sr_wakes_on off the walk applies no wake and cuts the
+    # The switch off. With bmad.sr_wakes_on off the walk applies no wake and cuts the
     # element like any other. The setup's record-count precompute must make the same
     # decision. If the precompute counts the element whole while the walk cuts it, the
     # run stops at the stats writer with more records than the precomputed count.
     wo = run(exe, wd, "int_wko", INT_NML.format(lat="intlatw.bmad", root="int_wko",
-        extra="  global%interlude_ds_step = 0.04\n  bmad_com%sr_wakes_on = F\n"))
+        extra="  run.interlude_ds_step = 0.04\n  bmad.sr_wakes_on = F\n"))
     wko = np.loadtxt(wd / "int_wko.diag.txt")
     check("interlude: with sr_wakes_on off the wake element is cut like any other",
           abs(inside(wko, 0.5, 0.9) - 9), 0.5, note=f"[{inside(wko, 0.5, 0.9)} rows inside it]")
@@ -437,10 +440,10 @@ def interludes(exe, wd):
     # with nothing to solve.
     (wd / "intlat_sc.bmad").write_text(INT_LAT.replace(
         "P1: pipe, l = 0.40", "P1: pipe, l = 0.40, space_charge_method = slice"))
-    (wd / "int_sc.nml").write_text(to_groups(INT_NML.format(lat="intlat_sc.bmad", root="int_sc",
-        extra="  bmad_com%csr_and_space_charge_on = T\n  space_charge%nz = 1\n"
-              "  space_charge%rmax = 250e-6\n")))
-    rs = subprocess.run([str(exe), "int_sc.nml"], cwd=wd, capture_output=True, text=True,
+    (wd / "int_sc.toml").write_text(to_groups(INT_NML.format(lat="intlat_sc.bmad", root="int_sc",
+        extra="  bmad.csr_and_space_charge_on = T\n  space_charge.nz = 1\n"
+              "  space_charge.rmax = 250e-6\n")))
+    rs = subprocess.run([str(exe), "int_sc.toml"], cwd=wd, capture_output=True, text=True,
                         env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = rs.returncode != 0 and "NOT AN FEL ELEMENT" in (rs.stdout + rs.stderr)
     check("interlude: space charge on a seam interlude is refused (0 = yes)",
@@ -552,23 +555,23 @@ def grid_parity(exe, wd, examples):
     returns the same deficit. An odd grid puts a cell on the axis. The example's dumps are
     left out, since the exit power is what the check reads, and the lattice is the
     example's own (docs/validation.md, the transverse grid)."""
-    deck = (examples / "steady_state" / "lucifer.in").read_text()
+    deck = (examples / "steady_state" / "lucifer.toml").read_text()
     shutil.copy(examples / "aramis.bmad", wd / "aramis.bmad")
-    deck = deck.replace('lat_file = "../aramis.bmad"', 'lat_file = "aramis.bmad"')
+    deck = deck.replace('lattice = "../aramis.bmad"', 'lattice = "aramis.bmad"')
     deck = "\n".join(line for line in deck.splitlines()
                      if "dump_beam_at" not in line and "dump_field_at" not in line) + "\n"
-    for needed in ('global%out_root = "steady_state"', "grid_n_pts = 256", "grid_half_width = 2e-4"):
+    for needed in ('out_root = "steady_state"', "grid_n_pts = 256", "grid_half_width = 2e-4"):
         if needed not in deck:
             print(f"FAIL: the steady-state example's deck no longer states {needed}")
             sys.exit(1)
     power = {}
     for n in (256, 255):
-        text = deck.replace('global%out_root = "steady_state"', f'global%out_root = "gp{n}"')
+        text = deck.replace('out_root = "steady_state"', f'out_root = "gp{n}"')
         if n == 255:
             text = text.replace("grid_n_pts = 256", "grid_n_pts = 255")
             text = text.replace("grid_half_width = 2e-4", f"grid_half_width = {2e-4 * 254 / 255:.12e}")
-        (wd / f"gp{n}.nml").write_text(text)
-        r = subprocess.run([str(exe), f"gp{n}.nml"], cwd=wd, capture_output=True, text=True,
+        (wd / f"gp{n}.toml").write_text(to_toml(text))
+        r = subprocess.run([str(exe), f"gp{n}.toml"], cwd=wd, capture_output=True, text=True,
                            env={"OMP_NUM_THREADS": "8", "PATH": "/usr/bin:/bin"})
         if r.returncode != 0:
             print(f"FAIL: gp{n} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
@@ -1087,16 +1090,16 @@ def main():
 
     # 5b. The environment switch: opt-in, so the fields appear only when asked for.
     run(exe, wd, "dgenv", NML.format(lat="dg_wrap.bmad", root="dgenv",
-        extra="  global%record_environment = T\n"), threads="2")
+        extra="  run.record_environment = T\n"), threads="2")
     with read_stats(wd / "dgenv.stats.h5") as st:
         got = sorted(k for k in st.meta if k in ("user", "cwd"))
-    check("provenance: global%record_environment restores user and cwd",
+    check("provenance: run.record_environment restores user and cwd",
           abs(len(got) - 2), 0.5, note=f"[{', '.join(got) if got else 'neither'}]")
 
     # 6. Refusal of a dump list entry that matches nothing.
-    (wd / "dg_bad.nml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_bad",
+    (wd / "dg_bad.toml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_bad",
                                              extra='  dump_beam_at(2) = "NO_SUCH_ELEMENT"\n')))
-    r = subprocess.run([str(exe), "dg_bad.nml"], cwd=wd, capture_output=True, text=True,
+    r = subprocess.run([str(exe), "dg_bad.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = r.returncode != 0 and "NO_SUCH_ELEMENT" in (r.stdout + r.stderr)
     check("refusal: unknown dump_beam_at element refused (0 = yes)",
@@ -1158,9 +1161,9 @@ def main():
     # frequency, so a dark-start run there would report a number with no startup behind
     # it. The message names the beamlet size that would carry it.
 
-    (wd / "pre_h.nml").write_text(to_groups(PRE_NML.format(root="pre_h",
+    (wd / "pre_h.toml").write_text(to_groups(PRE_NML.format(root="pre_h",
                                   extra="  harmonics = 1, 5\n")))
-    r3 = subprocess.run([str(exe), "pre_h.nml"], cwd=wd, capture_output=True, text=True,
+    r3 = subprocess.run([str(exe), "pre_h.toml"], cwd=wd, capture_output=True, text=True,
                         env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     said = r3.stdout + r3.stderr
     refused = r3.returncode != 0 and "BEAMLET_SIZE TO 11" in said
@@ -1172,8 +1175,8 @@ def main():
     # count small. The element-end dump is asked for by name so the two writers can be
     # compared on one position.
 
-    fr_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
-                '  global%migrate = T\n  global%dump_beam_at = "UND"\n')
+    fr_extra = ('  run.dump_at_comb = T\n  run.comb_ds_save = 1.0\n'
+                '  run.migrate = T\n  run.dump_beam_at = "UND"\n')
     r = run(exe, wd, "fr", FRAME_NML.format(root="fr", extra=fr_extra), threads="4")
     frames = sorted(wd.glob("fr-[0-9]*.beam.h5"))
     wframes = sorted(wd.glob("fr-[0-9]*.wf.h5"))
@@ -1248,7 +1251,7 @@ def main():
     # must not change the state it records, which is why the field's rotation is put
     # back.
     run(exe, wd, "nofr", FRAME_NML.format(root="nofr",
-        extra='  global%comb_ds_save = 1.0\n  global%migrate = T\n'), threads="4")
+        extra='  run.comb_ds_save = 1.0\n  run.migrate = T\n'), threads="4")
     check("frames: the run is identical to the same run without them (0 = yes)",
           0.0 if h5_identical(wd / "fr.stats.h5", wd / "nofr.stats.h5") else 1.0, 0.5)
 
@@ -1259,14 +1262,14 @@ def main():
     # unaveraged run could then finish only with dump_at_comb = F.
 
     (wd / "dg_unavg.bmad").write_text(WRAP)
-    ua_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
-                '  global%device = "off"\n')
+    ua_extra = ('  run.dump_at_comb = T\n  run.comb_ds_save = 1.0\n'
+                '  run.device = "off"\n')
     # Run it without run()'s own exit, so that a mode which cannot write a frame is a
     # named failing check here rather than an abort with the reason buried in a log.
     ua_text = (FRAME_NML.format(root="ua", extra=ua_extra)
-               .replace('lat_file = "aramis_1seg.bmad"', 'lat_file = "dg_unavg.bmad"'))
-    (wd / "ua.nml").write_text(to_groups(ua_text))
-    r = subprocess.run([str(exe), "ua.nml"], cwd=wd, capture_output=True, text=True,
+               .replace('lattice = "aramis_1seg.bmad"', 'lattice = "dg_unavg.bmad"'))
+    (wd / "ua.toml").write_text(to_groups(ua_text))
+    r = subprocess.run([str(exe), "ua.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     ua_frames = sorted(wd.glob("ua-[0-9]*.beam.h5"))
     check("frames: an unaveraged run writes them at all (exit 0)", float(r.returncode), 0.5,
@@ -1285,7 +1288,7 @@ def main():
     # Restarting from a frame needs no check of its own. A frame at an element end is
     # dataset-identical to that element's dump, which the check above holds, and
     # check_program holds the windowed composition for those dumps. A frame taken inside
-    # an element is not a restart point at all, since global%track_start names elements
+    # an element is not a restart point at all, since run.track_start names elements
     # and not positions.
     #
     # What needs a check is that frames land inside an element, which is the reason for
@@ -1306,8 +1309,8 @@ def main():
     # the time-order rotation and the slice indexing end to end: a picture drawn from a
     # frame and a number read from the row have to be the same run.
 
-    rr_extra = ('  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
-                '  global%dump_reduced = T\n')
+    rr_extra = ('  run.dump_at_comb = T\n  run.comb_ds_save = 1.0\n'
+                '  run.dump_reduced = T\n')
     run(exe, wd, "id", FRAME_NML.format(root="id", extra=rr_extra), threads="4")
     idf = particle_frames(wd, "id")
     idw = sorted(wd.glob("id-[0-9]*.wf.h5"))
@@ -1388,8 +1391,8 @@ def main():
 
     # A slice range cuts both files and says which slices it carried.
     run(exe, wd, "rg", FRAME_NML.format(root="rg",
-        extra='  global%dump_at_comb = T\n  global%comb_ds_save = 1.0\n'
-              '  global%dump_slice_first = 3\n  global%dump_slice_last = 5\n'), threads="4")
+        extra='  run.dump_at_comb = T\n  run.comb_ds_save = 1.0\n'
+              '  run.dump_slice_first = 3\n  run.dump_slice_last = 5\n'), threads="4")
     rgf = sorted(wd.glob("rg-[0-9]*.beam.h5"))
     rgw = sorted(wd.glob("rg-[0-9]*.wf.h5"))
     with h5py.File(rgf[-1]) as h:
@@ -1418,9 +1421,9 @@ def main():
           float(np.max(np.abs(off_cut[1:] - off_all[1:]))), 1e-18)
 
     # The range is refused where it leaves the window.
-    (wd / "rgbad.nml").write_text(to_groups(FRAME_NML.format(root="rgbad",
-        extra='  global%dump_slice_first = 4\n  global%dump_slice_last = 99\n')))
-    r4 = subprocess.run([str(exe), "rgbad.nml"], cwd=wd, capture_output=True, text=True,
+    (wd / "rgbad.toml").write_text(to_groups(FRAME_NML.format(root="rgbad",
+        extra='  run.dump_slice_first = 4\n  run.dump_slice_last = 99\n')))
+    r4 = subprocess.run([str(exe), "rgbad.toml"], cwd=wd, capture_output=True, text=True,
                         env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     check("refusal: a slice range outside the window refused (0 = yes)",
           0.0 if (r4.returncode != 0 and "INSIDE THE WINDOW" in (r4.stdout + r4.stderr)) else 1.0, 0.5)

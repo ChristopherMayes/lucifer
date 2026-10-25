@@ -9,6 +9,39 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Changed: the deck is one TOML file, read through a schema that is the program's, and
+  the three namelist groups are gone. `src/fel_schema_mod.f90` holds one table of every key the deck
+  can set, 106 keys in nine tables, each with its TOML table and name, its type, its unit, its
+  bounds where a bound is a refusal, a one-sentence description and the structure component it
+  fills: `lattice` at the top, `[run]` for the run switches, `[window]` for the slicing, `[beam]`
+  for the bunch, the load and the files with `[beam.resample]` for the resampler, `[field]` for the
+  radiation start and the field files, `[wake]`, `[space_charge]` and `[bmad]` for the Bmad switches
+  the tracker honors. Keys are lower-case words with underscores, `run.out_root` where the deck said
+  `global%out_root`, `beam.n_particle` for `beam_init%n_particle`, and the longitudinal fill is
+  `beam.z_distribution`, `beam.z_min` and `beam.z_max`. The defaults are not in the table: every
+  default the schema reports is read from a default-constructed run, so the table cannot disagree
+  with the declarations. `src/fel_input_mod.f90` reads the deck with toml-f, from conda-forge,
+  through the table, and refuses an unknown key with the keys of its table, a key in the wrong table
+  with the table it belongs in, a value of the wrong type with the type expected, and a value
+  outside its bounds with the value, the bounds and the key's meaning, before anything runs, so a
+  bound in the table is a refusal setup no longer sees. `lucifer --schema <file>` writes the table
+  as JSON Schema with a schema version, 1, which every stats file now records in `params/`;
+  `docs/generated/schema.json` is that file and `docs/generated/input-keys.md` the key tables
+  `tests/scripts/report_input_keys.py` renders from it, both regenerated and diffed by the keystone.
+  The echo in `meta/input_echo` is the resolved deck as TOML, and `params/` is written by one loop
+  over the table, a subgroup per TOML table, where it was 200 hand-written lines naming each key
+  again. `docs/input-reference.md` includes the generated tables and keeps the prose, in the new
+  names, and `tests/scripts/check_input_reference.py` holds the package's routing table, the key
+  tables and every dotted key on every page to the schema. The Python that exists moved into the
+  package `python/lucifer`, installed into `bmad-fel-validate` with its own pip and no dependencies,
+  and `lucifer.deck.to_toml` routes flat `key = value` text, in the old names or the new, into the
+  deck's tables, so the check scripts' templates stayed as they were and `tests/scripts/nml.py` is
+  gone. The 32 example decks are `lucifer.toml` and its variants, the five perf decks and every deck
+  the benchmark and the check scripts write are TOML, and the examples' record of 1,191 rows is
+  unmoved to every digit. `environment.yml` and the build environments take `toml-f`,
+  `CMakeLists.txt` links `toml-f::toml-f` and adds the active conda prefix to the search path. The
+  old names, `global%` and the other prefixes, the `&fel_` groups and `lucifer.in`, join the retired
+  words of `tests/scripts/check_retired_words.py`. The keystone reproduces every recorded digit.
 - 2026-10-24 Changed: the word harness is retired. The comparison against Genesis4 with its
   tolerances and check sections, `tests/run_fel_benchmark.sh` and the scripts under `tests/scripts`,
   is the benchmark, and `tests/run_perf_benchmark.sh` is the performance benchmark. The word is
@@ -281,7 +314,7 @@ of that history. The entries before that date describe that branch.
   actual name. `tests/scripts/check_beam_format.py`'s two comments on the dump's time resolution
   agree with the file: an arrival of 1.9e-7 s against a slice step of 1.0e-18 s, a ratio of 1.9e11,
   and an ulp of 2.6e-5 of a step. One comment had said 3e10 and 6.5e-6.
-- 2026-10-23 Fixed: `global%unaveraged_ramp_periods = 0` ran an unaveraged element with a hard edge,
+- 2026-10-23 Fixed: `run.unaveraged_ramp_periods = 0` ran an unaveraged element with a hard edge,
   while the refusal's message, the struct's comment and the input reference all said 0 keeps the
   default of 2 periods and only the sentinel -1 is a hard edge. Setup now takes the default at 0,
   from one named constant, `fel_ramp_periods_default$`, and the stats file records the value the run
@@ -290,15 +323,15 @@ of that history. The entries before that date describe that branch.
   dark probe at 0 byte-identical in its diag to the probe at the default, which the earlier code
   fails. `check_input_reference.py` reads a struct default written as a named constant as that
   constant's value. No deck in the benchmark or the examples sets 0, so no digit moves.
-- 2026-10-23 Fixed: a negative `slicing%n_wavelength` was derived from the gain as though it were 0.
+- 2026-10-23 Fixed: a negative `window.n_wavelength` was derived from the gain as though it were 0.
   The derivation took any value at or below zero, and the two refusals of a value below one in
   `fel_init_mod.f90` run after it and never saw one. Setup now refuses a negative value with the
   value in the message, and derives only at 0. The two later refusals guard a caller that builds the
   beam without running `fel_setup_lattice` first, and their messages say so. `check_load.py` holds
   the refusal of -3.
 - 2026-10-23 Changed: the stats module's comments and two dataset descriptions written into every
-  stats file, `coords/ct_slice` and `run/slice_spacing`, named the retired
-  `wavefront_init%window_sample`. They name `slicing%n_wavelength`.
+  stats file, `coords/ct_slice` and `run/slice_spacing`, named the retired `field.window_sample`.
+  They name `window.n_wavelength`.
 - 2026-10-23 Changed: twelve checks in `check_diagnostics.py`, `check_spontaneous.py`,
   `check_two_polarization.py` and `check_unaveraged.py` were labelled "(1 = yes)" while recording 0
   for yes against a bound of 0.5. Their labels say "(0 = yes)", their values and bounds are

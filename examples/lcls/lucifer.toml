@@ -1,0 +1,23 @@
+lattice = "lcls.bmad"
+
+[run]
+out_root = "lcls"
+
+[window]
+n_wavelength = 68
+n_slice = 300
+
+[beam]
+n_particle = 4096
+bunch_charge = 3.082369e-11
+sig_pz = 1.3e-4
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.540118e-6
+z_max = 1.540118e-6
+shot_noise = true
+
+[field]
+lambda0 = 1.50992e-10
+seed_power = 0

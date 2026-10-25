@@ -31,7 +31,7 @@ from pathlib import Path
 
 # Input files shown on a page, in the order they appear. A run's own deck first,
 # then the reference code's decks, then the lattices.
-DECK_GLOBS = ("lucifer.in", "lucifer[-_]*.in", "sat-*.in")
+DECK_GLOBS = ("lucifer.toml", "lucifer[-_]*.toml", "sat-*.toml", "sat-*.in")
 LATTICE_GLOBS = ("*.bmad", "*.lat")
 
 # An embedded file is meant to be read on a page. Anything larger is data, not input,
@@ -46,7 +46,7 @@ NO_FIGURE = ("saturation_demo",)
 # be index.md: that collides with the site's own index and is served as /index-1.
 INDEX_PAGE = "examples.md"
 
-LANG = {".in": "fortran", ".bmad": "fortran", ".lat": "text"}
+LANG = {".toml": "toml", ".in": "fortran", ".bmad": "fortran", ".lat": "text"}
 
 LINK = re.compile(r"\]\(([^)]+)\)")
 
@@ -87,7 +87,7 @@ def gather(d):
         found = []
         for g in globs:
             found += [p for p in d.glob(g) if p.is_file()]
-        for p in sorted(set(found), key=lambda p: (p.name != "lucifer.in", p.name)):
+        for p in sorted(set(found), key=lambda p: (p.name != "lucifer.toml", p.name)):
             if p not in out:
                 out.append(p)
     return out
@@ -173,7 +173,7 @@ def read_record(path):
 
 def measured_table(page, decks):
     """One table for an example: a row per quantity, a column per deck, and the unit."""
-    names = sorted(decks, key=lambda d: (d != "lucifer.in", d))
+    names = sorted(decks, key=lambda d: (d != "lucifer.toml", d))
     quantities = [q for q in ORDER if any(q in decks[d] for d in names)]
     quantities += sorted(q for d in names for q in decks[d] if q not in ORDER)
     page += ["## Measured on this run", "",

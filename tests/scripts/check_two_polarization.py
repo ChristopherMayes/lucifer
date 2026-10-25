@@ -52,24 +52,24 @@ import numpy as np
 import fieldio
 from checkrec import record
 
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 FAILED = False
 TOL_HEL = 1e-12  # The scalar envelope is the co-rotating pair. The two paths differ by 7.2e-15.
 
-NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 8.0e-15
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4e-10
-  beam_init%grid(3)%x_max = 4e-10
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 2048
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
@@ -91,9 +91,9 @@ def ss(nml):
     frame for the rotation and crossed-undulator physics. An 8-slice time-dependent window
     loses the whole field to slippage over this line, so these checks run in steady state
     while the ledger and thread checks stay time dependent."""
-    out = nml.replace('  beam_init%distribution_type(3) = "GRID"\n', "")
-    out = out.replace("  beam_init%grid(3)%x_min = -4e-10\n", "")
-    out = out.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
+    out = nml.replace('  beam.z_distribution = "GRID"\n', "")
+    out = out.replace("  beam.z_min = -4e-10\n", "")
+    out = out.replace("  beam.z_max = 4e-10\n", "  beam.sig_z = 0\n")
     out = out.replace("  window_length = 8e-10\n", "")
     out = out.replace("  n_wavelength = 1\n", "")
     out = out.replace("  shot_noise = T\n", "")
@@ -110,8 +110,8 @@ def check(name, value, tol, note=""):
 
 
 def run(exe, wd, name, text, threads="8"):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
@@ -119,8 +119,8 @@ def run(exe, wd, name, text, threads="8"):
 
 
 def refuse(exe, wd, name, text, fragment):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in (r.stdout + r.stderr)
 
@@ -283,8 +283,8 @@ def main():
     #     against the modulation and not against the spread it started with.
     cold = ss(NML).replace("seed_waist_size = 30e-6", "seed_waist_size = 1e-2").replace(
         "seed_power = 1e4", "seed_power = 1e9").replace(
-        "beam_init%sig_pz = 8.804506566858e-05", "beam_init%sig_pz = 1e-12").replace(
-        "beam_init%bunch_charge = 8.0e-15", "beam_init%bunch_charge = 8.0e-18")
+        "beam.sig_pz = 8.804506566858e-05", "beam.sig_pz = 1e-12").replace(
+        "beam.bunch_charge = 8.0e-15", "beam.bunch_charge = 8.0e-18")
     run(exe, wd, "p2s_src", cold.format(lat="p2_hel.bmad", root="p2s_src",
                                         extra="  write_initial = T\n  load_only = T\n"))
 
@@ -307,7 +307,7 @@ def main():
                         ("minus", "p2s_minus.wf.h5")):
             root = f"p2s_{mode[:2]}_{tag}"
             run(exe, wd, root, cold.format(lat=lat, root=root,
-                extra=f'  beam_file = "p2s_src-initial.beam.h5"\n  field_file = "{ff}"\n'
+                extra=f'  beam.file = "p2s_src-initial.beam.h5"\n  field.file = "{ff}"\n'
                       '  load_mode = "keep"\n'))
             sig[tag] = float(diag(wd, root)[-1, 0, 7])
         check(f"handedness, {mode}: the pair (1, +i) reproduces the scalar seed's energy modulation",
@@ -343,7 +343,7 @@ def main():
     run(exe, wd, "p2i_src", NML.format(lat="p2_hel.bmad", root="p2i_src",
                                        extra="  seed_polarization = 'y'\n  write_initial = T\n"
                                              "  load_only = T\n"))
-    load = ('  beam_file = "p2i_src-initial.beam.h5"\n  field_file = "p2i_src-initial.wf.h5"\n'
+    load = ('  beam.file = "p2i_src-initial.beam.h5"\n  field.file = "p2i_src-initial.wf.h5"\n'
             '  load_mode = "keep"\n')
     run(exe, wd, "p2i_def", NML.format(lat="p2_hel.bmad", root="p2i_def", extra=load))
     run(exe, wd, "p2i_y", NML.format(lat="p2_hel.bmad", root="p2i_y",

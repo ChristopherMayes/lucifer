@@ -12,10 +12,10 @@ The validation benchmark against Genesis4 is in `tests/`. The physics itself, wi
 ## Running an example
 
     cd examples/<example>
-    ../../../production/bin/lucifer lucifer.in        # or debug/bin
+    ../../build-release/bin/lucifer lucifer.toml        # or debug/bin
     python ../plot_fel.py <out_root>.stats.h5             # needs h5py + matplotlib
 
-Every input deck is named `lucifer.in`, and variants carry a descriptive suffix: `lucifer_averaged.in`, `lucifer_detuned.in`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
+Every input deck is named `lucifer.toml`, and variants carry a descriptive suffix: `lucifer_averaged.in`, `lucifer_detuned.in`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
 
 A deck carries no comment beyond the one line that says why a setting departs from its default. Each line is a namelist parameter documented in [the input reference](../../input-reference.md). What a deck is for is said in this file and in the directory's own README, and a deck is short enough to paste into a terminal.
 
@@ -71,17 +71,17 @@ The table has one row per feature declared in [the introduction](../../index.md)
 | Undulator tapering | [`taper/`](taper.md) |
 | Phasing between segments | [`chicane/`](chicane.md) |
 | Shared-memory parallelism, bit-identical at any thread count | Demonstrated inline, below |
-| A GPU backend for the averaged method | [`steady_state/`](steady_state.md), [`sase/`](sase.md), [`harmonics/`](harmonics.md), [`crossed_undulator/`](crossed_undulator.md) and [`migration/`](migration.md) run on it with `global%device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
+| A GPU backend for the averaged method | [`steady_state/`](steady_state.md), [`sase/`](sase.md), [`harmonics/`](harmonics.md), [`crossed_undulator/`](crossed_undulator.md) and [`migration/`](migration.md) run on it with `run.device = "metal"` and `grid_n_pts = 256`, on an Apple Silicon build (the device field solver takes powers of two, and refusing 255 it names 256). Measured levels and wall times are in the validation and performance pages |
 | openPMD dumps in both directions | [`steady_state/`](steady_state.md) writes mid-run, [`import/`](import.md) round-trips a bunch through a file, [`frames/`](frames.md) writes a series along z, [`saturation_demo/`](saturation_demo.md) reads Genesis4's |
 | A self-describing statistics file | Every example writes one |
 | One load path | [`import/`](import.md) |
 | A coherent source model | [`coherent_source/`](coherent_source.md) |
 
-Thread independence is a few commands rather than a directory. The threads divide the slices, so it takes a time-dependent example. Add `global%write_diag = T` to `migration/lucifer.in` and run it twice:
+Thread independence is a few commands rather than a directory. The threads divide the slices, so it takes a time-dependent example. Add `run.write_diag = true` to `migration/lucifer.toml` and run it twice:
 
     cd migration
     for n in 1 12; do
-      OMP_NUM_THREADS=$n ../../../production/bin/lucifer lucifer.in > t$n.log
+      OMP_NUM_THREADS=$n ../../build-release/bin/lucifer lucifer.toml > t$n.log
       mv migration.diag.txt t$n.diag.txt
     done
     cmp t1.diag.txt t12.diag.txt
@@ -99,13 +99,13 @@ Each of these is a feature with no example yet, and the reason it has none.
 | Elliptical polarization beyond the tilt-honored limits | The feature |
 | Undulator field errors | The feature |
 | One-to-one particle tracking | The feature |
-| `chamber_wake%model = 'bmad'` | The model, which is a named follow-on |
-| `space_charge%model = 'bmad_slice'` | The model, which is a named follow-on |
+| `wake.model = 'bmad'` | The model, which is a named follow-on |
+| `space_charge.model = 'bmad_slice'` | The model, which is a named follow-on |
 | The escaped-field bank and the reconstructed pulse | A small-window case. On the `sase/` configuration those two files come to more than a gigabyte each |
 
 ## What a run writes
 
-`<out_root>.stats.h5` is the statistics file, and [reading an output file](../../reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `global%write_diag = T` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`.
+`<out_root>.stats.h5` is the statistics file, and [reading an output file](../../reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `run.write_diag = true` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`.
 
 Run outputs are not committed. `.gitignore` in this directory covers them by extension.
 

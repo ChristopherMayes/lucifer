@@ -22,7 +22,7 @@ This page lists what this code implements, and where each thing came from. Every
 ## Papers the code implements
 
 (ref-tanaka)=
-**Coherent source.** T. Tanaka, [Phys. Rev. Accel. Beams **27**, 030703 (2024)](https://doi.org/10.1103/PhysRevAccelBeams.27.030703), [arXiv:2310.20197](https://arxiv.org/abs/2310.20197). The slice bunch factor splits into coherent and spatially incoherent parts, and the incoherent part's radiation diffracts away. It is implemented from the paper in `fel_track_mod` (`global%source_model = 'coherent'`), which refuses the configurations the model does not cover. See [](fel-physics.md#sec-coherent-source).
+**Coherent source.** T. Tanaka, [Phys. Rev. Accel. Beams **27**, 030703 (2024)](https://doi.org/10.1103/PhysRevAccelBeams.27.030703), [arXiv:2310.20197](https://arxiv.org/abs/2310.20197). The slice bunch factor splits into coherent and spatially incoherent parts, and the incoherent part's radiation diffracts away. It is implemented from the paper in `fel_track_mod` (`run.source_model = 'coherent'`), which refuses the configurations the model does not cover. See [](fel-physics.md#sec-coherent-source).
 
 (ref-bane-stupakov)=
 **Resistive-wall wakes.** K. L. F. Bane and G. Stupakov, [SLAC-PUB-10707](https://www.slac.stanford.edu/pubs/slacpubs/10500/slac-pub-10707.pdf). The numerical impedance with AC (Drude) conductivity and Leontovich surface impedance, round and flat geometry. It is transcribed in `fel_collective_mod` (`fel_resistive_wall_wake`), with Genesis4's exact numerics kept. See [](fel-physics.md#sec-wakes).

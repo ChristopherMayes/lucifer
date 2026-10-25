@@ -34,6 +34,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from lucifer.deck import to_toml
 
 import h5py
 import numpy as np
@@ -59,34 +60,34 @@ UNDULATOR = ("QU: wiggler, l = 0.06, l_period = 0.015, field_calc = planar_model
 
 # The beam and field every fixture shares: 64 particles in beamlets of 8, no seed, no
 # shot noise, a 16-point grid, a window of two wavelengths at 200 pm slice spacing.
-NAMELIST = """&fel_params
-  lat_file = "{lat}"
-  global%out_root = "{root}"
-  global%source_filter = F
-  global%ran_seed = 4242
-  slicing%n_wavelength = 2
-  slicing%window_length = 1.2e-9
+NAMELIST = """[run]
+  lattice = "{lat}"
+  run.out_root = "{root}"
+  run.source_filter = F
+  run.ran_seed = 4242
+  window.n_wavelength = 2
+  window.window_length = 1.2e-9
 {params}/
-&fel_beam_init
-  beam_init%n_particle = 64
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+[beam]
+  beam.n_particle = 64
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
 {beam}/
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 0
-  wavefront_init%grid_n_pts = 16
-  wavefront_init%grid_half_width = 2e-4
+[field]
+  field.lambda0 = 1e-10
+  field.seed_power = 0
+  field.grid_n_pts = 16
+  field.grid_half_width = 2e-4
 /
 """
 
-GRID_Z = """  beam_init%sig_z = 0
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -2.5e-10
-  beam_init%grid(3)%x_max = 2.5e-10
+GRID_Z = """  beam.sig_z = 0
+  beam.z_distribution = "GRID"
+  beam.z_min = -2.5e-10
+  beam.z_max = 2.5e-10
 """
 
 # Each fixture is one run: its root, its lattice body, its deck additions, and the files
@@ -94,7 +95,7 @@ GRID_Z = """  beam_init%sig_z = 0
 FIXTURES = (
     dict(root="avg",
          lattice=UNDULATOR.format(method="averaged", extra="") + "\nQL: line = (QU)\nuse, QL\n",
-         params="  global%dump_at_comb = T\n",
+         params="  run.dump_at_comb = T\n",
          beam=GRID_Z,
          settings="averaged QU, `dump_at_comb = T`, the whole window, z on a grid",
          files=(
@@ -105,7 +106,7 @@ FIXTURES = (
          )),
     dict(root="unavg",
          lattice=UNDULATOR.format(method="unaveraged", extra="") + "\nQL: line = (QU)\nuse, QL\n",
-         params="  global%dump_at_comb = T\n  global%unaveraged_steps_per_period = 40\n  global%unaveraged_ramp_periods = 2\n",
+         params="  run.dump_at_comb = T\n  run.unaveraged_steps_per_period = 40\n  run.unaveraged_ramp_periods = 2\n",
          beam=GRID_Z,
          settings="unaveraged QU, 40 steps per period, a two-period ramp, `dump_at_comb = T`",
          files=(
@@ -113,7 +114,7 @@ FIXTURES = (
          )),
     dict(root="crop",
          lattice=UNDULATOR.format(method="averaged", extra=", tilt = 0.4") + "\nQL: line = (QU)\nuse, QL\n",
-         params="  global%dump_at_comb = T\n  global%dump_slice_first = 2\n  global%dump_slice_last = 4\n",
+         params="  run.dump_at_comb = T\n  run.dump_slice_first = 2\n  run.dump_slice_last = 4\n",
          beam=GRID_Z,
          settings="averaged QU with `tilt = 0.4`, `dump_at_comb = T`, `dump_slice_first = 2`, `dump_slice_last = 4`",
          files=(
@@ -122,7 +123,7 @@ FIXTURES = (
     dict(root="keep",
          lattice=UNDULATOR.format(method="averaged", extra="") + "\nQL: line = (QU)\nuse, QL\n",
          params="",
-         beam="  load_mode = \"keep\"\n  beam_init%sig_z = 1.0e-10\n",
+         beam="  load_mode = \"keep\"\n  beam.sig_z = 1.0e-10\n",
          settings="averaged QU, `load_mode = \"keep\"`, `sig_z = 1.0e-10` in a six-slice window",
          files=(
              ("keep-final.beam.h5", "final dump of several patches, two of them empty", "dump, checkpoint"),
@@ -277,9 +278,9 @@ def run_fixtures(exe, work, log):
     for fx in FIXTURES:
         root = fx["root"]
         (work / f"{root}.bmad").write_text(LATTICE_HEAD + fx["lattice"])
-        (work / f"{root}.nml").write_text(NAMELIST.format(lat=f"{root}.bmad", root=root,
-                                                            params=fx["params"], beam=fx["beam"]))
-        r = subprocess.run([str(exe), f"{root}.nml"], cwd=str(work), capture_output=True,
+        (work / f"{root}.toml").write_text(to_toml(NAMELIST.format(lat=f"{root}.bmad", root=root,
+                                                            params=fx["params"], beam=fx["beam"])))
+        r = subprocess.run([str(exe), f"{root}.toml"], cwd=str(work), capture_output=True,
                            text=True, errors="replace", env=env)
         log.append(f"==== fixture {root}: exit {r.returncode}\n{r.stdout}\n{r.stderr}\n")
         if r.returncode != 0:

@@ -4,7 +4,7 @@ Checks of slice migration under weights, self-referenced with no Genesis run.
 
 Genesis migrates only under one4one, so weighted migration has no reference.
 
-1. Conservation. A beam with an energy spread of 60 in gamma, beam_init%sig_pz = 5.28e-3,
+1. Conservation. A beam with an energy spread of 60 in gamma, beam.sig_pz = 5.28e-3,
    tracked through the full line migrates heavily and loses charge off the window ends.
    At every diagnostic record, the in-window charge plus the charge dropped so far must
    equal the initial charge to 1e-10 relative. The in-window charge is the sum of the
@@ -48,23 +48,23 @@ import numpy as np
 import beamio
 from checkrec import record
 
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 C_LIGHT = 2.99792458e8
 
-BASE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = {npart}
-  beam_init%bunch_charge = {q}
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -{half}
-  beam_init%grid(3)%x_max = {half}
-  beam_init%sig_pz = {sig_pz}
-  beam_init%a_norm_emit = {emit}
-  beam_init%b_norm_emit = {emit}
+  beam.n_particle = {npart}
+  beam.bunch_charge = {q}
+  beam.z_distribution = "GRID"
+  beam.z_min = -{half}
+  beam.z_max = {half}
+  beam.sig_pz = {sig_pz}
+  beam.a_norm_emit = {emit}
+  beam.b_norm_emit = {emit}
   seed_power = 0
   grid_n_pts = 64
   grid_half_width = 2e-4
@@ -153,7 +153,7 @@ def main():
     ok = True
 
     # 1 + 2: conservation and phase continuity under heavy migration.
-    out = run(exe, wd, "migc.nml", BASE.format(lat="aramis.bmad", root="migc",
+    out = run(exe, wd, "migc.toml", BASE.format(lat="aramis.bmad", root="migc",
               sig_pz="5.282703940115e-03", emit="4e-7", npart=1024, slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9", mig="T"))
     moved, bdev, drops = read_migration_file(wd, "migc")
     z, q_win = in_window_charge(wd / "migc.diag.txt")
@@ -198,7 +198,7 @@ def main():
 
     # 4: no-op bit identity on a frozen-phase beam.
     for mig, root in (("F", "mignf"), ("T", "mignt")):
-        out = run(exe, wd, f"{root}.nml", BASE.format(lat="aramis_1seg.bmad", root=root,
+        out = run(exe, wd, f"{root}.toml", BASE.format(lat="aramis_1seg.bmad", root=root,
                   sig_pz="8.804506566858e-08", emit="1e-13", npart=256, slen="1.2e-9", q="1.200830742713e-14", half="6e-10", mig=mig))
     moved = read_migration_file(wd, "mignt")[0]
     diag_eq = (wd / "mignf.diag.txt").read_bytes() == (wd / "mignt.diag.txt").read_bytes()
@@ -224,7 +224,7 @@ def main():
     for tag, zoff, mig in (("zo0f", 0.0, "F"), ("zo1f", z_turn, "F"),
                            ("zo0t", 0.0, "T"), ("zo1t", z_turn, "T")):
         (wd / f"{tag}.bmad").write_text(OFFSET_LAT.format(zoff=zoff))
-        run(exe, wd, f"{tag}.nml", BASE.format(lat=f"{tag}.bmad", root=tag,
+        run(exe, wd, f"{tag}.toml", BASE.format(lat=f"{tag}.bmad", root=tag,
             sig_pz="1e-8", emit="1e-13", npart=128, slen="2.4e-9", q="2.401661485427e-18",
             half="1.2e-9", mig=mig))
         sls = beamio.read_slices(wd / f"{tag}-final.beam.h5", 1e-10, 3e-10)

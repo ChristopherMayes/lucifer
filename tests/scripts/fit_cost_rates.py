@@ -59,7 +59,7 @@ def read_run(path):
 
     # A deck that turned the filter off is a different configuration: the solve then
     # runs one transform fewer per field per step. The run says so in its own warning.
-    r["filtered"] = "global%source_filter = F" not in txt
+    r["filtered"] = "run.source_filter = F" not in txt
 
     for key, pat in (("push", r"^\s+particle push\s+\d+\s+([\d.]+)"),
                      ("solve", r"^\s+field solve\s+\d+\s+([\d.]+)"),

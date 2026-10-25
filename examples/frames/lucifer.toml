@@ -1,0 +1,32 @@
+lattice = "../aramis.bmad"
+
+[run]
+out_root = "frames"
+track_end = "UND##2"
+comb_ds_save = 1.0
+dump_at_comb = true
+dump_slice_first = 3
+dump_slice_last = 6
+dump_reduced = true
+migrate = true
+
+[window]
+window_length = 2.4e-9
+n_wavelength = 3
+
+[beam]
+n_particle = 1024
+bunch_charge = 2.401661485427e-14
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.2e-9
+z_max = 1.2e-9
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 0

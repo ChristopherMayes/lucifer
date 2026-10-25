@@ -206,7 +206,7 @@ do ie = run%i_start, run%i_end
   ! midpoint. So a split wake applies once, as in Bmad. Checking ele%wake directly would
   ! send lord wakes to the per-slice path, where Bmad applies them within single slices.
   !
-  ! With bmad_com%sr_wakes_on off, track1_bunch applies no wake. The whole-window
+  ! With bmad.sr_wakes_on off, track1_bunch applies no wake. The whole-window
   ! concatenation below then has only its serial cost, so a wake-carrying element routes
   ! like any other interlude, through the parallel slice loop. On a line of many wake
   ! pipes the switch decides between the serial and parallel interlude paths for the
@@ -234,7 +234,7 @@ do ie = run%i_start, run%i_end
 
     ! FEL segment: Genesis's unroll in the element's own step. The step comes from
     ! Bmad's ds_step and num_steps attributes, whose bookkeeper computes Genesis's
-    ! num_steps = round(l/ds_step) (attribute_bookkeeper.f90). There is no namelist step
+    ! num_steps = round(l/ds_step) (attribute_bookkeeper.f90). There is no deck step
     ! size. The steps are equal, and slippage follows each step's field solve. Any
     ! end-of-lattice fixup lands on the last step.
 
@@ -837,7 +837,7 @@ end subroutine write_ledger_row
 ! Subroutine apply_radiation ()
 !
 ! Routine to apply spontaneous radiation inside FEL elements.
-! The routine follows Bmad's global switches bmad_com%radiation_damping_on and
+! The routine follows Bmad's global switches bmad.radiation_damping_on and
 ! %radiation_fluctuations_on, as every Bmad tracking path does. Interludes get theirs
 ! through track1. This covers the custom-tracked FEL step, whose Newton-Lorentz
 ! equations of motion carry no radiation reaction. Per record:

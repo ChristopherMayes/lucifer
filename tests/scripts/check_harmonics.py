@@ -54,7 +54,7 @@ import convert_genesis
 import fieldio
 from checkrec import record
 from read_stats import read_stats
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 from scipy.special import jv
 
 FAILED = False
@@ -145,13 +145,13 @@ use, SEGP
 # lambda0 and beamlet_size come from this namelist. An openPMD beam file carries the slice
 # partition, and not the radiation it was sliced on nor the beamlet size. Both match the
 # Genesis deck above, where the imported state comes from.
-NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML_IMPORT = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   transport_model = "genesis"
-  beam_file = "{beam}"
-  field_file = "{field}"
+  beam.file = "{beam}"
+  field.file = "{field}"
   lambda0 = 1e-10
   beamlet_size = 8
   harmonics = 1, 3
@@ -167,20 +167,20 @@ NML_IMPORT = """! flat keys; routed into the three groups by nml.to_groups
 # 64 and 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed
 # upstream. docs/validation.md (val-the-transverse-grid) has the account.
 
-NML_TD = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{lat}"
+NML_TD = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
   transport_model = "genesis"
   lambda0 = 1e-10
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 8.0e-15
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4e-10
-  beam_init%grid(3)%x_max = 4e-10
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 2048
+  beam.bunch_charge = 8.0e-15
+  beam.z_distribution = "GRID"
+  beam.z_min = -4e-10
+  beam.z_max = 4e-10
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e4
   seed_waist_size = 30e-6
@@ -206,8 +206,8 @@ def check(name, value, tol, note=""):
 
 
 def run(exe, wd, name, text, threads="8"):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
@@ -215,8 +215,8 @@ def run(exe, wd, name, text, threads="8"):
 
 
 def refuse(exe, wd, name, text, fragment):
-    (wd / (name + ".nml")).write_text(to_groups(text))
-    r = subprocess.run([str(exe), name + ".nml"], cwd=wd, capture_output=True, text=True,
+    (wd / (name + ".toml")).write_text(to_groups(text))
+    r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in (r.stdout + r.stderr)
 
@@ -467,13 +467,13 @@ def main():
     # b1 near 1e-3 and b3 in the noise.
 
     buncher = NML_TD.format(lat="mid.bmad", root="h3bunch", extra="")
-    buncher = buncher.replace('  beam_init%distribution_type(3) = "GRID"\n', "")
-    buncher = buncher.replace("  beam_init%grid(3)%x_min = -4e-10\n", "")
-    buncher = buncher.replace("  beam_init%grid(3)%x_max = 4e-10\n", "  beam_init%sig_z = 0\n")
+    buncher = buncher.replace('  beam.z_distribution = "GRID"\n', "")
+    buncher = buncher.replace("  beam.z_min = -4e-10\n", "")
+    buncher = buncher.replace("  beam.z_max = 4e-10\n", "  beam.sig_z = 0\n")
     buncher = buncher.replace("  window_length = 8e-10\n", "")
     buncher = buncher.replace("  n_wavelength = 1\n", "")
     buncher = buncher.replace("  shot_noise = T\n", "")
-    buncher = buncher.replace("beam_init%n_particle = 2048", "beam_init%n_particle = 8192")
+    buncher = buncher.replace("beam.n_particle = 2048", "beam.n_particle = 8192")
     buncher = buncher.replace("bunch_charge = 8.0e-15", "bunch_charge = 1.000692285594e-15")
     buncher = buncher.replace("seed_power = 1e4", "seed_power = 1e9")
     buncher = buncher.replace("grid_n_pts = 63", "grid_n_pts = 151")
@@ -555,8 +555,8 @@ def main():
     nomatch = NML_IMPORT.format(lat="planar.bmad", root="rf_match",
                                 beam="h3both-final.beam.h5", field="H3-initial.wf.h5", extra="")
     nomatch = nomatch.replace("harmonics = 1, 3", "harmonics = 1, 5")
-    nomatch = nomatch.replace('field_file = "H3-initial.wf.h5"',
-                              'field_file = "H3-initial.wf.h5", "h3both-final-h3.wf.h5"')
+    nomatch = nomatch.replace('field.file = "H3-initial.wf.h5"',
+                              'field.file = "H3-initial.wf.h5", "h3both-final-h3.wf.h5"')
     ok = refuse(exe, wd, "rf_match", nomatch, "MATCHES NO FIELD")
     print(f"--- refusal harmonic import matching no field: {'ok' if ok else '** FAIL **'}")
     record("refusal harmonic import matching no field", None, None, "bool", ok)
@@ -564,8 +564,8 @@ def main():
 
     genharm = NML_IMPORT.format(lat="planar.bmad", root="rf_genh",
                                 beam="h3both-final.beam.h5", field="H3-initial.wf.h5", extra="")
-    genharm = genharm.replace('field_file = "H3-initial.wf.h5"',
-                              'field_file = "H3-initial.wf.h5", "h3both-final-h3.fld.h5"')
+    genharm = genharm.replace('field.file = "H3-initial.wf.h5"',
+                              'field.file = "H3-initial.wf.h5", "h3both-final-h3.fld.h5"')
     ok = refuse(exe, wd, "rf_genh", genharm, "MUST BE openPMD")
     print(f"--- refusal Genesis-format harmonic import: {'ok' if ok else '** FAIL **'}")
     record("refusal Genesis-format harmonic import", None, None, "bool", ok)

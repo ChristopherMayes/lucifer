@@ -1,0 +1,27 @@
+lattice = "../aramis.bmad"
+
+[run]
+out_root = "import"
+ran_seed = 12345
+
+[window]
+n_wavelength = 3
+
+[beam]
+n_particle = 50000
+bunch_charge = 3.01e-14
+sig_z = 1.2e-9
+sig_pz = 8.8045e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+load_mode = "keep"
+quiet_start = true
+beamlet_size = 8
+shot_noise = true
+write_openpmd_file = "import_bunch.h5"
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0

@@ -122,7 +122,7 @@ type fel_und_struct
   logical :: bmad_transport = .false.  ! Transverse maps: True for the flattened Bmad
                                        !   periodic-wiggler kernel, False for the
                                        !   transcribed TrackBeam. Set by the walk from
-                                       !   global%transport_model (default 'bmad').
+                                       !   run.transport_model (default 'bmad').
   integer :: nstep = 0        ! Number of integration steps over the segment.
   real(rp) :: dz = 0          ! Step length [m].
   integer :: source_model = 0 ! fel_source_deposit$ (default) or fel_source_coherent$.
@@ -331,14 +331,14 @@ if (ele%value(tilt$) /= 0 .and. ele%field_calc == helical_model$) then
 endif
 
 ! The integration step. With neither ds_step nor num_steps set, Bmad's bookkeeper falls
-! back to bmad_com%default_ds_step (0.2 m, about thirteen periods of a 15 mm undulator).
+! back to bmad.default_ds_step (0.2 m, about thirteen periods of a 15 mm undulator).
 ! That step gives wrong FEL physics with no complaint, and Bmad only warns. So an FEL
 ! element must set its step.
 
 if (ele%value(ds_step$) == bmad_com%default_ds_step) then
   call out_io (s_fatal$, r_name, 'FEL ELEMENT HAS NO INTEGRATION STEP; SET DS_STEP (GENESIS''S DELZ)', &
                                  'OR NUM_STEPS ON: ' // trim(ele%name), &
-                                 '(ITS DS_STEP EQUALS BMAD_COM%DEFAULT_DS_STEP, THE UNSET FALLBACK. IF YOU', &
+                                 '(ITS DS_STEP EQUALS BMAD.DEFAULT_DS_STEP, THE UNSET FALLBACK. IF YOU', &
                                  'REALLY WANT THAT EXACT VALUE, SET IT EXPLICITLY VIA NUM_STEPS.)')
   stop 1
 endif

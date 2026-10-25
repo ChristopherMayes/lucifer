@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lucifer"
+version = "0.0.0"
+description = "The Python side of Lucifer: the deck, the schema and the readers of its output files."
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lucifer*"]

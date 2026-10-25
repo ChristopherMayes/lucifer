@@ -30,7 +30,7 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 import pool
 
@@ -73,19 +73,19 @@ fft_fieldsolver = true
 &end
 """
 
-BMAD_NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis_1seg.bmad"
+BMAD_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 9.606645941707e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -4.800000e-09
-  beam_init%grid(3)%x_max = 4.800000e-09
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 2048
+  beam.bunch_charge = 9.606645941707e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -4.800000e-09
+  beam.z_max = 4.800000e-09
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 0
   grid_n_pts = 256
   grid_half_width = 2e-4
@@ -120,8 +120,8 @@ def main():
             print(f"FAIL: Genesis seed {seed} exited {r.returncode}");  sys.exit(1)
 
     def bmad_one(seed):
-        (wd / f"bsase{seed}.nml").write_text(to_groups(BMAD_NML.format(seed=seed)))
-        r = subprocess.run([str(exe), f"bsase{seed}.nml"], cwd=wd, env=env,
+        (wd / f"bsase{seed}.toml").write_text(to_groups(BMAD_NML.format(seed=seed)))
+        r = subprocess.run([str(exe), f"bsase{seed}.toml"], cwd=wd, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL: lucifer seed {seed} exited {r.returncode}:\n{r.stdout[-1500:]}")

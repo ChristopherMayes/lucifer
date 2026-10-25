@@ -103,8 +103,8 @@ where the two builds agree to every printed digit.
 | refused, noise on the unquiet generator |  | same | holds |
 | copies made outside the loader take the noise on the copies |  | same | holds |
 | refused, copies shifted singly |  | same | holds |
-| refused, a slice dump through beam_init%position_file |  | same | holds |
-| refused, a negative slicing%n_wavelength |  | same | holds |
+| refused, a slice dump through beam.position_file |  | same | holds |
+| refused, a negative window.n_wavelength |  | same | holds |
 | in-cone startup, Gaussian bunch in sample mode | 4.3086e-02 | same | <= 3.5000e-01 |
 
 (val-levels-sase-startup)=
@@ -191,8 +191,8 @@ where the two builds agree to every printed digit.
 | charge representation, space charge off: every particle split | 1.2035e-13 | 9.1213e-14 | <= 1.0000e-12 |
 | long-range kernel at zero width | 9.9106e-04 | same | <= 5.0000e-02 |
 | short-range with no radial scale: refused |  | same | holds |
-| space_charge%nphi outside its domain: refused at setup |  | same | holds |
-| space_charge%ngrid outside its domain: refused at setup |  | same | holds |
+| nphi outside its domain: refused at setup |  | same | holds |
+| ngrid outside its domain: refused at setup |  | same | holds |
 | a collapsed slice on a grid with a scale: lone particle dE | 0.0000e+00 | same | <= 1.0000e-06 |
 | a collapsed slice on a grid with a scale: lone particle dsigma | 0.0000e+00 | same | <= 1.0000e-06 |
 | a collapsed slice on a grid with a scale: zero-charge slice dE | 0.0000e+00 | same | <= 1.0000e-06 |
@@ -592,8 +592,8 @@ where the two builds agree to every printed digit.
 | the reader sees the whole charge | 3.9416e-16 | same | <= 1.0000e-12 |
 | a range carries the slices it asked for | 0 | same | <= 5.0000e-01 |
 | a frame cut to a range places its slices where the whole window does | 0.0000e+00 | same | <= 1.0000e-04 |
-| refusal beam_file, a frame into the device at a crest of the undulator phase |  | same | holds |
-| refusal beam_init%position_file, a frame into the device where the undulator phase crosses zero |  | same | holds |
+| refusal beam.file, a frame into the device at a crest of the undulator phase |  | same | holds |
+| refusal beam.position_file, a frame into the device where the undulator phase crosses zero |  | same | holds |
 | a frame at the device's end initializes, every record identical but the four that place a beam | 0.0000e+00 | same | <= 5.0000e-01 |
 | a continuation from that face composes with the run it continues | 5.1011e-19 | 6.5295e-17 | <= 1.0000e-10 |
 
@@ -699,13 +699,6 @@ where the two builds agree to every printed digit.
 | coherent + dark start refused |  | same | holds |
 | coherent run 1 vs 8 threads dataset-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 
-(val-levels-input-reference)=
-### `input-reference`
-
-| Check | Debug | Production | Bound |
-|---|---|---|---|
-| input reference problems | 0 | same | <= 0 |
-
 (val-levels-examples)=
 ### `examples`
 
@@ -718,10 +711,11 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| no-namelist library run == namelist run (diag byte, dumps dataset) |  | same | holds |
+| no-deck library run == deck run (diag byte, dumps dataset) |  | same | holds |
 | re-entrant: twice in one process bit-identical (pass 2 == pass 1) |  | same | holds |
 | a library error RETURNS (no beginning Twiss -> err to the program, exit 2) |  | same | holds |
-| &fel_track_params refused, naming the three groups |  | same | holds |
+| a key in the wrong table is refused, naming the table it belongs in |  | same | holds |
+| a key no table has is refused, naming the table's keys |  | same | holds |
 | the record axis: s non-decreasing, every repeat at an element boundary |  | same | holds |
 | comb > 0: rows == every-record rows at the comb positions (subset) |  | same | holds |
 | comb < 0: the rows are exactly the element ends |  | same | holds |
@@ -822,7 +816,7 @@ where the two builds agree to every printed digit.
 | zero-length wake: and every repeat straddles an element boundary | 0 | same | <= 5.0000e-01 |
 | zero-length wake: s is still non-decreasing | 0 | same | <= 5.0000e-01 |
 | zero-length wake: one that CANNOT kick leaves the file unchanged (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| provenance: global%record_environment restores user and cwd | 0 | same | <= 5.0000e-01 |
+| provenance: run.record_environment restores user and cwd | 0 | same | <= 5.0000e-01 |
 | refusal: unknown dump_beam_at element refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: the header states the work | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: particle-steps is the product of the two counts | 1.2493e-03 | same | <= 1.0000e-02 |

@@ -488,7 +488,7 @@ end subroutine from_c
 ! supported size.
 !
 ! Input:
-!   device_req -- character(*): global%device.
+!   device_req -- character(*): run.device.
 !   beam       -- fel_beam_struct: The beam. Slice fills size the rectangular array.
 !   ngrid      -- integer: Transverse grid points per side, one grid for the set.
 !   sample     -- integer: Slice spacing in radiation wavelengths.
@@ -1308,7 +1308,7 @@ if (upload) then
       delta = ks * s0(5, ip, is) / beta - ks * dev%z_ref(is)
       dev%su(ip) = nint(delta * fel_dev_ticks_per_rad$, c_int64_t)
 
-      ! The global%fp32_mutate hook coarsens the shared state here in lockstep, in ticks,
+      ! The run.fp32_mutate hook coarsens the shared state here in lockstep, in ticks,
       ! as fel_fp32_twin_slice coarsens dzr. The qres perturbation in the kernel is the
       ! second hook. There are two hooks, state and kernel, and each must move a
       ! recorded level.
@@ -1925,7 +1925,7 @@ end subroutine fel_device_unavg_ledger
 !                  z, pz in the beam's stored chart. px carries the quiver mid-segment,
 !                  and the conversion here is fel_unavg_step's own.
 !   nsub      -- integer: Substeps in one record step of this segment.
-!   mutate    -- logical: global%fp32_mutate. Coarsen the uploaded lag accumulator?
+!   mutate    -- logical: run.fp32_mutate. Coarsen the uploaded lag accumulator?
 !-
 
 subroutine fel_device_unavg_twin_begin (dev, beam, ff, s0, nsub, mutate, err_flag)

@@ -35,21 +35,21 @@ import subprocess
 import sys
 
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 FAILED = False
 
-BASE = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis_1seg.bmad"
+BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   source_filter = F
   lambda0 = 1e-10
-  beam_init%n_particle = 1024
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 1024
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 5e3
   seed_waist_size = 30e-6
   grid_n_pts = 64
@@ -59,11 +59,11 @@ BASE = """! flat keys; routed into the three groups by nml.to_groups
 {extra}&end
 """
 
-TD_EXTRA = """  beam_init%bunch_charge = 1.601107656951e-14
-  beam_init%sig_z = 0
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -1.200000e-09
-  beam_init%grid(3)%x_max = 1.200000e-09
+TD_EXTRA = """  beam.bunch_charge = 1.601107656951e-14
+  beam.sig_z = 0
+  beam.z_distribution = "GRID"
+  beam.z_min = -1.200000e-09
+  beam.z_max = 1.200000e-09
   seed_power = 0
   shot_noise = T
   beamlet_size = 8
@@ -141,7 +141,7 @@ def main():
 
     # 1. Steady lockstep: the recorded levels, particle and field rows alike.
     run(args.exe, wd, "fp32_ss.in", BASE.format(root="fp32ss",
-        extra='  global%fp32_check = "lockstep"\n'))
+        extra='  run.fp32_check = "lockstep"\n'))
     s = summary(wd, "fp32ss")
     for q in ("pz", "theta", "phasor", "source", "field"):
         ok(f"lockstep steady worst_{q}", f"{s[q]:.3e}", f"<= {CEIL[q]:.0e}", s[q] <= CEIL[q],
@@ -160,7 +160,7 @@ def main():
 
     # 3. Falsifiable: the mutation must move the theta level and the field twin's source row.
     run(args.exe, wd, "fp32_mut.in", BASE.format(root="fp32mut",
-        extra='  global%fp32_check = "lockstep"\n  global%fp32_mutate = T\n'))
+        extra='  run.fp32_check = "lockstep"\n  run.fp32_mutate = T\n'))
     m = summary(wd, "fp32mut")
     ok("mutation moves worst_theta", f"{m['theta']:.3e} vs {s['theta']:.3e}",
        ">= 10x", m["theta"] >= 10 * s["theta"],
@@ -173,7 +173,7 @@ def main():
     # divergence on this gain-regime segment must lie in (0, 1e-2]. That number is the
     # figure a device port is judged against.
     run(args.exe, wd, "fp32_fr.in", BASE.format(root="fp32fr",
-        extra='  global%fp32_check = "freerun"\n'))
+        extra='  run.fp32_check = "freerun"\n'))
     f = summary(wd, "fp32fr")
     ok("freerun compounds past lockstep (phasor)", f"{f['phasor']:.3e} vs {s['phasor']:.3e}",
        "> 1x", f["phasor"] > s["phasor"],
@@ -184,7 +184,7 @@ def main():
 
     # 5. Time dependence, and thread identity of the instrument's own stream.
     run(args.exe, wd, "fp32_td.in", BASE.format(root="fp32td",
-        extra=TD_EXTRA + '  global%fp32_check = "lockstep"\n'), threads="8")
+        extra=TD_EXTRA + '  run.fp32_check = "lockstep"\n'), threads="8")
     t8 = (wd / "fp32td.fp32.txt").read_bytes()
     t = summary(wd, "fp32td")
     for q in ("pz", "theta", "phasor", "source", "field"):
@@ -194,13 +194,13 @@ def main():
        t["guard"] >= GUARD_FLOOR,
        num=t["guard"], bound=GUARD_FLOOR, kind="min")
     run(args.exe, wd, "fp32_td.in", BASE.format(root="fp32td",
-        extra=TD_EXTRA + '  global%fp32_check = "lockstep"\n'), threads="1")
+        extra=TD_EXTRA + '  run.fp32_check = "lockstep"\n'), threads="1")
     same = t8 == (wd / "fp32td.fp32.txt").read_bytes()
     ok("instrument stream byte-identical, 1 vs 8 threads", same, "True", same)
 
     # 6. A wake run lies outside the twin's coverage and must be refused.
     r = run(args.exe, wd, "fp32_ref.in", BASE.format(root="fp32ref",
-        extra='  global%fp32_check = "lockstep"\n  wake_on = T\n  wake_radius = 2.5e-3\n'
+        extra='  run.fp32_check = "lockstep"\n  wake_on = T\n  wake_radius = 2.5e-3\n'
               '  wake_conductivity = 5.813e7\n  wake_relaxation = 8.1e-6\n'),
         expect_fail=True)
     refused = r.returncode != 0 and "FP32_CHECK DOES NOT COVER WAKES" in r.stdout

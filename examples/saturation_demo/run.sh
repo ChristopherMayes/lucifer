@@ -136,7 +136,7 @@ if [[ $SHOW -eq 1 ]]; then
   for f in "$SCRIPTS/report_fel_saturation.py" "$DEMO_DIR/check_agreement.py" \
            "$DEMO_DIR/Aramis.lat" "$DEMO_DIR/aramis.bmad" "$DEMO_DIR/sat_unavg.bmad" \
            "$DEMO_DIR/sat-prep.in" "$DEMO_DIR/sat-genesis.in" \
-           "$DEMO_DIR/lucifer-avg.in" "$DEMO_DIR/lucifer-unavg.in"; do
+           "$DEMO_DIR/lucifer-avg.toml" "$DEMO_DIR/lucifer-unavg.toml"; do
     [[ -f "$f" ]] || { echo "  missing after changing directory: $f"; missing=1; }
   done
   cd / && rm -rf "$scratch"
@@ -150,8 +150,8 @@ fi
 
 mkdir -p "$WORK_DIR"
 cp "$DEMO_DIR"/Aramis.lat "$DEMO_DIR"/aramis.bmad "$DEMO_DIR"/sat_unavg.bmad \
-   "$DEMO_DIR"/sat-prep.in "$DEMO_DIR"/sat-genesis.in "$DEMO_DIR"/lucifer-avg.in \
-   "$DEMO_DIR"/lucifer-unavg.in "$WORK_DIR/"
+   "$DEMO_DIR"/sat-prep.in "$DEMO_DIR"/sat-genesis.in "$DEMO_DIR"/lucifer-avg.toml \
+   "$DEMO_DIR"/lucifer-unavg.toml "$WORK_DIR/"
 cd "$WORK_DIR" || exit 1
 export FI_PROVIDER=tcp
 
@@ -169,9 +169,9 @@ timed () {  # <label> <log> <command...>
 }
 
 timed "Genesis4, $WORKERS MPI ranks" sat-genesis.log "$MPIRUN" -np "$WORKERS" "$GENESIS" sat-genesis.in
-timed "Bmad averaged, $WORKERS threads" sat-avg.log env OMP_NUM_THREADS="$WORKERS" "$EXE" lucifer-avg.in
+timed "Bmad averaged, $WORKERS threads" sat-avg.log env OMP_NUM_THREADS="$WORKERS" "$EXE" lucifer-avg.toml
 timed "Bmad unaveraged, $WORKERS threads (~32x; watch its progress lines in sat-unavg.log)" \
-      sat-unavg.log env OMP_NUM_THREADS="$WORKERS" "$EXE" lucifer-unavg.in
+      sat-unavg.log env OMP_NUM_THREADS="$WORKERS" "$EXE" lucifer-unavg.toml
 echo
 
 "$PYTHON" "$DEMO_DIR/check_agreement.py" AramisSat.out.h5 sat-avg.diag.txt sat-unavg.diag.txt || exit 1

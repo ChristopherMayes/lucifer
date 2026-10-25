@@ -3,7 +3,7 @@
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that
 failed, a job that timed out. Five tests read those outcomes, one each. A sixth test
-regenerates the five page sets and requires the Markdown diff to be empty. Before it
+regenerates the six page sets and requires the Markdown diff to be empty. Before it
 runs a generator, the sixth test verifies for itself that all five outcomes are present
 and successful. So it does not lean on test order and cannot pass on a partial run.
 Nothing here builds. Both trees are prerequisites and are checked before any job
@@ -313,7 +313,7 @@ def test_job(keystone: Keystone, name: str) -> None:
 
 
 def test_regeneration(keystone: Keystone) -> None:
-    """Regenerate the five page sets and require no diff, after all five jobs passed.
+    """Regenerate the six page sets and require no diff, after all five jobs passed.
 
     The prerequisite is checked here and not inherited from the five tests above, since
     those may be deselected or ordered after this one. A partial or failed run fails
@@ -329,6 +329,10 @@ def test_regeneration(keystone: Keystone) -> None:
          "--production", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation-measured.md")),
         (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "src"),
          "--code", str(LUCIFER / "programs"), "--out", str(GENERATED / "api.md")),
+        # The deck's schema, from the production binary, and the key tables from it.
+        (str(PRODUCTION_EXE), "--schema", str(GENERATED / "schema.json")),
+        (str(SCRIPTS / "report_input_keys.py"), "--schema", str(GENERATED / "schema.json"),
+         "--out", str(GENERATED / "input-keys.md")),
         (str(SCRIPTS / "report_examples.py"), "--examples", str(LUCIFER / "examples"),
          "--out", str(GENERATED / "examples")),
         # The startup-noise page's tables, from the committed JSON of the driver's runs. The
@@ -342,12 +346,15 @@ def test_regeneration(keystone: Keystone) -> None:
          "--out", str(GENERATED / "layouts.md"), "--log", str(art / "layouts.log")),
     )
     for gen in generators:
-        r = subprocess.run([sys.executable, *gen], cwd=str(LUCIFER), capture_output=True, text=True)
+        # A Python generator runs under this interpreter; the tracker's --schema runs as it is.
+        cmd = [sys.executable, *gen] if gen[0].endswith(".py") else list(gen)
+        r = subprocess.run(cmd, cwd=str(LUCIFER), capture_output=True, text=True)
         assert r.returncode == 0, f"{pathlib.Path(gen[0]).name} exited {r.returncode}\n{r.stdout[-2000:]}\n{r.stderr[-2000:]}"
     # The Markdown only. The figures are committed and a plotting library upgrade
     # rewrites them all with no physics moving (docs/validation.md).
     r = subprocess.run(["git", "diff", "--exit-code", "--stat", "--",
-                        "docs/generated/*.md", "docs/generated/examples/*.md", "examples/measured.tsv"],
+                        "docs/generated/*.md", "docs/generated/schema.json", "docs/generated/examples/*.md",
+                        "examples/measured.tsv"],
                        cwd=str(LUCIFER), capture_output=True, text=True)
     assert r.returncode == 0, ("a generated page moved after regeneration; a moved digit is a bug, "
                                "not a new baseline:\n" + r.stdout)

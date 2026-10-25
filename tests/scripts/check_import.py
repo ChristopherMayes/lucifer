@@ -20,7 +20,7 @@ exact, with no RNG, at a tolerance of roundoff except where stated:
             leave the moments unchanged, unweighted over the coincident copies. The
             current profile, a weighted sum, is unchanged too.
   openPMD   The same bunch written by hdf5_write_beam and read back through
-            beam_init%position_file reproduces the moments and the current profile.
+            beam.position_file reproduces the moments and the current profile.
   refusal   A bunch with zero total charge is refused.
   threads   The same seed at 1 and 8 threads gives byte-identical diag output, since
             the import runs serially before tracking.
@@ -55,7 +55,7 @@ import numpy as np
 
 import beamio
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 import pool
 
@@ -75,21 +75,21 @@ SIG_PZ = 1 / GAMMA0            # gen_delgam = 1 in fractional momentum
 # transform, since a Bmad lattice is the optics specification.
 LATTICE_TWISS = dict(betax=8.53711, alphax=-0.703306, betay=17.3899, alphay=1.40348)
 
-NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "aramis_1seg.bmad"
+NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   source_filter = F
   lambda0 = {lambda0}
   n_wavelength = {sample}
-  resample%n_particle_per_slice = 2048
-  resample%beamlet_size = 8
+  beam.resample.n_particle_per_slice = 2048
+  beam.resample.beamlet_size = 8
   shot_noise = T
   ran_seed = {seed}
   seed_power = 0
   grid_n_pts = 256
   grid_half_width = 2e-4
-{source}  resample%n_slice = {nslice}
-  resample%slice_width = 0.01
+{source}  beam.resample.n_slice = {nslice}
+  beam.resample.slice_width = 0.01
   write_diag = T
 {extra}&end
 """
@@ -166,13 +166,13 @@ def run(cmd, log, env=None):
         sys.exit(1)
 
 
-BEAM_INIT_SOURCE = """  resample%use_beam_init = T
-  beam_init%n_particle = 50000
-  beam_init%a_norm_emit = {emit}
-  beam_init%b_norm_emit = {emit}
-  beam_init%sig_z = 1.2e-9
-  beam_init%sig_pz = {sig_pz}
-  beam_init%bunch_charge = 3.01e-14
+BEAM_INIT_SOURCE = """  beam.resample.use_beam_init = T
+  beam.n_particle = 50000
+  beam.a_norm_emit = {emit}
+  beam.b_norm_emit = {emit}
+  beam.sig_z = 1.2e-9
+  beam.sig_pz = {sig_pz}
+  beam.bunch_charge = 3.01e-14
 """.format(emit=NORM_EMIT, sig_pz=SIG_PZ)
 
 
@@ -238,10 +238,10 @@ def main():
     ok = True
 
     # ---- The RNG-free runs: generate, write the shared file, import, dump and stop.
-    write_nml(w/"imp_ref.nml", "impref", 1000,
+    write_nml(w/"imp_ref.toml", "impref", 1000,
               extra='  write_genesis_dist = "impdist.h5"\n'
                     '  write_openpmd_file = "impopmd.h5"\n  load_only = T\n')
-    run([args.exe, "imp_ref.nml"], w/"imp_ref.log", env=env1)
+    run([args.exe, "imp_ref.toml"], w/"imp_ref.log", env=env1)
     mom_ref, cur_ref = read_import_file(w, "impref")
 
     # moments: init_beam_distribution generates the bunch matched to the lattice Twiss.
@@ -281,9 +281,9 @@ def main():
             ok = False
 
     # split: coincident copies leave the RNG-free outputs unchanged to roundoff.
-    write_nml(w/"imp_split.nml", "impsplit", 1000,
+    write_nml(w/"imp_split.toml", "impsplit", 1000,
               extra="  resample_split_weights = T\n  load_only = T\n")
-    run([args.exe, "imp_split.nml"], w/"imp_split.log", env=env1)
+    run([args.exe, "imp_split.toml"], w/"imp_split.log", env=env1)
     mom_s, cur_s = read_import_file(w, "impsplit")
     dm = np.abs(mom_s - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_s - cur_ref).max() / max(cur_ref.max(), 1e-30)
@@ -295,17 +295,17 @@ def main():
         ok = False
 
     # openPMD round trip: the same bunch written by Bmad's hdf5_write_beam and read back
-    # through beam_init%position_file must reproduce the RNG-free outputs to file
+    # through beam.position_file must reproduce the RNG-free outputs to file
     # precision. This runs the import's second input path end to end.
-    write_nml(w/"imp_opmd.nml", "impopmd", 1000,
+    write_nml(w/"imp_opmd.toml", "impopmd", 1000,
               extra='  load_only = T\n',
-              source='  beam_init%position_file = "impopmd.h5"\n  beam_init%n_particle = 2048\n'
+              source='  beam.position_file = "impopmd.h5"\n  beam.n_particle = 2048\n'
                      '  beamlet_size = 8\n')
-    run([args.exe, "imp_opmd.nml"], w/"imp_opmd.log", env=env1)
+    run([args.exe, "imp_opmd.toml"], w/"imp_opmd.log", env=env1)
     mom_o, cur_o = read_import_file(w, "impopmd")
     dm = np.abs(mom_o - mom_ref).max() / np.abs(mom_ref).max()
     dc = np.abs(cur_o - cur_ref).max() / max(cur_ref.max(), 1e-30)
-    print(f"openPMD round trip (write_openpmd_file -> beam_init%position_file): moments {dm:.3e}, currents {dc:.3e}")
+    print(f"openPMD round trip (write_openpmd_file -> beam.position_file): moments {dm:.3e}, currents {dc:.3e}")
     record("openPMD round trip: moments", dm, 1e-10, "max", not (dm > 1e-10))
     record("openPMD round trip: currents", dc, 1e-10, "max", not (dc > 1e-10))
     if dm > 1e-10 or dc > 1e-10:
@@ -313,11 +313,11 @@ def main():
         ok = False
 
     # zero-charge refusal: a chargeless bunch, as from openPMD without charge data and an
-    # unset beam_init%bunch_charge, must be refused and not imported as a dark beam.
-    write_nml(w/"imp_dark.nml", "impdark", 1000, extra='  load_only = T\n',
+    # unset beam.bunch_charge, must be refused and not imported as a dark beam.
+    write_nml(w/"imp_dark.toml", "impdark", 1000, extra='  load_only = T\n',
               source=BEAM_INIT_SOURCE.replace("bunch_charge = 3.01e-14", "bunch_charge = 0"))
     with open(w/"imp_dark.log", "w") as fh:
-        rr = subprocess.run([args.exe, "imp_dark.nml"], stdout=fh, stderr=subprocess.STDOUT, env=env1)
+        rr = subprocess.run([args.exe, "imp_dark.toml"], stdout=fh, stderr=subprocess.STDOUT, env=env1)
     dark_log = (w/"imp_dark.log").read_text()
     refused = rr.returncode != 0 and "ZERO TOTAL CHARGE" in dark_log
     record("zero-charge refusal", None, None, "bool", refused)
@@ -357,10 +357,10 @@ def main():
 
     # threads, exact: the same seed at 1 and 8 threads, tracked this time. The diag files
     # must be byte-equal.
-    write_nml(w/"imp_t1.nml", "impt1", 1000)
-    write_nml(w/"imp_t8.nml", "impt8", 1000)
-    run([args.exe, "imp_t1.nml"], w/"imp_t1.log", env=env1)
-    run([args.exe, "imp_t8.nml"], w/"imp_t8.log", env=env8)
+    write_nml(w/"imp_t1.toml", "impt1", 1000)
+    write_nml(w/"imp_t8.toml", "impt8", 1000)
+    run([args.exe, "imp_t1.toml"], w/"imp_t1.log", env=env1)
+    run([args.exe, "imp_t8.toml"], w/"imp_t8.log", env=env8)
     b1 = (w/"impt1.diag.txt").read_bytes()
     b8 = (w/"impt8.diag.txt").read_bytes()
     d1 = re.sub(rb"impt1", b"", b1); d8 = re.sub(rb"impt8", b"", b8)
@@ -377,9 +377,9 @@ def main():
     def seed_chain(k):
         seed = 2000 + 17*k
         dist = f"impdist_s{k}.h5"
-        write_nml(w/f"imp_s{k}.nml", f"imps{k}", seed,
+        write_nml(w/f"imp_s{k}.toml", f"imps{k}", seed,
                   extra=f'  write_genesis_dist = "{dist}"\n')
-        run([args.exe, f"imp_s{k}.nml"], w/f"imp_s{k}.log", env=env8)
+        run([args.exe, f"imp_s{k}.toml"], w/f"imp_s{k}.log", env=env8)
         (w/f"imp_g{k}.in").write_text(GENESIS_TRACK_DECK.format(
             root=f"impg{k}", dist=dist, lambda0=LAMBDA0, gamma0=GAMMA0,
             slen=SLEN, sample=SAMPLE))
@@ -411,16 +411,16 @@ def main():
     # against the Gaussian at the window's own center. The default window would also hold
     # the line's slippage and place the bunch low. That is a different geometry, and this
     # check measures the current derivation.
-    (w/"imp_xq.nml").write_text(to_groups(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
+    (w/"imp_xq.toml").write_text(to_groups(NML.format(root="impxq", seed=1000, lambda0=LAMBDA0,
         sample=SAMPLE, nslice=NSLICE, extra=f'  load_only = T\n  n_slice = {NSLICE}\n',
-        source="""  beam_init%n_particle = 512
-  beam_init%a_norm_emit = {emit}
-  beam_init%b_norm_emit = {emit}
-  beam_init%sig_z = 1.2e-9
-  beam_init%sig_pz = {sig_pz}
-  beam_init%bunch_charge = 3.01e-14
+        source="""  beam.n_particle = 512
+  beam.a_norm_emit = {emit}
+  beam.b_norm_emit = {emit}
+  beam.sig_z = 1.2e-9
+  beam.sig_pz = {sig_pz}
+  beam.bunch_charge = 3.01e-14
 """.format(emit=NORM_EMIT, sig_pz=SIG_PZ))))
-    run([args.exe, "imp_xq.nml"], w/"imp_xq.log", env=env1)
+    run([args.exe, "imp_xq.toml"], w/"imp_xq.log", env=env1)
     cur_q = load_dump_currents(w/"impxq-initial.beam.h5")
     sp = SAMPLE * LAMBDA0
     sig_z, q_charge = 1.2e-9, 3.01e-14
@@ -436,7 +436,7 @@ def main():
         ok = False
     # The import's profile is cur_ref, read earlier from the same description, on its
     # own slice centers with the bunch center fitted. The import min-shifts positions,
-    # and resample%n_slice truncates the +4 sigma tail, so the fit is over a clipped
+    # and beam.resample.n_slice truncates the +4 sigma tail, so the fit is over a clipped
     # profile and rms over the live slices is the statistic that applies. The mutations
     # this check exists to catch, a dropped sqrt(2pi) or dslen in place of the spacing,
     # sit at 0.65-1.5 of peak.

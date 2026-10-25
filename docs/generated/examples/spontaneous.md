@@ -11,11 +11,11 @@ Everything on this page lives in and runs from `examples/spontaneous/`.
 
 The example runs in two commands, with Bmad only:
 
-    ../../../production/bin/lucifer lucifer.in
-    ../../../production/bin/lucifer lucifer_damping_only.in
+    ../../build-release/bin/lucifer lucifer.toml
+    ../../build-release/bin/lucifer lucifer_damping_only.in
     python ../plot_fel.py spontaneous.stats.h5
 
-This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad_com%radiation_damping_on` subtracts the classical rate from every particle. `bmad_com%radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../input-reference.md)).
+This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad.radiation_damping_on` subtracts the classical rate from every particle. `bmad.radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../input-reference.md)).
 
 Both decks are the `../steady_state` deck plus the switches, so that run is the control and the difference is the radiation.
 
@@ -24,7 +24,7 @@ The plot shows it in the beam-energy panel, where the mean falls in a straight l
 | run | d\<E\>/ds per metre of undulator | against the analytic rate |
 |---|---|---|
 | `lucifer_damping_only.in` | -0.03071 m_e c^2 | 100.3% |
-| `lucifer.in`, both switches | -0.03103 m_e c^2 | 101.4% |
+| `lucifer.toml`, both switches | -0.03103 m_e c^2 | 101.4% |
 | `../steady_state`, neither switch | -0.00008 m_e c^2 | 0.25% |
 
 The classical rate `(2/3) r_e gamma^2 k_u^2 a_w^2` is 0.030616 m_e c^2 per metre of undulator at these parameters, and the damping run reproduces it to 0.3%. The last row is the control. With both switches off the same fit finds a quarter of a percent of that rate, which is the FEL's own start-up extraction and not radiation. Over the whole line the analytic loss is 1.47 m_e c^2 across 47.88 m of undulator. By then the FEL is extracting far more than radiation is, so the pre-gain slope is where the two can be told apart.
@@ -41,7 +41,7 @@ Each run takes about five seconds.
 
 The runner wrote these from each run's stats file and log, and the keystone regenerates them. A float carries five significant digits.
 
-| Quantity | `lucifer.in` | `lucifer_damping_only.in` | Unit |
+| Quantity | `lucifer.toml` | `lucifer_damping_only.toml` | Unit |
 |---|---|---|---|
 | exit power | 5.5527e+08 | 5.5672e+08 | W |
 | exit power per slice | 5.5527e+08 | 5.5672e+08 | W |
@@ -89,57 +89,57 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 The deck, its variants, and any lattice they name, as they are on disk.
 
-### `lucifer.in`
+### `lucifer.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "spontaneous"
-  bmad_com%radiation_damping_on = T
-  bmad_com%radiation_fluctuations_on = T
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "spontaneous"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
+
+[bmad]
+radiation_damping_on = true
+radiation_fluctuations_on = true
 ```
 
-### `lucifer_damping_only.in`
+### `lucifer_damping_only.toml`
 
-```fortran
-&fel_params
-  lat_file = "../aramis.bmad"
-  global%out_root = "damping_only"
-  bmad_com%radiation_damping_on = T
-/
+```toml
+lattice = "../aramis.bmad"
 
-&fel_beam_init
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
-/
+[run]
+out_root = "damping_only"
 
-&fel_wavefront_init
-  wavefront_init%lambda0 = 1e-10
-  wavefront_init%seed_power = 5e3
-  wavefront_init%seed_waist_size = 30e-6
-  wavefront_init%grid_n_pts = 256
-  wavefront_init%grid_half_width = 2e-4
-/
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 5e3
+seed_waist_size = 30e-6
+
+[bmad]
+radiation_damping_on = true
 ```

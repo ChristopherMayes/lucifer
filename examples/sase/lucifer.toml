@@ -1,0 +1,25 @@
+lattice = "../aramis.bmad"
+
+[run]
+out_root = "sase"
+
+[window]
+window_length = 2.88e-8
+n_wavelength = 3
+
+[beam]
+n_particle = 2048
+bunch_charge = 2.881993782512e-13
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+z_distribution = "GRID"
+z_min = -1.44e-8
+z_max = 1.44e-8
+shot_noise = true
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 256
+grid_half_width = 2e-4
+seed_power = 0

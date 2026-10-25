@@ -52,7 +52,7 @@ import numpy as np
 
 import convert_genesis
 from checkrec import record
-from nml import to_groups
+from lucifer.deck import to_toml as to_groups
 
 import pool
 
@@ -124,19 +124,19 @@ OPEN_MID = "B1, DD, B2, DD, B3"          # Three bends: NOT a closed bump.
 
 UNAVG = "wiggler::*[FEL_METHOD] = unaveraged"
 
-NML = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{tag}.bmad"
+NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{tag}.bmad"
   out_root = "{tag}"
   source_filter = F
   lambda0 = 1e-10
   interlude_model = '{imodel}'
   transport_model = '{transport}'
-  beam_init%n_particle = 8192
-  beam_init%bunch_charge = 1.000692285594e-15
-  beam_init%sig_z = 0
-  beam_init%sig_pz = 8.804506566858e-5
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 8192
+  beam.bunch_charge = 1.000692285594e-15
+  beam.sig_z = 0
+  beam.sig_pz = 8.804506566858e-5
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   seed_power = 1e7
   seed_waist_size = 30e-6
   grid_n_pts = 151
@@ -165,21 +165,21 @@ use, SEG
 {modeline}
 """
 
-NML_TD = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{tag}.bmad"
+NML_TD = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{tag}.bmad"
   out_root = "{tag}"
   source_filter = F
   lambda0 = 1e-10
   interlude_model = 'bmad'
   transport_model = '{transport}'
-  beam_init%n_particle = 2048
-  beam_init%bunch_charge = 1.6e-14
-  beam_init%distribution_type(3) = "GRID"
-  beam_init%grid(3)%x_min = -8e-10
-  beam_init%grid(3)%x_max = 8e-10
-  beam_init%sig_pz = 8.804506566858e-05
-  beam_init%a_norm_emit = 4e-7
-  beam_init%b_norm_emit = 4e-7
+  beam.n_particle = 2048
+  beam.bunch_charge = 1.6e-14
+  beam.z_distribution = "GRID"
+  beam.z_min = -8e-10
+  beam.z_max = 8e-10
+  beam.sig_pz = 8.804506566858e-05
+  beam.a_norm_emit = 4e-7
+  beam.b_norm_emit = 4e-7
   beamlet_size = 8
   seed_power = 1e6
   seed_waist_size = 30e-6
@@ -287,12 +287,12 @@ fft_fieldsolver = true
 # lambda0 and beamlet_size come from this namelist. An openPMD beam file carries the slice
 # partition and not the radiation it was sliced on. Both match GEN_PREP, which writes the
 # shared dumps.
-NML_IMP = """! flat keys; routed into the three groups by nml.to_groups
-  lat_file = "{tag}.bmad"
+NML_IMP = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+  lattice = "{tag}.bmad"
   out_root = "{tag}"
   source_filter = F
-  beam_file = "PSP-initial.beam.h5"
-  field_file = "PSP-initial.wf.h5"
+  beam.file = "PSP-initial.beam.h5"
+  field.file = "PSP-initial.wf.h5"
   lambda0 = 1e-10
   beamlet_size = 8
   interlude_model = '{imodel}'
@@ -328,8 +328,8 @@ def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"
     nml = (nml_t or NML).format(tag=tag, imodel=imodel, transport=transport)
     if extra:
         nml = nml.replace("/\n", extra + "/\n")
-    (wd / f"{tag}.nml").write_text(to_groups(nml))
-    r = subprocess.run([str(exe), f"{tag}.nml"], cwd=wd, capture_output=True, text=True,
+    (wd / f"{tag}.toml").write_text(to_groups(nml))
+    r = subprocess.run([str(exe), f"{tag}.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
     if r.returncode != 0:
         print(f"FAIL: {tag} exited {r.returncode}:\n{r.stdout[-2000:]}")
@@ -338,9 +338,9 @@ def run(exe, wd, tag, lat_text, imodel="bmad", extra="", nml_t=None, threads="4"
 
 def refuse(exe, wd, tag, lat_text, fragment, imodel="bmad", transport="bmad"):
     (wd / f"{tag}.bmad").write_text(lat_text)
-    (wd / f"{tag}.nml").write_text(to_groups(NML.format(tag=tag, imodel=imodel,
+    (wd / f"{tag}.toml").write_text(to_groups(NML.format(tag=tag, imodel=imodel,
                                                        transport=transport)))
-    r = subprocess.run([str(exe), f"{tag}.nml"], cwd=wd, capture_output=True, text=True,
+    r = subprocess.run([str(exe), f"{tag}.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     return r.returncode != 0 and fragment in (r.stdout + r.stderr)
 

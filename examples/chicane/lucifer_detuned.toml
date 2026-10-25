@@ -1,0 +1,20 @@
+lattice = "detuned.bmad"
+
+[run]
+out_root = "detuned"
+ran_seed = 12345
+
+[beam]
+n_particle = 8192
+bunch_charge = 1.000692285594e-15
+sig_z = 0
+sig_pz = 8.804506566858e-5
+a_norm_emit = 4e-7
+b_norm_emit = 4e-7
+
+[field]
+lambda0 = 1e-10
+grid_n_pts = 128
+grid_half_width = 2e-4
+seed_power = 2e8
+seed_waist_size = 30e-6
