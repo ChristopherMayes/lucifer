@@ -3990,8 +3990,9 @@ Output:
 
 ```
 Routine to render a real as TOML text: an integer value as "1.0", else in
-exponent form with the trailing zeros of the mantissa removed, so 1e-10 reads
-back as 1.0e-10 and 0.75 as 7.5e-1.
+exponent form with the fewest significant digits, 15 to 17, that read back to the
+same value and the trailing zeros of the mantissa removed, so 1e-10 reads back as
+1.0e-10, 0.75 as 7.5e-1 and 0.05 as 5.0e-2.
 ```
 
 ```

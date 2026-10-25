@@ -916,8 +916,9 @@ end function fel_schema_quoted
 ! Function real_text (v) result (txt)
 !
 ! Routine to render a real as TOML text: an integer value as "1.0", else in
-! exponent form with the trailing zeros of the mantissa removed, so 1e-10 reads
-! back as 1.0e-10 and 0.75 as 7.5e-1.
+! exponent form with the fewest significant digits, 15 to 17, that read back to the
+! same value and the trailing zeros of the mantissa removed, so 1e-10 reads back as
+! 1.0e-10, 0.75 as 7.5e-1 and 0.05 as 5.0e-2.
 !
 ! Input:
 !   v    -- real(rp): The value.
@@ -928,10 +929,11 @@ end function fel_schema_quoted
 
 function real_text (v) result (txt)
 
-real(rp) v
+real(rp) v, back
 character(:), allocatable :: txt
 character(32) buf
-integer ie, j
+character(12) fmt
+integer ie, j, nd
 
 !
 
@@ -939,7 +941,17 @@ if (v == 0) then
   txt = '0.0'
   return
 endif
-write (buf, '(es24.16e3)') v
+
+! The fewest significant digits, 15 to 17, that read back to the same value, so 0.05
+! reads 5.0e-2 and not 5.0000000000000003e-2, while a value that needs all 17 keeps
+! them.
+
+do nd = 15, 17
+  write (fmt, '(a, i0, a)') '(es24.', nd - 1, 'e3)'
+  write (buf, fmt) v
+  read (buf, *) back
+  if (back == v) exit
+enddo
 buf = adjustl(buf)
 ie = index(buf, 'E')
 ! Strip trailing zeros of the mantissa, keeping one digit after the point, and the

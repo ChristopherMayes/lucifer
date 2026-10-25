@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-24 Changed: the echo in `meta/input_echo` and the defaults in the schema write a real
+  with the fewest significant digits, 15 to 17, that read back to the same value, so `0.05` reads
+  `5.0e-2` where it read `5.0000000000000003e-2`, and `2.5e-3` and `2.0e-1` likewise, while a value
+  that needs all 17 digits keeps them.
 - 2026-10-24 Added: a key of the deck can be set on the command line, after the deck, as
   `table.key=value`, `lucifer lucifer.toml beam.n_particle=4096 run.out_root=s7`. The value is TOML,
   and a bare value for a string key is quoted, since the shell strips the quotes. `fel_read_deck`
