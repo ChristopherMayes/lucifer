@@ -28,6 +28,11 @@ of that history. The entries before that date describe that branch.
   no longer matched their pages, and three comments naming `chamber_wake%` and `wavefront_init%`
   components, which now name `wake.write_kernels`, `wake.on` and `field.harmonics`. The Genesis4
   input files' comments changed, so the next benchmark run misses the reference cache once.
+- 2026-10-25 Fixed: `docs/performance.md` named the performance input files `tests/perf/*.in` and
+  `unavg_sample.in`, and `examples/README.md` named the variants `lucifer_averaged.in` and called
+  each line a namelist parameter, all from before the input file became TOML. The page names the
+  four files the device table runs and `unavg_sample.toml`, and the README names
+  `lucifer_detuned.toml` and `lucifer_transcribed.toml` and calls each line an input key.
 - 2026-10-25 Added: the Python package carries the input file as typed models, a runner and the readers.
   `python/lucifer/schema.json` is the one committed copy of the schema, written there by the
   keystone's `lucifer --schema`, and `python -m lucifer.generate` writes `python/lucifer/models.py`

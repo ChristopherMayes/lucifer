@@ -28,7 +28,7 @@ The device table runs as:
 ./tests/perf/device_table.sh
 ```
 
-Its four input files are the `*.in` files beside it. The estimate-against-the-clock table reads the footers of runs made one at a time:
+Its four input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` beside it. The estimate-against-the-clock table reads the footers of runs made one at a time:
 
 ```
 ./tests/scripts/estimate_vs_clock.py tier1=<log> tier1_unavg=<log> ...
@@ -41,7 +41,7 @@ OMP_NUM_THREADS=12 build-release/bin/lucifer <input>.toml &
 sample $(pgrep -n lucifer) 15 1 -file prof.txt -mayDie
 ```
 
-The averaged input file is the 96-slice one the phases mode writes, and the unaveraged one is `tests/perf/unavg_sample.in`, run at one thread and sampled for 20 s.
+The averaged input file is the 96-slice one the phases mode writes, and the unaveraged one is `tests/perf/unavg_sample.toml`, run at one thread and sampled for 20 s.
 
 Read the `Sort by top of stack` section, which is exclusive cost per symbol. The call graph is per thread and fragments the same information across dozens of stacks.
 
@@ -203,7 +203,7 @@ The configuration is one slice of 16384 particles at `ngrid` 129, run serially (
 | everything else | 2.4% | 1.8% | 9.6% |
 | total samples | 13302 | 7964 | 8085 |
 
-The third column is the same input file, `tests/perf/unavg_sample.in`, under gfortran 15.3 on 2026-10-24, with the interchange of 2026-09-02 in the binary as well as the hoist. Its `everything else` holds 7.7 points the sampler attributes to the step's own parallel-region body, `fel_unavg_step`, where the newer compiler inlines what the older one called, and the undulator field's line is lower by the same amount. The walk was 12.2 s against the 21.94 s of 2026-09-01.
+The third column is the same input file, `tests/perf/unavg_sample.toml`, under gfortran 15.3 on 2026-10-24, with the interchange of 2026-09-02 in the binary as well as the hoist. Its `everything else` holds 7.7 points the sampler attributes to the step's own parallel-region body, `fel_unavg_step`, where the newer compiler inlines what the older one called, and the undulator field's line is lower by the same amount. The walk was 12.2 s against the 21.94 s of 2026-09-01.
 
 Half of this mode was libm, and none of it went through `fel_sincos`. `fel_unavg_bfield` called `cos(und%ku * s)` and `sin(und%ku * s)` as two separate intrinsics, and `fel_und_envelope` called two more, all four per particle per RK stage. The argument depends only on the substep position and is therefore the same for every particle in the loop. The four s-dependent factors now arrive as arguments, evaluated once per stage, and `fel_unavg_bfield` no longer takes `s` at all.
 
@@ -432,7 +432,7 @@ The Metal backend ([](validation.md#val-device)) is run against the CPU path on 
 | SASE window, 96 x 8192 | 3.509 s | 0.383 s | 0.290 s | 9.1x | 12.4x |
 | dispatch floor: 1 x 1024, ngrid 64 | 0.032 s | 0.045 s | 0.014 s | 0.7x | 0.9x |
 
-The input files are `tests/perf/*.in` and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-09-04, under gfortran 13.3 and the clang of 2025-06, when the CPU walks were 0.360, 0.873, 3.92 and 0.032 s and the device walls 0.049, 0.107, 0.316 and 0.037. The device walls are longer on the current toolchain, by 20 to 48 percent, and the busy seconds with them, which is the host side and the Metal library of the newer clang rather than the shaders, which are compiled at run time by the same Metal compiler. The source filter is on in these runs and was not the default then.
+The input files are `steady_1x8192.toml`, `sase_24x4096.toml`, `sase_96x8192.toml` and `floor_1x1024.toml` in `tests/perf/`, and `tests/perf/device_table.sh` prints the table. The last column is the ratio of 2026-09-04, under gfortran 13.3 and the clang of 2025-06, when the CPU walks were 0.360, 0.873, 3.92 and 0.032 s and the device walls 0.049, 0.107, 0.316 and 0.037. The device walls are longer on the current toolchain, by 20 to 48 percent, and the busy seconds with them, which is the host side and the Metal library of the newer clang rather than the shaders, which are compiled at run time by the same Metal compiler. The source filter is on in these runs and was not the default then.
 
 This table says where a step's device seconds go, per pass. `run.device_timing` encodes each pass into its own compute encoder carrying a timestamp attachment, which is what stage-boundary counter sampling can measure on an Apple GPU. Dispatch-boundary sampling would time each dispatch inside one encoder, and the M3 Max reports it absent. The input file is the full Aramis line, 12 segments and 1068 steps, one slice, `ngrid` 256, with the filter on and `comb_ds_save = -1`. The readbacks therefore fall at element ends, and each element's steps batch into one command buffer. Each row is the best complete run of five, never a per-pass minimum, with the spread over the five beside it. The transverse map runs twice a step, and the filter and the solve are four dispatches each, so those lines sum more encoders than the others.
 
