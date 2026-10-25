@@ -1,9 +1,9 @@
-"""Run the program on a deck and hand back where its output went.
+"""Run the program on an input file and hand back where its output went.
 
-    from lucifer import Deck, run
-    deck = Deck(lattice="aramis.bmad")
-    deck["beam.n_particle"] = 4096
-    result = run(deck, cwd="scan7", threads=12)
+    from lucifer import Input, run
+    inp = Input(lattice="aramis.bmad")
+    inp["beam.n_particle"] = 4096
+    result = run(inp, cwd="scan7", threads=12)
     result.stats["field/total/power"]
 
     for n in (1024, 2048, 4096):
@@ -46,10 +46,10 @@ def executable(exe=None) -> pathlib.Path:
 
 @dataclass
 class Result:
-    """One run: its exit code and output, the deck it ran, and the files it wrote."""
+    """One run: its exit code and output, the input file it ran, and the files it wrote."""
     returncode: int
     output: str
-    deck: pathlib.Path
+    input_file: pathlib.Path
     cwd: pathlib.Path
     out_root: str
     overrides: list[str] = field(default_factory=list)
@@ -76,22 +76,22 @@ WROTE = re.compile(r"^(?: Wrote\s+|\s{13})(\S+\.(?:h5|txt))", re.M)
 ERROR_BLOCK = re.compile(r"^\[ERROR[^\n]*\n((?:    [^\n]*\n?)+)", re.M)
 
 
-def run(deck, cwd=".", exe=None, threads=None, overrides=(), name="lucifer.toml") -> Result:
-    """Run the program on ``deck``, a ``Deck`` written as ``name`` in ``cwd`` or the path of
-    a deck relative to ``cwd``, with ``threads`` as OMP_NUM_THREADS and the overrides
+def run(input_file, cwd=".", exe=None, threads=None, overrides=(), name="lucifer.toml") -> Result:
+    """Run the program on ``input_file``, a ``Input`` written as ``name`` in ``cwd`` or the path of
+    an input file relative to ``cwd``, with ``threads`` as OMP_NUM_THREADS and the overrides
     as ``table.key=value`` arguments. Raises ``LuciferError`` on a nonzero exit."""
     cwd = pathlib.Path(cwd)
     cwd.mkdir(parents=True, exist_ok=True)
-    if hasattr(deck, "toml"):
-        deck_path = deck.write(cwd / name)
-        out_root = deck.run.out_root
+    if hasattr(input_file, "toml"):
+        input_path = input_file.write(cwd / name)
+        out_root = input_file.run.out_root
     else:
-        deck_path = cwd / deck
-        out_root = _out_root_of(deck_path)
+        input_path = cwd / input_file
+        out_root = _out_root_of(input_path)
     env = dict(os.environ)
     if threads is not None:
         env["OMP_NUM_THREADS"] = str(int(threads))
-    cmd = [str(executable(exe)), str(deck_path.relative_to(cwd) if deck_path.is_relative_to(cwd) else deck_path),
+    cmd = [str(executable(exe)), str(input_path.relative_to(cwd) if input_path.is_relative_to(cwd) else input_path),
            *overrides]
     r = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True, errors="replace")
     output = r.stdout + r.stderr
@@ -102,13 +102,13 @@ def run(deck, cwd=".", exe=None, threads=None, overrides=(), name="lucifer.toml"
         blocks = ERROR_BLOCK.findall(output)
         message = "\n".join(b.strip() for b in blocks) or output.strip()[-2000:]
         raise LuciferError(message, output, r.returncode)
-    return Result(r.returncode, output, deck_path, cwd.resolve(), out_root, list(overrides))
+    return Result(r.returncode, output, input_path, cwd.resolve(), out_root, list(overrides))
 
 
-def _out_root_of(deck_path: pathlib.Path) -> str:
+def _out_root_of(input_path: pathlib.Path) -> str:
     import tomllib
     try:
-        data = tomllib.loads(deck_path.read_text())
+        data = tomllib.loads(input_path.read_text())
     except (OSError, tomllib.TOMLDecodeError):
         return "fel_td"
     return str(data.get("run", {}).get("out_root", "fel_td"))

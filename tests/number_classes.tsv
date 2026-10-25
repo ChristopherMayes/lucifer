@@ -5,7 +5,7 @@ BMAD-STATS-SPEC.md	14	orced by a generic validator that knows no program (sectio
 BMAD-STATS-SPEC.md	64	er an attribute. A single HDF5 attribute stops writing near 64 kB (measured: 654	standard	the HDF5 attribute size limit, 64 kB
 BMAD-STATS-SPEC.md	65495	A single HDF5 attribute stops writing near 64 kB (measured: 65495 bytes is the l	standard	the largest HDF5 attribute that writes, in bytes
 BMAD-STATS-SPEC.md	8601	d , sits at the root and holds datasets only (R27): an ISO 8601 timestamp, and t	citation	ISO 8601
-fel-physics.md	1.3	alidation harness ( ) checks each statement against Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
+fel-physics.md	1.3	checks each statement against Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
 fel-physics.md	3300	dy averaged over. At that default a FLASH-scale probe takes 3300 steps a segment	example	the FLASH probe's steps a segment at Bmad's default step
 fel-physics.md	55	ASH-scale probe takes 3300 steps a segment against FLASH1's 55. The unset state 	example	FLASH1's steps a segment
 fel-physics.md	266	hase jump. Their reduced coupling length costs 2% in per 266-period benchmark se	example	the benchmark segment's periods
@@ -74,7 +74,7 @@ input-reference.md	6.8	`6.8/sqrt(z_R/L_g)`	measured	a level or a cost typed from
 input-reference.md	1.12	aller tolerance moves the edge out by with , a factor of 1.12 at 0.2 and 1.36 at	standard	the edge factor at tolerance 0.2, from the margin formula
 input-reference.md	1.36	moves the edge out by with , a factor of 1.12 at 0.2 and 1.36 at 0.01. That hold	standard	the edge factor at tolerance 0.01, from the margin formula
 input-reference.md	2.6	boundaries the production path does not, measured at 1.2 to 2.6 times the device	measured	a level or a cost typed from a run, no generated page
-input-reference.md	157	ith it off ([]). The sample buffer holds 2048 passes, about 157 steps. A command	example	2048 passes of the sample buffer on the device deck
+input-reference.md	157	ith it off ([]). The sample buffer holds 2048 passes, about 157 steps. A command	example	2048 passes of the sample buffer on the device input file
 input-reference.md	64	bank, and a transverse grid that is not a power of two from 64 to 1024. A build 	standard	the device grid range, 64 to 1024
 input-reference.md	1.3	er than the physics. The tiers that compare against Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
 input-reference.md	1.01	`max(1, int(1.01 * L / ds))`	standard	the factor in the step count formula
@@ -113,7 +113,7 @@ reading-output.md	126.9	. A 131-slice x 8192, 103-element case went from 137.7 s
 reading-output.md	931	ase went from 137.7 s to 126.9 s with core utilization from 931% to 1048%, since	measured	a level or a cost typed from a run, no generated page
 reading-output.md	1048	from 137.7 s to 126.9 s with core utilization from 931% to 1048%, since the seri	measured	a level or a cost typed from a run, no generated page
 reading-output.md	16.5	n from 931% to 1048%, since the serial block it removed was 16.5% of that run's 	measured	a level or a cost typed from a run, no generated page
-reading-output.md	1e-15	nfiguration the harness runs, the element-end rows moved by 1e-15 to 1e-13 on mo	measured	a level or a cost typed from a run, no generated page
+reading-output.md	1e-15	the element-end rows moved by 1e-15 to 1e-13 on mo	measured	a level or a cost typed from a run, no generated page
 reading-output.md	2.7e-9	figs. The moments themselves (centroid, sigma) are worst at 2.7e-9, and a tail r	measured	a level or a cost typed from a run, no generated page
 reading-output.md	1.1e-7	(centroid, sigma) are worst at 2.7e-9, and a tail reaching 1.1e-7 is confined to	measured	a level or a cost typed from a run, no generated page
 reading-output.md	4e-6	erse moments nearly vanish) the z cross terms agree only to 4e-6 relative while 	measured	a level or a cost typed from a run, no generated page
@@ -134,7 +134,7 @@ reading-output.md	1e8	The two are kept apart on purpose. The lag is a part in 1e
 reading-output.md	6.5e-6	bsolute time, so a double resolves it to about five digits, 6.5e-6 of a slice sp	measured	a level or a cost typed from a run, no generated page
 reading-output.md	2.1e-2	n is made of, and without the fold a mid-line restart lands 2.1e-2 away on the w	measured	a level or a cost typed from a run, no generated page
 user-guide.md	30	Direct RK4 integration through the analytic undulator field: no averaging, no re	standard	the envelope of 10 to 30 steps per period
-user-guide.md	32	Genesis4 decks: the time-dependent pair, 32 slices with shot noise	example	the 32-slice time-dependent line
+user-guide.md	32	Genesis4 input files: the time-dependent pair, 32 slices with shot noise	example	the 32-slice time-dependent line
 user-guide.md	2.8e-11	h Genesis4's constants transcribed, that cost puts tier1 at 2.8e-11 where the Ge	measured	a level or a cost typed from a run, no generated page
 user-guide.md	2.5e-12	2.8e-11 where the Genesis4-coordinate representation sat at 2.5e-12. The particl	measured	a level or a cost typed from a run, no generated page
 user-guide.md	376.7303	s impedance constant is truncated, 376.73 against the exact 376.7303..., so the 	standard	the vacuum impedance, exact

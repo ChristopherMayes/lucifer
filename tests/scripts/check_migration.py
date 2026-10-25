@@ -48,11 +48,11 @@ import numpy as np
 import lucifer.beam as beamio
 from checkrec import record
 
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 C_LIGHT = 2.99792458e8
 
-BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+BASE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F

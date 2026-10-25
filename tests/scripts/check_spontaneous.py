@@ -51,7 +51,7 @@ import sys
 import numpy as np
 
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 import pool
 
@@ -70,7 +70,7 @@ NGRID_SCAN = (64, 128, NGRID_REF)
 
 FAILED = False
 
-NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F

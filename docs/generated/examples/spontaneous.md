@@ -17,7 +17,7 @@ The example runs in two commands, with Bmad only:
 
 This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad.radiation_damping_on` subtracts the classical rate from every particle. `bmad.radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../input-reference.md)).
 
-Both decks are the `../steady_state` deck plus the switches, so that run is the control and the difference is the radiation.
+Both input files are the `../steady_state` input file plus the switches, so that run is the control and the difference is the radiation.
 
 The plot shows it in the beam-energy panel, where the mean falls in a straight line from the first meter. Over the first 20 m the FEL has amplified the seed to only a few MW and has extracted nothing measurable, so that slope is the radiation and nothing else. Fitting it there is the measurement:
 
@@ -33,7 +33,7 @@ The benchmark makes the same comparison without any FEL model, tracking the wigg
 
 Fluctuations barely move the exit numbers here, because at 1 Angstrom the quantum kick is small against the slice energy spread the beam starts with and the several times larger spread the FEL itself drives by saturation. Fluctuations are refused together with slice migration, since one draw per beamlet and a pass that regroups beamlets cannot both be right.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the mode peak and at the exit the power outside the split angle is a small fraction of the power inside it, so the exit power is the mode. With the filter off the same deck reports about half of its exit power as that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch. The measured quantities of both decks, the energy spreads and the ratios among them, are in the table below.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the mode peak and at the exit the power outside the split angle is a small fraction of the power inside it, so the exit power is the mode. With the filter off the same input file reports about half of its exit power as that emission. The damping and fluctuation measurements are made on the beam's energy, which the split does not touch. The measured quantities of both input files, the energy spreads and the ratios among them, are in the table below.
 
 Each run takes about five seconds.
 
@@ -87,7 +87,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 ## The input files
 
-The deck, its variants, and any lattice they name, as they are on disk.
+The input file, its variants, and any lattice they name, as they are on disk.
 
 ### `lucifer.toml`
 

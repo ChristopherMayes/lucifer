@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Lucifer deck",
+  "title": "Lucifer input",
   "description": "One TOML file: the lattice and the tables run, window, beam, field, wake, space_charge and bmad.",
   "x-schema-version": "1",
   "type": "object",

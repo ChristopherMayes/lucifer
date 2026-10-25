@@ -54,7 +54,7 @@ import convert_genesis
 import fieldio
 from checkrec import record
 from lucifer.stats import read_stats
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 from scipy.special import jv
 
 FAILED = False
@@ -72,7 +72,7 @@ TOL_TIER_P1 = 1e-6           # Fundamental power against Genesis, planar, steady
 TOL_TIER_P3 = 1e-3           # Third-harmonic power against Genesis, dark growth: 1.3e-4.
 TOL_DEPOSIT = 1e-12          # One-step P3/P1 against the exact deposit sum is 3.3e-16.
 
-GENESIS_DECK = """&setup
+GENESIS_INPUT = """&setup
 rootname=H3
 lattice=planar.lat
 beamline=SEGP
@@ -144,8 +144,8 @@ use, SEGP
 
 # lambda0 and beamlet_size come from this namelist. An openPMD beam file carries the slice
 # partition, and not the radiation it was sliced on nor the beamlet size. Both match the
-# Genesis deck above, where the imported state comes from.
-NML_IMPORT = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+# Genesis input file above, where the imported state comes from.
+NML_IMPORT = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -167,7 +167,7 @@ NML_IMPORT = """! flat keys; routed into the deck's tables by lucifer.deck.to_to
 # 64 and 256 puts P1 at 1.4e-3 against a 1e-6 level. Convert them once Genesis is fixed
 # upstream. docs/validation.md (val-the-transverse-grid) has the account.
 
-NML_TD = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -305,7 +305,7 @@ def main():
     # against Genesis.
 
     print("== harmonic tier vs Genesis4 (planar SS, harm 1 + dark harm 3) ==")
-    (wd / "H3.in").write_text(GENESIS_DECK)
+    (wd / "H3.in").write_text(GENESIS_INPUT)
     r = subprocess.run([args.genesis, "H3.in"], cwd=wd, capture_output=True, text=True,
                        env=dict(os.environ, FI_PROVIDER="tcp"))
     if r.returncode != 0:

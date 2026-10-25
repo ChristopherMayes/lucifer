@@ -31,7 +31,7 @@ Collective effects are refused in a line with any unaveraged segment, so this ex
 
 The benchmark runs the same configuration as its sandwich check. There the mixed line must agree with the all-averaged line at the exit, the energy ledger rows must appear only inside the unaveraged segment, and a wake on that segment must be refused ([validation](../../validation.md)). This directory is the runnable version of that check.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is several times the power inside it in both runs, so most of each exit power is that emission. The table carries the exit power inside and outside the split for both runs, so the difference between them can be read in the mode as well as in the total. Both decks state `run.source_filter = false`, so the two FEL methods compare like for like. The filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is several times the power inside it in both runs, so most of each exit power is that emission. The table carries the exit power inside and outside the split for both runs, so the difference between them can be read in the mode as well as in the total. Both input files state `run.source_filter = false`, so the two FEL methods compare like for like. The filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
 
 The run takes a few seconds, and the averaged twin about a second.
 
@@ -81,7 +81,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 ## The input files
 
-The deck, its variants, and any lattice they name, as they are on disk.
+The input file, its variants, and any lattice they name, as they are on disk.
 
 ### `lucifer.toml`
 

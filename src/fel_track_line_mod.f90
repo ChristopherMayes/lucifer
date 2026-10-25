@@ -234,8 +234,8 @@ do ie = run%i_start, run%i_end
 
     ! FEL segment: Genesis's unroll in the element's own step. The step comes from
     ! Bmad's ds_step and num_steps attributes, whose bookkeeper computes Genesis's
-    ! num_steps = round(l/ds_step) (attribute_bookkeeper.f90). There is no deck step
-    ! size. The steps are equal, and slippage follows each step's field solve. Any
+    ! num_steps = round(l/ds_step) (attribute_bookkeeper.f90). There is no step size in
+    ! the input file. The steps are equal, and slippage follows each step's field solve. Any
     ! end-of-lattice fixup lands on the last step.
 
     und = und_of(ie)

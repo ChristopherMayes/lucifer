@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-/* The field set's size bound, wavefront_init%harmonics(9)'s. Mirrored by
+/* The field set's size bound, the nine entries field.harmonics can hold. Mirrored by
  * fel_dev_max_field$ in fel_device_mod.f90. */
 #define LUC_DEV_MAX_FIELD 9
 
@@ -72,7 +72,7 @@ typedef struct {
    * that accumulates in ticks does not depend on the order threads reach a cell. A
    * power of two, so the scale and its reciprocal are exact and the conversion back
    * costs one rounding. The caller derives it from a bound on the per-cell sum that
-   * holds for the run and refuses a deck whose bound it cannot carry. */
+   * holds for the run and refuses an input file whose bound it cannot carry. */
   double dep_scale;
   /* The gamma the deposit's bound assumes no particle falls below. The kernel drops a
    * particle under it without converting or accumulating it and records a fault, which

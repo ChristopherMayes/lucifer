@@ -1,6 +1,6 @@
 # The SASE reference run of Aramis-td-sase.in with Genesis4's source-term filter on, which
 # is what the port's own filter is transcribed against (fel-physics.md sec-source-filter).
-# Everything else is that deck: same window, same grid, same shot noise, same FFT solver,
+# Everything else is that input file: same window, same grid, same shot noise, same FFT solver,
 # which is the solver the filter lives in. The filter's own parameters are Genesis4's
 # defaults, xcut = ycut = sigmoid = 1, so the sigmoid's edge sits at twice the Nyquist
 # angle, off the grid, and the filter is the sigmoid's soft roll-off alone.

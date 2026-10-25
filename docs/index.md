@@ -43,7 +43,7 @@ The averaged method's transverse maps have a third option behind them, the trans
 | If you want to | Read |
 |---|---|
 | build it, describe a run, and run it | [](user-guide.md) |
-| know what a deck key does | [](input-reference.md) |
+| know what an input key does | [](input-reference.md) |
 | read an output file you were handed | [](reading-output.md) |
 | know the physics and the conventions | [](fel-physics.md) |
 | know what is checked and at what level | [](validation.md) |

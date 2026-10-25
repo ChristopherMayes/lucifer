@@ -1,5 +1,5 @@
 /* The device seam with no backend behind it: every build that cannot carry one
- * compiles this file, so the same tree compiles everywhere and a deck asking for a
+ * compiles this file, so the same tree compiles everywhere and an input file asking for a
  * device is refused rather than failing at link time or, worse, quietly
  * taking the CPU path. That is not only the non-Darwin platforms: the Metal backend
  * is ARC-managed Objective-C++, so a macOS build whose Objective-C++ compiler is a

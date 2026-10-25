@@ -43,7 +43,7 @@ Two numbers are this file's and are marked in the lattice header. The segment is
 
 The field and K agree here to 0.04 percent, where the FLASH1 line's two published numbers are 2.7 percent apart. The resonance that follows at 13.6 GeV is 1.5099 Angstrom against the published 1.5.
 
-The slice energy spread is derived rather than published. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys. Runs at its two ends, 0.3 and 0.4 µm, differ in gain length and in saturation point by about a tenth, at a quarter of this deck's macroparticles.
+The slice energy spread is derived rather than published. The papers give no value at the undulator, and two numbers that fix one. The laser heater is set to a nominal 20 keV rms at 135 MeV (Table 2), and the total compression factor is 90 (Table 1). The slice spread arriving at the undulator is therefore 1.8 MeV, which is 1.3e-4 of 13.6 GeV. That is 0.23 of the Pierce parameter this beam gives, 5.85e-4, which is where a laser heater is meant to leave it. The published emittance range is wider than the gain it buys. Runs at its two ends, 0.3 and 0.4 µm, differ in gain length and in saturation point by about a tenth, at a quarter of this input file's macroparticles.
 
 ## What the run measures
 
@@ -63,13 +63,13 @@ The energy loss is the one number that does not compare directly. This window ca
 
 ## The window, and why it is a slab
 
-At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavelengths and 500 cooperation lengths, and the whole line slips the light forward by 3762 wavelengths, 0.57 µm. A time-dependent run over the whole bunch would need tens of thousands of slices. It would learn nothing the interior of a shorter window does not say, since each cooperation length lases independently of the others. The deck therefore carries a flat 3 kA slab 3.08 µm long, which is 150 cooperation lengths and 5.4 times the slippage, as the slice count and slice spacing in the table below. The pulse energy to set against the paper's is the peak power per slice times the machine's own pulse duration, and never a sum over this window.
+At 1.5 Angstrom the published 0.25 nC bunch is 10 µm long, which is 66000 wavelengths and 500 cooperation lengths, and the whole line slips the light forward by 3762 wavelengths, 0.57 µm. A time-dependent run over the whole bunch would need tens of thousands of slices. It would learn nothing the interior of a shorter window does not say, since each cooperation length lases independently of the others. The input file therefore carries a flat 3 kA slab 3.08 µm long, which is 150 cooperation lengths and 5.4 times the slippage, as the slice count and slice spacing in the table below. The pulse energy to set against the paper's is the peak power per slice times the machine's own pulse duration, and never a sum over this window.
 
 ## The numerical settings, and how each was chosen
 
 Every value is measured on this machine. The grid, the slice count, the macroparticle count and the filter's edge are in the table below, as the run printed them.
 
-- `grid_n_pts` and `grid_half_width`: the deck states neither. Setup derives cells of the beam size over 7, the criterion of the convergence page, rounds the point count up to a power of two, and prints both with their origin.
+- `grid_n_pts` and `grid_half_width`: the input file states neither. Setup derives cells of the beam size over 7, the criterion of the convergence page, rounds the point count up to a power of two, and prints both with their origin.
 - `window.n_wavelength` is 68, two slices per cooperation length. Half the spacing over twice the slices, the same window at twice the sampling, moves the gain length and the saturation point by about a percent, at twice the wall clock.
 - `window.n_slice` holds 5.4 times the whole line's slippage.
 - `ds_step` in the lattice is 0.09 m, three periods and 38 steps per segment. One period gives the same gain length and an exit power inside the seed spread, at over twice the wall clock.
@@ -77,7 +77,7 @@ Every value is measured on this machine. The grid, the slice count, the macropar
 - `beamlet_size` is 8, the default.
 - `run.source_filter` is T, the default. At its derived edge it removes about a hundred times the wide-angle power and moves the mode power a few percent, since the macroparticle count has already converged.
 
-The run's own convergence report puts the power outside the split angle at a small fraction of the power inside it, so the total field power is the mode. With the filter off the same deck reports about a hundred times that fraction outside the mode.
+The run's own convergence report puts the power outside the split angle at a small fraction of the power inside it, so the total field power is the mode. With the filter off the same input file reports about a hundred times that fraction outside the mode.
 
 Four seeds were run with the filter on and with it off and analysed the same way, so the two sets differ only in the filter. The saturation point, the peak bunching, the pulse energy and the energy loss move by a few percent. The fitted gain length moves by about an eighth, several times the seed-to-seed fluctuation.
 
@@ -139,7 +139,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 ## The input files
 
-The deck, its variants, and any lattice they name, as they are on disk.
+The input file, its variants, and any lattice they name, as they are on disk.
 
 ### `lucifer.toml`
 

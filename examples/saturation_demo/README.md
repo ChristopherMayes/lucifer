@@ -7,8 +7,8 @@ This is the Benchmark1-SASE configuration of Genesis 1.3 Version 4 (Genesis4), r
 | `Aramis.lat` | the Genesis4 lattice (6 FODO cells, 12 undulator segments) |
 | `aramis.bmad` | the Bmad translation (real wigglers, the manual's FEL-element section) |
 | `sat_unavg.bmad` | two-line wrapper selecting `fel_method = unaveraged` |
-| `sat-prep.in` | Genesis4 deck that writes the shared initial dumps (no tracking) |
-| `sat-genesis.in` | the timed Genesis4 deck (same seed and ranks as the prep) |
+| `sat-prep.in` | Genesis4 input file that writes the shared initial dumps (no tracking) |
+| `sat-genesis.in` | the timed Genesis4 input file (same seed and ranks as the prep) |
 | `lucifer-avg.toml` | Bmad averaged mode (the `bmad_standard` default) |
 | `lucifer-unavg.toml` | Bmad unaveraged mode (~32x cost). The point is the same answer from raw dynamics |
 | `check_agreement.py` | exit powers must agree at the documented levels before timings mean anything |

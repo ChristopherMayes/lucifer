@@ -50,7 +50,7 @@ implicit none
 
 type fel_wake_struct
   logical :: on = .false.
-  ! Deck keys, [wake], with Genesis &wake names:
+  ! Input keys, [wake], with Genesis &wake names:
   real(rp) :: loss = 0             ! External loss [eV/m], uniform (Genesis allows profiles).
   real(rp) :: radius = 2.5e-3_rp   ! Chamber radius, or half gap if flat [m].
   real(rp) :: conductivity = 0     ! DC conductivity [1/(Ohm m)]. 0: no resistive wake.

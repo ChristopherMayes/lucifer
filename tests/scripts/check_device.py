@@ -38,11 +38,11 @@ physics alone, the check can fail, and everything the backend does not cover is 
    on both the CPU and the device at grid 64, the same particles and the same field,
    so both are judged against one reference. One figure is printed and not asserted.
    A quiet-start dark harmonic whose true bunching sits at ~1e-8 of the charge (the
-   planar steady-state tier deck) radiates the device's FP32 phase floor instead,
+   planar steady-state tier input file) radiates the device's FP32 phase floor instead,
    ~1e-7 of the charge in the phasor row, and its P3 lands two decades above the
    CPU's. The device resolves harmonic bunching down to that floor and not below,
    which the phasor row states per member. The harmonic checks here sit above it.
-8. Slice migration, from check_migration's own decks at the device's grid. Migration
+8. Slice migration, from check_migration's own input files at the device's grid. Migration
    needs no kernel. At an element's last step the walk reads the beam back and releases
    residency before re-slicing, so conservation and phase continuity hold on the device
    exactly as on the CPU, and the check shows the order is right. The production run
@@ -52,7 +52,7 @@ physics alone, the check can fail, and everything the backend does not cover is 
    ceilings and the read-only proof, the twin re-staging each step across the changed
    fills. A slice outgrowing the setup rectangle exercises the seam's growth-only
    resize, which the log records.
-9. Two device runs of one deck agree bit for bit, every array of the statistics file,
+9. Two device runs of one input file agree bit for bit, every array of the statistics file,
    with the source filter on and off.
 10. The deposit's accuracy. The lockstep source row of the fixed-point deposit must stay
    under the source ceiling and no worse than the float deposit it replaced, and its
@@ -70,7 +70,7 @@ physics alone, the check can fail, and everything the backend does not cover is 
    must carry is the chart: the undulator quiver sits in px as a common offset, which
    the mean sees and an rms does not. See unaveraged() below.
 
-The deposit accumulates in fixed point, so two device runs of one deck agree bit for
+The deposit accumulates in fixed point, so two device runs of one input file agree bit for
 bit, and checks 8, 9 and the unaveraged section assert that. Against the CPU the
 device is held to the ceilings, and the read-only proof compares FP64 outputs only.
 
@@ -100,12 +100,12 @@ import check_two_polarization as tp
 import convert_genesis
 import fieldio
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 from lucifer.stats import read_stats
 
 FAILED = False
 
-BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+BASE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   source_filter = F
@@ -197,7 +197,7 @@ MIG_E2E_CEIL = 3e-3
 SF_E2E_CEIL = 1.0e-3
 
 # The unaveraged mode's own ceilings, each three times its first measurement (both
-# builds, the check's own decks). They are wider than the averaged ones, and the reason
+# builds, the check's own input files). They are wider than the averaged ones, and the reason
 # is arithmetic rather than the port. This mode runs the transform pair nsub times a
 # record step where the averaged mode runs it once, and an FP32 pair loses about 1.3e-7
 # of the field's energy every time it runs (validation.md, val-device-unaveraged). The
@@ -212,11 +212,11 @@ CEIL_U = {"x": 3.5e-6, "px": 2.5e-5, "y": 3.0e-6, "py": 2.1e-5, "pz": 6.5e-6,
           "theta": 1.1e-5, "phasor": 2.5e-7, "source": 5.0e-3, "field": 2.0e-5}
 GUARD_FLOOR_U = 1e9
 # The crossed probe's own guard floor. The guard is the median phase increment per
-# record step in ticks, so it belongs to the deck and not to the mode. This line's
-# elements are 0.6 m where the steady deck's are 4 m, and the guard reads 1.1e8.
+# record step in ticks, so it belongs to the input file and not to the mode. This line's
+# elements are 0.6 m where the steady input file's are 4 m, and the guard reads 1.1e8.
 GUARD_FLOOR_2P = 1e7
 # The two-plane rows all sit inside the one-plane ceilings above. On the crossed
-# unaveraged deck they read x 1.9e-6, px 2.5e-6, y 2.2e-6, py 3.0e-6, pz 5.0e-7, theta
+# unaveraged input file they read x 1.9e-6, px 2.5e-6, y 2.2e-6, py 3.0e-6, pz 5.0e-7, theta
 # 2.0e-6, phasor 1.6e-8, source 2.2e-4, field 2.0e-6. The field row is the whole record,
 # both planes summed, and the source row is the ledger's kick-side term.
 U_E2E_CEIL = 5.0e-3
@@ -230,7 +230,7 @@ U_FRAME_CEIL = 1.0e-5
 
 # The end-to-end band against the CPU's own unaveraged run, U_E2E_CEIL above. The
 # transform pair's loss below sets it, rather than anything the port chose. On the
-# steady deck, whose seed barely grows over one segment, the exit power sits 1.7e-3
+# steady input file, whose seed barely grows over one segment, the exit power sits 1.7e-3
 # under the CPU's, which is 5340 pairs of that loss carried into the power. The
 # time-dependent window reads 1.5e-6, because its power comes from a beam that is
 # radiating rather than from a seed that each pair reduces.
@@ -253,7 +253,7 @@ PROJ_BAND = (0.5, 2.0)
 # segment is helical and couples only the fundamental, at the device's grid.
 PLANAR_LAT = ch.BMAD_LAT
 
-HARM_BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+HARM_BASE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -602,7 +602,7 @@ def unaveraged(args, wd, exe):
        f"<= {U_E2E_CEIL:.1e}", rel <= U_E2E_CEIL,
        num=rel, bound=U_E2E_CEIL, kind="max")
 
-    # 6. Two device runs of one unaveraged deck agree bit for bit. The deposit
+    # 6. Two device runs of one unaveraged input file agree bit for bit. The deposit
     # accumulates in fixed point and the ledger's spontaneous term reduces without an
     # atomic, so no arrival order reaches either.
     run(args.exe, wd, "dvu_r1.in", base.format(root="dvur1", extra=DEV + TD_EXTRA))
@@ -615,7 +615,7 @@ def unaveraged(args, wd, exe):
     # 7. The transform pair's own energy loss, with no charge to feed the field. The
     # CPU's FP64 pair holds the energy to 1.6e-12 over the same 5340 applications. The
     # run header counts the pairs and projects the loss from the recorded rate, and the
-    # count must be the deck's and the projection must sit near what the run measured.
+    # count must be the input file's and the projection must sit near what the run measured.
     for root, extra, npair, nsub in (("dvu_darku", DEV, 89 * 60, 89 * 60),
                                      ("dvu_darka", DEV, 89, 0)):
         text = base.format(root=root, extra=extra)
@@ -629,23 +629,23 @@ def unaveraged(args, wd, exe):
         loss = (float(rows[0][2]) - p0) / float(rows[0][2]) / npair
         mode = "unaveraged" if root.endswith("u") else "averaged"
         good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
-        ok(f"FP32 transform pair energy loss, {mode} deck", f"{loss:.3e} a pair",
+        ok(f"FP32 transform pair energy loss, {mode} input file", f"{loss:.3e} a pair",
            f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good,
            num=loss, bound=list(PAIR_LOSS), kind="range")
         m = PAIR_RE.search(r.stdout)
         counts = (int(m.group(1)), int(m.group(2))) if m else None
-        ok(f"header counts the transform pairs, {mode} deck", counts, f"== {(npair, nsub)}",
+        ok(f"header counts the transform pairs, {mode} input file", counts, f"== {(npair, nsub)}",
            counts == (npair, nsub),
            num=counts, bound=[npair, nsub], kind="equal")
         ratio = float(m.group(3)) / loss if m else float("nan")
-        ok(f"header projection over measured loss, {mode} deck", f"{ratio:.3f}",
+        ok(f"header projection over measured loss, {mode} input file", f"{ratio:.3f}",
            f"in [{PROJ_BAND[0]}, {PROJ_BAND[1]}]", PROJ_BAND[0] <= ratio <= PROJ_BAND[1],
            num=ratio, bound=list(PROJ_BAND), kind="range")
 
     # 8. Two live polarizations. The mode needs no polarization vector: the two real
     # kinetic momenta work against and deposit into their own field components, so the
     # device's kick reads both planes and fills both source planes, and each plane meets
-    # the diffraction with its own source. The crossed line is the deck for it, an x set
+    # the diffraction with its own source. The crossed line is the input file for it, an x set
     # then a y set, so both planes carry power by the end.
     xb = base.replace('lattice = "' + lat + '"', 'lattice = "dvu_cross.bmad"')
 
@@ -709,10 +709,10 @@ def unaveraged(args, wd, exe):
                 "bunch_charge = 1.000692285594e-15", "bunch_charge = 1e-30"))
     p0 = sum(tp.dump_power(wd, "dvud2-initial.wf.h5", c) for c in ("x", "y"))
     p1 = sum(tp.dump_power(wd, "dvud2-final.wf.h5", c) for c in ("x", "y"))
-    npair = int(PAIR_RE.search(r.stdout).group(1))   # this line's own count, not the steady deck's
+    npair = int(PAIR_RE.search(r.stdout).group(1))   # this line's own count, not the steady input file's
     loss = (p0 - p1) / p0 / npair
     good = PAIR_LOSS[0] <= loss <= PAIR_LOSS[1]
-    ok("FP32 transform pair energy loss, two-plane deck", f"{loss:.3e} a pair",
+    ok("FP32 transform pair energy loss, two-plane input file", f"{loss:.3e} a pair",
        f"in [{PAIR_LOSS[0]:.0e}, {PAIR_LOSS[1]:.0e}]", good,
        num=loss, bound=list(PAIR_LOSS), kind="range")
 
@@ -877,7 +877,7 @@ def field_set(args, wd, exe):
        dv <= BESSEL_CEIL,
        num=dv, bound=BESSEL_CEIL, kind="max")
 
-    # 7c. Time dependence with the set: the harmonics check's time-dependent deck (8
+    # 7c. Time dependence with the set: the harmonics check's time-dependent input file (8
     # slices, shot noise, dark third harmonic) at the device's grid, slippage rotating
     # every plane. Shot noise puts b3 at ~1/sqrt(N), far above the floor, so P3 is a real
     # comparison.
@@ -922,13 +922,13 @@ def field_set(args, wd, exe):
        f"<= {H_E2E_CEIL:.1e}", abs(d3 - c3) / c3 <= H_E2E_CEIL,
        num=abs(d3 - c3) / c3, bound=H_E2E_CEIL, kind="max")
 
-    # 7d. One Genesis reference for both: check_harmonics' planar deck made time
+    # 7d. One Genesis reference for both: check_harmonics' planar input file made time
     # dependent (8 slices, shot noise on, so the third harmonic's bunching is real on
     # every side) at the device's grid, its starting state imported by the CPU and the
     # device alike. The CPU's level is the anchor the device's is read against.
     genesis_harmonics(args, wd, exe)
 
-    # 7e. The quiet-start floor, printed: the planar steady-state tier deck at grid 64,
+    # 7e. The quiet-start floor, printed: the planar steady-state tier input file at grid 64,
     # dark third harmonic, no shot noise. The fundamental holds its band. The harmonic's
     # true bunching is ~1e-8 of the charge, below the device's FP32 phase floor, so its
     # P3 is the floor radiating and is printed, not asserted.
@@ -947,7 +947,7 @@ def field_set(args, wd, exe):
           f"(CPU {c3:.3e} W, device {d3:.3e} W): the FP32 floor radiating, recorded")
 
     # 7f. Two polarizations: the crossed undulator of check_two_polarization, steady
-    # state and time dependent, on its own deck at the device's grid.
+    # state and time dependent, on its own input file at the device's grid.
     print("== the field set: two polarization planes on the device ==")
     (wd / "crossed_probe.bmad").write_bytes((pathlib.Path(args.latdir) / "crossed_probe.bmad").read_bytes())
     (wd / "devp_c.bmad").write_text("call, file = crossed_probe.bmad\nuse, CROSSED\n")
@@ -1033,7 +1033,7 @@ REPRO_SKIP = ("params", "meta/input_echo", "meta/timestamp")
 # The four configurations the recorded ceilings do not isolate, each read as the
 # lockstep source row: the device's deposit against the same deposit in FP64. The
 # fixed-point accumulator has to be no worse than the float one it replaced on every
-# one, and the numbers beside them are the float deposit's on these same decks.
+# one, and the numbers beside them are the float deposit's on these same input files.
 # Cancelling phases come first because a quiet start leaves the slice phasor at
 # roundoff, which is where a coarse quantum would show before anywhere else.
 
@@ -1057,7 +1057,7 @@ PRECISION_CASES = (
 PRECISION_MARGIN = 1.05
 
 # The quantum has to sit this far below the FP32 spacing of the deposit's own bound, in
-# bits, on every deck the precision cases run. The scale is derived per run and the run
+# bits, on every input file the precision cases run. The scale is derived per run and the run
 # prints the headroom it reached, so this is read back rather than assumed. The setup
 # refusal requires only 8, which is where fixed point stops beating the float
 # accumulation it replaced. The derivation delivers 37 bits. Holding the checks to 24
@@ -1069,7 +1069,7 @@ PRECISION_BITS_MIN = 24
 # run.device_dep_mutate shifts the derived scale by whole bits and touches nothing
 # else, so coarsening the quantum by a known factor and watching the source row separates
 # the quantization from the phase and arithmetic error beside it. On the cancelling-phase
-# deck the row is 1.4673e-05 at the derived scale and the same to every digit 24 bits
+# input file the row is 1.4673e-05 at the derived scale and the same to every digit 24 bits
 # coarser. It first moves at 26 (1.0100x), and reaches 1.0505x at 29, which is the last
 # shift the headroom refusal allows. So the 8-bit floor sits where quantization starts to
 # cost a few percent, and at the 37 bits the derivation delivers it costs nothing that
@@ -1087,7 +1087,7 @@ def precision(args, wd, exe):
     The lockstep source row is the device's deposit against the same deposit carried in
     FP64 on the host, so it measures the accumulator directly rather than through a
     power. Each case is asserted twice: under the recorded source ceiling, and no worse
-    than the float accumulator on the same deck, which is the number carried beside it.
+    than the float accumulator on the same input file, which is the number carried beside it.
 
     A fixed-point accumulator can be reproducible and still be worse, by taking a scale
     that keeps the bound but quantizes away what matters. Thirty-two bits do exactly that
@@ -1097,11 +1097,11 @@ def precision(args, wd, exe):
     The source row is a combined number, carrying the FP32 arithmetic and the phase error
     along with the quantization, so on its own it cannot say which of the three moved. The
     quantization is separated here by asserting the property it depends on directly, per
-    deck: the run derives its own scale and prints how far the quantum sits below the FP32
+    input file: the run derives its own scale and prints how far the quantum sits below the FP32
     spacing of the bound it was chosen against, and that headroom is read back and required
     to be at least PRECISION_BITS_MIN. A quantum that far under the spacing cannot be what
     a source row of 1e-5 is made of. The two together are the separation: the headroom
-    bounds the quantization per deck, and the source row measures everything at once.
+    bounds the quantization per input file, and the source row measures everything at once.
     """
     print("== 10. the deposit's accuracy against the CPU's FP64 deposit ==")
     for name, extra, before in PRECISION_CASES:
@@ -1186,25 +1186,25 @@ def stats_arrays(path, skip=REPRO_SKIP):
 
 def reproducible(args, wd, exe):
     """
-    Two runs of one deck, bit for bit.
+    Two runs of one input file, bit for bit.
 
     The deposit accumulates in fixed point so that this holds. Integer addition is
     associative and commutative where float addition is neither, so the order in which
-    threads reach a cell cannot reach the answer. This deck is the time-dependent window
+    threads reach a cell cannot reach the answer. This input file is the time-dependent window
     with shot noise, whose eight slices of 1024 macroparticles contend for cells on every
     step. With a float deposit, 54 of these 127 arrays differ with the filter on and 54
     with it off, the field power by 2.0e-07 and 1.5e-07 and the exit power by 1.6e-08 and
     2.2e-08 (validation.md, val-device). The level below is exact equality, asserted
     rather than toleranced.
 
-    A small dark deck is no test, since two runs of a float deposit can already agree
-    on one. This deck carries charge, noise and slippage.
+    A small dark input file is no test, since two runs of a float deposit can already agree
+    on one. This input file carries charge, noise and slippage.
 
     Both filter settings run. They read the source at different points, since with the
     filter on the first of its four source passes converts the accumulator and with it
     off nothing transforms the source and the solve's last pass converts as it reads.
     """
-    print("== 9. two runs of one deck, bit for bit ==")
+    print("== 9. two runs of one input file, bit for bit ==")
     for on, what in (("T", "the filter on"), ("F", "the filter off")):
         roots = []
         for i in (1, 2):
@@ -1227,14 +1227,14 @@ def reproducible(args, wd, exe):
 
 
 def migration(args, wd, exe):
-    """Slice migration with the device, on check_migration's decks at grid 64."""
+    """Slice migration with the device, on check_migration's input files at grid 64."""
     print("== slice migration with the device ==")
     base = cm.BASE.replace("&end\n", "{extra}&end\n")
-    # check_migration's heavy deck is a dark quiet start, which suits its accounting and
+    # check_migration's heavy input file is a dark quiet start, which suits its accounting and
     # not the instrument. A slice whose field sits at FP64 roundoff normalizes the source
     # and field rows to nothing (validation.md, val-device), and every slippage feeds the
     # tail slice exactly such a field. A seed fills the window and shot noise fills each
-    # fresh tail slice, as the time-dependent lockstep deck above does, and the 60 m_e c^2
+    # fresh tail slice, as the time-dependent lockstep input file above does, and the 60 m_e c^2
     # energy spread migrates just as heavily.
     heavy_base = base.replace("seed_power = 0\n",
                               "seed_power = 1e4\n  seed_waist_size = 30e-6\n  shot_noise = T\n")
@@ -1285,11 +1285,11 @@ def migration(args, wd, exe):
     same = (wd / "devml.diag.txt").read_bytes() == (wd / "devmc.diag.txt").read_bytes()
     ok("migrating FP64 diag byte-identical, device twin on vs off", same, "True", same)
 
-    # 8c. The no-op, exact. The frozen deck is dark, so its power is FP32 noise and says
+    # 8c. The no-op, exact. The frozen input file is dark, so its power is FP32 noise and says
     # nothing. The read-back beam is what carries the check. With zero moves the
     # migrate = T run differs from migrate = F only in where the readback happened, so the
     # final beam dumps must agree exactly. The fixed-point deposit leaves two migrate = F
-    # runs of this deck identical, so both comparisons below are equality.
+    # runs of this input file identical, so both comparisons below are equality.
     run(args.exe, wd, "devm_f1.in", base.format(root="devmf1", mig="F", extra=DEV, **frozen), threads="8")
     run(args.exe, wd, "devm_f2.in", base.format(root="devmf2", mig="F", extra=DEV, **frozen), threads="8")
     run(args.exe, wd, "devm_t.in", base.format(root="devmt", mig="T", extra=DEV, **frozen), threads="8")
@@ -1338,14 +1338,14 @@ def harm_powers(wd, root, window=False):
 
 
 def genesis_harmonics(args, wd, exe):
-    """check_harmonics' planar deck made time dependent, with shot noise, at grid 64: one
+    """check_harmonics' planar input file made time dependent, with shot noise, at grid 64: one
     Genesis reference, its starting state imported by the CPU and the device."""
     (wd / "devg_planar.lat").write_text(ch.GENESIS_LAT)
-    deck = ch.GENESIS_DECK.replace("ngrid=255", "ngrid=64").replace("shotnoise=0\n", "shotnoise=true\n")
-    deck = deck.replace("lattice=planar.lat", "lattice=devg_planar.lat").replace("rootname=H3", "rootname=DEVG")
-    deck = deck.replace("&field\npower=5e3", "&time\nslen=8e-10\nsample=1\n&end\n\n&field\npower=5e3")
-    deck = deck.replace("H3-initial", "DEVG-initial").replace("H3-final", "DEVG-final")
-    (wd / "DEVG.in").write_text(deck)
+    genesis_input = ch.GENESIS_INPUT.replace("ngrid=255", "ngrid=64").replace("shotnoise=0\n", "shotnoise=true\n")
+    genesis_input = genesis_input.replace("lattice=planar.lat", "lattice=devg_planar.lat").replace("rootname=H3", "rootname=DEVG")
+    genesis_input = genesis_input.replace("&field\npower=5e3", "&time\nslen=8e-10\nsample=1\n&end\n\n&field\npower=5e3")
+    genesis_input = genesis_input.replace("H3-initial", "DEVG-initial").replace("H3-final", "DEVG-final")
+    (wd / "DEVG.in").write_text(genesis_input)
     r = subprocess.run([args.genesis, "DEVG.in"], cwd=wd, capture_output=True, text=True,
                        env=dict(os.environ, FI_PROVIDER="tcp"))
     if r.returncode != 0:

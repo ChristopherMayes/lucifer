@@ -21,7 +21,7 @@ against the lattice's reference rather than its own, which is what the converter
 
 Note: An openPMD dump does not carry the wavelength, since the wavelength belongs to the
 run rather than to the beam. theta scales with it, so a caller reading an openPMD file
-must say which wavelength its deck used. A Genesis file states its own, and the
+must say which wavelength its input file used. A Genesis file states its own, and the
 argument is then a cross-check.
 
 theta is the absolute ponderomotive phase on both paths. Neither format has a place for a
@@ -100,7 +100,7 @@ def read_slices(path, wavelength=None, spacing=None):
     if is_openpmd(path):
         if wavelength is None:
             raise ValueError(f"{path.name} is openPMD and does not carry the wavelength: "
-                             "pass wavelength= (the deck's lambda0)")
+                             "pass wavelength= (the input file's lambda0)")
         return _read_openpmd(path, wavelength, spacing)
     return _read_genesis(path, wavelength)
 

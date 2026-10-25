@@ -710,7 +710,7 @@ kernel void unavg_kick (device atomic_uint* S [[buffer(0)]],
 // No atomic, and that is the point. One threadgroup owns one chunk of one slice
 // and one accumulator slot, reduces its chunk in threadgroup memory over a fixed
 // pairing, and adds the chunk's sum into its own slot. Nothing is contended, so
-// the arithmetic runs in one order and two runs of a deck give one answer, which
+// the arithmetic runs in one order and two runs of an input file give one answer, which
 // is what the fixed-point deposit bought for the source and what a float atomic
 // would have given back here. The slot is a compensated pair, since a slice's
 // grid contributes some five thousand times over an element and a bare float sum

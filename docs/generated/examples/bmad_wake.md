@@ -21,9 +21,9 @@ The table was exported by `wake.write_kernels` and then converted to Bmad's conv
 
 `lucifer_transcribed.in` is the comparison partner: the same beam and the same window through the transcribed model with the same chamber, so the two runs differ in the implementation and in nothing else. `../sase_wake` is not the partner, because it adds the gap and roughness terms that this table has no counterpart for.
 
-The transcribed `chamber_wake` applies the wake per integration step, and the Bmad `sr_wake` `z_long` table applies it once per element. The exit mean energy change of each deck is in the table below on the example's page, and the two differ by well under a percent. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them.
+The transcribed `chamber_wake` applies the wake per integration step, and the Bmad `sr_wake` `z_long` table applies it once per element. The exit mean energy change of each input file is in the table below on the example's page, and the two differ by well under a percent. Per slice across the window interior the agreement is 0.80% on average and 1.73% at worst. The two implementations apply one physical wake at two granularities, and the granularity is what separates them.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so the exit powers are the mode. With the filter off both decks reported far more power, nearly all of it that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so the exit powers are the mode. With the filter off both input files reported far more power, nearly all of it that emission. The comparison between the two wake implementations is made on the beam's energy loss, which the split does not touch.
 
 Each run takes about half a minute.
 
@@ -78,7 +78,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 ## The input files
 
-The deck, its variants, and any lattice they name, as they are on disk.
+The input file, its variants, and any lattice they name, as they are on disk.
 
 ### `lucifer.toml`
 
@@ -153,9 +153,9 @@ material = "CU"
 ! The benchmark line with a resistive-wall chamber wake on every element, delivered
 ! through Bmad's own machinery. ztable.wake is the Bane and Stupakov kernel for a
 ! 0.5 mm copper chamber (AC conductivity 5.813e7 S/m, relaxation 8.1 um), exported by
-! chamber_wake%write_kernels and then converted: sign flipped to Bmad's
+! wake.write_kernels and then converted: sign flipped to Bmad's
 ! positive-decelerating convention, self-slice unhalved, causal side z < 0, padded past
-! the window with zeros. Any chamber_wake%on run regenerates the exported kernel.
+! the window with zeros. Any run with wake.on regenerates the exported kernel.
 !
 ! The undulators apply it through the FEL walk, one whole-window kick at mid-element,
 ! and the quads and pipes through Bmad's own track1_bunch. The drift slots are pipes,

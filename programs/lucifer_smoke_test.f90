@@ -2,8 +2,8 @@
 ! Program lucifer_smoke_test
 !
 ! The library-contract check (docs/user-guide.md): drive the FEL tracker without the
-! deck reader. Fill the input structs in code, call the library, write the dumps.
-! The benchmark compares its outputs dataset-identically against a deck-driven run
+! input reader. Fill the input structs in code, call the library, write the dumps.
+! The benchmark compares its outputs dataset-identically against an input-driven run
 ! of the same configuration, and runs it twice in one process (both passes here) to
 ! prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 !
@@ -47,13 +47,13 @@ do ipass = 1, 2
 
   run = fel_run_struct()
 
-  ! The configuration, set in code, no deck anywhere. A small seeded
-  ! steady-state case (the benchmark's twin deck carries the same values).
+  ! The configuration, set in code, no input file anywhere. A small seeded
+  ! steady-state case (the benchmark's twin input file carries the same values).
 
   run%lat_file = lat_file
   run%global%out_root = out_root(ipass)
   run%global%interlude_model = 'genesis'
-  run%global%transport_model = 'genesis'   ! Matches the deck twin this is compared against.
+  run%global%transport_model = 'genesis'   ! Matches the input file twin this is compared against.
   run%global%source_filter = .false.       ! Likewise: both sides state it, neither takes the default.
   run%global%write_diag = .true.
   run%global%ran_seed = 777
@@ -62,7 +62,7 @@ do ipass = 1, 2
   run%winit%seed_power = 1e7_rp
   run%winit%seed_waist_size = 30e-6_rp
   ! 63, and deliberately not a power of two. See check_program.py, which runs the
-  ! deck twin of this configuration and must match it byte for byte.
+  ! input file twin of this configuration and must match it byte for byte.
   run%winit%grid_n_pts = 63
   run%winit%grid_half_width = 2e-4_rp
 

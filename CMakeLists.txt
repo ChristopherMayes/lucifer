@@ -52,7 +52,7 @@ endif ()
 find_package (Bmad REQUIRED)
 find_package (OpenMP REQUIRED COMPONENTS Fortran)
 find_package (HDF5 REQUIRED COMPONENTS Fortran HL)
-# The deck is TOML, read with toml-f (src/fel_input_mod.f90, src/fel_schema_mod.f90).
+# The input file is TOML, read with toml-f (src/fel_input_mod.f90, src/fel_schema_mod.f90).
 find_package (toml-f REQUIRED)
 
 # The FP32 field twin (src/fel_fp32_mod.f90) transforms with FFTW's single-precision
@@ -70,7 +70,7 @@ endif ()
 
 # The Metal backend is Objective-C++ against the Metal framework, so it needs a
 # Clang-family toolchain, and macOS alone is not enough. A build that cannot carry it
-# takes the stub, so the same tree builds everywhere and a deck that asks for a device
+# takes the stub, so the same tree builds everywhere and an input file that asks for a device
 # gets a refusal instead of a quiet CPU fallback. Exactly one of the two joins the
 # library.
 

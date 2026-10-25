@@ -15,9 +15,9 @@ The validation benchmark against Genesis4 is in `tests/`. The physics itself, wi
     ../../build-release/bin/lucifer lucifer.toml        # or debug/bin
     python ../plot_fel.py <out_root>.stats.h5             # needs h5py + matplotlib
 
-Every input deck is named `lucifer.toml`, and variants carry a descriptive suffix: `lucifer_averaged.in`, `lucifer_detuned.in`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
+Every input file is named `lucifer.toml`, and variants carry a descriptive suffix: `lucifer_detuned.toml`, `lucifer_transcribed.toml`. That is a convention for reading a directory. The program looks for no default name: the file name is an argument, and any name works.
 
-A deck carries no comment beyond the one line that says why a setting departs from its default. Each line is a namelist parameter documented in [the input reference](../../input-reference.md). What a deck is for is said in this file and in the directory's own README, and a deck is short enough to paste into a terminal.
+An input file carries no comment beyond the one line that says why a setting departs from its default. Each line is an input key documented in [the input reference](../../input-reference.md). What an input file is for is said in this file and in the directory's own README, and an input file is short enough to paste into a terminal.
 
 ## Shared pieces
 

@@ -55,9 +55,9 @@
 # only a source tree they read, and a lock the device section of each takes in turn.
 #
 # The Genesis reference dumps are cached, since they are a pure function of the
-# reference binary and the decks that make them. The cache sits under
+# reference binary and the input files that make them. The cache sits under
 # $LUCIFER_GENESIS_CACHE, or ~/.cache/lucifer/genesis-refs, keyed by the binary's
-# bytes, every deck genesis reads and the pinned reference version. Each run prints
+# bytes, every input file genesis reads and the pinned reference version. Each run prints
 # whether it hit or missed. Deleting the cache is always safe and costs one cold run.
 #
 # Every section runs on every invocation. There is no quicker mode, on purpose: a
@@ -243,7 +243,7 @@ fi
 
 # Inputs are grouped by consumer and configuration (genesis4/<config>/*.in with the
 # shared .lat files one level up, bmad/*.bmad). The run itself is flat in WORK_DIR, so
-# the decks' internal lattice= references need no paths.
+# the input files' internal lattice= references need no paths.
 cp "$SCRIPT_DIR"/genesis4/*.lat "$SCRIPT_DIR"/genesis4/*/*.in \
    "$SCRIPT_DIR"/bmad/*.bmad "$WORK_DIR/"
 
@@ -276,26 +276,26 @@ section_skip () {   # <label> <reason>
 
 # The Genesis reference runs form three independent chains -- [ss -> 1seg],
 # [td -> td-1seg, td-sc, td-wake], [td-sase] -- which run concurrently (same
-# decks, same single-process runs, so only the wall clock changes).
+# input files, same single-process runs, so only the wall clock changes).
 
 echo "--- Genesis references: three chains, concurrently ---------------------------"
-run_genesis () {   # <deck> ...: the decks of one chain, in order
-  for deck in "$@"; do
-    if ! "$GENESIS" $deck.in > genesis-$deck.log 2>&1; then
-      echo "Genesis $deck run FAILED; log tail:" >&2
-      tail -20 genesis-$deck.log >&2
+run_genesis () {   # <input> ...: the input files of one chain, in order
+  for input in "$@"; do
+    if ! "$GENESIS" $input.in > genesis-$input.log 2>&1; then
+      echo "Genesis $input run FAILED; log tail:" >&2
+      tail -20 genesis-$input.log >&2
       return 1
     fi
   done
 }
 
-# The references are a pure function of the reference binary and the decks that make
+# The references are a pure function of the reference binary and the input files that make
 # them, and they cost 131 s on both passes of every run, so they are cached. The key
 # names all three things that can change the answer: the binary's own bytes, every
-# deck genesis reads, and the version the benchmark pins, which is what a set generated
+# input file genesis reads, and the version the benchmark pins, which is what a set generated
 # by some other reference would fail. The cache holds whatever the chains wrote, found
 # by diffing the directory rather than by a list of names that could fall behind the
-# decks. It lives outside the repository, is safe to delete at any time, and the run
+# input files. It lives outside the repository, is safe to delete at any time, and the run
 # says which way it went, because a cache that silently serves stale physics is worse
 # than no cache. A reader requires the .complete marker rather than the directory,
 # since the two build passes may run at once: the set is staged under a private name
@@ -380,8 +380,8 @@ section_time convert-reference-dumps
 echo
 
 # The window each chain's dumps were sliced on is read from the Genesis dump itself. An
-# openPMD file carries the slice partition and not the radiation it was sliced on, so a
-# deck has to state the wavelength and the sample, and taking them from the reference file
+# openPMD file carries the slice partition and not the radiation it was sliced on, so an
+# input file has to state the wavelength and the sample, and taking them from the reference file
 # is one truth rather than two.
 
 read_window () {   # <genesis .par.h5>  ->  "<lambda0> <sample>"
@@ -397,22 +397,22 @@ print(f"{lam:.12e} {sample}")
 WINEOF
 }
 
-# make_deck <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
-# Every deck reads the converted openPMD dumps and writes openPMD, the only format the
+# make_input <nml> <lattice> <out_root> <interlude_model> <dump_root> [params_extra] [beam_extra]
+# Every input file reads the converted openPMD dumps and writes openPMD, the only format the
 # tracker speaks. Of the three input groups (docs/user-guide.md), argument 6 adds
 # [wake], [space_charge] or [bmad] content and argument 7 adds [beam] content
 # (check knobs). Every tier this builds sets transport_model = genesis, since a
 # transcription comparison needs Genesis4's own transverse maps, so what is left over is
 # transcription fidelity rather than a transport model difference. It is a no-op for the
 # unaveraged tier, which integrates the field and has no map to choose. nbins is the
-# beamlet size the Genesis decks load with, which no dump format carries.
+# beamlet size the Genesis input files load with, which no dump format carries.
 
-make_deck () {
+make_input () {
   local lam sample
   read -r lam sample <<<"$(read_window "$5-initial.par.h5")"
-  # Flat keys, routed into the deck's tables by lucifer.deck, so the extra lines a caller
+  # Flat keys, routed into the input file's tables by lucifer.flat, so the extra lines a caller
   # adds name their key and nothing else.
-  "$PYTHON" -m lucifer.deck - "$1" <<DECK
+  "$PYTHON" -m lucifer.flat - "$1" <<INPUT
   lattice = "$2"
   out_root = "$3"
   interlude_model = "$4"
@@ -425,20 +425,20 @@ ${6:+  $6}
 ${7:+  $7}
   field.file = "$5-initial.wf.h5"
   lambda0 = $lam
-DECK
+INPUT
 }
 
-make_deck tier1.toml  aramis_1seg.bmad tier1  bmad    Aramis
-make_deck tier2.toml  aramis.bmad      tier2  bmad    Aramis
-make_deck tier2g.toml aramis.bmad      tier2g genesis Aramis
-make_deck tier1s.toml aramis_1seg.bmad tier1s bmad    Aramis "" "split_weights = T"
-make_deck tier1u.toml aramis_1seg_unavg.bmad tier1u bmad Aramis
-make_deck td1.toml    aramis_1seg.bmad td1    bmad    AramisTD
-make_deck td2.toml    aramis.bmad      td2    bmad    AramisTD
-make_deck td2g.toml   aramis.bmad      td2g   genesis AramisTD
-make_deck tdsase.toml aramis.bmad      tdsase genesis AramisTDSASE
+make_input tier1.toml  aramis_1seg.bmad tier1  bmad    Aramis
+make_input tier2.toml  aramis.bmad      tier2  bmad    Aramis
+make_input tier2g.toml aramis.bmad      tier2g genesis Aramis
+make_input tier1s.toml aramis_1seg.bmad tier1s bmad    Aramis "" "split_weights = T"
+make_input tier1u.toml aramis_1seg_unavg.bmad tier1u bmad Aramis
+make_input td1.toml    aramis_1seg.bmad td1    bmad    AramisTD
+make_input td2.toml    aramis.bmad      td2    bmad    AramisTD
+make_input td2g.toml   aramis.bmad      td2g   genesis AramisTD
+make_input tdsase.toml aramis.bmad      tdsase genesis AramisTDSASE
 # The space-charge tier says where space charge acts on the element, as any Bmad program
-# does, and turns on Bmad's master switch in the deck. The solver's numbers stay in
+# does, and turns on Bmad's master switch in the input file. The solver's numbers stay in
 # space_charge%.
 
 cat > aramis_1seg_sc.bmad <<'LAT'
@@ -446,12 +446,12 @@ call, file = aramis_1seg.bmad
 wiggler::*[SPACE_CHARGE_METHOD] = slice
 LAT
 
-make_deck tdsc.toml   aramis_1seg_sc.bmad tdsc   genesis AramisTD "space_charge.rmax = 250e-6
+make_input tdsc.toml   aramis_1seg_sc.bmad tdsc   genesis AramisTD "space_charge.rmax = 250e-6
   space_charge.nz = 2
   space_charge.nphi = 1
   space_charge.longrange = T
   bmad.csr_and_space_charge_on = T"
-make_deck tdwk.toml   aramis_1seg.bmad tdwk   genesis AramisTD "wake.on = T
+make_input tdwk.toml   aramis_1seg.bmad tdwk   genesis AramisTD "wake.on = T
   wake.radius = 2.5e-3
   wake.conductivity = 5.813e7
   wake.relaxation = 8.1e-6
@@ -484,8 +484,8 @@ sed 's/field_calc = helical_model, &/field_calc = fieldmap, cartesian_map = {ter
     aramis_1seg.bmad > refusal_fieldmap.bmad
 
 CHECKS_OK=1
-run_assert_refusal () {   # <name> <a fragment of the message> [extra deck lines]
-  make_deck refusal_$1.toml refusal_$1.bmad refusal_$1 bmad Aramis "${3:-}"
+run_assert_refusal () {   # <name> <a fragment of the message> [extra input lines]
+  make_input refusal_$1.toml refusal_$1.bmad refusal_$1 bmad Aramis "${3:-}"
   if "$EXE" refusal_$1.toml > fel-refusal_$1.log 2>&1; then
     echo "FAIL: refusal_$1 lattice was accepted (exit 0); it must be refused" >&2
     CHECKS_OK=0
@@ -537,7 +537,7 @@ run_assert_refusal scnone   "NEITHER SPACE-CHARGE TERM IS CONFIGURED" \
 # exists to prevent.
 
 sed 's/fel_method = averaged, //' aramis_1seg.bmad > custom_seam.bmad
-make_deck custom_seam.toml custom_seam.bmad custom_seam bmad Aramis
+make_input custom_seam.toml custom_seam.bmad custom_seam bmad Aramis
 if "$EXE" custom_seam.toml > fel-custom_seam.log 2>&1; then
   echo "FAIL: a custom-tracked wiggler was claimed as an FEL segment" >&2
   CHECKS_OK=0
@@ -667,7 +667,7 @@ echo
 # ------------------------------------------------------------------------------
 # The check sections. Every section below is independent of the others and of the
 # tiers. Each runs in its own directory under $WORK_DIR/sections, with the lattices
-# and reference decks it may read copied in (never linked, since several rewrite a
+# and reference input files it may read copied in (never linked, since several rewrite a
 # lattice they were given), and source-filter alone also takes the converted
 # AramisTDSASEF reference it compares against. Nothing else is in a section's
 # directory when it starts, and nothing a section writes is read by another. They
@@ -897,8 +897,8 @@ sec_input_reference () {
 }
 
 # The examples are the feature list's evidence, so the two must agree. The generated
-# pages quote the decks verbatim. They are generated here into this section's own
-# directory and compared with the committed pages, so a deck edited without a
+# pages quote the input files verbatim. They are generated here into this section's own
+# directory and compared with the committed pages, so an input file edited without a
 # regeneration fails here by page name, and no pass writes into the tree while the
 # other may be reading it. The one write into the tree is the keystone's own
 # regeneration (tests/test_keystone.py), which then requires an empty diff.

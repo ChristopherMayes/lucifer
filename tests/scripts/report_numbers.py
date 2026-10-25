@@ -15,7 +15,7 @@ read and classified by matching its value against the sources a number can come 
              generated tables
   measured   a value a generated page carries, from the benchmark's records, or a value of
              the examples' record, examples/measured.tsv
-  example    a setting of a deck under examples/ or tests/
+  example    a setting of an input file under examples/ or tests/
 
 A token that matches no source is classified by hand in tests/number_classes.tsv, which
 this tool reads first, so a hand classification stands and the rest is rerunnable. The
@@ -158,15 +158,15 @@ class Sources:
                     self.add(cls, n, f"{path.name}:{cells[0][:30]}")
 
     def read_record(self, path: pathlib.Path):
-        """Measured values from the examples' record, one row per deck and quantity."""
+        """Measured values from the examples' record, one row per input file and quantity."""
         if not path.exists():
             return
         for row in csv.DictReader(path.open(), delimiter="\t"):
             if row.get("value") not in (None, "", "yes", "no"):
-                self.add("measured", row["value"], f"measured.tsv:{row['directory']}/{row['deck']}:{row['quantity']}")
+                self.add("measured", row["value"], f"measured.tsv:{row['directory']}/{row['input']}:{row['quantity']}")
 
-    def read_decks(self, roots):
-        """Settings of the decks, and of the namelists the check scripts carry as text."""
+    def read_inputs(self, roots):
+        """Settings of the input files, and of the namelists the check scripts carry as text."""
         for root in roots:
             files = list(root.rglob("*.in")) + list(root.rglob("*.bmad")) + list(root.rglob("*.lat"))
             files += list(root.rglob("check_*.py"))
@@ -254,7 +254,7 @@ def main() -> int:
     if (doc / "generated" / "startup-noise-measured.md").exists():
         src.read_generated(doc / "generated" / "startup-noise-measured.md")
     src.read_record(examples / "measured.tsv")
-    src.read_decks([examples, tests / "bmad", tests / "genesis4"])
+    src.read_inputs([examples, tests / "bmad", tests / "genesis4"])
     hand = read_hand(pathlib.Path(a.classes))
 
     rows = []

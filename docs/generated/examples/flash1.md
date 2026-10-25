@@ -40,20 +40,20 @@ Three numbers are this file's and are marked in the lattice header. The segment 
 
 The published K and the published field disagree by 2.7 percent. K = 1.23 needs 0.4825 T at this period. The field is the one taken. The disagreement then appears again in the energy: 13.7 nm needs 668.5 MeV at K = 1.19807 and 686 MeV at K = 1.23, against the machine's 700 MeV with its lasing spike near 680.
 
-The slice energy spread is derived rather than published. The papers give a bound on the beam and no slice value. Figure 2 of Ackermann puts a chirp of about 0.1 MeV per fs across the lasing spike. The FEL averages over one coherence time, measured there as 4.2 fs, so the chirp contributes 0.42 MeV to the spread the interaction sees, which is 6e-4 of the energy. That is the value here, and it is under the published bound of 0.1 percent. The value matters, since the field gain length of this deck grows by more than half between a spread of 1e-4 and one of 1e-3.
+The slice energy spread is derived rather than published. The papers give a bound on the beam and no slice value. Figure 2 of Ackermann puts a chirp of about 0.1 MeV per fs across the lasing spike. The FEL averages over one coherence time, measured there as 4.2 fs, so the chirp contributes 0.42 MeV to the spread the interaction sees, which is 6e-4 of the energy. That is the value here, and it is under the published bound of 0.1 percent. The value matters, since the field gain length of this input file grows by more than half between a spread of 1e-4 and one of 1e-3.
 
 ## What the run measures
 
-Four seeds were run at the settings below, measured with the source filter off. The spread is the SASE fluctuation of the window. The same four seeds were run with the filter on, as the deck runs, and one analysis was applied to both sets. The exit pulse energy and the peak bunching agree between the two sets within the seed spread, and the fitted field gain length is shorter by a few percent with the filter on. Those comparisons come from one fit over both sets, which is not the fit the rows below were recorded with, so they compare with each other and not with the table. The wide-angle emission raises the startup level the fit begins from, so a curve carrying it climbs more slowly through the fit window and reads longer. The exit power, pulse energy, bunching and split of the deck as it runs are in the table below.
+Four seeds were run at the settings below, measured with the source filter off. The spread is the SASE fluctuation of the window. The same four seeds were run with the filter on, as the input file runs, and one analysis was applied to both sets. The exit pulse energy and the peak bunching agree between the two sets within the seed spread, and the fitted field gain length is shorter by a few percent with the filter on. Those comparisons come from one fit over both sets, which is not the fit the rows below were recorded with, so they compare with each other and not with the table. The wide-angle emission raises the startup level the fit begins from, so a curve carrying it climbs more slowly through the fit window and reads longer. The exit power, pulse energy, bunching and split of the input file as it runs are in the table below.
 
-| quantity | this deck | published | source |
+| quantity | this input file | published | source |
 |---|---|---|---|
 | field gain length in the exponential regime | 2.05 +- 0.16 m | 2.5 +- 0.3 m | Ackermann Fig. 4a |
 | end of the exponential regime | 20.9 +- 1.1 m | inside the 27 m line | Ackermann Fig. 4a |
 | pulse energy there | 26.6 +- 5.7 µJ | 40 µJ characterized, 70 µJ demonstrated | Ackermann, results |
 | peak power in one slice at the exit | 2.8 to 5.0 GW | 10 GW | Ackermann, abstract |
 
-The gain lengths agree where their bands meet and the pulse energies agree. The simulation reaches the exponential regime sooner than the machine did, which is what an ideal beam does. This deck has no energy chirp along the bunch, no wakefield from the 12 mm gap, and no error in the trajectory or the matching, and each of those lengthens a real gain curve. The chirp is the largest of them. Ackermann reports a 10 fs radiation pulse out of a 30 fs spike, because the chirp takes the rest of the spike off resonance. This deck lases over the whole spike, so its pulse is longer than the machine's.
+The gain lengths agree where their bands meet and the pulse energies agree. The simulation reaches the exponential regime sooner than the machine did, which is what an ideal beam does. This input file has no energy chirp along the bunch, no wakefield from the 12 mm gap, and no error in the trajectory or the matching, and each of those lengthens a real gain curve. The chirp is the largest of them. Ackermann reports a 10 fs radiation pulse out of a 30 fs spike, because the chirp takes the rest of the spike off resonance. This input file lases over the whole spike, so its pulse is longer than the machine's.
 
 The gain length is read from the 4 m window of fastest growth in the pulse energy. Read instead over the whole rise from startup to saturation it is 2.9 m, since the curve is not one exponential. Ackermann fit the exponential part of Fig. 4a, which is the same choice.
 
@@ -71,19 +71,19 @@ Every value is measured on this machine. The Aramis column is what the other exa
 | `beam.n_particle` | 2048 | 4096 | measured with the filter off, the share of the exit power outside the mode falls with the load, from a quarter at 1024 to under the convergence page's tenth at 4096 and lower again at 16384. The filter row below is what the load now rests on |
 | `beamlet_size` | 8 | 8 | at 4096 particles, a beamlet of 4 leaves less outside the mode and one of 16 leaves more. Eight resolves three harmonics where four resolves one |
 | `run.source_filter` | T | T | the default, at the derived edge the table below records. It removes most of the wide-angle power here and moves the pulse energy by under a percent, since 4096 particles has already converged. At 1024 particles it removes a larger share and reaches the same answer at two thirds of the wall clock |
-| `beam.resample.slice_width` | 0.01 | not read | the deck describes its bunch and the loader evaluates it per slice, so nothing is resampled |
+| `beam.resample.slice_width` | 0.01 | not read | the input file describes its bunch and the loader evaluates it per slice, so nothing is resampled |
 
-The rows were measured at 129 points here and 255 on Aramis. The decks state 128 and 256, the powers of two the device field solver takes.
+The rows were measured at 129 points here and 255 on Aramis. The input files state 128 and 256, the powers of two the device field solver takes.
 
-Two of these do not carry over from Aramis. The convergence page estimates the wide-angle share in advance as 100/N_b times (1.57 µm/dx) squared, which gives 0.2 percent here, and the measurement with the filter off is far above it. The prefactor is the first machine's, as the page says, and it is 40 times low on this one, over cell sizes of 7.8 to 31 µm. The other is the cell size. The criterion sigma_x/7 holds, and it lands on 129 points at a 1 mm half width rather than 255 at 0.2 mm. A deck copied from `../sase` would therefore have run a grid 16 times too fine and reported a power that is mostly artifact.
+Two of these do not carry over from Aramis. The convergence page estimates the wide-angle share in advance as 100/N_b times (1.57 µm/dx) squared, which gives 0.2 percent here, and the measurement with the filter off is far above it. The prefactor is the first machine's, as the page says, and it is 40 times low on this one, over cell sizes of 7.8 to 31 µm. The other is the cell size. The criterion sigma_x/7 holds, and it lands on 129 points at a 1 mm half width rather than 255 at 0.2 mm. An input file copied from `../sase` would therefore have run a grid 16 times too fine and reported a power that is mostly artifact.
 
 ## The beam and the window
 
 The lattice carries the optics, so the bunch is generated matched to the periodic solution in the `beginning` statement, and there is no `gamma0` and no match transform. The current is derived from `bunch_charge` and `sig_z` and is never given. The window covers the bunch to four sigma either side with 990 wavelengths of slippage headroom at each end, because radiation made at the head of the bunch slips out of a shorter window before the exit. About a quarter of the slices therefore carry no charge, which is the price of holding the whole pulse.
 
-On this input at the `ran_seed` default of 12345 the exit power summed over the window and the pulse energy are the table's. The run's own convergence report puts the power outside the split angle at well under a percent of the power inside it, so the total is the mode. With the filter off the same deck gave nearly the same power and pulse energy, with several percent of the total outside the mode. At this load the filter removes an artifact that was already small here, and the settings table above was measured without it.
+On this input at the `ran_seed` default of 12345 the exit power summed over the window and the pulse energy are the table's. The run's own convergence report puts the power outside the split angle at well under a percent of the power inside it, so the total is the mode. With the filter off the same input file gave nearly the same power and pulse energy, with several percent of the total outside the mode. At this load the filter removes an artifact that was already small here, and the settings table above was measured without it.
 
-Leaving `grid_n_pts` and `grid_half_width` out of the deck derives a grid whose cell is within a few percent of the stated one. That run gave the same pulse energy to a part in a thousand and the same ratio, so the stated grid is the derived one. The derivation rounds the point count up to a power of two, so the same deck without a grid derives the count the deck states.
+Leaving `grid_n_pts` and `grid_half_width` out of the input file derives a grid whose cell is within a few percent of the stated one. That run gave the same pulse energy to a part in a thousand and the same ratio, so the stated grid is the derived one. The derivation rounds the point count up to a power of two, so the same input file without a grid derives the count the input file states.
 
 The run takes about twenty seconds.
 
@@ -138,7 +138,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 ## The input files
 
-The deck, its variants, and any lattice they name, as they are on disk.
+The input file, its variants, and any lattice they name, as they are on disk.
 
 ### `lucifer.toml`
 

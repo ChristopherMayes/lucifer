@@ -8,7 +8,7 @@ The example runs in two commands, with Bmad only:
 
 A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `run.migrate = true` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.in` is the same run with it off.
 
-No artificial driver is needed to make this happen. The phase advance a particle accumulates depends on its energy and on its betatron angles, both of which vary across the beam, so a real beam in a real line migrates on its own. Adding `../sase_wake`'s chamber block to this deck raises both the moves and the dropped charge. A wake that costs the tail slices 121 keV/m and the head slices 1.9 keV/m (`../sase_wake`) is a systematic phase walk on top of the beam's own spread.
+No artificial driver is needed to make this happen. The phase advance a particle accumulates depends on its energy and on its betatron angles, both of which vary across the beam, so a real beam in a real line migrates on its own. Adding `../sase_wake`'s chamber block to this input file raises both the moves and the dropped charge. A wake that costs the tail slices 121 keV/m and the head slices 1.9 keV/m (`../sase_wake`) is a systematic phase walk on top of the beam's own spread.
 
 On this input the run moves particles between slices at 48 element ends and drops a small fraction of the beam's 2.88e-13 C off the window ends. `migration.migration.txt` carries the totals. The measured quantities are in the table below, the exit power and the exit bunching with migration on and off among them.
 
@@ -22,6 +22,6 @@ Migration changes the physics and not only the bookkeeping. With migration off, 
 
 `migrate_check = true` is the check and not the feature. It verifies that the whole-beam weighted phasor obeys `S_before = S_after + S_dropped` across every move, and the worst deviation at the end of `migration.migration.txt` is that residual. Migration under weights generalizes a Genesis4 method that requires one4one, and the check is what validates the generalization.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../docs/startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so both exit powers are the mode. With the filter off the same decks reported far more power, most of it that emission.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../docs/startup-noise.md)). At the exit the power outside the split angle is a few percent of the power inside it in both runs, so both exit powers are the mode. With the filter off the same input files reported far more power, most of it that emission.
 
 Each run takes about a quarter of a minute.

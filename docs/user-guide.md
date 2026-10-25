@@ -48,7 +48,7 @@ A lattice writes them as it writes any attribute, `fel_method = unaveraged`, and
 
 ## Running
 
-A run is one deck, a TOML file that names the lattice:
+A run is one input file, a TOML file that names the lattice:
 
 ```
 lucifer lucifer.toml
@@ -56,20 +56,20 @@ lucifer lucifer.toml
 
 The name is an argument and any name works. `lucifer.toml` is the convention the examples follow, so that a directory reads the same way twice, and it is not a default the program looks for. Running `lucifer` with no argument prints that much, the Bmad version it was built against and the device backend this build carries.
 
-A key of the deck can be set on the command line, after the deck, as `table.key=value`:
+A key of the input file can be set on the command line, after the input file, as `table.key=value`:
 
 ```
 lucifer lucifer.toml beam.n_particle=4096 run.out_root=s7
 ```
 
-The value is TOML: a number, `true` or `false`, a quoted string or a bracketed list, and a bare value for a string key is quoted for you, since the shell strips the quotes. The overrides are read after the deck through the same schema, so an unknown key, a key in the wrong table, a wrong type and a value outside its bounds are refused as they are in the deck, and each override applied is printed before the run's header. The echo in `meta/input_echo` and the record under `params/` carry the resolved values, so a scan over one key is a shell loop over one deck.
+The value is TOML: a number, `true` or `false`, a quoted string or a bracketed list, and a bare value for a string key is quoted for you, since the shell strips the quotes. The overrides are read after the input file through the same schema, so an unknown key, a key in the wrong table, a wrong type and a value outside its bounds are refused as they are in the input file, and each override applied is printed before the run's header. The echo in `meta/input_echo` and the record under `params/` carry the resolved values, so a scan over one key is a shell loop over one input file.
 
 The file vocabulary of a run has four extensions:
 
 | Extension | Written by | What it is |
 |---|---|---|
-| `.toml` | you | The deck: the lattice at the top and the tables `[run]`, `[window]`, `[beam]`, `[field]`, `[wake]`, `[space_charge]` and `[bmad]` |
-| `.bmad` | you | A Bmad lattice, named by the deck's `lattice`. Variants call a shared one and override it |
+| `.toml` | you | The input file: the lattice at the top and the tables `[run]`, `[window]`, `[beam]`, `[field]`, `[wake]`, `[space_charge]` and `[bmad]` |
+| `.bmad` | you | A Bmad lattice, named by the input file's `lattice`. Variants call a shared one and override it |
 | `.h5` | the run | HDF5, openPMD throughout: the statistics file, and the beam and field dumps |
 | `.txt` | the run | The named streams, one per subject: diag, ledger, import, fp32, migration, wake |
 
@@ -91,28 +91,28 @@ The benchmark is a separate thing, described with its commands in [`validation.m
 
 ## From Python
 
-The package under `python/` is the same deck as typed Python, with a runner and the readers of the output files. It has no dependency beyond the standard library for the deck, and `h5py` and `numpy` for the readers:
+The package under `python/` is the same input file as typed Python, with a runner and the readers of the output files. It has no dependency beyond the standard library for the input file, and `h5py` and `numpy` for the readers:
 
 ```
 pip install -e python
 ```
 
-`lucifer.Deck` is generated from the schema the program writes, a dataclass per table with the program's defaults, so an editor completes the keys and a misspelled one is Python's own error. A deck is written as the TOML the program reads, the keys set away from their defaults or every key with `explicit=True`, and read back from a file or from the echo a run leaves in `meta/input_echo`:
+`lucifer.Input` is generated from the schema the program writes, a dataclass per table with the program's defaults, so an editor completes the keys and a misspelled one is Python's own error. An input file is written as the TOML the program reads, the keys set away from their defaults or every key with `explicit=True`, and read back from a file or from the echo a run leaves in `meta/input_echo`:
 
 ```python
-from lucifer import Deck, run
+from lucifer import Input, run
 
-deck = Deck(lattice="aramis.bmad")
-deck.beam.n_particle = 4096
-deck["run.out_root"] = "s7"          # a key by its dotted name
-deck.write("s7.toml")                # the TOML the program reads
-same = Deck.read("s7.toml")
+inp = Input(lattice="aramis.bmad")
+inp.beam.n_particle = 4096
+inp["run.out_root"] = "s7"          # a key by its dotted name
+inp.write("s7.toml")                # the TOML the program reads
+same = Input.read("s7.toml")
 ```
 
-`lucifer.run` writes the deck or takes the path of one, runs the executable named by `exe=`, by `LUCIFER_EXE` or found on `PATH`, and returns where the output went. A refusal raises `LuciferError` carrying the program's message. The overrides of the command line pass through, so a scan is a loop:
+`lucifer.run` writes the input file or takes the path of one, runs the executable named by `exe=`, by `LUCIFER_EXE` or found on `PATH`, and returns where the output went. A refusal raises `LuciferError` carrying the program's message. The overrides of the command line pass through, so a scan is a loop:
 
 ```python
-result = run(deck, cwd="s7", threads=12)
+result = run(inp, cwd="s7", threads=12)
 power = result.stats["field/total/power"]       # the stats file, through lucifer.stats
 
 for n in (1024, 2048, 4096):
@@ -139,7 +139,7 @@ The readers are `lucifer.stats` for the stats file, described in [`reading-outpu
 | `tests/scripts/check_seam_wake.py` | Seam-wake checks: closed-form pseudomode, lord resolution on a split pipe, exact causality cross-checked against the transcribed wake model, the z_long kernel against a numpy convolution, split-weight invariance, thread determinism |
 | `tests/scripts/check_import.py` | Resampler checks, exact: the current profile against Genesis4 on the same file, the generated moments, split-weight invariance, the openPMD round trip, the zero-charge refusal, thread determinism and the quiet-loaded current. Statistical: Twiss recovery, startup power and the imported current against the analytic Gaussian |
 | `src/fel_collective_mod.f90` | Wakes and space charge at Genesis4's granularity: the numerical resistive-wall impedance (Bane-Stupakov, a separable future Bmad port), geometric and roughness kernels, the causal convolution, the per-slice eloss application, and the short/long-range space-charge solvers behind a swappable interface |
-| `tests/genesis4/collective/` | Genesis4 decks: the collective tiers, importing the shared time-dependent dumps |
+| `tests/genesis4/collective/` | Genesis4 input files: the collective tiers, importing the shared time-dependent dumps |
 | `tests/scripts/check_collective.py` | Collective checks: exact wake energy bookkeeping with sigma_energy invariance, stale-wake structure under migration, a stride that only drops, the charge representation under splitting, the long-range kernel at zero width, the short-range solve on a collapsed slice |
 | `src/fel_unaveraged_mod.f90` | The unaveraged mode: full Newton-Lorentz quiver through the analytic undulator field with sin² end ramps, radiation kick + coupling-free source, energy ledger; fc and faw appear nowhere in it |
 | `tests/scripts/check_unaveraged.py` | Unaveraged checks: energy ledger, ballistic/handoff, fc measured vs closed form (planar, helical, h=3), step-size convergence, priced gain-curve comparison, the mixed line, thread determinism, the time-dependent ledger and the single-precision twin |
@@ -148,10 +148,10 @@ The readers are `lucifer.stats` for the stats file, described in [`reading-outpu
 | `tests/run_perf_benchmark.sh` | Performance head-to-head vs Genesis4, serial and at the machine's performance-core count. Also see the parallelism record in [`validation.md`](validation.md) |
 | `tests/scripts/compare_fel.py` | Comparison: four steady-state tiers and six time-dependent tiers against Genesis4, plus the split-weight invariance check |
 | `tests/scripts/plot_fel_compare.py` | Visual companion to `compare_fel.py`: overlays one tier's Bmad and Genesis4 curves (power, checked relative difference, per-slice exit power, bunching) from the diag file and the `.out.h5` |
-| `tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis4 deck: pure SASE, the time-dependent window with the seed removed (`power = 0`), writing its own shared dumps |
-| `tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis4 deck: Benchmark1-SASE steady state, modified as documented in the deck header |
-| `tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis4 deck: one undulator segment, importing the same dumps |
-| `tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis4 decks: the time-dependent pair, 32 slices with shot noise |
+| `tests/genesis4/time_dependent/Aramis-td-sase.in` | Genesis4 input file: pure SASE, the time-dependent window with the seed removed (`power = 0`), writing its own shared dumps |
+| `tests/genesis4/steady_state/Aramis-ss.in`, `genesis4/Aramis.lat` | Genesis4 input file: Benchmark1-SASE steady state, modified as documented in the input file header |
+| `tests/genesis4/steady_state/Aramis-1seg.in`, `genesis4/Aramis-1seg.lat` | Genesis4 input file: one undulator segment, importing the same dumps |
+| `tests/genesis4/time_dependent/Aramis-td.in`, `Aramis-td-1seg.in` | Genesis4 input files: the time-dependent pair, 32 slices with shot noise |
 | `tests/bmad/aramis.bmad`, `aramis_1seg.bmad` | The Bmad lattices: real wiggler elements, `b_max` encoding aw = 0.84853 exactly in Bmad's constants |
 | `tests/genesis4/sweep/Aramis-td-s12.in`, `run_delz_sweep.sh` | The coarse-step measurement: one shared dump at `sample = 12`, tracker runs at several `ds_step` values (wrapper lattices overriding that attribute) |
 
@@ -191,7 +191,7 @@ Outside the driver's own FEL walk the element is just a periodic wiggler, tracke
 
 Three assertions guard silent failures where the driver claims the element, in the setup pass that reads `fel_method`. They refuse a missing `b_max`, where Bmad's own kernel would silently give `osc_amplitude = 0` (no field, no resonance, no error). They refuse a missing `l_period`, the same silence. And they refuse a fieldmap `field_calc`, which segfaults the parse-time reference tracking if allowed through. Any later is too late, since the missing-`b_max` lattice otherwise dies downstream on an unrelated generation message. The assertions live in one routine (`fel_assert_wiggler_sane`) and nowhere else, since a second copy would mask the removal of either under mutation testing. The same routine also refuses a super_slave undulator, a nonzero roll-off attribute, a tilt on a helical element and an integration step equal to Bmad's fallback for an unset one, which a wiggler with a period never carries. All three refusals are permanent checks of the benchmark.
 
-The element-driven full time-dependent line is anchored against the deck-driven reference: it reproduces the earlier deck-driven run to a max relative difference of 3.4e-12, zero at z = 0 and growing with gain. That is the amplification of the 1-ulp `aw` difference between deriving `aw` through the `b_max` attribute round trip and reading it from input.
+The element-driven full time-dependent line is anchored against the input-driven reference: it reproduces the earlier input-driven run to a max relative difference of 3.4e-12, zero at z = 0 and growing with gain. That is the amplification of the 1-ulp `aw` difference between deriving `aw` through the `b_max` attribute round trip and reading it from input.
 
 The FEL mode is the element's `fel_method`, class-settable as `wiggler::*[FEL_METHOD] = unaveraged`, so averaged and unaveraged segments mix freely in one line. `averaged` uses the transverse maps of Bmad's own `bmad_standard` periodic-wiggler kernel, flattened per `ds_step` (`track_a_wiggler`'s matrix with the octupole-like end kicks, chromatic via `p0/p`). `unaveraged` is a production method whose cost buys the full quiver dynamics (see the manual's unaveraged-mode section).
 
@@ -201,7 +201,7 @@ Behind the averaged method there is one more choice, and it is a run switch rath
 
 ## Program structure
 
-The tracker is laid out the way Tao is laid out. The input structs are in `fel_struct`, with defaults in the declarations. The deck reader is quarantined in `fel_input_mod` and reads through the schema in `fel_schema_mod`, one table of every key with its type, default, bounds and the component it fills: `[run]`, `[window]`, `[beam]` with `[beam.resample]`, `[field]`, `[wake]`, `[space_charge]` and `[bmad]`, and the lattice at the top. The work is in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` / `fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops. Errors return and the driver decides, and `track_fel_line` is re-entrant: twice in one process is bit-identical to two processes, and `tests/lucifer_smoke_test.f90` drives the library with no deck anywhere. A key the schema does not name is refused with the keys of its table, and a key in the wrong table with the table it belongs in. `run.comb_ds_save` is the stats comb, with Bmad's `ds_save` semantics and one deliberate difference. An element end is always a record, whatever the comb, which is what lets the file carry one record axis and a mask instead of a second axis. The default, 0, is a row at every record. `run.track_start`/`track_end` bound the walk over a schedule always built on the full lattice, so windowed runs compose exactly. `run.continuation = true` declares that `beam.file` and `field.file` are the two frames of one checkpoint and the run continues from it, `track_start` opening at the element after the one the checkpoint completed. Off, the same files initialize a fresh run from their standard records ([reading-output](reading-output.md)). `stats.h5` carries `meta/` provenance (the resolved input echo, which lattice, a timestamp and the Bmad version) as datasets. `run.record_environment` adds the user name and working directory for a lab notebook, off by default because a stats file travels.
+The tracker is laid out the way Tao is laid out. The input structs are in `fel_struct`, with defaults in the declarations. The input reader is quarantined in `fel_input_mod` and reads through the schema in `fel_schema_mod`, one table of every key with its type, default, bounds and the component it fills: `[run]`, `[window]`, `[beam]` with `[beam.resample]`, `[field]`, `[wake]`, `[space_charge]` and `[bmad]`, and the lattice at the top. The work is in library modules (`fel_setup_mod` / `fel_init_mod` / `fel_track_line_mod` / `fel_io_mod`) over one explicit `fel_run_struct`. Nothing in the library stops. Errors return and the driver decides, and `track_fel_line` is re-entrant: twice in one process is bit-identical to two processes, and `tests/lucifer_smoke_test.f90` drives the library with no input file anywhere. A key the schema does not name is refused with the keys of its table, and a key in the wrong table with the table it belongs in. `run.comb_ds_save` is the stats comb, with Bmad's `ds_save` semantics and one deliberate difference. An element end is always a record, whatever the comb, which is what lets the file carry one record axis and a mask instead of a second axis. The default, 0, is a row at every record. `run.track_start`/`track_end` bound the walk over a schedule always built on the full lattice, so windowed runs compose exactly. `run.continuation = true` declares that `beam.file` and `field.file` are the two frames of one checkpoint and the run continues from it, `track_start` opening at the element after the one the checkpoint completed. Off, the same files initialize a fresh run from their standard records ([reading-output](reading-output.md)). `stats.h5` carries `meta/` provenance (the resolved input echo, which lattice, a timestamp and the Bmad version) as datasets. `run.record_environment` adds the user name and working directory for a lab notebook, off by default because a stats file travels.
 
 ## Output: stdout is for humans, files are for programs
 
@@ -225,15 +225,15 @@ A run prints a framed block naming the configuration, a progress table with a wa
 
 Four choices in the progress table, which the sample leaves out, are deliberate. Values carry an SI prefix chosen per value, so one column holds a kilowatt startup and a megawatt saturation without losing the early digits a fixed unit would flatten. The element name is last, unpadded, so every numeric column is fixed however long a name gets: no truncation rule, no name shoving the numbers rightward. The step column is blank for one-step elements, which is most of a real lattice. And the distance column is `s`, Bmad's arc length along the reference orbit. Through a bending break the arc exceeds the chord the light takes, which is what the light-path correction accounts for.
 
-The Radiation line reports the grid the run built, which is the file's when the field came from one and the derived one when the deck stated none ([](input-reference.md#param-wavefront-grid)).
+The Radiation line reports the grid the run built, which is the file's when the field came from one and the derived one when the input file stated none ([](input-reference.md#param-wavefront-grid)).
 
 The Work, Estimate and Load lines are the pre-run. The sample above leaves the Estimate line out, since it names a machine and a date. Work counts what the run will do, and every number in it is known before the first step. The numbers are the integration steps over the line, the macroparticles in the window, their product, and the transverse grid points the field solve touches per step over the window and every member of the field set. Estimate turns that into wall clock at rates measured on one machine, which the line names, from the particle push and the field solve ([](performance.md)). It is an estimate and it is checked: the Cost line in the completion block prints the clock beside it on every run. Load says where the macroparticle count stands against the load the source filter's convergence was measured at, 1024 macroparticles in 128 beamlets. It also says what the beamlet size buys, which is the harmonics the shot noise is imposed at, `(beamlet_size - 1)/2`. A harmonic field above that is refused when shot noise is on, with the beamlet size that would carry it.
 
-The Unaveraged line appears when the line has an unaveraged element. It states the substeps a period and the ramp at each end, and says whether the ramp is the default, the deck's own or the hard-edge sentinel ([](input-reference.md#param-global-unaveraged-ramp-periods)).
+The Unaveraged line appears when the line has an unaveraged element. It states the substeps a period and the ramp at each end, and says whether the ramp is the default, the input file's own or the hard-edge sentinel ([](input-reference.md#param-global-unaveraged-ramp-periods)).
 
 The Frames line appears when `run.dump_at_comb` is on, and states how many frames the run will write and roughly how many bytes they take. A comb of zero is a frame at every integration step, so read the number before the run rather than after the disk fills ([](input-reference.md#param-global-dump-at-comb), [](reading-output.md)).
 
-Setting `run.load_only` stops the run after this block. That is the pre-run on its own: everything the deck derives and everything it will cost, with the initial state written and nothing tracked ([](input-reference.md#param-global-load-only)).
+Setting `run.load_only` stops the run after this block. That is the pre-run on its own: everything the input file derives and everything it will cost, with the initial state written and nothing tracked ([](input-reference.md#param-global-load-only)).
 
 The Split block is the run's own convergence report. The field power is separated into the part inside an angle of about four mode diffraction angles and the part outside it. The inside part is what couples to the mode. The outside part is the emission of macroparticles that occupy one grid point each. That second part is an artifact of the representation. It grows as the cells shrink and falls as the beamlet count rises, and at common settings it is most of the total power of an unseeded run. The angular filter that removes it is on by default, and what it costs and what load it wants is [](fel-physics.md#sec-convergence). The block reports both at the record where the mode peaked and at the last record. The bunching beside each record is the mean over the window at that record, weighted by the live charge of each slice, and the bunching at the mode's peak is not the largest along the line. The run then warns when the outside part reaches a tenth of the inside part and confirms convergence below a hundredth. On the steady-state example with the filter on, that emission is a few thousandths of the exit power and about a thousandth of the power at saturation, which the example's table records ([](generated/examples/steady_state.md)). The same numbers are in the statistics file under `run/`, and the per-record per-slice arrays are `field/total/power_inside_angle` beside `field/total/power`.
 

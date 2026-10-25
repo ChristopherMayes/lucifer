@@ -3,16 +3,16 @@
 Checks of the program's structure (docs/user-guide.md): the library contract, the comb,
 and the tracking window.
 
-  1. Library. lucifer_smoke_test drives the tracker with *no* deck anywhere, its
-     structs filled in code, and runs twice in one process. Pass 1 must reproduce a
-     deck-driven run of the same configuration dataset-identically, since the
+  1. Library. lucifer_smoke_test drives the tracker with *no* input file anywhere, its
+     structs filled in code, and runs twice in one process. Pass 1 must reproduce an
+     input-driven run of the same configuration dataset-identically, since the
      library is the program. Pass 2 must reproduce pass 1 bit-for-bit. That is,
      twice in one process equals two processes.
   2. Library errors return. lucifer_smoke_test on an unreadable lattice must print its
      proof-of-return line and exit with its own code 2. The library returns and the
      program decides, with no exit inside the library.
   3. Refusals. A key in the wrong table and a key no table has are each refused, with
-     the table it belongs in or the keys the table has, so a stale deck cannot run on
+     the table it belongs in or the keys the table has, so a stale input file cannot run on
      defaults.
   4. The comb (run.comb_ds_save, with Bmad's ds_save semantics verbatim). A comb > 0
      run's per-record rows must be exactly the every-record run's rows at the comb
@@ -76,16 +76,16 @@ import h5py
 import numpy as np
 
 import lucifer.beam as beamio
-from lucifer import Deck, LuciferError
+from lucifer import Input, LuciferError
 from lucifer import run as run_lucifer
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 import fieldio
 from checkrec import record
 from lucifer.stats import read_stats, same_data
 
 FAILED = False
 
-LAMBDA0 = 1e-10          # the wavelength both decks below state
+LAMBDA0 = 1e-10          # the wavelength both input files below state
 KS_C = 2 * np.pi / LAMBDA0 * 2.99792458e8      # phase per second of the file's time
 
 # What the citation check below walks: the text this program ships.
@@ -120,10 +120,10 @@ SEG: line = (UND, D, UND2)
 use, SEG
 """
 
-# The deck twin of lucifer_smoke_test's in-code configuration (same values).
+# The input file twin of lucifer_smoke_test's in-code configuration (same values).
 # grid_n_pts is 63 here on purpose, and this pair is the only place in the benchmark that is
-# not a power of two. Every other deck runs a power-of-two grid, which is what the Metal
-# field solver takes, so a deck moves between the backends unchanged. This pair holds the
+# not a power of two. Every other input file runs a power-of-two grid, which is what the Metal
+# field solver takes, so an input file moves between the backends unchanged. This pair holds the
 # odd-grid path on the CPU, which has to keep working: a user writing a Genesis-style odd
 # count gets one, and an imported Genesis field can carry one. The value has to match
 # lucifer_smoke_test.f90, since the check below compares the two runs byte for byte.
@@ -241,7 +241,7 @@ def main():
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "snml.diag.txt").read_bytes()
     for s in ("-final.beam.h5", "-final.wf.h5"):
         same = same and h5_identical(wd / f"sp1{s}", wd / f"snml{s}")
-    check("no-deck library run == deck run (diag byte, dumps dataset)", same)
+    check("library run with no input file == input-file run (diag byte, dumps dataset)", same)
 
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "sp2.diag.txt").read_bytes()
     for s in ("-final.beam.h5", "-final.wf.h5", ".stats.h5"):
@@ -257,7 +257,7 @@ def main():
           note=f"[exit {r.returncode}]")
 
     # ------------------------------------------------------------------
-    print("== the deck's refusals ==")
+    print("== the input file's refusals ==")
     (wd / "wrong_table.toml").write_text(WRONG_TABLE)
     r = run([str(exe), "wrong_table.toml"], wd)
     ok = (r.returncode != 0 and "lambda0 IS NOT A KEY OF [beam]" in r.stdout
@@ -272,7 +272,7 @@ def main():
     # ------------------------------------------------------------------
     print("== the overrides on the command line ==")
 
-    # Three keys set after the deck, two of them in one table and one a string the shell
+    # Three keys set after the input file, two of them in one table and one a string the shell
     # has stripped the quotes from. The run writes under the overridden root, the echo
     # carries every value and params/ the particle count and the seed.
     (wd / "ovr.toml").write_text(to_toml(NML_TWIN.format(root="ovr", extra="", bextra="")))
@@ -291,7 +291,7 @@ def main():
     check("run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow",
           ok, note=f"[exit {r.returncode}]")
 
-    # The deck's own refusals, reached from the command line: a key no table has, a key
+    # The input file's own refusals, reached from the command line: a key no table has, a key
     # in the wrong table, a value outside its bounds, and an argument that is not
     # key=value.
     cases = [("run.wake_on=true", "wake_on IS NOT A KEY OF [run]", "a key no table has"),
@@ -305,27 +305,27 @@ def main():
         check(f"{what} on the command line is refused ({arg})", ok, note=f"[{text}]")
 
     # ------------------------------------------------------------------
-    print("== the package: a deck from the models, through the runner ==")
+    print("== the package: an input file from the models, through the runner ==")
 
-    # A Deck built from the models, written by the runner and run on the smoke lattice:
+    # An Input built from the models, written by the runner and run on the smoke lattice:
     # every key set away from a default comes back from the echo in meta/input_echo. The
-    # echo is the resolved deck, so it also carries what setup derived, n_wavelength
-    # here, and is read as a Deck without being equal to the one written.
-    deck = Deck.from_flat(NML_TWIN.format(root="pkg", extra="", bextra=""))
-    deck["beam.n_particle"] = 1024
-    deck.field.harmonics = [1, 3]
-    deck.run.dump_beam_at = ["UND"]
+    # echo is the resolved input file, so it also carries what setup derived, n_wavelength
+    # here, and is read as an Input without being equal to the one written.
+    inp = Input.from_flat(NML_TWIN.format(root="pkg", extra="", bextra=""))
+    inp["beam.n_particle"] = 1024
+    inp.field.harmonics = [1, 3]
+    inp.run.dump_beam_at = ["UND"]
     try:
-        res = run_lucifer(deck, cwd=wd, exe=exe, threads=4, name="pkg.toml")
+        res = run_lucifer(inp, cwd=wd, exe=exe, threads=4, name="pkg.toml")
         with h5py.File(res.stats_path) as h5:
-            echo = Deck.loads(h5["meta/input_echo"][()].decode())
+            echo = Input.loads(h5["meta/input_echo"][()].decode())
         ok = (res.returncode == 0 and res.out_root == "pkg" and res.stats_path.exists()
-              and all(echo[k] == v for k, v in deck.items())
+              and all(echo[k] == v for k, v in inp.items())
               and res.stats_path in res.files and len(res.files) >= 5)
-        note = f"[{len(deck.items())} keys set, {len(res.files)} files]"
+        note = f"[{len(inp.items())} keys set, {len(res.files)} files]"
     except LuciferError as err:
         ok, note = False, f"[LuciferError: {err.message[:200]}]"
-    check("a Deck from the models runs through lucifer.run and echoes every set key", ok, note=note)
+    check("an Input from the models runs through lucifer.run and echoes every set key", ok, note=note)
 
     # An override through the runner lands in params/, and a refusal through it raises
     # with the program's message.

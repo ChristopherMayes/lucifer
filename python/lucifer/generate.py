@@ -1,12 +1,12 @@
-"""Write ``models.py`` from the schema: one dataclass per table and ``Deck``.
+"""Write ``models.py`` from the schema: one dataclass per table and ``Input``.
 
     python -m lucifer.generate
 
 The keystone runs this after ``lucifer --schema`` and requires no diff, so the models
 cannot disagree with the program. Every field carries the program's type and default
 and a docstring of the schema's description, which ends with the unit where the key
-has one, and the bounds. The dataclasses hold data alone: what a ``Deck`` does is in
-``lucifer.deckops``, which the generated ``Deck`` inherits.
+has one, and the bounds. The dataclasses hold data alone: what a ``Input`` does is in
+``lucifer.inputops``, which the generated ``Input`` inherits.
 """
 from __future__ import annotations
 
@@ -61,10 +61,10 @@ def field_lines(name: str, prop: dict) -> list[str]:
 def render(schema: dict) -> str:
     keys = schema_mod.keys(schema)
     out = [
-        '"""The deck as typed models, generated from the schema. Do not edit.',
+        '"""The input file as typed models, generated from the schema. Do not edit.',
         "",
         f"Written by python -m lucifer.generate from schema.json, schema version "
-        f"{schema['x-schema-version']}. A dataclass per table of the deck, and Deck with",
+        f"{schema['x-schema-version']}. A dataclass per table of the input file, and Input with",
         "the lattice and one of each. The defaults are the program's, read from the schema,",
         "and nothing here checks a bound: the program refuses a value outside one. The",
         "field named field is the [field] table, so dataclasses.field is imported as _field.",
@@ -73,21 +73,21 @@ def render(schema: dict) -> str:
         "",
         "from dataclasses import dataclass, field as _field",
         "",
-        "from lucifer.deckops import DeckOps",
+        "from lucifer.inputops import InputOps",
         "",
         "",
     ]
     # The tables, the nested one before the table that holds it.
     order = ["run", "window", "beam.resample", "beam", "field", "wake", "space_charge", "bmad"]
     for table in order:
-        out += ["@dataclass", f"class {CLASS[table]}:", f'    """The [{table}] table of the deck."""']
+        out += ["@dataclass", f"class {CLASS[table]}:", f'    """The [{table}] table of the input file."""']
         for name, prop in keys[table].items():
             out += field_lines(name, prop)
         if table == "beam":
             out += ["    resample: Resample = _field(default_factory=Resample)",
                     '    """The [beam.resample] table, the resampler."""']
         out += ["", ""]
-    out += ["@dataclass", "class Deck(DeckOps):", '    """One deck: the lattice and the tables."""']
+    out += ["@dataclass", "class Input(InputOps):", '    """One input file: the lattice and the tables."""']
     for name, prop in keys[""].items():
         out += field_lines(name, prop)
     for table in schema_mod.TABLES:
@@ -96,7 +96,7 @@ def render(schema: dict) -> str:
         out += [f"    {table}: {CLASS[table]} = _field(default_factory={CLASS[table]})",
                 f'    """The [{table}] table."""']
     out += ["", "", "TABLES = (" + ", ".join(f'("{t}", {CLASS[t]})' for t in schema_mod.TABLES) + ")",
-            '"""The tables in the deck\'s order, with their classes."""', ""]
+            '"""The tables in the input file\'s order, with their classes."""', ""]
     return "\n".join(out)
 
 

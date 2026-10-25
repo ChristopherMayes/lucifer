@@ -4,7 +4,7 @@ Generate docs/generated/input-keys.md from the schema the program writes.
 
   report_input_keys.py --schema python/lucifer/schema.json --out docs/generated/input-keys.md
 
-One table per TOML table of the deck, in the deck's order, with each key's type, its
+One table per TOML table of the input file, in the input file's order, with each key's type, its
 default as the program's structures declare it, its unit and its bounds, and the one
 sentence the schema carries for it. docs/input-reference.md includes these tables
 between its prose, so the key list, the defaults and the bounds come from the program

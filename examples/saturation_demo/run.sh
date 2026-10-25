@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # run.sh is the saturation demo's thin runner. Every input is a real file in this
-# directory, the Genesis decks, the Bmad namelists and the unaveraged wrapper lattice, to
+# directory, the Genesis input files, the Bmad namelists and the unaveraged wrapper lattice, to
 # read, edit and rerun. It tracks one practical SASE case -- Genesis's own Benchmark1-SASE
 # configuration, the full 57 m Aramis line, dark start, 96 slices x 2048 particles --
 # three ways from identical initial dumps, each on the machine's full performance-core
@@ -12,7 +12,7 @@
 # the shared initial dumps. Wall times come from one external clock (/usr/bin/time -p).
 # check_agreement.py must pass before any timing or report is produced. The window is
 # fixed at 96 slices (sample = 3), divisible by any reasonable core count, so the input
-# decks stay static. The section "The saturation demo" of
+# input files stay static. The section "The saturation demo" of
 # lucifer/examples/saturation_demo/README.md records the results.
 #
 # Usage:  ./run.sh [--workers N] [--genesis <path>] [--exe <path>] [--mpirun <path>]

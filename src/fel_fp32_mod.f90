@@ -1333,7 +1333,7 @@ end subroutine fel_fp32_close
 !
 ! Routine to evaluate fel_unavg_bfield in single precision, term for term. Nothing here
 ! needs a reformulation. The arguments are of order one and the products carry no
-! cancellation. ku*y reaches 4e-3 on the checked decks, so cosh and sinh are evaluated
+! cancellation. ku*y reaches 4e-3 on the checked input files, so cosh and sinh are evaluated
 ! where they are well conditioned.
 !-
 
@@ -1382,7 +1382,7 @@ end subroutine fel_fp32_unavg_bfield
 ! transcribe directly. The fifth does not, and it is the one the mode lives on.
 !
 ! The FP64 form is dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8,
-! and their difference is the slippage, 1.9e-9 on the checked deck. In single precision
+! and their difference is the slippage, 1.9e-9 on the checked input file. In single precision
 ! a number near one has a quantum of 1.19e-7. So the answer is 0.016 of one quantum, and
 ! the naive difference is exactly zero: the slippage disappears and with it the physics.
 ! On a real mid-segment state the naive form is wrong by the whole of the answer

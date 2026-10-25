@@ -42,7 +42,7 @@
 #                           [--work-dir <path>] [--big-slices N] [--npart N]
 #                           [--ngrid N] [--no-sweep] [--grid-scan "N1 N2 ..."]
 #
-# --ngrid sets the transverse grid of every deck the phases mode writes, 256 by default.
+# --ngrid sets the transverse grid of every input file the phases mode writes, 256 by default.
 # --no-sweep leaves the thread sweep out, for a particle count whose profile alone is
 # wanted. --grid-scan runs the small configuration at each listed grid three times at the
 # worker count, takes the best walk of each, and prints the transform-length table in
@@ -196,11 +196,11 @@ if [[ $PHASES -eq 1 ]]; then
   cp "$SCRIPT_DIR/bmad/aramis.bmad" "$WORK_DIR/"
   cd "$WORK_DIR" || exit 1
 
-  # Each slice count gets one deck, the SASE example's configuration with the window resized.
+  # Each slice count gets one input file, the SASE example's configuration with the window resized.
   # A time window of nslice slices at sample = 3 is nslice * 3 * lambda0 long, which is
   # the same arithmetic the head-to-head above does for Genesis.
   #
-  # The deck states its slice spacing. An unstated one is derived from the beam and the
+  # The input file states its slice spacing. An unstated one is derived from the beam and the
   # gain, which on this line is 38 wavelengths rather than 3, so the same window_length
   # would build 8 slices where this profile wants 96. The slice count is what the two
   # columns compare, so it is stated and then checked below.
@@ -211,11 +211,11 @@ if [[ $PHASES -eq 1 ]]; then
   # phase shares agree to 0.1% across a factor of 5.25 in slice count). Read the two
   # columns as the same work at two sizes rather than as the same physics.
 
-  phase_deck () {   # <file> <nslice> <out_root>
+  phase_input () {   # <file> <nslice> <out_root>
     local slen sigz
     slen="$(awk -v n="$2" 'BEGIN { printf "%.6e", n * 3 * 1e-10 }')"
     sigz="$(awk -v n="$2" 'BEGIN { printf "%.6e", n * 3 * 1e-10 / 2 }')"
-    cat > "$1" <<DECK
+    cat > "$1" <<INPUT
 lattice = "aramis.bmad"
 
 [run]
@@ -241,7 +241,7 @@ lambda0 = 1e-10
 seed_power = 0
 grid_n_pts = $NGRID
 grid_half_width = 2e-4
-DECK
+INPUT
   }
 
   # phase_run <label> <nslice> <threads> [<suffix>] does one run and parses out its
@@ -250,7 +250,7 @@ DECK
     local label="$1" ns="$2" nt="$3" root log
     root="phase_${ns}_${nt}${4:-}"
     log="$root.log"
-    phase_deck "$root.toml" "$ns" "$root"
+    phase_input "$root.toml" "$ns" "$root"
     echo "--- $label: $ns slices, $nt thread(s) ---"
     if ! env OMP_NUM_THREADS="$nt" "$EXE" "$root.toml" > "$log" 2>&1; then
       echo "FAILED; log tail:" >&2
@@ -269,7 +269,7 @@ DECK
     built="$(awk '/^ Beam / {for (i = 1; i <= NF; i++) if ($i == "slices" || $i == "slice") print $(i-1)}' "$log")"
     if [[ "$built" != "$ns" ]]; then
       echo "FAILED: asked for $ns slices and the run built ${built:-none}." >&2
-      echo "The deck states window.n_wavelength; a derived spacing would change the count." >&2
+      echo "The input file states window.n_wavelength; a derived spacing would change the count." >&2
       exit 1
     fi
   }
@@ -443,14 +443,14 @@ cp "$SCRIPT_DIR/genesis4/Aramis.lat" "$SCRIPT_DIR/bmad/aramis.bmad" "$WORK_DIR/"
 cd "$WORK_DIR" || exit 1
 export FI_PROVIDER=tcp
 
-# The deck is Aramis-td.in's configuration with the window sized to the worker count.
+# The input file is Aramis-td.in's configuration with the window sized to the worker count.
 # The serial run carries the &write blocks (the dumps the Bmad side imports). The timed
 # parallel run drops them so neither code is charged for dump I/O asymmetrically --
 # the Bmad runs write only their final dumps, Genesis's serial run writes initial+final.
 # Dump I/O is seconds against minutes of tracking. The asymmetry is noted, not modeled.
 
-make_deck () {   # <file> <with_write: 1|0>
-  cat > "$1" <<DECK
+make_input () {   # <file> <with_write: 1|0>
+  cat > "$1" <<INPUT
 &setup
 rootname=AramisPerf
 lattice=Aramis.lat
@@ -487,28 +487,28 @@ delgam=1.000000
 ex=4.000000e-07
 ey=4.000000e-07
 &end
-DECK
+INPUT
   if [[ "$2" == "1" ]]; then
-    cat >> "$1" <<'DECK'
+    cat >> "$1" <<'INPUT'
 
 &write
 field = AramisPerf-initial
 beam = AramisPerf-initial
 &end
-DECK
+INPUT
   fi
-  cat >> "$1" <<'DECK'
+  cat >> "$1" <<'INPUT'
 
 &track
 fft_fieldsolver = true
 &end
-DECK
+INPUT
 }
 
-make_deck perf-serial.in 1
-make_deck perf-parallel.in 0
+make_input perf-serial.in 1
+make_input perf-parallel.in 0
 
-cat > perf.toml <<DECK
+cat > perf.toml <<INPUT
 lattice = "aramis.bmad"
 
 [run]
@@ -523,7 +523,7 @@ beamlet_size = 8
 [field]
 file = "AramisPerf-initial.wf.h5"
 lambda0 = 1e-10
-DECK
+INPUT
 
 # timed <label> <log> <command...> times a command on one uniform external wall clock.
 declare -a TIMES

@@ -2,15 +2,15 @@
 """
 Record what an example's run measured, from its stats file and its log.
 
-  example_record.py <deck.toml> <log>              # rows of the record, to stdout
+  example_record.py <input.toml> <log>              # rows of the record, to stdout
   example_record.py --sample <log> --out <md>    # the sample output the user guide shows
 
-The first form reads the deck for its out_root, opens the stats file the run wrote
+The first form reads the input file for its out_root, opens the stats file the run wrote
 beside it and the log the runner kept, and prints one row per quantity:
 
-  <directory> <tab> <deck> <tab> <quantity> <tab> <value> <tab> <unit>
+  <directory> <tab> <input> <tab> <quantity> <tab> <value> <tab> <unit>
 
-The quantities are one fixed set for every deck, so a page can compare its decks column
+The quantities are one fixed set for every input file, so a page can compare its input files column
 by column and a number a README once typed from a run comes from the run itself:
 
   exit_power, exit_pulse_energy          the window totals at the last record
@@ -84,12 +84,12 @@ SAMPLE_PREFIXES = (" Lucifer --", " Beam ", " Radiation ", " Work ", " Load ", "
                    " Split ", "             mode peak", "             last record")
 
 
-def out_root(deck: pathlib.Path) -> str:
-    for line in deck.read_text().splitlines():
+def out_root(input_file: pathlib.Path) -> str:
+    for line in input_file.read_text().splitlines():
         m = re.match(r"\s*(?:run.)?out_root\s*=\s*['\"]([^'\"]+)['\"]", line)
         if m:
             return m.group(1)
-    raise SystemExit(f"{deck}: no out_root")
+    raise SystemExit(f"{input_file}: no out_root")
 
 
 def fmt(v) -> str:
@@ -149,11 +149,11 @@ def gain_length(s, p_in):
     return 1.0 / best
 
 
-def rows_for(deck: pathlib.Path, log: pathlib.Path):
-    root = out_root(deck)
-    stats = deck.parent / f"{root}.stats.h5"
+def rows_for(input_file: pathlib.Path, log: pathlib.Path):
+    root = out_root(input_file)
+    stats = input_file.parent / f"{root}.stats.h5"
     if not stats.exists():
-        raise SystemExit(f"{deck}: no stats file at {stats}")
+        raise SystemExit(f"{input_file}: no stats file at {stats}")
     rows = []
     with h5py.File(stats, "r") as h5:
         s = h5["coords/s"][()]
@@ -242,7 +242,7 @@ def sample(log: pathlib.Path, out: pathlib.Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("deck", nargs="?", help="The deck the run read")
+    ap.add_argument("input_file", nargs="?", help="The input file the run read")
     ap.add_argument("log", nargs="?", help="The log the runner kept")
     ap.add_argument("--sample", metavar="LOG", help="Write the sample output of this log instead")
     ap.add_argument("--out", help="Where --sample writes")
@@ -252,11 +252,11 @@ def main() -> int:
             ap.error("--sample needs --out")
         sample(pathlib.Path(a.sample), pathlib.Path(a.out))
         return 0
-    if not (a.deck and a.log):
-        ap.error("give <deck> <log>, or --sample <log> --out <md>")
-    deck, log = pathlib.Path(a.deck), pathlib.Path(a.log)
-    for name, value, unit in rows_for(deck, log):
-        print(f"{deck.parent.name}\t{deck.name}\t{name}\t{fmt(value)}\t{unit}")
+    if not (a.input_file and a.log):
+        ap.error("give <input> <log>, or --sample <log> --out <md>")
+    input_file, log = pathlib.Path(a.input_file), pathlib.Path(a.log)
+    for name, value, unit in rows_for(input_file, log):
+        print(f"{input_file.parent.name}\t{input_file.name}\t{name}\t{fmt(value)}\t{unit}")
     return 0
 
 

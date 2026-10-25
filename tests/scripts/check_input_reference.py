@@ -2,13 +2,13 @@
 """
 Check the input reference against the schema the program writes.
 
-The deck's keys, their types, defaults and bounds are the program's, written by
+The input file's keys, their types, defaults and bounds are the program's, written by
 lucifer --schema into python/lucifer/schema.json and rendered into
 docs/generated/input-keys.md by report_input_keys.py, which docs/input-reference.md
 includes. What this check holds together:
 
-  1. python/lucifer/deck.py's routing table names exactly the schema's keys, table by
-     table, so a deck the package writes is one the program reads, and the generated
+  1. python/lucifer/flat.py's routing table names exactly the schema's keys, table by
+     table, so an input file the package writes is one the program reads, and the generated
      models python/lucifer/models.py carry exactly those keys with the schema's defaults.
   2. Every key of the schema appears in docs/generated/input-keys.md.
   3. Every dotted key a page names in code font, `beam.n_particle` or `[wake]`, is a key
@@ -61,10 +61,10 @@ def main():
     keys = schema_keys(schema)
 
     # (1) The package's routing table, and the models' fields and defaults.
-    from lucifer.deck import KEYS
+    from lucifer.flat import KEYS
     from lucifer import models
     for table, names in keys.items():
-        cls = models.Deck if table == "" else dict(models.TABLES)[table]
+        cls = models.Input if table == "" else dict(models.TABLES)[table]
         obj = cls()
         have = {k for k in vars(obj) if not hasattr(vars(obj)[k], "__dataclass_fields__")}
         if have != names:
@@ -78,11 +78,11 @@ def main():
     for table, names in keys.items():
         mine = set(KEYS.get(table, []))
         if mine != names:
-            failed.append(f"python/lucifer/deck.py KEYS[{table!r}] differs from the schema: "
+            failed.append(f"python/lucifer/flat.py KEYS[{table!r}] differs from the schema: "
                           f"missing {sorted(names - mine)}, extra {sorted(mine - names)}")
     for table in KEYS:
         if table not in keys:
-            failed.append(f"python/lucifer/deck.py names a table the schema does not: {table!r}")
+            failed.append(f"python/lucifer/flat.py names a table the schema does not: {table!r}")
 
     # (2) The generated key tables.
     page = (ROOT / "docs/generated/input-keys.md").read_text()
@@ -107,7 +107,7 @@ def main():
                 failed.append(f"{f} names `{m.group(1)}`, which the schema does not have")
         for m in TABLE.finditer(text):
             if m.group(1) not in tables - {""}:
-                failed.append(f"{f} names `[{m.group(1)}]`, which is not a table of the deck")
+                failed.append(f"{f} names `[{m.group(1)}]`, which is not a table of the input file")
 
     n = sum(len(v) for v in keys.values())
     if failed:

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lucifer"
 version = "0.0.0"
-description = "The Python side of Lucifer: the deck as typed models, the schema, a runner and the readers of its output files."
+description = "The Python side of Lucifer: the input file as typed models, the schema, a runner and the readers of its output files."
 requires-python = ">=3.11"
 dependencies = []
 

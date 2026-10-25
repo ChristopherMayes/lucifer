@@ -9,25 +9,44 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
-- 2026-10-25 Added: the Python package carries the deck as typed models, a runner and the readers.
+- 2026-10-25 Changed: the word deck is retired. The file a run reads is the input file, its keys
+  are input keys, and the usage text reads `lucifer <input.toml>`. The Bmad corpus never says deck:
+  it says input file, and master input file for a program's own, and Genesis4 says main input file.
+  The reader is `fel_read_input` with the argument `input_file`, and its messages say `IN THE INPUT
+  FILE`, `CANNOT READ THE INPUT FILE` and `THE INPUT FILE ... NAMES NO LATTICE`, as do the check
+  scripts that quote them. The schema's title is `Lucifer input`. In the package `Deck` is `Input`
+  and `DeckOps` is `InputOps` in `python/lucifer/inputops.py`, the converter of flat text is
+  `python/lucifer/flat.py` with `FlatError`, run as `python -m lucifer.flat`, the first argument of
+  `lucifer.run` is `input_file`, and so is the field of `Result` that named it. The column of
+  `examples/measured.tsv` that names a run's file is `input`. `make_deck`, `phase_deck`,
+  `GENESIS_DECK`, `DECK_GLOBS` and the other names that carried the word say input in the benchmark
+  and the check scripts. The tree carried the word on 803 lines in 104 files, 971 mentions outside
+  the changelog and the generated pages, and carries none. `tests/scripts/check_retired_words.py`
+  adds the word, alone or inside an identifier, and reads the C and Objective-C sources, the Genesis4
+  input files, the TOML input files, the TSV tables, the JSON and the lattices as well, where it
+  found five older misses: two excerpts of `tests/number_classes.tsv` that still quoted harness and
+  no longer matched their pages, and three comments naming `chamber_wake%` and `wavefront_init%`
+  components, which now name `wake.write_kernels`, `wake.on` and `field.harmonics`. The Genesis4
+  input files' comments changed, so the next benchmark run misses the reference cache once.
+- 2026-10-25 Added: the Python package carries the input file as typed models, a runner and the readers.
   `python/lucifer/schema.json` is the one committed copy of the schema, written there by the
   keystone's `lucifer --schema`, and `python -m lucifer.generate` writes `python/lucifer/models.py`
   from it, a dataclass per table, `Run`, `Window`, `Beam` with `Resample`, `Field`, `Wake`,
-  `SpaceCharge` and `Bmad`, and `Deck` with the lattice and one of each, every field typed with the
+  `SpaceCharge` and `Bmad`, and `Input` with the lattice and one of each, every field typed with the
   program's default and a docstring of the key's description and bounds; the keystone regenerates
   both and requires no diff, and the docs workflow regenerates the models from the committed
-  schema. `Deck.toml()` writes the keys set away from the defaults, every key with `explicit=True`,
-  `Deck.read` and `Deck.loads` go through `tomllib`, `Deck.from_flat` through the converter, and
-  `deck["beam.n_particle"]` reaches a key by its dotted name; an unknown key is Python's own
-  `TypeError`, and a bound stays the program's. `lucifer.run(deck, cwd, exe, threads, overrides)`
-  writes a `Deck` or takes a deck path, runs the executable named by `exe`, by `LUCIFER_EXE` or
+  schema. `Input.toml()` writes the keys set away from the defaults, every key with `explicit=True`,
+  `Input.read` and `Input.loads` go through `tomllib`, `Input.from_flat` through the converter, and
+  `inp["beam.n_particle"]` reaches a key by its dotted name; an unknown key is Python's own
+  `TypeError`, and a bound stays the program's. `lucifer.run(input_file, cwd, exe, threads, overrides)`
+  writes a `Input` or takes an input file path, runs the executable named by `exe`, by `LUCIFER_EXE` or
   found on `PATH`, passes the overrides as `table.key=value` arguments and returns a `Result` with
   the output, `out_root`, the stats file's path and `.stats` opened through the reader; a nonzero
   exit raises `LuciferError` with the program's error text. `tests/scripts/read_stats.py` is
   `lucifer.stats` and `beamio.py` is `lucifer.beam`, moved whole, and the fifteen scripts that
   imported them import them from the package. `python/tests/test_models.py` holds the models to
-  the schema field by field and the generated file to the generator, round-trips a deck, and runs
-  in the docs workflow; `check_program.py` runs a `Deck` from the models through `lucifer.run` on
+  the schema field by field and the generated file to the generator, round-trips an input file, and runs
+  in the docs workflow; `check_program.py` runs a `Input` from the models through `lucifer.run` on
   the smoke lattice and reads every set key back from the echo, an override through it from
   `params/`, and a refusal through it as `LuciferError`. `docs/user-guide.md` describes the three
   uses under From Python.

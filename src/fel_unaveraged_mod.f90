@@ -804,7 +804,7 @@ upar%pad = 0
 ! carries a roll-off over gamma. So the bound is the run's whole charge times the largest
 ! ratio the kernel is allowed to meet. The quiver sets that ratio. |j| reaches sqrt(2) aw
 ! at the peak of a planar wiggle and less on a helical one. The betatron momentum adds a
-! hundredth of that on the checked decks. u_s falls no lower than the gamma floor the
+! hundredth of that on the checked input files. u_s falls no lower than the gamma floor the
 ! device took at setup. One rest momentum of headroom on the numerator covers a
 ! transverse momentum no FEL beam has. The kernel checks the ratio on every particle and
 ! refuses the run through the same fault the averaged deposit's gamma floor uses, so the
@@ -1005,7 +1005,7 @@ end subroutine unavg_ode
 ! over (docs/validation.md, val-unaveraged-fp32).
 !
 ! What single precision destroys in this advance, on a real mid-segment state of the
-! one-segment deck (docs/validation.md, val-unaveraged-fp32):
+! one-segment input file (docs/validation.md, val-unaveraged-fp32):
 !
 !   slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
 !             the difference is 1.9e-9, which is 0.016 of the quantum of one in single

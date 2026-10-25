@@ -30,11 +30,11 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 import pool
 
-GENESIS_DECK = """&setup
+GENESIS_INPUT = """&setup
 rootname=SASE{seed}
 lattice=Aramis-1seg.lat
 beamline=SEG1
@@ -73,7 +73,7 @@ fft_fieldsolver = true
 &end
 """
 
-BMAD_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+BMAD_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis_1seg.bmad"
   out_root = "bsase{seed}"
   source_filter = F
@@ -113,7 +113,7 @@ def main():
 
     # Every seed's two runs are independent processes. The pool runs them all.
     def gen_one(seed):
-        (wd / f"gsase{seed}.in").write_text(GENESIS_DECK.format(seed=seed))
+        (wd / f"gsase{seed}.in").write_text(GENESIS_INPUT.format(seed=seed))
         r = subprocess.run([a.genesis, f"gsase{seed}.in"], cwd=wd, env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:

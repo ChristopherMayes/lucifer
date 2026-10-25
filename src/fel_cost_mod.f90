@@ -60,7 +60,7 @@ real(rp), parameter :: fel_cost_serial$ = 0.0105_rp
 real(rp), parameter :: fel_cost_walk_share$ = 0.883_rp
 
 ! The device against the CPU, from the device table of docs/performance.md. The largest
-! window there is 9.1 times the twelve-thread CPU. The smallest deck gives the host
+! window there is 9.1 times the twelve-thread CPU. The smallest input file gives the host
 ! dispatch floor: 0.045 s over 89 steps.
 ! The four device points cannot carry a two-term fit of their own. The two largest share
 ! a particle count per slice and the smallest is the floor. So the device takes the CPU
@@ -110,7 +110,7 @@ integer nstep, n_particle, ngrid, nstep_unavg, ie, n_ele, nsub, n_grid(3), npol
 !
 
 ! Only the elements the walk covers, as bounded by run.track_start and track_end.
-! For example, a deck that stops after the second segment counts two segments.
+! For example, an input file that stops after the second segment counts two segments.
 
 branch => run%lat%branch(0)
 nstep = 0;  nstep_unavg = 0

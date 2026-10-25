@@ -3,11 +3,11 @@
 Generate docs/generated/examples/ from the example directories themselves.
 
 Each page carries the example's own README prose, the figure the runner saved, the
-quantities the runner recorded for each of its decks (examples/measured.tsv, one table
-per example with a column per deck), and every input file it runs on, fenced verbatim
+quantities the runner recorded for each of its input files (examples/measured.tsv, one table
+per example with a column per input file), and every input file it runs on, fenced verbatim
 from the file on disk. The embedded text is read
-rather than transcribed, so a deck shown in the documentation cannot drift from the deck
-that runs: editing the deck and regenerating is the only way to change the page.
+rather than transcribed, so an input file shown in the documentation cannot drift from the input file
+that runs: editing the input file and regenerating is the only way to change the page.
 
 The output is deterministic. Nothing time dependent, machine dependent or path dependent
 is written, because the keystone suite regenerates these files and requires the diff to
@@ -29,9 +29,9 @@ import re
 import sys
 from pathlib import Path
 
-# Input files shown on a page, in the order they appear. A run's own deck first,
-# then the reference code's decks, then the lattices.
-DECK_GLOBS = ("lucifer.toml", "lucifer[-_]*.toml", "sat-*.toml", "sat-*.in")
+# Input files shown on a page, in the order they appear. A run's own input file first,
+# then the reference code's input files, then the lattices.
+INPUT_GLOBS = ("lucifer.toml", "lucifer[-_]*.toml", "sat-*.toml", "sat-*.in")
 LATTICE_GLOBS = ("*.bmad", "*.lat")
 
 # An embedded file is meant to be read on a page. Anything larger is data, not input,
@@ -83,7 +83,7 @@ def split_title(text, where):
 def gather(d):
     """The input files of one example, deduplicated, in a fixed order."""
     out = []
-    for globs in (DECK_GLOBS, LATTICE_GLOBS):
+    for globs in (INPUT_GLOBS, LATTICE_GLOBS):
         found = []
         for g in globs:
             found += [p for p in d.glob(g) if p.is_file()]
@@ -162,28 +162,28 @@ WORDS = {"exit_power": "exit power", "exit_power_per_slice": "exit power per sli
 
 
 def read_record(path):
-    """{directory: {deck: {quantity: (value, unit)}}} from examples/measured.tsv."""
+    """{directory: {input: {quantity: (value, unit)}}} from examples/measured.tsv."""
     rec = {}
     if not path.exists():
         return rec
     for row in csv.DictReader(path.open(), delimiter="\t"):
-        rec.setdefault(row["directory"], {}).setdefault(row["deck"], {})[row["quantity"]] = (row["value"], row["unit"])
+        rec.setdefault(row["directory"], {}).setdefault(row["input"], {})[row["quantity"]] = (row["value"], row["unit"])
     return rec
 
 
-def measured_table(page, decks):
-    """One table for an example: a row per quantity, a column per deck, and the unit."""
-    names = sorted(decks, key=lambda d: (d != "lucifer.toml", d))
-    quantities = [q for q in ORDER if any(q in decks[d] for d in names)]
-    quantities += sorted(q for d in names for q in decks[d] if q not in ORDER)
+def measured_table(page, inputs):
+    """One table for an example: a row per quantity, a column per input file, and the unit."""
+    names = sorted(inputs, key=lambda d: (d != "lucifer.toml", d))
+    quantities = [q for q in ORDER if any(q in inputs[d] for d in names)]
+    quantities += sorted(q for d in names for q in inputs[d] if q not in ORDER)
     page += ["## Measured on this run", "",
              "The runner wrote these from each run's stats file and log, and the keystone "
              "regenerates them. A float carries five significant digits.", "",
              "| Quantity | " + " | ".join(f"`{d}`" for d in names) + " | Unit |",
              "|---|" + "---|" * len(names) + "---|"]
     for q in dict.fromkeys(quantities):
-        cells = [decks[d].get(q, ("", ""))[0] for d in names]
-        unit = next((decks[d][q][1] for d in names if q in decks[d]), "")
+        cells = [inputs[d].get(q, ("", ""))[0] for d in names]
+        unit = next((inputs[d][q][1] for d in names if q in inputs[d]), "")
         word = WORDS.get(q) or (f"exit power, the {q[11:]} component" if q.startswith("exit_power_") else q)
         page.append(f"| {word} | " + " | ".join(cells) + f" | {unit} |")
     page.append("")
@@ -244,7 +244,7 @@ def main():
         if d.name in record:
             measured_table(page, record[d.name])
         page += ["## The input files", "",
-                 "The deck, its variants, and any lattice they name, as they are on disk.", ""]
+                 "The input file, its variants, and any lattice they name, as they are on disk.", ""]
         for f in files:
             embed(page, f)
         (out / f"{d.name}.md").write_text("\n".join(page).rstrip("\n") + "\n")

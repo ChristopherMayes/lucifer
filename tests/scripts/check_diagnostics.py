@@ -23,7 +23,7 @@ rather than by a reference file.
      creation times. Also zero-length wake elements of both polarities.
   6. Refusal. A dump_beam_at entry that matches no element is refused.
   7. The pre-run. The header's work count, cost estimate and load standing, the footer's
-     thin-slice list on a deck loaded under the measured floor, load_only stopping
+     thin-slice list on an input file loaded under the measured floor, load_only stopping
      after the header, and the refusal of a harmonic at which the load carries no shot
      noise.
   8. The frame series (run.dump_at_comb). One frame per stats record, a frame at an
@@ -67,7 +67,7 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 to_groups = to_toml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -81,7 +81,7 @@ import validate_bmad_stats  # noqa: E402  The standard's own conformance checker
 
 FAILED = False
 
-NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -113,10 +113,10 @@ WRAP = """call, file = aramis_1seg.bmad
 wiggler::*[FEL_METHOD] = unaveraged
 """
 
-# The frame-series deck. A short segment, a coarse comb so the frame count stays small,
+# The frame-series input file. A short segment, a coarse comb so the frame count stays small,
 # and migration on so labels have to follow particles between slices.
 
-FRAME_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+FRAME_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -140,12 +140,12 @@ FRAME_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_tom
 {extra}&end
 """
 
-# The pre-run deck. It is averaged, seeded so it reaches saturation in one segment at
+# The pre-run input file. It is averaged, seeded so it reaches saturation in one segment at
 # little cost, and loaded at 512 macroparticles in beamlets of 8. That is 64 beamlets,
 # half the floor at which the source filter's convergence was measured, so the load
 # standing and the thin-slice list both have something to report.
 
-PRE_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+PRE_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   lambda0 = 1e-10
@@ -210,7 +210,7 @@ def h5_identical(fa, fb):
 
     meta/ holds provenance as datasets (fel-physics.md, sec-meta), since HDF5 caps an
     attribute at 64 kB. input_echo carries out_root and timestamp carries the clock, so
-    any two runs differ in meta/. params/ records every key of the deck, the frame and
+    any two runs differ in meta/. params/ records every key of the input file, the frame and
     dump switches among them, so two runs that differ only in what they write differ
     there and nowhere else. Nothing in either is physics. Only datasets are compared, so
     attributes do not enter.
@@ -271,7 +271,7 @@ SEG: line = (UND, QF, P1, UND)
 use, SEG
 """
 
-INT_NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+INT_NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -298,8 +298,8 @@ def interludes(exe, wd):
     """
     Stats rows and frames along an interlude, and what the knob guarantees.
 
-    The knob is off by default, and off must be the path of a deck that never names it.
-    The first check is byte identity against such a deck. The second is that cutting an
+    The knob is off by default, and off must be the path of an input file that never names it.
+    The first check is byte identity against such an input file. The second is that cutting an
     element reproduces tracking it whole. The pieces come from Bmad's
     element_slice_iterator, which keeps an element's fringes at its own ends rather than
     giving every piece a pair. On FEL beam sizes the fringe difference is below notice.
@@ -435,7 +435,7 @@ def interludes(exe, wd):
     # at a time through track1_bunch, whose space-charge and CSR paths need the centroid
     # orbit of the whole beam. Without it Bmad prints that the centroid must be supplied
     # and returns the bunch untracked with no error set. A drift carrying the attribute
-    # then loses its transport while the run reports success. The deck configures a
+    # then loses its transport while the run reports success. The input file configures a
     # space-charge term, so the refusal reached is this one and not the one for a solver
     # with nothing to solve.
     (wd / "intlat_sc.bmad").write_text(INT_LAT.replace(
@@ -547,26 +547,26 @@ field = GREF-copy
 
 
 def grid_parity(exe, wd, examples):
-    """The parity cost of a power-of-two grid, on the steady-state example's deck. The
-    deck runs at its 256 points and at 255 with the cell held, the half width scaled by
+    """The parity cost of a power-of-two grid, on the steady-state example's input file. The
+    input file runs at its 256 points and at 255 with the cell held, the half width scaled by
     254/255, and the exit power's relative difference is recorded. On an even
     grid the axis falls between four cells, so a beam on the axis reads a centred field
     low by dx^2 over twice the waist squared through the bilinear gather, and the deposit
     returns the same deficit. An odd grid puts a cell on the axis. The example's dumps are
     left out, since the exit power is what the check reads, and the lattice is the
     example's own (docs/validation.md, the transverse grid)."""
-    deck = (examples / "steady_state" / "lucifer.toml").read_text()
+    input_text = (examples / "steady_state" / "lucifer.toml").read_text()
     shutil.copy(examples / "aramis.bmad", wd / "aramis.bmad")
-    deck = deck.replace('lattice = "../aramis.bmad"', 'lattice = "aramis.bmad"')
-    deck = "\n".join(line for line in deck.splitlines()
+    input_text = input_text.replace('lattice = "../aramis.bmad"', 'lattice = "aramis.bmad"')
+    input_text = "\n".join(line for line in input_text.splitlines()
                      if "dump_beam_at" not in line and "dump_field_at" not in line) + "\n"
     for needed in ('out_root = "steady_state"', "grid_n_pts = 256", "grid_half_width = 2e-4"):
-        if needed not in deck:
-            print(f"FAIL: the steady-state example's deck no longer states {needed}")
+        if needed not in input_text:
+            print(f"FAIL: the steady-state example's input file no longer states {needed}")
             sys.exit(1)
     power = {}
     for n in (256, 255):
-        text = deck.replace('out_root = "steady_state"', f'out_root = "gp{n}"')
+        text = input_text.replace('out_root = "steady_state"', f'out_root = "gp{n}"')
         if n == 255:
             text = text.replace("grid_n_pts = 256", "grid_n_pts = 255")
             text = text.replace("grid_half_width = 2e-4", f"grid_half_width = {2e-4 * 254 / 255:.12e}")
@@ -1105,7 +1105,7 @@ def main():
     check("refusal: unknown dump_beam_at element refused (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
-    # 7. The pre-run (docs/user-guide.md). The deck loads 512 macroparticles per slice in
+    # 7. The pre-run (docs/user-guide.md). The input file loads 512 macroparticles per slice in
     # beamlets of 8, which is 64 beamlets and half the measured floor, so the load
     # standing and the thin-slice list both have something to report. The count is
     # arithmetic and is checked as arithmetic. The estimate is one machine's, and is
@@ -1170,7 +1170,7 @@ def main():
     check("refusal: harmonic 5 on beamlets of 8 refused, naming the size that carries it",
           0.0 if refused else 1.0, 0.5)
 
-    # 8. The frame series (docs/reading-output.md). The deck migrates, so labels have to
+    # 8. The frame series (docs/reading-output.md). The input file migrates, so labels have to
     # survive particles changing slice, and its comb is coarse enough to keep the frame
     # count small. The element-end dump is asked for by name so the two writers can be
     # compared on one position.

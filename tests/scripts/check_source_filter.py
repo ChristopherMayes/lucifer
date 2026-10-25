@@ -6,9 +6,9 @@ The filter is a transcription, so the check is the one every transcribed path ge
 codes run the same configuration from the same particles and the same field, and what is
 left over is transcription fidelity. Genesis4 4.6.15 carries the filter as source_filter,
 so the reference exists rather than having to be argued for. The chain is
-Aramis-td-sase-filter.in, the pure-SASE deck with the filter on at Genesis4's own defaults
+Aramis-td-sase-filter.in, the pure-SASE input file with the filter on at Genesis4's own defaults
 (xcut = ycut = sigmoid = 1). That puts the sigmoid's half-height at twice the grid's
-Nyquist frequency, off the grid (FieldSolverFFT.cpp, FieldSolverFFT::init). The same deck
+Nyquist frequency, off the grid (FieldSolverFFT.cpp, FieldSolverFFT::init). The same input file
 with the filter off is the tdsase tier, recorded at 2.3e-6.
 
 Four runs, each compared against that one reference:
@@ -42,7 +42,7 @@ Usage:
   check_source_filter.py --exe <lucifer> --workdir <dir> [--tol <rel>]
 """
 
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 import argparse
 import pathlib
 import re
@@ -162,7 +162,7 @@ def refusals(exe, wd):
     A soft width that attenuates the axis removes half the physical seed with nothing in
     the output saying so. The angle together with the grid-relative cuts has no meaning,
     since one is a property of the physics and the other of the mesh. A negative angle is
-    not an angle, and the deck reader refuses it from the schema's bound, as it refuses
+    not an angle, and the input reader refuses it from the schema's bound, as it refuses
     a tolerance outside (0, 1), before setup is reached.
     """
     ok = True
@@ -193,11 +193,11 @@ def containment(exe, wd):
     Gaussian and nothing else. Containing it is the stronger statement in any case, since
     the gain-guided mode that grows out of it is narrower than the seed.
     """
-    deck = REFUSE.replace('lattice = "aramis_1seg.bmad"', 'lattice = "aramis.bmad"')
-    deck = deck.replace("beam.n_particle = 512", "beam.n_particle = 2048")
-    deck = deck.replace('run.out_root = "sfref"', 'run.out_root = "sfcont"')
-    deck = deck.replace("  run.source_filter = T\n", "")
-    (wd / "sfcont.toml").write_text(to_toml(deck.format(extra="")))
+    input_text = REFUSE.replace('lattice = "aramis_1seg.bmad"', 'lattice = "aramis.bmad"')
+    input_text = input_text.replace("beam.n_particle = 512", "beam.n_particle = 2048")
+    input_text = input_text.replace('run.out_root = "sfref"', 'run.out_root = "sfcont"')
+    input_text = input_text.replace("  run.source_filter = T\n", "")
+    (wd / "sfcont.toml").write_text(to_toml(input_text.format(extra="")))
     r = subprocess.run([exe, "sfcont.toml"], cwd=wd, capture_output=True, text=True)
     if r.returncode != 0:
         print(f"FAIL: containment run exited {r.returncode}:\n{r.stdout[-1500:]}", file=sys.stderr)
@@ -229,8 +229,8 @@ def edge_margin(tol, width):
 
 def tolerance_run(exe, wd, extra, root="sftol"):
     """One short run with extra namelist lines. Returns its result and stdout."""
-    deck = REFUSE.replace('run.out_root = "sfref"', f'run.out_root = "{root}"')
-    (wd / f"{root}.toml").write_text(to_toml(deck.format(extra=extra)))
+    input_text = REFUSE.replace('run.out_root = "sfref"', f'run.out_root = "{root}"')
+    (wd / f"{root}.toml").write_text(to_toml(input_text.format(extra=extra)))
     return subprocess.run([exe, f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                           env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
 
@@ -340,7 +340,7 @@ def tolerance(exe, wd):
 
     # A stated edge is a stated edge. Neither the angle nor the grid-relative cuts go
     # through the derivation, and a run that applied the tolerance to them would move an
-    # edge the deck placed itself.
+    # edge the input file placed itself.
 
     for extra, what in (
         ("  run.source_filter_tolerance = 0.01\n  run.source_filter_angle = 5e-6\n",
@@ -395,7 +395,7 @@ def scope(exe, wd):
     The filter is applied to the source term the averaged deposit builds, so an
     unaveraged element has nothing for it to act on and a coherent source is an analytic
     Gaussian that carries no wide-angle content. Both are no-ops rather than refusals,
-    since the filter is on by default and a deck that never asked for it must still run.
+    since the filter is on by default and an input file that never asked for it must still run.
     A no-op that is announced and a no-op that is silent print the same line, so each
     pair here is run with the filter on and off and the exit powers compared. The mixed
     line is the one that has to move: it holds two averaged segments around one

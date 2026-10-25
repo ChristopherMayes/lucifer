@@ -329,7 +329,7 @@ def test_regeneration(keystone: Keystone) -> None:
          "--production", str(art / "fel-prod.txt"), "--out", str(GENERATED / "validation-measured.md")),
         (str(SCRIPTS / "report_api.py"), "--code", str(LUCIFER / "src"),
          "--code", str(LUCIFER / "programs"), "--out", str(GENERATED / "api.md")),
-        # The deck's schema, from the production binary into the package, the models the
+        # The input file's schema, from the production binary into the package, the models the
         # package generates from it, and the key tables.
         (str(PRODUCTION_EXE), "--schema", str(LUCIFER / "python" / "lucifer" / "schema.json")),
         (sys.executable, "-m", "lucifer.generate"),

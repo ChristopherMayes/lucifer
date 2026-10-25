@@ -13,6 +13,6 @@ On this input the run writes the per-slice energy-loss rate to `sase_wake.wake.t
 
 The same resistive-wall kernel applied through Bmad's own wake machinery instead of the transcribed model is `../bmad_wake`, which carries both runs and their agreement. What a loss this size does to the ponderomotive phases is `../migration`.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../docs/startup-noise.md)). At the exit the power outside the split angle is about a percent of the power inside it, so the exit power is the mode. With the filter off the same deck reports far more power, nearly all of it that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../docs/startup-noise.md)). At the exit the power outside the split angle is about a percent of the power inside it, so the exit power is the mode. With the filter off the same input file reports far more power, nearly all of it that emission. The wake's effect is measured on the beam and on the energy panel, which the split does not touch.
 
 The run takes about half a minute.

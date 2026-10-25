@@ -83,7 +83,7 @@ jobs:
       - name: No retired words
         run: python tests/scripts/check_retired_words.py
 
-      # A deck edited without regenerating its page would leave the documentation
+      # An input file edited without regenerating its page would leave the documentation
       # quoting text that no longer runs. Regenerating here and requiring no diff is the
       # same guarantee the keystone gives, and it costs no build. The Markdown only: the
       # figures beside it are rewritten byte for byte by a plotting-library upgrade, and

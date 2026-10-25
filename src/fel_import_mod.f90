@@ -433,7 +433,7 @@ call fel_slice_reallocate (sl, prm%n_particle_per_slice)
 sl%n = prm%n_particle_per_slice
 sl%weight(1:prm%n_particle_per_slice) = w_part
 
-! Noise where the deck asks for it. Genesis's importdistribution applies it whether or
+! Noise where the input file asks for it. Genesis's importdistribution applies it whether or
 ! not its shotnoise flag says so. This port applies it only with shot_noise = true.
 
 if (ne > 0 .and. shot_noise) then

@@ -38,7 +38,7 @@ about this program.
    counts, empty slice included, and the file must hold one patch per slice.
 
 6. Refusals. A beam file that is not openPMD, where the message names the converter. A
-   file whose patch count disagrees with the window the deck states. A file that carries
+   file whose patch count disagrees with the window the input file states. A file that carries
    no charge.
 
 7. A converted Genesis dump reads as its slices. The converter writes the
@@ -62,7 +62,7 @@ about this program.
 
 The field file is also read as an import. Samples with a unitSI factor and a grid with a
 gridUnitSI factor must read as the plain file, a y component shaped unlike x is refused,
-and the source filter acts on an imported field whose deck states no grid.
+and the source filter acts on an imported field whose input file states no grid.
 
 Usage: check_beam_format.py --exe <lucifer> --workdir <dir>
 The workdir must hold aramis.bmad. Exit 0 only if all pass.
@@ -82,7 +82,7 @@ import numpy as np
 import lucifer.beam as beamio
 import convert_genesis
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 FAILED = False
 
@@ -90,7 +90,7 @@ LAMBDA0 = 1e-10
 SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
 
-BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+BASE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis.bmad"
   out_root = "{root}"
   source_filter = F
@@ -317,15 +317,15 @@ def main():
     refused("a y component shaped unlike x", code, out, "COMPONENT y IS SHAPED")
 
     # The source filter on an imported field. Its angle is converted to a cutoff on the
-    # grid, and the conversion comes from the field's own spacing, so a deck without the
-    # grid keys filters as one with them. A deck that imports its field need not state
-    # the grid. Taken from the deck's grid, the cutoff was infinite and every mode passed
+    # grid, and the conversion comes from the field's own spacing, so an input file without the
+    # grid keys filters as one with them. An input file that imports its field need not state
+    # the grid. Taken from the input file's grid, the cutoff was infinite and every mode passed
     # while the header named the angle asked for.
     nogrid = BASE.replace("  grid_n_pts = 64\n", "").replace("  grid_half_width = 2e-4\n", "")
     load = ('  beam.file = "bf1-final.beam.h5"\n  field.file = "bf1-final.wf.h5"\n'
             '  run.track_end = "UND##1"\n  source_filter = T\n')
-    for root, deck, ang in (("bff6", nogrid, "1e-6"), ("bff5", nogrid, "1e-5"), ("bffg", BASE, "1e-5")):
-        run(exe, wd, root, deck.replace("  source_filter = F\n", "").format(
+    for root, input_text, ang in (("bff6", nogrid, "1e-6"), ("bff5", nogrid, "1e-5"), ("bffg", BASE, "1e-5")):
+        run(exe, wd, root, input_text.replace("  source_filter = F\n", "").format(
             root=root, sig_pz="5.282703940115e-03",
             extra=load + f"  run.source_filter_angle = {ang}\n"))
     def x_field(fn):
@@ -333,9 +333,9 @@ def main():
             return mesh(h5)["x"][...]
     f6, f5, fg = (x_field(wd / f"{r}-final.wf.h5") for r in ("bff6", "bff5", "bffg"))
     scale = float(np.max(np.abs(f5)))
-    check("the filter angle acts on an imported field with no grid in the deck (relative move)",
+    check("the filter angle acts on an imported field with no grid in the input file (relative move)",
           1.0 / max(float(np.max(np.abs(f6 - f5))) / scale, 1e-300) * 1e-6, 1.0)
-    check("and the deck with the grid keys filters as the deck without them",
+    check("and the input file with the grid keys filters as the input file without them",
           float(np.max(np.abs(fg - f5))) / scale, 1e-9)
 
     # ------------------------------------------------------------------
@@ -463,11 +463,11 @@ def main():
                     expect_fail=True)
     refused("a beam file that is not openPMD", code, out, "BEAM FILE IS NOT openPMD")
 
-    # A window the file does not have: the deck states one slice fewer than the file holds.
+    # A window the file does not have: the input file states one slice fewer than the file holds.
     code, out = run(exe, wd, "bfnw",
                     restart("bfnw", "bf1-final.beam.h5", "bf1-final.wf.h5",
                             extra="  window_length = 4.5e-9\n"), expect_fail=True)
-    refused("patch count against the deck's window", code, out, "PARTICLE PATCHES BUT THE DECK")
+    refused("patch count against the input file's window", code, out, "PARTICLE PATCHES BUT THE INPUT FILE")
 
     # A file with no charge, every weight zeroed, would track and radiate nothing.
     shutil.copy(wd / "bf1-final.beam.h5", wd / "noq.beam.h5")
@@ -585,7 +585,7 @@ QD: pipe, l = 0.1
 QL: line = (QU, QD, QU)
 use, QL
 """)
-    qbase = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+    qbase = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "qframe.bmad"
   out_root = "{root}"
   source_filter = F

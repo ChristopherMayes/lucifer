@@ -17,7 +17,7 @@
 !            A per-slice plot cannot be drawn without it.
 !   params/  Every scalar as data: the window (lambda0, n_wavelength, slice_spacing,
 !            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
-!            Nothing a reader needs is left in the echoed deck.
+!            Nothing a reader needs is left in the echoed input file.
 !   beam/    slice/ holds the per-record sufficient statistics, named as the
 !            bunch_params_struct components. They are enough to construct one from any
 !            (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 6, 6) at

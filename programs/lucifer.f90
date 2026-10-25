@@ -6,14 +6,14 @@
 ! The documentation is in docs/:
 !   fel-physics.md       The physics: every equation the code integrates, its Genesis
 !                         provenance, and the check that pins it.
-!   input-reference.md   Every deck key: default, meaning, and what refuses it.
+!   input-reference.md   Every input key: default, meaning, and what refuses it.
 !                         This is the normative reference. This header is a summary.
 !   user-guide.md        Building, describing a run, running it, and the output files.
 !   reading-output.md    What the output files hold and how to read them.
 !   validation.md        What is checked against Genesis, how, and the recorded results.
 !   performance.md       Where a run spends its time, on a named machine.
 !
-! The program reads one TOML deck through the schema (fel_schema_mod). Each table sets
+! The program reads one TOML input file through the schema (fel_schema_mod). Each table sets
 ! structs directly, as Tao's &tao_params does. Defaults are in the struct declarations.
 !
 !   lattice         The Bmad lattice file, the one top-level key.
@@ -33,11 +33,11 @@
 ! Time dependence follows from the starting state alone. A multi-slice window makes a
 ! time-dependent run, and a single slice makes the steady state. There is no separate
 ! switch. A key the schema does not name is refused with the keys of its table, and a
-! key in the wrong table with the table it belongs in. The arguments after the deck set
-! keys of the deck, each table.key=value, read through the same schema after it.
+! key in the wrong table with the table it belongs in. The arguments after the input file set
+! keys of the input file, each table.key=value, read through the same schema after it.
 !
 ! Usage:
-!   lucifer <deck.toml> [<table>.<key>=<value> ...]
+!   lucifer <input.toml> [<table>.<key>=<value> ...]
 !   lucifer --schema <schema.json>
 !-
 
@@ -57,7 +57,7 @@ use, intrinsic :: iso_fortran_env, only: output_unit
 
 implicit none
 
-! The driver is read-parse-call (docs/user-guide.md). The deck reader fills the input
+! The driver is read-parse-call (docs/user-guide.md). The input reader fills the input
 ! structs, and the library builds and walks the run. Every library error returns here.
 ! This is the one place that stops. The check instruments (split_weights, swap_beam_xy,
 ! gen_test_weights, resample_split_weights, wake.write_kernels) are carried in
@@ -74,9 +74,9 @@ character(*), parameter :: r_name = 'lucifer'
 
 !
 
-! The first argument is the deck. The examples name it lucifer.toml by convention. No name
+! The first argument is the input file. The examples name it lucifer.toml by convention. No name
 ! is looked for here. The arguments after it are overrides, table.key=value, which
-! fel_read_deck applies after the deck. --schema <file> writes the deck's schema as JSON
+! fel_read_input applies after the input file. --schema <file> writes the input file's schema as JSON
 ! Schema and stops.
 
 ! The run clock starts before anything is read. So the footer's run total covers the
@@ -103,17 +103,17 @@ endif
 if (n_arg == 0) then
   call out_io (s_blank$, r_name, [ &
         'Usage:                                                                  ', &
-        '  lucifer <deck.toml> [<table>.<key>=<value> ...]                       ', &
+        '  lucifer <input.toml> [<table>.<key>=<value> ...]                      ', &
         '  lucifer --schema <schema.json>                                        ', &
         '                                                                        ', &
-        'One TOML deck names the lattice and holds the tables [run], [window],   ', &
-        '[beam], [field], [wake], [space_charge] and [bmad]. Any file name works.', &
-        'The examples name theirs lucifer.toml by convention, which is a         ', &
-        'convention rather than a default looked for here. An argument after the ', &
-        'deck sets one key of it, beam.n_particle=4096 or run.out_root=s7, read  ', &
-        'after the deck through the same schema. --schema writes the deck''s      ', &
-        'schema as JSON Schema. docs/ documents every key, every output file and ', &
-        'the lattice attributes.                                                 '])
+        'One TOML input file names the lattice and holds the tables [run],       ', &
+        '[window], [beam], [field], [wake], [space_charge] and [bmad]. Any file  ', &
+        'name works. The examples name theirs lucifer.toml by convention, which  ', &
+        'is a convention rather than a default looked for here. An argument after', &
+        'the input file sets one key of it, beam.n_particle=4096 or              ', &
+        'run.out_root=s7, read after the input file through the same schema.     ', &
+        '--schema writes the schema as JSON Schema. docs/ documents every key,   ', &
+        'every output file and the lattice attributes.                           '])
   ! Separate from the block above. A character array constructor needs every element the
   ! same length, and the length of the version string is not known here.
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
@@ -138,7 +138,7 @@ do i_k = 2, n_arg
   call get_command_argument (i_k, overrides(i_k-1))
 enddo
 
-call fel_read_deck (param_file, run, err, overrides)
+call fel_read_input (param_file, run, err, overrides)
 if (err) stop 1
 
 call fel_setup_lattice (run, err)
@@ -181,11 +181,11 @@ if (run%global%write_initial .or. run%global%load_only) then
 endif
 
 ! The pre-run. The header above has printed everything the run derives and everything
-! it will cost. So the cost and the load of a deck can be read before any tracking is
+! it will cost. So the cost and the load of an input file can be read before any tracking is
 ! done (docs/user-guide.md).
 
 if (run%global%load_only) then
-  call out_io (s_info$, r_name, 'load_only is set. The header above is the pre-run: what the deck ' // &
+  call out_io (s_info$, r_name, 'load_only is set. The header above is the pre-run: what the input file ' // &
         'derives, what it will cost and where its load stands. The initial state is written and ' // &
         'nothing is tracked.')
   stop 0

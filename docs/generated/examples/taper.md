@@ -22,7 +22,7 @@ Against `../steady_state` with the same seed and the same starting state, the un
 
 The step is at z = 38.0 m, where the fourth FODO cell ends. The two gain curves are bit-identical until the first record inside the first `UND2`, at z = 38.045 m. That is the check that the two runs differ in the taper and in nothing else. The exit power is an order of magnitude above the untapered exit and several times the untapered saturation peak.
 
-The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). The table gives the power outside the split angle over the power inside it at the exit. On the tapered line it is well under a percent, so the exit power is the mode and the taper's gain is the mode's. With the filter off the same deck reports more power, the excess being that emission.
+The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). The table gives the power outside the split angle over the power inside it at the exit. On the tapered line it is well under a percent, so the exit power is the mode and the taper's gain is the mode's. With the filter off the same input file reports more power, the excess being that emission.
 
 The run takes about four seconds.
 
@@ -76,7 +76,7 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 
 ## The input files
 
-The deck, its variants, and any lattice they name, as they are on disk.
+The input file, its variants, and any lattice they name, as they are on disk.
 
 ### `lucifer.toml`
 

@@ -24,8 +24,8 @@ The experiments, each a set of runs and one figure:
   d. doubled    The long window, 600 slices, through a line of twice the length, for the
                 saturated power and the saturation point against startup.
   e. theory     Ming Xie's gain length and Saldin, Schneidmiller and Yurkov's effective
-                shot-noise power and saturation estimates, from the deck's parameters.
-  f. genesis    Genesis4 on the benchmark's SASE tier deck at three grids with both of its
+                shot-noise power and saturation estimates, from the input file's parameters.
+  f. genesis    Genesis4 on the benchmark's SASE tier input file at three grids with both of its
                 field solvers, and Lucifer started from each of its dumps.
   g. filter     The source filter (fel-physics.md, sec-source-filter) at the machine's
                 filter grid, 256 on the first machine, and two loads, with its sigmoid's
@@ -39,7 +39,7 @@ The experiments, each a set of runs and one figure:
 
 Lucifer runs on the device by default (run.device = "metal"), with one CPU run at the
 sweep's smallest grid as the cross-check. Genesis runs on the CPU. Every run is cached
-in the work directory by its deck text, so a rerun costs only what changed. The figures
+in the work directory by its input file text, so a rerun costs only what changed. The figures
 and a JSON file of every number go to --out. This script is run on demand and never by
 the benchmark.
 
@@ -71,7 +71,7 @@ import datetime
 import re
 
 import h5py
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -160,7 +160,7 @@ FILL = SEG_LENGTH / (SEG_LENGTH + 0.44 + 0.08 + 0.24)   # undulator length per m
 
 
 def select_machine(name):
-    """Point the module's deck and theory constants at one machine."""
+    """Point the module's input file and theory constants at one machine."""
     m = MACHINES[name]
     g = globals()
     g["LAMBDA0"] = m["lambda0"];      g["HALF_WIDTH"] = m["half_width"]
@@ -198,7 +198,7 @@ DUMP_ELES = ("UND##1", "UND##2", "UND##4", "UND##8", "UND##12")
 UND_END_RECORDS = {1: 0, 2: 4, 4: 12, 8: 28, 12: 44}   # record index of each undulator end
 SHARP_WIDTH = 0.05        # the source filter's sigmoid width where the edge is meant to be sharp
 
-DECK = """[run]
+INPUT = """[run]
   lattice = "{lat}"
   run.out_root = "{root}"
   run.comb_ds_save = -1
@@ -227,7 +227,7 @@ DECK = """[run]
 /
 """
 
-GENESIS_DECK = """&setup
+GENESIS_INPUT = """&setup
 rootname={root}
 lattice=Aramis.lat
 beamline=ARAMIS
@@ -275,7 +275,7 @@ fft_fieldsolver = {fft}
 
 # The comparison against Genesis4 runs with the source filter off, since Genesis4's run
 # carries none and the filter is this program's default (fel-physics.md,
-# sec-source-filter). A deck that left it on would compare a filtered run with an
+# sec-source-filter). An input file that left it on would compare a filtered run with an
 # unfiltered one and read a difference of order one.
 LUCIFER_FROM_GENESIS = """[run]
   lattice = "aramis.bmad"
@@ -312,7 +312,7 @@ def filter_xcut(ngrid, theta):
     return theta * cell_size(ngrid) / LAMBDA0
 
 
-def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0,
+def input_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=None, width=1.0,
               tolerance=None, half=None, more=""):
     nslice, sample = window
     slen = nslice * sample * LAMBDA0
@@ -334,15 +334,15 @@ def deck_text(lat, root, ngrid, npart, beamlet, window, device, dumps=(), xcut=N
         extra += f'  run.source_filter_tolerance = {tolerance:.9f}\n'
     if dumps:
         extra += "  run.dump_field_at = " + ", ".join(f'"{d}"' for d in dumps) + "\n"
-    return DECK.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
+    return INPUT.format(lat=lat, root=root, ngrid=ngrid, npart=npart, beamlet=beamlet,
                        charge=charge, zhalf=slen / 2, slen=slen, sample=sample, extra=extra,
                        lam0=LAMBDA0, sigpz=SIG_PZ, emit=NORM_EMIT,
                        half=HALF_WIDTH if half is None else half)
 
 
 class Runner:
-    """Runs decks in a work directory, skipping any whose text and outputs are already
-    there. The stamp is the deck's hash, so an edited deck reruns and an unchanged one
+    """Runs input files in a work directory, skipping any whose text and outputs are already
+    there. The stamp is the input file's hash, so an edited input file reruns and an unchanged one
     does not."""
 
     def __init__(self, exe, workdir, threads):
@@ -350,20 +350,20 @@ class Runner:
         self.wd = pathlib.Path(workdir)
         self.wd.mkdir(parents=True, exist_ok=True)
         self.threads = str(threads)
-        self.n_ran = 0        # Decks run rather than found, so an experiment knows if it ran.
+        self.n_ran = 0        # Input files run rather than found, so an experiment knows if it ran.
 
     def run(self, name, text, exe=None, env_threads=None):
-        """Runs the deck and returns True, or returns False when its outputs are there."""
-        deck = self.wd / f"{name}.in"
+        """Runs the input file and returns True, or returns False when its outputs are there."""
+        input_path = self.wd / f"{name}.in"
         stamp = self.wd / f"{name}.done"
         digest = hashlib.sha256(text.encode()).hexdigest()
         if stamp.exists() and stamp.read_text().strip() == digest:
             return False
-        deck.write_text(to_toml(text))
+        input_path.write_text(to_toml(text))
         env = {"OMP_NUM_THREADS": env_threads or self.threads, "PATH": os.environ["PATH"],
                "HOME": os.environ.get("HOME", "")}
         with open(self.wd / f"{name}.log", "w") as log:
-            r = subprocess.run([exe or self.exe, deck.name], cwd=self.wd, stdout=log,
+            r = subprocess.run([exe or self.exe, input_path.name], cwd=self.wd, stdout=log,
                                stderr=subprocess.STDOUT, env=env)
         if r.returncode != 0:
             print(f"FAIL: {name} exited {r.returncode}, see {self.wd / (name + '.log')}")
@@ -474,7 +474,7 @@ def analyze_dumps(wd, root, cache):
 # Theory
 
 def pierce():
-    """The 1D Pierce parameter for the deck, Genesis's own form with the rms aw times the
+    """The 1D Pierce parameter for the input file, Genesis's own form with the rms aw times the
     undulator's coupling, and the transverse size from the mean matched beta."""
     beta = 0.5 * (BETA_A + BETA_B)
     emit = NORM_EMIT / GAMMA0
@@ -548,7 +548,7 @@ def exp_floor(rn, args, lat, results):
     for ng in GRIDS:
         for npart in NPARTS:
             root = f"floor_g{ng}_n{npart}"
-            rn.run(root, deck_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES))
+            rn.run(root, input_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES))
             rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
             z, P, b = element_end_power(rn.wd, root)
             res[root] = {"ngrid": ng, "dx": cell_size(ng), "npart": npart, "beamlets": npart // 8,
@@ -558,7 +558,7 @@ def exp_floor(rn, args, lat, results):
                 res[root]["profile"] = {str(k): P[i].tolist() for k, i in UND_END_RECORDS.items()}
     # The CPU cross-check at the smallest grid and load.
     root = "floor_g64_n1024_cpu"
-    rn.run(root, deck_text(lat, root, 64, 1024, 8, LONG, "off", DUMP_ELES), env_threads=args.cpu_threads)
+    rn.run(root, input_text(lat, root, 64, 1024, 8, LONG, "off", DUMP_ELES), env_threads=args.cpu_threads)
     rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
     dev = res["floor_g64_n1024"]["dumps"]
     rel = max(abs(a["total"] - b["total"]) / b["total"] for a, b in zip(dev, rows))
@@ -615,11 +615,11 @@ def exp_filter(rn, args, lat, results):
     loads = (1024,) if args.machine in ("flash", "flash1") else (1024, 4096)
     for npart in loads:
         for name, xcut, width in cases:
-            # The unfiltered case is experiment a's own deck, so the runner skips it when
+            # The unfiltered case is experiment a's own input file, so the runner skips it when
             # that experiment has already run in this work directory.
             root = f"floor_g{ng}_n{npart}" if name == "off" else f"filt_{name}_n{npart}"
             t0 = time.time()
-            ran = rn.run(root, deck_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES,
+            ran = rn.run(root, input_text(lat, root, ng, npart, 8, LONG, args.device, DUMP_ELES,
                                         xcut=xcut, width=width))
             wall = kept_wall(ran, t0, results.get("filter", {}).get(f"n{npart}_{name}"))
             rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
@@ -714,7 +714,7 @@ def exp_tolerance(rn, args, lat, results):
     for tol in tols:
         root = f"tol{str(tol).replace('.', 'p')}_n1024"
         t0 = time.time()
-        ran = rn.run(root, deck_text(lat, root, ng, 1024, 8, LONG, args.device, DUMP_ELES,
+        ran = rn.run(root, input_text(lat, root, ng, 1024, 8, LONG, args.device, DUMP_ELES,
                                     xcut="default", tolerance=tol))
         wall = kept_wall(ran, t0, results.get("tolerance", {}).get("rows", {}).get(str(tol)))
         rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
@@ -769,7 +769,7 @@ def exp_beamlets(rn, args, lat, results):
                          "dumps": results["floor"][src]["dumps"], "z": results["floor"][src]["z"],
                          "P": results["floor"][src]["P"], "b": results["floor"][src]["b"]}
             continue
-        rn.run(root, deck_text(lat, root, 256, npart, bl, LONG, args.device, DUMP_ELES))
+        rn.run(root, input_text(lat, root, 256, npart, bl, LONG, args.device, DUMP_ELES))
         rows = analyze_dumps(rn.wd, root, rn.wd / f"{root}.farfield.json")
         z, P, b = element_end_power(rn.wd, root)
         res[root] = {"npart": npart, "beamlet": bl, "beamlets": npart // bl, "dumps": rows,
@@ -802,7 +802,7 @@ def exp_line(rn, args, lat, lat2, results):
         for ng in (128, 256):
             for npart in (1024, 65536):
                 root = f"{tag}_g{ng}_n{npart}"
-                rn.run(root, deck_text(lt, root, ng, npart, 8, window, args.device))
+                rn.run(root, input_text(lt, root, ng, npart, 8, window, args.device))
                 z, P, b = element_end_power(rn.wd, root)
                 curve = P.sum(axis=1) if tag == "line" else interior(P)
                 zs, ps = saturation_point(z, curve)
@@ -815,7 +815,7 @@ def exp_line(rn, args, lat, lat2, results):
 
 
 def exp_genesis(rn, args, results):
-    print("== f. Genesis4 on the SASE tier deck at three grids, both solvers ==")
+    print("== f. Genesis4 on the SASE tier input file at three grids, both solvers ==")
     latdir = pathlib.Path(args.latdir)
     for name in ("genesis4/Aramis.lat", "bmad/aramis.bmad"):
         (rn.wd / pathlib.Path(name).name).write_bytes((latdir / name).read_bytes())
@@ -825,7 +825,7 @@ def exp_genesis(rn, args, results):
     def one(case):
         ng, fft = case
         root = f"G{ng}{'fft' if fft else 'adi'}"
-        text = GENESIS_DECK.format(root=root, ngrid=ng, fft="true" if fft else "false")
+        text = GENESIS_INPUT.format(root=root, ngrid=ng, fft="true" if fft else "false")
         rn.run(root, text, exe=args.genesis, env_threads="1")
         return root
 
@@ -1016,7 +1016,7 @@ def exp_cause(rn, args, results):
            "lambda_u": LAMBDA_U, "ds_step_lattice": 0.045}
 
     def one(root, lat, ngrid, sample, half, dz, more="", dumps=("UND",), device=None, threads=None):
-        text = deck_text(lat, root, ngrid, npart, beamlet, (nslice, sample), device or args.device,
+        text = input_text(lat, root, ngrid, npart, beamlet, (nslice, sample), device or args.device,
                          dumps=dumps, half=half, more=more)
         rn.run(root, text, env_threads=threads)
         row = None
@@ -1379,7 +1379,7 @@ def main():
     ap.add_argument("--exe", required=True)
     ap.add_argument("--genesis", required=True)
     ap.add_argument("--examples", required=True, help="examples, for aramis.bmad")
-    ap.add_argument("--latdir", required=True, help="tests, for the Genesis lattice and deck")
+    ap.add_argument("--latdir", required=True, help="tests, for the Genesis lattice and input file")
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="metal")
@@ -1413,11 +1413,11 @@ def main():
     th = ming_xie()
     th.update(ssy(th["Lg"]))
     results["theory"] = th
-    print("== e. theory for the deck ==")
+    print("== e. theory for the input file ==")
     for k, v in th.items():
         print(f"  {k:24s} {v:.4e}")
 
-    # Each experiment's wall time is recorded when it ran a deck. One that came whole
+    # Each experiment's wall time is recorded when it ran an input file. One that came whole
     # from the cache keeps the time of the run that made it.
     results["provenance"] = provenance(args, args.exe)
     walls = results.setdefault("wall_s", {})

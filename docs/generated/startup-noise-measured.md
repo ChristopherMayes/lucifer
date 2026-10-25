@@ -14,7 +14,7 @@
 <!-- end tab-sn-provenance -->
 
 <!-- begin tab-sn-derived -->
-```{table} Derived quantities, from the deck's parameters and Ming Xie's fit.
+```{table} Derived quantities, from the input file's parameters and Ming Xie's fit.
 :name: tab-sn-derived
 
 | quantity | symbol | value | unit |

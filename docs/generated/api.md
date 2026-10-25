@@ -249,9 +249,9 @@ Routine to read an openPMD-beamphysics particle file written by fel_write_openpm
 back into a packed beam, weights included. This is the inverse of that routine: one
 particlePatch per slice, in window order, empty patches included.
 
-n_slice is the window the deck asked for, and the file must agree. A dump carries one
-patch per slice. So a different patch count means the deck and the file describe
-different runs, and the run is refused. Pass -1 when the deck states no window, the
+n_slice is the window the input file asked for, and the file must agree. A dump carries one
+patch per slice. So a different patch count means the input file and the file describe
+different runs, and the run is refused. Pass -1 when the input file states no window, the
 usual case for a restart, and the file's patch count defines it. A bunch that is not a
 sliced window belongs on the bunch path (beam.position_file). That path slices it
 by load_mode instead of assuming a slicing the bunch does not carry.
@@ -272,9 +272,9 @@ from the file.
 Input:
   file_name    -- character(*): File to read.
   gamma0       -- real(rp): Reference gamma for the run, from the lattice.
-  n_slice      -- integer: Slices the deck's window has, or -1 to take the file's.
-  wavelength   -- real(rp): Radiation wavelength [m], from the deck.
-  spacing      -- real(rp): Slice spacing [m], from the deck.
+  n_slice      -- integer: Slices the input file's window has, or -1 to take the file's.
+  wavelength   -- real(rp): Radiation wavelength [m], from the input file.
+  spacing      -- real(rp): Slice spacing [m], from the input file.
   ele          -- ele_struct: Element to convert the coordinates against.
   continuation -- logical, optional: Rebuild phi0 and z from the checkpoint group,
                     refusing a file that has no complete one? Default is False, an
@@ -317,7 +317,7 @@ checkpoint, and refuses a frame that carries none wherever the frame was taken.
 
 ```
 Input:
-  file_name -- character(*): The file the deck names.
+  file_name -- character(*): The file the input file names.
   which     -- character(*): The input naming it, for the message.
 
 Output:
@@ -339,7 +339,7 @@ dump.
 
 ```
 Input:
-  file_name -- character(*): The file the deck names as beam.file.
+  file_name -- character(*): The file the input file names as beam.file.
 
 Output:
   err_flag  -- logical: Set True if the file opens and holds no checkpoint group.
@@ -369,7 +369,7 @@ trip.
 
 Each slice is one openPMD particlePatch, in window order, so an empty slice is a
 zero-count patch and not a gap. The patch count is the window. Nothing else about the
-window is written: the wavelength, spacing and beamlet size belong to the deck, and
+window is written: the wavelength, spacing and beamlet size belong to the input file, and
 one4one follows from the weights.
 
 The reference phase is folded into each particle's time coordinate (fold_phi0 in
@@ -988,7 +988,7 @@ Output:
 ```
 Routine to recover the wavelengths per slice from a spacing in metres.
 
-The deck states this as an integer and the code carries it as one. A dump does not.
+The input file states this as an integer and the code carries it as one. A dump does not.
 openPMD and Genesis's own format both record the spacing and not what it is a multiple
 of. So a beam read from a dump recovers the integer here, once, and every consumer
 reads it afterwards. A spacing that is not a whole number of wavelengths is refused.
@@ -1457,7 +1457,7 @@ device's arithmetic under test. The guard column is then the median per-step pha
 increment in ticks of the fixed-point quantum instead of in FP32 ulps. The same floor
 applies.
 
-The device deposit accumulates in fixed point, so two runs of one deck agree bit for
+The device deposit accumulates in fixed point, so two runs of one input file agree bit for
 bit. Integer addition is associative and commutative and float addition is neither. So
 the order threads reach a cell cannot change the answer. Both reference backends deposit
 in floats and are not reproducible (manual/GPU.md, gpu/metal-engine 4919b01). A float
@@ -1885,8 +1885,8 @@ The bits between the two are what the run reports. With too few of them the run 
 refused here, before the first step converts anything.
 
 Note: The scale is chosen against the same bound the headroom is taken against. So their
-product lands between 2^61 and 2^62 whatever the deck, and the headroom is 37 bits. No
-deck reaches the headroom refusal. Raising fel_dev_dep_bits_min$ past 37 fires it.
+product lands between 2^61 and 2^62 whatever the input file, and the headroom is 37 bits. No
+input file reaches the headroom refusal. Raising fel_dev_dep_bits_min$ past 37 fires it.
 
 The scale and its reciprocal reach the kernel in single precision, so both must be
 finite and normal there. The headroom cannot catch that, for the same reason it always
@@ -2510,7 +2510,7 @@ Routine to write the run summary block and close the stream.
 
 Routine to evaluate fel_unavg_bfield in single precision, term for term. Nothing here
 needs a reformulation. The arguments are of order one and the products carry no
-cancellation. ku*y reaches 4e-3 on the checked decks, so cosh and sinh are evaluated
+cancellation. ku*y reaches 4e-3 on the checked input files, so cosh and sinh are evaluated
 where they are well conditioned.
 ```
 
@@ -2524,7 +2524,7 @@ Routine to evaluate unavg_ode in single precision. The four transverse lines
 transcribe directly. The fifth does not, and it is the one the mode lives on.
 
 The FP64 form is dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8,
-and their difference is the slippage, 1.9e-9 on the checked deck. In single precision
+and their difference is the slippage, 1.9e-9 on the checked input file. In single precision
 a number near one has a quantum of 1.19e-7. So the answer is 0.016 of one quantum, and
 the naive difference is exactly zero: the slippage disappears and with it the physics.
 On a real mid-segment state the naive form is wrong by the whole of the answer
@@ -2786,7 +2786,7 @@ Routine to write one string of any length as a scalar string dataset.
 
 The text goes in a dataset and *not* an attribute. HDF5 caps a single attribute at
 64 kB, and the largest that writes is 65495 bytes (docs/reading-output.md). A scalar
-string dataset takes 3 MB. An echoed deck or lattice file can pass the cap on an
+string dataset takes 3 MB. An echoed input file or lattice file can pass the cap on an
 ordinary lattice. That failure is silent unless the error is checked.
 
 fel_h5_str writes a fixed-width array for label axes. This routine writes one string
@@ -3103,7 +3103,7 @@ keeps its phase and its weight. No random number is drawn before the shot noise,
 the same bunch loads the same way every time.
 
 The window follows the bunch: ceiling(extent / spacing) slices from the earliest
-particle. Where the deck states window.n_slice or window.window_length, that is the
+particle. Where the input file states window.n_slice or window.window_length, that is the
 window, with the bunch centered and the particles outside counted in a warning.
 ```
 
@@ -3208,38 +3208,38 @@ the distribution import share this. Both make their own beam and bring no field.
 *Module*
 
 ```
-The deck reader of the FEL tracker, kept apart the way Tao keeps its tao_init_*
-files. A deck is one TOML file, read through the schema (fel_schema_mod) into the
+The input reader of the FEL tracker, kept apart the way Tao keeps its tao_init_*
+files. An input file is one TOML file, read through the schema (fel_schema_mod) into the
 input structures of fel_struct. This module is library code. An embedding program
 may use the reader, or skip it and fill the structures in code.
 
-Every key the deck can set is in the schema's table, and a key the table does not
+Every key the input file can set is in the schema's table, and a key the table does not
 name is refused with the keys of its table, so a misspelling cannot pass as a
 default. A key in the wrong table is refused with the table it belongs in. The lattice
 is required, and everything else keeps the declarations' defaults when absent.
 
-A key can also be set on the command line, after the deck, as table.key=value with the
-value in TOML syntax, lucifer deck.toml beam.n_particle=4096 run.out_root=s7. A bare
+A key can also be set on the command line, after the input file, as table.key=value with the
+value in TOML syntax, lucifer input.toml beam.n_particle=4096 run.out_root=s7. A bare
 value for a string key is quoted, since the shell strips the quotes. The overrides are
-one TOML text parsed in memory and read through the same walk after the deck, so an
-override is refused as a deck line is.
+one TOML text parsed in memory and read through the same walk after the input file, so an
+override is refused as an input line is.
 ```
 
-(api-fel-read-deck)=
-### `fel_read_deck`
+(api-fel-read-input)=
+### `fel_read_input`
 
-*Subroutine* `(deck_file, run, err_flag, overrides)`
+*Subroutine* `(input_file, run, err_flag, overrides)`
 
 ```
-Routine to read a TOML deck into the input structures of run, and then the overrides
+Routine to read a TOML input file into the input structures of run, and then the overrides
 given on the command line. The Bmad switches of the [bmad] table set bmad_com and
 space_charge_com directly, since they are Bmad's own globals.
 ```
 
 ```
 Input:
-  deck_file  -- character(*): The deck.
-  overrides  -- character(*), optional: The arguments after the deck, each
+  input_file  -- character(*): The input file.
+  overrides  -- character(*), optional: The arguments after the input file, each
                   table.key=value or lattice=value with the value in TOML syntax.
 
 Output:
@@ -3694,7 +3694,7 @@ and text, how many files the parser opened, an ISO timestamp and the Bmad versio
 
 The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
-deck runs to 12 kB and a lattice text to 37 kB on a real lattice
+input file runs to 12 kB and a lattice text to 37 kB on a real lattice
 (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
 differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
@@ -3715,7 +3715,7 @@ not a fingerprint of content.
 A stats file is meant to travel, so nothing here identifies a person by default. The
 timestamp and the Bmad version identify the run. The login name and working directory
 go in only under run.record_environment. The file records a lattice basename.
-The deck is echoed as read, so an absolute path there is still an absolute path
+The input file is echoed as read, so an absolute path there is still an absolute path
 in the file. Genesis always records user and cwd. Parity is not a reason to leak.
 
 Note: This is best effort. A failure warns, and never fails the run.
@@ -3800,7 +3800,7 @@ Input:
 *Subroutine* `(run, txt)`
 
 ```
-Routine to render the resolved deck as one string, every key of the schema with its
+Routine to render the resolved input file as one string, every key of the schema with its
 value, through fel_schema_write_toml and a scratch file.
 ```
 
@@ -3855,19 +3855,19 @@ Output:
 *Module*
 
 ```
-The schema of the deck: one table of every key a deck can set, with its TOML table,
+The schema of the input file: one table of every key an input file can set, with its TOML table,
 its type, its unit, its bounds and its description, and the structure component it
-fills. Everything that reads or describes the deck goes through this table. The reader
+fills. Everything that reads or describes the input file goes through this table. The reader
 (fel_input_mod) walks it, lucifer --schema writes it out as JSON Schema, the stats
 file's params/ group records every key from it, and the echo in meta/input_echo is
-the resolved deck written back from it. A key added here is read, refused, recorded,
+the resolved input file written back from it. A key added here is read, refused, recorded,
 echoed and documented with no other edit.
 
 The defaults are not in this table. They are the declarations' own (fel_struct), and
 every default this module reports is read from a default-constructed run, so the table
 cannot disagree with the structures.
 
-The deck is one TOML file. Its tables are [run] for the run switches
+The input file is one TOML file. Its tables are [run] for the run switches
 (fel_global_struct), [window] for the slicing, [beam] for the bunch and the load with
 [beam.resample] for the resampler, [field] for the radiation start, [wake] for the
 chamber wake, [space_charge] for the space-charge solver and [bmad] for the Bmad
@@ -3880,7 +3880,7 @@ switches the tracker honors. The lattice is the one top-level key.
 *Struct*
 
 ```
-One key of the deck. lo and hi bound a real or integer key; a bound at huge is no
+One key of the input file. lo and hi bound a real or integer key; a bound at huge is no
 bound, and lo_open or hi_open makes it exclusive. recorded is false for the one key
 that is not physics input, out_root, which every output file carries already.
 ```
@@ -3891,13 +3891,13 @@ that is not physics input, out_root, which every output file carries already.
 *Subroutine* `(keys)`
 
 ```
-Routine to build the key table, in deck order. This is the one list of what a deck
+Routine to build the key table, in input file order. This is the one list of what an input file
 can say.
 ```
 
 ```
 Output:
-  keys  -- fel_key_struct(:), allocatable: Every key of the deck.
+  keys  -- fel_key_struct(:), allocatable: Every key of the input file.
 ```
 
 (api-fel-schema-set)=
@@ -3953,7 +3953,7 @@ Output:
 *Function* `(run, key) result (txt)`
 
 ```
-Routine to render one key's value in run as TOML text, the form a deck writes it in.
+Routine to render one key's value in run as TOML text, the form an input file writes it in.
 The echo and the JSON Schema's defaults are built from this.
 ```
 
@@ -4009,7 +4009,7 @@ Output:
 *Subroutine* `(run, iu)`
 
 ```
-Routine to write the resolved deck of run as TOML to an open unit, every key of the
+Routine to write the resolved input file of run as TOML to an open unit, every key of the
 schema with its value, defaults made explicit. This is the echo in the stats file's
 meta/input_echo, and what an embedding program writes to save a configuration built
 in code.
@@ -4030,7 +4030,7 @@ Input:
 Routine to write the schema as JSON Schema, draft 2020-12, to an open unit. Each table
 is an object that allows no key the schema does not name, and each key carries its
 type, its default as the structures declare it, its description with its unit, and
-its bounds. An editor that reads JSON Schema validates a deck against it as it is
+its bounds. An editor that reads JSON Schema validates an input file against it as it is
 typed, and the input reference's key tables are generated from it.
 ```
 
@@ -4069,7 +4069,7 @@ field-set allocation. Errors return through err_flag, and nothing here stops.
 
 ```
 Input:
-  run       -- fel_run_struct: Run state carrying the deck's inputs and the lattice
+  run       -- fel_run_struct: Run state carrying the input file's inputs and the lattice
                  file name.
 
 Output:
@@ -4104,15 +4104,15 @@ disagrees with the tracking locals.
 *Subroutine* `()`
 
 ```
-Routine to derive the transverse grid from the beam where the deck states none
+Routine to derive the transverse grid from the beam where the input file states none
 (docs/startup-noise.md, Recommendations). The rms beam size comes from the emittances
-the deck states and the matched Twiss the lattice states. It is averaged over the FEL
+the input file states and the matched Twiss the lattice states. It is averaged over the FEL
 elements by length, since that is the beta the mode sees. Cells are then a seventh of
 it and the half width nine of it. The point count follows from whichever half width is
 in force, rounded up to a power of two. The rounding only refines, since more points
 over one half width are smaller cells. It also gives the same count on every backend,
-so a derived deck runs on the device and on the CPU at one grid. A stated value is
-never overridden, and the other is derived against it. So a deck that fixes the cell
+so a derived input file runs on the device and on the CPU at one grid. A stated value is
+never overridden, and the other is derived against it. So an input file that fixes the cell
 size gets the containment it needs, and one that fixes the point count gets the
 resolution.
 
@@ -4126,8 +4126,8 @@ a dump has none, and the refusals that already ask for the grid still ask.
 *Function* `() result (sig)`
 
 ```
-Routine to return the rms transverse size of the beam the deck describes. It uses the
-emittances the deck states and the matched Twiss the lattice states, averaged over the
+Routine to return the rms transverse size of the beam the input file describes. It uses the
+emittances the input file states and the matched Twiss the lattice states, averaged over the
 FEL elements by length, since that is the beta the mode sees. The size is the quadratic
 mean of the two planes, one size for a round description. It is zero where there is
 nothing to derive from, as for a run that loads its beam from a dump.
@@ -4144,7 +4144,7 @@ Output:
 *Function* `() result (rho)`
 
 ```
-Routine to return the one-dimensional Pierce parameter of the beam the deck describes,
+Routine to return the one-dimensional Pierce parameter of the beam the input file describes,
 at the first FEL element, in Genesis's form:
   rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2)
 fc is the undulator's own coupling, which already carries aw. The source filter's edge
@@ -4152,7 +4152,7 @@ uses the same expression (fel_filter_angles). Here it is computed from the descr
 rather than from the built beam, because the slice spacing must be known before the
 beam is sliced at it.
 
-The peak current is the deck's own: a stated flat current, else the Gaussian peak
+The peak current is the input file's own: a stated flat current, else the Gaussian peak
 Q c / (sqrt(2 pi) sig_z), else the flat extent, else the steady state's whole charge in
 one slice at the stated spacing.
 ```
@@ -4169,7 +4169,7 @@ Output:
 
 ```
 Routine to derive the slice spacing and the integration step from the gain where the
-deck states neither (fel-physics.md sec-window and sec-element).
+input file states neither (fel-physics.md sec-window and sec-element).
 
 The spacing is the whole number of wavelengths in a quarter of the cooperation length
 lambda/(4 pi rho). That is four slices per cooperation length, the resolution at which
@@ -4179,11 +4179,11 @@ slice, so the spacing sets the current, and a derived one would rewrite the beam
 
 The step is a twentieth of the one-dimensional gain length lambda_u/(4 pi sqrt(3) rho),
 rounded down to whole periods and at least one. Bmad's bookkeeper gives any wiggler
-with a period a step of l_period/20 when the deck states neither ds_step nor num_steps,
+with a period a step of l_period/20 when the input file states neither ds_step nor num_steps,
 and fills num_steps from it. That resolves the wiggle the averaged model has already
 averaged over. The derived step replaces it. The unset state is that exact quotient,
 since the bookkeeper leaves nothing else to read. So an element whose step is
-l_period/20 by the deck's own choice is derived over. Any other stated step is kept.
+l_period/20 by the input file's own choice is derived over. Any other stated step is kept.
 ```
 
 (api-fel-setup-schedule)=
@@ -4303,7 +4303,7 @@ Five groups, and each answers one question.
            A per-slice plot cannot be drawn without it.
   params/  Every scalar as data: the window (lambda0, n_wavelength, slice_spacing,
            beamlet_size), p0c, the charge, the species, the seed, the grid, the counts.
-           Nothing a reader needs is left in the echoed deck.
+           Nothing a reader needs is left in the echoed input file.
   beam/    slice/ holds the per-record sufficient statistics, named as the
            bunch_params_struct components. They are enough to construct one from any
            (record, slice): centroid (nrec, nslice, 6), sigma (nrec, nslice, 6, 6) at
@@ -4785,7 +4785,7 @@ Every user-visible input struct is in this file, with its defaults in the declar
 One assembled-state struct, fel_run_struct, is passed explicitly by the library.
 
 The input structs have no allocatable or pointer components. So an input file sets
-them directly through the deck, as in Tao:
+them directly through the input file, as in Tao:
 
   [run]
     lattice = "line.bmad"
@@ -6375,7 +6375,7 @@ Output:
 ```
 Routine to compute the two angles a source filter's edge can be set from
 (fel-physics.md sec-source-filter). Both come from the loaded beam and the undulator
-it enters, so a deck states neither.
+it enters, so an input file states neither.
 
 th_mode is four diffraction angles of the fundamental mode, 4 lambda / (2 pi sigma),
 with sigma the rms transverse size of the beam. The radiation that can couple to the
@@ -6767,7 +6767,7 @@ averaged mode diffracts once, so the averaged instrument's field row does not ca
 over (docs/validation.md, val-unaveraged-fp32).
 
 What single precision destroys in this advance, on a real mid-segment state of the
-one-segment deck (docs/validation.md, val-unaveraged-fp32):
+one-segment input file (docs/validation.md, val-unaveraged-fp32):
 
   slippage  dtau/ds = gamma/u_s - 1/beta0. Both terms are one to within 1.3e-8 and
             the difference is 1.9e-9, which is 0.016 of the quantum of one in single
@@ -6814,14 +6814,14 @@ FEL tracker validated against Genesis 1.3 Version 4.
 The documentation is in docs/:
   fel-physics.md       The physics: every equation the code integrates, its Genesis
                         provenance, and the check that pins it.
-  input-reference.md   Every deck key: default, meaning, and what refuses it.
+  input-reference.md   Every input key: default, meaning, and what refuses it.
                         This is the normative reference. This header is a summary.
   user-guide.md        Building, describing a run, running it, and the output files.
   reading-output.md    What the output files hold and how to read them.
   validation.md        What is checked against Genesis, how, and the recorded results.
   performance.md       Where a run spends its time, on a named machine.
 
-The program reads one TOML deck through the schema (fel_schema_mod). Each table sets
+The program reads one TOML input file through the schema (fel_schema_mod). Each table sets
 structs directly, as Tao's &tao_params does. Defaults are in the struct declarations.
 
   lattice         The Bmad lattice file, the one top-level key.
@@ -6841,11 +6841,11 @@ There are three ways in, all through the same input file:
 Time dependence follows from the starting state alone. A multi-slice window makes a
 time-dependent run, and a single slice makes the steady state. There is no separate
 switch. A key the schema does not name is refused with the keys of its table, and a
-key in the wrong table with the table it belongs in. The arguments after the deck set
-keys of the deck, each table.key=value, read through the same schema after it.
+key in the wrong table with the table it belongs in. The arguments after the input file set
+keys of the input file, each table.key=value, read through the same schema after it.
 
 Usage:
-  lucifer <deck.toml> [<table>.<key>=<value> ...]
+  lucifer <input.toml> [<table>.<key>=<value> ...]
   lucifer --schema <schema.json>
 ```
 
@@ -6880,8 +6880,8 @@ a clang-built twin of the same loop is compiler/libm, not physics.
 
 ```
 The library-contract check (docs/user-guide.md): drive the FEL tracker without the
-deck reader. Fill the input structs in code, call the library, write the dumps.
-The benchmark compares its outputs dataset-identically against a deck-driven run
+input reader. Fill the input structs in code, call the library, write the dumps.
+The benchmark compares its outputs dataset-identically against an input-driven run
 of the same configuration, and runs it twice in one process (both passes here) to
 prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 

@@ -27,7 +27,7 @@ Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 
 import argparse
 import pathlib

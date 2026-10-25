@@ -52,7 +52,7 @@ import numpy as np
 
 import convert_genesis
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 import pool
 
@@ -124,7 +124,7 @@ OPEN_MID = "B1, DD, B2, DD, B3"          # Three bends: NOT a closed bump.
 
 UNAVG = "wiggler::*[FEL_METHOD] = unaveraged"
 
-NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{tag}.bmad"
   out_root = "{tag}"
   source_filter = F
@@ -165,7 +165,7 @@ use, SEG
 {modeline}
 """
 
-NML_TD = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML_TD = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{tag}.bmad"
   out_root = "{tag}"
   source_filter = F
@@ -193,7 +193,7 @@ NML_TD = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
 /
 """
 
-GEN_DECK = """&setup
+GEN_INPUT = """&setup
 rootname={root}
 lattice={lat}
 beamline=SEG
@@ -287,7 +287,7 @@ fft_fieldsolver = true
 # lambda0 and beamlet_size come from this namelist. An openPMD beam file carries the slice
 # partition and not the radiation it was sliced on. Both match GEN_PREP, which writes the
 # shared dumps.
-NML_IMP = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML_IMP = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{tag}.bmad"
   out_root = "{tag}"
   source_filter = F

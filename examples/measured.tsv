@@ -1,4 +1,4 @@
-directory	deck	quantity	value	unit
+directory	input	quantity	value	unit
 bmad_wake	lucifer.toml	bunching_max	1.5323e-02	
 bmad_wake	lucifer.toml	bunching_max_s	5.7000e+01	m
 bmad_wake	lucifer.toml	bunching_peak	1.5301e-02	

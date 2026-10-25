@@ -51,7 +51,7 @@ import numpy as np
 
 import lucifer.beam as beamio
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 LAMBDA0 = 1e-10
 SAMPLE = 3
@@ -80,7 +80,7 @@ WAKE_MODE = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
 WAKE_ZLONG = """, sr_wake = {{amp_scale = 1, scale_with_length = T,
   z_long = {{position_dependence = none, w = {{ call::{table} }}}}}}"""
 
-NML_GEN = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML_GEN = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -115,7 +115,7 @@ def gen_nml(**kw):
     kw.setdefault("half", f"{slen / 2:.9e}")
     return to_groups(NML_GEN.format(**kw))
 
-NML_IMP = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML_IMP = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -154,7 +154,7 @@ def run(exe, nml, log, w, threads="1"):
 
 def load_par(w, root):
     """Per-slice per-particle gamma and slice charge from a final openPMD dump. The
-    wavelength and the spacing are the deck's, since a beam file states the slice
+    wavelength and the spacing are the input file's, since a beam file states the slice
     partition and not the radiation it was sliced on."""
     out = []
     for sl in beamio.read_slices(w / f"{root}-final.beam.h5", LAMBDA0, SPACING):

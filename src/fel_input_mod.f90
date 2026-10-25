@@ -1,21 +1,21 @@
 !+
 ! Module fel_input_mod
 !
-! The deck reader of the FEL tracker, kept apart the way Tao keeps its tao_init_*
-! files. A deck is one TOML file, read through the schema (fel_schema_mod) into the
+! The input reader of the FEL tracker, kept apart the way Tao keeps its tao_init_*
+! files. An input file is one TOML file, read through the schema (fel_schema_mod) into the
 ! input structures of fel_struct. This module is library code. An embedding program
 ! may use the reader, or skip it and fill the structures in code.
 !
-! Every key the deck can set is in the schema's table, and a key the table does not
+! Every key the input file can set is in the schema's table, and a key the table does not
 ! name is refused with the keys of its table, so a misspelling cannot pass as a
 ! default. A key in the wrong table is refused with the table it belongs in. The lattice
 ! is required, and everything else keeps the declarations' defaults when absent.
 !
-! A key can also be set on the command line, after the deck, as table.key=value with the
-! value in TOML syntax, lucifer deck.toml beam.n_particle=4096 run.out_root=s7. A bare
+! A key can also be set on the command line, after the input file, as table.key=value with the
+! value in TOML syntax, lucifer input.toml beam.n_particle=4096 run.out_root=s7. A bare
 ! value for a string key is quoted, since the shell strips the quotes. The overrides are
-! one TOML text parsed in memory and read through the same walk after the deck, so an
-! override is refused as a deck line is.
+! one TOML text parsed in memory and read through the same walk after the input file, so an
+! override is refused as an input line is.
 !-
 
 module fel_input_mod
@@ -30,15 +30,15 @@ contains
 
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_read_deck (deck_file, run, err_flag, overrides)
+! Subroutine fel_read_input (input_file, run, err_flag, overrides)
 !
-! Routine to read a TOML deck into the input structures of run, and then the overrides
+! Routine to read a TOML input file into the input structures of run, and then the overrides
 ! given on the command line. The Bmad switches of the [bmad] table set bmad_com and
 ! space_charge_com directly, since they are Bmad's own globals.
 !
 ! Input:
-!   deck_file  -- character(*): The deck.
-!   overrides  -- character(*), optional: The arguments after the deck, each
+!   input_file  -- character(*): The input file.
+!   overrides  -- character(*), optional: The arguments after the input file, each
 !                   table.key=value or lattice=value with the value in TOML syntax.
 !
 ! Output:
@@ -50,7 +50,7 @@ contains
 !                   lattice is missing, or an override is not table.key=value.
 !-
 
-subroutine fel_read_deck (deck_file, run, err_flag, overrides)
+subroutine fel_read_input (input_file, run, err_flag, overrides)
 
 type (fel_run_struct), target :: run
 type (fel_key_struct), allocatable :: keys(:)
@@ -58,12 +58,12 @@ type (toml_table), allocatable :: root
 type (toml_table), pointer :: tab, sub
 type (toml_key), allocatable :: tkeys(:), ckeys(:)
 type (toml_error), allocatable :: terr
-character(*) deck_file
+character(*) input_file
 character(*), optional :: overrides(:)
 character(:), allocatable :: text, origin
 logical err_flag, found_lattice, bad
 integer i, j, it
-character(*), parameter :: r_name = 'fel_read_deck'
+character(*), parameter :: r_name = 'fel_read_input'
 
 !
 
@@ -71,17 +71,17 @@ err_flag = .true.
 found_lattice = .false.
 call fel_schema_table (keys)
 
-call toml_load (root, trim(deck_file), error = terr)
+call toml_load (root, trim(input_file), error = terr)
 if (allocated(terr)) then
-  call out_io (s_error$, r_name, 'CANNOT READ THE DECK ' // trim(deck_file) // ':', trim(terr%message))
+  call out_io (s_error$, r_name, 'CANNOT READ THE INPUT FILE ' // trim(input_file) // ':', trim(terr%message))
   return
 endif
 
-origin = 'THE DECK'
+origin = 'THE INPUT FILE'
 if (.not. read_root()) return
 
 if (.not. found_lattice) then
-  call out_io (s_error$, r_name, 'THE DECK ' // trim(deck_file) // ' NAMES NO LATTICE. ' // &
+  call out_io (s_error$, r_name, 'THE INPUT FILE ' // trim(input_file) // ' NAMES NO LATTICE. ' // &
         'The top-level key lattice is required.')
   return
 endif
@@ -291,6 +291,6 @@ do k = 1, size(fel_schema_tables$)
 enddo
 end function tables_text
 
-end subroutine fel_read_deck
+end subroutine fel_read_input
 
 end module fel_input_mod

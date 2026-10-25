@@ -1,5 +1,5 @@
-"""What a ``Deck`` does: render itself as TOML, read one, and reach a key by its dotted
-name. ``models.Deck`` inherits this, so the generated file holds data alone.
+"""What a ``Input`` does: render itself as TOML, read one, and reach a key by its dotted
+name. ``models.Input`` inherits this, so the generated file holds data alone.
 
 The TOML written here is the program's: a key is written when its value differs from
 the program's default, every key with ``explicit=True``, and nothing is checked that
@@ -37,14 +37,14 @@ def _is_table(f: dataclasses.Field) -> bool:
     return dataclasses.is_dataclass(f.type) or (isinstance(f.type, str) and f.type[:1].isupper())
 
 
-class DeckOps:
-    """Mixin for the generated ``Deck``."""
+class InputOps:
+    """Mixin for the generated ``Input``."""
 
     # ------------------------------------------------------------------
     # TOML out.
 
     def toml(self, explicit: bool = False) -> str:
-        """The deck as TOML: the keys set away from the program's defaults, or every
+        """The input file as TOML: the keys set away from the program's defaults, or every
         key with ``explicit``. The lattice is always written."""
         lines = []
         for f in dataclasses.fields(self):
@@ -59,7 +59,7 @@ class DeckOps:
         return "\n".join(lines) + "\n"
 
     def write(self, path, explicit: bool = False) -> pathlib.Path:
-        """Write the deck at ``path`` and return it."""
+        """Write the input file at ``path`` and return it."""
         path = pathlib.Path(path)
         path.write_text(self.toml(explicit))
         return path
@@ -69,7 +69,7 @@ class DeckOps:
 
     @classmethod
     def from_dict(cls, data: dict):
-        """A deck from the mapping a TOML parser returns. An unknown key is Python's own
+        """An input file from the mapping a TOML parser returns. An unknown key is Python's own
         TypeError from the dataclass, and a bound is the program's."""
         kw = {}
         for f in dataclasses.fields(cls):
@@ -78,27 +78,27 @@ class DeckOps:
             kw[f.name] = _table_from(f, data[f.name]) if _is_table(f) else data[f.name]
         extra = set(data) - {f.name for f in dataclasses.fields(cls)}
         if extra:
-            raise TypeError(f"the deck has no key {sorted(extra)}")
+            raise TypeError(f"the input file has no key {sorted(extra)}")
         return cls(**kw)
 
     @classmethod
     def loads(cls, text: str):
-        """A deck from TOML text."""
+        """An input file from TOML text."""
         return cls.from_dict(tomllib.loads(text))
 
     @classmethod
     def read(cls, path):
-        """A deck from a TOML file."""
+        """An input file from a TOML file."""
         return cls.loads(pathlib.Path(path).read_text())
 
     @classmethod
     def from_flat(cls, text: str):
-        """A deck from flat ``key = value`` text, through ``lucifer.deck.to_toml``."""
-        from lucifer.deck import to_toml
+        """An input file from flat ``key = value`` text, through ``lucifer.flat.to_toml``."""
+        from lucifer.flat import to_toml
         return cls.loads(to_toml(text))
 
     # ------------------------------------------------------------------
-    # Dotted access: deck["beam.n_particle"].
+    # Dotted access: inp["beam.n_particle"].
 
     def _resolve(self, key: str):
         obj = self

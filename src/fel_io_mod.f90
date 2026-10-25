@@ -646,7 +646,7 @@ endif
 call out_io (s_blank$, r_name, trim(line))
 
 ! The grid is the built wavefront's and not the input's. A field read from a file
-! carries its own grid, and the deck then states none.
+! carries its own grid, and the input file then states none.
 
 block
   integer n_grid(3)
@@ -661,7 +661,7 @@ call out_io (s_blank$, r_name, trim(line))
 
 ! What the run will do and how long it will take. The count is exact. The estimate is
 ! one machine's, which the line says (fel_cost_mod). load_only stops after this block,
-! so a deck's cost can be seen without tracking it (docs/user-guide.md).
+! so an input file's cost can be seen without tracking it (docs/user-guide.md).
 
 block
   real(rp) n_pstep, n_gpt, secs
@@ -676,10 +676,10 @@ block
   call out_io (s_blank$, r_name, trim(line))
 
   ! The device's transform pair is single precision. It loses a fixed fraction of the
-  ! field's energy every time it runs, always in one direction. So what a deck loses is
+  ! field's energy every time it runs, always in one direction. So what an input file loses is
   ! set by how often the pair runs: once a record step in an averaged element, and nsub
   ! times in an unaveraged one (nstep already counts the substeps). Nothing else in the
-  ! output says which regime a deck is in (validation.md, val-device-unaveraged).
+  ! output says which regime an input file is in (validation.md, val-device-unaveraged).
 
   if (run%dev%on) then
     write (line, '(a, i0, a, i0, a, es8.2, a, es8.2, a)') ' Device      FP32 transform pair ', nstep, &
@@ -710,7 +710,7 @@ block
             ' periods at each end, the default'
     case default
       write (ramp_str, '(a, i0, a)') 'sin^2 ramps of ', run%global%unaveraged_ramp_periods, &
-            ' periods at each end, as the deck sets'
+            ' periods at each end, as the input file sets'
     end select
     write (line, '(a, i0, 2a)') ' Unaveraged  ', run%global%unaveraged_steps_per_period, &
           ' substeps a period, ', trim(ramp_str)
@@ -1768,7 +1768,7 @@ end subroutine fel_write_wake_block
 !
 ! The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 ! the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
-! deck runs to 12 kB and a lattice text to 37 kB on a real lattice
+! input file runs to 12 kB and a lattice text to 37 kB on a real lattice
 ! (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 ! silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
 ! differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
@@ -1789,7 +1789,7 @@ end subroutine fel_write_wake_block
 ! A stats file is meant to travel, so nothing here identifies a person by default. The
 ! timestamp and the Bmad version identify the run. The login name and working directory
 ! go in only under run.record_environment. The file records a lattice basename.
-! The deck is echoed as read, so an absolute path there is still an absolute path
+! The input file is echoed as read, so an absolute path there is still an absolute path
 ! in the file. Genesis always records user and cwd. Parity is not a reason to leak.
 !
 ! Note: This is best effort. A failure warns, and never fails the run.
@@ -1948,7 +1948,7 @@ endif
 merr = .false.
 call H5LTset_attribute_string_f (f_id, 'params', 'kind', 'input', h5e)
 call H5LTset_attribute_string_f (f_id, 'params', 'description', &
-      'What the user controlled: one subgroup per table of the deck, every key ' // &
+      'What the user controlled: one subgroup per table of the input file, every key ' // &
       'resolved after defaults, from the schema (schema version ' // fel_schema_version$ // ').', h5e)
 
 call fel_schema_table (keys)
@@ -1968,12 +1968,12 @@ do it = 1, size(fel_schema_tables$)
     call H5Gopen_f (p_id, 'beam', b_id, h5e)
     call H5Gcreate_f (b_id, 'resample', g_id, h5e)
     call H5LTset_attribute_string_f (b_id, 'resample', 'kind', 'input', h5e)
-    call H5LTset_attribute_string_f (b_id, 'resample', 'description', 'The deck''s [beam.resample] table.', h5e)
+    call H5LTset_attribute_string_f (b_id, 'resample', 'description', 'The input file''s [beam.resample] table.', h5e)
   else
     call H5Gcreate_f (p_id, trim(table), g_id, h5e)
     call H5LTset_attribute_string_f (p_id, trim(table), 'kind', 'input', h5e)
     call H5LTset_attribute_string_f (p_id, trim(table), 'description', &
-          'The deck''s [' // trim(table) // '] table.', h5e)
+          'The input file''s [' // trim(table) // '] table.', h5e)
   endif
   merr = merr .or. (h5e < 0)
   do i = 1, size(keys)
@@ -2020,7 +2020,7 @@ case (key_string$)
   call fel_h5_str (g_id, trim(key%name), trim(key%label), trim(key%descrip), '', [sv], merr)
 case (key_path$)
   if (sv /= '') call fel_h5_text (g_id, trim(key%name), trim(key%label), trim(key%descrip) // &
-        ' As the deck wrote it.', sv, merr)
+        ' As the input file wrote it.', sv, merr)
 case (key_int_list$)
   if (size(ilist) > 0) then
     call H5LTset_attribute_int_f (g_id, '.', trim(key%name), ilist, int(size(ilist), size_t), h5e)
@@ -2209,7 +2209,7 @@ end subroutine fel_write_lattice
 !+
 ! Subroutine resolved_input_text (run, txt)
 !
-! Routine to render the resolved deck as one string, every key of the schema with its
+! Routine to render the resolved input file as one string, every key of the schema with its
 ! value, through fel_schema_write_toml and a scratch file.
 !
 ! Input:

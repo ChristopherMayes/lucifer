@@ -1,19 +1,19 @@
 !+
 ! Module fel_schema_mod
 !
-! The schema of the deck: one table of every key a deck can set, with its TOML table,
+! The schema of the input file: one table of every key an input file can set, with its TOML table,
 ! its type, its unit, its bounds and its description, and the structure component it
-! fills. Everything that reads or describes the deck goes through this table. The reader
+! fills. Everything that reads or describes the input file goes through this table. The reader
 ! (fel_input_mod) walks it, lucifer --schema writes it out as JSON Schema, the stats
 ! file's params/ group records every key from it, and the echo in meta/input_echo is
-! the resolved deck written back from it. A key added here is read, refused, recorded,
+! the resolved input file written back from it. A key added here is read, refused, recorded,
 ! echoed and documented with no other edit.
 !
 ! The defaults are not in this table. They are the declarations' own (fel_struct), and
 ! every default this module reports is read from a default-constructed run, so the table
 ! cannot disagree with the structures.
 !
-! The deck is one TOML file. Its tables are [run] for the run switches
+! The input file is one TOML file. Its tables are [run] for the run switches
 ! (fel_global_struct), [window] for the slicing, [beam] for the bunch and the load with
 ! [beam.resample] for the resampler, [field] for the radiation start, [wake] for the
 ! chamber wake, [space_charge] for the space-charge solver and [bmad] for the Bmad
@@ -28,7 +28,7 @@ use tomlf, only: toml_table, toml_array, toml_key, get_value, len
 implicit none
 
 ! The schema version, written into every stats file and the JSON Schema. It moves when a
-! key is added, renamed, retyped or rebounded, so a reader can tell which deck a run read.
+! key is added, renamed, retyped or rebounded, so a reader can tell which input file a run read.
 
 character(*), parameter :: fel_schema_version$ = '1'
 
@@ -46,7 +46,7 @@ character(16), parameter :: fel_schema_tables$(8) = [character(16) :: &
 !+
 ! Struct fel_key_struct
 !
-! One key of the deck. lo and hi bound a real or integer key; a bound at huge is no
+! One key of the input file. lo and hi bound a real or integer key; a bound at huge is no
 ! bound, and lo_open or hi_open makes it exclusive. recorded is false for the one key
 ! that is not physics input, out_root, which every output file carries already.
 !-
@@ -72,11 +72,11 @@ contains
 !+
 ! Subroutine fel_schema_table (keys)
 !
-! Routine to build the key table, in deck order. This is the one list of what a deck
+! Routine to build the key table, in input file order. This is the one list of what an input file
 ! can say.
 !
 ! Output:
-!   keys  -- fel_key_struct(:), allocatable: Every key of the deck.
+!   keys  -- fel_key_struct(:), allocatable: Every key of the input file.
 !-
 
 subroutine fel_schema_table (keys)
@@ -589,7 +589,7 @@ contains
 
 subroutine refuse (expected)
 character(*) expected
-call out_io (s_error$, r_name, 'IN THE DECK, ' // trim(where) // ': ' // expected // '.', trim(key%descrip))
+call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ': ' // expected // '.', trim(key%descrip))
 end subroutine refuse
 
 ! outside reports a value past the key's bounds, and refuses it.
@@ -613,11 +613,11 @@ endif
 if (key%hi < huge(1.0_rp)) then
   hi_text = merge('below ', 'up to ', key%hi_open) // bound_text(key%hi)
 endif
-call out_io (s_error$, r_name, 'IN THE DECK, ' // trim(where) // ' = ' // bound_text(v) // &
+call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ' = ' // bound_text(v) // &
       ' IS OUTSIDE ITS RANGE, WHICH IS ' // trim(lo_text) // ' ' // trim(hi_text) // '.', trim(key%descrip))
 end function outside
 
-! bound_text writes a bound as the deck would, an integer key's as an integer.
+! bound_text writes a bound as the input file would, an integer key's as an integer.
 
 function bound_text (b) result (t)
 real(rp) b
@@ -641,7 +641,7 @@ else
 endif
 ok = n_got <= n_max
 if (.not. ok) then
-  call out_io (s_error$, r_name, 'IN THE DECK, ' // trim(where) // ' HOLDS ' // int_str(n_got) // &
+  call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ' HOLDS ' // int_str(n_got) // &
         ' ENTRIES AND AT MOST ' // int_str(n_max) // ' ARE TAKEN.')
 endif
 end function fits
@@ -819,7 +819,7 @@ end subroutine fel_schema_value
 !+
 ! Function fel_schema_text (run, key) result (txt)
 !
-! Routine to render one key's value in run as TOML text, the form a deck writes it in.
+! Routine to render one key's value in run as TOML text, the form an input file writes it in.
 ! The echo and the JSON Schema's defaults are built from this.
 !
 ! Input:
@@ -988,7 +988,7 @@ end function real_text
 !+
 ! Subroutine fel_schema_write_toml (run, iu)
 !
-! Routine to write the resolved deck of run as TOML to an open unit, every key of the
+! Routine to write the resolved input file of run as TOML to an open unit, every key of the
 ! schema with its value, defaults made explicit. This is the echo in the stats file's
 ! meta/input_echo, and what an embedding program writes to save a configuration built
 ! in code.
@@ -1035,7 +1035,7 @@ end subroutine fel_schema_write_toml
 ! Routine to write the schema as JSON Schema, draft 2020-12, to an open unit. Each table
 ! is an object that allows no key the schema does not name, and each key carries its
 ! type, its default as the structures declare it, its description with its unit, and
-! its bounds. An editor that reads JSON Schema validates a deck against it as it is
+! its bounds. An editor that reads JSON Schema validates an input file against it as it is
 ! typed, and the input reference's key tables are generated from it.
 !
 ! Input:
@@ -1057,7 +1057,7 @@ call fel_schema_table (keys)
 
 write (iu, '(a)') '{'
 write (iu, '(a)') '  "$schema": "https://json-schema.org/draft/2020-12/schema",'
-write (iu, '(a)') '  "title": "Lucifer deck",'
+write (iu, '(a)') '  "title": "Lucifer input",'
 write (iu, '(a)') '  "description": "One TOML file: the lattice and the tables run, window, beam, field, wake, space_charge and bmad.",'
 write (iu, '(3a)') '  "x-schema-version": "', fel_schema_version$, '",'
 write (iu, '(a)') '  "type": "object",'
@@ -1150,7 +1150,7 @@ endif
 descrip = trim(key%descrip)
 if (key%unit /= '') descrip = descrip // ' [' // trim(key%unit) // ']'
 dflt = fel_schema_text(def, key)
-! A default the deck would write as a list of one string stays a list in JSON too.
+! A default the input file would write as a list of one string stays a list in JSON too.
 write (iu, '(a)', advance = 'no') indent // '"' // trim(key%name) // '": {"type": "' // jtype // '"' // items // &
       ', "default": ' // dflt // bounds // ', "description": "' // descrip // '"}'
 if (comma) then

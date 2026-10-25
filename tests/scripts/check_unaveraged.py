@@ -73,7 +73,7 @@ import numpy as np
 import lucifer.beam as beamio
 import fieldio
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 from scipy.special import jv
 
 C_LIGHT = 2.99792458e8
@@ -97,7 +97,7 @@ SEED_W0 = 4e-4                 # 1/e^2 intensity radius [m]
 # points and this waist, which the formula then charges to the coupling factor. At 127
 # points the planar factor measures 0.75050 and at 128 points 0.74864 against the closed
 # form's 0.75095. These runs stay on the CPU, which takes an odd grid.
-PROBE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+PROBE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -129,7 +129,7 @@ def probe_nml(wd, **kw):
     kw["lat"] = unavg_wrapper(wd, kw["lat"])
     return PROBE.format(**kw)
 
-GAIN = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+GAIN = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -150,7 +150,7 @@ GAIN = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
 &end
 """
 
-TDID = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+TDID = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F

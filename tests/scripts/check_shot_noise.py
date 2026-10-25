@@ -17,7 +17,7 @@ excellent approximation, and the mean over n samples has sigma = 1/sqrt(n). The 
 |m - 1| < 5/sqrt(n) per weight mode, plus a looser per-harmonic check on n/3 samples.
 
 Fawley's kick is linear in the noise amplitude only while a group holds many electrons.
-Every deck here therefore keeps about 150 electrons per group, as the generator's does.
+Every input file here therefore keeps about 150 electrons per group, as the generator's does.
 At 18 electrons per group the scaled mean sits at 0.88, and the higher harmonics far
 lower, in every mode alike. That is the algorithm's own limit, which Genesis4 shares,
 and is not a load defect (validation.md, val-shot-noise-under-weights).
@@ -54,17 +54,17 @@ import fieldio  # noqa: E402
 import lucifer.beam as beamio
 import bunchfile
 from checkrec import record
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 to_groups = to_toml
 
 E_CHARGE = 1.602176634e-19
 
-# The window the deck below states. A dump carries the slice partition and not the
+# The window the input file below states. A dump carries the slice partition and not the
 # radiation it was sliced on, so the reader is told.
 LAMBDA0 = 1e-10
 SPACING = 3 * LAMBDA0
 
-NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F

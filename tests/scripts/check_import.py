@@ -55,7 +55,7 @@ import numpy as np
 
 import lucifer.beam as beamio
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 import pool
 
@@ -75,7 +75,7 @@ SIG_PZ = 1 / GAMMA0            # gen_delgam = 1 in fractional momentum
 # transform, since a Bmad lattice is the optics specification.
 LATTICE_TWISS = dict(betax=8.53711, alphax=-0.703306, betay=17.3899, alphay=1.40348)
 
-NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   source_filter = F
@@ -94,7 +94,7 @@ NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
 {extra}&end
 """
 
-GENESIS_WRITE_DECK = """&setup
+GENESIS_WRITE_INPUT = """&setup
 rootname={root}
 lattice=Aramis-1seg.lat
 beamline=SEG1
@@ -121,7 +121,7 @@ beam = {root}-imp
 &end
 """
 
-GENESIS_TRACK_DECK = """&setup
+GENESIS_TRACK_INPUT = """&setup
 rootname={root}
 lattice=Aramis-1seg.lat
 beamline=SEG1
@@ -202,7 +202,7 @@ def read_import_file(wd, root):
 
 # Both formats appear here. The tracker's dumps are openPMD, Genesis's are its own, and
 # beamio reads either. beamio is told the window, which an openPMD dump does not carry and
-# a Genesis dump states. For a Genesis file the arguments check what the deck asked for.
+# a Genesis dump states. For a Genesis file the arguments check what the input file asked for.
 
 
 def load_dump_currents(fn):
@@ -259,7 +259,7 @@ def main():
         ok = False
 
     # current: Lucifer's import against Genesis's import of the same file, to roundoff.
-    (w/"imp_gen_write.in").write_text(GENESIS_WRITE_DECK.format(
+    (w/"imp_gen_write.in").write_text(GENESIS_WRITE_INPUT.format(
         root="impgw", dist="impdist.h5", lambda0=LAMBDA0, gamma0=GAMMA0,
         slen=SLEN, sample=SAMPLE))
     run([args.genesis, "imp_gen_write.in"], w/"imp_gen_write.log", env=env1)
@@ -380,7 +380,7 @@ def main():
         write_nml(w/f"imp_s{k}.toml", f"imps{k}", seed,
                   extra=f'  write_genesis_dist = "{dist}"\n')
         run([args.exe, f"imp_s{k}.toml"], w/f"imp_s{k}.log", env=env8)
-        (w/f"imp_g{k}.in").write_text(GENESIS_TRACK_DECK.format(
+        (w/f"imp_g{k}.in").write_text(GENESIS_TRACK_INPUT.format(
             root=f"impg{k}", dist=dist, lambda0=LAMBDA0, gamma0=GAMMA0,
             slen=SLEN, sample=SAMPLE))
         run([args.genesis, f"imp_g{k}.in"], w/f"imp_g{k}.log", env=env1)

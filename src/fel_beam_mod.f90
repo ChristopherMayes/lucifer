@@ -103,8 +103,8 @@ type fel_beam_struct
                                    !   reference. Derive p0/(m_e c) and the reference gamma
                                    !   with fel_p0_mc and fel_gamma0.
   real(rp) :: phi0 = 0             ! Common ponderomotive reference phase [rad].
-  real(rp) :: wavelength = 0       ! Radiation wavelength [m]. From the deck: no dump carries it.
-  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. From the deck likewise.
+  real(rp) :: wavelength = 0       ! Radiation wavelength [m]. From the input file: no dump carries it.
+  real(rp) :: slice_spacing = 0    ! Longitudinal slice spacing [m]. From the input file likewise.
   integer :: n_wavelength = 1      ! Wavelengths per slice: slice_spacing / wavelength as an
                                    !   integer. Slippage rotates the slice ring by one index
                                    !   per n_wavelength undulator periods, which needs a whole
@@ -365,9 +365,9 @@ end function fel_theta
 ! back into a packed beam, weights included. This is the inverse of that routine: one
 ! particlePatch per slice, in window order, empty patches included.
 !
-! n_slice is the window the deck asked for, and the file must agree. A dump carries one
-! patch per slice. So a different patch count means the deck and the file describe
-! different runs, and the run is refused. Pass -1 when the deck states no window, the
+! n_slice is the window the input file asked for, and the file must agree. A dump carries one
+! patch per slice. So a different patch count means the input file and the file describe
+! different runs, and the run is refused. Pass -1 when the input file states no window, the
 ! usual case for a restart, and the file's patch count defines it. A bunch that is not a
 ! sliced window belongs on the bunch path (beam.position_file). That path slices it
 ! by load_mode instead of assuming a slicing the bunch does not carry.
@@ -386,9 +386,9 @@ end function fel_theta
 ! Input:
 !   file_name    -- character(*): File to read.
 !   gamma0       -- real(rp): Reference gamma for the run, from the lattice.
-!   n_slice      -- integer: Slices the deck's window has, or -1 to take the file's.
-!   wavelength   -- real(rp): Radiation wavelength [m], from the deck.
-!   spacing      -- real(rp): Slice spacing [m], from the deck.
+!   n_slice      -- integer: Slices the input file's window has, or -1 to take the file's.
+!   wavelength   -- real(rp): Radiation wavelength [m], from the input file.
+!   spacing      -- real(rp): Slice spacing [m], from the input file.
 !   ele          -- ele_struct: Element to convert the coordinates against.
 !   continuation -- logical, optional: Rebuild phi0 and z from the checkpoint group,
 !                     refusing a file that has no complete one? Default is False, an
@@ -428,7 +428,7 @@ endif
 
 ! p0c is the one stored reference. phi0 starts at zero here, with the particle lag in z.
 ! A continuation replaces both from the checkpoint group once the slices are built. The
-! wavelength and spacing are the deck's, since a dump carries the beam and not the run's
+! wavelength and spacing are the input file's, since a dump carries the beam and not the run's
 ! parameters.
 
 beam%p0c = sqrt(gamma0**2 - 1) * m_electron
@@ -449,9 +449,9 @@ if (n_slice > 0) n_win = n_slice
 
 if (nb /= n_win) then
   call out_io (s_error$, r_name, &
-      'FILE HAS \i0\ PARTICLE PATCHES BUT THE DECK ASKED FOR \i0\ SLICES.', &
+      'FILE HAS \i0\ PARTICLE PATCHES BUT THE INPUT FILE ASKED FOR \i0\ SLICES.', &
       'FILE: ' // trim(file_name), &
-      'A DUMP CARRIES ONE PATCH PER SLICE, SO THE DECK AND THE FILE DESCRIBE DIFFERENT RUNS.', &
+      'A DUMP CARRIES ONE PATCH PER SLICE, SO THE INPUT FILE AND THE FILE DESCRIBE DIFFERENT RUNS.', &
       i_array = [nb, n_win])
   return
 endif
@@ -785,7 +785,7 @@ end subroutine fel_read_openpmd_beam
 ! checkpoint, and refuses a frame that carries none wherever the frame was taken.
 !
 ! Input:
-!   file_name -- character(*): The file the deck names.
+!   file_name -- character(*): The file the input file names.
 !   which     -- character(*): The input naming it, for the message.
 !
 ! Output:
@@ -860,7 +860,7 @@ end subroutine fel_assert_not_interior_frame
 ! dump.
 !
 ! Input:
-!   file_name -- character(*): The file the deck names as beam.file.
+!   file_name -- character(*): The file the input file names as beam.file.
 !
 ! Output:
 !   err_flag  -- logical: Set True if the file opens and holds no checkpoint group.
@@ -926,7 +926,7 @@ end subroutine fel_say_no_checkpoint
 !
 ! Each slice is one openPMD particlePatch, in window order, so an empty slice is a
 ! zero-count patch and not a gap. The patch count is the window. Nothing else about the
-! window is written: the wavelength, spacing and beamlet size belong to the deck, and
+! window is written: the wavelength, spacing and beamlet size belong to the input file, and
 ! one4one follows from the weights.
 !
 ! The reference phase is folded into each particle's time coordinate (fold_phi0 in
@@ -2365,7 +2365,7 @@ end function fel_phi0_rate
 !
 ! Routine to recover the wavelengths per slice from a spacing in metres.
 !
-! The deck states this as an integer and the code carries it as one. A dump does not.
+! The input file states this as an integer and the code carries it as one. A dump does not.
 ! openPMD and Genesis's own format both record the spacing and not what it is a multiple
 ! of. So a beam read from a dump recovers the integer here, once, and every consumer
 ! reads it afterwards. A spacing that is not a whole number of wavelengths is refused.

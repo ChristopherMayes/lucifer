@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# device_table.sh measures the Metal backend against the CPU path on the four decks of the
+# device_table.sh measures the Metal backend against the CPU path on the four input files of the
 # device table in docs/performance.md, one Aramis segment at ngrid 256 with comb_ds_save
-# = -1, so both sides pay stats at the element end only. Each deck runs three times on
+# = -1, so both sides pay stats at the element end only. Each input file runs three times on
 # the CPU at the machine's performance-core count and three times on the device, and the
 # table takes the best walk of each side and the device-busy seconds the backend reports
 # from its command-buffer timestamps.
@@ -11,7 +11,7 @@
 #   ./device_table.sh [--exe <path>] [--workers N] [--work-dir <path>]
 #
 # The production lucifer is preferred, found as in run_fel_benchmark.sh. The work
-# directory is kept. The decks are the *.toml files beside this script, and the lattice
+# directory is kept. The input files are the *.toml files beside this script, and the lattice
 # comes from tests/bmad. A build with no device backend refuses the device runs, which
 # this script reports and stops on.
 set -o pipefail

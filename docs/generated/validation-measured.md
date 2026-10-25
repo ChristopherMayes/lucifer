@@ -437,12 +437,12 @@ where the two builds agree to every printed digit.
 | unaveraged TD FP64 diag byte-identical, device twin on vs off |  | same | holds |
 | unaveraged production TD window power vs CPU | 1.6997e-06 | 1.6361e-06 | <= 5.0000e-03 |
 | two unaveraged device runs, diag and ledger identical |  | same | holds |
-| FP32 transform pair energy loss, unaveraged deck | 1.2829e-07 | 1.2854e-07 | 5.0000e-08 to 4.0000e-07 |
-| header counts the transform pairs, unaveraged deck | [5340, 5340] | same | = [5340, 5340] |
-| header projection over measured loss, unaveraged deck | 9.5098e-01 | 9.4915e-01 | 5.0000e-01 to 2.0000e+00 |
-| FP32 transform pair energy loss, averaged deck | 1.2733e-07 | same | 5.0000e-08 to 4.0000e-07 |
-| header counts the transform pairs, averaged deck | [89, 0] | same | = [89, 0] |
-| header projection over measured loss, averaged deck | 9.5814e-01 | same | 5.0000e-01 to 2.0000e+00 |
+| FP32 transform pair energy loss, unaveraged input file | 1.2829e-07 | 1.2854e-07 | 5.0000e-08 to 4.0000e-07 |
+| header counts the transform pairs, unaveraged input file | [5340, 5340] | same | = [5340, 5340] |
+| header projection over measured loss, unaveraged input file | 9.5098e-01 | 9.4915e-01 | 5.0000e-01 to 2.0000e+00 |
+| FP32 transform pair energy loss, averaged input file | 1.2733e-07 | same | 5.0000e-08 to 4.0000e-07 |
+| header counts the transform pairs, averaged input file | [89, 0] | same | = [89, 0] |
+| header projection over measured loss, averaged input file | 9.5814e-01 | same | 5.0000e-01 to 2.0000e+00 |
 | two-plane unaveraged lockstep worst_x | 1.9377e-06 | same | <= 3.5000e-06 |
 | two-plane unaveraged lockstep worst_px | 2.4567e-06 | same | <= 2.5000e-05 |
 | two-plane unaveraged lockstep worst_y | 2.2475e-06 | same | <= 3.0000e-06 |
@@ -461,7 +461,7 @@ where the two builds agree to every printed digit.
 | two-plane unaveraged production power x vs CPU | 2.0188e-04 | 2.0313e-04 | <= 5.0000e-03 |
 | two-plane unaveraged production power y vs CPU | 2.9801e-02 | same | <= 1.0000e-01 |
 | two-plane unaveraged frames on against off, final beam and field identical (device) |  | same | holds |
-| FP32 transform pair energy loss, two-plane deck | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
+| FP32 transform pair energy loss, two-plane input file | 1.2972e-07 | 1.2997e-07 | 5.0000e-08 to 4.0000e-07 |
 | handedness on the device: (1, +i) reproduces the scalar seed's energy modulation | 1.7298e-07 | same | <= 1.0000e-05 |
 | handedness on the device: (1, -i) leaves the beam unmodulated | 1.0053e-03 | same | <= 1.0000e-02 |
 
@@ -561,8 +561,8 @@ where the two builds agree to every printed digit.
 | unitSI = 0.5 on doubled samples reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | gridUnitSI = 2 on a halved spacing reads as the plain file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | refusal a y component shaped unlike x |  | same | holds |
-| the filter angle acts on an imported field with no grid in the deck (relative move) | 1.0208e-06 | 1.0184e-06 | <= 1.0000e+00 |
-| and the deck with the grid keys filters as the deck without them | 0.0000e+00 | same | <= 1.0000e-09 |
+| the filter angle acts on an imported field with no grid in the input file (relative move) | 1.0208e-06 | 1.0184e-06 | <= 1.0000e+00 |
+| and the input file with the grid keys filters as the input file without them | 0.0000e+00 | same | <= 1.0000e-09 |
 | restart, x | 0.0000e+00 | same | <= 1.0000e-16 |
 | restart, y | 0.0000e+00 | same | <= 1.0000e-16 |
 | restart, px | 0.0000e+00 | same | <= 1.0000e-15 |
@@ -584,7 +584,7 @@ where the two builds agree to every printed digit.
 | Bmad's reader returns one bunch per slice of the converted file | 0.0000e+00 | same | <= 5.0000e-01 |
 | the particles come back in the converted file's order, slice by slice [m or gamma beta] | 1.7347e-18 | same | <= 1.0000e-12 |
 | refusal a beam file that is not openPMD |  | same | holds |
-| refusal patch count against the deck's window |  | same | holds |
+| refusal patch count against the input file's window |  | same | holds |
 | refusal a file that carries no charge |  | same | holds |
 | consecutive slices sit one spacing apart in the file | 2.4185e-05 | same | <= 1.0000e-04 |
 | the bunch spans its window and not one slice | 5.0275e-07 | same | <= 1.0000e-04 |
@@ -711,7 +711,7 @@ where the two builds agree to every printed digit.
 
 | Check | Debug | Production | Bound |
 |---|---|---|---|
-| no-deck library run == deck run (diag byte, dumps dataset) |  | same | holds |
+| library run with no input file == input-file run (diag byte, dumps dataset) |  | same | holds |
 | re-entrant: twice in one process bit-identical (pass 2 == pass 1) |  | same | holds |
 | a library error RETURNS (no beginning Twiss -> err to the program, exit 2) |  | same | holds |
 | a key in the wrong table is refused, naming the table it belongs in |  | same | holds |
@@ -722,7 +722,7 @@ where the two builds agree to every printed digit.
 | a value outside its bounds on the command line is refused (beam.n_particle=-5) |  | same | holds |
 | an argument without = on the command line is refused (beam.n_particle) |  | same | holds |
 | a key without its table on the command line is refused (n_particle=512) |  | same | holds |
-| a Deck from the models runs through lucifer.run and echoes every set key |  | same | holds |
+| an Input from the models runs through lucifer.run and echoes every set key |  | same | holds |
 | an override through lucifer.run lands in params/ and names the new root |  | same | holds |
 | a refusal through lucifer.run raises LuciferError with the program's message |  | same | holds |
 | the record axis: s non-decreasing, every repeat at an element boundary |  | same | holds |

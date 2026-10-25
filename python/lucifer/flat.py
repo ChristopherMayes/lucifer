@@ -1,19 +1,19 @@
-"""Write the TOML deck the program reads.
+"""Write the TOML input file the program reads.
 
-A deck is one TOML file: the lattice at the top and the tables [run], [window], [beam]
+An input file is one TOML file: the lattice at the top and the tables [run], [window], [beam]
 with [beam.resample], [field], [wake], [space_charge] and [bmad]. The check scripts build
 their configurations as flat ``key = value`` text, one key a line, in the form the old
-namelist decks used, and this module routes each key into its table and renders the
+namelist input files used, and this module routes each key into its table and renders the
 value as TOML. A key may be written bare, ``n_particle = 2048``, and is routed by name,
 or dotted, ``beam.n_particle = 2048``, which names its table outright. Values follow the
 old form: ``T`` and ``F`` are booleans, a quoted string is a string, a number is a number,
 and a comma-separated list is a list. The longitudinal fill, ``distribution_type(3)``
 and ``grid(3)%x_min`` and ``grid(3)%x_max``, becomes ``z_distribution``, ``z_min`` and
 ``z_max``. An old group wrapper, ``&fel_params`` or ``/``, and a table heading, ``[run]``, are
-ignored, so an old deck converts as it stands and a flat text may carry headings as
+ignored, so an old input file converts as it stands and a flat text may carry headings as
 notes.
 
-  from lucifer.deck import to_toml, write
+  from lucifer.flat import to_toml, write
   write("run.toml", "lattice = 'aramis.bmad'\\nn_particle = 2048\\nlambda0 = 1e-10\\n")
 
 The routing table here names every key of the schema. ``lucifer --schema`` is the
@@ -25,7 +25,7 @@ import re
 
 TABLES = ("run", "window", "beam", "beam.resample", "field", "wake", "space_charge", "bmad")
 
-# Every key, by table. The order is the deck's.
+# Every key, by table. The order is the input file's.
 KEYS = {
     "": ["lattice"],
     "run": [
@@ -57,7 +57,7 @@ KEYS = {
              "sc_min_in_bin", "rel_tol_tracking", "particle_sigma_cutoff"],
 }
 
-# The old names, as the namelist decks and the check scripts' templates wrote them, to
+# The old names, as the namelist input files and the check scripts' templates wrote them, to
 # the dotted key. A prefix maps a whole structure; a full name maps one key.
 OLD_PREFIX = {
     "global%": "run.", "slicing%": "window.", "wavefront_init%": "field.",
@@ -78,7 +78,7 @@ BARE_TABLE = {}
 for _t in ("", "run", "window", "beam", "field", "wake", "space_charge", "bmad", "beam.resample"):
     for _k in KEYS[_t]:
         BARE_TABLE.setdefault(_k, _t)
-# A bare name two tables share routes to the one the old flat decks meant.
+# A bare name two tables share routes to the one the old flat input files meant.
 BARE_TABLE["beamlet_size"] = "beam"
 BARE_TABLE["n_slice"] = "window"
 BARE_TABLE["model"] = "wake"
@@ -86,12 +86,12 @@ BARE_TABLE["model"] = "wake"
 LINE = re.compile(r"^\s*([A-Za-z_][\w%().]*)\s*=\s*(.*?)\s*(?<!\\)$")
 
 
-class DeckError(ValueError):
+class FlatError(ValueError):
     pass
 
 
 def route(key: str) -> tuple[str, str]:
-    """(table, name) for a key as a deck or a template writes it."""
+    """(table, name) for a key as an input file or a template writes it."""
     k = key.strip()
     # A list entry written with an index, field_file(2) = "...", routes by its base name
     # and keeps the index for to_toml to assemble.
@@ -110,13 +110,13 @@ def route(key: str) -> tuple[str, str]:
     if "." in k:
         table, _, name = k.rpartition(".")
         if table not in TABLES and table != "":
-            raise DeckError(f"no table [{table}] for key {key}")
+            raise FlatError(f"no table [{table}] for key {key}")
         if name not in KEYS.get(table, []):
-            raise DeckError(f"[{table}] has no key {name} (from {key})")
+            raise FlatError(f"[{table}] has no key {name} (from {key})")
         return table, name
     if k in BARE_TABLE:
         return BARE_TABLE[k], k
-    raise DeckError(f"unknown key {key}")
+    raise FlatError(f"unknown key {key}")
 
 
 def value_toml(raw: str) -> str:
@@ -134,7 +134,7 @@ def value_toml(raw: str) -> str:
         for p in parts:
             q = p[0]
             if p[-1] != q:
-                raise DeckError(f"unterminated string: {raw}")
+                raise FlatError(f"unterminated string: {raw}")
             strs.append('"' + p[1:-1].replace("\\", "\\\\").replace('"', '\\"') + '"')
         return strs[0] if len(strs) == 1 else "[" + ", ".join(strs) + "]"
     nums = [p.strip() for p in v.split(",") if p.strip()]
@@ -144,14 +144,14 @@ def value_toml(raw: str) -> str:
 
 def number_toml(p: str) -> str:
     """One number in Fortran form as TOML. A number TOML already reads, 2048, 2e-4 or
-    0.75, is kept as written, so a deck converts into the text its author typed; 1d-3,
+    0.75, is kept as written, so an input file converts into the text its author typed; 1d-3,
     .5 and 5. are rewritten as 1.0e-3, 0.5 and 5.0."""
     s = p.replace("d", "e").replace("D", "e").rstrip("_rp")
     if re.fullmatch(r"[+-]?\d+", s) or re.fullmatch(r"[+-]?\d+(\.\d+)?([eE][+-]?\d+)?", s):
         return s
     m = re.fullmatch(r"([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?", s)
     if not m or (not m.group(2) and not m.group(3)):
-        raise DeckError(f"not a number: {p}")
+        raise FlatError(f"not a number: {p}")
     sign, whole, frac, exp = m.group(1), m.group(2) or "0", m.group(3) or "", m.group(4)
     out = f"{sign}{whole}.{frac or '0'}"
     if exp is not None:
@@ -181,7 +181,7 @@ def split_commas(v: str) -> list[str]:
 
 
 def to_toml(flat: str) -> str:
-    """Flat key = value text, in the old or the dotted form, as a TOML deck."""
+    """Flat key = value text, in the old or the dotted form, as a TOML input file."""
     found: dict[tuple[str, str], str] = {}
     lists: dict[tuple[str, str], dict[int, str]] = {}
     for raw in flat.splitlines():
@@ -190,7 +190,7 @@ def to_toml(flat: str) -> str:
             continue
         m = LINE.match(line)
         if not m:
-            raise DeckError(f"not a key = value line: {raw}")
+            raise FlatError(f"not a key = value line: {raw}")
         table, name = route(m.group(1))
         val = value_toml(m.group(2))
         im = re.fullmatch(r"(\w+)\((\d+)\)", name)
@@ -216,17 +216,17 @@ def to_toml(flat: str) -> str:
 
 
 def write(path, flat: str) -> None:
-    """Write flat text as a TOML deck at path."""
+    """Write flat text as a TOML input file at path."""
     with open(path, "w") as f:
         f.write(to_toml(flat))
 
 
 def main(argv=None) -> int:
-    """python -m lucifer.deck <flat file or -> <toml file or ->: convert flat text to a deck."""
+    """python -m lucifer.flat <flat file or -> <toml file or ->: convert flat text to an input file."""
     import sys
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != 2:
-        print("usage: python -m lucifer.deck <flat file | -> <toml file | ->", file=sys.stderr)
+        print("usage: python -m lucifer.flat <flat file | -> <toml file | ->", file=sys.stderr)
         return 2
     text = sys.stdin.read() if argv[0] == "-" else open(argv[0]).read()
     toml = to_toml(text)

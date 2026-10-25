@@ -21,7 +21,7 @@ Usage:
   fit_cost_rates.py <log> [<log> ...]
 
 The set needs at least two particle counts at one slice count for the solve to separate,
-and a thread sweep at one configuration for the serial fraction. Runs whose deck turned
+and a thread sweep at one configuration for the serial fraction. Runs whose input file turned
 the source filter off are reported and left out of the fit, since the estimate is for the
 default.
 """
@@ -57,7 +57,7 @@ def read_run(path):
     m = re.search(r"threads (\d+)", txt)
     r["threads"] = int(m.group(1)) if m else 1
 
-    # A deck that turned the filter off is a different configuration: the solve then
+    # An input file that turned the filter off is a different configuration: the solve then
     # runs one transform fewer per field per step. The run says so in its own warning.
     r["filtered"] = "run.source_filter = F" not in txt
 

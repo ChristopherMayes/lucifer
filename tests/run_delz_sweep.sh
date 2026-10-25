@@ -117,7 +117,7 @@ for np in 1 2 3 6 12; do
 call, file = aramis.bmad
 UND[ds_step] = $delz
 LAT
-  cat > "sweep_p$np.toml" <<DECK
+  cat > "sweep_p$np.toml" <<INPUT
 lattice = "sweep_p$np.bmad"
 
 [run]
@@ -135,7 +135,7 @@ beamlet_size = 8
 [field]
 file = "AramisS12-initial.wf.h5"
 lambda0 = 1e-10
-DECK
+INPUT
   echo "--- lucifer: ds_step = $np period(s) -----------------------------------"
   if ! "$EXE" "sweep_p$np.toml" > "sweep_p$np.log" 2>&1; then
     echo "lucifer ds_step=$delz FAILED; log tail:" >&2

@@ -50,7 +50,7 @@
 ! increment in ticks of the fixed-point quantum instead of in FP32 ulps. The same floor
 ! applies.
 !
-! The device deposit accumulates in fixed point, so two runs of one deck agree bit for
+! The device deposit accumulates in fixed point, so two runs of one input file agree bit for
 ! bit. Integer addition is associative and commutative and float addition is neither. So
 ! the order threads reach a cell cannot change the answer. Both reference backends deposit
 ! in floats and are not reproducible (manual/GPU.md, gpu/metal-engine 4919b01). A float
@@ -109,8 +109,8 @@ integer, parameter :: fel_dev_dep_bits_min$ = 8
 ! Fraction of the field's energy the FP32 transform pair loses each time it runs, always
 ! in one direction: about 0.17 of an FP32 quantum a butterfly stage, over the
 ! 2 log2(ngrid) stages of a forward and an inverse transform. docs/validation.md
-! (val-device-unaveraged) holds the fit over grids 64 to 512. The run header projects a
-! deck's loss from it.
+! (val-device-unaveraged) holds the fit over grids 64 to 512. The run header projects an
+! input file's loss from it.
 
 real(rp), parameter :: fel_dev_stage_loss$ = 0.17_rp / 16777216.0_rp   ! 0.17 * 2^-24
 
@@ -598,7 +598,7 @@ endif
 ! The exact-wrap assertion, on the device's own arithmetic: A bucket shift and its return
 ! must be bit-exact, and the extracted phase must never see the shift. Wraps are modular
 ! arithmetic, so this asserts exactly and not to a tolerance. The bucket is sample whole
-! periods. sample is an integer from the deck to here (fel_slicing_struct), so the
+! periods. sample is an integer from the input file to here (fel_slicing_struct), so the
 ! sample check cannot fire. It stays because the arithmetic below depends on it, and a
 ! future path that reached here another way would be caught.
 
@@ -1648,8 +1648,8 @@ end subroutine fel_device_close_run
 ! refused here, before the first step converts anything.
 !
 ! Note: The scale is chosen against the same bound the headroom is taken against. So their
-! product lands between 2^61 and 2^62 whatever the deck, and the headroom is 37 bits. No
-! deck reaches the headroom refusal. Raising fel_dev_dep_bits_min$ past 37 fires it.
+! product lands between 2^61 and 2^62 whatever the input file, and the headroom is 37 bits. No
+! input file reaches the headroom refusal. Raising fel_dev_dep_bits_min$ past 37 fires it.
 !
 ! The scale and its reciprocal reach the kernel in single precision, so both must be
 ! finite and normal there. The headroom cannot catch that, for the same reason it always

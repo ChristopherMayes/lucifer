@@ -55,13 +55,13 @@ import h5py
 import numpy as np
 
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 M_ELECTRON = 0.51099895069e6
 EPS0 = 8.8541878128e-12
-SPACING = 3e-10   # the probe deck's slice spacing, n_wavelength * lambda0
+SPACING = 3e-10   # the probe input file's slice spacing, n_wavelength * lambda0
 
-BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+BASE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -490,9 +490,9 @@ def main():
     # small against d^2, and it divides by a zero A. A guard that puts a square metre of
     # area in place of a zero A makes the field of a slice whose charge sits at one
     # transverse point orders too small. Migration reaches that state by moving particles
-    # out of a slice one at a time until one is left, which is the deck here.
+    # out of a slice one at a time until one is left, which is the input file here.
     #
-    # The deck isolates the term: dark, so no gain, the chamber wake off and the radial
+    # The input file isolates the term: dark, so no gain, the chamber wake off and the radial
     # solve off, so a slice's mean energy moves only by the long-range term's work. The
     # source's own contribution is isolated by differencing against the same beam with
     # that slice's charge set to zero, which leaves every other source where it was.
@@ -578,7 +578,7 @@ def main():
             ("collpc_ngrid", "  space_charge.rmax = 250e-6\n  space_charge.ngrid = 1\n",
              "NGRID")):
         r = sc_run(tag, "collsc_src-initial.beam.h5", extra, expect_fail=True)
-        # A negative nphi is refused by the deck reader, from the schema's bound, and a
+        # A negative nphi is refused by the input reader, from the schema's bound, and a
         # one-point radial grid at setup; the key's name is in both messages.
         got = r.returncode != 0 and phrase in (r.stdout + r.stderr).upper()
         r_ok = r_ok and got

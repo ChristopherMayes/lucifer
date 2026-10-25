@@ -1,6 +1,6 @@
-"""The deck as typed models, generated from the schema. Do not edit.
+"""The input file as typed models, generated from the schema. Do not edit.
 
-Written by python -m lucifer.generate from schema.json, schema version 1. A dataclass per table of the deck, and Deck with
+Written by python -m lucifer.generate from schema.json, schema version 1. A dataclass per table of the input file, and Input with
 the lattice and one of each. The defaults are the program's, read from the schema,
 and nothing here checks a bound: the program refuses a value outside one. The
 field named field is the [field] table, so dataclasses.field is imported as _field.
@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field as _field
 
-from lucifer.deckops import DeckOps
+from lucifer.inputops import InputOps
 
 
 @dataclass
 class Run:
-    """The [run] table of the deck."""
+    """The [run] table of the input file."""
     out_root: str = 'fel_track'
     """Root of every output file name."""
     interlude_model: str = 'bmad'
@@ -95,7 +95,7 @@ class Run:
 
 @dataclass
 class Window:
-    """The [window] table of the deck."""
+    """The [window] table of the input file."""
     window_length: float = 0.0
     """The time window. 0 derives it from the bunch, or is one slice. [m] Bounds: from 0.0."""
     n_wavelength: int = 0
@@ -108,7 +108,7 @@ class Window:
 
 @dataclass
 class Resample:
-    """The [beam.resample] table of the deck."""
+    """The [beam.resample] table of the input file."""
     slice_width: float = 0.01
     """Sampling window over bunch length, Genesis4's slicewidth. Bounds: above 0.0."""
     n_particle_per_slice: int = 8192
@@ -123,7 +123,7 @@ class Resample:
 
 @dataclass
 class Beam:
-    """The [beam] table of the deck."""
+    """The [beam] table of the input file."""
     file: str = ''
     """An openPMD particle dump to start from, already in slices. Blank loads a bunch instead."""
     position_file: str = ''
@@ -172,7 +172,7 @@ class Beam:
 
 @dataclass
 class Field:
-    """The [field] table of the deck."""
+    """The [field] table of the input file."""
     file: list[str] = _field(default_factory=lambda: [])
     """The openPMD wavefront file to start from, or one per harmonic member. Blank is a seed."""
     lambda0: float = 0.0
@@ -193,7 +193,7 @@ class Field:
 
 @dataclass
 class Wake:
-    """The [wake] table of the deck."""
+    """The [wake] table of the input file."""
     on: bool = False
     """The chamber wake."""
     model: str = 'genesis'
@@ -224,7 +224,7 @@ class Wake:
 
 @dataclass
 class SpaceCharge:
-    """The [space_charge] table of the deck."""
+    """The [space_charge] table of the input file."""
     model: str = 'genesis'
     """Which space-charge implementation runs: genesis, the transcribed solver."""
     rmax: float = 0.0
@@ -241,7 +241,7 @@ class SpaceCharge:
 
 @dataclass
 class Bmad:
-    """The [bmad] table of the deck."""
+    """The [bmad] table of the input file."""
     radiation_damping_on: bool = False
     """Bmad's radiation damping in the interludes."""
     radiation_fluctuations_on: bool = False
@@ -265,8 +265,8 @@ class Bmad:
 
 
 @dataclass
-class Deck(DeckOps):
-    """One deck: the lattice and the tables."""
+class Input(InputOps):
+    """One input file: the lattice and the tables."""
     lattice: str = ''
     """The Bmad lattice file. The FEL segments are its wigglers with fel_method set."""
     run: Run = _field(default_factory=Run)
@@ -286,4 +286,4 @@ class Deck(DeckOps):
 
 
 TABLES = (("run", Run), ("window", Window), ("beam", Beam), ("beam.resample", Resample), ("field", Field), ("wake", Wake), ("space_charge", SpaceCharge), ("bmad", Bmad))
-"""The tables in the deck's order, with their classes."""
+"""The tables in the input file's order, with their classes."""

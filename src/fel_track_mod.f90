@@ -107,8 +107,8 @@ end type
 type fel_und_struct
   real(rp) :: aw = 0          ! rms undulator parameter.
   real(rp) :: ku = 0          ! Undulator wavenumber twopi/lambdau [1/m].
-  real(rp) :: kx = 0          ! Natural focusing, deck kx * ku^2 [1/m^2].
-  real(rp) :: ky = 0          ! Natural focusing, deck ky * ku^2 [1/m^2].
+  real(rp) :: kx = 0          ! Natural focusing, Genesis4's kx * ku^2 [1/m^2].
+  real(rp) :: ky = 0          ! Natural focusing, Genesis4's ky * ku^2 [1/m^2].
   real(rp) :: ax = 0, ay = 0  ! Transverse offset of the undulator field [m].
   real(rp) :: tilt = 0        ! Wiggle-plane tilt [rad]: planar wiggles along
   real(rp) :: cos_t = 1, sin_t = 0   !   e = (cos_t, sin_t). Cached for the maps.
@@ -2895,7 +2895,7 @@ end subroutine fel_field_kernel_init
 !
 ! Routine to compute the two angles a source filter's edge can be set from
 ! (fel-physics.md sec-source-filter). Both come from the loaded beam and the undulator
-! it enters, so a deck states neither.
+! it enters, so an input file states neither.
 !
 ! th_mode is four diffraction angles of the fundamental mode, 4 lambda / (2 pi sigma),
 ! with sigma the rms transverse size of the beam. The radiation that can couple to the

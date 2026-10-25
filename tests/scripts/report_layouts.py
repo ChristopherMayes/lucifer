@@ -2,7 +2,7 @@
 """
 Generate docs/generated/layouts.md, the HDF5 hierarchy of the files this program writes.
 
-The page is an inventory and not a description. The generator runs a few small decks
+The page is an inventory and not a description. The generator runs a few small input files
 with the executable it is handed, opens the files they wrote, and prints for every
 group, dataset, link and attribute what h5py reports: the hierarchy with its empty
 groups, a dataset's shape, on-disk datatype and storage layout, every attribute's name,
@@ -34,7 +34,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 
 import h5py
 import numpy as np
@@ -90,7 +90,7 @@ GRID_Z = """  beam.sig_z = 0
   beam.z_max = 2.5e-10
 """
 
-# Each fixture is one run: its root, its lattice body, its deck additions, and the files
+# Each fixture is one run: its root, its lattice body, its input file additions, and the files
 # it contributes to the page, each with the case it shows and the file's role.
 FIXTURES = (
     dict(root="avg",

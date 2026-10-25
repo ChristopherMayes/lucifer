@@ -33,7 +33,7 @@ contains
 ! field-set allocation. Errors return through err_flag, and nothing here stops.
 !
 ! Input:
-!   run       -- fel_run_struct: Run state carrying the deck's inputs and the lattice
+!   run       -- fel_run_struct: Run state carrying the input file's inputs and the lattice
 !                  file name.
 !
 ! Output:
@@ -286,7 +286,7 @@ end select
 ! has replaced it by an analytic Gaussian with no wide-angle content. Neither case is
 ! refused. The filter reaches the elements that build a source and does nothing where
 ! there is none, as transport_model reaches the averaged elements only. The filter is on
-! by default, so a deck that asks for the unaveraged mode has not asked for the filter
+! by default, so an input file that asks for the unaveraged mode has not asked for the filter
 ! and must not be stopped by it. A mixed line filters its averaged elements and leaves
 ! the unaveraged ones alone, through the per-element filter state. Both cases are
 ! reported at setup, so a switch that does nothing says so.
@@ -525,15 +525,15 @@ end subroutine setup_fel_elements
 !+
 ! Subroutine derive_grid ()
 !
-! Routine to derive the transverse grid from the beam where the deck states none
+! Routine to derive the transverse grid from the beam where the input file states none
 ! (docs/startup-noise.md, Recommendations). The rms beam size comes from the emittances
-! the deck states and the matched Twiss the lattice states. It is averaged over the FEL
+! the input file states and the matched Twiss the lattice states. It is averaged over the FEL
 ! elements by length, since that is the beta the mode sees. Cells are then a seventh of
 ! it and the half width nine of it. The point count follows from whichever half width is
 ! in force, rounded up to a power of two. The rounding only refines, since more points
 ! over one half width are smaller cells. It also gives the same count on every backend,
-! so a derived deck runs on the device and on the CPU at one grid. A stated value is
-! never overridden, and the other is derived against it. So a deck that fixes the cell
+! so a derived input file runs on the device and on the CPU at one grid. A stated value is
+! never overridden, and the other is derived against it. So an input file that fixes the cell
 ! size gets the containment it needs, and one that fixes the point count gets the
 ! resolution.
 !
@@ -582,8 +582,8 @@ end subroutine derive_grid
 !+
 ! Function described_beam_size () result (sig)
 !
-! Routine to return the rms transverse size of the beam the deck describes. It uses the
-! emittances the deck states and the matched Twiss the lattice states, averaged over the
+! Routine to return the rms transverse size of the beam the input file describes. It uses the
+! emittances the input file states and the matched Twiss the lattice states, averaged over the
 ! FEL elements by length, since that is the beta the mode sees. The size is the quadratic
 ! mean of the two planes, one size for a round description. It is zero where there is
 ! nothing to derive from, as for a run that loads its beam from a dump.
@@ -632,7 +632,7 @@ end function described_beam_size
 !+
 ! Function described_pierce () result (rho)
 !
-! Routine to return the one-dimensional Pierce parameter of the beam the deck describes,
+! Routine to return the one-dimensional Pierce parameter of the beam the input file describes,
 ! at the first FEL element, in Genesis's form:
 !   rho^3 = (I/I_A) fc^2 / (8 gamma^3 sigma^2 ku^2)
 ! fc is the undulator's own coupling, which already carries aw. The source filter's edge
@@ -640,7 +640,7 @@ end function described_beam_size
 ! rather than from the built beam, because the slice spacing must be known before the
 ! beam is sliced at it.
 !
-! The peak current is the deck's own: a stated flat current, else the Gaussian peak
+! The peak current is the input file's own: a stated flat current, else the Gaussian peak
 ! Q c / (sqrt(2 pi) sig_z), else the flat extent, else the steady state's whole charge in
 ! one slice at the stated spacing.
 !
@@ -704,7 +704,7 @@ end function described_pierce
 ! Subroutine derive_slicing_and_step ()
 !
 ! Routine to derive the slice spacing and the integration step from the gain where the
-! deck states neither (fel-physics.md sec-window and sec-element).
+! input file states neither (fel-physics.md sec-window and sec-element).
 !
 ! The spacing is the whole number of wavelengths in a quarter of the cooperation length
 ! lambda/(4 pi rho). That is four slices per cooperation length, the resolution at which
@@ -714,11 +714,11 @@ end function described_pierce
 !
 ! The step is a twentieth of the one-dimensional gain length lambda_u/(4 pi sqrt(3) rho),
 ! rounded down to whole periods and at least one. Bmad's bookkeeper gives any wiggler
-! with a period a step of l_period/20 when the deck states neither ds_step nor num_steps,
+! with a period a step of l_period/20 when the input file states neither ds_step nor num_steps,
 ! and fills num_steps from it. That resolves the wiggle the averaged model has already
 ! averaged over. The derived step replaces it. The unset state is that exact quotient,
 ! since the bookkeeper leaves nothing else to read. So an element whose step is
-! l_period/20 by the deck's own choice is derived over. Any other stated step is kept.
+! l_period/20 by the input file's own choice is derived over. Any other stated step is kept.
 !-
 
 subroutine derive_slicing_and_step ()
@@ -762,7 +762,7 @@ endif
 
 if (rho <= 0) return
 
-! The step, per element, where the deck states none.
+! The step, per element, where the input file states none.
 
 l_1d = 0
 n_done = 0
@@ -897,7 +897,7 @@ endif
 ! The solver's grid is checked where it is stated rather than where it is used. Each of
 ! these describes a solve that cannot run. Unchecked, it runs anyway and returns an exact
 ! zero with nothing said. A radial grid of one point has no width between its points. An
-! azimuthal range whose upper bound is below its lower one iterates over no modes. A deck
+! azimuthal range whose upper bound is below its lower one iterates over no modes. An input file
 ! that asks for space charge and gets none is the failure this refuses.
 
 if (sc_ngrid < 2) then
@@ -941,7 +941,7 @@ coll%efield%active = .false.    ! Set per element by the walk, from run%sc_here.
 
 if (sc_nz < 1 .and. .not. sc_longrange .and. bmad_com%csr_and_space_charge_on) then
   ! Neither term is configured, so slice would compute an exact zero at full cost. The
-  ! deck says two things at once, and the useful answer is which one it meant. This
+  ! input file says two things at once, and the useful answer is which one it meant. This
   ! applies only when the master switch is on. With it off, a lattice that carries slice
   ! for its own reasons is run without space charge on purpose. Demanding numbers for a
   ! solver that will not run would then serve no one.
@@ -1080,9 +1080,9 @@ if (any(is_fel)) then
     ! lambda. Note: lambda/(4 dx) per unit xcut puts every edge four times wider than its
     ! name. On the generated path the grid comes from the input, the numbers the field was
     ! built from, and the conversion holds for every member of the field set. A field read
-    ! from field.file has the file's grid, whatever the deck states or leaves at zero. So
-    ! the conversion is taken from the field itself. Taken from the deck it would be zero
-    ! when the deck states no grid. Every cutoff would then be infinite, and the filter
+    ! from field.file has the file's grid, whatever the input file states or leaves at zero. So
+    ! the conversion is taken from the field itself. Taken from the input file it would be zero
+    ! when the input file states no grid. Every cutoff would then be infinite, and the filter
     ! would pass every mode while the header named the angle asked for.
 
     ie_first = findloc(is_fel, .true., dim = 1)
@@ -1103,7 +1103,7 @@ if (any(is_fel)) then
     if (th_rho > th_mode) run%split_origin = 'the rho angle'
     if (run%global%source_filter_angle > 0) then
       run%split_angle = run%global%source_filter_angle
-      run%split_origin = 'set by the deck'
+      run%split_origin = 'set by the input file'
     endif
 
     if (.not. run%global%source_filter) then
@@ -1122,7 +1122,7 @@ if (any(is_fel)) then
     else
       if (run%global%source_filter_angle > 0) then
         th = run%global%source_filter_angle
-        origin = 'set by the deck'
+        origin = 'set by the input file'
       else if (max(th_mode, th_rho) <= 0) then
         call out_io (s_error$, r_name, 'SOURCE_FILTER IS ON AND ITS ANGLE CANNOT BE ' // &
                      'DERIVED: THE BEAM HAS NO TRANSVERSE SIZE OR NO CURRENT.', &
@@ -1164,7 +1164,7 @@ if (any(is_fel)) then
                    'rho angle \es10.3\ rad, ratio \f8.2\ .', &
                    r_array = [th_mode, th_rho, ratio])
       if (run%global%source_filter_angle > 0) then
-        call out_io (s_info$, r_name, 'Edge at \es12.5\ rad, set by the deck, so ' // &
+        call out_io (s_info$, r_name, 'Edge at \es12.5\ rad, set by the input file, so ' // &
                      'source_filter_tolerance is bypassed. Sigmoid on axis \f7.4\ .', &
                      r_array = [th, 1 / (1 + exp(-1 / run%global%source_filter_width))])
       else
@@ -1719,7 +1719,7 @@ if (run%global%dump_reduced) then
         write (rname(k), '(a, i0, a)') 'h', harmonics(ih), '_y'
       endif
     enddo
-    ! The grid is the built wavefront's and not the deck's: a derived grid or one read
+    ! The grid is the built wavefront's and not the input file's: a derived grid or one read
     ! from a field file is what the projections are summed over.
     ngrid = wavefront_shape(run%ffield(1)%wf)
     call fel_stats_reduced_init (stats, ngrid(1), ngrid(2), rname)

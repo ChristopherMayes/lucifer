@@ -2,7 +2,7 @@
 # run_examples.sh runs every example and saves the figure the documentation shows.
 #
 # It does two jobs in one pass. It answers whether all the examples still run, printing
-# one line per deck and exiting nonzero if any deck failed. It also writes the figures
+# one line per input file and exiting nonzero if any input file failed. It also writes the figures
 # the generated pages reference, one per example, into docs/generated/examples/.
 #
 # The figures are committed. Building an FEL run at documentation build time would be
@@ -87,8 +87,8 @@ fi
 
 # The block below sets how many directories run at once, and says why.
 #
-# The unit is a directory, never a deck. The import example's second deck reads the
-# openPMD file its first deck writes, so a directory's decks stay in order inside one
+# The unit is a directory, never an input file. The import example's second input file reads the
+# openPMD file its first input file writes, so a directory's input files stay in order inside one
 # worker. Directories share only the lattice files they read, so several at once change
 # no result. The rows are printed after every worker has finished, in the order a
 # one-worker run prints them, so the table does not depend on the schedule.
@@ -136,53 +136,53 @@ echo "   lucifer: $EXE"
 echo "   workers: $JOBS directories at once"
 [[ $FIGURES -eq 1 ]] && echo "   figures: $FIG_DIR"
 echo "------------------------------------------------------------------------------"
-printf '%-20s %-26s %6s %6s  %s\n' DIR DECK EXIT SEC EXIT_LINE
+printf '%-20s %-26s %6s %6s  %s\n' DIR INPUT EXIT SEC EXIT_LINE
 
 FAILED=0
 
-# The directory list and each directory's decks are settled before anything launches, so
-# a directory with no deck is a failure found without running one.
+# The directory list and each directory's input files are settled before anything launches, so
+# a directory with no input file is a failure found without running one.
 DIRS=()
 for dir in */; do
   dir="${dir%/}"
   [[ "$dir" == "saturation_demo" ]] && continue
-  # The decks run lucifer.toml first, then the rest in byte order. A directory's decks can
+  # The input files run lucifer.toml first, then the rest in byte order. A directory's input files can
   # depend on each other: import's lucifer_from_file.toml reads the bunch its lucifer.toml
   # writes. The glob's own order follows the locale's collation, under which
   # lucifer_from_file.toml sorts ahead of lucifer.toml, and a bunch file an earlier run left
   # in the tree hides that.
   shopt -s nullglob
-  decks=()
-  [[ -f "$dir/lucifer.toml" ]] && decks=("$dir/lucifer.toml")
+  inputs=()
+  [[ -f "$dir/lucifer.toml" ]] && inputs=("$dir/lucifer.toml")
   while IFS= read -r d; do
-    decks+=("$d")
+    inputs+=("$d")
   done < <(LC_ALL=C ls -1 "$dir"/lucifer*.toml 2>/dev/null | LC_ALL=C sort | grep -vx "$dir/lucifer.toml")
   shopt -u nullglob
-  if [[ ${#decks[@]} -eq 0 ]]; then
-    echo "Error: $dir has no lucifer*.toml deck." >&2
+  if [[ ${#inputs[@]} -eq 0 ]]; then
+    echo "Error: $dir has no lucifer*.toml input file." >&2
     FAILED=1
     continue
   fi
-  printf '%s\n' "${decks[@]}" > "$STATE/decks.${#DIRS[@]}"
+  printf '%s\n' "${inputs[@]}" > "$STATE/inputs.${#DIRS[@]}"
   DIRS+=("$dir")
 done
 
-# run_dir does one directory's work, its decks in order and then its figure. Every deck
+# run_dir does one directory's work, its input files in order and then its figure. Every input file
 # leaves a record carrying the worker's own verdict, so the table and the exit status
-# cannot disagree, and a deck that left no record at all is a failure the parent reports
+# cannot disagree, and an input file that left no record at all is a failure the parent reports
 # by name.
 run_dir () {   # <dir> <index>
   local dir="$1" idx="$2"
-  local k=0 status=0 deck_path deck log rc dt t0 line verdict primary root stats
-  local decks=()
-  # The deck list is read into an array first. A while-read loop would hold the list on
-  # the loop's stdin, and a tracker that read stdin would eat the decks behind it.
-  while IFS= read -r deck_path; do decks+=("$deck_path"); done < "$STATE/decks.$idx"
-  for deck_path in "${decks[@]}"; do
-    deck="$(basename "$deck_path")"
-    log="${deck%.toml}.log"
+  local k=0 status=0 input_path input log rc dt t0 line verdict primary root stats
+  local inputs=()
+  # The input file list is read into an array first. A while-read loop would hold the list on
+  # the loop's stdin, and a tracker that read stdin would eat the input files behind it.
+  while IFS= read -r input_path; do inputs+=("$input_path"); done < "$STATE/inputs.$idx"
+  for input_path in "${inputs[@]}"; do
+    input="$(basename "$input_path")"
+    log="${input%.toml}.log"
     t0=$SECONDS
-    ( cd "$dir" && "$EXE" "$deck" > "$log" 2>&1 < /dev/null )
+    ( cd "$dir" && "$EXE" "$input" > "$log" 2>&1 < /dev/null )
     rc=$?
     dt=$((SECONDS - t0))
     line="$(grep -m1 '^ Exit' "$dir/$log" 2>/dev/null | sed 's/^ *Exit *//')"
@@ -197,24 +197,24 @@ run_dir () {   # <dir> <index>
     fi
     printf '%s\n%s\n%s\n%s\n' "$verdict" "$rc" "$dt" "$line" > "$STATE/out.$idx.$k"
     # The record holds what the run measured, from its stats file and its log, one row
-    # per quantity. The rows of every deck become examples/measured.tsv below, and the
+    # per quantity. The rows of every input file become examples/measured.tsv below, and the
     # pages carry them.
     if [[ "$verdict" == "ok" ]]; then
-      if ! "$PYTHON" "$RECORD" "$dir/$deck" "$dir/$log" >> "$STATE/rec.$idx" 2> "$STATE/recerr.$idx"; then
-        echo "Error: $dir/$deck: the record could not be written; see $STATE/recerr.$idx" > "$STATE/note.$idx"
+      if ! "$PYTHON" "$RECORD" "$dir/$input" "$dir/$log" >> "$STATE/rec.$idx" 2> "$STATE/recerr.$idx"; then
+        echo "Error: $dir/$input: the record could not be written; see $STATE/recerr.$idx" > "$STATE/note.$idx"
         status=1
       fi
     fi
     k=$((k + 1))
   done
 
-  # Each example gets one figure, from the primary deck's stats file. The out_root is read from
-  # the deck rather than assumed equal to the directory name, because several examples
+  # Each example gets one figure, from the primary input file's stats file. The out_root is read from
+  # the input file rather than assumed equal to the directory name, because several examples
   # deliberately differ (chicane writes "chicane", coherent_source writes "coherent").
-  # It runs in this worker, after this directory's decks, because it reads what they wrote.
+  # It runs in this worker, after this directory's input files, because it reads what they wrote.
   if [[ $FIGURES -eq 1 ]]; then
     primary="$dir/lucifer.toml"
-    [[ -f "$primary" ]] || primary="${decks[0]}"
+    [[ -f "$primary" ]] || primary="${inputs[0]}"
     root="$(sed -n 's/.*out_root[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$primary" | head -1)"
     stats="$dir/$root.stats.h5"
     if [[ -z "$root" || ! -f "$stats" ]]; then
@@ -262,20 +262,20 @@ idir=0
 while [[ $idir -lt ${#DIRS[@]} ]]; do
   dir="${DIRS[$idir]}"
   k=0
-  while IFS= read -r deck_path; do
-    deck="$(basename "$deck_path")"
+  while IFS= read -r input_path; do
+    input="$(basename "$input_path")"
     if [[ -f "$STATE/out.$idir.$k" ]]; then
       verdict=""; rc=""; dt=""; line=""
       { read -r verdict; read -r rc; read -r dt; IFS= read -r line || line=""; } \
           < "$STATE/out.$idir.$k"
       [[ "$verdict" == "ok" ]] || FAILED=1
-      printf '%-20s %-26s %6s %6s  %s\n' "$dir" "$deck" "$rc" "$dt" "$line"
+      printf '%-20s %-26s %6s %6s  %s\n' "$dir" "$input" "$rc" "$dt" "$line"
     else
-      printf '%-20s %-26s %6s %6s  %s\n' "$dir" "$deck" "-" "-" "no outcome recorded"
+      printf '%-20s %-26s %6s %6s  %s\n' "$dir" "$input" "-" "-" "no outcome recorded"
       FAILED=1
     fi
     k=$((k + 1))
-  done < "$STATE/decks.$idir"
+  done < "$STATE/inputs.$idir"
   if [[ -f "$STATE/note.$idir" ]]; then cat "$STATE/note.$idir" >&2; FAILED=1; fi
   idir=$((idir + 1))
 done
@@ -286,7 +286,7 @@ done
 # includes comes from the steady-state example's log the same way.
 if [[ $FAILED -eq 0 ]]; then
   {
-    printf 'directory\tdeck\tquantity\tvalue\tunit\n'
+    printf 'directory\tinput\tquantity\tvalue\tunit\n'
     cat "$STATE"/rec.* 2>/dev/null | LC_ALL=C sort
   } > measured.tsv
   if ! "$PYTHON" "$RECORD" --sample steady_state/lucifer.log --out "$LUCIFER_DIR/docs/generated/sample-output.md"; then
@@ -349,7 +349,7 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_retired_words.py" --root "$LU
 fi
 if [[ $FIGURES -eq 1 ]]; then
   echo " All examples ran. Figures in docs/generated/examples/."
-  echo " Regenerate the pages with tests/scripts/report_examples.py after changing a deck."
+  echo " Regenerate the pages with tests/scripts/report_examples.py after changing an input file."
 else
   echo " All examples ran. No figures written (--no-figures)."
 fi

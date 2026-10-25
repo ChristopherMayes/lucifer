@@ -32,7 +32,7 @@ reference file is involved:
      energy modulation, and the pair (1, -i) must leave the beam unmodulated.
   6. Refusals. Tilt on a helical element. Tilt with the transcribed-Genesis maps.
   7. An imported field carrying Ey decides the run's planes, with or without the seed's
-     polarization in the deck.
+     polarization in the input file.
 
 Run by the benchmark. Exits nonzero on failure.
 """
@@ -52,12 +52,12 @@ import numpy as np
 import fieldio
 from checkrec import record
 
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 FAILED = False
 TOL_HEL = 1e-12  # The scalar envelope is the co-rotating pair. The two paths differ by 7.2e-15.
 
-NML = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "{lat}"
   out_root = "{root}"
   source_filter = F
@@ -324,7 +324,7 @@ def main():
     (wd / "p2_hel_tilt.bmad").write_text("call, file = spont_probe.bmad\nUNDS[tilt] = 0.3\n")
     ok1 = refuse(exe, wd, "p2f1", NML.format(lat="p2_hel_tilt.bmad", root="p2f1", extra=""),
                  "TILT ON A HELICAL FEL ELEMENT")
-    # The transcribed maps are a run switch, transport_model, so the deck asks for them.
+    # The transcribed maps are a run switch, transport_model, so the input file asks for them.
     (wd / "p2_tr_tilt.bmad").write_text(
         "call, file = crossed_probe.bmad\nuse, CROSSED\n")
     ok2 = refuse(exe, wd, "p2f2", NML.format(lat="p2_tr_tilt.bmad", root="p2f2",
@@ -334,7 +334,7 @@ def main():
 
     # 7. An imported vector field decides the run's planes. When the state was set at
     #    lattice setup from the seed's polarization and the tilts alone, a file carrying
-    #    Ey under a deck that stated no polarization left the run at one plane. The stats
+    #    Ey under an input file that stated no polarization left the run at one plane. The stats
     #    and the device allocated one plane and the first record wrote past it: an array
     #    bound in the debug build and a bus error in the production one. The source here
     #    writes a y-seeded eight-slice field on the untilted helical line. The restart

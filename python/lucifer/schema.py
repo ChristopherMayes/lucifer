@@ -3,7 +3,7 @@
 ``schema.json`` beside this module is the one committed copy. The keystone writes it from
 the production executable and requires no diff, so the keys, the types, the defaults and
 the bounds here are the program's own. ``python -m lucifer.schema`` prints its path, for
-an editor that validates a deck against JSON Schema.
+an editor that validates an input file against JSON Schema.
 """
 from __future__ import annotations
 

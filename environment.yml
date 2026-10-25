@@ -9,7 +9,7 @@
 # Each entry is a minimum. bmad is taken in its nompi variant, which carries HDF5 without
 # MPI, since Lucifer is shared memory and the reference runs single process. compilers is
 # conda-forge's current toolchain, gfortran and clang, the one the package itself was built
-# with. toml-f reads the deck. The validation environment is a different file,
+# with. toml-f reads the input file. The validation environment is a different file,
 # tests/environment-validate.yml.
 name: lucifer-build
 channels:

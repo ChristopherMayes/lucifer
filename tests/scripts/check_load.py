@@ -35,7 +35,7 @@ Usage:
   check_load.py --exe <lucifer> --workdir <dir>
 """
 
-from lucifer.deck import to_toml
+from lucifer.flat import to_toml
 import argparse
 import pathlib
 import re
@@ -55,7 +55,7 @@ SAMPLE = 3
 SPACING = SAMPLE * LAMBDA0
 E_CHARGE = 1.602176634e-19
 
-DECK = """[run]
+INPUT = """[run]
   lattice = "{lat}"
   run.out_root = "{root}"
   run.ran_seed = {seed}
@@ -83,7 +83,7 @@ BUNCH = """  beam.n_particle = 40000
 def run(exe, wd, root, bextra, pextra="", lat="aramis_1seg.bmad", seed=777, ngrid=64,
         sample=SAMPLE, threads="4"):
     """One run. Returns (returncode, stdout)."""
-    (wd / f"{root}.toml").write_text(to_toml(DECK.format(lat=lat, root=root, seed=seed, pextra=pextra,
+    (wd / f"{root}.toml").write_text(to_toml(INPUT.format(lat=lat, root=root, seed=seed, pextra=pextra,
                                                   bextra=bextra, lam=LAMBDA0, ngrid=ngrid, sample=sample)))
     r = subprocess.run([exe, f"{root}.toml"], cwd=wd, capture_output=True, text=True,
                        env={"OMP_NUM_THREADS": threads, "PATH": "/usr/bin:/bin"})
@@ -172,12 +172,12 @@ def keep_exactness(exe, wd):
     return ok
 
 
-# The in-cone check. The page's deck is a flat 3 kA over 300 slices of 12 wavelengths
+# The in-cone check. The page's input file is a flat 3 kA over 300 slices of 12 wavelengths
 # on a 256-point grid of 2e-4 m half width, with 1024 macroparticles per slice in
 # beamlets of 8 and the filter off. Its statistic is the mean over the interior slices,
-# 80 to 230. The target is that deck run by startup_noise.py's filter experiment with the
+# 80 to 230. The target is that input file run by startup_noise.py's filter experiment with the
 # production build of lucifer 8be17ae, 1.3253e5 W, where the page records 1.328e5 W from
-# the same deck before the even-grid propagator was corrected. Here the current is
+# the same input file before the even-grid propagator was corrected. Here the current is
 # a Gaussian, the bunch's own, at the same peak: sigma_z of 5.5e-9 m, 37 slices of 12
 # wavelengths across 8 sigma. The window has 24 slices of headroom on each side. The field
 # slips 22 slices over the first undulator, 266 periods, and every record that started on
@@ -206,9 +206,9 @@ def incone(exe, wd):
     pextra = (f'  run.track_end = "UND##1"\n  run.source_filter = F\n'
               f'  run.source_filter_angle = {INCONE_CUT:.1e}\n'
               f'  window.window_length = {WINDOW:.6e}\n')
-    # The target comes from the page's deck on the same 256 points this run takes. What
+    # The target comes from the page's input file on the same 256 points this run takes. What
     # this check reads against it is the difference between this Gaussian bunch and the
-    # page's flat window. The parity of this deck moves its in-cone power by 3.4 percent
+    # page's flat window. The parity of this input file moves its in-cone power by 3.4 percent
     # of itself (docs/validation.md, the transverse grid).
     rc, out = run(exe, wd, "ldcone", bextra, pextra=pextra, lat="aramis.bmad", ngrid=256,
                   sample=INCONE_SAMPLE)
@@ -283,7 +283,7 @@ def refusals(exe, wd):
     record("refused, a slice dump through beam.position_file", None, None, "bool", good)
     ok = ok and good
 
-    # A negative spacing is refused by the deck reader, from the schema's bound on
+    # A negative spacing is refused by the input reader, from the schema's bound on
     # window.n_wavelength, with the value in the message. A setup that derived it as
     # though it were 0 would never be reached.
     rc, out = run(exe, wd, "ldnegsample", BUNCH, pextra="  run.load_only = T\n", sample=-3)

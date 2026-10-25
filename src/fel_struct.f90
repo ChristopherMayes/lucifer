@@ -6,7 +6,7 @@
 ! One assembled-state struct, fel_run_struct, is passed explicitly by the library.
 !
 ! The input structs have no allocatable or pointer components. So an input file sets
-! them directly through the deck, as in Tao:
+! them directly through the input file, as in Tao:
 !
 !   [run]
 !     lattice = "line.bmad"
@@ -42,7 +42,7 @@ use fel_stats_mod
 
 implicit none
 
-! The sin^2 ramp of an unaveraged element, in periods at each end, where the deck leaves
+! The sin^2 ramp of an unaveraged element, in periods at each end, where the input file leaves
 ! run.unaveraged_ramp_periods unset or sets it to 0 (fel-physics.md sec-unaveraged).
 
 integer, parameter :: fel_ramp_periods_default$ = 2
@@ -254,7 +254,7 @@ type wavefront_init_struct
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
 end type
 
-! The transverse grid derived from the beam when the deck sets none
+! The transverse grid derived from the beam when the input file sets none
 ! (docs/startup-noise.md, Recommendations). Cells of a seventh of the rms beam size
 ! resolve the beam and the mode. Finer cells raise the wide-angle emission of the point
 ! beamlets without moving the mode power. A half width of nine beam sizes contains the

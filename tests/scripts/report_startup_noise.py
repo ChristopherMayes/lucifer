@@ -42,7 +42,7 @@ import startup_noise as sn  # noqa: E402
 # The machines in the order the page presents them, with the name the page uses.
 MACHINES = (("aramis", "Aramis"), ("flash", "FLASH probe"), ("flash1", "FLASH1"), ("lcls", "LCLS"))
 
-# The sigmoid's width where the deck sets none, run.source_filter_width's default
+# The sigmoid's width where the input file sets none, run.source_filter_width's default
 # (docs/input-reference.md). The derived default rows of the filter experiment run at it.
 DEFAULT_WIDTH = 0.05
 
@@ -185,7 +185,7 @@ def table_derived(rec):
         [f"electrons per slice of {sn.LONG[1]} wavelengths", r"$N_\lambda$", tex(n_slice, 2), ""],
         ["rms shot-noise bunching of such a slice", r"$1/\sqrt{N_\lambda}$", tex(1 / math.sqrt(n_slice), 2), ""],
     ]
-    return block("tab-sn-derived", "Derived quantities, from the deck's parameters and Ming Xie's fit.",
+    return block("tab-sn-derived", "Derived quantities, from the input file's parameters and Ming Xie's fit.",
                  ["quantity", "symbol", "value", "unit"], rows)
 
 

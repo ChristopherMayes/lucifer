@@ -9,7 +9,7 @@ can fail.
    particle rows and for the field twin's source and post-solve rows. The residual
    guard must stay at or above 256 ulps, and the bucket renormalization round trip must
    stay within 1.5 ulps.
-2. Read-only. The same deck with the instrument off must reproduce the instrumented
+2. Read-only. The same input file with the instrument off must reproduce the instrumented
    run's diag file byte for byte. The twin observes the FP64 path and never steers it.
 3. Falsifiable. fp32_mutate = T coarsens the FP32 residual by eight mantissa bits. The
    theta level must then grow by 10 times and the field twin's source row by 5 times,
@@ -35,11 +35,11 @@ import subprocess
 import sys
 
 from checkrec import record
-from lucifer.deck import to_toml as to_groups
+from lucifer.flat import to_toml as to_groups
 
 FAILED = False
 
-BASE = """! flat keys; routed into the deck's tables by lucifer.deck.to_toml
+BASE = """! flat keys; routed into the input file's tables by lucifer.flat.to_toml
   lattice = "aramis_1seg.bmad"
   out_root = "{root}"
   source_filter = F

@@ -128,8 +128,8 @@ lambda0 = run%winit%lambda0
 window_length = run%slicing%window_length
 window_sample = run%slicing%n_wavelength
 
-! A slice count states the window as well as a length does. Genesis decks use one or the
-! other. Both together would have to be reconciled, so a deck giving both is refused.
+! A slice count states the window as well as a length does. Genesis input files use one or the
+! other. Both together would have to be reconciled, so an input file giving both is refused.
 
 if (run%slicing%n_slice > 0) then
   if (window_length > 0) then
@@ -155,8 +155,8 @@ seed_power = run%winit%seed_power
 seed_waist_size = run%winit%seed_waist_size
 
 ! There is one reference energy and the lattice holds it: gamma0 = e_tot/m_e c^2 from
-! the lattice header. It is never a deck input.
-! Note: A deck gamma0 once existed for symmetry with Genesis decks. A hand-rounded
+! the lattice header. It is never an input key.
+! Note: A gamma0 input key once existed for symmetry with Genesis input files. A hand-rounded
 ! value disagreed with the lattice e_tot at 1.4e-9. The FEL physics then ran on one
 ! reference while Bmad's momenta were normalized by the other. The p0c check in the
 ! seam stopped the run mid-tracking.
@@ -210,12 +210,12 @@ if (beam_file /= '') then
   endif
 
   ! An openPMD beam file carries the slice partition and not the radiation it was sliced
-  ! on, so the deck states the window. A missing lambda0 is refused and not defaulted.
+  ! on, so the input file states the window. A missing lambda0 is refused and not defaulted.
   ! A wrong wavelength rescales every phase in the run.
   if (lambda0 <= 0) then
     call out_io (s_error$, r_name, 'READING A BEAM DUMP NEEDS LAMBDA0 > 0.', &
                  'AN openPMD BEAM FILE CARRIES THE SLICE PARTITION AND NOT THE RADIATION', &
-                 'IT WAS SLICED ON, SO THE DECK MUST STATE lambda0 AND window.n_wavelength.', &
+                 'IT WAS SLICED ON, SO THE INPUT FILE MUST STATE lambda0 AND window.n_wavelength.', &
                  'FILE: ' // trim(beam_file))
     err_flag = .true.;  return
   endif
@@ -440,7 +440,7 @@ fbeam%one4one = .false.
 if (allocated(fbeam%slice)) deallocate(fbeam%slice)
 allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 
-! The derived per-slice current. Where the deck states window.current, that is used.
+! The derived per-slice current. Where the input file states window.current, that is used.
 ! It needs no z description and is Genesis's &beam current. Otherwise it comes from the
 ! bunch:
 !   Flat:         I = Q*c/extent inside the grid extent.
@@ -868,7 +868,7 @@ end subroutine fel_bunch_from_beam_init
 ! the same bunch loads the same way every time.
 !
 ! The window follows the bunch: ceiling(extent / spacing) slices from the earliest
-! particle. Where the deck states window.n_slice or window.window_length, that is the
+! particle. Where the input file states window.n_slice or window.window_length, that is the
 ! window, with the bunch centered and the particles outside counted in a warning.
 !-
 
@@ -1037,7 +1037,7 @@ do ip = 1, size(bp%particle)
 enddo
 
 ! Noise per slice on the groups the load has, then the independent-sample count.
-! The noise routine gets the deck's beamlet_size, since that sets the harmonics resolved
+! The noise routine gets the input file's beamlet_size, since that sets the harmonics resolved
 ! and the floor swept. This holds whether or not the load made beamlets of that size.
 
 n_clamp = 0;  rule_seen = 0;  floor_max = 0
@@ -1308,7 +1308,7 @@ if (field_file(1) /= '') then
   endif
 
   ! The file decides its own planes. run%two_pol is set at lattice setup from the seed's
-  ! polarization and the elements' tilts, which is what a generated field needs. A deck
+  ! polarization and the elements' tilts, which is what a generated field needs. An input file
   ! that imports its field states no seed, so the seed cannot decide.
   ! Note: A file carrying Ey once left two_pol false. The stats and the device then
   ! allocated one plane, and the first record wrote past it.

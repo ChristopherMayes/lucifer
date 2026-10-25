@@ -1,15 +1,15 @@
 """The Python side of Lucifer.
 
-models   the deck as typed dataclasses generated from the schema: Deck, Run, Beam, ...
-deck     the flat key = value text of the check scripts as a TOML deck.
+models   the input file as typed dataclasses generated from the schema: Input, Run, Beam, ...
+flat     the flat key = value text of the check scripts as a TOML input file.
 schema   the JSON Schema the program writes with lucifer --schema, carried here.
-runner   runs the program on a deck and hands back where its output went.
+runner   runs the program on an input file and hands back where its output went.
 stats    reads the stats file.
 beam     reads a particle dump, openPMD or Genesis, into per-slice arrays.
 
 Nothing here holds a default the program does not, generates anything but the TOML the
 program reads, or checks what the program refuses itself. The program is the source of
-truth, and this package makes decks and reads results.
+truth, and this package makes input files and reads results.
 
 The names below are reached on first use rather than imported here, so that
 python -m lucifer.generate can write models.py before it exists.
@@ -19,7 +19,7 @@ from __future__ import annotations
 import importlib
 
 _FROM = {name: "lucifer.models" for name in
-         ("Deck", "Run", "Window", "Beam", "Resample", "Field", "Wake", "SpaceCharge", "Bmad")}
+         ("Input", "Run", "Window", "Beam", "Resample", "Field", "Wake", "SpaceCharge", "Bmad")}
 _FROM.update({name: "lucifer.runner" for name in ("LuciferError", "Result", "run")})
 
 __all__ = sorted(_FROM)
