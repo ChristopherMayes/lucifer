@@ -247,7 +247,9 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
             if v.shape[1] > 1:
                 # A curve with values at a few records alone draws its mean as points;
                 # per-slice lines through those records would read as streaks.
-                if slices and not sparse:
+                # Only the first curve of an axis draws its slices: two curves' slices in
+                # one gray could not be told apart.
+                if slices and k == 0 and not sparse:
                     ax.plot(s, v, color=GRAY, lw=0.6, alpha=0.6, zorder=1)
                 agg = np.nansum(v, axis=1) if se.reduce == "sum" else np.nanmean(v, axis=1)
             else:
@@ -281,8 +283,11 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
             ax.yaxis.set_major_locator(MaxNLocator(4))
             ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
     multi = len(series) > 1 or any(se.values.shape[1] > 1 for se in series)
-    # The axis carries the first quantity and the unit, and the legend names each curve.
-    return quantities[0] + _unit_label(prefix, units[0]), factor, multi
+    # The axis carries the quantities and the unit while their names fit beside the axis,
+    # else the first, and the legend names each curve.
+    joined = ", ".join(quantities)
+    name = joined if len(joined) <= 32 else quantities[0]
+    return name + _unit_label(prefix, units[0]), factor, multi
 
 
 def layout(stats, ax, xfactor=1.0, xlabel=True):
@@ -395,6 +400,13 @@ def _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2, include_layout,
         ax.legend(leg_h, leg_l, frameon=False)
     if xlim is not None:
         ax.set_xlim(*(v / xfactor if v is not None else None for v in xlim))
+    elif lax is not None and x == "s":
+        # With the layout drawn, s covers the whole line, so curves that start at the
+        # first element end still sit over the elements they describe.
+        lo = min(float(np.min(st["lattice/s_start"])), *(float(np.min(se.s)) for se in ser + ser2))
+        hi = max(float(np.max(st["lattice/s_end"])), *(float(np.max(se.s)) for se in ser + ser2))
+        pad = 0.02 * (hi - lo)
+        ax.set_xlim((lo - pad) / xfactor, (hi + pad) / xfactor)
     if lax is not None:
         layout(st, lax, xfactor=xfactor, xlabel=False)
         lax.set_xlabel(xlab)

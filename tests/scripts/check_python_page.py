@@ -6,13 +6,16 @@ Check that every Python example on docs/python.md is code a test runs.
 
 Each ```python block on the page follows a MyST comment line naming it,
 "% example: <name>", and the code between "# example: <name>" and
-"# end example: <name>" in python/tests/test_page.py or tests/scripts/check_program.py
-is the same text once the region's common indentation is removed. pytest runs the
-first file's regions, and the keystone runs the second's, which call the program. So an
+"# end example: <name>" in one of SOURCES is the same text once the region's common
+indentation is removed. pytest runs python/tests/test_page.py's regions, the keystone
+runs check_program.py's, which call the program, and the keystone's examples job runs
+python_page_figures.py's on the sase example's run, saving the figure each draws. So an
 example that stops running fails a test, and one edited on the page alone fails here.
 
 Refused: a Python block with no name, a name no file holds or two files hold, a block
-that differs from its region, and a region no block on the page shows.
+that differs from its region, a region no block on the page shows, an image the page
+shows that does not exist, and a figure python_page_figures.py saves that the page does
+not show.
 
 Standard library only, so the docs job runs it without an environment.
 """
@@ -23,7 +26,11 @@ import textwrap
 from pathlib import Path
 
 PAGE = "docs/python.md"
-SOURCES = ("python/tests/test_page.py", "tests/scripts/check_program.py")
+SOURCES = ("python/tests/test_page.py", "tests/scripts/check_program.py",
+           "tests/scripts/python_page_figures.py")
+FIGURES = "tests/scripts/python_page_figures.py"
+IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+\.png)\)")
+SAVED = re.compile(r'\bsave\("([\w-]+)"\)')
 NAME = re.compile(r"^% example: ([\w-]+)\s*$")
 START = re.compile(r"^\s*# example: ([\w-]+)\s*$")
 END = re.compile(r"^\s*# end example: ([\w-]+)\s*$")
@@ -92,11 +99,22 @@ def main():
             failed.append(f"{PAGE}:{line}: example {name} differs from its region in {held[name][0]}")
     for name in sorted(set(held) - shown):
         failed.append(f"{held[name][0]}: example {name} is shown on no block of {PAGE}")
+    # The figures: every image the page shows exists, and every figure the script saves
+    # is shown.
+    page_text = (root / PAGE).read_text()
+    images = IMAGE.findall(page_text)
+    for img in images:
+        if not (root / PAGE).parent.joinpath(img).is_file():
+            failed.append(f"{PAGE} shows {img}, which does not exist")
+    for name in SAVED.findall((root / FIGURES).read_text()):
+        if f"generated/python/{name}.png" not in images:
+            failed.append(f"{FIGURES} saves {name}.png, which {PAGE} does not show")
     if failed:
         print("\n".join(failed))
         print(f"check_python_page: FAIL, {len(failed)} problems")
         return 1
-    print(f"check_python_page: {len(shown)} examples on {PAGE}, each the code a test runs")
+    print(f"check_python_page: {len(shown)} examples and {len(images)} figures on {PAGE}, "
+          f"each the code a test runs")
     return 0
 
 

@@ -283,26 +283,22 @@ def page_examples(exe, wd):
             slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
             # end example: beam
 
-            # example: plot
+            # The plots of the smoke run, checked below. The page's plotting examples run on
+            # the sase example in tests/scripts/python_page_figures.py.
             from lucifer.plot import plot
 
             fig = plot("n1024.stats.h5", y="field/total/power", y2="beam/slice/bunching",
                        yscale="log", return_figure=True)
             fig.savefig("n1024-power.png")
-            # end example: plot
 
-            # example: plot-components
             plot("n1024.stats.h5", y=["beam_size_x", "beam_size_y"])    # from the sigma matrix
             plot("n1024.stats.h5", y="beam/bunch/twiss/norm_emit[x]")   # one plane, at element ends
-            # end example: plot-components
             import matplotlib.pyplot as plt
             fig_emit = plt.gcf()
 
-            # example: summary
             from lucifer.plot import summary
 
             summary("n1024.stats.h5", return_figure=True).savefig("n1024.png")
-            # end example: summary
     finally:
         if old_exe is None:
             os.environ.pop("LUCIFER_EXE")

@@ -336,6 +336,20 @@ if [[ $FAILED -ne 0 ]]; then
   exit 1
 fi
 
+# The Python page's plotting examples run on the sase example's run, drawing the page's
+# figures into docs/generated/python with figures on and into the scratch directory
+# under --no-figures, so the page's code runs on every examples job while its figures,
+# like the examples', stay out of the regeneration diff. They are drawn before the link
+# check below, since the page links to them.
+if [[ $FIGURES -eq 1 ]]; then PY_FIGS="$LUCIFER_DIR/docs/generated/python"; else PY_FIGS="$STATE/python"; fi
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/python_page_figures.py" --stats-dir "$SCRIPT_DIR/sase" \
+       --out "$PY_FIGS" > "$STATE/python-figures.log" 2>&1 < /dev/null; then
+  echo " FAIL: the Python page's figures could not be drawn:"
+  tail -20 "$STATE/python-figures.log"
+  exit 1
+fi
+tail -1 "$STATE/python-figures.log"
+
 # Every relative link in the committed Markdown files resolves. The READMEs here are
 # what the example pages are generated from, with their links retargeted, so a dead
 # link in one reads correctly on the site and is caught nowhere else.

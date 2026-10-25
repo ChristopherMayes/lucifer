@@ -9,6 +9,19 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: the Plotting section of `docs/python.md` shows the figures its examples draw,
+  the power and bunching against s, the rms beam and field sizes, the projected and slice-average
+  emittances at the element ends, and the summary figure, each under the code that draws it, from
+  the run of the sase example. `tests/scripts/python_page_figures.py` holds that code as regions,
+  saves each figure to `docs/generated/python/` and checks its labels and layout, and
+  `examples/run_examples.sh` runs it after the examples, into its scratch directory under
+  `--no-figures`, so the keystone's examples job runs the page's code on the real run while the
+  figures stay out of the regeneration diff. `tests/scripts/check_python_page.py` holds the page's
+  blocks to the regions and refuses an image the page shows that does not exist and a figure the
+  script saves that the page does not show. The smoke run's plots stay in `check_program.py` as
+  checks. `lucifer.plot` draws the slices of an axis's first curve alone, names an axis by every
+  quantity on it when the names fit, and with the layout drawn covers the whole line in s, so
+  curves at the element ends sit over their elements; the examples' figures are redrawn with it.
 - 2026-10-25 Added: `lucifer.plot` draws curves of a stats file against s with the lattice layout
   under them, in the form of LUME-Genesis's `plot`: `plot(stats, y, x, y2, xlim, ylim, ylim2, yscale,
   yscale2, include_layout, include_legend, return_figure, ax, reduce, labels)`, with `Stats.plot` and

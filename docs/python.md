@@ -134,33 +134,50 @@ Units in these files are documentation, never a factor to apply. The values are 
 (python-plot)=
 ## Plotting
 
-`lucifer.plot.plot` draws curves of a stats file against `s`, with the lattice layout under them, in the form of LUME-Genesis's `plot`. It takes the file or its path, the curves for the left axis as `y` and for the right as `y2`, their scales, their limits in the file's units, and `include_layout`, `include_legend` and `return_figure`. Each axis is labeled by the curve's `@long_name` and `@unit`, scaled by the SI prefix that openpmd-beamphysics chooses for the values, and a unit with a power or a quotient keeps its stated form. A curve on the record and slice axes is drawn as a thin gray line per slice with the window total bold for watts, joules and coulombs and the slice mean bold for the rest. A curve on the element-end axis is drawn as points at the element ends. The layout comes from the file's `lattice` group, FEL elements as boxes scaled by `aw` and elements with a `k1` as boxes scaled by it with its sign, so no lattice is built in Python. `Stats.plot` and `Result.plot` call it with their own file.
+`lucifer.plot.plot` draws curves of a stats file against `s`, with the lattice layout under them, in the form of LUME-Genesis's `plot`. It takes the file or its path, the curves for the left axis as `y` and for the right as `y2`, their scales, their limits in the file's units, and `include_layout`, `include_legend` and `return_figure`. Each axis is labeled by the curves' `@long_name` and `@unit`, scaled by the SI prefix that openpmd-beamphysics chooses for the values, and a unit with a power or a quotient keeps its stated form. `Stats.plot` and `Result.plot` call it with their own file. The figures here are drawn from the run of the [SASE example](generated/examples/sase.md), 96 slices through twelve undulator segments, by the code shown above each one, and `examples/run_examples.sh` redraws them whenever it runs the examples.
 
-% example: plot
+% example: plot-power
 ```python
 from lucifer.plot import plot
 
-fig = plot("n1024.stats.h5", y="field/total/power", y2="beam/slice/bunching",
-           yscale="log", return_figure=True)
-fig.savefig("n1024-power.png")
+plot("sase.stats.h5", y="field/total/power", y2="beam/slice/bunching", yscale="log")
 ```
 
-A curve is a dataset path, a path with components named in brackets by the labels of the dataset's own axes, `coords/plane`, `coords/bmad` or `coords/wavefront`, or one of the derived quantities the module lists with their formulas, the rms sizes, the normalized emittances with the dispersion removed, the energy change and the field emittances. A dataset the file does not have is refused with the datasets its group does have.
+![power and bunching against s](generated/python/power.png)
+
+The window's total power grows segment by segment along the line, with a thin gray line for each slice under it, and the slice-mean bunching rises on the right axis. A curve on the record and slice axes is drawn this way, the window total bold for watts, joules and coulombs and the slice mean bold for the rest. The layout under the axes comes from the file's `lattice` group: the FEL elements are boxes scaled by `aw`, and the quadrupoles between them are marks scaled by `k1` with its sign, so no lattice is built in Python.
+
+A curve is a dataset path, a path with components named in brackets by the labels of the dataset's own axes, `coords/plane`, `coords/bmad` or `coords/wavefront`, or one of the derived quantities the module lists with their formulas, the rms sizes, the normalized emittances with the dispersion removed, the energy change and the field emittances. Curves of one unit share an axis, and the legend names each.
+
+% example: plot-sizes
+```python
+plot("sase.stats.h5", y=["beam_size_x", "field_size_x"])
+```
+
+![rms beam and field sizes against s](generated/python/sizes.png)
+
+The beam's size follows the FODO lattice, and the field's is pulled onto it as the gain grows, which is gain guiding. Only the first curve of an axis draws its slices, so the two stay legible.
 
 % example: plot-components
 ```python
-plot("n1024.stats.h5", y=["beam_size_x", "beam_size_y"])    # from the sigma matrix
-plot("n1024.stats.h5", y="beam/bunch/twiss/norm_emit[x]")   # one plane, at element ends
+plot("sase.stats.h5", y=["beam/bunch/twiss/norm_emit[x]", "beam/slice_twiss/twiss/norm_emit[x]"],
+     labels=["projected", "slice average"])
 ```
 
-`lucifer.plot.summary` is the standard figure of a run: radiation power and window field energy on log and linear scales with the power inside the split angle, bunching, the energy change and spread, the rms beam and field sizes, the beam's normalized and the field's emittances, a panel per polarization when the run carries two and per harmonic when it carries harmonics, and the layout under them all. Each panel is one call of `plot`. The examples' figures in the documentation are this figure.
+![projected and slice-average emittance at the element ends](generated/python/emittance.png)
+
+A dataset on the element-end axis is drawn as points at the element ends. Here the `x` in brackets picks the plane from `coords/plane`, and `labels` names the curves in place of the file's names: the projected emittance stands a little above the slice average, by the spread of the slice centroids. A dataset the file does not have is refused with the datasets its group does have, and a component its axes do not label with the labels they do have.
+
+`lucifer.plot.summary` is the standard figure of a run: radiation power and window field energy on log and linear scales with the power inside the split angle, bunching, the energy change and spread, the rms beam and field sizes, the beam's normalized and the field's emittances, a panel per polarization when the run carries two and per harmonic when it carries harmonics, and a layout under each column. Each panel is one call of `plot`, and the example pages show this figure for every example.
 
 % example: summary
 ```python
 from lucifer.plot import summary
 
-summary("n1024.stats.h5", return_figure=True).savefig("n1024.png")
+summary("sase.stats.h5")
 ```
+
+![the summary figure of the SASE example](generated/python/summary.png)
 
 The same figure from the command line, by default to `<out_root>.png` in the current directory:
 
