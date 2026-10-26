@@ -237,6 +237,28 @@ def check(name, value, tol, note=""):
         FAILED = True
 
 
+def headroom_checks(tag, out, n_wavelength, chicane):
+    """The header's two printed sums, the schedule's slippage over the line and the
+    headroom a derived window holds, come from one routine and must agree exactly, and
+    the headroom's slices are nint of the wavelengths over n_wavelength. ``chicane`` is
+    the rotations the line's chicanes must contribute."""
+    m_s = re.search(r"^ Slippage\s+(\S+) wavelengths over the line: (\S+) in undulator steps, "
+                    r"(\d+) in interludes and at the end, (\d+) in chicanes", out, re.M)
+    m_w = re.search(r"^ Window\s+derived: (\d+) slices for the bunch and (\d+) of headroom for "
+                    r"(\S+) wavelengths of slippage", out, re.M)
+    terms = (f"[{m_s.group(1)} wavelengths: {m_s.group(2)} in undulator steps, {m_s.group(3)} in "
+             f"interludes and at the end, {m_s.group(4)} in chicanes]") if m_s else "[no Slippage line]"
+    same = m_s is not None and m_w is not None and m_s.group(1) == m_w.group(3)
+    check(f"window: {tag}'s headroom is the schedule's slippage, the two printed sums equal (0 = yes)",
+          0.0 if same else 1.0, 0.5, note=terms)
+    if m_w:
+        check(f"window: {tag}'s headroom slices are nint(slippage / n_wavelength) (count)",
+              abs(int(m_w.group(2)) - round(float(m_w.group(3)) / n_wavelength)), 0.5,
+              note=f"[{m_w.group(2)} slices ahead of {m_w.group(1)}]")
+    if m_s:
+        check(f"window: {tag}'s chicanes contribute {chicane} rotations (count)", abs(int(m_s.group(4)) - chicane), 0.5)
+
+
 def run(exe, wd, name, text, threads="8"):
     (wd / (name + ".toml")).write_text(to_groups(text))
     r = subprocess.run([str(exe), name + ".toml"], cwd=wd, capture_output=True, text=True,
@@ -504,6 +526,27 @@ def interludes(exe, wd):
 # file, whose slice 1 is the slot just past the head. The run below has an interlude, so
 # the field is drifted along the lattice before the files are written. The check holds
 # refposition unmoved by that drift, so that it never carries a lattice position.
+
+# A closed-bump chicane between two segments, check_phasing's, at the angle whose
+# arc-minus-chord delay is 3.5 wavelengths, so the schedule charges 3 rotations for it.
+CHIC_LAT = """no_digested
+parameter[geometry] = open
+parameter[particle] = electron
+parameter[e_tot] = 11357.82 * m_electron
+beginning[beta_a] = 15
+beginning[beta_b] = 15
+UND: wiggler, l = 0.45, l_period = 0.015, field_calc = helical_model, &
+      b_max = 0.84853 * (twopi / 0.015) * m_electron / c_light, &
+      fel_method = averaged, ds_step = 0.015
+ANG = sqrt(3.5e-10 / (2 * 0.05 / 3 + 0.025))
+B1: sbend, l = 0.05, g =  ANG / 0.05
+B2: sbend, l = 0.05, g = -ANG / 0.05
+B3: sbend, l = 0.05, g = -ANG / 0.05
+B4: sbend, l = 0.05, g =  ANG / 0.05
+DD: pipe, l = 0.025
+SEG: line = (UND, DD, B1, DD, B2, DD, B3, DD, B4, DD, UND)
+use, SEG
+"""
 
 REF_LAT = """no_digested
 parameter[geometry] = open
@@ -1022,22 +1065,27 @@ def main():
     if falls == 0:
         check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
 
-    # A window with room ahead of the bunch for all the slippage the run applies keeps the
-    # light the bunch makes: escaped_energy is zero at every record, and with nothing
-    # banked neither the escaped nor the pulse file is written. The one segment slips the
-    # light 267 wavelengths, its 266 periods and the schedule's end-of-lattice +1, and the
-    # window gives 600 slices of 1e-10 m to an 8e-10 m bunch. The run is unseeded, since a
-    # seed fills the whole window, the empty slices ahead of the bunch included, and that
-    # seed light does slip out.
-    run(exe, wd, "dgw", NML.format(lat="aramis_1seg.bmad", root="dgw", extra="").replace(
-        "window_length = 8e-10", "window_length = 6e-8").replace("seed_power = 1e4", "seed_power = 0"))
-    with read_stats(wd / "dgw.stats.h5") as st:
-        esc_w = float(np.max(st["field/total/escaped_energy"]))
-        n_slice_w = len(st.coord("slice"))
-    files_w = sorted(f.name for f in wd.glob("dgw-escaped*.wf.h5")) + sorted(f.name for f in wd.glob("dgw-pulse*.wf.h5"))
-    check("pulse: a window holding the slippage loses no light, escaped_energy max [J]", esc_w, 0.0,
-          note=f"[{n_slice_w} slices; field files {files_w or 'none'}]")
-    check("pulse: and writes no escaped or pulse file (count)", float(len(files_w)), 0.0)
+    # A derived window has room ahead of the bunch for all the slippage the run applies,
+    # so it keeps the light the bunch makes: escaped_energy is zero at every record, and
+    # with nothing banked neither the escaped nor the pulse file is written. The headroom
+    # is the schedule's own sum, the one segment's 266 periods at the lattice's detuning
+    # and the end-of-lattice +1, in whole slices beyond the bunch's 8. The run is unseeded,
+    # since a seed fills the whole window, the empty slices ahead of the bunch included,
+    # and that seed light does slip out. A chicane line adds the interludes' and the
+    # chicane's rotations, 3 for a delay of 3.5 wavelengths, to the same sum.
+    for tag, lat, extra in (("dgw", "aramis_1seg.bmad", ""), ("dgc", "chic.bmad", "  interlude_model = 'bmad'\n")):
+        if tag == "dgc":
+            (wd / "chic.bmad").write_text(CHIC_LAT)
+        r = run(exe, wd, tag, NML.format(lat=lat, root=tag, extra=extra).replace(
+            "  window_length = 8e-10\n", "").replace("seed_power = 1e4", "seed_power = 0"))
+        with read_stats(wd / f"{tag}.stats.h5") as st:
+            esc_w = float(np.max(st["field/total/escaped_energy"]))
+            n_slice_w = len(st.coord("slice"))
+        files_w = sorted(f.name for f in wd.glob(f"{tag}-escaped*.wf.h5")) + sorted(f.name for f in wd.glob(f"{tag}-pulse*.wf.h5"))
+        check(f"window: {tag}'s derived window loses no light, escaped_energy max [J]", esc_w, 0.0,
+              note=f"[{n_slice_w} slices; field files {files_w or 'none'}]")
+        check(f"window: {tag} writes no escaped or pulse file (count)", float(len(files_w)), 0.0)
+        headroom_checks(tag, r.stdout, 1, chicane=3 if tag == "dgc" else 0)
 
     # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane. The
     # pulse file is read with h5py alone, independent of the package's reader.

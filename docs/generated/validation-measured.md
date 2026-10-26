@@ -847,8 +847,16 @@ where the two builds agree to every printed digit.
 | pulse: escaped_energy at the exit vs the banked slices' energies, rel | 7.2164e-15 | 8.1046e-15 | <= 1.0000e-12 |
 | pulse: escaped_energy at the exit vs the ledger's U_escaped, rel | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse: the largest fall of pulse_energy between records, rel (the window falls) | 0.0000e+00 | same | <= 1.0000e-12 |
-| pulse: a window holding the slippage loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
-| pulse: and writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgw's derived window loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgw writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgw's headroom is the schedule's slippage, the two printed sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| window: dgw's headroom slices are nint(slippage / n_wavelength) (count) | 0 | same | <= 5.0000e-01 |
+| window: dgw's chicanes contribute 0 rotations (count) | 0 | same | <= 5.0000e-01 |
+| window: dgc's derived window loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgc writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgc's headroom is the schedule's slippage, the two printed sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| window: dgc's headroom slices are nint(slippage / n_wavelength) (count) | 0 | same | <= 5.0000e-01 |
+| window: dgc's chicanes contribute 3 rotations (count) | 0 | same | <= 5.0000e-01 |
 | bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
 | pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.8823e-03 | same | <= 2.0000e-02 |
 | thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |

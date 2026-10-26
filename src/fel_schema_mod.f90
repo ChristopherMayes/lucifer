@@ -180,7 +180,7 @@ call add ('run', 'device_dep_mutate', key_int$, '', 'deposit mutate', &
 ! [window]: fel_slicing_struct.
 
 call add ('window', 'window_length', key_real$, 'm', 'window length', &
-      'The time window. 0 derives it from the bunch, or is one slice.', lo = 0.0_rp)
+      'The time window. 0 derives it from the bunch and the slippage the line applies, or is one slice.', lo = 0.0_rp)
 call add ('window', 'n_wavelength', key_int$, '', 'wavelengths per slice', &
       'Wavelengths per slice, Genesis4''s sample. 0 derives it from the gain.', lo = 0.0_rp)
 call add ('window', 'n_slice', key_int$, '', 'slice count', &

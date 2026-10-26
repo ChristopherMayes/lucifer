@@ -11,49 +11,12 @@ module fel_init_mod
 
 use fel_struct
 use fel_io_mod
+use fel_setup_mod
 use beam_mod
 
 implicit none
 
 contains
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Function fel_line_slippage (run, lambda) result (slip)
-!
-! Routine to return the slippage of the line: one wavelength per undulator period.
-! This is the headroom a window needs at its head for radiation that leaves the bunch
-! behind (fel-physics.md sec-window).
-!
-! Input:
-!   run     -- fel_run_struct: Run state with %lat and %is_fel set.
-!   lambda  -- real(rp): Radiation wavelength [m].
-!
-! Output:
-!   slip    -- real(rp): Slippage over the line [m].
-!-
-
-function fel_line_slippage (run, lambda) result (slip)
-
-type (fel_run_struct), target :: run
-type (branch_struct), pointer :: br
-real(rp) lambda, slip
-integer je
-
-!
-
-slip = 0
-br => run%lat%branch(0)
-do je = 1, br%n_ele_track
-  if (.not. run%is_fel(je)) cycle
-  if (br%ele(je)%value(l_period$) <= 0) cycle
-  slip = slip + br%ele(je)%value(l$) / br%ele(je)%value(l_period$)
-enddo
-slip = slip * lambda
-
-end function fel_line_slippage
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
@@ -283,8 +246,10 @@ real(rp) dx_grid, w_part, e0, xg, yg, wsum, w2sum, n_lambda, n_eff, floor_b2, ta
 real(rp) phi, an, nbl, br, bi
 real(rp), allocatable :: theta_work(:), beta_work(:), kick(:), cur_gen(:)
 real(rp) nl_min, nl_max, neff_min, neff_max, floor_max, floor_nl
-real(rp) spacing_gen, zlen_gen, s_i, q_slice, zbunch_gen, slip_gen
-integer ncenter_gen
+real(rp) spacing_gen, zlen_gen, s_i, q_slice, zbunch_gen, slip_gen, s_und
+real(rp), allocatable :: eslip(:), lcorr(:)
+integer ncenter_gen, n_head_gen, s_int, s_chic
+logical serr
 integer ib, im, ip, mbase, ix, iy, is_g, nslice_gen, ih, nharm, n_clamp, rule, rule_seen, n_group_w
 integer, allocatable :: group_w(:)
 logical flat_z
@@ -388,15 +353,29 @@ else
   zlen_gen = 0                            ! Steady state.
 endif
 
-! Add the line's slippage ahead of the window head, which is its high-index end
-! (fel-physics.md sec-window). A stated window sets its own headroom and gets none added.
+! A derived window holds the line's slippage ahead of the window head, which is its
+! high-index end (fel-physics.md sec-window), from the sum the walk's schedule takes
+! (fel_setup_slippage), with the reference gamma the schedule uses. The record rotates
+! one slice per n_wavelength wavelengths once 0.8 of a slice has accumulated, so
+! nint(S / n_wavelength) slices never fall short of the rotations S wavelengths produce.
+! A stated window sets its own headroom and gets none added.
 
+p0_mc = sqrt(gamma0**2 - 1)
+fbeam%p0c = p0_mc * m_electron
 zbunch_gen = zlen_gen
 slip_gen = 0
+n_head_gen = 0
 if (zlen_gen > 0 .and. window_length <= 0 .and. run%slicing%n_slice <= 0) then
-  slip_gen = fel_line_slippage (run, lambda0)
-  zlen_gen = zlen_gen + slip_gen
+  allocate (eslip(run%lat%branch(0)%n_ele_track), lcorr(run%lat%branch(0)%n_ele_track))
+  call fel_setup_slippage (run, fel_gamma0(fbeam), lambda0, eslip, lcorr, s_und, s_int, s_chic, serr)
+  if (serr) then
+    err_flag = .true.;  return
+  endif
+  slip_gen = s_und + sum(eslip)
+  n_head_gen = nint(slip_gen / window_sample)
 endif
+run%slip_headroom = slip_gen
+run%n_headroom = n_head_gen
 
 if (window_length > 0) then
   if (zlen_gen == 0 .and. run%slicing%current <= 0 .and. window_length > 1.5_rp * spacing_gen) then
@@ -411,7 +390,7 @@ if (window_length > 0) then
   endif
   nslice_gen = max(1, nint(window_length / spacing_gen))
 else
-  nslice_gen = max(1, nint(zlen_gen / spacing_gen))
+  nslice_gen = max(1, nint(zbunch_gen / spacing_gen)) + n_head_gen
 endif
 
 if (shot_noise .and. nslice_gen < 2) then
@@ -425,10 +404,8 @@ if (gen_test_weights .and. mod(mbase, 2) /= 0) then
   err_flag = .true.;  return
 endif
 
-p0_mc = sqrt(gamma0**2 - 1)
 delgam_gen = (p0_mc**2 / gamma0) * beam_init%sig_pz    ! beta0*p0_mc*sig_pz.
 
-fbeam%p0c = p0_mc * m_electron
 fbeam%phi0 = 0
 fbeam%wavelength = lambda0
 fbeam%slice_spacing = spacing_gen
@@ -447,11 +424,8 @@ allocate (fbeam%slice(nslice_gen), cur_gen(nslice_gen))
 !   Gaussian:     The profile at the slice centers, bunch centered in the window.
 !   Steady state: The whole charge in the one slice window, I = Q*c/spacing.
 
-if (slip_gen > 0) then
-  ncenter_gen = max(1, nint(zbunch_gen / spacing_gen))   ! Derived window: bunch low, headroom at the head.
-else
-  ncenter_gen = nslice_gen                               ! A stated window centers the bunch it is given.
-endif
+ncenter_gen = nslice_gen - n_head_gen   ! A derived window: the bunch low, the headroom at the head.
+                                        ! A stated window centers the bunch it is given.
 
 if (run%slicing%current > 0) then
   cur_gen = run%slicing%current

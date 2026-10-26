@@ -2986,26 +2986,6 @@ wavefront or generates the Gaussian seed, and adds the harmonic entries.
 Errors return through err_flag, and nothing here stops.
 ```
 
-(api-fel-line-slippage)=
-### `fel_line_slippage`
-
-*Function* `(run, lambda) result (slip)`
-
-```
-Routine to return the slippage of the line: one wavelength per undulator period.
-This is the headroom a window needs at its head for radiation that leaves the bunch
-behind (fel-physics.md sec-window).
-```
-
-```
-Input:
-  run     -- fel_run_struct: Run state with %lat and %is_fel set.
-  lambda  -- real(rp): Radiation wavelength [m].
-
-Output:
-  slip    -- real(rp): Slippage over the line [m].
-```
-
 (api-fel-init-beam)=
 ### `fel_init_beam`
 
@@ -4245,6 +4225,83 @@ since the bookkeeper leaves nothing else to read. So an element whose step is
 l_period/20 by the input file's own choice is derived over. Any other stated step is kept.
 ```
 
+(api-fel-setup-slippage)=
+### `fel_setup_slippage`
+
+*Subroutine* `(run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, slip_chic, err_flag)`
+
+```
+Routine to sum the slippage the walk applies over the line, in fundamental
+wavelengths. Two callers take this one sum: fel_setup_schedule, which gives the walk
+its rotations at each element's last step, and fel_init_beam, which gives a derived
+window this much headroom ahead of the bunch. So the window holds what the schedule
+slips, and the two cannot disagree.
+
+Three terms (fel-physics.md sec-slippage, sec-window, sec-phasing):
+  Undulator steps. Each FEL element slips l (1 + aw^2) / (2 gamma0_ref^2 lambda), which
+    the walk applies step by step as dz (1 + aw^2) / (2 gamma0_ref^2 lambda). At
+    resonance that is one wavelength per period. Returned as slip_und, and not in
+    ele_slip.
+  Interludes. Drift autophasing: interludes accumulate Lz, and the last interlude
+    before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
+    (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
+    (Lattice.cpp:191-193) is unguarded in Genesis. The last element always gets
+    floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at
+    all ("autophasing is applied in case for [a] second, succeeding run"). Transcribed
+    as is. Omitting that +1 leaves the field record one rotation short at the very
+    end. Their sum is slip_int.
+  Chicanes. A break whose elements bend the reference gets floor(delay/lambda) of its
+    arc over its chord (setup_break_geometry), and its light-path correction. Their
+    sum is slip_chic.
+ele_slip holds the interlude and chicane rotations at the element whose last step
+applies them. The line's total is slip_und + sum(ele_slip).
+```
+
+```
+Input:
+  run           -- fel_run_struct: Run state after fel_setup_lattice (%lat, %is_fel, %und_of).
+  gamma0_ref    -- real(rp): The walk's reference gamma, fel_gamma0 of the beam.
+  lambda        -- real(rp): The fundamental wavelength [m].
+
+Output:
+  ele_slip(:)   -- real(rp): Rotations at each element's last step [wavelengths], sized
+                     to the branch's tracked elements.
+  light_corr(:) -- real(rp): Chord-vs-arc correction on a break's last element [m].
+  slip_und      -- real(rp): The undulator steps' slippage [wavelengths].
+  slip_int      -- integer: The interludes' rotations, the end of the lattice included.
+  slip_chic     -- integer: The chicanes' rotations.
+  err_flag      -- logical: Set True on a refusal: a geometry element inside a
+                     genesis-model interlude, or a break that is not a closed bump.
+```
+
+(api-setup-break-geometry)=
+### `setup_break_geometry`
+
+*Subroutine* `()`
+
+```
+Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
+bend the reference (sbends, patches) detours the beam while the radiation goes
+straight. The light's path is the chord between the flanking undulator faces, from
+ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
+delay is charged as whole-wavelength window rotations on the break's last element
+(Genesis's chicane semantics: "always autophasing"). That element also takes the
+light-path drift correction. Absolute mode adds the delay's carrier phase in the walk.
+Only a closed bump keeps the light on the next undulator's axis, and anything else is
+refused. So is any geometry element under the genesis-model interludes, since
+Genesis's drift and quad set cannot represent it.
+```
+
+(api-close-geometry-break)=
+### `close_geometry_break`
+
+*Subroutine* `(ib0, iblast, arc)`
+
+```
+Routine to close one geometry break: the chord, the closed-bump refusal, the delay's
+rotations and the light-path correction (see setup_break_geometry's header).
+```
+
 (api-fel-setup-schedule)=
 ### `fel_setup_schedule`
 
@@ -4296,34 +4353,6 @@ The checks:
   A z_long table narrower than the window would overflow its binning grid.
 This runs after the beam is built, since the window length is the subject.
 setup_fel_elements runs before it, since two_pol must precede the field.
-```
-
-(api-setup-break-geometry)=
-### `setup_break_geometry`
-
-*Subroutine* `()`
-
-```
-Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
-bend the reference (sbends, patches) detours the beam while the radiation goes
-straight. The light's path is the chord between the flanking undulator faces, from
-ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
-delay is charged as whole-wavelength window rotations on the break's last element
-(Genesis's chicane semantics: "always autophasing"). That element also takes the
-light-path drift correction. Absolute mode adds the delay's carrier phase in the walk.
-Only a closed bump keeps the light on the next undulator's axis, and anything else is
-refused. So is any geometry element under the genesis-model interludes, since
-Genesis's drift and quad set cannot represent it.
-```
-
-(api-close-geometry-break)=
-### `close_geometry_break`
-
-*Subroutine* `(ib0, iblast, arc)`
-
-```
-Routine to close one geometry break: the chord, the closed-bump refusal, the delay's
-rotations and the light-path correction (see setup_break_geometry's header).
 ```
 
 (api-setup-diagnostics)=

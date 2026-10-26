@@ -99,7 +99,7 @@ class Run:
 class Window:
     """The [window] table of the input file."""
     window_length: float = 0.0
-    """The time window. 0 derives it from the bunch, or is one slice. [m] Bounds: from 0.0."""
+    """The time window. 0 derives it from the bunch and the slippage the line applies, or is one slice. [m] Bounds: from 0.0."""
     n_wavelength: int = 0
     """Wavelengths per slice, Genesis4's sample. 0 derives it from the gain. Bounds: from 0."""
     n_slice: int = 0

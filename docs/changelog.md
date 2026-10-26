@@ -9,6 +9,23 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-26 Fixed: a derived time window lost light at its head. The window's headroom was one
+  wavelength per undulator period, while the walk's schedule also slips each interlude run by
+  floor(Lz / (2 gamma0^2 lambda)) + 1 wavelengths, the end of the lattice by +1, each chicane by
+  floor(delay / lambda), and each undulator by L (1 + aw^2) / (2 gamma0^2 lambda) rather than its
+  period count. On the Aramis line the periods alone are 3192 of the 3552 wavelengths the schedule
+  slips, 10.1% short, on FLASH1 990 of 1098 and on LCLS 3762 of 3879, and an unseeded one-segment run
+  with the derived window let 4.2e-15 J escape. `fel_setup_slippage` in `src/fel_setup_mod.f90` is
+  now the one sum: `fel_setup_schedule` takes the walk's rotations from it, and `fel_init_beam` the
+  derived window's headroom, nint of the sum over `n_wavelength` in whole slices beyond the bunch's,
+  which never falls short of the rotations the sum produces. The header's `Slippage` line states the
+  sum by term and its `Window` line what a derived window holds of it, and `check_diagnostics.py`
+  holds the two printed sums equal on the Aramis segment and on a chicane line, with no light escaping
+  either. No recorded digit moved: every benchmark tier loads its window from the reference dump,
+  and every example and check whose bunch is generated states its window or is steady state, so the
+  diagnostics check's run, which stated 6e-8 m until now, is the one derived time-dependent window in
+  the benchmark. A stated window is unchanged. A drawn bunch's window, its particles' own
+  extent, is unchanged too, and gets no headroom as before.
 - 2026-10-26 Added: a run's dumps in Python, reached as files and read on first use, in the form
   LUME-Genesis uses. `Result.particle_files` and `Result.field_files` map a key to each dump the
   footer lists, `final`, `initial`, `at<n>-<element>`, a frame by its record number, and `escaped`

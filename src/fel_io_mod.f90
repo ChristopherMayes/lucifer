@@ -645,6 +645,23 @@ else
 endif
 call out_io (s_blank$, r_name, trim(line))
 
+! The slippage the schedule applies over the line, and what a derived window holds of
+! it. Both come from fel_setup_slippage, and check_diagnostics.py holds the two printed
+! totals equal.
+
+if (run%nslice > 1) then
+  write (line, '(a, f0.6, a, f0.6, a, i0, a, i0, a)') ' Slippage    ', run%slip_und + sum(run%ele_slip), &
+        ' wavelengths over the line: ', run%slip_und, ' in undulator steps, ', run%slip_int, &
+        ' in interludes and at the end, ', run%slip_chic, ' in chicanes'
+  call out_io (s_blank$, r_name, trim(line))
+  if (run%slip_headroom > 0) then
+    write (line, '(a, i0, a, i0, a, f0.6, a)') ' Window      derived: ', run%nslice - run%n_headroom, &
+          ' slices for the bunch and ', run%n_headroom, ' of headroom for ', run%slip_headroom, &
+          ' wavelengths of slippage'
+    call out_io (s_blank$, r_name, trim(line))
+  endif
+endif
+
 ! The grid is the built wavefront's and not the input's. A field read from a file
 ! carries its own grid, and the input file then states none.
 

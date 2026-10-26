@@ -62,7 +62,7 @@
 <!-- begin keys-window -->
 | key | type | default | unit | bounds | meaning |
 |---|---|---|---|---|---|
-| `window_length` | real | `0` | m | from 0 | The time window. 0 derives it from the bunch, or is one slice. |
+| `window_length` | real | `0` | m | from 0 | The time window. 0 derives it from the bunch and the slippage the line applies, or is one slice. |
 | `n_wavelength` | integer | `0` |  | from 0 | Wavelengths per slice, Genesis4's sample. 0 derives it from the gain. |
 | `n_slice` | integer | `0` |  | from 0 | The window as a slice count. 0 takes it from window_length. Both set is refused. |
 | `current` | real | `0` | A | from 0 | A flat current. 0 derives the current from the bunch's z structure. |

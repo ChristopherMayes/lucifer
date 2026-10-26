@@ -377,6 +377,13 @@ type fel_run_struct
   real(rp), allocatable :: ele_slip(:)     ! Slippage after each element's last step [wavelengths].
   real(rp), allocatable :: fel_zoff(:)     ! The z_offset off-phase knob per element [m].
   real(rp), allocatable :: light_corr(:)   ! Chord-vs-arc correction on a break's last element [m].
+  ! The schedule's slippage over the line [wavelengths] (fel_setup_slippage): the undulator
+  ! steps', the interludes' with the end of the lattice, and the chicanes'. The derived
+  ! window's headroom is the same sum (fel_init_beam), as wavelengths and as slices.
+  real(rp) :: slip_und = 0
+  integer :: slip_int = 0, slip_chic = 0
+  real(rp) :: slip_headroom = 0
+  integer :: n_headroom = 0
   logical, allocatable :: is_fel(:)
   ! Space charge per element: ele%space_charge_method = slice and Bmad's master switch
   ! bmad.csr_and_space_charge_on, resolved once at setup for the walk to read.

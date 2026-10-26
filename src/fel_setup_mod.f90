@@ -795,6 +795,203 @@ end subroutine fel_setup_lattice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Subroutine fel_setup_slippage (run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, slip_chic, err_flag)
+!
+! Routine to sum the slippage the walk applies over the line, in fundamental
+! wavelengths. Two callers take this one sum: fel_setup_schedule, which gives the walk
+! its rotations at each element's last step, and fel_init_beam, which gives a derived
+! window this much headroom ahead of the bunch. So the window holds what the schedule
+! slips, and the two cannot disagree.
+!
+! Three terms (fel-physics.md sec-slippage, sec-window, sec-phasing):
+!   Undulator steps. Each FEL element slips l (1 + aw^2) / (2 gamma0_ref^2 lambda), which
+!     the walk applies step by step as dz (1 + aw^2) / (2 gamma0_ref^2 lambda). At
+!     resonance that is one wavelength per period. Returned as slip_und, and not in
+!     ele_slip.
+!   Interludes. Drift autophasing: interludes accumulate Lz, and the last interlude
+!     before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
+!     (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
+!     (Lattice.cpp:191-193) is unguarded in Genesis. The last element always gets
+!     floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at
+!     all ("autophasing is applied in case for [a] second, succeeding run"). Transcribed
+!     as is. Omitting that +1 leaves the field record one rotation short at the very
+!     end. Their sum is slip_int.
+!   Chicanes. A break whose elements bend the reference gets floor(delay/lambda) of its
+!     arc over its chord (setup_break_geometry), and its light-path correction. Their
+!     sum is slip_chic.
+! ele_slip holds the interlude and chicane rotations at the element whose last step
+! applies them. The line's total is slip_und + sum(ele_slip).
+!
+! Input:
+!   run           -- fel_run_struct: Run state after fel_setup_lattice (%lat, %is_fel, %und_of).
+!   gamma0_ref    -- real(rp): The walk's reference gamma, fel_gamma0 of the beam.
+!   lambda        -- real(rp): The fundamental wavelength [m].
+!
+! Output:
+!   ele_slip(:)   -- real(rp): Rotations at each element's last step [wavelengths], sized
+!                      to the branch's tracked elements.
+!   light_corr(:) -- real(rp): Chord-vs-arc correction on a break's last element [m].
+!   slip_und      -- real(rp): The undulator steps' slippage [wavelengths].
+!   slip_int      -- integer: The interludes' rotations, the end of the lattice included.
+!   slip_chic     -- integer: The chicanes' rotations.
+!   err_flag      -- logical: Set True on a refusal: a geometry element inside a
+!                      genesis-model interlude, or a break that is not a closed bump.
+!-
+
+subroutine fel_setup_slippage (run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, &
+                               slip_chic, err_flag)
+
+type (fel_run_struct), target :: run
+type (branch_struct), pointer :: branch
+type (ele_struct), pointer :: ele
+real(rp) gamma0_ref, lambda, slip_und, Lz
+real(rp) ele_slip(:), light_corr(:)
+integer slip_int, slip_chic, ie, prev_ie, n_rot
+logical err_flag
+character(16) interlude_model
+character(*), parameter :: r_name = 'fel_setup_slippage'
+
+!
+
+err_flag = .false.
+branch => run%lat%branch(0)
+interlude_model = run%global%interlude_model
+ele_slip = 0
+light_corr = 0
+slip_und = 0;  slip_int = 0;  slip_chic = 0
+Lz = 0
+prev_ie = 0
+
+do ie = 1, branch%n_ele_track
+  ele => branch%ele(ie)
+  if (ele%value(l$) == 0) cycle
+  if (run%is_fel(ie)) then
+    slip_und = slip_und + ele%value(l$) * (1 + run%und_of(ie)%aw**2) / (2 * gamma0_ref**2 * lambda)
+    if (Lz > 0 .and. prev_ie > 0) then
+      n_rot = floor(Lz / (2 * gamma0_ref**2 * lambda)) + 1
+      ele_slip(prev_ie) = ele_slip(prev_ie) + n_rot
+      slip_int = slip_int + n_rot
+    endif
+    Lz = 0
+  else
+    Lz = Lz + ele%value(l$)
+  endif
+  prev_ie = ie
+enddo
+if (prev_ie > 0) then
+  n_rot = floor(Lz / (2 * gamma0_ref**2 * lambda)) + 1
+  ele_slip(prev_ie) = ele_slip(prev_ie) + n_rot
+  slip_int = slip_int + n_rot
+endif
+
+call setup_break_geometry ()   ! Chicane breaks: chord vs arc from ele%floor, the
+                               ! delay's rotations, the light-path correction, and
+                               ! the closed-bump and genesis-model refusals.
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine setup_break_geometry ()
+!
+! Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
+! bend the reference (sbends, patches) detours the beam while the radiation goes
+! straight. The light's path is the chord between the flanking undulator faces, from
+! ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
+! delay is charged as whole-wavelength window rotations on the break's last element
+! (Genesis's chicane semantics: "always autophasing"). That element also takes the
+! light-path drift correction. Absolute mode adds the delay's carrier phase in the walk.
+! Only a closed bump keeps the light on the next undulator's axis, and anything else is
+! refused. So is any geometry element under the genesis-model interludes, since
+! Genesis's drift and quad set cannot represent it.
+!-
+
+subroutine setup_break_geometry ()
+
+real(rp) arc
+integer i0, ie_g, last_in_break
+logical geom
+
+!
+
+i0 = 0                    ! Break start: exit face of the last FEL element (0 = origin).
+arc = 0;  geom = .false.;  last_in_break = 0
+
+do ie_g = 1, branch%n_ele_track
+  ele => branch%ele(ie_g)
+  if (run%is_fel(ie_g)) then
+    if (geom .and. last_in_break > 0) then
+      call close_geometry_break (i0, last_in_break, arc)
+      if (err_flag) return
+    endif
+    i0 = ie_g;  arc = 0;  geom = .false.;  last_in_break = 0
+  elseif (ele%value(l$) /= 0 .or. ele%key == patch$) then
+    arc = arc + ele%value(l$)
+    last_in_break = ie_g
+    if (ele%key == sbend$ .or. ele%key == patch$) then
+      geom = .true.
+      if (interlude_model == 'genesis') then
+        call out_io (s_error$, r_name, 'GEOMETRY ELEMENT ' // trim(ele%name) // ' (A BEND OR PATCH) INSIDE A', &
+                     'GENESIS-MODEL INTERLUDE: GENESIS''S DRIFT/QUAD SET CANNOT REPRESENT IT.', &
+                     'POSSIBLE SOLUTION: USE INTERLUDE_MODEL = "bmad" (THE SEAM TRACKS IT EXACTLY).')
+        err_flag = .true.;  return
+      endif
+    endif
+  endif
+enddo
+! A trailing geometry break (no following undulator) needs no phasing: there is no
+! next segment to phase against.
+
+end subroutine setup_break_geometry
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine close_geometry_break (ib0, iblast, arc)
+!
+! Routine to close one geometry break: the chord, the closed-bump refusal, the delay's
+! rotations and the light-path correction (see setup_break_geometry's header).
+!-
+
+subroutine close_geometry_break (ib0, iblast, arc)
+
+type (ele_struct), pointer :: e1, e2
+real(rp) arc, chord, dvec(3), axis(3), delay_geo, tol
+integer ib0, iblast
+
+!
+
+e1 => branch%ele(ib0)         ! Exit face of the upstream FEL element (or the origin).
+e2 => branch%ele(iblast)      ! Exit face of the break's last element = the entry face
+                              ! of the next FEL element.
+dvec = e2%floor%r - e1%floor%r
+chord = norm2(dvec)
+axis = e1%floor%w(:,3)
+tol = 1e-9_rp * max(1.0_rp, chord)
+
+if (abs(e2%floor%theta - e1%floor%theta) > 1e-9_rp .or. abs(e2%floor%phi - e1%floor%phi) > 1e-9_rp .or. &
+    abs(e2%floor%psi - e1%floor%psi) > 1e-9_rp .or. norm2(dvec - chord * axis) > tol) then
+  call out_io (s_error$, r_name, 'THE BREAK ENDING AT ' // trim(branch%ele(iblast)%name) // ' BENDS THE REFERENCE', &
+               'AND IS NOT A CLOSED BUMP: THE RADIATION WOULD LEAVE THE NEXT UNDULATOR''S AXIS.', &
+               'ONLY CLOSED-BUMP CHICANES ARE MODELED; CLOSE THE GEOMETRY OR STRAIGHTEN THE LINE.')
+  err_flag = .true.;  return
+endif
+
+delay_geo = arc - chord
+n_rot = floor(delay_geo / lambda)
+ele_slip(iblast) = ele_slip(iblast) + n_rot
+slip_chic = slip_chic + n_rot
+light_corr(iblast) = delay_geo
+
+end subroutine close_geometry_break
+
+end subroutine fel_setup_slippage
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine fel_setup_schedule (run, err_flag)
 !
 ! Routine to build everything that needs both the lattice and the built starting state:
@@ -1216,24 +1413,19 @@ if (run%any_unavg .and. (wake_on .or. sc_nz >= 1 .or. sc_longrange)) then
 endif
 
 
-! The rest of the schedule: drift autophasing. Interludes accumulate Lz, and the last
-! interlude before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
-! (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
-! (Lattice.cpp:191-193) is unguarded in Genesis. The last element always gets
-! floor(Lz/(2*gamma0^2*lambda)) + 1, which is +1 even with no trailing interlude at all
-! ("autophasing is applied in case for [a] second, succeeding run"). Transcribed as is.
-! Omitting that +1 leaves the field record one rotation short at the very end. The
-! citations stay at the call site, since the exactness of this quirk matters here
-! (fel-physics.md sec-slippage).
+! The rest of the schedule: the rotations the walk applies at each element's last step,
+! from the one sum a derived window's headroom also takes (fel_setup_slippage), and the
+! off-phase knob.
 
 allocate (run%ele_slip(branch%n_ele_track))
 allocate (run%fel_zoff(branch%n_ele_track), run%light_corr(branch%n_ele_track))
 ele_slip => run%ele_slip;  fel_zoff => run%fel_zoff;  light_corr => run%light_corr
-ele_slip = 0
 fel_zoff = 0
-light_corr = 0
 phase_rate = twopi / (2 * gamma0_ref**2 * wf%wavelength)
 run%phase_rate = phase_rate
+call fel_setup_slippage (run, gamma0_ref, wf%wavelength, ele_slip, light_corr, &
+                         run%slip_und, run%slip_int, run%slip_chic, err_flag)
+if (err_flag) return
 Lz = 0
 prev_ie = 0
 
@@ -1241,9 +1433,6 @@ do ie = 1, branch%n_ele_track
   ele => branch%ele(ie)
   if (ele%value(l$) == 0) cycle
   if (is_fel(ie)) then
-    if (Lz > 0 .and. prev_ie > 0) then
-      ele_slip(prev_ie) = ele_slip(prev_ie) + floor(Lz / (2 * gamma0_ref**2 * wf%wavelength)) + 1
-    endif
 
     ! The off-phase knob (fel-physics.md sec-phasing): the wiggler's own z_offset, standard
     ! Bmad misalignment (girder-composed _tot form). It is anchored at the nominal
@@ -1269,14 +1458,6 @@ do ie = 1, branch%n_ele_track
   endif
   prev_ie = ie
 enddo
-if (prev_ie > 0) then
-  ele_slip(prev_ie) = ele_slip(prev_ie) + floor(Lz / (2 * gamma0_ref**2 * wf%wavelength)) + 1
-endif
-
-call setup_break_geometry ()   ! Chicane breaks: chord vs arc from ele%floor, the
-                               ! delay's rotations, the light-path correction, and
-                               ! the closed-bump and genesis-model refusals.
-if (err_flag) return
 
 ! Diagnostics file, one row per slice per record at Genesis's record positions, slices in
 ! time-window order.
@@ -1506,102 +1687,6 @@ do je = 1, branch%n_ele_track
 enddo
 
 end subroutine check_wake_window
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine setup_break_geometry ()
-!
-! Routine to set up chicane breaks (fel-physics.md sec-phasing). A break whose elements
-! bend the reference (sbends, patches) detours the beam while the radiation goes
-! straight. The light's path is the chord between the flanking undulator faces, from
-! ele%floor. It is never the reference arc on which vec(5) is defined. The arc-minus-chord
-! delay is charged as whole-wavelength window rotations on the break's last element
-! (Genesis's chicane semantics: "always autophasing"). That element also takes the
-! light-path drift correction. Absolute mode adds the delay's carrier phase in the walk.
-! Only a closed bump keeps the light on the next undulator's axis, and anything else is
-! refused. So is any geometry element under the genesis-model interludes, since
-! Genesis's drift and quad set cannot represent it.
-!-
-
-subroutine setup_break_geometry ()
-
-real(rp) arc
-integer i0, ie_g, last_in_break
-logical geom
-
-!
-
-i0 = 0                    ! Break start: exit face of the last FEL element (0 = origin).
-arc = 0;  geom = .false.;  last_in_break = 0
-
-do ie_g = 1, branch%n_ele_track
-  ele => branch%ele(ie_g)
-  if (is_fel(ie_g)) then
-    if (geom .and. last_in_break > 0) then
-      call close_geometry_break (i0, last_in_break, arc)
-      if (err_flag) return
-    endif
-    i0 = ie_g;  arc = 0;  geom = .false.;  last_in_break = 0
-  elseif (ele%value(l$) /= 0 .or. ele%key == patch$) then
-    arc = arc + ele%value(l$)
-    last_in_break = ie_g
-    if (ele%key == sbend$ .or. ele%key == patch$) then
-      geom = .true.
-      if (interlude_model == 'genesis') then
-        call out_io (s_error$, r_name, 'GEOMETRY ELEMENT ' // trim(ele%name) // ' (A BEND OR PATCH) INSIDE A', &
-                     'GENESIS-MODEL INTERLUDE: GENESIS''S DRIFT/QUAD SET CANNOT REPRESENT IT.', &
-                     'POSSIBLE SOLUTION: USE INTERLUDE_MODEL = "bmad" (THE SEAM TRACKS IT EXACTLY).')
-        err_flag = .true.;  return
-      endif
-    endif
-  endif
-enddo
-! A trailing geometry break (no following undulator) needs no phasing: there is no
-! next segment to phase against.
-
-end subroutine setup_break_geometry
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
-! Subroutine close_geometry_break (ib0, iblast, arc)
-!
-! Routine to close one geometry break: the chord, the closed-bump refusal, the delay's
-! rotations and the light-path correction (see setup_break_geometry's header).
-!-
-
-subroutine close_geometry_break (ib0, iblast, arc)
-
-type (ele_struct), pointer :: e1, e2
-real(rp) arc, chord, dvec(3), axis(3), delay_geo, tol
-integer ib0, iblast
-
-!
-
-e1 => branch%ele(ib0)         ! Exit face of the upstream FEL element (or the origin).
-e2 => branch%ele(iblast)      ! Exit face of the break's last element = the entry face
-                              ! of the next FEL element.
-dvec = e2%floor%r - e1%floor%r
-chord = norm2(dvec)
-axis = e1%floor%w(:,3)
-tol = 1e-9_rp * max(1.0_rp, chord)
-
-if (abs(e2%floor%theta - e1%floor%theta) > 1e-9_rp .or. abs(e2%floor%phi - e1%floor%phi) > 1e-9_rp .or. &
-    abs(e2%floor%psi - e1%floor%psi) > 1e-9_rp .or. norm2(dvec - chord * axis) > tol) then
-  call out_io (s_error$, r_name, 'THE BREAK ENDING AT ' // trim(branch%ele(iblast)%name) // ' BENDS THE REFERENCE', &
-               'AND IS NOT A CLOSED BUMP: THE RADIATION WOULD LEAVE THE NEXT UNDULATOR''S AXIS.', &
-               'ONLY CLOSED-BUMP CHICANES ARE MODELED; CLOSE THE GEOMETRY OR STRAIGHTEN THE LINE.')
-  err_flag = .true.;  return
-endif
-
-delay_geo = arc - chord
-ele_slip(iblast) = ele_slip(iblast) + floor(delay_geo / wf%wavelength)
-light_corr(iblast) = delay_geo
-
-end subroutine close_geometry_break
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
