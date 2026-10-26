@@ -2,7 +2,7 @@
 
 This is version 1.1, in force for this writer, with open questions pending. It extends BMAD-STATS-SPEC.md for time-dependent FEL tracking output. It is declared by `'fel'` in the root `@extensions` and by `@fel_version` on the root. Everything here satisfies the core contract (spec R41): a generic core reader loads an FEL file without knowing this document exists. Rules are numbered F1, F2, ... and cite the core rules they instantiate.
 
-Lucifer is the reference writer. The escaped-field and pulse field files are companion files and not part of this extension. They carry Genesis 1.3 Version 4 (Genesis4) field conventions for reasons recorded in Lucifer's manual, and nothing in a bmad-stats file points into them normatively.
+Lucifer is the reference writer. The escaped-field and pulse field files are companion files and not part of this extension. They are openPMD EXT_Wavefront files, as every field dump is, and nothing in a bmad-stats file points into them normatively.
 
 ## 1. The slice axis
 
@@ -49,4 +49,3 @@ These identities are not checkable by the generic validator and are required of 
 ## 8. Open questions
 
 - **OF1.** `emit_x`/`emit_y` could be two datasets or one `emit` over a two-entry axis. They are kept as two on the grounds that a two-entry axis buys nothing. A standard may want the uniformity anyway.
-- **OF2.** The companion field files (escaped, pulse) may eventually want an extension of their own rather than Genesis4 conventions. That question is tabled with the escaped-field openPMD question.

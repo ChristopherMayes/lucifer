@@ -407,9 +407,11 @@ type fel_run_struct
   integer :: n_int_ele = 0              ! Interlude elements that take more than one.
   integer :: nrec_stats = 0, nend_stats = 0
   real(rp) :: z_last_rec = -1e30_rp        ! The comb's last-row position.
-  ! Escaped-field bank state, one slot per field.
+  ! Escaped-field bank state, one slot per field: the count banked, each banked slice's
+  ! transmission position and wavefront params (25 per slice, the y component's apart),
+  ! in transmission order, and the open escaped file.
   integer, allocatable :: n_banked(:)
-  real(rp), allocatable :: bank_z(:,:), bank_pms(:,:,:)
+  real(rp), allocatable :: bank_z(:,:), bank_pms(:,:,:), bank_pms_y(:,:,:)
   integer(hid_t), allocatable :: esc_id(:)
   ! Whole-window wake scratch (element sr wakes across the window).
   type (bunch_struct) :: wake_bunch

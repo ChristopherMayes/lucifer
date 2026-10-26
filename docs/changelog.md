@@ -9,6 +9,21 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Changed: the escaped-field bank and the reconstructed pulse are openPMD EXT_Wavefront files,
+  `<out_root>-escaped.wf.h5` and `-pulse.wf.h5`, like every field dump, so `Wavefront.from_openpmd` of
+  openpmd-beamphysics reads either and the last file in Genesis4's field layout is gone. Their planes
+  run along z in increasing position along the pulse, the z of `gridGlobalOffset` 0 for the pulse and
+  the window length for the escaped file, as `refposition` was, and both polarizations are components
+  `x` and `y` of one file, where the Genesis4 layout wrote `-pulse-x` and `-pulse-y`. The pulse's
+  `zCoordinate` is the exit plane. The escaped file's is NaN, since each of its planes left the window
+  at its own position, which the group `lucifer/escaped` beside the mesh carries as `zTransmit` with
+  each plane's moments at banking as `wavefrontParams`, 25 columns the dataset names. The bank still
+  streams as slices leave, into component datasets that grow one plane at a time, and the planes are
+  reversed in place at finalize, so peak memory stays a few planes. On the sase example the run took
+  61.4 s against 60.8 s with the Genesis4 layout, and the two files are 1.6 MB and 1.0 MB smaller.
+  `lucifer.field.read_escaped` returns the Wavefront with the two arrays, and the check scripts read
+  the new files at every level they held before. A file in the old layout is read by
+  `Wavefront.from_genesis4`, and `tests/scripts/convert_genesis.py to-openpmd` converts it.
 - 2026-10-25 Changed: the escaped-field bank, `run.keep_escaped_field`, is on by default, since the
   light is what an FEL makes and the pulse is what goes on to a beamline or another code. A run
   from which no light leaves the window banks nothing and writes neither `-escaped.fld.h5` nor

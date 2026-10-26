@@ -149,6 +149,19 @@ slices = read_slices("n1024-final.beam.h5", wavelength=inp.field.lambda0)
 slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
 ```
 
+`lucifer.field` reads the escaped-field bank, `<out_root>-escaped.wf.h5`: the light that slipped out of the window, each plane as it was when it left, with where each left and its moments then. The whole pulse at the exit, `<out_root>-pulse.wf.h5`, is an openPMD wavefront file like every field dump, so openpmd-beamphysics reads it whole. Both come from a run whose window let light out, here a time-dependent run of the same input:
+
+% example: field
+```python
+from beamphysics.wavefront import Wavefront
+from lucifer.field import read_escaped
+
+pulse = Wavefront.from_openpmd("td-pulse.wf.h5")   # the whole pulse at the exit, Ex (nx, ny, nz)
+esc = read_escaped("td-escaped.wf.h5")
+esc.z_transmit                                     # (n,) where along the lattice each plane left [m]
+esc.params[:, 20]                                  # each plane's energy when it left [J]
+```
+
 `tests/scripts/validate_bmad_stats.py` is the format's conformance checker. It knows no program and no extension, needs only numpy and h5py, and exits nonzero on any failure:
 
 ```

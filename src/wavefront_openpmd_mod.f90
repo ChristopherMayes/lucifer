@@ -43,6 +43,13 @@
 ! Reading implements exactly what writing produces and refuses the rest:
 ! temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
 ! (z,y,x), and any missing required attribute.
+!
+! wavefront_write_openpmd writes one wavefront whole. A file too large to hold in memory,
+! or one whose slice count is not known until the run ends, is written a few planes at a
+! time: wavefront_openpmd_create makes the file with its attributes and empty component
+! datasets, wavefront_openpmd_write_planes fills a run of planes along z, and
+! wavefront_openpmd_read_planes reads one back. The escaped-field bank and the pulse
+! (fel_io_mod) are written this way.
 !-
 
 module wavefront_openpmd_mod
@@ -55,6 +62,8 @@ implicit none
 
 character(*), parameter, private :: iter_path = 'data/1'
 character(*), parameter, private :: mesh_path = 'data/1/meshes/electricField'
+
+private write_mesh_attributes, write_component_attributes
 
 contains
 
@@ -122,15 +131,11 @@ subroutine wavefront_write_openpmd (wf, file_name, err_flag, z_offset)
 
 type (wavefront_struct), target :: wf
 character(*) file_name
-real(rp) gmax_x, gmax_y, e_photon
 real(rp), optional :: z_offset
 integer(hid_t) f_id, it_id, m_id, complex_t
-integer h5_err, i
+integer h5_err
 logical err_flag, err
 character(*), parameter :: r_name = 'wavefront_write_openpmd'
-! The dimension exponents of one grid axis: a length, so L = 1 and the rest zero.
-! gridUnitDimension repeats them once per axis (openPMD 2.0, "Mesh Based Records").
-real(rp), parameter :: len_dim(7) = [1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp]
 
 !
 
@@ -166,22 +171,8 @@ if (h5_err < 0) then
   return
 endif
 
-gmax_x = (size(wf%Ex,1) - 1) * wf%dx / 2
-gmax_y = (size(wf%Ex,2) - 1) * wf%dy / 2
-e_photon = h_planck * c_light / wf%wavelength * e_charge     ! [J]. h_planck is eV s.
-
-call hdf5_write_attribute_string (m_id, 'geometry', 'cartesian', err)
-call hdf5_write_attribute_string (m_id, 'axisLabels', [character(1):: 'z', 'y', 'x'], err)
-call hdf5_write_attribute_real (m_id, 'gridSpacing', [wf%dz, wf%dy, wf%dx], err)
-call hdf5_write_attribute_real (m_id, 'gridGlobalOffset', [real_option(0.0_rp, z_offset), -gmax_y, -gmax_x], err)
-call hdf5_write_attribute_real (m_id, 'gridUnitSI', [1.0_rp, 1.0_rp, 1.0_rp], err)
-call hdf5_write_attribute_real (m_id, 'gridUnitDimension', [(len_dim, i = 1, 3)], err)
-call hdf5_write_attribute_real (m_id, 'unitDimension', [1.0_rp, 1.0_rp, -3.0_rp, -1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp], err)
-call hdf5_write_attribute_real (m_id, 'timeOffset', 0.0_rp, err)
-call hdf5_write_attribute_real (m_id, 'photonEnergy', e_photon, err)
-call hdf5_write_attribute_string (m_id, 'temporalDomain', 'time', err)
-call hdf5_write_attribute_string (m_id, 'spatialDomain', 'r', err)
-call hdf5_write_attribute_real (m_id, 'zCoordinate', wf%s_position, err)
+call write_mesh_attributes (m_id, wf, real_option(0.0_rp, z_offset), wf%s_position, err)
+if (err) return
 
 call pmd_init_compound_complex (complex_t)
 
@@ -190,7 +181,7 @@ if (err) then
   call pmd_kill_compound_complex (complex_t)
   return
 endif
-call write_position ('x')
+call write_component_attributes (m_id, 'x', err)
 
 if (allocated(wf%Ey)) then
   call pmd_write_complex_to_dataset (m_id, 'y', complex_t, 'y', unit_V_per_m, wf%Ey, err)
@@ -198,7 +189,7 @@ if (allocated(wf%Ey)) then
     call pmd_kill_compound_complex (complex_t)
     return
   endif
-  call write_position ('y')
+  call write_component_attributes (m_id, 'y', err)
 endif
 
 call pmd_kill_compound_complex (complex_t)
@@ -207,34 +198,411 @@ call h5fclose_f (f_id, h5_err)
 
 err_flag = .false.
 
+end subroutine wavefront_write_openpmd
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_openpmd_create (file_name, wf, nz, f_id, m_id, err_flag, z_offset, extendable, z_coordinate)
+!
+! Routine to create an openPMD EXT_Wavefront file in the layout of the module header,
+! with its attributes taken from wf and its component datasets created empty, for a
+! caller that fills the planes with wavefront_openpmd_write_planes. The x component is
+! always created, and y when wf carries Ey. The caller closes m_id and f_id.
+!
+! The grid and the wavelength come from wf, and nz is the slice count of the file, which
+! need not be wf's. With extendable True the datasets are chunked one plane at a time
+! and grow without bound along z, so nz is their first extent and a plane written past
+! it extends them. Otherwise the datasets are contiguous at nz planes, as
+! wavefront_write_openpmd writes them.
+!
+! Input:
+!   file_name     -- character(*): Output file.
+!   wf            -- wavefront_struct: The grid, the wavelength and the components.
+!   nz            -- integer: Slice count of the datasets.
+!   z_offset      -- real(rp), optional: Where the first plane sits along the pulse [m],
+!                      the z of gridGlobalOffset. Default 0.
+!   extendable    -- logical, optional: Chunked datasets that grow along z? Default False.
+!   z_coordinate  -- real(rp), optional: The beamline position written as zCoordinate [m].
+!                      Default is wf%s_position.
+!
+! Output:
+!   f_id          -- integer(hid_t): The open file.
+!   m_id          -- integer(hid_t): The open mesh record group, the parent of x and y.
+!   err_flag      -- logical: Set True on error, False otherwise.
+!-
+
+subroutine wavefront_openpmd_create (file_name, wf, nz, f_id, m_id, err_flag, z_offset, &
+                                     extendable, z_coordinate)
+
+type (wavefront_struct), target :: wf
+character(*) file_name
+real(rp), optional :: z_offset, z_coordinate
+logical, optional :: extendable
+integer nz
+integer(hid_t) f_id, m_id, it_id, complex_t, s_id, d_id, p_id
+integer(hsize_t) dims(3), maxdims(3)
+integer h5_err
+logical err_flag, err, grow
+character(*), parameter :: r_name = 'wavefront_openpmd_create'
+
+!
+
+err_flag = .true.
+grow = logic_option(.false., extendable)
+
+call hdf5_open_file (file_name, 'WRITE', f_id, err);  if (err) return
+
+call hdf5_write_attribute_string (f_id, 'openPMD', '2.0.0', err)
+call hdf5_write_attribute_string (f_id, 'openPMDextension', 'Wavefront', err)
+call hdf5_write_attribute_string (f_id, 'basePath', '/data/%T/', err)
+call hdf5_write_attribute_string (f_id, 'meshesPath', 'meshes/', err)
+call hdf5_write_attribute_string (f_id, 'iterationEncoding', 'groupBased', err)
+call hdf5_write_attribute_string (f_id, 'iterationFormat', '/data/%T/', err)
+
+call h5gcreate_f (f_id, 'data', it_id, h5_err);  call h5gclose_f (it_id, h5_err)
+call h5gcreate_f (f_id, trim(iter_path), it_id, h5_err)
+call hdf5_write_attribute_real (it_id, 'time', 0.0_rp, err)
+call hdf5_write_attribute_real (it_id, 'dt', 0.0_rp, err)
+call hdf5_write_attribute_real (it_id, 'timeUnitSI', 1.0_rp, err)
+call h5gclose_f (it_id, h5_err)
+call h5gcreate_f (f_id, 'data/1/meshes', it_id, h5_err);  call h5gclose_f (it_id, h5_err)
+
+call h5gcreate_f (f_id, trim(mesh_path), m_id, h5_err)
+if (h5_err < 0) then
+  call out_io (s_error$, r_name, 'CANNOT CREATE MESH GROUP IN ' // trim(file_name))
+  return
+endif
+
+call write_mesh_attributes (m_id, wf, real_option(0.0_rp, z_offset), &
+                            real_option(wf%s_position, z_coordinate), err)
+if (err) return
+
+! The component datasets, empty. The Fortran (nx, ny, nz) shape is what the HDF5 Fortran
+! API records as a C-order (nz, ny, nx) dataspace, as the whole-file writer's is. An
+! extendable dataset must be chunked, and a chunk of one plane is the unit the planes
+! are written in.
+
+dims = [size(wf%Ex, 1), size(wf%Ex, 2), nz]
+maxdims = dims
+if (grow) maxdims(3) = H5S_UNLIMITED_F
+
+call pmd_init_compound_complex (complex_t)
+call H5Pcreate_f (H5P_DATASET_CREATE_F, p_id, h5_err)
+if (grow) call H5Pset_chunk_f (p_id, 3, [dims(1), dims(2), 1_hsize_t], h5_err)
+
+call create_component ('x')
+if (.not. err .and. allocated(wf%Ey)) call create_component ('y')
+
+call H5Pclose_f (p_id, h5_err)
+call pmd_kill_compound_complex (complex_t)
+if (err) return
+
+err_flag = .false.
+
 !------------------------------------------------------------------------------
 contains
 
 !+
-! Subroutine write_position (name)
+! Subroutine create_component (name)
 !
-! Routine to write the required openPMD component attribute "position" on one
-! polarisation component dataset. The value is the sample's offset within its cell in
-! units of gridSpacing. A wavefront's samples sit on the cell corners, so it is zero on
-! all three axes.
-!
-! Note: The attribute goes on the dataset. So this routine takes the dataset name and
-! hands it to the H5LT call that writes through a parent. The plain attribute writers
-! take an object id. Passing them a path as the attribute name puts an attribute with
-! slashes in its name on the root group instead.
+! Routine to create one empty polarisation component dataset with its attributes.
 !-
 
-subroutine write_position (name)
+subroutine create_component (name)
 
 character(*) name
 
 !
 
-call H5LTset_attribute_double_f (m_id, name, 'position', [0.0_rp, 0.0_rp, 0.0_rp], 3_size_t, h5_err)
+call H5Screate_simple_f (3, dims, s_id, h5_err, maxdims)
+call H5Dcreate_f (m_id, name, complex_t, s_id, d_id, h5_err, p_id)
+if (h5_err < 0) then
+  call out_io (s_error$, r_name, 'CANNOT CREATE COMPONENT ' // name // ' IN ' // trim(file_name))
+  err = .true.
+  return
+endif
+call H5Dclose_f (d_id, h5_err)
+call H5Sclose_f (s_id, h5_err)
+call write_component_attributes (m_id, name, err)
 
-end subroutine write_position
+end subroutine create_component
 
-end subroutine wavefront_write_openpmd
+end subroutine wavefront_openpmd_create
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_openpmd_write_planes (m_id, name, iz, planes, err_flag)
+!
+! Routine to write a run of planes into one component dataset of a file made by
+! wavefront_openpmd_create, at slice index iz onward. An extendable dataset grows to
+! hold them. A contiguous one must already hold index iz + size(planes, 3) - 1.
+!
+! Input:
+!   m_id           -- integer(hid_t): The open mesh record group.
+!   name           -- character(*): The component, 'x' or 'y'.
+!   iz             -- integer: Slice index of the first plane written, from 1.
+!   planes(:,:,:)  -- complex(wf_rp): The planes, (nx, ny, n).
+!
+! Output:
+!   err_flag       -- logical: Set True on error, False otherwise.
+!-
+
+subroutine wavefront_openpmd_write_planes (m_id, name, iz, planes, err_flag)
+
+complex(wf_rp), target, contiguous :: planes(:,:,:)
+character(*) name
+integer iz
+integer(hid_t) m_id, d_id, complex_t, f_space, m_space
+integer(hsize_t) dims(3), start(3), count(3), maxdims(3)
+integer h5_err, ndim
+logical err_flag
+type (c_ptr) f_ptr
+
+!
+
+err_flag = .true.
+count = shape(planes)
+start = [0_hsize_t, 0_hsize_t, int(iz - 1, hsize_t)]
+
+call H5Dopen_f (m_id, name, d_id, h5_err);  if (h5_err < 0) return
+call H5Dget_space_f (d_id, f_space, h5_err)
+call H5Sget_simple_extent_dims_f (f_space, dims, maxdims, ndim)
+call H5Sclose_f (f_space, h5_err)
+if (ndim /= 3 .or. any(dims(1:2) /= count(1:2))) then
+  call H5Dclose_f (d_id, h5_err)
+  return
+endif
+
+if (dims(3) < start(3) + count(3)) then
+  dims(3) = start(3) + count(3)
+  call H5Dset_extent_f (d_id, dims, h5_err)
+  if (h5_err < 0) then
+    call H5Dclose_f (d_id, h5_err)
+    return
+  endif
+endif
+
+call H5Dget_space_f (d_id, f_space, h5_err)
+call H5Sselect_hyperslab_f (f_space, H5S_SELECT_SET_F, start, count, h5_err)
+call H5Screate_simple_f (3, count, m_space, h5_err)
+call pmd_init_compound_complex (complex_t)
+f_ptr = c_loc(planes)
+call H5Dwrite_f (d_id, complex_t, f_ptr, h5_err, m_space, f_space)
+call pmd_kill_compound_complex (complex_t)
+call H5Sclose_f (m_space, h5_err)
+call H5Sclose_f (f_space, h5_err)
+call H5Dclose_f (d_id, h5_err)
+if (h5_err < 0) return
+
+err_flag = .false.
+
+end subroutine wavefront_openpmd_write_planes
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_openpmd_read_planes (m_id, name, iz, planes, err_flag)
+!
+! Routine to read a run of planes from one component dataset, from slice index iz
+! onward, into planes, whose shape says how many. The inverse of
+! wavefront_openpmd_write_planes.
+!
+! Input:
+!   m_id           -- integer(hid_t): The open mesh record group.
+!   name           -- character(*): The component, 'x' or 'y'.
+!   iz             -- integer: Slice index of the first plane read, from 1.
+!
+! Output:
+!   planes(:,:,:)  -- complex(wf_rp): The planes, (nx, ny, n).
+!   err_flag       -- logical: Set True on error, False otherwise.
+!-
+
+subroutine wavefront_openpmd_read_planes (m_id, name, iz, planes, err_flag)
+
+complex(wf_rp), target, contiguous :: planes(:,:,:)
+character(*) name
+integer iz
+integer(hid_t) m_id, d_id, complex_t, f_space, m_space
+integer(hsize_t) dims(3), start(3), count(3), maxdims(3)
+integer h5_err, ndim
+logical err_flag
+type (c_ptr) f_ptr
+
+!
+
+err_flag = .true.
+count = shape(planes)
+start = [0_hsize_t, 0_hsize_t, int(iz - 1, hsize_t)]
+
+call H5Dopen_f (m_id, name, d_id, h5_err);  if (h5_err < 0) return
+call H5Dget_space_f (d_id, f_space, h5_err)
+call H5Sget_simple_extent_dims_f (f_space, dims, maxdims, ndim)
+if (ndim /= 3 .or. any(dims(1:2) /= count(1:2)) .or. dims(3) < start(3) + count(3)) then
+  call H5Sclose_f (f_space, h5_err)
+  call H5Dclose_f (d_id, h5_err)
+  return
+endif
+
+call H5Sselect_hyperslab_f (f_space, H5S_SELECT_SET_F, start, count, h5_err)
+call H5Screate_simple_f (3, count, m_space, h5_err)
+call pmd_init_compound_complex (complex_t)
+f_ptr = c_loc(planes)
+call H5Dread_f (d_id, complex_t, f_ptr, h5_err, m_space, f_space)
+call pmd_kill_compound_complex (complex_t)
+call H5Sclose_f (m_space, h5_err)
+call H5Sclose_f (f_space, h5_err)
+call H5Dclose_f (d_id, h5_err)
+if (h5_err < 0) return
+
+err_flag = .false.
+
+end subroutine wavefront_openpmd_read_planes
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine wavefront_openpmd_mesh (f_id, m_id, err_flag)
+!
+! Routine to open the mesh record group of an open EXT_Wavefront file, the parent of
+! the component datasets wavefront_openpmd_write_planes and wavefront_openpmd_read_planes
+! take. The caller closes m_id.
+!
+! Input:
+!   f_id      -- integer(hid_t): The open file.
+!
+! Output:
+!   m_id      -- integer(hid_t): The open mesh record group.
+!   err_flag  -- logical: Set True when the file has no mesh record, False otherwise.
+!-
+
+subroutine wavefront_openpmd_mesh (f_id, m_id, err_flag)
+
+integer(hid_t) f_id, m_id
+logical err_flag, err
+
+!
+
+err_flag = .true.
+if (.not. hdf5_exists(f_id, trim(mesh_path), err, .false.)) return
+m_id = hdf5_open_group (f_id, trim(mesh_path), err, .true.);  if (err) return
+err_flag = .false.
+
+end subroutine wavefront_openpmd_mesh
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine write_mesh_attributes (m_id, wf, z_offset, z_coordinate, err_flag)
+!
+! Routine to write the mesh record's attributes: the base standard's mesh attributes
+! and the Wavefront extension's required set (module header), from the grid and the
+! wavelength of wf. Shared by the whole-file writer and wavefront_openpmd_create, so the
+! two cannot disagree.
+!
+! Input:
+!   m_id          -- integer(hid_t): The open mesh record group.
+!   wf            -- wavefront_struct: The grid and the wavelength.
+!   z_offset      -- real(rp): The z of gridGlobalOffset [m].
+!   z_coordinate  -- real(rp): The beamline position written as zCoordinate [m].
+!
+! Output:
+!   err_flag      -- logical: Set True on error, False otherwise.
+!-
+
+subroutine write_mesh_attributes (m_id, wf, z_offset, z_coordinate, err_flag)
+
+type (wavefront_struct) wf
+real(rp) z_offset, z_coordinate, gmax_x, gmax_y, e_photon
+integer(hid_t) m_id
+integer i
+logical err_flag, err, bad
+! The dimension exponents of one grid axis: a length, so L = 1 and the rest zero.
+! gridUnitDimension repeats them once per axis (openPMD 2.0, "Mesh Based Records").
+real(rp), parameter :: len_dim(7) = [1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp, 0.0_rp]
+
+!
+
+gmax_x = (size(wf%Ex,1) - 1) * wf%dx / 2
+gmax_y = (size(wf%Ex,2) - 1) * wf%dy / 2
+e_photon = h_planck * c_light / wf%wavelength * e_charge     ! [J]. h_planck is eV s.
+
+! Each writer reports its own failure, and bad accumulates them, as fel_h5_mod's do.
+
+bad = .false.
+call hdf5_write_attribute_string (m_id, 'geometry', 'cartesian', err)
+bad = bad .or. err
+call hdf5_write_attribute_string (m_id, 'axisLabels', [character(1):: 'z', 'y', 'x'], err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'gridSpacing', [wf%dz, wf%dy, wf%dx], err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'gridGlobalOffset', [z_offset, -gmax_y, -gmax_x], err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'gridUnitSI', [1.0_rp, 1.0_rp, 1.0_rp], err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'gridUnitDimension', [(len_dim, i = 1, 3)], err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'unitDimension', &
+                                [1.0_rp, 1.0_rp, -3.0_rp, -1.0_rp, 0.0_rp, 0.0_rp, 0.0_rp], err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'timeOffset', 0.0_rp, err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'photonEnergy', e_photon, err)
+bad = bad .or. err
+call hdf5_write_attribute_string (m_id, 'temporalDomain', 'time', err)
+bad = bad .or. err
+call hdf5_write_attribute_string (m_id, 'spatialDomain', 'r', err)
+bad = bad .or. err
+call hdf5_write_attribute_real (m_id, 'zCoordinate', z_coordinate, err)
+err_flag = bad .or. err
+
+end subroutine write_mesh_attributes
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Subroutine write_component_attributes (m_id, name, err_flag)
+!
+! Routine to write the attributes of one polarisation component dataset: the units,
+! unitSI 1 since the field is in V/m, and the required openPMD attribute "position",
+! the sample's offset within its cell in units of gridSpacing. A wavefront's samples
+! sit on the cell corners, so it is zero on all three axes.
+!
+! Note: The attributes go on the dataset. So this routine takes the dataset name and
+! hands it to the H5LT calls that write through a parent. The plain attribute writers
+! take an object id. Passing them a path as the attribute name puts an attribute with
+! slashes in its name on the root group instead.
+!
+! Input:
+!   m_id      -- integer(hid_t): The open mesh record group, the dataset's parent.
+!   name      -- character(*): The component, 'x' or 'y'.
+!
+! Output:
+!   err_flag  -- logical: Set True on error, False otherwise.
+!-
+
+subroutine write_component_attributes (m_id, name, err_flag)
+
+character(*) name
+integer(hid_t) m_id
+integer h5_err
+logical err_flag, err
+
+!
+
+call pmd_write_units_to_dataset (m_id, name, name, unit_V_per_m, err)
+call H5LTset_attribute_double_f (m_id, name, 'position', [0.0_rp, 0.0_rp, 0.0_rp], &
+                                 3_size_t, h5_err)
+err_flag = err .or. (h5_err < 0)
+
+end subroutine write_component_attributes
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

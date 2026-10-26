@@ -3536,17 +3536,24 @@ Output:
 *Subroutine* `(run, ihh, err_flag)`
 
 ```
-Routine to drain the slippage bank. Each slice carried out streams to
-<out_root>-escaped.fld.h5 as it leaves, so peak memory is a handful of grid planes.
-Each is stored with its wavefront_params and its transmission z. The params are the
-full 4x4 at bank time, which the analytic free-space propagation of pulse statistics
-needs. Genesis field-file conventions (dfl units) are used, so existing tools read
-the file.
+Routine to drain the slippage bank. Each slice carried out streams to the escaped
+file, <out_root>-escaped.wf.h5, as it leaves, so peak memory is a handful of grid
+planes. The file is an openPMD EXT_Wavefront file (wavefront_openpmd_mod), made at
+the first slice to leave with the live window's grid and wavelength and component
+datasets that grow along z (wavefront_openpmd_create). Its planes are in V/m, as the
+dumps are. Each slice's wavefront_params and transmission z are kept in run%bank_pms
+and run%bank_z, the params the full 4x4 at bank time, which the analytic free-space
+propagation of pulse statistics needs. They go into the file at finalize
+(fel_order_bank).
 
-During the run the groups are numbered in transmission order: slice k is the k-th to
-leave. That is the reverse of Genesis's order. Light leaves at the head, so the first
-to leave is the furthest ahead. fel_order_bank renumbers them at finalize, and the
-root datasets are written then. So the finished file is a Genesis field file.
+During the run the planes are in transmission order: plane k is the k-th to leave.
+That is the reverse of the mesh's order. Light leaves at the head, so the first to
+leave is the furthest ahead. fel_order_bank reverses them at finalize.
+
+No one beamline position holds the escaped planes, since each is as it was when it
+left at its own z. So the file's zCoordinate is NaN, and lucifer/escaped/zTransmit
+carries each plane's own. The mesh's z origin is the slot just past the window's
+head, nslice slice spacings along the pulse.
 ```
 
 ```
@@ -3555,8 +3562,9 @@ Input:
   ihh       -- integer: Field-set index whose bank is drained.
 
 Output:
-  run       -- fel_run_struct: Banked params appended to run%bank_z / run%bank_pms.
-                 run%n_banked(ihh) and run%esc_id(ihh) updated.
+  run       -- fel_run_struct: Banked params appended to run%bank_z, run%bank_pms and,
+                 with a live y component, run%bank_pms_y. run%n_banked(ihh) and
+                 run%esc_id(ihh) updated.
   err_flag  -- logical: Set True on a write error. False otherwise.
 ```
 
@@ -3566,13 +3574,13 @@ Output:
 *Subroutine* `(run, ihh, err_flag)`
 
 ```
-Routine to renumber the escaped file's slice groups into Genesis's order, where
-slice i sits at refposition + (i-1) slicespacing. fel_drain_bank numbers them in
-transmission order as they leave. Light leaves at the window's head, so the k-th to
-leave is the (n_banked - k + 1)-th in increasing coordinate. Each group moves whole,
-with its field planes, wavefront_params and z_transmit. This is done once, at
-finalize, when n_banked is known. run%bank_z and run%bank_pms stay in transmission
-order.
+Routine to put the escaped file in order at finalize, once n_banked is known.
+fel_drain_bank writes the planes in transmission order as they leave. Light leaves at
+the window's head, so the k-th to leave is the (n_banked - k + 1)-th in increasing
+position along the pulse, which is the mesh's order. The planes are reversed in place,
+two at a time, so peak memory stays at a few planes. The group lucifer/escaped is then
+written, with each plane's transmission position and wavefront params in the mesh's
+order. run%bank_z and run%bank_pms stay in transmission order.
 ```
 
 ```
@@ -3584,23 +3592,34 @@ Output:
   err_flag  -- logical: Set True on an HDF5 error. False otherwise.
 ```
 
-(api-fel-escaped-file-name)=
-### `fel_escaped_file_name`
+(api-swap-planes)=
+### `swap_planes`
 
-*Function* `(run, ihh) result (fname)`
+*Subroutine* `(name)`
 
 ```
-Routine to construct the escaped-field file name of field ihh. The fundamental
-keeps its pre-harmonic name. A harmonic's file carries -h<h>.
+Routine to exchange planes k and n - k + 1 of one component.
+```
+
+(api-fel-bank-file-name)=
+### `fel_bank_file_name`
+
+*Function* `(run, ihh, what) result (fname)`
+
+```
+Routine to construct the escaped or the pulse file name of field ihh,
+<out_root>-escaped.wf.h5 or <out_root>-pulse.wf.h5. The fundamental keeps its
+pre-harmonic name. A harmonic's file carries -h<h>.
 ```
 
 ```
 Input:
   run    -- fel_run_struct: Run state (out_root and the field set).
   ihh    -- integer: Field-set index.
+  what   -- character(*): 'escaped' or 'pulse'.
 
 Output:
-  fname  -- character(420): The escaped-field file name.
+  fname  -- character(420): The file name.
 ```
 
 (api-fel-finalize-diagnostics)=
@@ -3610,22 +3629,24 @@ Output:
 
 ```
 Routine to finalize the run's file diagnostics: the stats file always. With
-keep_escaped_field, also the escaped file's root datasets and the full pulse at the
-exit plane.
+keep_escaped_field, also the escaped file's order and private group and the full
+pulse at the exit plane.
 
 For the pulse, each banked slice is read back and free-space propagated over
 z_end - z_transmit. Transmitted light is fixed information, and undulator vacuum is
 free space for light with no beam under it. The slices are concatenated above the
 live window. Earliest-transmitted light is furthest ahead. So banked slice k lands at
-pulse index nslice + (run%n_banked - k + 1), which is also its number in the
-finished escaped file (fel_order_bank). The caller has already unrotated the live
-window (the final-dump cshift).
+pulse index nslice + (run%n_banked - k + 1), which is also its plane in the finished
+escaped file (fel_order_bank). The caller has already unrotated the live window (the
+final-dump cshift).
 
-refposition in both files is what Genesis means by it: the in-bunch coordinate of
-the file's slice 1 (readFieldHDF5 places slice i at refposition + (i-1) slicespacing).
-It is 0 for the pulse, whose slice 1 is the live window's tail. It is nslice times the
-slice spacing for the escaped file, whose slice 1 is the slot just past the window's
-head. Neither is the beamline position, which is the openPMD files' zCoordinate.
+Both files are openPMD EXT_Wavefront files whose planes run along z in increasing
+position, as the dumps' do. The z of gridGlobalOffset is the position along the pulse
+of a file's first plane: 0 for the pulse, whose first plane is the live window's tail,
+and nslice times the slice spacing for the escaped file, whose first plane is the
+slot just past the window's head. Neither is the beamline position, which is
+zCoordinate: the exit plane for the pulse, and NaN for the escaped file, whose planes
+each left at their own (lucifer/escaped/zTransmit).
 ```
 
 ```
@@ -3640,22 +3661,22 @@ Output:
 (api-fel-write-pulse-file)=
 ### `fel_write_pulse_file`
 
-*Subroutine* `(run, fname, use_y, ihh, err_flag)`
+*Subroutine* `(run, fname, ihh, err_flag)`
 
 ```
-Routine to write one component of the full exit-plane pulse (Genesis's format holds
-one per file). It writes the live window's slices, then each banked slice read back
-from the escaped file and free-space propagated over z_end - z_transmit. Shared by
-the -x and -y files. The escaped file is in Genesis's order by now (fel_order_bank).
-So its slice i lands at pulse slice nslice + i. The transmission z of that slice is
-run%bank_z(n_banked - i + 1), which stays in transmission order.
+Routine to write the full exit-plane pulse of one field as an openPMD EXT_Wavefront
+file: the live window's slices, then each banked slice read back from the escaped
+file and free-space propagated over z_end - z_transmit. The escaped file is in the
+mesh's order by now (fel_order_bank). So its plane i lands at pulse plane nslice + i.
+The transmission z of that plane is run%bank_z(n_banked - i + 1), which stays in
+transmission order. The planes are written one at a time, so peak memory is a few
+planes whatever the pulse's length.
 ```
 
 ```
 Input:
   run       -- fel_run_struct: Run state.
   fname     -- character(*): Pulse file to write.
-  use_y     -- logical: If True write the Ey component, otherwise the Ex component.
   ihh       -- integer: Field-set index.
 
 Output:
@@ -7658,6 +7679,13 @@ they are a mesh axis and never the openPMD iteration.
 Reading implements exactly what writing produces and refuses the rest:
 temporalDomain 'frequency', spatialDomain 'k', an axisLabels order other than
 (z,y,x), and any missing required attribute.
+
+wavefront_write_openpmd writes one wavefront whole. A file too large to hold in memory,
+or one whose slice count is not known until the run ends, is written a few planes at a
+time: wavefront_openpmd_create makes the file with its attributes and empty component
+datasets, wavefront_openpmd_write_planes fills a run of planes along z, and
+wavefront_openpmd_read_planes reads one back. The escaped-field bank and the pulse
+(fel_io_mod) are written this way.
 ```
 
 (api-file-is-openpmd)=
@@ -7705,21 +7733,161 @@ Output:
   err_flag   -- logical: Set True on error, False otherwise.
 ```
 
-(api-write-position)=
-### `write_position`
+(api-wavefront-openpmd-create)=
+### `wavefront_openpmd_create`
+
+*Subroutine* `(file_name, wf, nz, f_id, m_id, err_flag, z_offset, extendable, z_coordinate)`
+
+```
+Routine to create an openPMD EXT_Wavefront file in the layout of the module header,
+with its attributes taken from wf and its component datasets created empty, for a
+caller that fills the planes with wavefront_openpmd_write_planes. The x component is
+always created, and y when wf carries Ey. The caller closes m_id and f_id.
+
+The grid and the wavelength come from wf, and nz is the slice count of the file, which
+need not be wf's. With extendable True the datasets are chunked one plane at a time
+and grow without bound along z, so nz is their first extent and a plane written past
+it extends them. Otherwise the datasets are contiguous at nz planes, as
+wavefront_write_openpmd writes them.
+```
+
+```
+Input:
+  file_name     -- character(*): Output file.
+  wf            -- wavefront_struct: The grid, the wavelength and the components.
+  nz            -- integer: Slice count of the datasets.
+  z_offset      -- real(rp), optional: Where the first plane sits along the pulse [m],
+                     the z of gridGlobalOffset. Default 0.
+  extendable    -- logical, optional: Chunked datasets that grow along z? Default False.
+  z_coordinate  -- real(rp), optional: The beamline position written as zCoordinate [m].
+                     Default is wf%s_position.
+
+Output:
+  f_id          -- integer(hid_t): The open file.
+  m_id          -- integer(hid_t): The open mesh record group, the parent of x and y.
+  err_flag      -- logical: Set True on error, False otherwise.
+```
+
+(api-create-component)=
+### `create_component`
 
 *Subroutine* `(name)`
 
 ```
-Routine to write the required openPMD component attribute "position" on one
-polarisation component dataset. The value is the sample's offset within its cell in
-units of gridSpacing. A wavefront's samples sit on the cell corners, so it is zero on
-all three axes.
+Routine to create one empty polarisation component dataset with its attributes.
+```
 
-Note: The attribute goes on the dataset. So this routine takes the dataset name and
-hands it to the H5LT call that writes through a parent. The plain attribute writers
+(api-wavefront-openpmd-write-planes)=
+### `wavefront_openpmd_write_planes`
+
+*Subroutine* `(m_id, name, iz, planes, err_flag)`
+
+```
+Routine to write a run of planes into one component dataset of a file made by
+wavefront_openpmd_create, at slice index iz onward. An extendable dataset grows to
+hold them. A contiguous one must already hold index iz + size(planes, 3) - 1.
+```
+
+```
+Input:
+  m_id           -- integer(hid_t): The open mesh record group.
+  name           -- character(*): The component, 'x' or 'y'.
+  iz             -- integer: Slice index of the first plane written, from 1.
+  planes(:,:,:)  -- complex(wf_rp): The planes, (nx, ny, n).
+
+Output:
+  err_flag       -- logical: Set True on error, False otherwise.
+```
+
+(api-wavefront-openpmd-read-planes)=
+### `wavefront_openpmd_read_planes`
+
+*Subroutine* `(m_id, name, iz, planes, err_flag)`
+
+```
+Routine to read a run of planes from one component dataset, from slice index iz
+onward, into planes, whose shape says how many. The inverse of
+wavefront_openpmd_write_planes.
+```
+
+```
+Input:
+  m_id           -- integer(hid_t): The open mesh record group.
+  name           -- character(*): The component, 'x' or 'y'.
+  iz             -- integer: Slice index of the first plane read, from 1.
+
+Output:
+  planes(:,:,:)  -- complex(wf_rp): The planes, (nx, ny, n).
+  err_flag       -- logical: Set True on error, False otherwise.
+```
+
+(api-wavefront-openpmd-mesh)=
+### `wavefront_openpmd_mesh`
+
+*Subroutine* `(f_id, m_id, err_flag)`
+
+```
+Routine to open the mesh record group of an open EXT_Wavefront file, the parent of
+the component datasets wavefront_openpmd_write_planes and wavefront_openpmd_read_planes
+take. The caller closes m_id.
+```
+
+```
+Input:
+  f_id      -- integer(hid_t): The open file.
+
+Output:
+  m_id      -- integer(hid_t): The open mesh record group.
+  err_flag  -- logical: Set True when the file has no mesh record, False otherwise.
+```
+
+(api-write-mesh-attributes)=
+### `write_mesh_attributes`
+
+*Subroutine* `(m_id, wf, z_offset, z_coordinate, err_flag)`
+
+```
+Routine to write the mesh record's attributes: the base standard's mesh attributes
+and the Wavefront extension's required set (module header), from the grid and the
+wavelength of wf. Shared by the whole-file writer and wavefront_openpmd_create, so the
+two cannot disagree.
+```
+
+```
+Input:
+  m_id          -- integer(hid_t): The open mesh record group.
+  wf            -- wavefront_struct: The grid and the wavelength.
+  z_offset      -- real(rp): The z of gridGlobalOffset [m].
+  z_coordinate  -- real(rp): The beamline position written as zCoordinate [m].
+
+Output:
+  err_flag      -- logical: Set True on error, False otherwise.
+```
+
+(api-write-component-attributes)=
+### `write_component_attributes`
+
+*Subroutine* `(m_id, name, err_flag)`
+
+```
+Routine to write the attributes of one polarisation component dataset: the units,
+unitSI 1 since the field is in V/m, and the required openPMD attribute "position",
+the sample's offset within its cell in units of gridSpacing. A wavefront's samples
+sit on the cell corners, so it is zero on all three axes.
+
+Note: The attributes go on the dataset. So this routine takes the dataset name and
+hands it to the H5LT calls that write through a parent. The plain attribute writers
 take an object id. Passing them a path as the attribute name puts an attribute with
 slashes in its name on the root group instead.
+```
+
+```
+Input:
+  m_id      -- integer(hid_t): The open mesh record group, the dataset's parent.
+  name      -- character(*): The component, 'x' or 'y'.
+
+Output:
+  err_flag  -- logical: Set True on error, False otherwise.
 ```
 
 (api-wavefront-read-openpmd)=

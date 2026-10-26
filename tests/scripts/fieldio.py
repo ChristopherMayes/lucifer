@@ -98,6 +98,34 @@ def _read_genesis(path, component):
                     zmin=float(h5["refposition"][0]), s_position=None, components=("x",))
 
 
+def write_genesis(path, field):
+    """
+    Write one polarization of a field, as read_field returns it, in Genesis's own layout:
+    the root datasets gridpoints, gridsize, refposition (zmin), wavelength, slicecount and
+    slicespacing, and a group per slice with field-real and field-imag in the dfl scale.
+    The inverse of the Genesis side of read_field, with the same constants, so a field
+    written here and read back agrees to rounding. A check that hands Genesis a field
+    the program wrote writes the copy with this rather than with a converter whose
+    constants differ from Bmad's, since Genesis scales the field by the wavelength the
+    file states on import and by its own on export.
+    """
+    u, n = field["u"], field["u"].shape[1]
+    if field["u"].shape[2] != n or field["dx"] != field["dy"]:
+        raise ValueError("Genesis's layout holds a square grid of one spacing")
+    dfl = u * field["dx"] / np.sqrt(2 * MU0_C)
+    with h5py.File(path, "w") as h5:
+        h5["gridpoints"] = np.array([n], dtype=np.int32)
+        h5["gridsize"] = np.array([field["dx"]])
+        h5["refposition"] = np.array([field["zmin"]])
+        h5["wavelength"] = np.array([field["wavelength"]])
+        h5["slicecount"] = np.array([u.shape[0]], dtype=np.int32)
+        h5["slicespacing"] = np.array([field["dz"]])
+        for i in range(u.shape[0]):
+            g = h5.create_group(f"slice{i + 1:06d}")
+            g["field-real"] = np.ascontiguousarray(dfl[i].real).reshape(-1)
+            g["field-imag"] = np.ascontiguousarray(dfl[i].imag).reshape(-1)
+
+
 def _read_openpmd(path, component):
     with h5py.File(path) as h5:
         m = h5[MESH_PATH]

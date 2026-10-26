@@ -434,7 +434,8 @@ def main():
     r = run(args.exe, wd, "dev_bank.in", BASE.format(root="dev_bank", extra=DEV))
     with h5py.File(wd / "dev_bank.stats.h5") as h5:
         recorded = "field/total/escaped_energy" in h5 and "field/total/pulse_energy" in h5
-    dropped = ("SO THIS RUN KEEPS NONE" in r.stdout and not list(wd.glob("dev_bank-*.fld.h5"))
+    dropped = ("SO THIS RUN KEEPS NONE" in r.stdout and not list(wd.glob("dev_bank-escaped*.wf.h5"))
+               and not list(wd.glob("dev_bank-pulse*.wf.h5"))
                and recorded)
     ok("bank at its default: the device runs without it, says so, writes no field file",
        dropped, "True", dropped)

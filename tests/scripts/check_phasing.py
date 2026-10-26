@@ -51,6 +51,7 @@ import h5py
 import numpy as np
 
 import convert_genesis
+import fieldio
 from checkrec import record
 from lucifer.flat import to_toml as to_groups
 
@@ -357,8 +358,9 @@ def exit_power(wd, tag):
 
 
 def escaped_count(wd, tag):
-    with h5py.File(wd / f"{tag}-escaped.fld.h5") as h5:
-        return int(h5["slicecount"][0])
+    """How many slices the run banked: the escaped file's plane count along z."""
+    with h5py.File(wd / f"{tag}-escaped.wf.h5") as h5:
+        return h5[fieldio.MESH_PATH + "/x"].shape[0]
 
 
 def chicane_delay(ang):

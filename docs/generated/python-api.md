@@ -1079,6 +1079,54 @@ wavelength [m] is required for an openPMD dump and optional for a Genesis one, w
 a value that disagrees with the file is an error rather than a silent preference.
 ```
 
+(pyapi-lucifer-field)=
+## `lucifer.field`
+
+*Module*
+
+```
+Read the escaped-field bank a run writes beside its final dump.
+
+``<out_root>-escaped.wf.h5`` holds the light slippage carried out of the window, one
+plane per slice as it was when it left, and ``<out_root>-pulse.wf.h5`` the whole pulse
+at the exit, the window's slices and the escaped ones propagated to the exit plane.
+Both are openPMD EXT_Wavefront files, so ``Wavefront.from_openpmd`` of
+openpmd-beamphysics reads either whole, with both polarizations as its Ex and Ey. The
+escaped file carries beside its mesh what openPMD has no name for, in the group
+``lucifer/escaped``: ``zTransmit``, the beamline position at which each plane left the
+window, and ``wavefrontParams``, each plane's moments as the program computed them
+then, one row per plane in the mesh's order. ``read_escaped`` returns the Wavefront
+with those two arrays, and the y component's params where the run carried one.
+
+No one beamline position holds the escaped planes, so the file's ``zCoordinate``, and
+the Wavefront's ``s_position``, is NaN. Each plane's own is ``zTransmit``. The pulse
+file's is the exit plane.
+```
+
+(pyapi-lucifer-field-escaped)=
+### `Escaped`
+
+*Class* `Escaped(wavefront: object, z_transmit: numpy.ndarray, params: numpy.ndarray, params_y: numpy.ndarray | None = None)`
+
+```
+The escaped-field bank of one run: the planes as a Wavefront, in increasing
+position along the pulse, and per plane where it left the window and its moments
+then. ``params[:, PARAM_NAMES.index("energy")]`` is each plane's energy.
+```
+
+(pyapi-lucifer-field-read-escaped)=
+### `read_escaped`
+
+*Function* `read_escaped(path)`
+
+```
+The escaped-field file at ``path`` as an ``Escaped``: its planes as a Wavefront
+through ``Wavefront.from_openpmd``, with ``zTransmit`` and ``wavefrontParams`` of
+its ``lucifer/escaped`` group. A file without that group is refused, and so is one
+whose params columns are not ``PARAM_NAMES`` or whose arrays do not match the mesh's
+plane count. Needs openpmd-beamphysics.
+```
+
 (pyapi-lucifer-plot)=
 ## `lucifer.plot`
 

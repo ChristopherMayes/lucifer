@@ -75,6 +75,7 @@ from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON 
 from lucifer.stats import read_stats, same_data  # noqa: E402
 import lucifer.beam as beamio
 from lucifer.beam import read_slices  # noqa: E402
+from lucifer.field import read_escaped  # noqa: E402
 import fieldio  # noqa: E402
 
 import validate_bmad_stats  # noqa: E402  The standard's own conformance checker.
@@ -583,73 +584,91 @@ def grid_parity(exe, wd, examples):
 
 
 def refposition_checks(exe, genesis, wd):
-    """refposition in the pulse and escaped files, held against Genesis's own reader."""
+    """Where the pulse and escaped files put their first plane along the pulse, the z of
+    gridGlobalOffset, held against openPMD-beamphysics and against Genesis's own reader
+    of a converted copy."""
     from beamphysics.wavefront import Wavefront
 
-    print("--- refposition in the Genesis-format files:")
+    print("--- the pulse and escaped files' place along the pulse:")
     (wd / "ref_int.bmad").write_text(REF_LAT)
     run(exe, wd, "dgi", NML.format(lat="ref_int.bmad", root="dgi", extra=""))
 
     def roots(root):
-        with h5py.File(wd / f"{root}-pulse.fld.h5") as h5:
-            p_ref = float(h5["refposition"][0])
-            p_n = int(h5["slicecount"][0])
-            dz = float(h5["slicespacing"][0])
-        with h5py.File(wd / f"{root}-escaped.fld.h5") as h5:
-            b_ref = float(h5["refposition"][0])
-            b_n = int(h5["slicecount"][0])
-            zt = np.array([h5[f"slice{k:06d}/z_transmit"][0] for k in range(1, b_n + 1)])
-        return p_ref, p_n, dz, b_ref, b_n, zt
+        """The z origin, the plane count and the spacing of both files, and the escaped
+        file's transmission positions, read with h5py alone."""
+        with h5py.File(wd / f"{root}-pulse.wf.h5") as h5:
+            m = h5[fieldio.MESH_PATH]
+            p_ref = float(np.atleast_1d(m.attrs["gridGlobalOffset"])[0])
+            p_n = m["x"].shape[0]
+            dz = float(np.atleast_1d(m.attrs["gridSpacing"])[0])
+        with h5py.File(wd / f"{root}-escaped.wf.h5") as h5:
+            m = h5[fieldio.MESH_PATH]
+            b_ref = float(np.atleast_1d(m.attrs["gridGlobalOffset"])[0])
+            b_n = m["x"].shape[0]
+            zt = h5["lucifer/escaped/zTransmit"][...]
+            z_coord = float(np.atleast_1d(m.attrs["zCoordinate"])[0])
+        return p_ref, p_n, dz, b_ref, b_n, zt, z_coord
 
-    p_ref, p_n, dz, b_ref, b_n, zt = roots("dgi")
-    p_ref0, _, _, b_ref0, _, _ = roots("dg")
+    p_ref, p_n, dz, b_ref, b_n, zt, z_coord = roots("dgi")
+    p_ref0, _, _, b_ref0, _, _, _ = roots("dg")
     nlive = p_n - b_n
-    check("refposition: the pulse file's is 0 [m]", abs(p_ref), 1e-18)
-    check("refposition: the escaped file's is the window length n_slice * slicespacing [m]",
+    check("pulse file: its z origin is 0, the window's tail [m]", abs(p_ref), 1e-18)
+    check("escaped file: its z origin is the window length n_slice * dz [m]",
           abs(b_ref - nlive * dz), 1e-18, note=f"[{b_ref:.3e}, {nlive} live slices]")
-    check("refposition: both unmoved by the interlude's drift [m]",
+    check("both: unmoved by the interlude's drift [m]",
           max(abs(p_ref - p_ref0), abs(b_ref - b_ref0)), 1e-18)
-    # Tail to head: the escaped file's slice 1 left last, and the furthest ahead left first.
-    check("refposition: the escaped file's z_transmit falls with its slice number (0 = yes)",
+    # Tail to head: the escaped file's first plane left last, and the furthest ahead left first.
+    check("escaped file: zTransmit falls along the mesh (0 = yes)",
           0.0 if np.all(np.diff(zt) <= 0) and zt[0] > zt[-1] else 1.0, 0.5,
-          note=f"[{b_n} banked, z_transmit {zt[0]:.3f} to {zt[-1]:.3f} m]")
+          note=f"[{b_n} banked, zTransmit {zt[0]:.3f} to {zt[-1]:.3f} m]")
+    check("escaped file: zCoordinate is NaN, since its planes left at their own positions (0 = yes)",
+          0.0 if np.isnan(z_coord) else 1.0, 0.5)
 
-    # openPMD-beamphysics reads the pulse as Genesis would: its first slice is at zmin 0,
-    # and the live slices are the final openPMD field, slice by slice. The two agree to
-    # 1.6e-16, since its Z0 and Bmad's agree and the dfl scale round-trips in double.
-    w = Wavefront.from_genesis4(str(wd / "dgi-pulse.fld.h5"))
+    # openPMD-beamphysics reads the pulse: its first slice is at zmin 0, its position is
+    # the exit plane, and the live slices are the final dump's, slice by slice, exact.
+    w = Wavefront.from_openpmd(str(wd / "dgi-pulse.wf.h5"))
     fin = fieldio.read_field(wd / "dgi-final.wf.h5")
     live = np.transpose(w.Ex[:, :, :nlive], (2, 1, 0))
     rel = float(np.max(np.abs(live - fin["u"])) / np.max(np.abs(fin["u"])))
-    check("refposition: Wavefront.from_genesis4 puts the pulse's first slice at zmin 0 [m]",
+    check("pulse file: Wavefront.from_openpmd puts its first slice at zmin 0 [m]",
           abs(float(w.zmin)), 1e-18)
-    check("refposition: the pulse's live slices are the final field, slice by slice, rel", rel, 1e-8)
+    check("pulse file: its s_position is the final dump's, the exit plane [m]",
+          abs(w.s_position - fin["s_position"]), 1e-18)
+    check("pulse file: the live slices are the final field, slice by slice, rel", rel, 1e-8)
     # Its banked slices are the escaped file's in order. Free-space propagation conserves
     # each slice's energy and the slices differ in it, so energy in order is the test.
-    bank = fieldio.read_field(wd / "dgi-escaped.fld.h5")
+    bank = fieldio.read_field(wd / "dgi-escaped.wf.h5")
     e_b = fieldio.field_power(bank["u"], bank["dx"], bank["dy"])
     e_w = fieldio.field_power(np.transpose(w.Ex[:, :, nlive:], (2, 1, 0)), w.dx, w.dy)
     lit = e_b > 1e-6 * e_b.max()
-    check("refposition: pulse slice n_slice + i carries the energy of escaped slice i, rel",
+    check("pulse file: plane n_slice + i carries the energy of escaped plane i, rel",
           float(np.max(np.abs(e_w[lit] / e_b[lit] - 1))), 1e-8, note=f"[{lit.sum()} of {b_n} slices lit]")
 
-    # Genesis itself: import the pulse and write it back. The re-dump places every slice
-    # where the pulse said, with the pulse's own refposition.
+    # Genesis itself: the pulse written in its layout by fieldio, imported, and written
+    # back. The re-dump places every slice where the copy said, with the pulse's z origin
+    # as its refposition. The copy is written with Bmad's constants, as the program's
+    # wavelength was: a converter that derives the wavelength from the photon energy with
+    # CODATA's Planck constant states it 2.2e-10 above Bmad's truncated one, and Genesis
+    # scales the field by the wavelength on import and by its own on export.
+    pul = fieldio.read_field(wd / "dgi-pulse.wf.h5")
+    fieldio.write_genesis(wd / "dgi-pulse.fld.h5", pul)
+    gen = fieldio.read_field(wd / "dgi-pulse.fld.h5")
+    check("pulse file: its copy in Genesis's layout reads back as the pulse, slice by slice, rel",
+          float(np.max(np.abs(gen["u"] - pul["u"])) / np.max(np.abs(pul["u"]))), 1e-12)
     (wd / "ref.lat").write_text(GEN_LAT_REF)
     (wd / "gref.in").write_text(GEN_IMPORT_REF.format(pulse="dgi-pulse.fld.h5"))
     r = subprocess.run([str(genesis), "gref.in"], cwd=wd, capture_output=True, text=True,
                        env=dict(os.environ, FI_PROVIDER="tcp"))
     if r.returncode != 0:
-        print(f"FAIL: genesis import of the pulse file:\n{r.stdout[-1500:]}\n{r.stderr[-500:]}")
+        print(f"FAIL: genesis import of the pulse's copy:\n{r.stdout[-1500:]}\n{r.stderr[-500:]}")
         sys.exit(1)
-    pul = fieldio.read_field(wd / "dgi-pulse.fld.h5")
     cp = fieldio.read_field(wd / "GREF-copy.fld.h5")
-    check("refposition: Genesis imports the pulse and re-dumps the same slice count",
+    check("pulse file: Genesis imports the copy and re-dumps the same slice count",
           abs(cp["u"].shape[0] - pul["u"].shape[0]), 0.5, note=f"[{pul['u'].shape[0]} slices]")
     if cp["u"].shape == pul["u"].shape:
-        check("refposition: Genesis's re-dump is the pulse, slice by slice, rel",
+        check("pulse file: Genesis's re-dump is the pulse, slice by slice, rel",
               float(np.max(np.abs(cp["u"] - pul["u"])) / np.max(np.abs(pul["u"]))), 1e-12)
-    check("refposition: and carries the pulse's own refposition [m]", abs(cp["zmin"] - pul["zmin"]), 1e-18)
+    check("pulse file: and its refposition is the pulse's z origin [m]", abs(cp["zmin"] - pul["zmin"]), 1e-18)
 
 
 def main():
@@ -971,12 +990,11 @@ def main():
         f_sig = st["field/x/sigma"][-1]
         f_en = st["field/total/energy"][-1]
 
-    # 2. Banked energy == ledger U_escaped.
+    # 2. Banked energy == ledger U_escaped. The escaped file is read through the package's
+    # reader, so the benchmark exercises it on a file the program wrote.
     led = np.loadtxt(wd / "dg.ledger.txt")
-    with h5py.File(wd / "dg-escaped.fld.h5") as h5:
-        nb = int(h5["slicecount"][0])
-        pms = np.array([h5[f"slice{k:06d}/wavefront_params"][:] for k in range(1, nb + 1)])
-        zt = np.array([h5[f"slice{k:06d}/z_transmit"][0] for k in range(1, nb + 1)])
+    esc = read_escaped(wd / "dg-escaped.wf.h5")
+    nb, pms, zt = esc.wavefront.nz, esc.params, esc.z_transmit
     e_banked = pms[:, 20].sum()
     check("bank: banked slice energies vs ledger U_escaped, rel",
           abs(e_banked / led[-1, 4] - 1), 1e-12)
@@ -1016,25 +1034,25 @@ def main():
     with read_stats(wd / "dgw.stats.h5") as st:
         esc_w = float(np.max(st["field/total/escaped_energy"]))
         n_slice_w = len(st.coord("slice"))
-    files_w = sorted(f.name for f in wd.glob("dgw-*.fld.h5"))
+    files_w = sorted(f.name for f in wd.glob("dgw-escaped*.wf.h5")) + sorted(f.name for f in wd.glob("dgw-pulse*.wf.h5"))
     check("pulse: a window holding the slippage loses no light, escaped_energy max [J]", esc_w, 0.0,
           note=f"[{n_slice_w} slices; field files {files_w or 'none'}]")
     check("pulse: and writes no escaped or pulse file (count)", float(len(files_w)), 0.0)
 
-    # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane.
-    with h5py.File(wd / "dg-pulse.fld.h5") as h5:
-        n_all = int(h5["slicecount"][0])
-        nx = int(h5["gridpoints"][0])
-        dx = float(h5["gridsize"][0])
+    # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane. The
+    # pulse file is read with h5py alone, independent of the package's reader.
+    with h5py.File(wd / "dg-pulse.wf.h5") as h5:
+        m = h5[fieldio.MESH_PATH]
+        n_all = m["x"].shape[0]
+        nx = m["x"].shape[2]
+        dx = float(np.atleast_1d(m.attrs["gridSpacing"])[2])
         nlive = n_all - nb
         ax = (np.arange(nx) - 0.5 * (nx - 1)) * dx
         sxx_num, syy_num, w_num = [], [], []
         cx_num, cy_num = [], []
-        for j in range(nlive + 1, n_all + 1):
-            g = h5[f"slice{j:06d}"]
-            fr = g["field-real"][:].reshape(nx, nx)   # x fastest: columns = x.
-            fi = g["field-imag"][:].reshape(nx, nx)
-            I = fr**2 + fi**2
+        for j in range(nlive, n_all):
+            u = m["x"][j]                              # (y, x) complex: x fastest, columns = x.
+            I = np.abs(u) ** 2
             w = I.sum()
             w_num.append(w)
             if w == 0:
@@ -1045,8 +1063,8 @@ def main():
             cx_num.append(cx); cy_num.append(cy)
             sxx_num.append((I * (ax[None, :] - cx) ** 2).sum() / w)
             syy_num.append((I * (ax[:, None] - cy) ** 2).sum() / w)
-    # Pulse index nlive+i holds escaped slice i: both files are in Genesis's order,
-    # tail to head, and so is zt, read from the escaped file above.
+    # Pulse plane nlive+i holds escaped plane i: both files run along the pulse in
+    # increasing position, tail to head, and so does zt, read from the escaped file above.
     sxx_num = np.array(sxx_num)
     syy_num = np.array(syy_num)
     w_num = np.array(w_num)
@@ -1097,7 +1115,7 @@ def main():
     run(exe, wd, "dg1", NML.format(lat="dg_wrap.bmad", root="dg1", extra=""), threads="1")
 
     same = all(h5_identical(wd / f"dg{s}", wd / f"dg1{s}")
-               for s in (".stats.h5", "-escaped.fld.h5", "-pulse.fld.h5"))
+               for s in (".stats.h5", "-escaped.wf.h5", "-pulse.wf.h5"))
     check("thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes)",
           0.0 if same else 1.0, 0.5)
 

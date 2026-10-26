@@ -542,6 +542,9 @@ where the two builds agree to every printed digit.
 | crossed, unaveraged: the y plane's share outside the split, (outside at exit - the x plane's own) / Py | 1.4202e-01 | same | <= 5.0000e-01 |
 | crossed: averaged vs unaveraged y-power, \|ln ratio\| (priced) | 2.5136e-01 | same | <= 5.0000e-01 |
 | crossed: unaveraged TD ledger closure, both components | 1.7528e-09 | 1.7309e-09 | <= 1.0000e-03 |
+| crossed: the escaped file carries both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| crossed: the pulse file carries both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| crossed: the escaped file's params come per polarization, one row per plane (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | crossed: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | helical re-anchor: vector vs scalar path, shot-noise power | 1.5798e-14 | 1.5959e-14 | <= 1.0000e-12 |
 | handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
@@ -732,6 +735,7 @@ where the two builds agree to every printed digit.
 | the page's refusal example: LuciferError carries the program's message |  | same | holds |
 | the page's stats example: units and inputs as the page states them |  | same | holds |
 | the page's beam example: the final dump read into slices |  | same | holds |
+| the page's field example: the pulse holds the window and the banked planes |  | same | holds |
 | Lucifer: an input file run in a temporary directory, its lattice by an absolute path |  | same | holds |
 | Lucifer: archived, restored from the archive with its input and output, and plotted |  | same | holds |
 | Lucifer: an input file run in its own directory without a temporary one |  | same | holds |
@@ -909,14 +913,17 @@ where the two builds agree to every printed digit.
 | thin kicker: it takes a record, and the zero-length pipe is still skipped | 0 | same | <= 5.0000e-01 |
 | frames: the particle sPosition is the frame's own [m] | 8.8818e-16 | 1.1102e-15 | <= 1.0000e-12 |
 | frames: the particle timeOffset is the iteration's time [s] | 2.4815e-24 | 4.1359e-24 | <= 1.0000e-18 |
-| refposition: the pulse file's is 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
-| refposition: the escaped file's is the window length n_slice * slicespacing [m] | 0.0000e+00 | same | <= 1.0000e-18 |
-| refposition: both unmoved by the interlude's drift [m] | 0.0000e+00 | same | <= 1.0000e-18 |
-| refposition: the escaped file's z_transmit falls with its slice number (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
-| refposition: Wavefront.from_genesis4 puts the pulse's first slice at zmin 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
-| refposition: the pulse's live slices are the final field, slice by slice, rel | 1.5515e-16 | same | <= 1.0000e-08 |
-| refposition: pulse slice n_slice + i carries the energy of escaped slice i, rel | 1.4988e-14 | same | <= 1.0000e-08 |
-| refposition: Genesis imports the pulse and re-dumps the same slice count | 0 | same | <= 5.0000e-01 |
-| refposition: Genesis's re-dump is the pulse, slice by slice, rel | 2.0210e-16 | same | <= 1.0000e-12 |
-| refposition: and carries the pulse's own refposition [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| pulse file: its z origin is 0, the window's tail [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| escaped file: its z origin is the window length n_slice * dz [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| both: unmoved by the interlude's drift [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| escaped file: zTransmit falls along the mesh (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| escaped file: zCoordinate is NaN, since its planes left at their own positions (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| pulse file: Wavefront.from_openpmd puts its first slice at zmin 0 [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| pulse file: its s_position is the final dump's, the exit plane [m] | 0.0000e+00 | same | <= 1.0000e-18 |
+| pulse file: the live slices are the final field, slice by slice, rel | 0.0000e+00 | same | <= 1.0000e-08 |
+| pulse file: plane n_slice + i carries the energy of escaped plane i, rel | 9.7700e-15 | 1.0103e-14 | <= 1.0000e-08 |
+| pulse file: its copy in Genesis's layout reads back as the pulse, slice by slice, rel | 2.1921e-16 | 2.0210e-16 | <= 1.0000e-12 |
+| pulse file: Genesis imports the copy and re-dumps the same slice count | 0 | same | <= 5.0000e-01 |
+| pulse file: Genesis's re-dump is the pulse, slice by slice, rel | 2.1921e-16 | 2.0210e-16 | <= 1.0000e-12 |
+| pulse file: and its refposition is the pulse's z origin [m] | 0.0000e+00 | same | <= 1.0000e-18 |
 | grid parity: the steady-state example's exit power at 255 against 256 points, \|rel\| | 1.1474e-02 | same | <= 3.0000e-02 |

@@ -243,6 +243,20 @@ def main():
     check("crossed: unaveraged TD ledger closure, both components",
           np.abs(etot - etot[0]).max() / max(turn, 1e-300), 1e-3)
 
+    # 3b. Both polarizations of the escaped light and of the pulse sit in one file each,
+    #     as components x and y of its field record, with the y component's params beside
+    #     the x component's.
+    for what in ("escaped", "pulse"):
+        comps = fieldio.components(wd / f"p2t_uv-{what}.wf.h5")
+        check(f"crossed: the {what} file carries both polarizations (0 = yes)",
+              0.0 if comps == ("x", "y") else 1.0, 0.5, note=f"[components {comps}]")
+    with h5py.File(wd / "p2t_uv-escaped.wf.h5") as h5:
+        g = h5["lucifer/escaped"]
+        both = "wavefrontParams" in g and "wavefrontParamsY" in g \
+            and g["wavefrontParams"].shape == g["wavefrontParamsY"].shape == (len(g["zTransmit"]), 25)
+    check("crossed: the escaped file's params come per polarization, one row per plane (0 = yes)",
+          0.0 if both else 1.0, 0.5)
+
     # 4. Thread identity on the time-dependent crossed unaveraged run.
     run(exe, wd, "p2t_uv1", NML.format(lat="p2_c_uv.bmad", root="p2t_uv1",
                                        extra="  keep_escaped_field = T\n"), threads="1")

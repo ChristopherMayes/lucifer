@@ -298,6 +298,23 @@ def page_examples(exe, wd):
             R.input.beam.n_particle
             # end example: archive
             restored_plot = R.plot(return_figure=True)
+
+            # A time-dependent run of the same input, a bunch of 5 slices in a window of
+            # 6, whose seed light slips out of the window, so the run banks and writes the
+            # pulse. The segment's 30 periods slip 31 planes past the head.
+            run("lucifer.toml", threads=4, overrides=[
+                "beam.z_distribution=GRID", "beam.z_min=-2.5e-10", "beam.z_max=2.5e-10",
+                "beam.shot_noise=true", "window.window_length=6e-10", "window.n_wavelength=1",
+                "run.out_root=td"])
+            # example: field
+            from beamphysics.wavefront import Wavefront
+            from lucifer.field import read_escaped
+
+            pulse = Wavefront.from_openpmd("td-pulse.wf.h5")   # the whole pulse at the exit, Ex (nx, ny, nz)
+            esc = read_escaped("td-escaped.wf.h5")
+            esc.z_transmit                                     # (n,) where along the lattice each plane left [m]
+            esc.params[:, 20]                                  # each plane's energy when it left [J]
+            # end example: field
             own = Lucifer("lucifer.toml", threads=4, use_temp_dir=False)
             own.run()
 
@@ -339,6 +356,12 @@ def page_examples(exe, wd):
     check("the page's stats example: units and inputs as the page states them", ok)
     ok = slices[0]["n"] == 1024 and len(slices[0]["x"]) == 1024
     check("the page's beam example: the final dump read into slices", ok, note=f"[{slices[0]['n']} particles]")
+    with read_stats(page / "td.stats.h5") as st:
+        n_window = len(st.coord("slice"))
+    ok = (pulse.nz == n_window + esc.wavefront.nz and esc.wavefront.nz == len(esc.z_transmit)
+          and esc.params.shape == (esc.wavefront.nz, 25) and np.isnan(esc.wavefront.s_position))
+    check("the page's field example: the pulse holds the window and the banked planes", ok,
+          note=f"[{n_window} in the window, {esc.wavefront.nz} banked]")
 
     # The object. The run happened in a temporary directory, from an input file that names
     # its lattice by an absolute path, and the archive restored the input and the output.
