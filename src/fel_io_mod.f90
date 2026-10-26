@@ -824,6 +824,12 @@ end subroutine fel_write_header
 ! light ended up as, and which files were written. The file list comes last, so the last
 ! thing on screen is the list of what to open.
 !
+! The list is also what lucifer.runner.Result reads to find the run's dumps, so it names
+! every dump this run wrote and no other: the initial state, the dumps at elements, the
+! final state, the escaped light and the pulse, and the frames. A frame series is one
+! line per kind of file, its record numbers written as a shell brace range,
+! <out_root>-{000001..000012}.beam.h5, with the size of the whole series.
+!
 ! Input:
 !   run -- fel_run_struct: The finished run state.
 !-
@@ -835,10 +841,11 @@ type (fel_stats_struct), pointer :: stats
 character(400) line
 character(*), parameter :: r_name = 'lucifer'
 type (fel_convergence_struct) cvg
-integer ir, ih, n_listed, is, n_thin, n_shown, nbl
+integer ir, ih, n_listed, is, n_thin, n_shown, nbl, ie, nrec
 real(rp) pow, ene, bun, worst, secs, ratio_s
 character(8) hsuf
 character(16) backend
+character(420) root, dname
 integer, parameter :: n_thin_max$ = 8
 
 !
@@ -981,19 +988,36 @@ if (run%ffield(1)%slip%timerun) then
   call out_io (s_blank$, r_name, trim(line) // ' transmitted out of the window by slippage')
 endif
 
-! The file list is by existence, and not by replaying which switches were on. A
-! candidate name that is there is listed with its size. The naming rules stay in the
-! writers, which own them.
+! The dumps, each listed when the switch that writes it was on in this run and the file is
+! there. A rerun in one directory leaves the earlier run's dumps in place under the same
+! out_root, and a list by existence alone would name them as this run's. The text files
+! are listed by existence. The names here are the writers' own: fel_dump_beam and
+! fel_dump_field_set at the program's start and end and at element ends (end_of_element),
+! fel_dump_frame at each comb record, and fel_bank_file_name.
 
 n_listed = 0
-call note_file (trim(run%global%out_root) // '-final.beam.h5')
-do ih = 1, run%n_harm
-  hsuf = ''
-  if (run%ffield(ih)%harm /= 1) write (hsuf, '(a, i0)') '-h', run%ffield(ih)%harm
-  call note_file (trim(run%global%out_root) // '-final' // trim(hsuf) // '.wf.h5')
-  call note_file (trim(run%global%out_root) // '-escaped' // trim(hsuf) // '.wf.h5')
-  call note_file (trim(run%global%out_root) // '-pulse' // trim(hsuf) // '.wf.h5')
+root = run%global%out_root
+if (run%global%write_initial) call note_dumps (trim(root) // '-initial', .true., .true.)
+do ie = run%i_start, run%i_end
+  if (.not. (run%dump_beam_here(ie) .or. run%dump_field_here(ie))) cycle
+  write (dname, '(2a, i0, 2a)') trim(root), '-at', ie, '-', trim(run%lat%branch(0)%ele(ie)%name)
+  call note_dumps (trim(dname), run%dump_beam_here(ie), run%dump_field_here(ie))
 enddo
+call note_dumps (trim(root) // '-final', .true., .true.)
+do ih = 1, run%n_harm
+  if (run%n_banked(ih) == 0) cycle
+  call note_file (trim(fel_bank_file_name(run, ih, 'escaped')))
+  call note_file (trim(fel_bank_file_name(run, ih, 'pulse')))
+enddo
+nrec = run%stats%irec
+if (run%global%dump_at_comb .and. nrec > 0) then
+  call note_series ('.beam.h5')
+  do ih = 1, run%n_harm
+    hsuf = ''
+    if (run%ffield(ih)%harm /= 1) write (hsuf, '(a, i0)') '-h', run%ffield(ih)%harm
+    call note_series (trim(hsuf) // '.wf.h5')
+  enddo
+endif
 call note_file (trim(run%global%out_root) // '.stats.h5')
 call note_file (trim(run%global%out_root) // '.diag.txt')
 call note_file (trim(run%global%out_root) // '.ledger.txt')
@@ -1017,7 +1041,6 @@ contains
 subroutine note_file (name)
 
 character(*) name
-character(300) row
 integer(8) fsize
 logical there
 
@@ -1025,15 +1048,96 @@ logical there
 
 inquire (file = name, exist = there, size = fsize)
 if (.not. there) return
+call note_row (name, real(fsize, rp))
+
+end subroutine note_file
+
+!+
+! Subroutine note_dumps (prefix, beam, field)
+!
+! Routine to list the beam dump <prefix>.beam.h5 and the field set's dumps
+! <prefix>[-h<h>].wf.h5, each where its switch is on and the file is there.
+!-
+
+subroutine note_dumps (prefix, beam, field)
+
+character(*) prefix
+logical beam, field
+integer jh
+character(8) jsuf
+
+!
+
+if (beam) call note_file (prefix // '.beam.h5')
+if (.not. field) return
+do jh = 1, run%n_harm
+  jsuf = ''
+  if (run%ffield(jh)%harm /= 1) write (jsuf, '(a, i0)') '-h', run%ffield(jh)%harm
+  call note_file (prefix // trim(jsuf) // '.wf.h5')
+enddo
+
+end subroutine note_dumps
+
+!+
+! Subroutine note_series (suffix)
+!
+! Routine to list the frame files <out_root>-<record><suffix> of records 1 to nrec as one
+! row, the records as a shell brace range, with the size of the series. A series with
+! one record is listed by its own name. Every file of the series must be there, since
+! the frame writer writes one at every comb record, and a series with a file missing is
+! not listed.
+!-
+
+subroutine note_series (suffix)
+
+character(*) suffix
+character(440) fname, pattern
+integer(8) fsize
+real(rp) total
+integer jr
+logical there
+
+!
+
+total = 0
+do jr = 1, nrec
+  write (fname, '(2a, i6.6, a)') trim(root), '-', jr, suffix
+  inquire (file = trim(fname), exist = there, size = fsize)
+  if (.not. there) return
+  total = total + fsize
+enddo
+if (nrec == 1) then
+  write (pattern, '(2a, i6.6, a)') trim(root), '-', 1, suffix
+else
+  write (pattern, '(2a, i6.6, a, i6.6, 2a)') trim(root), '-{', 1, '..', nrec, '}', suffix
+endif
+call note_row (trim(pattern), total)
+
+end subroutine note_series
+
+!+
+! Subroutine note_row (name, fsize)
+!
+! Routine to write one row of the file list, the first after "Wrote".
+!-
+
+subroutine note_row (name, fsize)
+
+character(*) name
+character(500) row
+real(rp) fsize
+
+!
+
 n_listed = n_listed + 1
 if (n_listed == 1) then
-  write (row, '(2a, t62, a)') ' Wrote       ', trim(name), trim(adjustl(fel_si_str(real(fsize, rp), 'B')))
+  write (row, '(2a, t62, a)') ' Wrote       ', trim(name), trim(adjustl(fel_si_str(fsize, 'B')))
 else
-  write (row, '(2a, t62, a)') '             ', trim(name), trim(adjustl(fel_si_str(real(fsize, rp), 'B')))
+  write (row, '(2a, t62, a)') '             ', trim(name), trim(adjustl(fel_si_str(fsize, 'B')))
 endif
 call out_io (s_blank$, r_name, trim(row))
 
-end subroutine note_file
+end subroutine note_row
 
 end subroutine fel_write_footer
 

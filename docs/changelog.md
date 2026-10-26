@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-26 Changed: the footer's file list names every dump the run wrote: the initial state under
+  `run.write_initial`, the dumps at elements, and the frames, which it had left out, each frame series
+  as one row whose records are a shell brace range, `<out_root>-{000001..000012}.beam.h5`, with the
+  series' size. A dump is listed when the switch that writes it was on in this run and the file is
+  there, so a rerun in one directory no longer lists an earlier run's dumps under the same
+  `out_root`. The escaped and pulse files are listed when slices were banked. On a run with every
+  kind of dump the list names the 21 files on disk and no other.
 - 2026-10-25 Changed: the escaped-field bank and the reconstructed pulse are openPMD EXT_Wavefront files,
   `<out_root>-escaped.wf.h5` and `-pulse.wf.h5`, like every field dump, so `Wavefront.from_openpmd` of
   openpmd-beamphysics reads either and the last file in Genesis4's field layout is gone. Their planes

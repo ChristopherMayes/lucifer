@@ -3469,6 +3469,12 @@ Input:
 Routine to close a run for a human: how far it went and how long it took, what the
 light ended up as, and which files were written. The file list comes last, so the last
 thing on screen is the list of what to open.
+
+The list is also what lucifer.runner.Result reads to find the run's dumps, so it names
+every dump this run wrote and no other: the initial state, the dumps at elements, the
+final state, the escaped light and the pulse, and the frames. A frame series is one
+line per kind of file, its record numbers written as a shell brace range,
+<out_root>-{000001..000012}.beam.h5, with the size of the whole series.
 ```
 
 ```
@@ -3484,6 +3490,38 @@ Input:
 ```
 Routine to list one output file with its size, if it is there. Existence is the test,
 so the footer never claims a file the run did not write.
+```
+
+(api-note-dumps)=
+### `note_dumps`
+
+*Subroutine* `(prefix, beam, field)`
+
+```
+Routine to list the beam dump <prefix>.beam.h5 and the field set's dumps
+<prefix>[-h<h>].wf.h5, each where its switch is on and the file is there.
+```
+
+(api-note-series)=
+### `note_series`
+
+*Subroutine* `(suffix)`
+
+```
+Routine to list the frame files <out_root>-<record><suffix> of records 1 to nrec as one
+row, the records as a shell brace range, with the size of the series. A series with
+one record is listed by its own name. Every file of the series must be there, since
+the frame writer writes one at every comb record, and a series with a file missing is
+not listed.
+```
+
+(api-note-row)=
+### `note_row`
+
+*Subroutine* `(name, fsize)`
+
+```
+Routine to write one row of the file list, the first after "Wrote".
 ```
 
 (api-fel-read-openpmd-into-field)=
