@@ -3,10 +3,10 @@
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    ../../build-release/bin/lucifer lucifer_no_migrate.in
+    ../../build-release/bin/lucifer lucifer_no_migrate.toml
     python -m lucifer.plot migration.stats.h5
 
-A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `run.migrate = true` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.in` is the same run with it off.
+A particle's ponderomotive phase drifts, and once it leaves the slice window the particle belongs to a neighboring slice. `run.migrate = true` moves it there. This run is the `../sase` configuration at 1024 particles per slice with migration on, and `lucifer_no_migrate.toml` is the same run with it off.
 
 No artificial driver is needed to make this happen. The phase advance a particle accumulates depends on its energy and on its betatron angles, both of which vary across the beam, so a real beam in a real line migrates on its own. Adding `../sase_wake`'s chamber block to this input file raises both the moves and the dropped charge. A wake that costs the tail slices 121 keV/m and the head slices 1.9 keV/m (`../sase_wake`) is a systematic phase walk on top of the beam's own spread.
 

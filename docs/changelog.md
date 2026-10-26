@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Fixed: nine example READMEs named their variant input files with the `.in` suffix of
+  the namelist format, `lucifer_detuned.in` for `lucifer_detuned.toml`, so the commands they showed
+  failed as written. They name the `.toml` files, and `tests/scripts/check_examples.py` now refuses a
+  `lucifer_<name>` file a README names that is not in its directory.
 - 2026-10-25 Changed: `lucifer.plot` labels curves with symbols and draws the layout in
   LUME-Genesis's colors. With `tex=True`, the default of `plot` and `summary`, a curve that
   openpmd-beamphysics has a name for, `sigma_x`, `norm_emit_x`, `energy`, `sigma_energy` and the

@@ -3,7 +3,7 @@
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    ../../build-release/bin/lucifer lucifer_damping_only.in
+    ../../build-release/bin/lucifer lucifer_damping_only.toml
     python -m lucifer.plot spontaneous.stats.h5
 
 This is undulator radiation the FEL model does not account for, applied inside FEL elements under Bmad's own global switches. `bmad.radiation_damping_on` subtracts the classical rate from every particle. `bmad.radiation_fluctuations_on` adds the quantum kick, drawn once per beamlet because the quiet start cancels within a beamlet. There is no separate FEL-side switch and no separate FEL-side default. These are the same two switches Tao exposes, off unless the input turns them on ([the input reference](../../docs/input-reference.md)).
@@ -14,7 +14,7 @@ The plot shows it in the beam-energy panel, where the mean falls in a straight l
 
 | run | d\<E\>/ds per metre of undulator | against the analytic rate |
 |---|---|---|
-| `lucifer_damping_only.in` | -0.03071 m_e c^2 | 100.3% |
+| `lucifer_damping_only.toml` | -0.03071 m_e c^2 | 100.3% |
 | `lucifer.toml`, both switches | -0.03103 m_e c^2 | 101.4% |
 | `../steady_state`, neither switch | -0.00008 m_e c^2 | 0.25% |
 

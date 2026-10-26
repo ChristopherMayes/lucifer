@@ -12,14 +12,14 @@ Everything on this page lives in and runs from `examples/unaveraged/`.
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    ../../build-release/bin/lucifer lucifer_averaged.in
+    ../../build-release/bin/lucifer lucifer_averaged.toml
     python -m lucifer.plot unaveraged.stats.h5
 
 This is one seeded steady-state segment tracked with no period averaging and no resonance approximation (the manual's [unaveraged-mode section](../../fel-physics.md)). The particles ride the real helical field, quiver and all, at 20 integration substeps per period with sin^2 entry and exit ramps, and the radiation is a co-evolving kick. Nothing in this path knows the coupling factor `fc`: the energy exchange is what the Lorentz force does.
 
-The mode is `seg1.bmad`'s own `fel_method`, `unaveraged`. The substep count and the ramp length are global switches, `run.unaveraged_steps_per_period` and `run.unaveraged_ramp_periods`, at their defaults here. `lucifer_averaged.in` runs the identical configuration through the averaged default, with a lattice that calls the same file and overrides that one attribute.
+The mode is `seg1.bmad`'s own `fel_method`, `unaveraged`. The substep count and the ramp length are global switches, `run.unaveraged_steps_per_period` and `run.unaveraged_ramp_periods`, at their defaults here. `lucifer_averaged.toml` runs the identical configuration through the averaged default, with a lattice that calls the same file and overrides that one attribute.
 
-On this input the two gain curves agree in ln P at the segment exit to under one part in a thousand, and the table below carries both exit powers. Those are two independent formulations of the same physics, sharing no approximation, and the agreement is what pins the averaged mode's coupling factor. `lucifer_averaged.in` states `run.source_filter = false`, since the unaveraged mode builds no source to filter and the two must compare like for like. The benchmark measures the factor itself to about 6e-4 with dedicated probes ([validation](../../validation.md)).
+On this input the two gain curves agree in ln P at the segment exit to under one part in a thousand, and the table below carries both exit powers. Those are two independent formulations of the same physics, sharing no approximation, and the agreement is what pins the averaged mode's coupling factor. `lucifer_averaged.toml` states `run.source_filter = false`, since the unaveraged mode builds no source to filter and the two must compare like for like. The benchmark measures the factor itself to about 6e-4 with dedicated probes ([validation](../../validation.md)).
 
 The run also writes `unaveraged.ledger.txt`: beam energy relative to the reference and window field energy per record, whose sum is conserved. The benchmark checks the closure at 1e-4 of the turnover under a strong-exchange probe.
 

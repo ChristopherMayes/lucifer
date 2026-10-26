@@ -4,7 +4,7 @@ Examples conformance: the feature list, the matrix and the directories must agre
 
 docs/index.md declares what the program does and examples/README.md says which example
 shows each declared feature. Neither statement is checkable on its own, and a feature
-that quietly loses its example reads exactly like one that never had it. Six assertions:
+that quietly loses its example reads exactly like one that never had it. Seven assertions:
 
   1. Every Features bullet is represented by a matrix row. The row's name carries the
      bullet's own bold lead phrase, so the two files use one vocabulary.
@@ -18,6 +18,9 @@ that quietly loses its example reads exactly like one that never had it. Six ass
   5. Every input file fenced into a generated page is byte-identical to the file on disk,
      which is what makes the pages copy-paste safe.
   6. Every generated page's figure exists.
+  7. Every input file a README names as lucifer_<name>.<suffix> exists in its directory,
+     so a command the README shows runs as written. Names left from an older format,
+     lucifer_detuned.in for lucifer_detuned.toml, stood in nine READMEs unnoticed.
 
 Nothing here runs the program, so it is also the part of the benchmark that a machine with
 no Fortran build can run.
@@ -168,6 +171,12 @@ def main():
         elif "lucifer.toml" not in inputs and not (ex / d / "run.sh").is_file():
             problems.append(f"examples/{d}/ has no lucifer.toml and no run.sh to name its "
                             f"input files for it: {inputs}")
+        # 7. The input files a README names exist.
+        readme = ex / d / "README.md"
+        if readme.is_file():
+            for name in sorted(set(re.findall(r"\b(lucifer_[a-z0-9_]+\.[a-z]+)\b", readme.read_text()))):
+                if not (ex / d / name).is_file():
+                    problems.append(f"examples/{d}/README.md names {name}, which is not a file there")
 
     # 5 and 6. The generated pages quote the real files, and their figures exist.
     n_fenced = 0

@@ -3,7 +3,7 @@
 The example runs in two commands, with Bmad only:
 
     ../../build-release/bin/lucifer lucifer.toml
-    ../../build-release/bin/lucifer lucifer_detuned.in
+    ../../build-release/bin/lucifer lucifer_detuned.toml
 
 The line is two undulator segments with a four-bend closed-bump chicane in the break, in absolute time tracking mode (`bmad_com[absolute_time_tracking] = T` in the lattice). The inter-segment phase then follows the real geometry. The beam detours the bump while the radiation drifts the chord between the undulator faces, which is computed from `ele%floor` and never entered by hand. The arc-minus-chord delay (583 wavelengths at the reference angle) re-injects the light onto the bunched beam at whatever carrier phase the bend angle dictates.
 
