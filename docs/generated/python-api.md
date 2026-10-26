@@ -251,9 +251,10 @@ The command that runs the input file, as a list, run from ``path``. With
 *Method* `run(raise_on_error=True)`
 
 ```
-Configure if needed, run the program, and return the output, a Result. A refusal
-or a failed run raises LuciferError with the program's message, or with
-``raise_on_error`` off sets ``error`` and returns the output the run left.
+Configure if needed, write the input file as it now stands, run the program, and
+return the output, a Result. A refusal or a failed run raises LuciferError with the
+program's message, or with ``raise_on_error`` off sets ``error`` and returns the
+output the run left.
 ```
 
 (pyapi-lucifer-lucifer-lucifer-load-output)=
@@ -649,7 +650,18 @@ The stats file: ``stats_file``, or ``<out_root>.stats.h5`` in the run's director
 *Property*
 
 ```
-The stats file, opened through ``lucifer.stats.read_stats``.
+The stats file, opened through ``lucifer.stats.read_stats`` once and kept open
+until close(). A run cannot overwrite a stats file a reader holds open, so
+Lucifer.run() closes it before running again.
+```
+
+(pyapi-lucifer-runner-result-close)=
+#### `Result.close`
+
+*Method* `close()`
+
+```
+Close the stats file if ``stats`` opened it.
 ```
 
 (pyapi-lucifer-runner-result-plot)=

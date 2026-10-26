@@ -30,6 +30,7 @@ rebuilds the object from it.
 from __future__ import annotations
 
 import copy as _copy
+import dataclasses
 import hashlib
 import os
 import pathlib
@@ -288,12 +289,21 @@ class Lucifer:
         return script
 
     def run(self, raise_on_error=True):
-        """Configure if needed, run the program, and return the output, a Result. A refusal
-        or a failed run raises LuciferError with the program's message, or with
-        ``raise_on_error`` off sets ``error`` and returns the output the run left."""
+        """Configure if needed, write the input file as it now stands, run the program, and
+        return the output, a Result. A refusal or a failed run raises LuciferError with the
+        program's message, or with ``raise_on_error`` off sets ``error`` and returns the
+        output the run left."""
         from lucifer.runner import LuciferError, Result, run
+        # The input is written on every run, so a key changed since the last run is the
+        # one this run reads.
         if not self._configured:
             self.configure()
+        else:
+            self.write_input()
+        # The previous run's stats file may be open for reading, and the program cannot
+        # write over a file a reader holds open.
+        if self._output is not None:
+            self._output.close()
         self._finished = self._error = False
         try:
             self._output = run(self._input_name(), cwd=self._base_path, exe=self._command,
@@ -342,7 +352,8 @@ class Lucifer:
         directory."""
         other = _copy.copy(self)
         other._input = _copy.deepcopy(self._input)
-        other._output = _copy.deepcopy(self._output)
+        # A copy of the output without its open stats file, which cannot be copied.
+        other._output = dataclasses.replace(self._output) if self._output is not None else None
         other._initial_particles = _copy.deepcopy(self._initial_particles)
         other._tempdir = None
         other.reset()

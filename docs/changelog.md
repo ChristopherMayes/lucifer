@@ -9,6 +9,11 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Fixed: a second `Lucifer.run()` in one directory failed when the stats file of the first
+  was open, "CANNOT CREATE FILE FOR WRITING", since the program cannot write over a file a reader
+  holds open, and it ran the input file written at the first run, so a key changed between the runs
+  was not read. `Result.stats` now opens the file once and `Result.close()` closes it, and `run()`
+  closes the last output's file and writes the input file as it stands before every run.
 - 2026-10-25 Added: `lucifer.Lucifer`, one object for a run, in `python/lucifer/lucifer.py`. It carries
   the names and meanings of lume-base's `CommandWrapper`, the interface LUME-Genesis's `Genesis4`
   shares, without depending on lume-base: `input`, `output`, `initial_particles`, `workdir`, `path`,

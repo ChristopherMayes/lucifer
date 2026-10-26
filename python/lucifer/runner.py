@@ -58,6 +58,7 @@ class Result:
     out_root: str
     overrides: list[str] = field(default_factory=list)
     stats_file: pathlib.Path | None = None
+    _stats: object = field(default=None, init=False, repr=False, compare=False)
 
     @property
     def stats_path(self) -> pathlib.Path:
@@ -80,9 +81,19 @@ class Result:
 
     @property
     def stats(self):
-        """The stats file, opened through ``lucifer.stats.read_stats``."""
+        """The stats file, opened through ``lucifer.stats.read_stats`` once and kept open
+        until close(). A run cannot overwrite a stats file a reader holds open, so
+        Lucifer.run() closes it before running again."""
         from lucifer.stats import read_stats
-        return read_stats(self.stats_path)
+        if self._stats is None or not self._stats._h5:
+            self._stats = read_stats(self.stats_path)
+        return self._stats
+
+    def close(self):
+        """Close the stats file if ``stats`` opened it."""
+        if self._stats is not None:
+            self._stats.close()
+            self._stats = None
 
     def plot(self, **kwargs):
         """Plot curves of the run's stats file against s: lucifer.plot.plot, which names
