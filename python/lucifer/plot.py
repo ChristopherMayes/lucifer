@@ -149,7 +149,8 @@ BEAMPHYSICS_KEY = {
 }
 SYMBOL = {
     "field/total/power": "P", "field/total/power_inside_angle": r"P_\mathrm{inside}",
-    "field/total/energy": r"E_\mathrm{field}", "field/x/power": "P_x", "field/y/power": "P_y",
+    "field/total/energy": r"E_\mathrm{window}", "field/total/escaped_energy": r"E_\mathrm{escaped}",
+    "field/total/pulse_energy": r"E_\mathrm{pulse}", "field/x/power": "P_x", "field/y/power": "P_y",
     "beam/slice/bunching": "|b|", "beam/slice/current": "I",
     "field_size_x": r"\sigma_{x,\mathrm{field}}", "field_size_y": r"\sigma_{y,\mathrm{field}}",
     "field_emit_x": r"\epsilon_{x,\mathrm{field}}", "field_emit_y": r"\epsilon_{y,\mathrm{field}}",
@@ -172,6 +173,10 @@ def _symbol(se):
     m = re.fullmatch(r"field/harm(\d+)/total/power", path)
     if m:
         return f"P_{{{m.group(1)}}}"
+    m = re.fullmatch(r"field/harm(\d+)/total/(energy|escaped_energy|pulse_energy)", path)
+    if m:
+        which = {"energy": "window", "escaped_energy": "escaped", "pulse_energy": "pulse"}[m.group(2)]
+        return rf"E_{{\mathrm{{{which}}},{m.group(1)}}}"
     m = re.fullmatch(r"beam/(?:bunch|slice_twiss)/(?:twiss|modes)/(\w+)", path)
     if m and m.group(1) in TWISS and se.component:
         return texlabel(TWISS[m.group(1)].format(c=se.component))
@@ -502,7 +507,8 @@ def _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2, include_layout,
 
 def summary(stats, return_figure=False, tex=True):
     """The standard figure of a run, each panel made with plot(): radiation power and
-    window field energy on log and linear scales, the power inside the split angle where
+    field energy on log and linear scales, the energy of the whole pulse drawn over the
+    window's where the file records it, the power inside the split angle where
     the file has it, bunching, the energy change and spread, the rms beam and field
     sizes, the beam's normalized and the field's emittances, a panel per polarization
     when the run carries two, a panel per harmonic when it carries harmonics, and the
@@ -535,11 +541,16 @@ def _summary(plt, st, tex):
     power = ["field/total/power"]
     if "field/total/power_inside_angle" in st:
         power.append("field/total/power_inside_angle")
+    # The whole pulse, the window's energy and the energy slippage carried out of it,
+    # drawn over the window's own, so light leaving the window does not read as light lost.
+    energy = ["field/total/energy"]
+    if "field/total/pulse_energy" in st:
+        energy.insert(0, "field/total/pulse_energy")
     panels = {
         "power": dict(y=power, yscale="log"),
-        "energy": dict(y="field/total/energy", yscale="log"),
+        "energy": dict(y=energy, yscale="log"),
         "power_lin": dict(y=power),
-        "energy_lin": dict(y="field/total/energy"),
+        "energy_lin": dict(y=energy),
         "bunching": dict(y="beam/slice/bunching"),
         "gamma": dict(y=["energy_change", "beam/slice/sigma_energy"]),
         "bsize": dict(y=["beam_size_x", "beam_size_y"]),

@@ -1156,7 +1156,8 @@ without it every curve keeps the file's name. Returns the figure with
 
 ```
 The standard figure of a run, each panel made with plot(): radiation power and
-window field energy on log and linear scales, the power inside the split angle where
+field energy on log and linear scales, the energy of the whole pulse drawn over the
+window's where the file records it, the power inside the split angle where
 the file has it, bunching, the energy change and spread, the rms beam and field
 sizes, the beam's normalized and the field's emittances, a panel per polarization
 when the run carries two, a panel per harmonic when it carries harmonics, and the

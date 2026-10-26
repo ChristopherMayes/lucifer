@@ -9,6 +9,9 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Changed: the summary figure's energy panels draw `field/total/pulse_energy`, the whole
+  pulse, over `field/total/energy`, the window's, labeled $E_\mathrm{pulse}$ and
+  $E_\mathrm{window}$, so light leaving the window does not read as light lost.
 - 2026-10-25 Added: `escaped_energy` and `pulse_energy` in each field set's `total/` group of the
   stats file, in J on the record axis. The window is fixed and slippage carries light out at its
   head, so `field/total/energy`, the window's energy, falls when light leaves. `escaped_energy` is

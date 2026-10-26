@@ -194,7 +194,7 @@ plot("sase.stats.h5", y=["beam/bunch/twiss/norm_emit[x]", "beam/slice_twiss/twis
 
 A dataset on the element-end axis is drawn as points at the element ends. Here the `x` in brackets picks the plane from `coords/plane`, and `labels` names the curves in place of the file's names: the projected emittance stands a little above the slice average, by the spread of the slice centroids. A dataset the file does not have is refused with the datasets its group does have, and a component its axes do not label with the labels they do have.
 
-`lucifer.plot.summary` is the standard figure of a run: radiation power and window field energy on log and linear scales with the power inside the split angle, bunching, the energy change and spread, the rms beam and field sizes, the beam's normalized and the field's emittances, a panel per polarization when the run carries two and per harmonic when it carries harmonics, and a layout under each column. Each panel is one call of `plot`, and the example pages show this figure for every example.
+`lucifer.plot.summary` is the standard figure of a run: radiation power and field energy on log and linear scales with the power inside the split angle, the whole pulse's energy drawn over the window's, bunching, the energy change and spread, the rms beam and field sizes, the beam's normalized and the field's emittances, a panel per polarization when the run carries two and per harmonic when it carries harmonics, and a layout under each column. Each panel is one call of `plot`, and the example pages show this figure for every example.
 
 % example: summary
 ```python
