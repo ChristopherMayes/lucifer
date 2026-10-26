@@ -41,6 +41,7 @@ module costs nothing beyond numpy. They come with the extra lucifer[plot].
 from __future__ import annotations
 
 import argparse
+import contextlib
 import pathlib
 import re
 import sys
@@ -58,8 +59,8 @@ COLORS = ("#2a78d6", "#eb6834", "#2b9f6a", "#8a5cc2", "#c23b4a", "#8c6d3f")
 GRAY, INK, INK2 = "#b0afa9", "#0b0b0b", "#52514e"
 # The layout's colors, LUME-Genesis's: red for an undulator's aw, blue for a quadrupole's k.
 LAYOUT_AW, LAYOUT_K1 = "red", "blue"
-# The figures' style, applied with matplotlib's rc_context around each figure, so the
-# user's own settings are never changed.
+# The figures' style, set around each figure by _style(), which restores these keys alone,
+# so the user's own settings are never changed.
 STYLE = {
     "figure.facecolor": "white", "axes.facecolor": "white",
     "axes.edgecolor": INK2, "axes.labelcolor": INK,
@@ -72,6 +73,21 @@ EXTENSIVE = ("W", "J", "C")
 # The axes a curve runs along. Every other axis of a dataset is a label axis, whose
 # entries are named as components.
 DATA_AXES = ("record", "slice", "element_end")
+
+
+@contextlib.contextmanager
+def _style():
+    """Set STYLE for the figures drawn inside, and restore those keys alone after.
+    matplotlib's rc_context restores every key, interactive among them, and under IPython's
+    inline backend that switched interactive mode off after the first figure, so no later
+    figure in a notebook was shown."""
+    import matplotlib as mpl
+    saved = {k: mpl.rcParams[k] for k in STYLE}
+    mpl.rcParams.update(STYLE)
+    try:
+        yield
+    finally:
+        mpl.rcParams.update(saved)
 
 
 class PlotError(ValueError):
@@ -413,7 +429,7 @@ def plot(stats, y="field/total/power", x="s", y2=(), xlim=None, ylim=None, ylim2
     import matplotlib.pyplot as plt
     st, close = _open(stats)
     try:
-        with plt.rc_context(STYLE):
+        with _style():
             fig = _plot(plt, st, y, x, y2, xlim, ylim, ylim2, yscale, yscale2,
                         include_layout, include_legend, ax, reduce, labels, tex)
     finally:
@@ -494,7 +510,7 @@ def summary(stats, return_figure=False, tex=True):
     import matplotlib.pyplot as plt
     st, close = _open(stats)
     try:
-        with plt.rc_context(STYLE):
+        with _style():
             fig = _summary(plt, st, tex)
     finally:
         if close:

@@ -14,6 +14,10 @@ of that history. The entries before that date describe that branch.
   holds open, and it ran the input file written at the first run, so a key changed between the runs
   was not read. `Result.stats` now opens the file once and `Result.close()` closes it, and `run()`
   closes the last output's file and writes the input file as it stands before every run.
+- 2026-10-25 Fixed: under IPython's inline backend only the first figure `lucifer.plot` drew in a
+  notebook was shown. `matplotlib.rc_context`, which set the figures' style, restores every
+  rcParam on leaving, `interactive` among them, and that switched interactive mode off after the
+  first figure. The style is now set and restored key by key.
 - 2026-10-25 Added: `lucifer.Lucifer`, one object for a run, in `python/lucifer/lucifer.py`. It carries
   the names and meanings of lume-base's `CommandWrapper`, the interface LUME-Genesis's `Genesis4`
   shares, without depending on lume-base: `input`, `output`, `initial_particles`, `workdir`, `path`,
