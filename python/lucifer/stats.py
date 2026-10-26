@@ -300,7 +300,8 @@ def _scalars(group):
         val = dset[()]
         if getattr(val, "shape", None) == () or np.isscalar(val):
             val = np.atleast_1d(val)[0]
-            out[key] = _text(val) if isinstance(val, bytes) else val
+            # A plain Python value, so a parameter reads 12345 and not np.int32(12345).
+            out[key] = _text(val) if isinstance(val, bytes) else (val.item() if hasattr(val, "item") else val)
         else:
             out[key] = np.asarray(val)
     return out

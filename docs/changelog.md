@@ -18,6 +18,8 @@ of that history. The entries before that date describe that branch.
   notebook was shown. `matplotlib.rc_context`, which set the figures' style, restores every
   rcParam on leaving, `interactive` among them, and that switched interactive mode off after the
   first figure. The style is now set and restored key by key.
+- 2026-10-25 Fixed: `Stats.params` returned numpy scalars, `np.int32(12345)` for `run.ran_seed`. It
+  returns plain Python values.
 - 2026-10-25 Added: `lucifer.Lucifer`, one object for a run, in `python/lucifer/lucifer.py`. It carries
   the names and meanings of lume-base's `CommandWrapper`, the interface LUME-Genesis's `Genesis4`
   shares, without depending on lume-base: `input`, `output`, `initial_particles`, `workdir`, `path`,
