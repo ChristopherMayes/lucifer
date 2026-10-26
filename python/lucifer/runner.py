@@ -46,20 +46,37 @@ def executable(exe=None) -> pathlib.Path:
     return p.resolve()
 
 
-@dataclass
+@dataclass(repr=False)
 class Result:
-    """One run: its exit code and output, the input file it ran, and the files it wrote."""
+    """One run: its exit code and output, the input file it ran, and the files it wrote.
+    ``stats_file`` names the stats file where it is not ``<out_root>.stats.h5`` in the run's
+    directory, as for a run restored from an archive."""
     returncode: int
     output: str
     input_file: pathlib.Path
     cwd: pathlib.Path
     out_root: str
     overrides: list[str] = field(default_factory=list)
+    stats_file: pathlib.Path | None = None
 
     @property
     def stats_path(self) -> pathlib.Path:
-        """``<out_root>.stats.h5`` in the run's directory."""
+        """The stats file: ``stats_file``, or ``<out_root>.stats.h5`` in the run's directory."""
+        if self.stats_file is not None:
+            return pathlib.Path(self.stats_file)
         return self.cwd / f"{self.out_root}.stats.h5"
+
+    def __repr__(self):
+        return (f"Result(out_root={self.out_root!r}, returncode={self.returncode}, "
+                f"stats={str(self.stats_path)!r})")
+
+    def _repr_html_(self):
+        from lucifer._display import table
+        rows = [("exit", self.returncode), ("out_root", self.out_root), ("directory", self.cwd),
+                ("stats file", self.stats_path.name)]
+        rows += [("overrides", " ".join(self.overrides))] if self.overrides else []
+        rows += [("files", ", ".join(f.name for f in self.files))] if self.output else []
+        return table("Result", rows)
 
     @property
     def stats(self):
@@ -84,10 +101,12 @@ WROTE = re.compile(r"^(?: Wrote\s+|\s{13})(\S+\.(?:h5|txt))", re.M)
 ERROR_BLOCK = re.compile(r"^\[ERROR[^\n]*\n((?:    [^\n]*\n?)+)", re.M)
 
 
-def run(input_file, cwd=".", exe=None, threads=None, overrides=(), name="lucifer.toml") -> Result:
+def run(input_file, cwd=".", exe=None, threads=None, overrides=(), name="lucifer.toml",
+        timeout=None) -> Result:
     """Run the program on ``input_file``, a ``Input`` written as ``name`` in ``cwd`` or the path of
     an input file relative to ``cwd``, with ``threads`` as OMP_NUM_THREADS and the overrides
-    as ``table.key=value`` arguments. Raises ``LuciferError`` on a nonzero exit."""
+    as ``table.key=value`` arguments. ``timeout`` stops the run after that many seconds.
+    Raises ``LuciferError`` on a nonzero exit or a timeout."""
     cwd = pathlib.Path(cwd)
     cwd.mkdir(parents=True, exist_ok=True)
     if hasattr(input_file, "toml"):
@@ -101,7 +120,12 @@ def run(input_file, cwd=".", exe=None, threads=None, overrides=(), name="lucifer
         env["OMP_NUM_THREADS"] = str(int(threads))
     cmd = [str(executable(exe)), str(input_path.relative_to(cwd) if input_path.is_relative_to(cwd) else input_path),
            *overrides]
-    r = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True, errors="replace")
+    try:
+        r = subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True, errors="replace",
+                           timeout=timeout)
+    except subprocess.TimeoutExpired as err:
+        out = (err.stdout or b"").decode(errors="replace") if isinstance(err.stdout, bytes) else (err.stdout or "")
+        raise LuciferError(f"the run passed its timeout of {timeout} s", out, -1) from None
     output = r.stdout + r.stderr
     m = OUT_ROOT.search(output)
     if m:
@@ -118,5 +142,6 @@ def _out_root_of(input_path: pathlib.Path) -> str:
     try:
         data = tomllib.loads(input_path.read_text())
     except (OSError, tomllib.TOMLDecodeError):
-        return "fel_td"
-    return str(data.get("run", {}).get("out_root", "fel_td"))
+        data = {}
+    from lucifer.models import Run
+    return str(data.get("run", {}).get("out_root", Run().out_root))

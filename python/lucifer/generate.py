@@ -92,7 +92,8 @@ def render(schema: dict) -> str:
             out += ["    resample: Resample = _field(default_factory=Resample)",
                     '    """The [beam.resample] table, the resampler."""']
         out += ["", ""]
-    out += ["@dataclass", "class Input(InputOps):", '    """One input file: the lattice and the tables."""']
+    # repr=False, so the representation is InputOps's: the keys set away from the defaults.
+    out += ["@dataclass(repr=False)", "class Input(InputOps):", '    """One input file: the lattice and the tables."""']
     for name, prop in keys[""].items():
         out += field_lines(name, prop)
     for table in schema_mod.TABLES:

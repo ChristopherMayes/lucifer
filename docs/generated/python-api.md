@@ -7,6 +7,373 @@ short_title: Python reference
 
 This page lists every public module, class and function of the Python package `python/lucifer`, with its signature and its docstring as written. It is generated, so it says what the code says. A module's public names are its `__all__`. What the package is for, with examples, is [](../python.md).
 
+(pyapi-lucifer-lucifer)=
+## `lucifer.lucifer`
+
+*Module*
+
+```
+One object to build, run, read and plot a Lucifer run.
+
+    from lucifer import Lucifer
+
+    L = Lucifer("lucifer.toml", threads=12)
+    L.input.beam.n_particle = 4096
+    L.run()
+    L.plot("field/total/power", yscale="log")
+    L.archive("run.h5")
+    L2 = Lucifer.from_archive("run.h5")
+
+Lucifer carries the names and the meanings of lume-base's CommandWrapper, the interface
+LUME-Genesis's Genesis4 and the other LUME codes share, without depending on lume-base:
+input, output, initial_particles, workdir, path, command, timeout, verbose, configured,
+finished, error, configure(), run(), write_input(), load_input(), load_output(),
+fingerprint(), copy(), reset(), archive(), load_archive(), from_archive(), plot(). The
+MPI names, use_mpi, mpi_run, command_mpi, COMMAND_MPI and MPI_RUN, are left out, since
+the program threads with OpenMP, and from_yaml is left out, since the input is TOML.
+
+A run happens in a directory of its own: a temporary directory inside ``workdir``, or
+``workdir`` itself with ``use_temp_dir=False``, or the input file's own directory when
+neither is given. The input file is written there with the lattice and every file it
+names as absolute paths, resolved from the directory the input came from, so a run in a
+temporary directory reads its files where they are and nothing is copied.
+
+The archive of a run is its stats file, which holds the input file the run read in
+meta/input_echo and every output array, so archive() copies it and from_archive()
+rebuilds the object from it.
+```
+
+(pyapi-lucifer-lucifer-lucifer)=
+### `Lucifer`
+
+*Class* `Lucifer(input=None, *, workdir=None, use_temp_dir=True, command=None, threads=None, verbose=False, timeout=None, initial_particles=None)`
+
+```
+A Lucifer run: its input, the directory it runs in, and its output.
+
+``input`` is an Input, the path of an input file, or TOML text. ``workdir``,
+``use_temp_dir``, ``command``, ``verbose`` and ``timeout`` mean what lume-base's
+CommandWrapper means by them, and ``threads`` sets OMP_NUM_THREADS. ``command`` is the
+executable, by default ``$LUCIFER_EXE`` or ``lucifer`` on PATH. ``initial_particles``
+is an openPMD-beamphysics ParticleGroup to start from.
+```
+
+(pyapi-lucifer-lucifer-lucifer-input)=
+#### `Lucifer.input`
+
+*Property*
+
+```
+The input file, an Input.
+```
+
+(pyapi-lucifer-lucifer-lucifer-output)=
+#### `Lucifer.output`
+
+*Property*
+
+```
+The run's Result, with its stats file, or None before a run.
+```
+
+(pyapi-lucifer-lucifer-lucifer-initial-particles)=
+#### `Lucifer.initial_particles`
+
+*Property*
+
+```
+An openPMD-beamphysics ParticleGroup the run starts from, or None.
+```
+
+(pyapi-lucifer-lucifer-lucifer-command)=
+#### `Lucifer.command`
+
+*Property*
+
+```
+The executable: as given, else ``$LUCIFER_EXE``, else ``lucifer`` on PATH.
+```
+
+(pyapi-lucifer-lucifer-lucifer-verbose)=
+#### `Lucifer.verbose`
+
+*Property*
+
+```
+Whether run() prints the program's output when it ends.
+```
+
+(pyapi-lucifer-lucifer-lucifer-timeout)=
+#### `Lucifer.timeout`
+
+*Property*
+
+```
+Seconds after which a run is stopped and refused, or None.
+```
+
+(pyapi-lucifer-lucifer-lucifer-configured)=
+#### `Lucifer.configured`
+
+*Property*
+
+```
+Whether the run's directory exists and holds the input file.
+```
+
+(pyapi-lucifer-lucifer-lucifer-finished)=
+#### `Lucifer.finished`
+
+*Property*
+
+```
+Whether a run has ended, with or without an error.
+```
+
+(pyapi-lucifer-lucifer-lucifer-error)=
+#### `Lucifer.error`
+
+*Property*
+
+```
+Whether the last run ended with an error.
+```
+
+(pyapi-lucifer-lucifer-lucifer-use-temp-dir)=
+#### `Lucifer.use_temp_dir`
+
+*Property*
+
+```
+Whether the run happens in a temporary directory inside ``workdir``.
+```
+
+(pyapi-lucifer-lucifer-lucifer-workdir)=
+#### `Lucifer.workdir`
+
+*Property*
+
+```
+The directory runs happen in or under. Setting it sets up the run's directory.
+```
+
+(pyapi-lucifer-lucifer-lucifer-path)=
+#### `Lucifer.path`
+
+*Property*
+
+```
+The run's directory, once configured.
+```
+
+(pyapi-lucifer-lucifer-lucifer-input-file)=
+#### `Lucifer.input_file`
+
+*Property*
+
+```
+The input file the run reads: the one written into the run's directory once
+configured, else the file the input was loaded from.
+```
+
+(pyapi-lucifer-lucifer-lucifer-input-parser)=
+#### `Lucifer.input_parser`
+
+*Static method* `input_parser(path)`
+
+```
+The Input of an input file.
+```
+
+(pyapi-lucifer-lucifer-lucifer-load-input)=
+#### `Lucifer.load_input`
+
+*Method* `load_input(input_filepath, **kwargs)`
+
+```
+Read an input file into ``input``, and remember its directory, from which the
+files it names are resolved.
+```
+
+(pyapi-lucifer-lucifer-lucifer-setup-workdir)=
+#### `Lucifer.setup_workdir`
+
+*Method* `setup_workdir(workdir, cleanup=True)`
+
+```
+Set the run's directory: a temporary directory inside ``workdir`` with
+``use_temp_dir``, else ``workdir``, else the input file's own directory.
+```
+
+(pyapi-lucifer-lucifer-lucifer-resolved-input)=
+#### `Lucifer.resolved_input`
+
+*Method* `resolved_input()`
+
+```
+A copy of ``input`` with the lattice and the files it names as absolute paths,
+resolved from the directory the input came from.
+```
+
+(pyapi-lucifer-lucifer-lucifer-write-input)=
+#### `Lucifer.write_input`
+
+*Method* `write_input(input_filename=None)`
+
+```
+Write the resolved input file into the run's directory, or to
+``input_filename``, and return its path.
+```
+
+(pyapi-lucifer-lucifer-lucifer-configure)=
+#### `Lucifer.configure`
+
+*Method* `configure()`
+
+```
+Make the run's directory and write the input file there, with the initial
+particles as an openPMD-beamphysics file when there are any.
+```
+
+(pyapi-lucifer-lucifer-lucifer-get-run-script)=
+#### `Lucifer.get_run_script`
+
+*Method* `get_run_script(write_to_path=True)`
+
+```
+The command that runs the input file, as a list, run from ``path``. With
+``write_to_path`` it is also written there as a file named run.
+```
+
+(pyapi-lucifer-lucifer-lucifer-run)=
+#### `Lucifer.run`
+
+*Method* `run(raise_on_error=True)`
+
+```
+Configure if needed, run the program, and return the output, a Result. A refusal
+or a failed run raises LuciferError with the program's message, or with
+``raise_on_error`` off sets ``error`` and returns the output the run left.
+```
+
+(pyapi-lucifer-lucifer-lucifer-load-output)=
+#### `Lucifer.load_output`
+
+*Method* `load_output(**kwargs)`
+
+```
+Read the output a run left in ``path``, a run made outside this object included,
+and return it.
+```
+
+(pyapi-lucifer-lucifer-lucifer-vprint)=
+#### `Lucifer.vprint`
+
+*Method* `vprint(*args, **kwargs)`
+
+```
+Print only with ``verbose``.
+```
+
+(pyapi-lucifer-lucifer-lucifer-fingerprint)=
+#### `Lucifer.fingerprint`
+
+*Method* `fingerprint()`
+
+```
+A hash of the input file with every key written out, which two objects share
+exactly when they would run the same written input. An object restored from an
+archive holds the input as the run read it, with every value the program derived
+written out, so its fingerprint differs from one that left those to the program.
+```
+
+(pyapi-lucifer-lucifer-lucifer-copy)=
+#### `Lucifer.copy`
+
+*Method* `copy()`
+
+```
+A copy with its own input and output, not configured when it ran in a temporary
+directory.
+```
+
+(pyapi-lucifer-lucifer-lucifer-reset)=
+#### `Lucifer.reset`
+
+*Method* `reset()`
+
+```
+Forget the run's directory when it was temporary, so the next run configures a
+new one.
+```
+
+(pyapi-lucifer-lucifer-lucifer-archive)=
+#### `Lucifer.archive`
+
+*Method* `archive(h5=None)`
+
+```
+Copy the run's stats file, which holds the input file in meta/input_echo and every
+output array, to ``h5``, by default lucifer_<fingerprint>.h5 here, and return its
+path.
+```
+
+(pyapi-lucifer-lucifer-lucifer-load-archive)=
+#### `Lucifer.load_archive`
+
+*Method* `load_archive(h5, configure=True)`
+
+```
+Take the input file from an archive's meta/input_echo and its output from the
+archive itself.
+```
+
+(pyapi-lucifer-lucifer-lucifer-from-archive)=
+#### `Lucifer.from_archive`
+
+*Class method* `from_archive(archive_h5)`
+
+```
+A Lucifer rebuilt from an archive: its input from meta/input_echo, its output the
+archive.
+```
+
+(pyapi-lucifer-lucifer-lucifer-to-hdf5)=
+#### `Lucifer.to_hdf5`
+
+*Method* `to_hdf5(filename)`
+
+```
+archive() to ``filename``.
+```
+
+(pyapi-lucifer-lucifer-lucifer-from-hdf5)=
+#### `Lucifer.from_hdf5`
+
+*Class method* `from_hdf5(filename)`
+
+```
+from_archive() of ``filename``.
+```
+
+(pyapi-lucifer-lucifer-lucifer-plot)=
+#### `Lucifer.plot`
+
+*Method* `plot(y='field/total/power', **kwargs)`
+
+```
+lucifer.plot.plot of the output's stats file, which names its arguments.
+```
+
+(pyapi-lucifer-lucifer-lucifer-summary)=
+#### `Lucifer.summary`
+
+*Method* `summary(**kwargs)`
+
+```
+lucifer.plot.summary of the output's stats file.
+```
+
 (pyapi-lucifer-models)=
 ## `lucifer.models`
 
@@ -247,21 +614,24 @@ program wrote it.
 (pyapi-lucifer-runner-run)=
 ### `run`
 
-*Function* `run(input_file, cwd='.', exe=None, threads=None, overrides=(), name='lucifer.toml') -> lucifer.runner.Result`
+*Function* `run(input_file, cwd='.', exe=None, threads=None, overrides=(), name='lucifer.toml', timeout=None) -> lucifer.runner.Result`
 
 ```
 Run the program on ``input_file``, a ``Input`` written as ``name`` in ``cwd`` or the path of
 an input file relative to ``cwd``, with ``threads`` as OMP_NUM_THREADS and the overrides
-as ``table.key=value`` arguments. Raises ``LuciferError`` on a nonzero exit.
+as ``table.key=value`` arguments. ``timeout`` stops the run after that many seconds.
+Raises ``LuciferError`` on a nonzero exit or a timeout.
 ```
 
 (pyapi-lucifer-runner-result)=
 ### `Result`
 
-*Class* `Result(returncode: int, output: str, input_file: pathlib.Path, cwd: pathlib.Path, out_root: str, overrides: list[str] = <factory>)`
+*Class* `Result(returncode: int, output: str, input_file: pathlib.Path, cwd: pathlib.Path, out_root: str, overrides: list[str] = <factory>, stats_file: pathlib.Path | None = None)`
 
 ```
 One run: its exit code and output, the input file it ran, and the files it wrote.
+``stats_file`` names the stats file where it is not ``<out_root>.stats.h5`` in the run's
+directory, as for a run restored from an archive.
 ```
 
 (pyapi-lucifer-runner-result-stats-path)=
@@ -270,7 +640,7 @@ One run: its exit code and output, the input file it ran, and the files it wrote
 *Property*
 
 ```
-``<out_root>.stats.h5`` in the run's directory.
+The stats file: ``stats_file``, or ``<out_root>.stats.h5`` in the run's directory.
 ```
 
 (pyapi-lucifer-runner-result-stats)=

@@ -283,6 +283,24 @@ def page_examples(exe, wd):
             slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
             # end example: beam
 
+            # example: object
+            from lucifer import Lucifer
+
+            L = Lucifer("lucifer.toml", threads=4)
+            L.input.beam.n_particle = 1024
+            L.run()
+            L.plot(y="field/total/power", yscale="log")
+            # end example: object
+
+            # example: archive
+            L.archive("page-run.h5")
+            R = Lucifer.from_archive("page-run.h5")
+            R.input.beam.n_particle
+            # end example: archive
+            restored_plot = R.plot(return_figure=True)
+            own = Lucifer("lucifer.toml", threads=4, use_temp_dir=False)
+            own.run()
+
             # The plots of the smoke run, checked below. The page's plotting examples run on
             # the sase example in tests/scripts/python_page_figures.py.
             from lucifer.plot import plot
@@ -321,6 +339,22 @@ def page_examples(exe, wd):
     check("the page's stats example: units and inputs as the page states them", ok)
     ok = slices[0]["n"] == 1024 and len(slices[0]["x"]) == 1024
     check("the page's beam example: the final dump read into slices", ok, note=f"[{slices[0]['n']} particles]")
+
+    # The object. The run happened in a temporary directory, from an input file that names
+    # its lattice by an absolute path, and the archive restored the input and the output.
+    import tempfile
+    written = pathlib.Path(L.input_file).read_text()
+    ok = (L.finished and not L.error and str(pathlib.Path(L.path).resolve()).startswith(
+              str(pathlib.Path(tempfile.gettempdir()).resolve()))
+          and f'lattice = "{(page / "smoke.bmad").resolve()}"' in written and L.output.stats_path.is_file())
+    check("Lucifer: an input file run in a temporary directory, its lattice by an absolute path", ok,
+          note=f"[{L!r}]")
+    ok = (R.input.beam.n_particle == 1024 and R.output.stats_path == (page / "page-run.h5").resolve()
+          and restored_plot is not None and R.finished)
+    check("Lucifer: archived, restored from the archive with its input and output, and plotted", ok,
+          note=f"[{R!r}]")
+    ok = own.path == str(page.resolve()) and (page / "page.stats.h5").is_file() and own.finished
+    check("Lucifer: an input file run in its own directory without a temporary one", ok, note=f"[{own!r}]")
 
     # The plots. The smoke run's power is about 10 MW and its bunching dimensionless, so the
     # labels carry the file's long names and units with the prefix the values take.

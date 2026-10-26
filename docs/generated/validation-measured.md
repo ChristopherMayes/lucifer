@@ -730,6 +730,9 @@ where the two builds agree to every printed digit.
 | the page's refusal example: LuciferError carries the program's message |  | same | holds |
 | the page's stats example: units and inputs as the page states them |  | same | holds |
 | the page's beam example: the final dump read into slices |  | same | holds |
+| Lucifer: an input file run in a temporary directory, its lattice by an absolute path |  | same | holds |
+| Lucifer: archived, restored from the archive with its input and output, and plotted |  | same | holds |
+| Lucifer: an input file run in its own directory without a temporary one |  | same | holds |
 | plot: power and bunching on two axes, the file's units with their prefix, the layout under them |  | same | holds |
 | plot: a component of a dataset on the element-end axis, in its unit |  | same | holds |
 | summary: every panel and the layout, written to PNG |  | same | holds |

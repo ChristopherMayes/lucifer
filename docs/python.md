@@ -11,6 +11,32 @@ pip install -e "python[plot]"
 
 The package needs Python 3.11 or later. The input file, the runner and the schema use the standard library alone, and the readers need `numpy` and `h5py`. The plots need the extra `plot`, which is openpmd-beamphysics and brings matplotlib, so `pip install -e python` installs everything else. In this repository the package is installed into the `bmad-fel-validate` environment with that environment's own pip and `--no-deps`, since the environment's file states every dependency.
 
+(python-object)=
+## The Lucifer object
+
+`lucifer.Lucifer` is one object for a run: its input file, the directory it runs in, and its output, with plotting and archiving on it, so one import serves and tab completion shows the rest. It carries the names and meanings of lume-base's `CommandWrapper`, the interface LUME-Genesis's `Genesis4` and the other LUME codes share, without depending on lume-base: `input`, `output`, `initial_particles`, `workdir`, `path`, `configure()`, `run()`, `load_output()`, `fingerprint()`, `copy()`, `reset()`, `archive()`, `from_archive()`, `plot()` and the rest. The MPI names and `from_yaml` are left out, since the program threads with OpenMP and its input is TOML.
+
+% example: object
+```python
+from lucifer import Lucifer
+
+L = Lucifer("lucifer.toml", threads=4)
+L.input.beam.n_particle = 1024
+L.run()
+L.plot(y="field/total/power", yscale="log")
+```
+
+`Lucifer` takes an `Input`, the path of an input file or TOML text. A run happens in a temporary directory inside `workdir`, or in `workdir` itself with `use_temp_dir=False`, or in the input file's own directory when neither is given. The input file is written there with the lattice and every file it names as absolute paths resolved from the directory the input came from, so nothing is copied. `initial_particles` takes an openPMD-beamphysics `ParticleGroup`, written into the run's directory and named by `beam.position_file`. In Jupyter the object, its `input`, its `output` and the output's `stats` each show a table of what they hold.
+
+% example: archive
+```python
+L.archive("page-run.h5")
+R = Lucifer.from_archive("page-run.h5")
+R.input.beam.n_particle
+```
+
+The archive of a run is its stats file, which holds the input file the run read in `meta/input_echo` and every output array, so `archive()` copies it and `from_archive()` rebuilds the object from it. The restored input is the one the run read, with every value the program derived written out, so its `fingerprint()` differs from an input that left those values to the program.
+
 (python-schema)=
 ## The schema the package carries
 

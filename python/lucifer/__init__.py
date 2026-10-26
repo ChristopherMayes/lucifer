@@ -1,5 +1,6 @@
 """The Python side of Lucifer.
 
+lucifer  Lucifer, one object to build, run, read and plot a run, with lume-base's names.
 models   the input file as typed dataclasses generated from the schema: Input, Run, Beam, ...
 flat     the flat key = value text of the check scripts as a TOML input file.
 schema   the JSON Schema the program writes with lucifer --schema, carried here.
@@ -22,6 +23,7 @@ import importlib
 _FROM = {name: "lucifer.models" for name in
          ("Input", "Run", "Window", "Beam", "Resample", "Field", "Wake", "SpaceCharge", "Bmad")}
 _FROM.update({name: "lucifer.runner" for name in ("LuciferError", "Result", "run")})
+_FROM["Lucifer"] = "lucifer.lucifer"
 
 __all__ = sorted(_FROM)
 

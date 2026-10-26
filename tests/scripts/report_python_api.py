@@ -37,7 +37,7 @@ from pathlib import Path
 import lucifer
 
 # The modules in reading order: what a user builds, runs and reads first, the tools last.
-ORDER = ("models", "inputops", "runner", "stats", "beam", "plot", "flat", "schema", "generate")
+ORDER = ("lucifer", "models", "inputops", "runner", "stats", "beam", "plot", "flat", "schema", "generate")
 # The generated models are listed by name: their fields are on the input reference.
 MODELS = "models"
 
@@ -166,7 +166,8 @@ def main():
     p.add_argument("--out", required=True)
     args = p.parse_args()
 
-    found = {m.name for m in pkgutil.iter_modules(lucifer.__path__)}
+    # A module whose name starts with an underscore is private and has no entry.
+    found = {m.name for m in pkgutil.iter_modules(lucifer.__path__) if not m.name.startswith("_")}
     try:
         if found != set(ORDER):
             raise Refusal(f"the package's modules and ORDER differ: not in ORDER "

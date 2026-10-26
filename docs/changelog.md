@@ -9,6 +9,24 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: `lucifer.Lucifer`, one object for a run, in `python/lucifer/lucifer.py`. It carries
+  the names and meanings of lume-base's `CommandWrapper`, the interface LUME-Genesis's `Genesis4`
+  shares, without depending on lume-base: `input`, `output`, `initial_particles`, `workdir`, `path`,
+  `command`, `timeout`, `verbose`, `configured`, `finished`, `error`, `configure()`, `run()`,
+  `write_input()`, `load_input()`, `load_output()`, `fingerprint()`, `copy()`, `reset()`, `archive()`,
+  `load_archive()`, `from_archive()`, `to_hdf5()`, `from_hdf5()`, `get_run_script()` and `plot()`, with
+  `summary()` and `threads` beside them. The five MPI names and `from_yaml` are left out, since the
+  program threads with OpenMP and its input is TOML. A run happens in a temporary directory inside
+  `workdir`, in `workdir`, or in the input file's own directory, and the input file is written there
+  with the lattice and every file it names as absolute paths. `initial_particles` takes a
+  `ParticleGroup`, written there and named by `beam.position_file`. The archive is the stats file,
+  which holds the input echo and every output array. `Lucifer`, `Input`, `Result` and `Stats` show a
+  one-line representation and a table in Jupyter, and `run()` prints only with `verbose`.
+  `python/tests/test_lucifer.py` tests the object without the executable and compares its public names
+  with `CommandWrapper`'s where lume-base is installed; `check_program.py` runs it on the smoke lattice
+  from a temporary directory and from the input's own, archives, restores and plots it. `lucifer.run`
+  takes a `timeout`, a `Result` may name its stats file, and a run whose header gives no root falls back
+  to the program's default `fel_track`, where it named `fel_td`.
 - 2026-10-25 Fixed: nine example READMEs named their variant input files with the `.in` suffix of
   the namelist format, `lucifer_detuned.in` for `lucifer_detuned.toml`, so the commands they showed
   failed as written. They name the `.toml` files, and `tests/scripts/check_examples.py` now refuses a

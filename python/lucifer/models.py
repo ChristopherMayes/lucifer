@@ -266,7 +266,7 @@ class Bmad:
     """Bmad's particle sigma cutoff for the space-charge mesh."""
 
 
-@dataclass
+@dataclass(repr=False)
 class Input(InputOps):
     """One input file: the lattice and the tables."""
     lattice: str = ''

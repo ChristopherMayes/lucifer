@@ -100,6 +100,17 @@ class InputOps:
         return cls.loads(to_toml(text))
 
     # ------------------------------------------------------------------
+    # What it shows: the lattice and the keys set away from the defaults.
+
+    def __repr__(self):
+        keys = ", ".join(f"{k}={v!r}" for k, v in self.items())
+        return f"{type(self).__name__}({keys})"
+
+    def _repr_html_(self):
+        from lucifer._display import short, table
+        return table(type(self).__name__, [(k, short(v)) for k, v in self.items()])
+
+    # ------------------------------------------------------------------
     # Dotted access: inp["beam.n_particle"].
 
     def _resolve(self, key: str):

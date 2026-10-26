@@ -259,6 +259,19 @@ class Stats:
         children of field/ must skip these or it double-counts."""
         return _list(self._h5[group].attrs.get("derived_from", b""))
 
+    def __repr__(self):
+        return (f"Stats({self.path.name!r}, records={len(self.s)}, "
+                f"slices={len(self.coord('slice'))})")
+
+    def _repr_html_(self):
+        from lucifer._display import table
+        rows = [("file", self.path.name), ("format", f"{self.file_format} {self.version}"),
+                ("records", len(self.s)), ("element ends", int(self.at_end.sum())),
+                ("slices", len(self.coord("slice"))), ("s", f"{self.s[0]:g} to {self.s[-1]:g} m"),
+                ("components", ", ".join(self.components)),
+                ("harmonics", ", ".join(map(str, self.harmonics)) or "none")]
+        return table("Stats", rows)
+
     def plot(self, **kwargs):
         """Plot curves of this file against s: lucifer.plot.plot with this file, which
         names its arguments. Needs the extra lucifer[plot]."""
