@@ -35,7 +35,23 @@ R = Lucifer.from_archive("page-run.h5")
 R.input.beam.n_particle
 ```
 
-The archive of a run is its stats file, which holds the input file the run read in `meta/input_echo` and every output array, so `archive()` copies it and `from_archive()` rebuilds the object from it. The restored input is the one the run read, with every value the program derived written out, so its `fingerprint()` differs from an input that left those values to the program.
+The archive of a run is its stats file, which holds the input file the run read in `meta/input_echo` and every output array, so `archive()` copies it and `from_archive()` rebuilds the object from it. The restored input is the one the run read, with every value the program derived written out, so its `fingerprint()` differs from an input that left those values to the program. `archive(path, include_dumps=True)` also copies the run's particle and field dumps into a directory beside the archive named for its stem, `run/` for `run.h5`, where `from_archive()` finds them.
+
+(python-dumps)=
+### The dumps
+
+A run's particle and field dumps stay on disk until they are asked for, since a run's dumps are often gigabytes. `output.particle_files` and `output.field_files` map a key to the file, from the list of files the run's footer prints: `final` and `initial`, `at<n>-<element>` for a dump at the end of element n, a frame by its record number, and `escaped` and `pulse` for the fields, with `-h<h>` for a harmonic. Both polarizations are components of one file. `output.particles` and `output.fields` map the same keys to openPMD-beamphysics objects, each read on first access and kept, a `ParticleGroup` for a beam dump and a `Wavefront` for a field dump:
+
+% example: dumps
+```python
+L.output.particle_files              # {'final': PosixPath('.../page-final.beam.h5')}
+L.output.particles                   # every dump, its file size, and whether it is loaded
+P = L.output.particles["final"]      # a ParticleGroup, read now and kept
+W = L.output.fields["final"]         # a Wavefront
+one = L.output.load_particles_by_key("final", slice=0)   # one slice, from its patch alone
+```
+
+Shown, the mapping lists every key with its file size and whether it is loaded, and reads no file. `load_particles()` and `load_fields()` read every dump of the kind, and `load_particles_by_key()` and `load_field_by_key()` read one, as LUME-Genesis names them. `run(load_particles=True, load_fields=True)` reads them all when the run ends. A `slice` argument reads one slice of a beam dump from its particle patch alone, the i-th from 0 in the order the file stores them, which is the order `lucifer.beam.read_slices` returns. A run in a temporary directory keeps the directory while its output is held, so the files outlive the `Lucifer` object that ran them. openPMD-beamphysics is imported only when a dump is read.
 
 (python-schema)=
 ## The schema the package carries

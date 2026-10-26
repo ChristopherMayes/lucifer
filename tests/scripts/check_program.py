@@ -67,6 +67,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import gc
 import io
 import os
 import pathlib
@@ -315,6 +316,45 @@ def page_examples(exe, wd):
             esc.z_transmit                                     # (n,) where along the lattice each plane left [m]
             esc.params[:, 20]                                  # each plane's energy when it left [J]
             # end example: field
+
+            # example: dumps
+            L.output.particle_files              # {'final': PosixPath('.../page-final.beam.h5')}
+            L.output.particles                   # every dump, its file size, and whether it is loaded
+            P = L.output.particles["final"]      # a ParticleGroup, read now and kept
+            W = L.output.fields["final"]         # a Wavefront
+            one = L.output.load_particles_by_key("final", slice=0)   # one slice, from its patch alone
+            # end example: dumps
+
+            # A time-dependent run with every kind of dump: the initial state, the beam and
+            # the field at the end of the undulator, a frame at every record, and the bank.
+            every = run("lucifer.toml", threads=4, overrides=[
+                "beam.z_distribution=GRID", "beam.z_min=-2.5e-10", "beam.z_max=2.5e-10",
+                "beam.shot_noise=true", "window.window_length=6e-10", "window.n_wavelength=1",
+                "run.write_initial=true", 'run.dump_beam_at=["UND"]', 'run.dump_field_at=["UND"]',
+                "run.dump_at_comb=true", "run.comb_ds_save=0.1", "run.out_root=every"])
+            every_repr = repr(every.particles)
+            every_loaded_before = list(every.particles.loaded)
+            every_whole = every.particles["final"]
+            every_one = every.load_particles_by_key("final", slice=2)
+            every_one_rows = read_slices("every-final.beam.h5", wavelength=1e-10)
+
+            # The archive with its dumps, and the object that comes back from it.
+            L.archive("page-dumps.h5", include_dumps=True)
+            A = Lucifer.from_archive("page-dumps.h5")
+            archived = (list(A.output.particle_files), list(A.output.field_files), len(A.output.particles["final"]))
+
+            # A run in a temporary directory keeps its files while its Result lives, and
+            # loads every dump when asked to at the run.
+            T = Lucifer("lucifer.toml", threads=4)
+            kept = T.run(load_particles=True, load_fields=True)
+            kept_dir = kept.cwd
+            kept_loaded = (kept.particles.loaded, kept.fields.loaded)
+            del T
+            gc.collect()
+            kept_alive = kept_dir.is_dir()
+            del kept
+            gc.collect()
+            kept_gone = not kept_dir.exists()
             own = Lucifer("lucifer.toml", threads=4, use_temp_dir=False)
             own.run()
 
@@ -362,6 +402,35 @@ def page_examples(exe, wd):
           and esc.params.shape == (esc.wavefront.nz, 25) and np.isnan(esc.wavefront.s_position))
     check("the page's field example: the pulse holds the window and the banked planes", ok,
           note=f"[{n_window} in the window, {esc.wavefront.nz} banked]")
+    ok = len(P) == 1024 and type(W).__name__ == "Wavefront" and len(one) == 1024 and list(L.output.particles.loaded) == ["final"]
+    check("the page's dumps example: the final dumps read on first access, one slice from its patch", ok,
+          note=f"[{len(P)} particles, field {W.Ex.shape}]")
+
+    # Every dump the run wrote is in the footer and every file the footer names is on
+    # disk, frames expanded from their brace range.
+    on_disk = {f.name for f in page.glob("every*.h5")}
+    listed = {f.name for f in every.files if f.suffix == ".h5"}
+    with read_stats(page / "every.stats.h5") as st:
+        nrec = len(st.record)
+    check("dumps: the footer names every file the run wrote, and only those", on_disk == listed,
+          note=f"[{len(listed)} files, {len(on_disk ^ listed)} apart]")
+    want_p = ["initial", "at1-UND", "final", *range(1, nrec + 1)]
+    want_f = ["initial", "at1-UND", "final", "escaped", "pulse", *range(1, nrec + 1)]
+    ok = list(every.particle_files) == want_p and list(every.field_files) == want_f
+    check("dumps: the keys are the writers' names, each frame by its record", ok,
+          note=f"[{len(want_p)} beam, {len(want_f)} field, {nrec} records]")
+    ok = every_loaded_before == [] and "on disk" in every_repr and "every-000001.beam.h5" in every_repr
+    check("dumps: the mapping lists every key with its size and reads no file until asked", ok)
+    start = sum(s["n"] for s in every_one_rows[:2])
+    ok = len(every_one) == every_one_rows[2]["n"] and all(
+        np.array_equal(getattr(every_one, k), getattr(every_whole, k)[start:start + len(every_one)])
+        for k in ("x", "px", "y", "py", "z", "pz", "t", "weight", "id"))
+    check("dumps: one slice read from its patch is those rows of the whole dump", ok,
+          note=f"[slice 2, {len(every_one)} particles]")
+    ok = archived == (["final"], ["final"], 1024)
+    check("dumps: an archive with its dumps restores them, and they load", ok, note=f"[{archived}]")
+    ok = kept_alive and kept_gone and kept_loaded == (["final"], ["final"])
+    check("dumps: a temporary run's files live as long as its Result, loaded at the run when asked", ok)
 
     # The object. The run happened in a temporary directory, from an input file that names
     # its lattice by an absolute path, and the archive restored the input and the output.

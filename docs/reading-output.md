@@ -11,6 +11,8 @@ This page is for someone handed a Lucifer output file who never runs the program
 | `<out_root>.ledger.txt` | The unaveraged mode's energy ledger, one row per record |
 | `<out_root>.diag.txt` | The Genesis4-comparison text diagnostics, written only under `write_diag` |
 
+The footer of every run ends with the files the run wrote, each dump it wrote and no dump an earlier run left under the same `out_root`, and a frame series as one row whose records are a shell brace range, `<out_root>-{000001..000012}.beam.h5`. `lucifer.runner.Result` reads the dumps from that list ([](python.md#python-dumps)).
+
 ## The Python side
 
 `lucifer.stats` is the one reader of the stats file everything in the tree uses, and [](python.md) shows it with the beam reader, the conformance checker and the plotting script, every example run by a test.

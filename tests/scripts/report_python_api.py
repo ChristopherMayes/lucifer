@@ -37,7 +37,7 @@ from pathlib import Path
 import lucifer
 
 # The modules in reading order: what a user builds, runs and reads first, the tools last.
-ORDER = ("lucifer", "models", "inputops", "runner", "stats", "beam", "field", "plot", "flat", "schema", "generate")
+ORDER = ("lucifer", "models", "inputops", "runner", "dumps", "stats", "beam", "field", "plot", "flat", "schema", "generate")
 # The generated models are listed by name: their fields are on the input reference.
 MODELS = "models"
 

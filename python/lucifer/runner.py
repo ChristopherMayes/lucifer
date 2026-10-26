@@ -50,7 +50,16 @@ def executable(exe=None) -> pathlib.Path:
 class Result:
     """One run: its exit code and output, the input file it ran, and the files it wrote.
     ``stats_file`` names the stats file where it is not ``<out_root>.stats.h5`` in the run's
-    directory, as for a run restored from an archive."""
+    directory, as for a run restored from an archive.
+
+    The run's particle and field dumps are ``particle_files`` and ``field_files``, key to
+    path, and ``particles`` and ``fields``, key to a ParticleGroup or a Wavefront read on
+    first access and kept (lucifer.dumps names the keys). The files are the ones the
+    footer of the run's output lists. A Result with no output, one made by
+    Lucifer.load_output or restored from an archive, takes the dumps it finds by the
+    writers' names in ``dump_dir``, else in the run's directory, and a restored archive
+    with no ``dump_dir`` has none. ``keep`` holds
+    whatever must outlive the Result for its files to stay, a temporary directory."""
     returncode: int
     output: str
     input_file: pathlib.Path
@@ -58,7 +67,11 @@ class Result:
     out_root: str
     overrides: list[str] = field(default_factory=list)
     stats_file: pathlib.Path | None = None
+    dump_dir: pathlib.Path | None = None
+    keep: object = field(default=None, repr=False, compare=False)
     _stats: object = field(default=None, init=False, repr=False, compare=False)
+    _particles: object = field(default=None, init=False, repr=False, compare=False)
+    _fields: object = field(default=None, init=False, repr=False, compare=False)
 
     @property
     def stats_path(self) -> pathlib.Path:
@@ -77,6 +90,8 @@ class Result:
                 ("stats file", self.stats_path.name)]
         rows += [("overrides", " ".join(self.overrides))] if self.overrides else []
         rows += [("files", ", ".join(f.name for f in self.files))] if self.output else []
+        rows += [("particle dumps", ", ".join(map(str, self.particle_files)) or "none"),
+                 ("field dumps", ", ".join(map(str, self.field_files)) or "none")]
         return table("Result", rows)
 
     @property
@@ -103,8 +118,75 @@ class Result:
 
     @property
     def files(self) -> list[pathlib.Path]:
-        """Every file the footer says the run wrote."""
-        return [self.cwd / f for f in WROTE.findall(self.output)]
+        """Every file the footer says the run wrote, a frame series expanded to its files."""
+        from lucifer.dumps import expand
+        return [self.cwd / f for row in WROTE.findall(self.output) for f in expand(row)]
+
+    def _dump_paths(self):
+        """The footer's files, else the dumps in dump_dir, else none for a run restored
+        from an archive, else the dumps in the run's directory."""
+        import glob
+        if self.output:
+            return self.files
+        if self.dump_dir is not None:
+            where = pathlib.Path(self.dump_dir)
+        elif self.stats_file is not None:
+            return []
+        else:
+            where = self.cwd
+        return sorted(where.glob(f"{glob.escape(self.out_root)}-*.h5")) if where.is_dir() else []
+
+    @property
+    def particle_files(self) -> dict:
+        """The run's beam dumps, key to path: final, initial, at<n>-<element>, and each
+        frame by its record number."""
+        from lucifer.dumps import dump_files
+        return dump_files(self._dump_paths(), self.out_root)[0]
+
+    @property
+    def field_files(self) -> dict:
+        """The run's field dumps, key to path: those of particle_files and escaped and
+        pulse, a harmonic's with -h<h>."""
+        from lucifer.dumps import dump_files
+        return dump_files(self._dump_paths(), self.out_root)[1]
+
+    @property
+    def particles(self):
+        """The beam dumps as ParticleGroups, each read on first access and kept."""
+        from lucifer.dumps import Dumps, load_particle_group
+        if self._particles is None:
+            self._particles = Dumps(self.particle_files, load_particle_group, "particle")
+        return self._particles
+
+    @property
+    def fields(self):
+        """The field dumps as Wavefronts, each read on first access and kept."""
+        from lucifer.dumps import Dumps, load_wavefront
+        if self._fields is None:
+            self._fields = Dumps(self.field_files, load_wavefront, "field")
+        return self._fields
+
+    def load_particles_by_key(self, key, slice=None):
+        """The beam dump of ``key`` as a ParticleGroup, kept in ``particles``. With
+        ``slice``, that one slice, read from its particle patch alone and not kept."""
+        if slice is None:
+            return self.particles.load(key)
+        from lucifer.dumps import load_particle_group
+        if key not in self.particle_files:
+            raise KeyError(f"no particle dump {key!r}")
+        return load_particle_group(self.particle_files[key], slice=slice)
+
+    def load_field_by_key(self, key):
+        """The field dump of ``key`` as a Wavefront, kept in ``fields``."""
+        return self.fields.load(key)
+
+    def load_particles(self):
+        """Read every beam dump into ``particles`` and return the keys."""
+        return self.particles.load_all()
+
+    def load_fields(self):
+        """Read every field dump into ``fields`` and return the keys."""
+        return self.fields.load_all()
 
 
 OUT_ROOT = re.compile(r'^ Output\s+out_root "([^"]*)"', re.M)

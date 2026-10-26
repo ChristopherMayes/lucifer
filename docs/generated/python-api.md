@@ -248,13 +248,15 @@ The command that runs the input file, as a list, run from ``path``. With
 (pyapi-lucifer-lucifer-lucifer-run)=
 #### `Lucifer.run`
 
-*Method* `run(raise_on_error=True)`
+*Method* `run(raise_on_error=True, load_particles=False, load_fields=False)`
 
 ```
 Configure if needed, write the input file as it now stands, run the program, and
 return the output, a Result. A refusal or a failed run raises LuciferError with the
 program's message, or with ``raise_on_error`` off sets ``error`` and returns the
-output the run left.
+output the run left. ``load_particles`` and ``load_fields`` read every dump of the
+kind when the run ends, which otherwise waits for the first access. The Result
+holds the run's temporary directory, so its files stay while it does.
 ```
 
 (pyapi-lucifer-lucifer-lucifer-load-output)=
@@ -311,12 +313,14 @@ new one.
 (pyapi-lucifer-lucifer-lucifer-archive)=
 #### `Lucifer.archive`
 
-*Method* `archive(h5=None)`
+*Method* `archive(h5=None, include_dumps=False)`
 
 ```
 Copy the run's stats file, which holds the input file in meta/input_echo and every
 output array, to ``h5``, by default lucifer_<fingerprint>.h5 here, and return its
-path.
+path. With ``include_dumps`` the run's particle and field dumps are copied too, into
+a directory beside the archive named for its stem, run/ for run.h5, where
+from_archive() finds them. Without it an existing such directory is left alone.
 ```
 
 (pyapi-lucifer-lucifer-lucifer-load-archive)=
@@ -627,12 +631,21 @@ Raises ``LuciferError`` on a nonzero exit or a timeout.
 (pyapi-lucifer-runner-result)=
 ### `Result`
 
-*Class* `Result(returncode: int, output: str, input_file: pathlib.Path, cwd: pathlib.Path, out_root: str, overrides: list[str] = <factory>, stats_file: pathlib.Path | None = None)`
+*Class* `Result(returncode: int, output: str, input_file: pathlib.Path, cwd: pathlib.Path, out_root: str, overrides: list[str] = <factory>, stats_file: pathlib.Path | None = None, dump_dir: pathlib.Path | None = None, keep: object = None)`
 
 ```
 One run: its exit code and output, the input file it ran, and the files it wrote.
 ``stats_file`` names the stats file where it is not ``<out_root>.stats.h5`` in the run's
 directory, as for a run restored from an archive.
+
+The run's particle and field dumps are ``particle_files`` and ``field_files``, key to
+path, and ``particles`` and ``fields``, key to a ParticleGroup or a Wavefront read on
+first access and kept (lucifer.dumps names the keys). The files are the ones the
+footer of the run's output lists. A Result with no output, one made by
+Lucifer.load_output or restored from an archive, takes the dumps it finds by the
+writers' names in ``dump_dir``, else in the run's directory, and a restored archive
+with no ``dump_dir`` has none. ``keep`` holds
+whatever must outlive the Result for its files to stay, a temporary directory.
 ```
 
 (pyapi-lucifer-runner-result-stats-path)=
@@ -680,7 +693,82 @@ its arguments. Needs the extra lucifer[plot].
 *Property*
 
 ```
-Every file the footer says the run wrote.
+Every file the footer says the run wrote, a frame series expanded to its files.
+```
+
+(pyapi-lucifer-runner-result-particle-files)=
+#### `Result.particle_files`
+
+*Property*
+
+```
+The run's beam dumps, key to path: final, initial, at<n>-<element>, and each
+frame by its record number.
+```
+
+(pyapi-lucifer-runner-result-field-files)=
+#### `Result.field_files`
+
+*Property*
+
+```
+The run's field dumps, key to path: those of particle_files and escaped and
+pulse, a harmonic's with -h<h>.
+```
+
+(pyapi-lucifer-runner-result-particles)=
+#### `Result.particles`
+
+*Property*
+
+```
+The beam dumps as ParticleGroups, each read on first access and kept.
+```
+
+(pyapi-lucifer-runner-result-fields)=
+#### `Result.fields`
+
+*Property*
+
+```
+The field dumps as Wavefronts, each read on first access and kept.
+```
+
+(pyapi-lucifer-runner-result-load-particles-by-key)=
+#### `Result.load_particles_by_key`
+
+*Method* `load_particles_by_key(key, slice=None)`
+
+```
+The beam dump of ``key`` as a ParticleGroup, kept in ``particles``. With
+``slice``, that one slice, read from its particle patch alone and not kept.
+```
+
+(pyapi-lucifer-runner-result-load-field-by-key)=
+#### `Result.load_field_by_key`
+
+*Method* `load_field_by_key(key)`
+
+```
+The field dump of ``key`` as a Wavefront, kept in ``fields``.
+```
+
+(pyapi-lucifer-runner-result-load-particles)=
+#### `Result.load_particles`
+
+*Method* `load_particles()`
+
+```
+Read every beam dump into ``particles`` and return the keys.
+```
+
+(pyapi-lucifer-runner-result-load-fields)=
+#### `Result.load_fields`
+
+*Method* `load_fields()`
+
+```
+Read every field dump into ``fields`` and return the keys.
 ```
 
 (pyapi-lucifer-runner-lucifererror)=
@@ -701,6 +789,123 @@ The program exited nonzero. ``message`` is its error text and ``output`` all of 
 
 ```
 The program: ``exe``, ``$LUCIFER_EXE`` or ``lucifer`` on PATH.
+```
+
+(pyapi-lucifer-dumps)=
+## `lucifer.dumps`
+
+*Module*
+
+```
+A run's particle and field dumps, reached as files and loaded on first use.
+
+The program names every dump it writes after the run's ``out_root``, and its footer
+lists them. ``dump_files`` keys each one by what follows ``<out_root>-``, the form
+LUME-Genesis keys its files by:
+
+    final, initial          the state after the last element and before the first
+    at<n>-<element>         the dump at the end of element n (dump_beam_at, dump_field_at)
+    5, 6, ...               a frame, by the record it was taken at (dump_at_comb)
+    escaped, pulse          the light slippage carried out of the window, and the whole
+                            pulse at the exit (keep_escaped_field), fields only
+
+A harmonic's field file adds ``-h<h>`` to the key, ``final-h3`` or ``5-h3``. Both
+polarizations of a field are components of one file, so they share a key.
+
+``Dumps`` is a mapping from those keys to the loaded objects: an openPMD-beamphysics
+``ParticleGroup`` for a beam dump and a ``Wavefront`` for a field dump. A dump is read
+on first access and kept, so a run's gigabytes stay on disk until asked for. Its
+representation lists every key with its file size and whether it is loaded, and reads
+no file. openPMD-beamphysics is imported only when a dump is loaded.
+
+``load_particle_group(path, slice=i)`` reads one slice of a beam dump from its particle
+patch alone, the i-th from 0 in the order the file stores them, the order
+``lucifer.beam.read_slices`` returns.
+```
+
+(pyapi-lucifer-dumps-dump-files)=
+### `dump_files`
+
+*Function* `dump_files(paths, out_root)`
+
+```
+The beam and field dumps among ``paths``, as two dicts from key to path, in the
+order given. A path that is not ``<out_root>-<stem>.beam.h5`` or ``.wf.h5`` is passed
+over, the stats file and the text files among them.
+```
+
+(pyapi-lucifer-dumps-expand)=
+### `expand`
+
+*Function* `expand(name)`
+
+```
+The file names a footer row stands for: the row itself, or for a frame series
+written as a shell brace range, ``<root>-{000001..000012}.beam.h5``, every name in
+the range with the range's zero padding.
+```
+
+(pyapi-lucifer-dumps-dumps)=
+### `Dumps`
+
+*Class* `Dumps(files, loader, kind)`
+
+*Bases* `Mapping`
+
+```
+A run's beam or field dumps, key to loaded object, each read on first access and
+kept. ``files`` maps every key to its path, ``loaded`` names the keys read so far, and
+``load(key)`` reads one again. The representation lists every key with its file size
+and whether it is loaded, and reads no file.
+```
+
+(pyapi-lucifer-dumps-dumps-loaded)=
+#### `Dumps.loaded`
+
+*Property*
+
+```
+The keys read so far.
+```
+
+(pyapi-lucifer-dumps-dumps-load)=
+#### `Dumps.load`
+
+*Method* `load(key)`
+
+```
+Read the dump of ``key`` again, keep it and return it.
+```
+
+(pyapi-lucifer-dumps-dumps-load-all)=
+#### `Dumps.load_all`
+
+*Method* `load_all()`
+
+```
+Read every dump not yet read, frames by record after the named dumps, and
+return the keys.
+```
+
+(pyapi-lucifer-dumps-load-particle-group)=
+### `load_particle_group`
+
+*Function* `load_particle_group(path, slice=None)`
+
+```
+A beam dump as an openPMD-beamphysics ParticleGroup. With ``slice``, only that
+slice's particles, read from its particle patch alone: the records over the patch's
+span, through beamphysics.readers.particle_array, which applies the units and the
+offsets as a whole load does. So a slice is the same rows of the whole load.
+```
+
+(pyapi-lucifer-dumps-load-wavefront)=
+### `load_wavefront`
+
+*Function* `load_wavefront(path)`
+
+```
+A field dump as an openPMD-beamphysics Wavefront, through Wavefront.from_openpmd.
 ```
 
 (pyapi-lucifer-stats)=

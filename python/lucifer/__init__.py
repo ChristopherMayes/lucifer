@@ -5,6 +5,7 @@ models   the input file as typed dataclasses generated from the schema: Input, R
 flat     the flat key = value text of the check scripts as a TOML input file.
 schema   the JSON Schema the program writes with lucifer --schema, carried here.
 runner   runs the program on an input file and hands back where its output went.
+dumps    a run's particle and field dumps, as files and as objects read on first use.
 stats    reads the stats file.
 beam     reads a particle dump, openPMD or Genesis, into per-slice arrays.
 field    reads the escaped-field bank, its planes as a Wavefront with where each left.

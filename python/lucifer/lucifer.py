@@ -44,6 +44,13 @@ __all__ = ["Lucifer"]
 PATH_KEYS = ("lattice", "beam.file", "beam.position_file")
 
 
+def archive_dump_dir(h5):
+    """Where archive(include_dumps=True) puts the dumps of the archive ``h5``: the directory
+    beside it named for its stem."""
+    h5 = pathlib.Path(h5)
+    return h5.parent / h5.stem
+
+
 class Lucifer:
     """A Lucifer run: its input, the directory it runs in, and its output.
 
@@ -288,11 +295,13 @@ class Lucifer:
             (pathlib.Path(self._base_path) / "run").write_text(" ".join(script) + "\n")
         return script
 
-    def run(self, raise_on_error=True):
+    def run(self, raise_on_error=True, load_particles=False, load_fields=False):
         """Configure if needed, write the input file as it now stands, run the program, and
         return the output, a Result. A refusal or a failed run raises LuciferError with the
         program's message, or with ``raise_on_error`` off sets ``error`` and returns the
-        output the run left."""
+        output the run left. ``load_particles`` and ``load_fields`` read every dump of the
+        kind when the run ends, which otherwise waits for the first access. The Result
+        holds the run's temporary directory, so its files stay while it does."""
         from lucifer.runner import LuciferError, Result, run
         # The input is written on every run, so a key changed since the last run is the
         # one this run reads.
@@ -308,15 +317,20 @@ class Lucifer:
         try:
             self._output = run(self._input_name(), cwd=self._base_path, exe=self._command,
                                threads=self.threads, timeout=self._timeout)
+            self._output.keep = self._tempdir
         except LuciferError as err:
             self._error = True
             self._output = Result(err.returncode, err.output, pathlib.Path(self.input_file),
-                                  pathlib.Path(self._base_path), self._input.run.out_root)
+                                  pathlib.Path(self._base_path), self._input.run.out_root, keep=self._tempdir)
             if raise_on_error:
                 raise
         finally:
             self._finished = True
         self.vprint(self._output.output)
+        if load_particles:
+            self._output.load_particles()
+        if load_fields:
+            self._output.load_fields()
         return self._output
 
     def load_output(self, **kwargs):
@@ -327,7 +341,8 @@ class Lucifer:
         stats = pathlib.Path(self._base_path) / f"{out_root}.stats.h5"
         if not stats.is_file():
             raise FileNotFoundError(f"no stats file at {stats}")
-        self._output = Result(0, "", pathlib.Path(self.input_file), pathlib.Path(self._base_path), out_root)
+        self._output = Result(0, "", pathlib.Path(self.input_file), pathlib.Path(self._base_path), out_root,
+                              keep=self._tempdir)
         self._finished = True
         return self._output
 
@@ -366,14 +381,22 @@ class Lucifer:
             self._base_path = None
             self._configured = False
 
-    def archive(self, h5=None):
+    def archive(self, h5=None, include_dumps=False):
         """Copy the run's stats file, which holds the input file in meta/input_echo and every
         output array, to ``h5``, by default lucifer_<fingerprint>.h5 here, and return its
-        path."""
+        path. With ``include_dumps`` the run's particle and field dumps are copied too, into
+        a directory beside the archive named for its stem, run/ for run.h5, where
+        from_archive() finds them. Without it an existing such directory is left alone."""
         if self._output is None or not self._output.stats_path.is_file():
             raise ValueError("there is nothing to archive: run() first")
         path = pathlib.Path(h5 or f"lucifer_{self.fingerprint()[:12]}.h5")
         shutil.copyfile(self._output.stats_path, path)
+        if include_dumps:
+            where = archive_dump_dir(path)
+            where.mkdir(parents=True, exist_ok=True)
+            # The two maps share keys, final among them, so they are walked apart.
+            for f in [*self._output.particle_files.values(), *self._output.field_files.values()]:
+                shutil.copyfile(f, where / f.name)
         return path
 
     def load_archive(self, h5, configure=True):
@@ -388,7 +411,9 @@ class Lucifer:
         self._input = Input.loads(echo.decode() if isinstance(echo, bytes) else str(echo))
         self.original_path = str(h5.parent)
         self._archive = h5.name
-        self._output = Result(0, "", h5, h5.parent, self._input.run.out_root, stats_file=h5)
+        dumps = archive_dump_dir(h5)
+        self._output = Result(0, "", h5, h5.parent, self._input.run.out_root, stats_file=h5,
+                              dump_dir=dumps if dumps.is_dir() else None)
         self._finished = True
         self._configured = False
 

@@ -9,6 +9,19 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-26 Added: a run's dumps in Python, reached as files and read on first use, in the form
+  LUME-Genesis uses. `Result.particle_files` and `Result.field_files` map a key to each dump the
+  footer lists, `final`, `initial`, `at<n>-<element>`, a frame by its record number, and `escaped`
+  and `pulse`, with `-h<h>` for a harmonic. `Result.particles` and `Result.fields` map the same keys
+  to an openPMD-beamphysics `ParticleGroup` or `Wavefront`, read on first access and kept, and show
+  every key with its file size and whether it is loaded without reading a file. `load_particles()`,
+  `load_fields()`, `load_particles_by_key()` and `load_field_by_key()` read them as LUME-Genesis's
+  output does, and `Lucifer.run(load_particles=True, load_fields=True)` reads them all when the run
+  ends. A `slice` argument reads one slice of a beam dump from its particle patch alone, the same
+  rows a whole load gives. A Result holds its run's temporary directory, so the files outlive the
+  `Lucifer` that ran them, and `archive(path, include_dumps=True)` copies the dumps into a directory
+  beside the archive named for its stem, where `from_archive()` finds them. The new module is
+  `lucifer.dumps`.
 - 2026-10-26 Changed: the footer's file list names every dump the run wrote: the initial state under
   `run.write_initial`, the dumps at elements, and the frames, which it had left out, each frame series
   as one row whose records are a shell brace range, `<out_root>-{000001..000012}.beam.h5`, with the

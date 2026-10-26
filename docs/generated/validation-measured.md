@@ -736,6 +736,13 @@ where the two builds agree to every printed digit.
 | the page's stats example: units and inputs as the page states them |  | same | holds |
 | the page's beam example: the final dump read into slices |  | same | holds |
 | the page's field example: the pulse holds the window and the banked planes |  | same | holds |
+| the page's dumps example: the final dumps read on first access, one slice from its patch |  | same | holds |
+| dumps: the footer names every file the run wrote, and only those |  | same | holds |
+| dumps: the keys are the writers' names, each frame by its record |  | same | holds |
+| dumps: the mapping lists every key with its size and reads no file until asked |  | same | holds |
+| dumps: one slice read from its patch is those rows of the whole dump |  | same | holds |
+| dumps: an archive with its dumps restores them, and they load |  | same | holds |
+| dumps: a temporary run's files live as long as its Result, loaded at the run when asked |  | same | holds |
 | Lucifer: an input file run in a temporary directory, its lattice by an absolute path |  | same | holds |
 | Lucifer: archived, restored from the archive with its input and output, and plotted |  | same | holds |
 | Lucifer: an input file run in its own directory without a temporary one |  | same | holds |
