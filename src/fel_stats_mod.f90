@@ -128,6 +128,11 @@ type fel_stats_struct
   real(rp), allocatable :: fh_energy(:,:,:), fh_power(:,:,:), fh_on_axis(:,:,:)
   real(rp), allocatable :: fh_emit_x(:,:,:), fh_emit_y(:,:,:)
   integer, allocatable :: fh_angles_valid(:,:,:)
+  ! The energy slippage has carried out of the window by each record, per member of the
+  ! field set, the fundamental first: fel_slip_struct's u_escaped. The window is fixed and
+  ! the slice at its head is zeroed as light leaves, so the window's energy alone falls
+  ! when light leaves; this and the window's energy are the whole pulse.
+  real(rp), allocatable :: f_escaped(:,:)           ! (nrec, 1 + n_extra) [J]
   ! The field's reductions, when the run asked for them (BMAD-STATS-EXT-FEL F16). These
   ! are the projections a picture is drawn from, summed once per record over the field
   ! the run holds. So a view needs no raw field frame. One entry per member and plane of
@@ -282,6 +287,8 @@ allocate (stats%f_centroid(4, nslice, nrec), stats%f_sigma(16, nslice, nrec))
 allocate (stats%f_energy(nslice, nrec), stats%f_power(nslice, nrec), stats%f_on_axis(nslice, nrec))
 allocate (stats%f_p_in(nslice, nrec))
 stats%f_p_in = 0
+allocate (stats%f_escaped(nrec, 1 + size(harm_extra)))
+stats%f_escaped = 0
 allocate (stats%f_emit_x(nslice, nrec), stats%f_emit_y(nslice, nrec))
 allocate (stats%f_angles_valid(nslice, nrec))
 if (two_pol) then
@@ -468,6 +475,10 @@ endif
 stats%irec = stats%irec + 1
 ir = stats%irec
 stats%z(ir) = z_now
+! The light slippage has carried out of the window so far, per member of the field set.
+do i = 1, min(size(ff), size(stats%f_escaped, 2))
+  stats%f_escaped(ir, i) = ff(i)%slip%u_escaped
+enddo
 stats%ix_ele(ir) = ix_ele
 beta0 = fel_p0_mc(beam) / sqrt(fel_p0_mc(beam)**2 + 1)
 ks = twopi / wf%wavelength
@@ -1116,7 +1127,7 @@ write (writer_str, '(a, i0)') 'lucifer bmad-', bmad_inc_version$
 call hdf5_write_attribute_string (f_id, 'writer', trim(writer_str), err)
 call hdf5_write_attribute_string_rank1 (f_id, 'extensions', [character(3):: 'fel'], merr)
 err = err .or. merr
-call hdf5_write_attribute_string (f_id, 'fel_version', '1.0', err)
+call hdf5_write_attribute_string (f_id, 'fel_version', '1.1', err)
 call hdf5_write_attribute_string (f_id, 'phase_space', 'bmad', err)
 call hdf5_write_attribute_string_rank1 (f_id, 'kinds', fel_stats_kinds$, merr)
 err = err .or. merr
@@ -1466,11 +1477,12 @@ if (allocated(stats%f2_power)) then
   call string_note (b_id, 'components', fel_stats_pol$, err)
   call write_field_total (b_id, stats%f_power(:,1:ir) + stats%f2_power(:,1:ir), &
                           stats%f_energy(:,1:ir) + stats%f2_energy(:,1:ir), &
-                          stats%f_on_axis(:,1:ir) + stats%f2_on_axis(:,1:ir), 1, 2, err)
+                          stats%f_on_axis(:,1:ir) + stats%f2_on_axis(:,1:ir), &
+                          stats%f_escaped(1:ir,1), 1, 2, err)
 else
   call string_note (b_id, 'components', fel_stats_pol$(1:1), err)
   call write_field_total (b_id, stats%f_power(:,1:ir), stats%f_energy(:,1:ir), &
-                          stats%f_on_axis(:,1:ir), 1, 1, err)
+                          stats%f_on_axis(:,1:ir), stats%f_escaped(1:ir,1), 1, 1, err)
 endif
 
 ! The mode split of docs/startup-noise.md, written once for the fundamental. NaN at every
@@ -1533,7 +1545,8 @@ if (allocated(stats%fh_power)) then
     call string_note (s_id, 'components', fel_stats_pol$(1:1), err)
     call fel_h5_attr_int (s_id, 'harmonic', stats%fh_harm(ihh), err)
     call write_field_total (s_id, stats%fh_power(:,1:ir,ihh), stats%fh_energy(:,1:ir,ihh), &
-                            stats%fh_on_axis(:,1:ir,ihh), stats%fh_harm(ihh), 1, err)
+                            stats%fh_on_axis(:,1:ir,ihh), stats%f_escaped(1:ir,1+ihh), &
+                            stats%fh_harm(ihh), 1, err)
     call H5Gcreate_f (s_id, 'x', g_id, h5_err)
     call group_note (s_id, 'x', 'component', 'The x polarization component.', err)
     call write_field_component (g_id, stats%fh_centroid(:,:,1:ir,ihh), stats%fh_sigma(:,:,1:ir,ihh), &
@@ -1631,7 +1644,7 @@ call fel_h5_dset_attr_int (id, name, 'unit_power', power, err)
 end subroutine unit_axis_note
 
 !+
-! Subroutine write_field_total (id, pow, ene, onax, harm, ncomp, err)
+! Subroutine write_field_total (id, pow, ene, onax, esc, harm, ncomp, err)
 !
 ! Routine to write the total/ group of one wavelength: the sum over the live
 ! polarizations. It is always written, whether one polarization is live or two. So no
@@ -1639,11 +1652,11 @@ end subroutine unit_axis_note
 ! marked @derived_from, so summing the children of field/ cannot double-count.
 !-
 
-subroutine write_field_total (id, pow, ene, onax, harm, ncomp, err)
+subroutine write_field_total (id, pow, ene, onax, esc, harm, ncomp, err)
 
 integer(hid_t) id, tt_id
 integer harm, ncomp, h5e
-real(rp) pow(:,:), ene(:,:), onax(:,:)
+real(rp) pow(:,:), ene(:,:), onax(:,:), esc(:)
 logical err
 character(70) note
 
@@ -1661,6 +1674,15 @@ call fel_h5_real (tt_id, 'energy', 'J', 'field energy', &
       'Field energy of the slice.' // trim(note), 'record,slice', ene, err)
 call fel_h5_real (tt_id, 'on_axis_intensity', 'W/m^2', 'on-axis intensity', &
       'Intensity at the grid center.' // trim(note), 'record,slice', onax, err)
+call fel_h5_real (tt_id, 'escaped_energy', 'J', 'escaped energy', &
+      'Field energy slippage has carried out of the window ahead of its head by this ' // &
+      'record. The window is fixed, and the slice at its head is zeroed as its light ' // &
+      'leaves, so this light is not in energy. It travels in free space, which ' // &
+      'conserves its energy, so the value only grows.' // trim(note), 'record', esc, err)
+call fel_h5_real (tt_id, 'pulse_energy', 'J', 'pulse energy', &
+      'The whole pulse: energy summed over the window''s slices plus escaped_energy. ' // &
+      'Where the window holds the line''s slippage, nothing escapes and this is the ' // &
+      'window''s energy.' // trim(note), 'record', sum(ene, dim=1) + esc, err)
 call H5Gclose_f (tt_id, h5e)
 
 end subroutine write_field_total

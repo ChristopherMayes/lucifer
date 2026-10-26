@@ -9,6 +9,20 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: `escaped_energy` and `pulse_energy` in each field set's `total/` group of the
+  stats file, in J on the record axis. The window is fixed and slippage carries light out at its
+  head, so `field/total/energy`, the window's energy, falls when light leaves. `escaped_energy` is
+  the energy that has left by that record, summed at every slippage step on every path, and
+  `pulse_energy` is the window's energy plus it. On the sase example the window's energy peaks at
+  59 pJ and ends at 34 pJ, while the pulse ends at 845 pJ. `BMAD-STATS-EXT-FEL.md` names the two as
+  F12b, and its F17 states the version rule: a minor version adds what a reader of an earlier one
+  can pass over, and a major version changes a meaning. The extension is version 1.1.
+  `lucifer.stats` reads every minor version of major 1 and exposes `Stats.fel_version`, and
+  `tests/scripts/validate_bmad_stats.py` requires each declared extension's version attribute in
+  MAJOR.MINOR form. `tests/scripts/check_diagnostics.py` holds the pulse to the window plus the
+  escaped energy at 1.9e-16 at every record, the escaped energy to the banked slices at 8.1e-15 and
+  to the unaveraged ledger exactly, and the pulse to never falling where the window's energy falls
+  at 50 of 89 steps. A window with room for the slippage escapes nothing.
 - 2026-10-25 Added: three notebooks under `docs/notebooks`, on the site under Notebooks: a quickstart
   that loads the steady-state example's input file into a `Lucifer`, runs it, shows its output and
   stats, draws the summary and two plots, changes a key and runs again, and restores an archive;

@@ -44,6 +44,9 @@ __all__ = ["read_stats", "Stats", "same_data"]
 # The format versions this reader understands. No older ones: see the module docstring.
 # 1.0 is bmad-stats with the FEL extension, which replaced lucifer-stats 2.x.
 KNOWN_VERSIONS = ("1.0",)
+# The fel extension's majors this reader understands. Every minor version of a known
+# major is read, since a minor version only adds (BMAD-STATS-EXT-FEL.md, F17).
+KNOWN_FEL_MAJORS = ("1",)
 
 
 class Stats:
@@ -62,6 +65,10 @@ class Stats:
         if self.version not in KNOWN_VERSIONS:
             raise ValueError(f"{self.path.name} is stats format {self.version}, and this "
                              f"reader knows {', '.join(KNOWN_VERSIONS)}")
+        self.fel_version = _text(self._h5.attrs.get("fel_version", b""))
+        if self.fel_version and self.fel_version.split(".")[0] not in KNOWN_FEL_MAJORS:
+            raise ValueError(f"{self.path.name} is fel extension version {self.fel_version}, and "
+                             f"this reader knows majors {', '.join(KNOWN_FEL_MAJORS)}")
 
         # The four documentation attributes of every dataset, and the two of every
         # group, by path, collected in one walk. This is the units table, and it makes

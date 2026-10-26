@@ -108,6 +108,14 @@ def check_identity(h5, rep):
     if "extensions" in a:                      # Absence legally means none (R4).
         if not is_array(a["extensions"]):
             rep.must("/", "R4: @extensions is not an array (R24: shape expresses arity)")
+        # R40: each extension carries its version in a root attribute <name>_version,
+        # MAJOR.MINOR as the core's is (R2).
+        for ext in as_list(a["extensions"]):
+            key = f"{ext}_version"
+            if key not in a:
+                rep.must("/", f"R40: extension {ext!r} declared and no @{key}")
+            elif not re.fullmatch(r"\d+\.\d+", text(a[key])):
+                rep.must("/", f"R40: @{key} {text(a[key])!r} is not MAJOR.MINOR")
         rep.info("/", f"extensions declared: {as_list(a['extensions'])}; their structure "
                       "is checked by their own documents, not here")
 

@@ -4701,7 +4701,7 @@ since it is one number. Also see fel_h5_attr_int.
 (api-write-field-total)=
 ### `write_field_total`
 
-*Subroutine* `(id, pow, ene, onax, harm, ncomp, err)`
+*Subroutine* `(id, pow, ene, onax, esc, harm, ncomp, err)`
 
 ```
 Routine to write the total/ group of one wavelength: the sum over the live

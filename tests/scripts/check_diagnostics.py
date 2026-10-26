@@ -981,6 +981,43 @@ def main():
     check("bank: banked slice energies vs ledger U_escaped, rel",
           abs(e_banked / led[-1, 4] - 1), 1e-12)
 
+    # 2b. The pulse record. The window is fixed and light leaves it at the head, so the
+    # window's energy alone falls as the pulse slips out; escaped_energy is the light that
+    # left and pulse_energy the whole pulse. Each record's pulse is the window's energy
+    # plus the escaped light, the escaped light at the exit is the bank's and the
+    # ledger's, and with the gain still growing over this one seeded segment the pulse
+    # never falls where the window does.
+    with read_stats(wd / "dg.stats.h5") as st:
+        e_win = np.nansum(st["field/total/energy"], axis=1)
+        e_esc = st["field/total/escaped_energy"]
+        e_pul = st["field/total/pulse_energy"]
+    check("pulse: pulse_energy vs window energy + escaped_energy, every record, max rel",
+          float(np.max(np.abs(e_pul - (e_win + e_esc)) / np.maximum(e_pul, 1e-300))), 1e-12)
+    check("pulse: escaped_energy at the exit vs the banked slices' energies, rel",
+          abs(e_esc[-1] / e_banked - 1), 1e-12)
+    check("pulse: escaped_energy at the exit vs the ledger's U_escaped, rel",
+          abs(e_esc[-1] / led[-1, 4] - 1), 1e-12)
+    falls = int(np.sum(np.diff(e_win) < 0))
+    check("pulse: the largest fall of pulse_energy between records, rel (the window falls)",
+          float(max(0.0, -np.min(np.diff(e_pul) / np.maximum(e_pul[:-1], 1e-300)))), 1e-12,
+          note=f"[the window's energy falls at {falls} of {len(e_win) - 1} steps]")
+    if falls == 0:
+        check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
+
+    # A window with room ahead of the bunch for all the slippage the run applies keeps the
+    # light the bunch makes: escaped_energy is zero at every record. The one segment slips the
+    # light 267 wavelengths, its 266 periods and the schedule's end-of-lattice +1, and the
+    # window gives 600 slices of 1e-10 m to an 8e-10 m bunch. The run is unseeded, since a
+    # seed fills the whole window, the empty slices ahead of the bunch included, and that
+    # seed light does slip out.
+    run(exe, wd, "dgw", NML.format(lat="aramis_1seg.bmad", root="dgw", extra="").replace(
+        "window_length = 8e-10", "window_length = 6e-8").replace("seed_power = 1e4", "seed_power = 0"))
+    with read_stats(wd / "dgw.stats.h5") as st:
+        esc_w = float(np.max(st["field/total/escaped_energy"]))
+        n_slice_w = len(st.coord("slice"))
+    check("pulse: a window holding the slippage loses no light, escaped_energy max [J]", esc_w, 0.0,
+          note=f"[{n_slice_w} slices]")
+
     # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane.
     with h5py.File(wd / "dg-pulse.fld.h5") as h5:
         n_all = int(h5["slicecount"][0])

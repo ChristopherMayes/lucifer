@@ -383,8 +383,8 @@ where the two builds agree to every printed digit.
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
 | migration no-op on the device: migrate T vs F final beam z |  | same | holds |
-| two runs bit for bit, the filter on: 127 arrays compared | 0 | same | <= 0 |
-| two runs bit for bit, the filter off: 127 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter on: 129 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter off: 129 arrays compared | 0 | same | <= 0 |
 | deposit accuracy, cancelling phases | 1.4673e-05 | same | <= 1.5372e-05 |
 | deposit quantum below the FP32 spacing of its bound, cancelling phases | 37 | same | >= 24 |
 | deposit accuracy, unequal weights | 1.4681e-05 | same | <= 1.5383e-05 |
@@ -830,6 +830,11 @@ where the two builds agree to every printed digit.
 | stats: theta moments are NaN where they were not computed | 0.0000e+00 | same | <= 5.0000e-01 |
 | stats: and finite where they were | 0.0000e+00 | same | <= 5.0000e-01 |
 | bank: banked slice energies vs ledger U_escaped, rel | 7.3275e-15 | 7.9936e-15 | <= 1.0000e-12 |
+| pulse: pulse_energy vs window energy + escaped_energy, every record, max rel | 1.4355e-16 | 1.8890e-16 | <= 1.0000e-12 |
+| pulse: escaped_energy at the exit vs the banked slices' energies, rel | 7.2164e-15 | 8.1046e-15 | <= 1.0000e-12 |
+| pulse: escaped_energy at the exit vs the ledger's U_escaped, rel | 0.0000e+00 | same | <= 1.0000e-12 |
+| pulse: the largest fall of pulse_energy between records, rel (the window falls) | 0.0000e+00 | same | <= 1.0000e-12 |
+| pulse: a window holding the slippage loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
 | bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
 | pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.8823e-03 | same | <= 2.0000e-02 |
 | thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |

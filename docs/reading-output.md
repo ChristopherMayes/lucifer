@@ -36,6 +36,7 @@ The production statistics live in `<out_root>.stats.h5`: a `bmad-stats` 1.0 file
 - **The slice axis exists**, and its coordinates are exact. The slice number is the axis, with `ct_slice` and `t_slice` on it free of any beta and `z_slice` marked as Bmad's z at the reference beta. The slice grid is uniform in time and not in z, which is what makes slippage an exact integer shift of the field record. All three carry `@head_direction`, publishing the migration invariant that the high slice index is the window head. Without it no per-slice profile can be trusted, let alone overlaid on another code's.
 - **No dataset's meaning depends on what else the file holds.** `field/total/power` is the sum over live polarizations whether one or two are live, `field/x/power` is always the x component, and `@components`, `@harmonics` and `@derived_from` say which children are which, so that a sum over them cannot double-count.
 - **Not computed is NaN**, never a zero that reads as an answer: the theta moments away from element ends, an empty slice's moments, the twiss of a degenerate slice.
+- **The window is not the pulse.** The window is fixed, and slippage carries light out at its head, so `field/total/energy` is the energy the window holds and falls when light leaves it. `field/total/escaped_energy` is the energy that has left by that record, and `field/total/pulse_energy` is the two summed, the whole pulse. Free space conserves the escaped light's energy, so the pulse energy only grows while the beam amplifies. The sase example's window energy peaks at 59 pJ and ends at 34 pJ, while its pulse ends at 845 pJ. Each harmonic's `total/` group carries the same three. A window with room ahead of the bunch for all the slippage the run applies keeps every escaped energy zero.
 
 The per-record beam datasets are sufficient statistics, so `scripts/bunch_params_from_stats.py` reconstructs a bunch_params dict from any (record, slice), and the benchmark holds that reconstruction against the twiss the tracker stored from Bmad's own `calc_bunch_params`. The field side stores `wavefront_params_struct` per slice: `centroid(4)` = (x, theta_x, y, theta_y), `sigma(4,4)` Wigner moments, energy, power, on_axis_intensity, and emit_x/y = sqrt(det) (= M^2 lambda/4pi). `angle_moments_valid` marks where the FFT-costed theta rows were filled, element ends and bank time, on the `twiss_valid` pattern. Pulse values are pooled downstream. The file stays raw.
 
@@ -49,6 +50,11 @@ The benchmark measures these in check_diagnostics.py, each an identity between t
 |---|---|---|
 | bunch_params reconstruction vs stored calc_bunch_params | **4.5e-8** | 1e-6 |
 | banked slice energies vs the ledger's U_escaped | 8.0e-15 | 1e-12 |
+| pulse_energy vs window energy plus escaped_energy, every record | 1.9e-16 | 1e-12 |
+| escaped_energy at the exit vs the banked slices' energies | 8.1e-15 | 1e-12 |
+| escaped_energy at the exit vs the ledger's U_escaped | exact | 1e-12 |
+| the largest fall of pulse_energy, where the window's falls at 50 of 89 steps | 0 | 1e-12 |
+| escaped_energy in a window with room for the slippage | 0 | exact |
 | analytic (moment-map) vs FFT-propagated rms at exit | **9.3e-3** | 2e-2 |
 | pooled pulse sigma, analytic vs numerical routes | 3.9e-3 | 2e-2 |
 | stats/escaped/pulse dataset-identical, 1 vs 8 threads | exact | (exactness, no level) |
