@@ -47,10 +47,10 @@ The benchmark measures these in check_diagnostics.py, each an identity between t
 
 | Check | Measured | Check level |
 |---|---|---|
-| bunch_params reconstruction vs stored calc_bunch_params | **4.6e-8** | 1e-6 |
-| banked slice energies vs the ledger's U_escaped | 6.7e-16 | 1e-12 |
-| analytic (moment-map) vs FFT-propagated rms at exit, 267 slices | **8.4e-3** | 2e-2 |
-| pooled pulse sigma, analytic vs numerical routes | 3.4e-3 | 2e-2 |
+| bunch_params reconstruction vs stored calc_bunch_params | **4.5e-8** | 1e-6 |
+| banked slice energies vs the ledger's U_escaped | 8.0e-15 | 1e-12 |
+| analytic (moment-map) vs FFT-propagated rms at exit | **9.3e-3** | 2e-2 |
+| pooled pulse sigma, analytic vs numerical routes | 3.9e-3 | 2e-2 |
 | stats/escaped/pulse dataset-identical, 1 vs 8 threads | exact | (exactness, no level) |
 | position extremes vs numpy over a dump_beam_at file's particles | exact | (exactness, no level) |
 | momentum extremes across the dump's unit round trip | 3e-16 | (round-trip floor) |
