@@ -9,6 +9,18 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Added: three notebooks under `docs/notebooks`, on the site under Notebooks: a quickstart
+  that loads the steady-state example's input file into a `Lucifer`, runs it, shows its output and
+  stats, draws the summary and two plots, changes a key and runs again, and restores an archive;
+  one on the input file, built, written, read and looked up in the schema; and one on the output,
+  read with `lucifer.stats` and `lucifer.beam`. A code cell holds a few lines and shows its value
+  rather than printing it. `tests/scripts/run_notebooks.py` executes them with nbclient from a scratch
+  copy of `examples/steady_state` and writes them with their outputs, and `examples/run_examples.sh`
+  runs it into `docs/notebooks` with figures on and into its scratch directory under `--no-figures`,
+  so every examples job executes them while their stored outputs stay out of the regeneration diff.
+  `tests/scripts/check_notebooks.py` refuses a code cell over six lines, a call of print, a value with
+  no stored output, an error output, execution counts out of order and a markdown cell over three
+  sentences, and runs in the docs workflow and the examples job.
 - 2026-10-25 Fixed: a second `Lucifer.run()` in one directory failed when the stats file of the first
   was open, "CANNOT CREATE FILE FOR WRITING", since the program cannot write over a file a reader
   holds open, and it ran the input file written at the first run, so a key changed between the runs

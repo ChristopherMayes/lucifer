@@ -1,7 +1,7 @@
 (python-package)=
 # Python
 
-The package `lucifer` under `python/` is the input file as typed Python, a runner for the program, and the readers of the files a run writes. The program is the source of truth. The package holds no default the program does not, writes nothing but the TOML the program reads, and checks nothing the program refuses itself, so a value outside its bounds is refused by the program with the program's message. Every class and function is in the [Python reference](generated/python-api.md), generated from the package's own docstrings. Every example on this page is code a test runs: the ones that need no executable under pytest in `python/tests/test_page.py`, and the ones that run the program in `tests/scripts/check_program.py`, which the keystone runs.
+The package `lucifer` under `python/` is the input file as typed Python, a runner for the program, and the readers of the files a run writes. The program is the source of truth. The package holds no default the program does not, writes nothing but the TOML the program reads, and checks nothing the program refuses itself, so a value outside its bounds is refused by the program with the program's message. Every class and function is in the [Python reference](generated/python-api.md), generated from the package's own docstrings. The [notebooks](notebooks/quickstart.ipynb) show the package in use, a step to a cell with each output beneath it, executed with the examples so their outputs are real. Every example on this page is code a test runs: the ones that need no executable under pytest in `python/tests/test_page.py`, and the ones that run the program in `tests/scripts/check_program.py`, which the keystone runs.
 
 ## Installing
 

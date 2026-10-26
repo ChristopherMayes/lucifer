@@ -9,6 +9,11 @@ project:
     - file: input-reference.md
     - file: reading-output.md
     - file: python.md
+    - title: Notebooks
+      children:
+        - file: notebooks/quickstart.ipynb
+        - file: notebooks/input.ipynb
+        - file: notebooks/output.ipynb
     - file: fel-physics.md
     - file: validation.md
     - file: performance.md

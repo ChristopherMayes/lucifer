@@ -350,6 +350,24 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/python_page_figures.py" --stats-dir
 fi
 tail -1 "$STATE/python-figures.log"
 
+# The notebooks under docs/notebooks are executed on the steady-state example, into
+# docs/notebooks with figures on and into the scratch directory under --no-figures, so
+# every examples job runs them while their stored outputs stay out of the regeneration
+# diff, as the figures do. Then their cells are checked: short, shown rather than
+# printed, and executed in order.
+if [[ $FIGURES -eq 1 ]]; then NB_OUT="$LUCIFER_DIR/docs/notebooks"; else NB_OUT="$STATE/notebooks"; fi
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/run_notebooks.py" --out "$NB_OUT" --exe "$EXE" \
+       > "$STATE/notebooks.log" 2>&1 < /dev/null; then
+  echo " FAIL: a notebook did not execute:"
+  tail -40 "$STATE/notebooks.log"
+  exit 1
+fi
+grep '^run_notebooks:' "$STATE/notebooks.log"
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_notebooks.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a notebook's cells are not in the form the check holds them to."
+  exit 1
+fi
+
 # Every relative link in the committed Markdown files resolves. The READMEs here are
 # what the example pages are generated from, with their links retargeted, so a dead
 # link in one reads correctly on the site and is caught nowhere else.

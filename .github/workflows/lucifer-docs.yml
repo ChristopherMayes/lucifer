@@ -80,6 +80,12 @@ jobs:
           python tests/scripts/report_python_api.py --out docs/generated/python-api.md
           git diff --exit-code -- docs/generated/python-api.md
 
+      # The notebooks are executed by the examples job, which has the executable, and
+      # this job checks what they store: short cells, shown rather than printed, no
+      # error, executed in order.
+      - name: Notebooks are executed and short
+        run: python tests/scripts/check_notebooks.py
+
       # Every Python example on docs/python.md is the code of a region a test runs.
       - name: Python page examples are tested code
         run: python tests/scripts/check_python_page.py
