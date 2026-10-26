@@ -96,10 +96,9 @@ Each of these is a feature with no example yet, and the reason it has none.
 | One-to-one particle tracking | The feature |
 | `wake.model = 'bmad'` | The model, which is a named follow-on |
 | `space_charge.model = 'bmad_slice'` | The model, which is a named follow-on |
-| The escaped-field bank and the reconstructed pulse | A small-window case. On the `sase/` configuration those two files come to more than a gigabyte each |
 
 ## What a run writes
 
-`<out_root>.stats.h5` is the statistics file, and [reading an output file](../docs/reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `run.write_diag = true` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`.
+`<out_root>.stats.h5` is the statistics file, and [reading an output file](../docs/reading-output.md) covers it and the plot panels. `<out_root>.diag.txt` is the Genesis4-comparison text file, written on `run.write_diag = true` and large. Several examples write one more file named for what it carries: `.migration.txt`, `.wake.txt`, `.ledger.txt`, `.import.txt`. A run from which light slips out of the window writes `<out_root>-escaped.fld.h5`, that light, and `<out_root>-pulse.fld.h5`, the whole pulse at the exit, unless `run.keep_escaped_field = false`.
 
 Run outputs are not committed. `.gitignore` in this directory covers them by extension.

@@ -73,8 +73,8 @@ class Run:
     """Dump the initial state before tracking."""
     load_only: bool = False
     """Build the initial state, dump it, stop."""
-    keep_escaped_field: bool = False
-    """Keep the bank of field slices slippage carries out of the window."""
+    keep_escaped_field: bool = True
+    """Keep the light slippage carries out of the window, as the escaped bank and the whole pulse at the exit. On by default, since the light is what an FEL makes. A run whose window holds all its light writes neither file."""
     migrate: bool = False
     """Move particles between slices when their phase leaves the slice window."""
     migrate_check: bool = False

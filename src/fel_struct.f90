@@ -198,7 +198,7 @@ type fel_global_struct
   logical :: write_diag = .false.            ! The Genesis-comparison text diag file (large).
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
-  logical :: keep_escaped_field = .false.    ! Keep the escaped-slice bank file.
+  logical :: keep_escaped_field = .true.     ! Keep the escaped-slice bank and the pulse.
   logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
@@ -354,6 +354,7 @@ type fel_run_struct
   type (fel_beam_init_param_struct) :: bparam
   character(400) :: lat_file = ''
   character(400) :: field_file(9) = ''
+  logical :: bank_set = .false.            ! keep_escaped_field set by the input or the command line.
   ! The assembled state.
   type (lat_struct) :: lat
   type (fel_beam_struct) :: fbeam

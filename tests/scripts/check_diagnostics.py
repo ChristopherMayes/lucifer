@@ -1005,7 +1005,8 @@ def main():
         check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
 
     # A window with room ahead of the bunch for all the slippage the run applies keeps the
-    # light the bunch makes: escaped_energy is zero at every record. The one segment slips the
+    # light the bunch makes: escaped_energy is zero at every record, and with nothing
+    # banked neither the escaped nor the pulse file is written. The one segment slips the
     # light 267 wavelengths, its 266 periods and the schedule's end-of-lattice +1, and the
     # window gives 600 slices of 1e-10 m to an 8e-10 m bunch. The run is unseeded, since a
     # seed fills the whole window, the empty slices ahead of the bunch included, and that
@@ -1015,8 +1016,10 @@ def main():
     with read_stats(wd / "dgw.stats.h5") as st:
         esc_w = float(np.max(st["field/total/escaped_energy"]))
         n_slice_w = len(st.coord("slice"))
+    files_w = sorted(f.name for f in wd.glob("dgw-*.fld.h5"))
     check("pulse: a window holding the slippage loses no light, escaped_energy max [J]", esc_w, 0.0,
-          note=f"[{n_slice_w} slices]")
+          note=f"[{n_slice_w} slices; field files {files_w or 'none'}]")
+    check("pulse: and writes no escaped or pulse file (count)", float(len(files_w)), 0.0)
 
     # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane.
     with h5py.File(wd / "dg-pulse.fld.h5") as h5:

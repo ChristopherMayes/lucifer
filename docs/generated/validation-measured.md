@@ -293,7 +293,9 @@ where the two builds agree to every printed digit.
 | refused: does not cover wakes |  | same | holds |
 | refused: does not cover spontaneous radiation |  | same | holds |
 | refused: unrecognized device |  | same | holds |
+| refused: does not cover the escaped-field bank |  | same | holds |
 | refused: unsupported grid, nearest size named |  | same | holds |
+| bank at its default: the device runs without it, says so, writes no field file |  | same | holds |
 | harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
 | harmonic lockstep worst_px | 4.1970e-08 | same | <= 1.0000e-06 |
 | harmonic lockstep worst_y | 1.8743e-07 | same | <= 1.0000e-06 |
@@ -835,6 +837,7 @@ where the two builds agree to every printed digit.
 | pulse: escaped_energy at the exit vs the ledger's U_escaped, rel | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse: the largest fall of pulse_energy between records, rel (the window falls) | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse: a window holding the slippage loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
+| pulse: and writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
 | bank: analytic vs FFT-propagated rms at exit, max rel | 9.2942e-03 | same | <= 2.0000e-02 |
 | pulse: pooled sigma_xx analytic vs numerical routes, rel | 3.8823e-03 | same | <= 2.0000e-02 |
 | thread invariance: stats/escaped/pulse data identical 1 vs 8 (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |

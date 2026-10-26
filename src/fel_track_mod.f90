@@ -489,7 +489,7 @@ do while (abs(slip%accuslip) > slip%sample * 0.8_rp)
   direction = 1
   if (slip%accuslip < 0) direction = -1
   if (direction < 0 .and. present(bank)) then
-    call out_io (s_error$, r_name, 'BACKWARD SLIPPAGE WITH KEEP_ESCAPED_FIELD = T.', &
+    call out_io (s_error$, r_name, 'BACKWARD SLIPPAGE WITH THE ESCAPED-FIELD BANK ON, WHICH IT IS BY DEFAULT.', &
                                    'A SLICE TRANSMITTED FROM THE TAIL HAS NO PLACE AHEAD OF THE WINDOW', &
                                    'IN THE ESCAPED AND PULSE FILES.', &
                                    'POSSIBLE SOLUTION: SET KEEP_ESCAPED_FIELD = F.')
@@ -563,8 +563,8 @@ end subroutine fel_apply_slippage
 ! The bookkeeping is fel_apply_slippage's. The rotation's two data motions act on the
 ! resident record through fel_device_mod. The transmitted slice's energy is read back
 ! (one slice) and its device slice is zeroed. The host FP64 record stays stale, as
-! between any two readbacks. There is no escape bank, since keep_escaped_field is
-! refused with the device. Each member of the field set takes one call.
+! between any two readbacks. There is no escape bank, since a device run keeps none
+! (fel_setup). Each member of the field set takes one call.
 !
 ! Input:
 !   dev         -- fel_device_struct: The resident device state.

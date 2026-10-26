@@ -155,7 +155,9 @@ call add ('run', 'write_initial', key_logical$, '', 'write initial', &
 call add ('run', 'load_only', key_logical$, '', 'load only', &
       'Build the initial state, dump it, stop.')
 call add ('run', 'keep_escaped_field', key_logical$, '', 'keep escaped', &
-      'Keep the bank of field slices slippage carries out of the window.')
+      'Keep the light slippage carries out of the window, as the escaped bank and the ' // &
+      'whole pulse at the exit. On by default, since the light is what an FEL makes. ' // &
+      'A run whose window holds all its light writes neither file.')
 call add ('run', 'migrate', key_logical$, '', 'migrate', &
       'Move particles between slices when their phase leaves the slice window.')
 call add ('run', 'migrate_check', key_logical$, '', 'migrate check', &
@@ -492,7 +494,7 @@ case ('run.ran_seed');                     run%global%ran_seed = iv
 case ('run.write_diag');                   run%global%write_diag = lv
 case ('run.write_initial');                run%global%write_initial = lv
 case ('run.load_only');                    run%global%load_only = lv
-case ('run.keep_escaped_field');           run%global%keep_escaped_field = lv
+case ('run.keep_escaped_field');           run%global%keep_escaped_field = lv;  run%bank_set = .true.
 case ('run.migrate');                      run%global%migrate = lv
 case ('run.migrate_check');                run%global%migrate_check = lv
 case ('run.reference_run');                run%global%reference_run = lv

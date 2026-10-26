@@ -405,7 +405,11 @@ WINEOF
 # transcription comparison needs Genesis4's own transverse maps, so what is left over is
 # transcription fidelity rather than a transport model difference. It is a no-op for the
 # unaveraged tier, which integrates the field and has no map to choose. nbins is the
-# beamlet size the Genesis input files load with, which no dump format carries.
+# beamlet size the Genesis input files load with, which no dump format carries. Every
+# tier sets keep_escaped_field = F. Genesis4 keeps no bank, nothing in the comparison
+# reads one, and on by default the bank tripled the bytes a pass writes and cost the
+# keystone over five percent of its wall clock. The stats file records the escaped and
+# pulse energies either way.
 
 make_input () {
   local lam sample
@@ -418,6 +422,7 @@ make_input () {
   interlude_model = "$4"
   transport_model = "genesis"
   source_filter = F
+  keep_escaped_field = F
   write_diag = T
   n_wavelength = $sample
 ${6:+  $6}

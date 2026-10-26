@@ -25,7 +25,10 @@ physics alone, the check can fail, and everything the backend does not cover is 
    record holds the same ceilings, read-only proof and production band.
 6. Refused. Wakes, spontaneous radiation, harmonics together with two live
    polarizations, source_filter_mutate, an unsupported grid (the message names the
-   nearest supported size) and an unknown backend name each stop the run.
+   nearest supported size), an unknown backend name and keep_escaped_field set in the
+   input file each stop the run. The bank is on by default, so a device run that does
+   not set it runs without one, says so, and writes neither field file, while its stats
+   file still records the escaped and pulse energies.
 7. The field set. Harmonic members ride the device (planar segment, harmonics 1 and 3)
    and so do two polarization planes (the crossed undulator of check_two_polarization).
    Each is judged the same four ways: the lockstep rows inside the recorded ceilings
@@ -414,6 +417,7 @@ def main():
         ("dev_rr.in", DEV + '  bmad.radiation_damping_on = T\n',
          "DOES NOT COVER SPONTANEOUS RADIATION"),
         ("dev_rn.in", '  run.device = "cuda"\n', "UNRECOGNIZED DEVICE"),
+        ("dev_rb.in", DEV + '  keep_escaped_field = T\n', "DOES NOT COVER THE ESCAPED-FIELD BANK"),
     ]
     for name, extra, msg in refusals:
         r = run(args.exe, wd, name, BASE.format(root=name.removesuffix(".in"), extra=extra),
@@ -426,6 +430,14 @@ def main():
             expect_fail=True)
     refused = r.returncode != 0 and "nearest supported size is 64" in r.stdout
     ok("refused: unsupported grid, nearest size named", refused, "True", refused)
+
+    r = run(args.exe, wd, "dev_bank.in", BASE.format(root="dev_bank", extra=DEV))
+    with h5py.File(wd / "dev_bank.stats.h5") as h5:
+        recorded = "field/total/escaped_energy" in h5 and "field/total/pulse_energy" in h5
+    dropped = ("SO THIS RUN KEEPS NONE" in r.stdout and not list(wd.glob("dev_bank-*.fld.h5"))
+               and recorded)
+    ok("bank at its default: the device runs without it, says so, writes no field file",
+       dropped, "True", dropped)
 
     field_set(args, wd, exe)
     source_filter(args, wd, exe)

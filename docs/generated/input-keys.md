@@ -44,7 +44,7 @@
 | `write_diag` | true/false | false |  |  | Write the Genesis-comparison text diag file, which is large. |
 | `write_initial` | true/false | false |  |  | Dump the initial state before tracking. |
 | `load_only` | true/false | false |  |  | Build the initial state, dump it, stop. |
-| `keep_escaped_field` | true/false | false |  |  | Keep the bank of field slices slippage carries out of the window. |
+| `keep_escaped_field` | true/false | true |  |  | Keep the light slippage carries out of the window, as the escaped bank and the whole pulse at the exit. On by default, since the light is what an FEL makes. A run whose window holds all its light writes neither file. |
 | `migrate` | true/false | false |  |  | Move particles between slices when their phase leaves the slice window. |
 | `migrate_check` | true/false | false |  |  | The migration's bunching-invariance instrument. |
 | `reference_run` | true/false | false |  |  | No FEL interaction: Bmad tracks everything. |

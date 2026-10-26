@@ -5674,8 +5674,8 @@ Routine to account one step's slippage while the field is resident on the device
 The bookkeeping is fel_apply_slippage's. The rotation's two data motions act on the
 resident record through fel_device_mod. The transmitted slice's energy is read back
 (one slice) and its device slice is zeroed. The host FP64 record stays stale, as
-between any two readbacks. There is no escape bank, since keep_escaped_field is
-refused with the device. Each member of the field set takes one call.
+between any two readbacks. There is no escape bank, since a device run keeps none
+(fel_setup). Each member of the field set takes one call.
 ```
 
 ```

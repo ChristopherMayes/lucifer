@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-25 Changed: the escaped-field bank, `run.keep_escaped_field`, is on by default, since the
+  light is what an FEL makes and the pulse is what goes on to a beamline or another code. A run
+  from which no light leaves the window banks nothing and writes neither `-escaped.fld.h5` nor
+  `-pulse.fld.h5`. A device run, whose kernels carry no bank, runs without one and says so unless
+  the input file or the command line sets the key, which is refused as before. The benchmark's
+  tiers set the key false, since Genesis4 keeps no bank and nothing in the comparison reads one.
+  With the tiers so set a keystone took 581 s against 558 s before, and a benchmark pass wrote
+  14.9 GB against 5.6 GB. With the tiers banking too a keystone took 588 s, and a pass wrote
+  22.9 GB. The examples job writes 20.6 GB against 2.4 GB, about 2.6 GB of it for each of the
+  sase, sase_wake, bmad_wake and import runs. The sase example writes the bank, so the planned
+  example for it leaves `examples/README.md`.
 - 2026-10-25 Changed: the summary figure's energy panels draw `field/total/pulse_energy`, the whole
   pulse, over `field/total/energy`, the window's, labeled $E_\mathrm{pulse}$ and
   $E_\mathrm{window}$, so light leaving the window does not read as light lost.

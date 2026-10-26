@@ -1397,9 +1397,16 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER SPONTANEOUS RADIATION.')
     err_flag = .true.;  return
   endif
-  if (run%global%keep_escaped_field) then
+  ! The bank is on by default. A device run drops it unless the input asked for it, and
+  ! the escaped energy is still summed from the slice the device reads back.
+  if (run%global%keep_escaped_field .and. run%bank_set) then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE ESCAPED-FIELD BANK.')
     err_flag = .true.;  return
+  elseif (run%global%keep_escaped_field) then
+    call out_io (s_info$, r_name, 'DEVICE = "' // trim(run%global%device) // &
+                 '" DOES NOT COVER THE ESCAPED-FIELD BANK, SO THIS RUN KEEPS NONE.', &
+                 'THE STATS FILE STILL RECORDS ESCAPED_ENERGY AND PULSE_ENERGY.')
+    run%global%keep_escaped_field = .false.
   endif
   if (run%global%transport_model /= 'bmad') then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" CARRIES THE BMAD TRANSVERSE MAPS ONLY;', &

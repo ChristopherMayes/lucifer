@@ -1524,7 +1524,7 @@ type (fel_run_struct), target :: run
 type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
 type (fel_stats_params_struct) sprm
-integer nx, h5e, ihh, n_harm, nslice, is
+integer nx, h5e, ihh, n_harm, nslice, is, iu_del, ios_del
 logical ferr, err_flag, two_pol, keep_escaped_field
 character(400) out_root
 character(420) fname_h
@@ -1564,6 +1564,17 @@ endif
 do ihh = 1, n_harm
   nx = size(ffield(ihh)%wf%Ex, 1)
 
+  ! A bank that holds no light, only the empty slices that left ahead of the bunch, is
+  ! no output: its file is removed and no pulse is built, since the pulse is then the
+  ! window, which the final dump holds.
+  if (run%esc_id(ihh) /= 0 .and. ffield(ihh)%slip%u_escaped == 0) then
+    call H5Fclose_f (run%esc_id(ihh), h5e)
+    run%esc_id(ihh) = 0
+    run%n_banked(ihh) = 0
+    open (newunit = iu_del, file = trim(fel_escaped_file_name(run, ihh)), status = 'old', iostat = ios_del)
+    if (ios_del == 0) close (iu_del, status = 'delete')
+  endif
+
   if (run%esc_id(ihh) /= 0) then
     call fel_order_bank (run, ihh, ferr)
     if (ferr) return
@@ -1579,7 +1590,11 @@ do ihh = 1, n_harm
   endif
 
   ! The full pulse at the exit plane. With two live polarizations, one file per
-  ! component (Genesis's format holds one). Harmonic pulses carry -h<h>.
+  ! component (Genesis's format holds one). Harmonic pulses carry -h<h>. A run whose
+  ! window held all its light banked nothing, and its pulse is the window, which the
+  ! final dump already holds, so no pulse file is written.
+
+  if (run%n_banked(ihh) == 0) cycle
 
   if (two_pol) then
     call fel_write_pulse_file (run, trim(out_root) // '-pulse-x.fld.h5', .false., ihh, ferr)
