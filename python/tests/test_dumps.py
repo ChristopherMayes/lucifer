@@ -81,7 +81,10 @@ def test_an_out_root_with_dashes_keys_by_what_follows_it(tmp_path):
 
 def test_a_dump_is_read_on_first_access_and_kept(tmp_path):
     reads = []
-    files = {"final": field_file(tmp_path / "s7-final.wf.h5")}
+    # The loader is a stand-in, so the file need only exist: the test runs without
+    # openpmd-beamphysics, as the docs workflow runs it.
+    (tmp_path / "s7-final.wf.h5").write_bytes(b"0" * 2048)
+    files = {"final": tmp_path / "s7-final.wf.h5"}
     d = Dumps(files, lambda p: reads.append(p) or p.name, "field")
     text = repr(d)
     assert "s7-final.wf.h5" in text and "on disk" in text and reads == []
