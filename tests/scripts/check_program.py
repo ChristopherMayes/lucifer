@@ -1261,8 +1261,14 @@ def main():
         # The continuation opens at the element right after the one the checkpoint completed,
         # which for the split lord is the superimposed marker between its two slaves.
         after = {"PW": "UND2", "PW#1": "MK"}.get(applied_at[1] if applied_at else "", "UND2")
+        if applied_at is None:
+            # A wake that never acts leaves no passage to restart around, so the case ends
+            # with this failure rather than with an error in the note.
+            check(f"the wake {what} acts once, and the passage that applies it is read from the run",
+                  False, note="[no frame's beam differs from the wake-off history]")
+            continue
         check(f"the wake {what} acts once, and the passage that applies it is read from the run",
-              applied_at is not None and applied_at[2] > 1e-6,
+              applied_at[2] > 1e-6,
               note=f"[first change at s = {applied_at[0]} m in {applied_at[1]}, "
                    f"relative energy change {applied_at[2]:.2e}; the continuation restarts at {after}]")
         apply_ele = applied_at[1]
