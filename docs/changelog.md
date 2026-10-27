@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Fixed: a string from the input file was stored in its fixed-length component cut to
+  fit, and checked later as the shorter text, so `field.seed_polarization = "xyz"` ran as `"x"` and
+  a `run.track_end` past 60 characters was looked for under its first 60. A list with more entries
+  than its array, 41 locators in `run.dump_beam_at`, printed the refusal and then ran with the first
+  40. `fel_schema_set` now refuses a string longer than its component, a list longer than its array
+  and a list entry longer than an element, with both lengths in the message, and fails the key in
+  each case. `check_program.py` holds the three refusals.
 - 2026-10-27 Changed: the Python package lists its dependencies, `numpy>=1.24` and `h5py>=3.8`,
   which its readers import, where it had listed none. They are the lowest versions its tests have
   passed under, measured with Python 3.11, its stated minimum, and conda-forge's numpy 1.24.4 and

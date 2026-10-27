@@ -13,7 +13,9 @@ and the tracking window.
      program decides, with no exit inside the library.
   3. Refusals. A key in the wrong table and a key no table has are each refused, with
      the table it belongs in or the keys the table has, so a stale input file cannot run on
-     defaults.
+     defaults. A string longer than its component, a list longer than its array and a
+     list entry longer than an element are refused, where they had been cut to fit and
+     the shorter text checked or used.
   4. The comb (run.comb_ds_save, with Bmad's ds_save semantics verbatim). A comb > 0
      run's per-record rows must be exactly the every-record run's rows at the comb
      positions, a dataset-equal subset, with the element ends always present. comb < 0
@@ -539,6 +541,24 @@ def main():
     ok = (r.returncode != 0 and "wake_on IS NOT A KEY OF [run]" in r.stdout
           and "The keys there are: out_root" in r.stdout)
     check("a key no table has is refused, naming the table's keys", ok)
+
+    (wd / "long.toml").write_text(to_toml(NML_TWIN.format(root="long", extra="", bextra="")))
+    r = run([str(exe), "long.toml", "field.seed_polarization=xyz"], wd)
+    ok = (r.returncode != 0
+          and "seed_polarization IS 3 CHARACTERS AND AT MOST 1 ARE TAKEN" in r.stdout)
+    check("a string longer than its component is refused, seed_polarization = \"xyz\"", ok,
+          note=f"[exit {r.returncode}]")
+    many = "[" + ",".join(['"SEG"'] * 41) + "]"
+    r = run([str(exe), "long.toml", f"run.dump_beam_at={many}"], wd)
+    ok = (r.returncode != 0
+          and "dump_beam_at HOLDS 41 ENTRIES AND AT MOST 40 ARE TAKEN" in r.stdout)
+    check("a list longer than its array is refused, 41 dump_beam_at entries", ok,
+          note=f"[exit {r.returncode}]")
+    r = run([str(exe), "long.toml", 'run.dump_field_at=["SEG", "' + "U" * 61 + '"]'], wd)
+    ok = (r.returncode != 0
+          and "dump_field_at ENTRY 2 IS 61 CHARACTERS AND AT MOST 60 ARE TAKEN" in r.stdout)
+    check("a list entry longer than an element is refused, 61 characters in dump_field_at", ok,
+          note=f"[exit {r.returncode}]")
 
     # ------------------------------------------------------------------
     print("== the version ==")

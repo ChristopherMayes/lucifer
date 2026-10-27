@@ -4068,8 +4068,10 @@ Output:
 
 ```
 Routine to read one key from the TOML table it lives in and store it in run. The
-type must be the key's own, and a real or integer key must lie inside its bounds.
-A refusal names the table, the key and what was expected.
+type must be the key's own, and a real or integer key must lie inside its bounds. A
+string must fit its component and a list must fit its array, since a value cut to fit
+would be checked later as the shorter text. A refusal names the table, the key and what
+was expected.
 ```
 
 ```
@@ -4079,8 +4081,8 @@ Input:
 
 Output:
   run       -- fel_run_struct: The component the key fills is set.
-  err_flag  -- logical: Set on a wrong type, a value outside the bounds or a list
-                 longer than the component holds.
+  err_flag  -- logical: Set on a wrong type, a value outside the bounds, a string
+                 longer than its component or a list longer than its array.
 ```
 
 (api-fel-schema-value)=

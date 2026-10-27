@@ -358,8 +358,10 @@ end subroutine fel_schema_table
 ! Subroutine fel_schema_set (run, key, tab, err_flag)
 !
 ! Routine to read one key from the TOML table it lives in and store it in run. The
-! type must be the key's own, and a real or integer key must lie inside its bounds.
-! A refusal names the table, the key and what was expected.
+! type must be the key's own, and a real or integer key must lie inside its bounds. A
+! string must fit its component and a list must fit its array, since a value cut to fit
+! would be checked later as the shorter text. A refusal names the table, the key and what
+! was expected.
 !
 ! Input:
 !   key       -- fel_key_struct: The key, present in tab.
@@ -367,8 +369,8 @@ end subroutine fel_schema_table
 !
 ! Output:
 !   run       -- fel_run_struct: The component the key fills is set.
-!   err_flag  -- logical: Set on a wrong type, a value outside the bounds or a list
-!                  longer than the component holds.
+!   err_flag  -- logical: Set on a wrong type, a value outside the bounds, a string
+!                  longer than its component or a list longer than its array.
 !-
 
 subroutine fel_schema_set (run, key, tab, err_flag)
@@ -381,9 +383,9 @@ logical err_flag
 
 real(rp) rv
 integer iv, stat, i, n
-logical lv
+logical lv, bad
 character(:), allocatable :: sv
-character(400), allocatable :: slist(:)
+character(:), allocatable :: slist(:)
 integer, allocatable :: ilist(:)
 character(60) where
 character(*), parameter :: r_name = 'fel_schema_set'
@@ -446,7 +448,7 @@ case (key_string_list$)
   ! One string or a list of strings, since one file is the common case.
   call get_value (tab, trim(key%name), sv, stat = stat)
   if (stat == 0) then
-    allocate (slist(1))
+    allocate (character(len(sv)) :: slist(1))
     slist(1) = sv
   else
     call get_value (tab, trim(key%name), arr, requested = .false.)
@@ -454,28 +456,36 @@ case (key_string_list$)
       call refuse ('expected a quoted string or a list of them')
       return
     endif
-    allocate (slist(len(arr)))
+    ! Two passes, the first for the longest entry, so slist holds every entry whole.
+    n = 0
     do i = 1, len(arr)
       call get_value (arr, i, sv, stat = stat)
       if (stat /= 0) then
         call refuse ('expected a quoted string or a list of them')
         return
       endif
+      n = max(n, len(sv))
+    enddo
+    allocate (character(n) :: slist(len(arr)))
+    do i = 1, len(arr)
+      call get_value (arr, i, sv, stat = stat)
       slist(i) = sv
     enddo
   endif
 end select
 
-! The store. Each key names the component it fills.
+! The store. Each key names the component it fills. A string goes through put and a
+! list of them through put_list, which refuse what the component cannot hold whole.
 
+bad = .false.
 select case (trim(key%table) // '.' // trim(key%name))
-case ('.lattice');                         run%lat_file = sv
-case ('run.out_root');                     run%global%out_root = sv
-case ('run.interlude_model');              run%global%interlude_model = sv
-case ('run.transport_model');              run%global%transport_model = sv
+case ('.lattice');                         call put (run%lat_file)
+case ('run.out_root');                     call put (run%global%out_root)
+case ('run.interlude_model');              call put (run%global%interlude_model)
+case ('run.transport_model');              call put (run%global%transport_model)
 case ('run.unaveraged_steps_per_period');  run%global%unaveraged_steps_per_period = iv
 case ('run.unaveraged_ramp_periods');      run%global%unaveraged_ramp_periods = iv
-case ('run.source_model');                 run%global%source_model = sv
+case ('run.source_model');                 call put (run%global%source_model)
 case ('run.source_filter');                run%global%source_filter = lv
 case ('run.source_filter_angle');          run%global%source_filter_angle = rv
 case ('run.source_filter_tolerance');      run%global%source_filter_tolerance = rv
@@ -483,13 +493,13 @@ case ('run.source_filter_xcut');           run%global%source_filter_xcut = rv
 case ('run.source_filter_ycut');           run%global%source_filter_ycut = rv
 case ('run.source_filter_width');          run%global%source_filter_width = rv
 case ('run.source_filter_mutate');         run%global%source_filter_mutate = lv
-case ('run.track_start');                  run%global%track_start = sv
-case ('run.track_end');                    run%global%track_end = sv
+case ('run.track_start');                  call put (run%global%track_start)
+case ('run.track_end');                    call put (run%global%track_end)
 case ('run.continuation');                 run%global%continuation = lv
 case ('run.comb_ds_save');                 run%global%comb_ds_save = rv
 case ('run.interlude_ds_step');            run%global%interlude_ds_step = rv
-case ('run.dump_beam_at');                 if (fits(size(run%global%dump_beam_at))) run%global%dump_beam_at(1:size(slist)) = slist
-case ('run.dump_field_at');                if (fits(size(run%global%dump_field_at))) run%global%dump_field_at(1:size(slist)) = slist
+case ('run.dump_beam_at');                 call put_list (run%global%dump_beam_at)
+case ('run.dump_field_at');                call put_list (run%global%dump_field_at)
 case ('run.dump_at_comb');                 run%global%dump_at_comb = lv
 case ('run.dump_slice_first');             run%global%dump_slice_first = iv
 case ('run.dump_slice_last');              run%global%dump_slice_last = iv
@@ -504,32 +514,32 @@ case ('run.migrate');                      run%global%migrate = lv
 case ('run.migrate_check');                run%global%migrate_check = lv
 case ('run.reference_run');                run%global%reference_run = lv
 case ('run.record_environment');           run%global%record_environment = lv
-case ('run.fp32_check');                   run%global%fp32_check = sv
+case ('run.fp32_check');                   call put (run%global%fp32_check)
 case ('run.fp32_mutate');                  run%global%fp32_mutate = lv
-case ('run.device');                       run%global%device = sv
+case ('run.device');                       call put (run%global%device)
 case ('run.device_timing');                run%global%device_timing = lv
 case ('run.device_dep_mutate');            run%global%device_dep_mutate = iv
 case ('window.window_length');             run%slicing%window_length = rv
 case ('window.n_wavelength');              run%slicing%n_wavelength = iv
 case ('window.n_slice');                   run%slicing%n_slice = iv
 case ('window.current');                   run%slicing%current = rv
-case ('beam.file');                        run%bparam%beam_file = sv
-case ('beam.position_file');               run%beam_init%position_file = sv
+case ('beam.file');                        call put (run%bparam%beam_file)
+case ('beam.position_file');               call put (run%beam_init%position_file)
 case ('beam.n_particle');                  run%beam_init%n_particle = iv
 case ('beam.bunch_charge');                run%beam_init%bunch_charge = rv
 case ('beam.sig_z');                       run%beam_init%sig_z = rv
 case ('beam.sig_pz');                      run%beam_init%sig_pz = rv
 case ('beam.a_norm_emit');                 run%beam_init%a_norm_emit = rv
 case ('beam.b_norm_emit');                 run%beam_init%b_norm_emit = rv
-case ('beam.z_distribution');              run%beam_init%distribution_type(3) = sv
+case ('beam.z_distribution');              call put (run%beam_init%distribution_type(3))
 case ('beam.z_min');                       run%beam_init%grid(3)%x_min = rv
 case ('beam.z_max');                       run%beam_init%grid(3)%x_max = rv
-case ('beam.load_mode');                   run%bparam%load_mode = sv
+case ('beam.load_mode');                   call put (run%bparam%load_mode)
 case ('beam.quiet_start');                 run%bparam%quiet_start = lv
 case ('beam.beamlet_size');                run%bparam%beamlet_size = iv
 case ('beam.shot_noise');                  run%bparam%shot_noise = lv
-case ('beam.write_genesis_dist');          run%bparam%write_genesis_dist = sv
-case ('beam.write_openpmd_file');          run%bparam%write_openpmd_file = sv
+case ('beam.write_genesis_dist');          call put (run%bparam%write_genesis_dist)
+case ('beam.write_openpmd_file');          call put (run%bparam%write_openpmd_file)
 case ('beam.split_weights');               run%bparam%split_weights = lv
 case ('beam.swap_beam_xy');                run%bparam%swap_beam_xy = lv
 case ('beam.gen_test_weights');            run%bparam%gen_test_weights = lv
@@ -539,31 +549,31 @@ case ('beam.resample.n_particle_per_slice'); run%resample%n_particle_per_slice =
 case ('beam.resample.beamlet_size');       run%resample%beamlet_size = iv
 case ('beam.resample.n_slice');            run%resample%n_slice = iv
 case ('beam.resample.use_beam_init');      run%resample%use_beam_init = lv
-case ('field.file');                       if (fits(size(run%field_file))) run%field_file(1:size(slist)) = slist
+case ('field.file');                       call put_list (run%field_file)
 case ('field.lambda0');                    run%winit%lambda0 = rv
 case ('field.grid_n_pts');                 run%winit%grid_n_pts = iv
 case ('field.grid_half_width');            run%winit%grid_half_width = rv
 case ('field.seed_power');                 run%winit%seed_power = rv
 case ('field.seed_waist_size');            run%winit%seed_waist_size = rv
-case ('field.seed_polarization');          run%winit%seed_polarization = sv
+case ('field.seed_polarization');          call put (run%winit%seed_polarization)
 case ('field.harmonics')
   if (.not. fits(size(run%winit%harmonics))) return
   run%winit%harmonics = 0
   run%winit%harmonics(1:size(ilist)) = ilist
 case ('wake.on');                          run%chamber_wake%on = lv
-case ('wake.model');                       run%chamber_wake%model = sv
+case ('wake.model');                       call put (run%chamber_wake%model)
 case ('wake.loss');                        run%chamber_wake%loss = rv
 case ('wake.radius');                      run%chamber_wake%radius = rv
 case ('wake.conductivity');                run%chamber_wake%conductivity = rv
 case ('wake.relaxation');                  run%chamber_wake%relaxation = rv
 case ('wake.roundpipe');                   run%chamber_wake%roundpipe = lv
-case ('wake.material');                    run%chamber_wake%material = sv
+case ('wake.material');                    call put (run%chamber_wake%material)
 case ('wake.gap');                         run%chamber_wake%gap = rv
 case ('wake.lgap');                        run%chamber_wake%lgap = rv
 case ('wake.hrough');                      run%chamber_wake%hrough = rv
 case ('wake.lrough');                      run%chamber_wake%lrough = rv
-case ('wake.write_kernels');               run%chamber_wake%write_kernels = sv
-case ('space_charge.model');               run%space_charge%model = sv
+case ('wake.write_kernels');               call put (run%chamber_wake%write_kernels)
+case ('space_charge.model');               call put (run%space_charge%model)
 case ('space_charge.rmax');                run%space_charge%rmax = rv
 case ('space_charge.ngrid');               run%space_charge%ngrid = iv
 case ('space_charge.nz');                  run%space_charge%nz = iv
@@ -589,6 +599,7 @@ case default
   return
 end select
 
+if (bad) return
 err_flag = .false.
 
 !-------------------------------------------------------
@@ -650,8 +661,40 @@ ok = n_got <= n_max
 if (.not. ok) then
   call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ' HOLDS ' // int_str(n_got) // &
         ' ENTRIES AND AT MOST ' // int_str(n_max) // ' ARE TAKEN.')
+  bad = .true.
 endif
 end function fits
+
+! put stores the string in its component, and refuses one longer than the component.
+
+subroutine put (dest)
+character(*) dest
+if (len_trim(sv) > len(dest)) then
+  call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ' IS ' // int_str(len_trim(sv)) // &
+        ' CHARACTERS AND AT MOST ' // int_str(len(dest)) // ' ARE TAKEN.', trim(key%descrip))
+  bad = .true.
+  return
+endif
+dest = sv
+end subroutine put
+
+! put_list stores the list in its array, and refuses one with more entries than the array
+! or with an entry longer than an element.
+
+subroutine put_list (dest)
+character(*) dest(:)
+integer j
+if (.not. fits(size(dest))) return
+do j = 1, size(slist)
+  if (len_trim(slist(j)) > len(dest)) then
+    call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ' ENTRY ' // int_str(j) // ' IS ' // &
+          int_str(len_trim(slist(j))) // ' CHARACTERS AND AT MOST ' // int_str(len(dest)) // ' ARE TAKEN.')
+    bad = .true.
+    return
+  endif
+enddo
+dest(1:size(slist)) = slist
+end subroutine put_list
 
 end subroutine fel_schema_set
 

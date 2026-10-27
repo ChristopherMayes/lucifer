@@ -726,6 +726,9 @@ where the two builds agree to every printed digit.
 | a library error RETURNS (no beginning Twiss -> err to the program, exit 2) |  | same | holds |
 | a key in the wrong table is refused, naming the table it belongs in |  | same | holds |
 | a key no table has is refused, naming the table's keys |  | same | holds |
+| a string longer than its component is refused, seed_polarization = "xyz" |  | same | holds |
+| a list longer than its array is refused, 41 dump_beam_at entries |  | same | holds |
+| a list entry longer than an element is refused, 61 characters in dump_field_at |  | same | holds |
 | --version, the header and meta/lucifer_version carry the version CMake wrote |  | same | holds |
 | run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow |  | same | holds |
 | a key no table has on the command line is refused (run.wake_on=true) |  | same | holds |
