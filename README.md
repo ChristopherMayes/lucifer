@@ -4,7 +4,7 @@ Lucifer (*lux ferre*, light-bringer) is a free-electron-laser tracker inside Bma
 
 FEL segments are real Bmad wiggler elements tracked by a Bmad FEL method, so a Lucifer lattice is a Bmad lattice: quadrupoles, chicanes, phase shifters, wakes and apertures are Bmad's, and the FEL parameters are read from lattice attributes rather than a parallel namelist. Every other element tracks each slice's bunch with Bmad's own `track1_bunch`.
 
-Lucifer is under development and unreleased. It has no version number, and its inputs, outputs and interfaces may change without notice.
+Releases are tags of the form `v<version>` on GitHub, the first `v0.1.0`. The program prints the version it was built from, `lucifer --version`, and records it in every statistics file. Lucifer is under development, and its inputs, outputs and interfaces may change between releases.
 
 ## Layout
 

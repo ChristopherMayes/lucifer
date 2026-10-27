@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Added: a version. The build takes it from `-DLUCIFER_VERSION=<version>` when given,
+  else from `git describe --tags --dirty` in a checkout, else from the `describe-name` line of
+  `.git_archival.txt`, which `git archive` fills from the tag in a release archive, else
+  `0.0.0-unknown` (`cmake/LuciferVersion.cmake`). It is written into `fel_version_mod.f90` in the
+  build directory at every build, and rewritten only when it changes. `lucifer --version` prints it
+  with the Bmad version, the header prints it on a line of its own after the Bmad version, and the
+  stats file records it as `meta/lucifer_version`. The user guide's sample output leaves the line
+  out, since it changes with every commit. The Python package reads the same tag through
+  setuptools-scm. `cmake --install` places the tracker alone in the prefix's `bin/`, and the Linux
+  CI job runs the steady-state example from the installed tracker in an empty environment.
+  Releases are tags of the form `v<version>` on GitHub.
 - 2026-10-26 Changed: the footer's Exit line, `examples/measured.tsv` and the example pages called the
   window's field energy at the exit the pulse energy. Slippage carries light out of a fixed window,
   so on the SASE example that number was 34 pJ while the pulse holds 845 pJ. The Exit line now states
