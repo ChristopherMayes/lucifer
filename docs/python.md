@@ -9,7 +9,7 @@ The package `lucifer` under `python/` is the input file as typed Python, a runne
 pip install -e "python[plot]"
 ```
 
-The package needs Python 3.11 or later. The input file, the runner and the schema use the standard library alone, and the readers need `numpy` and `h5py`. The plots need the extra `plot`, which is openpmd-beamphysics and brings matplotlib, so `pip install -e python` installs everything else. In this repository the package is installed into the `bmad-fel-validate` environment with that environment's own pip and `--no-deps`, since the environment's file states every dependency.
+The package needs Python 3.11 or later. The input file, the runner and the schema use the standard library alone, and the readers need `numpy` 1.24 and `h5py` 3.8 or later, which the package lists as its dependencies. The plots need the extra `plot`, which is openpmd-beamphysics and brings matplotlib, so `pip install -e python` installs everything else. In this repository the package is installed into the `bmad-fel-validate` environment with that environment's own pip and `--no-deps`, since the environment's file states every dependency.
 
 (python-object)=
 ## The Lucifer object

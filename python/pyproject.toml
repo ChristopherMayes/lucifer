@@ -6,8 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "lucifer"
 dynamic = ["version"]
 description = "The Python side of Lucifer: the input file as typed models, the schema, a runner and the readers of its output files."
+# Python 3.11 is the first with tomllib, which reads the input file. The readers import
+# numpy and h5py. Each minimum is the lowest the package's tests have passed under, measured
+# with Python 3.11, numpy 1.24.4 and h5py 3.8.0 from conda-forge.
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["numpy>=1.24", "h5py>=3.8"]
 # The program's license, the text of which is LICENSE at the repository root. setuptools
 # 77 is the first to read an SPDX expression here.
 license = "GPL-3.0-only"
