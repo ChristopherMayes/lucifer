@@ -57,7 +57,7 @@ character(400) out_root
 character(400) field_file(9)
 logical quiet_start, shot_noise, gen_test_weights, resample_split_weights
 logical split_weights, swap_beam_xy, err
-integer beamlet_size, ran_seed, is, ih
+integer beamlet_size, ran_seed, is
 real(rp) gamma0, lambda0, window_length, seed_power, seed_waist_size, grid_half_width
 integer n_win
 integer window_sample, grid_n_pts, npart_gen
@@ -242,15 +242,14 @@ subroutine generate_initial_state ()
 
 type (fel_slice_struct), pointer :: sl
 real(rp) p0_mc, ks_l, eg_x, eg_y, u, v, x, xp, y, yp, gam, p_mc, beta, pz, theta0
-real(rp) dx_grid, w_part, e0, xg, yg, wsum, w2sum, n_lambda, n_eff, floor_b2, target_b2
-real(rp) phi, an, nbl, br, bi
-real(rp), allocatable :: theta_work(:), beta_work(:), kick(:), cur_gen(:)
+real(rp) w_part, wsum, w2sum, n_lambda, n_eff
+real(rp), allocatable :: theta_work(:), beta_work(:), cur_gen(:)
 real(rp) nl_min, nl_max, neff_min, neff_max, floor_max, floor_nl
 real(rp) spacing_gen, zlen_gen, s_i, q_slice, zbunch_gen, slip_gen, s_und
 real(rp), allocatable :: eslip(:), lcorr(:)
 integer ncenter_gen, n_head_gen, s_int, s_chic
 logical serr
-integer ib, im, ip, mbase, ix, iy, is_g, nslice_gen, ih, nharm, n_clamp, rule, rule_seen, n_group_w
+integer ib, im, ip, mbase, is_g, nslice_gen, n_clamp, rule, rule_seen, n_group_w
 integer, allocatable :: group_w(:)
 logical flat_z
 character(*), parameter :: r_name = 'generate_initial_state'
@@ -663,7 +662,6 @@ type (bunch_struct), pointer :: bp
 real(rp) moments(11)
 integer is_g, iu_i
 logical err_i
-character(400) line
 character(*), parameter :: r_name = 'import_initial_state'
 
 !

@@ -119,7 +119,7 @@ real(rp), allocatable :: s(:), gam(:), x(:), y(:), xp(:), yp(:), wt(:)
 real(rp), allocatable :: cg(:), cx(:), cy(:), cpx(:), cpy(:), theta(:), wk(:)
 
 real(rp) mom(11), gavg, xavg, pxavg, yavg, pyavg, ex, ey, bx, by, ax, ay
-real(rp) smin, ttotal, dslen, sloc, p_mc, p0_mc, u, ks_l, cur, ne, w_part, beta
+real(rp) smin, ttotal, dslen, sloc, p_mc, p0_mc, ks_l, cur, ne, w_part
 integer n, nalive, i, ip, islice, nslice, mpart, ncand, n_clamp
 logical err_flag
 
@@ -321,7 +321,7 @@ end subroutine gather_and_remove
 
 subroutine fill_slice ()
 
-real(rp) g1, x1, y1, px1, py1, g2, x2, y2, px2, py2, scl, rmin, r, tmp, uu
+real(rp) g1, x1, y1, px1, py1, g2, x2, y2, px2, py2, rmin, r, tmp, uu
 real(rp) gam_p, beta_p
 integer nd, nd0, k, j, n1, n2, i1, i2
 

@@ -952,7 +952,6 @@ end subroutine fel_say_no_checkpoint
 subroutine fel_write_openpmd_beam (beam, ele, file_name, err_flag, is1, is2, kinetic_ok, s_pos)
 
 type (fel_beam_struct), target :: beam
-type (fel_slice_struct), pointer :: sl
 type (ele_struct) ele
 type (beam_struct) beam_b
 real(rp), optional :: s_pos

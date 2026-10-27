@@ -168,7 +168,7 @@ end subroutine fel_cost_count
 subroutine fel_cost_estimate (run, secs, backend)
 
 type (fel_run_struct), target :: run
-real(rp) secs, n_pstep, n_gpt, t_one, speedup, f_unavg
+real(rp) secs, n_pstep, n_gpt, t_one, speedup
 integer nstep, n_particle, ngrid, nstep_unavg, n_omp, n_eff
 character(*) backend
 

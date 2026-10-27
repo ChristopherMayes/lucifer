@@ -62,7 +62,7 @@ character(*) input_file
 character(*), optional :: overrides(:)
 character(:), allocatable :: text, origin
 logical err_flag, found_lattice, bad
-integer i, j, it
+integer i, j
 character(*), parameter :: r_name = 'fel_read_input'
 
 !

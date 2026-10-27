@@ -602,14 +602,14 @@ complex(sp) base32
 ! FP32 per-particle working set.
 
 real(sp) x, y, px, py, pz, dzr, goff, delta, gam, awloc, btpar, px_g, py_g
-real(sp) wx, wy, q, s_d, c_d, d_new
+real(sp) s_d, c_d, d_new
 complex(sp) cpart, rpart, p32sum
 complex(rp) p64sum, e_ip
 real(rp) wsum
 real(rp) gamma0, p0_mc, theta64, beta64, p_mc64, aw64loc, ulp_med, phi_ref, zref_new
-real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$), dinc
+real(rp) dstat(fel_fp32_nq$), sc(fel_fp32_nq$)
 real(rp), allocatable :: incr(:)
-integer ip, n, ix, iy
+integer ip, n
 logical on_grid
 
 !

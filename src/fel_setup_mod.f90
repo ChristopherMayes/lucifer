@@ -409,8 +409,7 @@ subroutine setup_fel_elements ()
 
 type (ele_struct), pointer :: w
 integer je
-real(rp) kw, kk, rv
-logical err_a
+real(rp) kw, kk
 
 allocate (run%is_fel(branch%n_ele_track), run%und_of(branch%n_ele_track))
 allocate (run%fel_mode(branch%n_ele_track), run%fel_spp(branch%n_ele_track), run%fel_ramp(branch%n_ele_track))
