@@ -7,12 +7,13 @@
 # openPMD-beamphysics is installed into this environment as well, with this
 # environment's own pip, and no script puts a checkout on PYTHONPATH:
 #
-#   conda env create -f environment.yml
-#   conda env update -n bmad-fel-validate -f environment.yml     # after this file changes
+#   conda env create -f tests/environment-validate.yml
+#   conda env update -n bmad-fel-validate -f tests/environment-validate.yml   # after this file changes
 #   conda run -n bmad-fel-validate pip install --no-deps -e <openPMD-beamphysics checkout>
 #
-# Note this is deliberately separate from the bmad-build environment defined in
-# .github/bmad-build-env.yaml, which builds the Fortran side.
+# Note this is deliberately separate from the two environments that build the Fortran
+# side: lucifer-build from environment.yml at the repository root, and bmad-build from
+# the Bmad checkout's .github/bmad-build-env.yaml for the distribution build.
 
 name: bmad-fel-validate
 
