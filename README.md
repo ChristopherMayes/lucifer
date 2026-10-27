@@ -82,6 +82,8 @@ See [`docs/user-guide.md`](docs/user-guide.md) for the input file's tables, the 
 
 Validated against Genesis4 on eleven tiers plus twenty-eight check sections, on both debug and production builds, before every commit. A moved digit is treated as a bug rather than a new baseline.
 
+The keystone is the run every commit passes before it lands: five jobs at their tolerances, then the generated pages regenerated and required to equal the committed ones. The validation suite, `tests/run_fel_validation.sh`, compares against Genesis4 and runs the check sections, and the Linux CI job runs it on the debug build at its tolerances. Neither judges a wall clock. Performance is measured separately, on an idle machine, in [`docs/performance.md`](docs/performance.md). The table of every test, what it compares against, which build it uses and where it runs opens [`docs/validation.md`](docs/validation.md).
+
 Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`docs/validation.md`](docs/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 
 What the program does, and what it does not do yet, are the two lists in [`docs/index.md`](docs/index.md). They are kept in one place because the examples are checked against them: every declared feature names the example that shows it, and the validation suite refuses a feature that has lost its example.

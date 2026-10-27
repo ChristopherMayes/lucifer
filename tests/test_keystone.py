@@ -1,4 +1,12 @@
-"""The keystone as one pytest suite (docs/validation.md, val-the-keystone-rule).
+"""The keystone as one pytest suite (docs/validation.md, val-what-is-tested).
+
+The keystone is the run every commit passes before it lands. Its five jobs are the
+validation suite, tests/run_fel_validation.sh, on the debug build and on the release
+build, Bmad's own regression suite, the wavefront validation and the examples, and each
+must pass its tolerances. The generated pages are then regenerated and must equal the
+committed ones, so a recorded digit that moves fails the keystone. A commit that means
+to change a generated page reviews and commits it, and the next keystone must reproduce
+it exactly. No job judges a wall clock.
 
 Five jobs run once, at the same time. Each runs from an absolute working directory with
 its own log. Every outcome is kept: a zero return, a nonzero return, a launch that

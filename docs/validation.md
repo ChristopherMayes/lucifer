@@ -4,6 +4,27 @@ Lucifer's physics is transcribed from Genesis 1.3 Version 4 (Genesis4) and valid
 
 The physics itself is the manual, [`fel-physics.md`](fel-physics.md): every equation the code integrates, each subsystem's Genesis4 provenance, and which check pins it. This page carries the numbers. Where a section here touches physics it links to the manual section.
 
+(val-what-is-tested)=
+## What is tested, and where
+
+The keystone is the run every commit passes before it lands. It runs five jobs at once: the validation suite on the debug build and again on the release build, Bmad's own regression suite, the wavefront validation and the examples. Each job must pass its tolerances. The keystone then regenerates the generated pages and requires them to equal the committed ones, so a recorded digit that moves fails it. A commit that means to change a generated page, with a new check row or a changed file layout, reviews and commits the page, and the next keystone must reproduce it exactly. `tests/test_keystone.py` runs it, and [](#val-the-keystone-rule) gives the commands.
+
+The validation suite is `tests/run_fel_validation.sh` with its check scripts. It holds the Genesis4 tiers and the check sections below. The Linux CI job runs it too, at its tolerances, and is not a keystone.
+
+| Test | Compares against | Build | Runs in | Judges |
+|---|---|---|---|---|
+| The Genesis4 tiers, in the validation suite | Genesis4 4.6.15, both codes started from the same dumps | debug and release in the keystone, debug in CI | the keystone and the Linux CI job | each tier's largest relative difference against its tolerance |
+| The check sections, in the validation suite | identities, closed forms, independent routes to one number, invariance under a change that must not matter, and refusals | debug and release in the keystone, debug in CI | the keystone and the Linux CI job | each check's measured value against its stated bound |
+| The recorded digits | the committed generated pages: the tables in `docs/generated/validation-measured.md` and the example pages written from `examples/measured.tsv` | debug and release | the keystone alone | that the regenerated pages equal the committed ones |
+| Bmad's regression suite | Bmad's own `output.correct` files | Bmad's debug binaries | the keystone alone | the Bmad build Lucifer links against |
+| The wavefront validation, `tests/wavefront/run_validation.sh` | openPMD-beamphysics and an in-Fortran reference propagator | debug | the keystone and the Linux CI job | the largest relative difference against its tolerance |
+| The examples, `examples/run_examples.sh` | the bank bytes each run's header states | release in the keystone, debug in CI | the keystone, and in CI steady_state alone from the installed tracker | that each example runs and writes its record, with the notebook, link and retired-word checks |
+| The performance benchmark, `tests/run_perf_benchmark.sh` | Genesis4's wall clock on the same line, and the tracker's own phases | release | an idle machine, by hand | wall clocks, recorded with their toolchain and day in [`performance.md`](performance.md) |
+
+No test in the keystone or in the Linux CI job judges a wall clock. The validation suite prints each section's time as the cost of the check, and nothing reads it. Each keystone job has a one-hour timeout, which stops a hung run. The performance benchmark is the one timing measurement, and it runs on an otherwise idle machine because a shared CI runner gives clocks that do not repeat.
+
+The Linux CI job builds the debug configuration on purpose. `-fbounds-check` turns an out-of-bounds read into a failure instead of a wrong number. Five wake cases once failed on Linux by reading past the end of a one-element vector, which the macOS allocator had answered with a number that happened to work. The CI job asserts tolerances and not the recorded digits, since a different FFTW and HDF5 change the last digits by construction ([](#val-second-toolchain)). A release build is validated on the recording machine alone.
+
 (val-the-keystone-rule)=
 ## The keystone rule
 

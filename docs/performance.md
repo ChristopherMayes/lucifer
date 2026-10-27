@@ -5,6 +5,8 @@ short_title: Performance
 
 This page is the measured record of where a run spends its time. Every number here is machine-local and carries the machine and the build that produced it. That is why this page is hand written and stays out of `generated/`.
 
+This page is the one timing measurement in the tree. The performance benchmark, `tests/run_perf_benchmark.sh`, runs on a release build by hand, on a machine doing nothing else. It never runs in the keystone or in the Linux CI job. The keystone runs five jobs at once and a CI runner shares its hardware, so neither gives a clock that repeats. No test there judges a wall clock ([](validation.md#val-what-is-tested)).
+
 The instrument is `src/fel_timer_mod.f90`. It accumulates wall clock per phase at region boundaries, and the footer of every run prints the table. The phases partition the walk, so the fractions sum to it and the remainder has its own row named `unaccounted`. That remainder, measured below, is 0.02% of the walk, so the partition is the walk.
 
 Timers cannot see inside a parallel region. The deposit and its FFT interleave per slice, and so do the field gather and the RK4, so a clock call between them would measure the loop it perturbs. That split comes from a sampling profiler and appears in its own section.

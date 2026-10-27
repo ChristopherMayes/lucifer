@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Added: `docs/validation.md` opens with a definition of the keystone and a table of every
+  test: the Genesis4 tiers, the check sections, the recorded digits, Bmad's regression suite, the
+  wavefront validation, the examples and the performance benchmark. Each row gives what the test
+  compares against, its build, where it runs and what it judges. The page states that no test in the
+  keystone or in the Linux CI job judges a wall clock, and why the CI job builds the debug
+  configuration. `README.md`, `docs/performance.md` and the docstring of `tests/test_keystone.py`
+  carry the same definition.
 - 2026-10-27 Changed: `tests/run_fel_benchmark.sh` is `tests/run_fel_validation.sh`, and the prose
   calls it the validation suite. It judges no wall clock. It compares against Genesis4 over the eleven
   tiers and holds the check sections to their bounds. The Linux CI workflow is
