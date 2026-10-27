@@ -77,7 +77,6 @@ to_groups = to_toml
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from bunch_params_from_stats import bunch_params_at, pool_wavefront, M_ELECTRON  # noqa: E402
 from lucifer.stats import read_stats, same_data  # noqa: E402
-import lucifer.beam as beamio
 from lucifer.beam import read_slices  # noqa: E402
 from lucifer.field import read_escaped  # noqa: E402
 import bank_bytes  # noqa: E402
@@ -452,7 +451,7 @@ def interludes(exe, wd):
     # element like any other. The setup's record-count precompute must make the same
     # decision. If the precompute counts the element whole while the walk cuts it, the
     # run stops at the stats writer with more records than the precomputed count.
-    wo = run(exe, wd, "int_wko", INT_NML.format(lat="intlatw.bmad", root="int_wko",
+    run(exe, wd, "int_wko", INT_NML.format(lat="intlatw.bmad", root="int_wko",
         extra="  run.interlude_ds_step = 0.04\n  bmad.sr_wakes_on = F\n"))
     wko = np.loadtxt(wd / "int_wko.diag.txt")
     check("interlude: with sr_wakes_on off the wake element is cut like any other",

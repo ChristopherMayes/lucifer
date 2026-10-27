@@ -122,7 +122,7 @@ def split_fortran(text: str):
 
 
 def split_c(text: str):
-    code, comments = [], []
+    comments = []
     out, i, quote, n = [], 0, None, len(text)
     while i < n:
         ch = text[i]

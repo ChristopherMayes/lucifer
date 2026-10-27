@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import argparse
 import pathlib
-import re
 import subprocess
 import sys
 
@@ -153,8 +152,8 @@ def main():
     ok = True
 
     # 1 + 2: conservation and phase continuity under heavy migration.
-    out = run(exe, wd, "migc.toml", BASE.format(lat="aramis.bmad", root="migc",
-              sig_pz="5.282703940115e-03", emit="4e-7", npart=1024, slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9", mig="T"))
+    run(exe, wd, "migc.toml", BASE.format(lat="aramis.bmad", root="migc",
+        sig_pz="5.282703940115e-03", emit="4e-7", npart=1024, slen="4.8e-9", q="4.803322970853e-14", half="2.4e-9", mig="T"))
     moved, bdev, drops = read_migration_file(wd, "migc")
     z, q_win = in_window_charge(wd / "migc.diag.txt")
     q0 = q_win[0]
@@ -198,8 +197,8 @@ def main():
 
     # 4: no-op bit identity on a frozen-phase beam.
     for mig, root in (("F", "mignf"), ("T", "mignt")):
-        out = run(exe, wd, f"{root}.toml", BASE.format(lat="aramis_1seg.bmad", root=root,
-                  sig_pz="8.804506566858e-08", emit="1e-13", npart=256, slen="1.2e-9", q="1.200830742713e-14", half="6e-10", mig=mig))
+        run(exe, wd, f"{root}.toml", BASE.format(lat="aramis_1seg.bmad", root=root,
+            sig_pz="8.804506566858e-08", emit="1e-13", npart=256, slen="1.2e-9", q="1.200830742713e-14", half="6e-10", mig=mig))
     moved = read_migration_file(wd, "mignt")[0]
     diag_eq = (wd / "mignf.diag.txt").read_bytes() == (wd / "mignt.diag.txt").read_bytes()
     d_eq = all(dumps_equal(wd / f"mignf-final.{s}.h5", wd / f"mignt-final.{s}.h5")

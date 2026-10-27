@@ -46,7 +46,6 @@ import re
 import subprocess
 import sys
 
-import h5py
 import numpy as np
 
 import lucifer.beam as beamio
@@ -200,7 +199,6 @@ def main():
         # where pz leaves only rounding.
         dpz = A[i]["pz"] - B[i]["pz"]
         q_ahead = q[i+1:].sum()
-        w_part = q[i] / B[i]["npart"]
         # Within the slice every particle has a distinct z (quiet-start phases). For a
         # constant wake each particle sees the particles of its slice ahead of it plus
         # half itself. Mean over the slice: q_ahead + (q_i - w_part)/2 + w_part/2
@@ -330,7 +328,6 @@ def main():
     interp_w = lambda dz: np.interp(dz, z_tab, w_tab, left=0.0, right=0.0)
     dpz_ref = np.zeros(len(zs))
     order = np.argsort(-zs)                          # head first
-    qsum_kick = np.zeros(len(zs))
     for j in order:                                  # O(N^2) fine at N ~ 6k
         dzv = zs[j] - zs
         mask = dzv <= 0
@@ -338,7 +335,6 @@ def main():
         dpz_ref[j] = -(L_ELE / P0C) * contrib
     # Bmad's kick as a slice mean against the reference slice mean.
     worst_m = 0.0
-    scale = max(abs(dpz_ref.mean()), np.abs(dpz_ref).max())
     for i, (a, b) in enumerate(zip(A, B)):
         if b["q"] < 0.01 * max(bb["q"] for bb in B):
             continue

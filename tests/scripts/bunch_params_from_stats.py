@@ -29,7 +29,6 @@ Or from the command line, for a quick look:
 
 from __future__ import annotations
 
-import pathlib
 import sys
 
 import numpy as np

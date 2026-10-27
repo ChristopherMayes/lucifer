@@ -447,9 +447,8 @@ def main():
     src = seeded.format(lat="collsc.bmad", root="collsc_src", sig_pz="8.804506566858e-08",
                         extra="  write_initial = T\n  load_only = T\n")
     run(exe, wd, "collsc_src.toml", src)
-    n_sel = split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_sel.beam.h5",
-                            16, which=0)
-    n_all = split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_all.beam.h5", 2)
+    split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_sel.beam.h5", 16, which=0)
+    split_particles(wd / "collsc_src-initial.beam.h5", wd / "collsc_all.beam.h5", 2)
     load = ('  beam.file = "{f}"\n  field.file = "collsc_src-initial.wf.h5"\n'
             '  load_mode = "keep"\n')
     for tag, extra in (("on", sc_on), ("off", "")):

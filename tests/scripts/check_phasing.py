@@ -419,7 +419,6 @@ def main():
     pool.run_all(jobs, threads_per_job=4)
     base_bp = [bphase(wd, f"pb{k}", 0.76) for k in range(NSCAN)]
     knob_bp = [bphase(wd, f"pk{k}", 0.76) for k in range(NSCAN)]
-    knob_pw = [exit_power(wd, f"pk{k}") for k in range(NSCAN)]
     xmode_bp = [bphase(wd, f"px{k}", 0.76) for k in range(NSCAN)]
 
     d_base = wrap(np.array(base_bp) - base_bp[0])

@@ -653,7 +653,7 @@ def main():
                           overrides=["run.out_root=pkg2", "run.ran_seed=779"])
         with h5py.File(res.stats_path) as h5:
             ok = res.out_root == "pkg2" and int(h5["params/run/ran_seed"][()]) == 779
-    except LuciferError as err:
+    except LuciferError:
         ok = False
     check("an override through lucifer.run lands in params/ and names the new root", ok)
     try:
