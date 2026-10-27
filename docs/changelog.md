@@ -9,6 +9,9 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Removed: `source-explorer/`, a browser prototype of sampled sources and diffraction
+  that was independent of the build. Its `src/app.js` imported `physics.js`, `plots.js` and
+  `worker.js`, which were never in the repository, so it could not be built from it.
 - 2026-10-27 Added: a version. The build takes it from `-DLUCIFER_VERSION=<version>` when given,
   else from `git describe --tags --dirty` in a checkout, else from the `describe-name` line of
   `.git_archival.txt`, which `git archive` fills from the tag in a release archive, else
