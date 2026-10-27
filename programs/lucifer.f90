@@ -53,6 +53,7 @@ use fel_io_mod
 use fel_timer_mod
 use fel_device_mod, only: fel_device_query
 use bmad_version_mod, only: bmad_version_date
+use fel_version_mod, only: lucifer_version$
 use, intrinsic :: iso_fortran_env, only: output_unit
 
 implicit none
@@ -77,7 +78,7 @@ character(*), parameter :: r_name = 'lucifer'
 ! The first argument is the input file. The examples name it lucifer.toml by convention. No name
 ! is looked for here. The arguments after it are overrides, table.key=value, which
 ! fel_read_input applies after the input file. --schema <file> writes the input file's schema as JSON
-! Schema and stops.
+! Schema and stops. --version prints the Lucifer version and the Bmad version and stops.
 
 ! The run clock starts before anything is read. So the footer's run total covers the
 ! whole process, and the work outside the walk is the difference.
@@ -85,6 +86,15 @@ character(*), parameter :: r_name = 'lucifer'
 call fel_timer_reset()
 
 n_arg = command_argument_count()
+if (n_arg == 1) then
+  call get_command_argument (1, param_file)
+  if (param_file == '--version') then
+    call out_io (s_blank$, r_name, 'Lucifer version ' // lucifer_version$)
+    call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
+    flush (output_unit)
+    stop
+  endif
+endif
 if (n_arg == 2) then
   call get_command_argument (1, param_file)
   if (param_file == '--schema') then
@@ -105,6 +115,7 @@ if (n_arg == 0) then
         'Usage:                                                                  ', &
         '  lucifer <input.toml> [<table>.<key>=<value> ...]                      ', &
         '  lucifer --schema <schema.json>                                        ', &
+        '  lucifer --version                                                     ', &
         '                                                                        ', &
         'One TOML input file names the lattice and holds the tables [run],       ', &
         '[window], [beam], [field], [wake], [space_charge] and [bmad]. Any file  ', &
@@ -112,10 +123,12 @@ if (n_arg == 0) then
         'is a convention rather than a default looked for here. An argument after', &
         'the input file sets one key of it, beam.n_particle=4096 or              ', &
         'run.out_root=s7, read after the input file through the same schema.     ', &
-        '--schema writes the schema as JSON Schema. docs/ documents every key,   ', &
-        'every output file and the lattice attributes.                           '])
+        '--schema writes the schema as JSON Schema, and --version prints the two ', &
+        'versions below. docs/ documents every key, every output file and the    ', &
+        'lattice attributes.                                                     '])
   ! Separate from the block above. A character array constructor needs every element the
-  ! same length, and the length of the version string is not known here.
+  ! same length, and the length of a version string is not known here.
+  call out_io (s_blank$, r_name, 'Lucifer version ' // lucifer_version$)
   call out_io (s_blank$, r_name, 'Bmad version ' // bmad_version_date)
   ! Print what run.device can be set to in this build. The backend is a property of
   ! the build and the machine. Where there is none, the reason names the toolchain

@@ -83,6 +83,8 @@ import sys
 import h5py
 import numpy as np
 
+# The header lines the user guide's sample shows. The Lucifer version line is not among
+# them: it changes with every commit, and the generated page would change with it.
 SAMPLE_PREFIXES = (" Lucifer --", " Beam ", " Radiation ", " Work ", " Load ", " Exit ",
                    " Split ", "             mode peak", "             last record")
 

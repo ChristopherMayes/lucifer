@@ -386,8 +386,8 @@ where the two builds agree to every printed digit.
 | migration no-op on the device: moves | 0 | same | <= 0 |
 | two migrate = F device runs, final beam z |  | same | holds |
 | migration no-op on the device: migrate T vs F final beam z |  | same | holds |
-| two runs bit for bit, the filter on: 129 arrays compared | 0 | same | <= 0 |
-| two runs bit for bit, the filter off: 129 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter on: 130 arrays compared | 0 | same | <= 0 |
+| two runs bit for bit, the filter off: 130 arrays compared | 0 | same | <= 0 |
 | deposit accuracy, cancelling phases | 1.4673e-05 | same | <= 1.5372e-05 |
 | deposit quantum below the FP32 spacing of its bound, cancelling phases | 37 | same | >= 24 |
 | deposit accuracy, unequal weights | 1.4681e-05 | same | <= 1.5383e-05 |
@@ -726,6 +726,7 @@ where the two builds agree to every printed digit.
 | a library error RETURNS (no beginning Twiss -> err to the program, exit 2) |  | same | holds |
 | a key in the wrong table is refused, naming the table it belongs in |  | same | holds |
 | a key no table has is refused, naming the table's keys |  | same | holds |
+| --version, the header and meta/lucifer_version carry the version CMake wrote |  | same | holds |
 | run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow |  | same | holds |
 | a key no table has on the command line is refused (run.wake_on=true) |  | same | holds |
 | a key in the wrong table on the command line is refused (beam.lambda0=1e-10) |  | same | holds |

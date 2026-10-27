@@ -88,12 +88,30 @@ if (APPLE)
   endif ()
 endif ()
 
-# The library, liblucifer.a: every module under src/, the paired-sincos shim, and the
-# device seam. The target is lucifer_lib since the tracker's executable takes the name.
+# The version (cmake/LuciferVersion.cmake): LUCIFER_VERSION when given, else git describe,
+# else the release archive's .git_archival.txt, else 0.0.0-unknown. It is written into
+# fel_version_mod.f90 in the build directory, here and again at every build by the target
+# lucifer_version, so each build tree carries the version it was built at.
+
+set (LUCIFER_VERSION "" CACHE STRING "The version to build as, in place of git's")
+find_package (Git QUIET)
+set (LUCIFER_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
+set (LUCIFER_VERSION_FILE "${CMAKE_BINARY_DIR}/generated/fel_version_mod.f90")
+include (LuciferVersion)
+add_custom_target (lucifer_version
+  COMMAND "${CMAKE_COMMAND}" "-DLUCIFER_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+          "-DLUCIFER_VERSION_FILE=${LUCIFER_VERSION_FILE}" "-DLUCIFER_VERSION=${LUCIFER_VERSION}"
+          "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}" -P "${CMAKE_SOURCE_DIR}/cmake/LuciferVersion.cmake"
+  BYPRODUCTS "${LUCIFER_VERSION_FILE}")
+
+# The library, liblucifer.a: every module under src/, the version module, the
+# paired-sincos shim, and the device seam. The target is lucifer_lib since the tracker's
+# executable takes the name.
 
 file (GLOB LUCIFER_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.f90")
-add_library (lucifer_lib STATIC ${LUCIFER_SOURCES} src/fel_sincos.c)
+add_library (lucifer_lib STATIC ${LUCIFER_SOURCES} "${LUCIFER_VERSION_FILE}" src/fel_sincos.c)
 set_target_properties (lucifer_lib PROPERTIES OUTPUT_NAME lucifer)
+add_dependencies (lucifer_lib lucifer_version)
 
 # -O3 with the paired-sincos shim takes the FEL step's particle path from 152 to about
 # 108 ns a particle-step, and neither pays alone (docs/validation.md). The change is at

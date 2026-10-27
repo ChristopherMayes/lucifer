@@ -3850,7 +3850,8 @@ Output:
 ```
 Routine to write the provenance group into the stats file: the resolved input echo
 (every default explicit, straight from the structs), the top-level lattice file's name
-and text, how many files the parser opened, an ISO timestamp and the Bmad version.
+and text, how many files the parser opened, an ISO timestamp, the Lucifer version and
+the Bmad version.
 
 The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
@@ -3873,7 +3874,7 @@ not a substitute either. It hashes inode and size, which makes it machine specif
 not a fingerprint of content.
 
 A stats file is meant to travel, so nothing here identifies a person by default. The
-timestamp and the Bmad version identify the run. The login name and working directory
+timestamp and the two versions identify the run. The login name and working directory
 go in only under run.record_environment. The file records a lattice basename.
 The input file is echoed as read, so an absolute path there is still an absolute path
 in the file. Genesis always records user and cwd. Parity is not a reason to leak.

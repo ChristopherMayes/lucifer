@@ -59,6 +59,9 @@ and the tracking window.
      continuous run's frames, field slice by slice and particles by id, to the same
      floor. A continuation from the dump with the attribute stripped is refused, and so
      is an impossible residual.
+ 11. The version. CMake writes it into the build directory beside bin/, and --version,
+     the header's version line and the stats file's meta/lucifer_version all carry that
+     string.
 
 Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
 """
@@ -193,6 +196,7 @@ def run_nml(exe, wd, root, nml_text):
     if r.returncode != 0:
         print(f"FAIL: {root} exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
+    return r
 
 
 def h5_identical(fa, fb):
@@ -503,7 +507,7 @@ def main():
     if r.returncode != 0:
         print(f"FAIL: lucifer_smoke_test exited {r.returncode}:\n{r.stdout[-2000:]}")
         sys.exit(1)
-    run_nml(exe, wd, "snml", NML_TWIN.format(root="snml", extra="", bextra=""))
+    r_snml = run_nml(exe, wd, "snml", NML_TWIN.format(root="snml", extra="", bextra=""))
 
     same = (wd / "sp1.diag.txt").read_bytes() == (wd / "snml.diag.txt").read_bytes()
     for s in ("-final.beam.h5", "-final.wf.h5"):
@@ -535,6 +539,26 @@ def main():
     ok = (r.returncode != 0 and "wake_on IS NOT A KEY OF [run]" in r.stdout
           and "The keys there are: out_root" in r.stdout)
     check("a key no table has is refused, naming the table's keys", ok)
+
+    # ------------------------------------------------------------------
+    print("== the version ==")
+
+    # cmake/LuciferVersion.cmake writes the version into generated/ beside bin/. The
+    # program prints it for --version and in the header, and records it in meta/.
+    gen = exe.parent.parent / "generated" / "fel_version_mod.f90"
+    m = re.search(r"lucifer_version\$ = '([^']*)'", gen.read_text()) if gen.is_file() else None
+    built = m.group(1) if m else None
+    r = run([str(exe), "--version"], wd)
+    m = re.fullmatch(r"Lucifer version (\S+)\nBmad version \S+\n", r.stdout)
+    printed = m.group(1) if m else None
+    m = re.search(r"^ Lucifer version (\S+)$", r_snml.stdout, re.M)
+    header = m.group(1) if m else None
+    with h5py.File(wd / "snml.stats.h5") as h5:
+        stored = h5["meta/lucifer_version"][()].decode() if "meta/lucifer_version" in h5 else None
+    ok = r.returncode == 0 and built is not None and printed == header == stored == built
+    check("--version, the header and meta/lucifer_version carry the version CMake wrote", ok,
+          note=f"[{built} from {gen.parent.parent.name}/generated, --version {printed}, "
+               f"header {header}, meta {stored}, exit {r.returncode}]")
 
     # ------------------------------------------------------------------
     print("== the overrides on the command line ==")

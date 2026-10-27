@@ -1,0 +1,15 @@
+!+
+! Module fel_version_mod
+!
+! The Lucifer version this build was made from. cmake/LuciferVersion.cmake writes this
+! module into the build directory from src/fel_version_mod.f90.in at every build, and
+! rewrites it only when the version changes. The source tree holds the template alone.
+!-
+
+module fel_version_mod
+
+implicit none
+
+character(*), parameter :: lucifer_version$ = '@LUCIFER_VERSION_STRING@'
+
+end module

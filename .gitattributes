@@ -1,0 +1,4 @@
+# git archive fills .git_archival.txt from the archived commit, so a release archive,
+# which has no .git, carries its tag for CMake (cmake/LuciferVersion.cmake) and for
+# setuptools-scm (python/pyproject.toml).
+.git_archival.txt  export-subst

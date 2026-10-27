@@ -24,8 +24,9 @@ use, intrinsic :: ieee_arithmetic, only: ieee_is_finite, ieee_value, ieee_quiet_
 ! fel_write_meta.
 use bmad_parser_struct, only: bp_com
 ! For bmad_version_date, the distribution's own version. Tao reports the same string.
-! Lucifer builds against the same distribution, so there is no second version to keep.
 use bmad_version_mod, only: bmad_version_date
+! For lucifer_version$, the version of this build, written by CMake into the build directory.
+use fel_version_mod, only: lucifer_version$
 !$ use omp_lib
 
 implicit none
@@ -623,6 +624,9 @@ n_omp = 1
 
 call out_io (s_blank$, r_name, rule)
 call out_io (s_blank$, r_name, ' Lucifer -- FEL tracking in Bmad, Bmad version ' // bmad_version_date)
+! The Lucifer version has a line of its own, which the sample output on the user guide's
+! page leaves out. The version moves with every commit and the page would move with it.
+call out_io (s_blank$, r_name, ' Lucifer version ' // lucifer_version$)
 call out_io (s_blank$, r_name, &
       '--------------------------------------------------------------------------------')
 
@@ -2183,7 +2187,8 @@ end subroutine fel_write_wake_block
 !
 ! Routine to write the provenance group into the stats file: the resolved input echo
 ! (every default explicit, straight from the structs), the top-level lattice file's name
-! and text, how many files the parser opened, an ISO timestamp and the Bmad version.
+! and text, how many files the parser opened, an ISO timestamp, the Lucifer version and
+! the Bmad version.
 !
 ! The texts are datasets and not attributes. HDF5 caps a single attribute at 64 kB, and
 ! the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An echoed
@@ -2206,7 +2211,7 @@ end subroutine fel_write_wake_block
 ! not a fingerprint of content.
 !
 ! A stats file is meant to travel, so nothing here identifies a person by default. The
-! timestamp and the Bmad version identify the run. The login name and working directory
+! timestamp and the two versions identify the run. The login name and working directory
 ! go in only under run.record_environment. The file records a lattice basename.
 ! The input file is echoed as read, so an absolute path there is still an absolute path
 ! in the file. Genesis always records user and cwd. Parity is not a reason to leak.
@@ -2286,6 +2291,10 @@ stamp = date_s(1:4) // '-' // date_s(5:6) // '-' // date_s(7:8) // 'T' // &
         time_s(1:2) // ':' // time_s(3:4) // ':' // time_s(5:6)
 call fel_h5_text (g_id, 'timestamp', 'timestamp', &
       'Local time the run finished, ISO 8601 without a zone.', stamp, merr)
+call fel_h5_text (g_id, 'lucifer_version', 'Lucifer version', &
+      'The Lucifer version the run was built from: the release tag, git describe of the ' // &
+      'commit, or what the build was told. A version ending in -dirty was built from a ' // &
+      'tree with uncommitted changes.', lucifer_version$, merr)
 call fel_h5_int (g_id, 'bmad_inc_version', '1', 'Bmad lattice-format version', &
       'The bmad_inc_version$ the run was built against.', '', bmad_inc_version$, merr)
 call fel_h5_text (g_id, 'bmad_version', 'Bmad distribution version', &

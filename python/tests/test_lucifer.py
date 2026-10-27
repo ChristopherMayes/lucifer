@@ -19,6 +19,16 @@ TEXT = 'lattice = "aramis.bmad"\n\n[beam]\nn_particle = 4096\n\n[run]\nout_root 
 LEFT_OUT = {"use_mpi", "mpi_run", "command_mpi", "COMMAND_MPI", "MPI_RUN", "from_yaml"}
 
 
+def test_version_is_the_installed_packages():
+    # setuptools-scm sets the installed package's version from the git tag, so an install
+    # carries a version and the package reports the one it was installed with.
+    import importlib.metadata
+
+    import lucifer
+    assert isinstance(lucifer.__version__, str) and lucifer.__version__
+    assert lucifer.__version__ == importlib.metadata.version("lucifer")
+
+
 def test_built_from_an_input_a_path_and_text(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "s7.toml").write_text(TEXT)

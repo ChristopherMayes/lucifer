@@ -21,6 +21,14 @@ python -m lucifer.generate can write models.py before it exists.
 from __future__ import annotations
 
 import importlib
+from importlib.metadata import PackageNotFoundError, version
+
+# The version setuptools-scm gave the installed package, from the git tag the program's
+# version comes from. An editable install keeps the version it was installed at.
+try:
+    __version__ = version("lucifer")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 
 _FROM = {name: "lucifer.models" for name in
          ("Input", "Run", "Window", "Beam", "Resample", "Field", "Wake", "SpaceCharge", "Bmad")}
