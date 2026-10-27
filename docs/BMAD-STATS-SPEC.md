@@ -126,7 +126,7 @@ Within this file, the primary data are what the program computed from particles:
 
 ## 14. Conformance
 
-- **R42.** A file conforms when `validate_bmad_stats.py` reports no MUST failure. The validator is part of this standard, knows no program and no extension, and checks everything generically checkable. Some MUSTs are writer-side honesty the validator cannot see. It can only verify that a declared join key or mask resolves, and not that every one is declared. It cannot see that R26's strings really are the code's enums, that R28's NaN means not-computed, or that R34's trees are complete. Those belong in each writing program's own benchmark, beside the physics checks.
+- **R42.** A file conforms when `validate_bmad_stats.py` reports no MUST failure. The validator is part of this standard, knows no program and no extension, and checks everything generically checkable. Some MUSTs are writer-side honesty the validator cannot see. It can only verify that a declared join key or mask resolves, and not that every one is declared. It cannot see that R26's strings really are the code's enums, that R28's NaN means not-computed, or that R34's trees are complete. Those belong in each writing program's own tests, beside the physics checks.
 
 ## 15. Relation to openPMD
 

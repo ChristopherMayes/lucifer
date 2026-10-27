@@ -7,9 +7,9 @@ BMAD-STATS-SPEC.md	8601	d , sits at the root and holds datasets only (R27): an I
 fel-physics.md	1.3	checks each statement against Genesis 1.3 Version 4 (Genes	citation	Genesis 1.3 Version 4
 fel-physics.md	3300	dy averaged over. At that default a FLASH-scale probe takes 3300 steps a segment	example	the FLASH probe's steps a segment at Bmad's default step
 fel-physics.md	55	ASH-scale probe takes 3300 steps a segment against FLASH1's 55. The unset state 	example	FLASH1's steps a segment
-fel-physics.md	266	hase jump. Their reduced coupling length costs 2% in per 266-period benchmark se	example	the benchmark segment's periods
+fel-physics.md	266	hase jump. Their reduced coupling length costs 2% in per 266-period Benchmark1-S	example	the Benchmark1-SASE segment's periods
 fel-physics.md	127	The point count is 127 whatever the beam is, since cancels between the two rules	standard	the derived point count before rounding, from 7 cells and 9 widths per sigma
-fel-physics.md	23.6	amis benchmark at a spacing of 12 wavelengths that angle is 23.6 µrad. The expon	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	23.6	ark1-SASE line at a spacing of 12 wavelengths that angle is 23.6 µrad. The expon	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	2.25	t angle is 23.6 µrad. The exponent of the reported power is 2.25, 1.42 and 1.08 	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	1.42	e is 23.6 µrad. The exponent of the reported power is 2.25, 1.42 and 1.08 over c	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	1.08	µrad. The exponent of the reported power is 2.25, 1.42 and 1.08 over cells of 6.	measured	a level or a cost typed from a run, no generated page
@@ -45,19 +45,19 @@ fel-physics.md	30	ce measurement supports that floor, and the published 10 to 30
 fel-physics.md	2.8	e pair the observed order between successive resolutions is 2.8 and 2.1 for the 	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	2.1	he observed order between successive resolutions is 2.8 and 2.1 for the complex 	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	65	s the field of the plane it is named for. The ledger closes 65 tighter than unde	measured	a level or a cost typed from a run, no generated page
-fel-physics.md	3.3	p to the FFT Nyquist . At the benchmark parameters that is 3.3% of the analytic 	measured	a level or a cost typed from a run, no generated page
+fel-physics.md	3.3	he FFT Nyquist . At the Benchmark1-SASE parameters that is 3.3% of the analytic 	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	30	published practices this mode shares with it are the 10 to 30 steps per period e	standard	the published envelope of 10 to 30 steps per period
-fel-physics.md	266	xact, emittance drift over the longest benchmark segment (266 periods, 5320 step	example	the benchmark segment's periods
-fel-physics.md	5320	ce drift over the longest benchmark segment (266 periods, 5320 steps).	example	the benchmark segment's steps
-fel-physics.md	25.8	segment gap by fractions of (one full turn of drift slip, 25.8 mm at the benchma	example	one carrier turn of drift slip at the benchmark
+fel-physics.md	266	emittance drift over the longest Benchmark1-SASE segment (266 periods, 5320 step	example	the Benchmark1-SASE segment's periods
+fel-physics.md	5320	ft over the longest Benchmark1-SASE segment (266 periods, 5320 steps).	example	the Benchmark1-SASE segment's steps
+fel-physics.md	25.8	segment gap by fractions of (one full turn of drift slip, 25.8 mm on the Benchma	example	one carrier turn of drift slip on the Benchmark1-SASE line
 fel-physics.md	32	*Step size.* The measured convergence (one shared 32-slice dump at , swept) is r	example	the 32-slice dump of the convergence check
 fel-physics.md	26	power holds to 3% up to six periods per step and misses by 26% at twelve. Two to	measured	a level or a cost typed from a run, no generated page
 fel-physics.md	030703	urce deposit with Tanaka's coherent retrieval (PRAB **27**, 030703 (2024), imple	citation	PRAB 27, 030703 (2024)
 fel-physics.md	26	h from the order-0/1 Laguerre-Gauss sums (the paper's Eq. 26), charge-weighted a	citation	the paper's equation 26
 fel-physics.md	175	wo polarizations, and dark starts. A dark start measures a 175 startup deficit. 	measured	a level or a cost typed from a run, no generated page
-genesis4.md	89	tor layout segment. The step count over the benchmark is 12*89 undulator steps +	example	the benchmark line's undulator steps
-genesis4.md	36	he step count over the benchmark is 12*89 undulator steps + 36 interlude steps =	example	the benchmark line's interlude steps
-genesis4.md	1104	e benchmark is 12*89 undulator steps + 36 interlude steps = 1104.	example	the benchmark line's step count
+genesis4.md	89	tor layout segment. The step count over the Benchmark1-SASE line is 12*89 undulator steps +	example	the Benchmark1-SASE line's undulator steps
+genesis4.md	36	he step count over the Benchmark1-SASE line is 12*89 undulator steps + 36 interlude steps =	example	the Benchmark1-SASE line's interlude steps
+genesis4.md	1104	1-SASE line is 12*89 undulator steps + 36 interlude steps = 1104.	example	the Benchmark1-SASE line's step count
 genesis4.md	77	`readBeamHDF5.cpp:68-77`	citation	Genesis4 source line
 genesis4.md	70	`GenTime.cpp:70`	citation	Genesis4 source line
 genesis4.md	191	`Lattice.cpp:191-193`	citation	Genesis4 source line

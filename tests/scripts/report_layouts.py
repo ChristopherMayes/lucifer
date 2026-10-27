@@ -42,7 +42,7 @@ import numpy as np
 # Attribute names whose values are omitted wherever they occur. Names, not patterns.
 OMITTED = ("date", "softwareVersion")
 
-# The lattice head every fixture shares: the benchmark's beam energy and twiss.
+# The lattice head every fixture shares: the Benchmark1-SASE beam energy and twiss.
 LATTICE_HEAD = """no_digested
 parameter[geometry] = open
 parameter[particle] = electron
@@ -53,7 +53,7 @@ beginning[beta_b] = 17.3899
 beginning[alpha_b] = 1.40348
 """
 
-# Four periods of the benchmark undulator, aw = 0.84853, one comb step per period.
+# Four periods of the Benchmark1-SASE undulator, aw = 0.84853, one comb step per period.
 UNDULATOR = ("QU: wiggler, l = 0.06, l_period = 0.015, field_calc = planar_model, "
              "b_max = sqrt(2) * 0.84853 * (twopi / 0.015) * m_electron / c_light, "
              "fel_method = {method}, ds_step = 0.015{extra}")
@@ -339,7 +339,7 @@ def page(work):
     L.append("## Fixtures")
     L.append("")
     L.append("Each file below comes from one of four runs of the executable the regeneration test "
-             "hands this generator, in a scratch directory of its own. The runs share the benchmark "
+             "hands this generator, in a scratch directory of its own. The runs share the Benchmark1-SASE "
              "beam energy and twiss, four periods of an undulator of `aw = 0.84853` with one comb step "
              "per period, 64 particles in beamlets of 8, no seed and no shot noise, a 16-point grid, "
              "and a window of two wavelengths at 1e-10 m, six slices of 200 pm. The settings column "

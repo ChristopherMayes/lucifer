@@ -13,7 +13,7 @@ read and classified by matching its value against the sources a number can come 
   tolerance  a tolerance or bound a check script holds a value to: its module-level
              constants, the literal bound in a check() call, and the bounds of the
              generated tables
-  measured   a value a generated page carries, from the benchmark's records, or a value of
+  measured   a value a generated page carries, from the validation suite's records, or a value of
              the examples' record, examples/measured.tsv
   example    a setting of an input file under examples/ or tests/
 

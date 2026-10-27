@@ -7,7 +7,7 @@
 ! helicity from field_calc. Everything else is tracked by Bmad.
 !
 ! e_tot is the reference energy and the driver derives gamma0 from it. Genesis4's
-! benchmark value 11357.82 is encoded as an expression in Bmad's own rest mass.
+! Benchmark1-SASE value 11357.82 is encoded as an expression in Bmad's own rest mass.
 !
 ! Genesis4's quadrupole k1 = 2 m^-2 is the geometric strength at the reference energy
 ! and Bmad's k1 means the same. The chromatic behavior differs at the model level.

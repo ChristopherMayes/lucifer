@@ -227,7 +227,7 @@ csr_and_space_charge_on = true
 ### `sc_line.bmad`
 
 ```fortran
-! The benchmark line with space charge asked for on its undulators. The method is Bmad's
+! The Benchmark1-SASE line with space charge asked for on its undulators. The method is Bmad's
 ! own space_charge_method attribute, so the same lattice means the same thing in any Bmad
 ! program, and the FEL slices are the bins the solve uses.
 

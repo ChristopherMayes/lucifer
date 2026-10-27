@@ -10,7 +10,7 @@
 # Usage:
 #   ./device_table.sh [--exe <path>] [--workers N] [--work-dir <path>]
 #
-# The production lucifer is preferred, found as in run_fel_benchmark.sh. The work
+# The production lucifer is preferred, found as in run_fel_validation.sh. The work
 # directory is kept. The input files are the *.toml files beside this script, and the lattice
 # comes from tests/bmad. A build with no device backend refuses the device runs, which
 # this script reports and stops on.

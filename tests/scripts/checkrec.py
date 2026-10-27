@@ -1,7 +1,7 @@
 """Record what a check measured, beside the line it prints.
 
 A check script prints one line per check: the name, the value it measured, the bound it
-held the value to, and ok or FAIL. The benchmark reads only the exit status, so the
+held the value to, and ok or FAIL. The validation suite reads only the exit status, so the
 measured values reached the documentation by hand. record() writes the same facts as
 one line of the results file, and the documentation is generated from them.
 
@@ -17,14 +17,14 @@ kind    how the value met the bound: "max" (value <= bound), "min" (value >= bou
         "range" (lo <= value <= hi), "equal" (value == bound), or "bool" (no number).
 passed  whether the check passed, as the script itself judged it.
 
-The line is written to the file named by LUCIFER_CHECK_RECORD, which run_fel_benchmark.sh
+The line is written to the file named by LUCIFER_CHECK_RECORD, which run_fel_validation.sh
 sets for each section, with the section's name from LUCIFER_CHECK_SECTION, as
 
     check|{"section": ..., "name": ..., "value": ..., "bound": ..., "kind": ..., "pass": ...}
 
-The benchmark appends each section's file to its results file beside the section's
+The validation suite appends each section's file to its results file beside the section's
 outcome. With LUCIFER_CHECK_RECORD unset, as in a script run by hand, record() does
-nothing, so a script behaves the same inside and outside the benchmark.
+nothing, so a script behaves the same inside and outside the validation suite.
 """
 
 from __future__ import annotations

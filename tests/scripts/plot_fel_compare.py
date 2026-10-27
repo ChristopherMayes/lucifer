@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Overlay the Bmad FEL tracker and Genesis 1.3 Version 4 outputs of one benchmark tier,
+Overlay the Bmad FEL tracker and Genesis 1.3 Version 4 outputs of one Genesis4 tier,
 as a figure beside compare_fel.py's numbers. Reads the tracker's diag file and
 Genesis's .out.h5 and writes a four-panel figure. The slice count comes from the
 Genesis file, so steady-state and time-dependent tiers both work with no option.
@@ -21,7 +21,7 @@ Usage:
   plot_fel_compare.py <bmad diag.txt> <genesis .out.h5> [-o out.png]
                       [--fld <bmad wf.h5> <genesis fld.h5>]
 
-e.g., from a benchmark work directory:
+e.g., from a validation work directory:
   plot_fel_compare.py tdsase.diag.txt AramisTDSASE.out.h5
   plot_fel_compare.py tier1u.diag.txt Aramis1seg.out.h5 --fld tier1u-final.wf.h5 Aramis1seg-final.fld.h5
 """

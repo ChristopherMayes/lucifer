@@ -5,7 +5,7 @@ The example runs in one command, with Bmad only:
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot steady_state.stats.h5
 
-This is a seeded, single-slice FEL on the benchmark line (`../aramis.bmad`): a 3 kA slice and a 5 kW Gaussian seed at its waist are tracked through 6 FODO cells of helical undulator. Nothing external is read. The program generates the quiet-start beam and the seed field from the namelist, and the lattice supplies everything else.
+This is a seeded, single-slice FEL on the Benchmark1-SASE line (`../aramis.bmad`): a 3 kA slice and a 5 kW Gaussian seed at its waist are tracked through 6 FODO cells of helical undulator. Nothing external is read. The program generates the quiet-start beam and the seed field from the namelist, and the lattice supplies everything else.
 
 `sig_z = 0` makes the run steady state. The whole charge sits in the one slice window, so the current is `I = Q*c/slice_spacing`, and `bunch_charge` in the input file encodes 3 kA exactly. The current is always derived this way and never entered ([the input reference](../../docs/input-reference.md)).
 

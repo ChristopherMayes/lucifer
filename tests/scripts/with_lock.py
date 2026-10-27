@@ -7,7 +7,7 @@ held until it ends. The kernel releases the lock when the process dies, however 
 dies, so a killed run leaves no stale lock behind. A lock directory would. The
 command's stdin, stdout and stderr are inherited, and its exit status is returned.
 
-The benchmark's device section runs under this. The two build passes of a keystone run
+The validation suite's device section runs under this. The two build passes of a keystone run
 at once, and the device is one resource across both. So their device sections take
 turns while their CPU sections carry on (docs/validation.md, val-the-keystone-rule). A
 wait longer than 1 s is printed, so the cost of taking turns can be read from the log.

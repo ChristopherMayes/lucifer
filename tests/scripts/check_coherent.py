@@ -3,8 +3,8 @@
 Checks of the coherent source (fel-physics.md, sec-coherent-source), implemented from
 Tanaka, PRAB 27, 030703 (2024): SIMPLEX's coherent source driving Lucifer's field.
 
-  1. Every other check in the benchmark leaves source_model at its default, the deposit,
-     so the benchmark's tiers hold that path. Here a coherent run on the reference
+  1. Every other check in the validation suite leaves source_model at its default, the deposit,
+     so the validation suite's tiers hold that path. Here a coherent run on the reference
      configuration runs clean.
   2. Limit identity. At large M on the seeded 6 GeV segment, the coherent and deposit
      |ln P| curves differ by the coherent Gaussian's own error in the lethargy regime,
@@ -23,7 +23,7 @@ Tanaka, PRAB 27, 030703 (2024): SIMPLEX's coherent source driving Lucifer's fiel
      dominant seed at startup.
   6. A coherent run is bit-identical at 1 and 8 threads.
 
-Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
+Run by the validation suite. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations

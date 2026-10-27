@@ -6,7 +6,7 @@ An FEL segment is a wiggler or undulator carrying Bmad's fel_method attribute, a
 tracking_method stays bmad_standard, so a Lucifer lattice is an ordinary Bmad lattice that
 any Bmad program reads. This check holds that. It runs Tao over every lattice under
 tests/bmad and examples that names a line, and requires a zero exit with no error line.
-A lattice Tao cannot load fails the benchmark.
+A lattice Tao cannot load fails the validation suite.
 
 The tree under tests/bmad and examples is copied into the work directory with its layout
 intact, since a wrapper reaches its base by relative path, and so that no digested file

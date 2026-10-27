@@ -4,7 +4,7 @@ Reconstruct a Bmad bunch_params_struct-shaped dict from any (record, slice) of t
 tracker's stats file <out_root>.stats.h5. The per-record beam datasets (centroid,
 sigma, charge_live, n_particle_live) are sufficient statistics, and this module shows
 it by construction. At element ends its output must reproduce the twiss the tracker
-stored from Bmad's own calc_bunch_params, and the benchmark checks that. The moments
+stored from Bmad's own calc_bunch_params, and the validation suite checks that. The moments
 themselves are stored once, per record, so there is nothing there to compare against.
 
 The formulas are transcribed from Bmad's calc_emittances_and_twiss_from_sigma_matrix
@@ -96,7 +96,7 @@ def bunch_params_from_moments(centroid, sigma36, charge_live, n_live, p0c):
     emits = emits[::2]                         # One per conjugate pair.
     # Note: Mode labels here are in descending magnitude. Bmad's mat_eigen identifies
     # modes by eigenvector structure, so a/b/c may be permuted relative to Bmad. The
-    # benchmark compares the normal-mode emittances as a sorted set.
+    # validation suite compares the normal-mode emittances as a sorted set.
     for k, name in enumerate(("a", "b", "c")):
         e = float(emits[k]) if k < len(emits) else 0.0
         bp[name] = {"emit": e, "norm_emit": f_emit * e}

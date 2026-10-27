@@ -14,7 +14,7 @@ The example runs in one command, with Bmad only:
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot flash1.stats.h5
 
-FLASH at DESY lased at 13.7 nm in 2006, the first free-electron laser to reach saturation at that wavelength, and reported its undulator, its beam and its performance. This example is that line: six planar segments, a Gaussian bunch on the published beam, and SASE from the quiet start through 27 m of undulator. Every other example in this directory runs the Aramis benchmark at 0.1 nm, so this one is also the third machine the numerical defaults are measured on ([SASE convergence](../../startup-noise.md)).
+FLASH at DESY lased at 13.7 nm in 2006, the first free-electron laser to reach saturation at that wavelength, and reported its undulator, its beam and its performance. This example is that line: six planar segments, a Gaussian bunch on the published beam, and SASE from the quiet start through 27 m of undulator. Every other example in this directory runs the Benchmark1-SASE line at 0.1 nm, so this one is also the third machine the numerical defaults are measured on ([SASE convergence](../../startup-noise.md)).
 
 The first source is Ackermann et al., *Operation of a free-electron laser from the extreme ultraviolet to the water window*, Nature Photonics **1**, 336 (2007), [doi:10.1038/nphoton.2007.76](https://doi.org/10.1038/nphoton.2007.76). The second is Schreiber and Faatz, *The free-electron laser FLASH*, High Power Laser Science and Engineering **3**, e20 (2015), [doi:10.1017/hpl.2015.16](https://doi.org/10.1017/hpl.2015.16).
 

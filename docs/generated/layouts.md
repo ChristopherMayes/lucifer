@@ -21,7 +21,7 @@ This page shows the hierarchy of each representative file this program writes, p
 
 ## Fixtures
 
-Each file below comes from one of four runs of the executable the regeneration test hands this generator, in a scratch directory of its own. The runs share the benchmark beam energy and twiss, four periods of an undulator of `aw = 0.84853` with one comb step per period, 64 particles in beamlets of 8, no seed and no shot noise, a 16-point grid, and a window of two wavelengths at 1e-10 m, six slices of 200 pm. The settings column lists what a run adds to that.
+Each file below comes from one of four runs of the executable the regeneration test hands this generator, in a scratch directory of its own. The runs share the Benchmark1-SASE beam energy and twiss, four periods of an undulator of `aw = 0.84853` with one comb step per period, 64 particles in beamlets of 8, no seed and no shot noise, a 16-point grid, and a window of two wavelengths at 1e-10 m, six slices of 200 pm. The settings column lists what a run adds to that.
 
 | Run | Settings | Files and their roles |
 |---|---|---|

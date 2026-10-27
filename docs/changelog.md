@@ -9,6 +9,14 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Changed: `tests/run_fel_benchmark.sh` is `tests/run_fel_validation.sh`, and the prose
+  calls it the validation suite. It judges no wall clock. It compares against Genesis4 over the eleven
+  tiers and holds the check sections to their bounds. The Linux CI workflow is
+  `.github/workflows/lucifer-linux.yml`, named `Lucifer - Validation (Linux)`, where it was
+  `lucifer-keystone.yml`, and its step `Benchmark, debug build` is `Validation suite against Genesis4,
+  debug build`. A reviewer had read that step as a timing run on a shared runner. Where the prose said
+  the benchmark for Genesis4's own case, the line or its parameters, it names Benchmark1-SASE.
+  `tests/run_perf_benchmark.sh`, the performance benchmark, is the one benchmark left.
 - 2026-10-27 Fixed: the Metal backend did not compile against a macOS SDK older than 15, which
   conda-forge builds with, since it set `MTLCompileOptions.mathMode`, first declared in the macOS 15
   SDK. The macOS 15 branch is now compiled only where the SDK declares it, and an older SDK compiles

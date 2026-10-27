@@ -106,7 +106,7 @@ def run(exe, wd, root, lam, sample, on="T", xcut=1.0, mutate="F", track_end=""):
                               on=on, xcut=xcut, mutate=mutate, end=end)))
     log = wd / f"fel-{root}.log"
 
-    # Four threads, the same cap check_device.py takes. The two benchmark passes run this
+    # Four threads, the same cap check_device.py takes. The two validation passes run this
     # section at the same time as three other jobs. Four unbounded runs a pass
     # oversubscribe the machine badly enough to kill an unrelated run in the next section.
 

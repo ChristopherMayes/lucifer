@@ -27,9 +27,9 @@ The two curves are bit-identical up to the method boundary, which is the check t
 
 The cost is where the difference is spent. The one unaveraged segment takes most of the run's wall time at 20 substeps per period, and the eleven averaged segments share the rest. Per-element selection puts the expensive method in the segment where it is wanted and the cheap one everywhere else.
 
-Collective effects are refused in a line with any unaveraged segment, so this example carries none, and the benchmark checks the refusal.
+Collective effects are refused in a line with any unaveraged segment, so this example carries none, and the validation suite checks the refusal.
 
-The benchmark runs the same configuration as its sandwich check. There the mixed line must agree with the all-averaged line at the exit, the energy ledger rows must appear only inside the unaveraged segment, and a wake on that segment must be refused ([validation](../../validation.md)). This directory is the runnable version of that check.
+The validation suite runs the same configuration as its sandwich check. There the mixed line must agree with the all-averaged line at the exit, the energy ledger rows must appear only inside the unaveraged segment, and a wake on that segment must be refused ([validation](../../validation.md)). This directory is the runnable version of that check.
 
 The run reports the split between the mode and the wide-angle emission of the point beamlets. That emission comes from macroparticles that occupy one grid point each, and no real beam radiates it ([SASE convergence](../../startup-noise.md)). At the exit the power outside the split angle is several times the power inside it in both runs, so most of each exit power is that emission. The table carries the exit power inside and outside the split for both runs, so the difference between them can be read in the mode as well as in the total. Both input files state `run.source_filter = false`, so the two FEL methods compare like for like. The filter reaches the averaged elements only and would filter eleven segments of one line and twelve of the other.
 
@@ -137,7 +137,7 @@ seed_waist_size = 30e-6
 ### `mixed.bmad`
 
 ```fortran
-! The benchmark line with one segment tracked unaveraged and the other eleven averaged.
+! The Benchmark1-SASE line with one segment tracked unaveraged and the other eleven averaged.
 ! The tracking method is an element attribute, so a mixed line is a line of elements
 ! that differ, exactly as the tapered line is (fel-physics.md sec-element).
 

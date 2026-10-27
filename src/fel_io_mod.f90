@@ -2195,7 +2195,7 @@ end subroutine fel_write_wake_block
 ! input file runs to 12 kB and a lattice text to 37 kB on a real lattice
 ! (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 ! silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
-! differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
+! differ in meta/. The validation suite excludes meta/ by name from identity comparisons.
 !
 ! Note: meta/ is not a reproducibility record. lattice_source is the top-level file
 ! only. Bmad's "call, file =" pulls in more, and a wrapper lattice records a call

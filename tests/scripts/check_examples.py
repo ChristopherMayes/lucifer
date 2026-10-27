@@ -22,7 +22,7 @@ that quietly loses its example reads exactly like one that never had it. Seven a
      so a command the README shows runs as written. Names left from an older format,
      lucifer_detuned.in for lucifer_detuned.toml, stood in nine READMEs unnoticed.
 
-Nothing here runs the program, so it is also the part of the benchmark that a machine with
+Nothing here runs the program, so it is also the part of the validation suite that a machine with
 no Fortran build can run.
 
 Usage:

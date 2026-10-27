@@ -1,7 +1,7 @@
 ! Unaveraged-mode coupling probe, PLANAR, short (fel-physics.tex sec:unaveraged): a
-! 12-period planar undulator at the benchmark energy and rms aw = 0.84853 (planar
+! 12-period planar undulator at the Benchmark1-SASE energy and rms aw = 0.84853 (planar
 ! b_max carries the extra sqrt(2): peak K = sqrt(2)*aw), resonant at 1 Angstrom like
-! the benchmark line. The unaveraged tracker runs 2-period sin^2 ramps at each end;
+! the Benchmark1-SASE line. The unaveraged tracker runs 2-period sin^2 ramps at each end;
 ! the paired _b lattice is identical except 8 more flat periods, and the DIFFERENCE
 ! of the two measured energy-modulation phasors isolates the flat region -- ramps and
 ! their detuning cancel exactly -- giving the measured coupling fc to compare against

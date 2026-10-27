@@ -49,7 +49,7 @@
 # place of the profile and the sweep.
 #
 # Defaults: workers = the machine's performance-core count (hw.perflevel0.physicalcpu on
-# macOS, nproc on Linux). The binaries and Python are found as in run_fel_benchmark.sh,
+# macOS, nproc on Linux). The binaries and Python are found as in run_fel_validation.sh,
 # except that the production lucifer is preferred. The work directory is kept.
 
 set -o pipefail
@@ -158,7 +158,7 @@ if [[ -z "$PYTHON" ]]; then
   done
 fi
 if [[ -z "$PYTHON" || ! -x "$PYTHON" ]]; then
-  echo "Error: Python (numpy + h5py) not found; see run_fel_benchmark.sh." >&2
+  echo "Error: Python (numpy + h5py) not found; see run_fel_validation.sh." >&2
   exit 1
 fi
 
@@ -549,7 +549,7 @@ timed "Genesis4, $WORKERS MPI ranks" genesis-parallel.log \
   "$MPIRUN" -np "$WORKERS" "$GENESIS" perf-parallel.in
 
 # The tracker reads openPMD only, so the Genesis dumps convert once here. The conversion
-# is outside every timed section: it is the benchmark's own work, not either code's.
+# is outside every timed section: it is the performance benchmark's own work, not either code's.
 
 for pair in "AramisPerf-initial.par.h5 AramisPerf-initial.beam.h5" \
             "AramisPerf-initial.fld.h5 AramisPerf-initial.wf.h5"; do

@@ -16,7 +16,7 @@
 #
 #   ./run_delz_sweep.sh [--genesis <path>] [--exe <path>] [--python <path>] [--work-dir <path>]
 #
-# Its prerequisites are run_fel_benchmark.sh's.
+# Its prerequisites are run_fel_validation.sh's.
 
 set -o pipefail
 

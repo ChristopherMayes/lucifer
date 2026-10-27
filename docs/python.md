@@ -242,7 +242,7 @@ python -m lucifer.plot run.stats.h5 -o run.png
 (python-flat)=
 ## Flat text
 
-`lucifer.flat` turns flat `key = value` text, one key a line, into an input file. A key is written bare, `n_particle = 2048`, and routed into its table by name, or dotted, `run.out_root = 's7'`. The check scripts and the benchmark write their input files this way, so a template is a few lines of text and a variant is a string replacement, and `python -m lucifer.flat <flat file> <toml file>` converts from the command line, with `-` for standard input or output.
+`lucifer.flat` turns flat `key = value` text, one key a line, into an input file. A key is written bare, `n_particle = 2048`, and routed into its table by name, or dotted, `run.out_root = 's7'`. The check scripts and the validation suite write their input files this way, so a template is a few lines of text and a variant is a string replacement, and `python -m lucifer.flat <flat file> <toml file>` converts from the command line, with `-` for standard input or output.
 
 % example: flat
 ```python

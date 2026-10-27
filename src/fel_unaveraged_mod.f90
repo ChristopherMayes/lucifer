@@ -17,7 +17,7 @@
 !
 ! DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 ! path. They are outputs of this mode, and their appearance here would make the check
-! circular. The benchmark greps this file for them.
+! circular. The validation suite greps this file for them.
 !
 ! The step, per substep delta (Strang split, second order):
 !
@@ -64,7 +64,7 @@
 ! symplectic scheme needs ~100 steps/period to match. No explicit symplectic method
 ! exists for this non-separable Hamiltonian without implicit iterations. gamma is
 ! conserved exactly by construction (B does no work, and gamma changes only in the
-! kick). The dark-run emittance drift over the longest benchmark segment (266 periods,
+! kick). The dark-run emittance drift over the longest Benchmark1-SASE segment (266 periods,
 ! 5320 steps) is <= 3.3e-6, orders below every check (docs/validation.md).
 !
 ! Note: If production-length unaveraged runs appear (oscillator passes), revisit the
@@ -73,7 +73,7 @@
 ! The step runs parallel over slices with the averaged step's guarantees: disjoint
 ! particle arrays and field slices per iteration, serial kernel init, threadprivate FFT
 ! plans, and per-slice energy summed in fixed order. Results are bit-identical across
-! thread counts, and the benchmark checks it.
+! thread counts, and the validation suite checks it.
 !
 ! The device path (fel_device_mod, docs/validation.md val-device-unaveraged): With a
 ! backend armed, the beam and the field stay resident for the whole segment, and one
@@ -421,7 +421,7 @@ any_err = .false.
 ! The device in the instrument's twin role. It advances the same record step from the
 ! state this one received. It is encoded before the FP64 loop below, so the two overlap
 ! and its field image rounds from the pre-step record. The FP64 path is untouched, and
-! the benchmark asserts that as it does for the CPU twin.
+! the validation suite asserts that as it does for the CPU twin.
 
 dev_twin = dev%on .and. fp32%on
 if (dev_twin) then
@@ -852,7 +852,7 @@ end subroutine unavg_field_to_midpoint
 ! (an adiabatic switch-on). An electron under a ramped quiver <u_perp^2> = g^2 aw^2 lags
 ! the wave less than the contracted hard-edge element would have it, by
 ! dtau = (gamma aw^2 / 2 u_s^3) INT (1-g^2) ds. That is ks*dtau ~ 2.6 rad of optical
-! phase per end at the benchmark parameters (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp
+! phase per end at the Benchmark1-SASE parameters (sin^2 envelope: INT (1-g^2) = (5/8) l_ramp
 ! per end). Uncompensated, every segment after the first receives a pre-bunched beam
 ! with its bunching-to-field phase rotated by that much. The first segment is immune,
 ! since nothing is bunched yet.
@@ -1221,7 +1221,7 @@ fp32%div_slice(7, is) = sqrt((p32r - p64r)**2 + (p32i - p64i)**2) / sc(7)
 ! The scale is the energy the step moved and not the energy it netted. Over a record step
 ! the gains and the losses very nearly cancel, so the net is a small difference of large
 ! exchanges, and a relative error against it means nothing. Against the net the ratio
-! reaches 3 on the benchmark segment (docs/validation.md, val-unaveraged-fp32). The
+! reaches 3 on the Benchmark1-SASE segment (docs/validation.md, val-unaveraged-fp32). The
 ! turnover is the sum of the absolute exchanges. The ledger's own check normalizes by it
 ! for the same reason, as the averaged instrument's phasor row scales to charge and not
 ! to a noise-level sum.

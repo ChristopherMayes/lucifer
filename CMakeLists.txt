@@ -154,8 +154,8 @@ if (APPLE)
   target_link_options (lucifer_lib PUBLIC "-Wl,-no_compact_unwind")
 endif ()
 
-# The four executables: the tracker, the smoke test and its namelist twin, the advance
-# benchmark and the wavefront propagator's test driver.
+# The four executables: the tracker, the smoke test and its namelist twin, the
+# advance benchmark and the wavefront propagator's test driver.
 
 foreach (exe lucifer lucifer_smoke_test lucifer_advance_bench wavefront_drift_test)
   add_executable (${exe} "programs/${exe}.f90")

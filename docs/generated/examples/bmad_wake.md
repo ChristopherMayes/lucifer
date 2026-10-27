@@ -151,7 +151,7 @@ material = "CU"
 ### `wake_lattice.bmad`
 
 ```fortran
-! The benchmark line with a resistive-wall chamber wake on every element, delivered
+! The Benchmark1-SASE line with a resistive-wall chamber wake on every element, delivered
 ! through Bmad's own machinery. ztable.wake is the Bane and Stupakov kernel for a
 ! 0.5 mm copper chamber (AC conductivity 5.813e7 S/m, relaxation 8.1 um), exported by
 ! wake.write_kernels and then converted: sign flipped to Bmad's

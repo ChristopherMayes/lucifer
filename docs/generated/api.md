@@ -3878,7 +3878,7 @@ the largest that writes is 65495 bytes. A scalar string dataset takes 3 MB. An e
 input file runs to 12 kB and a lattice text to 37 kB on a real lattice
 (docs/reading-output.md). A failure would only warn, so the provenance would go missing
 silently on a lattice of ordinary size. Since input_echo carries out_root, two runs
-differ in meta/. The benchmark excludes meta/ by name from identity comparisons.
+differ in meta/. The validation suite excludes meta/ by name from identity comparisons.
 
 Note: meta/ is not a reproducibility record. lattice_source is the top-level file
 only. Bmad's "call, file =" pulls in more, and a wrapper lattice records a call
@@ -4563,7 +4563,7 @@ There is one record axis. Element ends are always recorded whatever the comb
 (fel_comb_take). So an element end is a record, and the element-end arrays need no
 axis of their own: at_element_end selects them. lucifer.stats in the Python package is
 the reader everything uses. tests/scripts/bunch_params_from_stats.py reconstructs a
-bunch_params dict from any (record, slice) of the sufficient statistics. The benchmark
+bunch_params dict from any (record, slice) of the sufficient statistics. The validation suite
 checks that at element ends it reproduces the stored twiss.
 
 Beam moments are computed in two passes: the mean first, then centered second moments
@@ -5116,7 +5116,7 @@ allocatable state, which an input mirror need not. fel_setup copies these in.
 ```
 The beam-side scalars of [beam]. They sit beside Bmad's beam_init, which
 describes the bunch, and imp, the resampler. They are the source and output files,
-the quiet-start settings and the check instruments the benchmark sets.
+the quiet-start settings and the check instruments the validation suite sets.
 ```
 
 (api-fel-run-struct)=
@@ -6625,7 +6625,7 @@ red-shifts by rho, and beyond it emission is outside the bandwidth of the
 interaction. rho is the one-dimensional Pierce parameter in Genesis's form, with the
 undulator's coupling and the peak current of the loaded beam.
 
-The ratio of the two goes as sqrt(z_R / L_g). That is 15 on the Aramis benchmark and
+The ratio of the two goes as sqrt(z_R / L_g). That is 15 on the Benchmark1-SASE line and
 near 1 on a diffraction-dominated machine. So neither angle alone serves as a default.
 ```
 
@@ -6800,7 +6800,7 @@ step is in fel-physics.md (sec-unaveraged) and examples/saturation_demo.
 
 DO NOT introduce fc, faw, or any other period-averaged coupling quantity into this
 path. They are outputs of this mode, and their appearance here would make the check
-circular. The benchmark greps this file for them.
+circular. The validation suite greps this file for them.
 
 The step, per substep delta (Strang split, second order):
 
@@ -6847,7 +6847,7 @@ merit. The currency here is short-probe accuracy, and 4th order is what resolves
 symplectic scheme needs ~100 steps/period to match. No explicit symplectic method
 exists for this non-separable Hamiltonian without implicit iterations. gamma is
 conserved exactly by construction (B does no work, and gamma changes only in the
-kick). The dark-run emittance drift over the longest benchmark segment (266 periods,
+kick). The dark-run emittance drift over the longest Benchmark1-SASE segment (266 periods,
 5320 steps) is <= 3.3e-6, orders below every check (docs/validation.md).
 
 Note: If production-length unaveraged runs appear (oscillator passes), revisit the
@@ -6856,7 +6856,7 @@ push with a symplectic composition. The ballistic check will show when.
 The step runs parallel over slices with the averaged step's guarantees: disjoint
 particle arrays and field slices per iteration, serial kernel init, threadprivate FFT
 plans, and per-slice energy summed in fixed order. Results are bit-identical across
-thread counts, and the benchmark checks it.
+thread counts, and the validation suite checks it.
 
 The device path (fel_device_mod, docs/validation.md val-device-unaveraged): With a
 backend armed, the beam and the field stay resident for the whole segment, and one
@@ -7120,14 +7120,14 @@ a clang-built twin of the same loop is compiler/libm, not physics.
 ```
 The library-contract check (docs/user-guide.md): drive the FEL tracker without the
 input reader. Fill the input structs in code, call the library, write the dumps.
-The benchmark compares its outputs dataset-identically against an input-driven run
+The validation suite compares its outputs dataset-identically against an input-driven run
 of the same configuration, and runs it twice in one process (both passes here) to
 prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 
   lucifer_smoke_test <lattice> <out_root_pass1> <out_root_pass2>
 
 With an unreadable lattice file the library must return an error (never exit): this
-program then prints its proof-of-return line and stops with code 2. The benchmark's
+program then prints its proof-of-return line and stops with code 2. The validation suite's
 library-error check requires exactly that behavior.
 ```
 
@@ -7858,7 +7858,7 @@ Output:
 openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
 Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
 The standard document is authoritative for this format. This module and the
-benchmark's h5py reader are each checked against its text.
+validation suite's h5py reader are each checked against its text.
 
 Layout (also see fel-physics.md sec-field-set):
 

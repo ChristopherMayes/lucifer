@@ -1,5 +1,5 @@
 ! Spontaneous-emission cross-check probe (check_spontaneous.py): ONE short helical
-! wiggler at the benchmark parameters, tracked three ways from the same beam -- the
+! wiggler at the Benchmark1-SASE parameters, tracked three ways from the same beam -- the
 ! averaged FEL mode, the unaveraged FEL mode, and Bmad's own runge_kutta with
 ! radiation damping (spont_probe_rk.bmad, the same wiggler with a different tracking
 ! method) -- against the analytic rate dgamma/ds = (2/3) r_e gamma^2 ku^2 aw^2.

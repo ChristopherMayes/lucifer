@@ -16,7 +16,7 @@ that a later FEL tracker will carry, and the transport step it will use outside 
 |---|---|
 | `src/wavefront_mod.f90` | `wavefront_struct`, derived quantities, `wavefront_drift`, the cached FFTW plan, and `wavefront_drift_reference` |
 | `src/wavefront_hdf5_mod.f90` | `wavefront_read_genesis4`, `wavefront_write_genesis4` |
-| `src/wavefront_openpmd_mod.f90` | openPMD EXT_Wavefront: `wavefront_write_openpmd`, `wavefront_read_openpmd`, `wavefront_file_is_openpmd` (manual: the openPMD-wavefront section, validated by the benchmark's harmonic section) |
+| `src/wavefront_openpmd_mod.f90` | openPMD EXT_Wavefront: `wavefront_write_openpmd`, `wavefront_read_openpmd`, `wavefront_file_is_openpmd` (manual: the openPMD-wavefront section, validated by the validation suite's harmonic section) |
 | `programs/wavefront_drift_test.f90` | Test driver, both modes |
 | `tests/wavefront/run_validation.sh` | The whole validation, one command |
 | `tests/wavefront/validate_drift.py` | Python side: builds the test input, drifts it, compares |
@@ -66,7 +66,7 @@ Gaussian is invariant under most of the mistakes worth catching.
 
 ### Mutation results
 
-Every mutation below was built and run against the benchmark. All are caught.
+Every mutation below was built and run against the validation suite. All are caught.
 
 | Mutation | Caught by |
 |---|---|
@@ -94,7 +94,7 @@ allocator would read as working.
 
 ### Two differences from Python that are not defects
 
-Both are reported by the benchmark with their cause, and each has its own tolerance rather than
+Both are reported by the validation suite with their cause, and each has its own tolerance rather than
 being absorbed into one loose one.
 
 `photon_energy` differs by 2.234e-10. Bmad's `h_planck` is `4.135667696e-15` eV·s, truncated

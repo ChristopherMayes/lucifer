@@ -3,14 +3,14 @@
 !
 ! The library-contract check (docs/user-guide.md): drive the FEL tracker without the
 ! input reader. Fill the input structs in code, call the library, write the dumps.
-! The benchmark compares its outputs dataset-identically against an input-driven run
+! The validation suite compares its outputs dataset-identically against an input-driven run
 ! of the same configuration, and runs it twice in one process (both passes here) to
 ! prove re-entrancy: pass 2 must be bit-identical to pass 1 and to a separate process.
 !
 !   lucifer_smoke_test <lattice> <out_root_pass1> <out_root_pass2>
 !
 ! With an unreadable lattice file the library must return an error (never exit): this
-! program then prints its proof-of-return line and stops with code 2. The benchmark's
+! program then prints its proof-of-return line and stops with code 2. The validation suite's
 ! library-error check requires exactly that behavior.
 !-
 
@@ -48,7 +48,7 @@ do ipass = 1, 2
   run = fel_run_struct()
 
   ! The configuration, set in code, no input file anywhere. A small seeded
-  ! steady-state case (the benchmark's twin input file carries the same values).
+  ! steady-state case (the validation suite's twin input file carries the same values).
 
   run%lat_file = lat_file
   run%global%out_root = out_root(ipass)
@@ -74,7 +74,7 @@ do ipass = 1, 2
   run%beam_init%b_norm_emit = 4e-7_rp
 
   ! The library sequence. Every error returns. The proof-of-return line below is
-  ! what the benchmark's library-error check greps for.
+  ! what the validation suite's library-error check greps for.
 
   err = .false.
   call fel_setup_lattice (run, err)

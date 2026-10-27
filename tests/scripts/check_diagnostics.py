@@ -54,7 +54,7 @@ rather than by a reference file.
      is an external reader, and a round trip through this program's own reader cannot
      stand in for it.
 
-Run by the benchmark. Exits nonzero on failure.
+Run by the validation suite. Exits nonzero on failure.
 """
 
 from __future__ import annotations
@@ -1039,7 +1039,7 @@ def main():
         f_en = st["field/total/energy"][-1]
 
     # 2. Banked energy == ledger U_escaped. The escaped file is read through the package's
-    # reader, so the benchmark exercises it on a file the program wrote.
+    # reader, so the validation suite exercises it on a file the program wrote.
     led = np.loadtxt(wd / "dg.ledger.txt")
     esc = read_escaped(wd / "dg-escaped.wf.h5")
     nb, pms, zt = esc.wavefront.nz, esc.params, esc.z_transmit

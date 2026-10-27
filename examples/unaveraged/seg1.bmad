@@ -1,4 +1,4 @@
-! One undulator segment of the benchmark line, ../aramis.bmad's UND and nothing else:
+! One undulator segment of the Benchmark1-SASE line, ../aramis.bmad's UND and nothing else:
 ! 3.99 m and 266 periods of helical undulator, aw = 0.85 rms, resonant at 1 Angstrom at
 ! 5.8 GeV. The element's fel_method is unaveraged, which is what selects the mode, and
 ! the averaged twin sets it back to averaged.

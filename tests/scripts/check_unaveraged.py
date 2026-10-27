@@ -37,7 +37,7 @@ point is measuring the inputs of the averaged mode (the coupling factor fc).
 5. Convergence: fc at 10, 20 and 30 steps per period, tabulated, with fc(30) within
    5e-4 of fc(20). The floor of 10 steps per period rests on this.
 
-6. Gain curve: the benchmark single segment, seeded steady state, unaveraged against
+6. Gain curve: the Benchmark1-SASE single segment, seeded steady state, unaveraged against
    averaged from the same generated start. The exit ln power ratio is the difference
    in integrator structure (ramps, split, quiver diagnostics), bounded at 0.2.
 
@@ -417,7 +417,7 @@ def main():
         print(f"      {spp:3d} steps/period: fc = {fcs[spp]:.6f}")
     check("convergence: |fc(30)/fc(20) - 1|", abs(fcs[30] / fcs[20] - 1), 5e-4)
 
-    # 6. Gain curve: benchmark segment, unaveraged vs averaged, same start.
+    # 6. Gain curve: Benchmark1-SASE segment, unaveraged vs averaged, same start.
     run(exe, wd, "uv_gain_unavg", GAIN.format(root="uv_gain_unavg",
         lat=unavg_wrapper(wd, "aramis_1seg.bmad")))
     run(exe, wd, "uv_gain_avg", GAIN.format(root="uv_gain_avg", lat="aramis_1seg.bmad"))

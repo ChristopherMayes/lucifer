@@ -1,6 +1,6 @@
 # Crossed undulator: the two-polarization afterburner
 
-An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulator rotated a quarter turn, `UNDY: UNDX, tilt = pi/2`, follows after a short gap. The tilt is standard Bmad, and it is what states the polarization. Microbunching is longitudinal and blind to polarization, so the y set radiates orthogonally polarized light seeded by the bunching the x set built. The x field passes through the y set gaining nothing, and the benchmark holds that isolation at the level in [](../../docs/validation.md#val-levels-two-polarization) (the manual's field-solver vector convention).
+An x-planar undulator (0.6 m) seeds and microbunches the beam. The same undulator rotated a quarter turn, `UNDY: UNDX, tilt = pi/2`, follows after a short gap. The tilt is standard Bmad, and it is what states the polarization. Microbunching is longitudinal and blind to polarization, so the y set radiates orthogonally polarized light seeded by the bunching the x set built. The x field passes through the y set gaining nothing, and the validation suite holds that isolation at the level in [](../../docs/validation.md#val-levels-two-polarization) (the manual's field-solver vector convention).
 
     ../../build-release/bin/lucifer lucifer.toml
     python -m lucifer.plot crossed.stats.h5

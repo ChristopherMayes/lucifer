@@ -4,7 +4,7 @@
 ! openPMD EXT_Wavefront I/O for wavefront_struct: the openPMD-standard base plus the
 ! Wavefront extension (openPMD-standard, branch upcoming-2.0.0, EXT_Wavefront.md).
 ! The standard document is authoritative for this format. This module and the
-! benchmark's h5py reader are each checked against its text.
+! validation suite's h5py reader are each checked against its text.
 !
 ! Layout (also see fel-physics.md sec-field-set):
 !

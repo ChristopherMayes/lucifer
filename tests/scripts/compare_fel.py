@@ -2,7 +2,7 @@
 """
 Compare the Bmad FEL tracker, Lucifer, against Genesis 1.3 Version 4 on the
 Benchmark1-SASE configuration, in steady state and time dependent with slippage.
-run_fel_benchmark.sh produces every input. This script only reads and compares.
+run_fel_validation.sh produces every input. This script only reads and compares.
 
 Each tier has its own tolerance, sized to what the tier measures. The fundamental
 constants set the floor of the comparison. The tracker uses Bmad's impedance,
@@ -308,7 +308,7 @@ def main():
     w = args.workdir
 
     print("=" * 78)
-    print("FEL benchmark: Bmad tracker against Genesis 1.3 Version 4")
+    print("FEL validation: Bmad tracker against Genesis 1.3 Version 4")
     print("=" * 78)
     print()
 

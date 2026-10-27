@@ -8,7 +8,7 @@ This page lists what this code implements, and where each thing came from. Every
 ## The codes this one is measured against
 
 (ref-genesis4)=
-**Genesis 1.3 Version 4 (Genesis4)**, S. Reiche. The FEL physics of the averaged path is transcribed from it, routine by routine, and the benchmark tiers compare against it from shared dumps. Genesis4 is GPLv3, which permits the transcription, and the per-routine citations in the source are kept for that reason. The original code is described in S. Reiche, *GENESIS 1.3: a fully 3D time-dependent FEL simulation code*, [Nucl. Instr. and Meth. A **429** (1999) 243](<https://doi.org/10.1016/S0168-9002(99)00114-X>). The current code, its [manual](https://github.com/svenreiche/Genesis-1.3-Version4/blob/master/manual/MAIN_INPUT.md) and its [changelog](https://github.com/svenreiche/Genesis-1.3-Version4/blob/master/CHANGELOG.md) are on GitHub. Release 4.6.12 added an FFT field solver and the `source_filter` option, a sigmoid filter on the transformed source term. See [](startup-noise.md#prior-work).
+**Genesis 1.3 Version 4 (Genesis4)**, S. Reiche. The FEL physics of the averaged path is transcribed from it, routine by routine, and the Genesis4 tiers compare against it from shared dumps. Genesis4 is GPLv3, which permits the transcription, and the per-routine citations in the source are kept for that reason. The original code is described in S. Reiche, *GENESIS 1.3: a fully 3D time-dependent FEL simulation code*, [Nucl. Instr. and Meth. A **429** (1999) 243](<https://doi.org/10.1016/S0168-9002(99)00114-X>). The current code, its [manual](https://github.com/svenreiche/Genesis-1.3-Version4/blob/master/manual/MAIN_INPUT.md) and its [changelog](https://github.com/svenreiche/Genesis-1.3-Version4/blob/master/CHANGELOG.md) are on GitHub. Release 4.6.12 added an FFT field solver and the `source_filter` option, a sigmoid filter on the transformed source term. See [](startup-noise.md#prior-work).
 
 **Bmad**, D. Sagan. The lattice, the tracking of every non-FEL element, the wake machinery, the beam I/O and the units and phase-space conventions are Bmad's. D. Sagan, *Bmad: A relativistic charged particle simulation library*, [Nucl. Instr. and Meth. A **558** (2006) 356](https://doi.org/10.1016/j.nima.2005.11.001).
 
@@ -17,7 +17,7 @@ This page lists what this code implements, and where each thing came from. Every
 
 **SIMPLEX**, T. Tanaka. Its source is unlicensed and unread. The coherent source is implemented from the published paper alone.
 
-**openPMD-beamphysics** is a library the benchmark calls: it converts the Genesis4 reference dumps, and the wavefront round trip goes through its openPMD I/O in both directions.
+**openPMD-beamphysics** is a library the validation suite calls: it converts the Genesis4 reference dumps, and the wavefront round trip goes through its openPMD I/O in both directions.
 
 ## Papers the code implements
 

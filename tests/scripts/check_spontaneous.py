@@ -2,9 +2,9 @@
 """
 Spontaneous emission: the FEL modes against Bmad's own radiation physics and against
 the analytic undulator-radiation rate. Bmad only. Genesis is not involved, since the
-benchmark's tiers already hold the averaged mode's agreement with Genesis.
+Genesis4 tiers already hold the averaged mode's agreement with Genesis.
 
-One short helical wiggler (spont_probe.bmad, 40 periods, benchmark parameters) is
+One short helical wiggler (spont_probe.bmad, 40 periods, Benchmark1-SASE parameters) is
 tracked four ways from the same beam:
 
   1. Bmad's own runge_kutta with radiation damping. spont_probe_rk.bmad is the same
@@ -37,7 +37,7 @@ Then, with Bmad's switches on: damping in both FEL modes (5), fluctuations again
 analytic variance and against runge_kutta (6), 1 against 8 threads with fluctuations on
 (7), and the energy ledger closing with the radiated energy (8).
 
-Run by the benchmark. Exits nonzero on failure.
+Run by the validation suite. Exits nonzero on failure.
 """
 
 from __future__ import annotations

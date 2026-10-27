@@ -46,7 +46,7 @@ if (n_arg >= 2) then
   call get_command_argument (2, arg);  read (arg, *) nstep
 endif
 
-! A synthetic but physically sane state: the benchmark tiers' helical segment
+! A synthetic but physically sane state: the Genesis4 tiers' helical segment
 ! (gamma0 11357.82, lambda 1e-10, aw 0.84853, lambda_u 0.015), one slice, a seeded
 ! Gaussian-ish field so the gather reads real numbers.
 

@@ -14,7 +14,7 @@ Releases are tags of the form `v<version>` on GitHub, the first `v0.1.0`. The pr
 | [`programs/`](programs) | The main programs: `lucifer`, the smoke test, the advance benchmark and the wavefront drift test |
 | [`docs/`](docs) | The documentation, a MyST site that also reads as Markdown |
 | [`examples/`](examples) | Runnable cases, each a directory of real input files with its own README |
-| [`tests/`](tests) | The keystone suite, the benchmark, its check scripts and, under `tests/wavefront/`, the wavefront validation |
+| [`tests/`](tests) | The keystone suite, the validation suite, its check scripts and, under `tests/wavefront/`, the wavefront validation |
 | [`util/`](util) | The build script, the release check and the locations rule the scripts share |
 | [`cmake/`](cmake) | `FindBmad.cmake`, which finds the Bmad tree to build against |
 
@@ -84,7 +84,7 @@ Validated against Genesis4 on eleven tiers plus twenty-eight check sections, on 
 
 Nine of the eleven tiers are transcription checks and agree with Genesis4 at the floor set by its truncated impedance constants. The other two are priced model differences, not defects: the Bmad seam's interlude transport, and the unaveraged mode against Genesis4's averaged one. Every level, every attribution and the full tier table live in [`docs/validation.md`](docs/validation.md), which is their one home, so the numbers here are a click away rather than a copy that can drift.
 
-What the program does, and what it does not do yet, are the two lists in [`docs/index.md`](docs/index.md). They are kept in one place because the examples are checked against them: every declared feature names the example that shows it, and the benchmark refuses a feature that has lost its example.
+What the program does, and what it does not do yet, are the two lists in [`docs/index.md`](docs/index.md). They are kept in one place because the examples are checked against them: every declared feature names the example that shows it, and the validation suite refuses a feature that has lost its example.
 
 ## License
 

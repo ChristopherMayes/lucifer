@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# run_fel_benchmark.sh validates the Bmad FEL tracker against Genesis 1.3 Version 4, in
+# run_fel_validation.sh validates the Bmad FEL tracker against Genesis 1.3 Version 4, in
 # the steady state and time dependent with slippage.
 #
 # One command runs everything: Genesis over the Benchmark1-SASE lattice (writing the
@@ -12,7 +12,7 @@
 # of the time-dependent single segment (8 threads must reproduce 1 thread bit for bit),
 # and the tiered comparison printing the largest relative difference of each tier.
 #
-#   ./run_fel_benchmark.sh
+#   ./run_fel_validation.sh
 #
 # Prerequisites:
 #
@@ -20,8 +20,9 @@
 #        BUILD_PRODUCTION=N util/conda_compile   # from the Lucifer clone's root
 #
 #   2. genesis4 4.6.15 from conda-forge, in the bmad-fel-validate environment, which this
-#      benchmark takes ahead of PATH. --genesis names another, and its version is checked.
-#      The benchmark needs FFTW support compiled in, since it runs with fft_fieldsolver = true.
+#      validation suite takes ahead of PATH. --genesis names another, and its version is
+#      checked. The validation suite needs FFTW support compiled in, since it runs with
+#      fft_fieldsolver = true.
 #
 #   3. Python with numpy and h5py: the bmad-fel-validate environment
 #      (conda env create -f ../wavefront/tests/environment.yml).
@@ -61,7 +62,7 @@
 # whether it hit or missed. Deleting the cache is always safe and costs one cold run.
 #
 # Every section runs on every invocation. There is no quicker mode, on purpose: a
-# cheap run that checks less is what this benchmark exists to prevent. The device
+# cheap run that checks less is what this validation suite exists to prevent. The device
 # section is the one section that can skip, and only where the build carries no
 # usable device backend, which it establishes from lucifer's own banner rather than
 # from the platform. A results file recording that skip cannot write the generated
@@ -191,13 +192,13 @@ SECTION_CPUS=$((CPUS / SECTION_WORKERS))
 
 KEEP_WORK_DIR=1
 if [[ -z "$WORK_DIR" ]]; then
-  WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fel_benchmark.XXXXXX")"
+  WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fel_validation.XXXXXX")"
   KEEP_WORK_DIR=0
 fi
 mkdir -p "$WORK_DIR"
 
 echo "=============================================================================="
-echo "FEL steady-state benchmark"
+echo "FEL validation against Genesis4"
 echo "=============================================================================="
 echo "  lucifer: $EXE"
 echo "  genesis4:    $GENESIS"
@@ -254,12 +255,12 @@ cd "$WORK_DIR" || exit 1
 export FI_PROVIDER=tcp
 
 # Every section prints its wall time, so a regression in test cost is visible from the
-# benchmark's own output.
+# validation suite's own output.
 
-BENCH_T_LAST=$SECONDS
+SECTION_T_LAST=$SECONDS
 section_time () {   # <label>
-  echo "  [time: $1 $((SECONDS - BENCH_T_LAST)) s]"
-  BENCH_T_LAST=$SECONDS
+  echo "  [time: $1 $((SECONDS - SECTION_T_LAST)) s]"
+  SECTION_T_LAST=$SECONDS
   # Reaching here means the section passed: every failure exits before it. The timing
   # is machine dependent and deliberately not recorded.
   if [[ -n "$RESULTS" ]]; then echo "section|$1|pass" >> "$RESULTS"; fi
@@ -269,8 +270,8 @@ section_time () {   # <label>
 # says which run it came from. report_validation.py refuses to write the generated
 # table from a file carrying a skip, since that table names every section that ran.
 section_skip () {   # <label> <reason>
-  echo "  [time: $1 $((SECONDS - BENCH_T_LAST)) s, skipped: $2]"
-  BENCH_T_LAST=$SECONDS
+  echo "  [time: $1 $((SECONDS - SECTION_T_LAST)) s, skipped: $2]"
+  SECTION_T_LAST=$SECONDS
   if [[ -n "$RESULTS" ]]; then echo "section|$1|skip|$2" >> "$RESULTS"; fi
 }
 
@@ -289,18 +290,18 @@ run_genesis () {   # <input> ...: the input files of one chain, in order
   done
 }
 
-# The references are a pure function of the reference binary and the input files that make
-# them, and they cost 131 s on both passes of every run, so they are cached. The key
-# names all three things that can change the answer: the binary's own bytes, every
-# input file genesis reads, and the version the benchmark pins, which is what a set generated
-# by some other reference would fail. The cache holds whatever the chains wrote, found
-# by diffing the directory rather than by a list of names that could fall behind the
-# input files. It lives outside the repository, is safe to delete at any time, and the run
-# says which way it went, because a cache that silently serves stale physics is worse
-# than no cache. A reader requires the .complete marker rather than the directory,
-# since the two build passes may run at once: the set is staged under a private name
-# with its marker written last and moved into place whole, so a half-filled directory
-# is never mistaken for a reference set.
+# The references are a pure function of the reference binary and the input files that
+# make them, and they cost 131 s on both passes of every run, so they are cached. The
+# key names all three things that can change the answer: the binary's own bytes, every
+# input file genesis reads, and the version the validation suite pins, which is what a
+# set generated by some other reference would fail. The cache holds whatever the chains
+# wrote, found by diffing the directory rather than by a list of names that could fall
+# behind the input files. It lives outside the repository, is safe to delete at any
+# time, and the run says which way it went, because a cache that silently serves stale
+# physics is worse than no cache. A reader requires the .complete marker rather than the
+# directory, since the two build passes may run at once: the set is staged under a
+# private name with its marker written last and moved into place whole, so a half-filled
+# directory is never mistaken for a reference set.
 GEN_CACHE_ROOT="${LUCIFER_GENESIS_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lucifer/genesis-refs}"
 if command -v shasum >/dev/null 2>&1; then SHA="shasum -a 256"; else SHA="sha256sum"; fi
 GEN_KEY="$( { echo "genesis $GENESIS_VERSION"
@@ -1058,7 +1059,7 @@ for name in $SECTION_ORDER; do
 done
 echo "  [time: sections-all-concurrent $((SECONDS - SEC_T0)) s, $SECTION_WORKERS at once]"
 echo
-BENCH_T_LAST=$SECONDS
+SECTION_T_LAST=$SECONDS
 if [[ $SECTIONS_OK -ne 1 ]]; then
   echo "FAIL: these sections did not pass:$SECTIONS_FAILED; outputs kept in: $SECTIONS" >&2
   exit 1

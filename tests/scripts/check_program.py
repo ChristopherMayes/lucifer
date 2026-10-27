@@ -66,7 +66,7 @@ and the tracking window.
      the header's version line and the stats file's meta/lucifer_version all carry that
      string.
 
-Run by the benchmark. Exits nonzero on failure. No Genesis run is involved.
+Run by the validation suite. Exits nonzero on failure. No Genesis run is involved.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ use, SEG
 """
 
 # The input file twin of lucifer_smoke_test's in-code configuration (same values).
-# grid_n_pts is 63 here on purpose, and this pair is the only place in the benchmark that is
+# grid_n_pts is 63 here on purpose, and this pair is the only place in the validation suite that is
 # not a power of two. Every other input file runs a power-of-two grid, which is what the Metal
 # field solver takes, so an input file moves between the backends unchanged. This pair holds the
 # odd-grid path on the CPU, which has to keep working: a user writing a Genesis-style odd

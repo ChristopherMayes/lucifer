@@ -2,7 +2,7 @@
 
 The examples are self-contained runs of the FEL tracker, one command each, with no Genesis 1.3 Version 4 (Genesis4) and no dump files. The one exception is `saturation_demo/`, the three-way comparison, which needs the genesis4 binary. Every directory holds its own README. It says what the example demonstrates and what to look for in the plot. The quantities measured on each run are in a table on the example's page, written by the runner.
 
-The validation benchmark against Genesis4 is in `tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`docs/fel-physics.md`](../docs/fel-physics.md).
+The validation suite, which compares against Genesis4, is in `tests/`. The physics itself, with equations, conventions and provenance, is the manual, [`docs/fel-physics.md`](../docs/fel-physics.md).
 
 ## Running an example
 
@@ -81,7 +81,7 @@ Thread independence is a few commands rather than a directory. The threads divid
     done
     cmp t1.diag.txt t12.diag.txt
 
-On this configuration, 1 thread against 12, the two diag files are identical. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The benchmark runs the same check on the td1 tier at every commit.
+On this configuration, 1 thread against 12, the two diag files are identical. Compare the text file rather than the stats file. HDF5 object headers carry timestamps, so a whole-file compare would false-alarm on them. The validation suite runs the same check on the td1 tier at every commit.
 
 ## Planned examples
 

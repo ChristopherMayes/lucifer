@@ -5,7 +5,7 @@ powers must agree at the documented levels (this directory's README, "The measur
 result").
 
 The averaged mode against Genesis carries the seam-transport difference, about 4e-2 on
-the benchmark line and 4.9e-4 at saturation, where the power self-limits. The check
+the Benchmark1-SASE line and 4.9e-4 at saturation, where the power self-limits. The check
 holds that difference to a relative 0.15. The unaveraged mode also carries the
 shot-noise radiation channel that it resolves and the averaged model does not track.
 That channel puts the unaveraged exit power +0.6 in ln above Genesis, independent of

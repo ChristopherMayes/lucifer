@@ -25,8 +25,8 @@ The experiments, each a set of runs and one figure:
                 saturated power and the saturation point against startup.
   e. theory     Ming Xie's gain length and Saldin, Schneidmiller and Yurkov's effective
                 shot-noise power and saturation estimates, from the input file's parameters.
-  f. genesis    Genesis4 on the benchmark's SASE tier input file at three grids with both of its
-                field solvers, and Lucifer started from each of its dumps.
+  f. genesis    Genesis4 on the validation suite's SASE tier input file at three grids
+                with both of its field solvers, and Lucifer started from each of its dumps.
   g. filter     The source filter (fel-physics.md, sec-source-filter) at the machine's
                 filter grid, 256 on the first machine, and two loads, with its sigmoid's
                 edge at the central cone and at the 3 urad cut, against the same runs with
@@ -41,7 +41,7 @@ Lucifer runs on the device by default (run.device = "metal"), with one CPU run a
 sweep's smallest grid as the cross-check. Genesis runs on the CPU. Every run is cached
 in the work directory by its input file text, so a rerun costs only what changed. The figures
 and a JSON file of every number go to --out. This script is run on demand and never by
-the benchmark.
+the validation suite.
 
 Usage:
   startup_noise.py --exe <lucifer> --genesis <genesis4>
@@ -84,7 +84,7 @@ M_E_EV = 0.51099895e6
 EPS0 = 8.8541878128e-12
 I_ALFVEN = 17045.0
 
-# Four machines. The Aramis benchmark is the page's own. The second is a probe at FLASH's
+# Four machines. The Benchmark1-SASE line is the page's own. The second is a probe at FLASH's
 # scales, a hundred times the wavelength on a beam five times the size, whose z_R/L_g is
 # 2.6 times smaller. The filter's default is built from two angles whose ratio goes as
 # 1/sqrt(z_R/L_g), so a second machine is what says whether the default is general or a

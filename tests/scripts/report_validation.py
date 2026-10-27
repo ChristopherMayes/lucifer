@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate docs/generated/validation-measured.md from benchmark results files.
+Generate docs/generated/validation-measured.md from validation results files.
 
-The levels in the documentation are written by the benchmark that produces them, and not
-by hand. Run the benchmark on each build with --results, then point this script at both
+The levels in the documentation are written by the validation suite that produces them, and not
+by hand. Run the validation suite on each build with --results, then point this script at both
 files.
 
 The output is deterministic: the same results in give the same bytes out. Nothing time
@@ -15,7 +15,7 @@ Usage:
 
   report_validation.py --debug <results> --production <results> --out <file.md>
 
-The results files are written by run_fel_benchmark.sh --results, one record per line:
+The results files are written by run_fel_validation.sh --results, one record per line:
 
   build|<flavor>
   section|<name>|<outcome>[|<reason>]

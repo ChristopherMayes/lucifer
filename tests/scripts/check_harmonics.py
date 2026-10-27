@@ -14,7 +14,7 @@ sec-field-set):
      round-trips its own writer exactly. What its writer produces must come back
      through the Fortran reader unchanged.
   2. Harmonic tier against Genesis4. A planar steady-state segment has the
-     benchmark's gamma, wavelength and rms aw. The segment is planar so that fc(3)
+     Benchmark1-SASE gamma, wavelength and rms aw. The segment is planar so that fc(3)
      is nonzero. Both codes track the same Genesis-written starting state with a
      dark third-harmonic field, and the fundamental and third-harmonic power curves
      compare per record.
@@ -33,7 +33,7 @@ sec-field-set):
      matches no field of the run. A Genesis-format harmonic import, which carries no
      photon energy to match on.
 
-Run by the benchmark. Exits nonzero on failure. Needs the genesis4 binary
+Run by the validation suite. Exits nonzero on failure. Needs the genesis4 binary
 (--genesis) for section 2, and openPMD-beamphysics installed in this interpreter's
 environment for the openPMD checks of section 1.
 """
@@ -161,7 +161,7 @@ NML_IMPORT = """! flat keys; routed into the input file's tables by lucifer.flat
 {extra}&end
 """
 
-# The grids here are odd on purpose, where the rest of the benchmark runs powers of two.
+# The grids here are odd on purpose, where the rest of the validation suite runs powers of two.
 # Genesis propagates the transverse field on wavenumbers that are whole multiples of dk
 # only when ngrid is odd. On an even ngrid its FieldSolverFFT carries every mode half a
 # step out. Lucifer's kernel is correct at both parities, so a power comparison this tight

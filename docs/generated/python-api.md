@@ -1200,7 +1200,7 @@ Whether two arrays hold the same data, counting NaN as equal to NaN.
 The stats file carries NaN wherever a quantity was not computed: the theta moments
 away from element ends, an empty slice's moments, the twiss of a degenerate slice.
 Two files with a NaN in the same place are identical, and plain equality would call
-every such pair different, so every identity check in the benchmark comes here.
+every such pair different, so every identity check in the validation suite comes here.
 ```
 
 (pyapi-lucifer-beam)=

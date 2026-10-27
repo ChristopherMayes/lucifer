@@ -1,4 +1,4 @@
-! Single undulator segment from aramis.bmad, nothing else. This is tier 1 of the benchmark:
+! Single undulator segment from aramis.bmad, nothing else. This is tier 1 of the validation suite:
 ! with no interludes, the comparison against Genesis4 isolates the transcribed FEL core,
 ! push, deposition and field solve, from every seam and transport question.
 
@@ -8,7 +8,7 @@ parameter[particle] = electron
 parameter[e_tot] = 11357.82 * m_electron
 
 ! The matched periodic Twiss of this FODO cell at this energy (Genesis4's zmatch values,
-! the same numbers the benchmark namelists carry). The FEL walk itself never reads
+! the same numbers the Genesis4 input files carry). The FEL walk itself never reads
 ! lattice Twiss. Imports do, since init_beam_distribution matches the bunch it generates
 ! to these.
 beginning[beta_a] = 8.53711

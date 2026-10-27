@@ -18,7 +18,7 @@ def run_all(jobs, threads_per_job=4):
 
     The worker count is the caller's core allowance over threads_per_job, the OMP
     thread count each child runs with. The allowance is LUCIFER_CPU_BUDGET when the
-    caller set it. The benchmark sets it for every check section from the pass's own
+    caller set it. The validation suite sets it for every check section from the pass's own
     share, so several sections at once cannot each take the whole machine. Unset, as
     in a script run by hand, the allowance is the machine's core count. All jobs are
     launched first. Then the first failure in list order propagates (a job that calls

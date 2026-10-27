@@ -14,8 +14,8 @@ The words, and why each is retired. They are this port's own coinages or testing
 jargon, absent from the Bmad corpus the prose is measured against, and each had spread
 through the pages and comments before it was noticed:
 
-  harness          testing jargon for tests/run_fel_benchmark.sh and its check scripts,
-                   which are the benchmark, and for tests/run_perf_benchmark.sh, which
+  harness          testing jargon for tests/run_fel_validation.sh and its check scripts,
+                   which are the validation suite, and for tests/run_perf_benchmark.sh, which
                    is the performance benchmark.
   gate, gates      process jargon for a check, a test, a tolerance or a refusal.
   refused by name  this port's coinage; the run is refused, and the message says why.

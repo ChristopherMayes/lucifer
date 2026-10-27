@@ -7,7 +7,7 @@ regenerates the seven page sets and requires the Markdown diff to be empty. Befo
 runs a generator, the sixth test verifies for itself that all five outcomes are present
 and successful. So it does not lean on test order and cannot pass on a partial run.
 Nothing here builds. Both trees are prerequisites and are checked before any job
-launches, since a benchmark reads the source tree throughout.
+launches, since the validation suite reads the source tree throughout.
 
     BUILD_PRODUCTION=N util/conda_compile
     util/conda_compile
@@ -34,9 +34,9 @@ What the contract means in practice:
   read from them.
 
 The five check scripts are unchanged. This file launches them as the recipe in
-docs/validation.md does. A retyped recipe twice launched a benchmark from a directory an
-earlier command had moved into, ran four jobs of five, and reported a complete keystone
-from a one-line log. This file replaces the retyping.
+docs/validation.md does. A retyped recipe twice launched the validation suite from a
+directory an earlier command had moved into, ran four jobs of five, and reported a
+complete keystone from a one-line log. This file replaces the retyping.
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ LOCATIONS = {"BMAD_DIR": str(BMAD),
              "LUCIFER_DEBUG_BIN": str(DEBUG_BIN), "LUCIFER_PRODUCTION_BIN": str(PRODUCTION_BIN)}
 DEBUG_EXE = DEBUG_BIN / "lucifer"
 PRODUCTION_EXE = PRODUCTION_BIN / "lucifer"
-BENCHMARK = LUCIFER / "tests" / "run_fel_benchmark.sh"
+FEL_VALIDATION = LUCIFER / "tests" / "run_fel_validation.sh"
 WAVEFRONT = LUCIFER / "tests" / "wavefront" / "run_validation.sh"
 EXAMPLES = LUCIFER / "examples" / "run_examples.sh"
 SCRIPTS = LUCIFER / "tests" / "scripts"
@@ -160,9 +160,9 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
 
     The static allocation. The machine's performance cores are divided once, here, and
     every job spends what it is handed and no more.
-      Each benchmark pass is handed the whole count in --cpus. Its check sections run
+      Each validation pass is handed the whole count in --cpus. Its check sections run
         cores/4 at once, and each section's pools take the cores over that number
-        (run_fel_benchmark.sh).
+        (run_fel_validation.sh).
       The two passes' device sections share one lock, since the device is one resource.
       The examples take two workers.
       The regression suite and the wavefront validation take one process each.
@@ -179,11 +179,11 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
     # block until that marker appears and runs the rest of its work meanwhile.
     tiers = str(art / "tiers-debug.done")
     return (
-        Job("debug", (str(BENCHMARK), "--exe", str(DEBUG_EXE), "--build", "debug",
+        Job("debug", (str(FEL_VALIDATION), "--exe", str(DEBUG_EXE), "--build", "debug",
                       "--results", str(art / "fel-debug.txt"),
                       "--work-dir", str(art / "wd-dbg"), "--cpus", str(cores),
                       "--tiers-marker", tiers), LUCIFER, lock),
-        Job("production", (str(BENCHMARK), "--exe", str(PRODUCTION_EXE), "--build", "production",
+        Job("production", (str(FEL_VALIDATION), "--exe", str(PRODUCTION_EXE), "--build", "production",
                            "--results", str(art / "fel-prod.txt"),
                            "--work-dir", str(art / "wd-prd"), "--cpus", str(cores),
                            "--wait-tiers", tiers), LUCIFER, lock),
@@ -192,7 +192,7 @@ def jobs(art: pathlib.Path) -> tuple[Job, ...]:
         Job("wavefront", (str(WAVEFRONT),), LUCIFER),
         # Two workers for the examples, this job's whole allocation while the five run
         # together. At one worker the examples job finishes last. At two the debug pass
-        # finishes last. Three workers slowed the benchmark passes by more than they
+        # finishes last. Three workers slowed the validation passes by more than they
         # saved. docs/validation.md (val-the-keystone-rule) records the wall times. A
         # standalone run of run_examples.sh takes its own default instead.
         Job("examples", (str(EXAMPLES), "--no-figures", "--jobs", "2"), LUCIFER),
@@ -252,7 +252,7 @@ def preflight() -> None:
             print(f"keystone: {line}")
         if r.returncode != 0:
             pytest.fail(f"bmad_release_check {arg} refused:\n{r.stdout}{r.stderr}")
-    missing = [str(p) for p in (BENCHMARK, WAVEFRONT, EXAMPLES) if not os.access(p, os.X_OK)]
+    missing = [str(p) for p in (FEL_VALIDATION, WAVEFRONT, EXAMPLES) if not os.access(p, os.X_OK)]
     if missing:
         pytest.fail("keystone scripts not executable: " + ", ".join(missing))
     if "bmad-fel-validate" not in sys.executable:

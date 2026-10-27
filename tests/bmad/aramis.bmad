@@ -4,12 +4,12 @@
 ! measure the same line.
 !
 ! e_tot is the reference energy and the driver derives gamma0 from it. Genesis4's
-! benchmark value 11357.82 is encoded as an expression in Bmad's own rest mass.
+! Benchmark1-SASE value 11357.82 is encoded as an expression in Bmad's own rest mass.
 !
 ! Genesis4's quadrupole k1 = 2 m^-2 is the geometric strength at the reference energy
 ! and Bmad's k1 means the same. The chromatic behavior differs at the model level:
 ! Genesis scales the focusing per particle by gamma0/gammaz (TrackBeam.cpp:26,69), Bmad by
-! p0/p. The two differ by ~4e-9 relative at this energy, quantified in the benchmark README.
+! p0/p. The two differ by ~4e-9 relative at this energy, quantified in docs/genesis4.md.
 
 no_digested
 parameter[geometry] = open
@@ -17,7 +17,7 @@ parameter[particle] = electron
 parameter[e_tot] = 11357.82 * m_electron
 
 ! The matched periodic Twiss of this FODO cell at this energy (Genesis4's zmatch values,
-! the same numbers the benchmark namelists carry). The FEL walk itself never reads
+! the same numbers the Genesis4 input files carry). The FEL walk itself never reads
 ! lattice Twiss. Imports do, since init_beam_distribution matches the bunch it generates
 ! to these.
 beginning[beta_a] = 8.53711

@@ -1,4 +1,8 @@
-# Lucifer's own checks, on Linux.
+# Lucifer's own checks, on Linux: the validation suite, tests/run_fel_validation.sh, and the
+# wavefront validation, on the debug build. This is not the keystone, which runs on the
+# recording machine (docs/validation.md). Nothing here judges a wall clock. The times the
+# log prints are what each section cost, and performance is measured by
+# tests/run_perf_benchmark.sh on an idle machine and never here (docs/performance.md).
 #
 # Every level Lucifer records was measured on one machine, an Apple M3 Max running
 # macOS. This job runs the same checks on Linux, which is the only way a defect that
@@ -63,7 +67,7 @@
 # It does not replace Bmad's own CI, which builds the whole distribution on every push
 # to Bmad.
 
-name: Lucifer - Keystone (Linux)
+name: Lucifer - Validation (Linux)
 
 permissions:
   contents: read
@@ -80,15 +84,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  keystone:
+  validation:
     runs-on: ubuntu-latest
     # Measured on this runner on 2026-10-24, against the conda-forge package: 36.0 minutes
-    # end to end, of which the benchmark is 33.9, the Lucifer build 0.7 and the two
-    # environments 0.9. The run of 2026-10-23 that cloned Bmad and built its debug tree
-    # took 37.5, with 6.4 in that build and 30 in the benchmark. The benchmark costs four
-    # times its local 7.7 minutes because a runner has four cores against the recording
-    # machine's sixteen and its Genesis references are always cold, and its longest
-    # sections are spontaneous at 642 s and the eleven tiers at 320 s.
+    # end to end, of which the validation suite is 33.9, the Lucifer build 0.7 and the two
+    # environments 0.9. The run of 2026-10-23 that cloned Bmad and built its debug tree took
+    # 37.5, with 6.4 in that build and 30 in the validation suite. The validation suite
+    # costs four times its local 7.7 minutes because a runner has four cores against the
+    # recording machine's sixteen and its Genesis references are always cold, and its
+    # longest sections are spontaneous at 642 s and the eleven tiers at 320 s.
     timeout-minutes: 120
 
     steps:
@@ -103,7 +107,7 @@ jobs:
       # nompi variant, the compilers and cmake, each a minimum. The package resolves on the
       # day the job runs, so the release it carries is checked against BMAD_RELEASE below
       # and printed.
-      - name: Install the build environment
+      - name: Install the build environment, conda-forge bmad and the compilers
         uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
@@ -153,7 +157,7 @@ jobs:
       # and the installed tracker prints its version and runs the steady-state example
       # from a directory outside the tree, in an empty environment, so the libraries come
       # from its rpath and nothing else.
-      - name: Install the tracker and run the installed one
+      - name: Install the debug tracker and run steady_state from the prefix
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
@@ -172,19 +176,19 @@ jobs:
           test -s steady_state.stats.h5
 
       # Which backend this build carries, from lucifer's own banner. This is the line the
-      # benchmark reads to decide whether the device section can run, so having it in the
+      # validation suite reads to decide whether the device section can run, so having it in the
       # log makes the skip below checkable rather than asserted.
-      - name: Name the device backend
+      - name: Print the debug build's device backend
         shell: bash
         run: ./build-debug/bin/lucifer || true
 
       # One environment for the reference and the Python side, from the repository's own
-      # file, which pins genesis4 4.6.15. The pin is the whole reason this job is
-      # possible: releases to 4.6.14 carry a pre-CODATA electron rest energy and seed
-      # their noise per MPI rank, and the benchmark refuses any other version, printing what it found and wanted. It
-      # is separate from the build environment for the reason the recording machine keeps
-      # them separate, and the benchmark finds it by name.
-      - name: Install the reference and the Python side
+      # file, which pins genesis4 4.6.15. The pin is the whole reason this job is possible:
+      # releases to 4.6.14 carry a pre-CODATA electron rest energy and seed their noise per
+      # MPI rank, and the validation suite refuses any other version, printing what it found
+      # and wanted. It is separate from the build environment for the reason the recording
+      # machine keeps them separate, and the validation suite finds it by name.
+      - name: Install genesis4 and the Python package
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
@@ -195,31 +199,31 @@ jobs:
           # recording machine installs it.
           conda run -n bmad-fel-validate python -m pip install -e python --no-deps
           # The reference's own banner, so a wrong version is visible here rather than
-          # only in the benchmark's refusal. genesis4 exits non-zero when it is given no
+          # only in the validation suite's refusal. genesis4 exits non-zero when it is given no
           # input file, so it runs inside a shell that exits zero after the banner, and
           # conda run then prints no error line for a status this step ignores anyway.
           conda run -n bmad-fel-validate bash -c 'genesis4 2>&1 | head -3; true'
           # openPMD-beamphysics comes from the same file, at the minimum it states or
-          # later. The benchmark prints the version and path again before its sections run.
+          # later. The validation suite prints the version and path again before its sections run.
           conda run -n bmad-fel-validate python -c \
               "import beamphysics; print('openPMD-beamphysics', beamphysics.__version__)"
 
-      # The benchmark prints the reference version and the electron rest energy it carries,
+      # The validation suite prints the reference version and the electron rest energy it carries,
       # every section's name and wall time, and every tier's level against its tolerance.
       # Its exit status is zero only if every tier passed. Run from the validate
       # environment, which is how the recording machine runs it.
-      - name: Benchmark, debug build
+      - name: Validation suite against Genesis4, debug build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
           set -e
-          ./tests/run_fel_benchmark.sh \
+          ./tests/run_fel_validation.sh \
               --exe "$PWD/build-debug/bin/lucifer" --build debug \
               --results "$RUNNER_TEMP/fel-debug.txt" \
               --work-dir "$RUNNER_TEMP/wd-dbg"
 
-      - name: Wavefront validation
+      - name: Wavefront validation, debug build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
@@ -232,13 +236,13 @@ jobs:
       # It is not what writes the generated table: report_validation.py refuses a file
       # carrying a skip, because that table names every section that ran and this run is
       # one short. The table stays the product of a full local run on both builds.
-      - name: Summarize
+      - name: Summarize the validation suite's levels, debug build
         if: always()
         shell: bash
         run: |
           if [ -f "$RUNNER_TEMP/fel-debug.txt" ]; then
             {
-              echo '## Lucifer keystone, Linux debug build'
+              echo '## Lucifer validation suite, Linux debug build'
               echo
               echo 'Levels are this platform'"'"'s own. The recorded digits belong to the'
               echo 'machine that recorded them, and this job asserts the tolerances.'

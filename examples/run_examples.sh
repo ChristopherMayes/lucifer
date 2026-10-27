@@ -110,7 +110,7 @@ fi
 # four performance cores, which is three here.
 #
 # The count is also a static allocation against the rest of the keystone, which runs
-# five jobs at once (docs/validation.md). The two benchmark passes take eleven concurrent
+# five jobs at once (docs/validation.md). The two validation passes take eleven concurrent
 # single-thread tier processes each while their tiers run, the regression suite takes
 # one and the wavefront validation one. The suite spends 2*11 + JOBS + 2 processes at its
 # widest, which is above the core count. A larger share here is taken from the passes

@@ -3,7 +3,7 @@ title: Lucifer and Genesis 1.3 Version 4 (Genesis4)
 short_title: Genesis4
 ---
 
-Lucifer's averaged physics was transcribed from Genesis4, and the benchmark tiers compare against it. This page is for a user who knows one code and wants the other. It says what physics the two share, what each has that the other does not, how a setting translates, and how a file moves between them.
+Lucifer's averaged physics was transcribed from Genesis4, and the Genesis4 tiers compare against it. This page is for a user who knows one code and wants the other. It says what physics the two share, what each has that the other does not, how a setting translates, and how a file moves between them.
 
 This page is checked against Genesis4 release v4.6.15, which is also the reference the comparison tiers run against. This page is the only one that tracks Genesis4, so it is the only one to revisit when Genesis4 changes. Everything else in this documentation describes Lucifer on its own terms.
 
@@ -92,7 +92,7 @@ A file that is not openPMD is refused, with the conversion command in the messag
 
 The transcription had to establish these properties of Genesis4 by reading its source, and they are recorded here because its documentation does not state them. Each is true of the release named at the top of this page.
 
-- Outside undulators Genesis4 does not subdivide into `delz` steps. Each interlude element is one integration step of the element's full length, since `Lattice::unrollLattice` pushes one entry per non-undulator layout segment. The step count over the benchmark is 12*89 undulator steps + 36 interlude steps = 1104.
+- Outside undulators Genesis4 does not subdivide into `delz` steps. Each interlude element is one integration step of the element's full length, since `Lattice::unrollLattice` pushes one entry per non-undulator layout segment. The step count over the Benchmark1-SASE line is 12*89 undulator steps + 36 interlude steps = 1104.
 - In steady state `slippage` and `phaseshift` are no-ops. `Control::applySlippage` returns immediately when the run is not time dependent, and the phaseshift array is all zero without phase shifter elements.
 - Time dependence follows from `&time` or from importing a multi-slice dump. `readBeamHDF5.cpp:68-77` reconstructs the window from `slicespacing` and `slicecount`, with time on by default, and `nslice = round(slen/(sample*lambda0))` (`GenTime.cpp:70`).
 - The end-of-lattice autophasing is unguarded. The last step always gets `floor(Lz/(2*gamma0^2*lambda)) + 1` wavelengths of slippage, the `+1` included when there is no trailing drift (`Lattice.cpp:191-193`).

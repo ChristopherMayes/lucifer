@@ -7,7 +7,7 @@
 #     spacing 3*lambda0. sample = 3 matches the slice spacing to the slippage of one
 #     delz = 0.045 m = 3-period step (one slice per step at resonance), the matched
 #     configuration of the coarse-step sweep, and the 32-slice window keeps the
-#     benchmark's runtime in check -- slippage physics does not depend on window length.
+#     validation suite's runtime in check -- slippage physics does not depend on window length.
 #
 #   - shotnoise = 1. In steady state shot noise was disabled to make the run
 #     deterministic; here the slice-to-slice variation it creates is the signal that

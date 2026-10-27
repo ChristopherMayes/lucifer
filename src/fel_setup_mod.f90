@@ -140,9 +140,9 @@ if (bmad_com%radiation_fluctuations_on .and. migrate) then
 endif
 
 ! Read the lattice and the starting state. The state is a pair of openPMD dumps, or a
-! self-generated steady-state condition when both file names are blank. The dumps are the
-! shared-start benchmark method, where the reference code's dumps are converted at the
-! benchmark's boundary.
+! self-generated steady-state condition when both file names are blank. The dumps are how
+! the validation suite starts both codes from one state: the reference code's dumps are
+! converted to openPMD at the suite's boundary.
 !
 ! An FEL element carries fel_method and its own tracking_method, which is bmad_standard.
 ! So Bmad's own periodic-wiggler kernel gives it its reference time and its transport
