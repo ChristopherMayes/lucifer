@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Fixed: the Metal backend did not compile against a macOS SDK older than 15, which
+  conda-forge builds with, since it set `MTLCompileOptions.mathMode`, first declared in the macOS 15
+  SDK. The macOS 15 branch is now compiled only where the SDK declares it, and an older SDK compiles
+  the `fastMathEnabled = NO` branch alone. A build against the macOS 15 SDK or later is unchanged.
 - 2026-10-27 Fixed: a string from the input file was stored in its fixed-length component cut to
   fit, and checked later as the shorter text, so `field.seed_polarization = "xyz"` ran as `"x"` and
   a `run.track_end` past 60 characters was looked for under its first 60. A list with more entries
