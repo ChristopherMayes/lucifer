@@ -4781,11 +4781,13 @@ Output:
 (api-fel-stats-exit-light)=
 ### `fel_stats_exit_light`
 
-*Subroutine* `(stats, pow, ene, bun)`
+*Subroutine* `(stats, pow, ene, bun, pul)`
 
 ```
 Routine to return the radiation the run holds at its last record: total power and
-total window energy over the live polarizations, and the mean bunching over slices.
+total window energy over the live polarizations, the mean bunching over slices, and
+the whole pulse's energy, the window's and what slippage carried out of it, as the
+stats file's field/total/pulse_energy states it.
 
 This is the one place that sums the polarizations for display. So the progress line
 and the completion block cannot differ about what power means. The values are zero
@@ -4800,6 +4802,7 @@ Output:
   pow   -- real(rp): Total radiation power [W].
   ene   -- real(rp): Total window field energy [J].
   bun   -- real(rp): Mean |b| over slices.
+  pul   -- real(rp), optional: The fundamental's pulse energy, window plus escaped [J].
 ```
 
 (api-fel-stats-convergence)=

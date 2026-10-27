@@ -34,7 +34,8 @@ The runner wrote these from each run's stats file and log, and the keystone rege
 |---|---|---|
 | exit power | 8.8074e+09 | W |
 | exit power per slice | 8.8074e+09 | W |
-| exit pulse energy | 2.9378e-09 | J |
+| exit window energy | 2.9378e-09 | J |
+| exit pulse energy, the window's and the light slipped out of it | 2.9378e-09 | J |
 | peak power | 8.8074e+09 | W |
 | s of the peak power | 5.6240e+01 | m |
 | mode peak, power inside the split | 8.7969e+09 | W |

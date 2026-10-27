@@ -922,10 +922,12 @@ end subroutine fel_pool_bunch_params
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_stats_exit_light (stats, pow, ene, bun)
+! Subroutine fel_stats_exit_light (stats, pow, ene, bun, pul)
 !
 ! Routine to return the radiation the run holds at its last record: total power and
-! total window energy over the live polarizations, and the mean bunching over slices.
+! total window energy over the live polarizations, the mean bunching over slices, and
+! the whole pulse's energy, the window's and what slippage carried out of it, as the
+! stats file's field/total/pulse_energy states it.
 !
 ! This is the one place that sums the polarizations for display. So the progress line
 ! and the completion block cannot differ about what power means. The values are zero
@@ -938,17 +940,20 @@ end subroutine fel_pool_bunch_params
 !   pow   -- real(rp): Total radiation power [W].
 !   ene   -- real(rp): Total window field energy [J].
 !   bun   -- real(rp): Mean |b| over slices.
+!   pul   -- real(rp), optional: The fundamental's pulse energy, window plus escaped [J].
 !-
 
-subroutine fel_stats_exit_light (stats, pow, ene, bun)
+subroutine fel_stats_exit_light (stats, pow, ene, bun, pul)
 
 type (fel_stats_struct) stats
 real(rp) pow, ene, bun
+real(rp), optional :: pul
 integer ir
 
 !
 
 pow = 0;  ene = 0;  bun = 0
+if (present(pul)) pul = 0
 if (stats%irec < 1) return
 ir = stats%irec
 
@@ -959,6 +964,7 @@ if (allocated(stats%f2_power)) then
   ene = ene + sum(stats%f2_energy(:, ir))
 endif
 bun = sum(stats%bunching(:, ir)) / stats%nslice
+if (present(pul)) pul = ene + stats%f_escaped(ir, 1)
 
 end subroutine fel_stats_exit_light
 

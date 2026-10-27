@@ -1071,6 +1071,23 @@ def main():
     if falls == 0:
         check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
 
+    # The footer's Exit line states the window's energy and the pulse's, each as the last
+    # record holds it. The line prints an SI mantissa to three decimals, so the
+    # level is the print's.
+    m = re.search(r"^ Exit\s+power .*, window energy\s+(\S+)\s*(\S?)J, pulse energy\s+(\S+)\s*(\S?)J,",
+                  r_dg.stdout, re.M)
+    if m:
+        si = {"": 1.0, "y": 1e-24, "z": 1e-21, "a": 1e-18, "f": 1e-15, "p": 1e-12, "n": 1e-9,
+              "u": 1e-6, "m": 1e-3, "k": 1e3, "M": 1e6, "G": 1e9, "T": 1e12, "P": 1e15}
+        w_line = float(m.group(1)) * si[m.group(2)]
+        p_line = float(m.group(3)) * si[m.group(4)]
+        check("pulse: the Exit line's window energy vs the last record's, rel",
+              abs(w_line / e_win[-1] - 1), 1e-3, note=f"[{w_line:.4e} J]")
+        check("pulse: the Exit line's pulse energy vs the last record's pulse_energy, rel",
+              abs(p_line / e_pul[-1] - 1), 1e-3, note=f"[{p_line:.4e} J]")
+    else:
+        check("pulse: the Exit line states the window's energy and the pulse's (0 = yes)", 1.0, 0.5)
+
     # 2c. The pulse alone. Without run.write_escaped the banked planes stream into the
     # pulse alone, so the directory holds the one file and the footer lists it alone. The
     # pulse's lucifer/pulse group holds the rows of the escaped file's lucifer/escaped, so

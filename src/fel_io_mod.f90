@@ -942,7 +942,7 @@ character(400) line
 character(*), parameter :: r_name = 'lucifer'
 type (fel_convergence_struct) cvg
 integer ir, ih, n_listed, is, n_thin, n_shown, nbl, ie, nrec
-real(rp) pow, ene, bun, worst, secs, ratio_s
+real(rp) pow, ene, bun, pul, worst, secs, ratio_s
 character(8) hsuf
 character(16) backend
 character(420) root, dname
@@ -959,9 +959,10 @@ call out_io (s_blank$, r_name, trim(line))
 
 ! The exit light, from whichever row holds the run's last state.
 
-call fel_stats_exit_light (stats, pow, ene, bun)
-write (line, '(5a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
-      ', pulse energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', <|b|> ', bun
+call fel_stats_exit_light (stats, pow, ene, bun, pul)
+write (line, '(7a, f6.4)') ' Exit        power ', trim(adjustl(fel_si_str(pow, 'W'))), &
+      ', window energy ', trim(adjustl(fel_si_str(ene, 'J'))), ', pulse energy ', &
+      trim(adjustl(fel_si_str(pul, 'J'))), ', <|b|> ', bun
 call out_io (s_blank$, r_name, trim(line))
 
 ! The mode against the wide-angle emission of the point beamlets, from the records the

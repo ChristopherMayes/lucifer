@@ -13,7 +13,10 @@ beside it and the log the runner kept, and prints one row per quantity:
 The quantities are one fixed set for every input file, so a page can compare its input files column
 by column and a number a README once typed from a run comes from the run itself:
 
-  exit_power, exit_pulse_energy          the window totals at the last record
+  exit_power, exit_window_energy         the window totals at the last record
+  exit_pulse_energy                      the whole pulse's energy at the last record, the
+                                         window's and what slippage carried out of it
+                                         (field/total/pulse_energy)
   exit_power_<component>                 the exit power of each field component beyond the
                                          total and the x plane, such as y or h3
   exit_power_per_slice, exit_power_slice_spread  the exit power over the slices, and the
@@ -159,6 +162,7 @@ def rows_for(input_file: pathlib.Path, log: pathlib.Path):
         s = h5["coords/s"][()]
         power = h5["field/total/power"][()]
         energy = h5["field/total/energy"][()]
+        pulse = h5["field/total/pulse_energy"][()]
         inside = h5["field/total/power_inside_angle"][()]
         win = power.sum(axis=1)
         # The split is not computed at every record or every slice, and a slice without it
@@ -166,7 +170,8 @@ def rows_for(input_file: pathlib.Path, log: pathlib.Path):
         # record with none is NaN.
         have = np.isfinite(inside)
         win_in = np.where(have.any(axis=1), np.nansum(np.where(have, inside, 0.0), axis=1), np.nan)
-        rows += [("exit_power", win[-1], "W"), ("exit_pulse_energy", energy[-1].sum(), "J")]
+        rows += [("exit_power", win[-1], "W"), ("exit_window_energy", energy[-1].sum(), "J"),
+                 ("exit_pulse_energy", pulse[-1], "J")]
         n_slice = power.shape[1]
         rows.append(("exit_power_per_slice", win[-1] / n_slice, "W"))
         if n_slice > 1 and win[-1] > 0:

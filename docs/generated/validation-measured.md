@@ -852,6 +852,8 @@ where the two builds agree to every printed digit.
 | pulse: escaped_energy at the exit vs the banked slices' energies, rel | 7.2164e-15 | 8.1046e-15 | <= 1.0000e-12 |
 | pulse: escaped_energy at the exit vs the ledger's U_escaped, rel | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse: the largest fall of pulse_energy between records, rel (the window falls) | 0.0000e+00 | same | <= 1.0000e-12 |
+| pulse: the Exit line's window energy vs the last record's, rel | 1.1632e-05 | 1.1629e-05 | <= 1.0000e-03 |
+| pulse: the Exit line's pulse energy vs the last record's pulse_energy, rel | 1.0011e-04 | 1.0012e-04 | <= 1.0000e-03 |
 | pulse alone: a default run keeps the pulse file and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pulse alone: the footer lists the pulse and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pulse alone: lucifer/pulse rows of dgp and dg vs dg's lucifer/escaped, max abs | 0.0000e+00 | same | <= 0.0000e+00 |

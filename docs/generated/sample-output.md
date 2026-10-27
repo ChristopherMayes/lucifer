@@ -6,7 +6,7 @@
  Radiation   lambda0 = 100.000 pm, slice spacing 100.000 pm, 1 field(s), grid 256 points of 1.569 um
  Work        1068 FEL steps, 8192 macroparticles, 8.75E+06 particle-steps, 6.55E+04 grid points per step
  Load        8192 macroparticles in the thinnest slice, beamlets of 8, 1024 beamlets.
- Exit        power 801.994 MW, pulse energy 267.516 pJ, <|b|> 0.2413
+ Exit        power 801.994 MW, window energy 267.516 pJ, pulse energy 267.516 pJ, <|b|> 0.2413
  Split       2.966 urad, the mode angle. Inside it the mode, outside it the beamlets.
              mode peak, z =   37.760 m: inside 1.558 GW, outside 2.141 MW, ratio  1.37E-03, <|b|> 0.3020
              last record, z = 57.000 m: inside 799.509 MW, outside 2.484 MW, ratio  3.11E-03, <|b|> 0.2413

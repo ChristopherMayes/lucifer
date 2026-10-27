@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-26 Changed: the footer's Exit line, `examples/measured.tsv` and the example pages called the
+  window's field energy at the exit the pulse energy. Slippage carries light out of a fixed window,
+  so on the SASE example that number was 34 pJ while the pulse holds 845 pJ. The Exit line now states
+  `window energy` and `pulse energy`, the second the stats file's `field/total/pulse_energy` at the
+  last record. `tests/scripts/example_record.py` records the old value as `exit_window_energy` and
+  the pulse's as `exit_pulse_energy`, and `check_diagnostics.py` holds the two printed numbers to the
+  last record within the print's 1e-3.
 - 2026-10-26 Changed: the pulse is written as the light leaves. `fel_drain_bank` streams each leaving
   slice into `<out_root>-pulse.wf.h5` after room for the window, and `fel_finish_pulse` reverses the
   banked planes in place at finalize, two at a time, as it drifts each to the exit, then writes the

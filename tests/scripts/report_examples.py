@@ -120,7 +120,8 @@ def embed(page, path, label=None):
     page.append("")
 
 
-ORDER = ["exit_power", "exit_power_per_slice", "exit_power_slice_spread", "exit_pulse_energy",
+ORDER = ["exit_power", "exit_power_per_slice", "exit_power_slice_spread", "exit_window_energy",
+         "exit_pulse_energy",
          "peak_power", "peak_power_s", "mode_peak_inside",
          "mode_peak_s", "exit_power_inside", "exit_power_outside", "exit_power_inside_s", "wide_angle_ratio",
          "wide_angle_ratio_exit", "split_angle", "gain_length", "power_after_first_element",
@@ -136,7 +137,8 @@ WORDS = {"exit_power": "exit power", "exit_power_per_slice": "exit power per sli
          "exit_power_slice_spread": "exit power, rms over mean across slices",
          "exit_power_inside_s": "s of the last record with the split",
          "power_after_first_element_per_slice": "power per slice at the first element end",
-         "exit_pulse_energy": "exit pulse energy",
+         "exit_window_energy": "exit window energy",
+         "exit_pulse_energy": "exit pulse energy, the window's and the light slipped out of it",
          "peak_power": "peak power", "peak_power_s": "s of the peak power",
          "mode_peak_inside": "mode peak, power inside the split", "mode_peak_s": "s of the mode peak",
          "exit_power_inside": "exit power inside the split", "exit_power_outside": "exit power outside the split",
