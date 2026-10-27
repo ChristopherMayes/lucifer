@@ -42,8 +42,9 @@
 # this job guards the recorded digits will eventually trust it to.
 #
 # What is deliberately not here, so the difference from the local keystone is on the
-# record: the production build and the two-build digit comparison, the examples, and
-# Bmad's own regression suite, which the package does not carry and Bmad's own CI runs.
+# record: the production build and the two-build digit comparison, the examples but the
+# steady-state one, which runs once from the installed tracker, and Bmad's own regression
+# suite, which the package does not carry and Bmad's own CI runs.
 # The device section cannot run on a runner with no Metal device and skips with its
 # reason recorded, the one section allowed to.
 #
@@ -91,7 +92,12 @@ jobs:
     timeout-minutes: 120
 
     steps:
+      # The whole history, so the tags reach git describe and the build carries the
+      # version cmake/LuciferVersion.cmake reads from them. A clone of depth one has no
+      # tag and the version is the commit alone.
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       # The build environment is the repository's own file: conda-forge's bmad in its
       # nompi variant, the compilers and cmake, each a minimum. The package resolves on the
@@ -142,6 +148,28 @@ jobs:
           ls -l build-debug/bin/lucifer build-debug/bin/lucifer_smoke_test \
                 build-debug/bin/wavefront_drift_test "$CONDA_PREFIX/bin/tao"
           echo "LUCIFER_BMAD_ROOT=$CONDA_PREFIX" >> "$GITHUB_ENV"
+
+      # The install rule. cmake --install places the tracker alone in the prefix's bin/,
+      # and the installed tracker prints its version and runs the steady-state example
+      # from a directory outside the tree, in an empty environment, so the libraries come
+      # from its rpath and nothing else.
+      - name: Install the tracker and run the installed one
+        shell: bash -o pipefail {0}
+        run: |
+          source "$CONDA/etc/profile.d/conda.sh"
+          conda activate lucifer-build
+          set -e
+          cmake --install build-debug --prefix "$RUNNER_TEMP/prefix"
+          find "$RUNNER_TEMP/prefix" -type f
+          mkdir -p "$RUNNER_TEMP/installed/steady_state"
+          cp examples/steady_state/lucifer.toml "$RUNNER_TEMP/installed/steady_state/"
+          cp examples/aramis.bmad "$RUNNER_TEMP/installed/"
+          cd "$RUNNER_TEMP/installed/steady_state"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/prefix/bin/lucifer" --version
+          env -i HOME="$HOME" PATH=/usr/bin:/bin OMP_NUM_THREADS=4 \
+              "$RUNNER_TEMP/prefix/bin/lucifer" lucifer.toml > run.log
+          grep -e '^ Lucifer version' -e '^ Exit ' run.log
+          test -s steady_state.stats.h5
 
       # Which backend this build carries, from lucifer's own banner. This is the line the
       # benchmark reads to decide whether the device section can run, so having it in the

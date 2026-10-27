@@ -6,7 +6,8 @@
 # LUCIFER_BMAD_ROOT names the Bmad tree to build against, a distribution build's production/ or
 # debug/ root or a prefix of the same shape (cmake/FindBmad.cmake). The binaries land in
 # the build directory's bin/, the Fortran modules in its modules/ and the library in its
-# lib/. util/conda_compile runs these lines for both configurations.
+# lib/. util/conda_compile runs these lines for both configurations. cmake --install with
+# --prefix <dir> then places the tracker in <dir>/bin.
 #
 # The flags are the ones Bmad's distribution build gave this program as a user program,
 # since the recorded levels of docs/validation.md were measured under them: gfortran at
@@ -160,3 +161,13 @@ foreach (exe lucifer lucifer_smoke_test lucifer_advance_bench wavefront_drift_te
   add_executable (${exe} "programs/${exe}.f90")
   target_link_libraries (${exe} PRIVATE lucifer_lib)
 endforeach ()
+
+# What cmake --install places: the tracker in the prefix's bin/, and nothing else. The
+# library, its modules and the three test programs stay in the build directory. The
+# installed tracker keeps the directories of the libraries it was linked against in its
+# rpath, the conda environment's lib/ among them, so it runs from the prefix as it runs
+# from the build directory.
+
+include (GNUInstallDirs)
+set_target_properties (lucifer PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+install (TARGETS lucifer RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
