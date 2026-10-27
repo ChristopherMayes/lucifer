@@ -130,6 +130,7 @@ mkdir -p "$FIG_DIR"
 
 STATE="$(mktemp -d "${TMPDIR:-/tmp}/run_examples.XXXXXX")"
 RECORD="$SCRIPT_DIR/../tests/scripts/example_record.py"
+BANK="$SCRIPT_DIR/../tests/scripts/bank_bytes.py"
 trap 'rm -rf "$STATE"' EXIT
 
 echo "=============================================================================="
@@ -175,7 +176,7 @@ done
 # by name.
 run_dir () {   # <dir> <index>
   local dir="$1" idx="$2"
-  local k=0 status=0 input_path input log rc dt t0 line verdict primary root stats
+  local k=0 status=0 input_path input log rc dt t0 line verdict primary root stats bank
   local inputs=()
   # The input file list is read into an array first. A while-read loop would hold the list on
   # the loop's stdin, and a tracker that read stdin would eat the input files behind it.
@@ -204,6 +205,13 @@ run_dir () {   # <dir> <index>
     if [[ "$verdict" == "ok" ]]; then
       if ! "$PYTHON" "$RECORD" "$dir/$input" "$dir/$log" >> "$STATE/rec.$idx" 2> "$STATE/recerr.$idx"; then
         echo "Error: $dir/$input: the record could not be written; see $STATE/recerr.$idx" > "$STATE/note.$idx"
+        status=1
+      fi
+      # The bytes the header states for the escaped-field bank, against the files the
+      # run kept, and no pulse or escaped file where the header states no bank.
+      if ! bank="$("$PYTHON" "$BANK" "$dir/$log" "$dir" 2>&1)"; then
+        printf 'Error: %s/%s: the bank the header states is not the files on disk:\n%s\n' \
+               "$dir" "$input" "$bank" > "$STATE/note.$idx"
         status=1
       fi
     fi

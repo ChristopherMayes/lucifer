@@ -712,8 +712,8 @@ frame by its record number.
 *Property*
 
 ```
-The run's field dumps, key to path: those of particle_files and escaped and
-pulse, a harmonic's with -h<h>.
+The run's field dumps, key to path: those of particle_files, pulse, and
+escaped when the run kept it, a harmonic's with -h<h>.
 ```
 
 (pyapi-lucifer-runner-result-particles)=
@@ -806,8 +806,9 @@ LUME-Genesis keys its files by:
     final, initial          the state after the last element and before the first
     at<n>-<element>         the dump at the end of element n (dump_beam_at, dump_field_at)
     5, 6, ...               a frame, by the record it was taken at (dump_at_comb)
-    escaped, pulse          the light slippage carried out of the window, and the whole
-                            pulse at the exit (keep_escaped_field), fields only
+    pulse, escaped          the whole pulse at the exit (keep_escaped_field), and the light
+                            slippage carried out of the window as it left (write_escaped),
+                            fields only
 
 A harmonic's field file adds ``-h<h>`` to the key, ``final-h3`` or ``5-h3``. Both
 polarizations of a field are components of one file, so they share a key.
@@ -1290,22 +1291,27 @@ a value that disagrees with the file is an error rather than a silent preference
 *Module*
 
 ```
-Read the escaped-field bank a run writes beside its final dump.
+Read the escaped light a run writes beside its final dump.
 
-``<out_root>-escaped.wf.h5`` holds the light slippage carried out of the window, one
-plane per slice as it was when it left, and ``<out_root>-pulse.wf.h5`` the whole pulse
-at the exit, the window's slices and the escaped ones propagated to the exit plane.
-Both are openPMD EXT_Wavefront files, so ``Wavefront.from_openpmd`` of
-openpmd-beamphysics reads either whole, with both polarizations as its Ex and Ey. The
-escaped file carries beside its mesh what openPMD has no name for, in the group
-``lucifer/escaped``: ``zTransmit``, the beamline position at which each plane left the
-window, and ``wavefrontParams``, each plane's moments as the program computed them
-then, one row per plane in the mesh's order. ``read_escaped`` returns the Wavefront
-with those two arrays, and the y component's params where the run carried one.
+``<out_root>-pulse.wf.h5`` is the whole pulse at the exit, the window's slices and the
+light slippage carried out of the window propagated to the exit plane. A run keeps it
+whenever light left the window. ``<out_root>-escaped.wf.h5`` is the bank the pulse is
+built from, one plane per slice as it was when it left, and a run keeps it only with
+``run.write_escaped``. Both are openPMD EXT_Wavefront files, so ``Wavefront.from_openpmd``
+of openpmd-beamphysics reads either whole, with both polarizations as its Ex and Ey.
 
-No one beamline position holds the escaped planes, so the file's ``zCoordinate``, and
-the Wavefront's ``s_position``, is NaN. Each plane's own is ``zTransmit``. The pulse
-file's is the exit plane.
+Each file carries beside its mesh what openPMD has no name for, in a group of its own,
+``lucifer/pulse`` or ``lucifer/escaped``: ``zTransmit``, the beamline position at which
+each banked plane left the window, and ``wavefrontParams``, each banked plane's moments
+as the program computed them then, one row per banked plane in the mesh's order. The two
+groups hold the same rows. In the escaped file every plane is banked. In the pulse the
+banked planes follow the window's, so row i is plane ``nz - n + i``. ``read_pulse`` and
+``read_escaped`` return the Wavefront with those two arrays, and the y component's params
+where the run carried one.
+
+No one beamline position holds the escaped planes, so the escaped file's
+``zCoordinate``, and the Wavefront's ``s_position``, is NaN. Each plane's own is
+``zTransmit``. The pulse file's is the exit plane.
 ```
 
 (pyapi-lucifer-field-escaped)=
@@ -1319,6 +1325,20 @@ position along the pulse, and per plane where it left the window and its moments
 then. ``params[:, PARAM_NAMES.index("energy")]`` is each plane's energy.
 ```
 
+(pyapi-lucifer-field-pulse)=
+### `Pulse`
+
+*Class* `Pulse(wavefront: object, z_transmit: numpy.ndarray, params: numpy.ndarray, params_y: numpy.ndarray | None = None, n_window: int = 0)`
+
+*Bases* `lucifer.field.Escaped`
+
+```
+The whole pulse of one run at the exit: the window's planes and then the banked
+ones as a Wavefront, in increasing position along the pulse, and per banked plane
+where it left the window and its moments then. The banked planes are
+``wavefront.Ex[:, :, n_window:]``, and their rows are those of the escaped file.
+```
+
 (pyapi-lucifer-field-read-escaped)=
 ### `read_escaped`
 
@@ -1329,7 +1349,22 @@ The escaped-field file at ``path`` as an ``Escaped``: its planes as a Wavefront
 through ``Wavefront.from_openpmd``, with ``zTransmit`` and ``wavefrontParams`` of
 its ``lucifer/escaped`` group. A file without that group is refused, and so is one
 whose params columns are not ``PARAM_NAMES`` or whose arrays do not match the mesh's
-plane count. Needs openpmd-beamphysics.
+plane count. A run writes the file only with ``run.write_escaped``. Needs
+openpmd-beamphysics.
+```
+
+(pyapi-lucifer-field-read-pulse)=
+### `read_pulse`
+
+*Function* `read_pulse(path)`
+
+```
+The pulse file at ``path`` as a ``Pulse``: its planes as a Wavefront through
+``Wavefront.from_openpmd``, with ``zTransmit`` and ``wavefrontParams`` of its
+``lucifer/pulse`` group, one row per banked plane, and the count of the window's
+planes before them. A file without that group is refused, and so is one whose params
+columns are not ``PARAM_NAMES`` or that has more rows than planes. Needs
+openpmd-beamphysics.
 ```
 
 (pyapi-lucifer-plot)=

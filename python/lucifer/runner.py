@@ -145,8 +145,8 @@ class Result:
 
     @property
     def field_files(self) -> dict:
-        """The run's field dumps, key to path: those of particle_files and escaped and
-        pulse, a harmonic's with -h<h>."""
+        """The run's field dumps, key to path: those of particle_files, pulse, and
+        escaped when the run kept it, a harmonic's with -h<h>."""
         from lucifer.dumps import dump_files
         return dump_files(self._dump_paths(), self.out_root)[1]
 

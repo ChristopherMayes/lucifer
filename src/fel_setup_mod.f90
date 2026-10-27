@@ -795,7 +795,8 @@ end subroutine fel_setup_lattice
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_setup_slippage (run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, slip_chic, err_flag)
+! Subroutine fel_setup_slippage (run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, slip_chic,
+!                                err_flag, und_slip)
 !
 ! Routine to sum the slippage the walk applies over the line, in fundamental
 ! wavelengths. Two callers take this one sum: fel_setup_schedule, which gives the walk
@@ -806,8 +807,8 @@ end subroutine fel_setup_lattice
 ! Three terms (fel-physics.md sec-slippage, sec-window, sec-phasing):
 !   Undulator steps. Each FEL element slips l (1 + aw^2) / (2 gamma0_ref^2 lambda), which
 !     the walk applies step by step as dz (1 + aw^2) / (2 gamma0_ref^2 lambda). At
-!     resonance that is one wavelength per period. Returned as slip_und, and not in
-!     ele_slip.
+!     resonance that is one wavelength per period. Returned as slip_und, per element
+!     in und_slip, and not in ele_slip.
 !   Interludes. Drift autophasing: interludes accumulate Lz, and the last interlude
 !     before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
 !     (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
@@ -836,16 +837,19 @@ end subroutine fel_setup_lattice
 !   slip_chic     -- integer: The chicanes' rotations.
 !   err_flag      -- logical: Set True on a refusal: a geometry element inside a
 !                      genesis-model interlude, or a break that is not a closed bump.
+!   und_slip(:)   -- real(rp), optional: Each FEL element's undulator steps' slippage
+!                      [wavelengths], zero elsewhere, sized as ele_slip. Its sum is slip_und.
 !-
 
 subroutine fel_setup_slippage (run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, &
-                               slip_chic, err_flag)
+                               slip_chic, err_flag, und_slip)
 
 type (fel_run_struct), target :: run
 type (branch_struct), pointer :: branch
 type (ele_struct), pointer :: ele
-real(rp) gamma0_ref, lambda, slip_und, Lz
+real(rp) gamma0_ref, lambda, slip_und, Lz, s_ele
 real(rp) ele_slip(:), light_corr(:)
+real(rp), optional :: und_slip(:)
 integer slip_int, slip_chic, ie, prev_ie, n_rot
 logical err_flag
 character(16) interlude_model
@@ -858,6 +862,7 @@ branch => run%lat%branch(0)
 interlude_model = run%global%interlude_model
 ele_slip = 0
 light_corr = 0
+if (present(und_slip)) und_slip = 0
 slip_und = 0;  slip_int = 0;  slip_chic = 0
 Lz = 0
 prev_ie = 0
@@ -866,7 +871,9 @@ do ie = 1, branch%n_ele_track
   ele => branch%ele(ie)
   if (ele%value(l$) == 0) cycle
   if (run%is_fel(ie)) then
-    slip_und = slip_und + ele%value(l$) * (1 + run%und_of(ie)%aw**2) / (2 * gamma0_ref**2 * lambda)
+    s_ele = ele%value(l$) * (1 + run%und_of(ie)%aw**2) / (2 * gamma0_ref**2 * lambda)
+    slip_und = slip_und + s_ele
+    if (present(und_slip)) und_slip(ie) = s_ele
     if (Lz > 0 .and. prev_ie > 0) then
       n_rot = floor(Lz / (2 * gamma0_ref**2 * lambda)) + 1
       ele_slip(prev_ie) = ele_slip(prev_ie) + n_rot
@@ -1417,14 +1424,14 @@ endif
 ! from the one sum a derived window's headroom also takes (fel_setup_slippage), and the
 ! off-phase knob.
 
-allocate (run%ele_slip(branch%n_ele_track))
+allocate (run%ele_slip(branch%n_ele_track), run%und_slip(branch%n_ele_track))
 allocate (run%fel_zoff(branch%n_ele_track), run%light_corr(branch%n_ele_track))
 ele_slip => run%ele_slip;  fel_zoff => run%fel_zoff;  light_corr => run%light_corr
 fel_zoff = 0
 phase_rate = twopi / (2 * gamma0_ref**2 * wf%wavelength)
 run%phase_rate = phase_rate
 call fel_setup_slippage (run, gamma0_ref, wf%wavelength, ele_slip, light_corr, &
-                         run%slip_und, run%slip_int, run%slip_chic, err_flag)
+                         run%slip_und, run%slip_int, run%slip_chic, err_flag, run%und_slip)
 if (err_flag) return
 Lz = 0
 prev_ie = 0
@@ -1546,6 +1553,15 @@ call fel_fp32_setup (run%fp32, run%global%fp32_check, run%global%fp32_mutate, ru
                      fel_p0_mc(fbeam) / fel_gamma0(fbeam) * fbeam%slice_spacing, trim(out_root), err_flag)
 if (err_flag) return
 
+! The escaped file is the bank's own, and a run without the bank has none to keep.
+
+if (run%global%write_escaped .and. .not. run%global%keep_escaped_field) then
+  call out_io (s_error$, r_name, 'WRITE_ESCAPED = T KEEPS THE ESCAPED FILE OF THE BANK,', &
+               'AND KEEP_ESCAPED_FIELD = F TURNS THE BANK OFF.', &
+               'POSSIBLE SOLUTION: SET KEEP_ESCAPED_FIELD = T, OR DROP WRITE_ESCAPED.')
+  err_flag = .true.;  return
+endif
+
 ! The device backend. Everything its kernels do not cover is refused here. An
 ! unsupported configuration stops the run and never takes the CPU path instead. Element
 ! wakes are refused at the element, since only the walk sees them. The grid refusal,
@@ -1579,8 +1595,9 @@ if (run%global%device /= '' .and. run%global%device /= 'off') then
     err_flag = .true.;  return
   endif
   ! The bank is on by default. A device run drops it unless the input asked for it, and
-  ! the escaped energy is still summed from the slice the device reads back.
-  if (run%global%keep_escaped_field .and. run%bank_set) then
+  ! the escaped energy is still summed from the slice the device reads back. Asking for
+  ! the escaped file asks for the bank.
+  if (run%global%keep_escaped_field .and. (run%bank_set .or. run%global%write_escaped)) then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE ESCAPED-FIELD BANK.')
     err_flag = .true.;  return
   elseif (run%global%keep_escaped_field) then

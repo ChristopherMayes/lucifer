@@ -294,6 +294,7 @@ where the two builds agree to every printed digit.
 | refused: does not cover spontaneous radiation |  | same | holds |
 | refused: unrecognized device |  | same | holds |
 | refused: does not cover the escaped-field bank |  | same | holds |
+| refused: write_escaped, which asks for the bank |  | same | holds |
 | refused: unsupported grid, nearest size named |  | same | holds |
 | bank at its default: the device runs without it, says so, writes no field file |  | same | holds |
 | harmonic lockstep worst_x | 1.1731e-07 | same | <= 1.0000e-06 |
@@ -545,6 +546,8 @@ where the two builds agree to every printed digit.
 | crossed: the escaped file carries both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | crossed: the pulse file carries both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | crossed: the escaped file's params come per polarization, one row per plane (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| crossed: the pulse's lucifer/pulse rows equal the escaped file's, both polarizations (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| crossed: the stated pulse and escaped files vs on disk, both polarizations, rel | 1.5011e-03 | same | <= 1.0000e-02 |
 | crossed: 1-thread vs 8-thread byte-identical (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | helical re-anchor: vector vs scalar path, shot-noise power | 1.5798e-14 | 1.5959e-14 | <= 1.0000e-12 |
 | handedness, averaged: the pair (1, +i) reproduces the scalar seed's energy modulation | 0.0000e+00 | same | <= 1.0000e-06 |
@@ -663,6 +666,8 @@ where the two builds agree to every printed digit.
 | Fortran reads the Python writer's file, re-dump identical | 0.0000e+00 | same | <= 5.0000e-01 |
 | one-step deposit P3/P1 vs the Bessel fc + h*theta sum | 1.1213e-14 | 2.5646e-14 | <= 1.0000e-12 |
 | 1 vs 8 threads byte/dataset-identical | 0.0000e+00 | same | <= 5.0000e-01 |
+| bank bytes: h1's stated pulse file vs on disk, rel | 3.7676e-04 | same | <= 1.0000e-02 |
+| bank bytes: h3's stated pulse file vs on disk, rel | 3.7676e-04 | same | <= 1.0000e-02 |
 | refusal harmonics without the fundamental |  | same | holds |
 | refusal harmonics + unaveraged element |  | same | holds |
 | refusal harmonics + two polarizations |  | same | holds |
@@ -735,7 +740,7 @@ where the two builds agree to every printed digit.
 | the page's refusal example: LuciferError carries the program's message |  | same | holds |
 | the page's stats example: units and inputs as the page states them |  | same | holds |
 | the page's beam example: the final dump read into slices |  | same | holds |
-| the page's field example: the pulse holds the window and the banked planes |  | same | holds |
+| the page's field example: the pulse holds the window and the banked planes, alone |  | same | holds |
 | the page's dumps example: the final dumps read on first access, one slice from its patch |  | same | holds |
 | dumps: the footer names every file the run wrote, and only those |  | same | holds |
 | dumps: the keys are the writers' names, each frame by its record |  | same | holds |
@@ -847,13 +852,22 @@ where the two builds agree to every printed digit.
 | pulse: escaped_energy at the exit vs the banked slices' energies, rel | 7.2164e-15 | 8.1046e-15 | <= 1.0000e-12 |
 | pulse: escaped_energy at the exit vs the ledger's U_escaped, rel | 0.0000e+00 | same | <= 1.0000e-12 |
 | pulse: the largest fall of pulse_energy between records, rel (the window falls) | 0.0000e+00 | same | <= 1.0000e-12 |
+| pulse alone: a default run keeps the pulse file and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| pulse alone: the footer lists the pulse and no escaped file (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| pulse alone: lucifer/pulse rows of dgp and dg vs dg's lucifer/escaped, max abs | 0.0000e+00 | same | <= 0.0000e+00 |
+| pulse alone: dgp's pulse identical to dg's (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| bank bytes: dg's stated pulse and escaped files vs on disk, rel | 8.9992e-04 | same | <= 1.0000e-02 |
+| bank bytes: dgp's stated pulse file vs on disk, rel | 3.7485e-04 | same | <= 1.0000e-02 |
+| bank bytes: dgp's stated peak vs its pulse and dg's escaped file, rel | 8.9992e-04 | same | <= 1.0000e-02 |
 | window: dgw's derived window loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgw writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgw's header states no bank (slices) | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgw's headroom is the schedule's slippage, the two printed sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | window: dgw's headroom slices are nint(slippage / n_wavelength) (count) | 0 | same | <= 5.0000e-01 |
 | window: dgw's chicanes contribute 0 rotations (count) | 0 | same | <= 5.0000e-01 |
 | window: dgc's derived window loses no light, escaped_energy max [J] | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgc writes no escaped or pulse file (count) | 0.0000e+00 | same | <= 0.0000e+00 |
+| window: dgc's header states no bank (slices) | 0.0000e+00 | same | <= 0.0000e+00 |
 | window: dgc's headroom is the schedule's slippage, the two printed sums equal (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | window: dgc's headroom slices are nint(slippage / n_wavelength) (count) | 0 | same | <= 5.0000e-01 |
 | window: dgc's chicanes contribute 3 rotations (count) | 0 | same | <= 5.0000e-01 |
@@ -866,6 +880,7 @@ where the two builds agree to every printed digit.
 | zero-length wake: one that CANNOT kick leaves the file unchanged (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | provenance: run.record_environment restores user and cwd | 0 | same | <= 5.0000e-01 |
 | refusal: unknown dump_beam_at element refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
+| refusal: write_escaped with keep_escaped_field = F refused (0 = yes) | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: the header states the work | 0.0000e+00 | same | <= 5.0000e-01 |
 | pre-run: particle-steps is the product of the two counts | 1.2493e-03 | same | <= 1.0000e-02 |
 | pre-run: the header estimates the walk and names the machine | 0.0000e+00 | same | <= 5.0000e-01 |

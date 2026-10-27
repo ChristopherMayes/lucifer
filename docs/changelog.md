@@ -9,6 +9,23 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-26 Changed: a run keeps the escaped light as the whole pulse alone, `<out_root>-pulse.wf.h5`,
+  and the bank the pulse is built from, `<out_root>-escaped.wf.h5`, only under the new key
+  `run.write_escaped`, off by default. The two files held the same light twice. On the SASE example
+  the escaped file is 1.24 GB beside the pulse's 1.34 GB, so a run kept 2.58 GB of bank files and now
+  keeps 1.34 GB. The pulse carries what the escaped file had beyond its planes, each banked slice's
+  transmission position and 25 params, in the group `lucifer/pulse`, whose rows are those of
+  `lucifer/escaped`, and `lucifer.field.read_pulse` reads it. The bank still streams to the escaped
+  file during the run, so memory stays a few planes, and the file is removed once the pulse is
+  written. Only a kept file is put in the mesh's order. The escaped file is also made only when the
+  first slice with light leaves, so a run whose light stays in its window, as a derived window holds
+  the slippage, writes nothing. Before, it streamed every empty slice to disk and removed the file at
+  the end. The header's new `Bank` line states, before the run tracks, the slices that will leave and
+  for each member of the field set the bytes the run keeps and the peak while both files exist. On
+  the SASE example it states 1.3424e9 and 2.5842e9 bytes, against 1342430395 and 2584266495 written.
+  The checks hold the estimate within 1% of the files on a one-member, a harmonic and a
+  two-polarization run and on every example. `run.write_escaped` with the bank off is refused, and a
+  device run that sets it is refused as one that sets `run.keep_escaped_field` is.
 - 2026-10-26 Fixed: a derived time window lost light at its head. The window's headroom was one
   wavelength per undulator period, while the walk's schedule also slips each interlude run by
   floor(Lz / (2 gamma0^2 lambda)) + 1 wavelengths, the end of the lattice by +1, each chicane by

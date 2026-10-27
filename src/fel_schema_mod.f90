@@ -155,9 +155,13 @@ call add ('run', 'write_initial', key_logical$, '', 'write initial', &
 call add ('run', 'load_only', key_logical$, '', 'load only', &
       'Build the initial state, dump it, stop.')
 call add ('run', 'keep_escaped_field', key_logical$, '', 'keep escaped', &
-      'Keep the light slippage carries out of the window, as the escaped bank and the ' // &
-      'whole pulse at the exit. On by default, since the light is what an FEL makes. ' // &
-      'A run whose window holds all its light writes neither file.')
+      'Keep the light slippage carries out of the window, as the whole pulse at the exit. ' // &
+      'On by default, since the light is what an FEL makes. A run whose window holds all ' // &
+      'its light writes no file.')
+call add ('run', 'write_escaped', key_logical$, '', 'write escaped', &
+      'Also keep the escaped file the pulse is built from, each plane as it left the window. ' // &
+      'Off by default, since the pulse holds the same light at the exit with each plane''s ' // &
+      'transmission position and params. Needs keep_escaped_field.')
 call add ('run', 'migrate', key_logical$, '', 'migrate', &
       'Move particles between slices when their phase leaves the slice window.')
 call add ('run', 'migrate_check', key_logical$, '', 'migrate check', &
@@ -495,6 +499,7 @@ case ('run.write_diag');                   run%global%write_diag = lv
 case ('run.write_initial');                run%global%write_initial = lv
 case ('run.load_only');                    run%global%load_only = lv
 case ('run.keep_escaped_field');           run%global%keep_escaped_field = lv;  run%bank_set = .true.
+case ('run.write_escaped');                run%global%write_escaped = lv
 case ('run.migrate');                      run%global%migrate = lv
 case ('run.migrate_check');                run%global%migrate_check = lv
 case ('run.reference_run');                run%global%reference_run = lv
@@ -719,6 +724,7 @@ case ('run.write_diag');                   lv = run%global%write_diag
 case ('run.write_initial');                lv = run%global%write_initial
 case ('run.load_only');                    lv = run%global%load_only
 case ('run.keep_escaped_field');           lv = run%global%keep_escaped_field
+case ('run.write_escaped');                lv = run%global%write_escaped
 case ('run.migrate');                      lv = run%global%migrate
 case ('run.migrate_check');                lv = run%global%migrate_check
 case ('run.reference_run');                lv = run%global%reference_run

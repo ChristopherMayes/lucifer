@@ -25,8 +25,8 @@ physics alone, the check can fail, and everything the backend does not cover is 
    record holds the same ceilings, read-only proof and production band.
 6. Refused. Wakes, spontaneous radiation, harmonics together with two live
    polarizations, source_filter_mutate, an unsupported grid (the message names the
-   nearest supported size), an unknown backend name and keep_escaped_field set in the
-   input file each stop the run. The bank is on by default, so a device run that does
+   nearest supported size), an unknown backend name, and keep_escaped_field or
+   write_escaped set in the input file each stop the run. The bank is on by default, so a device run that does
    not set it runs without one, says so, and writes neither field file, while its stats
    file still records the escaped and pulse energies.
 7. The field set. Harmonic members ride the device (planar segment, harmonics 1 and 3)
@@ -424,6 +424,12 @@ def main():
                 expect_fail=True)
         refused = r.returncode != 0 and msg in r.stdout
         ok(f"refused: {msg.lower()}", refused, "True", refused)
+
+    # Asking for the escaped file asks for the bank, so it is refused with the same message.
+    r = run(args.exe, wd, "dev_rw.in", BASE.format(root="dev_rw", extra=DEV + '  write_escaped = T\n'),
+            expect_fail=True)
+    refused = r.returncode != 0 and "DOES NOT COVER THE ESCAPED-FIELD BANK" in r.stdout
+    ok("refused: write_escaped, which asks for the bank", refused, "True", refused)
 
     r = run(args.exe, wd, "dev_rg.in",
             BASE.format(root="dev_rg", extra=DEV).replace("grid_n_pts = 64", "grid_n_pts = 65"),

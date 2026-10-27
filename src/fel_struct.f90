@@ -198,7 +198,8 @@ type fel_global_struct
   logical :: write_diag = .false.            ! The Genesis-comparison text diag file (large).
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
-  logical :: keep_escaped_field = .true.     ! Keep the escaped-slice bank and the pulse.
+  logical :: keep_escaped_field = .true.     ! Keep the escaped light, as the pulse.
+  logical :: write_escaped = .false.         ! Also keep the escaped file the pulse is built from.
   logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
@@ -375,6 +376,7 @@ type fel_run_struct
   integer, allocatable :: fel_mode(:), fel_spp(:)
   real(rp), allocatable :: fel_ramp(:)
   real(rp), allocatable :: ele_slip(:)     ! Slippage after each element's last step [wavelengths].
+  real(rp), allocatable :: und_slip(:)     ! Each FEL element's undulator steps' slippage [wavelengths].
   real(rp), allocatable :: fel_zoff(:)     ! The z_offset off-phase knob per element [m].
   real(rp), allocatable :: light_corr(:)   ! Chord-vs-arc correction on a break's last element [m].
   ! The schedule's slippage over the line [wavelengths] (fel_setup_slippage): the undulator
@@ -416,7 +418,8 @@ type fel_run_struct
   real(rp) :: z_last_rec = -1e30_rp        ! The comb's last-row position.
   ! Escaped-field bank state, one slot per field: the count banked, each banked slice's
   ! transmission position and wavefront params (25 per slice, the y component's apart),
-  ! in transmission order, and the open escaped file.
+  ! in transmission order, and the open escaped file. The file is made when the first
+  ! plane with light leaves, so until then n_banked counts planes that are all zero.
   integer, allocatable :: n_banked(:)
   real(rp), allocatable :: bank_z(:,:), bank_pms(:,:,:), bank_pms_y(:,:,:)
   integer(hid_t), allocatable :: esc_id(:)

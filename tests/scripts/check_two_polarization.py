@@ -21,7 +21,10 @@ reference file is involved:
      longitudinal and blind to polarization: this is the crossed-polarized afterburner.
      Both FEL modes run, and the two modes must agree within 0.5 in |ln| of the y power.
   3. Ledger. The unaveraged time-dependent closure holds on the crossed line, since
-     kick and deposit are exact duals per component.
+     kick and deposit are exact duals per component. The same run keeps its escaped
+     file (run.write_escaped): both polarizations sit in each file, the pulse's rows are
+     the escaped file's, and the header's stated bank bytes are the two files' own
+     (bank_bytes.py).
   4. Thread identity. 1 and 8 threads are byte-identical on the crossed unaveraged run.
   5. Helical re-anchor. A helical run is forced onto the two-polarization path by a
      y-polarized seed of negligible power, which makes Ey live. The run must reproduce
@@ -49,6 +52,7 @@ import sys
 
 import numpy as np
 
+import bank_bytes
 import fieldio
 from checkrec import record
 
@@ -116,6 +120,7 @@ def run(exe, wd, name, text, threads="8"):
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
         sys.exit(1)
+    return r
 
 
 def refuse(exe, wd, name, text, fragment):
@@ -235,8 +240,8 @@ def main():
     check("crossed: averaged vs unaveraged y-power, |ln ratio| (priced)", lnr, 0.5)
 
     # 3. Ledger on a time-dependent crossed unaveraged run, with slippage and escape live.
-    run(exe, wd, "p2t_uv", NML.format(lat="p2_c_uv.bmad", root="p2t_uv",
-                                      extra="  keep_escaped_field = T\n"))
+    r_uv = run(exe, wd, "p2t_uv", NML.format(lat="p2_c_uv.bmad", root="p2t_uv",
+                                             extra="  keep_escaped_field = T\n  write_escaped = T\n"))
     led = np.loadtxt(wd / "p2t_uv.ledger.txt")
     etot = led[:, 1] + led[:, 2] + led[:, 4] - led[:, 5] + led[:, 6]
     turn = np.abs(np.diff(led[:, 2])).sum() + abs(led[-1, 4]) + abs(led[-1, 5]) + abs(led[-1, 6])
@@ -256,6 +261,23 @@ def main():
             and g["wavefrontParams"].shape == g["wavefrontParamsY"].shape == (len(g["zTransmit"]), 25)
     check("crossed: the escaped file's params come per polarization, one row per plane (0 = yes)",
           0.0 if both else 1.0, 0.5)
+    with h5py.File(wd / "p2t_uv-escaped.wf.h5") as he, h5py.File(wd / "p2t_uv-pulse.wf.h5") as hp:
+        # An empty plane has no moments, and its row is NaN in both files.
+        same = all(np.array_equal(he["lucifer/escaped/" + k][...], hp["lucifer/pulse/" + k][...], equal_nan=True)
+                   for k in ("zTransmit", "wavefrontParams", "wavefrontParamsY"))
+    check("crossed: the pulse's lucifer/pulse rows equal the escaped file's, both polarizations (0 = yes)",
+          0.0 if same else 1.0, 0.5)
+
+    # 3c. The header states the bank's bytes before the run tracks, both components in each
+    #     file. The run keeps the escaped file, so the statement is the two files.
+    n_rot, members = bank_bytes.stated(r_uv.stdout)
+    on_disk = sum(bank_bytes.kept(wd, "p2t_uv", 1))
+    if 1 in members:
+        check("crossed: the stated pulse and escaped files vs on disk, both polarizations, rel",
+              abs(members[1][0] / on_disk - 1), bank_bytes.TOLERANCE,
+              note=f"[{n_rot} slices, {members[1][0]:.4e} stated, {on_disk} on disk]")
+    else:
+        check("crossed: the header states the bank (0 = yes)", 1.0, 0.5)
 
     # 4. Thread identity on the time-dependent crossed unaveraged run.
     run(exe, wd, "p2t_uv1", NML.format(lat="p2_c_uv.bmad", root="p2t_uv1",

@@ -3440,6 +3440,31 @@ Input:
   run -- fel_run_struct: The fully set-up run state.
 ```
 
+(api-write-bank-bytes)=
+### `write_bank_bytes`
+
+*Subroutine* `()`
+
+```
+Routine to state, before the run tracks, what the escaped-field bank will write: the
+slices that leave the window and, per member of the field set, the bytes of the files
+the run keeps and the peak while the escaped file and the pulse are both on disk
+(fel_finalize_diagnostics). So a pulse of gigabytes is stated before the run rather than
+discovered on a full disk.
+
+The slices are the rotations the walk makes over the tracked elements, from the
+schedule's own slippage (fel_setup_slippage): the record rotates once |accuslip| passes
+0.8 of a slice, so S wavelengths give the least integer at or above S/n_wavelength - 0.8.
+The k-th slice to leave is the window's slice nslice - k + 1 at the start, carried to
+the head with what the beam there radiated into it. So light leaves only if one of the
+last n_rot slices holds charge or field at the start. A derived window puts its headroom
+there, and a run whose light stays in the window states nothing, as it writes nothing.
+
+A file holds 16 bytes a grid point a component, a plane per slice, and a row of 25
+params a component and the transmission position per banked slice. The pulse holds the
+window's slices too.
+```
+
 (api-fel-write-footer)=
 ### `fel_write_footer`
 
@@ -3452,7 +3477,8 @@ thing on screen is the list of what to open.
 
 The list is also what lucifer.runner.Result reads to find the run's dumps, so it names
 every dump this run wrote and no other: the initial state, the dumps at elements, the
-final state, the escaped light and the pulse, and the frames. A frame series is one
+final state, the pulse and the escaped file it was built from when write_escaped kept
+it, and the frames. A frame series is one
 line per kind of file, its record numbers written as a shell brace range,
 <out_root>-{000001..000012}.beam.h5, with the size of the whole series.
 ```
@@ -3556,10 +3582,17 @@ Output:
 ```
 Routine to drain the slippage bank. Each slice carried out streams to the escaped
 file, <out_root>-escaped.wf.h5, as it leaves, so peak memory is a handful of grid
-planes. The file is an openPMD EXT_Wavefront file (wavefront_openpmd_mod), made at
-the first slice to leave with the live window's grid and wavelength and component
-datasets that grow along z (wavefront_openpmd_create). Its planes are in V/m, as the
-dumps are. Each slice's wavefront_params and transmission z are kept in run%bank_pms
+planes. The file is an openPMD EXT_Wavefront file (wavefront_openpmd_mod), made with
+the live window's grid and wavelength and component datasets that grow along z
+(wavefront_openpmd_create). Its planes are in V/m, as the dumps are.
+
+The file is made when the first plane with light leaves. The planes before it are the
+empty slices ahead of the bunch, all zero, and they are written then as the file's
+first planes, so the file is the same as if it had been made at the first slice. A run
+whose light never leaves the window, as a derived window holds the slippage, makes no
+file at all. Until the file is made, run%n_banked counts the zero planes.
+
+Each slice's wavefront_params and transmission z are kept in run%bank_pms
 and run%bank_z, the params the full 4x4 at bank time, which the analytic free-space
 propagation of pulse statistics needs. They go into the file at finalize
 (fel_order_bank).
@@ -3597,8 +3630,10 @@ fel_drain_bank writes the planes in transmission order as they leave. Light leav
 the window's head, so the k-th to leave is the (n_banked - k + 1)-th in increasing
 position along the pulse, which is the mesh's order. The planes are reversed in place,
 two at a time, so peak memory stays at a few planes. The group lucifer/escaped is then
-written, with each plane's transmission position and wavefront params in the mesh's
-order. run%bank_z and run%bank_pms stay in transmission order.
+written (fel_write_bank_group). run%bank_z and run%bank_pms stay in transmission order.
+
+Only a run that keeps the escaped file (write_escaped) orders it. Otherwise the pulse is
+read from it in transmission order and the file is removed.
 ```
 
 ```
@@ -3617,6 +3652,32 @@ Output:
 
 ```
 Routine to exchange planes k and n - k + 1 of one component.
+```
+
+(api-fel-write-bank-group)=
+### `fel_write_bank_group`
+
+*Subroutine* `(f_id, run, ihh, group, description, err_flag)`
+
+```
+Routine to write what openPMD has no name for beside a file's standard records: where
+each banked plane left the window, and its moments then. The group is
+lucifer/<group>, lucifer/escaped in the escaped file and lucifer/pulse in the pulse,
+and holds zTransmit and wavefrontParams, with wavefrontParamsY for a y component, one
+row per banked plane in the mesh's order. That is the reverse of run%bank_z's
+transmission order. The two files' groups hold the same rows.
+```
+
+```
+Input:
+  f_id        -- integer(hid_t): The open file.
+  run         -- fel_run_struct: Run state. run%bank_z and run%bank_pms hold the rows.
+  ihh         -- integer: Field-set index.
+  group       -- character(*): 'escaped' or 'pulse'.
+  description -- character(*): The group's description attribute.
+
+Output:
+  err_flag    -- logical: Set True on an HDF5 error. False otherwise.
 ```
 
 (api-fel-bank-file-name)=
@@ -3647,14 +3708,15 @@ Output:
 
 ```
 Routine to finalize the run's file diagnostics: the stats file always. With
-keep_escaped_field, also the escaped file's order and private group and the full
-pulse at the exit plane.
+keep_escaped_field, also the full pulse at the exit plane. The escaped file it is
+built from is then removed, unless write_escaped keeps it, which also puts it in the
+mesh's order and writes its private group.
 
 For the pulse, each banked slice is read back and free-space propagated over
 z_end - z_transmit. Transmitted light is fixed information, and undulator vacuum is
 free space for light with no beam under it. The slices are concatenated above the
 live window. Earliest-transmitted light is furthest ahead. So banked slice k lands at
-pulse index nslice + (run%n_banked - k + 1), which is also its plane in the finished
+pulse index nslice + (run%n_banked - k + 1), which is also its plane in a kept
 escaped file (fel_order_bank). The caller has already unrotated the live window (the
 final-dump cshift).
 
@@ -3664,7 +3726,11 @@ of a file's first plane: 0 for the pulse, whose first plane is the live window's
 and nslice times the slice spacing for the escaped file, whose first plane is the
 slot just past the window's head. Neither is the beamline position, which is
 zCoordinate: the exit plane for the pulse, and NaN for the escaped file, whose planes
-each left at their own (lucifer/escaped/zTransmit).
+each left at their own (lucifer/escaped/zTransmit). The pulse carries the same rows in
+lucifer/pulse, so the one file holds all the escaped file holds but the raw planes.
+
+The escaped file and the pulse are both on disk while the pulse is written, which is the
+peak the header states. A pulse of many gigabytes needs room for both.
 ```
 
 ```
@@ -3676,19 +3742,31 @@ Output:
   err_flag  -- logical: Set True on a write error. False otherwise.
 ```
 
+(api-delete-escaped)=
+### `delete_escaped`
+
+*Subroutine* `()`
+
+```
+Routine to remove field ihh's escaped file.
+```
+
 (api-fel-write-pulse-file)=
 ### `fel_write_pulse_file`
 
-*Subroutine* `(run, fname, ihh, err_flag)`
+*Subroutine* `(run, fname, ihh, ordered, err_flag)`
 
 ```
 Routine to write the full exit-plane pulse of one field as an openPMD EXT_Wavefront
 file: the live window's slices, then each banked slice read back from the escaped
-file and free-space propagated over z_end - z_transmit. The escaped file is in the
-mesh's order by now (fel_order_bank). So its plane i lands at pulse plane nslice + i.
-The transmission z of that plane is run%bank_z(n_banked - i + 1), which stays in
-transmission order. The planes are written one at a time, so peak memory is a few
-planes whatever the pulse's length.
+file and free-space propagated over z_end - z_transmit. Pulse plane nslice + i is the
+i-th banked plane in the mesh's order, whose transmission z is
+run%bank_z(n_banked - i + 1), which stays in transmission order. A kept escaped file
+is in the mesh's order by now (fel_order_bank), and the plane is its plane i. One
+that is to be removed is in transmission order, and the plane is its plane
+n_banked - i + 1. The planes are written one at a time, so peak memory is a few
+planes whatever the pulse's length. The group lucifer/pulse then holds each banked
+plane's transmission z and params, the rows of the escaped file's lucifer/escaped.
 ```
 
 ```
@@ -3696,6 +3774,7 @@ Input:
   run       -- fel_run_struct: Run state.
   fname     -- character(*): Pulse file to write.
   ihh       -- integer: Field-set index.
+  ordered   -- logical: Is the escaped file in the mesh's order?
 
 Output:
   err_flag  -- logical: Set True on a read or write error. False otherwise.
@@ -4228,9 +4307,11 @@ l_period/20 by the input file's own choice is derived over. Any other stated ste
 (api-fel-setup-slippage)=
 ### `fel_setup_slippage`
 
-*Subroutine* `(run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, slip_chic, err_flag)`
+*Subroutine* `(run, gamma0_ref, lambda, ele_slip, light_corr, slip_und, slip_int, slip_chic,`
 
 ```
+                               err_flag, und_slip)
+
 Routine to sum the slippage the walk applies over the line, in fundamental
 wavelengths. Two callers take this one sum: fel_setup_schedule, which gives the walk
 its rotations at each element's last step, and fel_init_beam, which gives a derived
@@ -4240,8 +4321,8 @@ slips, and the two cannot disagree.
 Three terms (fel-physics.md sec-slippage, sec-window, sec-phasing):
   Undulator steps. Each FEL element slips l (1 + aw^2) / (2 gamma0_ref^2 lambda), which
     the walk applies step by step as dz (1 + aw^2) / (2 gamma0_ref^2 lambda). At
-    resonance that is one wavelength per period. Returned as slip_und, and not in
-    ele_slip.
+    resonance that is one wavelength per period. Returned as slip_und, per element
+    in und_slip, and not in ele_slip.
   Interludes. Drift autophasing: interludes accumulate Lz, and the last interlude
     before each undulator gets floor(Lz/(2*gamma0^2*lambda)) + 1 wavelengths
     (Lattice.cpp:171-174, guarded there by Lz > 0). The end-of-lattice fixup
@@ -4272,6 +4353,8 @@ Output:
   slip_chic     -- integer: The chicanes' rotations.
   err_flag      -- logical: Set True on a refusal: a geometry element inside a
                      genesis-model interlude, or a break that is not a closed bump.
+  und_slip(:)   -- real(rp), optional: Each FEL element's undulator steps' slippage
+                     [wavelengths], zero elsewhere, sized as ele_slip. Its sum is slip_und.
 ```
 
 (api-setup-break-geometry)=

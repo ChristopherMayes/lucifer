@@ -8,7 +8,7 @@ runner   runs the program on an input file and hands back where its output went.
 dumps    a run's particle and field dumps, as files and as objects read on first use.
 stats    reads the stats file.
 beam     reads a particle dump, openPMD or Genesis, into per-slice arrays.
-field    reads the escaped-field bank, its planes as a Wavefront with where each left.
+field    reads the pulse and the escaped-field bank, as a Wavefront with where each plane left.
 plot     plots a stats file against s with the lattice layout, and its summary figure.
 
 Nothing here holds a default the program does not, generates anything but the TOML the

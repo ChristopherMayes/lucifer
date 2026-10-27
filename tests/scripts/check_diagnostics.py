@@ -21,7 +21,11 @@ rather than by a reference file.
   5. Thread invariance. Every dataset of the stats, escaped and pulse files is identical
      at 1 and 8 threads. The comparison is by dataset, since HDF5 headers embed
      creation times. Also zero-length wake elements of both polarities.
-  6. Refusal. A dump_beam_at entry that matches no element is refused.
+     The checks that read the escaped file set run.write_escaped. A run that does not
+     keeps the pulse alone, whose lucifer/pulse rows are the escaped file's, and the
+     header's stated bytes are held to the files on disk (bank_bytes.py).
+  6. Refusal. A dump_beam_at entry that matches no element is refused, and so is
+     run.write_escaped with the bank off.
   7. The pre-run. The header's work count, cost estimate and load standing, the footer's
      thin-slice list on an input file loaded under the measured floor, load_only stopping
      after the header, and the refusal of a harmonic at which the load carries no shot
@@ -76,6 +80,7 @@ from lucifer.stats import read_stats, same_data  # noqa: E402
 import lucifer.beam as beamio
 from lucifer.beam import read_slices  # noqa: E402
 from lucifer.field import read_escaped  # noqa: E402
+import bank_bytes  # noqa: E402
 import fieldio  # noqa: E402
 
 import validate_bmad_stats  # noqa: E402  The standard's own conformance checker.
@@ -105,6 +110,7 @@ NML = """! flat keys; routed into the input file's tables by lucifer.flat.to_tom
   shot_noise = T
   ran_seed = 999
   keep_escaped_field = T
+  write_escaped = T
   dump_beam_at = "UND"
   dump_field_at = "UND"
 {extra}&end
@@ -730,7 +736,7 @@ def main():
     (wd / "aramis_1seg.bmad").write_bytes((latdir / "aramis_1seg.bmad").read_bytes())
     (wd / "dg_wrap.bmad").write_text(WRAP)
 
-    run(exe, wd, "dg", NML.format(lat="dg_wrap.bmad", root="dg", extra=""))
+    r_dg = run(exe, wd, "dg", NML.format(lat="dg_wrap.bmad", root="dg", extra=""))
 
     # 0. The acceptance test is the standard's own validator, which knows no program. A
     # bmad-stats file conforms when the validator reports zero MUST failures, and
@@ -1065,6 +1071,63 @@ def main():
     if falls == 0:
         check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
 
+    # 2c. The pulse alone. Without run.write_escaped a run keeps the pulse and removes the
+    # escaped file it was built from, so the directory holds the one file and the footer
+    # lists it alone. The pulse's lucifer/pulse group holds the rows of the escaped file's
+    # lucifer/escaped, so the one file keeps all the escaped file held but the raw planes:
+    # its rows equal those of dg, the same run with the escaped file kept, and of dg's own
+    # escaped file, exactly. The pulse is read from the escaped file in transmission order
+    # here and in the mesh's order in dg, and the two pulses are identical.
+    r_dgp = run(exe, wd, "dgp", NML.format(lat="dg_wrap.bmad", root="dgp", extra="").replace(
+        "  write_escaped = T\n", ""))
+    left = sorted(f.name for f in wd.glob("dgp-*.wf.h5") if "-escaped" in f.name or "-pulse" in f.name)
+    check("pulse alone: a default run keeps the pulse file and no escaped file (0 = yes)",
+          0.0 if left == ["dgp-pulse.wf.h5"] else 1.0, 0.5, note=f"[{left}]")
+    footer = r_dgp.stdout[r_dgp.stdout.rfind(" Wrote"):]
+    check("pulse alone: the footer lists the pulse and no escaped file (0 = yes)",
+          0.0 if "dgp-pulse.wf.h5" in footer and "escaped" not in footer else 1.0, 0.5)
+    # An empty plane has no moments, and its row is NaN in every file. NaN equals NaN here.
+    worst_rows = 0.0
+    with h5py.File(wd / "dgp-pulse.wf.h5") as hp, h5py.File(wd / "dg-pulse.wf.h5") as hq, \
+            h5py.File(wd / "dg-escaped.wf.h5") as he:
+        for name in ("zTransmit", "wavefrontParams"):
+            rows_e = he["lucifer/escaped/" + name][...]
+            for h in (hp, hq):
+                rows_p = h["lucifer/pulse/" + name][...]
+                if not np.array_equal(rows_p, rows_e, equal_nan=True):
+                    worst_rows = max(worst_rows, float(np.nanmax(np.abs(rows_p - rows_e)))
+                                     if rows_p.shape == rows_e.shape else float("inf"))
+                    worst_rows = worst_rows or float("inf")
+        n_rows = len(he["lucifer/escaped/zTransmit"])
+        n_nan = int(np.isnan(he["lucifer/escaped/wavefrontParams"][:, 20]).sum())
+    check("pulse alone: lucifer/pulse rows of dgp and dg vs dg's lucifer/escaped, max abs",
+          worst_rows, 0.0, note=f"[{n_rows} rows, {n_nan} of them an empty plane's]")
+    check("pulse alone: dgp's pulse identical to dg's (0 = yes)",
+          0.0 if h5_identical(wd / "dgp-pulse.wf.h5", wd / "dg-pulse.wf.h5") else 1.0, 0.5)
+
+    # 2d. The header states the bank's bytes before the run tracks: per member the files
+    # the run keeps, and the peak while the escaped file and the pulse are both on disk.
+    # dg keeps both, so its statement is the two files. dgp keeps the pulse, and its
+    # peak is its pulse with the escaped file dg kept. The estimate counts planes and
+    # rows, and HDF5's headers are the rest.
+    n_dg, st_dg = bank_bytes.stated(r_dg.stdout)
+    n_dgp, st_dgp = bank_bytes.stated(r_dgp.stdout)
+    on_dg = sum(bank_bytes.kept(wd, "dg", 1))
+    on_dgp = bank_bytes.kept(wd, "dgp", 1)[0]
+    if 1 in st_dg and 1 in st_dgp:
+        check("bank bytes: dg's stated pulse and escaped files vs on disk, rel",
+              abs(st_dg[1][0] / on_dg - 1), bank_bytes.TOLERANCE,
+              note=f"[{n_dg} slices, {st_dg[1][0]:.4e} stated, {on_dg} on disk]")
+        check("bank bytes: dgp's stated pulse file vs on disk, rel",
+              abs(st_dgp[1][0] / on_dgp - 1), bank_bytes.TOLERANCE,
+              note=f"[{st_dgp[1][0]:.4e} stated, {on_dgp} on disk]")
+        peak = on_dgp + bank_bytes.kept(wd, "dg", 1)[1]
+        check("bank bytes: dgp's stated peak vs its pulse and dg's escaped file, rel",
+              abs(st_dgp[1][1] / peak - 1), bank_bytes.TOLERANCE,
+              note=f"[{st_dgp[1][1]:.4e} stated, {peak} on disk]")
+    else:
+        check("bank bytes: dg and dgp state the bank in the header (0 = yes)", 1.0, 0.5)
+
     # A derived window has room ahead of the bunch for all the slippage the run applies,
     # so it keeps the light the bunch makes: escaped_energy is zero at every record, and
     # with nothing banked neither the escaped nor the pulse file is written. The headroom
@@ -1085,6 +1148,7 @@ def main():
         check(f"window: {tag}'s derived window loses no light, escaped_energy max [J]", esc_w, 0.0,
               note=f"[{n_slice_w} slices; field files {files_w or 'none'}]")
         check(f"window: {tag} writes no escaped or pulse file (count)", float(len(files_w)), 0.0)
+        check(f"window: {tag}'s header states no bank (slices)", float(bank_bytes.stated(r.stdout)[0]), 0.0)
         headroom_checks(tag, r.stdout, 1, chicane=3 if tag == "dgc" else 0)
 
     # 3. Analytic (moment-map) vs numerical (FFT) propagation to the exit plane. The
@@ -1209,6 +1273,15 @@ def main():
                        env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
     refused = r.returncode != 0 and "NO_SUCH_ELEMENT" in (r.stdout + r.stderr)
     check("refusal: unknown dump_beam_at element refused (0 = yes)",
+          0.0 if refused else 1.0, 0.5)
+
+    # The escaped file is the bank's, so asking for it with the bank off is refused.
+    (wd / "dg_noesc.toml").write_text(to_groups(NML.format(lat="dg_wrap.bmad", root="dg_noesc", extra="").replace(
+        "keep_escaped_field = T", "keep_escaped_field = F")))
+    r = subprocess.run([str(exe), "dg_noesc.toml"], cwd=wd, capture_output=True, text=True,
+                       env={"OMP_NUM_THREADS": "4", "PATH": "/usr/bin:/bin"})
+    refused = r.returncode != 0 and "WRITE_ESCAPED = T KEEPS THE ESCAPED FILE" in (r.stdout + r.stderr)
+    check("refusal: write_escaped with keep_escaped_field = F refused (0 = yes)",
           0.0 if refused else 1.0, 0.5)
 
     # 7. The pre-run (docs/user-guide.md). The input file loads 512 macroparticles per slice in

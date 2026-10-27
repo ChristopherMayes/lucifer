@@ -308,14 +308,14 @@ def page_examples(exe, wd):
                 "beam.shot_noise=true", "window.window_length=6e-10", "window.n_wavelength=1",
                 "run.out_root=td"])
             # example: field
-            from beamphysics.wavefront import Wavefront
-            from lucifer.field import read_escaped
+            from lucifer.field import read_pulse
 
-            pulse = Wavefront.from_openpmd("td-pulse.wf.h5")   # the whole pulse at the exit, Ex (nx, ny, nz)
-            esc = read_escaped("td-escaped.wf.h5")
-            esc.z_transmit                                     # (n,) where along the lattice each plane left [m]
-            esc.params[:, 20]                                  # each plane's energy when it left [J]
+            pulse = read_pulse("td-pulse.wf.h5")   # the whole pulse at the exit
+            pulse.wavefront.Ex.shape               # (nx, ny, nz), the window's planes and then the banked
+            pulse.z_transmit                       # (n,) where along the lattice each banked plane left [m]
+            pulse.params[:, 20]                    # each banked plane's energy when it left [J]
             # end example: field
+            td_left = sorted(f.name for f in pathlib.Path(".").glob("td-*.wf.h5"))
 
             # example: dumps
             L.output.particle_files              # {'final': PosixPath('.../page-final.beam.h5')}
@@ -326,12 +326,14 @@ def page_examples(exe, wd):
             # end example: dumps
 
             # A time-dependent run with every kind of dump: the initial state, the beam and
-            # the field at the end of the undulator, a frame at every record, and the bank.
+            # the field at the end of the undulator, a frame at every record, and the pulse
+            # with the escaped file it was built from.
             every = run("lucifer.toml", threads=4, overrides=[
                 "beam.z_distribution=GRID", "beam.z_min=-2.5e-10", "beam.z_max=2.5e-10",
                 "beam.shot_noise=true", "window.window_length=6e-10", "window.n_wavelength=1",
                 "run.write_initial=true", 'run.dump_beam_at=["UND"]', 'run.dump_field_at=["UND"]',
-                "run.dump_at_comb=true", "run.comb_ds_save=0.1", "run.out_root=every"])
+                "run.dump_at_comb=true", "run.comb_ds_save=0.1", "run.write_escaped=true",
+                "run.out_root=every"])
             every_repr = repr(every.particles)
             every_loaded_before = list(every.particles.loaded)
             every_whole = every.particles["final"]
@@ -398,10 +400,11 @@ def page_examples(exe, wd):
     check("the page's beam example: the final dump read into slices", ok, note=f"[{slices[0]['n']} particles]")
     with read_stats(page / "td.stats.h5") as st:
         n_window = len(st.coord("slice"))
-    ok = (pulse.nz == n_window + esc.wavefront.nz and esc.wavefront.nz == len(esc.z_transmit)
-          and esc.params.shape == (esc.wavefront.nz, 25) and np.isnan(esc.wavefront.s_position))
-    check("the page's field example: the pulse holds the window and the banked planes", ok,
-          note=f"[{n_window} in the window, {esc.wavefront.nz} banked]")
+    n_banked = len(pulse.z_transmit)
+    ok = (pulse.n_window == n_window and pulse.wavefront.nz == n_window + n_banked
+          and pulse.params.shape == (n_banked, 25) and td_left == ["td-final.wf.h5", "td-pulse.wf.h5"])
+    check("the page's field example: the pulse holds the window and the banked planes, alone", ok,
+          note=f"[{n_window} in the window, {n_banked} banked, field files {td_left}]")
     ok = len(P) == 1024 and type(W).__name__ == "Wavefront" and len(one) == 1024 and list(L.output.particles.loaded) == ["final"]
     check("the page's dumps example: the final dumps read on first access, one slice from its patch", ok,
           note=f"[{len(P)} particles, field {W.Ex.shape}]")

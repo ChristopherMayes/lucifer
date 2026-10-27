@@ -40,7 +40,7 @@ The archive of a run is its stats file, which holds the input file the run read 
 (python-dumps)=
 ### The dumps
 
-A run's particle and field dumps stay on disk until they are asked for, since a run's dumps are often gigabytes. `output.particle_files` and `output.field_files` map a key to the file, from the list of files the run's footer prints: `final` and `initial`, `at<n>-<element>` for a dump at the end of element n, a frame by its record number, and `escaped` and `pulse` for the fields, with `-h<h>` for a harmonic. Both polarizations are components of one file. `output.particles` and `output.fields` map the same keys to openPMD-beamphysics objects, each read on first access and kept, a `ParticleGroup` for a beam dump and a `Wavefront` for a field dump:
+A run's particle and field dumps stay on disk until they are asked for, since a run's dumps are often gigabytes. `output.particle_files` and `output.field_files` map a key to the file, from the list of files the run's footer prints: `final` and `initial`, `at<n>-<element>` for a dump at the end of element n, a frame by its record number, and `pulse` for the fields, with `escaped` beside it when `run.write_escaped` kept it, and `-h<h>` for a harmonic. Both polarizations are components of one file. `output.particles` and `output.fields` map the same keys to openPMD-beamphysics objects, each read on first access and kept, a `ParticleGroup` for a beam dump and a `Wavefront` for a field dump:
 
 % example: dumps
 ```python
@@ -165,17 +165,16 @@ slices = read_slices("n1024-final.beam.h5", wavelength=inp.field.lambda0)
 slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
 ```
 
-`lucifer.field` reads the escaped-field bank, `<out_root>-escaped.wf.h5`: the light that slipped out of the window, each plane as it was when it left, with where each left and its moments then. The whole pulse at the exit, `<out_root>-pulse.wf.h5`, is an openPMD wavefront file like every field dump, so openpmd-beamphysics reads it whole. Both come from a run whose window let light out, here a time-dependent run of the same input:
+`lucifer.field` reads the whole pulse at the exit, `<out_root>-pulse.wf.h5`, which a run whose window let light out keeps: the window's planes and then the light that slipped out of the window, each banked plane drifted to the exit, with where each left and its moments when it left. The pulse is an openPMD wavefront file like every field dump, so openpmd-beamphysics reads it whole, and `read_pulse` adds the two arrays of its `lucifer/pulse` group. With `run.write_escaped` the run also keeps the bank the pulse was built from, `<out_root>-escaped.wf.h5`, each plane as it was when it left, which `read_escaped` reads with the same two arrays. A time-dependent run of the same input lets light out:
 
 % example: field
 ```python
-from beamphysics.wavefront import Wavefront
-from lucifer.field import read_escaped
+from lucifer.field import read_pulse
 
-pulse = Wavefront.from_openpmd("td-pulse.wf.h5")   # the whole pulse at the exit, Ex (nx, ny, nz)
-esc = read_escaped("td-escaped.wf.h5")
-esc.z_transmit                                     # (n,) where along the lattice each plane left [m]
-esc.params[:, 20]                                  # each plane's energy when it left [J]
+pulse = read_pulse("td-pulse.wf.h5")   # the whole pulse at the exit
+pulse.wavefront.Ex.shape               # (nx, ny, nz), the window's planes and then the banked
+pulse.z_transmit                       # (n,) where along the lattice each banked plane left [m]
+pulse.params[:, 20]                    # each banked plane's energy when it left [J]
 ```
 
 `tests/scripts/validate_bmad_stats.py` is the format's conformance checker. It knows no program and no extension, needs only numpy and h5py, and exits nonzero on any failure:

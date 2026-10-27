@@ -8,8 +8,9 @@ LUME-Genesis keys its files by:
     final, initial          the state after the last element and before the first
     at<n>-<element>         the dump at the end of element n (dump_beam_at, dump_field_at)
     5, 6, ...               a frame, by the record it was taken at (dump_at_comb)
-    escaped, pulse          the light slippage carried out of the window, and the whole
-                            pulse at the exit (keep_escaped_field), fields only
+    pulse, escaped          the whole pulse at the exit (keep_escaped_field), and the light
+                            slippage carried out of the window as it left (write_escaped),
+                            fields only
 
 A harmonic's field file adds ``-h<h>`` to the key, ``final-h3`` or ``5-h3``. Both
 polarizations of a field are components of one file, so they share a key.

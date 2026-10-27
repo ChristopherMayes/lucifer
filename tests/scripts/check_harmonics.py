@@ -24,7 +24,9 @@ sec-field-set):
      particles. There is no gain and no diffraction to speak of, so this pins the
      normalization of the harmonic deposit independently of Genesis.
   4. Thread identity. 1 and 8 threads are byte-identical on a time-dependent
-     harmonic run: the diag byte-equal and the harmonic dumps dataset-equal.
+     harmonic run: the diag byte-equal and the harmonic dumps dataset-equal. The same
+     run's header states each member's bank bytes, held to the pulse files it kept
+     (bank_bytes.py).
   5. Refusals. Harmonics not anchored on the fundamental. Harmonic fields with an
      unaveraged element. Harmonic fields with two live polarizations. An openPMD
      import declaring the frequency domain. A harmonic import whose photonEnergy
@@ -50,6 +52,7 @@ import h5py
 import numpy as np
 
 import lucifer.beam as beamio
+import bank_bytes
 import convert_genesis
 import fieldio
 from checkrec import record
@@ -212,6 +215,7 @@ def run(exe, wd, name, text, threads="8"):
     if r.returncode != 0:
         print(f"FAIL: {name} exited {r.returncode}:\n{r.stdout[-2500:]}\n{r.stderr[-800:]}")
         sys.exit(1)
+    return r
 
 
 def refuse(exe, wd, name, text, fragment):
@@ -505,10 +509,24 @@ def main():
 
     print("== thread identity (TD, harmonics 1+3) ==")
     run(exe, wd, "h3t1", NML_TD.format(lat="planar.bmad", root="h3t1", extra=""), threads="1")
-    run(exe, wd, "h3t8", NML_TD.format(lat="planar.bmad", root="h3t8", extra=""), threads="8")
+    r_t8 = run(exe, wd, "h3t8", NML_TD.format(lat="planar.bmad", root="h3t8", extra=""), threads="8")
     same = (wd / "h3t1.diag.txt").read_bytes() == (wd / "h3t8.diag.txt").read_bytes()
     same = same and fields_identical(wd / "h3t1-final-h3.wf.h5", wd / "h3t8-final-h3.wf.h5")
     check("1 vs 8 threads byte/dataset-identical", 0.0 if same else 1.0, 0.5)
+
+    # The header states each member's bank before the run tracks. The seed fills the
+    # window, so light leaves it, and the run keeps one pulse file a member and no
+    # escaped file.
+    n_rot, members = bank_bytes.stated(r_t8.stdout)
+    for h in (1, 3):
+        pulse_b, esc_b = bank_bytes.kept(wd, "h3t8", h)
+        if h in members and pulse_b > 0 and esc_b == 0:
+            check(f"bank bytes: h{h}'s stated pulse file vs on disk, rel",
+                  abs(members[h][0] / pulse_b - 1), bank_bytes.TOLERANCE,
+                  note=f"[{n_rot} slices, {members[h][0]:.4e} stated, {pulse_b} on disk]")
+        else:
+            check(f"bank bytes: h{h} states its bank and keeps its pulse alone (0 = yes)", 1.0, 0.5,
+                  note=f"[stated {sorted(members)}, pulse {pulse_b}, escaped {esc_b} bytes]")
 
     # ------------------------------------------------------------------
     # 5. Refusals.
