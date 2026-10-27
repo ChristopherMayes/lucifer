@@ -1,8 +1,9 @@
 # The part of Lucifer's validation that needs no Fortran build.
 #
-# The keystone runs eleven comparison tiers and twenty-five check sections against a
-# genesis4 binary, which needs the whole distribution built and the reference installed.
-# That is lucifer-keystone.yml, which costs a build and runs on demand. What fits here is
+# The keystone runs eleven comparison tiers and twenty-eight check sections against a
+# genesis4 binary, which needs a Lucifer build and the reference installed. Its Linux
+# counterpart is lucifer-keystone.yml, which builds against the conda-forge bmad package
+# on every push to main and weekly, at the cost of a build. What fits here is
 # everything that only reads files, so it runs on every push: the documentation builds,
 # the input reference agrees with the Fortran declarations, the examples agree with the
 # feature list, and the generated example pages are current.
@@ -43,14 +44,12 @@ jobs:
         with:
           node-version: "20"
 
-      # pip rather than conda-forge here, which is the opposite of the rule for a
+      # npm and pip rather than conda-forge here, which is the opposite of the rule for a
       # workstation. A runner is thrown away after the job, so there is no shared
       # environment for an install to escape into.
       - name: Install mystmd
         run: npm install -g mystmd
 
-      # The three conformance checks are standard library only, so nothing else is
-      # installed. If one of them ever needs numpy, it stops belonging in this job.
       # The repository's own Python package, which the conformance checks import,
       # pytest for its tests, and numpy and h5py, since the package's two readers import
       # them and the Python reference imports every module to read its docstrings. Two
