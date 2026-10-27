@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-27 Changed: `check_retired_words.py` fails on `run_fel_benchmark` and on the word benchmark
+  standing alone, any case, so `the benchmark`, `a benchmark pass` and `BENCHMARK` are refused. The
+  performance benchmark, the advance benchmark, `Benchmark1-SASE`, `microbenchmark` and Genesis4's
+  `benchmark/` directory in a path pass.
 - 2026-10-27 Added: `docs/validation.md` opens with a definition of the keystone and a table of every
   test: the Genesis4 tiers, the check sections, the recorded digits, Bmad's regression suite, the
   wavefront validation, the examples and the performance benchmark. Each row gives what the test

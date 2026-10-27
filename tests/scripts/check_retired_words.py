@@ -27,6 +27,14 @@ through the pages and comments before it was noticed:
                    and Genesis4 says main input file. The file a run reads is the input
                    file, and its keys are input keys. An identifier carrying the word is
                    a hit too, make_deck or Deck, since a name is read as a word.
+  run_fel_benchmark, the validation suite's old name. It is tests/run_fel_validation.sh.
+  benchmark        the word, standing alone, for a run that judges no wall clock. A CI
+                   step named for it read as a timing run on a shared runner. The run that
+                   compares against Genesis4 and holds the check sections is the
+                   validation suite, and the line it compares on is Benchmark1-SASE.
+                   The performance benchmark and the advance benchmark measure time and
+                   keep the word, and so do Benchmark1-SASE, microbenchmark and Genesis4's
+                   own benchmark/ directory in a path.
 
 A retired word in a quoted title or a URL is still a hit, so the list stays short and
 the words plain.
@@ -50,6 +58,11 @@ RETIRED = [
     # The word alone or inside an identifier: deck, Deck, DECK, make_deck, deck_path,
     # GENESIS_DECK, DeckOps. Not inside a longer word, so bedeck and decker would pass.
     ("deck", re.compile(r"(?:\b|_|(?<=[a-z]))[Dd][Ee][Cc][Kk]s?(?=\b|_|[A-Z])|\bDECKS?(?=\b|_)")),
+    ("run_fel_benchmark", re.compile(r"run_fel_benchmark")),
+    # The word alone, any case: the benchmark, a benchmark pass, BENCHMARK. Not after
+    # performance or advance, not inside Benchmark1-SASE or microbenchmark, and not as
+    # Genesis4's benchmark/ directory.
+    ("benchmark", re.compile(r"(?<!performance )(?<!advance )\bbenchmarks?(?:'s)?\b(?!/)", re.I)),
 ]
 SUFFIXES = (".md", ".py", ".sh", ".f90", ".yml", ".yaml", ".cmake", ".txt", ".c", ".h", ".mm", ".in",
             ".toml", ".tsv", ".json", ".bmad", ".lat")
