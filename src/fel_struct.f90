@@ -199,7 +199,7 @@ type fel_global_struct
   logical :: write_initial = .false.         ! Dump the initial state before tracking.
   logical :: load_only = .false.             ! Build the initial state, dump it, stop.
   logical :: keep_escaped_field = .true.     ! Keep the escaped light, as the pulse.
-  logical :: write_escaped = .false.         ! Also keep the escaped file the pulse is built from.
+  logical :: write_escaped = .false.         ! Also write the escaped file, each plane as it left.
   logical :: migrate = .false.               ! Slice migration (fel-physics.md sec-migration).
   logical :: migrate_check = .false.         ! Migration's bunching-invariance instrument.
   logical :: reference_run = .false.         ! No FEL interaction: Bmad tracks everything.
@@ -418,11 +418,12 @@ type fel_run_struct
   real(rp) :: z_last_rec = -1e30_rp        ! The comb's last-row position.
   ! Escaped-field bank state, one slot per field: the count banked, each banked slice's
   ! transmission position and wavefront params (25 per slice, the y component's apart),
-  ! in transmission order, and the open escaped file. The file is made when the first
-  ! plane with light leaves, so until then n_banked counts planes that are all zero.
+  ! in transmission order, and the open pulse file and, with write_escaped, the open
+  ! escaped file. The files are made when the first plane with light leaves, so until
+  ! then n_banked counts planes that are all zero.
   integer, allocatable :: n_banked(:)
   real(rp), allocatable :: bank_z(:,:), bank_pms(:,:,:), bank_pms_y(:,:,:)
-  integer(hid_t), allocatable :: esc_id(:)
+  integer(hid_t), allocatable :: pul_id(:), esc_id(:)
   ! Whole-window wake scratch (element sr wakes across the window).
   type (bunch_struct) :: wake_bunch
   real(rp), allocatable :: wake_beta0(:)

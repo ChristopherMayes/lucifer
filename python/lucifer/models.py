@@ -76,7 +76,7 @@ class Run:
     keep_escaped_field: bool = True
     """Keep the light slippage carries out of the window, as the whole pulse at the exit. On by default, since the light is what an FEL makes. A run whose window holds all its light writes no file."""
     write_escaped: bool = False
-    """Also keep the escaped file the pulse is built from, each plane as it left the window. Off by default, since the pulse holds the same light at the exit with each plane's transmission position and params. Needs keep_escaped_field."""
+    """Also write the escaped file, each plane of the bank as it left the window. Off by default, since the pulse holds the same light at the exit with each plane's transmission position and params. Needs keep_escaped_field."""
     migrate: bool = False
     """Move particles between slices when their phase leaves the slice window."""
     migrate_check: bool = False

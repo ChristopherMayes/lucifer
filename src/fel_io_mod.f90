@@ -839,13 +839,15 @@ contains
 !
 ! Routine to state, before the run tracks, what the escaped-field bank will write: the
 ! slices that leave the window and, per member of the field set, the bytes of the files
-! the run keeps and the peak while the escaped file and the pulse are both on disk
-! (fel_finalize_diagnostics). So a pulse of gigabytes is stated before the run rather than
-! discovered on a full disk.
+! the run keeps. The banked planes stream into those files as they leave
+! (fel_drain_bank), and nothing else is written, so the bytes kept are also the peak on
+! disk. So a pulse of gigabytes is stated before the run rather than discovered on a full
+! disk.
 !
 ! The slices are the rotations the walk makes over the tracked elements, from the
-! schedule's own slippage (fel_setup_slippage): the record rotates once |accuslip| passes
-! 0.8 of a slice, so S wavelengths give the least integer at or above S/n_wavelength - 0.8.
+! schedule's own slippage (fel_setup_slippage) and the residual a continuation starts
+! with: the record rotates once |accuslip| passes 0.8 of a slice, so S wavelengths give
+! the least integer at or above S/n_wavelength - 0.8.
 ! The k-th slice to leave is the window's slice nslice - k + 1 at the start, carried to
 ! the head with what the beam there radiated into it. So light leaves only if one of the
 ! last n_rot slices holds charge or field at the start. A derived window puts its headroom
@@ -866,7 +868,8 @@ logical lit, any_lit
 
 if (.not. run%global%keep_escaped_field .or. run%nslice <= 1) return
 if (.not. allocated(run%und_slip)) return
-s_line = sum(run%und_slip(run%i_start:run%i_end)) + sum(run%ele_slip(run%i_start:run%i_end))
+s_line = run%ffield(1)%slip%accuslip + sum(run%und_slip(run%i_start:run%i_end)) + &
+         sum(run%ele_slip(run%i_start:run%i_end))
 n_rot = max(0, ceiling(s_line / run%fbeam%n_wavelength - 0.8_rp))
 if (n_rot == 0) return
 is1 = max(1, run%nslice - n_rot + 1)
@@ -900,9 +903,8 @@ do ihh = 1, run%n_harm
     write (line, '(a, i0, a, es10.4, a)') '             h', run%ffield(ihh)%harm, &
           ': the pulse and escaped files about ', b_pulse + b_esc, ' bytes kept, which is the peak'
   else
-    write (line, '(a, i0, a, es10.4, a, es10.4, a)') '             h', run%ffield(ihh)%harm, &
-          ': the pulse file about ', b_pulse, ' bytes kept, ', b_pulse + b_esc, &
-          ' at the peak with the escaped file'
+    write (line, '(a, i0, a, es10.4, a)') '             h', run%ffield(ihh)%harm, &
+          ': the pulse file about ', b_pulse, ' bytes kept, which is the peak'
   endif
   call out_io (s_blank$, r_name, trim(line))
 enddo
@@ -923,8 +925,8 @@ end subroutine fel_write_header
 !
 ! The list is also what lucifer.runner.Result reads to find the run's dumps, so it names
 ! every dump this run wrote and no other: the initial state, the dumps at elements, the
-! final state, the pulse and the escaped file it was built from when write_escaped kept
-! it, and the frames. A frame series is one
+! final state, the pulse and, with write_escaped, the escaped file, and the frames. A
+! frame series is one
 ! line per kind of file, its record numbers written as a shell brace range,
 ! <out_root>-{000001..000012}.beam.h5, with the size of the whole series.
 !
@@ -1483,31 +1485,38 @@ end subroutine fel_import_harmonic_field
 !+
 ! Subroutine fel_drain_bank (run, ihh, err_flag)
 !
-! Routine to drain the slippage bank. Each slice carried out streams to the escaped
-! file, <out_root>-escaped.wf.h5, as it leaves, so peak memory is a handful of grid
-! planes. The file is an openPMD EXT_Wavefront file (wavefront_openpmd_mod), made with
-! the live window's grid and wavelength and component datasets that grow along z
-! (wavefront_openpmd_create). Its planes are in V/m, as the dumps are.
+! Routine to drain the slippage bank. Each slice carried out streams to the pulse file,
+! <out_root>-pulse.wf.h5, as it leaves, so peak memory is a handful of grid planes and
+! the pulse is the one file on disk. With write_escaped it also streams to the escaped
+! file, <out_root>-escaped.wf.h5. Both are openPMD EXT_Wavefront files
+! (wavefront_openpmd_mod), made with the live window's grid and wavelength and
+! component datasets that grow along z (wavefront_openpmd_create). Their planes are in
+! V/m, as the dumps are.
 !
-! The file is made when the first plane with light leaves. The planes before it are the
-! empty slices ahead of the bunch, all zero, and they are written then as the file's
-! first planes, so the file is the same as if it had been made at the first slice. A run
-! whose light never leaves the window, as a derived window holds the slippage, makes no
-! file at all. Until the file is made, run%n_banked counts the zero planes.
+! The files are made when the first plane with light leaves. The planes before it are
+! the empty slices ahead of the bunch, all zero, and they are written then as the
+! files' first banked planes, so the files are the same as if they had been made at the
+! first slice. A run whose light never leaves the window, as a derived window holds the
+! slippage, makes no file at all. Until the files are made, run%n_banked counts the
+! zero planes.
 !
-! Each slice's wavefront_params and transmission z are kept in run%bank_pms
-! and run%bank_z, the params the full 4x4 at bank time, which the analytic free-space
-! propagation of pulse statistics needs. They go into the file at finalize
-! (fel_order_bank).
+! Each slice's wavefront_params and transmission z are kept in run%bank_pms and
+! run%bank_z, the params the full 4x4 at bank time, which the analytic free-space
+! propagation of pulse statistics needs. They go into the files at finalize
+! (fel_write_bank_group).
 !
-! During the run the planes are in transmission order: plane k is the k-th to leave.
-! That is the reverse of the mesh's order. Light leaves at the head, so the first to
-! leave is the furthest ahead. fel_order_bank reverses them at finalize.
+! During the run the banked planes are in transmission order: banked plane k is the
+! k-th to leave. That is the reverse of the mesh's order. Light leaves at the head, so
+! the first to leave is the furthest ahead. In the pulse they follow nslice planes the
+! window fills at finalize, and fel_finish_pulse reverses them there as it drifts them
+! to the exit. In the escaped file they are its only planes, and fel_order_bank
+! reverses them.
 !
 ! No one beamline position holds the escaped planes, since each is as it was when it
-! left at its own z. So the file's zCoordinate is NaN, and lucifer/escaped/zTransmit
-! carries each plane's own. The mesh's z origin is the slot just past the window's
-! head, nslice slice spacings along the pulse.
+! left at its own z. So the escaped file's zCoordinate is NaN, and
+! lucifer/escaped/zTransmit carries each plane's own. Its mesh's z origin is the slot
+! just past the window's head, nslice slice spacings along the pulse. The pulse's
+! zCoordinate is written at finalize, as the exit plane.
 !
 ! Input:
 !   run       -- fel_run_struct: Run state. run%ffield(ihh)%bank holds the slices to drain.
@@ -1515,8 +1524,8 @@ end subroutine fel_import_harmonic_field
 !
 ! Output:
 !   run       -- fel_run_struct: Banked params appended to run%bank_z, run%bank_pms and,
-!                  with a live y component, run%bank_pms_y. run%n_banked(ihh) and
-!                  run%esc_id(ihh) updated.
+!                  with a live y component, run%bank_pms_y. run%n_banked(ihh),
+!                  run%pul_id(ihh) and run%esc_id(ihh) updated.
 !   err_flag  -- logical: Set True on a write error. False otherwise.
 !-
 
@@ -1590,10 +1599,11 @@ do k = 1, bnk%n
   endif
 enddo
 
-! The file, at the first plane with light.
+! The files, at the first plane with light. The pulse's first nslice planes are the
+! window's, written at finalize.
 
 fresh = .false.
-if (run%esc_id(ihh) == 0) then
+if (run%pul_id(ihh) == 0) then
   dark = all(bnk%plane(:,:,1:bnk%n) == 0)
   if (dark .and. two) dark = all(bnk%plane_y(:,:,1:bnk%n) == 0)
   if (dark) then
@@ -1601,38 +1611,61 @@ if (run%esc_id(ihh) == 0) then
     err_flag = .false.
     return
   endif
-  call wavefront_openpmd_create (trim(fel_bank_file_name(run, ihh, 'escaped')), wfl, 0, run%esc_id(ihh), m_id, berr, &
-                                 z_offset = run%nslice * fbeam%slice_spacing, extendable = .true., &
-                                 z_coordinate = ieee_value(0.0_rp, ieee_quiet_nan))
+  call wavefront_openpmd_create (trim(fel_bank_file_name(run, ihh, 'pulse')), wfl, run%nslice, &
+                                 run%pul_id(ihh), m_id, berr, extendable = .true.)
   if (berr) return
   call H5Gclose_f (m_id, h5e)
+  if (run%global%write_escaped) then
+    call wavefront_openpmd_create (trim(fel_bank_file_name(run, ihh, 'escaped')), wfl, 0, run%esc_id(ihh), m_id, &
+                                   berr, z_offset = run%nslice * fbeam%slice_spacing, extendable = .true., &
+                                   z_coordinate = ieee_value(0.0_rp, ieee_quiet_nan))
+    if (berr) return
+    call H5Gclose_f (m_id, h5e)
+  endif
   fresh = .true.
 endif
 
-! The planes, appended after those already in the file, and in a new file after the
-! zero planes that left before it.
-
-call wavefront_openpmd_mesh (run%esc_id(ihh), m_id, berr);  if (berr) return
-if (fresh .and. n0 > 0) then
-  allocate (zero(size(wfl%Ex, 1), size(wfl%Ex, 2), 1))
-  zero = 0
-  do k = 1, n0
-    call wavefront_openpmd_write_planes (m_id, 'x', k, zero, berr)
-    if (.not. berr .and. two) call wavefront_openpmd_write_planes (m_id, 'y', k, zero, berr)
-    if (berr) exit
-  enddo
-  if (berr) then
-    call H5Gclose_f (m_id, h5e)
-    return
-  endif
-endif
-call wavefront_openpmd_write_planes (m_id, 'x', n0 + 1, bnk%plane(:,:,1:bnk%n), berr)
-if (.not. berr .and. two) call wavefront_openpmd_write_planes (m_id, 'y', n0 + 1, bnk%plane_y(:,:,1:bnk%n), berr)
-call H5Gclose_f (m_id, h5e)
+call append_planes (run%pul_id(ihh), run%nslice);  if (berr) return
+if (run%esc_id(ihh) /= 0) call append_planes (run%esc_id(ihh), 0)
 if (berr) return
 run%n_banked(ihh) = n0 + bnk%n
 
 err_flag = .false.
+
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine append_planes (f_id, i_first)
+!
+! Routine to write this drain's planes into one open file after the banked planes it
+! holds, which follow i_first planes, and in a new file after the zero planes that left
+! before it. Sets berr on a write error.
+!-
+
+subroutine append_planes (f_id, i_first)
+
+integer(hid_t) f_id
+integer i_first
+
+!
+
+call wavefront_openpmd_mesh (f_id, m_id, berr);  if (berr) return
+if (fresh .and. n0 > 0) then
+  if (.not. allocated(zero)) allocate (zero(size(wfl%Ex, 1), size(wfl%Ex, 2), 1))
+  zero = 0
+  do k = 1, n0
+    call wavefront_openpmd_write_planes (m_id, 'x', i_first + k, zero, berr)
+    if (.not. berr .and. two) call wavefront_openpmd_write_planes (m_id, 'y', i_first + k, zero, berr)
+    if (berr) exit
+  enddo
+endif
+if (.not. berr) call wavefront_openpmd_write_planes (m_id, 'x', i_first + n0 + 1, bnk%plane(:,:,1:bnk%n), berr)
+if (.not. berr .and. two) call wavefront_openpmd_write_planes (m_id, 'y', i_first + n0 + 1, &
+                                                               bnk%plane_y(:,:,1:bnk%n), berr)
+call H5Gclose_f (m_id, h5e)
+
+end subroutine append_planes
 
 end subroutine fel_drain_bank
 
@@ -1649,8 +1682,8 @@ end subroutine fel_drain_bank
 ! two at a time, so peak memory stays at a few planes. The group lucifer/escaped is then
 ! written (fel_write_bank_group). run%bank_z and run%bank_pms stay in transmission order.
 !
-! Only a run that keeps the escaped file (write_escaped) orders it. Otherwise the pulse is
-! read from it in transmission order and the file is removed.
+! Only a run with write_escaped has an escaped file. The pulse is built without it
+! (fel_finish_pulse).
 !
 ! Input:
 !   run       -- fel_run_struct: Run state. run%esc_id(ihh) is the open escaped file.
@@ -1837,17 +1870,16 @@ end function fel_bank_file_name
 ! Subroutine fel_finalize_diagnostics (run, err_flag)
 !
 ! Routine to finalize the run's file diagnostics: the stats file always. With
-! keep_escaped_field, also the full pulse at the exit plane. The escaped file it is
-! built from is then removed, unless write_escaped keeps it, which also puts it in the
-! mesh's order and writes its private group.
+! keep_escaped_field, also the full pulse at the exit plane (fel_finish_pulse), and with
+! write_escaped the escaped file's order and private group (fel_order_bank).
 !
-! For the pulse, each banked slice is read back and free-space propagated over
-! z_end - z_transmit. Transmitted light is fixed information, and undulator vacuum is
-! free space for light with no beam under it. The slices are concatenated above the
-! live window. Earliest-transmitted light is furthest ahead. So banked slice k lands at
-! pulse index nslice + (run%n_banked - k + 1), which is also its plane in a kept
-! escaped file (fel_order_bank). The caller has already unrotated the live window (the
-! final-dump cshift).
+! The pulse's banked planes streamed into it during the run (fel_drain_bank). Each is
+! free-space propagated over z_end - z_transmit here. Transmitted light is fixed
+! information, and undulator vacuum is free space for light with no beam under it. The
+! banked planes follow the live window's. Earliest-transmitted light is furthest ahead.
+! So banked slice k lands at pulse index nslice + (run%n_banked - k + 1), which is also
+! its plane in a kept escaped file. The caller has already unrotated the live window
+! (the final-dump cshift).
 !
 ! Both files are openPMD EXT_Wavefront files whose planes run along z in increasing
 ! position, as the dumps' do. The z of gridGlobalOffset is the position along the pulse
@@ -1858,14 +1890,12 @@ end function fel_bank_file_name
 ! each left at their own (lucifer/escaped/zTransmit). The pulse carries the same rows in
 ! lucifer/pulse, so the one file holds all the escaped file holds but the raw planes.
 !
-! The escaped file and the pulse are both on disk while the pulse is written, which is the
-! peak the header states. A pulse of many gigabytes needs room for both.
-!
 ! Input:
 !   run       -- fel_run_struct: Run state at the end of tracking.
 !
 ! Output:
-!   run       -- fel_run_struct: Escaped files closed (run%esc_id zeroed).
+!   run       -- fel_run_struct: Pulse and escaped files closed (run%pul_id and
+!                  run%esc_id zeroed).
 !   err_flag  -- logical: Set True on a write error. False otherwise.
 !-
 
@@ -1876,7 +1906,7 @@ type (fel_field_struct), pointer :: ffield(:)
 type (fel_beam_struct), pointer :: fbeam
 type (fel_stats_params_struct) sprm
 integer h5e, ihh, n_harm, iu_del, ios_del
-logical ferr, err_flag, keep_escaped_field, write_escaped
+logical ferr, err_flag, keep_escaped_field
 character(400) out_root
 character(*), parameter :: r_name = 'fel_finalize_diagnostics'
 
@@ -1887,7 +1917,6 @@ ffield => run%ffield
 fbeam => run%fbeam
 n_harm = run%n_harm
 keep_escaped_field = run%global%keep_escaped_field
-write_escaped = run%global%write_escaped
 out_root = run%global%out_root
 
 ! The parameters the file states as data. They are assembled here because the whole run
@@ -1913,37 +1942,37 @@ endif
 do ihh = 1, n_harm
 
   ! A bank that holds no light, only the empty slices that left ahead of the bunch, is
-  ! no output, and no pulse is built, since the pulse is then the window, which the final
-  ! dump holds. fel_drain_bank makes no file for such a bank, and one that holds no
-  ! energy is removed.
-  if (run%esc_id(ihh) == 0) run%n_banked(ihh) = 0
-  if (run%esc_id(ihh) /= 0 .and. ffield(ihh)%slip%u_escaped == 0) then
-    call H5Fclose_f (run%esc_id(ihh), h5e)
-    run%esc_id(ihh) = 0
+  ! no output, since the pulse is then the window, which the final dump holds.
+  ! fel_drain_bank makes no file for such a bank, and files that hold no energy are
+  ! removed.
+  if (run%pul_id(ihh) == 0) then
     run%n_banked(ihh) = 0
-    call delete_escaped ()
+    cycle
+  endif
+  if (ffield(ihh)%slip%u_escaped == 0) then
+    call H5Fclose_f (run%pul_id(ihh), h5e)
+    run%pul_id(ihh) = 0
+    call delete_file (fel_bank_file_name(run, ihh, 'pulse'))
+    if (run%esc_id(ihh) /= 0) then
+      call H5Fclose_f (run%esc_id(ihh), h5e)
+      run%esc_id(ihh) = 0
+      call delete_file (fel_bank_file_name(run, ihh, 'escaped'))
+    endif
+    run%n_banked(ihh) = 0
+    cycle
   endif
 
   if (run%esc_id(ihh) /= 0) then
-    if (write_escaped) then
-      call fel_order_bank (run, ihh, ferr)
-      if (ferr) return
-    endif
+    call fel_order_bank (run, ihh, ferr)
+    if (ferr) return
     call H5Fclose_f (run%esc_id(ihh), h5e)
     run%esc_id(ihh) = 0
-    if (write_escaped) call out_io (s_blank$, r_name, '  ' // trim(fel_bank_file_name(run, ihh, 'escaped')))
+    call out_io (s_blank$, r_name, '  ' // trim(fel_bank_file_name(run, ihh, 'escaped')))
   endif
 
-  ! The full pulse at the exit plane, both polarizations in one file as in every dump.
-  ! A run whose window held all its light banked nothing, and its pulse is the window,
-  ! which the final dump already holds, so no pulse file is written.
-
-  if (run%n_banked(ihh) == 0) cycle
-
-  call fel_write_pulse_file (run, trim(fel_bank_file_name(run, ihh, 'pulse')), ihh, write_escaped, ferr)
+  call fel_finish_pulse (run, ihh, ferr)
   if (ferr) return
   call out_io (s_blank$, r_name, '  ' // trim(fel_bank_file_name(run, ihh, 'pulse')))
-  if (.not. write_escaped) call delete_escaped ()
 enddo
 
 err_flag = .false.
@@ -1952,17 +1981,21 @@ err_flag = .false.
 contains
 
 !+
-! Subroutine delete_escaped ()
+! Subroutine delete_file (name)
 !
-! Routine to remove field ihh's escaped file.
+! Routine to remove one file of the bank.
 !-
 
-subroutine delete_escaped ()
+subroutine delete_file (name)
 
-open (newunit = iu_del, file = trim(fel_bank_file_name(run, ihh, 'escaped')), status = 'old', iostat = ios_del)
+character(*) name
+
+!
+
+open (newunit = iu_del, file = trim(name), status = 'old', iostat = ios_del)
 if (ios_del == 0) close (iu_del, status = 'delete')
 
-end subroutine delete_escaped
+end subroutine delete_file
 
 end subroutine fel_finalize_diagnostics
 
@@ -1970,96 +2003,144 @@ end subroutine fel_finalize_diagnostics
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Subroutine fel_write_pulse_file (run, fname, ihh, ordered, err_flag)
+! Subroutine fel_finish_pulse (run, ihh, err_flag)
 !
-! Routine to write the full exit-plane pulse of one field as an openPMD EXT_Wavefront
-! file: the live window's slices, then each banked slice read back from the escaped
-! file and free-space propagated over z_end - z_transmit. Pulse plane nslice + i is the
-! i-th banked plane in the mesh's order, whose transmission z is
-! run%bank_z(n_banked - i + 1), which stays in transmission order. A kept escaped file
-! is in the mesh's order by now (fel_order_bank), and the plane is its plane i. One
-! that is to be removed is in transmission order, and the plane is its plane
-! n_banked - i + 1. The planes are written one at a time, so peak memory is a few
-! planes whatever the pulse's length. The group lucifer/pulse then holds each banked
-! plane's transmission z and params, the rows of the escaped file's lucifer/escaped.
+! Routine to finish the pulse file of one field, which fel_drain_bank opened and filled
+! with the banked planes in transmission order after nslice empty planes. Banked plane
+! k left at run%bank_z(k) and is drifted to the exit over z_end - run%bank_z(k). Its
+! place in the mesh's order is nslice + n_banked - k + 1, so planes k and
+! n_banked - k + 1 are read, drifted and exchanged two at a time, and peak memory is a
+! few planes whatever the pulse's length. The live window then fills planes 1 to nslice,
+! the group lucifer/pulse takes each banked plane's transmission z and params
+! (fel_write_bank_group), and zCoordinate is set to the exit plane, the window's
+! position, which the walk set to the exit. The file is then closed.
 !
 ! Input:
-!   run       -- fel_run_struct: Run state.
-!   fname     -- character(*): Pulse file to write.
+!   run       -- fel_run_struct: Run state. run%pul_id(ihh) is the open pulse file.
 !   ihh       -- integer: Field-set index.
-!   ordered   -- logical: Is the escaped file in the mesh's order?
 !
 ! Output:
+!   run       -- fel_run_struct: run%pul_id(ihh) closed and zeroed.
 !   err_flag  -- logical: Set True on a read or write error. False otherwise.
 !-
 
-subroutine fel_write_pulse_file (run, fname, ihh, ordered, err_flag)
+subroutine fel_finish_pulse (run, ihh, err_flag)
 
 type (fel_run_struct), target :: run
-type (fel_field_struct), pointer :: ffield(:)
-type (wavefront_struct) wf1
+type (wavefront_struct) lo, hi
 type (wavefront_struct), pointer :: wfl
-real(rp), pointer :: z_now
-character(*) fname
-logical ordered, err_flag
-integer(hid_t) p_id, pm_id, e_id, em_id
-integer ihh, k, ke, n, nslice, h5e
+logical err_flag
+integer(hid_t) pm_id
+integer ihh, k, n, nslice, h5e
 logical ferr, two
 character(300) descrip
+character(*), parameter :: r_name = 'fel_finish_pulse'
 
 !
 
 err_flag = .true.
-ffield => run%ffield
-z_now => run%z_now
 nslice = run%nslice
 n = run%n_banked(ihh)
-wfl => ffield(ihh)%wf
+wfl => run%ffield(ihh)%wf
 two = allocated(wfl%Ey)
 
-! The live window first. The mesh's z origin is the window's tail, and zCoordinate is
-! the window's position, which the walk set to the exit.
-
-call wavefront_openpmd_create (fname, wfl, nslice + n, p_id, pm_id, ferr);  if (ferr) return
-call wavefront_openpmd_write_planes (pm_id, 'x', 1, wfl%Ex, ferr);  if (ferr) return
-if (two) call wavefront_openpmd_write_planes (pm_id, 'y', 1, wfl%Ey, ferr)
-if (ferr) return
-
-! Each banked plane, drifted to the exit at its own wavelength. Ex and Ey do not couple
+! Two one-plane wavefronts at the window's grid and wavelength. Ex and Ey do not couple
 ! in free space, so the one drift carries both.
 
-allocate (wf1%Ex(size(wfl%Ex, 1), size(wfl%Ex, 2), 1))
-if (two) allocate (wf1%Ey(size(wfl%Ex, 1), size(wfl%Ex, 2), 1))
-wf1%dx = wfl%dx;  wf1%dy = wfl%dy;  wf1%dz = wfl%dz
-wf1%wavelength = wfl%wavelength
+call one_plane (lo);  call one_plane (hi)
 
-call hdf5_open_file (trim(fel_bank_file_name(run, ihh, 'escaped')), 'READ', e_id, ferr);  if (ferr) return
-call wavefront_openpmd_mesh (e_id, em_id, ferr);  if (ferr) return
-do k = 1, n
-  ke = k
-  if (.not. ordered) ke = n - k + 1
-  call wavefront_openpmd_read_planes (em_id, 'x', ke, wf1%Ex, ferr);  if (ferr) return
-  if (two) call wavefront_openpmd_read_planes (em_id, 'y', ke, wf1%Ey, ferr)
-  if (ferr) return
-  call wavefront_drift (wf1, z_now - run%bank_z(n - k + 1, ihh), ferr);  if (ferr) return
-  call wavefront_openpmd_write_planes (pm_id, 'x', nslice + k, wf1%Ex, ferr);  if (ferr) return
-  if (two) call wavefront_openpmd_write_planes (pm_id, 'y', nslice + k, wf1%Ey, ferr)
-  if (ferr) return
+call wavefront_openpmd_mesh (run%pul_id(ihh), pm_id, ferr);  if (ferr) return
+do k = 1, (n + 1) / 2
+  call read_plane (lo, k);  if (ferr) exit
+  call wavefront_drift (lo, run%z_now - run%bank_z(k, ihh), ferr);  if (ferr) exit
+  if (k /= n - k + 1) then
+    call read_plane (hi, n - k + 1);  if (ferr) exit
+    call wavefront_drift (hi, run%z_now - run%bank_z(n - k + 1, ihh), ferr);  if (ferr) exit
+    call write_plane (hi, k);  if (ferr) exit
+  endif
+  call write_plane (lo, n - k + 1);  if (ferr) exit
 enddo
-call H5Gclose_f (em_id, h5e)
-call H5Fclose_f (e_id, h5e)
+
+! The live window ahead of them, and the exit plane as the file's beamline position.
+
+if (.not. ferr) call wavefront_openpmd_write_planes (pm_id, 'x', 1, wfl%Ex, ferr)
+if (.not. ferr .and. two) call wavefront_openpmd_write_planes (pm_id, 'y', 1, wfl%Ey, ferr)
+if (.not. ferr) call hdf5_write_attribute_real (pm_id, 'zCoordinate', wfl%s_position, ferr)
 call H5Gclose_f (pm_id, h5e)
+if (ferr) then
+  call out_io (s_error$, r_name, 'CANNOT FINISH THE PULSE FILE ' // trim(fel_bank_file_name(run, ihh, 'pulse')))
+  return
+endif
 
 write (descrip, '(a, i0, a, i0, a)') 'Planes ', nslice + 1, ' to ', nslice + n, &
       ' of the mesh are the banked ones. Each left the window at its own zTransmit and ' // &
       'was drifted to the exit. The planes before them are the window''s.'
-call fel_write_bank_group (p_id, run, ihh, 'pulse', trim(descrip), ferr)
-call H5Fclose_f (p_id, h5e)
+call fel_write_bank_group (run%pul_id(ihh), run, ihh, 'pulse', trim(descrip), ferr)
+call H5Fclose_f (run%pul_id(ihh), h5e)
+run%pul_id(ihh) = 0
 if (ferr) return
 
 err_flag = .false.
 
-end subroutine fel_write_pulse_file
+!------------------------------------------------------------------------------
+contains
+
+!+
+! Subroutine one_plane (w)
+!
+! Routine to make w a one-plane wavefront on the window's grid.
+!-
+
+subroutine one_plane (w)
+
+type (wavefront_struct) w
+
+!
+
+allocate (w%Ex(size(wfl%Ex, 1), size(wfl%Ex, 2), 1))
+if (two) allocate (w%Ey(size(wfl%Ex, 1), size(wfl%Ex, 2), 1))
+w%dx = wfl%dx;  w%dy = wfl%dy;  w%dz = wfl%dz
+w%wavelength = wfl%wavelength
+
+end subroutine one_plane
+
+!+
+! Subroutine read_plane (w, k)
+!
+! Routine to read banked plane k, in transmission order, into w.
+!-
+
+subroutine read_plane (w, k)
+
+type (wavefront_struct) w
+integer k
+
+!
+
+call wavefront_openpmd_read_planes (pm_id, 'x', nslice + k, w%Ex, ferr)
+if (.not. ferr .and. two) call wavefront_openpmd_read_planes (pm_id, 'y', nslice + k, w%Ey, ferr)
+
+end subroutine read_plane
+
+!+
+! Subroutine write_plane (w, i)
+!
+! Routine to write w as banked plane i in the mesh's order.
+!-
+
+subroutine write_plane (w, i)
+
+type (wavefront_struct) w
+integer i
+
+!
+
+call wavefront_openpmd_write_planes (pm_id, 'x', nslice + i, w%Ex, ferr)
+if (.not. ferr .and. two) call wavefront_openpmd_write_planes (pm_id, 'y', nslice + i, w%Ey, ferr)
+
+end subroutine write_plane
+
+end subroutine fel_finish_pulse
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

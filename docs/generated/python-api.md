@@ -1295,8 +1295,8 @@ Read the escaped light a run writes beside its final dump.
 
 ``<out_root>-pulse.wf.h5`` is the whole pulse at the exit, the window's slices and the
 light slippage carried out of the window propagated to the exit plane. A run keeps it
-whenever light left the window. ``<out_root>-escaped.wf.h5`` is the bank the pulse is
-built from, one plane per slice as it was when it left, and a run keeps it only with
+whenever light left the window. ``<out_root>-escaped.wf.h5`` is the bank itself, one
+plane per slice as it was when it left, and a run writes it only with
 ``run.write_escaped``. Both are openPMD EXT_Wavefront files, so ``Wavefront.from_openpmd``
 of openpmd-beamphysics reads either whole, with both polarizations as its Ex and Ey.
 

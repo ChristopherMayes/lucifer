@@ -3448,13 +3448,15 @@ Input:
 ```
 Routine to state, before the run tracks, what the escaped-field bank will write: the
 slices that leave the window and, per member of the field set, the bytes of the files
-the run keeps and the peak while the escaped file and the pulse are both on disk
-(fel_finalize_diagnostics). So a pulse of gigabytes is stated before the run rather than
-discovered on a full disk.
+the run keeps. The banked planes stream into those files as they leave
+(fel_drain_bank), and nothing else is written, so the bytes kept are also the peak on
+disk. So a pulse of gigabytes is stated before the run rather than discovered on a full
+disk.
 
 The slices are the rotations the walk makes over the tracked elements, from the
-schedule's own slippage (fel_setup_slippage): the record rotates once |accuslip| passes
-0.8 of a slice, so S wavelengths give the least integer at or above S/n_wavelength - 0.8.
+schedule's own slippage (fel_setup_slippage) and the residual a continuation starts
+with: the record rotates once |accuslip| passes 0.8 of a slice, so S wavelengths give
+the least integer at or above S/n_wavelength - 0.8.
 The k-th slice to leave is the window's slice nslice - k + 1 at the start, carried to
 the head with what the beam there radiated into it. So light leaves only if one of the
 last n_rot slices holds charge or field at the start. A derived window puts its headroom
@@ -3477,8 +3479,8 @@ thing on screen is the list of what to open.
 
 The list is also what lucifer.runner.Result reads to find the run's dumps, so it names
 every dump this run wrote and no other: the initial state, the dumps at elements, the
-final state, the pulse and the escaped file it was built from when write_escaped kept
-it, and the frames. A frame series is one
+final state, the pulse and, with write_escaped, the escaped file, and the frames. A
+frame series is one
 line per kind of file, its record numbers written as a shell brace range,
 <out_root>-{000001..000012}.beam.h5, with the size of the whole series.
 ```
@@ -3580,31 +3582,38 @@ Output:
 *Subroutine* `(run, ihh, err_flag)`
 
 ```
-Routine to drain the slippage bank. Each slice carried out streams to the escaped
-file, <out_root>-escaped.wf.h5, as it leaves, so peak memory is a handful of grid
-planes. The file is an openPMD EXT_Wavefront file (wavefront_openpmd_mod), made with
-the live window's grid and wavelength and component datasets that grow along z
-(wavefront_openpmd_create). Its planes are in V/m, as the dumps are.
+Routine to drain the slippage bank. Each slice carried out streams to the pulse file,
+<out_root>-pulse.wf.h5, as it leaves, so peak memory is a handful of grid planes and
+the pulse is the one file on disk. With write_escaped it also streams to the escaped
+file, <out_root>-escaped.wf.h5. Both are openPMD EXT_Wavefront files
+(wavefront_openpmd_mod), made with the live window's grid and wavelength and
+component datasets that grow along z (wavefront_openpmd_create). Their planes are in
+V/m, as the dumps are.
 
-The file is made when the first plane with light leaves. The planes before it are the
-empty slices ahead of the bunch, all zero, and they are written then as the file's
-first planes, so the file is the same as if it had been made at the first slice. A run
-whose light never leaves the window, as a derived window holds the slippage, makes no
-file at all. Until the file is made, run%n_banked counts the zero planes.
+The files are made when the first plane with light leaves. The planes before it are
+the empty slices ahead of the bunch, all zero, and they are written then as the
+files' first banked planes, so the files are the same as if they had been made at the
+first slice. A run whose light never leaves the window, as a derived window holds the
+slippage, makes no file at all. Until the files are made, run%n_banked counts the
+zero planes.
 
-Each slice's wavefront_params and transmission z are kept in run%bank_pms
-and run%bank_z, the params the full 4x4 at bank time, which the analytic free-space
-propagation of pulse statistics needs. They go into the file at finalize
-(fel_order_bank).
+Each slice's wavefront_params and transmission z are kept in run%bank_pms and
+run%bank_z, the params the full 4x4 at bank time, which the analytic free-space
+propagation of pulse statistics needs. They go into the files at finalize
+(fel_write_bank_group).
 
-During the run the planes are in transmission order: plane k is the k-th to leave.
-That is the reverse of the mesh's order. Light leaves at the head, so the first to
-leave is the furthest ahead. fel_order_bank reverses them at finalize.
+During the run the banked planes are in transmission order: banked plane k is the
+k-th to leave. That is the reverse of the mesh's order. Light leaves at the head, so
+the first to leave is the furthest ahead. In the pulse they follow nslice planes the
+window fills at finalize, and fel_finish_pulse reverses them there as it drifts them
+to the exit. In the escaped file they are its only planes, and fel_order_bank
+reverses them.
 
 No one beamline position holds the escaped planes, since each is as it was when it
-left at its own z. So the file's zCoordinate is NaN, and lucifer/escaped/zTransmit
-carries each plane's own. The mesh's z origin is the slot just past the window's
-head, nslice slice spacings along the pulse.
+left at its own z. So the escaped file's zCoordinate is NaN, and
+lucifer/escaped/zTransmit carries each plane's own. Its mesh's z origin is the slot
+just past the window's head, nslice slice spacings along the pulse. The pulse's
+zCoordinate is written at finalize, as the exit plane.
 ```
 
 ```
@@ -3614,9 +3623,20 @@ Input:
 
 Output:
   run       -- fel_run_struct: Banked params appended to run%bank_z, run%bank_pms and,
-                 with a live y component, run%bank_pms_y. run%n_banked(ihh) and
-                 run%esc_id(ihh) updated.
+                 with a live y component, run%bank_pms_y. run%n_banked(ihh),
+                 run%pul_id(ihh) and run%esc_id(ihh) updated.
   err_flag  -- logical: Set True on a write error. False otherwise.
+```
+
+(api-append-planes)=
+### `append_planes`
+
+*Subroutine* `(f_id, i_first)`
+
+```
+Routine to write this drain's planes into one open file after the banked planes it
+holds, which follow i_first planes, and in a new file after the zero planes that left
+before it. Sets berr on a write error.
 ```
 
 (api-fel-order-bank)=
@@ -3632,8 +3652,8 @@ position along the pulse, which is the mesh's order. The planes are reversed in 
 two at a time, so peak memory stays at a few planes. The group lucifer/escaped is then
 written (fel_write_bank_group). run%bank_z and run%bank_pms stay in transmission order.
 
-Only a run that keeps the escaped file (write_escaped) orders it. Otherwise the pulse is
-read from it in transmission order and the file is removed.
+Only a run with write_escaped has an escaped file. The pulse is built without it
+(fel_finish_pulse).
 ```
 
 ```
@@ -3708,17 +3728,16 @@ Output:
 
 ```
 Routine to finalize the run's file diagnostics: the stats file always. With
-keep_escaped_field, also the full pulse at the exit plane. The escaped file it is
-built from is then removed, unless write_escaped keeps it, which also puts it in the
-mesh's order and writes its private group.
+keep_escaped_field, also the full pulse at the exit plane (fel_finish_pulse), and with
+write_escaped the escaped file's order and private group (fel_order_bank).
 
-For the pulse, each banked slice is read back and free-space propagated over
-z_end - z_transmit. Transmitted light is fixed information, and undulator vacuum is
-free space for light with no beam under it. The slices are concatenated above the
-live window. Earliest-transmitted light is furthest ahead. So banked slice k lands at
-pulse index nslice + (run%n_banked - k + 1), which is also its plane in a kept
-escaped file (fel_order_bank). The caller has already unrotated the live window (the
-final-dump cshift).
+The pulse's banked planes streamed into it during the run (fel_drain_bank). Each is
+free-space propagated over z_end - z_transmit here. Transmitted light is fixed
+information, and undulator vacuum is free space for light with no beam under it. The
+banked planes follow the live window's. Earliest-transmitted light is furthest ahead.
+So banked slice k lands at pulse index nslice + (run%n_banked - k + 1), which is also
+its plane in a kept escaped file. The caller has already unrotated the live window
+(the final-dump cshift).
 
 Both files are openPMD EXT_Wavefront files whose planes run along z in increasing
 position, as the dumps' do. The z of gridGlobalOffset is the position along the pulse
@@ -3728,9 +3747,6 @@ slot just past the window's head. Neither is the beamline position, which is
 zCoordinate: the exit plane for the pulse, and NaN for the escaped file, whose planes
 each left at their own (lucifer/escaped/zTransmit). The pulse carries the same rows in
 lucifer/pulse, so the one file holds all the escaped file holds but the raw planes.
-
-The escaped file and the pulse are both on disk while the pulse is written, which is the
-peak the header states. A pulse of many gigabytes needs room for both.
 ```
 
 ```
@@ -3738,46 +3754,72 @@ Input:
   run       -- fel_run_struct: Run state at the end of tracking.
 
 Output:
-  run       -- fel_run_struct: Escaped files closed (run%esc_id zeroed).
+  run       -- fel_run_struct: Pulse and escaped files closed (run%pul_id and
+                 run%esc_id zeroed).
   err_flag  -- logical: Set True on a write error. False otherwise.
 ```
 
-(api-delete-escaped)=
-### `delete_escaped`
+(api-delete-file)=
+### `delete_file`
 
-*Subroutine* `()`
-
-```
-Routine to remove field ihh's escaped file.
-```
-
-(api-fel-write-pulse-file)=
-### `fel_write_pulse_file`
-
-*Subroutine* `(run, fname, ihh, ordered, err_flag)`
+*Subroutine* `(name)`
 
 ```
-Routine to write the full exit-plane pulse of one field as an openPMD EXT_Wavefront
-file: the live window's slices, then each banked slice read back from the escaped
-file and free-space propagated over z_end - z_transmit. Pulse plane nslice + i is the
-i-th banked plane in the mesh's order, whose transmission z is
-run%bank_z(n_banked - i + 1), which stays in transmission order. A kept escaped file
-is in the mesh's order by now (fel_order_bank), and the plane is its plane i. One
-that is to be removed is in transmission order, and the plane is its plane
-n_banked - i + 1. The planes are written one at a time, so peak memory is a few
-planes whatever the pulse's length. The group lucifer/pulse then holds each banked
-plane's transmission z and params, the rows of the escaped file's lucifer/escaped.
+Routine to remove one file of the bank.
+```
+
+(api-fel-finish-pulse)=
+### `fel_finish_pulse`
+
+*Subroutine* `(run, ihh, err_flag)`
+
+```
+Routine to finish the pulse file of one field, which fel_drain_bank opened and filled
+with the banked planes in transmission order after nslice empty planes. Banked plane
+k left at run%bank_z(k) and is drifted to the exit over z_end - run%bank_z(k). Its
+place in the mesh's order is nslice + n_banked - k + 1, so planes k and
+n_banked - k + 1 are read, drifted and exchanged two at a time, and peak memory is a
+few planes whatever the pulse's length. The live window then fills planes 1 to nslice,
+the group lucifer/pulse takes each banked plane's transmission z and params
+(fel_write_bank_group), and zCoordinate is set to the exit plane, the window's
+position, which the walk set to the exit. The file is then closed.
 ```
 
 ```
 Input:
-  run       -- fel_run_struct: Run state.
-  fname     -- character(*): Pulse file to write.
+  run       -- fel_run_struct: Run state. run%pul_id(ihh) is the open pulse file.
   ihh       -- integer: Field-set index.
-  ordered   -- logical: Is the escaped file in the mesh's order?
 
 Output:
+  run       -- fel_run_struct: run%pul_id(ihh) closed and zeroed.
   err_flag  -- logical: Set True on a read or write error. False otherwise.
+```
+
+(api-one-plane)=
+### `one_plane`
+
+*Subroutine* `(w)`
+
+```
+Routine to make w a one-plane wavefront on the window's grid.
+```
+
+(api-read-plane)=
+### `read_plane`
+
+*Subroutine* `(w, k)`
+
+```
+Routine to read banked plane k, in transmission order, into w.
+```
+
+(api-write-plane)=
+### `write_plane`
+
+*Subroutine* `(w, i)`
+
+```
+Routine to write w as banked plane i in the mesh's order.
 ```
 
 (api-fel-write-wake-block)=
@@ -4193,7 +4235,7 @@ Input:
 Output:
   run       -- fel_run_struct: Lattice parsed and FEL elements recognized (%lat, %gamma0,
                  %is_fel, %und_of, %fel_mode, %fel_spp, %fel_ramp, %two_pol), field set
-                 allocated (%ffield, %n_harm, %n_banked, %esc_id).
+                 allocated (%ffield, %n_harm, %n_banked, %pul_id, %esc_id).
   err_flag  -- logical: Set True if there is an error. False otherwise.
 ```
 

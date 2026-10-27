@@ -165,7 +165,7 @@ slices = read_slices("n1024-final.beam.h5", wavelength=inp.field.lambda0)
 slices[0]["n"], slices[0]["x"]    # the first slice's particle count and x [m]
 ```
 
-`lucifer.field` reads the whole pulse at the exit, `<out_root>-pulse.wf.h5`, which a run whose window let light out keeps: the window's planes and then the light that slipped out of the window, each banked plane drifted to the exit, with where each left and its moments when it left. The pulse is an openPMD wavefront file like every field dump, so openpmd-beamphysics reads it whole, and `read_pulse` adds the two arrays of its `lucifer/pulse` group. With `run.write_escaped` the run also keeps the bank the pulse was built from, `<out_root>-escaped.wf.h5`, each plane as it was when it left, which `read_escaped` reads with the same two arrays. A time-dependent run of the same input lets light out:
+`lucifer.field` reads the whole pulse at the exit, `<out_root>-pulse.wf.h5`, which a run whose window let light out keeps: the window's planes and then the light that slipped out of the window, each banked plane drifted to the exit, with where each left and its moments when it left. The pulse is an openPMD wavefront file like every field dump, so openpmd-beamphysics reads it whole, and `read_pulse` adds the two arrays of its `lucifer/pulse` group. With `run.write_escaped` the run also writes the bank itself, `<out_root>-escaped.wf.h5`, each plane as it was when it left, which `read_escaped` reads with the same two arrays. A time-dependent run of the same input lets light out:
 
 % example: field
 ```python

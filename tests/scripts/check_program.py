@@ -327,7 +327,7 @@ def page_examples(exe, wd):
 
             # A time-dependent run with every kind of dump: the initial state, the beam and
             # the field at the end of the undulator, a frame at every record, and the pulse
-            # with the escaped file it was built from.
+            # with the escaped file beside it.
             every = run("lucifer.toml", threads=4, overrides=[
                 "beam.z_distribution=GRID", "beam.z_min=-2.5e-10", "beam.z_max=2.5e-10",
                 "beam.shot_noise=true", "window.window_length=6e-10", "window.n_wavelength=1",

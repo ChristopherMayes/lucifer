@@ -39,7 +39,7 @@ contains
 ! Output:
 !   run       -- fel_run_struct: Lattice parsed and FEL elements recognized (%lat, %gamma0,
 !                  %is_fel, %und_of, %fel_mode, %fel_spp, %fel_ramp, %two_pol), field set
-!                  allocated (%ffield, %n_harm, %n_banked, %esc_id).
+!                  allocated (%ffield, %n_harm, %n_banked, %pul_id, %esc_id).
 !   err_flag  -- logical: Set True if there is an error. False otherwise.
 !-
 
@@ -380,8 +380,9 @@ ffield => run%ffield
 do ih = 1, n_harm
   ffield(ih)%harm = harmonics(ih)
 enddo
-allocate (run%n_banked(n_harm), run%esc_id(n_harm))
+allocate (run%n_banked(n_harm), run%pul_id(n_harm), run%esc_id(n_harm))
 run%n_banked = 0
+run%pul_id = 0
 run%esc_id = 0
 
 !------------------------------------------------------------------------------

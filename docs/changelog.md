@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-26 Changed: the pulse is written as the light leaves. `fel_drain_bank` streams each leaving
+  slice into `<out_root>-pulse.wf.h5` after room for the window, and `fel_finish_pulse` reverses the
+  banked planes in place at finalize, two at a time, as it drifts each to the exit, then writes the
+  window ahead of them. The pulse had been built at finalize from `<out_root>-escaped.wf.h5`, which
+  was written whether or not it was kept, so both files were on disk at once. On the SASE example
+  that peak was 2.58 GB and is now the pulse's 1.34 GB, and the header's `Bank` line states the
+  bytes kept as the peak. The escaped file is written only under `run.write_escaped`. The pulse is
+  dataset-identical to the one the earlier finalize wrote, on the SASE example's 1280 planes and on
+  the diagnostics check's runs, attributes included. Its file is 81545 bytes larger on the SASE
+  example, the chunk index of a dataset that grows. The header's slice count now includes the
+  slippage residual a continuation starts with.
 - 2026-10-26 Changed: a run keeps the escaped light as the whole pulse alone, `<out_root>-pulse.wf.h5`,
   and the bank the pulse is built from, `<out_root>-escaped.wf.h5`, only under the new key
   `run.write_escaped`, off by default. The two files held the same light twice. On the SASE example

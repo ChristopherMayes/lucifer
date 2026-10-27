@@ -159,8 +159,8 @@ call add ('run', 'keep_escaped_field', key_logical$, '', 'keep escaped', &
       'On by default, since the light is what an FEL makes. A run whose window holds all ' // &
       'its light writes no file.')
 call add ('run', 'write_escaped', key_logical$, '', 'write escaped', &
-      'Also keep the escaped file the pulse is built from, each plane as it left the window. ' // &
-      'Off by default, since the pulse holds the same light at the exit with each plane''s ' // &
+      'Also write the escaped file, each plane of the bank as it left the window. Off by ' // &
+      'default, since the pulse holds the same light at the exit with each plane''s ' // &
       'transmission position and params. Needs keep_escaped_field.')
 call add ('run', 'migrate', key_logical$, '', 'migrate', &
       'Move particles between slices when their phase leaves the slice window.')

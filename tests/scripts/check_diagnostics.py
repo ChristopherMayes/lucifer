@@ -1071,13 +1071,13 @@ def main():
     if falls == 0:
         check("pulse: the window's energy falls somewhere, so the check above is not empty", 1.0, 0.5)
 
-    # 2c. The pulse alone. Without run.write_escaped a run keeps the pulse and removes the
-    # escaped file it was built from, so the directory holds the one file and the footer
-    # lists it alone. The pulse's lucifer/pulse group holds the rows of the escaped file's
-    # lucifer/escaped, so the one file keeps all the escaped file held but the raw planes:
-    # its rows equal those of dg, the same run with the escaped file kept, and of dg's own
-    # escaped file, exactly. The pulse is read from the escaped file in transmission order
-    # here and in the mesh's order in dg, and the two pulses are identical.
+    # 2c. The pulse alone. Without run.write_escaped the banked planes stream into the
+    # pulse alone, so the directory holds the one file and the footer lists it alone. The
+    # pulse's lucifer/pulse group holds the rows of the escaped file's lucifer/escaped, so
+    # the one file keeps all the escaped file holds but the raw planes: its rows equal
+    # those of dg, the same run with the escaped file written, and of dg's own escaped
+    # file, exactly. Writing the escaped file beside it changes nothing in the pulse, and
+    # the two pulses are identical.
     r_dgp = run(exe, wd, "dgp", NML.format(lat="dg_wrap.bmad", root="dgp", extra="").replace(
         "  write_escaped = T\n", ""))
     left = sorted(f.name for f in wd.glob("dgp-*.wf.h5") if "-escaped" in f.name or "-pulse" in f.name)
@@ -1106,9 +1106,9 @@ def main():
           0.0 if h5_identical(wd / "dgp-pulse.wf.h5", wd / "dg-pulse.wf.h5") else 1.0, 0.5)
 
     # 2d. The header states the bank's bytes before the run tracks: per member the files
-    # the run keeps, and the peak while the escaped file and the pulse are both on disk.
-    # dg keeps both, so its statement is the two files. dgp keeps the pulse, and its
-    # peak is its pulse with the escaped file dg kept. The estimate counts planes and
+    # the run keeps, which are also the peak on disk, since the banked planes stream into
+    # them and into nothing else. dg keeps both, so its statement is the two files. dgp
+    # keeps the pulse, and its peak is the pulse alone. The estimate counts planes and
     # rows, and HDF5's headers are the rest.
     n_dg, st_dg = bank_bytes.stated(r_dg.stdout)
     n_dgp, st_dgp = bank_bytes.stated(r_dgp.stdout)
@@ -1121,10 +1121,9 @@ def main():
         check("bank bytes: dgp's stated pulse file vs on disk, rel",
               abs(st_dgp[1][0] / on_dgp - 1), bank_bytes.TOLERANCE,
               note=f"[{st_dgp[1][0]:.4e} stated, {on_dgp} on disk]")
-        peak = on_dgp + bank_bytes.kept(wd, "dg", 1)[1]
-        check("bank bytes: dgp's stated peak vs its pulse and dg's escaped file, rel",
-              abs(st_dgp[1][1] / peak - 1), bank_bytes.TOLERANCE,
-              note=f"[{st_dgp[1][1]:.4e} stated, {peak} on disk]")
+        check("bank bytes: dgp's stated peak vs its pulse alone, rel",
+              abs(st_dgp[1][1] / on_dgp - 1), bank_bytes.TOLERANCE,
+              note=f"[{st_dgp[1][1]:.4e} stated, {on_dgp} on disk]")
     else:
         check("bank bytes: dg and dgp state the bank in the header (0 = yes)", 1.0, 0.5)
 
