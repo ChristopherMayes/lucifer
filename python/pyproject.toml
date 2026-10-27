@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8"]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,15 @@ dynamic = ["version"]
 description = "The Python side of Lucifer: the input file as typed models, the schema, a runner and the readers of its output files."
 requires-python = ">=3.11"
 dependencies = []
+# The program's license, the text of which is LICENSE at the repository root. setuptools
+# 77 is the first to read an SPDX expression here.
+license = "GPL-3.0-only"
+authors = [{name = "Christopher Mayes"}]
+
+[project.urls]
+Homepage = "https://github.com/ChristopherMayes/lucifer"
+Documentation = "https://christophermayes.github.io/lucifer/"
+Issues = "https://github.com/ChristopherMayes/lucifer/issues"
 
 [project.optional-dependencies]
 # The plots: lucifer.plot and the plot methods of Stats and Result. matplotlib, numpy
