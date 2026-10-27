@@ -12,7 +12,7 @@ of that history. The entries before that date describe that branch.
 - 2026-10-27 Changed: the Python package lists its dependencies, `numpy>=1.24` and `h5py>=3.8`,
   which its readers import, where it had listed none. They are the lowest versions its tests have
   passed under, measured with Python 3.11, its stated minimum, and conda-forge's numpy 1.24.4 and
-  h5py 3.8.0.
+  h5py 3.8.0. `tests/environment-validate.yml` states Python 3.12 as a minimum where it pinned it.
 - 2026-10-27 Removed: `source-explorer/`, a browser prototype of sampled sources and diffraction
   that was independent of the build. Its `src/app.js` imported `physics.js`, `plots.js` and
   `worker.js`, which were never in the repository, so it could not be built from it.

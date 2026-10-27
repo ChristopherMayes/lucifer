@@ -21,7 +21,9 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.12
+  # A minimum, the release the recorded levels were measured under. The package alone
+  # needs 3.11, the floor python/pyproject.toml states.
+  - python>=3.12
   - numpy
   - scipy
   - h5py
