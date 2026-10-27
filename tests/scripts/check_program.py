@@ -15,7 +15,8 @@ and the tracking window.
      the table it belongs in or the keys the table has, so a stale input file cannot run on
      defaults. A string longer than its component, a list longer than its array and a
      list entry longer than an element are refused, where they had been cut to fit and
-     the shorter text checked or used.
+     the shorter text checked or used. An unknown device is refused as a name before any
+     configuration check quotes it as a device.
   4. The comb (run.comb_ds_save, with Bmad's ds_save semantics verbatim). A comb > 0
      run's per-record rows must be exactly the every-record run's rows at the comb
      positions, a dataset-equal subset, with the element ends always present. comb < 0
@@ -559,6 +560,13 @@ def main():
           and "dump_field_at ENTRY 2 IS 61 CHARACTERS AND AT MOST 60 ARE TAKEN" in r.stdout)
     check("a list entry longer than an element is refused, 61 characters in dump_field_at", ok,
           note=f"[exit {r.returncode}]")
+    # The bank is on by default, and the device block had noted that the device does not
+    # cover it before the name was checked.
+    r = run([str(exe), "long.toml", "run.device=metl"], wd)
+    ok = (r.returncode != 0 and 'UNRECOGNIZED DEVICE: "metl"' in r.stdout
+          and "DOES NOT COVER" not in r.stdout)
+    check("an unknown device is refused as a name, before the checks that quote it as a device",
+          ok, note=f"[exit {r.returncode}]")
 
     # ------------------------------------------------------------------
     print("== the version ==")

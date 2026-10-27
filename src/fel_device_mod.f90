@@ -443,6 +443,43 @@ end subroutine fel_device_query
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
+! Function fel_device_known (device_req) result (is_known)
+!
+! Routine to check run.device against the names this tree knows, '', 'off' and 'metal',
+! and refuse any other, listing them. fel_setup_schedule calls it before it checks the
+! configuration against the device, so a misspelt name is refused as a name and no
+! message quotes it as a device.
+!
+! Input:
+!   device_req -- character(*): run.device.
+!
+! Output:
+!   is_known   -- logical: True if the name is one this tree knows.
+!-
+
+function fel_device_known (device_req) result (is_known)
+
+character(*) device_req
+logical is_known
+character(*), parameter :: r_name = 'fel_device_known'
+
+!
+
+select case (device_req)
+case ('', 'off', 'metal')
+  is_known = .true.
+case default
+  call out_io (s_error$, r_name, 'UNRECOGNIZED DEVICE: "' // trim(device_req) // '".', &
+                                 'THIS TREE KNOWS off AND metal.')
+  is_known = .false.
+end select
+
+end function fel_device_known
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
 ! Subroutine from_c (c_str, f_str)
 !
 ! Routine to copy a null-terminated C string into a Fortran one, truncating at the
@@ -531,16 +568,11 @@ character(*), parameter :: r_name = 'fel_device_setup'
 
 err_flag = .false.
 
-select case (device_req)
-case ('', 'off')
-  return
-case ('metal')
-case default
-  call out_io (s_error$, r_name, 'UNRECOGNIZED DEVICE: "' // trim(device_req) // '".', &
-                                 'THIS TREE KNOWS off AND metal.')
+if (.not. fel_device_known(device_req)) then
   err_flag = .true.
   return
-end select
+endif
+if (device_req == '' .or. device_req == 'off') return
 
 call fel_device_query (usable, name, reason)
 if (.not. usable) then

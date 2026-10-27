@@ -1563,7 +1563,8 @@ if (run%global%write_escaped .and. .not. run%global%keep_escaped_field) then
   err_flag = .true.;  return
 endif
 
-! The device backend. Everything its kernels do not cover is refused here. An
+! The device backend. The name is checked first, so a misspelt one is refused as a name
+! before any message below quotes it. Everything its kernels do not cover is refused here. An
 ! unsupported configuration stops the run and never takes the CPU path instead. Element
 ! wakes are refused at the element, since only the walk sees them. The grid refusal,
 ! naming the nearest supported size, comes back from the backend itself. The field set
@@ -1573,6 +1574,9 @@ endif
 ! the beam back (do_migrate). The next element re-uploads into a rectangle grown to the
 ! new largest fill.
 
+if (.not. fel_device_known(run%global%device)) then
+  err_flag = .true.;  return
+endif
 if (run%global%device /= '' .and. run%global%device /= 'off') then
   if (run%global%source_model == 'coherent') then
     call out_io (s_error$, r_name, 'DEVICE = "' // trim(run%global%device) // '" DOES NOT COVER THE COHERENT SOURCE MODEL.')

@@ -15,7 +15,9 @@ of that history. The entries before that date describe that branch.
   than its array, 41 locators in `run.dump_beam_at`, printed the refusal and then ran with the first
   40. `fel_schema_set` now refuses a string longer than its component, a list longer than its array
   and a list entry longer than an element, with both lengths in the message, and fails the key in
-  each case. `check_program.py` holds the three refusals.
+  each case. An unknown `run.device` was checked only after the device's configuration checks, one
+  of which noted that the device does not cover the escaped-field bank while quoting the misspelt
+  name. `fel_device_known` now refuses the name first. `check_program.py` holds all four refusals.
 - 2026-10-27 Changed: the Python package lists its dependencies, `numpy>=1.24` and `h5py>=3.8`,
   which its readers import, where it had listed none. They are the lowest versions its tests have
   passed under, measured with Python 3.11, its stated minimum, and conda-forge's numpy 1.24.4 and

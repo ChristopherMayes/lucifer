@@ -1539,6 +1539,26 @@ Output:
   reason -- character(*): Why it is unusable. Blank when usable is True.
 ```
 
+(api-fel-device-known)=
+### `fel_device_known`
+
+*Function* `(device_req) result (is_known)`
+
+```
+Routine to check run.device against the names this tree knows, '', 'off' and 'metal',
+and refuse any other, listing them. fel_setup_schedule calls it before it checks the
+configuration against the device, so a misspelt name is refused as a name and no
+message quotes it as a device.
+```
+
+```
+Input:
+  device_req -- character(*): run.device.
+
+Output:
+  is_known   -- logical: True if the name is one this tree knows.
+```
+
 (api-from-c)=
 ### `from_c`
 
