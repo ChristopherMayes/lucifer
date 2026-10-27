@@ -8,5 +8,7 @@ build-*
 __pycache__
 .DS_Store
 
-# The Python package installed in place.
+# The Python package installed in place, and what building a wheel of it writes.
 *.egg-info
+python/build/
+python/dist/
