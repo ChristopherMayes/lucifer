@@ -9,6 +9,10 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Fixed: the distribution route in `docs/user-guide.md` and `util/conda_compile` created
+  `bmad-build` from Bmad's `.github/bmad-build-env.yaml` alone, which has no toml-f, so a build environment
+  made as written stopped Lucifer's configure with `Could not find a package configuration file provided
+  by "toml-f"`. Both now install `toml-f>=0.5` into the environment once after creating it.
 - 2026-10-29 Fixed: `tests/environment-validate.yml` did not list nbformat, nbclient or ipykernel, which
   `tests/scripts/run_notebooks.py` imports to execute the notebooks in the examples job, so an environment
   created from the file failed that job with `No module named 'nbformat'`. The file lists all three.

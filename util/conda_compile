@@ -13,6 +13,7 @@
 # Create the environment once, then build:
 #
 #   conda env create -n bmad-build -f <bmad>/.github/bmad-build-env.yaml
+#   conda install -n bmad-build -c conda-forge "toml-f>=0.5"   # Bmad's file has no toml-f
 #   lucifer/util/conda_compile                    # production: Bmad, then Lucifer
 #   BUILD_PRODUCTION=N lucifer/util/conda_compile # debug, the build to develop against
 #   BUILD_BMAD=N lucifer/util/conda_compile       # Lucifer alone, Bmad already built
