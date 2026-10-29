@@ -9,6 +9,9 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Fixed: `tests/environment-validate.yml` did not list nbformat, nbclient or ipykernel, which
+  `tests/scripts/run_notebooks.py` imports to execute the notebooks in the examples job, so an environment
+  created from the file failed that job with `No module named 'nbformat'`. The file lists all three.
 - 2026-10-27 Changed: `check_retired_words.py` fails on `run_fel_benchmark` and on the word benchmark
   standing alone, any case, so `the benchmark`, `a benchmark pass` and `BENCHMARK` are refused. The
   performance benchmark, the advance benchmark, `Benchmark1-SASE`, `microbenchmark` and Genesis4's

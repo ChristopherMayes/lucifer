@@ -37,6 +37,11 @@ dependencies:
   # after any change to the build configuration:
   #   cd regression_tests && python -m pytest test_fortran.py -q
   - pytest
+  # The notebooks under docs/notebooks, which tests/scripts/run_notebooks.py executes with
+  # nbclient on the python3 kernel in the examples job.
+  - nbformat
+  - nbclient
+  - ipykernel
   # The reference code the validation suite compares against. It lives here so the
   # comparison runs against a named build rather than whatever is on PATH: the
   # recorded levels belong to the build that produced them, and the validation suite refuses a
