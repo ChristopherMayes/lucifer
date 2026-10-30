@@ -1421,6 +1421,172 @@ columns are not ``PARAM_NAMES`` or that has more rows than planes. Needs
 openpmd-beamphysics.
 ```
 
+(pyapi-lucifer-compare)=
+## `lucifer.compare`
+
+*Module*
+
+```
+Compare a Lucifer run with a reference run, Genesis 1.3 Version 4's or another Lucifer run.
+
+    from lucifer.compare import read_curves, aligned, differences
+    run, ref = read_curves("run.stats.h5"), read_curves("Aramis.out.h5")
+    reason = aligned(run, ref)          # None, or why the two cannot be differenced
+    d = differences(run, ref)           # each curve's difference, divided as its label says
+
+The curves both codes record along the line are read into one form, ``Curves``: the
+record positions s, the power, the bunching, the mean energy and the rms sizes, each per
+record and slice, and the slice spacing. A Lucifer run gives them from its stats file and
+Genesis4 from its ``.out.h5``, the datasets Lattice/zplot, Field/power, Beam/bunching,
+Beam/energy, Beam/xsize, Beam/ysize and Global/s. Genesis4's energy is gamma and is
+converted to eV with Bmad's electron mass, so the two codes' energies are in one unit.
+
+A difference is Lucifer's value less the reference's, divided as ``DIVISOR`` says for
+each curve: the power elementwise by the reference's power at each record and slice,
+floored at 1e-9 of its peak so a slice that holds no light yet cannot divide by zero, the
+bunching by the reference's peak bunching, the mean energy change by the reference's
+largest change, the exit power across the window by its peak, and a field amplitude by
+the reference's peak amplitude. The power and bunching rules are the ones
+tests/scripts/compare_fel.py checks the tiers by, so the largest difference here is the
+tier's number for that curve. A time-dependent run's difference at a record is the one
+over its slices of largest magnitude, with its sign, so the largest over the records is
+the largest over everything.
+
+A difference is taken only where the two runs share their record positions to
+``S_TOLERANCE`` and their slice count and spacing, which ``aligned`` tests. Nothing here
+interpolates: a run recorded at other positions is overlaid and not differenced, since
+an interpolated difference would hide the mismatch inside a number that looks small.
+
+numpy and h5py alone. ``lucifer.plot.compare`` draws the figure.
+```
+
+(pyapi-lucifer-compare-curves)=
+### `Curves`
+
+*Class* `Curves(name: str, kind: str, s: numpy.ndarray, power: numpy.ndarray, bunching: numpy.ndarray, energy: numpy.ndarray, size_x: numpy.ndarray, size_y: numpy.ndarray, ds: float | None, source: pathlib.Path | None = None)`
+
+```
+What one run recorded along the line, per record and slice, in one form for both
+codes. The arrays are (nz, ns): nz records at positions ``s`` and ns slices, one in
+steady state.
+```
+
+(pyapi-lucifer-compare-curves-n-slice)=
+#### `Curves.n_slice`
+
+*Property*
+
+```
+The slice count.
+```
+
+(pyapi-lucifer-compare-curves-pulse-energy)=
+#### `Curves.pulse_energy`
+
+*Property*
+
+```
+(nz,) the energy in the window [J], the power summed over the slices times the
+slice spacing over c. None in steady state, where there is no window.
+```
+
+(pyapi-lucifer-compare-curves-energy-change)=
+#### `Curves.energy_change`
+
+*Property*
+
+```
+(nz, ns) the mean energy less its value at the first record [eV].
+```
+
+(pyapi-lucifer-compare-difference)=
+### `Difference`
+
+*Class* `Difference(key: str, x: numpy.ndarray, values: numpy.ndarray)`
+
+```
+One curve's difference between a run and its reference, divided as
+``DIVISOR[key]`` says, along ``x``.
+```
+
+(pyapi-lucifer-compare-difference-largest)=
+#### `Difference.largest`
+
+*Property*
+
+```
+The largest magnitude of the difference.
+```
+
+(pyapi-lucifer-compare-read-genesis-out)=
+### `read_genesis_out`
+
+*Function* `read_genesis_out(path, name='Genesis4')`
+
+```
+The curves of a Genesis4 ``.out.h5``. Beam/energy is gamma there and comes back in
+eV. The slice spacing is the step of Global/s, and None for one slice.
+```
+
+(pyapi-lucifer-compare-from-stats)=
+### `from_stats`
+
+*Function* `from_stats(st, name=None)`
+
+```
+The curves of a Lucifer run from its ``Stats``: coords/s, field/total/power,
+beam/slice/bunching, beam/slice/energy and the rms sizes from beam/slice/sigma. The
+slice spacing is the step of coords/ct_slice. ``name`` defaults to the file's stem.
+```
+
+(pyapi-lucifer-compare-read-curves)=
+### `read_curves`
+
+*Function* `read_curves(source)`
+
+```
+The curves of ``source``: a ``Curves`` as it is, a ``Stats`` through
+``from_stats``, or a path, read by what the file is: a bmad-stats file by its root
+attribute, a Genesis4 output by its Lattice/zplot and Field/power. Any other file is
+refused with what it does hold.
+```
+
+(pyapi-lucifer-compare-aligned)=
+### `aligned`
+
+*Function* `aligned(run, ref)`
+
+```
+None when the two runs can be differenced record by record and slice by slice,
+else the reason they cannot: a different record count, a record position differing by
+more than ``S_TOLERANCE``, a different slice count, or a different slice spacing.
+```
+
+(pyapi-lucifer-compare-differences)=
+### `differences`
+
+*Function* `differences(run, ref, fields=None)`
+
+```
+The differences of ``run`` from ``ref``, by key: power, bunching and energy along
+s; exit_power across the window for a time-dependent run; size_x and size_y along s
+for a steady-state one; and field, the amplitude along the row through the grid's
+center at y = 0, when ``fields`` names the two runs' field dumps at the exit, read
+with ``lucifer.field.read_field``. The runs must be aligned, as ``aligned`` tests,
+and the two fields on one grid, else a ValueError names the reason.
+```
+
+(pyapi-lucifer-compare-field-level)=
+### `field_level`
+
+*Function* `field_level(fields, n_slice=None)`
+
+```
+The largest difference of the two complex fields over every slice and grid point,
+over the reference's peak amplitude: compare_fel.py's final-field number. ``fields``
+names the run's and the reference's dumps, or holds them read.
+```
+
 (pyapi-lucifer-plot)=
 ## `lucifer.plot`
 
@@ -1429,12 +1595,14 @@ openpmd-beamphysics.
 ```
 Plots of a stats file against s, with the lattice layout under them.
 
-    from lucifer.plot import plot, summary
+    from lucifer.plot import plot, summary, compare
     plot("run.stats.h5", y="field/total/power", yscale="log")
     plot("run.stats.h5", y=["beam_size_x", "beam_size_y"], y2="beam/slice/bunching")
     summary("run.stats.h5")
+    compare("run.stats.h5", "Aramis.out.h5")
 
     python -m lucifer.plot run.stats.h5 -o run.png
+    python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 -o run-vs-genesis.png
 
 The file describes itself, so a plot needs no table of names: each dataset carries its
 @long_name, its @unit and its @axes, and the lattice group carries each element's
@@ -1463,6 +1631,14 @@ inside a matrix, each with its formula:
                                 beam/slice/sigma, beam/slice/centroid and run/p0c
   energy_change                 beam/slice/energy less its value at the first record
   field_emit_x, field_emit_y    field/x/emit_x and emit_y where field/x/angle_moments_valid
+
+compare() draws a run over a reference run, Genesis4's or another Lucifer run, with the
+difference beneath each curve, from the curves lucifer.compare reads: the power on a
+linear and a log axis, the bunching, the mean energy change and, in steady state, the
+field amplitude across the exit plane or the rms beam sizes, and in a time-dependent run
+the pulse energy in place of the power and the power across the window at the exit. The
+reference is a thick solid line and the run a thinner dashed one over it. A difference
+axis carries its power of ten in its label.
 
 matplotlib and beamphysics.units are imported inside the functions, so importing this
 module costs nothing beyond numpy. They come with the extra lucifer[plot].
@@ -1506,6 +1682,36 @@ when the run carries two, a panel per harmonic when it carries harmonics, and th
 layout under them all. ``tex`` is plot()'s. Returns the figure with ``return_figure``.
 ```
 
+(pyapi-lucifer-plot-compare)=
+### `compare`
+
+*Function* `compare(stats, reference, fields=None, labels=None, return_figure=False, tex=True)`
+
+```
+Draw a run over a reference run with the difference beneath each curve.
+
+``stats`` is the run, a Stats, its path or a ``lucifer.compare.Curves``, and
+``reference`` the run it is drawn over: a Genesis4 ``.out.h5``, a second stats file,
+or Curves. Four blocks, lettered: (a) the power on a linear and a log axis, or the
+pulse energy for a time-dependent run, (b) the bunching, (c) the mean energy change
+from the first record, and (d) in steady state the field amplitude along the row
+through the center of the exit plane when ``fields`` names the run's and the
+reference's field dumps there, else the rms beam sizes, and in a time-dependent run
+the power across the window at the exit. The reference is drawn thick and solid, the
+run thinner and dashed over it. Under each block is Lucifer's value less the
+reference's, divided as ``lucifer.compare.DIVISOR`` says, and the axis label carries
+the power of ten the values are in. A time-dependent run's difference at a record is
+the one over its slices of largest magnitude, with its sign.
+
+A difference is drawn only where the two runs share their record positions and their
+window, as ``lucifer.compare.aligned`` tests, and the field row only where the two
+fields share a grid. Otherwise the block holds the overlay alone and the reason is
+printed. Nothing interpolates. ``labels`` names the run and the reference in the
+legend, in that order. Without it a run drawn over Genesis4 is Lucifer and a stats
+file is named by its stem. ``tex`` is plot()'s. Returns the figure with
+``return_figure``.
+```
+
 (pyapi-lucifer-plot-layout)=
 ### `layout`
 
@@ -1542,6 +1748,9 @@ file does have.
 ```
 python -m lucifer.plot <stats.h5> [-o out.png] [--dpi N] [--show]: write the
 summary figure of a run, by default to <out_root>.png in the current directory.
+python -m lucifer.plot compare <stats.h5> <reference> [--fields <run.wf.h5>
+<reference field>] [-o out.png]: write compare()'s figure of the run over the
+reference, by default to <out_root>-compare.png.
 ```
 
 (pyapi-lucifer-flat)=

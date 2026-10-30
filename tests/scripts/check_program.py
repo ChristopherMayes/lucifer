@@ -384,6 +384,13 @@ def page_examples(exe, wd):
             from lucifer.plot import summary
 
             summary("n1024.stats.h5", return_figure=True).savefig("n1024.png")
+
+            # example: compare
+            from lucifer.plot import compare
+
+            compare("n1024.stats.h5", "scan2048.stats.h5")
+            # end example: compare
+            fig_compare = plt.gcf()
     finally:
         if old_exe is None:
             os.environ.pop("LUCIFER_EXE")
@@ -416,6 +423,13 @@ def page_examples(exe, wd):
     ok = len(P) == 1024 and type(W).__name__ == "Wavefront" and len(one) == 1024 and list(L.output.particles.loaded) == ["final"]
     check("the page's dumps example: the final dumps read on first access, one slice from its patch", ok,
           note=f"[{len(P)} particles, field {W.Ex.shape}]")
+    # The two runs share their lattice, so they are differenced: four lettered blocks, each
+    # with its difference axes, and the legend names the two stats files by their stems.
+    letters = sorted(x.get_text() for a in fig_compare.axes for x in a.texts if x.get_text().startswith("("))
+    legend = [x.get_text() for x in fig_compare.axes[0].get_legend().get_texts()]
+    ok = letters == ["(a)", "(b)", "(c)", "(d)"] and legend == ["scan2048", "n1024"] and len(fig_compare.axes) == 9
+    check("the page's compare example: four lettered blocks with their differences, the runs named by their stems",
+          ok, note=f"[{letters}, legend {legend}, {len(fig_compare.axes)} axes]")
 
     # Every dump the run wrote is in the footer and every file the footer names is on
     # disk, frames expanded from their brace range.

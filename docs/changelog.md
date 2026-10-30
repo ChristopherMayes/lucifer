@@ -9,6 +9,18 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Added: `lucifer.compare` reads a Lucifer run and a reference run, a Genesis4 `.out.h5`
+  or a second stats file, into one form, `Curves`, and takes their differences, each divided as
+  `DIVISOR` says: the power elementwise by the reference's power, floored at 1e-9 of its peak, the
+  bunching by the reference's peak bunching, the mean energy change by the largest change, the exit
+  power across the window by its peak, and a field amplitude by the peak amplitude. A difference is
+  taken only where the two runs share their record positions to 1e-9 m and their window, and nothing
+  interpolates. `lucifer.plot.compare(stats, reference, fields=None)` draws the run over the
+  reference with the difference beneath each curve, in four lettered blocks, with the reference thick
+  and solid and the run thinner and dashed, and each difference axis carrying its power of ten in its
+  label. `python -m lucifer.plot compare <stats.h5> <reference>` writes it. `docs/python.md` shows
+  the call, and `python/tests/test_compare.py` runs the readers and the differences without the
+  executable.
 - 2026-10-30 Changed: the field reader of the check scripts, `read_field` with `is_openpmd` and
   `components`, moved from `tests/scripts/fieldio.py` into `lucifer.field`, which reads one
   polarization of an openPMD EXT_Wavefront file or a Genesis4 `.fld.h5` into per-slice complex arrays

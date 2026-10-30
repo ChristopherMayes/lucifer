@@ -8,8 +8,11 @@ runner   runs the program on an input file and hands back where its output went.
 dumps    a run's particle and field dumps, as files and as objects read on first use.
 stats    reads the stats file.
 beam     reads a particle dump, openPMD or Genesis, into per-slice arrays.
-field    reads the pulse and the escaped-field bank, as a Wavefront with where each plane left.
-plot     plots a stats file against s with the lattice layout, and its summary figure.
+field    reads a field dump, openPMD or Genesis, and the pulse and the escaped-field bank.
+compare  reads a Lucifer run and a reference run, Genesis4's or another Lucifer run, into
+         one form and takes their differences.
+plot     plots a stats file against s with the lattice layout, its summary figure, and a
+         run over a reference run with the difference beneath each curve.
 
 Nothing here holds a default the program does not, generates anything but the TOML the
 program reads, or checks what the program refuses itself. The program is the source of

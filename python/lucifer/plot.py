@@ -1,11 +1,13 @@
 """Plots of a stats file against s, with the lattice layout under them.
 
-    from lucifer.plot import plot, summary
+    from lucifer.plot import plot, summary, compare
     plot("run.stats.h5", y="field/total/power", yscale="log")
     plot("run.stats.h5", y=["beam_size_x", "beam_size_y"], y2="beam/slice/bunching")
     summary("run.stats.h5")
+    compare("run.stats.h5", "Aramis.out.h5")
 
     python -m lucifer.plot run.stats.h5 -o run.png
+    python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 -o run-vs-genesis.png
 
 The file describes itself, so a plot needs no table of names: each dataset carries its
 @long_name, its @unit and its @axes, and the lattice group carries each element's
@@ -35,6 +37,14 @@ inside a matrix, each with its formula:
   energy_change                 beam/slice/energy less its value at the first record
   field_emit_x, field_emit_y    field/x/emit_x and emit_y where field/x/angle_moments_valid
 
+compare() draws a run over a reference run, Genesis4's or another Lucifer run, with the
+difference beneath each curve, from the curves lucifer.compare reads: the power on a
+linear and a log axis, the bunching, the mean energy change and, in steady state, the
+field amplitude across the exit plane or the rms beam sizes, and in a time-dependent run
+the pulse energy in place of the power and the power across the window at the exit. The
+reference is a thick solid line and the run a thinner dashed one over it. A difference
+axis carries its power of ten in its label.
+
 matplotlib and beamphysics.units are imported inside the functions, so importing this
 module costs nothing beyond numpy. They come with the extra lucifer[plot].
 """
@@ -49,7 +59,7 @@ import warnings
 
 import numpy as np
 
-__all__ = ["plot", "summary", "layout", "PlotError", "main"]
+__all__ = ["plot", "summary", "compare", "layout", "PlotError", "main"]
 
 M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
@@ -339,15 +349,7 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
                 color=color, label=label, zorder=3)
     ax.set_yscale(yscale)
     if yscale == "log":
-        # A log axis labels its decades. One that spans less than a decade would show no
-        # decade, or crowd its minor ticks with digits, so it takes a few evenly spaced
-        # ticks in plain numbers instead.
-        from matplotlib.ticker import MaxNLocator, NullFormatter, ScalarFormatter
-        ax.yaxis.set_minor_formatter(NullFormatter())
-        lo, hi = ax.dataLim.y0, ax.dataLim.y1
-        if lo > 0 and hi / lo < 10:
-            ax.yaxis.set_major_locator(MaxNLocator(4))
-            ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
+        _log_ticks(ax)
     multi = len(series) > 1 or any(se.values.shape[1] > 1 for se in series)
     # With tex and a symbol for every curve, the axis carries the symbols, as LUME-Genesis's
     # mathlabel does. Else it carries the quantities while their names fit beside the axis,
@@ -358,6 +360,18 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
         joined = ", ".join(quantities)
         name = joined if len(joined) <= 32 else quantities[0]
     return name + _unit_label(prefix, units[0]), factor, multi
+
+
+def _log_ticks(ax):
+    """A log axis labels its decades. One that spans less than a decade would show no
+    decade, or crowd its minor ticks with digits, so it takes a few evenly spaced ticks in
+    plain numbers instead."""
+    from matplotlib.ticker import MaxNLocator, NullFormatter, ScalarFormatter
+    ax.yaxis.set_minor_formatter(NullFormatter())
+    lo, hi = ax.get_ylim()
+    if lo > 0 and hi / lo < 10:
+        ax.yaxis.set_major_locator(MaxNLocator(4))
+        ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
 
 
 def layout(stats, ax, xfactor=1.0, xlabel=True, ylabels=True):
@@ -578,20 +592,295 @@ def _summary(plt, st, tex):
     return fig
 
 
+# The compare figure's two curves: the reference thick and solid, the run thinner and
+# dashed over it, so the two read apart in gray as well as in color.
+REF_LINE = dict(color=COLORS[0], lw=2.8, ls="-")
+RUN_LINE = dict(color=COLORS[1], lw=1.3, ls=(0, (4, 2)))
+# The symbol and the plain name of each curve the compare figure draws, and of each
+# difference, with the unit the top panel's values are in before any prefix.
+COMPARE_LABEL = {
+    "power": ("P", "power", "W"), "pulse_energy": (r"E_\mathrm{pulse}", "pulse energy", "J"),
+    "bunching": ("|b|", "bunching", "1"),
+    "energy": (r"\langle \Delta E \rangle", "mean energy change", "eV"),
+    "exit_power": (r"P_\mathrm{exit}", "power at the exit", "W"),
+    "size": (r"\sigma", "rms beam size", "m"), "field": ("|E|", "field amplitude", "V/m"),
+}
+COMPARE_DIFF = {
+    "power": (r"\delta P / P", "dP/P"),
+    "bunching": (r"\delta |b| \,/\, |b|_\mathrm{max}", "d|b| / max|b|"),
+    "energy": (r"\delta \langle \Delta E \rangle \,/\, |\langle \Delta E \rangle|_\mathrm{max}",
+               "d<dE> / max|<dE>|"),
+    "exit_power": (r"\delta P_\mathrm{exit} \,/\, P_\mathrm{exit,max}", "dP_exit / max P_exit"),
+    "size": (r"\delta \sigma / \sigma", "d sigma / sigma"),
+    "field": (r"\delta |E| \,/\, |E|_\mathrm{max}", "d|E| / max|E|"),
+}
+
+
+def _power_of_ten(values, label):
+    """The values scaled by a power of ten and the label carrying it, as "(10^-6)", so no
+    axis shows an offset or a scale factor of its own. A scale between 1e-1 and 1e2 is
+    left as it is."""
+    m = float(np.nanmax(np.abs(values))) if np.isfinite(values).any() else 0.0
+    e = int(np.floor(np.log10(m))) if m > 0 else 0
+    if -1 <= e <= 2:
+        return values, label
+    return values / 10.0 ** e, f"{label} ($10^{{{e}}}$)"
+
+
+def _compare_label(key, prefix, tex):
+    sym, name, unit = COMPARE_LABEL[key]
+    base = f"${sym}$" if tex else name
+    return base + _unit_label(prefix, unit)
+
+
+def _compare_scale(key, arrays):
+    """(factor, prefix) for a compare curve. A quotient unit takes its prefix on its
+    numerator, so a field reads GV/m rather than carrying an offset on the axis."""
+    unit = COMPARE_LABEL[key][2]
+    return _scale(unit.split("/")[0], arrays)
+
+
+def _diff_label(key, tex):
+    return f"${COMPARE_DIFF[key][0]}$" if tex else COMPARE_DIFF[key][1]
+
+
+def compare(stats, reference, fields=None, labels=None, return_figure=False, tex=True):
+    """Draw a run over a reference run with the difference beneath each curve.
+
+    ``stats`` is the run, a Stats, its path or a ``lucifer.compare.Curves``, and
+    ``reference`` the run it is drawn over: a Genesis4 ``.out.h5``, a second stats file,
+    or Curves. Four blocks, lettered: (a) the power on a linear and a log axis, or the
+    pulse energy for a time-dependent run, (b) the bunching, (c) the mean energy change
+    from the first record, and (d) in steady state the field amplitude along the row
+    through the center of the exit plane when ``fields`` names the run's and the
+    reference's field dumps there, else the rms beam sizes, and in a time-dependent run
+    the power across the window at the exit. The reference is drawn thick and solid, the
+    run thinner and dashed over it. Under each block is Lucifer's value less the
+    reference's, divided as ``lucifer.compare.DIVISOR`` says, and the axis label carries
+    the power of ten the values are in. A time-dependent run's difference at a record is
+    the one over its slices of largest magnitude, with its sign.
+
+    A difference is drawn only where the two runs share their record positions and their
+    window, as ``lucifer.compare.aligned`` tests, and the field row only where the two
+    fields share a grid. Otherwise the block holds the overlay alone and the reason is
+    printed. Nothing interpolates. ``labels`` names the run and the reference in the
+    legend, in that order. Without it a run drawn over Genesis4 is Lucifer and a stats
+    file is named by its stem. ``tex`` is plot()'s. Returns the figure with
+    ``return_figure``.
+    """
+    import matplotlib.pyplot as plt
+    from lucifer import compare as cmp
+
+    run, ref = cmp.read_curves(stats), cmp.read_curves(reference)
+    if labels is not None:
+        run.name, ref.name = labels
+    elif ref.kind == "genesis4" and run.kind == "lucifer":
+        run.name = "Lucifer"
+    with _style():
+        fig = _compare(plt, cmp, run, ref, fields, tex)
+    return fig if return_figure else None
+
+
+def _compare(plt, cmp, run, ref, fields, tex):
+    reason = cmp.aligned(run, ref)
+    diffs = {}
+    if reason:
+        print(f"compare: the differences are not drawn: {reason}")
+    else:
+        diffs = cmp.differences(run, ref)
+    td = run.n_slice > 1
+    fa = fb = None
+    if fields is not None and not td:
+        fa, fb = cmp._fields(fields, run.n_slice)
+        if not reason:
+            try:
+                diffs["field"] = cmp.differences(run, ref, fields=(fa, fb))["field"]
+            except ValueError as err:
+                print(f"compare: the field difference is not drawn: {err}")
+    sfactor, sprefix = _scale("m", [run.s, ref.s])
+    xs = f"$s$ ({sprefix}m)" if tex else f"s ({sprefix}m)"
+
+    fig = plt.figure(figsize=(11.5, 11), layout="constrained")
+    blocks = fig.subfigures(2, 2, hspace=0.04, wspace=0.03)
+
+    def overlay(ax, xr, yr, xv, yv, label, log=False):
+        ax.plot(xr, yr, label=ref.name, **REF_LINE)
+        ax.plot(xv, yv, label=run.name, **RUN_LINE)
+        ax.set_ylabel(label)
+        if log:
+            ax.set_yscale("log")
+            # A dark start's first record is exactly zero. Do not let it stretch the axis
+            # below the light. A curve within one decade keeps its own range.
+            pos = yr[yr > 0]
+            if pos.size and pos.max() / pos.min() > 10:
+                ax.set_ylim(bottom=max(pos.min() * 0.3, pos.max() * 1e-14), top=pos.max() * 3)
+            _log_ticks(ax)
+        ax.tick_params(labelbottom=False)
+
+    def difference(ax, x, d, key, xlabel):
+        v, lab = _power_of_ten(d, _diff_label(key, tex))
+        ax.axhline(0, color=INK2, lw=0.8)
+        ax.plot(x, v, color=INK, lw=1.2)
+        ax.set_ylabel(lab)
+        ax.set_xlabel(xlabel)
+
+    def letter(ax, tag):
+        ax.text(0.0, 1.03, f"({tag})", transform=ax.transAxes, ha="left", va="bottom",
+                fontweight="bold", color=INK)
+
+    def rows(block, n_top, with_diff):
+        ratios = [1.2] * n_top + ([1] if with_diff else [])
+        ax = block.subplots(len(ratios), 1, sharex=True, gridspec_kw={"height_ratios": ratios})
+        return list(np.atleast_1d(ax))
+
+    # (a) The power, or the pulse energy, on a linear and a log axis.
+    if td:
+        key, yr, yv = "pulse_energy", ref.pulse_energy, run.pulse_energy
+    else:
+        key, yr, yv = "power", ref.power[:, 0], run.power[:, 0]
+    factor, prefix = _compare_scale(key, [yr, yv])
+    ax = rows(blocks[0, 0], 2, "power" in diffs)
+    overlay(ax[0], ref.s / sfactor, yr / factor, run.s / sfactor, yv / factor, _compare_label(key, prefix, tex))
+    ax[0].set_ylim(bottom=0)
+    ax[0].legend(loc="upper left")
+    letter(ax[0], "a")
+    overlay(ax[1], ref.s / sfactor, yr / factor, run.s / sfactor, yv / factor,
+            _compare_label(key, prefix, tex), log=True)
+    if "power" in diffs:
+        difference(ax[2], diffs["power"].x / sfactor, diffs["power"].values, "power", xs)
+    else:
+        ax[1].tick_params(labelbottom=True)
+        ax[1].set_xlabel(xs)
+
+    # (b) The bunching and (c) the mean energy change, slice means in a time-dependent run.
+    for block, tag, key, yr, yv in (
+            (blocks[0, 1], "b", "bunching", ref.bunching.mean(axis=1), run.bunching.mean(axis=1)),
+            (blocks[1, 0], "c", "energy", ref.energy_change.mean(axis=1), run.energy_change.mean(axis=1))):
+        factor, prefix = _compare_scale(key, [yr, yv])
+        ax = rows(block, 1, key in diffs)
+        overlay(ax[0], ref.s / sfactor, yr / factor, run.s / sfactor, yv / factor, _compare_label(key, prefix, tex))
+        if key == "bunching":
+            ax[0].set_ylim(bottom=0)
+        letter(ax[0], tag)
+        if key in diffs:
+            difference(ax[1], diffs[key].x / sfactor, diffs[key].values, key, xs)
+        else:
+            ax[0].tick_params(labelbottom=True)
+            ax[0].set_xlabel(xs)
+
+    # (d) The power across the window at the exit, the field row at the exit, or the sizes.
+    block = blocks[1, 1]
+    if td:
+        xr, xv = np.arange(ref.n_slice) * ref.ds, np.arange(run.n_slice) * run.ds
+        xf, xp = _scale("m", [xr, xv])
+        yr, yv = ref.power[-1], run.power[-1]
+        factor, prefix = _compare_scale("exit_power", [yr, yv])
+        ax = rows(block, 1, "exit_power" in diffs)
+        ax[0].step(xr / xf, yr / factor, where="mid", label=ref.name, **REF_LINE)
+        ax[0].step(xv / xf, yv / factor, where="mid", label=run.name, **RUN_LINE)
+        ax[0].set_ylabel(_compare_label("exit_power", prefix, tex))
+        ax[0].set_ylim(bottom=0)
+        ax[0].tick_params(labelbottom=False)
+        letter(ax[0], "d")
+        xlabel = (f"$s$ along the window ({xp}m)" if tex else f"s along the window ({xp}m)")
+        if "exit_power" in diffs:
+            d = diffs["exit_power"]
+            v, lab = _power_of_ten(d.values, _diff_label("exit_power", tex))
+            ax[1].axhline(0, color=INK2, lw=0.8)
+            ax[1].step(d.x / xf, v, where="mid", color=INK, lw=1.2)
+            ax[1].set_ylabel(lab)
+            ax[1].set_xlabel(xlabel)
+        else:
+            ax[0].tick_params(labelbottom=True)
+            ax[0].set_xlabel(xlabel)
+    elif fa is not None:
+        ua, ub = fa["u"][0], fb["u"][0]
+        ca, cb = ua.shape[0] // 2, ub.shape[0] // 2
+        xa = (np.arange(ua.shape[1]) - ua.shape[1] // 2) * fa["dx"]
+        xb = (np.arange(ub.shape[1]) - ub.shape[1] // 2) * fb["dx"]
+        xf, xp = _scale("m", [xa, xb])
+        factor, prefix = _compare_scale("field", [np.abs(ub[cb]), np.abs(ua[ca])])
+        ax = rows(block, 1, "field" in diffs)
+        ax[0].plot(xb / xf, np.abs(ub[cb]) / factor, label=ref.name, **REF_LINE)
+        ax[0].plot(xa / xf, np.abs(ua[ca]) / factor, label=run.name, **RUN_LINE)
+        ax[0].set_ylabel(_compare_label("field", prefix, tex))
+        ax[0].set_ylim(bottom=0)
+        ax[0].tick_params(labelbottom=False)
+        letter(ax[0], "d")
+        xlabel = f"$x$ ({xp}m)" if tex else f"x ({xp}m)"
+        if "field" in diffs:
+            difference(ax[1], diffs["field"].x / xf, diffs["field"].values, "field", xlabel)
+        else:
+            ax[0].tick_params(labelbottom=True)
+            ax[0].set_xlabel(xlabel)
+    else:
+        factor, prefix = _compare_scale("size", [ref.size_x, ref.size_y, run.size_x, run.size_y])
+        with_diff = "size_x" in diffs
+        ax = rows(block, 1, with_diff)
+        for comp, yr, yv, shade in (("x", ref.size_x[:, 0], run.size_x[:, 0], 1.0),
+                                     ("y", ref.size_y[:, 0], run.size_y[:, 0], 0.55)):
+            ax[0].plot(ref.s / sfactor, yr / factor, label=f"{ref.name} {comp}", alpha=shade, **REF_LINE)
+            ax[0].plot(run.s / sfactor, yv / factor, label=f"{run.name} {comp}", alpha=shade, **RUN_LINE)
+        ax[0].set_ylabel(_compare_label("size", prefix, tex))
+        ax[0].set_ylim(bottom=0)
+        ax[0].legend(loc="lower center", ncol=2)
+        ax[0].tick_params(labelbottom=False)
+        letter(ax[0], "d")
+        if with_diff:
+            # One power of ten for both planes, so the two lines share an axis.
+            both = np.concatenate([diffs["size_x"].values, diffs["size_y"].values])
+            v, lab = _power_of_ten(both, _diff_label("size", tex))
+            e = len(diffs["size_x"].values)
+            ax[1].axhline(0, color=INK2, lw=0.8)
+            ax[1].plot(diffs["size_x"].x / sfactor, v[:e], color=INK, lw=1.2, label="x")
+            ax[1].plot(diffs["size_y"].x / sfactor, v[e:], color=INK2, lw=1.2, ls=(0, (4, 2)), label="y")
+            ax[1].set_ylabel(lab)
+            ax[1].set_xlabel(xs)
+            ax[1].legend(loc="lower right", ncol=2)
+        else:
+            ax[0].tick_params(labelbottom=True)
+            ax[0].set_xlabel(xs)
+    return fig
+
+
 def main(argv=None) -> int:
     """python -m lucifer.plot <stats.h5> [-o out.png] [--dpi N] [--show]: write the
-    summary figure of a run, by default to <out_root>.png in the current directory."""
-    ap = argparse.ArgumentParser(prog="python -m lucifer.plot", description=main.__doc__.split(":")[1].strip())
-    ap.add_argument("stats", help="a stats file, <out_root>.stats.h5")
-    ap.add_argument("-o", "--output", help="the image to write (default: <out_root>.png)")
-    ap.add_argument("--dpi", type=int, default=160, help="output resolution (default: 160)")
-    ap.add_argument("--show", action="store_true", help="also open a window")
-    args = ap.parse_args(argv)
-    import matplotlib
-    if not args.show:
-        matplotlib.use("Agg")
-    out = args.output or pathlib.Path(args.stats).name.removesuffix(".stats.h5") + ".png"
-    fig = summary(args.stats, return_figure=True)
+    summary figure of a run, by default to <out_root>.png in the current directory.
+    python -m lucifer.plot compare <stats.h5> <reference> [--fields <run.wf.h5>
+    <reference field>] [-o out.png]: write compare()'s figure of the run over the
+    reference, by default to <out_root>-compare.png."""
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] == "compare":
+        ap = argparse.ArgumentParser(prog="python -m lucifer.plot compare",
+                                     description="write the figure of a run over a reference run, "
+                                                 "Genesis4's .out.h5 or a second stats file")
+        ap.add_argument("stats", help="the run, <out_root>.stats.h5")
+        ap.add_argument("reference", help="the reference, a Genesis4 .out.h5 or a stats file")
+        ap.add_argument("--fields", nargs=2, metavar=("RUN_FIELD", "REFERENCE_FIELD"),
+                        help="the two runs' field dumps at the exit, for the field row of block (d)")
+        ap.add_argument("--labels", nargs=2, metavar=("RUN", "REFERENCE"),
+                        help="the legend's names for the run and the reference")
+        ap.add_argument("-o", "--output", help="the image to write (default: <out_root>-compare.png)")
+        ap.add_argument("--dpi", type=int, default=160, help="output resolution (default: 160)")
+        ap.add_argument("--show", action="store_true", help="also open a window")
+        args = ap.parse_args(argv[1:])
+        import matplotlib
+        if not args.show:
+            matplotlib.use("Agg")
+        out = args.output or pathlib.Path(args.stats).name.removesuffix(".stats.h5") + "-compare.png"
+        fig = compare(args.stats, args.reference, fields=args.fields, labels=args.labels, return_figure=True)
+    else:
+        ap = argparse.ArgumentParser(prog="python -m lucifer.plot", description=main.__doc__.split(":")[1].strip())
+        ap.add_argument("stats", help="a stats file, <out_root>.stats.h5")
+        ap.add_argument("-o", "--output", help="the image to write (default: <out_root>.png)")
+        ap.add_argument("--dpi", type=int, default=160, help="output resolution (default: 160)")
+        ap.add_argument("--show", action="store_true", help="also open a window")
+        args = ap.parse_args(argv)
+        import matplotlib
+        if not args.show:
+            matplotlib.use("Agg")
+        out = args.output or pathlib.Path(args.stats).name.removesuffix(".stats.h5") + ".png"
+        fig = summary(args.stats, return_figure=True)
     fig.savefig(out, dpi=args.dpi)
     print(f"wrote {out}")
     if args.show:

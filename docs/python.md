@@ -239,6 +239,24 @@ The same figure from the command line, by default to `<out_root>.png` in the cur
 python -m lucifer.plot run.stats.h5 -o run.png
 ```
 
+(python-compare)=
+### A run over a reference run
+
+`lucifer.plot.compare` draws a run over a reference run with the difference beneath each curve. The reference is a Genesis4 `.out.h5` or a second stats file. Four blocks, lettered: the power on a linear and a log axis, the bunching, the mean energy change from the first record, and in steady state the field amplitude across the exit plane when the two runs' field dumps are given or else the rms beam sizes. A time-dependent run shows the pulse energy in place of the power and the power across the window at the exit in place of the fourth block. The reference is the thick solid line and the run the thinner dashed one over it. Under each block is the run's value less the reference's, divided as `lucifer.compare.DIVISOR` says: the power elementwise by the reference's power, the bunching by its peak, the energy change by its largest change. The axis label carries the power of ten the values are in, so no axis shows an offset of its own. A difference is drawn only where the two runs share their record positions and their window, which `lucifer.compare.aligned` tests, and nothing interpolates: a run recorded at other positions is overlaid alone and the reason printed.
+
+% example: compare
+```python
+from lucifer.plot import compare
+
+compare("n1024.stats.h5", "scan2048.stats.h5")
+```
+
+The two runs are one input at 1024 and 2048 particles per slice, so the figure shows where along the line the loader's difference enters. `lucifer.compare` reads either file into one form, `Curves`, and takes the differences, with numpy and h5py alone. From the command line, with the two field dumps for the field row:
+
+```
+python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 --fields run-final.wf.h5 Aramis-final.fld.h5
+```
+
 (python-flat)=
 ## Flat text
 
