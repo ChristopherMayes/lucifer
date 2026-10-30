@@ -7,7 +7,8 @@ Draw the figures of docs/python.md's Plotting section from the sase example's ru
 Each region between "# example: <name>" and "# end example: <name>" is the code of one
 block on the page, as a user types it, with the run's own file name, and
 tests/scripts/check_python_page.py holds the page to it. After each region the figure it
-drew is saved as <out>/<name>.png at one fixed resolution and checked: its labels carry
+drew is saved as <out>/<name>.svg through lucifer.plot.save, the same bytes on every run,
+and checked: its labels carry
 the file's units with their prefix, and the layout is drawn. A figure that lacks what
 the page says it shows exits nonzero.
 
@@ -22,7 +23,9 @@ import os
 import pathlib
 import sys
 
-DPI = 90
+# The resolution of the per-slice lines, which an SVG draws as an image. 150 dpi is
+# twice the figures' width on the page, which a high-density display needs.
+DPI = 150
 
 
 def main():
@@ -36,9 +39,11 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     failed = []
 
+    from lucifer.plot import save as save_figure
+
     def save(name):
         fig = plt.gcf()
-        fig.savefig(out / f"{name}.png", dpi=DPI)
+        save_figure(fig, out / f"{name}.svg", dpi=DPI)
         return fig
 
     def expect(name, ok, what):

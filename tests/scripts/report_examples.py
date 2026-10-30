@@ -11,8 +11,9 @@ that runs: editing the input file and regenerating is the only way to change the
 
 The output is deterministic. Nothing time dependent, machine dependent or path dependent
 is written, because the keystone suite regenerates these files and requires the diff to
-be empty. Figures are referenced, never read. PNG bytes vary with the plotting library,
-so run_examples.sh writes them and check_examples.py asserts only that each one exists.
+be empty. Figures are referenced, never read. A figure's bytes vary with the plotting
+library, so run_examples.sh writes them and check_examples.py asserts only that each one
+exists.
 
 Usage:
 
@@ -237,7 +238,7 @@ def main():
         page = front_matter(title, d.name, f"examples/{d.name}/")
         # The figure the runner saved, referenced beside the page it belongs to.
         if d.name not in NO_FIGURE:
-            page += [f"![{d.name}]({d.name}.png)", ""]
+            page += [f"![{d.name}]({d.name}.svg)", ""]
         # The commands below carry paths relative to the example's own directory, which a
         # reader of the repository knows and a reader of this page has not been told.
         page += [f"Everything on this page lives in and runs from "

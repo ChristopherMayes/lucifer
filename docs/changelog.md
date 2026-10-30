@@ -9,6 +9,16 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Changed: the example pages' figures and the Python page's are SVG, where they were PNG
+  at 110 and 90 dpi, which read soft on a high-density display. `lucifer.plot.save(fig, path, dpi=150)`
+  writes a figure in the format its suffix names, and for an SVG fixes the layout, salts the element
+  ids and writes no date, so the same figure is the same bytes on every run. `python -m lucifer.plot`,
+  `examples/run_examples.sh`, `tests/scripts/python_page_figures.py` and `report_tier_figures.py`
+  write through it, and `compare()` no longer fixes its own layout, so a figure drawn on screen still
+  follows the window. The per-slice gray lines are drawn rasterized, one image in a vector file at the
+  file's dpi, since 96 slices as paths made the SASE example's SVG 4.1 MB. With them at 150 dpi it is
+  694 kB, and the 17 summary figures are 7.9 MB against 5.7 MB as PNG. The command line's default
+  resolution is 150 dpi, where it was 160.
 - 2026-10-30 Changed: the tier figures on `docs/validation.md` are SVG, where they were PNG at
   110 dpi, which read soft on a high-density display. An SVG is 167 to 219 kB against 143 to 183 kB
   for the PNGs, and stays sharp under the reader's zoom. Each takes the class

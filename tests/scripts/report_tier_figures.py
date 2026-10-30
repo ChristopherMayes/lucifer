@@ -24,9 +24,9 @@ same arrays the figure draws, so a caption cannot disagree with its figure.
 
 The figures are SVG, so they stay sharp on a high-density display and under the reader's
 zoom, at 167 to 219 kB each, near the 143 to 183 kB of a 110 dpi PNG of the same figure.
-matplotlib writes a date and random element ids into an SVG unless told otherwise, so
-the date is left out and the ids are salted with a fixed string: the same arrays give
-the same bytes, and a keystone that redraws the figures leaves the tree as it found it.
+Each is written through lucifer.plot.save, which fixes the layout, salts the element ids
+and leaves out the date, so the same arrays give the same bytes and a keystone that
+redraws the figures leaves the tree as it found it.
 Each figure takes the site's col-body-outset-right class, which widens it 3rem past the
 text column to the right. The wider col-page and col-page-right reach under the left
 navigation and under the sticky outline at the right of the book theme.
@@ -157,10 +157,8 @@ def main():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    # The SVG's element ids from a fixed salt, so a figure is the same bytes on every run.
-    matplotlib.rcParams["svg.hashsalt"] = "lucifer-tier-figures"
     from lucifer import compare as cmp
-    from lucifer.plot import compare
+    from lucifer.plot import compare, save
 
     w = Path(args.work_dir)
     out = Path(args.out)
@@ -191,7 +189,7 @@ def main():
         flevel = cmp.field_level(fields, run.n_slice)
         fig = compare(run, ref, fields=fields, labels=(run.name, ref.name), return_figure=True)
         image = out / f"{key}.svg"
-        fig.savefig(image, metadata={"Date": None})
+        save(fig, image)
         plt.close(fig)
         rel = image.resolve().relative_to(link_dir).as_posix()
         text = caption(key, what, run, ref, diffs, levels[key], TOLERANCE[key], flevel,

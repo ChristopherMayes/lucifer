@@ -1601,8 +1601,8 @@ Plots of a stats file against s, with the lattice layout under them.
     summary("run.stats.h5")
     compare("run.stats.h5", "Aramis.out.h5")
 
-    python -m lucifer.plot run.stats.h5 -o run.png
-    python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 -o run-vs-genesis.png
+    python -m lucifer.plot run.stats.h5 -o run.svg
+    python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 -o run-vs-genesis.svg
 
 The file describes itself, so a plot needs no table of names: each dataset carries its
 @long_name, its @unit and its @axes, and the lattice group carries each element's
@@ -1639,6 +1639,12 @@ field amplitude across the exit plane or the rms beam sizes, and in a time-depen
 the pulse energy in place of the power and the power across the window at the exit. The
 reference is a thick solid line and the run a thinner dashed one over it. A difference
 axis carries its power of ten in its label.
+
+save() writes a figure so that the same figure gives the same bytes on every run, which
+the documentation's committed figures need, and the command line writes through it. A
+vector file keeps the text, the axes and the bold curves as vectors and draws the thin
+per-slice lines as one image at the file's dpi, since hundreds of slice paths made an SVG
+of several megabytes.
 
 matplotlib and beamphysics.units are imported inside the functions, so importing this
 module costs nothing beyond numpy. They come with the extra lucifer[plot].
@@ -1725,6 +1731,24 @@ has an edge in its color, so a quadrupole a pixel wide stays visible at its true
 length. ``xfactor`` divides s, so the layout matches a plot drawn with a prefix on s,
 and ``ylabels`` labels the two axes, a_w and k_1. Nothing is modeled: the extents and
 strengths are the file's.
+```
+
+(pyapi-lucifer-plot-save)=
+### `save`
+
+*Function* `save(fig, path, dpi=150)`
+
+```
+Write ``fig`` to ``path``, in the format its suffix names, so that the same figure
+gives the same bytes on every run. ``dpi`` is the resolution of a raster file, and of
+the parts of a vector file drawn as an image, the per-slice lines among them.
+
+An SVG is written with its element ids salted by ``SVG_SALT`` and with no date, and
+the layout is fixed first: placed once, each subfigure and axes rounded to 1e-5 of its
+parent, and the layout engine then turned off. The constrained-layout solver's result
+varies in its last bits from one process to the next, and an SVG names each clip
+rectangle by a hash of its full-precision bounds, so without this the same arrays drew
+a different file on every run. The figure keeps the fixed layout after the call.
 ```
 
 (pyapi-lucifer-plot-ploterror)=

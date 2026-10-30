@@ -8,7 +8,7 @@
 #
 # The figures are committed. Building an FEL run at documentation build time would be
 # wrong, and a page whose figure is missing is worse than a page with an old one. Their
-# bytes are not compared: a plotting library upgrade rewrites every PNG without changing
+# bytes are not compared: a plotting library upgrade rewrites every figure without changing
 # any physics, so check_examples.py asserts that each figure exists and the regeneration
 # check covers the Markdown only.
 #
@@ -37,10 +37,10 @@ PYTHON=""
 FIGURES=1
 JOBS=0
 
-# The committed figures are read on a page rather than zoomed into, and they live in the
-# repository's history, so they are written below the default resolution of
-# python -m lucifer.plot.
-DPI=110
+# The figures are SVG, written through lucifer.plot.save, so the text, the axes and the
+# bold curves are vectors and the thin per-slice lines one image at this resolution, twice
+# the figures' width on the page, which a high-density display needs.
+DPI=150
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -232,7 +232,7 @@ run_dir () {   # <dir> <index>
   if [[ -f "$dir/figure.args" ]]; then
     read -r -a fargs < "$dir/figure.args"
     if [[ $FIGURES -eq 1 ]]; then
-      figure="$FIG_DIR/$dir.png"; fdpi="$DPI"
+      figure="$FIG_DIR/$dir.svg"; fdpi="$DPI"
     else
       figure="$STATE/$dir-figure.png"; fdpi=40
     fi
@@ -249,7 +249,7 @@ run_dir () {   # <dir> <index>
     if [[ -z "$root" || ! -f "$stats" ]]; then
       echo "Error: $dir: no stats file at $stats to plot." > "$STATE/note.$idx"
       status=1
-    elif ! "$PYTHON" -m lucifer.plot "$stats" --dpi "$DPI" -o "$FIG_DIR/$dir.png" \
+    elif ! "$PYTHON" -m lucifer.plot "$stats" --dpi "$DPI" -o "$FIG_DIR/$dir.svg" \
            > "$dir/plot.log" 2>&1 < /dev/null; then
       echo "Error: $dir: python -m lucifer.plot failed; see $dir/plot.log" > "$STATE/note.$idx"
       status=1

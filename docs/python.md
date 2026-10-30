@@ -197,7 +197,7 @@ from lucifer.plot import plot
 plot("sase.stats.h5", y="field/total/power", y2="beam/slice/bunching", yscale="log")
 ```
 
-![power and bunching against s](generated/python/power.png)
+![power and bunching against s](generated/python/power.svg)
 
 The window's total power grows segment by segment along the line, with a thin gray line for each slice under it, and the slice-mean bunching rises on the right axis. A curve on the record and slice axes is drawn this way, the window total bold for watts, joules and coulombs and the slice mean bold for the rest. The layout under the axes comes from the file's `lattice` group, in LUME-Genesis's colors: each FEL element's `aw` is a red box on the left axis, and each quadrupole's `k1` a blue box on the right, up or down by its sign. Both are drawn at their true lengths, so a quadrupole of 0.08 m on this 57 m line is a line one pixel wide, edged so that it stays visible. No lattice is built in Python.
 
@@ -208,7 +208,7 @@ A curve is a dataset path, a path with components named in brackets by the label
 plot("sase.stats.h5", y=["beam_size_x", "field_size_x"])
 ```
 
-![rms beam and field sizes against s](generated/python/sizes.png)
+![rms beam and field sizes against s](generated/python/sizes.svg)
 
 The beam's size follows the FODO lattice, and the field's is pulled onto it as the gain grows, which is gain guiding. Only the first curve of an axis draws its slices, so the two stay legible.
 
@@ -218,7 +218,7 @@ plot("sase.stats.h5", y=["beam/bunch/twiss/norm_emit[x]", "beam/slice_twiss/twis
      labels=["projected", "slice average"])
 ```
 
-![projected and slice-average emittance at the element ends](generated/python/emittance.png)
+![projected and slice-average emittance at the element ends](generated/python/emittance.svg)
 
 A dataset on the element-end axis is drawn as points at the element ends. Here the `x` in brackets picks the plane from `coords/plane`, and `labels` names the curves in place of the file's names: the projected emittance stands a little above the slice average, by the spread of the slice centroids. A dataset the file does not have is refused with the datasets its group does have, and a component its axes do not label with the labels they do have.
 
@@ -231,13 +231,15 @@ from lucifer.plot import summary
 summary("sase.stats.h5")
 ```
 
-![the summary figure of the SASE example](generated/python/summary.png)
+![the summary figure of the SASE example](generated/python/summary.svg)
 
 The same figure from the command line, by default to `<out_root>.png` in the current directory:
 
 ```
-python -m lucifer.plot run.stats.h5 -o run.png
+python -m lucifer.plot run.stats.h5 -o run.svg
 ```
+
+`lucifer.plot.save(fig, path, dpi=150)` writes a figure in the format the path's suffix names, as the command line does. An SVG keeps the text, the axes and the bold curves as vectors and draws the thin per-slice lines as one image at `dpi`, and the same figure gives the same bytes on every run. The figures on this page and on the example pages are written this way.
 
 (python-compare)=
 ### A run over a reference run

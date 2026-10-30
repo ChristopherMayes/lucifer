@@ -45,7 +45,7 @@ from checkrec import record
 PROSE_CELLS = ("Demonstrated inline, below", "Every example writes one")
 
 FENCE = re.compile(r"^### `([^`]+)`\n\n```[a-z]*\n(.*?)\n```", re.S | re.M)
-FIGURE = re.compile(r"^!\[[^\]]*\]\(([^)]+\.png)\)", re.M)
+FIGURE = re.compile(r"^!\[[^\]]*\]\(([^)]+\.svg)\)", re.M)
 
 # The generated index page, whose source is examples/README.md rather than one
 # example directory. report_examples.py names it, and the two must agree.

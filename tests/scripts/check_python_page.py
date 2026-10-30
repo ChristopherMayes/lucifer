@@ -29,7 +29,7 @@ PAGE = "docs/python.md"
 SOURCES = ("python/tests/test_page.py", "tests/scripts/check_program.py",
            "tests/scripts/python_page_figures.py")
 FIGURES = "tests/scripts/python_page_figures.py"
-IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+\.png)\)")
+IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+\.svg)\)")
 SAVED = re.compile(r'\bsave\("([\w-]+)"\)')
 NAME = re.compile(r"^% example: ([\w-]+)\s*$")
 START = re.compile(r"^\s*# example: ([\w-]+)\s*$")
@@ -107,8 +107,8 @@ def main():
         if not (root / PAGE).parent.joinpath(img).is_file():
             failed.append(f"{PAGE} shows {img}, which does not exist")
     for name in SAVED.findall((root / FIGURES).read_text()):
-        if f"generated/python/{name}.png" not in images:
-            failed.append(f"{FIGURES} saves {name}.png, which {PAGE} does not show")
+        if f"generated/python/{name}.svg" not in images:
+            failed.append(f"{FIGURES} saves {name}.svg, which {PAGE} does not show")
     if failed:
         print("\n".join(failed))
         print(f"check_python_page: FAIL, {len(failed)} problems")

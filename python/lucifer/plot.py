@@ -6,8 +6,8 @@
     summary("run.stats.h5")
     compare("run.stats.h5", "Aramis.out.h5")
 
-    python -m lucifer.plot run.stats.h5 -o run.png
-    python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 -o run-vs-genesis.png
+    python -m lucifer.plot run.stats.h5 -o run.svg
+    python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 -o run-vs-genesis.svg
 
 The file describes itself, so a plot needs no table of names: each dataset carries its
 @long_name, its @unit and its @axes, and the lattice group carries each element's
@@ -45,6 +45,12 @@ the pulse energy in place of the power and the power across the window at the ex
 reference is a thick solid line and the run a thinner dashed one over it. A difference
 axis carries its power of ten in its label.
 
+save() writes a figure so that the same figure gives the same bytes on every run, which
+the documentation's committed figures need, and the command line writes through it. A
+vector file keeps the text, the axes and the bold curves as vectors and draws the thin
+per-slice lines as one image at the file's dpi, since hundreds of slice paths made an SVG
+of several megabytes.
+
 matplotlib and beamphysics.units are imported inside the functions, so importing this
 module costs nothing beyond numpy. They come with the extra lucifer[plot].
 """
@@ -59,7 +65,7 @@ import warnings
 
 import numpy as np
 
-__all__ = ["plot", "summary", "compare", "layout", "PlotError", "main"]
+__all__ = ["plot", "summary", "compare", "layout", "save", "PlotError", "main"]
 
 M_ELECTRON = 0.51099895069e6   # Bmad's m_electron [eV]
 
@@ -323,8 +329,11 @@ def _draw(ax, series, first_color, xfactor, yscale, include_legend, slices=True,
                 # per-slice lines through those records would read as streaks.
                 # Only the first curve of an axis draws its slices: two curves' slices in
                 # one gray could not be told apart.
+                # The slice lines are context and can number in the hundreds, so in a
+                # vector file they are drawn as one image at the file's dpi and the rest
+                # stays vector. 96 slices as paths made an SVG of 4 MB.
                 if slices and k == 0 and not sparse:
-                    ax.plot(s, v, color=GRAY, lw=0.6, alpha=0.6, zorder=1)
+                    ax.plot(s, v, color=GRAY, lw=0.6, alpha=0.6, zorder=1, rasterized=True)
                 agg = np.nansum(v, axis=1) if se.reduce == "sum" else np.nanmean(v, axis=1)
             else:
                 agg = v[:, 0]
@@ -368,7 +377,7 @@ def _log_ticks(ax):
     plain numbers instead."""
     from matplotlib.ticker import MaxNLocator, NullFormatter, ScalarFormatter
     ax.yaxis.set_minor_formatter(NullFormatter())
-    lo, hi = ax.get_ylim()
+    lo, hi = ax.dataLim.y0, ax.dataLim.y1
     if lo > 0 and hi / lo < 10:
         ax.yaxis.set_major_locator(MaxNLocator(4))
         ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
@@ -840,16 +849,38 @@ def _compare(plt, cmp, run, ref, fields, tex):
         else:
             ax[0].tick_params(labelbottom=True)
             ax[0].set_xlabel(xs)
-    _freeze_layout(fig)
     return fig
 
 
+# The salt of an SVG's element ids, so a figure is the same bytes on every run.
+SVG_SALT = "lucifer"
+
+
+def save(fig, path, dpi=150):
+    """Write ``fig`` to ``path``, in the format its suffix names, so that the same figure
+    gives the same bytes on every run. ``dpi`` is the resolution of a raster file, and of
+    the parts of a vector file drawn as an image, the per-slice lines among them.
+
+    An SVG is written with its element ids salted by ``SVG_SALT`` and with no date, and
+    the layout is fixed first: placed once, each subfigure and axes rounded to 1e-5 of its
+    parent, and the layout engine then turned off. The constrained-layout solver's result
+    varies in its last bits from one process to the next, and an SVG names each clip
+    rectangle by a hash of its full-precision bounds, so without this the same arrays drew
+    a different file on every run. The figure keeps the fixed layout after the call."""
+    import matplotlib as mpl
+    path = pathlib.Path(path)
+    if path.suffix.lower() != ".svg":
+        fig.savefig(path, dpi=dpi)
+        return path
+    _freeze_layout(fig)
+    with mpl.rc_context({"svg.hashsalt": SVG_SALT}):
+        fig.savefig(path, dpi=dpi, metadata={"Date": None})
+    return path
+
+
 def _freeze_layout(fig):
-    """Place the blocks and their axes once with constrained layout, round each box to
-    1e-5 of its parent and turn the layout engine off. The solver's result varies in its
-    last bits from one process to the next, and an SVG names each clip rectangle by a hash
-    of its full-precision bounds, so without this the same arrays drew a different file on
-    every run."""
+    """Place the figure's subfigures and axes once, round each box to 1e-5 of its parent
+    and turn the layout engine off, as save() describes."""
     fig.draw_without_rendering()
     fig.set_layout_engine("none")
     for sub in fig.subfigs:
@@ -878,7 +909,7 @@ def main(argv=None) -> int:
         ap.add_argument("--labels", nargs=2, metavar=("RUN", "REFERENCE"),
                         help="the legend's names for the run and the reference")
         ap.add_argument("-o", "--output", help="the image to write (default: <out_root>-compare.png)")
-        ap.add_argument("--dpi", type=int, default=160, help="output resolution (default: 160)")
+        ap.add_argument("--dpi", type=int, default=150, help="the resolution of a raster image, and of the per-slice lines of an SVG (default: 150)")
         ap.add_argument("--show", action="store_true", help="also open a window")
         args = ap.parse_args(argv[1:])
         import matplotlib
@@ -890,7 +921,7 @@ def main(argv=None) -> int:
         ap = argparse.ArgumentParser(prog="python -m lucifer.plot", description=main.__doc__.split(":")[1].strip())
         ap.add_argument("stats", help="a stats file, <out_root>.stats.h5")
         ap.add_argument("-o", "--output", help="the image to write (default: <out_root>.png)")
-        ap.add_argument("--dpi", type=int, default=160, help="output resolution (default: 160)")
+        ap.add_argument("--dpi", type=int, default=150, help="the resolution of a raster image, and of the per-slice lines of an SVG (default: 150)")
         ap.add_argument("--show", action="store_true", help="also open a window")
         args = ap.parse_args(argv)
         import matplotlib
@@ -898,7 +929,7 @@ def main(argv=None) -> int:
             matplotlib.use("Agg")
         out = args.output or pathlib.Path(args.stats).name.removesuffix(".stats.h5") + ".png"
         fig = summary(args.stats, return_figure=True)
-    fig.savefig(out, dpi=args.dpi)
+    save(fig, out, dpi=args.dpi)
     print(f"wrote {out}")
     if args.show:
         import matplotlib.pyplot as plt
