@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Added: `docs/validation.md` shows each of the eleven tiers as a figure, Lucifer over
+  Genesis4 with the difference beneath each curve, and `weight_split` as Lucifer over Lucifer.
+  `tests/scripts/report_tier_figures.py` draws them through `lucifer.plot.compare` from a kept work
+  directory of the validation suite into `docs/generated/validation/`, and writes
+  `docs/generated/validation-figures.md`, each caption stating what the tier runs, the four blocks,
+  the largest difference in each at two significant figures, the tier's level from the results file
+  against its tolerance from `compare_fel.py`'s table, and which quantity sets the level. The
+  keystone's regeneration runs it from the production pass's work directory and diffs the captions
+  with the other generated pages. The figures stay out of the diff, as the example figures do. The
+  tier table's names link to the figures. `compare_fel.py` carries its tolerances in one table,
+  `TOLERANCE`, which its options default to.
 - 2026-10-30 Added: `lucifer.compare` reads a Lucifer run and a reference run, a Genesis4 `.out.h5`
   or a second stats file, into one form, `Curves`, and takes their differences, each divided as
   `DIVISOR` says: the power elementwise by the reference's power, floored at 1e-9 of its peak, the

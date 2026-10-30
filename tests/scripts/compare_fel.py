@@ -175,6 +175,16 @@ def load_par(fn, nslice=1, window=None):
             for k in ("gamma", "theta", "x", "y", "px", "py")}
 
 
+# Each tier's tolerance, sized to what the tier measures, as the module docstring says.
+# The comments at the argparse options below say why each is what it is. The figures'
+# captions read the tolerances from here (report_tier_figures.py), so the two agree.
+TOLERANCE = {
+    "tier1": 1.0e-4, "tier1_unavg": 1.5e-1, "tier2_genesis": 1.0e-3, "tier2_bmad": 1.0e-1,
+    "weight_split": 1.0e-10, "td1": 1.0e-4, "td2_genesis": 1.0e-3, "td2_bmad": 1.0e-1,
+    "tdsase": 1.0e-3, "tdsc": 1.0e-3, "tdwk": 1.0e-4,
+}
+
+
 def compare_tier(name, fortran_diag, genesis_out, fortran_fld, genesis_fld,
                  fortran_par, genesis_par, tolerance, nslice=1):
     """
@@ -283,26 +293,26 @@ def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("workdir", help="Directory holding all run outputs")
-    p.add_argument("--tol-tier1", type=float, default=1.0e-4)
+    p.add_argument("--tol-tier1", type=float, default=TOLERANCE["tier1"])
     # The unaveraged tier holds a model difference from Genesis: sin^2 end ramps against
     # Genesis's hard edges, no period averaging, and RK4 against RK4 of different
     # equations. check_unaveraged.py checks the mode against its own physics. This tier
     # holds the mode's distance to Genesis so a drift shows. The difference is 6.9e-2.
-    p.add_argument("--tol-tier1-unavg", type=float, default=1.5e-1)
-    p.add_argument("--tol-tier2-genesis", type=float, default=1.0e-3)
-    p.add_argument("--tol-tier2-bmad", type=float, default=1.0e-1)
-    p.add_argument("--tol-split", type=float, default=1.0e-10)
-    p.add_argument("--tol-td1", type=float, default=1.0e-4)
-    p.add_argument("--tol-td2-genesis", type=float, default=1.0e-3)
-    p.add_argument("--tol-td2-bmad", type=float, default=1.0e-1)
+    p.add_argument("--tol-tier1-unavg", type=float, default=TOLERANCE["tier1_unavg"])
+    p.add_argument("--tol-tier2-genesis", type=float, default=TOLERANCE["tier2_genesis"])
+    p.add_argument("--tol-tier2-bmad", type=float, default=TOLERANCE["tier2_bmad"])
+    p.add_argument("--tol-split", type=float, default=TOLERANCE["weight_split"])
+    p.add_argument("--tol-td1", type=float, default=TOLERANCE["td1"])
+    p.add_argument("--tol-td2-genesis", type=float, default=TOLERANCE["td2_genesis"])
+    p.add_argument("--tol-td2-bmad", type=float, default=TOLERANCE["td2_bmad"])
     # Pure SASE starts dark, so the whole curve is startup from noise. The interlude model
     # is transcribed and the floor is the constants floor, as for td2_genesis.
-    p.add_argument("--tol-tdsase", type=float, default=1.0e-3)
+    p.add_argument("--tol-tdsase", type=float, default=TOLERANCE["tdsase"])
     # The space-charge floor is Genesis's truncated epsilon_0 in longRange, 8.85e-12,
     # which is 4.7e-4 relative. The wake tier sits at the impedance floor.
     # docs/validation.md (val-validation-from-one-command) records both levels.
-    p.add_argument("--tol-tdsc", type=float, default=1.0e-3)
-    p.add_argument("--tol-tdwk", type=float, default=1.0e-4)
+    p.add_argument("--tol-tdsc", type=float, default=TOLERANCE["tdsc"])
+    p.add_argument("--tol-tdwk", type=float, default=TOLERANCE["tdwk"])
     p.add_argument("--results", help="Append tier levels here for doc generation")
     args = p.parse_args()
     w = args.workdir
