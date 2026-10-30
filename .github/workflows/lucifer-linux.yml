@@ -111,13 +111,15 @@ jobs:
             config: Release
             dir: build-release
             flavor: production
-    # The debug job, measured on this runner on 2026-10-24 against the conda-forge package:
-    # 36.0 minutes end to end, of which the validation suite is 33.9, the Lucifer build 0.7
-    # and the two environments 0.9. The run of 2026-10-23 that cloned Bmad and built its
-    # debug tree took 37.5 minutes, with 6.4 in that build and 30 in the validation suite.
-    # The validation suite costs four times its local 7.7 minutes because a runner has four
-    # cores against the recording machine's sixteen and its Genesis references are always
-    # cold, and its longest sections are spontaneous at 642 s and the eleven tiers at 320 s.
+    # Measured on this runner on 2026-10-30, the first run of both jobs, against the
+    # conda-forge package. The debug job took 23.7 minutes end to end, of which the
+    # validation suite is 21.8 and the Lucifer build 0.6. The release job took 31.6 minutes,
+    # of which the validation suite is 28.9 and the Lucifer build 1.0. The two run at once,
+    # so the run took 31.6 minutes. The debug job alone took 36.0 minutes on 2026-10-24,
+    # with 33.9 in the validation suite, so a runner's minutes move by a third between runs
+    # and say nothing about which build is faster. The validation suite costs three to four
+    # times its local 7.7 minutes because a runner has four cores against the recording
+    # machine's sixteen and its Genesis references are always cold.
     timeout-minutes: 120
 
     steps:
