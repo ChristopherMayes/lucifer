@@ -9,6 +9,11 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Added: `check_program.py` checks the refusal of a name outside its set for each of the
+  eleven keys that take one, with the set the schema carries in the message, and fails when a key gains
+  a set without a check here. The length refusal of a string is checked with 61 characters in
+  `run.track_end`, where it used `field.seed_polarization = "xyz"`, which the set now refuses first.
+  `check_device.py` matches the device's refusal at the key table.
 - 2026-10-29 Added: `tests/scripts/check_allowed_values.py` reads each name-valued key's set from the
   key table and follows the component it fills through the copies the code makes, an assignment or an
   argument. It fails when the code compares the value against a name outside the set, in an `==`, a

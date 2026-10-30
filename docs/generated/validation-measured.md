@@ -726,10 +726,21 @@ where the two builds agree to every printed digit.
 | a library error RETURNS (no beginning Twiss -> err to the program, exit 2) |  | same | holds |
 | a key in the wrong table is refused, naming the table it belongs in |  | same | holds |
 | a key no table has is refused, naming the table's keys |  | same | holds |
-| a string longer than its component is refused, seed_polarization = "xyz" |  | same | holds |
+| a string longer than its component is refused, 61 characters in track_end |  | same | holds |
 | a list longer than its array is refused, 41 dump_beam_at entries |  | same | holds |
 | a list entry longer than an element is refused, 61 characters in dump_field_at |  | same | holds |
-| an unknown device is refused as a name, before the checks that quote it as a device |  | same | holds |
+| every key with a set of names has a refusal check here |  | same | holds |
+| a name outside the set is refused with the set, beam.load_mode = "all" |  | same | holds |
+| a name outside the set is refused with the set, beam.z_distribution = "gauss" |  | same | holds |
+| a name outside the set is refused with the set, field.seed_polarization = "z" |  | same | holds |
+| a name outside the set is refused with the set, run.device = "metl" |  | same | holds |
+| a name outside the set is refused with the set, run.fp32_check = "on" |  | same | holds |
+| a name outside the set is refused with the set, run.interlude_model = "bamd" |  | same | holds |
+| a name outside the set is refused with the set, run.source_model = "deposits" |  | same | holds |
+| a name outside the set is refused with the set, run.transport_model = "genesys" |  | same | holds |
+| a name outside the set is refused with the set, space_charge.model = "mine" |  | same | holds |
+| a name outside the set is refused with the set, wake.material = "FE" |  | same | holds |
+| a name outside the set is refused with the set, wake.model = "mine" |  | same | holds |
 | --version, the header and meta/lucifer_version carry the version CMake wrote |  | same | holds |
 | run.out_root, run.ran_seed and beam.n_particle overridden: root, echo and params/ follow |  | same | holds |
 | a key no table has on the command line is refused (run.wake_on=true) |  | same | holds |

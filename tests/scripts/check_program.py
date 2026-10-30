@@ -89,6 +89,7 @@ import lucifer.beam as beamio
 from lucifer import Input, LuciferError
 from lucifer import run as run_lucifer
 from lucifer.flat import to_toml
+from lucifer import schema as lucifer_schema
 import fieldio
 from checkrec import record
 from lucifer.stats import read_stats, same_data
@@ -544,10 +545,10 @@ def main():
     check("a key no table has is refused, naming the table's keys", ok)
 
     (wd / "long.toml").write_text(to_toml(NML_TWIN.format(root="long", extra="", bextra="")))
-    r = run([str(exe), "long.toml", "field.seed_polarization=xyz"], wd)
+    r = run([str(exe), "long.toml", 'run.track_end="' + "U" * 61 + '"'], wd)
     ok = (r.returncode != 0
-          and "seed_polarization IS 3 CHARACTERS AND AT MOST 1 ARE TAKEN" in r.stdout)
-    check("a string longer than its component is refused, seed_polarization = \"xyz\"", ok,
+          and "track_end IS 61 CHARACTERS AND AT MOST 60 ARE TAKEN" in r.stdout)
+    check("a string longer than its component is refused, 61 characters in track_end", ok,
           note=f"[exit {r.returncode}]")
     many = "[" + ",".join(['"SEG"'] * 41) + "]"
     r = run([str(exe), "long.toml", f"run.dump_beam_at={many}"], wd)
@@ -560,13 +561,33 @@ def main():
           and "dump_field_at ENTRY 2 IS 61 CHARACTERS AND AT MOST 60 ARE TAKEN" in r.stdout)
     check("a list entry longer than an element is refused, 61 characters in dump_field_at", ok,
           note=f"[exit {r.returncode}]")
-    # The bank is on by default, and the device block had noted that the device does not
-    # cover it before the name was checked.
-    r = run([str(exe), "long.toml", "run.device=metl"], wd)
-    ok = (r.returncode != 0 and 'UNRECOGNIZED DEVICE: "metl"' in r.stdout
-          and "DOES NOT COVER" not in r.stdout)
-    check("an unknown device is refused as a name, before the checks that quote it as a device",
-          ok, note=f"[exit {r.returncode}]")
+
+    # A key with a set of names refuses any other as the input file is read, and the message
+    # carries the set. The set each message must carry is the schema's, written from the key
+    # table, so the check holds the program to the table and not to a list of its own. The
+    # bank is on by default, and the device block once noted that the device does not cover
+    # it before the name was checked, so no device message may quote the misspelt name.
+    names = {}
+    for table, props in lucifer_schema.keys(lucifer_schema.load()).items():
+        for key, prop in props.items():
+            if "enum" in prop:
+                names[f"{table}.{key}"] = prop
+    bad = {"run.interlude_model": "bamd", "run.transport_model": "genesys", "run.source_model": "deposits",
+           "run.fp32_check": "on", "run.device": "metl", "beam.z_distribution": "gauss",
+           "beam.load_mode": "all", "field.seed_polarization": "z", "wake.model": "mine",
+           "wake.material": "FE", "space_charge.model": "mine"}
+    check("every key with a set of names has a refusal check here", sorted(bad) == sorted(names),
+          note=f"[{len(names)} keys with a set]")
+    for key in sorted(names):
+        prop = names[key]
+        listed = [n for n in prop["enum"] if not prop.get("x-any-case") or n == n.upper()]
+        text = ", ".join(f'"{n}"' for n in listed) + (" IN ANY CASE" if prop.get("x-any-case") else "")
+        table, name = key.rsplit(".", 1)
+        r = run([str(exe), "long.toml", f'{key}="{bad[key]}"'], wd)
+        ok = (r.returncode != 0 and f'[{table}] {name} = "{bad[key]}" IS NOT ONE OF {text}.' in r.stdout
+              and "DOES NOT COVER" not in r.stdout)
+        check(f"a name outside the set is refused with the set, {key} = \"{bad[key]}\"", ok,
+              note=f"[exit {r.returncode}]")
 
     # ------------------------------------------------------------------
     print("== the version ==")

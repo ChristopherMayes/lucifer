@@ -416,14 +416,15 @@ def main():
          "DOES NOT COVER WAKES"),
         ("dev_rr.in", DEV + '  bmad.radiation_damping_on = T\n',
          "DOES NOT COVER SPONTANEOUS RADIATION"),
-        ("dev_rn.in", '  run.device = "cuda"\n', "UNRECOGNIZED DEVICE"),
+        # The key table refuses a name outside run.device's set as the input file is read.
+        ("dev_rn.in", '  run.device = "cuda"\n', 'device = "cuda" IS NOT ONE OF', "unrecognized device"),
         ("dev_rb.in", DEV + '  keep_escaped_field = T\n', "DOES NOT COVER THE ESCAPED-FIELD BANK"),
     ]
-    for name, extra, msg in refusals:
+    for name, extra, msg, *label in refusals:
         r = run(args.exe, wd, name, BASE.format(root=name.removesuffix(".in"), extra=extra),
                 expect_fail=True)
         refused = r.returncode != 0 and msg in r.stdout
-        ok(f"refused: {msg.lower()}", refused, "True", refused)
+        ok(f"refused: {label[0] if label else msg.lower()}", refused, "True", refused)
 
     # Asking for the escaped file asks for the bank, so it is refused with the same message.
     r = run(args.exe, wd, "dev_rw.in", BASE.format(root="dev_rw", extra=DEV + '  write_escaped = T\n'),
