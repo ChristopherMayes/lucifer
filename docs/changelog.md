@@ -9,6 +9,9 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Fixed: `docs/validation.md` named the particle-path timing program
+  `tests/lucifer_advance_bench.f90`. It is `programs/lucifer_advance_bench.f90`, where it has been since
+  the sources moved to the repository root.
 - 2026-10-29 Fixed: the distribution route in `docs/user-guide.md` and `util/conda_compile` created
   `bmad-build` from Bmad's `.github/bmad-build-env.yaml` alone, which has no toml-f, so a build environment
   made as written stopped Lucifer's configure with `Could not find a package configuration file provided

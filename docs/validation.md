@@ -578,7 +578,7 @@ The tracker is 1.2x faster serial and 1.85x faster at 12 workers. The parallel g
 
 A real 42 m case (131 slices) at 2048 particles/slice ran at parity with Genesis4 (96 vs 94 s, 12 threads vs 12 MPI ranks, same machine back-to-back). At 8192/slice it did not (164 vs 99 s). The per-element time stamps and an in-wiggler profile put the gap in one place: the FEL step's particle path (the RK4 + gather), whose cost quadrupled with the particles while the per-slice field FFTs (~68 s) stayed constant. [](performance.md#perf-the-transform-length) measures that crossover as a table, and [](performance.md#perf-the-phase-profile) is the standing phase profile every run's own footer prints.
 
-`tests/lucifer_advance_bench.f90` (built as `lucifer_advance_bench`) times the path serially at fixed state -- measured (min-of-5, this machine): full fel_advance 152 ns/particle-step, the RK4+ODE alone 87.5, the four sin/cos pairs the ODE evaluates 48. A clang -O3 twin of the same verbatim RK loop runs 68 ns, and its sincos loop 13.7 ns. The gap is codegen and libm rather than physics (macOS gfortran has no vectorized libm and emits scalar calls).
+`programs/lucifer_advance_bench.f90` (built as `lucifer_advance_bench`) times the path serially at fixed state -- measured (min-of-5, this machine): full fel_advance 152 ns/particle-step, the RK4+ODE alone 87.5, the four sin/cos pairs the ODE evaluates 48. A clang -O3 twin of the same verbatim RK loop runs 68 ns, and its sincos loop 13.7 ns. The gap is codegen and libm rather than physics (macOS gfortran has no vectorized libm and emits scalar calls).
 
 Two changes were adopted as one value change, since each pays nothing alone and together full fel_advance drops to ~108-125 ns and the real case 164 -> 143 s:
 
