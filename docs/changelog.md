@@ -9,6 +9,17 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Changed: a string key that takes one of a set of names carries the set in the key table,
+  `src/fel_schema_mod.f90`, and `fel_schema_set` refuses any other value as the input file is read,
+  with the key, the value and the set: `IN THE INPUT FILE, [run] device = "metl" IS NOT ONE OF "",
+  "off", "metal".` The eleven keys are `run.interlude_model`, `transport_model`, `source_model`,
+  `fp32_check` and `device`, `beam.z_distribution` and `load_mode`, `field.seed_polarization`,
+  `wake.model` and `material`, and `space_charge.model`. Each had been refused by the routine that used
+  it, with a list and a message of its own, and those refusals are gone. `beam.z_distribution` and
+  `wake.material` match in any case, where three spellings of each name were taken, so `Ran_gauss` now
+  runs as `RAN_GAUSS`. A name is checked before its length, so `field.seed_polarization = "xyz"` is
+  refused for the name. `fel_device_known` moved to `fel_setup_mod` and reads the device's set from
+  the table.
 - 2026-10-29 Fixed: on macOS 15 and later the Metal backend compiled its kernels with fast
   single-precision math functions. `fastMathEnabled = NO` had set safe arithmetic and precise functions
   together, and its replacement, `mathMode = MTLMathModeSafe`, sets the arithmetic alone and leaves

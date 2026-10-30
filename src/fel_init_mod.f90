@@ -137,12 +137,6 @@ if (field_file(1) == '' .and. any(field_file(2:) /= '')) then
   call out_io (s_error$, r_name, 'HARMONIC FIELD FILES NEED THE FUNDAMENTAL IN FIELD_FILE(1).')
   err_flag = .true.;  return
 endif
-select case (trim(load_mode))
-case ('sample', 'keep')
-case default
-  call out_io (s_error$, r_name, 'LOAD_MODE MUST BE "sample" OR "keep", GOT: ' // trim(load_mode))
-  err_flag = .true.;  return
-end select
 if (beam_file /= '' .and. (beam_init%position_file /= '' .or. resample%use_beam_init)) then
   call out_io (s_error$, r_name, 'A BEAM ALREADY IN SLICES (beam.file) AND A BUNCH TO SLICE', &
                                  '(beam.position_file) ARE MUTUALLY EXCLUSIVE.')
@@ -315,16 +309,14 @@ endif
 ! sig_z = 0 is the steady state (the whole charge in one slice window). It is refused
 ! for a time-dependent window.
 
+! beam.z_distribution takes RAN_GAUSS, a Gaussian bunch, or GRID, flat as Bmad's uniform,
+! in any case. The key table refuses any other name as the input file is read.
+
 flat_z = .false.
-select case (trim(beam_init%distribution_type(3)))
-case ('', 'RAN_GAUSS', 'ran_gauss', 'Ran_Gauss')
-case ('GRID', 'grid', 'Grid')
+select case (upcase(beam_init%distribution_type(3)))
+case ('', 'RAN_GAUSS')
+case ('GRID')
   flat_z = .true.
-case default
-  call out_io (s_error$, r_name, 'BEAM.Z_DISTRIBUTION MUST BE RAN_GAUSS (GAUSSIAN BUNCH)', &
-               'OR GRID (FLAT, BMAD''S UNIFORM) FOR THE QUIET-START GENERATOR, GOT: ' // &
-               trim(beam_init%distribution_type(3)))
-  err_flag = .true.;  return
 end select
 
 spacing_gen = window_sample * lambda0

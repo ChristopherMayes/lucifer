@@ -76,18 +76,8 @@ harmonics = run%winit%harmonics
 
 ! The FEL tracking mode is a lattice attribute. Its refusals are in setup_fel_elements.
 ! The refusal of collective effects in the unaveraged mode follows setup, once any_unavg
-! is known.
-
-if (interlude_model /= 'bmad' .and. interlude_model /= 'genesis') then
-  call out_io (s_error$, r_name, 'INTERLUDE_MODEL MUST BE "bmad" OR "genesis", GOT: ' // trim(interlude_model))
-  err_flag = .true.;  return
-endif
-
-if (run%global%transport_model /= 'bmad' .and. run%global%transport_model /= 'genesis') then
-  call out_io (s_error$, r_name, 'TRANSPORT_MODEL MUST BE "bmad" OR "genesis", GOT: ' // &
-               trim(run%global%transport_model))
-  err_flag = .true.;  return
-endif
+! is known. interlude_model and transport_model take a name from their set in the key
+! table (fel_schema_mod), which refuses any other as the input file is read.
 
 if (run%global%unaveraged_steps_per_period < 10) then
   call out_io (s_error$, r_name, 'UNAVERAGED_STEPS_PER_PERIOD IS BELOW THE CONVERGENCE FLOOR OF 10, GOT: ' // &
@@ -274,10 +264,6 @@ case ('coherent')
     err_flag = .true.;  return
   endif
   where (is_fel) und_of%source_model = fel_source_coherent$
-case default
-  call out_io (s_error$, r_name, 'SOURCE_MODEL MUST BE "deposit" OR "coherent", GOT: ' // &
-               trim(run%global%source_model))
-  err_flag = .true.;  return
 end select
 
 ! The source filter (fel-physics.md sec-source-filter), validated and stamped onto every
@@ -505,11 +491,6 @@ run%two_pol = seed_polarization == 'y'
 do je = 1, branch%n_ele_track
   if (is_fel(je) .and. und_of(je)%sin_t /= 0) run%two_pol = .true.
 enddo
-if (seed_polarization /= 'x' .and. seed_polarization /= 'y') then
-  call out_io (s_error$, r_name, 'SEED_POLARIZATION MUST BE "x" OR "y".')
-  err_flag = .true.;  return
-endif
-
 if (.not. any(is_fel) .and. .not. reference_run) then
   call out_io (s_error$, r_name, &
                'THE LATTICE HAS NO FEL ELEMENT: NO WIGGLER OR UNDULATOR CARRIES', &
@@ -1085,18 +1066,9 @@ sc_nz = run%space_charge%nz
 sc_nphi = run%space_charge%nphi
 sc_longrange = run%space_charge%longrange
 
-! Each collective family names its implementation. One value is accepted today, and an
-! unknown one is refused rather than silently treated as the transcribed solver.
-
-if (run%chamber_wake%model /= 'genesis') then
-  call out_io (s_error$, r_name, 'WAKE.MODEL MUST BE "genesis", GOT: ' // trim(run%chamber_wake%model))
-  err_flag = .true.;  return
-endif
-
-if (run%space_charge%model /= 'genesis') then
-  call out_io (s_error$, r_name, 'SPACE_CHARGE.MODEL MUST BE "genesis", GOT: ' // trim(run%space_charge%model))
-  err_flag = .true.;  return
-endif
+! Each collective family names its implementation, wake.model and space_charge.model. One
+! value, genesis, is in each set today, and the key table refuses any other as the input
+! file is read, so an unknown one is never treated as the transcribed solver.
 
 ! The solver's grid is checked where it is stated rather than where it is used. Each of
 ! these describes a solve that cannot run. Unchecked, it runs anyway and returns an exact
@@ -1844,5 +1816,39 @@ end subroutine setup_diagnostics
 
 end subroutine fel_setup_schedule
 
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_device_known (device_req) result (is_known)
+!
+! Routine to check run.device against the names in its set in the key table
+! (fel_schema_mod), and refuse any other, listing them. The input file's value is refused
+! there as it is read. This covers a program that sets the component itself.
+! fel_setup_schedule calls it before it checks the configuration against the device, so a
+! misspelt name is refused as a name and no message quotes it as a device.
+!
+! Input:
+!   device_req -- character(*): run.device.
+!
+! Output:
+!   is_known   -- logical: True if the name is one this tree knows.
+!-
+
+function fel_device_known (device_req) result (is_known)
+
+type (fel_key_struct) key
+character(*) device_req
+logical is_known
+character(*), parameter :: r_name = 'fel_device_known'
+
+!
+
+key = fel_schema_key('run.device')
+is_known = fel_schema_allows(key, device_req)
+if (.not. is_known) call out_io (s_error$, r_name, 'UNRECOGNIZED DEVICE: "' // trim(device_req) // '".', &
+                                 'THE DEVICES ARE ' // fel_schema_values_text(key) // '.')
+
+end function fel_device_known
 
 end module fel_setup_mod

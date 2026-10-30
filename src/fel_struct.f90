@@ -86,7 +86,7 @@ end type
 
 type fel_global_struct
   character(400) :: out_root = 'fel_track'   ! Output file root.
-  character(16) :: interlude_model = 'bmad'  ! 'bmad' (the seam) or 'genesis' (transcribed).
+  character(16) :: interlude_model = 'bmad'  ! Seam or transcribed. Names: fel_schema_mod's key table.
   ! Transverse transport inside averaged FEL elements. 'bmad' is Bmad's own periodic-wiggler
   ! kernel, the production model. 'genesis' is Genesis4's maps verbatim, for validation
   ! only: the comparisons against Genesis4 need its transport. So it is a run switch rather
@@ -249,7 +249,7 @@ type wavefront_init_struct
   real(rp) :: grid_half_width = 0    ! Transverse half width [m].
   real(rp) :: seed_power = 0         ! Gaussian seed power [W]. 0 = dark start.
   real(rp) :: seed_waist_size = 0    ! Seed intensity 1/e^2 radius [m].
-  character(1) :: seed_polarization = 'x'   ! 'x' or 'y'.
+  character(1) :: seed_polarization = 'x'   ! Seed polarization. Names: fel_schema_mod's key table.
   ! The field set: harmonics(1) must be 1 (the fundamental). Further entries are
   ! harmonic numbers in increasing order, 0 = unused.
   integer :: harmonics(9) = [1, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -284,7 +284,7 @@ type fel_chamber_wake_init_struct
   real(rp) :: conductivity = 0     ! DC conductivity [1/(Ohm m)]. 0: no resistive wake.
   real(rp) :: relaxation = 0       ! AC relaxation distance c*tau [m].
   logical :: roundpipe = .true.    ! Round chamber. False: flat (parallel plates).
-  character(8) :: material = ''    ! 'CU' or 'AL' shortcut for conductivity+relaxation.
+  character(8) :: material = ''    ! Conductivity+relaxation shortcut. Names: fel_schema_mod's key table.
   real(rp) :: gap = 0              ! Undulator gap [m]. 0: no geometric wake.
   real(rp) :: lgap = 1             ! Period of the gaps [m].
   real(rp) :: hrough = 0           ! Roughness amplitude [m]. 0: no roughness wake.

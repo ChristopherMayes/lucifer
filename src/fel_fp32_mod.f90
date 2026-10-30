@@ -207,7 +207,8 @@ contains
 !
 ! Routine to arm the instrument from the input knob and open the .fp32.txt stream. '' or
 ! 'off' leaves it dark. 'lockstep' rebuilds the FP32 state from FP64 every step.
-! 'freerun' lets the longitudinal state carry across steps.
+! 'freerun' lets the longitudinal state carry across steps. The key table refuses any
+! other mode as the input file is read.
 !
 ! Input:
 !   mode         -- character(*): run.fp32_check.
@@ -219,7 +220,7 @@ contains
 !
 ! Output:
 !   fp32         -- fel_fp32_struct: Armed (or left dark).
-!   err_flag     -- logical: Set True on an unrecognized mode or a refusal. False otherwise.
+!   err_flag     -- logical: Set True on a refusal. False otherwise.
 !-
 
 subroutine fel_fp32_setup (fp32, mode, mutate, nslice, bucket_shift, out_root, err_flag)
@@ -245,11 +246,6 @@ case ('lockstep')
   fp32%freerun = .false.
 case ('freerun')
   fp32%freerun = .true.
-case default
-  call out_io (s_error$, r_name, 'UNRECOGNIZED FP32_CHECK MODE: "' // trim(mode) // '".', &
-                                 'THE MODES ARE off, lockstep AND freerun.')
-  err_flag = .true.
-  return
 end select
 
 ! The field twin's transform is FFTW's own single-precision interface, so a build

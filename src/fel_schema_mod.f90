@@ -49,6 +49,10 @@ character(16), parameter :: fel_schema_tables$(8) = [character(16) :: &
 ! One key of the input file. lo and hi bound a real or integer key; a bound at huge is no
 ! bound, and lo_open or hi_open makes it exclusive. recorded is false for the one key
 ! that is not physics input, out_root, which every output file carries already.
+!
+! A string key that takes one of a fixed set of names carries the set in allowed(1:n_allowed),
+! and any other value is refused when it is read. any_case makes the set match in any case,
+! and the routines that read such a key compare it upcased.
 !-
 
 type fel_key_struct
@@ -62,6 +66,9 @@ type fel_key_struct
   logical :: lo_open = .false., hi_open = .false.
   logical :: recorded = .true.
   logical :: required = .false.
+  character(16) :: allowed(4) = ''
+  integer :: n_allowed = 0
+  logical :: any_case = .false.
 end type
 
 contains
@@ -99,16 +106,18 @@ call add ('', 'lattice', key_path$, '', 'lattice', &
 call add ('run', 'out_root', key_string$, '', 'output root', &
       'Root of every output file name.', recorded = .false.)
 call add ('run', 'interlude_model', key_string$, '', 'interludes', &
-      'Interlude transport: bmad (the seam) or genesis (transcribed).')
+      'Interlude transport: bmad (the seam) or genesis (transcribed).', &
+      allowed = [character(16) :: 'bmad', 'genesis'])
 call add ('run', 'transport_model', key_string$, '', 'undulator transport', &
       'Transverse transport inside averaged FEL elements: bmad, Bmad''s own kernel, or genesis, ' // &
-      'the transcribed maps for validation only.')
+      'the transcribed maps for validation only.', allowed = [character(16) :: 'bmad', 'genesis'])
 call add ('run', 'unaveraged_steps_per_period', key_int$, '', 'steps per period', &
       'Integration steps per undulator period in unaveraged elements. Below 10 the push does not converge.', lo = 10.0_rp)
 call add ('run', 'unaveraged_ramp_periods', key_int$, '', 'ramp periods', &
       'Periods the field ramps over at each end of an unaveraged element. 0 keeps the default of 2, -1 is a hard edge.', lo = -1.0_rp)
 call add ('run', 'source_model', key_string$, '', 'source', &
-      'The FEL source model: deposit, the per-particle scatter, or coherent, the coherent-Gaussian source.')
+      'The FEL source model: deposit, the per-particle scatter, or coherent, the coherent-Gaussian source.', &
+      allowed = [character(16) :: 'deposit', 'coherent'])
 call add ('run', 'source_filter', key_logical$, '', 'source filter', &
       'The angular filter on the source term, transcribed from Genesis4. Off to compare against a code without one.')
 call add ('run', 'source_filter_angle', key_real$, 'rad', 'filter angle', &
@@ -171,11 +180,13 @@ call add ('run', 'reference_run', key_logical$, '', 'reference run', &
 call add ('run', 'record_environment', key_logical$, '', 'record environment', &
       'Record the login name and the working directory in meta/. Off, since a stats file travels.')
 call add ('run', 'fp32_check', key_string$, '', 'fp32 check', &
-      'The FP32 lockstep check: off, lockstep or freerun. For checks only.')
+      'The FP32 lockstep check: off, lockstep or freerun. For checks only.', &
+      allowed = [character(16) :: '', 'off', 'lockstep', 'freerun'])
 call add ('run', 'fp32_mutate', key_logical$, '', 'fp32 mutate', &
       'The FP32 check''s self-test: coarsen the residual.')
 call add ('run', 'device', key_string$, '', 'device', &
-      'The device backend: off, or metal on a build that carries it.')
+      'The device backend: off, or metal on a build that carries it.', &
+      allowed = [character(16) :: '', 'off', 'metal'])
 call add ('run', 'device_timing', key_logical$, '', 'device timing', &
       'Per-pass device timing, one compute encoder a pass. Slows the run.')
 call add ('run', 'device_dep_mutate', key_int$, '', 'deposit mutate', &
@@ -212,14 +223,16 @@ call add ('beam', 'a_norm_emit', key_real$, 'm rad', 'a norm emit', &
 call add ('beam', 'b_norm_emit', key_real$, 'm rad', 'b norm emit', &
       'Normalized b-mode emittance.', lo = 0.0_rp)
 call add ('beam', 'z_distribution', key_string$, '', 'current profile', &
-      'The current profile: ran_gauss, a Gaussian of sig_z, or grid, flat from z_min to z_max.')
+      'The current profile: ran_gauss, a Gaussian of sig_z, or grid, flat from z_min to z_max.', &
+      allowed = [character(16) :: '', 'RAN_GAUSS', 'GRID'], any_case = .true.)
 call add ('beam', 'z_min', key_real$, 'm', 'z min', &
       'The flat profile''s lower z bound, read under grid only.')
 call add ('beam', 'z_max', key_real$, 'm', 'z max', &
       'The flat profile''s upper z bound, read under grid only.')
 call add ('beam', 'load_mode', key_string$, '', 'load mode', &
       'How the bunch becomes slices: sample, the same count in every slice with weights from the ' // &
-      'slice charge, or keep, every particle kept with the counts following the charge.')
+      'slice charge, or keep, every particle kept with the counts following the charge.', &
+      allowed = [character(16) :: 'sample', 'keep'])
 call add ('beam', 'quiet_start', key_logical$, '', 'quiet start', &
       'Load beamlets of beamlet_size phase copies, quiet below that harmonic.')
 call add ('beam', 'beamlet_size', key_int$, '', 'beamlet size', &
@@ -267,7 +280,7 @@ call add ('field', 'seed_power', key_real$, 'W', 'seed power', &
 call add ('field', 'seed_waist_size', key_real$, 'm', 'seed waist', &
       'The seed''s intensity 1/e^2 radius.', lo = 0.0_rp)
 call add ('field', 'seed_polarization', key_string$, '', 'seed polarization', &
-      'The seed''s polarization, x or y.')
+      'The seed''s polarization, x or y.', allowed = [character(16) :: 'x', 'y'])
 call add ('field', 'harmonics', key_int_list$, '', 'harmonics', &
       'The field set: 1 first, then further harmonic numbers in increasing order.')
 
@@ -275,7 +288,8 @@ call add ('field', 'harmonics', key_int_list$, '', 'harmonics', &
 
 call add ('wake', 'on', key_logical$, '', 'wake on', 'The chamber wake.')
 call add ('wake', 'model', key_string$, '', 'wake model', &
-      'Which chamber-wake implementation runs: genesis, the transcribed solver.')
+      'Which chamber-wake implementation runs: genesis, the transcribed solver.', &
+      allowed = [character(16) :: 'genesis'])
 call add ('wake', 'loss', key_real$, 'eV/m', 'external loss', 'External loss.')
 call add ('wake', 'radius', key_real$, 'm', 'chamber radius', &
       'Chamber radius, or the half gap of a flat chamber.', lo = 0.0_rp, lo_open = .true.)
@@ -286,7 +300,8 @@ call add ('wake', 'relaxation', key_real$, 'm', 'relaxation', &
 call add ('wake', 'roundpipe', key_logical$, '', 'round pipe', &
       'A round chamber. False is flat, parallel plates.')
 call add ('wake', 'material', key_string$, '', 'material', &
-      'CU or AL, a shortcut for the conductivity and relaxation.')
+      'CU or AL, a shortcut for the conductivity and relaxation.', allowed = [character(16) :: '', 'CU', 'AL'], &
+      any_case = .true.)
 call add ('wake', 'gap', key_real$, 'm', 'gap', 'Undulator gap. 0 is no geometric wake.', lo = 0.0_rp)
 call add ('wake', 'lgap', key_real$, 'm', 'gap period', 'Period of the gaps.', lo = 0.0_rp, lo_open = .true.)
 call add ('wake', 'hrough', key_real$, 'm', 'roughness', 'Roughness amplitude. 0 is no roughness wake.', lo = 0.0_rp)
@@ -297,7 +312,8 @@ call add ('wake', 'write_kernels', key_path$, '', 'kernel file', &
 ! [space_charge]: fel_space_charge_input_struct.
 
 call add ('space_charge', 'model', key_string$, '', 'space-charge model', &
-      'Which space-charge implementation runs: genesis, the transcribed solver.')
+      'Which space-charge implementation runs: genesis, the transcribed solver.', &
+      allowed = [character(16) :: 'genesis'])
 call add ('space_charge', 'rmax', key_real$, 'm', 'radial extent', &
       'Radial grid extent scale. It grows adaptively as Genesis4''s does.', lo = 0.0_rp)
 call add ('space_charge', 'ngrid', key_int$, '', 'radial points', 'Radial grid points.', lo = 1.0_rp)
@@ -324,12 +340,14 @@ keys = keys(1:n)
 !-------------------------------------------------------
 contains
 
-subroutine add (table, name, kind, unit, label, descrip, lo, hi, lo_open, hi_open, recorded, required)
+subroutine add (table, name, kind, unit, label, descrip, lo, hi, lo_open, hi_open, recorded, required, &
+                allowed, any_case)
 
 character(*) table, name, unit, label, descrip
+character(*), optional :: allowed(:)
 integer kind
 real(rp), optional :: lo, hi
-logical, optional :: lo_open, hi_open, recorded, required
+logical, optional :: lo_open, hi_open, recorded, required, any_case
 
 !
 
@@ -346,6 +364,11 @@ if (present(lo_open)) keys(n)%lo_open = lo_open
 if (present(hi_open)) keys(n)%hi_open = hi_open
 if (present(recorded)) keys(n)%recorded = recorded
 if (present(required)) keys(n)%required = required
+if (present(allowed)) then
+  keys(n)%n_allowed = size(allowed)
+  keys(n)%allowed(1:size(allowed)) = allowed
+endif
+if (present(any_case)) keys(n)%any_case = any_case
 
 end subroutine add
 
@@ -359,9 +382,10 @@ end subroutine fel_schema_table
 !
 ! Routine to read one key from the TOML table it lives in and store it in run. The
 ! type must be the key's own, and a real or integer key must lie inside its bounds. A
-! string must fit its component and a list must fit its array, since a value cut to fit
-! would be checked later as the shorter text. A refusal names the table, the key and what
-! was expected.
+! string key with a set of names takes one of them and nothing else, checked on the value
+! as written and so before its length. A string must fit its component and a list must
+! fit its array, since a value cut to fit would be checked later as the shorter text. A
+! refusal names the table, the key and what was expected, and for a set the names in it.
 !
 ! Input:
 !   key       -- fel_key_struct: The key, present in tab.
@@ -369,8 +393,9 @@ end subroutine fel_schema_table
 !
 ! Output:
 !   run       -- fel_run_struct: The component the key fills is set.
-!   err_flag  -- logical: Set on a wrong type, a value outside the bounds, a string
-!                  longer than its component or a list longer than its array.
+!   err_flag  -- logical: Set on a wrong type, a value outside the bounds, a name outside
+!                  the key's set, a string longer than its component or a list longer
+!                  than its array.
 !-
 
 subroutine fel_schema_set (run, key, tab, err_flag)
@@ -421,6 +446,11 @@ case (key_string$, key_path$)
   call get_value (tab, trim(key%name), sv, stat = stat)
   if (stat /= 0) then
     call refuse ('expected a quoted string')
+    return
+  endif
+  if (.not. fel_schema_allows(key, sv)) then
+    call out_io (s_error$, r_name, 'IN THE INPUT FILE, ' // trim(where) // ' = "' // sv // '" IS NOT ONE OF ' // &
+          fel_schema_values_text(key) // '.', trim(key%descrip))
     return
   endif
 case (key_int_list$)
@@ -697,6 +727,110 @@ dest(1:size(slist)) = slist
 end subroutine put_list
 
 end subroutine fel_schema_set
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_schema_allows (key, value) result (is_allowed)
+!
+! Routine to say whether a value is one of a string key's allowed names. A key with no
+! set allows any value. A key whose set matches in any case compares upcased.
+!
+! Input:
+!   key    -- fel_key_struct: The key.
+!   value  -- character(*): The value. Trailing blanks are not part of it.
+!
+! Output:
+!   is_allowed  -- logical: True if the value is in the key's set, or the key has none.
+!-
+
+function fel_schema_allows (key, value) result (is_allowed)
+
+type (fel_key_struct) key
+character(*) value
+logical is_allowed
+integer i
+
+!
+
+is_allowed = (key%n_allowed == 0)
+do i = 1, key%n_allowed
+  if (key%any_case) then
+    if (upcase(value) == upcase(key%allowed(i))) is_allowed = .true.
+  else
+    if (value == key%allowed(i)) is_allowed = .true.
+  endif
+enddo
+
+end function fel_schema_allows
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_schema_values_text (key) result (txt)
+!
+! Routine to write a string key's allowed names as a refusal states them, each quoted,
+! "IN ANY CASE" after a set that matches in any case.
+!
+! Input:
+!   key  -- fel_key_struct: The key.
+!
+! Output:
+!   txt  -- character(:), allocatable: The names, '"bmad", "genesis"'.
+!-
+
+function fel_schema_values_text (key) result (txt)
+
+type (fel_key_struct) key
+character(:), allocatable :: txt
+integer i
+
+!
+
+txt = ''
+do i = 1, key%n_allowed
+  if (i > 1) txt = txt // ', '
+  txt = txt // '"' // trim(key%allowed(i)) // '"'
+enddo
+if (key%any_case) txt = txt // ' IN ANY CASE'
+
+end function fel_schema_values_text
+
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!+
+! Function fel_schema_key (dotted) result (key)
+!
+! Routine to find a key by its table and name joined with a dot, run.device, and the
+! lattice as .lattice, as the store spells them.
+!
+! Input:
+!   dotted  -- character(*): The table and the name.
+!
+! Output:
+!   key     -- fel_key_struct: The key. A name no key has gives a key with a blank name.
+!-
+
+function fel_schema_key (dotted) result (key)
+
+type (fel_key_struct) key
+type (fel_key_struct), allocatable :: keys(:)
+character(*) dotted
+integer i
+
+!
+
+call fel_schema_table (keys)
+do i = 1, size(keys)
+  if (trim(keys(i)%table) // '.' // trim(keys(i)%name) /= dotted) cycle
+  key = keys(i)
+  return
+enddo
+
+end function fel_schema_key
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------

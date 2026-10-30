@@ -443,43 +443,6 @@ end subroutine fel_device_query
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
 !+
-! Function fel_device_known (device_req) result (is_known)
-!
-! Routine to check run.device against the names this tree knows, '', 'off' and 'metal',
-! and refuse any other, listing them. fel_setup_schedule calls it before it checks the
-! configuration against the device, so a misspelt name is refused as a name and no
-! message quotes it as a device.
-!
-! Input:
-!   device_req -- character(*): run.device.
-!
-! Output:
-!   is_known   -- logical: True if the name is one this tree knows.
-!-
-
-function fel_device_known (device_req) result (is_known)
-
-character(*) device_req
-logical is_known
-character(*), parameter :: r_name = 'fel_device_known'
-
-!
-
-select case (device_req)
-case ('', 'off', 'metal')
-  is_known = .true.
-case default
-  call out_io (s_error$, r_name, 'UNRECOGNIZED DEVICE: "' // trim(device_req) // '".', &
-                                 'THIS TREE KNOWS off AND metal.')
-  is_known = .false.
-end select
-
-end function fel_device_known
-
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!------------------------------------------------------------------------------
-!+
 ! Subroutine from_c (c_str, f_str)
 !
 ! Routine to copy a null-terminated C string into a Fortran one, truncating at the
@@ -517,7 +480,9 @@ end subroutine from_c
 !
 ! Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal' asks
 ! for the one backend this tree knows. A build without it (the stub) refuses with the
-! stub's own reason. Any other value is refused, and the error lists what this tree knows.
+! stub's own reason. device_req is one of run.device's names, which the key table
+! (fel_schema_mod) refuses any other of as the input file is read, and which fel_setup_mod's
+! fel_device_known checks before this is called.
 !
 ! The routine allocates the resident buffers for this run shape, runs the exact-wrap
 ! assertion on the device, and writes the device header lines into the instrument's stream
@@ -568,11 +533,11 @@ character(*), parameter :: r_name = 'fel_device_setup'
 
 err_flag = .false.
 
-if (.not. fel_device_known(device_req)) then
-  err_flag = .true.
+select case (device_req)
+case ('', 'off')
   return
-endif
-if (device_req == '' .or. device_req == 'off') return
+case ('metal')
+end select
 
 call fel_device_query (usable, name, reason)
 if (.not. usable) then

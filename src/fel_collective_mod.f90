@@ -268,23 +268,22 @@ logical err_flag
 
 real(rp) coef, rrough, tau
 integer i
-character(*), parameter :: r_name = 'fel_wake_init'
 
 !
 
 err_flag = .true.
 
-select case (wake%material)
-case ('CU', 'Cu', 'cu')
+! The material shortcut, wake.material, in any case. The key table refuses a name outside
+! its set as the input file is read, and blank leaves the conductivity as given.
+
+select case (upcase(wake%material))
+case ('CU')
   wake%conductivity = 5.813e7_rp
   wake%relaxation = 8.1e-6_rp
-case ('AL', 'Al', 'al')
+case ('AL')
   wake%conductivity = 3.571e7_rp
   wake%relaxation = 2.4e-6_rp
 case ('')
-case default
-  call out_io (s_error$, r_name, 'UNKNOWN WAKE MATERIAL: ' // trim(wake%material))
-  return
 end select
 
 wake%ns = nslice * sample

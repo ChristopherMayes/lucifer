@@ -1539,26 +1539,6 @@ Output:
   reason -- character(*): Why it is unusable. Blank when usable is True.
 ```
 
-(api-fel-device-known)=
-### `fel_device_known`
-
-*Function* `(device_req) result (is_known)`
-
-```
-Routine to check run.device against the names this tree knows, '', 'off' and 'metal',
-and refuse any other, listing them. fel_setup_schedule calls it before it checks the
-configuration against the device, so a misspelt name is refused as a name and no
-message quotes it as a device.
-```
-
-```
-Input:
-  device_req -- character(*): run.device.
-
-Output:
-  is_known   -- logical: True if the name is one this tree knows.
-```
-
 (api-from-c)=
 ### `from_c`
 
@@ -1587,7 +1567,9 @@ Output:
 
 Routine to arm the device from the input knob. '' or 'off' leaves it dark. 'metal' asks
 for the one backend this tree knows. A build without it (the stub) refuses with the
-stub's own reason. Any other value is refused, and the error lists what this tree knows.
+stub's own reason. device_req is one of run.device's names, which the key table
+(fel_schema_mod) refuses any other of as the input file is read, and which fel_setup_mod's
+fel_device_known checks before this is called.
 
 The routine allocates the resident buffers for this run shape, runs the exact-wrap
 assertion on the device, and writes the device header lines into the instrument's stream
@@ -2252,7 +2234,8 @@ worst-case accumulators the footer and the check read.
 ```
 Routine to arm the instrument from the input knob and open the .fp32.txt stream. '' or
 'off' leaves it dark. 'lockstep' rebuilds the FP32 state from FP64 every step.
-'freerun' lets the longitudinal state carry across steps.
+'freerun' lets the longitudinal state carry across steps. The key table refuses any
+other mode as the input file is read.
 ```
 
 ```
@@ -2266,7 +2249,7 @@ Input:
 
 Output:
   fp32         -- fel_fp32_struct: Armed (or left dark).
-  err_flag     -- logical: Set True on an unrecognized mode or a refusal. False otherwise.
+  err_flag     -- logical: Set True on a refusal. False otherwise.
 ```
 
 (api-fel-fp32-field-prep)=
@@ -4064,6 +4047,10 @@ switches the tracker honors. The lattice is the one top-level key.
 One key of the input file. lo and hi bound a real or integer key; a bound at huge is no
 bound, and lo_open or hi_open makes it exclusive. recorded is false for the one key
 that is not physics input, out_root, which every output file carries already.
+
+A string key that takes one of a fixed set of names carries the set in allowed(1:n_allowed),
+and any other value is refused when it is read. any_case makes the set match in any case,
+and the routines that read such a key compare it upcased.
 ```
 
 (api-fel-schema-table)=
@@ -4089,9 +4076,10 @@ Output:
 ```
 Routine to read one key from the TOML table it lives in and store it in run. The
 type must be the key's own, and a real or integer key must lie inside its bounds. A
-string must fit its component and a list must fit its array, since a value cut to fit
-would be checked later as the shorter text. A refusal names the table, the key and what
-was expected.
+string key with a set of names takes one of them and nothing else, checked on the value
+as written and so before its length. A string must fit its component and a list must
+fit its array, since a value cut to fit would be checked later as the shorter text. A
+refusal names the table, the key and what was expected, and for a set the names in it.
 ```
 
 ```
@@ -4101,8 +4089,64 @@ Input:
 
 Output:
   run       -- fel_run_struct: The component the key fills is set.
-  err_flag  -- logical: Set on a wrong type, a value outside the bounds, a string
-                 longer than its component or a list longer than its array.
+  err_flag  -- logical: Set on a wrong type, a value outside the bounds, a name outside
+                 the key's set, a string longer than its component or a list longer
+                 than its array.
+```
+
+(api-fel-schema-allows)=
+### `fel_schema_allows`
+
+*Function* `(key, value) result (is_allowed)`
+
+```
+Routine to say whether a value is one of a string key's allowed names. A key with no
+set allows any value. A key whose set matches in any case compares upcased.
+```
+
+```
+Input:
+  key    -- fel_key_struct: The key.
+  value  -- character(*): The value. Trailing blanks are not part of it.
+
+Output:
+  is_allowed  -- logical: True if the value is in the key's set, or the key has none.
+```
+
+(api-fel-schema-values-text)=
+### `fel_schema_values_text`
+
+*Function* `(key) result (txt)`
+
+```
+Routine to write a string key's allowed names as a refusal states them, each quoted,
+"IN ANY CASE" after a set that matches in any case.
+```
+
+```
+Input:
+  key  -- fel_key_struct: The key.
+
+Output:
+  txt  -- character(:), allocatable: The names, '"bmad", "genesis"'.
+```
+
+(api-fel-schema-key)=
+### `fel_schema_key`
+
+*Function* `(dotted) result (key)`
+
+```
+Routine to find a key by its table and name joined with a dot, run.device, and the
+lattice as .lattice, as the store spells them.
+```
+
+```
+Input:
+  dotted  -- character(*): The table and the name.
+
+Output:
+  key     -- fel_key_struct: The key. A name no key has gives a key with a blank name.
 ```
 
 (api-fel-schema-value)=
@@ -4513,6 +4557,27 @@ Routine to set up the diagnostics (fel-physics.md sec-stats). The dump-at lists 
 resolved through Bmad's own lat_ele_locator, which gives class::name syntax. The exact
 record and element-end counts are precomputed by replaying the walk's skip rule, so the
 stats arrays are sized once and never grown. An entry matching nothing is refused.
+```
+
+(api-fel-device-known)=
+### `fel_device_known`
+
+*Function* `(device_req) result (is_known)`
+
+```
+Routine to check run.device against the names in its set in the key table
+(fel_schema_mod), and refuse any other, listing them. The input file's value is refused
+there as it is read. This covers a program that sets the component itself.
+fel_setup_schedule calls it before it checks the configuration against the device, so a
+misspelt name is refused as a name and no message quotes it as a device.
+```
+
+```
+Input:
+  device_req -- character(*): run.device.
+
+Output:
+  is_known   -- logical: True if the name is one this tree knows.
 ```
 
 ## `fel_stats_mod.f90`
