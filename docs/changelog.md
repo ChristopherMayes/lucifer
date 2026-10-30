@@ -9,6 +9,12 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Added: `tests/scripts/check_allowed_values.py` reads each name-valued key's set from the
+  key table and follows the component it fills through the copies the code makes, an assignment or an
+  argument. It fails when the code compares the value against a name outside the set, in an `==`, a
+  `/=` or a case of a select, and when a name in the set is compared nowhere and is not the default,
+  naming the file, the line and the key. It needs no build and runs in the docs workflow and the
+  examples job.
 - 2026-10-29 Changed: the JSON Schema gives each key with a set of names an `enum`, `models.py` types
   its field as a `Literal` of the set, and the key tables on `docs/input-reference.md` list the set in
   their bounds column, now headed bounds or names. All three are written from the key table. A set

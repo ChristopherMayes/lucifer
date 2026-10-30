@@ -104,6 +104,11 @@ jobs:
       - name: No retired words
         run: python tests/scripts/check_retired_words.py
 
+      # A key that takes one of a set of names: the code compares it against the names in
+      # its set in the key table and no other, and every name is compared or is the default.
+      - name: Allowed names agree with the code
+        run: python tests/scripts/check_allowed_values.py
+
       # An input file edited without regenerating its page would leave the documentation
       # quoting text that no longer runs. Regenerating here and requiring no diff is the
       # same guarantee the keystone gives, and it costs no build. The Markdown only: the

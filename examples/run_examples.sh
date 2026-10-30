@@ -389,6 +389,13 @@ if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_retired_words.py" --root "$LU
   echo " FAIL: a committed file carries a retired word."
   exit 1
 fi
+
+# And every key with a set of names in the key table is compared against those names and no
+# other, so the table and the code that acts on it cannot drift apart.
+if ! "$PYTHON" "$SCRIPT_DIR/../tests/scripts/check_allowed_values.py" --root "$LUCIFER_DIR"; then
+  echo " FAIL: a name-valued key's set and the names the code compares it against disagree."
+  exit 1
+fi
 # The plotting module runs even without figures, on the steady-state example's stats file
 # into a scratch image, so a plotter that fails to import or to draw fails this run.
 if ! "$PYTHON" -m lucifer.plot "$SCRIPT_DIR/steady_state/steady_state.stats.h5" --dpi 40 \
