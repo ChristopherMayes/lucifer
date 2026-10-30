@@ -1,13 +1,15 @@
 """The input file as typed models, generated from the schema. Do not edit.
 
-Written by python -m lucifer.generate from schema.json, schema version 1. A dataclass per table of the input file, and Input with
+Written by python -m lucifer.generate from schema.json, schema version 2. A dataclass per table of the input file, and Input with
 the lattice and one of each. The defaults are the program's, read from the schema,
-and nothing here checks a bound: the program refuses a value outside one. The
-field named field is the [field] table, so dataclasses.field is imported as _field.
+and nothing here checks a bound or a set of names: the program refuses a value outside
+one. The field named field is the [field] table, so dataclasses.field is imported as
+_field.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field as _field
+from typing import Literal
 
 from lucifer.inputops import InputOps
 
@@ -19,15 +21,15 @@ class Run:
     """The [run] table of the input file."""
     out_root: str = 'fel_track'
     """Root of every output file name."""
-    interlude_model: str = 'bmad'
+    interlude_model: Literal['bmad', 'genesis'] = 'bmad'
     """Interlude transport: bmad (the seam) or genesis (transcribed)."""
-    transport_model: str = 'bmad'
+    transport_model: Literal['bmad', 'genesis'] = 'bmad'
     """Transverse transport inside averaged FEL elements: bmad, Bmad's own kernel, or genesis, the transcribed maps for validation only."""
     unaveraged_steps_per_period: int = 20
     """Integration steps per undulator period in unaveraged elements. Below 10 the push does not converge. Bounds: from 10."""
     unaveraged_ramp_periods: int = 2
     """Periods the field ramps over at each end of an unaveraged element. 0 keeps the default of 2, -1 is a hard edge. Bounds: from -1."""
-    source_model: str = 'deposit'
+    source_model: Literal['deposit', 'coherent'] = 'deposit'
     """The FEL source model: deposit, the per-particle scatter, or coherent, the coherent-Gaussian source."""
     source_filter: bool = True
     """The angular filter on the source term, transcribed from Genesis4. Off to compare against a code without one."""
@@ -85,11 +87,11 @@ class Run:
     """No FEL interaction: Bmad tracks everything."""
     record_environment: bool = False
     """Record the login name and the working directory in meta/. Off, since a stats file travels."""
-    fp32_check: str = 'off'
+    fp32_check: Literal['', 'off', 'lockstep', 'freerun'] = 'off'
     """The FP32 lockstep check: off, lockstep or freerun. For checks only."""
     fp32_mutate: bool = False
     """The FP32 check's self-test: coarsen the residual."""
-    device: str = 'off'
+    device: Literal['', 'off', 'metal'] = 'off'
     """The device backend: off, or metal on a build that carries it."""
     device_timing: bool = False
     """Per-pass device timing, one compute encoder a pass. Slows the run."""
@@ -144,13 +146,13 @@ class Beam:
     """Normalized a-mode emittance. [m rad] Bounds: from 0.0."""
     b_norm_emit: float = 0.0
     """Normalized b-mode emittance. [m rad] Bounds: from 0.0."""
-    z_distribution: str = 'RAN_GAUSS'
+    z_distribution: Literal['', 'RAN_GAUSS', 'ran_gauss', 'Ran_Gauss', 'GRID', 'grid', 'Grid'] = 'RAN_GAUSS'
     """The current profile: ran_gauss, a Gaussian of sig_z, or grid, flat from z_min to z_max."""
     z_min: float = 0.0
     """The flat profile's lower z bound, read under grid only. [m]"""
     z_max: float = 0.0
     """The flat profile's upper z bound, read under grid only. [m]"""
-    load_mode: str = 'sample'
+    load_mode: Literal['sample', 'keep'] = 'sample'
     """How the bunch becomes slices: sample, the same count in every slice with weights from the slice charge, or keep, every particle kept with the counts following the charge."""
     quiet_start: bool = True
     """Load beamlets of beamlet_size phase copies, quiet below that harmonic."""
@@ -189,7 +191,7 @@ class Field:
     """Gaussian seed power. 0 is a dark start. [W] Bounds: from 0.0."""
     seed_waist_size: float = 0.0
     """The seed's intensity 1/e^2 radius. [m] Bounds: from 0.0."""
-    seed_polarization: str = 'x'
+    seed_polarization: Literal['x', 'y'] = 'x'
     """The seed's polarization, x or y."""
     harmonics: list[int] = _field(default_factory=lambda: [1])
     """The field set: 1 first, then further harmonic numbers in increasing order."""
@@ -200,7 +202,7 @@ class Wake:
     """The [wake] table of the input file."""
     on: bool = False
     """The chamber wake."""
-    model: str = 'genesis'
+    model: Literal['genesis'] = 'genesis'
     """Which chamber-wake implementation runs: genesis, the transcribed solver."""
     loss: float = 0.0
     """External loss. [eV/m]"""
@@ -212,7 +214,7 @@ class Wake:
     """AC relaxation distance c tau. [m] Bounds: from 0.0."""
     roundpipe: bool = True
     """A round chamber. False is flat, parallel plates."""
-    material: str = ''
+    material: Literal['', 'CU', 'cu', 'Cu', 'AL', 'al', 'Al'] = ''
     """CU or AL, a shortcut for the conductivity and relaxation."""
     gap: float = 0.0
     """Undulator gap. 0 is no geometric wake. [m] Bounds: from 0.0."""
@@ -229,7 +231,7 @@ class Wake:
 @dataclass
 class SpaceCharge:
     """The [space_charge] table of the input file."""
-    model: str = 'genesis'
+    model: Literal['genesis'] = 'genesis'
     """Which space-charge implementation runs: genesis, the transcribed solver."""
     rmax: float = 0.0
     """Radial grid extent scale. It grows adaptively as Genesis4's does. [m] Bounds: from 0.0."""

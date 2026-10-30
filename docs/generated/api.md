@@ -4257,8 +4257,10 @@ Input:
 Routine to write the schema as JSON Schema, draft 2020-12, to an open unit. Each table
 is an object that allows no key the schema does not name, and each key carries its
 type, its default as the structures declare it, its description with its unit, and
-its bounds. An editor that reads JSON Schema validates an input file against it as it is
-typed, and the input reference's key tables are generated from it.
+its bounds or its set of names as an enum. A set that matches in any case lists each
+name in upper, lower and title case, since an enum cannot say any case, and carries
+"x-any-case": true. An editor that reads JSON Schema validates an input file against it
+as it is typed, and the input reference's key tables are generated from it.
 ```
 
 ```

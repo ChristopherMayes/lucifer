@@ -5,7 +5,7 @@
 ### The top level
 
 <!-- begin keys-top -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `lattice` | string | `""` |  |  | The Bmad lattice file. The FEL segments are its wigglers with fel_method set. |
 <!-- end keys-top -->
@@ -14,14 +14,14 @@
 ### `[run]`
 
 <!-- begin keys-run -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `out_root` | string | `"fel_track"` |  |  | Root of every output file name. |
-| `interlude_model` | string | `"bmad"` |  |  | Interlude transport: bmad (the seam) or genesis (transcribed). |
-| `transport_model` | string | `"bmad"` |  |  | Transverse transport inside averaged FEL elements: bmad, Bmad's own kernel, or genesis, the transcribed maps for validation only. |
+| `interlude_model` | string | `"bmad"` |  | `"bmad"`, `"genesis"` | Interlude transport: bmad (the seam) or genesis (transcribed). |
+| `transport_model` | string | `"bmad"` |  | `"bmad"`, `"genesis"` | Transverse transport inside averaged FEL elements: bmad, Bmad's own kernel, or genesis, the transcribed maps for validation only. |
 | `unaveraged_steps_per_period` | integer | `20` |  | from 10 | Integration steps per undulator period in unaveraged elements. Below 10 the push does not converge. |
 | `unaveraged_ramp_periods` | integer | `2` |  | from -1 | Periods the field ramps over at each end of an unaveraged element. 0 keeps the default of 2, -1 is a hard edge. |
-| `source_model` | string | `"deposit"` |  |  | The FEL source model: deposit, the per-particle scatter, or coherent, the coherent-Gaussian source. |
+| `source_model` | string | `"deposit"` |  | `"deposit"`, `"coherent"` | The FEL source model: deposit, the per-particle scatter, or coherent, the coherent-Gaussian source. |
 | `source_filter` | true/false | true |  |  | The angular filter on the source term, transcribed from Genesis4. Off to compare against a code without one. |
 | `source_filter_angle` | real | `0` | rad | from 0 | The filter's edge as an angle. 0 derives it from the beam and the gain. |
 | `source_filter_tolerance` | real | `0.75` |  | above 0, below 1 | The largest fraction of source intensity the filter may remove inside the protected angle. |
@@ -50,9 +50,9 @@
 | `migrate_check` | true/false | false |  |  | The migration's bunching-invariance instrument. |
 | `reference_run` | true/false | false |  |  | No FEL interaction: Bmad tracks everything. |
 | `record_environment` | true/false | false |  |  | Record the login name and the working directory in meta/. Off, since a stats file travels. |
-| `fp32_check` | string | `"off"` |  |  | The FP32 lockstep check: off, lockstep or freerun. For checks only. |
+| `fp32_check` | string | `"off"` |  | `""`, `"off"`, `"lockstep"`, `"freerun"` | The FP32 lockstep check: off, lockstep or freerun. For checks only. |
 | `fp32_mutate` | true/false | false |  |  | The FP32 check's self-test: coarsen the residual. |
-| `device` | string | `"off"` |  |  | The device backend: off, or metal on a build that carries it. |
+| `device` | string | `"off"` |  | `""`, `"off"`, `"metal"` | The device backend: off, or metal on a build that carries it. |
 | `device_timing` | true/false | false |  |  | Per-pass device timing, one compute encoder a pass. Slows the run. |
 | `device_dep_mutate` | integer | `0` |  |  | Shift the device deposit's fixed-point scale, in bits. A check instrument. |
 <!-- end keys-run -->
@@ -61,7 +61,7 @@
 ### `[window]`
 
 <!-- begin keys-window -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `window_length` | real | `0` | m | from 0 | The time window. 0 derives it from the bunch and the slippage the line applies, or is one slice. |
 | `n_wavelength` | integer | `0` |  | from 0 | Wavelengths per slice, Genesis4's sample. 0 derives it from the gain. |
@@ -73,7 +73,7 @@
 ### `[beam]`
 
 <!-- begin keys-beam -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `file` | string | `""` |  |  | An openPMD particle dump to start from, already in slices. Blank loads a bunch instead. |
 | `position_file` | string | `""` |  |  | An openPMD-beamphysics bunch to load, read whole and then sliced by load_mode. |
@@ -83,10 +83,10 @@
 | `sig_pz` | real | `0` |  | from 0 | Fractional momentum spread dP/P0. |
 | `a_norm_emit` | real | `0` | m rad | from 0 | Normalized a-mode emittance. |
 | `b_norm_emit` | real | `0` | m rad | from 0 | Normalized b-mode emittance. |
-| `z_distribution` | string | `"RAN_GAUSS"` |  |  | The current profile: ran_gauss, a Gaussian of sig_z, or grid, flat from z_min to z_max. |
+| `z_distribution` | string | `"RAN_GAUSS"` |  | `""`, `"RAN_GAUSS"`, `"GRID"` in any case | The current profile: ran_gauss, a Gaussian of sig_z, or grid, flat from z_min to z_max. |
 | `z_min` | real | `0` | m |  | The flat profile's lower z bound, read under grid only. |
 | `z_max` | real | `0` | m |  | The flat profile's upper z bound, read under grid only. |
-| `load_mode` | string | `"sample"` |  |  | How the bunch becomes slices: sample, the same count in every slice with weights from the slice charge, or keep, every particle kept with the counts following the charge. |
+| `load_mode` | string | `"sample"` |  | `"sample"`, `"keep"` | How the bunch becomes slices: sample, the same count in every slice with weights from the slice charge, or keep, every particle kept with the counts following the charge. |
 | `quiet_start` | true/false | true |  |  | Load beamlets of beamlet_size phase copies, quiet below that harmonic. |
 | `beamlet_size` | integer | `8` |  | from 1 | Copies per beamlet, and the harmonics the noise resolves. |
 | `shot_noise` | true/false | false |  |  | Impose the physical noise on the load's groups. Time-dependent windows only. |
@@ -102,7 +102,7 @@
 ### `[beam.resample]`
 
 <!-- begin keys-beam-resample -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `slice_width` | real | `0.01` |  | above 0 | Sampling window over bunch length, Genesis4's slicewidth. |
 | `n_particle_per_slice` | integer | `8192` |  | from 1 | Macroparticles per slice on the validation route. |
@@ -115,7 +115,7 @@
 ### `[field]`
 
 <!-- begin keys-field -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `file` | list of strings | `[]` |  |  | The openPMD wavefront file to start from, or one per harmonic member. Blank is a seed. |
 | `lambda0` | real | `0` | m | from 0 | The resonant wavelength. Required for generation. |
@@ -123,7 +123,7 @@
 | `grid_half_width` | real | `0` | m | from 0 | Transverse grid half width. 0 derives it from the beam. |
 | `seed_power` | real | `0` | W | from 0 | Gaussian seed power. 0 is a dark start. |
 | `seed_waist_size` | real | `0` | m | from 0 | The seed's intensity 1/e^2 radius. |
-| `seed_polarization` | string | `"x"` |  |  | The seed's polarization, x or y. |
+| `seed_polarization` | string | `"x"` |  | `"x"`, `"y"` | The seed's polarization, x or y. |
 | `harmonics` | list of integers | `[1]` |  |  | The field set: 1 first, then further harmonic numbers in increasing order. |
 <!-- end keys-field -->
 
@@ -131,16 +131,16 @@
 ### `[wake]`
 
 <!-- begin keys-wake -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `on` | true/false | false |  |  | The chamber wake. |
-| `model` | string | `"genesis"` |  |  | Which chamber-wake implementation runs: genesis, the transcribed solver. |
+| `model` | string | `"genesis"` |  | `"genesis"` | Which chamber-wake implementation runs: genesis, the transcribed solver. |
 | `loss` | real | `0` | eV/m |  | External loss. |
 | `radius` | real | `0.0025` | m | above 0 | Chamber radius, or the half gap of a flat chamber. |
 | `conductivity` | real | `0` | 1/(Ohm m) | from 0 | DC conductivity. 0 is no resistive wake. |
 | `relaxation` | real | `0` | m | from 0 | AC relaxation distance c tau. |
 | `roundpipe` | true/false | true |  |  | A round chamber. False is flat, parallel plates. |
-| `material` | string | `""` |  |  | CU or AL, a shortcut for the conductivity and relaxation. |
+| `material` | string | `""` |  | `""`, `"CU"`, `"AL"` in any case | CU or AL, a shortcut for the conductivity and relaxation. |
 | `gap` | real | `0` | m | from 0 | Undulator gap. 0 is no geometric wake. |
 | `lgap` | real | `1` | m | above 0 | Period of the gaps. |
 | `hrough` | real | `0` | m | from 0 | Roughness amplitude. 0 is no roughness wake. |
@@ -152,9 +152,9 @@
 ### `[space_charge]`
 
 <!-- begin keys-space_charge -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
-| `model` | string | `"genesis"` |  |  | Which space-charge implementation runs: genesis, the transcribed solver. |
+| `model` | string | `"genesis"` |  | `"genesis"` | Which space-charge implementation runs: genesis, the transcribed solver. |
 | `rmax` | real | `0` | m | from 0 | Radial grid extent scale. It grows adaptively as Genesis4's does. |
 | `ngrid` | integer | `100` |  | from 1 | Radial grid points. |
 | `nz` | integer | `0` |  | from 0 | Longitudinal harmonics. 0 disables the short-range solve. |
@@ -166,7 +166,7 @@
 ### `[bmad]`
 
 <!-- begin keys-bmad -->
-| key | type | default | unit | bounds | meaning |
+| key | type | default | unit | bounds or names | meaning |
 |---|---|---|---|---|---|
 | `radiation_damping_on` | true/false | false |  |  | Bmad's radiation damping in the interludes. |
 | `radiation_fluctuations_on` | true/false | false |  |  | Bmad's radiation fluctuations in the interludes. |
@@ -180,4 +180,4 @@
 | `particle_sigma_cutoff` | real | `-1` |  |  | Bmad's particle sigma cutoff for the space-charge mesh. |
 <!-- end keys-bmad -->
 
-Schema version 1.
+Schema version 2.

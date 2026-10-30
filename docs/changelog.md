@@ -9,6 +9,13 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Changed: the JSON Schema gives each key with a set of names an `enum`, `models.py` types
+  its field as a `Literal` of the set, and the key tables on `docs/input-reference.md` list the set in
+  their bounds column, now headed bounds or names. All three are written from the key table. A set
+  that matches in any case is an enum of each name in upper, lower and title case with
+  `"x-any-case": true`, since an enum cannot say any case. The schema version is 2. `lucifer.Input`
+  refuses nothing it did not refuse before, and its test for a nested table, which took the
+  `Literal[...]` annotation for a class name, requires a name.
 - 2026-10-29 Changed: a string key that takes one of a set of names carries the set in the key table,
   `src/fel_schema_mod.f90`, and `fel_schema_set` refuses any other value as the input file is read,
   with the key, the value and the set: `IN THE INPUT FILE, [run] device = "metl" IS NOT ONE OF "",

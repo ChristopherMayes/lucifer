@@ -30,7 +30,7 @@ implicit none
 ! The schema version, written into every stats file and the JSON Schema. It moves when a
 ! key is added, renamed, retyped or rebounded, so a reader can tell which input file a run read.
 
-character(*), parameter :: fel_schema_version$ = '1'
+character(*), parameter :: fel_schema_version$ = '2'
 
 ! The kinds a key can have. A path is a string that names a file, written into params/
 ! only when set. A string is a short word, a mode or a name.
@@ -1220,8 +1220,10 @@ end subroutine fel_schema_write_toml
 ! Routine to write the schema as JSON Schema, draft 2020-12, to an open unit. Each table
 ! is an object that allows no key the schema does not name, and each key carries its
 ! type, its default as the structures declare it, its description with its unit, and
-! its bounds. An editor that reads JSON Schema validates an input file against it as it is
-! typed, and the input reference's key tables are generated from it.
+! its bounds or its set of names as an enum. A set that matches in any case lists each
+! name in upper, lower and title case, since an enum cannot say any case, and carries
+! "x-any-case": true. An editor that reads JSON Schema validates an input file against it
+! as it is typed, and the input reference's key tables are generated from it.
 !
 ! Input:
 !   iu  -- integer: Open unit to write to.
@@ -1234,7 +1236,7 @@ type (fel_key_struct), allocatable :: keys(:)
 integer iu, i, it, n_in
 logical key_kind_int
 character(16) table
-character(:), allocatable :: descrip
+character(:), allocatable :: descrip, enum
 
 !
 
@@ -1302,6 +1304,7 @@ type (fel_key_struct) key
 character(*) indent
 logical comma
 character(:), allocatable :: jtype, items, bounds, dflt
+integer j
 
 !
 
@@ -1332,12 +1335,25 @@ if (key%hi < huge(1.0_rp)) then
   endif
 endif
 
+enum = ''
+if (key%n_allowed > 0) then
+  do j = 1, key%n_allowed
+    call add_name (key%allowed(j))
+    if (key%any_case .and. key%allowed(j) /= '') then
+      call add_name (downcase(key%allowed(j)))
+      call add_name (title_case(key%allowed(j)))
+    endif
+  enddo
+  enum = ', "enum": [' // enum // ']'
+  if (key%any_case) enum = enum // ', "x-any-case": true'
+endif
+
 descrip = trim(key%descrip)
 if (key%unit /= '') descrip = descrip // ' [' // trim(key%unit) // ']'
 dflt = fel_schema_text(def, key)
 ! A default the input file would write as a list of one string stays a list in JSON too.
 write (iu, '(a)', advance = 'no') indent // '"' // trim(key%name) // '": {"type": "' // jtype // '"' // items // &
-      ', "default": ' // dflt // bounds // ', "description": "' // descrip // '"}'
+      ', "default": ' // dflt // bounds // enum // ', "description": "' // descrip // '"}'
 if (comma) then
   write (iu, '(a)') ','
 else
@@ -1345,6 +1361,33 @@ else
 endif
 
 end subroutine key_json
+
+! add_name appends one quoted name to the enum, once.
+
+subroutine add_name (name)
+character(*) name
+character(:), allocatable :: q
+q = '"' // trim(name) // '"'
+if (index(enum, q) > 0) return
+if (enum /= '') enum = enum // ', '
+enum = enum // q
+end subroutine add_name
+
+! title_case writes a name with each part after an underscore capitalized, Ran_Gauss.
+
+function title_case (name) result (t)
+character(*) name
+character(:), allocatable :: t
+integer k
+t = downcase(trim(name))
+do k = 1, len(t)
+  if (k == 1) then
+    t(k:k) = upcase(t(k:k))
+  elseif (t(k-1:k-1) == '_') then
+    t(k:k) = upcase(t(k:k))
+  endif
+enddo
+end function title_case
 
 ! bound_json writes a bound as a JSON number, an integer key's as an integer.
 

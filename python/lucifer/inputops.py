@@ -36,7 +36,10 @@ def _default(f: dataclasses.Field):
 
 
 def _is_table(f: dataclasses.Field) -> bool:
-    return dataclasses.is_dataclass(f.type) or (isinstance(f.type, str) and f.type[:1].isupper())
+    # A table's annotation is its class name, Run or Resample. A key with a set of names is
+    # annotated Literal[...], which also starts upper case and is not a name.
+    return dataclasses.is_dataclass(f.type) or (isinstance(f.type, str) and f.type.isidentifier()
+                                                and f.type[:1].isupper())
 
 
 class InputOps:

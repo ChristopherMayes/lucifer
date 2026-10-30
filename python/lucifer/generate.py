@@ -5,8 +5,10 @@
 The keystone runs this after ``lucifer --schema`` and requires no diff, so the models
 cannot disagree with the program. Every field carries the program's type and default
 and a docstring of the schema's description, which ends with the unit where the key
-has one, and the bounds. The dataclasses hold data alone: what a ``Input`` does is in
-``lucifer.inputops``, which the generated ``Input`` inherits.
+has one, and the bounds. A key with a set of names, an enum in the schema, is typed as a
+Literal of the set, which a type checker reads and nothing enforces at run time. The
+dataclasses hold data alone: what a ``Input`` does is in ``lucifer.inputops``, which the
+generated ``Input`` inherits.
 """
 from __future__ import annotations
 
@@ -23,6 +25,8 @@ PY_TYPE = {"string": "str", "number": "float", "integer": "int", "boolean": "boo
 
 
 def py_type(prop: dict) -> str:
+    if "enum" in prop:
+        return "Literal[" + ", ".join(repr(v) for v in prop["enum"]) + "]"
     if prop["type"] == "array":
         return f"list[{PY_TYPE[prop['items']['type']]}]"
     return PY_TYPE[prop["type"]]
@@ -69,12 +73,14 @@ def render(schema: dict) -> str:
         f"Written by python -m lucifer.generate from schema.json, schema version "
         f"{schema['x-schema-version']}. A dataclass per table of the input file, and Input with",
         "the lattice and one of each. The defaults are the program's, read from the schema,",
-        "and nothing here checks a bound: the program refuses a value outside one. The",
-        "field named field is the [field] table, so dataclasses.field is imported as _field.",
+        "and nothing here checks a bound or a set of names: the program refuses a value outside",
+        "one. The field named field is the [field] table, so dataclasses.field is imported as",
+        "_field.",
         '"""',
         "from __future__ import annotations",
         "",
         "from dataclasses import dataclass, field as _field",
+        "from typing import Literal",
         "",
         "from lucifer.inputops import InputOps",
         "",
