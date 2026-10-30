@@ -3,7 +3,7 @@
 # The keystone runs eleven comparison tiers and twenty-eight check sections against a
 # genesis4 binary, which needs a Lucifer build and the reference installed. Its Linux
 # counterpart is lucifer-linux.yml, which builds against the conda-forge bmad package
-# on every push to main and weekly, at the cost of a build. What fits here is
+# on every push to main and weekly, at the cost of two builds. What fits here is
 # everything that only reads files, so it runs on every push: the documentation builds,
 # the input reference agrees with the Fortran declarations, the examples agree with the
 # feature list, and the generated example pages are current.
@@ -185,7 +185,8 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
 
-  # The tiers and the check sections are in lucifer-linux.yml, which builds the debug
-  # tree and runs the validation suite on a Linux toolchain. It is separate from this
-  # workflow because it costs a distribution build where these steps cost none, so the
-  # two have different triggers: this one runs on every push, and that one on demand.
+  # The tiers and the check sections are in lucifer-linux.yml, which builds the debug and
+  # the release configuration against the conda-forge bmad package and runs the validation
+  # suite on each on a Linux toolchain. It is separate from this workflow because it costs
+  # two builds and two runs of the validation suite where these steps cost none, so the two
+  # have different triggers: this one runs on pull requests as well, and that one weekly.

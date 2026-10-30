@@ -201,6 +201,7 @@ echo "==========================================================================
 echo "FEL validation against Genesis4"
 echo "=============================================================================="
 echo "  lucifer: $EXE"
+echo "  build:       ${BUILD:-not declared, since --build was not given}"
 echo "  genesis4:    $GENESIS"
 # The lines below establish which reference this is. The recorded levels belong to one
 # version of it, and another moves them while every check still passes, so this is a

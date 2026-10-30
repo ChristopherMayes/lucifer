@@ -1,8 +1,9 @@
 # Lucifer's own checks, on Linux: the validation suite, tests/run_fel_validation.sh, and the
-# wavefront validation, on the debug build. This is not the keystone, which runs on the
-# recording machine (docs/validation.md). Nothing here judges a wall clock. The times the
-# log prints are what each section cost, and performance is measured by
-# tests/run_perf_benchmark.sh on an idle machine and never here (docs/performance.md).
+# wavefront validation, on the debug build and on the release build, each in a job of its
+# own. This is not the keystone, which runs on the recording machine (docs/validation.md).
+# Nothing here judges a wall clock. The times the log prints are what each section cost,
+# and performance is measured by tests/run_perf_benchmark.sh on an idle machine and never
+# here (docs/performance.md).
 #
 # Every level Lucifer records was measured on one machine, an Apple M3 Max running
 # macOS. This job runs the same checks on Linux, which is the only way a defect that
@@ -11,6 +12,14 @@
 # of a one-element vector, and the macOS allocator had been answering with a number that
 # happened to work. The debug build is what reaches that class, since -fbounds-check
 # turns such a read into a failure rather than a wrong number.
+#
+# The release build is the one the conda-forge lucifer package ships and users run, and
+# what it differs in the debug build cannot reach: every file at -O2 where the debug build
+# has -O0, with the floating-point contraction an optimizing compiler does. Both builds
+# compile fel_track_mod at -O3 with the paired-sincos shim. The two run as one job
+# definition over a matrix of the two builds, on two runners at once, and neither cancels
+# the other when it fails, so a defect that one build carries and the other does not fails
+# the one job that carries it.
 #
 # Bmad comes from conda-forge's bmad package, installed from environment.yml at the
 # repository root, and Lucifer builds against it with the two cmake lines of
@@ -23,10 +32,10 @@
 # bmad_version_mod.mod and refuses one below BMAD_RELEASE before anything is built. The
 # declared release is a minimum, so a green run certifies that release and no later one.
 #
-# The package is a production build of Bmad. Lucifer's Debug configuration is built
-# against it, so Lucifer's own code runs with -fbounds-check and Bmad's does not, where
-# the recording machine's debug pass runs both bounds-checked against the distribution's
-# debug tree. The tracker and the reference read one HDF5: lucifer resolves the package
+# The package is a production build of Bmad. Both of Lucifer's configurations are built
+# against it, so in the debug job Lucifer's own code runs with -fbounds-check and Bmad's
+# does not, where the recording machine's debug pass runs both bounds-checked against the
+# distribution's debug tree. The tracker and the reference read one HDF5: lucifer resolves the package
 # environment's through the rpath it was built with, and genesis4 resolves its own, where
 # a shared build reached through LD_LIBRARY_PATH would offer the reference a library it
 # was not linked against. The recording machine keeps those two environments apart for
@@ -46,11 +55,11 @@
 # this job guards the recorded digits will eventually trust it to.
 #
 # What is deliberately not here, so the difference from the local keystone is on the
-# record: the production build and the two-build digit comparison, the examples but the
-# steady-state one, which runs once from the installed tracker, and Bmad's own regression
-# suite, which the package does not carry and Bmad's own CI runs.
-# The device section cannot run on a runner with no Metal device and skips with its
-# reason recorded, the one section allowed to.
+# record: the recorded digits of either build, the examples but the steady-state one,
+# which each job runs once from its installed tracker, and Bmad's own regression suite,
+# which the package does not carry and Bmad's own CI runs. The device section cannot run
+# on a runner with no Metal device and skips with its reason recorded in both jobs, the
+# one section allowed to.
 #
 # `workflow_dispatch` and `schedule` read this file from the repository's default branch,
 # main, rather than from the ref they name, which is GitHub's rule for both. `push` is the
@@ -59,7 +68,7 @@
 # On every push to the branch, and weekly besides. Every commit here is validated before
 # it lands, and the keystone that does it runs on one macOS machine, so a per-push run is
 # what extends that rule to a second platform. The wall clock recorded below is the
-# price, and the concurrency group above bounds it: a second push cancels the first run
+# price, and the concurrency group below bounds it: a second push cancels the first run
 # rather than queueing behind it, so a day of six pushes costs one run and not six. A
 # path filter would be no substitute, since the defects this reaches come from the
 # platform rather than from which file moved.
@@ -85,21 +94,38 @@ concurrency:
 
 jobs:
   validation:
+    name: validation, ${{ matrix.build }} build
     runs-on: ubuntu-latest
-    # Measured on this runner on 2026-10-24, against the conda-forge package: 36.0 minutes
-    # end to end, of which the validation suite is 33.9, the Lucifer build 0.7 and the two
-    # environments 0.9. The run of 2026-10-23 that cloned Bmad and built its debug tree took
-    # 37.5, with 6.4 in that build and 30 in the validation suite. The validation suite
-    # costs four times its local 7.7 minutes because a runner has four cores against the
-    # recording machine's sixteen and its Genesis references are always cold, and its
-    # longest sections are spontaneous at 642 s and the eleven tiers at 320 s.
+    # build names the job and its steps, config is CMake's configuration, dir the build
+    # directory, and flavor what the validation suite's --build takes and its results
+    # file records.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build: debug
+            config: Debug
+            dir: build-debug
+            flavor: debug
+          - build: release
+            config: Release
+            dir: build-release
+            flavor: production
+    # The debug job, measured on this runner on 2026-10-24 against the conda-forge package:
+    # 36.0 minutes end to end, of which the validation suite is 33.9, the Lucifer build 0.7
+    # and the two environments 0.9. The run of 2026-10-23 that cloned Bmad and built its
+    # debug tree took 37.5 minutes, with 6.4 in that build and 30 in the validation suite.
+    # The validation suite costs four times its local 7.7 minutes because a runner has four
+    # cores against the recording machine's sixteen and its Genesis references are always
+    # cold, and its longest sections are spontaneous at 642 s and the eleven tiers at 320 s.
     timeout-minutes: 120
 
     steps:
       # The whole history, so the tags reach git describe and the build carries the
       # version cmake/LuciferVersion.cmake reads from them. A clone of depth one has no
       # tag and the version is the commit alone.
-      - uses: actions/checkout@v6
+      - name: Check out the repository, ${{ matrix.build }} build
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -107,7 +133,7 @@ jobs:
       # nompi variant, the compilers and cmake, each a minimum. The package resolves on the
       # day the job runs, so the release it carries is checked against BMAD_RELEASE below
       # and printed.
-      - name: Install the build environment, conda-forge bmad and the compilers
+      - name: Install the build environment, conda-forge bmad and the compilers, ${{ matrix.build }} build
         uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
@@ -119,7 +145,7 @@ jobs:
 
       # The package's release against the declared minimum, read from the module file the
       # package installs. The check prints both and refuses a package below the minimum.
-      - name: Check the package's release
+      - name: Check the package's release, ${{ matrix.build }} build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
@@ -128,14 +154,14 @@ jobs:
           conda list bmad | grep '^bmad '
           util/bmad_release_check "$CONDA_PREFIX"
 
-      # The two cmake lines of the user guide, in the Debug configuration. The Fortran and
+      # The two cmake lines of the user guide, in this job's configuration. The Fortran and
       # C compilers are named by path, since the compiler packages export nothing on
       # activation and CMake would otherwise take the first gfortran on PATH. HDF5_ROOT pins
       # the library to this environment, since CMake's FindHDF5 otherwise prefers whichever
       # h5fc is first on PATH, and a mismatch across a major version can compile and link.
       # The three binaries the later steps need are listed after the build, so a build
       # that half worked cannot pass.
-      - name: Build the debug configuration against the package
+      - name: Build the ${{ matrix.build }} configuration against the package
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
@@ -146,24 +172,24 @@ jobs:
             [ -x "$f" ] && { export CC="$f"; break; }
           done
           echo "FC=$FC CC=${CC:-unset, so CMake chooses}"
-          cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug \
+          cmake -S . -B ${{ matrix.dir }} -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
                 -DLUCIFER_BMAD_ROOT="$CONDA_PREFIX" -DHDF5_ROOT="$CONDA_PREFIX"
-          cmake --build build-debug --parallel "$(nproc)"
-          ls -l build-debug/bin/lucifer build-debug/bin/lucifer_smoke_test \
-                build-debug/bin/wavefront_drift_test "$CONDA_PREFIX/bin/tao"
+          cmake --build ${{ matrix.dir }} --parallel "$(nproc)"
+          ls -l ${{ matrix.dir }}/bin/lucifer ${{ matrix.dir }}/bin/lucifer_smoke_test \
+                ${{ matrix.dir }}/bin/wavefront_drift_test "$CONDA_PREFIX/bin/tao"
           echo "LUCIFER_BMAD_ROOT=$CONDA_PREFIX" >> "$GITHUB_ENV"
 
       # The install rule. cmake --install places the tracker alone in the prefix's bin/,
       # and the installed tracker prints its version and runs the steady-state example
       # from a directory outside the tree, in an empty environment, so the libraries come
       # from its rpath and nothing else.
-      - name: Install the debug tracker and run steady_state from the prefix
+      - name: Install the ${{ matrix.build }} tracker and run steady_state from the prefix
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate lucifer-build
           set -e
-          cmake --install build-debug --prefix "$RUNNER_TEMP/prefix"
+          cmake --install ${{ matrix.dir }} --prefix "$RUNNER_TEMP/prefix"
           find "$RUNNER_TEMP/prefix" -type f
           mkdir -p "$RUNNER_TEMP/installed/steady_state"
           cp examples/steady_state/lucifer.toml "$RUNNER_TEMP/installed/steady_state/"
@@ -178,9 +204,9 @@ jobs:
       # Which backend this build carries, from lucifer's own banner. This is the line the
       # validation suite reads to decide whether the device section can run, so having it in the
       # log makes the skip below checkable rather than asserted.
-      - name: Print the debug build's device backend
+      - name: Print the ${{ matrix.build }} build's device backend
         shell: bash
-        run: ./build-debug/bin/lucifer || true
+        run: ./${{ matrix.dir }}/bin/lucifer || true
 
       # One environment for the reference and the Python side, from the repository's own
       # file, which pins genesis4 4.6.15. The pin is the whole reason this job is possible:
@@ -188,7 +214,7 @@ jobs:
       # MPI rank, and the validation suite refuses any other version, printing what it found
       # and wanted. It is separate from the build environment for the reason the recording
       # machine keeps them separate, and the validation suite finds it by name.
-      - name: Install genesis4 and the Python package
+      - name: Install genesis4 and the Python package, ${{ matrix.build }} build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
@@ -210,45 +236,49 @@ jobs:
 
       # The validation suite prints the reference version and the electron rest energy it carries,
       # every section's name and wall time, and every tier's level against its tolerance.
-      # Its exit status is zero only if every tier passed. Run from the validate
-      # environment, which is how the recording machine runs it.
-      - name: Validation suite against Genesis4, debug build
+      # Its header names the build --build declares, debug or production. Its exit status
+      # is zero only if every tier passed. Run from the validate environment, which is how
+      # the recording machine runs it.
+      - name: Validation suite against Genesis4, ${{ matrix.build }} build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
           set -e
           ./tests/run_fel_validation.sh \
-              --exe "$PWD/build-debug/bin/lucifer" --build debug \
-              --results "$RUNNER_TEMP/fel-debug.txt" \
-              --work-dir "$RUNNER_TEMP/wd-dbg"
+              --exe "$PWD/${{ matrix.dir }}/bin/lucifer" --build ${{ matrix.flavor }} \
+              --results "$RUNNER_TEMP/fel-${{ matrix.build }}.txt" \
+              --work-dir "$RUNNER_TEMP/wd-${{ matrix.build }}"
 
-      - name: Wavefront validation, debug build
+      # The propagator this job's build compiled, named, since the script's default tries
+      # the debug build first.
+      - name: Wavefront validation, ${{ matrix.build }} build
         shell: bash -o pipefail {0}
         run: |
           source "$CONDA/etc/profile.d/conda.sh"
           conda activate bmad-fel-validate
           set -e
           ./tests/wavefront/run_validation.sh \
-              --work-dir "$RUNNER_TEMP/wd-wf"
+              --exe "$PWD/${{ matrix.dir }}/bin/wavefront_drift_test" \
+              --work-dir "$RUNNER_TEMP/wd-wf-${{ matrix.build }}"
 
       # The results file records what ran, what skipped and why, and each tier's level.
       # It is not what writes the generated table: report_validation.py refuses a file
       # carrying a skip, because that table names every section that ran and this run is
       # one short. The table stays the product of a full local run on both builds.
-      - name: Summarize the validation suite's levels, debug build
+      - name: Summarize the validation suite's levels, ${{ matrix.build }} build
         if: always()
         shell: bash
         run: |
-          if [ -f "$RUNNER_TEMP/fel-debug.txt" ]; then
+          if [ -f "$RUNNER_TEMP/fel-${{ matrix.build }}.txt" ]; then
             {
-              echo '## Lucifer validation suite, Linux debug build'
+              echo '## Lucifer validation suite, Linux ${{ matrix.build }} build'
               echo
               echo 'Levels are this platform'"'"'s own. The recorded digits belong to the'
               echo 'machine that recorded them, and this job asserts the tolerances.'
               echo
               echo '```'
-              cat "$RUNNER_TEMP/fel-debug.txt"
+              cat "$RUNNER_TEMP/fel-${{ matrix.build }}.txt"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi

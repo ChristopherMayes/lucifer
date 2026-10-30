@@ -9,6 +9,16 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-29 Changed: `.github/workflows/lucifer-linux.yml` validates the release build beside the
+  debug build, as one job definition over a matrix of the two, each on its own runner, with
+  `fail-fast` off so neither cancels the other. Each job builds its configuration against the
+  conda-forge `bmad` package with the user guide's two cmake lines, installs the tracker and runs
+  `steady_state` from the prefix, runs the validation suite with its own `--build`, `--results` and
+  `--work-dir`, and runs the wavefront validation on its own build's `wavefront_drift_test`. Every
+  step and the summary heading name the build. The release build is the one the conda-forge package
+  ships, and it was run on Linux by the recipe's `steady_state` test alone. Both jobs assert
+  tolerances, never the recorded digits. The validation suite's header names the build `--build`
+  declares.
 - 2026-10-29 Added: `check_program.py` checks the refusal of a name outside its set for each of the
   eleven keys that take one, with the set the schema carries in the message, and fails when a key gains
   a set without a check here. The length refusal of a string is checked with 61 characters in
