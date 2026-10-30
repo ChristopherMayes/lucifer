@@ -251,7 +251,7 @@ from lucifer.plot import compare
 compare("n1024.stats.h5", "scan2048.stats.h5")
 ```
 
-The two runs are one input at 1024 and 2048 particles per slice, so the figure shows where along the line the loader's difference enters. `lucifer.compare` reads either file into one form, `Curves`, and takes the differences, with numpy and h5py alone. The figures of the [validation page](validation.md#val-tiers-drawn) are Lucifer over Genesis4 for each tier, drawn through this function, with their captions' numbers computed from the arrays the figures draw. From the command line, with the two field dumps for the field row:
+The two runs are one input at 1024 and 2048 particles per slice, so the figure shows where along the line the loader's difference enters. `lucifer.compare` reads either file into one form, `Curves`, and takes the differences, with numpy and h5py alone. The [migration example](generated/examples/migration.md)'s figure is this one, migration on over migration off. The figures of the [validation page](validation.md#val-tiers-drawn) are Lucifer over Genesis4 for each tier, drawn through this function, with their captions' numbers computed from the arrays the figures draw. From the command line, with the two field dumps for the field row:
 
 ```
 python -m lucifer.plot compare run.stats.h5 Aramis.out.h5 --fields run-final.wf.h5 Aramis-final.fld.h5

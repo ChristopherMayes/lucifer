@@ -9,6 +9,12 @@ Development history of Lucifer, newest first. Until 2026-10-21 Lucifer was devel
 the `lucifer-dev` branch of a fork of `bmad-sim/bmad-ecosystem`, which stays as the record
 of that history. The entries before that date describe that branch.
 
+- 2026-10-30 Changed: `examples/migration`'s figure is the run with migration on drawn over the run
+  with it off, through `python -m lucifer.plot compare`, in place of the summary figure of the one run.
+  An example directory names its own figure in `figure.args`, one line of arguments to
+  `python -m lucifer.plot` that `examples/run_examples.sh` runs from the directory, and draws under
+  `--no-figures` too, into its scratch directory, so the plotting path it names runs on every
+  examples job.
 - 2026-10-30 Added: `docs/validation.md` shows each of the eleven tiers as a figure, Lucifer over
   Genesis4 with the difference beneath each curve, and `weight_split` as Lucifer over Lucifer.
   `tests/scripts/report_tier_figures.py` draws them through `lucifer.plot.compare` from a kept work

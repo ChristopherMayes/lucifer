@@ -3,7 +3,8 @@
 #
 # It does two jobs in one pass. It answers whether all the examples still run, printing
 # one line per input file and exiting nonzero if any input file failed. It also writes the figures
-# the generated pages reference, one per example, into docs/generated/examples/.
+# the generated pages reference, one per example, into docs/generated/examples/: the summary
+# figure of the primary input file's run, or the figure a directory's figure.args names.
 #
 # The figures are committed. Building an FEL run at documentation build time would be
 # wrong, and a page whose figure is missing is worse than a page with an old one. Their
@@ -218,11 +219,29 @@ run_dir () {   # <dir> <index>
     k=$((k + 1))
   done
 
-  # Each example gets one figure, from the primary input file's stats file. The out_root is read from
-  # the input file rather than assumed equal to the directory name, because several examples
-  # deliberately differ (chicane writes "chicane", coherent_source writes "coherent").
+  # Each example gets one figure, the summary of the primary input file's stats file. The out_root is
+  # read from the input file rather than assumed equal to the directory name, because several
+  # examples deliberately differ (chicane writes "chicane", coherent_source writes "coherent").
+  # A directory holding figure.args names its own figure instead: the file is one line of
+  # arguments to python -m lucifer.plot, run from the directory, as migration's
+  # "compare migration.stats.h5 no_migrate.stats.h5" draws one run over the other. Such a
+  # figure is drawn even under --no-figures, into the scratch directory at a low resolution,
+  # so the plotting path it names runs on every examples job, as the plotting module itself
+  # does below.
   # It runs in this worker, after this directory's input files, because it reads what they wrote.
-  if [[ $FIGURES -eq 1 ]]; then
+  if [[ -f "$dir/figure.args" ]]; then
+    read -r -a fargs < "$dir/figure.args"
+    if [[ $FIGURES -eq 1 ]]; then
+      figure="$FIG_DIR/$dir.png"; fdpi="$DPI"
+    else
+      figure="$STATE/$dir-figure.png"; fdpi=40
+    fi
+    if ! ( cd "$dir" && "$PYTHON" -m lucifer.plot "${fargs[@]}" --dpi "$fdpi" -o "$figure" ) \
+           > "$dir/plot.log" 2>&1 < /dev/null; then
+      echo "Error: $dir: python -m lucifer.plot ${fargs[*]} failed; see $dir/plot.log" > "$STATE/note.$idx"
+      status=1
+    fi
+  elif [[ $FIGURES -eq 1 ]]; then
     primary="$dir/lucifer.toml"
     [[ -f "$primary" ]] || primary="${inputs[0]}"
     root="$(sed -n 's/.*out_root[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$primary" | head -1)"
